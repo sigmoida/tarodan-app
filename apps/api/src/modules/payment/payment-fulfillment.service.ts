@@ -3,29 +3,23 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import {
+  Prisma,
   PaymentStatus,
-  PaymentHoldStatus,
   OrderStatus,
   ProductStatus,
-  SubscriptionStatus,
   TradeStatus,
   OfferStatus,
 } from "@prisma/client";
-import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
-import {
-  computeRelevanceScore,
-  RELEVANCE_PREMIUM_BONUS,
-} from "../product/helpers/relevance-score";
 import { EventService } from "../events";
-import { InvoiceService } from "../invoice/invoice.service";
-import { ElogoInvoicingService } from "../elogo";
-import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
-import { CommissionLedgerService } from "../commission/commission-ledger.service";
-import { ModuleRef } from "@nestjs/core";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
+import { FulfillmentNotifier } from "./fulfillment-notifier.service";
+import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { EscrowHoldService } from "./escrow-hold.service";
+import { FulfillmentStockService } from "./fulfillment-stock.service";
+import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -73,19 +67,70 @@ export class PaymentFulfillmentService {
     return { columns, metaPatch };
   }
 
+  /**
+   * Faz 8.3: Ödemeyi CAS ile `pending → completed` claim eder — tekil / grup / takas
+   * ortak boilerplate'i (audit trail + provider verisi + FLOW-M5 oid senkronu). CAS
+   * guard'ı (`status: pending`) mükerrer başarı callback'ini idempotent kılar.
+   * @returns bu çağrı ödemeyi tamamladı mı (count > 0; false → zaten completed).
+   */
+  private async claimPaymentCompleted(
+    tx: Prisma.TransactionClient,
+    payment: any,
+    opts: {
+      transactionId?: string;
+      capturedMerchantOid?: string;
+      providerData?: ProviderPaymentData;
+    },
+  ): Promise<boolean> {
+    const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat(
+      {
+        action: "payment.completed",
+        timestamp: new Date().toISOString(),
+        oldStatus: payment.status,
+        newStatus: PaymentStatus.completed,
+        transactionId: opts.transactionId || payment.providerPaymentId,
+      },
+    );
+    const { columns: providerColumns, metaPatch } = this.buildProviderPatch(
+      opts.providerData,
+    );
+    const claimed = await tx.payment.updateMany({
+      where: { id: payment.id, status: PaymentStatus.pending },
+      data: {
+        status: PaymentStatus.completed,
+        paidAt: new Date(),
+        providerPaymentId: opts.transactionId || payment.providerPaymentId,
+        // FLOW-M5: çekilen oid'e senkronla (yoksa mevcut değeri koru) → iade
+        // providerConversationId üzerinden doğru oid'i çağırır.
+        ...(opts.capturedMerchantOid
+          ? { providerConversationId: opts.capturedMerchantOid }
+          : {}),
+        // Gözlemlenebilirlik: PayTR'nin bildirdiği gerçek taksit/currency (varsa).
+        ...providerColumns,
+        metadata: {
+          ...((payment.metadata as any) || {}),
+          auditHistory,
+          ...(metaPatch || {}),
+        } as object,
+      },
+    });
+    return claimed.count > 0;
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
-    private readonly invoiceService: InvoiceService,
-    private readonly elogoInvoicing: ElogoInvoicingService,
-    private readonly productLockService: ProductLockService,
+    private readonly fulfillmentNotifier: FulfillmentNotifier,
+    private readonly virtualOrder: VirtualOrderFulfillmentService,
+    private readonly stock: FulfillmentStockService,
     private readonly notificationService: NotificationService,
-    private readonly commissionLedger: CommissionLedgerService,
-    private readonly moduleRef: ModuleRef,
+    private readonly escrowHold: EscrowHoldService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentRefund: PaymentRefundService,
+    // Faz 8.2: yakalama/order.paid/kargo sonlandırması (ledger dahil) FulfillmentFinalizer'da.
+    private readonly fulfillmentFinalizer: FulfillmentFinalizer,
   ) {}
 
   /**
@@ -141,47 +186,12 @@ export class PaymentFulfillmentService {
     let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const oldStatus = payment.status;
-
-      const auditHistory = (
-        (payment.metadata as any)?.auditHistory || []
-      ).concat({
-        action: "payment.completed",
-        timestamp: new Date().toISOString(),
-        oldStatus,
-        newStatus: PaymentStatus.completed,
-        transactionId: transactionId || payment.providerPaymentId,
+      const claimed = await this.claimPaymentCompleted(tx, payment, {
+        transactionId,
+        capturedMerchantOid,
+        providerData,
       });
-
-      const { columns: providerColumns, metaPatch } =
-        this.buildProviderPatch(providerData);
-      const newMetadata = {
-        ...((payment.metadata as any) || {}),
-        auditHistory,
-        ...(metaPatch || {}),
-      };
-
-      const claimed = await tx.payment.updateMany({
-        where: {
-          id: payment.id,
-          status: PaymentStatus.pending,
-        },
-        data: {
-          status: PaymentStatus.completed,
-          paidAt: new Date(),
-          providerPaymentId: transactionId || payment.providerPaymentId,
-          // FLOW-M5: çekilen oid'e senkronla (yoksa mevcut değeri koru) → iade
-          // providerConversationId üzerinden doğru oid'i çağırır.
-          ...(capturedMerchantOid
-            ? { providerConversationId: capturedMerchantOid }
-            : {}),
-          // Gözlemlenebilirlik: PayTR'nin bildirdiği gerçek taksit/currency (varsa).
-          ...providerColumns,
-          metadata: newMetadata as object,
-        },
-      });
-
-      if (claimed.count === 0) {
+      if (!claimed) {
         return null;
       }
 
@@ -229,247 +239,29 @@ export class PaymentFulfillmentService {
       const productIdsToInvalidate: string[] = [];
 
       if (isMembershipOrder) {
-        // Activate membership for the buyer
-        const membership = await tx.userMembership.findUnique({
-          where: { userId: payment.order.buyerId },
-          include: { tier: true },
-        });
-
-        if (membership) {
-          await tx.userMembership.update({
-            where: { userId: payment.order.buyerId },
-            data: {
-              status: SubscriptionStatus.active,
-              cancelledAt: null,
-            },
-          });
-
-          // Premium (free olmayan) üyelik aktifleşti: satıcının boost'suz aktif ilanlarını
-          // premium kademesine (rankTier=1) yükselt. Boost'lu (2) ürünlere dokunma.
-          if (membership.tier.type !== "free") {
-            await tx.product.updateMany({
-              where: {
-                sellerId: payment.order.buyerId,
-                status: ProductStatus.active,
-                rankTier: 0,
-              },
-              // rankTier 0→1; relevanceScore'a premium bonusu ekle (kademe 0→1 farkı)
-              data: {
-                rankTier: 1,
-                relevanceScore: { increment: RELEVANCE_PREMIUM_BONUS },
-              },
-            });
-          }
-
-          // Update membership payment record
-          await tx.membershipPayment.updateMany({
-            where: {
-              membershipId: membership.id,
-              status: "pending",
-            },
-            data: {
-              status: "completed",
-              providerPaymentId: transactionId || payment.providerPaymentId,
-            },
-          });
-
-          this.logger.log(
-            `Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`,
-          );
-        }
-
-        // Üyelik sanal hizmettir: kargo/teslimat akışına girmesin → terminal "completed".
-        // (Paylaşılan kod yukarıda preparing yapmıştı; boost ile aynı override.)
-        await tx.order.update({
-          where: { id: payment.orderId },
-          data: { status: OrderStatus.completed, preparingDeadline: null },
-        });
-
-        // Yetim sipariş temizliği: kullanıcı birden çok kez "Ödemeyi tamamla"ya
-        // basıp yarım bıraktıysa, aynı sanal üründen başka pending_payment
-        // siparişler kalmış olabilir. Üyelik artık aktif → onları iptal et ki
-        // sarı "ödemeyi tamamla" uyarısı / yetim ödeme kayıtları kalmasın.
-        const siblingPendings = await tx.order.findMany({
-          where: {
-            buyerId: payment.order.buyerId,
-            productId: payment.order.productId,
-            status: OrderStatus.pending_payment,
-            id: { not: payment.orderId },
-          },
-          select: { id: true },
-        });
-        if (siblingPendings.length > 0) {
-          const ids = siblingPendings.map((o) => o.id);
-          await tx.order.updateMany({
-            where: { id: { in: ids } },
-            data: { status: OrderStatus.cancelled },
-          });
-          await tx.payment.updateMany({
-            where: { orderId: { in: ids }, status: PaymentStatus.pending },
-            data: {
-              status: PaymentStatus.failed,
-              failureReason: "Üyelik başka ödeme ile tamamlandı",
-            },
-          });
-          this.logger.log(
-            `Cancelled ${ids.length} sibling pending membership orders for user ${payment.order.buyerId}`,
-          );
-        }
+        // Faz 8.2: sanal (üyelik) aktivasyonu → VirtualOrderFulfillmentService.
+        await this.virtualOrder.applyMembershipInTx(tx, payment, transactionId);
       } else if (isBoostOrder) {
-        // Boost siparişi: ilgili ProductBoost'u aktive et, ürünü sponsorlu kademesine (rankTier=2) al.
-        // Stok/quantity'ye DOKUNULMAZ — boost sanal bir hizmet, fiziksel ürün değil.
-        const boost = await tx.productBoost.findUnique({
-          where: { orderId: payment.orderId },
-        });
-        if (boost) {
-          const nowTs = new Date();
-          // Stacking: ilanda hâlâ aktif bir boost varsa, yeni süre kalan sürenin ÜSTÜNE eklenir.
-          // (örn. kalan 15 gün + yeni 30 gün = toplam 45 gün)
-          const boostedProduct = await tx.product.findUnique({
-            where: { id: boost.productId },
-            select: {
-              boostedUntil: true,
-              qualityScore: true,
-              popularityScore: true,
-            },
-          });
-          const base =
-            boostedProduct?.boostedUntil && boostedProduct.boostedUntil > nowTs
-              ? boostedProduct.boostedUntil
-              : nowTs;
-          const startsAt = nowTs;
-          const endsAt = new Date(
-            base.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
-          );
-          await tx.productBoost.update({
-            where: { id: boost.id },
-            data: { status: "active", startsAt, endsAt },
-          });
-          await tx.product.update({
-            where: { id: boost.productId },
-            data: {
-              boostedUntil: endsAt,
-              rankTier: 2,
-              relevanceScore: computeRelevanceScore({
-                rankTier: 2,
-                qualityScore: boostedProduct?.qualityScore ?? 0,
-                popularityScore: boostedProduct?.popularityScore,
-              }),
-            },
-          });
-          // Boost sanal hizmettir: sipariş kargo/teslimat akışına girmesin → terminal "completed".
-          // (Paylaşılan kod yukarıda preparing yapmıştı; burada override ediyoruz.)
-          await tx.order.update({
-            where: { id: payment.orderId },
-            data: { status: OrderStatus.completed, preparingDeadline: null },
-          });
-          productIdsToInvalidate.push(boost.productId);
-          this.logger.log(
-            `Boost activated for product ${boost.productId} until ${endsAt.toISOString()} after payment ${payment.id}`,
-          );
-        } else {
-          this.logger.warn(
-            `Boost order ${payment.orderId} paid but no matching ProductBoost found`,
-          );
-        }
-      } else {
-        // Regular product order: ödeme başarılı → quantity--, reservedQuantity--
-        productIdsToInvalidate.push(payment.order.productId);
-        // Bulgu E: ürün satırını FOR UPDATE ile kilitle. Rezervasyon normalde 1-stoklu
-        // üründe ikinci ödemeyi engeller, ama reservedQuantity drift'i olursa iki eşzamanlı
-        // ödeme quantity'yi negatife itebilir. Kilit + clamp'li mutlak set bunu kapatır.
-        await tx.$queryRaw`SELECT id FROM products WHERE id = ${payment.order.productId} FOR UPDATE`;
-        const product = await tx.product.findUnique({
-          where: { id: payment.order.productId },
-        });
-
-        if (!product) {
-          throw new Error("Product not found");
-        }
-
-        const orderQty = payment.order?.quantity ?? 1;
-        const newQuantity =
-          product.quantity !== null
-            ? Math.max(0, product.quantity - orderQty)
-            : null;
-        const updateData: any = {
-          status: getProductStatusFromQuantity(newQuantity),
-          reservedQuantity: safeDecrementReserved(
-            product.reservedQuantity,
-            orderQty,
-          ),
-        };
-        if (product.quantity !== null) {
-          // Clamp'li mutlak set (FOR UPDATE kilidi altında yarışsız); { decrement } yerine
-          // GREATEST(quantity-orderQty, 0) eşdeğeri — negatif stok imkânsız.
-          updateData.quantity = newQuantity;
-        }
-
-        await tx.product.update({
-          where: { id: payment.order.productId },
-          data: updateData,
-        });
-
-        // Stockout cascade: only when PHYSICAL stock is actually drained
-        // (quantity <= 0), cancel other open offers/orders for the same product
-        // within the same transaction so no other buyer can complete a payment
-        // that would push stock negative. The order matters: invalidate pending
-        // orders FIRST (so their linked offers chain-cancel atomically), then
-        // sweep any remaining standalone offers. Both helpers are idempotent
-        // w.r.t. already-terminal rows, and the order helper now safely clamps
-        // the reservedQuantity decrement.
-        //
-        // NOTE: we intentionally gate on physical `quantity`, NOT on
-        // `quantity - reservedQuantity`. reservedQuantity still includes OTHER
-        // buyers' legitimate pending_payment orders, each of which has a real
-        // physical unit waiting for it. Gating on available-for-new-buyers (q-r)
-        // would wrongly cancel those valid orders whenever stock > 1 and
-        // multiple buyers checked out concurrently (e.g. 2 stock + 2 buyers:
-        // after the first payment q=1,r=1 → available=0 → the still-valid second
-        // order gets cancelled and auto-refunded even though a unit remained).
-        const refreshed = await tx.product.findUnique({
-          where: { id: payment.order.productId },
-          select: { quantity: true, reservedQuantity: true, categoryId: true },
-        });
-        if (
-          refreshed &&
-          refreshed.quantity !== null &&
-          refreshed.quantity <= 0
-        ) {
-          stockoutCategoryId = refreshed.categoryId ?? null;
-          const orderResult =
-            await this.productLockService.invalidatePendingOrdersForProduct(
-              tx,
-              payment.order.productId,
-              "Stok tükendi",
-            );
-          const offerResult =
-            await this.productLockService.invalidateRelatedOffers(
-              tx,
-              payment.order.productId,
-            );
-          cancelledOrders.push(
-            ...orderResult.cancelledOrders.map((o) => ({
-              orderId: o.orderId,
-              buyerId: o.buyerId,
-              productId: o.productId,
-              productTitle: o.productTitle,
-              offerId: o.offerId,
-              hadPayment: o.hadPayment,
-            })),
-          );
-          cancelledOffers.push(
-            ...offerResult.rejectedOffers.map((o) => ({
-              buyerId: o.buyerId,
-              productId: o.productId,
-              productTitle: o.productTitle,
-            })),
-          );
-        }
-
-        this.logger.log(
-          `Product ${payment.order.productId} stock updated: quantity=${newQuantity}, reserved=${updateData.reservedQuantity}`,
+        // Faz 8.2: sanal (boost) aktivasyonu → VirtualOrderFulfillmentService.
+        const boostProductId = await this.virtualOrder.applyBoostInTx(
+          tx,
+          payment,
         );
+        if (boostProductId) productIdsToInvalidate.push(boostProductId);
+      } else {
+        // Regular product order: stok düşümü + stockout kaskadı → FulfillmentStockService
+        // (FOR UPDATE + clamp'li düşüm + fiziksel-quantity-gate kaskad; tekil/grup ortak).
+        productIdsToInvalidate.push(payment.order.productId);
+        const stockout = await this.stock.decrementForOrder(
+          tx,
+          payment.order.productId,
+          payment.order?.quantity ?? 1,
+        );
+        cancelledOrders.push(...stockout.cancelledOrders);
+        cancelledOffers.push(...stockout.cancelledOffers);
+        if (stockout.stockoutCategoryId !== undefined) {
+          stockoutCategoryId = stockout.stockoutCategoryId;
+        }
       }
 
       // Get full order details for event emission
@@ -488,36 +280,8 @@ export class PaymentFulfillmentService {
 
       // Only create payment hold for regular product orders (not membership/boost orders)
       if (!isMembershipOrder && !isBoostOrder) {
-        // Calculate seller payout (amount - commission - stopaj).
-        // Stopaj (GVK 94/19) yalnız kurumsal satıcı siparişlerinde > 0'dır; platform
-        // muhtasar ile beyan eder, satıcı kendi beyannamesinde mahsup eder.
-        const sellerAmount =
-          Number(order.totalAmount) -
-          Number(order.commissionAmount) -
-          Number(order.withholdingTaxAmount ?? 0);
-
-        // Create payment hold for seller (escrow). releaseAt ödeme anında SET
-        // EDİLMEZ; teslimde (shipping.worker delivered) deliveredAt + return + grace
-        // olarak hesaplanır. Teslim olmadan asla serbest bırakılmaz (releaseAt null).
-        await tx.paymentHold.create({
-          data: {
-            paymentId: payment.id,
-            orderId: payment.orderId,
-            sellerId: order.sellerId,
-            amount: sellerAmount,
-            status: PaymentHoldStatus.held,
-            releaseAt: null,
-          },
-        });
-
-        // CommissionLedger satırı — pending (Faz 3A.2). Spec Bölüm 5.1.
-        await this.commissionLedger.upsertPending({
-          orderId: payment.orderId,
-          sellerCommission: order.sellerFeeAmount,
-          buyerFee: order.buyerFeeAmount,
-          tx,
-        });
-
+        // Faz 8.2: escrow hold + pending komisyon → EscrowHoldService (tekil/grup ortak).
+        await this.escrowHold.createHold(tx, order, payment.id);
         this.logger.log(
           `Payment ${payment.id} completed, hold created for seller ${order.sellerId}`,
         );
@@ -570,55 +334,11 @@ export class PaymentFulfillmentService {
     // rather than the misleading "Siparişiniz iptal edildi". Direct-buy orders
     // (no offer) and orders whose payment was already initiated keep the
     // order-cancelled message.
-    const notifiedBuyers = new Set<string>();
-    for (const o of cancelledOrders) {
-      if (notifiedBuyers.has(o.buyerId)) continue;
-      notifiedBuyers.add(o.buyerId);
-      const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
-      const notify = isUnpaidOffer
-        ? this.notificationService.notifyOfferCancelledOutOfStock(
-            o.buyerId,
-            o.productId,
-            o.productTitle,
-            stockoutCategoryId,
-          )
-        : this.notificationService.notifyOrderCancelledOutOfStock(
-            o.buyerId,
-            o.productId,
-            o.productTitle,
-            stockoutCategoryId,
-          );
-      await notify.catch((err) =>
-        this.logger.warn(
-          `stockout-notify (${isUnpaidOffer ? "offer" : "order"}) failed for ${o.buyerId}: ${err.message}`,
-        ),
-      );
-    }
-    // Sipariş iptali e-postaları (alıcı+satıcı) — sipariş bazlı; teklif
-    // iptallerini (isUnpaidOffer) ve mükerrer order'ları atla.
-    const emailedCancelledOrders = new Set<string>();
-    for (const o of cancelledOrders) {
-      if (o.offerId !== null && !o.hadPayment) continue;
-      if (emailedCancelledOrders.has(o.orderId)) continue;
-      emailedCancelledOrders.add(o.orderId);
-      await this.notificationService.sendOrderCancelledEmails(o.orderId);
-    }
-    for (const o of cancelledOffers) {
-      if (notifiedBuyers.has(o.buyerId)) continue;
-      notifiedBuyers.add(o.buyerId);
-      await this.notificationService
-        .notifyOfferCancelledOutOfStock(
-          o.buyerId,
-          o.productId,
-          o.productTitle,
-          stockoutCategoryId,
-        )
-        .catch((err) =>
-          this.logger.warn(
-            `stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`,
-          ),
-        );
-    }
+    await this.fulfillmentNotifier.notifyStockoutCascade({
+      cancelledOrders,
+      cancelledOffers,
+      stockoutCategoryId,
+    });
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership/boost)
     // This publishes jobs to email, push, and shipping queues
@@ -634,127 +354,28 @@ export class PaymentFulfillmentService {
       await this.cache.delPattern("products:list:*").catch(() => {});
     }
 
+    // Faz 8.1: fiziksel siparişin POST-COMMIT sonlandırması (ledger capture + order.paid
+    // + Sürat gönderi kaydı) artık EVENT ile istenir (OrderFulfillmentListener tüketir) →
+    // ödeme servisi FulfillmentFinalizer'a doğrudan bağlı değil (DIP); tekil/grup ortak seam.
     if (!isMembershipOrder && !isBoostOrder) {
-      try {
-        const shippingAddressData = resultOrder.shippingAddress as any;
-
-        // Check if this is a guest order and get actual buyer info
-        const isGuestOrder =
-          resultOrder.buyer.email === "guest@tarodan.system" ||
-          shippingAddressData?.isGuestOrder;
-        const actualBuyerEmail = isGuestOrder
-          ? shippingAddressData?.guestEmail ||
-            shippingAddressData?.email ||
-            resultOrder.buyer.email
-          : resultOrder.buyer.email;
-        const actualBuyerName = isGuestOrder
-          ? shippingAddressData?.guestName ||
-            shippingAddressData?.fullName ||
-            "Misafir Müşteri"
-          : resultOrder.buyer.displayName || resultOrder.buyer.email;
-
-        this.logger.log(
-          `Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`,
-        );
-
-        await this.eventService.emitOrderPaid({
-          orderId: resultOrder.id,
-          orderNumber: resultOrder.orderNumber,
-          buyerId: resultOrder.buyerId,
-          sellerId: resultOrder.sellerId,
-          productId: resultOrder.productId,
-          productTitle: resultOrder.product.title,
-          totalAmount: Number(resultOrder.totalAmount),
-          commissionAmount: Number(resultOrder.commissionAmount),
-          buyerEmail: actualBuyerEmail,
-          buyerName: actualBuyerName,
-          sellerEmail: resultOrder.seller.email,
-          sellerName:
-            resultOrder.seller.displayName || resultOrder.seller.email,
-          paymentMethod: payment.provider,
-          transactionId:
-            transactionId || payment.providerPaymentId || payment.id,
-          shippingAddress: {
-            fullName: shippingAddressData?.fullName || "",
-            phone: shippingAddressData?.phone || "",
-            address: shippingAddressData?.address || "",
-            city: shippingAddressData?.city || "",
-            district: shippingAddressData?.district || "",
-            zipCode: shippingAddressData?.zipCode || "",
-          },
-          isGuestOrder,
-          buyerSystemEmail: resultOrder.buyer.email || "",
-        });
-
-        this.logger.log(
-          `order.paid event emitted for order ${resultOrder.orderNumber}`,
-        );
-      } catch (error) {
-        // Log but don't fail - payment was already successful
-        this.logger.error(`Failed to emit order.paid event: ${error}`);
-      }
+      await this.eventService.emitOrderFulfillmentRequested({
+        order: resultOrder,
+        payment,
+        transactionId,
+      });
     }
 
-    // Generate and send invoice to buyer (only for regular product orders, not membership/boost)
-    if (!isMembershipOrder && !isBoostOrder) {
-      try {
-        // ESKİ PDFKit makbuzu KALDIRILDI — Tarodan artık eLogo e-Arşiv kesiyor (sipariş
-        // tamamlanınca komisyon/hizmet/platform-satış). Ödeme anında eski makbuz gönderilmez.
-        // await this.invoiceService.generateAndSendInvoice(resultOrder.id);
-      } catch (error) {
-        // Log but don't fail - payment was already successful
-        this.logger.error(
-          `Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`,
-        );
-      }
-    }
-
-    // Tarodan gelir e-Arşivi: üyelik → üyeye, boost → satıcıya (sanal hizmet, ödeme anında).
-    // Fire-and-forget, idempotent, retry cron'lu — ödemeyi BLOKLAMAZ.
+    // Tarodan gelir e-Arşivi (sanal hizmet): üyelik → üyeye, boost → satıcıya.
+    // POST-COMMIT fire-and-forget, idempotent, retry cron'lu → VirtualOrderFulfillmentService.
     if (isMembershipOrder) {
-      void (async () => {
-        const mp = await this.prisma.membershipPayment.findFirst({
-          where: {
-            providerPaymentId:
-              transactionId || payment.providerPaymentId || undefined,
-          },
-          orderBy: { createdAt: "desc" },
-          select: { id: true },
-        });
-        // membershipPayment kaydı varsa ondan; YOKSA (mevcut akış MEM- order + tier upgrade
-        // yapıyor, ayrı membershipPayment üretmiyor) MEM- SİPARİŞTEN kes.
-        if (mp) await this.elogoInvoicing.issueMembershipInvoice(mp.id);
-        else
-          await this.elogoInvoicing.issueMembershipInvoiceForOrder(
-            resultOrder.id,
-          );
-      })().catch((e) =>
-        this.logger.warn(`eLogo üyelik faturası tetik hatası: ${e?.message}`),
+      this.virtualOrder.issueMembershipInvoice(
+        payment,
+        resultOrder.id,
+        transactionId,
       );
     }
     if (isBoostOrder) {
-      void (async () => {
-        const boost = await this.prisma.productBoost.findUnique({
-          where: { orderId: resultOrder.id },
-          select: { id: true },
-        });
-        if (boost) await this.elogoInvoicing.issueBoostInvoice(boost.id);
-      })().catch((e) =>
-        this.logger.warn(`eLogo boost faturası tetik hatası: ${e?.message}`),
-      );
-    }
-
-    // Auto-create Shipment record (Sürat Kargo gönderi kaydı oluşturuldu at order creation)
-    // Membership/boost sanal sipariştir → kargo kaydı oluşturma.
-    // Ortak yol (create + H4 cancelled-revive + gerçek kod): PaymentCommonService.
-    if (!isMembershipOrder && !isBoostOrder) {
-      try {
-        await this.paymentCommon.ensureSuratShipmentForOrder(resultOrder.id);
-      } catch (error) {
-        this.logger.error(
-          `Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`,
-        );
-      }
+      this.virtualOrder.issueBoostInvoice(resultOrder.id);
     }
 
     return true;
@@ -790,38 +411,12 @@ export class PaymentFulfillmentService {
 
     const result = await this.prisma.$transaction(
       async (tx) => {
-        const oldStatus = payment.status;
-        const auditHistory = (
-          (payment.metadata as any)?.auditHistory || []
-        ).concat({
-          action: "payment.completed",
-          timestamp: new Date().toISOString(),
-          oldStatus,
-          newStatus: PaymentStatus.completed,
-          transactionId: transactionId || payment.providerPaymentId,
+        const claimed = await this.claimPaymentCompleted(tx, payment, {
+          transactionId,
+          capturedMerchantOid,
+          providerData,
         });
-
-        const { columns: providerColumns, metaPatch } =
-          this.buildProviderPatch(providerData);
-        const claimed = await tx.payment.updateMany({
-          where: { id: payment.id, status: PaymentStatus.pending },
-          data: {
-            status: PaymentStatus.completed,
-            paidAt: new Date(),
-            providerPaymentId: transactionId || payment.providerPaymentId,
-            // FLOW-M5: çekilen oid'e senkronla (iade doğru oid'i kullansın).
-            ...(capturedMerchantOid
-              ? { providerConversationId: capturedMerchantOid }
-              : {}),
-            ...providerColumns,
-            metadata: {
-              ...((payment.metadata as any) || {}),
-              auditHistory,
-              ...(metaPatch || {}),
-            } as object,
-          },
-        });
-        if (claimed.count === 0) {
+        if (!claimed) {
           return null;
         }
 
@@ -859,115 +454,22 @@ export class PaymentFulfillmentService {
 
         const productIdsToInvalidate: string[] = [];
 
-        // 2. geçiş: ürün başına stok düşümü + stockout kaskadı + hold + ledger
+        // 2. geçiş: ürün başına stok düşümü + stockout kaskadı + hold (tekil yolla ortak servisler)
         for (const order of aliveOrders) {
           productIdsToInvalidate.push(order.productId);
-          // Bulgu E: ürün satırını FOR UPDATE ile kilitle (regular path ile aynı savunma).
-          await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
-          const product = await tx.product.findUnique({
-            where: { id: order.productId },
-          });
-          if (!product) {
-            throw new Error(`Product not found for group order ${order.id}`);
-          }
-
-          // Adet bazlı stok düşümü: sipariş adedi kadar quantity-- ve reserved--.
-          const orderQty = order.quantity ?? 1;
-          const newQuantity =
-            product.quantity !== null
-              ? Math.max(0, product.quantity - orderQty)
-              : null;
-          const updateData: any = {
-            status: getProductStatusFromQuantity(newQuantity),
-            reservedQuantity: safeDecrementReserved(
-              product.reservedQuantity,
-              orderQty,
-            ),
-          };
-          if (product.quantity !== null) {
-            // Clamp'li mutlak set (FOR UPDATE altında yarışsız) — negatif stok imkânsız.
-            updateData.quantity = newQuantity;
-          }
-          await tx.product.update({
-            where: { id: order.productId },
-            data: updateData,
-          });
-
-          const refreshed = await tx.product.findUnique({
-            where: { id: order.productId },
-            select: {
-              quantity: true,
-              reservedQuantity: true,
-              categoryId: true,
-            },
-          });
-          // Gate on PHYSICAL stock (quantity <= 0), not available-for-new-buyers
-          // (quantity - reservedQuantity). reservedQuantity still includes other
-          // buyers' valid pending_payment orders, each with a real unit waiting;
-          // gating on (q-r) would wrongly cancel + auto-refund them whenever
-          // stock > 1 and buyers checked out concurrently. See the direct-buy
-          // branch above for the detailed 2-stock/2-buyer walkthrough.
-          if (
-            refreshed &&
-            refreshed.quantity !== null &&
-            refreshed.quantity <= 0
-          ) {
-            stockoutCategoryId = refreshed.categoryId ?? null;
-            const orderResult =
-              await this.productLockService.invalidatePendingOrdersForProduct(
-                tx,
-                order.productId,
-                "Stok tükendi",
-              );
-            const offerResult =
-              await this.productLockService.invalidateRelatedOffers(
-                tx,
-                order.productId,
-              );
-            cancelledOrders.push(
-              ...orderResult.cancelledOrders.map((o) => ({
-                orderId: o.orderId,
-                buyerId: o.buyerId,
-                productId: o.productId,
-                productTitle: o.productTitle,
-                offerId: o.offerId,
-                hadPayment: o.hadPayment,
-              })),
-            );
-            cancelledOffers.push(
-              ...offerResult.rejectedOffers.map((o) => ({
-                buyerId: o.buyerId,
-                productId: o.productId,
-                productTitle: o.productTitle,
-              })),
-            );
-          }
-
-          // Satıcı başına escrow hold (tek payment'a sipariş başına bir hold).
-          // releaseAt teslimde hesaplanır (deliveredAt + return + grace); ödeme
-          // anında null → teslim olmadan asla serbest bırakılmaz.
-          // Stopaj (kurumsal satıcı) da hold'dan düşülür — payout'a hiç girmez.
-          const sellerAmount =
-            Number(order.totalAmount) -
-            Number(order.commissionAmount) -
-            Number(order.withholdingTaxAmount ?? 0);
-          await tx.paymentHold.create({
-            data: {
-              paymentId: payment.id,
-              orderId: order.id,
-              sellerId: order.sellerId,
-              amount: sellerAmount,
-              status: PaymentHoldStatus.held,
-              releaseAt: null,
-            },
-          });
-
-          await this.commissionLedger.upsertPending({
-            orderId: order.id,
-            sellerCommission: order.sellerFeeAmount,
-            buyerFee: order.buyerFeeAmount,
+          const stockout = await this.stock.decrementForOrder(
             tx,
-          });
+            order.productId,
+            order.quantity ?? 1,
+          );
+          cancelledOrders.push(...stockout.cancelledOrders);
+          cancelledOffers.push(...stockout.cancelledOffers);
+          if (stockout.stockoutCategoryId !== undefined) {
+            stockoutCategoryId = stockout.stockoutCategoryId;
+          }
+
+          // Satıcı başına escrow hold + pending komisyon → EscrowHoldService.
+          await this.escrowHold.createHold(tx, order, payment.id);
         }
 
         return { aliveOrders, refundOrders, productIdsToInvalidate };
@@ -1007,56 +509,12 @@ export class PaymentFulfillmentService {
     }
     await this.cache.delPattern("products:list:*").catch(() => {});
 
-    // Stockout kaskad bildirimleri (tx sonrası; tek bildirimle alıcı başına)
-    const notifiedBuyers = new Set<string>();
-    for (const o of cancelledOrders) {
-      if (notifiedBuyers.has(o.buyerId)) continue;
-      notifiedBuyers.add(o.buyerId);
-      const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
-      const notify = isUnpaidOffer
-        ? this.notificationService.notifyOfferCancelledOutOfStock(
-            o.buyerId,
-            o.productId,
-            o.productTitle,
-            stockoutCategoryId,
-          )
-        : this.notificationService.notifyOrderCancelledOutOfStock(
-            o.buyerId,
-            o.productId,
-            o.productTitle,
-            stockoutCategoryId,
-          );
-      await notify.catch((err) =>
-        this.logger.warn(
-          `stockout-notify failed for ${o.buyerId}: ${err.message}`,
-        ),
-      );
-    }
-    // Sipariş iptali e-postaları (alıcı+satıcı) — sipariş bazlı; teklif
-    // iptallerini (isUnpaidOffer) ve mükerrer order'ları atla.
-    const emailedCancelledOrders = new Set<string>();
-    for (const o of cancelledOrders) {
-      if (o.offerId !== null && !o.hadPayment) continue;
-      if (emailedCancelledOrders.has(o.orderId)) continue;
-      emailedCancelledOrders.add(o.orderId);
-      await this.notificationService.sendOrderCancelledEmails(o.orderId);
-    }
-    for (const o of cancelledOffers) {
-      if (notifiedBuyers.has(o.buyerId)) continue;
-      notifiedBuyers.add(o.buyerId);
-      await this.notificationService
-        .notifyOfferCancelledOutOfStock(
-          o.buyerId,
-          o.productId,
-          o.productTitle,
-          stockoutCategoryId,
-        )
-        .catch((err) =>
-          this.logger.warn(
-            `stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`,
-          ),
-        );
-    }
+    // Stockout kaskad bildirimleri (tx sonrası; tekil yolla ortak — FulfillmentNotifier).
+    await this.fulfillmentNotifier.notifyStockoutCascade({
+      cancelledOrders,
+      cancelledOffers,
+      stockoutCategoryId,
+    });
 
     // ALICI tarafı: çoklu-ürün (sepet) ödemesinde CheckoutGroup başına TEK onay
     // maili + TEK push. Sipariş başına emitOrderPaid (skipBuyer:true) yalnız satıcı
@@ -1116,69 +574,15 @@ export class PaymentFulfillmentService {
 
     // Sipariş başına: order.paid eventi (SATICI tarafı; alıcı atlanır), fatura, kargo kaydı
     for (const resultOrder of result.aliveOrders) {
-      try {
-        const shippingAddressData = resultOrder.shippingAddress as any;
-        const isGuestOrder =
-          resultOrder.buyer.email === "guest@tarodan.system" ||
-          shippingAddressData?.isGuestOrder;
-        const actualBuyerEmail = isGuestOrder
-          ? shippingAddressData?.guestEmail ||
-            shippingAddressData?.email ||
-            resultOrder.buyer.email
-          : resultOrder.buyer.email;
-        const actualBuyerName = isGuestOrder
-          ? shippingAddressData?.guestName ||
-            shippingAddressData?.fullName ||
-            "Misafir Müşteri"
-          : resultOrder.buyer.displayName || resultOrder.buyer.email;
-
-        await this.eventService.emitOrderPaid({
-          orderId: resultOrder.id,
-          orderNumber: resultOrder.orderNumber,
-          buyerId: resultOrder.buyerId,
-          sellerId: resultOrder.sellerId,
-          productId: resultOrder.productId,
-          productTitle: resultOrder.product.title,
-          totalAmount: Number(resultOrder.totalAmount),
-          commissionAmount: Number(resultOrder.commissionAmount),
-          buyerEmail: actualBuyerEmail,
-          buyerName: actualBuyerName,
-          sellerEmail: resultOrder.seller.email,
-          sellerName:
-            resultOrder.seller.displayName || resultOrder.seller.email,
-          paymentMethod: payment.provider,
-          transactionId:
-            transactionId || payment.providerPaymentId || payment.id,
-          shippingAddress: {
-            fullName: shippingAddressData?.fullName || "",
-            phone: shippingAddressData?.phone || "",
-            address: shippingAddressData?.address || "",
-            city: shippingAddressData?.city || "",
-            district: shippingAddressData?.district || "",
-            zipCode: shippingAddressData?.zipCode || "",
-          },
-          isGuestOrder,
-          buyerSystemEmail: resultOrder.buyer.email || "",
-          // Sepet akışı: alıcı onayı grup başına tek kez gönderildi → burada atla.
-          skipBuyer: true,
-        });
-      } catch (error) {
-        this.logger.error(
-          `Failed to emit order.paid event for group order ${resultOrder.id}: ${error}`,
-        );
-      }
-
-      // ESKİ PDFKit makbuzu KALDIRILDI (grup akışı) — yasal değil; eLogo e-Arşiv tek belge.
-      // await this.invoiceService.generateAndSendInvoice(resultOrder.id);
-
-      // Ortak yol (create + H4 cancelled-revive + gerçek kod): PaymentCommonService.
-      try {
-        await this.paymentCommon.ensureSuratShipmentForOrder(resultOrder.id);
-      } catch (error) {
-        this.logger.error(
-          `Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`,
-        );
-      }
+      // Faz 8.1: sepetteki HER siparişin POST-COMMIT sonlandırması EVENT ile istenir (tekil
+      // yolla ortak seam — OrderFulfillmentListener tüketir). skipBuyer:true — alıcı onayı
+      // grup başına TEK kez (emitGroupBuyerOrderPaid) yukarıda gönderildi.
+      await this.eventService.emitOrderFulfillmentRequested({
+        order: resultOrder,
+        payment,
+        skipBuyer: true,
+        transactionId,
+      });
     }
 
     this.logger.log(
@@ -1208,30 +612,14 @@ export class PaymentFulfillmentService {
       parseInt(shippingDaysSetting?.settingValue ?? "7", 10) || 7;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const { columns: providerColumns, metaPatch } =
-        this.buildProviderPatch(providerData);
-      const claimed = await tx.payment.updateMany({
-        where: { id: payment.id, status: PaymentStatus.pending },
-        data: {
-          status: PaymentStatus.completed,
-          providerPaymentId: transactionId || payment.providerPaymentId,
-          // FLOW-M5: çekilen oid'e senkronla (takas iadesi doğru oid'i kullansın).
-          ...(capturedMerchantOid
-            ? { providerConversationId: capturedMerchantOid }
-            : {}),
-          ...providerColumns,
-          ...(metaPatch
-            ? {
-                metadata: {
-                  ...((payment.metadata as any) || {}),
-                  ...metaPatch,
-                } as object,
-              }
-            : {}),
-          paidAt: new Date(),
-        },
+      // Faz 8.3: tekil/grup ile ORTAK claim (audit trail dahil — takas ödemesi de artık
+      // tutarlı şekilde denetim izine yazılır; eskiden auditHistory eklenmiyordu).
+      const claimed = await this.claimPaymentCompleted(tx, payment, {
+        transactionId,
+        capturedMerchantOid,
+        providerData,
       });
-      if (claimed.count === 0) {
+      if (!claimed) {
         return { didComplete: false } as const;
       }
 
@@ -1284,6 +672,14 @@ export class PaymentFulfillmentService {
       `Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`,
     );
 
+    // Faz 6.4: takas nakit yakalamasını birleşik gelir defterine yaz (takas komisyonu
+    // da platform_commission'a düşer; escrow trade payout'unda kapanır). Best-effort.
+    if (payment.tradeCashPaymentId) {
+      await this.fulfillmentFinalizer.recordTradeCashCapture(
+        payment.tradeCashPaymentId,
+      );
+    }
+
     // NOT: Takas nakit komisyonu e-Arşivi ARTIK BURADA (ödeme anında) DEĞİL, ürünler DEPOYA VARINCA
     // (at_warehouse) kesilir — surat-tracking.maybeTransitionTradeToAtWarehouse. İptal penceresi
     // ödeme sonrası/depo öncesi olduğundan, iptalde henüz fatura kesilmemiş olur (iade faturası gerekmez).
@@ -1307,39 +703,12 @@ export class PaymentFulfillmentService {
         );
       }
 
-      // Auto-create the two `to_warehouse` Sürat shipments now that the cash
-      // trade has cleared payment and entered `shipping_to_warehouse`. Mirrors
-      // the non-cash hook in TradeService.acceptTrade. We resolve TradeService
-      // lazily via ModuleRef + a runtime require to avoid the Trade<>Payment
-      // module circular import (Membership eagerly imports Payment; Trade
-      // imports Payment; Payment can't statically import Trade).
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { TradeService } = require("../trade/trade.service");
-        const tradeService = this.moduleRef.get(TradeService, {
-          strict: false,
-        });
-        if (
-          tradeService &&
-          typeof tradeService.createInboundTradeShipments === "function"
-        ) {
-          tradeService
-            .createInboundTradeShipments(result.trade.id)
-            .catch((err: any) =>
-              this.logger.error(
-                `createInboundTradeShipments crashed for cash-trade ${result.trade!.id}: ${err?.message ?? err}`,
-              ),
-            );
-        } else {
-          this.logger.warn(
-            `TradeService.createInboundTradeShipments not available; inbound shipments NOT auto-created for cash-trade ${result.trade.id}`,
-          );
-        }
-      } catch (err: any) {
-        this.logger.error(
-          `Failed to resolve TradeService for cash-trade inbound shipments: ${err?.message ?? err}`,
-        );
-      }
+      // Faz 8.4: Nakit takas ödemesi temizlendi → inbound (depoya) Sürat gönderileri
+      // oluşturulmalı. Eskiden TradeService `require()` + ModuleRef ile lazy resolve
+      // ediliyordu (Trade↔Payment döngüsünü aşmak için). Artık in-process event yayınlanıp
+      // Trade tarafındaki dinleyici (TradeCashClearedListener) createInboundTradeShipments'ı
+      // çağırır → Payment, Trade'e statik veya runtime bağımlılık taşımaz (döngü tamamen kalktı).
+      this.eventService.emitTradeCashCleared({ tradeId: result.trade.id });
     }
 
     return true;
@@ -1588,32 +957,16 @@ export class PaymentFulfillmentService {
       const afterAvailable =
         (after?.quantity ?? 0) - (after?.reservedQuantity ?? 0);
       if (beforeAvailable <= 0 && afterAvailable > 0 && before?.title) {
-        await this.dispatchBackInStock(order.productId, before.title).catch(
-          (err: any) =>
+        await this.fulfillmentNotifier
+          .dispatchBackInStock(order.productId, before.title)
+          .catch((err: any) =>
             this.logger.warn(`back-in-stock dispatch failed: ${err?.message}`),
-        );
+          );
       }
     } catch (error: any) {
       this.logger.error(
         `Failed to release product for order ${orderId}: ${error?.message}`,
       );
     }
-  }
-
-  /**
-   * Notify all wishlist users for a product that just transitioned from
-   * unavailable -> available. Debounced 24h per (userId, productId) so
-   * repeated payment failures don't spam wishlists.
-   */
-  private async dispatchBackInStock(
-    productId: string,
-    productTitle: string,
-  ): Promise<void> {
-    // Delegated to NotificationService.broadcastBackInStock — kept here only
-    // as a thin wrapper to preserve the existing call site contract.
-    return this.notificationService.broadcastBackInStock(
-      productId,
-      productTitle,
-    );
   }
 }

@@ -1,12 +1,7 @@
 import { Injectable, Logger, Optional, OnModuleInit } from "@nestjs/common";
-import { CronExpression } from "@nestjs/schedule";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  moneyCronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PaymentService } from "./payment.service";
 import { ProductLockService } from "../product/product-lock.service";
@@ -30,26 +25,22 @@ export class PaymentSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const on = moneyCronsViaBull();
     await registerRepeatableCron(
       this.scheduledQueue,
       "payment-expired",
       "*/5 * * * *",
-      on,
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "payment-release-holds",
       "0 * * * *",
-      on,
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "payment-expired-preparing",
       "*/30 * * * *",
-      on,
       this.logger,
     );
   }
@@ -65,9 +56,8 @@ export class PaymentSchedulerService implements OnModuleInit {
    * aksi halde örn. reconcilePendingPaytrPayments patlayınca
    * releaseExpiredOrderReservations hiç çalışmaz ve rezervasyonlar takılı kalır.
    */
-  // İzleme: handleExpiredPayments her adımı bu log'a yazar (Bull "Kayıtlar").
-  // Bull processor'ı tek tek (concurrency 1) işlediği ve flag açıkken in-process
-  // no-op olduğu için instance alanı kullanımı güvenli.
+  // İzleme: runHandleExpiredPayments her adımı bu log'a yazar (Bull "Kayıtlar").
+  // Bull processor'ı tek tek (concurrency 1) işlediği için instance alanı güvenli.
   private stepLog: (msg: string) => void = () => {};
 
   private async runStep(name: string, fn: () => Promise<void>): Promise<void> {
@@ -80,15 +70,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     }
   }
 
-  @TrackedCron("*/5 * * * *") // Every 5 minutes
-  async handleExpiredPayments() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runHandleExpiredPayments();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor 'payment-expired' buradan çağırır. */
   async runHandleExpiredPayments(log: (msg: string) => void = () => {}) {
     this.stepLog = log;
     this.logger.log("Checking for expired reservations and payments...");
@@ -225,15 +207,7 @@ export class PaymentSchedulerService implements OnModuleInit {
   /**
    * Run every hour: release payment holds whose releaseAt date has passed
    */
-  @TrackedCron("0 * * * *") // Every hour at minute 0
-  async handleReleaseHoldsDue() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runHandleReleaseHoldsDue();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor 'payment-release-holds' buradan çağırır. */
   async runHandleReleaseHoldsDue(log: (msg: string) => void = () => {}) {
     this.stepLog = log;
     this.logger.log("Checking for payment holds due for release...");
@@ -283,15 +257,7 @@ export class PaymentSchedulerService implements OnModuleInit {
    * Run every 30 minutes: check for orders stuck in "preparing" past deadline.
    * Warns sellers 24h before deadline, auto-cancels + refunds when deadline passes.
    */
-  @TrackedCron("*/30 * * * *") // Every 30 minutes
-  async handleExpiredPreparingOrders() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runHandleExpiredPreparingOrders();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor 'payment-expired-preparing' buradan çağırır. */
   async runHandleExpiredPreparingOrders(log: (msg: string) => void = () => {}) {
     this.logger.log("Checking for expired preparing orders...");
 

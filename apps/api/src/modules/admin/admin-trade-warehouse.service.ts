@@ -12,17 +12,7 @@ import { PaymentStatus, TradeStatus, ShipmentStatus } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { EventService } from "../events/event.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import {
-  normalizeSuratPhone,
-  normalizeSuratLocation,
-} from "../surat-cargo/surat-address.util";
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-} from "../surat-cargo/surat-cargo.types";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 
 /**
@@ -101,26 +91,21 @@ export class AdminTradeWarehouseService {
     const result = await this.suratCargoService.createShipmentWithBarcode({
       idempotencyKey: `surat:trade-return:${oid}`,
       correlationId: `trade-reject-${tradeId}`,
-      payload: {
-        KisiKurum: address.fullName || user?.displayName || "Takas İade",
-        SahisBirim: "Takas İade Gönderisi",
-        AliciAdresi: address.address,
-        Il: normalizeSuratLocation(address.city),
-        Ilce: normalizeSuratLocation(address.district),
-        TelefonCep: normalizeSuratPhone(address.phone),
-        KargoTuru: SuratKargoTuru.Koli,
-        OdemeTipi: SuratOdemeTipi.Pesin,
-        OzelKargoTakipNo: oid,
-        Adet: 1,
-        BirimDesi: 1,
-        BirimKg: 1,
-        KapidanOdemeTahsilatTipi: 1,
-        TasimaSekli: SuratTasimaSekli.KaraYolu,
-        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-        GonderiSekli: SuratGonderiSekli.Standart,
-        Pazaryerimi: 0,
-        Iademi: true,
-      },
+      payload: buildStandardGonderiPayload({
+        recipientName: address.fullName || user?.displayName || "Takas İade",
+        address: address.address,
+        city: address.city,
+        district: address.district,
+        phone: address.phone,
+        ref: oid,
+        content: "Takas İade Gönderisi",
+        isReturn: true,
+        // KisiKurum fallback zinciri "Takas İade" (builder'ın "Alıcı"sı
+        // değil) ve trim yok → birebir korumak için override.
+        overrides: {
+          KisiKurum: address.fullName || user?.displayName || "Takas İade",
+        },
+      }),
     });
     if (!result.ok) {
       const r = result as any;
@@ -496,27 +481,22 @@ export class AdminTradeWarehouseService {
             {
               idempotencyKey: `surat:trade:${oid}`,
               correlationId: `trade-approve-${tradeId}`,
-              payload: {
-                KisiKurum:
+              payload: buildStandardGonderiPayload({
+                recipientName:
                   addr.fullName || user?.displayName || "Takas Alıcısı",
-                SahisBirim: "Takas Gönderisi",
-                AliciAdresi: addr.address,
-                Il: normalizeSuratLocation(addr.city),
-                Ilce: normalizeSuratLocation(addr.district),
-                TelefonCep: normalizeSuratPhone(addr.phone),
-                KargoTuru: SuratKargoTuru.Koli,
-                OdemeTipi: SuratOdemeTipi.Pesin,
-                OzelKargoTakipNo: oid,
-                Adet: 1,
-                BirimDesi: 1,
-                BirimKg: 1,
-                KapidanOdemeTahsilatTipi: 1,
-                TasimaSekli: SuratTasimaSekli.KaraYolu,
-                TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-                GonderiSekli: SuratGonderiSekli.Standart,
-                Pazaryerimi: 0,
-                Iademi: false,
-              },
+                address: addr.address,
+                city: addr.city,
+                district: addr.district,
+                phone: addr.phone,
+                ref: oid,
+                content: "Takas Gönderisi",
+                // KisiKurum fallback zinciri "Takas Alıcısı" (builder'ın
+                // "Alıcı"sı değil) ve trim yok → birebir korumak için override.
+                overrides: {
+                  KisiKurum:
+                    addr.fullName || user?.displayName || "Takas Alıcısı",
+                },
+              }),
             },
           );
           if (!result.ok) {

@@ -1,11 +1,11 @@
-import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { RefundReconciliationService } from "./refund-reconciliation.service";
 
 /**
  * MONEY-M4: reconcileStuckRefundMarkers — PayTR iadesi yapılıp DB finalize'ı patlayan
  * (refundInProgressOrders marker'ı takılı, refundedOrders'ta YOK) siparişleri finalize eder.
  * Marker'daki tutarla processRefund çağrılır (PayTR marker sayesinde atlanır → tx finalize eder).
  */
-describe("PaymentReconciliationService.reconcileStuckRefundMarkers — MONEY-M4", () => {
+describe("RefundReconciliationService.reconcileStuckRefundMarkers — MONEY-M4", () => {
   const makeService = (candidates: any[]) => {
     const prisma = {
       payment: { findMany: jest.fn().mockResolvedValue(candidates) },
@@ -13,18 +13,9 @@ describe("PaymentReconciliationService.reconcileStuckRefundMarkers — MONEY-M4"
     const paymentRefund = {
       processRefund: jest.fn().mockResolvedValue({ success: true }),
     };
-    const service = new PaymentReconciliationService(
-      prisma as any,
-      {} as any, // cache
-      {} as any, // configService
-      {} as any, // paymentProviders
-      {} as any, // invoiceService
-      {} as any, // notificationService
-      {} as any, // commissionLedger
+    const service = new RefundReconciliationService(
+      prisma as any, // prisma
       paymentRefund as any, // paymentRefund
-      {} as any, // eventService
-      {} as any, // paymentCommon
-      {} as any, // paymentFulfillment
     );
     return { service, paymentRefund };
   };

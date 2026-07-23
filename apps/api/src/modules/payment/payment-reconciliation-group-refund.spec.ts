@@ -1,4 +1,4 @@
-import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { RefundReconciliationService } from "./refund-reconciliation.service";
 
 /**
  * MONEY-H5: processRefundedOrders artık GRUP (sepet) siparişlerini de süpürür.
@@ -9,7 +9,7 @@ import { PaymentReconciliationService } from "./payment-reconciliation.service";
  * SEAM-B3: outbound paket göndericiye iade dönmüş (shipment=returned) ama
  * refund_requested'da takılı siparişler de returned-arm ile retry edilir.
  */
-describe("PaymentReconciliationService.processRefundedOrders — MONEY-H5 group + SEAM-B3 returned", () => {
+describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group + SEAM-B3 returned", () => {
   const makeService = () => {
     const prisma = {
       order: { findMany: jest.fn() },
@@ -17,18 +17,9 @@ describe("PaymentReconciliationService.processRefundedOrders — MONEY-H5 group 
     const paymentRefund = {
       processRefund: jest.fn().mockResolvedValue({ success: true }),
     };
-    const service = new PaymentReconciliationService(
+    const service = new RefundReconciliationService(
       prisma as any, // prisma
-      {} as any, // cache
-      {} as any, // configService
-      {} as any, // paymentProviders
-      {} as any, // invoiceService
-      {} as any, // notificationService
-      {} as any, // commissionLedger
       paymentRefund as any, // paymentRefund
-      {} as any, // eventService
-      {} as any, // paymentCommon
-      {} as any, // paymentFulfillment
     );
     return { service, prisma, paymentRefund };
   };

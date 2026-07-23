@@ -9,10 +9,11 @@ import type {
   SuratBarcodeResult,
   SuratBarcodeSuccess,
 } from "./surat-cargo.types";
-import { SuratSoapClient } from "./surat-soap.client";
+import { SuratCarrierClient } from "./surat-soap.client";
 import { withSuratTechnicalRetries } from "./surat-technical-retry";
+import type { CargoProvider } from "./cargo-provider";
 
-export const SURAT_SOAP_CLIENT = Symbol("SURAT_SOAP_CLIENT");
+export const SURAT_CARRIER_CLIENT = Symbol("SURAT_CARRIER_CLIENT");
 
 // Idempotency caches are keyed by OzelKargoTakipNo (= our order/trade/refund
 // number) so BOTH create and cancel can compute the key — the cancel path can
@@ -48,13 +49,14 @@ function classifyCaughtError(e: unknown): SuratTechnicalCode {
 }
 
 @Injectable()
-export class SuratCargoService {
+export class SuratCargoService implements CargoProvider {
   private readonly logger = new Logger(SuratCargoService.name);
 
   constructor(
     private readonly configService: ConfigService,
     private readonly cache: CacheService,
-    @Inject(SURAT_SOAP_CLIENT) private readonly soapClient: SuratSoapClient,
+    @Inject(SURAT_CARRIER_CLIENT)
+    private readonly carrierClient: SuratCarrierClient,
   ) {}
 
   /**
@@ -114,7 +116,7 @@ export class SuratCargoService {
     const { idempotencyKey, correlationId, payload } = input;
     let raw: string | undefined;
     try {
-      raw = await this.soapClient.callGonderiyiKargoyaGonderYeni(payload, {
+      raw = await this.carrierClient.callGonderiyiKargoyaGonderYeni(payload, {
         timeoutMs,
       });
     } catch (e) {
@@ -242,9 +244,39 @@ export class SuratCargoService {
     timeoutMs: number,
   ): Promise<SuratBarcodeResult> {
     const { idempotencyKey, correlationId, payload } = input;
+
+    // Capability guard (LSP/ISP): clients that cannot create barcodes (the
+    // legacy SOAP web service) declare supportsBarcode()=false. Previously such
+    // a client threw inside callOrtakBarkodOlustur; that throw was caught below,
+    // classified, and returned as a non-retryable technical UNKNOWN failure.
+    // We reproduce that EXACT outcome here — same error message, same
+    // classifyCaughtError path, same warn log, same returned result — without
+    // relying on the throw.
+    if (!this.carrierClient.supportsBarcode()) {
+      const e = new Error(
+        "OrtakBarkodOlustur SOAP modunda desteklenmiyor — SURAT_SOAP_MODE=rest kullanın",
+      );
+      const code = classifyCaughtError(e);
+      this.logger.warn({
+        msg: "Surat OrtakBarkodOlustur threw",
+        correlationId,
+        idempotencyKey,
+        code,
+        err: e.message,
+      });
+      return {
+        ok: false,
+        kind: "technical",
+        code,
+        cause: e,
+        correlationId,
+        idempotencyKey,
+      };
+    }
+
     let raw;
     try {
-      raw = await this.soapClient.callOrtakBarkodOlustur(payload, {
+      raw = await this.carrierClient.callOrtakBarkodOlustur(payload, {
         timeoutMs,
       });
     } catch (e) {
@@ -313,7 +345,7 @@ export class SuratCargoService {
     // iptali YEREL olarak tutarlı say (çağıran kargoyu 'cancelled' işaretler).
     // Not: REST client artık GonderiGeriCek, SOAP client GonderiSil ile uzak iptali
     // destekler; bu dal yalnızca gelecekte cancel'sız bir client için geçerli.
-    if (!this.soapClient.supportsRemoteCancel()) {
+    if (!this.carrierClient.supportsRemoteCancel()) {
       this.logger.warn(
         `Surat uzak iptal desteklenmiyor — yalnızca yerel iptal ref=${ozelKargoTakipNo}.`,
       );
@@ -324,7 +356,7 @@ export class SuratCargoService {
       Number(this.configService.get("SURAT_SOAP_TIMEOUT_MS", "15000")) || 15000;
 
     try {
-      const raw = await this.soapClient.callGonderiSil(ozelKargoTakipNo, {
+      const raw = await this.carrierClient.callGonderiSil(ozelKargoTakipNo, {
         timeoutMs,
       });
       const normalized = (raw || "").trim();

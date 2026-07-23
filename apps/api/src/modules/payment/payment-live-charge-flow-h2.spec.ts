@@ -1,4 +1,4 @@
-import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
 import { PaymentStatus } from "@prisma/client";
 
 /**
@@ -6,7 +6,7 @@ import { PaymentStatus } from "@prisma/client";
  * (metadata.lastChargeStartedAt) sayar. Kullanıcı initiate'ten çok sonra 3DS'e girse
  * bile (createdAt eski, charge yeni) canlı oturum `failed` YAPILMAZ → orphan capture yok.
  */
-describe("PaymentReconciliationService.cancelExpiredPayments — FLOW-H2 live 3DS guard", () => {
+describe("PaymentExpiryReconciliationService.cancelExpiredPayments — FLOW-H2 live 3DS guard", () => {
   const makeService = (candidate: any) => {
     const prisma = {
       payment: {
@@ -30,12 +30,10 @@ describe("PaymentReconciliationService.cancelExpiredPayments — FLOW-H2 live 3D
         return Date.now() - startedAt < windowMin * 60 * 1000;
       },
     };
-    const service = new PaymentReconciliationService(
+    const service = new PaymentExpiryReconciliationService(
       prisma as any, // prisma
       {} as any, // cache
       configService as any, // configService
-      {} as any, // paymentProviders
-      {} as any, // invoiceService
       {} as any, // notificationService
       {} as any, // commissionLedger
       {} as any, // paymentRefund

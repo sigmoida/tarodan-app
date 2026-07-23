@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
@@ -24,6 +25,13 @@ import { CommissionLedgerService } from "../commission/commission-ledger.service
 import { ElogoInvoicingService } from "../elogo";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
+import { OutboxService } from "../outbox/outbox.service";
+import {
+  OUTBOX_SHIPMENT_CANCEL,
+  OUTBOX_INVOICE_REFUND_REVERSE,
+  OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
+} from "../outbox/outbox.types";
+import { LedgerService } from "../ledger/ledger.service";
 import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 
@@ -33,6 +41,15 @@ import { i18nMessage } from "../i18n";
  * scheduleHoldReleaseOnDelivery hold penceresi hesabı için holdDays/returnWindowDays/
  * payoutGraceDays alanlarını KENDİ constructor'ında bayt-bayt aynı mantıkla yeniden üretir.
  */
+/**
+ * 11.4c — Kısmi iade ORANI (TEK otorite): hold tüketimi ve ledger pro-rate AYNI formülü
+ * kullanır. `amount/threshold`, [0,1] arasına clamp'li; threshold ≤ 0 iken 1 (tam). Eskiden
+ * iki yerde birebir kopyalanıyordu → drift riski; artık tek yerden.
+ */
+function refundPortion(amountToRefund: number, threshold: number): number {
+  return threshold > 0 ? Math.min(amountToRefund / threshold, 1) : 1;
+}
+
 @Injectable()
 export class PaymentRefundService {
   private readonly logger = new Logger(PaymentRefundService.name);
@@ -55,6 +72,16 @@ export class PaymentRefundService {
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly providerEvents: PaymentProviderEventService,
+    // Faz 5: iade tx'iyle AYNI anda "Sürat iptali" outbox satırı yaz → çökmeye dayanıklı
+    // backstop (post-commit anlık iptal hızlı-yol kalır; handler idempotent). @Optional:
+    // prod'da global OutboxModule daima enjekte eder; birim testleri (mock tx) sağlamak
+    // zorunda kalmasın diye opsiyonel — yoksa yalnız anlık best-effort yola düşülür.
+    @Optional()
+    private readonly outbox?: OutboxService,
+    // Faz 6.2: iade tx'inde `refund_issued` çift-taraflı defter kaydı (oransal ters kayıt).
+    // @Optional + best-effort — defter hatası iadeyi BOZMAZ; reconciliation açığı yakalar.
+    @Optional()
+    private readonly ledger?: LedgerService,
   ) {
     this.holdDays = parseInt(
       this.configService.get("PAYMENT_HOLD_DAYS") || "7",
@@ -68,6 +95,191 @@ export class PaymentRefundService {
       this.configService.get("PAYOUT_GRACE_DAYS") || "1",
       10,
     );
+  }
+
+  /**
+   * 11.2b — Atomik iade "slot" claim'i (eşzamanlı kısmi-iade çift-PayTR koruması).
+   *
+   * Payment satırını `FOR UPDATE` ile kilitler, `metadata`'yı TX İÇİNDE TAZE okur (çağıranın
+   * elindeki stale in-memory snapshot değil), sonra KİLİT ALTINDA: (a) kümülatif tavanı taze
+   * `refundedOrders`'a göre doğrular, (b) order-başı `refundInProgressOrders` marker'ını
+   * kontrol eder — yoksa MONEY-M4 formatında (amount+at) yazar. Kilit tx commit'iyle serbest
+   * kalır; PayTR çağrısı DIŞARIDA yapılır (HTTP gecikmesi kilidi tutmaz). Aynı marker/CAS/
+   * clearRefundInProgress sözleşmesi korunur (obje truthy marker; tutar farklıysa reddet).
+   *
+   * @returns `"proceed"` marker yeni yazıldı → PayTR çağır · `"recovered"` marker zaten vardı
+   *          (aynı tutar) → PayTR atla, persist-recovery. Reddi `BadRequestException` ile atar.
+   */
+  private async claimRefundSlot(
+    paymentId: string,
+    orderId: string,
+    amountToRefund: number,
+    refundCap: number,
+    isGroupPayment: boolean,
+  ): Promise<"proceed" | "recovered"> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Payment satırını kilitle — eşzamanlı claim'ler burada serileşir.
+        await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+        const fresh = await tx.payment.findUnique({
+          where: { id: paymentId },
+          select: { metadata: true },
+        });
+        const meta = (fresh?.metadata as Record<string, any>) || {};
+        const inProgressOrders =
+          (meta.refundInProgressOrders as Record<
+            string,
+            { amount?: number; at?: string } | string
+          >) || {};
+        const refundedOrders =
+          (meta.refundedOrders as Record<string, number>) || {};
+
+        // Kümülatif tavan — TAZE refundedOrders (kilit altında) → cap race'i kapatır.
+        if (isGroupPayment) {
+          if (refundedOrders[orderId]) {
+            throw new BadRequestException(
+              i18nMessage("server.payment.orderAlreadyRefunded"),
+            );
+          }
+        } else {
+          const prior = Number(refundedOrders[orderId] || 0);
+          if (prior + amountToRefund > refundCap + MONEY_EPSILON) {
+            throw new BadRequestException(
+              i18nMessage("server.payment.refundAmountExceedsLimit", {
+                amountToRefund,
+                refundCap: Math.max(
+                  Math.round((refundCap - prior) * 100) / 100,
+                  0,
+                ),
+              }),
+            );
+          }
+        }
+
+        const existingMarker = inProgressOrders[orderId];
+        if (existingMarker) {
+          // Finding 1: marker order-BAŞINA; MONEY-H4 tek ödemede çoklu kısmi iadeye izin verir.
+          // Marker tutarı YENİ tutardan FARKLIYSA başka (takılı) bir iadeye aittir → "recovered"
+          // sanıp PayTR'ı atlarsak SAHTE iade olur. Tutar eşitse gerçek retry (kurtarma).
+          const markerAmount =
+            existingMarker &&
+            typeof existingMarker === "object" &&
+            typeof existingMarker.amount === "number"
+              ? existingMarker.amount
+              : undefined;
+          if (
+            markerAmount !== undefined &&
+            Math.abs(markerAmount - amountToRefund) > MONEY_EPSILON
+          ) {
+            this.logger.warn(
+              `claimRefundSlot: order ${orderId} için farklı tutarlı iade kurtarma bekliyor ` +
+                `(marker=${markerAmount}, istenen=${amountToRefund}) — REDDEDİLDİ (payment=${paymentId}).`,
+            );
+            throw new BadRequestException(
+              i18nMessage("server.payment.refundInitiationFailed"),
+            );
+          }
+          return "recovered" as const;
+        }
+
+        // Marker'ı KİLİT ALTINDA + TAZE meta üzerine yaz (concurrent clobber yok).
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: {
+            metadata: {
+              ...meta,
+              refundInProgressOrders: {
+                ...inProgressOrders,
+                [orderId]: {
+                  amount: amountToRefund,
+                  at: new Date().toISOString(),
+                },
+              },
+            },
+          },
+        });
+        return "proceed" as const;
+      });
+    } catch (e) {
+      // Reddi (cap/marker) aynen ilet; DB/kilit hatasında para hareketi OLMADAN abort et
+      // (orijinal marker-yazım-hatası davranışıyla simetrik → çağıran güvenle retry eder).
+      if (e instanceof BadRequestException) throw e;
+      this.logger.error(
+        `claimRefundSlot: kilit/marker tx hatası, PayTR çağrısı yapılmadan abort ` +
+          `(payment=${paymentId}, order=${orderId}): ${(e as Error)?.message}`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.payment.refundInitiationFailed"),
+      );
+    }
+  }
+
+  /**
+   * 11.2d — İade sonucu bildirimleri (POST-COMMIT best-effort). Eskiden finalize tx'i
+   * İÇİNDE koşuyordu → FOR UPDATE kilidini uzatıyor + bir bildirim hatası para-tx'ini
+   * abort edebiliyordu. Artık tx commit'inden SONRA çağrılır (para zaten geri döndü;
+   * bildirim hatası iadeyi bozmaz). Guard/iptal-vs-refunded dallanması birebir korundu.
+   * (Recovery no-op'ta çağrılmaz — finalize tx null döner, .then erken çıkar.)
+   */
+  private async notifyRefundOutcome(
+    orderId: string,
+    amountToRefund: number,
+    payment: any,
+    providerRefundId: string | undefined,
+    skipRefundEvent: boolean | undefined,
+  ): Promise<void> {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          buyer: { select: { id: true, email: true, displayName: true } },
+          seller: { select: { id: true, email: true, displayName: true } },
+        },
+      });
+      // refund.service akışı kendi REFUND_COMPLETED (push+mail) bildirimini gönderiyor;
+      // oradan çağrıldığında payment_refunded'ı atla ki alıcı çift push almasın.
+      if (order && !skipRefundEvent) {
+        if (order.cancellationType === "iptal") {
+          // Kargo öncesi İPTAL: para iade ediliyor ama kullanıcıya "iade" değil "iptal"
+          // denmeli. Alıcı + satıcıya iptal bildirimi + order-cancelled maili; refunded ATLA.
+          await this.notificationService.createInAppNotification(
+            order.buyerId,
+            NotificationType.ORDER_CANCELLED,
+            { orderId, orderNumber: order.orderNumber, amount: amountToRefund },
+          );
+          await this.notificationService.createInAppNotification(
+            order.sellerId,
+            NotificationType.ORDER_CANCELLED_SELLER,
+            { orderId, orderNumber: order.orderNumber },
+          );
+          await this.notificationService.sendOrderCancelledEmails(orderId);
+          this.logger.log(
+            `order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`,
+          );
+        } else {
+          await this.eventService.emitPaymentRefunded({
+            paymentId: payment.id,
+            orderId,
+            orderNumber: order.orderNumber,
+            buyerId: order.buyerId,
+            buyerEmail: order.buyer.email,
+            buyerName: order.buyer.displayName || order.buyer.email,
+            sellerId: order.sellerId,
+            sellerEmail: order.seller.email,
+            sellerName: order.seller.displayName || order.seller.email,
+            refundAmount: amountToRefund,
+            totalAmount: Number(payment.amount),
+            provider: payment.provider,
+            providerRefundId,
+          });
+          this.logger.log(
+            `payment.refunded event emitted for payment ${payment.id}`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to emit payment.refunded event: ${error}`);
+    }
   }
 
   /**
@@ -223,7 +435,12 @@ export class PaymentRefundService {
         // PAYMENT_BYPASS: dev/test modunda PayTR callback olmadan ödeme tamamlandığı
         // için PayTR tarafında oid kaydı yok. Refund'ı da bypass'la — DB'de payment
         // direkt refunded olarak işaretlenir; provider çağrısı atlanır.
+        // 11.1b (G3/SEC-H1): PROD'da bypass ASLA aktif değil — completion'daki SEC-H1 ile
+        // simetrik ikinci savunma hattı. main.ts boot-guard'ı yalnız API process'inde koşar;
+        // refund cron'ları WORKER process'inde çalışır (o guard'ı çağırmaz). Yanlış env'de
+        // flag "true" olsa bile gerçek PayTR iadesi yapılır → "iade edildi" ama para gitmedi olmaz.
         const bypassEnabled =
+          process.env.NODE_ENV !== "production" &&
           this.configService.get("PAYMENT_BYPASS") === "true";
         if (bypassEnabled) {
           this.logger.warn(
@@ -244,41 +461,19 @@ export class PaymentRefundService {
           // persist-recovery'ye geç. Grup ödemesinde tek payment birden çok siparişi
           // kapsadığından marker SİPARİŞ BAŞINA tutulur (refundedOrders map'i gibi) —
           // kardeş siparişin markerı bu siparişin PayTR çağrısını engellemesin.
-          const existingMeta = (payment.metadata as Record<string, any>) || {};
-          const inProgressOrders =
-            (existingMeta.refundInProgressOrders as Record<
-              string,
-              { amount?: number; at?: string } | string
-            >) || {};
-
-          const existingMarker = inProgressOrders[orderId];
-          if (existingMarker) {
-            // Finding 1: marker order-BAŞINA tutulur ama MONEY-H4 tek ödemede ÇOKLU kısmi
-            // iadeye izin verir. Marker'daki tutar YENİ iade tutarından FARKLIYSA, bu marker
-            // kurtarma bekleyen BAŞKA (takılı) bir iadeye aittir; onu "recovered" sanıp PayTR'ı
-            // atlarsak SAHTE iade olur (para dönmez ama DB'ye yazılır). O yüzden:
-            //  - tutar EŞİTSE → gerçek retry → kurtarma yolu (PayTR atla),
-            //  - tutar FARKLIYSA → REDDET; reconcileStuckRefundMarkers takılıyı finalize edince
-            //    çağıran tekrar dener. Böylece order başına her an ≤1 in-flight marker olur.
-            const markerAmount =
-              existingMarker &&
-              typeof existingMarker === "object" &&
-              typeof existingMarker.amount === "number"
-                ? existingMarker.amount
-                : undefined;
-            if (
-              markerAmount !== undefined &&
-              Math.abs(markerAmount - amountToRefund) > MONEY_EPSILON
-            ) {
-              this.logger.warn(
-                `processRefund: order ${orderId} için farklı tutarlı iade kurtarma bekliyor ` +
-                  `(marker=${markerAmount}, istenen=${amountToRefund}) — yeni iade REDDEDİLDİ; ` +
-                  `süpürme finalize edince tekrar deneyin (payment=${payment.id}).`,
-              );
-              throw new BadRequestException(
-                i18nMessage("server.payment.refundInitiationFailed"),
-              );
-            }
+          // 11.2b: iade "slot" claim'i ATOMİK — payment satırını FOR UPDATE ile kilitle,
+          // metadata'yı TAZE oku (in-memory stale snapshot değil), kümülatif tavan + order-başı
+          // marker'ı KİLİT ALTINDA kontrol et, yoksa marker'ı yaz. Böylece EŞZAMANLI kısmi
+          // iadeler artık marker'ı yarışarak oku-yaz edemez → çift-PayTR penceresi kapanır.
+          // PayTR çağrısı kilit DIŞINDA (aşağıda) yapılır — HTTP gecikmesi DB kilidini tutmaz.
+          const claim = await this.claimRefundSlot(
+            payment.id,
+            orderId,
+            amountToRefund,
+            refundCap,
+            isGroupPayment,
+          );
+          if (claim === "recovered") {
             this.logger.warn(
               `processRefund: refundInProgressOrders[${orderId}] zaten set — PayTR ` +
                 `çağrısı atlanıyor, yalnız persist-recovery denenecek (payment=${payment.id}).`,
@@ -290,38 +485,6 @@ export class PaymentRefundService {
               recovered: true,
             };
           } else {
-            // Marker'ı PayTR'den ÖNCE kalıcı yaz. Yazım başarısızsa para hareketi
-            // olmadan abort et — çağıran güvenle tekrar deneyebilir.
-            try {
-              await this.prisma.payment.update({
-                where: { id: payment.id },
-                data: {
-                  metadata: {
-                    ...existingMeta,
-                    refundInProgressOrders: {
-                      ...inProgressOrders,
-                      // MONEY-M4: tutarı da sakla — PayTR sonrası tx patlarsa
-                      // reconcileStuckRefundMarkers doğru tutarla finalize edebilsin
-                      // (yalnız timestamp'ten tam/kısmi ayırt edilemezdi). Truthiness
-                      // guard'ı (obje truthy) ve clearRefundInProgress etkilenmez.
-                      [orderId]: {
-                        amount: amountToRefund,
-                        at: new Date().toISOString(),
-                      },
-                    },
-                  },
-                },
-              });
-            } catch (markerErr: any) {
-              this.logger.error(
-                `processRefund: refundInProgress marker yazılamadı, PayTR çağrısı ` +
-                  `yapılmadan abort (payment=${payment.id}, order=${orderId}): ${markerErr?.message}`,
-              );
-              throw new BadRequestException(
-                i18nMessage("server.payment.refundInitiationFailed"),
-              );
-            }
-
             const paytrOid =
               payment.providerConversationId?.trim() ||
               orderId.replace(/-/g, "");
@@ -528,10 +691,7 @@ export class PaymentRefundService {
             // amount - refundedAmount ödenir. orderRefundThreshold = siparişin tutarı
             // (grup'ta order.totalAmount, tekilde payment.amount) — tx başında hesaplandı.
             const sellerAmount = Number(activeHold.amount);
-            const portion =
-              orderRefundThreshold > 0
-                ? Math.min(amountToRefund / orderRefundThreshold, 1)
-                : 1;
+            const portion = refundPortion(amountToRefund, orderRefundThreshold);
             const refundedSeller =
               Math.round(sellerAmount * portion * 100) / 100;
             const newRefunded =
@@ -558,11 +718,43 @@ export class PaymentRefundService {
           // (elogo net faturalar). Kümülatif tam iadeye ulaşınca status=refunded olur ve
           // e-Arşiv reverse tetiklenir (eski davranış: yalnız tam iadede reverse — korunur).
           // ledger threshold = siparişin tutarı (orderRefundThreshold, tx başında).
-          const ledgerPortion =
-            orderRefundThreshold > 0
-              ? Math.min(amountToRefund / orderRefundThreshold, 1)
-              : 1;
+          const ledgerPortion = refundPortion(
+            amountToRefund,
+            orderRefundThreshold,
+          );
           await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
+
+          // Faz 6.2 (ledger): `refund_issued` oransal ters kayıt (best-effort — defter
+          // hatası iadeyi bozmaz). orderRefundThreshold = sipariş tutarı (T); komisyon/stopaj
+          // sipariş satırından okunur; LedgerService oranı ve yuvarlamayı yönetir.
+          try {
+            const ledgerOrder = await tx.order.findUnique({
+              where: { id: orderId },
+              select: {
+                sellerId: true,
+                buyerId: true,
+                commissionAmount: true,
+                withholdingTaxAmount: true,
+              },
+            });
+            if (ledgerOrder) {
+              await this.ledger?.recordRefund(tx, {
+                orderId,
+                paymentId: payment.id,
+                sellerId: ledgerOrder.sellerId,
+                buyerId: ledgerOrder.buyerId,
+                orderTotal: orderRefundThreshold,
+                commission: Number(ledgerOrder.commissionAmount ?? 0),
+                withholdingTax: Number(ledgerOrder.withholdingTaxAmount ?? 0),
+                refundAmount: amountToRefund,
+              });
+            }
+          } catch (e: any) {
+            this.logger.warn(
+              `Ledger refund kaydı başarısız (order ${orderId}): ${e?.message}`,
+            );
+          }
+
           // e-Arşiv reverse: siparişin KÜMÜLATİF iadesi tamamlanınca tetiklenir
           // (MONEY-H4: art arda kısmi iadelerin sonuncusunda da; eskiden tek seferde
           // tam tutar iade edilmezse hiç tetiklenmiyordu). Ledger'a BAĞLI DEĞİL
@@ -661,73 +853,33 @@ export class PaymentRefundService {
               refundResult.paymentId || refundResult.merchant_oid,
           };
 
-          // Emit payment.refunded event
-          try {
-            const order = await tx.order.findUnique({
-              where: { id: orderId },
-              include: {
-                buyer: { select: { id: true, email: true, displayName: true } },
-                seller: {
-                  select: { id: true, email: true, displayName: true },
-                },
-              },
+          // 11.2d: iade sonucu bildirimleri (payment.refunded / order_cancelled) artık
+          // finalize tx'inde DEĞİL, POST-COMMIT çağrılır (notifyRefundOutcome, aşağıdaki
+          // .then) → FOR UPDATE kilidi kısalır + bir bildirim hatası para-tx'ini abort etmez.
+
+          // Faz 5 (outbox): iade commit'iyle ATOMİK olarak "Sürat iptali" satırını yaz.
+          // Böylece post-commit anlık iptal (aşağıda) çökme/hata ile kaçsa bile drainer
+          // güvenilir şekilde iptal eder. Handler idempotent → çift iptal zararsız.
+          await this.outbox?.enqueue(tx, {
+            type: OUTBOX_SHIPMENT_CANCEL,
+            payload: {
+              orderId,
+              orderNumber:
+                payment.order?.orderNumber ??
+                refundTargetOrder?.orderNumber ??
+                orderId,
+            },
+            dedupeKey: `${OUTBOX_SHIPMENT_CANCEL}:${orderId}`,
+          });
+
+          // Faz 5 (outbox): tam iade → eLogo e-Arşiv ters kaydını da iade commit'iyle
+          // ATOMİK sıraya al (post-commit anlık tetik hızlı-yol kalır; handler idempotent).
+          if (einvoiceReverse) {
+            await this.outbox?.enqueue(tx, {
+              type: OUTBOX_INVOICE_REFUND_REVERSE,
+              payload: { orderId },
+              dedupeKey: `${OUTBOX_INVOICE_REFUND_REVERSE}:${orderId}`,
             });
-
-            // refund.service akışı kendi REFUND_COMPLETED (push+mail) bildirimini
-            // gönderiyor; oradan çağrıldığında payment_refunded'ı atla ki alıcı
-            // çift push almasın. Diğer caller'lar (admin/direct/surat) için aynen gider.
-            if (order && !opts?.skipRefundEvent) {
-              if (order.cancellationType === "iptal") {
-                // Kargo öncesi İPTAL: para iade ediliyor ama kullanıcıya "iade" değil
-                // "iptal" denmeli. Alıcı + satıcıya iptal bildirimi (zil+push) ve
-                // order-cancelled mailleri gönder; payment_refunded'ı ATLA.
-                await this.notificationService.createInAppNotification(
-                  order.buyerId,
-                  NotificationType.ORDER_CANCELLED,
-                  {
-                    orderId,
-                    orderNumber: order.orderNumber,
-                    amount: amountToRefund,
-                  },
-                );
-                await this.notificationService.createInAppNotification(
-                  order.sellerId,
-                  NotificationType.ORDER_CANCELLED_SELLER,
-                  { orderId, orderNumber: order.orderNumber },
-                );
-                await this.notificationService.sendOrderCancelledEmails(
-                  orderId,
-                );
-                this.logger.log(
-                  `order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`,
-                );
-              } else {
-                await this.eventService.emitPaymentRefunded({
-                  paymentId: payment.id,
-                  orderId: orderId,
-                  orderNumber: order.orderNumber,
-                  buyerId: order.buyerId,
-                  buyerEmail: order.buyer.email,
-                  buyerName: order.buyer.displayName || order.buyer.email,
-                  sellerId: order.sellerId,
-                  sellerEmail: order.seller.email,
-                  sellerName: order.seller.displayName || order.seller.email,
-                  refundAmount: amountToRefund,
-                  totalAmount: Number(payment.amount),
-                  provider: payment.provider,
-                  providerRefundId: refundResponse.providerRefundId,
-                });
-
-                this.logger.log(
-                  `payment.refunded event emitted for payment ${payment.id}`,
-                );
-              }
-            }
-          } catch (error) {
-            // Log but don't fail - refund was already processed
-            this.logger.error(
-              `Failed to emit payment.refunded event: ${error}`,
-            );
           }
 
           return refundResponse;
@@ -736,6 +888,14 @@ export class PaymentRefundService {
           // Finding 2: tx idempotent no-op döndüyse (eşzamanlı kurtarma zaten finalize
           // etti) Sürat iptalini TEKRAR yapma — onu kazanan çağrı zaten yaptı.
           if (!response) return response;
+          // 11.2d: iade bildirimleri POST-COMMIT (tx dışında, best-effort — para geri döndü).
+          await this.notifyRefundOutcome(
+            orderId,
+            amountToRefund,
+            payment,
+            response.providerRefundId,
+            opts?.skipRefundEvent,
+          );
           // After PayTR refund + DB updates succeed, cancel the Sürat shipment.
           // Best-effort: a failure here doesn't undo the refund (money is already back).
           try {
@@ -914,7 +1074,11 @@ export class PaymentRefundService {
     const refundAlreadyInitiated = Boolean(existingMeta.refundInProgressAt);
 
     // PAYMENT_BYPASS: dev/test modunda PayTR'a refund çağrısı yapma.
-    const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
+    // 11.1b (G3/SEC-H1): PROD'da ASLA aktif değil (worker refund cron'ları için ikinci
+    // savunma hattı) — yanlış env'de gerçek PayTR trade iadesi çalışır.
+    const bypassEnabled =
+      process.env.NODE_ENV !== "production" &&
+      this.configService.get("PAYMENT_BYPASS") === "true";
     if (refundAlreadyInitiated) {
       this.logger.warn(
         `refundTradeCashPaymentIfCompleted: refundInProgressAt zaten set — PayTR çağrısı atlanıyor, ` +
@@ -1028,6 +1192,13 @@ export class PaymentRefundService {
             await tx.tradeCashPayment.update({
               where: { id: payment.tradeCashPaymentId },
               data: { status: PaymentStatus.refunded, refundedAt: new Date() },
+            });
+            // Faz 5.3 (outbox): eLogo takas-iade ters kaydını iade persist'iyle ATOMİK
+            // sıraya al (post-commit anlık tetik hızlı-yol kalır; handler idempotent).
+            await this.outbox?.enqueue(tx, {
+              type: OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
+              payload: { tradeCashPaymentId: payment.tradeCashPaymentId },
+              dedupeKey: `${OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE}:${payment.tradeCashPaymentId}`,
             });
           }
         });

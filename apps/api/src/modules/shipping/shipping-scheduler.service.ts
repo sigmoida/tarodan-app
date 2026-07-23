@@ -1,10 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { SuratTrackingService } from '../surat-cargo/surat-tracking.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 
 @Injectable()
 export class ShippingSchedulerService implements OnModuleInit {
@@ -18,26 +17,16 @@ export class ShippingSchedulerService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await registerRepeatableCron(
       this.scheduledQueue,
-      'sync-surat-tracking',
-      '*/30 * * * *',
-      cronsViaBull(),
+      "sync-surat-tracking",
+      "*/30 * * * *",
       this.logger,
     );
   }
 
   /**
    * Every 30 minutes: sync tracking status for all active Sürat shipments.
-   * Flag (CRONS_VIA_BULL) açıkken iş Bull repeatable'a taşınır; in-process no-op.
+   * Gerçek iş — Bull processor 'sync-surat-tracking' buradan çağırır.
    */
-  @TrackedCron('*/30 * * * *')
-  async syncSuratTracking() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runSyncSuratTracking();
-  }
-
-  /** Gerçek iş — hem in-process cron hem Bull processor buradan çağırır. */
   async runSyncSuratTracking(log: (msg: string) => void = () => {}) {
     const stats = {
       barcodeRetried: 0,
@@ -75,9 +64,13 @@ export class ShippingSchedulerService implements OnModuleInit {
       const result = await this.suratTracking.syncAllActiveShipments();
       stats.shipmentSynced = result.synced;
       stats.failed += result.failed;
-      log(`Sipariş kargo senkron: ${result.synced} güncellendi, ${result.failed} başarısız`);
+      log(
+        `Sipariş kargo senkron: ${result.synced} güncellendi, ${result.failed} başarısız`,
+      );
       if (result.synced > 0 || result.failed > 0) {
-        this.logger.log(`Sürat tracking sync: ${result.synced} synced, ${result.failed} failed`);
+        this.logger.log(
+          `Sürat tracking sync: ${result.synced} synced, ${result.failed} failed`,
+        );
       }
     } catch (error: any) {
       this.logger.error(`Sürat tracking sync error: ${error.message}`);
@@ -85,12 +78,17 @@ export class ShippingSchedulerService implements OnModuleInit {
     }
 
     try {
-      const tradeResult = await this.suratTracking.syncAllActiveTradeShipments();
+      const tradeResult =
+        await this.suratTracking.syncAllActiveTradeShipments();
       stats.tradeSynced = tradeResult.synced;
       stats.failed += tradeResult.failed;
-      log(`Takas kargo senkron: ${tradeResult.synced} güncellendi, ${tradeResult.failed} başarısız`);
+      log(
+        `Takas kargo senkron: ${tradeResult.synced} güncellendi, ${tradeResult.failed} başarısız`,
+      );
       if (tradeResult.synced > 0 || tradeResult.failed > 0) {
-        this.logger.log(`Sürat trade-shipment sync: ${tradeResult.synced} synced, ${tradeResult.failed} failed`);
+        this.logger.log(
+          `Sürat trade-shipment sync: ${tradeResult.synced} synced, ${tradeResult.failed} failed`,
+        );
       }
     } catch (error: any) {
       this.logger.error(`Sürat trade-shipment sync error: ${error.message}`);
@@ -98,12 +96,17 @@ export class ShippingSchedulerService implements OnModuleInit {
     }
 
     try {
-      const refundResult = await this.suratTracking.syncAllActiveRefundReturns();
+      const refundResult =
+        await this.suratTracking.syncAllActiveRefundReturns();
       stats.refundSynced = refundResult.synced;
       stats.failed += refundResult.failed;
-      log(`İade kargo senkron: ${refundResult.synced} güncellendi, ${refundResult.failed} başarısız`);
+      log(
+        `İade kargo senkron: ${refundResult.synced} güncellendi, ${refundResult.failed} başarısız`,
+      );
       if (refundResult.synced > 0 || refundResult.failed > 0) {
-        this.logger.log(`Sürat refund-return sync: ${refundResult.synced} synced, ${refundResult.failed} failed`);
+        this.logger.log(
+          `Sürat refund-return sync: ${refundResult.synced} synced, ${refundResult.failed} failed`,
+        );
       }
     } catch (error: any) {
       this.logger.error(`Sürat refund-return sync error: ${error.message}`);
@@ -118,9 +121,12 @@ export class ShippingSchedulerService implements OnModuleInit {
       this.logger.error(`Stale cargo alert error: ${error.message}`);
     }
 
-    const totalSynced = stats.shipmentSynced + stats.tradeSynced + stats.refundSynced;
+    const totalSynced =
+      stats.shipmentSynced + stats.tradeSynced + stats.refundSynced;
     const retrySummary =
-      stats.barcodeRetried > 0 ? ` · ${stats.barcodeRetried} kod tamamlandı` : '';
+      stats.barcodeRetried > 0
+        ? ` · ${stats.barcodeRetried} kod tamamlandı`
+        : "";
     return {
       summary: `${totalSynced} kargo güncellendi · ${stats.failed} başarısız${retrySummary}`,
       stats,

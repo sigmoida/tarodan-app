@@ -22,21 +22,22 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       holdUpdate: undefined as any,
     };
     const metadata = opts.metadata ?? {};
+    // 11.2b: STATEFUL metadata — claimRefundSlot marker'ı KİLİT ALTINDA yazar, ardından
+    // finalize tx TAZE okur. Mock'u gerçeğe uygun tut: `update` metadata'yı biriktirir,
+    // `findUnique` güncel hâli döndürür. Böylece taze iadede claim marker'ı yazıp "proceed"
+    // döner (PayTR çağrılır); önceden set marker "recovered" verir (PayTR atlanır) — ikisi de
+    // gerçek davranış. (Eskiden findUnique sabit sahte marker döndürüp claim'i yanıltıyordu.)
+    let currentMeta: Record<string, any> = { ...metadata };
 
     const mockTx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       payment: {
-        // Finding 2: prod'da marker PayTR'den ÖNCE yazılır → tx'in FOR UPDATE okuması
-        // marker'ı GÖRÜR. Idempotency guard'ı (marker yoksa no-op) taze iadede tetiklenmesin
-        // diye tx-metadata'sına marker'ı ekliyoruz (tutar önemsiz — yalnız varlık kontrol edilir).
-        findUnique: jest.fn().mockResolvedValue({
-          metadata: {
-            ...metadata,
-            refundInProgressOrders: { [ORDER_ID]: { amount: 1, at: "x" } },
-          },
-        }),
+        findUnique: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ metadata: currentMeta })),
         update: jest.fn().mockImplementation((arg: any) => {
           captured.paymentUpdate = arg;
+          if (arg?.data?.metadata) currentMeta = arg.data.metadata;
           return Promise.resolve({});
         }),
       },

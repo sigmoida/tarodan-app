@@ -1,10 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { moneyCronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { PayoutService } from './payout.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { PayoutService } from "./payout.service";
 
 @Injectable()
 export class PayoutSchedulerService implements OnModuleInit {
@@ -16,36 +15,41 @@ export class PayoutSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const on = moneyCronsViaBull();
-    await registerRepeatableCron(this.scheduledQueue, 'payout-check-returned', '0 6 * * *', on, this.logger);
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "payout-check-returned",
+      "0 6 * * *",
+      this.logger,
+    );
     // Tier 3: gerçek PayTR transfer. Bull tek-sefer garantisi = çift-ödeme kilidi.
-    await registerRepeatableCron(this.scheduledQueue, 'payout-process', '*/15 * * * *', on, this.logger);
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "payout-process",
+      "*/15 * * * *",
+      this.logger,
+    );
   }
 
   /**
    * Every 15 minutes: process pending payouts via PayTR Platform Transfer.
+   * Gerçek iş — Bull processor 'payout-process' buradan çağırır.
    */
-  @TrackedCron('*/15 * * * *')
-  async handleProcessPayouts() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runProcessPayouts();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runProcessPayouts(log: (msg: string) => void = () => {}) {
     try {
       // 1) Move retry_pending → pending if nextRetryAt has passed
       const retried = await this.payoutService.processRetryPayouts();
       log(`${retried} payout retry_pending → pending taşındı`);
       if (retried > 0) {
-        this.logger.log(`Moved ${retried} payout(s) from retry_pending to pending`);
+        this.logger.log(
+          `Moved ${retried} payout(s) from retry_pending to pending`,
+        );
       }
 
       // 2) Process all pending payouts
       const result = await this.payoutService.processPendingPayouts();
-      log(`Payout işleme: ${result.processed} tamamlandı · ${result.failed} başarısız`);
+      log(
+        `Payout işleme: ${result.processed} tamamlandı · ${result.failed} başarısız`,
+      );
       if (result.processed > 0 || result.failed > 0) {
         this.logger.log(
           `Payout processing: ${result.processed} completed, ${result.failed} failed`,
@@ -56,11 +60,18 @@ export class PayoutSchedulerService implements OnModuleInit {
       const stuck = await this.payoutService.detectStuckProcessingPayouts();
       if (stuck > 0) {
         log(`⚠ ${stuck} payout 'processing'te takılı`);
-        this.logger.error(`${stuck} payout 'processing'te takılı — manuel inceleme gerekir`);
+        this.logger.error(
+          `${stuck} payout 'processing'te takılı — manuel inceleme gerekir`,
+        );
       }
       return {
-        summary: `${result.processed} işlendi · ${result.failed} başarısız${stuck ? ` · ${stuck} takılı` : ''}`,
-        stats: { retried, processed: result.processed, failed: result.failed, stuck },
+        summary: `${result.processed} işlendi · ${result.failed} başarısız${stuck ? ` · ${stuck} takılı` : ""}`,
+        stats: {
+          retried,
+          processed: result.processed,
+          failed: result.failed,
+          stuck,
+        },
       };
     } catch (error: any) {
       this.logger.error(`Payout processing error: ${error.message}`);
@@ -71,16 +82,8 @@ export class PayoutSchedulerService implements OnModuleInit {
 
   /**
    * Daily at 06:00: check for returned transfers from PayTR.
+   * Gerçek iş — Bull processor 'payout-check-returned' buradan çağırır.
    */
-  @TrackedCron('0 6 * * *')
-  async handleCheckReturnedTransfers() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runCheckReturnedTransfers();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runCheckReturnedTransfers(log: (msg: string) => void = () => {}) {
     try {
       const returned = await this.payoutService.checkReturnedTransfers();

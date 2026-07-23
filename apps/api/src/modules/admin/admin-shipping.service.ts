@@ -5,14 +5,7 @@ import { AdminShipmentQueryDto } from "./dto";
 import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratKapidanOdemeTahsilatTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-} from "../surat-cargo/surat-cargo.types";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 
 /**
  * Kargo görünümü admin operasyonları (salt-okunur) — AdminService'in
@@ -154,26 +147,18 @@ export class AdminShippingService {
     const createResult = await this.suratCargoService.submitShipmentWithRetry({
       idempotencyKey: ref,
       correlationId: ref,
-      payload: {
-        KisiKurum: "ADMIN TEST ALICI",
-        SahisBirim: "Endpoint testi",
-        AliciAdresi: "Caferağa Mah. Moda Cad. No:14",
-        Il: "İstanbul",
-        Ilce: "Kadıköy",
-        TelefonCep: "5321112233",
-        KargoTuru: SuratKargoTuru.Koli,
-        OdemeTipi: SuratOdemeTipi.Pesin,
-        OzelKargoTakipNo: ref,
-        Adet: 1,
-        BirimDesi: 1,
-        BirimKg: 1,
-        KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
-        TasimaSekli: SuratTasimaSekli.KaraYolu,
-        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-        GonderiSekli: SuratGonderiSekli.Standart,
-        Pazaryerimi: 0,
-        Iademi: false,
-      },
+      payload: buildStandardGonderiPayload({
+        recipientName: "ADMIN TEST ALICI",
+        address: "Caferağa Mah. Moda Cad. No:14",
+        city: "İstanbul",
+        district: "Kadıköy",
+        phone: "5321112233",
+        ref,
+        content: "Endpoint testi",
+        // Test payload'u telefonu HAM (05xx normalizasyonu olmadan) gönderir;
+        // builder normalize eder → birebir korumak için override.
+        overrides: { TelefonCep: "5321112233" },
+      }),
     });
 
     const create = createResult.ok
@@ -239,26 +224,19 @@ export class AdminShippingService {
       };
     }
     const ref = `ADMIN-BARKOD-${Date.now()}`;
-    const result = await this.suratTrackingService.probeBarcode({
-      KisiKurum: "ADMIN BARKOD TEST",
-      SahisBirim: "Endpoint testi",
-      AliciAdresi: "Caferağa Mah. Moda Cad. No:14",
-      Il: "İstanbul",
-      Ilce: "Kadıköy",
-      TelefonCep: "5321112233",
-      KargoTuru: SuratKargoTuru.Koli,
-      OdemeTipi: SuratOdemeTipi.Pesin,
-      OzelKargoTakipNo: ref,
-      Adet: 1,
-      BirimDesi: 1,
-      BirimKg: 1,
-      KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
-      TasimaSekli: SuratTasimaSekli.KaraYolu,
-      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-      GonderiSekli: SuratGonderiSekli.Standart,
-      Pazaryerimi: 0,
-      Iademi: false,
-    });
+    const result = await this.suratTrackingService.probeBarcode(
+      buildStandardGonderiPayload({
+        recipientName: "ADMIN BARKOD TEST",
+        address: "Caferağa Mah. Moda Cad. No:14",
+        city: "İstanbul",
+        district: "Kadıköy",
+        phone: "5321112233",
+        ref,
+        content: "Endpoint testi",
+        // Test payload'u telefonu HAM gönderir; builder normalize eder → koru.
+        overrides: { TelefonCep: "5321112233" },
+      }),
+    );
     return { ref, ...result };
   }
 

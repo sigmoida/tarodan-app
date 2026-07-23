@@ -1,16 +1,12 @@
-import {
-  Injectable,
-  OnModuleInit,
-  Logger,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { PrismaService } from '../../prisma';
-import { Client } from '@elastic/elasticsearch';
-import { Prisma, ProductStatus } from '@prisma/client';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { PrismaService } from "../../prisma";
+import { Client } from "@elastic/elasticsearch";
+import { Prisma, ProductStatus } from "@prisma/client";
 
 export interface ProductSearchResult {
   id: string;
@@ -66,12 +62,26 @@ export interface SearchResponse {
   page: number;
   pageSize: number;
   took: number;
-  aggregations?: Record<string, { buckets: Array<{ key: string; doc_count: number }> }>;
+  aggregations?: Record<
+    string,
+    { buckets: Array<{ key: string; doc_count: number }> }
+  >;
 }
 
 export interface RichAutocompleteResult {
-  products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
-  brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+  products: Array<{
+    id: string;
+    title: string;
+    imageUrl?: string;
+    price: number;
+    brandName?: string;
+  }>;
+  brands: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string | null;
+  }>;
   categories: Array<{ id: string; name: string; slug: string }>;
   manufacturers: Array<{ id: string; name: string; slug: string }>;
   suggestions: string[];
@@ -79,7 +89,7 @@ export interface RichAutocompleteResult {
 
 // Sanal/platform sözde-ürünleri (üyelik + öne-çıkarma) aramadan/indeksten hariç tut.
 // Tek kaynak — drift olmasın diye tüm exclusion noktaları bunu kullanır.
-const VIRTUAL_PRODUCT_ID_PREFIXES = ['membership-', 'boost-'] as const;
+const VIRTUAL_PRODUCT_ID_PREFIXES = ["membership-", "boost-"] as const;
 
 /**
  * Search modülü ortak servisi: paylaşılan Elasticsearch client'ı + bağlantı
@@ -95,8 +105,8 @@ export class SearchCommonService implements OnModuleInit {
   private readonly logger = new Logger(SearchCommonService.name);
   // Public: alt servisler this.common.client ile paylaşılan ES bağlantısına erişir.
   client: Client;
-  private readonly PRODUCTS_INDEX = 'products';
-  private readonly COLLECTIONS_INDEX = 'collections';
+  private readonly PRODUCTS_INDEX = "products";
+  private readonly COLLECTIONS_INDEX = "collections";
   private esAvailable = false;
   // Re-entrancy guard for collections reindex — TEK örnek Common'da tutulur ki
   // eşzamanlı reindex koruması alt servisler arasında paylaşılsın.
@@ -118,26 +128,32 @@ export class SearchCommonService implements OnModuleInit {
 
   async onModuleInit() {
     const node =
-      this.configService.get('ELASTICSEARCH_URL') ||
-      this.configService.get('ELASTICSEARCH_NODE', 'http://localhost:9200');
+      this.configService.get("ELASTICSEARCH_URL") ||
+      this.configService.get("ELASTICSEARCH_NODE", "http://localhost:9200");
 
     this.client = new Client({
       node,
       auth: {
-        username: this.configService.get('ELASTICSEARCH_USERNAME', 'elastic'),
-        password: this.configService.get('ELASTICSEARCH_PASSWORD', 'changeme'),
+        username: this.configService.get("ELASTICSEARCH_USERNAME", "elastic"),
+        password: this.configService.get("ELASTICSEARCH_PASSWORD", "changeme"),
       },
     });
 
     await this.ensureIndexExists();
     await this.ensureCollectionsIndexExists();
 
-    // Cron'u Bull repeatable'a senkronla (flag açıksa kaydet, kapalıysa temizle).
+    // Bull repeatable: periyodik ES↔DB senkron (tek zamanlama mekanizması).
     await registerRepeatableCron(
       this.scheduledQueue,
-      'search-periodic-sync',
-      '0 */5 * * * *',
-      cronsViaBull(),
+      "search-periodic-sync",
+      "0 */5 * * * *",
+      this.logger,
+    );
+    // Faz 7.1: saatlik tam reconcile (ID-bazlı yetim/eksik doküman eşitleme).
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "search-hourly-reconcile",
+      "0 * * * *",
       this.logger,
     );
   }
@@ -190,176 +206,176 @@ export class SearchCommonService implements OnModuleInit {
             analysis: {
               analyzer: {
                 turkish: {
-                  type: 'custom',
-                  tokenizer: 'standard',
-                  filter: ['lowercase', 'turkish_stop', 'turkish_stemmer'],
+                  type: "custom",
+                  tokenizer: "standard",
+                  filter: ["lowercase", "turkish_stop", "turkish_stemmer"],
                 },
                 turkish_edge_ngram: {
-                  type: 'custom',
-                  tokenizer: 'edge_ngram_tokenizer',
-                  filter: ['lowercase', 'asciifolding'],
+                  type: "custom",
+                  tokenizer: "edge_ngram_tokenizer",
+                  filter: ["lowercase", "asciifolding"],
                 },
                 turkish_ngram: {
-                  type: 'custom',
-                  tokenizer: 'ngram_tokenizer',
-                  filter: ['lowercase', 'asciifolding'],
+                  type: "custom",
+                  tokenizer: "ngram_tokenizer",
+                  filter: ["lowercase", "asciifolding"],
                 },
                 turkish_search: {
-                  type: 'custom',
-                  tokenizer: 'standard',
-                  filter: ['lowercase', 'asciifolding'],
+                  type: "custom",
+                  tokenizer: "standard",
+                  filter: ["lowercase", "asciifolding"],
                 },
               },
               tokenizer: {
                 edge_ngram_tokenizer: {
-                  type: 'edge_ngram',
+                  type: "edge_ngram",
                   min_gram: 2,
                   max_gram: 15,
-                  token_chars: ['letter', 'digit'],
+                  token_chars: ["letter", "digit"],
                 },
                 ngram_tokenizer: {
-                  type: 'ngram',
+                  type: "ngram",
                   min_gram: 2,
                   max_gram: 4,
-                  token_chars: ['letter', 'digit'],
+                  token_chars: ["letter", "digit"],
                 },
               },
               filter: {
-                turkish_stop: { type: 'stop', stopwords: '_turkish_' },
-                turkish_stemmer: { type: 'stemmer', language: 'turkish' },
-                asciifolding: { type: 'asciifolding', preserve_original: true },
+                turkish_stop: { type: "stop", stopwords: "_turkish_" },
+                turkish_stemmer: { type: "stemmer", language: "turkish" },
+                asciifolding: { type: "asciifolding", preserve_original: true },
               },
             },
           },
           mappings: {
             properties: {
-              id: { type: 'keyword' },
+              id: { type: "keyword" },
               title: {
-                type: 'text',
-                analyzer: 'turkish',
-                search_analyzer: 'turkish_search',
+                type: "text",
+                analyzer: "turkish",
+                search_analyzer: "turkish_search",
                 fields: {
-                  keyword: { type: 'keyword' },
+                  keyword: { type: "keyword" },
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                   ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
               description: {
-                type: 'text',
-                analyzer: 'turkish',
+                type: "text",
+                analyzer: "turkish",
                 fields: {
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
-              price: { type: 'float' },
-              oldPrice: { type: 'float' },
-              condition: { type: 'keyword' },
-              status: { type: 'keyword' },
-              categoryId: { type: 'keyword' },
+              price: { type: "float" },
+              oldPrice: { type: "float" },
+              condition: { type: "keyword" },
+              status: { type: "keyword" },
+              categoryId: { type: "keyword" },
               categoryName: {
-                type: 'text',
-                analyzer: 'turkish',
+                type: "text",
+                analyzer: "turkish",
                 fields: {
-                  keyword: { type: 'keyword' },
+                  keyword: { type: "keyword" },
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
-              brandId: { type: 'keyword' },
+              brandId: { type: "keyword" },
               brandName: {
-                type: 'text',
-                analyzer: 'turkish',
+                type: "text",
+                analyzer: "turkish",
                 fields: {
-                  keyword: { type: 'keyword' },
+                  keyword: { type: "keyword" },
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
-              manufacturerId: { type: 'keyword' },
+              manufacturerId: { type: "keyword" },
               manufacturerName: {
-                type: 'text',
-                analyzer: 'turkish',
+                type: "text",
+                analyzer: "turkish",
                 fields: {
-                  keyword: { type: 'keyword' },
+                  keyword: { type: "keyword" },
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
-              carModelId: { type: 'keyword' },
+              carModelId: { type: "keyword" },
               carModelName: {
-                type: 'text',
-                analyzer: 'turkish',
-                search_analyzer: 'turkish_search',
+                type: "text",
+                analyzer: "turkish",
+                search_analyzer: "turkish_search",
                 fields: {
-                  keyword: { type: 'keyword' },
+                  keyword: { type: "keyword" },
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                   ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
-              sellerId: { type: 'keyword' },
-              sellerName: { type: 'keyword' },
-              imageUrl: { type: 'keyword' },
-              scale: { type: 'keyword' },
-              material: { type: 'keyword' },
-              vehicleType: { type: 'keyword' },
-              isTradeEnabled: { type: 'boolean' },
-              isPreorder: { type: 'boolean' },
-              isLimited: { type: 'boolean' },
-              isSet: { type: 'boolean' },
-              inStock: { type: 'boolean' },
-              quantity: { type: 'integer' },
-              viewCount: { type: 'integer' },
-              ratingAverage: { type: 'float' },
-              ratingCount: { type: 'integer' },
-              rankTier: { type: 'integer' },
-              qualityScore: { type: 'integer' },
-              popularityScore: { type: 'integer' },
-              relevanceScore: { type: 'integer' },
-              createdAt: { type: 'date' },
-              updatedAt: { type: 'date' },
+              sellerId: { type: "keyword" },
+              sellerName: { type: "keyword" },
+              imageUrl: { type: "keyword" },
+              scale: { type: "keyword" },
+              material: { type: "keyword" },
+              vehicleType: { type: "keyword" },
+              isTradeEnabled: { type: "boolean" },
+              isPreorder: { type: "boolean" },
+              isLimited: { type: "boolean" },
+              isSet: { type: "boolean" },
+              inStock: { type: "boolean" },
+              quantity: { type: "integer" },
+              viewCount: { type: "integer" },
+              ratingAverage: { type: "float" },
+              ratingCount: { type: "integer" },
+              rankTier: { type: "integer" },
+              qualityScore: { type: "integer" },
+              popularityScore: { type: "integer" },
+              relevanceScore: { type: "integer" },
+              createdAt: { type: "date" },
+              updatedAt: { type: "date" },
             },
           },
         });
-        this.logger.log('Created Elasticsearch index with extended mappings');
+        this.logger.log("Created Elasticsearch index with extended mappings");
       }
 
       this.esAvailable = true;
 
       await this.prisma.searchIndex.upsert({
         where: { indexName: this.PRODUCTS_INDEX },
-        update: { status: 'active' },
+        update: { status: "active" },
         create: {
           indexName: this.PRODUCTS_INDEX,
-          status: 'active',
+          status: "active",
           settings: {},
         },
       });
@@ -374,7 +390,9 @@ export class SearchCommonService implements OnModuleInit {
   async ensureCollectionsIndexExists(): Promise<void> {
     if (!this.esAvailable) return;
     try {
-      const exists = await this.client.indices.exists({ index: this.COLLECTIONS_INDEX });
+      const exists = await this.client.indices.exists({
+        index: this.COLLECTIONS_INDEX,
+      });
       if (!exists) {
         await this.client.indices.create({
           index: this.COLLECTIONS_INDEX,
@@ -385,103 +403,107 @@ export class SearchCommonService implements OnModuleInit {
             analysis: {
               analyzer: {
                 turkish: {
-                  type: 'custom',
-                  tokenizer: 'standard',
-                  filter: ['lowercase', 'turkish_stop', 'turkish_stemmer'],
+                  type: "custom",
+                  tokenizer: "standard",
+                  filter: ["lowercase", "turkish_stop", "turkish_stemmer"],
                 },
                 turkish_edge_ngram: {
-                  type: 'custom',
-                  tokenizer: 'edge_ngram_tokenizer',
-                  filter: ['lowercase', 'asciifolding'],
+                  type: "custom",
+                  tokenizer: "edge_ngram_tokenizer",
+                  filter: ["lowercase", "asciifolding"],
                 },
                 turkish_search: {
-                  type: 'custom',
-                  tokenizer: 'standard',
-                  filter: ['lowercase', 'asciifolding'],
+                  type: "custom",
+                  tokenizer: "standard",
+                  filter: ["lowercase", "asciifolding"],
                 },
               },
               tokenizer: {
                 edge_ngram_tokenizer: {
-                  type: 'edge_ngram',
+                  type: "edge_ngram",
                   min_gram: 2,
                   max_gram: 15,
-                  token_chars: ['letter', 'digit'],
+                  token_chars: ["letter", "digit"],
                 },
               },
               filter: {
-                turkish_stop: { type: 'stop', stopwords: '_turkish_' },
-                turkish_stemmer: { type: 'stemmer', language: 'turkish' },
-                asciifolding: { type: 'asciifolding', preserve_original: true },
+                turkish_stop: { type: "stop", stopwords: "_turkish_" },
+                turkish_stemmer: { type: "stemmer", language: "turkish" },
+                asciifolding: { type: "asciifolding", preserve_original: true },
               },
             },
           },
           mappings: {
             properties: {
-              id: { type: 'keyword' },
+              id: { type: "keyword" },
               name: {
-                type: 'text',
-                analyzer: 'turkish',
-                search_analyzer: 'turkish_search',
+                type: "text",
+                analyzer: "turkish",
+                search_analyzer: "turkish_search",
                 fields: {
-                  keyword: { type: 'keyword' },
+                  keyword: { type: "keyword" },
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
-              slug: { type: 'keyword' },
+              slug: { type: "keyword" },
               description: {
-                type: 'text',
-                analyzer: 'turkish',
-                search_analyzer: 'turkish_search',
+                type: "text",
+                analyzer: "turkish",
+                search_analyzer: "turkish_search",
                 fields: {
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
-              userId: { type: 'keyword' },
+              userId: { type: "keyword" },
               userName: {
-                type: 'text',
-                analyzer: 'turkish',
-                search_analyzer: 'turkish_search',
+                type: "text",
+                analyzer: "turkish",
+                search_analyzer: "turkish_search",
                 fields: {
-                  keyword: { type: 'keyword' },
+                  keyword: { type: "keyword" },
                   edge_ngram: {
-                    type: 'text',
-                    analyzer: 'turkish_edge_ngram',
-                    search_analyzer: 'turkish_search',
+                    type: "text",
+                    analyzer: "turkish_edge_ngram",
+                    search_analyzer: "turkish_search",
                   },
                 },
               },
-              categoryId: { type: 'keyword' },
+              categoryId: { type: "keyword" },
               categoryName: {
-                type: 'text',
-                analyzer: 'turkish',
-                search_analyzer: 'turkish_search',
-                fields: { keyword: { type: 'keyword' } },
+                type: "text",
+                analyzer: "turkish",
+                search_analyzer: "turkish_search",
+                fields: { keyword: { type: "keyword" } },
               },
-              isPublic: { type: 'boolean' },
-              isFeatured: { type: 'boolean' },
-              viewCount: { type: 'integer' },
-              likeCount: { type: 'integer' },
-              itemCount: { type: 'integer' },
-              coverImageUrl: { type: 'keyword' },
-              createdAt: { type: 'date' },
-              updatedAt: { type: 'date' },
+              isPublic: { type: "boolean" },
+              isFeatured: { type: "boolean" },
+              viewCount: { type: "integer" },
+              likeCount: { type: "integer" },
+              itemCount: { type: "integer" },
+              coverImageUrl: { type: "keyword" },
+              createdAt: { type: "date" },
+              updatedAt: { type: "date" },
             },
           },
         });
-        this.logger.log('Created Elasticsearch collections index');
+        this.logger.log("Created Elasticsearch collections index");
       }
       await this.prisma.searchIndex.upsert({
         where: { indexName: this.COLLECTIONS_INDEX },
-        update: { status: 'active' },
-        create: { indexName: this.COLLECTIONS_INDEX, status: 'active', settings: {} },
+        update: { status: "active" },
+        create: {
+          indexName: this.COLLECTIONS_INDEX,
+          status: "active",
+          settings: {},
+        },
       });
     } catch (error) {
       this.logger.warn(
@@ -501,7 +523,7 @@ export class SearchCommonService implements OnModuleInit {
         },
       });
     } catch (error) {
-      this.logger.warn('Failed to update index stats');
+      this.logger.warn("Failed to update index stats");
     }
   }
 
@@ -514,7 +536,9 @@ export class SearchCommonService implements OnModuleInit {
     message: string;
   }> {
     try {
-      const esResponse = await this.client.count({ index: this.PRODUCTS_INDEX });
+      const esResponse = await this.client.count({
+        index: this.PRODUCTS_INDEX,
+      });
       const dbCount = await this.prisma.product.count({
         where: {
           status: ProductStatus.active,
@@ -529,9 +553,10 @@ export class SearchCommonService implements OnModuleInit {
         documentCount: esResponse.count,
         dbCount,
         inSync,
-        message: esResponse.count > 0
-          ? `ES çalışıyor: ${esResponse.count} ES / ${dbCount} DB doküman${inSync ? ' (senkron)' : ' (SENKRON DEĞİL)'}`
-          : 'ES çalışıyor ama index boş. /search/dev/reindex çağırın.',
+        message:
+          esResponse.count > 0
+            ? `ES çalışıyor: ${esResponse.count} ES / ${dbCount} DB doküman${inSync ? " (senkron)" : " (SENKRON DEĞİL)"}`
+            : "ES çalışıyor ama index boş. /search/dev/reindex çağırın.",
       };
     } catch {
       return {
@@ -540,7 +565,7 @@ export class SearchCommonService implements OnModuleInit {
         documentCount: 0,
         dbCount: 0,
         inSync: false,
-        message: 'Elasticsearch bağlantı hatası',
+        message: "Elasticsearch bağlantı hatası",
       };
     }
   }

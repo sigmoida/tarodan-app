@@ -6,9 +6,19 @@ import { PaymentQueryService } from "./payment-query.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { ReservationReconciliationService } from "./reservation-reconciliation.service";
+import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
+import { PspReconciliationService } from "./psp-reconciliation.service";
+import { RefundReconciliationService } from "./refund-reconciliation.service";
+import { MiscReconciliationService } from "./misc-reconciliation.service";
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { FulfillmentNotifier } from "./fulfillment-notifier.service";
+import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { EscrowHoldService } from "./escrow-hold.service";
+import { FulfillmentStockService } from "./fulfillment-stock.service";
+import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
@@ -20,6 +30,7 @@ import { ElogoInvoicingService } from "../elogo";
 import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { CARGO_PROVIDER } from "../surat-cargo/cargo-provider";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
 import { I18nService } from "../i18n";
@@ -62,11 +73,27 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         PaymentCommonService,
         PaymentRefundService,
         PaymentReconciliationService,
+        ReservationReconciliationService,
+        PaymentExpiryReconciliationService,
+        PspReconciliationService,
+        RefundReconciliationService,
+        MiscReconciliationService,
         PaymentInitiationService,
         PaymentCallbackService,
         PaymentFulfillmentService,
         PaymentLifecycleService,
         I18nService,
+        FulfillmentFinalizer,
+        EscrowHoldService,
+        FulfillmentStockService,
+        VirtualOrderFulfillmentService,
+        {
+          provide: FulfillmentNotifier,
+          useValue: {
+            notifyStockoutCascade: jest.fn().mockResolvedValue(undefined),
+            dispatchBackInStock: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         {
           provide: ElogoInvoicingService,
           useValue: {
@@ -98,6 +125,8 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         { provide: ProductLockService, useValue: noop },
         { provide: NotificationService, useValue: noop },
         { provide: SuratCargoService, useValue: noop },
+        // Faz 11.5a: PaymentCommonService artık CARGO_PROVIDER token'ına bağlı.
+        { provide: CARGO_PROVIDER, useValue: noop },
         { provide: CommissionLedgerService, useValue: noop },
         { provide: StorageService, useValue: noop },
         { provide: ModuleRef, useValue: noop },

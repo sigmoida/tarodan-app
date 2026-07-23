@@ -7,6 +7,8 @@ import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from "@nestjs/core";
 import { PrismaModule } from "./prisma";
 import { DevModule } from "./modules/dev/dev.module";
 import { AuthModule, JwtAuthGuard, BannedUserGuard } from "./modules/auth";
+import { OutboxModule } from "./modules/outbox/outbox.module";
+import { LedgerModule } from "./modules/ledger/ledger.module";
 import { UserModule } from "./modules/user";
 import { ProductModule } from "./modules/product";
 import { CategoryModule } from "./modules/category";
@@ -60,6 +62,8 @@ import { I18nModule } from "./modules/i18n";
 
 // Background Workers (BullMQ)
 import { WorkerModule } from "./workers";
+import { BullRootModule } from "./workers/bull-root.module";
+import { runsQueueWorkers } from "./process-role";
 
 // WebSocket for real-time communication
 import { WebSocketModule } from "./modules/websocket";
@@ -150,6 +154,12 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     // Global Cache (Redis) - GAP-020
     CacheModule,
 
+    // Reliable side-effect queue (Faz 5) — @Global
+    OutboxModule,
+
+    // Immutable double-entry ledger + drift reconciliation (Faz 6) — @Global
+    LedgerModule,
+
     // Core Feature modules
     AuthModule,
     UserModule,
@@ -196,8 +206,15 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     // GraphQLAppModule,   // GAP-L02: GraphQL API Support - Temporarily disabled
     I18nModule, // GAP-L03: Multi-language Support
 
-    // Background Workers (BullMQ)
-    WorkerModule, // Email, Push, Image, Payment, Shipping, Search workers
+    // Bull KÖK bağlantısı (Redis) — Faz 7.2: KOŞULSUZ yüklenir (gated WorkerModule'den
+    // ayrı). `PROCESS_ROLE=web` job İŞLEMEZ ama yine de enqueue eder + repeatable cron
+    // kaydeder → bağlantı her rolde gerekli.
+    BullRootModule,
+
+    // Background Workers (BullMQ) — Faz 7.2: `PROCESS_ROLE=web` iken YÜKLENMEZ (ağır
+    // kuyruk worker'ları = job TÜKETİCİLERİ ayrı worker process'ine taşınır). Varsayılan
+    // (`all`) + `worker` rollerinde yüklenir → tek-process deploy'da davranış değişmez.
+    ...(runsQueueWorkers() ? [WorkerModule] : []),
 
     // WebSocket for real-time communication
     WebSocketModule, // Messaging, Notifications, Live updates
@@ -205,7 +222,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     // Sentry for error tracking
     SentryModule, // Error tracking & Performance monitoring
 
-    // Cron job monitoring (global) — @TrackedCron + /admin/jobs dashboard
+    // Cron job monitoring (global) — CronTracker + /admin/jobs dashboard
     MonitoringModule,
 
     // Health check endpoints

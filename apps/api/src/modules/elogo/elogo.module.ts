@@ -1,8 +1,11 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { BullModule } from "@nestjs/bull";
+import { QUEUE_NAMES } from "../../workers/constants";
 import { ElogoService, ELOGO_SOAP_CLIENT } from "./elogo.service";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
 import { ElogoSchedulerService } from "./elogo-scheduler.service";
+import { ElogoScheduledProcessor } from "./elogo-scheduled.processor";
 import { ElogoInvoiceController } from "./elogo-invoice.controller";
 import { StorageModule } from "../storage/storage.module";
 import { TaxModule } from "../tax/tax.module";
@@ -19,7 +22,12 @@ import {
  * stub/live arasında seçilir; ElogoService dışarı export edilir.
  */
 @Module({
-  imports: [ConfigModule, StorageModule, TaxModule],
+  imports: [
+    ConfigModule,
+    StorageModule,
+    TaxModule,
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+  ],
   providers: [
     {
       provide: ELOGO_SOAP_CLIENT,
@@ -38,6 +46,7 @@ import {
     ElogoService,
     ElogoInvoicingService,
     ElogoSchedulerService,
+    ElogoScheduledProcessor,
   ],
   controllers: [ElogoInvoiceController],
   exports: [ElogoService, ElogoInvoicingService],

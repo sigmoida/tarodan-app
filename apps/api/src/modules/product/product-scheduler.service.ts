@@ -1,15 +1,14 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { PrismaService } from '../../prisma';
-import { ProductStatus, MembershipTierType } from '@prisma/client';
-import { computeQualityScore } from './helpers/quality-score';
-import { computeRelevanceScore } from './helpers/relevance-score';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { PrismaService } from "../../prisma";
+import { ProductStatus, MembershipTierType } from "@prisma/client";
+import { computeQualityScore } from "./helpers/quality-score";
+import { computeRelevanceScore } from "./helpers/relevance-score";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 
 /**
  * Product Scheduler Service
@@ -19,7 +18,6 @@ import { NotificationType } from '../notification/dto';
 @Injectable()
 export class ProductSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(ProductSchedulerService.name);
-
 
   // Popularity (etkileşim/aktivite) skoru ağırlıkları.
   // Belgedeki aktivite faktörleri: görüntülenme + favori + mesaj alma (+ son aktivite).
@@ -43,15 +41,33 @@ export class ProductSchedulerService implements OnModuleInit {
   ) {}
 
   /**
-   * Flag (CRONS_VIA_BULL) açıkken expireBoosts'u Bull repeatable job'una bağla.
-   * Flag kapalıyken hiçbir şey yapma — eski in-process @Cron çalışmaya devam eder.
+   * Ürün cron işlerini Bull repeatable olarak kaydeder (tek zamanlama mekanizması).
    */
   async onModuleInit(): Promise<void> {
-    const on = cronsViaBull();
-    await registerRepeatableCron(this.scheduledQueue, 'expire-boosts', '*/15 * * * *', on, this.logger);
-    await registerRepeatableCron(this.scheduledQueue, 'update-popularity', '0 3 * * *', on, this.logger);
-    await registerRepeatableCron(this.scheduledQueue, 'expire-old-listings', '0 4 * * *', on, this.logger);
-    await registerRepeatableCron(this.scheduledQueue, 'send-expiration-warnings', '0 10 * * *', on, this.logger);
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "expire-boosts",
+      "*/15 * * * *",
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "update-popularity",
+      "0 3 * * *",
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "expire-old-listings",
+      "0 4 * * *",
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "send-expiration-warnings",
+      "0 10 * * *",
+      this.logger,
+    );
   }
 
   /**
@@ -87,19 +103,11 @@ export class ProductSchedulerService implements OnModuleInit {
    * - popularityScore: mevcut ağırlıklı skor (popularityScore kolonuna yazılır)
    * - qualityScore: foto sayısı + açıklama + satıcı güven puanı (sıralamada kullanılır)
    * - rankTier reconcile: aktif boost → 2; ücretli (free olmayan) üyeli satıcı → 1; standart → 0
+   * Gerçek iş — Bull processor 'update-popularity' buradan çağırır.
    */
-  @TrackedCron('0 3 * * *') // Every day at 03:00 AM
-  async updatePopularityScores() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runUpdatePopularityScores();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runUpdatePopularityScores(log: (msg: string) => void = () => {}) {
-    this.logger.log('Starting popularity + quality score update...');
-    log('Popülerlik/kalite skoru güncellemesi başladı');
+    this.logger.log("Starting popularity + quality score update...");
+    log("Popülerlik/kalite skoru güncellemesi başladı");
 
     try {
       const now = new Date();
@@ -120,7 +128,7 @@ export class ProductSchedulerService implements OnModuleInit {
           _count: {
             select: {
               images: true,
-              orders: { where: { status: 'completed' } },
+              orders: { where: { status: "completed" } },
               likes: { where: { createdAt: { gte: sevenDaysAgo } } },
             },
           },
@@ -133,14 +141,15 @@ export class ProductSchedulerService implements OnModuleInit {
       const sellerIds = [...new Set(products.map((p) => p.sellerId))];
       const ratingGroups = sellerIds.length
         ? await this.prisma.rating.groupBy({
-            by: ['receiverId'],
-            where: { receiverId: { in: sellerIds }, status: 'approved' },
+            by: ["receiverId"],
+            where: { receiverId: { in: sellerIds }, status: "approved" },
             _avg: { score: true },
           })
         : [];
       const sellerRatingMap = new Map<string, number>();
       for (const g of ratingGroups) {
-        if (g._avg?.score != null) sellerRatingMap.set(g.receiverId, Number(g._avg.score));
+        if (g._avg?.score != null)
+          sellerRatingMap.set(g.receiverId, Number(g._avg.score));
       }
 
       // Ücretli (free olmayan) aktif üyeli satıcılar → rankTier 1
@@ -148,7 +157,7 @@ export class ProductSchedulerService implements OnModuleInit {
         ? await this.prisma.userMembership.findMany({
             where: {
               userId: { in: sellerIds },
-              status: 'active',
+              status: "active",
               tier: { type: { not: MembershipTierType.free } },
             },
             select: { userId: true },
@@ -160,14 +169,15 @@ export class ProductSchedulerService implements OnModuleInit {
       const productIds = products.map((p) => p.id);
       const messageGroups = productIds.length
         ? await this.prisma.messageThread.groupBy({
-            by: ['productId'],
+            by: ["productId"],
             where: { productId: { in: productIds } },
             _count: true,
           })
         : [];
       const messageCountMap = new Map<string, number>();
       for (const g of messageGroups) {
-        if (g.productId) messageCountMap.set(g.productId, (g as any)._count ?? 0);
+        if (g.productId)
+          messageCountMap.set(g.productId, (g as any)._count ?? 0);
       }
 
       let updatedCount = 0;
@@ -191,25 +201,47 @@ export class ProductSchedulerService implements OnModuleInit {
         // rankTier reconcile
         const hasActiveBoost =
           product.boostedUntil != null && new Date(product.boostedUntil) > now;
-        const rankTier = hasActiveBoost ? 2 : premiumSet.has(product.sellerId) ? 1 : 0;
+        const rankTier = hasActiveBoost
+          ? 2
+          : premiumSet.has(product.sellerId)
+            ? 1
+            : 0;
 
-        const relevanceScore = computeRelevanceScore({ rankTier, qualityScore, popularityScore });
+        const relevanceScore = computeRelevanceScore({
+          rankTier,
+          qualityScore,
+          popularityScore,
+        });
 
         await this.prisma.product.update({
           where: { id: product.id },
-          data: { popularityScore, popularityUpdatedAt: now, qualityScore, rankTier, relevanceScore } as any,
+          data: {
+            popularityScore,
+            popularityUpdatedAt: now,
+            qualityScore,
+            rankTier,
+            relevanceScore,
+          } as any,
         });
 
         updatedCount++;
       }
 
-      this.logger.log(`Popularity/quality scores updated for ${updatedCount} products`);
+      this.logger.log(
+        `Popularity/quality scores updated for ${updatedCount} products`,
+      );
       log(`${updatedCount} ürünün skoru güncellendi`);
-      return { summary: `${updatedCount} ürün skoru güncellendi`, stats: { updated: updatedCount } };
+      return {
+        summary: `${updatedCount} ürün skoru güncellendi`,
+        stats: { updated: updatedCount },
+      };
     } catch (error: any) {
       this.logger.error(`Error updating scores: ${error.message}`, error.stack);
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { updated: 0, errors: 1 } };
+      return {
+        summary: `Hata: ${error.message}`,
+        stats: { updated: 0, errors: 1 },
+      };
     }
   }
 
@@ -218,7 +250,7 @@ export class ProductSchedulerService implements OnModuleInit {
    * Can be called by admin endpoints
    */
   async manualUpdatePopularityScores(): Promise<{ updated: number }> {
-    await this.updatePopularityScores();
+    await this.runUpdatePopularityScores();
     const count = await this.prisma.product.count({
       where: {
         status: ProductStatus.active,
@@ -232,20 +264,7 @@ export class ProductSchedulerService implements OnModuleInit {
    * - boostedUntil geçmişte kalan ürünlerin rankTier'ını premium(1)/standart(0)'a indirir.
    * - İlgili ProductBoost kayıtlarını 'expired' yapar.
    * - Uzun süredir 'pending' kalan (ödenmemiş) boost'ları 'failed' yapar.
-   */
-  @TrackedCron('*/15 * * * *') // Her 15 dakikada
-  async expireBoosts() {
-    // Flag açıkken bu iş Bull repeatable'a taşındı; in-process cron no-op olur
-    // (çift çalışmayı önler). Flag kapalıyken eski davranış birebir devam eder.
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runExpireBoosts();
-  }
-
-  /**
-   * Boost süresi dolanları düşüren GERÇEK iş. Hem in-process cron hem Bull
-   * processor buradan çağırır — mantık tek kaynakta, davranış birebir korunur.
+   * Gerçek iş — Bull processor 'expire-boosts' buradan çağırır.
    */
   async runExpireBoosts(log: (msg: string) => void = () => {}) {
     try {
@@ -254,12 +273,17 @@ export class ProductSchedulerService implements OnModuleInit {
       // rankTier=2 ama boostedUntil süresi dolmuş ürünler
       const expiredProducts = await this.prisma.product.findMany({
         where: { rankTier: 2, boostedUntil: { lt: now } },
-        select: { id: true, sellerId: true, qualityScore: true, popularityScore: true },
+        select: {
+          id: true,
+          sellerId: true,
+          qualityScore: true,
+          popularityScore: true,
+        },
       });
 
       // Şimdi sona eren aktif boost'lar (otomatik yenileme hatırlatması için)
       const expiringBoosts = await this.prisma.productBoost.findMany({
-        where: { status: 'active', endsAt: { lt: now } },
+        where: { status: "active", endsAt: { lt: now } },
         select: {
           id: true,
           userId: true,
@@ -272,7 +296,9 @@ export class ProductSchedulerService implements OnModuleInit {
       const sellerIds = [
         ...new Set([
           ...expiredProducts.map((p) => p.sellerId),
-          ...expiringBoosts.map((b) => b.product?.sellerId).filter(Boolean) as string[],
+          ...(expiringBoosts
+            .map((b) => b.product?.sellerId)
+            .filter(Boolean) as string[]),
         ]),
       ];
       const premiumSet = new Set<string>();
@@ -280,7 +306,7 @@ export class ProductSchedulerService implements OnModuleInit {
         const premiumMemberships = await this.prisma.userMembership.findMany({
           where: {
             userId: { in: sellerIds },
-            status: 'active',
+            status: "active",
             tier: { type: { not: MembershipTierType.free } },
           },
           select: { userId: true },
@@ -304,7 +330,9 @@ export class ProductSchedulerService implements OnModuleInit {
         });
       }
       if (expiredProducts.length > 0) {
-        this.logger.log(`Expired boost on ${expiredProducts.length} product(s)`);
+        this.logger.log(
+          `Expired boost on ${expiredProducts.length} product(s)`,
+        );
       }
 
       // Otomatik yenileme açık + premium satıcı → yenileme hatırlatma bildirimi
@@ -321,25 +349,33 @@ export class ProductSchedulerService implements OnModuleInit {
 
       // ProductBoost kayıtlarını expired yap
       await this.prisma.productBoost.updateMany({
-        where: { status: 'active', endsAt: { lt: now } },
-        data: { status: 'expired' },
+        where: { status: "active", endsAt: { lt: now } },
+        data: { status: "expired" },
       });
 
       // 1 günden uzun süredir ödenmemiş (pending) boost'ları failed yap
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       await this.prisma.productBoost.updateMany({
-        where: { status: 'pending', createdAt: { lt: oneDayAgo } },
-        data: { status: 'failed' },
+        where: { status: "pending", createdAt: { lt: oneDayAgo } },
+        data: { status: "failed" },
       });
-      log(`${expiredProducts.length} ürün boost düşürüldü · ${expiringBoosts.length} boost sona erdi`);
+      log(
+        `${expiredProducts.length} ürün boost düşürüldü · ${expiringBoosts.length} boost sona erdi`,
+      );
       return {
         summary: `${expiredProducts.length} boost düşürüldü · ${expiringBoosts.length} sona erdi`,
-        stats: { downgraded: expiredProducts.length, expired: expiringBoosts.length },
+        stats: {
+          downgraded: expiredProducts.length,
+          expired: expiringBoosts.length,
+        },
       };
     } catch (error: any) {
       this.logger.error(`Error expiring boosts: ${error.message}`, error.stack);
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { downgraded: 0, errors: 1 } };
+      return {
+        summary: `Hata: ${error.message}`,
+        stats: { downgraded: 0, errors: 1 },
+      };
     }
   }
 
@@ -347,18 +383,10 @@ export class ProductSchedulerService implements OnModuleInit {
    * Expire old listings (60 days)
    * Runs every day at 04:00 AM
    * Sets active listings older than 60 days to inactive status
+   * Gerçek iş — Bull processor 'expire-old-listings' buradan çağırır.
    */
-  @TrackedCron('0 4 * * *') // Every day at 04:00 AM
-  async expireOldListings() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runExpireOldListings();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runExpireOldListings(log: (msg: string) => void = () => {}) {
-    this.logger.log('Starting listing expiration check...');
+    this.logger.log("Starting listing expiration check...");
 
     try {
       const expiryDate = new Date();
@@ -391,32 +419,51 @@ export class ProductSchedulerService implements OnModuleInit {
       });
 
       if (result.count > 0) {
-        this.logger.log(`Expired ${result.count} listings older than ${this.LISTING_EXPIRY_DAYS} days`);
+        this.logger.log(
+          `Expired ${result.count} listings older than ${this.LISTING_EXPIRY_DAYS} days`,
+        );
       } else {
-        this.logger.log('No listings to expire');
+        this.logger.log("No listings to expire");
       }
 
       // "İlanınız sona erdi" e-postaları (ilan başına, satıcıya). İlan 60 günü
       // doldurduğu ilk gün expire olup active'den çıktığı için mükerrer gitmez.
-      const frontendUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
+      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com";
       for (const listing of toExpire) {
         try {
-          await this.notificationService.sendTemplateEmailToUser(listing.seller.id, 'listing-expired', {
-            sellerName: listing.seller.displayName ?? '',
-            productTitle: listing.title,
-            listingUrl: `${frontendUrl}/products/${listing.id}`,
-          });
+          await this.notificationService.sendTemplateEmailToUser(
+            listing.seller.id,
+            "listing-expired",
+            {
+              sellerName: listing.seller.displayName ?? "",
+              productTitle: listing.title,
+              listingUrl: `${frontendUrl}/products/${listing.id}`,
+            },
+          );
         } catch (err: any) {
-          this.logger.warn(`listing-expired email failed for ${listing.id}: ${err?.message}`);
+          this.logger.warn(
+            `listing-expired email failed for ${listing.id}: ${err?.message}`,
+          );
         }
       }
 
-      log(`${result.count} eski ilan pasif yapıldı (>${this.LISTING_EXPIRY_DAYS} gün)`);
-      return { summary: `${result.count} eski ilan pasif yapıldı`, stats: { expired: result.count } };
+      log(
+        `${result.count} eski ilan pasif yapıldı (>${this.LISTING_EXPIRY_DAYS} gün)`,
+      );
+      return {
+        summary: `${result.count} eski ilan pasif yapıldı`,
+        stats: { expired: result.count },
+      };
     } catch (error: any) {
-      this.logger.error(`Error expiring listings: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error expiring listings: ${error.message}`,
+        error.stack,
+      );
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { expired: 0, errors: 1 } };
+      return {
+        summary: `Hata: ${error.message}`,
+        stats: { expired: 0, errors: 1 },
+      };
     }
   }
 
@@ -426,8 +473,10 @@ export class ProductSchedulerService implements OnModuleInit {
    */
   async getExpiringListings(daysUntilExpiry: number = 7): Promise<any[]> {
     const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() - this.LISTING_EXPIRY_DAYS + daysUntilExpiry);
-    
+    expiryDate.setDate(
+      expiryDate.getDate() - this.LISTING_EXPIRY_DAYS + daysUntilExpiry,
+    );
+
     const warningDate = new Date();
     warningDate.setDate(warningDate.getDate() - this.LISTING_EXPIRY_DAYS);
 
@@ -457,18 +506,10 @@ export class ProductSchedulerService implements OnModuleInit {
   /**
    * Send expiration warnings to sellers
    * Runs every day at 10:00 AM
+   * Gerçek iş — Bull processor 'send-expiration-warnings' buradan çağırır.
    */
-  @TrackedCron('0 10 * * *') // Every day at 10:00 AM
-  async sendExpirationWarnings() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runSendExpirationWarnings();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runSendExpirationWarnings(log: (msg: string) => void = () => {}) {
-    this.logger.log('Checking for listings expiring soon...');
+    this.logger.log("Checking for listings expiring soon...");
 
     try {
       // Cron günlük çalışır. 7 günlük pencerenin TAMAMINI seçersek aynı ilana
@@ -476,7 +517,9 @@ export class ProductSchedulerService implements OnModuleInit {
       // (60 - 7) dolduran ilanları (1 günlük bant) seç → ilan başına tek uyarı.
       const WARN_DAYS_BEFORE = 7;
       const bandEnd = new Date();
-      bandEnd.setDate(bandEnd.getDate() - (this.LISTING_EXPIRY_DAYS - WARN_DAYS_BEFORE));
+      bandEnd.setDate(
+        bandEnd.getDate() - (this.LISTING_EXPIRY_DAYS - WARN_DAYS_BEFORE),
+      );
       const bandStart = new Date(bandEnd);
       bandStart.setDate(bandStart.getDate() - 1);
 
@@ -494,42 +537,64 @@ export class ProductSchedulerService implements OnModuleInit {
       });
 
       if (expiringListings.length === 0) {
-        this.logger.log('No listings entering the 7-day expiry warning window');
-        log('Süresi yaklaşan ilan yok');
-        return { summary: '0 yaklaşan ilan', stats: { sellers: 0, listings: 0 } };
+        this.logger.log("No listings entering the 7-day expiry warning window");
+        log("Süresi yaklaşan ilan yok");
+        return {
+          summary: "0 yaklaşan ilan",
+          stats: { sellers: 0, listings: 0 },
+        };
       }
 
-      this.logger.log(`Warning sellers about ${expiringListings.length} listing(s) expiring in ~7 days`);
+      this.logger.log(
+        `Warning sellers about ${expiringListings.length} listing(s) expiring in ~7 days`,
+      );
       log(`${expiringListings.length} ilan 7 gün içinde sona eriyor`);
 
       // "İlanınızın süresi doluyor" e-postası (ilan başına, satıcıya).
-      const frontendUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
+      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com";
       for (const listing of expiringListings) {
         const expirationDate = new Date(listing.createdAt);
-        expirationDate.setDate(expirationDate.getDate() + this.LISTING_EXPIRY_DAYS);
+        expirationDate.setDate(
+          expirationDate.getDate() + this.LISTING_EXPIRY_DAYS,
+        );
         try {
-          await this.notificationService.sendTemplateEmailToUser(listing.seller.id, 'listing-expiring', {
-            sellerName: listing.seller.displayName ?? '',
-            productTitle: listing.title,
-            daysRemaining: WARN_DAYS_BEFORE,
-            expirationDate: expirationDate.toLocaleDateString('tr-TR'),
-            listingUrl: `${frontendUrl}/products/${listing.id}`,
-          });
+          await this.notificationService.sendTemplateEmailToUser(
+            listing.seller.id,
+            "listing-expiring",
+            {
+              sellerName: listing.seller.displayName ?? "",
+              productTitle: listing.title,
+              daysRemaining: WARN_DAYS_BEFORE,
+              expirationDate: expirationDate.toLocaleDateString("tr-TR"),
+              listingUrl: `${frontendUrl}/products/${listing.id}`,
+            },
+          );
         } catch (err: any) {
-          this.logger.warn(`listing-expiring email failed for ${listing.id}: ${err?.message}`);
+          this.logger.warn(
+            `listing-expiring email failed for ${listing.id}: ${err?.message}`,
+          );
         }
       }
 
-      const sellerCount = new Set(expiringListings.map((l) => l.seller.id)).size;
-      log(`${sellerCount} satıcıya ${expiringListings.length} ilan için süre uyarısı gönderildi`);
+      const sellerCount = new Set(expiringListings.map((l) => l.seller.id))
+        .size;
+      log(
+        `${sellerCount} satıcıya ${expiringListings.length} ilan için süre uyarısı gönderildi`,
+      );
       return {
         summary: `${sellerCount} satıcı · ${expiringListings.length} ilan`,
         stats: { sellers: sellerCount, listings: expiringListings.length },
       };
     } catch (error: any) {
-      this.logger.error(`Error sending expiration warnings: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error sending expiration warnings: ${error.message}`,
+        error.stack,
+      );
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { sellers: 0, listings: 0, errors: 1 } };
+      return {
+        summary: `Hata: ${error.message}`,
+        stats: { sellers: 0, listings: 0, errors: 1 },
+      };
     }
   }
 

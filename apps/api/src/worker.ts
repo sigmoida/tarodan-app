@@ -5,7 +5,7 @@
 import { NestFactory } from "@nestjs/core";
 import { Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
-import { WorkerModule } from "./workers";
+import { AppModule } from "./app.module";
 import { AppNestLogger } from "./common/logging/nest-logger";
 
 /**
@@ -51,13 +51,20 @@ async function bootstrap() {
 
   logger.log("Starting Tarodan Worker...");
 
-  const app = await NestFactory.createApplicationContext(WorkerModule, {
+  // Faz 7.2: worker, AppModule'ü BAŞSIZ (HTTP yok) application-context olarak yükler.
+  // Böylece hem klasik kuyruk worker'ları (WorkerModule) hem de feature modüllerine
+  // gömülü `scheduled` kuyruğu processor'ları (outbox-drain, ledger-reconcile, payout,
+  // membership, boost, ...) ayrı worker process'inde koşar. Rol env'den okunur; worker
+  // servisine `PROCESS_ROLE=worker` verilir (WorkerModule yine yüklenir — `web` değil).
+  const app = await NestFactory.createApplicationContext(AppModule, {
     logger: new AppNestLogger(),
   });
 
-  logger.log("Worker started successfully");
   logger.log(
-    "Listening for jobs on queues: email, push, image, payment, shipping, search",
+    "Worker started successfully (headless AppModule application-context)",
+  );
+  logger.log(
+    "Processing queues: email, push, image, payment, search, analytics, moderation + scheduled",
   );
 
   // Graceful shutdown

@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { SuratGonderiPayload, SuratBarcodeRaw } from "./surat-cargo.types";
 import {
-  SuratSoapClient,
+  SuratCarrierClient,
   type SuratSoapCallOptions,
 } from "./surat-soap.client";
 
@@ -101,7 +101,7 @@ export function buildRestGonderi(
 }
 
 @Injectable()
-export class RestSuratClient extends SuratSoapClient {
+export class RestSuratClient extends SuratCarrierClient {
   private readonly logger = new Logger(RestSuratClient.name);
 
   constructor(private readonly configService: ConfigService) {

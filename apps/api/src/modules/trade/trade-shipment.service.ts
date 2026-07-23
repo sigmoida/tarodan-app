@@ -7,18 +7,8 @@ import {
 import { PrismaService } from "../../prisma";
 import { ShipmentStatus } from "@prisma/client";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import {
-  normalizeSuratPhone,
-  normalizeSuratLocation,
-} from "../surat-cargo/surat-address.util";
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-  SuratGonderiPayload,
-} from "../surat-cargo/surat-cargo.types";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { SuratGonderiPayload } from "../surat-cargo/surat-cargo.types";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
@@ -478,26 +468,17 @@ export class TradeShipmentService {
       user?.email ||
       "Takas Gönderici";
 
-    return {
-      KisiKurum: warehouseName,
-      SahisBirim: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
-      AliciAdresi: warehouseAddress,
-      Il: normalizeSuratLocation(warehouseCity),
-      Ilce: normalizeSuratLocation(warehouseDistrict),
-      TelefonCep: normalizeSuratPhone(warehousePhone),
-      KargoTuru: SuratKargoTuru.Koli,
-      OdemeTipi: SuratOdemeTipi.Pesin,
-      OzelKargoTakipNo: ozelKargoTakipNo,
-      Adet: 1,
-      BirimDesi: 1,
-      BirimKg: 1,
-      KapidanOdemeTahsilatTipi: 1 as any,
-      TasimaSekli: SuratTasimaSekli.KaraYolu,
-      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-      GonderiSekli: SuratGonderiSekli.Standart,
-      Pazaryerimi: 0,
-      Iademi: false,
-    };
+    // warehouseName zaten `?.trim() || "Tarodan Depo"` → daima boş olmayan trimli
+    // değer; builder'ın `KisiKurum.trim() || "Alıcı"` mantığı burada no-op olur.
+    return buildStandardGonderiPayload({
+      recipientName: warehouseName,
+      address: warehouseAddress,
+      city: warehouseCity,
+      district: warehouseDistrict,
+      phone: warehousePhone,
+      ref: ozelKargoTakipNo,
+      content: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
+    });
   }
 
   /**

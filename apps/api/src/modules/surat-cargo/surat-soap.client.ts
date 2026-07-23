@@ -7,9 +7,11 @@ export interface SuratSoapCallOptions {
 }
 
 /**
- * Abstraction over Sürat SOAP operations — returns raw string from carrier.
+ * Transport-neutral abstraction over Sürat carrier operations — returns raw
+ * string/objects from the carrier. Concrete clients speak SOAP (legacy .asmx),
+ * REST/JSON (api01/api02), or are config-driven stubs.
  */
-export abstract class SuratSoapClient {
+export abstract class SuratCarrierClient {
   abstract callGonderiyiKargoyaGonderYeni(
     payload: SuratGonderiPayload,
     options: SuratSoapCallOptions,
@@ -44,6 +46,17 @@ export abstract class SuratSoapClient {
   supportsRemoteCancel(): boolean {
     return true;
   }
+
+  /**
+   * Bu client `OrtakBarkodOlustur` (gönderi oluştur + gerçek KargoTakipNo + ZPL
+   * etiket) ucunu destekliyor mu? REST/stub client'lar için true. Eski SOAP
+   * web servisi (services.asmx) bu ucu sunmadığı için LiveSuratSoapClient'ta
+   * false döner; o durumda çağıran barkod yolunu KULLANMAZ ve create+barkod
+   * isteği teknik hata (UNKNOWN) olarak sonuçlanır (SURAT_SOAP_MODE=rest gerekir).
+   */
+  supportsBarcode(): boolean {
+    return true;
+  }
 }
 
 /**
@@ -51,7 +64,7 @@ export abstract class SuratSoapClient {
  * SURAT_STUB_THROW=TIMEOUT|NETWORK|HTTP_5XX|PARSE_ERROR|EMPTY|UNKNOWN simulates technical failures.
  */
 @Injectable()
-export class StubSuratSoapClient extends SuratSoapClient {
+export class StubSuratSoapClient extends SuratCarrierClient {
   private readonly logger = new Logger(StubSuratSoapClient.name);
 
   /** Test introspection: history of submitShipment calls (cleared on reset) */
@@ -320,8 +333,16 @@ function parseCancelResponse(xml: string): string {
  * Production SOAP client — sends real XML to Sürat Kargo web service.
  */
 @Injectable()
-export class LiveSuratSoapClient extends SuratSoapClient {
+export class LiveSuratSoapClient extends SuratCarrierClient {
   private readonly logger = new Logger(LiveSuratSoapClient.name);
+
+  // OrtakBarkodOlustur is a REST-only endpoint (api01/api02). The legacy SOAP
+  // web service (services.asmx) does not expose it, so this client declares the
+  // barcode capability unsupported — callers must guard on supportsBarcode()
+  // rather than invoke callOrtakBarkodOlustur (which throws, see below).
+  supportsBarcode(): boolean {
+    return false;
+  }
 
   constructor(private readonly configService: ConfigService) {
     super();

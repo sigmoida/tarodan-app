@@ -1,22 +1,13 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./payment-metadata.types";
-import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import {
-  normalizeSuratPhone,
-  normalizeSuratLocation,
-} from "../surat-cargo/surat-address.util";
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-  SuratKapidanOdemeTahsilatTipi,
-  type SuratGonderiPayload,
-  type SuratShipmentFailure,
-} from "../surat-cargo/surat-cargo.types";
+  CARGO_PROVIDER,
+  type CargoProvider,
+} from "../surat-cargo/cargo-provider";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { type SuratShipmentFailure } from "../surat-cargo/surat-cargo.types";
 
 /**
  * Ödeme grupları arasında paylaşılan yardımcılar (order/trade split'lerindeki
@@ -29,7 +20,7 @@ export class PaymentCommonService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly suratCargoService: SuratCargoService,
+    @Inject(CARGO_PROVIDER) private readonly cargo: CargoProvider,
   ) {}
 
   /**
@@ -70,8 +61,7 @@ export class PaymentCommonService {
         return;
       }
 
-      const result =
-        await this.suratCargoService.cancelShipmentByOrderNumber(orderNumber);
+      const result = await this.cargo.cancelShipmentByOrderNumber(orderNumber);
       if (result.ok) {
         await this.prisma.shipment.update({
           where: { id: shipment.id },
@@ -99,7 +89,7 @@ export class PaymentCommonService {
   async createSuratBarcodeForOrder(
     orderId: string,
   ): Promise<{ kargoTakipNo: string; labelZpl: string | null } | null> {
-    if (!this.suratCargoService.isIntegrationEnabled()) return null;
+    if (!this.cargo.isIntegrationEnabled()) return null;
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -123,29 +113,19 @@ export class PaymentCommonService {
       return null;
     }
 
-    const payload: SuratGonderiPayload = {
-      KisiKurum: String(addr.fullName ?? "").trim() || "Alıcı",
-      AliciAdresi: String(addr.address).trim(),
-      Il: normalizeSuratLocation(String(addr.city)),
-      Ilce: normalizeSuratLocation(String(addr.district)),
-      TelefonCep: normalizeSuratPhone(String(addr.phone ?? "")),
-      SahisBirim: order.product?.title ?? undefined,
-      KargoTuru: SuratKargoTuru.Koli,
-      OdemeTipi: SuratOdemeTipi.Pesin,
-      OzelKargoTakipNo: order.orderNumber,
-      Adet: 1,
-      BirimDesi: 1,
-      BirimKg: 1,
-      KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
-      TasimaSekli: SuratTasimaSekli.KaraYolu,
-      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-      GonderiSekli: SuratGonderiSekli.Standart,
-      Pazaryerimi: 0,
-      Iademi: false,
-    };
+    const payload = buildStandardGonderiPayload({
+      recipientName: String(addr.fullName ?? ""),
+      // AliciAdresi'ni trimli geç: builder adresi normalize etmez (yalnız il/ilçe/tel).
+      address: String(addr.address).trim(),
+      city: String(addr.city),
+      district: String(addr.district),
+      phone: String(addr.phone ?? ""),
+      ref: order.orderNumber,
+      content: order.product?.title ?? undefined,
+    });
 
     try {
-      const result = await this.suratCargoService.createShipmentWithBarcode({
+      const result = await this.cargo.createShipmentWithBarcode({
         idempotencyKey: `surat:order:${order.orderNumber}`,
         correlationId: order.orderNumber,
         payload,

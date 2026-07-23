@@ -7,10 +7,20 @@ import { PaymentQueryService } from "./payment-query.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { ReservationReconciliationService } from "./reservation-reconciliation.service";
+import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
+import { PspReconciliationService } from "./psp-reconciliation.service";
+import { RefundReconciliationService } from "./refund-reconciliation.service";
+import { MiscReconciliationService } from "./misc-reconciliation.service";
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { FulfillmentNotifier } from "./fulfillment-notifier.service";
+import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { EscrowHoldService } from "./escrow-hold.service";
+import { FulfillmentStockService } from "./fulfillment-stock.service";
+import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -21,6 +31,7 @@ import { ElogoInvoicingService } from "../elogo";
 import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { CARGO_PROVIDER } from "../surat-cargo/cargo-provider";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
 import { I18nService } from "../i18n";
@@ -109,6 +120,7 @@ describe("PaymentService group payment (checkout group)", () => {
   const mockEvents = {
     emitOrderPaid: jest.fn(),
     emitGroupBuyerOrderPaid: jest.fn(),
+    emitOrderFulfillmentRequested: jest.fn(),
     emitPaymentFailed: jest.fn(),
   };
 
@@ -164,11 +176,31 @@ describe("PaymentService group payment (checkout group)", () => {
         PaymentCommonService,
         PaymentRefundService,
         PaymentReconciliationService,
+        ReservationReconciliationService,
+        PaymentExpiryReconciliationService,
+        PspReconciliationService,
+        RefundReconciliationService,
+        MiscReconciliationService,
         PaymentInitiationService,
         PaymentCallbackService,
         PaymentFulfillmentService,
         PaymentLifecycleService,
         I18nService,
+        // Faz 8.1: finalizer artık OrderFulfillmentListener üzerinden çağrılır; burada
+        // yalnız PaymentFulfillmentService DI'ı için sağlanır (trade capture yolu kullanır).
+        FulfillmentFinalizer,
+        // Gerçek escrow servisi → paymentHold.create / upsertPending assertion'ları için.
+        EscrowHoldService,
+        // Gerçek stok servisi → product.update / invalidate kaskad assertion'ları için.
+        FulfillmentStockService,
+        VirtualOrderFulfillmentService,
+        {
+          provide: FulfillmentNotifier,
+          useValue: {
+            notifyStockoutCascade: jest.fn().mockResolvedValue(undefined),
+            dispatchBackInStock: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         {
           provide: ElogoInvoicingService,
           useValue: {
@@ -203,6 +235,8 @@ describe("PaymentService group payment (checkout group)", () => {
         { provide: ProductLockService, useValue: mockProductLock },
         { provide: NotificationService, useValue: {} },
         { provide: SuratCargoService, useValue: {} },
+        // Faz 11.5a: PaymentCommonService artık CARGO_PROVIDER token'ına bağlı.
+        { provide: CARGO_PROVIDER, useValue: {} },
         { provide: CommissionLedgerService, useValue: mockCommissionLedger },
         {
           provide: StorageService,
@@ -256,9 +290,9 @@ describe("PaymentService group payment (checkout group)", () => {
     // Ledger sipariş başına
     expect(mockCommissionLedger.upsertPending).toHaveBeenCalledTimes(2);
 
-    // Tx sonrası: sipariş başına order.paid (SATICI tarafı) + shipment
-    expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(2);
-    expect(mockPrisma.shipment.create).toHaveBeenCalledTimes(2);
+    // Faz 8.1: tx sonrası sipariş başına fulfillment sonlandırması EVENT ile istenir
+    // (OrderFulfillmentListener tüketir; order.paid/Sürat orada). Burada seam doğrulanır.
+    expect(mockEvents.emitOrderFulfillmentRequested).toHaveBeenCalledTimes(2);
 
     // ALICI tarafı: grup başına TEK onay maili (ürün başına değil)
     expect(mockEvents.emitGroupBuyerOrderPaid).toHaveBeenCalledTimes(1);
@@ -266,8 +300,9 @@ describe("PaymentService group payment (checkout group)", () => {
     expect(groupBuyerArg.items).toHaveLength(2);
     expect(groupBuyerArg.buyerId).toBe("buyer-1");
 
-    // Sipariş başına emitOrderPaid alıcıyı atlamalı (skipBuyer:true)
-    for (const call of mockEvents.emitOrderPaid.mock.calls) {
+    // Sipariş başına fulfillment isteği alıcıyı atlamalı (skipBuyer:true) — grup onayı
+    // yukarıda emitGroupBuyerOrderPaid ile bir kez gönderildi.
+    for (const call of mockEvents.emitOrderFulfillmentRequested.mock.calls) {
       expect(call[0].skipBuyer).toBe(true);
     }
   });
@@ -357,7 +392,7 @@ describe("PaymentService group payment (checkout group)", () => {
     expect(mockTx.paymentHold.create.mock.calls[0][0].data.orderId).toBe(
       "order-1",
     );
-    expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(1);
+    expect(mockEvents.emitOrderFulfillmentRequested).toHaveBeenCalledTimes(1);
   });
 
   it("group payment initiation rejects when any order is no longer pending_payment", async () => {

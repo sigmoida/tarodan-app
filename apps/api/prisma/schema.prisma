@@ -2373,3 +2373,94 @@ enum BuyerConfirmationType {
   auto_timeout
   admin_force
 }
+
+// =============================================================================
+// OUTBOX (Faz 5) — para mutasyonuyla AYNI tx'te yazılan güvenilir yan-etki kuyruğu.
+// "post-commit best-effort .catch(log)" yan-etkilerini (PayTR iade, Sürat iptali,
+// fatura, bildirim) çökmeye dayanıklı kılar: tx commit olursa satır KESİN işlenir
+// (drainer retry+backoff+DLQ). Handler'lar idempotent olmalı. PAN/CVV asla payload'a
+// yazılmaz (yalnız id'ler + tutar). dedupeKey ile aynı yan-etki iki kez enqueue edilmez.
+// =============================================================================
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  type          String // handler dispatch anahtarı (ör. "invoice.generate")
+  payload       Json // handler girdisi (id'ler + tutar; PAN/CVV/PII minimal)
+  status        OutboxStatus @default(pending)
+  attempts      Int          @default(0)
+  maxAttempts   Int          @default(8) @map("max_attempts")
+  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at")
+  dedupeKey     String?      @unique @map("dedupe_key") // idempotency (aynı yan-etki tek satır)
+  lastError     String?      @map("last_error")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  processedAt   DateTime?    @map("processed_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([type, status])
+  @@map("outbox_events")
+}
+
+enum OutboxStatus {
+  pending
+  processing
+  completed
+  dead // maxAttempts aşıldı — DLQ (manuel inceleme + alarm)
+}
+
+// =============================================================================
+// LEDGER (Faz 6) — DEĞİŞMEZ çift-taraflı (double-entry) para defteri.
+// Her para olayı DENGELİ bir satır grubu yazar (Σdebit == Σcredit; LedgerService
+// bunu zorlar). Bakiye/tutar tutarlılığının denetim kaynağı; drift reconciliation'ın
+// (6.5) temeli. Append-only — satır GÜNCELLENMEZ/SİLİNMEZ; düzeltme ters kayıtla yapılır.
+// FK yok (soft ref) — defter, kaynak tablolar silinse bile kalıcı denetim izidir.
+// =============================================================================
+model LedgerEntry {
+  id           String          @id @default(uuid())
+  entryGroupId String          @map("entry_group_id") // aynı olayın satırlarını bağlar
+  eventType    LedgerEventType @map("event_type")
+  account      LedgerAccount
+  direction    LedgerDirection
+  amount       Decimal         @db.Decimal(12, 2) // her zaman pozitif; yön `direction`'da
+  currency     String          @default("TRY")
+  paymentId    String?         @map("payment_id")
+  orderId      String?         @map("order_id")
+  tradeId      String?         @map("trade_id")
+  payoutId     String?         @map("payout_id")
+  holdId       String?         @map("hold_id")
+  sellerId     String?         @map("seller_id")
+  buyerId      String?         @map("buyer_id")
+  memo         String?
+  metadata     Json?
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@index([entryGroupId])
+  @@index([account, createdAt])
+  @@index([eventType, createdAt])
+  @@index([orderId])
+  @@index([sellerId, account])
+  @@map("ledger_entries")
+}
+
+enum LedgerEventType {
+  payment_captured // alıcı ödedi → escrow + komisyon
+  hold_released // escrow satıcıya uygun hale geldi
+  payout_created // satıcıya transfer başlatıldı
+  payout_completed // transfer tamamlandı
+  refund_issued // alıcıya iade
+  trade_commission // takas komisyonu
+  adjustment // manuel düzeltme (ters kayıt)
+}
+
+enum LedgerAccount {
+  buyer_payment // dış para girişi (alıcının ödediği)
+  seller_escrow // satıcıya borç (tutulan)
+  platform_commission // platform geliri
+  withholding_tax // stopaj (GVK 94/19 — muhtasar ile beyan)
+  payout // dış para çıkışı (satıcıya transfer)
+  refund // dış para çıkışı (alıcıya iade)
+}
+
+enum LedgerDirection {
+  debit
+  credit
+}

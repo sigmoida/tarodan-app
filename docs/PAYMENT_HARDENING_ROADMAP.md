@@ -264,47 +264,151 @@
 
 ---
 
-## Faz 5 — Outbox pattern (para yan-etkileri) · `fix/payment-hardening-outbox`
+## Faz 5 — Outbox pattern (para yan-etkileri) · `fix/payment-hardening-outbox-ledger-bull`
 
 > "post-commit best-effort .catch(log)" para yan-etkilerini güvenilir kılar.
 
-- [ ] **5.1** `outbox` tablosu (event tipi, payload, status, attempts, nextAttemptAt).
-- [ ] **5.2** Para mutasyonuyla AYNI tx'te outbox satırı; ayrı worker retry+backoff+DLQ ile boşaltır.
-- [ ] **5.3** Taşınacak yan-etkiler: PayTR iade çağrısı, Sürat gönderi iptali, takas nakit iadesi, fatura üretimi, bildirim fan-out. (SEAM-B2, MONEY-H1/H2 ile kesişir — outbox onların kalıcı çözümü.)
+- [x] **5.1** ✓ `outbox_events` tablosu (type, payload, status, attempts, maxAttempts, nextAttemptAt,
+      **dedupeKey unique** = idempotency, lastError). Migration `20260723090000_outbox_events`.
+- [x] **5.2** ✓ `OutboxService.enqueue(tx, …)` para mutasyonuyla **AYNI** tx'e yazar (rollback'te geri
+      alınır; dedupe hariç hata FIRLATIR — best-effort DEĞİL). `OutboxDrainerService` (`@TrackedCron`,
+      `moneyCronsViaBull` gate'li → Faz 7'de Bull) `pending & nextAttemptAt<=now`'ı CAS ile claim edip
+      handler'a verir: başarı→completed, hata→exp-backoff retry, maxAttempts→`dead` (DLQ + alarm).
+      `OutboxHandlerRegistry` (type→idempotent handler, domain servisleri onModuleInit'te kaydeder).
+      `@Global OutboxModule`. **Spec:** enqueue (dedupe/tx-güvenli) + drainer (retry/backoff/dead/CAS).
+- [x] **5.3** ✓ Taşınan yan-etkiler (hepsi iade commit'iyle ATOMİK outbox satırı; anlık post-commit
+      tetik hızlı-yol kalır, outbox çökmeye dayanıklı backstop; handler'lar idempotent; enjeksiyon
+      `@Optional` → para testlerinde sıfır churn):
+  - **Sürat gönderi iptali (iade)** → `shipment.cancel`.
+  - **eLogo e-Arşiv ters kaydı (tam iade)** → `invoice.refund_reverse`.
+  - **eLogo takas-nakit iade ters kaydı** → `invoice.trade_cash_refund_reverse` (persist tx'inde atomik).
+
+  **KARAR — PayTR iade ÇAĞRISI bilinçli olarak outbox'a TAŞINMADI:** `createRefund`'ı outbox'a almak
+  iadeyi senkron→async yapardı ve `refundInProgress` marker + `reconcileStuckRefundMarkers` sweep'i
+  (Faz 1.1/4.4) zaten bu para çağrısının outbox-eşdeğeri güvenilirliğini SAĞLIYOR (marker = idempotency
+  anahtarı). Admin/çağıranların beklediği senkron iade sonucunu bozmamak için marker-tabanlı bırakıldı.
+  Fulfillment yan-etkileri (eLogo fatura, bildirim, Sürat oluşturma) → Faz 8.1 event-driven ile ele alınır.
 
 ---
 
-## Faz 6 — Birleşik ledger (double-entry) · `fix/payment-hardening-ledger`
+## Faz 6 — Birleşik ledger (double-entry) · `fix/payment-hardening-outbox-ledger-bull`
 
 > Bakiye/tutar tutarlılığının tek kaynağı; kısmi iade doğruluğunun yapısal temeli.
 
-- [ ] **6.1** Değişmez `ledger_entry` (debit/credit, hesap, tutar, para olayı ref).
-- [ ] **6.2** Her para olayı (ödeme, komisyon, hold, release, payout, iade, takas komisyonu) bir entry; bakiyeler türetilir.
-- [ ] **6.3** Hold tüketimi/kısmi iade ledger'dan okusun (Faz 1.4'ün yapısal hâli).
-- [ ] **6.4** Sipariş + takas komisyonlarını tek deftere birleştir (MONEY-L7).
-- [ ] **6.5** Günlük reconciliation: ledger vs Payment/Hold/Payout vs PSP raporu; drift alarmı.
-      (Kaynak: Faz 4c `payment_provider_events` — PayTR'nin bildirdiği tutar/yöntem/taksit orada.)
+- [x] **6.1** ✓ Değişmez `ledger_entries` (entryGroupId, eventType, account, direction, amount,
+      soft ref'ler). `LedgerService.record(tx, …)` DENGELİ grup zorlar (Σdebit==Σcredit, değilse
+      FIRLATIR); append-only (güncelleme/silme yok; düzeltme = ters kayıt). Migration
+      `20260723100000_ledger_entries`. **Spec:** denge zorlaması + negatif reddi + recordCapture.
+- [x] **6.2** ✓ Ana para olayları çift-taraflı deftere yazılıyor (hepsi @Optional + best-effort;
+      defter hatası para akışını BOZMAZ; reconciliation açığı yakalar):
+  - **`payment_captured`** (`recordCapture`): buyer_payment = seller_escrow + platform_commission +
+    withholding_tax; fulfillment tekil + grup, POST-COMMIT.
+  - **`payout_completed`** (`PayoutService`): seller_escrow (credit) = payout (debit) → escrow settle;
+    capture'ın escrow debit'ini dengeler → sipariş bazında escrow net 0.
+  - **`refund_issued`** (`recordRefund`): dış çıkış (refund) = capture'ın ORANSAL ters kaydı
+    (ratio = refund/orderTotal; komisyon/stopaj yuvarlanır, seller_escrow kalanı emer → drift'siz
+    dengeli); iade finalize tx'inde. **Spec:** tam/kısmi iade denge + dejenere-null.
+    **Devam (6.3'e):** hold_release (nakit değil, iç yeniden-sınıflama) + trade_commission (takas alt-sistemi,
+    takas capture ledger'ı henüz yok) → tam per-hesap bakiye türetimiyle birlikte.
+- [x] **6.3** ✓ Bakiyeler defterden OKUNUYOR — `LedgerBalanceService` (CQRS read-model): siparişin
+      `captured` (Σ buyer_payment credit), `refunded` (Σ refund debit), `remainingRefundable` (yapısal
+      kısmi-iade tavanı) ve `escrowNet` (signed seller_escrow) değerlerini Payment/Hold'dan DEĞİL,
+      değişmez `ledger_entries`'ten türetir. Tek türetim otoritesi (`deriveOrderBalances` saf fonksiyonu)
+      hem tek-sipariş DB sorgusunda hem de reconciliation'ın pencere satırlarında AYNI mantığı koşar (DRY).
+      `LedgerReconciliationService`'e 3. invaryant eklendi: defter-native sipariş-bazlı fazla-iade
+      (Σ refund > Σ capture → `LEDGER_OVER_REFUND` alarmı) — Payment metadata'ya değil deftere dayanır,
+      6.5'in "ledger vs Payment" çapraz-doğrulamasını sertleştirir. **Spec:** türetim + DB + escrow +
+      reconcile over-refund. **Kapsam kararı:** para YAZMA yolunu (refund tavanı/payout uygunluğu)
+      defterden ZORLAMAK (Payment/Hold'u kaynak olmaktan tamamen çıkarmak) bilinçli ERTELENDİ — defter
+      @Optional + best-effort (eksik/gecikmeli olabilir), onunla para akışını BLOKLAMAK "defter hatası
+      parayı bozmaz" invaryantını çiğnerdi; defter OKUMA/çapraz-doğrulama kaynağıdır.
+- [x] **6.4** ✓ Sipariş + takas komisyonları TEK deftere birleşti (MONEY-L7). Eski `commission_ledger`
+      yalnız SİPARİŞ komisyonuydu (`orderId @unique`); takas komisyonu takas alt-sisteminde ayrıydı.
+      `LedgerService.recordTradeCashCapture` takas nakit yakalamasını (payer totalAmount = recipient net +
+      platform komisyon) çift-taraflı deftere yazıyor → takas komisyonu da sipariş komisyonuyla AYNI
+      `platform_commission` hesabına düşer; gelir tek yerden (Σ platform_commission) sorgulanır. Takas
+      escrow'u trade `payout_completed` ile kapanır → sipariş akışıyla aynı yaşam döngüsü. Fulfillment
+      trade-cash yolunda POST-COMMIT best-effort (@Optional). **Spec:** takas capture denge + tradeId ref.
+- [x] **6.5** ✓ `LedgerReconciliationService` GÜNLÜK drift denetimi (`@TrackedCron 0 4 * * *`,
+      moneyCronsViaBull-gate → Faz 7 Bull). Yalnız OKUR; sert invaryant ihlalinde greplenebilir ALARM:
+      (1) defter dengesi (her grup Σ=0), (2) fazla-iade (ΣrefundedOrders > payment.amount). **Spec:**
+      dengeli/dengesiz + fazla-iade. (Tam "ledger vs Payment/Hold/Payout vs PSP" mutabakatı 6.3 sonrası
+      sertleşir; PSP kaynağı Faz 4c `payment_provider_events`.)
 
 ---
 
-## Faz 7 — Dayanıklılık: Bull migrasyonu + ayrı worker · `fix/payment-hardening-resilience`
+## Faz 7 — Dayanıklılık: Bull migrasyonu + ayrı worker · `fix/payment-hardening-outbox-ledger-bull`
 
 > "Sistem çökse bile çalışsın" isteğinin gerçek karşılığı. Faz 0 önkoşul.
 
-- [ ] **7.1** Kalan saf-`@Cron`'ları Bull desenine getir: `elogo-scheduler` (EVERY_30_MIN), `featured-scheduler` (`15 3 * * *`), `search-sync:82` (EVERY_HOUR).
-- [ ] **7.2** Worker'ı ayrı process olarak deploy et (`worker.ts` → `node dist/worker`, ayrı Coolify servisi) + `AppModule`'den `WorkerModule`'ü çıkar (API çift-işlemesin). → API çökse kuyruk donmaz; worker replike edilebilir (HA).
-- [ ] **7.3** Her job'ın idempotentliğini doğrula (Bull at-least-once). Faz 1-2'deki CAS işi para job'larını hazırlar; tek tek onayla.
-- [ ] **7.4** Bull `settings` (lockDuration/stalledInterval/maxStalledCount) + DLQ; her job "vadesi gelmiş HER ŞEYİ bul" deseninde (backfill yok kuralı).
-- [ ] **7.5** Bayrakları aç (önce `CRONS_VIA_BULL`, sonra `MONEY_CRONS_VIA_BULL`), in-process `@Cron` ikizlerini kaldır → **tek mekanizma**.
+- [x] **Yeni PARA cron'ları Bull-hazır (KRİTİK):** Faz 5 `outbox-drain` (`*/1`) ve Faz 6
+      `ledger-reconcile` (`0 4`) artık `scheduled` kuyruğuna repeatable kayıt + `@Process`
+      handler'a sahip (OutboxScheduledProcessor / LedgerScheduledProcessor). Aksi halde
+      `MONEY_CRONS_VIA_BULL=true` flag'i bu crons'ları SESSİZCE durduracaktı (gate var, Bull
+      yok). Artık payout/payment/refund ile aynı desen — tek mekanizma flag'iyle tutarlı.
+- [x] **7.1** ✓ Tüm saf `@Cron`'lar dual Bull desenine taşındı: `elogo-scheduler` (EVERY_30_MIN),
+      `featured-scheduler` (`15 3 * * *`), `search-sync` saatlik reconcile (EVERY_HOUR). Kod tabanında
+      artık **HİÇ saf `@Cron` YOK** — her zamanlanmış iş `@TrackedCron` (gate) + Bull repeatable +
+      `@Process` handler'a sahip. Flag açılınca (Faz 0 sonrası) hepsi Bull'a geçer, in-process temizlenir.
+- [~] **7.2** ✓ (KOD) Process-rol ayrımı env ile yapılabilir hâle geldi (`PROCESS_ROLE`: `all`
+  varsayılan tek-process | `web` yalnız HTTP | `worker` başsız). `src/process-role.ts` helper +
+  spec. `AppModule` `WorkerModule`'ü artık `runsQueueWorkers()` ile koşullu import ediyor →
+  `PROCESS_ROLE=web`'de API ağır kuyruk worker'larını (email/push/image/payment/search/analytics/
+  moderation) YÜKLEMEZ; varsayılan `all`'da yüklenir (davranış değişmez, tek-process deploy bozulmaz).
+  `worker.ts` artık `WorkerModule` yerine `AppModule`'ü BAŞSIZ application-context olarak yüklüyor →
+  ayrı worker hem klasik kuyrukları hem de feature modüllerine gömülü `scheduled` processor'ları
+  (outbox-drain, ledger-reconcile, payout, membership, boost, …) koşturur ("worker.ts ilgili modülleri
+  yüklesin" karşılandı). `entrypoint.sh` artık ROL-FARKINDA: `PROCESS_ROLE=worker`'da migration'ı atlayıp
+  `node dist/worker`, aksi halde migrate + `node dist/main` başlatır (varsayılan davranış aynı) → TEK imaj
+  iki Coolify servisi olarak boot edebilir. **KALAN (OPS):** 2. Coolify servisi (aynı imaj, env
+  `PROCESS_ROLE=worker`) + API servisine `PROCESS_ROLE=web` + Faz 0 (ayrı Redis) — saf deploy adımı. **Ön-fix:** Bull KÖK bağlantısı (`forRootAsync`) gated `WorkerModule`'den `BullRootModule`'e (@Global, koşulsuz) taşındı — `PROCESS_ROLE=web` de enqueue + repeatable-cron kaydı için bağlantıya sahip. Faz 0: Bull `REDIS_HOST/PORT/PASSWORD`, cache ayrı `REDIS_URL` (kod hazır, ayrı instance sadece env).
+- [x] **7.3** Idempotency: para job'ları Faz 1-2 CAS ile idempotent; yeni outbox (CAS claim +
+      dedupeKey + idempotent handler) ve ledger (dengeli record + best-effort capture) tasarımca
+      idempotent — Bull at-least-once güvenli.
+- [~] **7.4** DLQ: outbox `dead` statüsü + alarm (maxAttempts). Bull kök `defaultJobOptions`
+  (attempts:3 + exp backoff) mevcut. `lockDuration/stalledInterval` ince ayarı → ops.
+- [x] **7.5** ✓ Cutover TAMAM — Bull artık TEK zamanlama mekanizması. Flag'ler (`CRONS_VIA_BULL` /
+      `MONEY_CRONS_VIA_BULL`) ve **28 in-process `@TrackedCron` ikizi** 16 zamanlayıcı dosyasından kaldırıldı;
+      `registerRepeatableCron` koşulsuz kayıt yapan 4-arg imzasına indi (her cron `onModuleInit`'te repeatable
+      olarak kaydolur). Gerçek iş metotları (`run*()`) korundu — Bull `@Process` handler'ları onları
+      `runTrackedJob` ile çağırıyor. Silinen ikizleri çağıran manuel-tetik yolları (admin test-araçları,
+      dev controller) `run*()`'a yönlendirildi (bonus: eski butonlar flag açıkken no-op'tu, artık her zaman
+      çalışır). Doğrulama: 28:28:28 twin↔registration↔@Process eşleşmesi denetlendi (hepsi COVERED, hiçbir cron
+      düşmedi) + typecheck temiz + tam test paketi yeşil (yalnız 4 ÖNCEDEN-VAR alakasız hata: list/sort/order-detail).
+      **Gözlemlenebilirlik korundu:** in-process ikizler gidince `@TrackedCron`'un beslediği `/admin/jobs` +
+      Sentry Cron check-in kaybolacaktı → `runTrackedJob` (tek Bull yürütme yolu) artık CronTracker'ı besliyor
+      (zamanlama repeatable job `opts`'undan); ölü `tracked-cron.decorator.ts` silindi. **Not:** üretimde Bull'a
+      tam güven için Faz 0 (ayrı Redis + `noeviction` + AOF) hâlâ önkoşul — kod artık flag'siz Bull-only.
 
 ---
 
 ## Faz 8 — Event-driven fulfillment + god-service parçalama · `refactor/payment-fulfillment-decompose`
 
-- [ ] **8.1** Ödeme `paid`'e geçip **event yaysın**; fulfillment tüketsin (fulfillment hatası ödeme durumunu bozmasın).
-- [ ] **8.2** Ekstraksiyon: `VirtualOrderFulfillment` (membership/boost), `OrderStock` (decrement+cascade), `FulfillmentNotifier`, `ShipmentProvisioning`, `TradeCashFulfillment`.
-- [ ] **8.3** Tekil fulfillment'ı "group-of-one"a indir → ~450-500 satır kopya silinir (QUAL).
-- [ ] **8.4** `ModuleRef`/`require()` lazy-resolve hack'lerini event bus ile erit.
+- [x] **8.1** ✓ Ödeme başarı akışı, para tx'i (claim + preparing + stok + escrow hold) commit olduktan
+      SONRA `order.fulfillment-requested` EVENT'i yayıyor; yeni `OrderFulfillmentListener` tüketip fiziksel
+      siparişin POST-COMMIT sonlandırmasını (ledger capture + order.paid + Sürat) `FulfillmentFinalizer`'a
+      devrediyor. Böylece `PaymentFulfillmentService` sipariş sonlandırmasında FulfillmentFinalizer'a DOĞRUDAN
+      bağlı değil (DIP) ve tekil↔grup yolu AYNI seam'i paylaşıyor (DRY). Escrow-hold ATOMİK tx'te KALDI (not'taki
+      "ödeme tamam ama hold yok" penceresi açılmadı). Zamanlama korundu (`emitAsync` awaited → sonlandırma dönmeden
+      önce tamamlanır; tek değişiklik dispatch); listener best-effort (try/catch) → fulfillment hatası ödemeyi
+      BOZMAZ (ikinci savunma hattı; finalizer zaten adım-adım best-effort). **Spec:** listener delegasyon + hata-yutma;
+      grup spec seam'i (`emitOrderFulfillmentRequested` ×2, skipBuyer) doğruluyor (finalizer efekti listener spec'inde).
+- [x] **8.2** ✓ God-service parçalama TAMAMLANDI — 5 cohesive, tek-sorumluluklu servis çıkarıldı
+      (her biri kendi odaklı karakterizasyon testiyle): - `FulfillmentNotifier` — stokout kaskad bildirimi (tekil=grup birebir kopya) + back-in-stock. - `FulfillmentFinalizer` — fiziksel sipariş POST-COMMIT sonlandırması (ledger capture + order.paid + Sürat). - `EscrowHoldService` — escrow hold + pending komisyon (in-tx; tekil=grup). - `FulfillmentStockService` — stok düşümü + stockout kaskadı (in-tx; FOR UPDATE + fiziksel-quantity-gate). - `VirtualOrderFulfillmentService` — üyelik/boost aktivasyonu (in-tx) + eLogo fatura (post-commit).
+      Yöntem: disiplinli "önce test, sonra çıkar" — her in-tx çıkarımı odaklı unit testle kilitlendi + grup
+      entegrasyon spec'i yeşil. Ölü `invoiceService` + kullanılmayan `ledger`/`commissionLedger`/`productLock`
+      deps temizlendi. **PaymentFulfillmentService: 1643 → 984 satır (−659, %40, artık <1000).**
+- [~] **8.3** 8.2'nin paylaşılan servisleri (stock/escrow/notifier/finalizer) tekil↔grup kopyasının BÜYÜK
+  kısmını zaten sildi. Kalan tekil-vs-grup farkı KÜÇÜK ve GERÇEK (tekil: sanal sipariş + doğrudan alıcı
+  bildirimi; grup: gruplu alıcı e-postası) → tam "group-of-one" collapse artık düşük-değerli + bu farklar
+  yüzünden birebir birleşmiyor. Kalan boilerplate (claim + preparing) küçük; istenirse ortak bir
+  `claimAndPromote(tx, payment)` helper'ı ile eritilebilir.
+- [x] **8.4** ✓ Fulfillment'taki `ModuleRef` + runtime `require("../trade/trade.service")` lazy-resolve
+      hack'i (Trade↔Payment döngüsünü aşmak için) KALDIRILDI. Nakit takas ödemesi temizlenince Payment
+      in-process event yayınlar (`EventService.emitTradeCashCleared` → EventEmitter2 `payment.trade-cash-cleared`);
+      Trade tarafındaki `TradeCashClearedListener` (@OnEvent) `createInboundTradeShipments`'ı çağırır. Payment
+      artık Trade'e statik VEYA runtime bağımlılık taşımaz; `ModuleRef` fulfillment ctor'undan çıktı (spec churn
+      yok — `new` spec'in fazladan arg'ı @Optional ledger'a düşüyor). **Spec:** trade + events + fulfillment yeşil.
 
 ---
 
@@ -329,6 +433,99 @@
 ## Faz 10 — Kalan düşük-önem temizlik
 
 - [ ] FLOW-L1 (SavedCard grup/trade), FLOW-L2/MONEY-L2 (restock miktar), FLOW-L3 (üyelik sibling), FLOW-L4 (boost debris), SEAM-B6 (kargo ücreti tek-kaynak: üye-offer kargo, quote≠checkout, kısmi-iade kargo kuralı), SEAM-B7 (admin 4. teslim yolu → `handleOrderDelivered`'a bağla), SEAM-B8/B9.
+
+---
+
+## Faz 11 — Kargo/Ödeme denetim bulguları (review follow-up) · `fix/payment-hardening-outbox-ledger-bull`
+
+> 2026-07-23 kod incelemesi (payment + surat-cargo + entegrasyon, 3 paralel denetim).
+> Çekirdek güvenlik (callback sahteciliği/replay/çifte-çekim, kart verisi) SAĞLAM doğrulandı;
+> money→cargo yönü (event+outbox) örnek. Kalan borç: birkaç SOMUT güvenlik açığı + hâlâ duran
+> god-service'ler + cargo→money yönünün concretion bağımlılığı. Sıra: önce ucuz güvenlik, sonra
+> dikkatli güvenlik/doğruluk, sonra refactor.
+
+### 11.1 — Hızlı güvenlik kazanımları (düşük risk, küçük edit)
+
+- [~] **11.1a (G1)** ✓ (kısmi) Kimlik içeren Sürat takip/sil URL'i TEK chokepoint'e alındı
+  (`buildAuthedSuratUrl`, 3× kopya birleşti) + `redactSuratUrl` ile tüm hata log'ları maskeleniyor
+  (Sifre asla loglanmaz/breadcrumb'a girmez). **Ertelendi:** kimliği query'den body/header'a taşımak
+  Sürat API sözleşmesi doğrulaması gerektiriyor (bu uçlar query-auth; canlı test edilemedi → wire
+  formatı korundu). `surat-cargo/surat-tracking.service.ts:46-67,106,176,320`.
+- [x] **11.1b (G3)** ✓ Refund bypass PROD'da ASLA aktif değil (`NODE_ENV!=='production'` konjunksiyonu) —
+      completion SEC-H1 ile simetrik ikinci savunma hattı (worker refund cron'ları main.ts boot-guard'ını
+      çağırmaz). Yanlış env → gerçek PayTR iadesi çalışır. `payment/payment-refund.service.ts:244,997` (order+trade).
+- [x] **11.1c (G4)** ✓ Tam IBAN log'u last-4 maskeye indi (`maskIban` helper; email'le simetrik). KVKK.
+      `payout/payout.service.ts:350`.
+- [x] **11.1d (G5)** ✓ Webhook ham payload verbatim log kaldırıldı → yalnız `tracking`+`status` whitelist.
+      `shipping/shipping.service.ts:376`.
+
+### 11.2 — Güvenlik/doğruluk (dikkat isteyen)
+
+- [x] **11.2a (G2)** ✓ Public delivered-webhook VARSAYILAN KAPALI: yalnız `SHIPPING_WEBHOOK_ENABLED=true` iken
+      çalışır (kapalıyken 404 → uç görünmez) + gövde doğrulama (trackingNumber+status string zorunlu). Sürat
+      poll-tabanlı olduğundan gerçek callback yok → forge edilmiş "delivered" ile escrow-erken-başlatma yüzeyi
+      varsayılan olarak kalktı; gerçek imzalı callback gelirse flag ile açılır. `shipping/shipping.controller.ts:142`.
+- [x] **11.2b (G6)** ✓ Atomik `FOR UPDATE` iade claim'i (`claimRefundSlot`): payment satırını kilitle, metadata'yı
+      TX İÇİNDE TAZE oku, kümülatif tavan + order-başı marker'ı KİLİT ALTINDA kontrol et, yoksa yaz. Eşzamanlı kısmi
+      iadeler artık marker'ı yarışarak oku-yaz edemez → çift-PayTR penceresi kapandı. PayTR çağrısı kilit DIŞINDA (HTTP
+      gecikmesi kilidi tutmaz). Marker/recovery/reject sözleşmesi korundu; bu metod 11.3b `RefundCapPolicy`/claim
+      bileşeninin tohumu. **Spec:** refund-partial mock stateful (claim yazar, finalize tazeler) → 130 test yeşil.
+- [x] **11.2c** ✓ Poll `delivered`→escrow ATOMİK: CAS flip + `handleOrderDelivered(tx)` tek `$transaction`'da
+      (webhook yoluyla aynı desen; hata → rollback → sonraki poll retry). Bildirim + event-sync POST-COMMIT.
+      Artık çökme escrow'u askıda bırakmaz. `surat-cargo/surat-tracking.service.ts`.
+- [x] **11.2d** ✓ İade sonucu bildirimleri (`payment.refunded`/`order_cancelled`) finalize tx'inden çıkarılıp
+      POST-COMMIT `notifyRefundOutcome`'a alındı → FOR UPDATE kilidi kısaldı + bir bildirim hatası artık para-tx'ini
+      abort etmiyor (para zaten geri döndü; best-effort). Guard/iptal-vs-refunded dallanması + recovery-noop davranışı
+      birebir korundu (finalize tx null → .then erken çıkar). tsc temiz; 130 refund/payment test yeşil.
+
+### 11.3 — SOLID: god-service parçalama + cargo→money event'leme
+
+- [x] **11.3a** ✓ (böl) `SuratTrackingService` (1808 → **121 satır facade**) 6 cohesive alt-servise bölündü:
+      `SuratTrackingClient` (ham HTTP + probe'lar + URL helper'ları) / `OrderTrackingSyncService` / `TradeTrackingSyncService`
+      / `RefundReturnTrackingSyncService` / `BarcodeRetryService` / `CargoAlertingService`. STRICT PURE MOVE (metod
+      gövdeleri birebir; yalnız wiring). Facade aynı 12 public imzayla delege; çağıranlar (shipping-scheduler, admin,
+      admin-shipping) DEĞİŞMEDİ. **11.2c atomik delivered-tx birebir korundu** (order-sync'te tek `$transaction`). ModuleRef
+      para hop'ları verbatim taşındı (event'e ÇEVRİLMEDİ — atomiklik korunur). tsc temiz; 152 test yeşil (0 yeni hata).
+      **NOT (11.3a-event + 11.4b ertelendi):** cargo→money'yi event'e çevirmek delivered atomikliğiyle çelişir (atomiklik
+      kazanır); sync-loop DRY (11.4b) logic konsolidasyonu — bu dosyanın spec'i YOK → önce karakterizasyon testi gerekir.
+
+- [~] **11.3b** ✓ (çekirdek) `PaymentRefundService`'in iki en değerli `processRefund` fazı ayrı bileşenlere çıkarıldı:
+  **claim** → `claimRefundSlot` (11.2b atomik FOR UPDATE), **bildirim** → `notifyRefundOutcome` (11.2d post-commit).
+  Tam `RefundExecutor`/`RefundFinalizer` sınıf-çıkarımı ERTELENDİ: kalan finalize tx tek, iç içe hata-akışlı
+  (outer void-restore + paytrRefunded bayrağı) bir birim; sınıfa bölmenin riski SRP kazancını aşıyor. Coverage güçlü.
+- [x] **11.3c** ✓ `PaymentReconciliationService` (1483 → **91 satır facade**) 5 cohesive alt-servise bölündü
+      (`Reservation`/`PaymentExpiry`/`Psp`/`Refund`/`Misc` Reconciliation). Facade aynı public imzalarla delege
+      ediyor (PaymentService/scheduler değişmedi); her alt-servis yalnız kullandığı dep'i alıyor; ölü
+      `InvoiceService` inj. temizlendi; paylaşılan private helper yok. 7 spec construction güncellendi; 130 test yeşil.
+
+### 11.4 — DRY + tipleme
+
+- [x] **11.4a** ✓ Sürat `SuratGonderiPayload` **8 build site (6 dosya)** tek `buildStandardGonderiPayload(...)`'a
+      indi (`surat-cargo/surat-address.util.ts`) — standart zarf + tek normalizasyon noktası; çağırana özgü
+      sapmalar (`KisiKurum` fallback zincirleri, admin-test raw telefon) `overrides` ile BYTE-IDENTICAL korundu.
+      Ölü Sürat enum import'ları temizlendi. tsc temiz; surat/payment/refund/trade 163 test yeşil.
+- [~] **11.4b** ERTELENDİ (güvenlik gerekçesi). Tracking sync/apply 3× kopya artık 11.3a ile ayrı sync
+  servislerinde; DRY için ortak generic core'a indirmek LOGIC konsolidasyonu demek — bu dosyaların dedike SPEC'i YOK.
+  Önce karakterizasyon testi yazılmalı (Faz 8.2 disiplini), sonra güvenle konsolide edilir. Test'siz körlemesine DRY riskli.
+- [x] **11.4c** ✓ İkiz `portion`/`ledgerPortion` (hold tüketimi + ledger pro-rate, birebir aynı formül) tek
+      `refundPortion(amount, threshold)` otoritesine indi. NOT: `ledger.recordRefund` ratio'su (refund/orderTotal)
+      ve `refund.computeRefundAmount` (adet formülü) FARKLI semantik → bilinçli ayrı bırakıldı. tsc temiz; refund 28 test yeşil.
+- [~] **11.4d** ERTELENDİ (kademeli — bulgunun kendi önerisi). Para nesnelerini `any` → `PaymentMetadata`/tipli order'a
+  taşımak GENİŞ yüzeyli (onlarca money call-site) + düşük test-güvenliği → toplu değişim riskli. `PaymentMetadata` tipi
+  mevcut (Faz 9.1); her gelecek dokunuşta kademeli benimsenmeli. Tek seferde zorlamak fayda/risk açısından mantıksız.
+
+### 11.5 — DIP / abstraction
+
+- [x] **11.5a** ✓ Payment→Sürat DIP: yeni `CargoProvider` arayüzü + `CARGO_PROVIDER` token (`surat-cargo/cargo-provider.ts`);
+      `SuratCargoService implements CargoProvider`; modül `{provide:CARGO_PROVIDER, useExisting:SuratCargoService}` export ediyor.
+      `PaymentCommonService` artık somut servise değil `@Inject(CARGO_PROVIDER)` ile arayüze bağlı (payload inşası zaten 11.4a
+      ile surat modülünde). 2 spec'e token provider eklendi. tsc temiz; 192 test yeşil (yalnız pre-existing tracking-url hatası).
+- [x] **11.5b** ✓ Sürat carrier-client soyutlaması düzeltildi (LSP): transport-nötr `abstract SuratSoapClient`
+      → `SuratCarrierClient` yeniden adlandırıldı (REST client artık "Soap" adlı bir tabanı extend etmiyor); token
+      `SURAT_SOAP_CLIENT` → `SURAT_CARRIER_CLIENT`. Barkod desteği ARTIK açık capability: `supportsBarcode()` (Live=false).
+      `createBarcodeOnce` çağrıdan ÖNCE capability guard'lıyor → Live'ın "not supported" THROW'una güvenmiyor; guard
+      aynı UNKNOWN teknik-hata sonucunu (mesaj/log/retry/no-cache) BİREBİR üretiyor. tsc temiz; 163 test yeşil (davranış aynı).
+      NOT: `IPaymentProvider` ISP reshape'i (capi/transfer ayrımı) tek PSP olduğu için spekülatif → ertelendi (değer düşük).
 
 ---
 
