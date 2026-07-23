@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -24,8 +24,8 @@ import { NotificationService } from "../notification/notification.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
-import { LedgerService } from "../ledger/ledger.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
+import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -85,11 +85,8 @@ export class PaymentFulfillmentService {
     private readonly commissionLedger: CommissionLedgerService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentRefund: PaymentRefundService,
-    // Faz 6: yakalama anında çift-taraflı defter kaydı (denetim/reconciliation).
-    // @Optional: prod'da global LedgerModule enjekte eder; birim testleri (mock tx)
-    // sağlamak zorunda kalmasın — yoksa defter kaydı atlanır (para akışı etkilenmez).
-    @Optional()
-    private readonly ledger?: LedgerService,
+    // Faz 8.2: yakalama/order.paid/kargo sonlandırması (ledger dahil) FulfillmentFinalizer'da.
+    private readonly fulfillmentFinalizer: FulfillmentFinalizer,
   ) {}
 
   /**
@@ -594,104 +591,12 @@ export class PaymentFulfillmentService {
       await this.cache.delPattern("products:list:*").catch(() => {});
     }
 
-    // Faz 6 (ledger): yakalamayı çift-taraflı deftere yaz. POST-COMMIT + best-effort —
-    // defter/muhasebe hatası ödemeyi ASLA bozmamalı; reconciliation cron açığı yakalar.
-    // Sanal sipariş (üyelik/boost) escrow üretmez → deftere yazılmaz.
+    // Faz 8.2: fiziksel siparişin POST-COMMIT sonlandırması (ledger capture + order.paid
+    // + Sürat gönderi kaydı) FulfillmentFinalizer'da — tekil/grup ortak, best-effort.
     if (!isMembershipOrder && !isBoostOrder) {
-      try {
-        const gross = Number(resultOrder.totalAmount);
-        const commission = Number(resultOrder.commissionAmount);
-        const withholdingTax = Number(resultOrder.withholdingTaxAmount ?? 0);
-        await this.ledger?.recordCapture(this.prisma, {
-          paymentId: payment.id,
-          orderId: resultOrder.id,
-          buyerId: resultOrder.buyerId,
-          sellerId: resultOrder.sellerId,
-          gross,
-          sellerNet: Number((gross - commission - withholdingTax).toFixed(2)),
-          commission,
-          withholdingTax,
-        });
-      } catch (e: any) {
-        this.logger.warn(
-          `Ledger capture kaydı başarısız (order ${resultOrder.id}): ${e?.message}`,
-        );
-      }
-    }
-
-    if (!isMembershipOrder && !isBoostOrder) {
-      try {
-        const shippingAddressData = resultOrder.shippingAddress as any;
-
-        // Check if this is a guest order and get actual buyer info
-        const isGuestOrder =
-          resultOrder.buyer.email === "guest@tarodan.system" ||
-          shippingAddressData?.isGuestOrder;
-        const actualBuyerEmail = isGuestOrder
-          ? shippingAddressData?.guestEmail ||
-            shippingAddressData?.email ||
-            resultOrder.buyer.email
-          : resultOrder.buyer.email;
-        const actualBuyerName = isGuestOrder
-          ? shippingAddressData?.guestName ||
-            shippingAddressData?.fullName ||
-            "Misafir Müşteri"
-          : resultOrder.buyer.displayName || resultOrder.buyer.email;
-
-        this.logger.log(
-          `Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`,
-        );
-
-        await this.eventService.emitOrderPaid({
-          orderId: resultOrder.id,
-          orderNumber: resultOrder.orderNumber,
-          buyerId: resultOrder.buyerId,
-          sellerId: resultOrder.sellerId,
-          productId: resultOrder.productId,
-          productTitle: resultOrder.product.title,
-          totalAmount: Number(resultOrder.totalAmount),
-          commissionAmount: Number(resultOrder.commissionAmount),
-          buyerEmail: actualBuyerEmail,
-          buyerName: actualBuyerName,
-          sellerEmail: resultOrder.seller.email,
-          sellerName:
-            resultOrder.seller.displayName || resultOrder.seller.email,
-          paymentMethod: payment.provider,
-          transactionId:
-            transactionId || payment.providerPaymentId || payment.id,
-          shippingAddress: {
-            fullName: shippingAddressData?.fullName || "",
-            phone: shippingAddressData?.phone || "",
-            address: shippingAddressData?.address || "",
-            city: shippingAddressData?.city || "",
-            district: shippingAddressData?.district || "",
-            zipCode: shippingAddressData?.zipCode || "",
-          },
-          isGuestOrder,
-          buyerSystemEmail: resultOrder.buyer.email || "",
-        });
-
-        this.logger.log(
-          `order.paid event emitted for order ${resultOrder.orderNumber}`,
-        );
-      } catch (error) {
-        // Log but don't fail - payment was already successful
-        this.logger.error(`Failed to emit order.paid event: ${error}`);
-      }
-    }
-
-    // Generate and send invoice to buyer (only for regular product orders, not membership/boost)
-    if (!isMembershipOrder && !isBoostOrder) {
-      try {
-        // ESKİ PDFKit makbuzu KALDIRILDI — Tarodan artık eLogo e-Arşiv kesiyor (sipariş
-        // tamamlanınca komisyon/hizmet/platform-satış). Ödeme anında eski makbuz gönderilmez.
-        // await this.invoiceService.generateAndSendInvoice(resultOrder.id);
-      } catch (error) {
-        // Log but don't fail - payment was already successful
-        this.logger.error(
-          `Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`,
-        );
-      }
+      await this.fulfillmentFinalizer.finalizePaidOrder(resultOrder, payment, {
+        transactionId,
+      });
     }
 
     // Tarodan gelir e-Arşivi: üyelik → üyeye, boost → satıcıya (sanal hizmet, ödeme anında).
@@ -727,19 +632,6 @@ export class PaymentFulfillmentService {
       })().catch((e) =>
         this.logger.warn(`eLogo boost faturası tetik hatası: ${e?.message}`),
       );
-    }
-
-    // Auto-create Shipment record (Sürat Kargo gönderi kaydı oluşturuldu at order creation)
-    // Membership/boost sanal sipariştir → kargo kaydı oluşturma.
-    // Ortak yol (create + H4 cancelled-revive + gerçek kod): PaymentCommonService.
-    if (!isMembershipOrder && !isBoostOrder) {
-      try {
-        await this.paymentCommon.ensureSuratShipmentForOrder(resultOrder.id);
-      } catch (error) {
-        this.logger.error(
-          `Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`,
-        );
-      }
     }
 
     return true;
@@ -1057,90 +949,12 @@ export class PaymentFulfillmentService {
 
     // Sipariş başına: order.paid eventi (SATICI tarafı; alıcı atlanır), fatura, kargo kaydı
     for (const resultOrder of result.aliveOrders) {
-      // Faz 6 (ledger): sepetteki HER siparişin yakalamasını çift-taraflı deftere yaz.
-      // POST-COMMIT + best-effort — defter hatası ödemeyi bozmaz; reconciliation yakalar.
-      try {
-        const gross = Number(resultOrder.totalAmount);
-        const commission = Number(resultOrder.commissionAmount);
-        const withholdingTax = Number(resultOrder.withholdingTaxAmount ?? 0);
-        await this.ledger?.recordCapture(this.prisma, {
-          paymentId: payment.id,
-          orderId: resultOrder.id,
-          buyerId: resultOrder.buyerId,
-          sellerId: resultOrder.sellerId,
-          gross,
-          sellerNet: Number((gross - commission - withholdingTax).toFixed(2)),
-          commission,
-          withholdingTax,
-        });
-      } catch (e: any) {
-        this.logger.warn(
-          `Ledger capture kaydı başarısız (group order ${resultOrder.id}): ${e?.message}`,
-        );
-      }
-      try {
-        const shippingAddressData = resultOrder.shippingAddress as any;
-        const isGuestOrder =
-          resultOrder.buyer.email === "guest@tarodan.system" ||
-          shippingAddressData?.isGuestOrder;
-        const actualBuyerEmail = isGuestOrder
-          ? shippingAddressData?.guestEmail ||
-            shippingAddressData?.email ||
-            resultOrder.buyer.email
-          : resultOrder.buyer.email;
-        const actualBuyerName = isGuestOrder
-          ? shippingAddressData?.guestName ||
-            shippingAddressData?.fullName ||
-            "Misafir Müşteri"
-          : resultOrder.buyer.displayName || resultOrder.buyer.email;
-
-        await this.eventService.emitOrderPaid({
-          orderId: resultOrder.id,
-          orderNumber: resultOrder.orderNumber,
-          buyerId: resultOrder.buyerId,
-          sellerId: resultOrder.sellerId,
-          productId: resultOrder.productId,
-          productTitle: resultOrder.product.title,
-          totalAmount: Number(resultOrder.totalAmount),
-          commissionAmount: Number(resultOrder.commissionAmount),
-          buyerEmail: actualBuyerEmail,
-          buyerName: actualBuyerName,
-          sellerEmail: resultOrder.seller.email,
-          sellerName:
-            resultOrder.seller.displayName || resultOrder.seller.email,
-          paymentMethod: payment.provider,
-          transactionId:
-            transactionId || payment.providerPaymentId || payment.id,
-          shippingAddress: {
-            fullName: shippingAddressData?.fullName || "",
-            phone: shippingAddressData?.phone || "",
-            address: shippingAddressData?.address || "",
-            city: shippingAddressData?.city || "",
-            district: shippingAddressData?.district || "",
-            zipCode: shippingAddressData?.zipCode || "",
-          },
-          isGuestOrder,
-          buyerSystemEmail: resultOrder.buyer.email || "",
-          // Sepet akışı: alıcı onayı grup başına tek kez gönderildi → burada atla.
-          skipBuyer: true,
-        });
-      } catch (error) {
-        this.logger.error(
-          `Failed to emit order.paid event for group order ${resultOrder.id}: ${error}`,
-        );
-      }
-
-      // ESKİ PDFKit makbuzu KALDIRILDI (grup akışı) — yasal değil; eLogo e-Arşiv tek belge.
-      // await this.invoiceService.generateAndSendInvoice(resultOrder.id);
-
-      // Ortak yol (create + H4 cancelled-revive + gerçek kod): PaymentCommonService.
-      try {
-        await this.paymentCommon.ensureSuratShipmentForOrder(resultOrder.id);
-      } catch (error) {
-        this.logger.error(
-          `Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`,
-        );
-      }
+      // Faz 8.2: sepetteki HER siparişin POST-COMMIT sonlandırması (FulfillmentFinalizer,
+      // tekil yolla ortak). skipBuyer:true — alıcı onayı grup başına TEK kez gönderildi.
+      await this.fulfillmentFinalizer.finalizePaidOrder(resultOrder, payment, {
+        skipBuyer: true,
+        transactionId,
+      });
     }
 
     this.logger.log(

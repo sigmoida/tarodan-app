@@ -12,6 +12,7 @@ import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
+import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -170,6 +171,8 @@ describe("PaymentService group payment (checkout group)", () => {
         PaymentFulfillmentService,
         PaymentLifecycleService,
         I18nService,
+        // Gerçek finalizer → emitOrderPaid mockEvents'e yönlensin (assertion'lar için).
+        FulfillmentFinalizer,
         {
           provide: FulfillmentNotifier,
           useValue: {
