@@ -17,17 +17,7 @@ import { safeDecrementReserved } from "../product/helpers/product-availability.h
 import { PaymentService } from "../payment/payment.service";
 import { EventService } from "../events/event.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import {
-  normalizeSuratPhone,
-  normalizeSuratLocation,
-} from "../surat-cargo/surat-address.util";
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-} from "../surat-cargo/surat-cargo.types";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 
 /**
@@ -547,29 +537,27 @@ export class AdminTradeResolutionService {
             {
               idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
               correlationId: `trade-force-cancel-${tradeId}`,
-              payload: {
-                KisiKurum:
+              payload: buildStandardGonderiPayload({
+                recipientName:
                   arrivedAddress.fullName ||
                   arrivedUser?.displayName ||
                   "Takas İade",
-                SahisBirim: "Takas Kayıp İade",
-                AliciAdresi: arrivedAddress.address,
-                Il: normalizeSuratLocation(arrivedAddress.city),
-                Ilce: normalizeSuratLocation(arrivedAddress.district),
-                TelefonCep: normalizeSuratPhone(arrivedAddress.phone),
-                KargoTuru: SuratKargoTuru.Koli,
-                OdemeTipi: SuratOdemeTipi.Pesin,
-                OzelKargoTakipNo: txResult.returnShipmentDraft.oid,
-                Adet: 1,
-                BirimDesi: 1,
-                BirimKg: 1,
-                KapidanOdemeTahsilatTipi: 1,
-                TasimaSekli: SuratTasimaSekli.KaraYolu,
-                TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-                GonderiSekli: SuratGonderiSekli.Standart,
-                Pazaryerimi: 0,
-                Iademi: true,
-              },
+                address: arrivedAddress.address,
+                city: arrivedAddress.city,
+                district: arrivedAddress.district,
+                phone: arrivedAddress.phone,
+                ref: txResult.returnShipmentDraft.oid,
+                content: "Takas Kayıp İade",
+                isReturn: true,
+                // KisiKurum fallback zinciri "Takas İade" (builder'ın "Alıcı"sı
+                // değil) ve trim yok → birebir korumak için override.
+                overrides: {
+                  KisiKurum:
+                    arrivedAddress.fullName ||
+                    arrivedUser?.displayName ||
+                    "Takas İade",
+                },
+              }),
             },
           );
           if (result.ok) {

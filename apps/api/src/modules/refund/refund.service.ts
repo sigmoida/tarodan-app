@@ -20,17 +20,7 @@ import { PaymentService } from "../payment/payment.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
-import {
-  normalizeSuratPhone,
-  normalizeSuratLocation,
-} from "../surat-cargo/surat-address.util";
-import {
-  SuratGonderiSekli,
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-} from "../surat-cargo/surat-cargo.types";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { CreateRefundRequestDto } from "./dto/create-refund-request.dto";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto/notification.dto";
@@ -519,26 +509,21 @@ export class RefundService {
     const result = await this.suratCargoService.createShipmentWithBarcode({
       idempotencyKey: `surat:refund-return:${rr.refundNumber}`,
       correlationId: `refund-${rr.id}`,
-      payload: {
-        KisiKurum: sellerAddr.fullName || rr.order.seller.displayName,
-        SahisBirim: `İade: ${rr.order.orderNumber}`,
-        AliciAdresi: sellerAddr.address,
-        Il: normalizeSuratLocation(sellerAddr.city),
-        Ilce: normalizeSuratLocation(sellerAddr.district),
-        TelefonCep: normalizeSuratPhone(sellerAddr.phone),
-        KargoTuru: SuratKargoTuru.Koli,
-        OdemeTipi: SuratOdemeTipi.Pesin,
-        OzelKargoTakipNo: rr.refundNumber,
-        Adet: 1,
-        BirimDesi: 1,
-        BirimKg: 1,
-        KapidanOdemeTahsilatTipi: 1,
-        TasimaSekli: SuratTasimaSekli.KaraYolu,
-        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-        GonderiSekli: SuratGonderiSekli.Standart,
-        Pazaryerimi: 0,
-        Iademi: true,
-      },
+      payload: buildStandardGonderiPayload({
+        recipientName: sellerAddr.fullName || rr.order.seller.displayName,
+        address: sellerAddr.address,
+        city: sellerAddr.city,
+        district: sellerAddr.district,
+        phone: sellerAddr.phone,
+        ref: rr.refundNumber,
+        content: `İade: ${rr.order.orderNumber}`,
+        isReturn: true,
+        // KisiKurum fallback burada seller.displayName (builder'ın "Alıcı"sı
+        // değil) ve trim uygulanmıyor → birebir korumak için override.
+        overrides: {
+          KisiKurum: sellerAddr.fullName || rr.order.seller.displayName,
+        },
+      }),
     });
 
     if (!result.ok) {

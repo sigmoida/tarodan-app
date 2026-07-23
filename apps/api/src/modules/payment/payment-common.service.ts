@@ -3,20 +3,8 @@ import { PrismaService } from "../../prisma";
 import { PaymentStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./payment-metadata.types";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import {
-  normalizeSuratPhone,
-  normalizeSuratLocation,
-} from "../surat-cargo/surat-address.util";
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-  SuratKapidanOdemeTahsilatTipi,
-  type SuratGonderiPayload,
-  type SuratShipmentFailure,
-} from "../surat-cargo/surat-cargo.types";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { type SuratShipmentFailure } from "../surat-cargo/surat-cargo.types";
 
 /**
  * Ödeme grupları arasında paylaşılan yardımcılar (order/trade split'lerindeki
@@ -123,26 +111,16 @@ export class PaymentCommonService {
       return null;
     }
 
-    const payload: SuratGonderiPayload = {
-      KisiKurum: String(addr.fullName ?? "").trim() || "Alıcı",
-      AliciAdresi: String(addr.address).trim(),
-      Il: normalizeSuratLocation(String(addr.city)),
-      Ilce: normalizeSuratLocation(String(addr.district)),
-      TelefonCep: normalizeSuratPhone(String(addr.phone ?? "")),
-      SahisBirim: order.product?.title ?? undefined,
-      KargoTuru: SuratKargoTuru.Koli,
-      OdemeTipi: SuratOdemeTipi.Pesin,
-      OzelKargoTakipNo: order.orderNumber,
-      Adet: 1,
-      BirimDesi: 1,
-      BirimKg: 1,
-      KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
-      TasimaSekli: SuratTasimaSekli.KaraYolu,
-      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-      GonderiSekli: SuratGonderiSekli.Standart,
-      Pazaryerimi: 0,
-      Iademi: false,
-    };
+    const payload = buildStandardGonderiPayload({
+      recipientName: String(addr.fullName ?? ""),
+      // AliciAdresi'ni trimli geç: builder adresi normalize etmez (yalnız il/ilçe/tel).
+      address: String(addr.address).trim(),
+      city: String(addr.city),
+      district: String(addr.district),
+      phone: String(addr.phone ?? ""),
+      ref: order.orderNumber,
+      content: order.product?.title ?? undefined,
+    });
 
     try {
       const result = await this.suratCargoService.createShipmentWithBarcode({

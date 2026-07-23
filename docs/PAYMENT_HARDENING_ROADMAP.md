@@ -488,8 +488,10 @@
 
 ### 11.4 — DRY + tipleme
 
-- [ ] **11.4a** Sürat `SuratGonderiPayload` builder **6× kopya** (payment-common, refund, trade-shipment,
-      admin-trade-warehouse/resolution, admin-shipping) → tek `buildStandardGonderiPayload(...)` surat modülünde.
+- [x] **11.4a** ✓ Sürat `SuratGonderiPayload` **8 build site (6 dosya)** tek `buildStandardGonderiPayload(...)`'a
+      indi (`surat-cargo/surat-address.util.ts`) — standart zarf + tek normalizasyon noktası; çağırana özgü
+      sapmalar (`KisiKurum` fallback zincirleri, admin-test raw telefon) `overrides` ile BYTE-IDENTICAL korundu.
+      Ölü Sürat enum import'ları temizlendi. tsc temiz; surat/payment/refund/trade 163 test yeşil.
 - [ ] **11.4b** Tracking sync/apply **3× kopya** (order/trade/refund-return: `syncAllActive*` + `applyTrackingUpdate`
       / `syncTradeShipmentTracking` + `sync*Events`) → entity-adapter'lı generic sync core.
 - [ ] **11.4c** Refund proration **3+ yerde farklı yuvarlama** (`portion`/`ledgerPortion`/`ledger.recordRefund` ratio/
