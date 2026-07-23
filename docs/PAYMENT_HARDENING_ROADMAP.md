@@ -299,9 +299,17 @@
       soft ref'ler). `LedgerService.record(tx, …)` DENGELİ grup zorlar (Σdebit==Σcredit, değilse
       FIRLATIR); append-only (güncelleme/silme yok; düzeltme = ters kayıt). Migration
       `20260723100000_ledger_entries`. **Spec:** denge zorlaması + negatif reddi + recordCapture.
-- [~] **6.2** `recordCapture` yakalama olayını yazıyor: buyer_payment = seller_escrow + platform_commission + withholding_tax (stopaj), gross dengeli. Fulfillment tekil + grup yollarında **POST-COMMIT
-  best-effort** (@Optional; defter hatası ödemeyi BOZMAZ; reconciliation açığı yakalar) çağrılıyor.
-  **Devam:** hold-release / payout / iade / takas-komisyon olayları (aynı `record` API'siyle).
+- [x] **6.2** ✓ Ana para olayları çift-taraflı deftere yazılıyor (hepsi @Optional + best-effort;
+      defter hatası para akışını BOZMAZ; reconciliation açığı yakalar):
+  - **`payment_captured`** (`recordCapture`): buyer_payment = seller_escrow + platform_commission +
+    withholding_tax; fulfillment tekil + grup, POST-COMMIT.
+  - **`payout_completed`** (`PayoutService`): seller_escrow (credit) = payout (debit) → escrow settle;
+    capture'ın escrow debit'ini dengeler → sipariş bazında escrow net 0.
+  - **`refund_issued`** (`recordRefund`): dış çıkış (refund) = capture'ın ORANSAL ters kaydı
+    (ratio = refund/orderTotal; komisyon/stopaj yuvarlanır, seller_escrow kalanı emer → drift'siz
+    dengeli); iade finalize tx'inde. **Spec:** tam/kısmi iade denge + dejenere-null.
+    **Devam (6.3'e):** hold_release (nakit değil, iç yeniden-sınıflama) + trade_commission (takas alt-sistemi,
+    takas capture ledger'ı henüz yok) → tam per-hesap bakiye türetimiyle birlikte.
 - [ ] **6.3** Hold tüketimi/kısmi iade ledger'dan okusun (Faz 1.4'ün yapısal hâli). → para akışları
       deftere taşınınca (büyük, riskli geçiş); şimdilik defter denetim/reconciliation için popüle edilir.
 - [ ] **6.4** Sipariş + takas komisyonlarını tek deftere birleştir (MONEY-L7).

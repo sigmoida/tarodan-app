@@ -112,4 +112,74 @@ describe("LedgerService", () => {
     const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
     expect(rows).toHaveLength(2);
   });
+
+  describe("recordRefund", () => {
+    it("tam iade: refund debit = Σ ters kredi (escrow+komisyon+stopaj), DENGELİ", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      // T=100 (C=15, W=3, sellerNet=82), tam iade R=100
+      await svc.recordRefund(tx, {
+        orderId: "o1",
+        orderTotal: 100,
+        commission: 15,
+        withholdingTax: 3,
+        refundAmount: 100,
+      });
+      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      const byAcc = Object.fromEntries(
+        rows.map((r: any) => [r.account, [r.direction, Number(r.amount)]]),
+      );
+      expect(byAcc[LedgerAccount.refund]).toEqual([LedgerDirection.debit, 100]);
+      expect(byAcc[LedgerAccount.platform_commission]).toEqual([
+        LedgerDirection.credit,
+        15,
+      ]);
+      expect(byAcc[LedgerAccount.withholding_tax]).toEqual([
+        LedgerDirection.credit,
+        3,
+      ]);
+      // seller_escrow kalanı emer: 100 − 15 − 3 = 82
+      expect(byAcc[LedgerAccount.seller_escrow]).toEqual([
+        LedgerDirection.credit,
+        82,
+      ]);
+    });
+
+    it("kısmi iade (yarısı): oransal + seller_escrow kalanı emer → yuvarlama drift'siz DENGELİ", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      // T=100.01 (C=15.01, W=0), R=50 → ratio~0.4999; komisyon round(15.01*0.4999)=7.50,
+      // sellerPortion = 50 − 7.50 = 42.50 (drift emildi)
+      await svc.recordRefund(tx, {
+        orderId: "o1",
+        orderTotal: 100.01,
+        commission: 15.01,
+        withholdingTax: 0,
+        refundAmount: 50,
+      });
+      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      const debit = rows
+        .filter((r: any) => r.direction === LedgerDirection.debit)
+        .reduce((s: number, r: any) => s + Number(r.amount), 0);
+      const credit = rows
+        .filter((r: any) => r.direction === LedgerDirection.credit)
+        .reduce((s: number, r: any) => s + Number(r.amount), 0);
+      expect(debit).toBeCloseTo(credit, 2); // dengeli (record() de zorlardı)
+      expect(debit).toBe(50);
+    });
+
+    it("tutar 0 / dejenere split → null (kayıt yok)", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      expect(
+        await svc.recordRefund(tx, {
+          orderTotal: 0,
+          commission: 0,
+          withholdingTax: 0,
+          refundAmount: 10,
+        }),
+      ).toBeNull();
+      expect(tx.ledgerEntry.createMany).not.toHaveBeenCalled();
+    });
+  });
 });

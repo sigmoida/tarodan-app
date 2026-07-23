@@ -31,6 +31,7 @@ import {
   OUTBOX_INVOICE_REFUND_REVERSE,
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
 } from "../outbox/outbox.types";
+import { LedgerService } from "../ledger/ledger.service";
 import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 
@@ -68,6 +69,10 @@ export class PaymentRefundService {
     // zorunda kalmasın diye opsiyonel — yoksa yalnız anlık best-effort yola düşülür.
     @Optional()
     private readonly outbox?: OutboxService,
+    // Faz 6.2: iade tx'inde `refund_issued` çift-taraflı defter kaydı (oransal ters kayıt).
+    // @Optional + best-effort — defter hatası iadeyi BOZMAZ; reconciliation açığı yakalar.
+    @Optional()
+    private readonly ledger?: LedgerService,
   ) {
     this.holdDays = parseInt(
       this.configService.get("PAYMENT_HOLD_DAYS") || "7",
@@ -576,6 +581,38 @@ export class PaymentRefundService {
               ? Math.min(amountToRefund / orderRefundThreshold, 1)
               : 1;
           await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
+
+          // Faz 6.2 (ledger): `refund_issued` oransal ters kayıt (best-effort — defter
+          // hatası iadeyi bozmaz). orderRefundThreshold = sipariş tutarı (T); komisyon/stopaj
+          // sipariş satırından okunur; LedgerService oranı ve yuvarlamayı yönetir.
+          try {
+            const ledgerOrder = await tx.order.findUnique({
+              where: { id: orderId },
+              select: {
+                sellerId: true,
+                buyerId: true,
+                commissionAmount: true,
+                withholdingTaxAmount: true,
+              },
+            });
+            if (ledgerOrder) {
+              await this.ledger?.recordRefund(tx, {
+                orderId,
+                paymentId: payment.id,
+                sellerId: ledgerOrder.sellerId,
+                buyerId: ledgerOrder.buyerId,
+                orderTotal: orderRefundThreshold,
+                commission: Number(ledgerOrder.commissionAmount ?? 0),
+                withholdingTax: Number(ledgerOrder.withholdingTaxAmount ?? 0),
+                refundAmount: amountToRefund,
+              });
+            }
+          } catch (e: any) {
+            this.logger.warn(
+              `Ledger refund kaydı başarısız (order ${orderId}): ${e?.message}`,
+            );
+          }
+
           // e-Arşiv reverse: siparişin KÜMÜLATİF iadesi tamamlanınca tetiklenir
           // (MONEY-H4: art arda kısmi iadelerin sonuncusunda da; eskiden tek seferde
           // tam tutar iade edilmezse hiç tetiklenmiyordu). Ledger'a BAĞLI DEĞİL

@@ -166,6 +166,79 @@ export class LedgerService {
     });
   }
 
+  /**
+   * İade (tam/kısmi): dış çıkış (refund) = capture'daki escrow + komisyon + stopajın
+   * ORANSAL ters kaydı. ratio = refundAmount / orderTotal. Komisyon/stopaj oranları
+   * yuvarlanır; seller_escrow kalanı EMER (grup tam olarak dengelensin, epsilon aşımı yok).
+   * @returns entryGroupId, veya kayıt anlamsızsa (tutar<=0 / dejenere split) null.
+   */
+  async recordRefund(
+    tx: Prisma.TransactionClient,
+    input: {
+      orderId?: string | null;
+      paymentId?: string | null;
+      buyerId?: string | null;
+      sellerId?: string | null;
+      orderTotal: number;
+      commission: number;
+      withholdingTax: number;
+      refundAmount: number;
+      currency?: string;
+    },
+  ): Promise<string | null> {
+    const total = Number(input.orderTotal);
+    const refund = Number(input.refundAmount);
+    if (!(total > 0) || !(refund > 0)) return null;
+    const ratio = Math.min(refund / total, 1);
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    const commissionPortion = round2(input.commission * ratio);
+    const withholdingPortion = round2(input.withholdingTax * ratio);
+    // seller_escrow kalanı emer → krediler toplamı TAM olarak refund'a eşit (yuvarlama drift'i yok).
+    const sellerPortion = round2(
+      refund - commissionPortion - withholdingPortion,
+    );
+    if (sellerPortion <= 0) return null; // dejenere (neredeyse tümü komisyon/stopaj) → atla
+
+    const entries: LedgerEntryInput[] = [
+      {
+        account: LedgerAccount.refund,
+        direction: LedgerDirection.debit,
+        amount: refund,
+      },
+      {
+        account: LedgerAccount.seller_escrow,
+        direction: LedgerDirection.credit,
+        amount: sellerPortion,
+      },
+    ];
+    if (commissionPortion > 0) {
+      entries.push({
+        account: LedgerAccount.platform_commission,
+        direction: LedgerDirection.credit,
+        amount: commissionPortion,
+      });
+    }
+    if (withholdingPortion > 0) {
+      entries.push({
+        account: LedgerAccount.withholding_tax,
+        direction: LedgerDirection.credit,
+        amount: withholdingPortion,
+      });
+    }
+    return this.record(tx, {
+      eventType: LedgerEventType.refund_issued,
+      currency: input.currency,
+      entries,
+      refs: {
+        paymentId: input.paymentId,
+        orderId: input.orderId,
+        buyerId: input.buyerId,
+        sellerId: input.sellerId,
+      },
+    });
+  }
+
   /** Bir hesabın signed (debit +, credit −) bakiyesi. Test/teşhis/gelecekteki türetim. */
   async accountBalance(
     account: LedgerAccount,
