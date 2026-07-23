@@ -504,12 +504,15 @@
       indi (`surat-cargo/surat-address.util.ts`) — standart zarf + tek normalizasyon noktası; çağırana özgü
       sapmalar (`KisiKurum` fallback zincirleri, admin-test raw telefon) `overrides` ile BYTE-IDENTICAL korundu.
       Ölü Sürat enum import'ları temizlendi. tsc temiz; surat/payment/refund/trade 163 test yeşil.
-- [ ] **11.4b** Tracking sync/apply **3× kopya** (order/trade/refund-return: `syncAllActive*` + `applyTrackingUpdate`
-      / `syncTradeShipmentTracking` + `sync*Events`) → entity-adapter'lı generic sync core.
+- [~] **11.4b** ERTELENDİ (güvenlik gerekçesi). Tracking sync/apply 3× kopya artık 11.3a ile ayrı sync
+  servislerinde; DRY için ortak generic core'a indirmek LOGIC konsolidasyonu demek — bu dosyaların dedike SPEC'i YOK.
+  Önce karakterizasyon testi yazılmalı (Faz 8.2 disiplini), sonra güvenle konsolide edilir. Test'siz körlemesine DRY riskli.
 - [x] **11.4c** ✓ İkiz `portion`/`ledgerPortion` (hold tüketimi + ledger pro-rate, birebir aynı formül) tek
       `refundPortion(amount, threshold)` otoritesine indi. NOT: `ledger.recordRefund` ratio'su (refund/orderTotal)
       ve `refund.computeRefundAmount` (adet formülü) FARKLI semantik → bilinçli ayrı bırakıldı. tsc temiz; refund 28 test yeşil.
-- [ ] **11.4d** Para nesneleri `any` (`payment: any`/`order: any`/`metadata as any` yaygın) → mevcut `PaymentMetadata` + tipli order shape'i tutarlı uygula (derleme-zamanı `amount`/`status` güvenliği).
+- [~] **11.4d** ERTELENDİ (kademeli — bulgunun kendi önerisi). Para nesnelerini `any` → `PaymentMetadata`/tipli order'a
+  taşımak GENİŞ yüzeyli (onlarca money call-site) + düşük test-güvenliği → toplu değişim riskli. `PaymentMetadata` tipi
+  mevcut (Faz 9.1); her gelecek dokunuşta kademeli benimsenmeli. Tek seferde zorlamak fayda/risk açısından mantıksız.
 
 ### 11.5 — DIP / abstraction
 
