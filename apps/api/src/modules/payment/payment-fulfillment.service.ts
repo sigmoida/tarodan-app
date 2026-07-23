@@ -10,7 +10,6 @@ import {
   TradeStatus,
   OfferStatus,
 } from "@prisma/client";
-import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import {
   computeRelevanceScore,
@@ -18,13 +17,13 @@ import {
 } from "../product/helpers/relevance-score";
 import { EventService } from "../events";
 import { ElogoInvoicingService } from "../elogo";
-import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { EscrowHoldService } from "./escrow-hold.service";
+import { FulfillmentStockService } from "./fulfillment-stock.service";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -79,7 +78,7 @@ export class PaymentFulfillmentService {
     private readonly eventService: EventService,
     private readonly fulfillmentNotifier: FulfillmentNotifier,
     private readonly elogoInvoicing: ElogoInvoicingService,
-    private readonly productLockService: ProductLockService,
+    private readonly stock: FulfillmentStockService,
     private readonly notificationService: NotificationService,
     private readonly escrowHold: EscrowHoldService,
     private readonly paymentCommon: PaymentCommonService,
@@ -373,103 +372,19 @@ export class PaymentFulfillmentService {
           );
         }
       } else {
-        // Regular product order: ödeme başarılı → quantity--, reservedQuantity--
+        // Regular product order: stok düşümü + stockout kaskadı → FulfillmentStockService
+        // (FOR UPDATE + clamp'li düşüm + fiziksel-quantity-gate kaskad; tekil/grup ortak).
         productIdsToInvalidate.push(payment.order.productId);
-        // Bulgu E: ürün satırını FOR UPDATE ile kilitle. Rezervasyon normalde 1-stoklu
-        // üründe ikinci ödemeyi engeller, ama reservedQuantity drift'i olursa iki eşzamanlı
-        // ödeme quantity'yi negatife itebilir. Kilit + clamp'li mutlak set bunu kapatır.
-        await tx.$queryRaw`SELECT id FROM products WHERE id = ${payment.order.productId} FOR UPDATE`;
-        const product = await tx.product.findUnique({
-          where: { id: payment.order.productId },
-        });
-
-        if (!product) {
-          throw new Error("Product not found");
-        }
-
-        const orderQty = payment.order?.quantity ?? 1;
-        const newQuantity =
-          product.quantity !== null
-            ? Math.max(0, product.quantity - orderQty)
-            : null;
-        const updateData: any = {
-          status: getProductStatusFromQuantity(newQuantity),
-          reservedQuantity: safeDecrementReserved(
-            product.reservedQuantity,
-            orderQty,
-          ),
-        };
-        if (product.quantity !== null) {
-          // Clamp'li mutlak set (FOR UPDATE kilidi altında yarışsız); { decrement } yerine
-          // GREATEST(quantity-orderQty, 0) eşdeğeri — negatif stok imkânsız.
-          updateData.quantity = newQuantity;
-        }
-
-        await tx.product.update({
-          where: { id: payment.order.productId },
-          data: updateData,
-        });
-
-        // Stockout cascade: only when PHYSICAL stock is actually drained
-        // (quantity <= 0), cancel other open offers/orders for the same product
-        // within the same transaction so no other buyer can complete a payment
-        // that would push stock negative. The order matters: invalidate pending
-        // orders FIRST (so their linked offers chain-cancel atomically), then
-        // sweep any remaining standalone offers. Both helpers are idempotent
-        // w.r.t. already-terminal rows, and the order helper now safely clamps
-        // the reservedQuantity decrement.
-        //
-        // NOTE: we intentionally gate on physical `quantity`, NOT on
-        // `quantity - reservedQuantity`. reservedQuantity still includes OTHER
-        // buyers' legitimate pending_payment orders, each of which has a real
-        // physical unit waiting for it. Gating on available-for-new-buyers (q-r)
-        // would wrongly cancel those valid orders whenever stock > 1 and
-        // multiple buyers checked out concurrently (e.g. 2 stock + 2 buyers:
-        // after the first payment q=1,r=1 → available=0 → the still-valid second
-        // order gets cancelled and auto-refunded even though a unit remained).
-        const refreshed = await tx.product.findUnique({
-          where: { id: payment.order.productId },
-          select: { quantity: true, reservedQuantity: true, categoryId: true },
-        });
-        if (
-          refreshed &&
-          refreshed.quantity !== null &&
-          refreshed.quantity <= 0
-        ) {
-          stockoutCategoryId = refreshed.categoryId ?? null;
-          const orderResult =
-            await this.productLockService.invalidatePendingOrdersForProduct(
-              tx,
-              payment.order.productId,
-              "Stok tükendi",
-            );
-          const offerResult =
-            await this.productLockService.invalidateRelatedOffers(
-              tx,
-              payment.order.productId,
-            );
-          cancelledOrders.push(
-            ...orderResult.cancelledOrders.map((o) => ({
-              orderId: o.orderId,
-              buyerId: o.buyerId,
-              productId: o.productId,
-              productTitle: o.productTitle,
-              offerId: o.offerId,
-              hadPayment: o.hadPayment,
-            })),
-          );
-          cancelledOffers.push(
-            ...offerResult.rejectedOffers.map((o) => ({
-              buyerId: o.buyerId,
-              productId: o.productId,
-              productTitle: o.productTitle,
-            })),
-          );
-        }
-
-        this.logger.log(
-          `Product ${payment.order.productId} stock updated: quantity=${newQuantity}, reserved=${updateData.reservedQuantity}`,
+        const stockout = await this.stock.decrementForOrder(
+          tx,
+          payment.order.productId,
+          payment.order?.quantity ?? 1,
         );
+        cancelledOrders.push(...stockout.cancelledOrders);
+        cancelledOffers.push(...stockout.cancelledOffers);
+        if (stockout.stockoutCategoryId !== undefined) {
+          stockoutCategoryId = stockout.stockoutCategoryId;
+        }
       }
 
       // Get full order details for event emission
@@ -707,92 +622,21 @@ export class PaymentFulfillmentService {
 
         const productIdsToInvalidate: string[] = [];
 
-        // 2. geçiş: ürün başına stok düşümü + stockout kaskadı + hold + ledger
+        // 2. geçiş: ürün başına stok düşümü + stockout kaskadı + hold (tekil yolla ortak servisler)
         for (const order of aliveOrders) {
           productIdsToInvalidate.push(order.productId);
-          // Bulgu E: ürün satırını FOR UPDATE ile kilitle (regular path ile aynı savunma).
-          await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
-          const product = await tx.product.findUnique({
-            where: { id: order.productId },
-          });
-          if (!product) {
-            throw new Error(`Product not found for group order ${order.id}`);
+          const stockout = await this.stock.decrementForOrder(
+            tx,
+            order.productId,
+            order.quantity ?? 1,
+          );
+          cancelledOrders.push(...stockout.cancelledOrders);
+          cancelledOffers.push(...stockout.cancelledOffers);
+          if (stockout.stockoutCategoryId !== undefined) {
+            stockoutCategoryId = stockout.stockoutCategoryId;
           }
 
-          // Adet bazlı stok düşümü: sipariş adedi kadar quantity-- ve reserved--.
-          const orderQty = order.quantity ?? 1;
-          const newQuantity =
-            product.quantity !== null
-              ? Math.max(0, product.quantity - orderQty)
-              : null;
-          const updateData: any = {
-            status: getProductStatusFromQuantity(newQuantity),
-            reservedQuantity: safeDecrementReserved(
-              product.reservedQuantity,
-              orderQty,
-            ),
-          };
-          if (product.quantity !== null) {
-            // Clamp'li mutlak set (FOR UPDATE altında yarışsız) — negatif stok imkânsız.
-            updateData.quantity = newQuantity;
-          }
-          await tx.product.update({
-            where: { id: order.productId },
-            data: updateData,
-          });
-
-          const refreshed = await tx.product.findUnique({
-            where: { id: order.productId },
-            select: {
-              quantity: true,
-              reservedQuantity: true,
-              categoryId: true,
-            },
-          });
-          // Gate on PHYSICAL stock (quantity <= 0), not available-for-new-buyers
-          // (quantity - reservedQuantity). reservedQuantity still includes other
-          // buyers' valid pending_payment orders, each with a real unit waiting;
-          // gating on (q-r) would wrongly cancel + auto-refund them whenever
-          // stock > 1 and buyers checked out concurrently. See the direct-buy
-          // branch above for the detailed 2-stock/2-buyer walkthrough.
-          if (
-            refreshed &&
-            refreshed.quantity !== null &&
-            refreshed.quantity <= 0
-          ) {
-            stockoutCategoryId = refreshed.categoryId ?? null;
-            const orderResult =
-              await this.productLockService.invalidatePendingOrdersForProduct(
-                tx,
-                order.productId,
-                "Stok tükendi",
-              );
-            const offerResult =
-              await this.productLockService.invalidateRelatedOffers(
-                tx,
-                order.productId,
-              );
-            cancelledOrders.push(
-              ...orderResult.cancelledOrders.map((o) => ({
-                orderId: o.orderId,
-                buyerId: o.buyerId,
-                productId: o.productId,
-                productTitle: o.productTitle,
-                offerId: o.offerId,
-                hadPayment: o.hadPayment,
-              })),
-            );
-            cancelledOffers.push(
-              ...offerResult.rejectedOffers.map((o) => ({
-                buyerId: o.buyerId,
-                productId: o.productId,
-                productTitle: o.productTitle,
-              })),
-            );
-          }
-
-          // Satıcı başına escrow hold (tek payment'a sipariş başına bir hold).
-          // Faz 8.2: escrow hold + pending komisyon → EscrowHoldService (tekil/grup ortak).
+          // Satıcı başına escrow hold + pending komisyon → EscrowHoldService.
           await this.escrowHold.createHold(tx, order, payment.id);
         }
 

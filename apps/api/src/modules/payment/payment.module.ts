@@ -20,6 +20,7 @@ import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { EscrowHoldService } from "./escrow-hold.service";
+import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { CacheModule } from "../cache/cache.module";
@@ -73,6 +74,7 @@ import { ElogoModule } from "../elogo";
     FulfillmentNotifier,
     FulfillmentFinalizer,
     EscrowHoldService,
+    FulfillmentStockService,
     PaymentProviderEventService,
     PaymentLifecycleService,
     PaymentSchedulerService,

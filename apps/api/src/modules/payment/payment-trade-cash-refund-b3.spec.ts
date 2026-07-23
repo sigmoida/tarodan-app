@@ -12,6 +12,7 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { EscrowHoldService } from "./escrow-hold.service";
+import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
@@ -72,6 +73,7 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         I18nService,
         FulfillmentFinalizer,
         EscrowHoldService,
+        FulfillmentStockService,
         {
           provide: FulfillmentNotifier,
           useValue: {
