@@ -6,17 +6,11 @@ import {
   PaymentStatus,
   OrderStatus,
   ProductStatus,
-  SubscriptionStatus,
   TradeStatus,
   OfferStatus,
 } from "@prisma/client";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
-import {
-  computeRelevanceScore,
-  RELEVANCE_PREMIUM_BONUS,
-} from "../product/helpers/relevance-score";
 import { EventService } from "../events";
-import { ElogoInvoicingService } from "../elogo";
 import { NotificationService } from "../notification/notification.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
@@ -24,6 +18,7 @@ import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { EscrowHoldService } from "./escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment-stock.service";
+import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -77,7 +72,7 @@ export class PaymentFulfillmentService {
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
     private readonly fulfillmentNotifier: FulfillmentNotifier,
-    private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly virtualOrder: VirtualOrderFulfillmentService,
     private readonly stock: FulfillmentStockService,
     private readonly notificationService: NotificationService,
     private readonly escrowHold: EscrowHoldService,
@@ -228,149 +223,15 @@ export class PaymentFulfillmentService {
       const productIdsToInvalidate: string[] = [];
 
       if (isMembershipOrder) {
-        // Activate membership for the buyer
-        const membership = await tx.userMembership.findUnique({
-          where: { userId: payment.order.buyerId },
-          include: { tier: true },
-        });
-
-        if (membership) {
-          await tx.userMembership.update({
-            where: { userId: payment.order.buyerId },
-            data: {
-              status: SubscriptionStatus.active,
-              cancelledAt: null,
-            },
-          });
-
-          // Premium (free olmayan) üyelik aktifleşti: satıcının boost'suz aktif ilanlarını
-          // premium kademesine (rankTier=1) yükselt. Boost'lu (2) ürünlere dokunma.
-          if (membership.tier.type !== "free") {
-            await tx.product.updateMany({
-              where: {
-                sellerId: payment.order.buyerId,
-                status: ProductStatus.active,
-                rankTier: 0,
-              },
-              // rankTier 0→1; relevanceScore'a premium bonusu ekle (kademe 0→1 farkı)
-              data: {
-                rankTier: 1,
-                relevanceScore: { increment: RELEVANCE_PREMIUM_BONUS },
-              },
-            });
-          }
-
-          // Update membership payment record
-          await tx.membershipPayment.updateMany({
-            where: {
-              membershipId: membership.id,
-              status: "pending",
-            },
-            data: {
-              status: "completed",
-              providerPaymentId: transactionId || payment.providerPaymentId,
-            },
-          });
-
-          this.logger.log(
-            `Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`,
-          );
-        }
-
-        // Üyelik sanal hizmettir: kargo/teslimat akışına girmesin → terminal "completed".
-        // (Paylaşılan kod yukarıda preparing yapmıştı; boost ile aynı override.)
-        await tx.order.update({
-          where: { id: payment.orderId },
-          data: { status: OrderStatus.completed, preparingDeadline: null },
-        });
-
-        // Yetim sipariş temizliği: kullanıcı birden çok kez "Ödemeyi tamamla"ya
-        // basıp yarım bıraktıysa, aynı sanal üründen başka pending_payment
-        // siparişler kalmış olabilir. Üyelik artık aktif → onları iptal et ki
-        // sarı "ödemeyi tamamla" uyarısı / yetim ödeme kayıtları kalmasın.
-        const siblingPendings = await tx.order.findMany({
-          where: {
-            buyerId: payment.order.buyerId,
-            productId: payment.order.productId,
-            status: OrderStatus.pending_payment,
-            id: { not: payment.orderId },
-          },
-          select: { id: true },
-        });
-        if (siblingPendings.length > 0) {
-          const ids = siblingPendings.map((o) => o.id);
-          await tx.order.updateMany({
-            where: { id: { in: ids } },
-            data: { status: OrderStatus.cancelled },
-          });
-          await tx.payment.updateMany({
-            where: { orderId: { in: ids }, status: PaymentStatus.pending },
-            data: {
-              status: PaymentStatus.failed,
-              failureReason: "Üyelik başka ödeme ile tamamlandı",
-            },
-          });
-          this.logger.log(
-            `Cancelled ${ids.length} sibling pending membership orders for user ${payment.order.buyerId}`,
-          );
-        }
+        // Faz 8.2: sanal (üyelik) aktivasyonu → VirtualOrderFulfillmentService.
+        await this.virtualOrder.applyMembershipInTx(tx, payment, transactionId);
       } else if (isBoostOrder) {
-        // Boost siparişi: ilgili ProductBoost'u aktive et, ürünü sponsorlu kademesine (rankTier=2) al.
-        // Stok/quantity'ye DOKUNULMAZ — boost sanal bir hizmet, fiziksel ürün değil.
-        const boost = await tx.productBoost.findUnique({
-          where: { orderId: payment.orderId },
-        });
-        if (boost) {
-          const nowTs = new Date();
-          // Stacking: ilanda hâlâ aktif bir boost varsa, yeni süre kalan sürenin ÜSTÜNE eklenir.
-          // (örn. kalan 15 gün + yeni 30 gün = toplam 45 gün)
-          const boostedProduct = await tx.product.findUnique({
-            where: { id: boost.productId },
-            select: {
-              boostedUntil: true,
-              qualityScore: true,
-              popularityScore: true,
-            },
-          });
-          const base =
-            boostedProduct?.boostedUntil && boostedProduct.boostedUntil > nowTs
-              ? boostedProduct.boostedUntil
-              : nowTs;
-          const startsAt = nowTs;
-          const endsAt = new Date(
-            base.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
-          );
-          await tx.productBoost.update({
-            where: { id: boost.id },
-            data: { status: "active", startsAt, endsAt },
-          });
-          await tx.product.update({
-            where: { id: boost.productId },
-            data: {
-              boostedUntil: endsAt,
-              rankTier: 2,
-              relevanceScore: computeRelevanceScore({
-                rankTier: 2,
-                qualityScore: boostedProduct?.qualityScore ?? 0,
-                popularityScore: boostedProduct?.popularityScore,
-              }),
-            },
-          });
-          // Boost sanal hizmettir: sipariş kargo/teslimat akışına girmesin → terminal "completed".
-          // (Paylaşılan kod yukarıda preparing yapmıştı; burada override ediyoruz.)
-          await tx.order.update({
-            where: { id: payment.orderId },
-            data: { status: OrderStatus.completed, preparingDeadline: null },
-          });
-          productIdsToInvalidate.push(boost.productId);
-          this.logger.log(
-            `Boost activated for product ${boost.productId} until ${endsAt.toISOString()} after payment ${payment.id}`,
-          );
-        } else {
-          this.logger.warn(
-            `Boost order ${payment.orderId} paid but no matching ProductBoost found`,
-          );
-        }
+        // Faz 8.2: sanal (boost) aktivasyonu → VirtualOrderFulfillmentService.
+        const boostProductId = await this.virtualOrder.applyBoostInTx(
+          tx,
+          payment,
+        );
+        if (boostProductId) productIdsToInvalidate.push(boostProductId);
       } else {
         // Regular product order: stok düşümü + stockout kaskadı → FulfillmentStockService
         // (FOR UPDATE + clamp'li düşüm + fiziksel-quantity-gate kaskad; tekil/grup ortak).
@@ -485,39 +346,17 @@ export class PaymentFulfillmentService {
       });
     }
 
-    // Tarodan gelir e-Arşivi: üyelik → üyeye, boost → satıcıya (sanal hizmet, ödeme anında).
-    // Fire-and-forget, idempotent, retry cron'lu — ödemeyi BLOKLAMAZ.
+    // Tarodan gelir e-Arşivi (sanal hizmet): üyelik → üyeye, boost → satıcıya.
+    // POST-COMMIT fire-and-forget, idempotent, retry cron'lu → VirtualOrderFulfillmentService.
     if (isMembershipOrder) {
-      void (async () => {
-        const mp = await this.prisma.membershipPayment.findFirst({
-          where: {
-            providerPaymentId:
-              transactionId || payment.providerPaymentId || undefined,
-          },
-          orderBy: { createdAt: "desc" },
-          select: { id: true },
-        });
-        // membershipPayment kaydı varsa ondan; YOKSA (mevcut akış MEM- order + tier upgrade
-        // yapıyor, ayrı membershipPayment üretmiyor) MEM- SİPARİŞTEN kes.
-        if (mp) await this.elogoInvoicing.issueMembershipInvoice(mp.id);
-        else
-          await this.elogoInvoicing.issueMembershipInvoiceForOrder(
-            resultOrder.id,
-          );
-      })().catch((e) =>
-        this.logger.warn(`eLogo üyelik faturası tetik hatası: ${e?.message}`),
+      this.virtualOrder.issueMembershipInvoice(
+        payment,
+        resultOrder.id,
+        transactionId,
       );
     }
     if (isBoostOrder) {
-      void (async () => {
-        const boost = await this.prisma.productBoost.findUnique({
-          where: { orderId: resultOrder.id },
-          select: { id: true },
-        });
-        if (boost) await this.elogoInvoicing.issueBoostInvoice(boost.id);
-      })().catch((e) =>
-        this.logger.warn(`eLogo boost faturası tetik hatası: ${e?.message}`),
-      );
+      this.virtualOrder.issueBoostInvoice(resultOrder.id);
     }
 
     return true;

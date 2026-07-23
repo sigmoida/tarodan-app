@@ -15,6 +15,7 @@ import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { EscrowHoldService } from "./escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment-stock.service";
+import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -179,6 +180,7 @@ describe("PaymentService group payment (checkout group)", () => {
         EscrowHoldService,
         // Gerçek stok servisi → product.update / invalidate kaskad assertion'ları için.
         FulfillmentStockService,
+        VirtualOrderFulfillmentService,
         {
           provide: FulfillmentNotifier,
           useValue: {
