@@ -361,7 +361,7 @@
   yüklesin" karşılandı). `entrypoint.sh` artık ROL-FARKINDA: `PROCESS_ROLE=worker`'da migration'ı atlayıp
   `node dist/worker`, aksi halde migrate + `node dist/main` başlatır (varsayılan davranış aynı) → TEK imaj
   iki Coolify servisi olarak boot edebilir. **KALAN (OPS):** 2. Coolify servisi (aynı imaj, env
-  `PROCESS_ROLE=worker`) + API servisine `PROCESS_ROLE=web` + Faz 0 (ayrı Redis) — saf deploy adımı.
+  `PROCESS_ROLE=worker`) + API servisine `PROCESS_ROLE=web` + Faz 0 (ayrı Redis) — saf deploy adımı. **Ön-fix:** Bull KÖK bağlantısı (`forRootAsync`) gated `WorkerModule`'den `BullRootModule`'e (@Global, koşulsuz) taşındı — `PROCESS_ROLE=web` de enqueue + repeatable-cron kaydı için bağlantıya sahip. Faz 0: Bull `REDIS_HOST/PORT/PASSWORD`, cache ayrı `REDIS_URL` (kod hazır, ayrı instance sadece env).
 - [x] **7.3** Idempotency: para job'ları Faz 1-2 CAS ile idempotent; yeni outbox (CAS claim +
       dedupeKey + idempotent handler) ve ledger (dengeli record + best-effort capture) tasarımca
       idempotent — Bull at-least-once güvenli.

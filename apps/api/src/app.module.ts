@@ -62,6 +62,7 @@ import { I18nModule } from "./modules/i18n";
 
 // Background Workers (BullMQ)
 import { WorkerModule } from "./workers";
+import { BullRootModule } from "./workers/bull-root.module";
 import { runsQueueWorkers } from "./process-role";
 
 // WebSocket for real-time communication
@@ -205,9 +206,14 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     // GraphQLAppModule,   // GAP-L02: GraphQL API Support - Temporarily disabled
     I18nModule, // GAP-L03: Multi-language Support
 
+    // Bull KÖK bağlantısı (Redis) — Faz 7.2: KOŞULSUZ yüklenir (gated WorkerModule'den
+    // ayrı). `PROCESS_ROLE=web` job İŞLEMEZ ama yine de enqueue eder + repeatable cron
+    // kaydeder → bağlantı her rolde gerekli.
+    BullRootModule,
+
     // Background Workers (BullMQ) — Faz 7.2: `PROCESS_ROLE=web` iken YÜKLENMEZ (ağır
-    // kuyruk worker'ları ayrı worker process'ine taşınır). Varsayılan (`all`) + `worker`
-    // rollerinde yüklenir → tek-process deploy'da davranış değişmez.
+    // kuyruk worker'ları = job TÜKETİCİLERİ ayrı worker process'ine taşınır). Varsayılan
+    // (`all`) + `worker` rollerinde yüklenir → tek-process deploy'da davranış değişmez.
     ...(runsQueueWorkers() ? [WorkerModule] : []),
 
     // WebSocket for real-time communication
