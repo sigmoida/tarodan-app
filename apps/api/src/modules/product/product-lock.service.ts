@@ -12,6 +12,7 @@ import {
   getAvailableQuantity,
   safeDecrementReserved,
 } from "./helpers/product-availability.helper";
+import { getReservedAwareStatus } from "./helpers/product-status.helper";
 import { NotificationService } from "../notification/notification.service";
 
 type PrismaTx = Prisma.TransactionClient;
@@ -150,6 +151,31 @@ export class ProductLockService {
     );
 
     return product;
+  }
+
+  /**
+   * checkAndReserve'in TERSİ — bir rezervasyonu güvenle serbest bırakır. Ürünü ÖNCE
+   * FOR UPDATE ile kilitler, reservedQuantity'yi clamp'li düşürür ve rezerv-duyarlı
+   * status yazar. Kilit ŞART: eskiden takas iptal/red/dispute yolları ürünü kilitlemeden
+   * oku-hesapla-mutlak-yaz yapıyordu (#4 lost-update) → araya giren bir checkout
+   * rezervasyonu siliniyordu. Çağıran, DEADLOCK'a karşı ürün id'lerini SIRALI iterlemeli
+   * (checkAndReserve/completion yollarıyla aynı kilit sırası).
+   */
+  async releaseReservation(
+    tx: PrismaTx,
+    productId: string,
+    qty: number,
+  ): Promise<void> {
+    const product = await this.lockProductForUpdate(tx, productId);
+    if (!product) return;
+    const newReserved = safeDecrementReserved(product.reservedQuantity, qty);
+    await tx.product.update({
+      where: { id: productId },
+      data: {
+        reservedQuantity: newReserved,
+        status: getReservedAwareStatus(product.quantity, newReserved),
+      },
+    });
   }
 
   /**

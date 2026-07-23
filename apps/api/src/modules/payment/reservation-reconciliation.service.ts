@@ -243,38 +243,46 @@ export class ReservationReconciliationService {
         // Eski sürüm ödemesi hiç başlatılmamış teklif siparişlerini de sayıp reservedQuantity'yi
         // şişiriyordu → ürün yanlışlıkla "Stok bitti" görünüyordu.
         // (invalidatePendingOrdersForProduct'taki kuralla birebir aynı.)
-        const directBuyHeldAgg = await this.prisma.order.aggregate({
-          _sum: { quantity: true },
-          where: {
-            productId: id,
-            status: OrderStatus.pending_payment,
-            reservationReleasedAt: null,
-            offerId: null,
-          },
-        });
-        const offerWithPaymentHeldAgg = await this.prisma.order.aggregate({
-          _sum: { quantity: true },
-          where: {
-            productId: id,
-            status: OrderStatus.pending_payment,
-            reservationReleasedAt: null,
-            offerId: { not: null },
-            payment: { isNot: null },
-          },
-        });
-        const orderHeld =
-          (directBuyHeldAgg._sum.quantity ?? 0) +
-          (offerWithPaymentHeldAgg._sum.quantity ?? 0);
-        const tradeHeldAgg = await this.prisma.tradeItem.aggregate({
-          _sum: { quantity: true },
-          where: {
-            productId: id,
-            trade: { status: { in: TRADE_RESERVATION_HOLDING_STATUSES } },
-          },
-        });
-        const held = orderHeld + (tradeHeldAgg._sum.quantity ?? 0);
         await this.prisma.$transaction(async (tx) => {
+          // #2 (lost-update): Ürünü ÖNCE FOR UPDATE ile kilitle, `held`'i AYNI kilit
+          // altında tx içinde hesapla. checkout da ürünü checkAndReserve ile FOR UPDATE
+          // kilitlediğinden, bu kilidi tutarken eşzamanlı rezervasyon araya GİREMEZ →
+          // held tutarlı snapshot'tan gelir. Eskiden aggregate'ler tx DIŞINDA hesaplanıp
+          // kilit SONRA alınıyordu; arada commit eden bir checkout'ın rezervasyonu bayat
+          // held'in mutlak yazımıyla siliniyordu (oversell).
           await tx.$queryRaw`SELECT id FROM products WHERE id = ${id} FOR UPDATE`;
+
+          const directBuyHeldAgg = await tx.order.aggregate({
+            _sum: { quantity: true },
+            where: {
+              productId: id,
+              status: OrderStatus.pending_payment,
+              reservationReleasedAt: null,
+              offerId: null,
+            },
+          });
+          const offerWithPaymentHeldAgg = await tx.order.aggregate({
+            _sum: { quantity: true },
+            where: {
+              productId: id,
+              status: OrderStatus.pending_payment,
+              reservationReleasedAt: null,
+              offerId: { not: null },
+              payment: { isNot: null },
+            },
+          });
+          const orderHeld =
+            (directBuyHeldAgg._sum.quantity ?? 0) +
+            (offerWithPaymentHeldAgg._sum.quantity ?? 0);
+          const tradeHeldAgg = await tx.tradeItem.aggregate({
+            _sum: { quantity: true },
+            where: {
+              productId: id,
+              trade: { status: { in: TRADE_RESERVATION_HOLDING_STATUSES } },
+            },
+          });
+          const held = orderHeld + (tradeHeldAgg._sum.quantity ?? 0);
+
           const product = await tx.product.findUnique({
             where: { id },
             select: { reservedQuantity: true, quantity: true, status: true },

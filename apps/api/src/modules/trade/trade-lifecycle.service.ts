@@ -561,26 +561,15 @@ export class TradeLifecycleService {
               (byProduct.get(item.productId) ?? 0) + item.quantity,
             );
           }
-          for (const [productId, qty] of byProduct) {
-            const prod = await tx.product.findUnique({
-              where: { id: productId },
-              select: { reservedQuantity: true, quantity: true },
-            });
-            if (prod) {
-              const newReserved = safeDecrementReserved(
-                prod.reservedQuantity,
-                qty,
-              );
-              await tx.product.update({
-                where: { id: productId },
-                // Bulgu H: koşulsuz "active" yerine rezerv-duyarlı status — üründe BAŞKA
-                // canlı rezervasyon (eşzamanlı takas/sipariş) varsa "reserved" kalır.
-                data: {
-                  reservedQuantity: newReserved,
-                  status: getReservedAwareStatus(prod.quantity, newReserved),
-                },
-              });
-            }
+          // #4: DEADLOCK-güvenli SIRALI FOR UPDATE + clamp'li release. Eskiden ürün
+          // kilitlenmeden oku-hesapla-mutlak-yaz yapılıyordu → araya giren bir checkout
+          // rezervasyonu siliniyordu (lost-update). releaseReservation ürünü kilitler.
+          for (const productId of [...byProduct.keys()].sort()) {
+            await this.productLockService.releaseReservation(
+              tx,
+              productId,
+              byProduct.get(productId)!,
+            );
           }
         }
       }
@@ -986,26 +975,13 @@ export class TradeLifecycleService {
             (byProduct.get(item.productId) ?? 0) + item.quantity,
           );
         }
-        for (const [productId, qty] of byProduct) {
-          const prod = await tx.product.findUnique({
-            where: { id: productId },
-            select: { reservedQuantity: true, quantity: true },
-          });
-          if (prod) {
-            const newReserved = safeDecrementReserved(
-              prod.reservedQuantity,
-              qty,
-            );
-            await tx.product.update({
-              where: { id: productId },
-              // Bulgu H: koşulsuz "active" yerine rezerv-duyarlı status — üründe BAŞKA
-              // canlı rezervasyon (eşzamanlı takas/sipariş) varsa "reserved" kalır.
-              data: {
-                reservedQuantity: newReserved,
-                status: getReservedAwareStatus(prod.quantity, newReserved),
-              },
-            });
-          }
+        // #4: DEADLOCK-güvenli SIRALI FOR UPDATE + clamp'li release (bkz. releaseReservation).
+        for (const productId of [...byProduct.keys()].sort()) {
+          await this.productLockService.releaseReservation(
+            tx,
+            productId,
+            byProduct.get(productId)!,
+          );
         }
       }
 
@@ -1595,26 +1571,13 @@ export class TradeLifecycleService {
         }
       } else if (newStatus === TradeStatus.cancelled) {
         // İptal: kabul anında yapılan rezervasyonu geri al
-        for (const [productId, qty] of qtyByProduct) {
-          const prod = await tx.product.findUnique({
-            where: { id: productId },
-            select: { reservedQuantity: true, quantity: true },
-          });
-          if (prod) {
-            const newReserved = safeDecrementReserved(
-              prod.reservedQuantity,
-              qty,
-            );
-            await tx.product.update({
-              where: { id: productId },
-              // Bulgu H: koşulsuz "active" yerine rezerv-duyarlı status — üründe BAŞKA
-              // canlı rezervasyon (eşzamanlı takas/sipariş) varsa "reserved" kalır.
-              data: {
-                reservedQuantity: newReserved,
-                status: getReservedAwareStatus(prod.quantity, newReserved),
-              },
-            });
-          }
+        // #4: DEADLOCK-güvenli SIRALI FOR UPDATE + clamp'li release (bkz. releaseReservation).
+        for (const productId of [...qtyByProduct.keys()].sort()) {
+          await this.productLockService.releaseReservation(
+            tx,
+            productId,
+            qtyByProduct.get(productId)!,
+          );
         }
       }
     });

@@ -39,8 +39,11 @@ describe("ProductLockService.checkAndReserve — stok eş-zamanlılık matrisi",
         update: jest.fn().mockImplementation(({ where, data }: any) => {
           const row = store[where.id];
           if (row && data.reservedQuantity?.increment != null) {
-            row.reservedQuantity += data.reservedQuantity.increment;
+            row.reservedQuantity += data.reservedQuantity.increment; // checkAndReserve
+          } else if (row && typeof data.reservedQuantity === "number") {
+            row.reservedQuantity = data.reservedQuantity; // releaseReservation (mutlak)
           }
+          if (row && typeof data.status === "string") row.status = data.status;
           return Promise.resolve({ ...row });
         }),
       },
@@ -48,7 +51,9 @@ describe("ProductLockService.checkAndReserve — stok eş-zamanlılık matrisi",
     const svc = new ProductLockService({} as any, {} as any);
     const reserve = (id: string, qty = 1) =>
       svc.checkAndReserve(tx as any, id, qty);
-    return { svc, tx, reserve, queryRawCalls };
+    const release = (id: string, qty = 1) =>
+      svc.releaseReservation(tx as any, id, qty);
+    return { svc, tx, reserve, release, queryRawCalls };
   };
 
   const row = (over: Partial<Row>): Row => ({
@@ -146,5 +151,40 @@ describe("ProductLockService.checkAndReserve — stok eş-zamanlılık matrisi",
     const { reserve } = makeSvc(store);
 
     await expect(reserve("ghost", 1)).rejects.toThrow();
+  });
+
+  // #4: releaseReservation — takas iptal/red/dispute'ün kilitli, clamp'li release primitifi.
+  it("releaseReservation reservedQuantity'yi FOR UPDATE altında düşürür (2→1)", async () => {
+    const store = { p1: row({ quantity: 2, reservedQuantity: 2 }) };
+    const { release, queryRawCalls } = makeSvc(store);
+
+    await release("p1", 1);
+
+    expect(store.p1.reservedQuantity).toBe(1);
+    expect(queryRawCalls.some((q) => /FOR UPDATE/i.test(q))).toBe(true);
+  });
+
+  it("releaseReservation 0'ın altına inmez (clamp)", async () => {
+    const store = { p1: row({ quantity: 3, reservedQuantity: 1 }) };
+    const { release } = makeSvc(store);
+
+    await release("p1", 3); // safeDecrement(1,3) = 0
+
+    expect(store.p1.reservedQuantity).toBe(0);
+  });
+
+  it("release, tam dolu ürünü tekrar rezerve edilebilir yapar (lost-update DEĞİL)", async () => {
+    // qty-1 ürün tam rezerve; bir akış release eder → başka akış yeniden rezerve edebilir.
+    const store = { p1: row({ quantity: 1, reservedQuantity: 1 }) };
+    const { reserve, release } = makeSvc(store);
+
+    // dolu iken reserve reddedilir
+    await expect(reserve("p1", 1)).rejects.toThrow();
+    // takas iptali release eder
+    await release("p1", 1);
+    expect(store.p1.reservedQuantity).toBe(0);
+    // artık yeniden rezerve edilebilir
+    await reserve("p1", 1);
+    expect(store.p1.reservedQuantity).toBe(1);
   });
 });
