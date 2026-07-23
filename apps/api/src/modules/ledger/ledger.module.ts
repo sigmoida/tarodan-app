@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { LedgerService } from "./ledger.service";
+import { LedgerBalanceService } from "./ledger-balance.service";
 import { LedgerReconciliationService } from "./ledger-reconciliation.service";
 import { LedgerScheduledProcessor } from "./ledger-scheduled.processor";
 
@@ -15,9 +16,10 @@ import { LedgerScheduledProcessor } from "./ledger-scheduled.processor";
   imports: [BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED })],
   providers: [
     LedgerService,
+    LedgerBalanceService,
     LedgerReconciliationService,
     LedgerScheduledProcessor,
   ],
-  exports: [LedgerService, LedgerReconciliationService],
+  exports: [LedgerService, LedgerBalanceService, LedgerReconciliationService],
 })
 export class LedgerModule {}

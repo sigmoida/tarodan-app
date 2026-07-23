@@ -310,8 +310,18 @@
     dengeli); iade finalize tx'inde. **Spec:** tam/kısmi iade denge + dejenere-null.
     **Devam (6.3'e):** hold_release (nakit değil, iç yeniden-sınıflama) + trade_commission (takas alt-sistemi,
     takas capture ledger'ı henüz yok) → tam per-hesap bakiye türetimiyle birlikte.
-- [ ] **6.3** Hold tüketimi/kısmi iade ledger'dan okusun (Faz 1.4'ün yapısal hâli). → para akışları
-      deftere taşınınca (büyük, riskli geçiş); şimdilik defter denetim/reconciliation için popüle edilir.
+- [x] **6.3** ✓ Bakiyeler defterden OKUNUYOR — `LedgerBalanceService` (CQRS read-model): siparişin
+      `captured` (Σ buyer_payment credit), `refunded` (Σ refund debit), `remainingRefundable` (yapısal
+      kısmi-iade tavanı) ve `escrowNet` (signed seller_escrow) değerlerini Payment/Hold'dan DEĞİL,
+      değişmez `ledger_entries`'ten türetir. Tek türetim otoritesi (`deriveOrderBalances` saf fonksiyonu)
+      hem tek-sipariş DB sorgusunda hem de reconciliation'ın pencere satırlarında AYNI mantığı koşar (DRY).
+      `LedgerReconciliationService`'e 3. invaryant eklendi: defter-native sipariş-bazlı fazla-iade
+      (Σ refund > Σ capture → `LEDGER_OVER_REFUND` alarmı) — Payment metadata'ya değil deftere dayanır,
+      6.5'in "ledger vs Payment" çapraz-doğrulamasını sertleştirir. **Spec:** türetim + DB + escrow +
+      reconcile over-refund. **Kapsam kararı:** para YAZMA yolunu (refund tavanı/payout uygunluğu)
+      defterden ZORLAMAK (Payment/Hold'u kaynak olmaktan tamamen çıkarmak) bilinçli ERTELENDİ — defter
+      @Optional + best-effort (eksik/gecikmeli olabilir), onunla para akışını BLOKLAMAK "defter hatası
+      parayı bozmaz" invaryantını çiğnerdi; defter OKUMA/çapraz-doğrulama kaynağıdır.
 - [x] **6.4** ✓ Sipariş + takas komisyonları TEK deftere birleşti (MONEY-L7). Eski `commission_ledger`
       yalnız SİPARİŞ komisyonuydu (`orderId @unique`); takas komisyonu takas alt-sisteminde ayrıydı.
       `LedgerService.recordTradeCashCapture` takas nakit yakalamasını (payer totalAmount = recipient net +

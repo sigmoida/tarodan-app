@@ -10,6 +10,7 @@ import {
   registerRepeatableCron,
 } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
+import { LedgerBalanceService } from "./ledger-balance.service";
 
 const EPSILON = 0.01;
 
@@ -17,6 +18,8 @@ export interface ReconciliationReport {
   ledgerGroupsChecked: number;
   unbalancedGroups: number;
   overRefundedPayments: number;
+  /** Faz 6.3: defterden türetilen (Payment metadata'sından DEĞİL) sipariş-bazlı fazla-iade. */
+  overRefundedOrders: number;
   driftAlarms: string[];
 }
 
@@ -73,12 +76,15 @@ export class LedgerReconciliationService implements OnModuleInit {
     const driftAlarms: string[] = [];
 
     // 1) Defter dengesi — son penceredeki tüm gruplar signed toplamı 0 mı?
+    //    (account + orderId de çekilir: 3. invaryant defter-native fazla-iade için.)
     const entries = await this.prisma.ledgerEntry.findMany({
       where: { createdAt: { gte: since } },
       select: {
         entryGroupId: true,
         direction: true,
         amount: true,
+        account: true,
+        orderId: true,
       },
     });
     const groupNet = new Map<string, number>();
@@ -125,14 +131,29 @@ export class LedgerReconciliationService implements OnModuleInit {
       }
     }
 
+    // 3) Faz 6.3 — defter-native fazla-iade: bir siparişin defterden TÜRETİLEN iade
+    //    edilen brütü (Σ refund debit) yakalanan brütünü (Σ buyer_payment credit) aşamaz.
+    //    Payment metadata'ya değil, değişmez ledger'a dayanır (aynı türetim otoritesi).
+    let overRefundedOrders = 0;
+    const orderBalances = LedgerBalanceService.deriveOrderBalances(entries);
+    for (const [orderId, b] of orderBalances) {
+      if (b.captured > EPSILON && b.refunded - b.captured > EPSILON) {
+        overRefundedOrders++;
+        const msg = `LEDGER_OVER_REFUND order=${orderId} refunded=${b.refunded.toFixed(2)} captured=${b.captured.toFixed(2)}`;
+        driftAlarms.push(msg);
+        this.logger.error(`RECONCILE ALARM: ${msg}`);
+      }
+    }
+
     const report: ReconciliationReport = {
       ledgerGroupsChecked: groupNet.size,
       unbalancedGroups,
       overRefundedPayments,
+      overRefundedOrders,
       driftAlarms,
     };
     log(
-      `Reconcile: ${groupNet.size} defter grubu · ${unbalancedGroups} dengesiz · ${overRefundedPayments} fazla-iade`,
+      `Reconcile: ${groupNet.size} defter grubu · ${unbalancedGroups} dengesiz · ${overRefundedPayments} ödeme-fazla-iade · ${overRefundedOrders} sipariş-fazla-iade`,
     );
     if (driftAlarms.length === 0) {
       this.logger.log(

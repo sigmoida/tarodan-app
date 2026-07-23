@@ -59,4 +59,51 @@ describe("LedgerReconciliationService.reconcile", () => {
     expect(r.overRefundedPayments).toBe(1);
     expect(r.driftAlarms.some((a) => a.includes("OVER_REFUND"))).toBe(true);
   });
+
+  it("Faz 6.3: defter-native fazla-iade (Σrefund debit > Σcapture credit) → alarm", async () => {
+    // o1: capture 100 (buyer credit) ama iade 130 (refund debit) → 30 fazla-iade.
+    // Not: gruplar dengeli tutuldu ki 1. invaryant (grup dengesi) alarma girmesin.
+    const prisma = makePrisma(
+      [
+        // capture grubu (dengeli)
+        {
+          entryGroupId: "cap",
+          account: "buyer_payment",
+          direction: "credit",
+          amount: 100,
+          orderId: "o1",
+        },
+        {
+          entryGroupId: "cap",
+          account: "seller_escrow",
+          direction: "debit",
+          amount: 100,
+          orderId: "o1",
+        },
+        // iade grubu (dengeli ama capture'ı aşıyor)
+        {
+          entryGroupId: "ref",
+          account: "refund",
+          direction: "debit",
+          amount: 130,
+          orderId: "o1",
+        },
+        {
+          entryGroupId: "ref",
+          account: "seller_escrow",
+          direction: "credit",
+          amount: 130,
+          orderId: "o1",
+        },
+      ],
+      [],
+    );
+    const svc = new LedgerReconciliationService(prisma, config, {} as any);
+    const r = await svc.reconcile();
+    expect(r.unbalancedGroups).toBe(0);
+    expect(r.overRefundedOrders).toBe(1);
+    expect(r.driftAlarms.some((a) => a.includes("LEDGER_OVER_REFUND"))).toBe(
+      true,
+    );
+  });
 });
