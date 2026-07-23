@@ -485,7 +485,10 @@
       money→cargo yönüyle simetrik. `surat-cargo/surat-tracking.service.ts`. Büyük.
 - [ ] **11.3b** `PaymentRefundService` (1537) böl: `RefundCapPolicy` / `RefundExecutor` / `RefundFinalizer(tx)`.
       `processRefund` tek başına ~770 satır. Büyük.
-- [ ] **11.3c** `PaymentReconciliationService` (1483, 12 dep, ~10 alakasız sweep) → concern başına böl. Orta-büyük.
+- [x] **11.3c** ✓ `PaymentReconciliationService` (1483 → **91 satır facade**) 5 cohesive alt-servise bölündü
+      (`Reservation`/`PaymentExpiry`/`Psp`/`Refund`/`Misc` Reconciliation). Facade aynı public imzalarla delege
+      ediyor (PaymentService/scheduler değişmedi); her alt-servis yalnız kullandığı dep'i alıyor; ölü
+      `InvoiceService` inj. temizlendi; paylaşılan private helper yok. 7 spec construction güncellendi; 130 test yeşil.
 
 ### 11.4 — DRY + tipleme
 
