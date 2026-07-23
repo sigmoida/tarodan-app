@@ -363,8 +363,68 @@ export class OrderQueryService {
   }
 
   /**
+   * Faz 3: Grup siparişini SATICI PAKETİ (çatı) hiyerarşisiyle sun. Bir sepetteki
+   * order'lar packageId'ye göre gruplanır → UI satıcı başına TEK kart gösterebilir:
+   * tek kargo takibi (paketin order'ları aynı gönderi/ref'i paylaşır) + tek kargo
+   * ücreti + o satıcının ürün satırları. Düz `orders` alanı geriye-dönük korunur.
+   */
+  private async buildPackagesView(
+    orders: any[],
+    packagesMeta: Array<{ id: string; sellerId: string; shippingCost: any }>,
+    userId: string,
+  ) {
+    const metaById = new Map(packagesMeta.map((p) => [p.id, p]));
+    const byPackage = new Map<string, any[]>();
+    for (const o of orders) {
+      const key = o.packageId ?? `nopkg:${o.id}`;
+      const arr = byPackage.get(key);
+      if (arr) arr.push(o);
+      else byPackage.set(key, [o]);
+    }
+    return Promise.all(
+      [...byPackage.entries()].map(async ([pkgId, pkgOrders]) => {
+        const meta = metaById.get(pkgId);
+        const seller = pkgOrders[0]?.seller ?? null;
+        // Paylaşılan kargo: paketin order'ları aynı gönderiyi (trackingNumber/
+        // providerTrackingId) paylaşır → ilk kargo satırı paketin takibidir.
+        const sh = pkgOrders.find((o) => o.shipment)?.shipment ?? null;
+        const cargo = sh
+          ? {
+              trackingNumber: sh.trackingNumber ?? null,
+              cargoCode: sh.providerTrackingId ?? null,
+              provider: sh.provider ?? null,
+              status: sh.status ?? null,
+              trackingUrl: sh.trackingUrl ?? null,
+              shippedAt: sh.shippedAt ?? null,
+              deliveredAt: sh.deliveredAt ?? null,
+            }
+          : null;
+        return {
+          id: meta?.id ?? pkgId,
+          sellerId: meta?.sellerId ?? seller?.id ?? null,
+          seller: seller
+            ? {
+                id: seller.id,
+                displayName: seller.displayName,
+                avatarUrl: seller.avatarUrl ?? null,
+                isVerified: seller.isVerified ?? false,
+              }
+            : null,
+          shippingCost: meta ? Number(meta.shippingCost) : 0,
+          cargo,
+          orders: await Promise.all(
+            pkgOrders.map((o) =>
+              this.orderCommon.formatOrderResponse(o, userId),
+            ),
+          ),
+        };
+      }),
+    );
+  }
+
+  /**
    * Alıcının sipariş grupları (sayfalı). Her grup tek "sipariş" kartı gibi
-   * gösterilir; içindeki siparişler ürün satırlarıdır (her birinin kendi kargosu).
+   * gösterilir; içindeki siparişler ürün satırlarıdır (satıcı paketi başına gruplu).
    * GET /orders/groups
    */
   async findUserCheckoutGroups(userId: string, page = 1, limit = 20) {
@@ -405,6 +465,7 @@ export class OrderQueryService {
             shipment: true,
           },
         },
+        packages: true,
       },
     });
 
@@ -420,6 +481,13 @@ export class OrderQueryService {
           totalAmount: Number(group.totalAmount),
           status: this.deriveGroupStatus(group.orders),
           createdAt: group.createdAt,
+          // Faz 3: satıcı-paketi hiyerarşisi (UI satıcı başına tek kart + tek kargo).
+          packages: await this.buildPackagesView(
+            orders,
+            group.packages,
+            userId,
+          ),
+          // Geriye-dönük: düz order listesi.
           orders: await Promise.all(
             orders.map((o) => this.orderCommon.formatOrderResponse(o, userId)),
           ),
@@ -483,6 +551,7 @@ export class OrderQueryService {
             paidAt: true,
           },
         },
+        packages: true,
       },
     });
 
@@ -510,6 +579,13 @@ export class OrderQueryService {
             paidAt: group.payment.paidAt,
           }
         : null,
+      // Faz 3: satıcı-paketi (çatı) hiyerarşisi — UI satıcı başına tek kart + tek
+      // kargo takibi + tek kargo ücreti. Düz `orders` geriye-dönük korunur.
+      packages: await this.buildPackagesView(
+        group.orders,
+        group.packages,
+        userId,
+      ),
       orders: await Promise.all(
         group.orders.map((o) =>
           this.orderCommon.formatOrderResponse(o, userId),
