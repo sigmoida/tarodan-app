@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import {
+  Prisma,
   PaymentStatus,
   OrderStatus,
   ProductStatus,
@@ -64,6 +65,56 @@ export class PaymentFulfillmentService {
       },
     };
     return { columns, metaPatch };
+  }
+
+  /**
+   * Faz 8.3: Ödemeyi CAS ile `pending → completed` claim eder — tekil / grup / takas
+   * ortak boilerplate'i (audit trail + provider verisi + FLOW-M5 oid senkronu). CAS
+   * guard'ı (`status: pending`) mükerrer başarı callback'ini idempotent kılar.
+   * @returns bu çağrı ödemeyi tamamladı mı (count > 0; false → zaten completed).
+   */
+  private async claimPaymentCompleted(
+    tx: Prisma.TransactionClient,
+    payment: any,
+    opts: {
+      transactionId?: string;
+      capturedMerchantOid?: string;
+      providerData?: ProviderPaymentData;
+    },
+  ): Promise<boolean> {
+    const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat(
+      {
+        action: "payment.completed",
+        timestamp: new Date().toISOString(),
+        oldStatus: payment.status,
+        newStatus: PaymentStatus.completed,
+        transactionId: opts.transactionId || payment.providerPaymentId,
+      },
+    );
+    const { columns: providerColumns, metaPatch } = this.buildProviderPatch(
+      opts.providerData,
+    );
+    const claimed = await tx.payment.updateMany({
+      where: { id: payment.id, status: PaymentStatus.pending },
+      data: {
+        status: PaymentStatus.completed,
+        paidAt: new Date(),
+        providerPaymentId: opts.transactionId || payment.providerPaymentId,
+        // FLOW-M5: çekilen oid'e senkronla (yoksa mevcut değeri koru) → iade
+        // providerConversationId üzerinden doğru oid'i çağırır.
+        ...(opts.capturedMerchantOid
+          ? { providerConversationId: opts.capturedMerchantOid }
+          : {}),
+        // Gözlemlenebilirlik: PayTR'nin bildirdiği gerçek taksit/currency (varsa).
+        ...providerColumns,
+        metadata: {
+          ...((payment.metadata as any) || {}),
+          auditHistory,
+          ...(metaPatch || {}),
+        } as object,
+      },
+    });
+    return claimed.count > 0;
   }
 
   constructor(
@@ -135,47 +186,12 @@ export class PaymentFulfillmentService {
     let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const oldStatus = payment.status;
-
-      const auditHistory = (
-        (payment.metadata as any)?.auditHistory || []
-      ).concat({
-        action: "payment.completed",
-        timestamp: new Date().toISOString(),
-        oldStatus,
-        newStatus: PaymentStatus.completed,
-        transactionId: transactionId || payment.providerPaymentId,
+      const claimed = await this.claimPaymentCompleted(tx, payment, {
+        transactionId,
+        capturedMerchantOid,
+        providerData,
       });
-
-      const { columns: providerColumns, metaPatch } =
-        this.buildProviderPatch(providerData);
-      const newMetadata = {
-        ...((payment.metadata as any) || {}),
-        auditHistory,
-        ...(metaPatch || {}),
-      };
-
-      const claimed = await tx.payment.updateMany({
-        where: {
-          id: payment.id,
-          status: PaymentStatus.pending,
-        },
-        data: {
-          status: PaymentStatus.completed,
-          paidAt: new Date(),
-          providerPaymentId: transactionId || payment.providerPaymentId,
-          // FLOW-M5: çekilen oid'e senkronla (yoksa mevcut değeri koru) → iade
-          // providerConversationId üzerinden doğru oid'i çağırır.
-          ...(capturedMerchantOid
-            ? { providerConversationId: capturedMerchantOid }
-            : {}),
-          // Gözlemlenebilirlik: PayTR'nin bildirdiği gerçek taksit/currency (varsa).
-          ...providerColumns,
-          metadata: newMetadata as object,
-        },
-      });
-
-      if (claimed.count === 0) {
+      if (!claimed) {
         return null;
       }
 
@@ -392,38 +408,12 @@ export class PaymentFulfillmentService {
 
     const result = await this.prisma.$transaction(
       async (tx) => {
-        const oldStatus = payment.status;
-        const auditHistory = (
-          (payment.metadata as any)?.auditHistory || []
-        ).concat({
-          action: "payment.completed",
-          timestamp: new Date().toISOString(),
-          oldStatus,
-          newStatus: PaymentStatus.completed,
-          transactionId: transactionId || payment.providerPaymentId,
+        const claimed = await this.claimPaymentCompleted(tx, payment, {
+          transactionId,
+          capturedMerchantOid,
+          providerData,
         });
-
-        const { columns: providerColumns, metaPatch } =
-          this.buildProviderPatch(providerData);
-        const claimed = await tx.payment.updateMany({
-          where: { id: payment.id, status: PaymentStatus.pending },
-          data: {
-            status: PaymentStatus.completed,
-            paidAt: new Date(),
-            providerPaymentId: transactionId || payment.providerPaymentId,
-            // FLOW-M5: çekilen oid'e senkronla (iade doğru oid'i kullansın).
-            ...(capturedMerchantOid
-              ? { providerConversationId: capturedMerchantOid }
-              : {}),
-            ...providerColumns,
-            metadata: {
-              ...((payment.metadata as any) || {}),
-              auditHistory,
-              ...(metaPatch || {}),
-            } as object,
-          },
-        });
-        if (claimed.count === 0) {
+        if (!claimed) {
           return null;
         }
 
@@ -616,30 +606,14 @@ export class PaymentFulfillmentService {
       parseInt(shippingDaysSetting?.settingValue ?? "7", 10) || 7;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const { columns: providerColumns, metaPatch } =
-        this.buildProviderPatch(providerData);
-      const claimed = await tx.payment.updateMany({
-        where: { id: payment.id, status: PaymentStatus.pending },
-        data: {
-          status: PaymentStatus.completed,
-          providerPaymentId: transactionId || payment.providerPaymentId,
-          // FLOW-M5: çekilen oid'e senkronla (takas iadesi doğru oid'i kullansın).
-          ...(capturedMerchantOid
-            ? { providerConversationId: capturedMerchantOid }
-            : {}),
-          ...providerColumns,
-          ...(metaPatch
-            ? {
-                metadata: {
-                  ...((payment.metadata as any) || {}),
-                  ...metaPatch,
-                } as object,
-              }
-            : {}),
-          paidAt: new Date(),
-        },
+      // Faz 8.3: tekil/grup ile ORTAK claim (audit trail dahil — takas ödemesi de artık
+      // tutarlı şekilde denetim izine yazılır; eskiden auditHistory eklenmiyordu).
+      const claimed = await this.claimPaymentCompleted(tx, payment, {
+        transactionId,
+        capturedMerchantOid,
+        providerData,
       });
-      if (claimed.count === 0) {
+      if (!claimed) {
         return { didComplete: false } as const;
       }
 
