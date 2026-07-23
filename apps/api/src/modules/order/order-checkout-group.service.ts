@@ -147,6 +147,7 @@ export class OrderCheckoutGroupService {
                 productId: { in: productIds },
                 status: OrderStatus.pending_payment,
               },
+              include: { payment: { select: { id: true } } },
             });
             for (const stale of staleOrders) {
               await tx.order.update({
@@ -158,7 +159,14 @@ export class OrderCheckoutGroupService {
                     stale.reservationReleasedAt ?? new Date(),
                 },
               });
-              if (!stale.reservationReleasedAt) {
+              // #1 (OVERSELL FIX): YALNIZ gerçekten rezervasyon TUTAN stale sipariş sayacı
+              // düşürür. Kabul-edilmiş-ödenmemiş teklif siparişi (offerId var, payment yok)
+              // hiç rezerve etmedi → düşürürsek paylaşılan reservedQuantity'den başka bir
+              // (belki eşzamanlı) siparişin rezervini çalarız (oversell). release path'iyle
+              // aynı predicate: rezerve iff (offerId null) VEYA (payment var).
+              const staleHeldReservation =
+                stale.offerId === null || stale.payment !== null;
+              if (!stale.reservationReleasedAt && staleHeldReservation) {
                 await tx.product.update({
                   where: { id: stale.productId },
                   // Adet bazlı: rezervasyon stale.quantity kadar açılır (1 değil) →

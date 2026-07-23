@@ -66,6 +66,17 @@ export class ReservationReconciliationService {
         status: OrderStatus.pending_payment,
         createdAt: { lt: cutoff },
         reservationReleasedAt: null,
+        // #1 (OVERSELL FIX): YALNIZ gerçekten rezervasyon TUTAN siparişleri serbest bırak.
+        // Direct-buy (offerId=null) checkout'ta rezerve eder → her zaman tutar. Teklif siparişi
+        // (offerId!=null) YALNIZ ödeme başlatınca (Payment satırı oluşunca) rezerve eder; kabul
+        // edilip ödenmemiş teklif siparişi HİÇ rezerve etmez. Onu da "serbest bırakırsak"
+        // paylaşılan reservedQuantity'yi düşürüp BAŞKA bir siparişin/takasın canlı rezervasyonunu
+        // ÇALARIZ → available yükselir → aynı birim tekrar satılır (oversell). reconcile'ın
+        // ground-truth predicate'iyle birebir aynı: rezerve iff (offerId null) VEYA (payment var).
+        OR: [
+          { offerId: null },
+          { offerId: { not: null }, payment: { isNot: null } },
+        ],
       },
       select: {
         id: true,
@@ -175,13 +186,50 @@ export class ReservationReconciliationService {
    * bu metod o boşluğu kapatan emniyet ağıdır.
    */
   async reconcileReservedQuantities(): Promise<{ count: number }> {
-    const candidates = await this.prisma.product.findMany({
-      where: { reservedQuantity: { gt: 0 } },
-      select: { id: true },
-    });
+    // #1 heal: hem OVER-count (reservedQuantity>0 ama gerçekte daha az) hem UNDER-count
+    // (rezervasyon TUTAN sipariş/takas var ama sayaç düşük/0) onarılsın. Adaylar = sayacı>0
+    // olan ∪ aktif rezervasyon tutan (sipariş/takas) ürünler. Yalnız reservedQuantity>0
+    // taransaydı 0'a düşmüş under-count asla düzelmezdi (release bug'ının bıraktığı iz).
+    const [withReserved, reservingOrders, activeTradeItems] = await Promise.all(
+      [
+        this.prisma.product.findMany({
+          where: { reservedQuantity: { gt: 0 } },
+          select: { id: true },
+        }),
+        this.prisma.order.findMany({
+          where: {
+            status: OrderStatus.pending_payment,
+            reservationReleasedAt: null,
+            productId: { not: null },
+            OR: [
+              { offerId: null },
+              { offerId: { not: null }, payment: { isNot: null } },
+            ],
+          },
+          select: { productId: true },
+          distinct: ["productId"],
+        }),
+        this.prisma.tradeItem.findMany({
+          where: {
+            trade: { status: { in: TRADE_RESERVATION_HOLDING_STATUSES } },
+          },
+          select: { productId: true },
+          distinct: ["productId"],
+        }),
+      ],
+    );
+    const candidateIds = Array.from(
+      new Set<string>([
+        ...withReserved.map((p) => p.id),
+        ...reservingOrders
+          .map((o) => o.productId)
+          .filter((x): x is string => !!x),
+        ...activeTradeItems.map((t) => t.productId),
+      ]),
+    );
 
     let fixed = 0;
-    for (const { id } of candidates) {
+    for (const id of candidateIds) {
       try {
         // Ground-truth = sipariş rezervasyonları + AKTİF takas rezervasyonları.
         // Takaslar checkAndReserve ile reservedQuantity'yi artırır ama Order satırı
