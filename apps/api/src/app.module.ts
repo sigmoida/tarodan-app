@@ -216,7 +216,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     // Sentry for error tracking
     SentryModule, // Error tracking & Performance monitoring
 
-    // Cron job monitoring (global) — @TrackedCron + /admin/jobs dashboard
+    // Cron job monitoring (global) — CronTracker + /admin/jobs dashboard
     MonitoringModule,
 
     // Health check endpoints

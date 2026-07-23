@@ -4,11 +4,7 @@ import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { PrismaService } from "../../prisma";
 import { OutboxStatus } from "@prisma/client";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  moneyCronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { OutboxHandlerRegistry } from "./outbox-handler.registry";
 
@@ -17,8 +13,8 @@ import { OutboxHandlerRegistry } from "./outbox-handler.registry";
  * kayıtlı handler'a verir. Başarı → completed; hata → attempts++ + exponential backoff;
  * maxAttempts aşılınca → dead (DLQ + alarm log). At-least-once: handler'lar idempotent.
  *
- * Faz 5: in-process @TrackedCron. Faz 7: `MONEY_CRONS_VIA_BULL=true` iken bu erken döner,
- * `runDrain()` Bull processor'dan çağrılır (tek-sefer garantisi + ayrı worker).
+ * Faz 7.5: `runDrain()` yalnızca Bull processor'dan (OutboxScheduledProcessor
+ * 'outbox-drain') çağrılır — tek-sefer garantisi + ayrı worker.
  */
 @Injectable()
 export class OutboxDrainerService implements OnModuleInit {
@@ -32,14 +28,12 @@ export class OutboxDrainerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Faz 7: MONEY_CRONS_VIA_BULL=true iken in-process @TrackedCron erken döner ve bu
-    // Bull repeatable job (OutboxScheduledProcessor 'outbox-drain') çalışır. false iken
-    // registerRepeatableCron kaydı temizler → çift-işleme yok, tek mekanizma.
+    // Bull repeatable job (OutboxScheduledProcessor 'outbox-drain') her dakika
+    // çalışır — tek zamanlama mekanizması, tek-sefer garantisi.
     await registerRepeatableCron(
       this.scheduledQueue,
       "outbox-drain",
       "*/1 * * * *",
-      moneyCronsViaBull(),
       this.logger,
     );
   }
@@ -57,16 +51,7 @@ export class OutboxDrainerService implements OnModuleInit {
     );
   }
 
-  /** Her dakika: bekleyen outbox olaylarını boşalt (para yan-etkileri gecikmemeli). */
-  @TrackedCron("*/1 * * * *")
-  async handleDrain() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runDrain();
-  }
-
-  /** Gerçek iş — in-process cron ve (Faz 7) Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor buradan çağırır (bekleyen outbox olaylarını boşaltır). */
   async runDrain(log: (msg: string) => void = () => {}) {
     const now = new Date();
     const due = await this.prisma.outboxEvent.findMany({

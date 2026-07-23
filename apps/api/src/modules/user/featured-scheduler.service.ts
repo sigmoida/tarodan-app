@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { UserService } from "./user.service";
 
@@ -18,8 +14,7 @@ import { UserService } from "./user.service";
  * Cadence: günde bir (gece 03:15). Skor 7 günlük kayan pencere kullandığı için
  * günlük tazeleme "haftalık" anlamı korurken kazananın bayatlamasını önler.
  *
- * Faz 7.1: pure @Cron → dual (in-process @TrackedCron + Bull). PARA cron'u DEĞİL →
- * `cronsViaBull` (CRONS_VIA_BULL) ile geçer.
+ * Faz 7.5: Bull tek zamanlama mekanizması ('featured-refresh' repeatable job).
  */
 @Injectable()
 export class FeaturedSchedulerService implements OnModuleInit {
@@ -40,21 +35,14 @@ export class FeaturedSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "featured-refresh",
       "15 3 * * *",
-      cronsViaBull(),
       this.logger,
     );
   }
 
-  /** Her gün 03:15'te haftalık kazananları yeniden hesaplar. */
-  @TrackedCron("15 3 * * *")
-  async handleDailyRefresh() {
-    if (cronsViaBull()) {
-      return;
-    }
-    await this.runDailyRefresh();
-  }
-
-  /** Gerçek iş — in-process cron ve (Faz 7) Bull processor buradan çağırır. */
+  /**
+   * Her gün 03:15'te haftalık kazananları yeniden hesaplar.
+   * Gerçek iş — Bull processor 'featured-refresh' buradan çağırır.
+   */
   async runDailyRefresh(log: (msg: string) => void = () => {}) {
     await this.refresh("cron");
     log("Featured snapshots refreshed");

@@ -248,7 +248,7 @@ describe.skip("PaymentSchedulerService handleExpiredPayments order", () => {
       mockEventService as any,
       mockScheduledQueue,
     );
-    await scheduler.handleExpiredPayments();
+    await scheduler.runHandleExpiredPayments();
 
     expect(order).toEqual(["reconcile", "release", "cancel"]);
   });

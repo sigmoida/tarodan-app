@@ -162,7 +162,7 @@ export function setupBullBoard(
 const JOBS_PATH = "/admin/jobs";
 
 /**
- * 22 @TrackedCron işini tek ekranda gösterir: son durum, son çalışma, süre,
+ * Bull cron işlerini tek ekranda gösterir (in-process ikizler kaldırıldı, Bull-only): son durum, son çalışma, süre,
  * hata, toplam çalışma/başarısızlık. Bull Board ile aynı Basic Auth'u paylaşır.
  *   - GET /admin/jobs       -> HTML tablo (3 sn'de bir otomatik yenilenir)
  *   - GET /admin/jobs/api   -> JSON (programatik erişim / Sentry karşılaştırma)

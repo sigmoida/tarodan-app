@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
 
@@ -14,8 +10,7 @@ import { ElogoInvoicingService } from "./elogo-invoicing.service";
  * pending/failed kalan kayıtları periyodik olarak yeniden gönderir (aynı numara/ETTN).
  * Servis kapalıysa (ELOGO_ENABLED=false) no-op.
  *
- * Faz 7.1: pure @Cron → dual (in-process @TrackedCron + Bull). Bu bir PARA cron'u DEĞİL
- * (gelir faturası retry) → `cronsViaBull` (CRONS_VIA_BULL) ile geçiş yapar, money flag'i değil.
+ * Faz 7.5: Bull tek zamanlama mekanizması ('elogo-retry-pending' repeatable job).
  */
 @Injectable()
 export class ElogoSchedulerService implements OnModuleInit {
@@ -31,20 +26,11 @@ export class ElogoSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "elogo-retry-pending",
       "*/30 * * * *",
-      cronsViaBull(),
       this.logger,
     );
   }
 
-  @TrackedCron("*/30 * * * *")
-  async retryPending(): Promise<void> {
-    if (cronsViaBull()) {
-      return;
-    }
-    await this.runRetryPending();
-  }
-
-  /** Gerçek iş — in-process cron ve (Faz 7) Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor 'elogo-retry-pending' buradan çağırır. */
   async runRetryPending(log: (msg: string) => void = () => {}) {
     try {
       await this.invoicing.retryPendingInvoices();

@@ -4,11 +4,7 @@ import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, LedgerDirection } from "@prisma/client";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  moneyCronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { LedgerBalanceService } from "./ledger-balance.service";
 
@@ -45,12 +41,11 @@ export class LedgerReconciliationService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Faz 7: MONEY_CRONS_VIA_BULL=true iken Bull repeatable 'ledger-reconcile' çalışır.
+    // Bull repeatable 'ledger-reconcile' her gün 04:00'te çalışır (tek mekanizma).
     await registerRepeatableCron(
       this.scheduledQueue,
       "ledger-reconcile",
       "0 4 * * *",
-      moneyCronsViaBull(),
       this.logger,
     );
   }
@@ -59,15 +54,7 @@ export class LedgerReconciliationService implements OnModuleInit {
     return parseInt(this.config.get("LEDGER_RECONCILE_WINDOW_DAYS") || "2", 10);
   }
 
-  @TrackedCron("0 4 * * *")
-  async handleReconcile() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.reconcile();
-  }
-
-  /** Gerçek iş — in-process cron ve (Faz 7) Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor 'ledger-reconcile' buradan çağırır. */
   async reconcile(
     log: (msg: string) => void = () => {},
   ): Promise<ReconciliationReport> {

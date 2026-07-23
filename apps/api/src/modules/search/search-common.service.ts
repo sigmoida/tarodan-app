@@ -2,10 +2,7 @@ import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { Client } from "@elastic/elasticsearch";
@@ -145,12 +142,11 @@ export class SearchCommonService implements OnModuleInit {
     await this.ensureIndexExists();
     await this.ensureCollectionsIndexExists();
 
-    // Cron'u Bull repeatable'a senkronla (flag açıksa kaydet, kapalıysa temizle).
+    // Bull repeatable: periyodik ES↔DB senkron (tek zamanlama mekanizması).
     await registerRepeatableCron(
       this.scheduledQueue,
       "search-periodic-sync",
       "0 */5 * * * *",
-      cronsViaBull(),
       this.logger,
     );
     // Faz 7.1: saatlik tam reconcile (ID-bazlı yetim/eksik doküman eşitleme).
@@ -158,7 +154,6 @@ export class SearchCommonService implements OnModuleInit {
       this.scheduledQueue,
       "search-hourly-reconcile",
       "0 * * * *",
-      cronsViaBull(),
       this.logger,
     );
   }

@@ -367,8 +367,18 @@
       idempotent — Bull at-least-once güvenli.
 - [~] **7.4** DLQ: outbox `dead` statüsü + alarm (maxAttempts). Bull kök `defaultJobOptions`
   (attempts:3 + exp backoff) mevcut. `lockDuration/stalledInterval` ince ayarı → ops.
-- [ ] **7.5** (OPS) Bayrakları aç (önce `CRONS_VIA_BULL`, sonra `MONEY_CRONS_VIA_BULL`), in-process
-      `@Cron` ikizlerini kaldır → tek mekanizma. Faz 0 (ayrı Redis + `noeviction` + AOF) önkoşul.
+- [x] **7.5** ✓ Cutover TAMAM — Bull artık TEK zamanlama mekanizması. Flag'ler (`CRONS_VIA_BULL` /
+      `MONEY_CRONS_VIA_BULL`) ve **28 in-process `@TrackedCron` ikizi** 16 zamanlayıcı dosyasından kaldırıldı;
+      `registerRepeatableCron` koşulsuz kayıt yapan 4-arg imzasına indi (her cron `onModuleInit`'te repeatable
+      olarak kaydolur). Gerçek iş metotları (`run*()`) korundu — Bull `@Process` handler'ları onları
+      `runTrackedJob` ile çağırıyor. Silinen ikizleri çağıran manuel-tetik yolları (admin test-araçları,
+      dev controller) `run*()`'a yönlendirildi (bonus: eski butonlar flag açıkken no-op'tu, artık her zaman
+      çalışır). Doğrulama: 28:28:28 twin↔registration↔@Process eşleşmesi denetlendi (hepsi COVERED, hiçbir cron
+      düşmedi) + typecheck temiz + tam test paketi yeşil (yalnız 4 ÖNCEDEN-VAR alakasız hata: list/sort/order-detail).
+      **Gözlemlenebilirlik korundu:** in-process ikizler gidince `@TrackedCron`'un beslediği `/admin/jobs` +
+      Sentry Cron check-in kaybolacaktı → `runTrackedJob` (tek Bull yürütme yolu) artık CronTracker'ı besliyor
+      (zamanlama repeatable job `opts`'undan); ölü `tracked-cron.decorator.ts` silindi. **Not:** üretimde Bull'a
+      tam güven için Faz 0 (ayrı Redis + `noeviction` + AOF) hâlâ önkoşul — kod artık flag'siz Bull-only.
 
 ---
 

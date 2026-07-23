@@ -1,18 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { CronExpression } from "@nestjs/schedule";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import { cronsViaBull } from "../../monitoring/bull-cron.helper";
 import { PrismaService } from "../../prisma";
 import { SearchCommonService } from "./search-common.service";
 import { SearchProductService } from "./search-product.service";
 
 /**
- * Periyodik ES↔DB senkron alt servisi (search.service.ts'ten birebir taşındı):
- * handlePeriodicSync (@TrackedCron), runHandlePeriodicSync, handleHourlyReconcile
- * (@Cron) ve deltaSync. @Cron/@TrackedCron dekoratörleri metotla birlikte taşındı
- * — ScheduleModule herhangi bir provider üzerindeki @Cron'u keşfeder, bu servis de
- * provider olduğu için kayıt korunur (ifade birebir aynı). indexProduct/removeProduct
- * için SearchProductService'e, client/where-builder'lar için SearchCommonService'e delege eder.
+ * Periyodik ES↔DB senkron alt servisi: runHandlePeriodicSync + runHourlyReconcile
+ * + deltaSync. Zamanlama Bull repeatable ('search-periodic-sync' /
+ * 'search-hourly-reconcile', SearchCommonService.onModuleInit'te kaydedilir) ile
+ * yapılır; işi bu servisin run* metotları yürütür. indexProduct/removeProduct için
+ * SearchProductService'e, client/where-builder'lar için SearchCommonService'e delege eder.
  */
 @Injectable()
 export class SearchSyncService {
@@ -26,15 +22,7 @@ export class SearchSyncService {
 
   // ──────────────────────────── Periodic Sync ────────────────────────────
 
-  @TrackedCron(CronExpression.EVERY_5_MINUTES)
-  async handlePeriodicSync() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runHandlePeriodicSync();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor 'search-periodic-sync' buradan çağırır. */
   async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
     if (!this.common.isAvailable()) {
       log("Elasticsearch erişilemez, atlandı");
@@ -84,15 +72,7 @@ export class SearchSyncService {
    * bazlı drift hiç yakalanmaz. Bu yüzden sayıdan bağımsız, saatlik tam reconcile
    * çalıştırıp yetim/eksik dokümanları her durumda eşitliyoruz.
    */
-  @TrackedCron(CronExpression.EVERY_HOUR)
-  async handleHourlyReconcile() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runHourlyReconcile();
-  }
-
-  /** Gerçek iş — in-process cron ve (Faz 7) Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor 'search-hourly-reconcile' buradan çağırır. */
   async runHourlyReconcile(log: (msg: string) => void = () => {}) {
     if (!this.common.isAvailable()) {
       log("Elasticsearch erişilemez, atlandı");

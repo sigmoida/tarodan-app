@@ -1,15 +1,14 @@
-import type { CronTrackerService } from './cron-tracker.service';
+import type { CronTrackerService } from "./cron-tracker.service";
 
 /**
- * Decorator ile servis arasındaki köprü.
+ * CronTracker köprüsü — servis örneği ile onu kullanan yardımcılar arasında.
  *
- * `@TrackedCron` bir method decorator'ı; Nest DI'ya doğrudan erişemez. Servis
- * oluşturulduğunda kendini buraya kaydeder, decorator da çalışırken buradan
- * okur. Ayrı dosyada tutulur ki decorator <-> servis arası döngüsel import
- * oluşmasın.
+ * `runTrackedJob` (Bull cron yürütme yolu — Faz 7.5) DI'ya doğrudan erişemez;
+ * CronTrackerService oluşturulduğunda kendini buraya kaydeder, yardımcı da
+ * çalışırken buradan okur. Ayrı dosyada tutulur ki döngüsel import oluşmasın.
  *
- * Fail-safe: tracker henüz set edilmemişse decorator işi sarmadan, orijinal
- * cron'u olduğu gibi çalıştırır (cron asla tracking yüzünden aksamaz).
+ * Fail-safe: tracker henüz set edilmemişse iş sarılmadan olduğu gibi çalışır
+ * (cron asla tracking yüzünden aksamaz).
  */
 let trackerRef: CronTrackerService | null = null;
 
