@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { PaymentStatus } from "@prisma/client";
+import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./payment-metadata.types";
 import {
   CARGO_PROVIDER,
@@ -45,32 +45,60 @@ export class PaymentCommonService {
         return;
       }
 
-      // 'delivered'/'returned'/'failed' gibi terminal durumlarda Sürat'a iptal
-      // çağrısı atmanın anlamı yok; ancak sipariş iptal edildiği için yerel
-      // kargo kaydını yine de 'cancelled' yaparak veriyi tutarlı tutuyoruz
-      // (aksi halde iptal edilen siparişte kargo "Teslim Edildi" görünüyordu).
-      const terminalStatuses = ["delivered", "returned", "failed"];
-      if (terminalStatuses.includes(shipment.status)) {
+      // Faz 2 (paket-farkında iptal): Fiziksel Sürat gönderisi satıcı paketi başına
+      // PAYLAŞILIR (paketin tüm order'ları tek barkod). Bir order iptal/iade olunca:
+      //  - onun YEREL kargo satırı her durumda 'cancelled' yapılır,
+      //  - fiziksel gönderi YALNIZCA paketin TÜM order'ları iptal olduysa iptal edilir
+      //    (kardeşler hâlâ gidiyorsa dokunma — aksi halde giden koliyi iptal ederdik).
+      let cancelPhysical = true;
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { packageId: true },
+      });
+      if (order?.packageId) {
+        const siblings = await this.prisma.order.findMany({
+          where: { packageId: order.packageId },
+          select: { id: true, status: true },
+        });
+        cancelPhysical = siblings.every(
+          (o) => o.id === orderId || o.status === OrderStatus.cancelled,
+        );
+      }
+
+      const markLocalCancelled = async (was: string) => {
         await this.prisma.shipment.update({
           where: { id: shipment.id },
           data: { status: "cancelled" as any },
         });
         this.logger.log(
-          `Surat shipment locally marked cancelled (was ${shipment.status}) for order ${orderNumber}`,
+          `Surat shipment locally marked cancelled (was ${was}) for order ${orderNumber}` +
+            (cancelPhysical ? "" : " — package siblings still shipping"),
         );
+      };
+
+      // 'delivered'/'returned'/'failed' terminal durumda ya da kardeşler hâlâ
+      // giderken fiziksel gönderiye dokunma — yalnız yerel kaydı tutarlı tut.
+      const terminalStatuses = ["delivered", "returned", "failed"];
+      if (terminalStatuses.includes(shipment.status) || !cancelPhysical) {
+        await markLocalCancelled(shipment.status);
         return;
       }
 
-      const result = await this.cargo.cancelShipmentByOrderNumber(orderNumber);
+      // Paketin tümü iptal (ya da paketsiz) → fiziksel gönderiyi PAYLAŞILAN ref ile
+      // iptal et (shipment.trackingNumber = paket OzelKargoTakipNo).
+      const cancelRef = shipment.trackingNumber ?? orderNumber;
+      const result = await this.cargo.cancelShipmentByOrderNumber(cancelRef);
       if (result.ok) {
         await this.prisma.shipment.update({
           where: { id: shipment.id },
           data: { status: "cancelled" as any },
         });
-        this.logger.log(`Surat shipment cancelled for order ${orderNumber}`);
+        this.logger.log(
+          `Surat shipment cancelled for order ${orderNumber} (ref=${cancelRef})`,
+        );
       } else {
         this.logger.warn(
-          `Surat cancel returned non-OK for order ${orderNumber}: ${result.suratMessage}`,
+          `Surat cancel returned non-OK for order ${orderNumber} (ref=${cancelRef}): ${result.suratMessage}`,
         );
       }
     } catch (error: any) {
@@ -86,6 +114,26 @@ export class PaymentCommonService {
    * returns null on any failure (missing address, disabled, Sürat error) so the
    * caller leaves the shipment `pending` with no code, to be retried later.
    */
+  /**
+   * Faz 2: Bir siparişin ait olduğu SATICI PAKETİNİN paylaşılan Sürat referansı
+   * (OzelKargoTakipNo). Deterministik = paketin en küçük orderNumber'ı. Paketteki
+   * tüm order-shipment satırları bu ref'i (trackingNumber) ve tek barkodu paylaşır
+   * → satıcı başına TEK fiziksel gönderi. Paketi olmayan (legacy) sipariş kendi
+   * orderNumber'ını kullanır (birebir eski davranış).
+   */
+  private async resolveSuratRef(
+    orderNumber: string,
+    packageId: string | null | undefined,
+  ): Promise<string> {
+    if (!packageId) return orderNumber;
+    const pkgOrders = await this.prisma.order.findMany({
+      where: { packageId },
+      select: { orderNumber: true },
+    });
+    const nums = pkgOrders.map((o) => o.orderNumber).filter(Boolean);
+    return nums.length ? [...nums].sort()[0] : orderNumber;
+  }
+
   async createSuratBarcodeForOrder(
     orderId: string,
   ): Promise<{ kargoTakipNo: string; labelZpl: string | null } | null> {
@@ -96,17 +144,55 @@ export class PaymentCommonService {
       select: {
         orderNumber: true,
         shippingAddress: true,
+        packageId: true,
         product: { select: { title: true } },
       },
     });
-    const addr = order?.shippingAddress as {
+    if (!order) {
+      this.logger.warn(
+        `Surat barcode skipped: order not found order=${orderId}`,
+      );
+      return null;
+    }
+
+    // Faz 2: paket başına TEK gönderi. Paketin tüm ürünleri tek barkoda toplanır
+    // (ortak ref + toplam adet + birleşik içerik); idempotencyKey paket-bazlı →
+    // paketin her order'ının fulfillment/retry çağrısı AYNI barkodu alır (çift
+    // gönderi yok). Paketi yoksa birebir eski per-order davranış.
+    const ref = await this.resolveSuratRef(order.orderNumber, order.packageId);
+    let content = order.product?.title ?? undefined;
+    let adet = 1;
+    let idempotencyKey = `surat:order:${order.orderNumber}`;
+    let addrSource = order.shippingAddress;
+    if (order.packageId) {
+      const pkgOrders = await this.prisma.order.findMany({
+        where: { packageId: order.packageId },
+        select: {
+          quantity: true,
+          shippingAddress: true,
+          product: { select: { title: true } },
+        },
+      });
+      const titles = pkgOrders
+        .map((o) => o.product?.title)
+        .filter((t): t is string => !!t);
+      content = titles.length ? titles.join(", ") : content;
+      adet = pkgOrders.reduce((s, o) => s + (o.quantity ?? 1), 0);
+      idempotencyKey = `surat:package:${order.packageId}`;
+      // Adres: paketteki ilk dolu adres (hepsi aynı alıcı+teslimat adresi).
+      addrSource =
+        pkgOrders.find((o) => o.shippingAddress)?.shippingAddress ??
+        order.shippingAddress;
+    }
+
+    const addr = addrSource as {
       fullName?: string;
       phone?: string;
       city?: string;
       district?: string;
       address?: string;
     } | null;
-    if (!order || !addr?.address || !addr.city || !addr.district) {
+    if (!addr?.address || !addr.city || !addr.district) {
       this.logger.warn(
         `Surat barcode skipped: missing shipping address order=${orderId}`,
       );
@@ -120,14 +206,15 @@ export class PaymentCommonService {
       city: String(addr.city),
       district: String(addr.district),
       phone: String(addr.phone ?? ""),
-      ref: order.orderNumber,
-      content: order.product?.title ?? undefined,
+      ref,
+      content,
+      overrides: adet > 1 ? { Adet: adet } : undefined,
     });
 
     try {
       const result = await this.cargo.createShipmentWithBarcode({
-        idempotencyKey: `surat:order:${order.orderNumber}`,
-        correlationId: order.orderNumber,
+        idempotencyKey,
+        correlationId: ref,
         payload,
       });
       if (!result.ok) {
@@ -169,7 +256,12 @@ export class PaymentCommonService {
   ): Promise<"created" | "revived" | "exists" | "skipped"> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { id: true, orderNumber: true, shippingCost: true },
+      select: {
+        id: true,
+        orderNumber: true,
+        shippingCost: true,
+        packageId: true,
+      },
     });
     if (!order) return "skipped";
 
@@ -180,6 +272,13 @@ export class PaymentCommonService {
 
     // Gerçek Sürat kodu (KargoTakipNo) + ZPL etiket — non-blocking, hata → null.
     const barcode = await this.createSuratBarcodeForOrder(orderId);
+    // Faz 2: trackingNumber (OzelKargoTakipNo = Sürat sorgu anahtarı) = PAKET ref'i,
+    // barkod başarısız olsa bile tutarlı. Paketteki tüm order-shipment satırları aynı
+    // ref'i paylaşır → poller tek gönderiyi sorgular, cancel doğru gönderiyi hedefler.
+    const trackingRef = await this.resolveSuratRef(
+      order.orderNumber,
+      order.packageId,
+    );
     const estimatedDelivery = new Date();
     estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
 
@@ -189,9 +288,9 @@ export class PaymentCommonService {
           orderId,
           provider: "surat",
           status: "pending",
-          // trackingNumber = OzelKargoTakipNo (sipariş no) — poller bununla
-          // sorgular; gerçek kod providerTrackingId'de.
-          trackingNumber: order.orderNumber,
+          // trackingNumber = paket OzelKargoTakipNo — poller bununla sorgular;
+          // gerçek kod providerTrackingId'de.
+          trackingNumber: trackingRef,
           providerTrackingId: barcode?.kargoTakipNo ?? null,
           labelZpl: barcode?.labelZpl ?? null,
           cost: Number(order.shippingCost),
@@ -210,7 +309,7 @@ export class PaymentCommonService {
       where: { id: existing.id },
       data: {
         status: "pending" as any,
-        trackingNumber: order.orderNumber,
+        trackingNumber: trackingRef,
         providerTrackingId: barcode?.kargoTakipNo ?? null,
         labelZpl: barcode?.labelZpl ?? null,
         estimatedDelivery,
