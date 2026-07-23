@@ -54,7 +54,11 @@ export default function OrderSummaryCard({ order }: { order: OrderDetail }) {
             <span>
               {shippingAmount > 0
                 ? `₺${formatPriceNumber(shippingAmount)}`
-                : t("membership.free")}
+                : order.packageId
+                  ? /* Satıcı paketi kardeşi: kargo pakette bir kez ödendi, bu order 0 →
+                       "Ücretsiz" YANLIŞ olur; kargo pakete dahildir. */
+                    t("order.shippingIncludedInPackage")
+                  : t("membership.free")}
             </span>
           </div>
         )}

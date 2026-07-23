@@ -16,6 +16,7 @@ import { formatDate } from "@/lib/format";
 import {
   formatTL,
   getOrderPrimary,
+  groupByPackage,
   orderAmount,
   type OrderGroup,
 } from "../_lib/types";
@@ -42,6 +43,10 @@ export default function OrderGroupAccordion({
   const t = useTranslations();
   const total = group.orders.reduce((sum, o) => sum + orderAmount(o), 0);
   const date = group.orders[0]?.createdAt;
+  // Satıcı paketi (çatı): aynı satıcının ürünleri tek koli/tek kargo. Birden fazla paket
+  // varsa detayı satıcı başına ayır; tek paketse düz liste (görsel gürültü olmasın).
+  const packages = groupByPackage(group.orders);
+  const multiPackage = packages.length > 1;
 
   return (
     <Accordion
@@ -93,7 +98,7 @@ export default function OrderGroupAccordion({
                   {t("order.cartOfItems", { count: group.orders.length })}
                 </p>
                 <p className="text-sm font-normal text-muted">
-                  {t("order.eachItemShipsSeparately")}
+                  {t("order.shipsPerSellerPackage")}
                 </p>
               </div>
             </div>
@@ -111,16 +116,46 @@ export default function OrderGroupAccordion({
         </AccordionTrigger>
 
         <AccordionContent className="py-0">
-          <div className="ml-3 space-y-3 border-l-2 border-primary-300 pl-4">
-            {group.orders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                actions={actions}
-                compact
-              />
-            ))}
-          </div>
+          {multiPackage ? (
+            /* Çok satıcı: satıcı paketi (çatı) başına ayrı bölüm — tek koli/tek kargo */
+            <div className="space-y-4">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.key}
+                  className="ml-3 border-l-2 border-primary-300 pl-4"
+                >
+                  <p className="mb-2 text-sm font-medium text-heading">
+                    {pkg.seller?.displayName
+                      ? t("order.sellerPackage", {
+                          name: pkg.seller.displayName,
+                        })
+                      : t("order.multiItemOrder")}
+                  </p>
+                  <div className="space-y-3">
+                    {pkg.orders.map((order) => (
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        actions={actions}
+                        compact
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="ml-3 space-y-3 border-l-2 border-primary-300 pl-4">
+              {group.orders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  actions={actions}
+                  compact
+                />
+              ))}
+            </div>
+          )}
         </AccordionContent>
       </AccordionItem>
     </Accordion>

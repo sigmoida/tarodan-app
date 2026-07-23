@@ -15,6 +15,9 @@ export interface OrderDetail {
   amount: number;
   commissionAmount: number;
   shippingCost?: number;
+  /** Satıcı paketi (çatı). Set ve shippingCost=0 ise kargo pakette bir kez ödendi
+   * (kardeş order) → UI "Ücretsiz" değil "Kargo pakete dahil" gösterir. */
+  packageId?: string | null;
   buyerFeeAmount?: number;
   sellerFeeAmount?: number;
   pricing?: {

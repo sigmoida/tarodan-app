@@ -5,6 +5,9 @@ export interface Order {
   orderNumber: string;
   /** Çok ürünlü checkout grubu: aynı gruptaki siparişler tek kart altında gösterilir */
   checkoutGroupId?: string | null;
+  /** Satıcı paketi (çatı): aynı grupta aynı satıcının order'ları tek paket. Kargo pakete
+   * bir kez yüklenir → kardeş order shippingCost=0 olabilir ("ücretsiz" değil, pakete dahil). */
+  packageId?: string | null;
   status: string;
   /** 'iptal' (kargo öncesi) | 'iade' (kargo sonrası). */
   cancellationType?: string | null;
@@ -110,23 +113,58 @@ export interface OrderGroup {
   orders: Order[];
 }
 
+/** Bir checkout grubu içinde satıcı paketi (çatı): aynı satıcının order'ları tek pakette. */
+export interface OrderPackageGroup {
+  key: string;
+  seller?: { id: string; displayName: string };
+  orders: Order[];
+}
+
 /**
- * Alıcı siparişlerini checkout grubuna göre topla: aynı checkout'ta alınan
- * ürünler tek kart altında görünür. Satıcı görünümündekiler gruplanmaz.
+ * Grup order'larını SATICI PAKETİNE göre alt-grupla (çatı): aynı satıcının ürünleri tek
+ * koli/tek kargo altında toplanır. packageId yoksa (eski veri) satıcıya, o da yoksa order
+ * id'sine düşer — böylece her order en azından kendi kovasına düşer.
+ */
+export function groupByPackage(orders: Order[]): OrderPackageGroup[] {
+  const entries: OrderPackageGroup[] = [];
+  const indexByKey = new Map<string, number>();
+  for (const order of orders) {
+    const key = order.packageId ?? order.seller?.id ?? order.id;
+    const idx = indexByKey.get(key);
+    if (idx != null) {
+      entries[idx].orders.push(order);
+      continue;
+    }
+    indexByKey.set(key, entries.length);
+    entries.push({ key, seller: order.seller, orders: [order] });
+  }
+  return entries;
+}
+
+/**
+ * Sipariş listesini tek kart altında toplayacak şekilde grupla:
+ * - ALICI görünümü: aynı checkout'ta alınan ürünler (checkoutGroupId) tek kartta.
+ * - SATICI görünümü: aynı satıcının aynı checkout'taki dilimi = satıcı paketi
+ *   (packageId, tek koli/tek kargo) tek kartta. Böylece bir alıcı tek checkout'ta
+ *   satıcının 2 ürününü aldıysa satıcı 2 ayrı kart değil tek paket görür.
+ * Grup anahtarı olmayan (tekil / eski veri) order'lar kendi başına kalır.
  */
 export function groupOrders(orders: Order[]): OrderGroup[] {
   const entries: OrderGroup[] = [];
   const indexByGroup = new Map<string, number>();
   for (const order of orders) {
-    const gid = order.checkoutGroupId;
-    if (gid && order.isSeller !== true) {
-      const idx = indexByGroup.get(gid);
+    const groupKey =
+      order.isSeller === true
+        ? (order.packageId ?? null)
+        : (order.checkoutGroupId ?? null);
+    if (groupKey) {
+      const idx = indexByGroup.get(groupKey);
       if (idx != null) {
         entries[idx].orders.push(order);
         continue;
       }
-      indexByGroup.set(gid, entries.length);
-      entries.push({ key: gid, orders: [order] });
+      indexByGroup.set(groupKey, entries.length);
+      entries.push({ key: groupKey, orders: [order] });
     } else {
       entries.push({ key: order.id, orders: [order] });
     }

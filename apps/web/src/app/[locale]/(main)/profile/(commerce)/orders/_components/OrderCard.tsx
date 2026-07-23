@@ -31,6 +31,10 @@ export default function OrderCard({ order, actions, compact }: OrderCardProps) {
   const display = getDisplayStatus(order, t, locale);
   const { product, image } = getOrderPrimary(order);
   const net = sellerNetOf(order);
+  // Çok adetli sipariş: gerçek adet + birim fiyat (satır tutarı / adet).
+  const amount = orderAmount(order);
+  const quantity = order.items?.[0]?.quantity ?? 1;
+  const unitPrice = quantity > 0 ? amount / quantity : amount;
 
   return (
     <div
@@ -81,7 +85,7 @@ export default function OrderCard({ order, actions, compact }: OrderCardProps) {
               {product.title || t("order.product")}
             </Link>
             <p className="text-sm text-muted">
-              1 {t("order.unitTimes")} {formatTL(orderAmount(order))}
+              {quantity} {t("order.unitTimes")} {formatTL(unitPrice)}
             </p>
           </div>
         </div>
@@ -101,7 +105,7 @@ export default function OrderCard({ order, actions, compact }: OrderCardProps) {
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold text-primary-500">
-            {formatTL(orderAmount(order))}
+            {formatTL(amount)}
           </p>
           {order.isSeller && net != null && (
             <p className="mt-0.5 text-sm text-success-600">
