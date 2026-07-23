@@ -25,3 +25,19 @@ export const OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE =
 export interface InvoiceTradeCashRefundReversePayload {
   tradeCashPaymentId: string;
 }
+
+/**
+ * Ödenmiş fiziksel siparişin POST-COMMIT sonlandırması (ledger capture + order.paid
+ * + Sürat gönderi) için DAYANIKLI backstop (#8). Ödeme tx'iyle ATOMİK yazılır; anlık
+ * event yolu çökme penceresinde kaybolursa drainer bu satırdan sonlandırmayı tamamlar.
+ * Anlık yol BAŞARIRSA satır `completed` işaretlenir → backstop çalışmaz (çift yan-etki yok).
+ * Handler idempotenttir: ledger existence-guard'lı, kargo mevcut-kontrollü.
+ */
+export const OUTBOX_ORDER_FULFILLMENT = "order.fulfillment_requested";
+
+export interface OrderFulfillmentOutboxPayload {
+  orderId: string;
+  /** Sepet (grup) siparişi: alıcı onayı grup başına tek gönderilir → order başına atla. */
+  skipBuyer?: boolean;
+  transactionId?: string;
+}

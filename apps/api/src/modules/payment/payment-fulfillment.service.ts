@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -20,6 +20,8 @@ import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { EscrowHoldService } from "./escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { OUTBOX_ORDER_FULFILLMENT } from "../outbox/outbox.types";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -143,6 +145,9 @@ export class PaymentFulfillmentService {
     private readonly paymentRefund: PaymentRefundService,
     // Faz 8.2: yakalama/order.paid/kargo sonlandırması (ledger dahil) FulfillmentFinalizer'da.
     private readonly fulfillmentFinalizer: FulfillmentFinalizer,
+    // #8: fulfillment sonlandırmasını ödeme tx'iyle atomik olarak dayanıklı kılan backstop.
+    // @Optional: OutboxModule @Global; yoksa (test) anlık yol yine çalışır (graceful degrade).
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   /**
@@ -297,6 +302,13 @@ export class PaymentFulfillmentService {
         this.logger.log(
           `Payment ${payment.id} completed, hold created for seller ${order.sellerId}`,
         );
+        // #8: fulfillment sonlandırmasını ödeme tx'iyle ATOMİK, dayanıklı yaz. Anlık
+        // event yolu (aşağıda) çökme penceresinde kaybolursa drainer bu satırdan tamamlar.
+        await this.outbox?.enqueue(tx, {
+          type: OUTBOX_ORDER_FULFILLMENT,
+          payload: { orderId: order.id, skipBuyer: false, transactionId },
+          dedupeKey: `${OUTBOX_ORDER_FULFILLMENT}:${order.id}`,
+        });
       } else {
         this.logger.log(
           `Virtual order payment ${payment.id} (membership/boost) completed, no hold needed`,
@@ -482,6 +494,13 @@ export class PaymentFulfillmentService {
 
           // Satıcı başına escrow hold + pending komisyon → EscrowHoldService.
           await this.escrowHold.createHold(tx, order, payment.id);
+          // #8: her siparişin fulfillment'ı için ödeme tx'iyle atomik dayanıklı backstop.
+          // skipBuyer:true — alıcı onayı grup başına TEK kez (emitGroupBuyerOrderPaid).
+          await this.outbox?.enqueue(tx, {
+            type: OUTBOX_ORDER_FULFILLMENT,
+            payload: { orderId: order.id, skipBuyer: true, transactionId },
+            dedupeKey: `${OUTBOX_ORDER_FULFILLMENT}:${order.id}`,
+          });
         }
 
         return { aliveOrders, refundOrders, productIdsToInvalidate };

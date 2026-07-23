@@ -35,6 +35,8 @@ import { CARGO_PROVIDER } from "../surat-cargo/cargo-provider";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
 import { I18nService } from "../i18n";
+import { OutboxService } from "../outbox/outbox.service";
+import { OUTBOX_ORDER_FULFILLMENT } from "../outbox/outbox.types";
 import { OrderStatus, PaymentStatus, ProductStatus } from "@prisma/client";
 
 /**
@@ -123,6 +125,8 @@ describe("PaymentService group payment (checkout group)", () => {
     emitOrderFulfillmentRequested: jest.fn(),
     emitPaymentFailed: jest.fn(),
   };
+  // #8: fulfillment backstop — ödeme tx'iyle atomik enqueue'yu doğrulamak için mock.
+  const mockOutbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -247,6 +251,7 @@ describe("PaymentService group payment (checkout group)", () => {
           provide: PaymentProviderEventService,
           useValue: { record: jest.fn().mockResolvedValue(undefined) },
         },
+        { provide: OutboxService, useValue: mockOutbox },
       ],
     }).compile();
 
@@ -293,6 +298,22 @@ describe("PaymentService group payment (checkout group)", () => {
     // Faz 8.1: tx sonrası sipariş başına fulfillment sonlandırması EVENT ile istenir
     // (OrderFulfillmentListener tüketir; order.paid/Sürat orada). Burada seam doğrulanır.
     expect(mockEvents.emitOrderFulfillmentRequested).toHaveBeenCalledTimes(2);
+
+    // #8 (dayanıklılık): her sipariş için fulfillment backstop satırı ödeme tx'inin
+    // İÇİNDE (mockTx ile) enqueue edilmeli — çökme penceresinde drainer tamamlar.
+    expect(mockOutbox.enqueue).toHaveBeenCalledTimes(2);
+    for (const call of mockOutbox.enqueue.mock.calls) {
+      expect(call[0]).toBe(mockTx); // tx client → ödeme commit'iyle atomik
+      expect(call[1].type).toBe(OUTBOX_ORDER_FULFILLMENT);
+      expect(call[1].payload.skipBuyer).toBe(true); // sepet: alıcı grup başına tek
+    }
+    const enqueuedDedupe = mockOutbox.enqueue.mock.calls
+      .map((c: any) => c[1].dedupeKey)
+      .sort();
+    expect(enqueuedDedupe).toEqual([
+      `${OUTBOX_ORDER_FULFILLMENT}:order-1`,
+      `${OUTBOX_ORDER_FULFILLMENT}:order-2`,
+    ]);
 
     // ALICI tarafı: grup başına TEK onay maili (ürün başına değil)
     expect(mockEvents.emitGroupBuyerOrderPaid).toHaveBeenCalledTimes(1);

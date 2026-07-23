@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
+import { LedgerEventType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { EventService } from "../events";
 import { PaymentCommonService } from "./payment-common.service";
@@ -32,20 +33,38 @@ export class FulfillmentFinalizer {
       opts.transactionId || payment.providerPaymentId || payment.id;
 
     // 1) Ledger capture (best-effort; defter hatası ödemeyi bozmaz — reconciliation yakalar).
+    // #8 İDEMPOTENCY: ledger.record her çağrıda yeni entryGroup yazar (idempotent DEĞİL).
+    // finalize iki kez koşabildiği için (anlık yol + outbox backstop / drainer retry) önce
+    // bu sipariş için `payment_captured` grubu VAR MI diye bak — varsa yakalamayı ATLA
+    // (çift capture defter read-model'ini bozar). Kargo/order.paid adımları kendi
+    // idempotency'lerine sahip; yalnız ledger'ın açık koruması burada.
     try {
-      const gross = Number(order.totalAmount);
-      const commission = Number(order.commissionAmount);
-      const withholdingTax = Number(order.withholdingTaxAmount ?? 0);
-      await this.ledger?.recordCapture(this.prisma, {
-        paymentId: payment.id,
-        orderId: order.id,
-        buyerId: order.buyerId,
-        sellerId: order.sellerId,
-        gross,
-        sellerNet: Number((gross - commission - withholdingTax).toFixed(2)),
-        commission,
-        withholdingTax,
+      const already = await this.prisma.ledgerEntry.findFirst({
+        where: {
+          orderId: order.id,
+          eventType: LedgerEventType.payment_captured,
+        },
+        select: { id: true },
       });
+      if (already) {
+        this.logger.log(
+          `Ledger capture zaten kayıtlı (order ${order.id}) — çift kayıt atlandı`,
+        );
+      } else {
+        const gross = Number(order.totalAmount);
+        const commission = Number(order.commissionAmount);
+        const withholdingTax = Number(order.withholdingTaxAmount ?? 0);
+        await this.ledger?.recordCapture(this.prisma, {
+          paymentId: payment.id,
+          orderId: order.id,
+          buyerId: order.buyerId,
+          sellerId: order.sellerId,
+          gross,
+          sellerNet: Number((gross - commission - withholdingTax).toFixed(2)),
+          commission,
+          withholdingTax,
+        });
+      }
     } catch (e: any) {
       this.logger.warn(
         `Ledger capture kaydı başarısız (order ${order.id}): ${e?.message}`,
