@@ -25,6 +25,59 @@ describe("validateEnv", () => {
     expect(() => validateEnv({ ...prodBase })).not.toThrow();
   });
 
+  // #6: production'da kargo AÇIKSA gerçek gönderi üretecek konfig zorunlu.
+  const cargoOn = { ...prodBase, SURAT_CARGO_ENABLED: "true" };
+
+  it("throws when cargo enabled in prod but SURAT_SOAP_MODE is not 'rest'", () => {
+    expect(() =>
+      validateEnv({
+        ...cargoOn,
+        SURAT_KARGO_TEST_MODE: "false",
+        SURAT_KARGO_CARI_KODU: "c",
+        SURAT_KARGO_SIFRE: "s",
+      }),
+    ).toThrow(/SURAT_SOAP_MODE/);
+  });
+
+  it("throws when cargo enabled in prod but SURAT_KARGO_TEST_MODE is not 'false'", () => {
+    expect(() =>
+      validateEnv({
+        ...cargoOn,
+        SURAT_SOAP_MODE: "rest",
+        SURAT_KARGO_CARI_KODU: "c",
+        SURAT_KARGO_SIFRE: "s",
+      }),
+    ).toThrow(/SURAT_KARGO_TEST_MODE/);
+  });
+
+  it("throws when cargo enabled in prod but credentials missing", () => {
+    expect(() =>
+      validateEnv({
+        ...cargoOn,
+        SURAT_SOAP_MODE: "rest",
+        SURAT_KARGO_TEST_MODE: "false",
+      }),
+    ).toThrow(/SURAT_KARGO_CARI_KODU|SURAT_KARGO_SIFRE/);
+  });
+
+  it("passes with cargo enabled + rest + TEST_MODE=false + credentials", () => {
+    expect(() =>
+      validateEnv({
+        ...cargoOn,
+        SURAT_SOAP_MODE: "rest",
+        SURAT_KARGO_TEST_MODE: "false",
+        SURAT_KARGO_CARI_KODU: "c",
+        SURAT_KARGO_SIFRE: "s",
+      }),
+    ).not.toThrow();
+  });
+
+  it("does not require Surat config when cargo is disabled", () => {
+    expect(() =>
+      validateEnv({ ...prodBase, SURAT_CARGO_ENABLED: "false" }),
+    ).not.toThrow();
+  });
+
   it("strips unrelated env vars from its return (they resolve live from process.env)", () => {
     // The returned object becomes ConfigModule's validated layer, which wins over
     // process.env. Unrelated vars must NOT be captured here, or a runtime change

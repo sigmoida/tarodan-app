@@ -254,12 +254,19 @@ export class ShippingService {
     const estimatedDelivery = new Date();
     estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
 
-    // Create shipment
+    // #7: Bu (legacy manuel) uç eskiden Sürat çağrısı YAPMADAN, trackingNumber'sız bir
+    // yerel kayıt oluşturuyordu → gerçek gönderi hiç oluşmuyor VE barcode-retry'ın
+    // codeless filtresi (provider surat + trackingNumber != null) bunu ASLA seçmiyordu
+    // (öksüz kalıyordu). Sürat sağlayıcısında trackingNumber'ı OzelKargoTakipNo (sipariş
+    // no) olarak set et → retry job'u sonraki tick'te gerçek barkodu (providerTrackingId)
+    // idempotent olarak tamamlar. Sürat-dışı sağlayıcılar eskisi gibi lokal kalır.
+    const isSurat = dto.provider === "surat";
     const shipment = await this.prisma.shipment.create({
       data: {
         orderId: dto.orderId,
         provider: dto.provider,
         status: ShipmentStatus.pending,
+        ...(isSurat ? { trackingNumber: order.orderNumber } : {}),
         cost: rate.cost,
         estimatedDelivery,
       },

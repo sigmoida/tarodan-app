@@ -48,6 +48,14 @@ const envSchema = z
     PAYTR_MERCHANT_ID: z.string().optional(),
     PAYTR_MERCHANT_KEY: z.string().optional(),
     PAYTR_MERCHANT_SALT: z.string().optional(),
+
+    // Surat cargo — when the integration is enabled, production must ship for real
+    // (mode/test-flag/credentials enforced in the production block below).
+    SURAT_CARGO_ENABLED: z.string().optional(),
+    SURAT_SOAP_MODE: z.string().optional(),
+    SURAT_KARGO_TEST_MODE: z.string().optional(),
+    SURAT_KARGO_CARI_KODU: z.string().optional(),
+    SURAT_KARGO_SIFRE: z.string().optional(),
   })
   .strip()
   .superRefine((env, ctx) => {
@@ -104,6 +112,43 @@ const envSchema = z
           path: [key],
           message: `${key} is required in production`,
         });
+      }
+    }
+
+    // #6: Production'da kargo ENTEGRASYONU AÇIKSA gerçek gönderi üretecek konfig ZORUNLU.
+    // Aksi halde stub/test modu SESSİZCE devreye girer: siparişler "kargolandı" görünür
+    // ama Sürat'ta fiziksel gönderi HİÇ oluşmaz. (isTestMode() ayrıca default 'true'.)
+    const cargoEnabled = ["true", "1"].includes(
+      (env.SURAT_CARGO_ENABLED ?? "").trim(),
+    );
+    if (cargoEnabled) {
+      if ((env.SURAT_SOAP_MODE ?? "").trim().toLowerCase() !== "rest") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SURAT_SOAP_MODE"],
+          message:
+            "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (live/soap do not support barcode creation)",
+        });
+      }
+      if ((env.SURAT_KARGO_TEST_MODE ?? "").trim() !== "false") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SURAT_KARGO_TEST_MODE"],
+          message:
+            "SURAT_KARGO_TEST_MODE must be explicitly 'false' in production (it defaults to test mode -> no real shipments)",
+        });
+      }
+      for (const key of [
+        "SURAT_KARGO_CARI_KODU",
+        "SURAT_KARGO_SIFRE",
+      ] as const) {
+        if (!env[key]) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
+          });
+        }
       }
     }
   });
