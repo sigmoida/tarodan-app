@@ -116,6 +116,14 @@ describe("OrderService checkout group (batch checkout)", () => {
             Promise.resolve({ id: "group-1", ...data }),
           ),
       },
+      // Faz 1: satıcı-paketi (çatı) — checkout satıcı başına bir OrderPackage yaratır.
+      orderPackage: {
+        create: jest
+          .fn()
+          .mockImplementation(({ data }: any) =>
+            Promise.resolve({ id: `pkg-${data.sellerId}`, ...data }),
+          ),
+      },
       // Sipariş oluşturulunca alıcının sepetindeki sipariş edilen ürünler silinir.
       cartItem: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -248,6 +256,70 @@ describe("OrderService checkout group (batch checkout)", () => {
         productId: { in: [productA, productB].sort() },
       },
     });
+  });
+
+  // Faz 1: satıcı-bazlı kargo + OrderPackage (çatı) senaryoları.
+  const sellerId2 = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+
+  it("S2 aynı mağaza 2 ürün → 1 paket + TEK kargo ücreti (alıcı 2× ödemez)", async () => {
+    // varsayılan: productA ve productB aynı satıcı (sellerId)
+    await service.checkout(buyerId, baseDto() as any);
+
+    // Tek satıcı → tek OrderPackage
+    expect(mockTx.orderPackage.create).toHaveBeenCalledTimes(1);
+    expect(
+      mockTx.orderPackage.create.mock.calls[0][0].data.shippingCost,
+    ).toBeCloseTo(29.99);
+
+    // İki order da AYNI pakete bağlı
+    const pkgIds = mockTx.order.create.mock.calls.map(
+      (c: any) => c[0].data.packageId,
+    );
+    expect(new Set(pkgIds).size).toBe(1);
+    expect(pkgIds[0]).toBe(`pkg-${sellerId}`);
+
+    // Kargo ücreti TEK sefer (bir satırda 29.99, diğerinde 0) → toplam 29.99, 59.98 değil
+    const shippings = mockTx.order.create.mock.calls.map(
+      (c: any) => c[0].data.shippingCost,
+    );
+    expect(shippings.filter((s: number) => s > 0)).toHaveLength(1);
+    expect(shippings.reduce((a: number, b: number) => a + b, 0)).toBeCloseTo(
+      29.99,
+    );
+  });
+
+  it("S3 2 farklı mağaza birer ürün → 2 paket + 2 kargo ücreti (3 değil)", async () => {
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct(productA), // seller = sellerId
+      makeProduct(productB, {
+        sellerId: sellerId2,
+        seller: { id: sellerId2, email: "s2@test.com", displayName: "Seller2" },
+      }),
+    ]);
+
+    await service.checkout(buyerId, baseDto() as any);
+
+    // 2 satıcı → 2 OrderPackage
+    expect(mockTx.orderPackage.create).toHaveBeenCalledTimes(2);
+    const pkgSellers = mockTx.orderPackage.create.mock.calls.map(
+      (c: any) => c[0].data.sellerId,
+    );
+    expect(pkgSellers).toEqual(expect.arrayContaining([sellerId, sellerId2]));
+    for (const c of mockTx.orderPackage.create.mock.calls) {
+      expect(c[0].data.shippingCost).toBeCloseTo(29.99);
+    }
+
+    // Her order kendi satıcı-paketine bağlı + her satıcı 1 kargo ücreti → 2 ücret
+    const perOrder = mockTx.order.create.mock.calls.map((c: any) => ({
+      seller: c[0].data.sellerId,
+      shipping: c[0].data.shippingCost,
+      pkg: c[0].data.packageId,
+    }));
+    expect(perOrder.filter((o: any) => o.shipping > 0)).toHaveLength(2);
+    const aOrder = perOrder.find((o: any) => o.seller === sellerId);
+    const bOrder = perOrder.find((o: any) => o.seller === sellerId2);
+    expect(aOrder.pkg).toBe(`pkg-${sellerId}`);
+    expect(bOrder.pkg).toBe(`pkg-${sellerId2}`);
   });
 
   it("idempotency replay: same key returns the existing group without running the transaction", async () => {

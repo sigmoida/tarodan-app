@@ -402,6 +402,17 @@ export class OrderCheckoutDirectService {
         },
       });
 
+      // Faz 1: tek order da satıcı-paketi (çatı) altında — model tüm yollarda uniform
+      // (Faz 2 Shipment.packageId + Faz 3 UI gruplaması her order'ın paketi olduğunu varsayar).
+      const singleOrderPackage = await tx.orderPackage.create({
+        data: {
+          checkoutGroupId: singleOrderGroup.id,
+          sellerId: product.sellerId,
+          buyerId,
+          shippingCost,
+        },
+      });
+
       // Create order with discount info
       const order = await tx.order.create({
         data: {
@@ -410,6 +421,7 @@ export class OrderCheckoutDirectService {
           buyerId,
           sellerId: product.sellerId,
           checkoutGroupId: singleOrderGroup.id,
+          packageId: singleOrderPackage.id,
           totalAmount,
           subtotal,
           discountAmount: totalDiscount,
@@ -703,6 +715,17 @@ export class OrderCheckoutDirectService {
         },
       });
 
+      // Faz 1: teklif siparişi de satıcı-paketi altında (uniform model). Teklif yolunda
+      // ayrı kargo ücreti yok → shippingCost 0.
+      const offerOrderPackage = await tx.orderPackage.create({
+        data: {
+          checkoutGroupId: offerOrderGroup.id,
+          sellerId: offer.sellerId,
+          buyerId,
+          shippingCost: 0,
+        },
+      });
+
       // Create order
       const order = await tx.order.create({
         data: {
@@ -712,6 +735,7 @@ export class OrderCheckoutDirectService {
           sellerId: offer.sellerId,
           offerId: dto.offerId,
           checkoutGroupId: offerOrderGroup.id,
+          packageId: offerOrderPackage.id,
           totalAmount,
           taxAmount: offerTaxAmount,
           withholdingTaxAmount: offerWithholdingAmount,

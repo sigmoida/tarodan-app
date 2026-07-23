@@ -1089,10 +1089,34 @@ model CheckoutGroup {
   updatedAt      DateTime @updatedAt @map("updated_at")
   buyer          User     @relation("BuyerCheckoutGroups", fields: [buyerId], references: [id])
   orders         Order[]
+  packages       OrderPackage[]
   payment        Payment?
 
   @@index([buyerId, createdAt])
   @@map("checkout_groups")
+}
+
+// Satıcı-paketi ("çatı"): bir sepet (CheckoutGroup) içinde AYNI satıcının siparişleri
+// tek pakette birleşir. Kargo ücreti + (Faz 2'de) fiziksel Sürat gönderisi paket
+// başınadır → 2 farklı satıcı = 2 paket = 2 kargo (ürün sayısından bağımsız). Direct-buy
+// tek üründe de tek order'lı bir paket kullanılabilir (tek biçim). sellerId/buyerId düz
+// kolon (User ilişkisi yok — denormalize, sorgu için yeterli).
+model OrderPackage {
+  id              String         @id @default(uuid())
+  checkoutGroupId String?        @map("checkout_group_id")
+  sellerId        String         @map("seller_id")
+  buyerId         String         @map("buyer_id")
+  // Bu satıcı paketi için TEK kargo ücreti (satıcının paket-içi satır toplamı bedava
+  // eşiğini geçerse 0). Buyer toplamı bu değerle beslenir; iade paket bazında ele alınır.
+  shippingCost    Decimal        @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  checkoutGroup   CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id])
+  orders          Order[]
+
+  @@index([checkoutGroupId])
+  @@index([sellerId])
+  @@map("order_packages")
 }
 
 model Order {
@@ -1103,6 +1127,9 @@ model Order {
   productId              String          @map("product_id")
   offerId                String?         @unique @map("offer_id")
   checkoutGroupId        String?         @map("checkout_group_id")
+  // Satıcı-paketi (çatı): aynı sepet+satıcı order'ları burada birleşir. Nullable —
+  // Faz 1'de grup/direct checkout doldurur; eski/diğer yollar null kalabilir.
+  packageId              String?         @map("package_id")
   shippingAddressId      String?         @map("shipping_address_id")
   // Adet (sepet çoklu-adet): çoğu ikinci-el ürün tekildir → default 1. unitPrice
   // birim fiyatı; subtotal = unitPrice * quantity. Adet bazlı kısmi iade buna dayanır.
@@ -1149,12 +1176,14 @@ model Order {
   commissionLedger       CommissionLedger?
   sellerUploadedInvoice  SellerUploadedInvoice?
   checkoutGroup          CheckoutGroup?  @relation(fields: [checkoutGroupId], references: [id])
+  package                OrderPackage?   @relation(fields: [packageId], references: [id])
 
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
   @@index([status, paymentExpiresAt])
   @@index([checkoutGroupId])
+  @@index([packageId])
   @@map("orders")
 }
 

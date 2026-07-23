@@ -434,6 +434,30 @@ export class OrderCheckoutGroupService {
             suratIdempotencyKey: string;
           }> = [];
 
+          // Faz 1 (satıcı-bazlı kargo): Kargo ücreti SATICI bazında hesaplanır. Aynı
+          // satıcının paket-içi satır toplamı bedava-kargo eşiğini geçerse ücretsiz;
+          // aksi halde satıcı başına TEK baseCost. Eskiden satır başına hesaplanıyordu
+          // → aynı mağazadan N ürün = N kargo ücreti (alıcı fazla öderdi). Ücret her
+          // satıcının İLK satırına yüklenir (kardeş satırlar 0) → order.totalAmount +
+          // grup toplamı formülü değişmeden per-seller olur.
+          const sellerLineSubtotals = new Map<string, number>();
+          for (const entry of pricing) {
+            const line =
+              entry.productPrice * entry.quantity - entry.couponDiscount;
+            sellerLineSubtotals.set(
+              entry.product.sellerId,
+              (sellerLineSubtotals.get(entry.product.sellerId) ?? 0) + line,
+            );
+          }
+          const sellerShipping = new Map<string, number>();
+          for (const [sellerId, subtotal] of sellerLineSubtotals) {
+            sellerShipping.set(
+              sellerId,
+              await this.orderPricing.calculateShippingCost(subtotal),
+            );
+          }
+          const sellerShippingCharged = new Set<string>();
+
           for (const entry of pricing) {
             // Satır toplamı = birim fiyat * adet - (satıra düşen kupon). Komisyon,
             // kargo ve vergi satır toplamı üzerinden hesaplanır (adet>1 ölçeklenir).
@@ -445,8 +469,13 @@ export class OrderCheckoutGroupService {
                 entry.product.sellerId,
                 entry.product.categoryId,
               );
-            const shippingCost =
-              await this.orderPricing.calculateShippingCost(discountedPrice);
+            // Satıcı-bazlı kargo ücreti: yalnız satıcının İLK satırına yükle, kardeşlere 0.
+            const entrySellerId = entry.product.sellerId;
+            let shippingCost = 0;
+            if (!sellerShippingCharged.has(entrySellerId)) {
+              shippingCost = sellerShipping.get(entrySellerId) ?? 0;
+              sellerShippingCharged.add(entrySellerId);
+            }
             const { taxAmount, withholdingTaxAmount } =
               await this.checkoutCommon.resolveSellerTaxes(
                 entry.product.sellerId,
@@ -506,6 +535,21 @@ export class OrderCheckoutGroupService {
             },
           });
 
+          // Satıcı başına OrderPackage (çatı): o satıcının order'ları + tek kargo ücreti.
+          // Faz 2'de fiziksel Sürat gönderisi de bu paket başına konsolide olacak.
+          const packageBySeller = new Map<string, string>();
+          for (const [sellerId, shipping] of sellerShipping) {
+            const pkg = await tx.orderPackage.create({
+              data: {
+                checkoutGroupId: group.id,
+                sellerId,
+                buyerId,
+                shippingCost: shipping,
+              },
+            });
+            packageBySeller.set(sellerId, pkg.id);
+          }
+
           const createdOrders: Array<{
             id: string;
             orderNumber: string;
@@ -562,6 +606,7 @@ export class OrderCheckoutGroupService {
                 buyerId,
                 sellerId: entry.product.sellerId,
                 checkoutGroupId: group.id,
+                packageId: packageBySeller.get(entry.product.sellerId),
                 quantity: entry.quantity,
                 unitPrice: entry.productPrice,
                 totalAmount: input.totalAmount,

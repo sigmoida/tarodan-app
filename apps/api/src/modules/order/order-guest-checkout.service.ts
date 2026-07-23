@@ -395,6 +395,16 @@ export class OrderGuestCheckoutService {
         },
       });
 
+      // Faz 1: misafir tek siparişi de satıcı-paketi altında (uniform model).
+      const guestOrderPackage = await tx.orderPackage.create({
+        data: {
+          checkoutGroupId: guestOrderGroup.id,
+          sellerId: product.sellerId,
+          buyerId: guestUser.id,
+          shippingCost,
+        },
+      });
+
       // Create order - store all guest info in shippingAddress JSON
       const order = await tx.order.create({
         data: {
@@ -404,6 +414,7 @@ export class OrderGuestCheckoutService {
           sellerId: product.sellerId,
           offerId: dto.offerId,
           checkoutGroupId: guestOrderGroup.id,
+          packageId: guestOrderPackage.id,
           totalAmount,
           shippingCost,
           taxAmount: guestTaxAmount,
