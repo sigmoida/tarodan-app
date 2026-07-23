@@ -478,11 +478,15 @@
 
 ### 11.3 — SOLID: god-service parçalama + cargo→money event'leme
 
-- [ ] **11.3a** `SuratTrackingService` (1766 LOC) god-service + **10 `ModuleRef.get`/dinamik `import()`** ile
-      payment/refund/trade/eLogo'yu doğrudan çağırıyor (kargo katmanı para orkestrasyonu yapıyor). Parçala
-      (`SuratTrackingClient` / `{Order,Trade,RefundReturn}TrackingSync` / `BarcodeRetryService` / `CargoAlertingService`)
-      ve para yan-etkilerini **domain event**'lerine çevir (`shipment.delivered/returned`, `return.delivered`) →
-      money→cargo yönüyle simetrik. `surat-cargo/surat-tracking.service.ts`. Büyük.
+- [x] **11.3a** ✓ (böl) `SuratTrackingService` (1808 → **121 satır facade**) 6 cohesive alt-servise bölündü:
+      `SuratTrackingClient` (ham HTTP + probe'lar + URL helper'ları) / `OrderTrackingSyncService` / `TradeTrackingSyncService`
+      / `RefundReturnTrackingSyncService` / `BarcodeRetryService` / `CargoAlertingService`. STRICT PURE MOVE (metod
+      gövdeleri birebir; yalnız wiring). Facade aynı 12 public imzayla delege; çağıranlar (shipping-scheduler, admin,
+      admin-shipping) DEĞİŞMEDİ. **11.2c atomik delivered-tx birebir korundu** (order-sync'te tek `$transaction`). ModuleRef
+      para hop'ları verbatim taşındı (event'e ÇEVRİLMEDİ — atomiklik korunur). tsc temiz; 152 test yeşil (0 yeni hata).
+      **NOT (11.3a-event + 11.4b ertelendi):** cargo→money'yi event'e çevirmek delivered atomikliğiyle çelişir (atomiklik
+      kazanır); sync-loop DRY (11.4b) logic konsolidasyonu — bu dosyanın spec'i YOK → önce karakterizasyon testi gerekir.
+
 - [ ] **11.3b** `PaymentRefundService` (1537) böl: `RefundCapPolicy` / `RefundExecutor` / `RefundFinalizer(tx)`.
       `processRefund` tek başına ~770 satır. Büyük.
 - [x] **11.3c** ✓ `PaymentReconciliationService` (1483 → **91 satır facade**) 5 cohesive alt-servise bölündü

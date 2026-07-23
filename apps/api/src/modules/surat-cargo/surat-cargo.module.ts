@@ -4,6 +4,12 @@ import { CacheModule } from "../cache/cache.module";
 import { PrismaModule } from "../../prisma";
 import { SuratCargoService, SURAT_SOAP_CLIENT } from "./surat-cargo.service";
 import { SuratTrackingService } from "./surat-tracking.service";
+import { SuratTrackingClient } from "./surat-tracking.client";
+import { OrderTrackingSyncService } from "./order-tracking-sync.service";
+import { TradeTrackingSyncService } from "./trade-tracking-sync.service";
+import { RefundReturnTrackingSyncService } from "./refund-return-tracking-sync.service";
+import { BarcodeRetryService } from "./barcode-retry.service";
+import { CargoAlertingService } from "./cargo-alerting.service";
 import { CARGO_PROVIDER } from "./cargo-provider";
 import {
   StubSuratSoapClient,
@@ -35,6 +41,13 @@ import { RestSuratClient } from "./surat-rest.client";
     },
     SuratCargoService,
     SuratTrackingService,
+    // Faz 11.3a: SuratTrackingService (facade) + tek-sorumluluklu alt servisler.
+    SuratTrackingClient,
+    OrderTrackingSyncService,
+    TradeTrackingSyncService,
+    RefundReturnTrackingSyncService,
+    BarcodeRetryService,
+    CargoAlertingService,
     // Faz 11.5a (DIP): CARGO_PROVIDER token → aynı SuratCargoService singleton'ına
     // bağlanır; tüketiciler (ör. Payment) somut servis yerine bu soyutlamayı enjekte eder.
     { provide: CARGO_PROVIDER, useExisting: SuratCargoService },
