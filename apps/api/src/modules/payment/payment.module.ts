@@ -16,6 +16,7 @@ import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PaymentSchedulerService } from "./payment-scheduler.service";
 import { PaymentScheduledProcessor } from "./payment-scheduled.processor";
+import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { CacheModule } from "../cache/cache.module";
@@ -70,6 +71,7 @@ import { ElogoModule } from "../elogo";
     PaymentLifecycleService,
     PaymentSchedulerService,
     PaymentScheduledProcessor,
+    PaymentOutboxHandlers,
     RawBodyMiddleware,
   ],
   exports: [PaymentService, PaymentProviderEventService],

@@ -2373,3 +2373,36 @@ enum BuyerConfirmationType {
   auto_timeout
   admin_force
 }
+
+// =============================================================================
+// OUTBOX (Faz 5) — para mutasyonuyla AYNI tx'te yazılan güvenilir yan-etki kuyruğu.
+// "post-commit best-effort .catch(log)" yan-etkilerini (PayTR iade, Sürat iptali,
+// fatura, bildirim) çökmeye dayanıklı kılar: tx commit olursa satır KESİN işlenir
+// (drainer retry+backoff+DLQ). Handler'lar idempotent olmalı. PAN/CVV asla payload'a
+// yazılmaz (yalnız id'ler + tutar). dedupeKey ile aynı yan-etki iki kez enqueue edilmez.
+// =============================================================================
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  type          String // handler dispatch anahtarı (ör. "invoice.generate")
+  payload       Json // handler girdisi (id'ler + tutar; PAN/CVV/PII minimal)
+  status        OutboxStatus @default(pending)
+  attempts      Int          @default(0)
+  maxAttempts   Int          @default(8) @map("max_attempts")
+  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at")
+  dedupeKey     String?      @unique @map("dedupe_key") // idempotency (aynı yan-etki tek satır)
+  lastError     String?      @map("last_error")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  processedAt   DateTime?    @map("processed_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([type, status])
+  @@map("outbox_events")
+}
+
+enum OutboxStatus {
+  pending
+  processing
+  completed
+  dead // maxAttempts aşıldı — DLQ (manuel inceleme + alarm)
+}

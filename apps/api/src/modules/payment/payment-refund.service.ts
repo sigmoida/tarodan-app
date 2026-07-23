@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
@@ -24,6 +25,8 @@ import { CommissionLedgerService } from "../commission/commission-ledger.service
 import { ElogoInvoicingService } from "../elogo";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { OUTBOX_SHIPMENT_CANCEL } from "../outbox/outbox.types";
 import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 
@@ -55,6 +58,12 @@ export class PaymentRefundService {
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly providerEvents: PaymentProviderEventService,
+    // Faz 5: iade tx'iyle AYNI anda "Sürat iptali" outbox satırı yaz → çökmeye dayanıklı
+    // backstop (post-commit anlık iptal hızlı-yol kalır; handler idempotent). @Optional:
+    // prod'da global OutboxModule daima enjekte eder; birim testleri (mock tx) sağlamak
+    // zorunda kalmasın diye opsiyonel — yoksa yalnız anlık best-effort yola düşülür.
+    @Optional()
+    private readonly outbox?: OutboxService,
   ) {
     this.holdDays = parseInt(
       this.configService.get("PAYMENT_HOLD_DAYS") || "7",
@@ -729,6 +738,21 @@ export class PaymentRefundService {
               `Failed to emit payment.refunded event: ${error}`,
             );
           }
+
+          // Faz 5 (outbox): iade commit'iyle ATOMİK olarak "Sürat iptali" satırını yaz.
+          // Böylece post-commit anlık iptal (aşağıda) çökme/hata ile kaçsa bile drainer
+          // güvenilir şekilde iptal eder. Handler idempotent → çift iptal zararsız.
+          await this.outbox?.enqueue(tx, {
+            type: OUTBOX_SHIPMENT_CANCEL,
+            payload: {
+              orderId,
+              orderNumber:
+                payment.order?.orderNumber ??
+                refundTargetOrder?.orderNumber ??
+                orderId,
+            },
+            dedupeKey: `${OUTBOX_SHIPMENT_CANCEL}:${orderId}`,
+          });
 
           return refundResponse;
         })

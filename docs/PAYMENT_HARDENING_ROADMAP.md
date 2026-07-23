@@ -264,13 +264,23 @@
 
 ---
 
-## Faz 5 — Outbox pattern (para yan-etkileri) · `fix/payment-hardening-outbox`
+## Faz 5 — Outbox pattern (para yan-etkileri) · `fix/payment-hardening-outbox-ledger-bull`
 
 > "post-commit best-effort .catch(log)" para yan-etkilerini güvenilir kılar.
 
-- [ ] **5.1** `outbox` tablosu (event tipi, payload, status, attempts, nextAttemptAt).
-- [ ] **5.2** Para mutasyonuyla AYNI tx'te outbox satırı; ayrı worker retry+backoff+DLQ ile boşaltır.
-- [ ] **5.3** Taşınacak yan-etkiler: PayTR iade çağrısı, Sürat gönderi iptali, takas nakit iadesi, fatura üretimi, bildirim fan-out. (SEAM-B2, MONEY-H1/H2 ile kesişir — outbox onların kalıcı çözümü.)
+- [x] **5.1** ✓ `outbox_events` tablosu (type, payload, status, attempts, maxAttempts, nextAttemptAt,
+      **dedupeKey unique** = idempotency, lastError). Migration `20260723090000_outbox_events`.
+- [x] **5.2** ✓ `OutboxService.enqueue(tx, …)` para mutasyonuyla **AYNI** tx'e yazar (rollback'te geri
+      alınır; dedupe hariç hata FIRLATIR — best-effort DEĞİL). `OutboxDrainerService` (`@TrackedCron`,
+      `moneyCronsViaBull` gate'li → Faz 7'de Bull) `pending & nextAttemptAt<=now`'ı CAS ile claim edip
+      handler'a verir: başarı→completed, hata→exp-backoff retry, maxAttempts→`dead` (DLQ + alarm).
+      `OutboxHandlerRegistry` (type→idempotent handler, domain servisleri onModuleInit'te kaydeder).
+      `@Global OutboxModule`. **Spec:** enqueue (dedupe/tx-güvenli) + drainer (retry/backoff/dead/CAS).
+- [~] **5.3** Taşınan yan-etki: **Sürat gönderi iptali (iade)** → iade commit'iyle ATOMİK `shipment.cancel`
+  outbox satırı (`PaymentOutboxHandlers`, idempotent handler); anlık post-commit iptal hızlı-yol kalır,
+  outbox çökmeye dayanıklı backstop. Enjeksiyon `@Optional` → para testlerinde sıfır churn. **Devam
+  (aynı desen):** PayTR iade çağrısı (zaten marker+sweep korumalı — Faz 1/4), takas nakit iadesi,
+  eLogo fatura (zaten retry cron'lu), bildirim fan-out.
 
 ---
 

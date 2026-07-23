@@ -7,6 +7,7 @@ import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from "@nestjs/core";
 import { PrismaModule } from "./prisma";
 import { DevModule } from "./modules/dev/dev.module";
 import { AuthModule, JwtAuthGuard, BannedUserGuard } from "./modules/auth";
+import { OutboxModule } from "./modules/outbox/outbox.module";
 import { UserModule } from "./modules/user";
 import { ProductModule } from "./modules/product";
 import { CategoryModule } from "./modules/category";
@@ -149,6 +150,9 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
     // Global Cache (Redis) - GAP-020
     CacheModule,
+
+    // Reliable side-effect queue (Faz 5) — @Global
+    OutboxModule,
 
     // Core Feature modules
     AuthModule,
