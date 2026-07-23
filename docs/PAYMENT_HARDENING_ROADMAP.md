@@ -366,9 +366,15 @@
 
 ## Faz 8 — Event-driven fulfillment + god-service parçalama · `refactor/payment-fulfillment-decompose`
 
-- [ ] **8.1** Ödeme `paid`'e geçip **event yaysın**; fulfillment tüketsin (fulfillment hatası ödeme durumunu bozmasın).
-      NOT: mevcut yapı ödeme-tamamlama + escrow-hold'u TEK tx'te atomik tutuyor (bu escrow için DAHA güvenli;
-      ayırmak "ödeme tamam ama hold yok" penceresi açar) → düşünülerek yapılmalı, aceleye gelmez.
+- [x] **8.1** ✓ Ödeme başarı akışı, para tx'i (claim + preparing + stok + escrow hold) commit olduktan
+      SONRA `order.fulfillment-requested` EVENT'i yayıyor; yeni `OrderFulfillmentListener` tüketip fiziksel
+      siparişin POST-COMMIT sonlandırmasını (ledger capture + order.paid + Sürat) `FulfillmentFinalizer`'a
+      devrediyor. Böylece `PaymentFulfillmentService` sipariş sonlandırmasında FulfillmentFinalizer'a DOĞRUDAN
+      bağlı değil (DIP) ve tekil↔grup yolu AYNI seam'i paylaşıyor (DRY). Escrow-hold ATOMİK tx'te KALDI (not'taki
+      "ödeme tamam ama hold yok" penceresi açılmadı). Zamanlama korundu (`emitAsync` awaited → sonlandırma dönmeden
+      önce tamamlanır; tek değişiklik dispatch); listener best-effort (try/catch) → fulfillment hatası ödemeyi
+      BOZMAZ (ikinci savunma hattı; finalizer zaten adım-adım best-effort). **Spec:** listener delegasyon + hata-yutma;
+      grup spec seam'i (`emitOrderFulfillmentRequested` ×2, skipBuyer) doğruluyor (finalizer efekti listener spec'inde).
 - [x] **8.2** ✓ God-service parçalama TAMAMLANDI — 5 cohesive, tek-sorumluluklu servis çıkarıldı
       (her biri kendi odaklı karakterizasyon testiyle): - `FulfillmentNotifier` — stokout kaskad bildirimi (tekil=grup birebir kopya) + back-in-stock. - `FulfillmentFinalizer` — fiziksel sipariş POST-COMMIT sonlandırması (ledger capture + order.paid + Sürat). - `EscrowHoldService` — escrow hold + pending komisyon (in-tx; tekil=grup). - `FulfillmentStockService` — stok düşümü + stockout kaskadı (in-tx; FOR UPDATE + fiziksel-quantity-gate). - `VirtualOrderFulfillmentService` — üyelik/boost aktivasyonu (in-tx) + eLogo fatura (post-commit).
       Yöntem: disiplinli "önce test, sonra çıkar" — her in-tx çıkarımı odaklı unit testle kilitlendi + grup

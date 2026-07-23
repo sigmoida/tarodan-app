@@ -114,6 +114,7 @@ describe("PaymentService group payment (checkout group)", () => {
   const mockEvents = {
     emitOrderPaid: jest.fn(),
     emitGroupBuyerOrderPaid: jest.fn(),
+    emitOrderFulfillmentRequested: jest.fn(),
     emitPaymentFailed: jest.fn(),
   };
 
@@ -174,7 +175,8 @@ describe("PaymentService group payment (checkout group)", () => {
         PaymentFulfillmentService,
         PaymentLifecycleService,
         I18nService,
-        // Gerçek finalizer → emitOrderPaid mockEvents'e yönlensin (assertion'lar için).
+        // Faz 8.1: finalizer artık OrderFulfillmentListener üzerinden çağrılır; burada
+        // yalnız PaymentFulfillmentService DI'ı için sağlanır (trade capture yolu kullanır).
         FulfillmentFinalizer,
         // Gerçek escrow servisi → paymentHold.create / upsertPending assertion'ları için.
         EscrowHoldService,
@@ -275,9 +277,9 @@ describe("PaymentService group payment (checkout group)", () => {
     // Ledger sipariş başına
     expect(mockCommissionLedger.upsertPending).toHaveBeenCalledTimes(2);
 
-    // Tx sonrası: sipariş başına order.paid (SATICI tarafı) + shipment
-    expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(2);
-    expect(mockPrisma.shipment.create).toHaveBeenCalledTimes(2);
+    // Faz 8.1: tx sonrası sipariş başına fulfillment sonlandırması EVENT ile istenir
+    // (OrderFulfillmentListener tüketir; order.paid/Sürat orada). Burada seam doğrulanır.
+    expect(mockEvents.emitOrderFulfillmentRequested).toHaveBeenCalledTimes(2);
 
     // ALICI tarafı: grup başına TEK onay maili (ürün başına değil)
     expect(mockEvents.emitGroupBuyerOrderPaid).toHaveBeenCalledTimes(1);
@@ -285,8 +287,9 @@ describe("PaymentService group payment (checkout group)", () => {
     expect(groupBuyerArg.items).toHaveLength(2);
     expect(groupBuyerArg.buyerId).toBe("buyer-1");
 
-    // Sipariş başına emitOrderPaid alıcıyı atlamalı (skipBuyer:true)
-    for (const call of mockEvents.emitOrderPaid.mock.calls) {
+    // Sipariş başına fulfillment isteği alıcıyı atlamalı (skipBuyer:true) — grup onayı
+    // yukarıda emitGroupBuyerOrderPaid ile bir kez gönderildi.
+    for (const call of mockEvents.emitOrderFulfillmentRequested.mock.calls) {
       expect(call[0].skipBuyer).toBe(true);
     }
   });
@@ -376,7 +379,7 @@ describe("PaymentService group payment (checkout group)", () => {
     expect(mockTx.paymentHold.create.mock.calls[0][0].data.orderId).toBe(
       "order-1",
     );
-    expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(1);
+    expect(mockEvents.emitOrderFulfillmentRequested).toHaveBeenCalledTimes(1);
   });
 
   it("group payment initiation rejects when any order is no longer pending_payment", async () => {

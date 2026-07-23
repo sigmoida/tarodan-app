@@ -19,6 +19,7 @@ import { PaymentScheduledProcessor } from "./payment-scheduled.processor";
 import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { OrderFulfillmentListener } from "./order-fulfillment.listener";
 import { EscrowHoldService } from "./escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
@@ -74,6 +75,7 @@ import { ElogoModule } from "../elogo";
     PaymentFulfillmentService,
     FulfillmentNotifier,
     FulfillmentFinalizer,
+    OrderFulfillmentListener,
     EscrowHoldService,
     FulfillmentStockService,
     VirtualOrderFulfillmentService,

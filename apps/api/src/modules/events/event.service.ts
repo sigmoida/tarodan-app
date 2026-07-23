@@ -7,6 +7,21 @@ import { PrismaService } from "../../prisma";
 
 /** In-process (EventEmitter2) event adları — modüller-arası döngüsüz decoupling. */
 export const PAYMENT_TRADE_CASH_CLEARED = "payment.trade-cash-cleared";
+/** Faz 8.1 — fiziksel siparişin ödemesi commit oldu; fulfillment sonlandırması istenir. */
+export const ORDER_FULFILLMENT_REQUESTED = "order.fulfillment-requested";
+
+/**
+ * Faz 8.1 — Ödeme atomik tx'i (claim + preparing + stok + escrow hold) commit olduktan
+ * SONRA fiziksel siparişin POST-COMMIT sonlandırması (ledger capture + order.paid + Sürat)
+ * bu event ile İSTENİR; `OrderFulfillmentListener` tüketir. order/payment nesneleri tx'te
+ * yüklenmiş hâlleriyle taşınır (birebir aynı argümanlar → davranış değişmez, ekstra sorgu yok).
+ */
+export interface OrderFulfillmentRequestedPayload {
+  order: any; // buyer/seller/product include'lı Prisma order (finalizer'a aynen geçer)
+  payment: any; // Prisma payment
+  skipBuyer?: boolean;
+  transactionId?: string;
+}
 
 /**
  * Event Payload Types
@@ -209,6 +224,18 @@ export class EventService {
       `Emitting ${PAYMENT_TRADE_CASH_CLEARED} for trade ${payload.tradeId}`,
     );
     this.eventEmitter.emit(PAYMENT_TRADE_CASH_CLEARED, payload);
+  }
+
+  /**
+   * Faz 8.1 — Ödeme servisi FulfillmentFinalizer'a DOĞRUDAN bağlı olmadan (DIP) sipariş
+   * sonlandırmasını ister. `emitAsync` + await: mevcut zamanlama korunur (sonlandırma
+   * dönmeden önce tamamlanır) → tek değişiklik dispatch mekanizması, davranış aynı.
+   * Listener best-effort (kendi içinde try/catch) → fulfillment hatası ödemeyi BOZMAZ.
+   */
+  async emitOrderFulfillmentRequested(
+    payload: OrderFulfillmentRequestedPayload,
+  ): Promise<void> {
+    await this.eventEmitter.emitAsync(ORDER_FULFILLMENT_REQUESTED, payload);
   }
 
   /**

@@ -354,10 +354,13 @@ export class PaymentFulfillmentService {
       await this.cache.delPattern("products:list:*").catch(() => {});
     }
 
-    // Faz 8.2: fiziksel siparişin POST-COMMIT sonlandırması (ledger capture + order.paid
-    // + Sürat gönderi kaydı) FulfillmentFinalizer'da — tekil/grup ortak, best-effort.
+    // Faz 8.1: fiziksel siparişin POST-COMMIT sonlandırması (ledger capture + order.paid
+    // + Sürat gönderi kaydı) artık EVENT ile istenir (OrderFulfillmentListener tüketir) →
+    // ödeme servisi FulfillmentFinalizer'a doğrudan bağlı değil (DIP); tekil/grup ortak seam.
     if (!isMembershipOrder && !isBoostOrder) {
-      await this.fulfillmentFinalizer.finalizePaidOrder(resultOrder, payment, {
+      await this.eventService.emitOrderFulfillmentRequested({
+        order: resultOrder,
+        payment,
         transactionId,
       });
     }
@@ -571,9 +574,12 @@ export class PaymentFulfillmentService {
 
     // Sipariş başına: order.paid eventi (SATICI tarafı; alıcı atlanır), fatura, kargo kaydı
     for (const resultOrder of result.aliveOrders) {
-      // Faz 8.2: sepetteki HER siparişin POST-COMMIT sonlandırması (FulfillmentFinalizer,
-      // tekil yolla ortak). skipBuyer:true — alıcı onayı grup başına TEK kez gönderildi.
-      await this.fulfillmentFinalizer.finalizePaidOrder(resultOrder, payment, {
+      // Faz 8.1: sepetteki HER siparişin POST-COMMIT sonlandırması EVENT ile istenir (tekil
+      // yolla ortak seam — OrderFulfillmentListener tüketir). skipBuyer:true — alıcı onayı
+      // grup başına TEK kez (emitGroupBuyerOrderPaid) yukarıda gönderildi.
+      await this.eventService.emitOrderFulfillmentRequested({
+        order: resultOrder,
+        payment,
         skipBuyer: true,
         transactionId,
       });
