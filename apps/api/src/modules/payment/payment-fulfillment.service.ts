@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -26,6 +26,7 @@ import { CommissionLedgerService } from "../commission/commission-ledger.service
 import { ModuleRef } from "@nestjs/core";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
+import { LedgerService } from "../ledger/ledger.service";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -86,6 +87,11 @@ export class PaymentFulfillmentService {
     private readonly moduleRef: ModuleRef,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentRefund: PaymentRefundService,
+    // Faz 6: yakalama anında çift-taraflı defter kaydı (denetim/reconciliation).
+    // @Optional: prod'da global LedgerModule enjekte eder; birim testleri (mock tx)
+    // sağlamak zorunda kalmasın — yoksa defter kaydı atlanır (para akışı etkilenmez).
+    @Optional()
+    private readonly ledger?: LedgerService,
   ) {}
 
   /**
@@ -634,6 +640,31 @@ export class PaymentFulfillmentService {
       await this.cache.delPattern("products:list:*").catch(() => {});
     }
 
+    // Faz 6 (ledger): yakalamayı çift-taraflı deftere yaz. POST-COMMIT + best-effort —
+    // defter/muhasebe hatası ödemeyi ASLA bozmamalı; reconciliation cron açığı yakalar.
+    // Sanal sipariş (üyelik/boost) escrow üretmez → deftere yazılmaz.
+    if (!isMembershipOrder && !isBoostOrder) {
+      try {
+        const gross = Number(resultOrder.totalAmount);
+        const commission = Number(resultOrder.commissionAmount);
+        const withholdingTax = Number(resultOrder.withholdingTaxAmount ?? 0);
+        await this.ledger?.recordCapture(this.prisma, {
+          paymentId: payment.id,
+          orderId: resultOrder.id,
+          buyerId: resultOrder.buyerId,
+          sellerId: resultOrder.sellerId,
+          gross,
+          sellerNet: Number((gross - commission - withholdingTax).toFixed(2)),
+          commission,
+          withholdingTax,
+        });
+      } catch (e: any) {
+        this.logger.warn(
+          `Ledger capture kaydı başarısız (order ${resultOrder.id}): ${e?.message}`,
+        );
+      }
+    }
+
     if (!isMembershipOrder && !isBoostOrder) {
       try {
         const shippingAddressData = resultOrder.shippingAddress as any;
@@ -1116,6 +1147,27 @@ export class PaymentFulfillmentService {
 
     // Sipariş başına: order.paid eventi (SATICI tarafı; alıcı atlanır), fatura, kargo kaydı
     for (const resultOrder of result.aliveOrders) {
+      // Faz 6 (ledger): sepetteki HER siparişin yakalamasını çift-taraflı deftere yaz.
+      // POST-COMMIT + best-effort — defter hatası ödemeyi bozmaz; reconciliation yakalar.
+      try {
+        const gross = Number(resultOrder.totalAmount);
+        const commission = Number(resultOrder.commissionAmount);
+        const withholdingTax = Number(resultOrder.withholdingTaxAmount ?? 0);
+        await this.ledger?.recordCapture(this.prisma, {
+          paymentId: payment.id,
+          orderId: resultOrder.id,
+          buyerId: resultOrder.buyerId,
+          sellerId: resultOrder.sellerId,
+          gross,
+          sellerNet: Number((gross - commission - withholdingTax).toFixed(2)),
+          commission,
+          withholdingTax,
+        });
+      } catch (e: any) {
+        this.logger.warn(
+          `Ledger capture kaydı başarısız (group order ${resultOrder.id}): ${e?.message}`,
+        );
+      }
       try {
         const shippingAddressData = resultOrder.shippingAddress as any;
         const isGuestOrder =

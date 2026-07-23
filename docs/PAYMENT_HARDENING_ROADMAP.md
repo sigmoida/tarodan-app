@@ -284,16 +284,25 @@
 
 ---
 
-## Faz 6 — Birleşik ledger (double-entry) · `fix/payment-hardening-ledger`
+## Faz 6 — Birleşik ledger (double-entry) · `fix/payment-hardening-outbox-ledger-bull`
 
 > Bakiye/tutar tutarlılığının tek kaynağı; kısmi iade doğruluğunun yapısal temeli.
 
-- [ ] **6.1** Değişmez `ledger_entry` (debit/credit, hesap, tutar, para olayı ref).
-- [ ] **6.2** Her para olayı (ödeme, komisyon, hold, release, payout, iade, takas komisyonu) bir entry; bakiyeler türetilir.
-- [ ] **6.3** Hold tüketimi/kısmi iade ledger'dan okusun (Faz 1.4'ün yapısal hâli).
+- [x] **6.1** ✓ Değişmez `ledger_entries` (entryGroupId, eventType, account, direction, amount,
+      soft ref'ler). `LedgerService.record(tx, …)` DENGELİ grup zorlar (Σdebit==Σcredit, değilse
+      FIRLATIR); append-only (güncelleme/silme yok; düzeltme = ters kayıt). Migration
+      `20260723100000_ledger_entries`. **Spec:** denge zorlaması + negatif reddi + recordCapture.
+- [~] **6.2** `recordCapture` yakalama olayını yazıyor: buyer_payment = seller_escrow + platform_commission + withholding_tax (stopaj), gross dengeli. Fulfillment tekil + grup yollarında **POST-COMMIT
+  best-effort** (@Optional; defter hatası ödemeyi BOZMAZ; reconciliation açığı yakalar) çağrılıyor.
+  **Devam:** hold-release / payout / iade / takas-komisyon olayları (aynı `record` API'siyle).
+- [ ] **6.3** Hold tüketimi/kısmi iade ledger'dan okusun (Faz 1.4'ün yapısal hâli). → para akışları
+      deftere taşınınca (büyük, riskli geçiş); şimdilik defter denetim/reconciliation için popüle edilir.
 - [ ] **6.4** Sipariş + takas komisyonlarını tek deftere birleştir (MONEY-L7).
-- [ ] **6.5** Günlük reconciliation: ledger vs Payment/Hold/Payout vs PSP raporu; drift alarmı.
-      (Kaynak: Faz 4c `payment_provider_events` — PayTR'nin bildirdiği tutar/yöntem/taksit orada.)
+- [x] **6.5** ✓ `LedgerReconciliationService` GÜNLÜK drift denetimi (`@TrackedCron 0 4 * * *`,
+      moneyCronsViaBull-gate → Faz 7 Bull). Yalnız OKUR; sert invaryant ihlalinde greplenebilir ALARM:
+      (1) defter dengesi (her grup Σ=0), (2) fazla-iade (ΣrefundedOrders > payment.amount). **Spec:**
+      dengeli/dengesiz + fazla-iade. (Tam "ledger vs Payment/Hold/Payout vs PSP" mutabakatı 6.3 sonrası
+      sertleşir; PSP kaynağı Faz 4c `payment_provider_events`.)
 
 ---
 

@@ -8,6 +8,7 @@ import { PrismaModule } from "./prisma";
 import { DevModule } from "./modules/dev/dev.module";
 import { AuthModule, JwtAuthGuard, BannedUserGuard } from "./modules/auth";
 import { OutboxModule } from "./modules/outbox/outbox.module";
+import { LedgerModule } from "./modules/ledger/ledger.module";
 import { UserModule } from "./modules/user";
 import { ProductModule } from "./modules/product";
 import { CategoryModule } from "./modules/category";
@@ -153,6 +154,9 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
     // Reliable side-effect queue (Faz 5) — @Global
     OutboxModule,
+
+    // Immutable double-entry ledger + drift reconciliation (Faz 6) — @Global
+    LedgerModule,
 
     // Core Feature modules
     AuthModule,
