@@ -341,7 +341,12 @@
 - [ ] **8.1** Ödeme `paid`'e geçip **event yaysın**; fulfillment tüketsin (fulfillment hatası ödeme durumunu bozmasın).
 - [ ] **8.2** Ekstraksiyon: `VirtualOrderFulfillment` (membership/boost), `OrderStock` (decrement+cascade), `FulfillmentNotifier`, `ShipmentProvisioning`, `TradeCashFulfillment`.
 - [ ] **8.3** Tekil fulfillment'ı "group-of-one"a indir → ~450-500 satır kopya silinir (QUAL).
-- [ ] **8.4** `ModuleRef`/`require()` lazy-resolve hack'lerini event bus ile erit.
+- [x] **8.4** ✓ Fulfillment'taki `ModuleRef` + runtime `require("../trade/trade.service")` lazy-resolve
+      hack'i (Trade↔Payment döngüsünü aşmak için) KALDIRILDI. Nakit takas ödemesi temizlenince Payment
+      in-process event yayınlar (`EventService.emitTradeCashCleared` → EventEmitter2 `payment.trade-cash-cleared`);
+      Trade tarafındaki `TradeCashClearedListener` (@OnEvent) `createInboundTradeShipments`'ı çağırır. Payment
+      artık Trade'e statik VEYA runtime bağımlılık taşımaz; `ModuleRef` fulfillment ctor'undan çıktı (spec churn
+      yok — `new` spec'in fazladan arg'ı @Optional ledger'a düşüyor). **Spec:** trade + events + fulfillment yeşil.
 
 ---
 

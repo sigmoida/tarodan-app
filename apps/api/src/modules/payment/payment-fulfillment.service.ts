@@ -23,7 +23,6 @@ import { ElogoInvoicingService } from "../elogo";
 import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
-import { ModuleRef } from "@nestjs/core";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { LedgerService } from "../ledger/ledger.service";
@@ -84,7 +83,6 @@ export class PaymentFulfillmentService {
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
     private readonly commissionLedger: CommissionLedgerService,
-    private readonly moduleRef: ModuleRef,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentRefund: PaymentRefundService,
     // Faz 6: yakalama anında çift-taraflı defter kaydı (denetim/reconciliation).
@@ -1359,39 +1357,12 @@ export class PaymentFulfillmentService {
         );
       }
 
-      // Auto-create the two `to_warehouse` Sürat shipments now that the cash
-      // trade has cleared payment and entered `shipping_to_warehouse`. Mirrors
-      // the non-cash hook in TradeService.acceptTrade. We resolve TradeService
-      // lazily via ModuleRef + a runtime require to avoid the Trade<>Payment
-      // module circular import (Membership eagerly imports Payment; Trade
-      // imports Payment; Payment can't statically import Trade).
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { TradeService } = require("../trade/trade.service");
-        const tradeService = this.moduleRef.get(TradeService, {
-          strict: false,
-        });
-        if (
-          tradeService &&
-          typeof tradeService.createInboundTradeShipments === "function"
-        ) {
-          tradeService
-            .createInboundTradeShipments(result.trade.id)
-            .catch((err: any) =>
-              this.logger.error(
-                `createInboundTradeShipments crashed for cash-trade ${result.trade!.id}: ${err?.message ?? err}`,
-              ),
-            );
-        } else {
-          this.logger.warn(
-            `TradeService.createInboundTradeShipments not available; inbound shipments NOT auto-created for cash-trade ${result.trade.id}`,
-          );
-        }
-      } catch (err: any) {
-        this.logger.error(
-          `Failed to resolve TradeService for cash-trade inbound shipments: ${err?.message ?? err}`,
-        );
-      }
+      // Faz 8.4: Nakit takas ödemesi temizlendi → inbound (depoya) Sürat gönderileri
+      // oluşturulmalı. Eskiden TradeService `require()` + ModuleRef ile lazy resolve
+      // ediliyordu (Trade↔Payment döngüsünü aşmak için). Artık in-process event yayınlanıp
+      // Trade tarafındaki dinleyici (TradeCashClearedListener) createInboundTradeShipments'ı
+      // çağırır → Payment, Trade'e statik veya runtime bağımlılık taşımaz (döngü tamamen kalktı).
+      this.eventService.emitTradeCashCleared({ tradeId: result.trade.id });
     }
 
     return true;

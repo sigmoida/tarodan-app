@@ -9,6 +9,7 @@ import { TradeLifecycleService } from "./trade-lifecycle.service";
 import { TradeReconciliationService } from "./trade-reconciliation.service";
 import { TradeSchedulerService } from "./trade-scheduler.service";
 import { TradeScheduledProcessor } from "./trade-scheduled.processor";
+import { TradeCashClearedListener } from "./trade-cash-cleared.listener";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { CacheModule } from "../cache/cache.module";
@@ -43,6 +44,7 @@ import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
     TradeReconciliationService,
     TradeSchedulerService,
     TradeScheduledProcessor,
+    TradeCashClearedListener,
   ],
   exports: [TradeService],
 })
