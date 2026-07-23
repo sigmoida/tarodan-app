@@ -1,15 +1,10 @@
-import Link from "next/link";
 import {
   Button,
   Badge,
   orderStatusConfig,
   shipmentStatusConfig,
 } from "@tarodan/ui";
-import {
-  ShoppingBagIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-} from "@heroicons/react/24/outline";
+import { ShoppingBagIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
 import { fmtTry } from "@/lib/format";
@@ -20,65 +15,60 @@ import {
   TruncatedText,
   type RowActionItem,
 } from "@/components/table";
-import { type Order } from "./orders";
+import { type OrderGroupRow } from "./orders";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
 export interface OrderColumnProps {
   t: T;
-  expandedGroups: Set<string>;
-  toggleGroup: (gid: string) => void;
-  rowMenu: (o: Order) => RowActionItem[];
+  expandedId: string | null;
+  toggleRow: (id: string) => void;
+  rowMenu: (o: OrderGroupRow) => RowActionItem[];
 }
 
 export function orderColumns({
   t,
-  expandedGroups,
-  toggleGroup,
+  expandedId,
+  toggleRow,
   rowMenu,
 }: OrderColumnProps) {
   return [
-    col.custom<Order>(
+    col.custom<OrderGroupRow>(
       t("admin.operations.orders.orderNumber"),
       (o) => {
-        if (o.isGroupSummary && o.checkoutGroupId) {
-          const gid = o.checkoutGroupId;
-          const isOpen = expandedGroups.has(gid);
-          return (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleGroup(gid);
-              }}
-              aria-expanded={isOpen}
-              title={
-                isOpen
-                  ? t("admin.operations.orders.collapseCart")
-                  : t("admin.operations.orders.expandCart")
-              }
-              className="-mx-1 h-auto w-fit gap-1 rounded px-1 py-0.5 text-[11px] font-medium uppercase tracking-wide text-primary-600 hover:bg-primary-100 hover:text-primary-700"
-            >
-              <ShoppingBagIcon className="h-3.5 w-3.5" />
-              {t("admin.operations.orders.cartItems", {
-                count: o.groupItemCount,
-              })}
-              {isOpen ? (
-                <ChevronUpIcon className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronDownIcon className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          );
-        }
+        const open = expandedId === o.id;
         return (
-          <Link
-            href={`/operations/orders/${o.id}`}
-            className="block truncate font-mono text-sm text-primary-600 hover:underline"
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRow(o.id);
+            }}
+            aria-expanded={open}
+            title={
+              open
+                ? t("admin.operations.orders.hideItems")
+                : t("admin.operations.orders.showItems")
+            }
+            className="-mx-1 flex h-auto w-fit max-w-full items-center gap-1.5 rounded px-1 py-0.5 hover:bg-primary-100"
           >
-            {o.orderNumber}
-          </Link>
+            <ChevronRightIcon
+              className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${
+                open ? "rotate-90" : ""
+              }`}
+            />
+            {o.isGroup ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-primary-600">
+                <ShoppingBagIcon className="h-3.5 w-3.5" />
+                {t("admin.operations.orders.cartItems", { count: o.itemCount })}
+              </span>
+            ) : (
+              <TruncatedText className="font-mono text-sm text-primary-600">
+                {o.displayNumber}
+              </TruncatedText>
+            )}
+          </Button>
         );
       },
       {
@@ -88,10 +78,10 @@ export function orderColumns({
         sortType: "text",
       },
     ),
-    col.custom<Order>(
+    col.custom<OrderGroupRow>(
       t("common.status"),
       (o) =>
-        o.isGroupSummary ? (
+        o.isGroup ? (
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
               o.groupStatus === "done"
@@ -133,7 +123,7 @@ export function orderColumns({
         ),
       { grow: 2, minWidth: 170, sortKey: "status", sortType: "text" },
     ),
-    col.user<Order>(
+    col.user<OrderGroupRow>(
       t("admin.operations.orders.buyer"),
       (o) => ({
         name: o.buyer.displayName,
@@ -141,13 +131,12 @@ export function orderColumns({
       }),
       { sortKey: "buyer.displayName", sortType: "text" },
     ),
-    col.custom<Order>(
+    col.custom<OrderGroupRow>(
       t("admin.operations.orders.seller"),
       (o) => {
-        if (o.isGroupSummary) {
-          const sellers = o.groupSellers ?? [];
-          const first = sellers[0];
-          const extra = Math.max(0, sellers.length - 1);
+        if (o.isMultiSeller) {
+          const first = o.sellers[0];
+          const extra = Math.max(0, o.sellers.length - 1);
           return (
             <span className="flex items-center gap-1 text-sm text-body">
               <CellText value={first?.displayName} />
@@ -159,24 +148,25 @@ export function orderColumns({
             </span>
           );
         }
+        const seller = o.sellers[0];
         return (
           <CellUser
-            name={o.seller.displayName}
-            href={`/accounts/users/${o.seller.id}`}
+            name={seller?.displayName}
+            href={seller ? `/accounts/users/${seller.id}` : undefined}
           />
         );
       },
       { sortKey: "seller.displayName", sortType: "text" },
     ),
-    col.id<Order>(t("admin.operations.orders.sellerId"), (o) =>
-      o.isGroupSummary ? undefined : o.seller.id,
+    col.id<OrderGroupRow>(t("admin.operations.orders.sellerId"), (o) =>
+      o.isMultiSeller ? undefined : o.sellers[0]?.id,
     ),
-    col.custom<Order>(
+    col.custom<OrderGroupRow>(
       t("admin.catalog.common.product"),
       (o) => {
-        if (o.isGroupSummary) {
-          const thumbs = o.groupThumbs ?? [];
-          const extra = o.groupItemCount - thumbs.length;
+        if (o.isGroup) {
+          const thumbs = o.thumbs;
+          const extra = o.itemCount - thumbs.length;
           return (
             <div className="flex items-center gap-1">
               {thumbs.length > 0 ? (
@@ -205,7 +195,7 @@ export function orderColumns({
         return (
           <CellText
             value={
-              o.product?.title ||
+              o.items[0]?.product?.title ||
               t("admin.operations.orders.itemCountUnit", { count: o.itemCount })
             }
           />
@@ -213,23 +203,20 @@ export function orderColumns({
       },
       { grow: 2, sortKey: "product.title", sortType: "text" },
     ),
-    col.money<Order>(
-      t("common.amount"),
-      (o) => (o.isGroupSummary ? (o.groupTotalAmount ?? 0) : o.totalAmount),
-      { tone: "primary", sortKey: "totalAmount", sortType: "number" },
-    ),
-    col.custom<Order>(
+    col.money<OrderGroupRow>(t("common.amount"), (o) => o.totalAmount, {
+      tone: "primary",
+      sortKey: "totalAmount",
+      sortType: "number",
+    }),
+    col.custom<OrderGroupRow>(
       t("admin.operations.orders.commission"),
       (o) => {
-        const amount = o.isGroupSummary
-          ? (o.groupCommission ?? 0)
-          : o.commission;
-        const base = o.isGroupSummary ? 0 : o.subtotal;
-        const rate = base > 0 ? Math.round((amount / base) * 100) : null;
+        const rate =
+          o.subtotal > 0 ? Math.round((o.commission / o.subtotal) * 100) : null;
         return (
           <span className="whitespace-nowrap tabular-nums">
             <span className="font-medium text-success-600">
-              {fmtTry(amount)}
+              {fmtTry(o.commission)}
             </span>
             {rate != null && (
               <span className="ml-1 text-xs text-muted">%{rate}</span>
@@ -239,14 +226,14 @@ export function orderColumns({
       },
       { sortKey: "commissionAmount", sortType: "number" },
     ),
-    col.badge<Order>(t("admin.operations.orders.cargoStatus"), (o) =>
-      o.isGroupSummary || !o.shipmentStatus ? (
+    col.badge<OrderGroupRow>(t("admin.operations.orders.cargoStatus"), (o) =>
+      o.isGroup || !o.shipmentStatus ? (
         <span className="text-subtle">—</span>
       ) : (
         <Badge status={o.shipmentStatus} config={shipmentStatusConfig} />
       ),
     ),
-    col.date<Order>(t("common.date"), "createdAt"),
-    col.rowMenu<Order>(rowMenu),
+    col.date<OrderGroupRow>(t("common.date"), "createdAt"),
+    col.rowMenu<OrderGroupRow>(rowMenu),
   ];
 }

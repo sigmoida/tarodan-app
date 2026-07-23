@@ -192,6 +192,9 @@ export class AdminOrderService {
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
         shipmentStatus: (o as any).shipment?.status ?? null,
+        // Satıcı-paketi (OrderPackage) referansı — admin listede sepeti satıcı
+        // bazında gruplayabilmek için (checkoutGroupId zaten ...o ile geliyor).
+        packageId: o.packageId ?? null,
         groupNumber: o.checkoutGroup?.groupNumber ?? null,
         groupItemCount: o.checkoutGroupId
           ? (groupCountMap.get(o.checkoutGroupId) ?? 1)

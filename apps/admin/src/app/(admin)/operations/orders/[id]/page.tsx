@@ -16,6 +16,7 @@ import { printOrderInvoice } from "./_lib/printInvoice";
 import { OrderBanners } from "./_sections/OrderBanners";
 import { OrderInfoSection } from "./_sections/OrderInfoSection";
 import { ProductSection } from "./_sections/ProductSection";
+import { PackagesSection } from "./_sections/PackagesSection";
 import { PaymentSection } from "./_sections/PaymentSection";
 import { ShippingSection } from "./_sections/ShippingSection";
 import { AddressSection } from "./_sections/AddressSection";
@@ -81,7 +82,11 @@ export default function OrderDetailPage() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="space-y-6 lg:col-span-2">
                 <OrderInfoSection order={order} status={status} />
-                <ProductSection order={order} />
+                {order.group && order.group.isMultiItem ? (
+                  <PackagesSection group={order.group} />
+                ) : (
+                  <ProductSection order={order} />
+                )}
                 {order.payment && <PaymentSection payment={order.payment} />}
                 <ShippingSection
                   order={order}
