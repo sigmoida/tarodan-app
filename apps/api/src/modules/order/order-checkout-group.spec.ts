@@ -322,6 +322,27 @@ describe("OrderService checkout group (batch checkout)", () => {
     expect(bOrder.pkg).toBe(`pkg-${sellerId2}`);
   });
 
+  it("Medium A: aynı ürünü 2× ekleyip @Max(20) aşımı REDDEDİLİR (birleşik 30)", async () => {
+    // Aynı ürün 2 satır, 15+15=30 → perOrderCap(20) aşımı → stoktan ÖNCE max reddi.
+    mockTx.$queryRaw.mockResolvedValue([{ id: productA }]);
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct(productA, { quantity: 100 }), // bol stok: red max'tan, stoktan değil
+    ]);
+
+    await expect(
+      service.checkout(buyerId, {
+        items: [
+          { productId: productA, quantity: 15 },
+          { productId: productA, quantity: 15 },
+        ],
+        idempotencyKey,
+        shippingAddressId: addressId,
+      } as any),
+    ).rejects.toThrow(/maksimum 20 adet/i);
+
+    expect(mockTx.order.create).not.toHaveBeenCalled();
+  });
+
   it("idempotency replay: same key returns the existing group without running the transaction", async () => {
     mockPrisma.checkoutGroup.findUnique.mockResolvedValue({
       id: "group-existing",

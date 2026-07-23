@@ -166,6 +166,24 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     expect(captured.shipmentUpdate.status).toBe("cancelled"); // yerel cancel
   });
 
+  it("cancel: TESLİM EDİLMİŞ kargo iptalde EZİLMEZ (Medium D — taşıyıcı gerçeği korunur)", async () => {
+    const { svc, captured, cargo } = makeService({
+      existingShipment: {
+        id: "sh1",
+        status: "delivered",
+        trackingNumber: "ORD-1",
+      },
+      orderUnique: { packageId: "pkg-1" },
+      packageOrders: [{ id: "o1", status: OrderStatus.cancelled }],
+    });
+
+    await svc.cancelSuratShipmentIfExists("o1", "ORD-1");
+
+    // Terminal → fiziksel iptal yok VE yerel status EZİLMEZ (delivered korunur)
+    expect(cargo.cancelShipmentByOrderNumber).not.toHaveBeenCalled();
+    expect(captured.shipmentUpdate).toBeUndefined();
+  });
+
   it("cancel: paketin TÜM order'ları iptal → fiziksel gönderi PAYLAŞILAN ref ile iptal", async () => {
     const { svc, captured, cargo } = makeService({
       existingShipment: {

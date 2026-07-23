@@ -76,10 +76,19 @@ export class PaymentCommonService {
         );
       };
 
-      // 'delivered'/'returned'/'failed' terminal durumda ya da kardeşler hâlâ
-      // giderken fiziksel gönderiye dokunma — yalnız yerel kaydı tutarlı tut.
+      // Medium D: 'delivered'/'returned'/'failed' terminal kargo, TAŞIYICI GERÇEĞİDİR.
+      // Sipariş iptal edilse bile status'ü 'cancelled' ile EZME — teslim/iade geçmişi
+      // kaybolur. Sipariş iptali order.status'te izlenir; kargo geçmişi ayrı gösterilir.
       const terminalStatuses = ["delivered", "returned", "failed"];
-      if (terminalStatuses.includes(shipment.status) || !cancelPhysical) {
+      if (terminalStatuses.includes(shipment.status)) {
+        this.logger.log(
+          `Surat cancel skipped for order ${orderNumber}: shipment terminal (${shipment.status}) — carrier history preserved`,
+        );
+        return;
+      }
+      // Kardeşler hâlâ giderken (paket paylaşımlı) fiziksel gönderiye dokunma — yalnız
+      // bu order'ın yerel kaydını cancelled yap.
+      if (!cancelPhysical) {
         await markLocalCancelled(shipment.status);
         return;
       }

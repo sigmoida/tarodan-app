@@ -212,6 +212,21 @@ export class OrderCheckoutGroupService {
             }
             const available = getAvailableQuantity(product);
             const reqQty = qtyByProduct.get(productId) ?? 1;
+            // Medium A: BİRLEŞİK adedi (aynı ürünü sepete birden çok kez ekleyerek
+            // toplanan qty) üst sınıra karşı da doğrula. Eskiden yalnız STOĞA karşı
+            // bakılıyordu → 2×20 = 40 gibi girdiler @Max(20)/maxQuantityPerOrder'ı
+            // aşabiliyordu. Sınır = ürünün maxQuantityPerOrder'ı VE global 20 tavanı.
+            const HARD_CAP = 20;
+            const perOrderCap = Math.min(
+              HARD_CAP,
+              product.maxQuantityPerOrder ?? HARD_CAP,
+            );
+            if (reqQty > perOrderCap) {
+              throw new BadRequestException({
+                message: `"${product.title}" için maksimum ${perOrderCap} adet alabilirsiniz (istenen ${reqQty})`,
+                productId,
+              });
+            }
             if (available !== null && available < reqQty) {
               throw new BadRequestException({
                 message: `"${product.title}" için yeterli stok yok (istenen ${reqQty}, mevcut ${available})`,
