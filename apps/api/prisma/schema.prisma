@@ -340,12 +340,18 @@ model MembershipPayment {
   amount            Decimal        @db.Decimal(10, 2)
   provider          String
   providerPaymentId String?        @map("provider_payment_id")
+  // Oto-yenileme (recurring) gözlemlenebilirliği: PayTR merchant_oid + ödeme yöntemi
+  // + ham sağlayıcı yanıtı. Muhasebe/mutabakat/destek için (Faz 6.5 PSP reconciliation).
+  merchantOid       String?        @map("merchant_oid")
+  paymentType       String?        @map("payment_type") // card/eft
+  metadata          Json?
   status            PaymentStatus  @default(pending)
   periodStart       DateTime       @map("period_start")
   periodEnd         DateTime       @map("period_end")
   createdAt         DateTime       @default(now()) @map("created_at")
   membership        UserMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
+  @@index([merchantOid])
   @@map("membership_payments")
 }
 
@@ -1259,6 +1265,12 @@ model SavedCard {
   ctoken              String          @unique @map("c_token")
   last4               String          @map("last_4")
   brand               String?
+  // PayTR CAPI liste alanları (kayıtlı-kart-listesi dokümanı): kart gözlemlenebilirliği
+  // + UX (banka/şema göster). PAN/CVV DEĞİL — yalnız maskeli/kart-meta bilgisi.
+  bank                String? // PayTR c_bank — kartı çıkaran banka
+  cardType            String?         @map("card_type") // PayTR c_type — credit/debit
+  cardScheme          String?         @map("card_scheme") // PayTR schema — VISA/MASTERCARD/TROY/AMEX
+  businessCard        Boolean?        @map("business_card") // PayTR businessCard — kurumsal kart (y/n)
   expMonth            String?         @map("exp_month")
   expYear             String?         @map("exp_year")
   requireCvv          Boolean         @default(false) @map("require_cvv")
@@ -1280,6 +1292,51 @@ enum SavedCardStatus {
   active
   expired
   revoked
+}
+
+// PSP (PayTR) etkileşim/yanıt kaydı — append-only denetim/gözlemlenebilirlik günlüğü.
+// Her PayTR yanıtı (bildirim callback'i, Direkt API, recurring çekim, durum-sorgu, iade,
+// kart listele/sil) yapısal alanlar + ham zarf ile buraya yazılır. Amaç: muhasebe/mutabakat
+// (Faz 6.5 ledger vs PSP raporu), destek ("hangi kart/taksit"), itiraz/chargeback savunması,
+// ödeme-yöntemi raporlaması. GÜVENLİK: PAN/CVV ASLA yazılmaz — PayTR yanıtları bunları içermez
+// ve recorder yalnızca maskeli/meta alanları alır. paymentId/membershipPaymentId YUMUŞAK bağ
+// (FK yok): re-init'te oid değişebilir ve kart listele/sil olaylarının ödemesi yoktur.
+model PaymentProviderEvent {
+  id                  String                   @id @default(uuid())
+  provider            String                   @default("paytr")
+  eventType           PaymentProviderEventType @map("event_type")
+  merchantOid         String?                  @map("merchant_oid")
+  paymentId           String?                  @map("payment_id")
+  membershipPaymentId String?                  @map("membership_payment_id")
+  status              String? // success/failed/wait_callback/error
+  paymentType         String?                  @map("payment_type") // card/eft
+  installmentCount    Int?                     @map("installment_count")
+  currency            String?
+  amount              Decimal?                 @db.Decimal(12, 2) // payment_amount (sipariş tutarı)
+  totalAmount         Decimal?                 @map("total_amount") @db.Decimal(12, 2) // total_amount (çekilen)
+  failedReasonCode    String?                  @map("failed_reason_code")
+  failedReasonMsg     String?                  @map("failed_reason_msg")
+  utoken              String?
+  testMode            Boolean?                 @map("test_mode")
+  hashValid           Boolean?                 @map("hash_valid") // yalnız callback: hash doğrulaması geçti mi
+  raw                 Json? // ham PayTR zarfı (PAN/CVV içermez; 3DS HTML saklanmaz)
+  createdAt           DateTime                 @default(now()) @map("created_at")
+
+  @@index([merchantOid])
+  @@index([paymentId])
+  @@index([membershipPaymentId])
+  @@index([provider, eventType, createdAt])
+  @@map("payment_provider_events")
+}
+
+enum PaymentProviderEventType {
+  callback // Bildirim URL POST (ödeme sonucu)
+  direct_payment // /odeme Direkt API (CIT yeni kart) yanıtı
+  recurring_charge // recurring_payment=1 (kayıtlı kart / oto-yenileme) yanıtı
+  status_inquiry // durum-sorgu yanıtı
+  refund // /odeme/iade yanıtı
+  card_list // capi/list yanıtı
+  card_delete // capi/delete yanıtı
 }
 
 model PayoutTransfer {

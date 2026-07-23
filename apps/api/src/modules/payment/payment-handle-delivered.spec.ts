@@ -26,6 +26,7 @@ describe("PaymentRefundService.handleOrderDelivered — escrow trigger", () => {
       {} as any,
       {} as any,
       {} as any,
+      { record: jest.fn() } as any, // providerEvents
     );
     return { service, prisma };
   };

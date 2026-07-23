@@ -1,0 +1,218 @@
+import { Test, TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
+import { PayTRService, PayTRBuyer } from "./paytr.service";
+
+/**
+ * PayTR Direkt API doküman uyumu:
+ *  - Kayıtlı karttan ödeme (Payment By Registered Card): /odeme, recurring_payment
+ *    GÖNDERİLMEZ, require_cvv zorunlu, hash Direkt API ile birebir aynı.
+ *  - BIN sorgulama: /odeme/api/bin-detail, hash = bin_number + merchant_id + merchant_salt.
+ *  - Taksit oranları: /odeme/taksit-oranlari, hash = merchant_id + request_id + merchant_salt.
+ */
+describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)", () => {
+  const MID = "merchant_id_1";
+  const KEY = "merchant_key_xx";
+  const SALT = "merchant_salt_yy";
+  let service: PayTRService;
+  let fetchSpy: jest.SpyInstance;
+
+  const buyer: PayTRBuyer = {
+    name: "Ada",
+    surname: "Lovelace",
+    email: "ada@example.com",
+    phone: "5550001122",
+    address: "Analytical Engine Sok. 1",
+    city: "Istanbul",
+    country: "Turkey",
+    ip: "88.77.66.55",
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PayTRService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === "PAYTR_MERCHANT_ID") return MID;
+              if (key === "PAYTR_MERCHANT_KEY") return KEY;
+              if (key === "PAYTR_MERCHANT_SALT") return SALT;
+              if (key === "PAYTR_TEST_MODE") return "true";
+              if (key === "FRONTEND_URL") return "https://app.test";
+              return undefined;
+            }),
+          },
+        },
+      ],
+    }).compile();
+    service = module.get(PayTRService);
+    fetchSpy = jest.spyOn(
+      global,
+      "fetch" as never,
+    ) as unknown as jest.SpyInstance;
+  });
+
+  afterEach(() => fetchSpy.mockRestore());
+
+  const bodyOf = (): URLSearchParams =>
+    new URLSearchParams(fetchSpy.mock.calls[0][1].body as string);
+
+  describe("capiPaymentByRegisteredCard", () => {
+    it("posts to /odeme with utoken/ctoken/require_cvv, NO recurring_payment, and the Direkt API hash", async () => {
+      fetchSpy.mockResolvedValue({ text: async () => '{"status":"success"}' });
+
+      const r = await service.capiPaymentByRegisteredCard({
+        utoken: "UT1",
+        ctoken: "CT1",
+        amount: 149.9,
+        merchantOid: "ORDREG123",
+        buyer,
+        basketItems: [{ name: "Ürün", price: 149.9, quantity: 1 }],
+        requireCvv: false,
+        non3d: true,
+      });
+
+      expect(r.status).toBe("success");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://www.paytr.com/odeme",
+        expect.objectContaining({ method: "POST" }),
+      );
+      const body = bodyOf();
+      expect(body.get("utoken")).toBe("UT1");
+      expect(body.get("ctoken")).toBe("CT1");
+      expect(body.get("payment_amount")).toBe("149.90"); // ONDALIK TL
+      expect(body.get("installment_count")).toBe("0");
+      expect(body.get("non_3d")).toBe("1");
+      expect(body.get("require_cvv")).toBe("0");
+      // KRİTİK: kullanıcı-mevcut (CIT) ödemede recurring_payment GÖNDERİLMEZ.
+      expect(body.get("recurring_payment")).toBeNull();
+      expect(body.get("cvv")).toBeNull();
+
+      // Hash Direkt API ile birebir aynı: mid+ip+oid+email+amount+type+installment+currency+test+non3d, salt update içinde.
+      const hashStr =
+        MID +
+        buyer.ip +
+        "ORDREG123" +
+        buyer.email +
+        "149.90" +
+        "card" +
+        "0" +
+        "TL" +
+        "1" +
+        "1";
+      const expected = crypto
+        .createHmac("sha256", KEY)
+        .update(hashStr + SALT)
+        .digest("base64");
+      expect(body.get("paytr_token")).toBe(expected);
+    });
+
+    it("require_cvv=true → require_cvv '1' + cvv gönderilir", async () => {
+      fetchSpy.mockResolvedValue({ text: async () => '{"status":"success"}' });
+      await service.capiPaymentByRegisteredCard({
+        utoken: "UT1",
+        ctoken: "CT1",
+        amount: 10,
+        merchantOid: "ORDREG124",
+        buyer,
+        basketItems: [{ name: "Ürün", price: 10, quantity: 1 }],
+        requireCvv: true,
+        cvv: "123",
+        non3d: true,
+      });
+      const body = bodyOf();
+      expect(body.get("require_cvv")).toBe("1");
+      expect(body.get("cvv")).toBe("123");
+    });
+
+    it("non3d=false + HTML yanıt → threeDSHtml döner", async () => {
+      fetchSpy.mockResolvedValue({
+        text: async () => "<html><form>3DS</form></html>",
+      });
+      const r = await service.capiPaymentByRegisteredCard({
+        utoken: "UT1",
+        ctoken: "CT1",
+        amount: 10,
+        merchantOid: "ORDREG125",
+        buyer,
+        basketItems: [{ name: "Ürün", price: 10, quantity: 1 }],
+        non3d: false,
+      });
+      expect(r.status).toBe("success");
+      expect(r.threeDSHtml).toContain("<form>");
+      expect(bodyOf().get("non_3d")).toBe("0");
+    });
+  });
+
+  describe("lookupBin", () => {
+    it("hits /odeme/api/bin-detail with hash = bin + merchant_id + merchant_salt", async () => {
+      fetchSpy.mockResolvedValue({
+        text: async () =>
+          JSON.stringify({
+            status: "success",
+            bank: "Yapı Kredi",
+            bankCode: 67,
+            schema: "VISA",
+            cardType: "credit",
+            brand: "world",
+            businessCard: "n",
+            allow_non3d: "Y",
+          }),
+      });
+
+      const r = await service.lookupBin("454671xxxx");
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://www.paytr.com/odeme/api/bin-detail",
+        expect.objectContaining({ method: "POST" }),
+      );
+      const body = bodyOf();
+      expect(body.get("bin_number")).toBe("454671");
+      const expected = crypto
+        .createHmac("sha256", KEY)
+        .update("454671" + MID + SALT)
+        .digest("base64");
+      expect(body.get("paytr_token")).toBe(expected);
+
+      expect(r.ok).toBe(true);
+      expect(r.bank).toBe("Yapı Kredi");
+      expect(r.schema).toBe("VISA");
+      expect(r.cardType).toBe("credit");
+      expect(r.businessCard).toBe(false);
+      expect(r.allowNon3d).toBe(true);
+    });
+  });
+
+  describe("getInstallmentRates", () => {
+    it("hits /odeme/taksit-oranlari with hash = merchant_id + request_id + merchant_salt", async () => {
+      fetchSpy.mockResolvedValue({
+        text: async () =>
+          JSON.stringify({
+            status: "success",
+            request_id: "req-1",
+            max_inst_non_bus: "9",
+            rates: { axess: [] },
+          }),
+      });
+
+      const r = await service.getInstallmentRates("req-1");
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://www.paytr.com/odeme/taksit-oranlari",
+        expect.objectContaining({ method: "POST" }),
+      );
+      const body = bodyOf();
+      expect(body.get("request_id")).toBe("req-1");
+      const expected = crypto
+        .createHmac("sha256", KEY)
+        .update(MID + "req-1" + SALT)
+        .digest("base64");
+      expect(body.get("paytr_token")).toBe(expected);
+
+      expect(r.ok).toBe(true);
+      expect(r.maxInstallment).toBe(9);
+    });
+  });
+});

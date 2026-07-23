@@ -4,15 +4,18 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus, ProductStatus } from "@prisma/client";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
+import type { PayTRStatusInquirySuccess } from "../payment-providers/paytr.service";
 import { EventService } from "../events";
 import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { i18nMessage } from "../i18n";
 
 @Injectable()
@@ -26,6 +29,10 @@ export class PaymentLifecycleService {
     private readonly eventService: EventService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
+    // Gözlemlenebilirlik (best-effort). @Optional: verify'ı new(...) ile kuran birim
+    // testleri recorder sağlamak zorunda kalmasın — record() zaten hiç fırlatmaz.
+    @Optional()
+    private readonly providerEvents?: PaymentProviderEventService,
   ) {}
 
   /**
@@ -405,10 +412,7 @@ export class PaymentLifecycleService {
     const ourAmount = Number(payment.amount);
 
     let capturedOid: string | null = null;
-    let capturedInquiry: {
-      paymentTotalTl: number;
-      paymentDate?: string | null;
-    } | null = null;
+    let capturedInquiry: PayTRStatusInquirySuccess | null = null;
     let sawMismatch = false;
     for (const candidateOid of oids) {
       let inquiry = await this.paymentProviders
@@ -451,6 +455,24 @@ export class PaymentLifecycleService {
       txnRef,
       capturedOid, // FLOW-M5: çekilen oid'e senkronla
     );
+    // Gözlemlenebilirlik: istemci-tetikli doğrulama, callback kaçırılmış bir ödemeyi
+    // durum-sorgu ile buldu (çift-çekim guard'ı). Yalnız BULUNAN sorgu kaydedilir.
+    await this.providerEvents?.record({
+      eventType: "status_inquiry",
+      merchantOid: capturedOid,
+      paymentId: payment.id,
+      status: "success",
+      paymentType: capturedInquiry.paymentType ?? null,
+      installmentCount: capturedInquiry.installmentCount ?? null,
+      currency: capturedInquiry.currency ?? null,
+      amount: ourAmount,
+      totalAmount: capturedInquiry.paymentTotalTl,
+      raw: {
+        source: "verify",
+        completed: did,
+        paymentDate: capturedInquiry.paymentDate ?? null,
+      },
+    });
     if (did) {
       this.logger.log(
         `verifyPaymentFromClient completed payment=${payment.id} oid=${capturedOid}`,

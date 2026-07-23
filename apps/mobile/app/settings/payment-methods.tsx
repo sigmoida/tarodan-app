@@ -1,11 +1,17 @@
-import React from 'react';
-import { View, ScrollView, StyleSheet, Pressable, RefreshControl } from 'react-native';
-import { Card, Spinner, Text, theme, appAlert } from '@tarodan/ui-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ScreenHeader, EmptyState } from '@/components/common';
-import { useAuthStore } from '@/stores/authStore';
-import { membershipApi } from '@/lib/api';
+import React from "react";
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+  RefreshControl,
+} from "react-native";
+import { Card, Spinner, Text, theme, appAlert } from "@tarodan/ui-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ScreenHeader, EmptyState } from "@/components/common";
+import { useAuthStore } from "@/stores/authStore";
+import { membershipApi } from "@/lib/api";
 
 const { colors } = theme;
 
@@ -19,6 +25,10 @@ interface SavedCard {
   id: string;
   last4: string;
   brand: string | null;
+  bank: string | null;
+  cardType: string | null;
+  cardScheme: string | null;
+  businessCard: boolean | null;
   expMonth: string | null;
   expYear: string | null;
   requireCvv: boolean;
@@ -26,12 +36,17 @@ interface SavedCard {
   autoRenewEligible: boolean;
 }
 
+const CARD_TYPE_LABELS: Record<string, string> = {
+  credit: "Kredi kartı",
+  debit: "Banka kartı",
+};
+
 export default function PaymentMethodsScreen() {
   const { isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
 
   const cardsQuery = useQuery({
-    queryKey: ['saved-cards'],
+    queryKey: ["saved-cards"],
     queryFn: async () => {
       const res = await membershipApi.listCards();
       const data: any = res.data;
@@ -43,19 +58,22 @@ export default function PaymentMethodsScreen() {
 
   const handleDelete = (card: SavedCard) => {
     appAlert(
-      'Kartı sil',
-      `${card.brand || 'Kart'} •••• ${card.last4} kartını silmek istediğine emin misin? Bu kartla otomatik yenileme yapılamaz hale gelir.`,
+      "Kartı sil",
+      `${card.brand || "Kart"} •••• ${card.last4} kartını silmek istediğine emin misin? Bu kartla otomatik yenileme yapılamaz hale gelir.`,
       [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: "Vazgeç", style: "cancel" },
         {
-          text: 'Sil',
-          style: 'destructive',
+          text: "Sil",
+          style: "destructive",
           onPress: async () => {
             try {
               await membershipApi.deleteCard(card.id);
-              queryClient.invalidateQueries({ queryKey: ['saved-cards'] });
+              queryClient.invalidateQueries({ queryKey: ["saved-cards"] });
             } catch (e: any) {
-              appAlert('Hata', e?.response?.data?.message || 'Kart silinemedi.');
+              appAlert(
+                "Hata",
+                e?.response?.data?.message || "Kart silinemedi.",
+              );
             }
           },
         },
@@ -71,12 +89,15 @@ export default function PaymentMethodsScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={cardsQuery.isFetching} onRefresh={() => cardsQuery.refetch()} />
+          <RefreshControl
+            refreshing={cardsQuery.isFetching}
+            onRefresh={() => cardsQuery.refetch()}
+          />
         }
       >
         <Text variant="body" tone="muted" style={styles.intro}>
-          Otomatik yenileme ve hızlı ödeme için kayıtlı kartların. Yeni kart, ödeme sırasında
-          "kartımı kaydet" ile eklenir.
+          Otomatik yenileme ve hızlı ödeme için kayıtlı kartların. Yeni kart,
+          ödeme sırasında "kartımı kaydet" ile eklenir.
         </Text>
 
         {cardsQuery.isLoading ? (
@@ -95,39 +116,120 @@ export default function PaymentMethodsScreen() {
               <Ionicons name="card" size={28} color={colors.primary[500]} />
               <View style={styles.cardInfo}>
                 <Text variant="body" style={styles.cardTitle}>
-                  {(c.brand || 'Kart') + ' •••• ' + c.last4}
+                  {(c.brand || "Kart") + " •••• " + c.last4}
                 </Text>
                 <View style={styles.badges}>
+                  {c.cardScheme && (
+                    <Text
+                      variant="caption"
+                      style={[
+                        styles.badge,
+                        {
+                          backgroundColor: colors.surface.alt,
+                          color: colors.text.muted,
+                        },
+                      ]}
+                    >
+                      {c.cardScheme.toUpperCase()}
+                    </Text>
+                  )}
                   {c.isDefault && (
-                    <Text variant="caption" style={[styles.badge, { backgroundColor: colors.primary[50], color: colors.primary[700] }]}>
+                    <Text
+                      variant="caption"
+                      style={[
+                        styles.badge,
+                        {
+                          backgroundColor: colors.primary[50],
+                          color: colors.primary[700],
+                        },
+                      ]}
+                    >
                       Varsayılan
                     </Text>
                   )}
                   {c.autoRenewEligible ? (
-                    <Text variant="caption" style={[styles.badge, { backgroundColor: colors.success[50], color: colors.success[600] }]}>
+                    <Text
+                      variant="caption"
+                      style={[
+                        styles.badge,
+                        {
+                          backgroundColor: colors.success[50],
+                          color: colors.success[600],
+                        },
+                      ]}
+                    >
                       Oto-yenilemeye uygun
                     </Text>
                   ) : (
-                    <Text variant="caption" style={[styles.badge, { backgroundColor: colors.warning[50], color: colors.warning[600] }]}>
+                    <Text
+                      variant="caption"
+                      style={[
+                        styles.badge,
+                        {
+                          backgroundColor: colors.warning[50],
+                          color: colors.warning[600],
+                        },
+                      ]}
+                    >
                       CVV gerektirir
                     </Text>
                   )}
+                  {c.businessCard && (
+                    <Text
+                      variant="caption"
+                      style={[
+                        styles.badge,
+                        {
+                          backgroundColor: colors.info[50],
+                          color: colors.info[600],
+                        },
+                      ]}
+                    >
+                      Kurumsal
+                    </Text>
+                  )}
                 </View>
+                {[
+                  c.bank,
+                  c.cardType ? CARD_TYPE_LABELS[c.cardType] : null,
+                ].filter(Boolean).length > 0 ? (
+                  <Text variant="caption" tone="muted">
+                    {[c.bank, c.cardType ? CARD_TYPE_LABELS[c.cardType] : null]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                ) : null}
                 {c.expMonth && c.expYear ? (
-                  <Text variant="caption" tone="muted">{`Son kullanma: ${c.expMonth}/${c.expYear}`}</Text>
+                  <Text
+                    variant="caption"
+                    tone="muted"
+                  >{`Son kullanma: ${c.expMonth}/${c.expYear}`}</Text>
                 ) : null}
               </View>
-              <Pressable onPress={() => handleDelete(c)} hitSlop={10} style={styles.delete}>
-                <Ionicons name="trash-outline" size={22} color={colors.danger[500]} />
+              <Pressable
+                onPress={() => handleDelete(c)}
+                hitSlop={10}
+                style={styles.delete}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={22}
+                  color={colors.danger[500]}
+                />
               </Pressable>
             </Card>
           ))
         )}
 
         <View style={styles.secure}>
-          <Ionicons name="shield-checkmark-outline" size={16} color={colors.success[600]} />
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={16}
+            color={colors.success[600]}
+          />
           <Text variant="caption" tone="muted" style={styles.secureText}>
-            Kartların PayTR güvenli kasasında saklanır; numara/CVV bizde tutulmaz.
+            Kartların PayTR güvenli kasasında saklanır; numara/CVV bizde
+            tutulmaz.
           </Text>
         </View>
       </ScrollView>
@@ -139,13 +241,31 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.DEFAULT },
   content: { padding: theme.spacing[4], gap: theme.spacing[3] },
   intro: { marginBottom: theme.spacing[1] },
-  center: { paddingVertical: theme.spacing[12], alignItems: 'center' },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[3], padding: theme.spacing[3.5] },
+  center: { paddingVertical: theme.spacing[12], alignItems: "center" },
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[3],
+    padding: theme.spacing[3.5],
+  },
   cardInfo: { flex: 1, gap: theme.spacing[1] },
-  cardTitle: { fontWeight: '600' },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[1.5] },
-  badge: { paddingHorizontal: theme.spacing[2], paddingVertical: theme.spacing[0.5], borderRadius: 999, overflow: 'hidden', fontSize: 11 },
+  cardTitle: { fontWeight: "600" },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[1.5] },
+  badge: {
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[0.5],
+    borderRadius: 999,
+    overflow: "hidden",
+    fontSize: 11,
+  },
   delete: { padding: theme.spacing[2] },
-  secure: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing[1.5], marginTop: theme.spacing[3], paddingHorizontal: theme.spacing[4] },
+  secure: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing[1.5],
+    marginTop: theme.spacing[3],
+    paddingHorizontal: theme.spacing[4],
+  },
   secureText: { flexShrink: 1 },
 });

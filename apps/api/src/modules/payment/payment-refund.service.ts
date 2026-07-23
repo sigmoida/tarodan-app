@@ -23,6 +23,7 @@ import { NotificationType } from "../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";
 import { PaymentCommonService } from "./payment-common.service";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 
@@ -53,6 +54,7 @@ export class PaymentRefundService {
     private readonly commissionLedger: CommissionLedgerService,
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly paymentCommon: PaymentCommonService,
+    private readonly providerEvents: PaymentProviderEventService,
   ) {
     this.holdDays = parseInt(
       this.configService.get("PAYMENT_HOLD_DAYS") || "7",
@@ -327,6 +329,17 @@ export class PaymentRefundService {
               refundResult = await this.paymentProviders
                 .resolve(payment.provider)
                 .createRefund(paytrOid, amountToRefund);
+              // Gözlemlenebilirlik: PayTR iade yanıtını denetim günlüğüne yaz (dispute/
+              // muhasebe). createRefund başarısızlıkta THROW eder → buraya ulaşmak = başarı.
+              await this.providerEvents.record({
+                eventType: "refund",
+                merchantOid: paytrOid,
+                paymentId: payment.id,
+                status: refundResult?.status ?? "success",
+                amount: amountToRefund,
+                totalAmount: amountToRefund,
+                raw: refundResult as unknown as Record<string, unknown>,
+              });
             } catch (err) {
               // PayTR KESİN başarısız (throw) → marker'ı geri al ki kullanıcı/cron tekrar
               // denediğinde PayTR yeniden çağrılsın (yoksa iade edilmeden refunded işaretlenir;
@@ -954,6 +967,16 @@ export class PaymentRefundService {
               i18nMessage("server.payment.paytrRefundFailed"),
           );
         }
+        // Gözlemlenebilirlik: takas nakit iadesinin PayTR yanıtını kaydet.
+        await this.providerEvents.record({
+          eventType: "refund",
+          merchantOid: oid,
+          paymentId: payment.id,
+          status: "success",
+          amount,
+          totalAmount: amount,
+          raw: refundResult as unknown as Record<string, unknown>,
+        });
       } catch (e: any) {
         // MONEY-H1: PayTR başarılı DÖNMEDİ (throw YA DA non-success status → bu
         // catch'e düşer). refundInProgressAt marker'ını GERİ AL. Aksi halde marker

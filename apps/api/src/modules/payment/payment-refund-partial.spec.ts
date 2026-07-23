@@ -126,6 +126,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       {
         cancelSuratShipmentIfExists: jest.fn().mockResolvedValue(undefined),
       } as any,
+      { record: jest.fn().mockResolvedValue(undefined) } as any, // providerEvents
     );
     return { service, captured, paytr, mockTx };
   };

@@ -30,6 +30,7 @@ describe("PaymentRefundService.releaseHoldsDue — escrow release guards", () =>
       {} as any, // commissionLedger
       {} as any, // elogoInvoicing
       {} as any, // paymentCommon
+      { record: jest.fn() } as any, // providerEvents
     );
     return { service, prisma };
   };

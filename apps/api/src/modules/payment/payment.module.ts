@@ -12,6 +12,7 @@ import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PaymentSchedulerService } from "./payment-scheduler.service";
 import { PaymentScheduledProcessor } from "./payment-scheduled.processor";
@@ -65,12 +66,13 @@ import { ElogoModule } from "../elogo";
     PaymentInitiationService,
     PaymentCallbackService,
     PaymentFulfillmentService,
+    PaymentProviderEventService,
     PaymentLifecycleService,
     PaymentSchedulerService,
     PaymentScheduledProcessor,
     RawBodyMiddleware,
   ],
-  exports: [PaymentService],
+  exports: [PaymentService, PaymentProviderEventService],
 })
 export class PaymentModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

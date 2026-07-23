@@ -41,6 +41,7 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
         {} as any, // paymentCommon
         { processSuccessfulPayment } as any, // paymentFulfillment
         {} as any, // paymentLifecycle
+        { record: jest.fn() } as any, // providerEvents
       );
       return { service, processSuccessfulPayment };
     };

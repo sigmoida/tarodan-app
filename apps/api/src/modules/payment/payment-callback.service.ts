@@ -7,6 +7,7 @@ import { PaymentProviderRegistry } from "../payment-providers/payment-provider.r
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { CacheService } from "../cache/cache.service";
 
 @Injectable()
@@ -20,8 +21,29 @@ export class PaymentCallbackService {
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
     private readonly paymentReconciliation: PaymentReconciliationService,
+    private readonly providerEvents: PaymentProviderEventService,
     private readonly cache: CacheService,
   ) {}
+
+  /**
+   * PayTR bildiriminden yapısal ödeme-yöntemi verisi çıkar (gözlemlenebilirlik).
+   * parseCallback taksit/currency/tutar/test_mode'u tiplenmiş döndürür.
+   */
+  private parsePaytrCallbackData(dto: PayTRCallbackDto) {
+    return this.paymentProviders.resolve().parseCallback({
+      merchant_oid: dto.merchant_oid as string,
+      status: dto.status as "success" | "failed",
+      total_amount: dto.total_amount as string,
+      hash: dto.hash as string,
+      failed_reason_code: dto.failed_reason_code,
+      failed_reason_msg: dto.failed_reason_msg,
+      test_mode: dto.test_mode,
+      payment_type: dto.payment_type,
+      currency: dto.currency,
+      payment_amount: dto.payment_amount,
+      installment_count: dto.installment_count,
+    });
+  }
 
   /**
    * Rate-limit the outbound PayTR durum-sorgu triggered by a hash-mismatch
@@ -105,6 +127,18 @@ export class PaymentCallbackService {
   ): Promise<string> {
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
 
+    // Gözlemlenebilirlik/güvenlik: hash uyuşmayan (güvenilmeyen) bildirimi de kaydet.
+    // Body'ye GÜVENMEDİĞİMİZ için yalnız ham + hashValid=false; para alanları durum-sorgu
+    // ile teyit edilir. Replay/saldırı analizi için değerli.
+    await this.providerEvents.record({
+      eventType: "callback",
+      merchantOid: dto.merchant_oid,
+      paymentId: payment?.id ?? null,
+      status: dto.status,
+      hashValid: false,
+      raw: { ...dto },
+    });
+
     if (!payment) {
       this.logger.error(
         `PayTR callback invalid hash and no payment row: merchant_oid=${dto.merchant_oid} status=${dto.status}`,
@@ -185,6 +219,12 @@ export class PaymentCallbackService {
       payment,
       txnRef,
       oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
+      {
+        // durum-sorgu artık ödeme yöntemi/taksit de döndürüyor (gözlemlenebilirlik).
+        paymentType: inquiry.paymentType,
+        installmentCount: inquiry.installmentCount,
+        currency: inquiry.currency,
+      },
     );
     if (did) {
       this.logger.log(
@@ -225,6 +265,27 @@ export class PaymentCallbackService {
 
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
 
+    // Gözlemlenebilirlik: her doğrulanmış (hash geçerli) bildirimi denetim günlüğüne
+    // yaz — başarı/başarısızlık, ödeme yöntemi, taksit, tutarlar. Best-effort.
+    const parsed = this.parsePaytrCallbackData(dto);
+    await this.providerEvents.record({
+      eventType: "callback",
+      merchantOid: dto.merchant_oid,
+      paymentId: payment?.id ?? null,
+      status: dto.status,
+      paymentType: parsed.paymentType ?? null,
+      installmentCount: parsed.installmentCount ?? null,
+      currency: parsed.currency ?? null,
+      amount: parsed.paymentAmount ?? null,
+      totalAmount: parsed.amount ?? null,
+      failedReasonCode: dto.failed_reason_code ?? null,
+      failedReasonMsg: dto.failed_reason_msg ?? null,
+      utoken: dto.utoken ?? null,
+      testMode: parsed.testMode ?? null,
+      hashValid: true,
+      raw: { ...dto },
+    });
+
     if (!payment) {
       this.logger.warn(
         `PayTR callback: payment not found for merchant_oid=${dto.merchant_oid}`,
@@ -254,6 +315,11 @@ export class PaymentCallbackService {
         payment,
         dto.merchant_oid,
         dto.merchant_oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
+        {
+          paymentType: parsed.paymentType,
+          installmentCount: parsed.installmentCount,
+          currency: parsed.currency,
+        },
       );
       // CAPI (Faz 3): store_card ödemesinde PayTR bildirimle utoken döndürür → kullanıcının
       // kayıtlı kartlarını SavedCard'a senkronla (recurring için). Best-effort, ödemeyi etkilemez.

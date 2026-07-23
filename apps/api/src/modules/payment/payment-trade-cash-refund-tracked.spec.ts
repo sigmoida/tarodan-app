@@ -29,6 +29,7 @@ describe("PaymentRefundService.refundTradeCashTracked — MONEY-H2 failure track
       {} as any, // commissionLedger
       {} as any, // elogoInvoicing
       {} as any, // paymentCommon
+      { record: jest.fn() } as any, // providerEvents
     );
     return { service, prisma, eventService };
   };
@@ -79,12 +80,10 @@ describe("PaymentRefundService.refundTradeCashTracked — MONEY-H2 failure track
 
   it("iade edilecek tamamlanmış ödeme yoksa (skip): marker temizlenir, refund-completed yayınlanmaz, failed değildir", async () => {
     const { service, prisma, eventService } = makeService();
-    jest
-      .spyOn(service, "refundTradeCashPaymentIfCompleted")
-      .mockResolvedValue({
-        refunded: false,
-        skippedReason: "already_refunded",
-      });
+    jest.spyOn(service, "refundTradeCashPaymentIfCompleted").mockResolvedValue({
+      refunded: false,
+      skippedReason: "already_refunded",
+    });
 
     const r = await service.refundTradeCashTracked(TRADE_ID);
 
