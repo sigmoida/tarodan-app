@@ -19,6 +19,7 @@ import { PaymentScheduledProcessor } from "./payment-scheduled.processor";
 import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { EscrowHoldService } from "./escrow-hold.service";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { CacheModule } from "../cache/cache.module";
@@ -71,6 +72,7 @@ import { ElogoModule } from "../elogo";
     PaymentFulfillmentService,
     FulfillmentNotifier,
     FulfillmentFinalizer,
+    EscrowHoldService,
     PaymentProviderEventService,
     PaymentLifecycleService,
     PaymentSchedulerService,

@@ -4,7 +4,6 @@ import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import {
   PaymentStatus,
-  PaymentHoldStatus,
   OrderStatus,
   ProductStatus,
   SubscriptionStatus,
@@ -21,11 +20,11 @@ import { EventService } from "../events";
 import { ElogoInvoicingService } from "../elogo";
 import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
-import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { EscrowHoldService } from "./escrow-hold.service";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -82,7 +81,7 @@ export class PaymentFulfillmentService {
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
-    private readonly commissionLedger: CommissionLedgerService,
+    private readonly escrowHold: EscrowHoldService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentRefund: PaymentRefundService,
     // Faz 8.2: yakalama/order.paid/kargo sonlandırması (ledger dahil) FulfillmentFinalizer'da.
@@ -489,36 +488,8 @@ export class PaymentFulfillmentService {
 
       // Only create payment hold for regular product orders (not membership/boost orders)
       if (!isMembershipOrder && !isBoostOrder) {
-        // Calculate seller payout (amount - commission - stopaj).
-        // Stopaj (GVK 94/19) yalnız kurumsal satıcı siparişlerinde > 0'dır; platform
-        // muhtasar ile beyan eder, satıcı kendi beyannamesinde mahsup eder.
-        const sellerAmount =
-          Number(order.totalAmount) -
-          Number(order.commissionAmount) -
-          Number(order.withholdingTaxAmount ?? 0);
-
-        // Create payment hold for seller (escrow). releaseAt ödeme anında SET
-        // EDİLMEZ; teslimde (shipping.worker delivered) deliveredAt + return + grace
-        // olarak hesaplanır. Teslim olmadan asla serbest bırakılmaz (releaseAt null).
-        await tx.paymentHold.create({
-          data: {
-            paymentId: payment.id,
-            orderId: payment.orderId,
-            sellerId: order.sellerId,
-            amount: sellerAmount,
-            status: PaymentHoldStatus.held,
-            releaseAt: null,
-          },
-        });
-
-        // CommissionLedger satırı — pending (Faz 3A.2). Spec Bölüm 5.1.
-        await this.commissionLedger.upsertPending({
-          orderId: payment.orderId,
-          sellerCommission: order.sellerFeeAmount,
-          buyerFee: order.buyerFeeAmount,
-          tx,
-        });
-
+        // Faz 8.2: escrow hold + pending komisyon → EscrowHoldService (tekil/grup ortak).
+        await this.escrowHold.createHold(tx, order, payment.id);
         this.logger.log(
           `Payment ${payment.id} completed, hold created for seller ${order.sellerId}`,
         );
@@ -821,30 +792,8 @@ export class PaymentFulfillmentService {
           }
 
           // Satıcı başına escrow hold (tek payment'a sipariş başına bir hold).
-          // releaseAt teslimde hesaplanır (deliveredAt + return + grace); ödeme
-          // anında null → teslim olmadan asla serbest bırakılmaz.
-          // Stopaj (kurumsal satıcı) da hold'dan düşülür — payout'a hiç girmez.
-          const sellerAmount =
-            Number(order.totalAmount) -
-            Number(order.commissionAmount) -
-            Number(order.withholdingTaxAmount ?? 0);
-          await tx.paymentHold.create({
-            data: {
-              paymentId: payment.id,
-              orderId: order.id,
-              sellerId: order.sellerId,
-              amount: sellerAmount,
-              status: PaymentHoldStatus.held,
-              releaseAt: null,
-            },
-          });
-
-          await this.commissionLedger.upsertPending({
-            orderId: order.id,
-            sellerCommission: order.sellerFeeAmount,
-            buyerFee: order.buyerFeeAmount,
-            tx,
-          });
+          // Faz 8.2: escrow hold + pending komisyon → EscrowHoldService (tekil/grup ortak).
+          await this.escrowHold.createHold(tx, order, payment.id);
         }
 
         return { aliveOrders, refundOrders, productIdsToInvalidate };

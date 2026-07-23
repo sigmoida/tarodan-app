@@ -13,6 +13,7 @@ import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { EscrowHoldService } from "./escrow-hold.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -173,6 +174,8 @@ describe("PaymentService group payment (checkout group)", () => {
         I18nService,
         // Gerçek finalizer → emitOrderPaid mockEvents'e yönlensin (assertion'lar için).
         FulfillmentFinalizer,
+        // Gerçek escrow servisi → paymentHold.create / upsertPending assertion'ları için.
+        EscrowHoldService,
         {
           provide: FulfillmentNotifier,
           useValue: {
