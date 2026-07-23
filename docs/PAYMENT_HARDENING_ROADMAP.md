@@ -436,6 +436,71 @@
 
 ---
 
+## Faz 11 — Kargo/Ödeme denetim bulguları (review follow-up) · `fix/payment-hardening-outbox-ledger-bull`
+
+> 2026-07-23 kod incelemesi (payment + surat-cargo + entegrasyon, 3 paralel denetim).
+> Çekirdek güvenlik (callback sahteciliği/replay/çifte-çekim, kart verisi) SAĞLAM doğrulandı;
+> money→cargo yönü (event+outbox) örnek. Kalan borç: birkaç SOMUT güvenlik açığı + hâlâ duran
+> god-service'ler + cargo→money yönünün concretion bağımlılığı. Sıra: önce ucuz güvenlik, sonra
+> dikkatli güvenlik/doğruluk, sonra refactor.
+
+### 11.1 — Hızlı güvenlik kazanımları (düşük risk, küçük edit)
+
+- [ ] **11.1a (G1)** Sürat şifresi (`Sifre`) URL query string'inden çıkar → body/header. URL'ler proxy/APM/
+      error-tracker loglarına sızar. `surat-cargo/surat-tracking.service.ts:86,156,300` (+ probe 300). Orta.
+- [ ] **11.1b (G3)** Refund bypass'a prod hard-block ekle (`NODE_ENV==='production'` → reddet), completion'daki
+      SEC-H1 guard'ıyla simetrik. Yoksa yanlış env'de "iade edildi" ama para gitmez. `payment/payment-refund.service.ts:245` (order) + ~992 (trade-cash). Orta.
+- [ ] **11.1c (G4)** Tam IBAN cleartext log → last-4 maskele (aynı dosya email'de zaten maskeliyor). KVKK.
+      `payout/payout.service.ts:349`. Orta.
+- [ ] **11.1d (G5)** Webhook payload verbatim log → yalnız whitelist alanlar. PII + log-injection.
+      `shipping/shipping.service.ts:376`. Düşük-orta.
+
+### 11.2 — Güvenlik/doğruluk (dikkat isteyen)
+
+- [ ] **11.2a (G2)** Public delivered-webhook tek statik secret + tahmin-edilebilir `trackingNumber`(=`orderNumber`)
+      → escrow saatini erken başlatma/griefing (refund TETİKLEYEMEZ; o yol poll-only/TLS-auth). Sürat poll-only
+      olduğundan: endpoint'i KALDIR ya da HMAC(imza+timestamp+nonce) iste + DTO doğrulama + IP allowlist.
+      `shipping/shipping.controller.ts:50`, `shipping.service.ts:449`. Orta.
+- [ ] **11.2b (G6)** Eşzamanlı kısmi-iade penceresi: iade tavanı + marker tx DIŞINDA okunuyor → nadir ama gerçek
+      çifte-iade (marker/CAS/completed-lookup büyük ölçüde savunuyor). `SELECT … FOR UPDATE`'i cap kontrolü ve
+      marker yazımından ÖNCE al. `payment/payment-refund.service.ts:164-341`. Yüksek-ama-dar.
+- [ ] **11.2c** Poll `delivered`→escrow ATOMİK değil: CAS flip commit olur, `handleOrderDelivered` ayrı çağrıda;
+      çökmede `PaymentHold.releaseAt=null` askıda + re-poll yok → satıcı ödenmez (webhook yolu tek tx — tutarsız).
+      tx'e sar VEYA "delivered ama hold zamanlanmamış" sweep'i ekle. `surat-cargo/surat-tracking.service.ts:~1106-1173`. Orta.
+- [ ] **11.2d** Refund money tx'i içinde dış I/O (`emitPaymentRefunded`/bildirim/e-posta) → kilit süresini uzatır,
+      bildirim hatası para-tx'ini abort edebilir. Post-commit'e taşı. `payment/payment-refund.service.ts:715-781`. Orta.
+
+### 11.3 — SOLID: god-service parçalama + cargo→money event'leme
+
+- [ ] **11.3a** `SuratTrackingService` (1766 LOC) god-service + **10 `ModuleRef.get`/dinamik `import()`** ile
+      payment/refund/trade/eLogo'yu doğrudan çağırıyor (kargo katmanı para orkestrasyonu yapıyor). Parçala
+      (`SuratTrackingClient` / `{Order,Trade,RefundReturn}TrackingSync` / `BarcodeRetryService` / `CargoAlertingService`)
+      ve para yan-etkilerini **domain event**'lerine çevir (`shipment.delivered/returned`, `return.delivered`) →
+      money→cargo yönüyle simetrik. `surat-cargo/surat-tracking.service.ts`. Büyük.
+- [ ] **11.3b** `PaymentRefundService` (1537) böl: `RefundCapPolicy` / `RefundExecutor` / `RefundFinalizer(tx)`.
+      `processRefund` tek başına ~770 satır. Büyük.
+- [ ] **11.3c** `PaymentReconciliationService` (1483, 12 dep, ~10 alakasız sweep) → concern başına böl. Orta-büyük.
+
+### 11.4 — DRY + tipleme
+
+- [ ] **11.4a** Sürat `SuratGonderiPayload` builder **6× kopya** (payment-common, refund, trade-shipment,
+      admin-trade-warehouse/resolution, admin-shipping) → tek `buildStandardGonderiPayload(...)` surat modülünde.
+- [ ] **11.4b** Tracking sync/apply **3× kopya** (order/trade/refund-return: `syncAllActive*` + `applyTrackingUpdate`
+      / `syncTradeShipmentTracking` + `sync*Events`) → entity-adapter'lı generic sync core.
+- [ ] **11.4c** Refund proration **3+ yerde farklı yuvarlama** (`portion`/`ledgerPortion`/`ledger.recordRefund` ratio/
+      `refund.computeRefundAmount`) → tek yuvarlama otoritesi.
+- [ ] **11.4d** Para nesneleri `any` (`payment: any`/`order: any`/`metadata as any` yaygın) → mevcut `PaymentMetadata` + tipli order shape'i tutarlı uygula (derleme-zamanı `amount`/`status` güvenliği).
+
+### 11.5 — DIP / abstraction
+
+- [ ] **11.5a** Payment, Sürat concretion'ına bağlı: `PaymentCommonService` `SuratCargoService`'i enjekte edip
+      payload'ı inline kuruyor (`payment-common.service.ts:126`). `CargoProvider` arayüzü (create/cancel/label) token
+      ile enjekte et; payload inşasını surat modülüne al. Orta.
+- [ ] **11.5b** `IPaymentProvider` PayTR-shaped (ISP/LSP: `RestSuratClient extends SoapClient` "not supported" throw'lar;
+      capi/transfer generic para-yolundan ayrık değil). Generic para metotlarını sağlayıcı-özel yeteneklerden ayır. Düşük-orta.
+
+---
+
 ## Bağımlılık haritası (neden bu sıra)
 
 ```
