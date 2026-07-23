@@ -2,7 +2,7 @@ import { Badge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel } from "@/lib/utils";
 import { col, type RowActionItem } from "@/components/table";
-import { type Trade, disputeConfig } from "./trades";
+import { type Trade, disputeConfig, cashPayerName } from "./trades";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -47,6 +47,19 @@ export function tradeColumns(t: T, rowMenu: (t: Trade) => RowActionItem[]) {
         sortKey: "cashAmount",
         sortType: "number",
       },
+    ),
+    // Farkı kim öder — nakit farkı olan takaslarda ödeyen taraf, yoksa "—".
+    col.custom<Trade>(
+      t("admin.operations.trades.paidBy"),
+      (r) => {
+        const name = cashPayerName(r);
+        return name ? (
+          <span className="text-sm text-body">{name}</span>
+        ) : (
+          <span className="text-muted">—</span>
+        );
+      },
+      { minWidth: 120 },
     ),
     col.date<Trade>(t("common.date"), "createdAt"),
     col.rowMenu<Trade>(rowMenu),

@@ -11,10 +11,20 @@ export interface Trade {
   initiator: { id: string; displayName: string };
   receiver: { id: string; displayName: string };
   cashAmount?: number;
+  /** Nakit farkını ödeyen taraf (initiator.id | receiver.id). null = eşit takas. */
+  cashPayerId?: string | null;
   hasDispute: boolean;
   createdAt: string;
   cancelReason?: string;
 }
+
+/** Nakit farkını ödeyen tarafın görünen adı (cashPayerId → initiator/receiver). */
+export const cashPayerName = (trade: Trade): string | null => {
+  if (!trade.cashPayerId) return null;
+  return trade.cashPayerId === trade.initiator.id
+    ? trade.initiator.displayName
+    : trade.receiver.displayName;
+};
 
 // Intermediate/per-side statuses are intentionally hidden (needless detail for admins; they still render correctly in the badge).
 const TRADE_FILTER_STATUSES = [
@@ -58,6 +68,7 @@ export function mapTrades(raw: any[], t: T): Trade[] {
       displayName: t("admin.operations.trades.receiver"),
     },
     cashAmount: Number(tr.cashAmount || 0),
+    cashPayerId: tr.cashPayerId ?? null,
     hasDispute: !!tr.dispute,
     createdAt: tr.createdAt,
     cancelReason: tr.cancelReason ?? undefined,

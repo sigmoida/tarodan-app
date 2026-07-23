@@ -3669,6 +3669,7 @@
         "initiator": "Initiator",
         "receiver": "Recipient",
         "cash": "Cash",
+        "paidBy": "Paid by",
         "disputed": "Disputed",
         "disputedBadge": "⚠️ Disputed",
         "resolveDispute": "Resolve Dispute",

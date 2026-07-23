@@ -31,6 +31,18 @@ export interface TradeDetail {
   tradeNumber?: string;
   status: string;
   cashAmount?: number;
+  /** Nakit farkını ödeyen taraf (initiator.id | receiver.id). null = eşit takas. */
+  cashPayerId?: string | null;
+  /** Escrow nakit ödeme kaydı (accept'te oluşur): komisyon + toplam dahil. */
+  cashPayment?: {
+    payerId: string;
+    recipientId: string;
+    amount: number;
+    commission: number;
+    totalAmount: number;
+    status: string;
+    paidAt?: string | null;
+  } | null;
   initiator: { id: string; displayName: string; email: string };
   receiver: { id: string; displayName: string; email: string };
   initiatorItems: TradeItem[];

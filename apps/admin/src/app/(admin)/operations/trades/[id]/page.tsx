@@ -142,13 +142,26 @@ export default function TradeDetailPage() {
             />
 
             {trade.cashAmount && trade.cashAmount > 0 && (
-              <div className="flex items-center justify-between rounded-xl bg-surface-elevated p-4 shadow-sm">
-                <span className="font-medium text-heading">
-                  {t("admin.operations.trades.cashDifference")}
-                </span>
-                <span className="text-lg font-semibold text-primary-600">
-                  +{fmtTry(trade.cashAmount)}
-                </span>
+              <div className="rounded-xl bg-surface-elevated p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-heading">
+                    {t("admin.operations.trades.cashDifference")}
+                  </span>
+                  <span className="text-lg font-semibold text-primary-600">
+                    +{fmtTry(trade.cashAmount)}
+                  </span>
+                </div>
+                {/* Farkı kim öder — cashPayerId'den çözülen taraf. */}
+                {trade.cashPayerId && (
+                  <p className="mt-2 text-sm text-muted">
+                    {t("admin.operations.trades.paidBy")}:{" "}
+                    <span className="font-medium text-body">
+                      {trade.cashPayerId === trade.initiator.id
+                        ? trade.initiator.displayName
+                        : trade.receiver.displayName}
+                    </span>
+                  </p>
+                )}
               </div>
             )}
 

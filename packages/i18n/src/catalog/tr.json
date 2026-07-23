@@ -3669,6 +3669,7 @@
         "initiator": "Başlatan",
         "receiver": "Alan",
         "cash": "Nakit",
+        "paidBy": "Ödeyen",
         "disputed": "İtirazlı",
         "disputedBadge": "⚠️ İtirazlı",
         "resolveDispute": "İtirazı Çöz",
