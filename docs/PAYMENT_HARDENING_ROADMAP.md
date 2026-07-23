@@ -517,8 +517,12 @@
       `SuratCargoService implements CargoProvider`; modül `{provide:CARGO_PROVIDER, useExisting:SuratCargoService}` export ediyor.
       `PaymentCommonService` artık somut servise değil `@Inject(CARGO_PROVIDER)` ile arayüze bağlı (payload inşası zaten 11.4a
       ile surat modülünde). 2 spec'e token provider eklendi. tsc temiz; 192 test yeşil (yalnız pre-existing tracking-url hatası).
-- [ ] **11.5b** `IPaymentProvider` PayTR-shaped (ISP/LSP: `RestSuratClient extends SoapClient` "not supported" throw'lar;
-      capi/transfer generic para-yolundan ayrık değil). Generic para metotlarını sağlayıcı-özel yeteneklerden ayır. Düşük-orta.
+- [x] **11.5b** ✓ Sürat carrier-client soyutlaması düzeltildi (LSP): transport-nötr `abstract SuratSoapClient`
+      → `SuratCarrierClient` yeniden adlandırıldı (REST client artık "Soap" adlı bir tabanı extend etmiyor); token
+      `SURAT_SOAP_CLIENT` → `SURAT_CARRIER_CLIENT`. Barkod desteği ARTIK açık capability: `supportsBarcode()` (Live=false).
+      `createBarcodeOnce` çağrıdan ÖNCE capability guard'lıyor → Live'ın "not supported" THROW'una güvenmiyor; guard
+      aynı UNKNOWN teknik-hata sonucunu (mesaj/log/retry/no-cache) BİREBİR üretiyor. tsc temiz; 163 test yeşil (davranış aynı).
+      NOT: `IPaymentProvider` ISP reshape'i (capi/transfer ayrımı) tek PSP olduğu için spekülatif → ertelendi (değer düşük).
 
 ---
 
