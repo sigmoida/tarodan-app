@@ -3,8 +3,10 @@ import { OutboxHandlerRegistry } from "../outbox/outbox-handler.registry";
 import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
+  OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
   ShipmentCancelPayload,
   InvoiceRefundReversePayload,
+  InvoiceTradeCashRefundReversePayload,
 } from "../outbox/outbox.types";
 import { PaymentCommonService } from "./payment-common.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -40,5 +42,14 @@ export class PaymentOutboxHandlers implements OnModuleInit {
       const { orderId } = payload as InvoiceRefundReversePayload;
       await this.elogoInvoicing.handleOrderRefund(orderId);
     });
+
+    this.registry.register(
+      OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
+      async (payload) => {
+        const { tradeCashPaymentId } =
+          payload as InvoiceTradeCashRefundReversePayload;
+        await this.elogoInvoicing.handleTradeCashRefund(tradeCashPaymentId);
+      },
+    );
   }
 }

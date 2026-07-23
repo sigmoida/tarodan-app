@@ -276,14 +276,18 @@
       handler'a verir: başarı→completed, hata→exp-backoff retry, maxAttempts→`dead` (DLQ + alarm).
       `OutboxHandlerRegistry` (type→idempotent handler, domain servisleri onModuleInit'te kaydeder).
       `@Global OutboxModule`. **Spec:** enqueue (dedupe/tx-güvenli) + drainer (retry/backoff/dead/CAS).
-- [~] **5.3** Taşınan yan-etkiler (hepsi iade commit'iyle ATOMİK outbox satırı; anlık post-commit
-  tetik hızlı-yol kalır, outbox çökmeye dayanıklı backstop; handler'lar idempotent; enjeksiyon
-  `@Optional` → para testlerinde sıfır churn):
-  - **Sürat gönderi iptali (iade)** → `shipment.cancel` (`PaymentOutboxHandlers`).
+- [x] **5.3** ✓ Taşınan yan-etkiler (hepsi iade commit'iyle ATOMİK outbox satırı; anlık post-commit
+      tetik hızlı-yol kalır, outbox çökmeye dayanıklı backstop; handler'lar idempotent; enjeksiyon
+      `@Optional` → para testlerinde sıfır churn):
+  - **Sürat gönderi iptali (iade)** → `shipment.cancel`.
   - **eLogo e-Arşiv ters kaydı (tam iade)** → `invoice.refund_reverse`.
-    **Devam:** PayTR iade çağrısı (zaten marker+sweep korumalı — Faz 1/4), takas nakit iadesi;
-    fulfillment yan-etkileri (eLogo fatura, bildirim fan-out, Sürat oluşturma) → **Faz 8** ile
-    event-driven olarak outbox'a taşınacak (doğru sıralama: fulfillment event yayınlayınca).
+  - **eLogo takas-nakit iade ters kaydı** → `invoice.trade_cash_refund_reverse` (persist tx'inde atomik).
+
+  **KARAR — PayTR iade ÇAĞRISI bilinçli olarak outbox'a TAŞINMADI:** `createRefund`'ı outbox'a almak
+  iadeyi senkron→async yapardı ve `refundInProgress` marker + `reconcileStuckRefundMarkers` sweep'i
+  (Faz 1.1/4.4) zaten bu para çağrısının outbox-eşdeğeri güvenilirliğini SAĞLIYOR (marker = idempotency
+  anahtarı). Admin/çağıranların beklediği senkron iade sonucunu bozmamak için marker-tabanlı bırakıldı.
+  Fulfillment yan-etkileri (eLogo fatura, bildirim, Sürat oluşturma) → Faz 8.1 event-driven ile ele alınır.
 
 ---
 

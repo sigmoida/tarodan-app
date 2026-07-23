@@ -3,6 +3,7 @@ import { OutboxHandlerRegistry } from "../outbox/outbox-handler.registry";
 import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
+  OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
 } from "../outbox/outbox.types";
 
 const makeDeps = () => {
@@ -12,6 +13,7 @@ const makeDeps = () => {
   } as any;
   const elogoInvoicing = {
     handleOrderRefund: jest.fn().mockResolvedValue(undefined),
+    handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
   } as any;
   const svc = new PaymentOutboxHandlers(
     registry,
@@ -60,5 +62,19 @@ describe("PaymentOutboxHandlers", () => {
       {} as any,
     );
     expect(elogoInvoicing.handleOrderRefund).toHaveBeenCalledWith("o3");
+  });
+
+  it("invoice.trade_cash_refund_reverse handler'ını kaydeder ve eLogo takas ters kaydına yönlendirir", async () => {
+    const { registry, elogoInvoicing, svc } = makeDeps();
+    svc.onModuleInit();
+    expect(registry.types()).toContain(
+      OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
+    );
+
+    await registry.get(OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE)!(
+      { tradeCashPaymentId: "tcp-9" },
+      {} as any,
+    );
+    expect(elogoInvoicing.handleTradeCashRefund).toHaveBeenCalledWith("tcp-9");
   });
 });

@@ -29,6 +29,7 @@ import { OutboxService } from "../outbox/outbox.service";
 import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
+  OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
 } from "../outbox/outbox.types";
 import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
@@ -1065,6 +1066,13 @@ export class PaymentRefundService {
             await tx.tradeCashPayment.update({
               where: { id: payment.tradeCashPaymentId },
               data: { status: PaymentStatus.refunded, refundedAt: new Date() },
+            });
+            // Faz 5.3 (outbox): eLogo takas-iade ters kaydını iade persist'iyle ATOMİK
+            // sıraya al (post-commit anlık tetik hızlı-yol kalır; handler idempotent).
+            await this.outbox?.enqueue(tx, {
+              type: OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
+              payload: { tradeCashPaymentId: payment.tradeCashPaymentId },
+              dedupeKey: `${OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE}:${payment.tradeCashPaymentId}`,
             });
           }
         });

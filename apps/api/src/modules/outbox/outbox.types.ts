@@ -17,3 +17,11 @@ export const OUTBOX_INVOICE_REFUND_REVERSE = "invoice.refund_reverse";
 export interface InvoiceRefundReversePayload {
   orderId: string;
 }
+
+/** Takas nakit iadesi sonrası eLogo komisyon e-Arşiv ters kaydı. İdempotent. */
+export const OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE =
+  "invoice.trade_cash_refund_reverse";
+
+export interface InvoiceTradeCashRefundReversePayload {
+  tradeCashPaymentId: string;
+}
