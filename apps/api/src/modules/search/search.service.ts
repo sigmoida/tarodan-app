@@ -1,13 +1,13 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from "@nestjs/common";
 import {
   SearchCommonService,
   SearchOptions,
   SearchResponse,
-} from './search-common.service';
-import { SearchProductService } from './search-product.service';
-import { SearchAutocompleteService } from './search-autocomplete.service';
-import { SearchCollectionService } from './search-collection.service';
-import { SearchSyncService } from './search-sync.service';
+} from "./search-common.service";
+import { SearchProductService } from "./search-product.service";
+import { SearchAutocompleteService } from "./search-autocomplete.service";
+import { SearchCollectionService } from "./search-collection.service";
+import { SearchSyncService } from "./search-sync.service";
 
 // Geriye dönük uyumluluk: arama tip sözleşmeleri artık search-common.service'te
 // yaşıyor; mevcut tüketiciler (search.controller vb.) bu modülden import
@@ -17,7 +17,7 @@ export {
   SearchOptions,
   SearchResponse,
   RichAutocompleteResult,
-} from './search-common.service';
+} from "./search-common.service";
 
 /**
  * Facade: tüm public imzalar aynen korunur, iş mantığı alt servislerde
@@ -75,7 +75,9 @@ export class SearchService implements OnModuleInit {
     return this.product.searchProducts(options);
   }
 
-  async searchProductIds(options: SearchOptions): Promise<{ ids: string[]; total: number }> {
+  async searchProductIds(
+    options: SearchOptions,
+  ): Promise<{ ids: string[]; total: number }> {
     return this.product.searchProductIds(options);
   }
 
@@ -107,11 +109,32 @@ export class SearchService implements OnModuleInit {
   }
 
   async autocompleteRich(query: string): Promise<{
-    products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
-    brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+    products: Array<{
+      id: string;
+      title: string;
+      imageUrl?: string;
+      price: number;
+      brandName?: string;
+    }>;
+    brands: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo?: string | null;
+    }>;
     categories: Array<{ id: string; name: string; slug: string }>;
-    manufacturers: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
-    carModels: Array<{ id: string; name: string; slug: string; brandId: string }>;
+    manufacturers: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo?: string | null;
+    }>;
+    carModels: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      brandId: string;
+    }>;
     scales: string[];
     materials: Array<{ slug: string; label: string }>;
     conditions: Array<{ value: string; label: string }>;
@@ -141,7 +164,8 @@ export class SearchService implements OnModuleInit {
     isPublic?: boolean;
     isFeatured?: boolean;
     userId?: string;
-    sortBy?: 'popular' | 'recent' | 'name' | 'items' | 'items_asc' | 'items_desc';
+    sortBy?:
+      "popular" | "recent" | "name" | "items" | "items_asc" | "items_desc";
     page?: number;
     pageSize?: number;
   }): Promise<{ ids: string[]; total: number } | null> {
@@ -156,5 +180,9 @@ export class SearchService implements OnModuleInit {
 
   async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
     return this.sync.runHandlePeriodicSync(log);
+  }
+
+  async runHourlyReconcile(log: (msg: string) => void = () => {}) {
+    return this.sync.runHourlyReconcile(log);
   }
 }

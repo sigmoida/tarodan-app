@@ -315,9 +315,10 @@
       handler'a sahip (OutboxScheduledProcessor / LedgerScheduledProcessor). Aksi halde
       `MONEY_CRONS_VIA_BULL=true` flag'i bu crons'ları SESSİZCE durduracaktı (gate var, Bull
       yok). Artık payout/payment/refund ile aynı desen — tek mekanizma flag'iyle tutarlı.
-- [~] **7.1** `elogo-scheduler` (EVERY_30_MIN) dual Bull desenine taşındı (ElogoScheduledProcessor,
-  `cronsViaBull` gate — PARA cron'u değil). **Kalan (mekanik, aynı desen):** `featured-scheduler`
-  (`15 3 * * *`), `search-sync:82` (EVERY_HOUR).
+- [x] **7.1** ✓ Tüm saf `@Cron`'lar dual Bull desenine taşındı: `elogo-scheduler` (EVERY_30_MIN),
+      `featured-scheduler` (`15 3 * * *`), `search-sync` saatlik reconcile (EVERY_HOUR). Kod tabanında
+      artık **HİÇ saf `@Cron` YOK** — her zamanlanmış iş `@TrackedCron` (gate) + Bull repeatable +
+      `@Process` handler'a sahip. Flag açılınca (Faz 0 sonrası) hepsi Bull'a geçer, in-process temizlenir.
 - [ ] **7.2** (OPS) Worker'ı ayrı process olarak deploy et (`worker.ts` → `node dist/worker`, ayrı
       Coolify servisi) + `AppModule`'den `WorkerModule`'ü çıkar. Not: `scheduled` kuyruğu processor'ları
       şu an ANA API process'inde koşar; ayrı worker'a taşımak worker.ts'in ilgili modülleri
