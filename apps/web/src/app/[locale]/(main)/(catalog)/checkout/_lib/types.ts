@@ -19,6 +19,10 @@ export interface CheckoutItem {
   price: number;
   /** Üstü çizili eski fiyat (satıcı indirimi varsa) */
   originalPrice?: number;
+  /** Satın alınacak adet (sepet satırından veya "Hemen Al" adet seçiminden). */
+  quantity: number;
+  /** Adet tavanı (mevcut stok ∧ sipariş-cap'i); yoksa üst sınır uygulanmaz. */
+  maxQuantity?: number;
   imageUrl: string;
   seller: {
     id: string;

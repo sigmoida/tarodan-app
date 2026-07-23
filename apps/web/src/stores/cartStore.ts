@@ -21,6 +21,8 @@ interface CartStoreState {
   setItemCount: (count: number) => void;
 
   addToOfflineCart: (item: Omit<OfflineCartItem, "id" | "quantity">) => void;
+  /** Misafir sepetinde bir satırın adedini stok tavanına kırparak ayarlar (stepper). */
+  updateOfflineQuantity: (productId: string, quantity: number) => void;
   removeFromOfflineCart: (productId: string) => void;
   clearOfflineCart: () => void;
 }
@@ -40,9 +42,16 @@ export const useCartStore = create<CartStoreState>()(
         );
         if (existingIndex >= 0) {
           set({
-            offlineItems: offlineItems.map((i, idx) =>
-              idx === existingIndex ? { ...i, quantity: i.quantity + 1 } : i,
-            ),
+            offlineItems: offlineItems.map((i, idx) => {
+              if (idx !== existingIndex) return i;
+              // En güncel stok bilgisini koru; adedi stok tavanına kırp.
+              const stock = item.stock ?? i.stock;
+              const nextQty =
+                stock != null
+                  ? Math.min(i.quantity + 1, stock)
+                  : i.quantity + 1;
+              return { ...i, stock, quantity: nextQty };
+            }),
           });
         } else {
           set({
@@ -52,6 +61,18 @@ export const useCartStore = create<CartStoreState>()(
             ],
           });
         }
+      },
+
+      updateOfflineQuantity: (productId, quantity) => {
+        set({
+          offlineItems: get().offlineItems.map((i) => {
+            if (i.productId !== productId) return i;
+            // [1, stok] aralığına kırp (stok bilinmiyorsa yalnız alt sınır).
+            const capped =
+              i.stock != null ? Math.min(quantity, i.stock) : quantity;
+            return { ...i, quantity: Math.max(1, capped) };
+          }),
+        });
       },
 
       removeFromOfflineCart: (productId) => {

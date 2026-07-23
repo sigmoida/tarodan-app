@@ -78,7 +78,7 @@ export const ordersApi = {
   }) => api.post("/orders/guest", data),
   /** Toplu checkout (üye): sepetteki tüm ürünler tek CheckoutGroup altında, tek ödeme */
   checkout: (data: {
-    items: Array<{ productId: string }>;
+    items: Array<{ productId: string; quantity?: number }>;
     idempotencyKey: string;
     shippingAddressId?: string;
     shippingAddress?: {
@@ -102,7 +102,7 @@ export const ordersApi = {
   }) => api.post("/orders/checkout", data),
   /** Toplu checkout (misafir) */
   checkoutGuest: (data: {
-    items: Array<{ productId: string }>;
+    items: Array<{ productId: string; quantity?: number }>;
     idempotencyKey: string;
     email: string;
     emailVerificationCode: string;

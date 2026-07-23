@@ -34,6 +34,9 @@ export interface CartLine {
   sellerId: string;
   sellerName: string;
   quantity: number;
+  /** Adet tavanı: mevcut stok ∧ sipariş-cap'i. Stepper `+` bunda kilitlenir.
+   * Bilinmiyorsa (misafir eski satır) undefined → tavan yok, checkout doğrular. */
+  maxQuantity?: number;
   price: number;
   originalPrice?: number;
   lineTotal: number;
@@ -67,6 +70,7 @@ export function useCart() {
 
   const offlineItems = useCartStore((s) => s.offlineItems);
   const addToOfflineCart = useCartStore((s) => s.addToOfflineCart);
+  const updateOfflineQuantity = useCartStore((s) => s.updateOfflineQuantity);
   const removeFromOfflineCart = useCartStore((s) => s.removeFromOfflineCart);
   const clearOfflineCart = useCartStore((s) => s.clearOfflineCart);
   const itemCountHint = useCartStore((s) => s.itemCount);
@@ -127,6 +131,7 @@ export function useCart() {
         sellerId: item.sellerId,
         sellerName: item.sellerName,
         quantity: item.quantity,
+        maxQuantity: item.maxQuantity,
         price: item.effectivePrice,
         originalPrice: item.originalPrice,
         lineTotal: item.lineTotal,
@@ -144,6 +149,7 @@ export function useCart() {
       sellerId: item.seller.id,
       sellerName: item.seller.displayName,
       quantity: item.quantity,
+      maxQuantity: item.stock,
       price: item.price,
       originalPrice: undefined,
       lineTotal: item.price * item.quantity,
@@ -206,10 +212,18 @@ export function useCart() {
     if (!productId) return;
     if (!isAuthenticated) {
       const { data: product } = await listingsApi.getOne(productId);
+      // Misafir adet tavanı: müsait stok (rezervasyon düşülmüş) ∧ 20 sipariş-cap'i.
+      // Bilinmiyorsa undefined → stepper serbest, backend checkout'ta doğrular.
+      const avail = product.availableQuantity;
+      const stock =
+        typeof avail === "number" && avail > 0
+          ? Math.min(avail, 20)
+          : undefined;
       addToOfflineCart({
         productId: product.id,
         title: product.title,
         price: product.salePrice ?? product.price,
+        stock,
         imageUrl:
           product.images?.[0]?.cardUrl ??
           product.images?.[0]?.detailUrl ??
@@ -225,6 +239,9 @@ export function useCart() {
             "Satıcı",
         },
       });
+      // `addToOfflineCart` yeni satırı adet 1 ekler; ürün sayfasında adet>1
+      // seçildiyse satırı seçilen adede ayarla (stok tavanına kırpılır).
+      if (quantity > 1) updateOfflineQuantity(product.id, quantity);
       return;
     }
     try {
@@ -246,9 +263,12 @@ export function useCart() {
   };
 
   // Rethrows so the cart-page stepper can toast the backend's quantity/stock
-  // rejection.
+  // rejection. Misafir sepetinde offline store'da (stok tavanına kırparak) günceller.
   const updateQuantity = async (productId: string, quantity: number) => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      updateOfflineQuantity(productId, quantity);
+      return;
+    }
     try {
       await cartApi.updateItem(productId, quantity);
     } catch (error) {

@@ -5,7 +5,7 @@
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { TrashIcon } from "@heroicons/react/24/outline";
-import { Badge, IconButton } from "@tarodan/ui";
+import { Badge, IconButton, QuantityStepper } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import type { CartLineItem } from "../_lib/types";
@@ -77,6 +77,28 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
             {!item.isAvailable && (
               <span className="text-sm font-medium text-muted">
                 {t("cart.excludedFromTotal")}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Stok-duyarlı adet: + `maxQuantity`'de kilit. Adet > 1 ise satır toplamı da göster. */}
+        {item.isAvailable && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <QuantityStepper
+              value={item.quantity}
+              max={item.maxQuantity}
+              onChange={item.onQuantityChange}
+              size="sm"
+              decreaseLabel={t("cart.decreaseQuantity")}
+              increaseLabel={t("cart.increaseQuantity")}
+            />
+            {item.quantity > 1 && (
+              <span className="text-sm text-muted">
+                {t("cart.lineTotal")}:{" "}
+                <span className="font-semibold text-body">
+                  {fmtTL(item.price * item.quantity)} TL
+                </span>
               </span>
             )}
           </div>

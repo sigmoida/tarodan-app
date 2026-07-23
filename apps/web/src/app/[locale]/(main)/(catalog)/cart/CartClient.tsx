@@ -27,6 +27,7 @@ export default function CartClient() {
     refetch: fetchCart,
     removeFromCart,
     removeFromOfflineCart,
+    updateQuantity,
     totalDiscount,
     appliedDiscounts,
     canCheckout,
@@ -65,6 +66,20 @@ export default function CartClient() {
     toast.success(t("product.removedFromCart"));
   };
 
+  // Adet değişimi: auth → backend (stok reddini toast'lar), misafir → offline store
+  // (senkron, stok tavanına kırpar). Her iki yol da tek `updateQuantity` üzerinden.
+  const handleQuantityChange = async (productId: string, quantity: number) => {
+    try {
+      await updateQuantity(productId, quantity);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("product.removeFromCartFailed"),
+      );
+    }
+  };
+
   const hasLines = lineCount > 0;
 
   // Show the skeleton while loading OR before the first fetch settles — but never
@@ -85,6 +100,10 @@ export default function CartClient() {
     originalPrice: line.originalPrice,
     isAvailable: line.isAvailable,
     stockWarning: line.stockWarning,
+    quantity: line.quantity,
+    maxQuantity: line.maxQuantity,
+    onQuantityChange: (quantity: number) =>
+      handleQuantityChange(line.productId, quantity),
     onRemove: () =>
       line.source === "authenticated"
         ? handleRemove(line.productId)

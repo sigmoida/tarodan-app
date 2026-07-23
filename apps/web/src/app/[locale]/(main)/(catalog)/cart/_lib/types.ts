@@ -14,5 +14,11 @@ export interface CartLineItem {
   originalPrice?: number | null;
   isAvailable: boolean;
   stockWarning?: string;
+  /** Satır adedi (stepper değeri). */
+  quantity: number;
+  /** Adet tavanı (stok ∧ sipariş-cap'i); yoksa üst sınır uygulanmaz. */
+  maxQuantity?: number;
+  /** Stepper adet değişimi (auth: backend, misafir: offline store). */
+  onQuantityChange: (quantity: number) => void;
   onRemove: () => void;
 }

@@ -14,27 +14,76 @@ import {
   TruckIcon,
   CalendarIcon,
 } from "@heroicons/react/24/outline";
-import { api } from "@/lib/api";
+import { api, ordersApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@tarodan/ui";
+
+interface OrderProduct {
+  id: string;
+  title: string;
+  imageUrl?: string;
+}
+
+interface OrderLine {
+  id: string;
+  product: OrderProduct | null;
+  quantity: number;
+  price: number;
+}
 
 interface OrderDetails {
   id: string;
   orderNumber: string;
   totalAmount: number;
   status: string;
-  product: {
-    id: string;
-    title: string;
-    imageUrl?: string;
-  } | null;
+  /** Çok ürünlü / çok satıcılı checkout: doluysa grup detayı çekilir. */
+  checkoutGroupId?: string | null;
+  product: OrderProduct | null;
+  /** Sipariş kalemleri (adet burada). Tek-ürün siparişte tek kalem döner. */
+  items?: OrderLine[];
   createdAt: string;
+}
+
+/** Satıcı paketi (çatı): aynı satıcının order'ları tek koli — bkz. buildPackagesView. */
+interface GroupPackage {
+  id: string;
+  seller: { id: string; displayName: string } | null;
+  shippingCost: number;
+  orders: Array<{
+    id: string;
+    orderNumber: string;
+    totalAmount: number;
+    product: OrderProduct | null;
+    items?: OrderLine[];
+  }>;
+}
+
+interface GroupDetails {
+  id: string;
+  groupNumber: string;
+  totalAmount: number;
+  packages: GroupPackage[];
 }
 
 interface InvoiceDetails {
   id: string;
   invoiceNumber: string;
+}
+
+/** Bir order'ı satır(lar)a düzleştir: kalem varsa onları, yoksa ürün+toplamı kullan. */
+function orderToLines(o: {
+  id: string;
+  totalAmount: number;
+  product: OrderProduct | null;
+  items?: OrderLine[];
+}): OrderLine[] {
+  if (o.items && o.items.length > 0) return o.items;
+  if (o.product)
+    return [
+      { id: o.id, product: o.product, quantity: 1, price: o.totalAmount },
+    ];
+  return [];
 }
 
 // Calculate estimated delivery (3 business days from order date)
@@ -80,6 +129,37 @@ export default function CheckoutSuccessClient() {
   });
   const order = orderQuery.data ?? null;
   const loading = orderQuery.isLoading;
+
+  // Çok ürünlü / çok satıcılı checkout: sipariş bir gruba bağlıysa grubu çek →
+  // paketlere (satıcı başına) göre kalemleri göster. Yoksa tek sipariş gösterilir.
+  const groupId = order?.checkoutGroupId ?? "";
+  const groupQuery = useQuery({
+    queryKey: ["checkout-success-group", groupId],
+    queryFn: async () =>
+      (await ordersApi.getGroup(groupId)).data as GroupDetails,
+    enabled: !!groupId && isAuthenticated && !isGuest,
+  });
+  const group = groupQuery.data ?? null;
+
+  // Özet başlığı/toplamı grup varsa gruptan, yoksa tek siparişten gelir. Kalemler
+  // pakete (satıcıya) göre bölümlenir; grup yoksa tek bölüm (tek sipariş).
+  const summaryNumber = group?.groupNumber ?? order?.orderNumber ?? "";
+  const summaryTotal = group?.totalAmount ?? order?.totalAmount ?? 0;
+  const summarySections: Array<{
+    key: string;
+    sellerName: string | null;
+    lines: OrderLine[];
+  }> =
+    group && group.packages.length > 0
+      ? group.packages.map((pkg) => ({
+          key: pkg.id,
+          sellerName: pkg.seller?.displayName ?? null,
+          lines: pkg.orders.flatMap(orderToLines),
+        }))
+      : order
+        ? [{ key: order.id, sellerName: null, lines: orderToLines(order) }]
+        : [];
+  const multiSeller = summarySections.length > 1;
 
   // YENİ eLogo e-Arşiv faturası (yoksa null → buton çıkmaz; sipariş teslimde kesilir)
   const invoiceQuery = useQuery({
@@ -143,23 +223,47 @@ export default function CheckoutSuccessClient() {
                 <div className="flex justify-between items-center py-2 border-b border-border-subtle">
                   <span className="text-muted">Sipariş No:</span>
                   <span className="font-semibold text-heading">
-                    {order.orderNumber}
+                    {summaryNumber}
                   </span>
                 </div>
 
-                {order.product && (
-                  <div className="flex justify-between items-center py-2 border-b border-border-subtle">
-                    <span className="text-muted">Ürün:</span>
-                    <span className="font-medium text-heading text-right max-w-[200px] truncate">
-                      {order.product.title}
-                    </span>
-                  </div>
-                )}
+                {/* Ürünler — pakete (satıcıya) göre gruplu; her satırda adet. */}
+                <div className="py-2 border-b border-border-subtle space-y-4">
+                  {summarySections.map((section) => (
+                    <div key={section.key} className="space-y-1.5">
+                      {section.sellerName && (
+                        <p className="text-xs font-medium text-muted">
+                          {multiSeller ? "Satıcı: " : ""}
+                          {section.sellerName}
+                        </p>
+                      )}
+                      {section.lines.map((line) => (
+                        <div
+                          key={line.id}
+                          className="flex justify-between items-start gap-3"
+                        >
+                          <span className="text-heading min-w-0">
+                            {line.product?.title ?? "Ürün"}
+                            {line.quantity > 1 ? (
+                              <span className="text-muted">
+                                {" "}
+                                × {line.quantity}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="font-medium text-body whitespace-nowrap">
+                            {formatPrice(line.price)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
 
                 <div className="flex justify-between items-center py-2">
                   <span className="text-muted">Toplam Tutar:</span>
                   <span className="font-bold text-lg text-success-600">
-                    {formatPrice(order.totalAmount)}
+                    {formatPrice(summaryTotal)}
                   </span>
                 </div>
               </div>

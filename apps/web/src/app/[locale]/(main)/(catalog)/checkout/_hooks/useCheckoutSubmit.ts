@@ -243,8 +243,11 @@ export function useCheckoutSubmit({
       // ödeme grubu kapsar (eski ürün-başına-sipariş döngüsü 2. siparişi ödemesiz bırakıyordu).
       {
         let orderResponse;
+        // Adet dahil: backend grup checkout item.quantity'yi onurlandırır (aggregate +
+        // order.quantity + fiyat*adet). Eskiden yalnız productId gidiyordu (hep 1 adet).
         const checkoutGroupItems = checkoutItems.map((ci) => ({
           productId: ci.productId,
+          quantity: ci.quantity,
         }));
 
         try {
@@ -257,7 +260,7 @@ export function useCheckoutSubmit({
                 : undefined;
 
             const payload: {
-              items: Array<{ productId: string }>;
+              items: Array<{ productId: string; quantity: number }>;
               idempotencyKey: string;
               shippingAddressId?: string;
               shippingAddress?: typeof shippingAddress;
@@ -362,7 +365,7 @@ export function useCheckoutSubmit({
             );
 
             const guestPayload: {
-              items: Array<{ productId: string }>;
+              items: Array<{ productId: string; quantity: number }>;
               idempotencyKey: string;
               email: string;
               phone: string;

@@ -67,6 +67,9 @@ export interface OfflineCartItem {
   title: string;
   price: number;
   quantity: number;
+  /** Mevcut stok ∧ sipariş-cap'i — ekleme anında yakalanır, misafir adet tavanı.
+   * Eski persist edilmiş satırlarda olmayabilir (undefined → tavan yok, checkout'ta doğrulanır). */
+  stock?: number;
   imageUrl: string;
   seller: {
     id: string;

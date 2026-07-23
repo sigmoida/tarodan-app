@@ -79,6 +79,14 @@ function useCheckoutValue() {
 
   const [selectedCarrier] = useState<string>("surat");
 
+  // "Hemen Al" adet seçimi (yalnız direct/buy-now akışı). Sepet checkout'unda adet
+  // sepet sayfasında ayarlanır; burada satırdan gelir. Ürün sayfasından gelen
+  // `?quantity=` ilk adedi tohumlar (pozitif tam sayıya kırpılır, varsayılan 1).
+  const [directQuantity, setDirectQuantity] = useState(() => {
+    const raw = Number.parseInt(searchParams.get("quantity") ?? "", 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 1;
+  });
+
   // ---- Server data (TanStack Query) ----
   const { directProduct, directProductError } = useDirectProduct(
     directProductId,
@@ -116,7 +124,7 @@ function useCheckoutValue() {
   // Get checkout items: direct buy > available normalized cart lines. The cart
   // hook already hides stale guest lines for authenticated users.
   const checkoutItems: CheckoutItem[] = directProduct
-    ? [directProduct]
+    ? [{ ...directProduct, quantity: directQuantity }]
     : cartLines
         .filter((line) => line.isAvailable)
         .map((line) => ({
@@ -124,6 +132,8 @@ function useCheckoutValue() {
           productId: line.productId,
           title: line.title,
           price: line.price,
+          quantity: line.quantity,
+          maxQuantity: line.maxQuantity,
           originalPrice:
             line.originalPrice != null && line.originalPrice > line.price
               ? line.originalPrice
@@ -134,11 +144,17 @@ function useCheckoutValue() {
           seller: { id: line.sellerId, displayName: line.sellerName },
         }));
   const subtotal = Number(
-    (directProduct ? directProduct.price : cartSubtotal) ?? 0,
+    (directProduct ? directProduct.price * directQuantity : cartSubtotal) ?? 0,
   );
 
-  const productIds = checkoutItems.map((i) => i.productId);
-  const { quote, quoteLoading } = useCheckoutQuote(productIds);
+  // Quote her item'ı GERÇEK adediyle fiyatlar (adet değişince yeniden çeker) →
+  // önizleme = tahsilat. Eskiden hep quantity:1 gönderiliyordu (çok-adet yanlış).
+  const { quote, quoteLoading } = useCheckoutQuote(
+    checkoutItems.map((i) => ({
+      productId: i.productId,
+      quantity: i.quantity,
+    })),
+  );
 
   const shippingCity =
     isAuthenticated && selectedAddressId
@@ -335,6 +351,10 @@ function useCheckoutValue() {
     isLoading,
     // items / pricing
     checkoutItems,
+    isCartCheckout,
+    // "Hemen Al" adet seçimi (buy-now); sepet checkout'unda kullanılmaz.
+    directQuantity,
+    setDirectQuantity,
     subtotal,
     quote,
     quoteLoading,

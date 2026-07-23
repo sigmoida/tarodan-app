@@ -12,7 +12,7 @@ import {
   ShoppingCartIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
-import { Button, IconButton } from "@tarodan/ui";
+import { Button, IconButton, QuantityStepper } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import SellerCard from "./SellerCard";
@@ -32,6 +32,8 @@ export default function ProductInfo() {
     isInCart,
     isAddingToCart,
     cartLoading,
+    quantity,
+    setQuantity,
     showShareMenu,
     handleToggleFavorite,
     handleShare,
@@ -49,6 +51,15 @@ export default function ProductInfo() {
 
   const available = listing.availableQuantity ?? listing.quantity;
   const hasStock = available == null || available > 0;
+
+  // Adet seçici yalnız satılabilir, stok>1 olan ilanlarda (tek-stok 2. el ürün
+  // için gösterme). Tavan: müsait stok ∧ 20 sipariş-cap'i.
+  const showQuantityStepper =
+    !isOwner &&
+    listing.status === "active" &&
+    available != null &&
+    available > 1;
+  const maxQuantity = available != null ? Math.min(available, 20) : undefined;
 
   return (
     <div>
@@ -166,6 +177,21 @@ export default function ProductInfo() {
               </Button>
             )}
           </>
+        )}
+
+        {showQuantityStepper && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-body">
+              {t("common.quantity")}
+            </span>
+            <QuantityStepper
+              value={quantity}
+              onChange={setQuantity}
+              max={maxQuantity}
+              decreaseLabel={t("cart.decreaseQuantity")}
+              increaseLabel={t("cart.increaseQuantity")}
+            />
+          </div>
         )}
 
         {!isOwner && (

@@ -112,6 +112,9 @@ function useListingDetailValue() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  // Seçilen adet (stok-duyarlı stepper — yalnız stok>1 iken gösterilir). Sepete
+  // ekleme ve "Hemen Al" bu adedi taşır.
+  const [quantity, setQuantity] = useState(1);
 
   // ---- Cart ----
   const handleAddToCart = async () => {
@@ -122,7 +125,7 @@ function useListingDetailValue() {
     }
     setIsAddingToCart(true);
     try {
-      await addToCart(listing.id);
+      await addToCart(listing.id, quantity);
       toast.success(t("product.addedToCart"));
     } catch (error: any) {
       if (error?.message === "AUTH_REQUIRED") {
@@ -188,7 +191,7 @@ function useListingDetailValue() {
       }
       return;
     }
-    router.push(`/checkout?productId=${listing.id}`);
+    router.push(`/checkout?productId=${listing.id}&quantity=${quantity}`);
   };
 
   // ---- Offer ----
@@ -377,6 +380,8 @@ function useListingDetailValue() {
     isInCart,
     cartLoading,
     isAddingToCart,
+    quantity,
+    setQuantity,
     handleCartToggle,
     handleBuyNow,
     // offer

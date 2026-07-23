@@ -39,11 +39,20 @@ export function useDirectProduct(
       const originalPriceForDisplay = onSale
         ? getProductOriginalPriceForDisplay(product)
         : undefined;
+      // Adet tavanı: müsait stok (rezervasyon düşülmüş) ∧ 20 sipariş-cap'i.
+      const avail = product.availableQuantity ?? product.quantity;
+      const maxQuantity =
+        typeof avail === "number" && avail > 0
+          ? Math.min(avail, 20)
+          : undefined;
       return {
         id: `direct-${product.id}`,
         productId: product.id,
         title: product.title,
         price: effectivePrice,
+        // Adet CheckoutContext'teki `directQuantity` ile override edilir (stepper).
+        quantity: 1,
+        maxQuantity,
         originalPrice:
           originalPriceForDisplay != null &&
           originalPriceForDisplay > effectivePrice
