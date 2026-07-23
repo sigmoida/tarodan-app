@@ -17,6 +17,7 @@ import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PaymentSchedulerService } from "./payment-scheduler.service";
 import { PaymentScheduledProcessor } from "./payment-scheduled.processor";
 import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
+import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { CacheModule } from "../cache/cache.module";
@@ -67,6 +68,7 @@ import { ElogoModule } from "../elogo";
     PaymentInitiationService,
     PaymentCallbackService,
     PaymentFulfillmentService,
+    FulfillmentNotifier,
     PaymentProviderEventService,
     PaymentLifecycleService,
     PaymentSchedulerService,

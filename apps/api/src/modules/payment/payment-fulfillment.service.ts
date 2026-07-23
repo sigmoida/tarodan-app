@@ -18,7 +18,6 @@ import {
   RELEVANCE_PREMIUM_BONUS,
 } from "../product/helpers/relevance-score";
 import { EventService } from "../events";
-import { InvoiceService } from "../invoice/invoice.service";
 import { ElogoInvoicingService } from "../elogo";
 import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
@@ -26,6 +25,7 @@ import { CommissionLedgerService } from "../commission/commission-ledger.service
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { LedgerService } from "../ledger/ledger.service";
+import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -78,7 +78,7 @@ export class PaymentFulfillmentService {
     private readonly cache: CacheService,
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
-    private readonly invoiceService: InvoiceService,
+    private readonly fulfillmentNotifier: FulfillmentNotifier,
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
@@ -574,55 +574,11 @@ export class PaymentFulfillmentService {
     // rather than the misleading "Siparişiniz iptal edildi". Direct-buy orders
     // (no offer) and orders whose payment was already initiated keep the
     // order-cancelled message.
-    const notifiedBuyers = new Set<string>();
-    for (const o of cancelledOrders) {
-      if (notifiedBuyers.has(o.buyerId)) continue;
-      notifiedBuyers.add(o.buyerId);
-      const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
-      const notify = isUnpaidOffer
-        ? this.notificationService.notifyOfferCancelledOutOfStock(
-            o.buyerId,
-            o.productId,
-            o.productTitle,
-            stockoutCategoryId,
-          )
-        : this.notificationService.notifyOrderCancelledOutOfStock(
-            o.buyerId,
-            o.productId,
-            o.productTitle,
-            stockoutCategoryId,
-          );
-      await notify.catch((err) =>
-        this.logger.warn(
-          `stockout-notify (${isUnpaidOffer ? "offer" : "order"}) failed for ${o.buyerId}: ${err.message}`,
-        ),
-      );
-    }
-    // Sipariş iptali e-postaları (alıcı+satıcı) — sipariş bazlı; teklif
-    // iptallerini (isUnpaidOffer) ve mükerrer order'ları atla.
-    const emailedCancelledOrders = new Set<string>();
-    for (const o of cancelledOrders) {
-      if (o.offerId !== null && !o.hadPayment) continue;
-      if (emailedCancelledOrders.has(o.orderId)) continue;
-      emailedCancelledOrders.add(o.orderId);
-      await this.notificationService.sendOrderCancelledEmails(o.orderId);
-    }
-    for (const o of cancelledOffers) {
-      if (notifiedBuyers.has(o.buyerId)) continue;
-      notifiedBuyers.add(o.buyerId);
-      await this.notificationService
-        .notifyOfferCancelledOutOfStock(
-          o.buyerId,
-          o.productId,
-          o.productTitle,
-          stockoutCategoryId,
-        )
-        .catch((err) =>
-          this.logger.warn(
-            `stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`,
-          ),
-        );
-    }
+    await this.fulfillmentNotifier.notifyStockoutCascade({
+      cancelledOrders,
+      cancelledOffers,
+      stockoutCategoryId,
+    });
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership/boost)
     // This publishes jobs to email, push, and shipping queues
@@ -1036,56 +992,12 @@ export class PaymentFulfillmentService {
     }
     await this.cache.delPattern("products:list:*").catch(() => {});
 
-    // Stockout kaskad bildirimleri (tx sonrası; tek bildirimle alıcı başına)
-    const notifiedBuyers = new Set<string>();
-    for (const o of cancelledOrders) {
-      if (notifiedBuyers.has(o.buyerId)) continue;
-      notifiedBuyers.add(o.buyerId);
-      const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
-      const notify = isUnpaidOffer
-        ? this.notificationService.notifyOfferCancelledOutOfStock(
-            o.buyerId,
-            o.productId,
-            o.productTitle,
-            stockoutCategoryId,
-          )
-        : this.notificationService.notifyOrderCancelledOutOfStock(
-            o.buyerId,
-            o.productId,
-            o.productTitle,
-            stockoutCategoryId,
-          );
-      await notify.catch((err) =>
-        this.logger.warn(
-          `stockout-notify failed for ${o.buyerId}: ${err.message}`,
-        ),
-      );
-    }
-    // Sipariş iptali e-postaları (alıcı+satıcı) — sipariş bazlı; teklif
-    // iptallerini (isUnpaidOffer) ve mükerrer order'ları atla.
-    const emailedCancelledOrders = new Set<string>();
-    for (const o of cancelledOrders) {
-      if (o.offerId !== null && !o.hadPayment) continue;
-      if (emailedCancelledOrders.has(o.orderId)) continue;
-      emailedCancelledOrders.add(o.orderId);
-      await this.notificationService.sendOrderCancelledEmails(o.orderId);
-    }
-    for (const o of cancelledOffers) {
-      if (notifiedBuyers.has(o.buyerId)) continue;
-      notifiedBuyers.add(o.buyerId);
-      await this.notificationService
-        .notifyOfferCancelledOutOfStock(
-          o.buyerId,
-          o.productId,
-          o.productTitle,
-          stockoutCategoryId,
-        )
-        .catch((err) =>
-          this.logger.warn(
-            `stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`,
-          ),
-        );
-    }
+    // Stockout kaskad bildirimleri (tx sonrası; tekil yolla ortak — FulfillmentNotifier).
+    await this.fulfillmentNotifier.notifyStockoutCascade({
+      cancelledOrders,
+      cancelledOffers,
+      stockoutCategoryId,
+    });
 
     // ALICI tarafı: çoklu-ürün (sepet) ödemesinde CheckoutGroup başına TEK onay
     // maili + TEK push. Sipariş başına emitOrderPaid (skipBuyer:true) yalnız satıcı
@@ -1611,32 +1523,16 @@ export class PaymentFulfillmentService {
       const afterAvailable =
         (after?.quantity ?? 0) - (after?.reservedQuantity ?? 0);
       if (beforeAvailable <= 0 && afterAvailable > 0 && before?.title) {
-        await this.dispatchBackInStock(order.productId, before.title).catch(
-          (err: any) =>
+        await this.fulfillmentNotifier
+          .dispatchBackInStock(order.productId, before.title)
+          .catch((err: any) =>
             this.logger.warn(`back-in-stock dispatch failed: ${err?.message}`),
-        );
+          );
       }
     } catch (error: any) {
       this.logger.error(
         `Failed to release product for order ${orderId}: ${error?.message}`,
       );
     }
-  }
-
-  /**
-   * Notify all wishlist users for a product that just transitioned from
-   * unavailable -> available. Debounced 24h per (userId, productId) so
-   * repeated payment failures don't spam wishlists.
-   */
-  private async dispatchBackInStock(
-    productId: string,
-    productTitle: string,
-  ): Promise<void> {
-    // Delegated to NotificationService.broadcastBackInStock — kept here only
-    // as a thin wrapper to preserve the existing call site contract.
-    return this.notificationService.broadcastBackInStock(
-      productId,
-      productTitle,
-    );
   }
 }

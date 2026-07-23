@@ -9,6 +9,7 @@ import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
@@ -67,6 +68,13 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         PaymentFulfillmentService,
         PaymentLifecycleService,
         I18nService,
+        {
+          provide: FulfillmentNotifier,
+          useValue: {
+            notifyStockoutCascade: jest.fn().mockResolvedValue(undefined),
+            dispatchBackInStock: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         {
           provide: ElogoInvoicingService,
           useValue: {
