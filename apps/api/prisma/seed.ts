@@ -5994,6 +5994,17 @@ async function main() {
         [s1Product, sub1],
         [s2Product, sub2],
       ] as const) {
+        // Satıcı paketi (çatı): her satıcının order'ı kendi paketinde, kargo pakete
+        // yüklenir. Burada satıcı başına 1 order → 2 ayrı paket (2 kargo, 3 değil).
+        const pkg = await prisma.orderPackage.create({
+          data: {
+            checkoutGroupId: group.id,
+            sellerId: sp.sellerId,
+            buyerId: buyerDeniz.id,
+            shippingCost: 30,
+            createdAt,
+          },
+        });
         await prisma.order.create({
           data: {
             orderNumber: generateOrderNumber(),
@@ -6001,9 +6012,80 @@ async function main() {
             sellerId: sp.sellerId,
             productId: sp.id,
             checkoutGroupId: group.id,
+            packageId: pkg.id,
             totalAmount: sub + 30,
             subtotal: sub,
             shippingCost: 30,
+            commissionAmount: Math.round(sub * 0.05 * 100) / 100,
+            status: OrderStatus.paid,
+            paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+            shippingAddress: denizShip,
+            createdAt,
+          },
+        });
+      }
+      await prisma.payment.create({
+        data: {
+          checkoutGroupId: group.id,
+          provider: "paytr",
+          providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+          amount: groupTotal,
+          currency: "TRY",
+          status: PaymentStatus.completed,
+          paidAt: new Date(createdAt.getTime() + 3600000),
+        },
+      });
+    }
+  }
+
+  // --- 29a-3. Tek satıcı ÇOK ürün: 1 CheckoutGroup + AYNI satıcıdan 2 sipariş, TEK paket ---
+  // Gerçek konsolidasyon: aynı satıcının 2 order'ı tek OrderPackage'da (tek koli, tek kargo).
+  // Kargo pakete BİR kez yüklenir → 1. order shippingCost=30, kardeş 0. UI "çatı" + tek kargo.
+  {
+    const sameSellerProducts = products
+      .filter((p) => p.sellerId === users[3].id)
+      .slice(0, 2);
+    if (sameSellerProducts.length === 2) {
+      const [pA, pB] = sameSellerProducts;
+      const subA = Number(pA.price);
+      const subB = Number(pB.price);
+      const groupTotal = subA + subB + 30; // tek satıcı → tek kargo (30)
+      const createdAt = daysAgoDate(6);
+      const group = await prisma.checkoutGroup.create({
+        data: {
+          groupNumber: `GRP${generateOrderNumber()}`,
+          buyerId: buyerDeniz.id,
+          idempotencyKey: `idem-${randomUUID()}`,
+          totalAmount: groupTotal,
+          createdAt,
+        },
+      });
+      const pkg = await prisma.orderPackage.create({
+        data: {
+          checkoutGroupId: group.id,
+          sellerId: users[3].id,
+          buyerId: buyerDeniz.id,
+          shippingCost: 30,
+          createdAt,
+        },
+      });
+      // Kargo yalnız İLK order'a yüklenir (kardeş 0) — create yolundaki paket mantığıyla aynı.
+      const lines = [
+        { p: pA, sub: subA, ship: 30 },
+        { p: pB, sub: subB, ship: 0 },
+      ];
+      for (const { p, sub, ship } of lines) {
+        await prisma.order.create({
+          data: {
+            orderNumber: generateOrderNumber(),
+            buyerId: buyerDeniz.id,
+            sellerId: users[3].id,
+            productId: p.id,
+            checkoutGroupId: group.id,
+            packageId: pkg.id,
+            totalAmount: sub + ship,
+            subtotal: sub,
+            shippingCost: ship,
             commissionAmount: Math.round(sub * 0.05 * 100) / 100,
             status: OrderStatus.paid,
             paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
