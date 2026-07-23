@@ -461,18 +461,19 @@
 
 ### 11.2 — Güvenlik/doğruluk (dikkat isteyen)
 
-- [ ] **11.2a (G2)** Public delivered-webhook tek statik secret + tahmin-edilebilir `trackingNumber`(=`orderNumber`)
-      → escrow saatini erken başlatma/griefing (refund TETİKLEYEMEZ; o yol poll-only/TLS-auth). Sürat poll-only
-      olduğundan: endpoint'i KALDIR ya da HMAC(imza+timestamp+nonce) iste + DTO doğrulama + IP allowlist.
-      `shipping/shipping.controller.ts:50`, `shipping.service.ts:449`. Orta.
-- [ ] **11.2b (G6)** Eşzamanlı kısmi-iade penceresi: iade tavanı + marker tx DIŞINDA okunuyor → nadir ama gerçek
-      çifte-iade (marker/CAS/completed-lookup büyük ölçüde savunuyor). `SELECT … FOR UPDATE`'i cap kontrolü ve
-      marker yazımından ÖNCE al. `payment/payment-refund.service.ts:164-341`. Yüksek-ama-dar.
-- [ ] **11.2c** Poll `delivered`→escrow ATOMİK değil: CAS flip commit olur, `handleOrderDelivered` ayrı çağrıda;
-      çökmede `PaymentHold.releaseAt=null` askıda + re-poll yok → satıcı ödenmez (webhook yolu tek tx — tutarsız).
-      tx'e sar VEYA "delivered ama hold zamanlanmamış" sweep'i ekle. `surat-cargo/surat-tracking.service.ts:~1106-1173`. Orta.
-- [ ] **11.2d** Refund money tx'i içinde dış I/O (`emitPaymentRefunded`/bildirim/e-posta) → kilit süresini uzatır,
-      bildirim hatası para-tx'ini abort edebilir. Post-commit'e taşı. `payment/payment-refund.service.ts:715-781`. Orta.
+- [x] **11.2a (G2)** ✓ Public delivered-webhook VARSAYILAN KAPALI: yalnız `SHIPPING_WEBHOOK_ENABLED=true` iken
+      çalışır (kapalıyken 404 → uç görünmez) + gövde doğrulama (trackingNumber+status string zorunlu). Sürat
+      poll-tabanlı olduğundan gerçek callback yok → forge edilmiş "delivered" ile escrow-erken-başlatma yüzeyi
+      varsayılan olarak kalktı; gerçek imzalı callback gelirse flag ile açılır. `shipping/shipping.controller.ts:142`.
+- [~] **11.2b (G6)** → **11.3b'ye taşındı.** Atomik `FOR UPDATE` claim (cap + marker'ı kilit altında taze oku-yaz)
+  processRefund'ın böleceğimiz tam bloğuna denk geliyor; yerinde yapıp 11.3b'de tekrar bölmek en kritik para
+  yolunda riski ikiye katlar. 11.3b'de `RefundCapPolicy`/claim bileşeninde kilitle (test'li). Pencere dar +
+  çok-katmanlı savunuluyor (marker/CAS/completed-lookup/over-refund alarm). `payment/payment-refund.service.ts:146-346`.
+- [x] **11.2c** ✓ Poll `delivered`→escrow ATOMİK: CAS flip + `handleOrderDelivered(tx)` tek `$transaction`'da
+      (webhook yoluyla aynı desen; hata → rollback → sonraki poll retry). Bildirim + event-sync POST-COMMIT.
+      Artık çökme escrow'u askıda bırakmaz. `surat-cargo/surat-tracking.service.ts`.
+- [~] **11.2d** → **11.3b'ye taşındı.** Refund tx'inden dış I/O'yu (`emitPaymentRefunded`/bildirim/e-posta)
+  post-commit'e almak `RefundFinalizer` çıkarımının doğal parçası — split'le birlikte. `payment/payment-refund.service.ts:715-781`.
 
 ### 11.3 — SOLID: god-service parçalama + cargo→money event'leme
 

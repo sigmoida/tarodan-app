@@ -1132,71 +1132,83 @@ export class SuratTrackingService {
     // güncelleme stale'dir. Snapshot'ı where'e koy: count 0 → hiçbir alanı yazma,
     // sonraki tick taze snapshot'la işler. (delivered→in_transit regresyonu gibi
     // terminal-dışı yarış pencerelerini kapatır.)
-    const cas = await this.prisma.shipment.updateMany({
-      where: { id: shipment.id, status: shipment.status },
-      data: updateData,
+    // 11.2c: CAS flip + teslim escrow'u ATOMİK. Eskiden CAS anında commit olup
+    // handleOrderDelivered AYRI çağrıda koşuyordu; arada çökme shipment'ı `delivered`
+    // (terminal → re-poll'da atlanır) bırakıp PaymentHold.releaseAt=null'ı ASKIDA
+    // bırakabiliyordu (satıcı hiç ödenmez, kendi kendine düzelmez). Webhook yoluyla aynı
+    // desen: CAS + escrow tek tx'te (ya ikisi ya hiçbiri; hata → rollback → sonraki poll
+    // retry eder). handleOrderDelivered tx-güvenli (webhook de tx geçiyor) + idempotent.
+    // Bildirim + event sync POST-COMMIT (dış I/O / kritik olmayan tx'e girmez).
+    let deliveryResult: {
+      acted: boolean;
+      use48h: boolean;
+      confirmationDeadline: Date | null;
+      buyerId: string | null;
+    } | null = null;
+    const flipped = await this.prisma.$transaction(async (tx) => {
+      const cas = await tx.shipment.updateMany({
+        where: { id: shipment.id, status: shipment.status },
+        data: updateData,
+      });
+      if (cas.count === 0) return false;
+      if (isDelivered) {
+        const deliveredAt =
+          updateData.deliveredAt instanceof Date
+            ? updateData.deliveredAt
+            : new Date();
+        // PaymentService circular import'u önlemek için lazy resolve. (#83)
+        const { PaymentService } = await import("../payment/payment.service");
+        const paymentService = this.moduleRef.get(PaymentService, {
+          strict: false,
+        });
+        if (paymentService) {
+          deliveryResult = await paymentService.handleOrderDelivered(
+            shipment.orderId,
+            deliveredAt,
+            tx,
+          );
+        }
+      }
+      return true;
     });
-    if (cas.count === 0) {
+    if (!flipped) {
       this.logger.warn(
         `Skipping stale shipment update for ${shipment.id}: status changed concurrently (snapshot=${shipment.status})`,
       );
       return false;
     }
 
-    // Sync movement events (Hareketler)
+    // Sync movement events (Hareketler) — POST-COMMIT (bilgi amaçlı, kritik değil).
     await this.syncShipmentEvents(shipment.id, gonderi);
 
-    // Teslim: order geçişini + escrow release'ini + 48h dallanmasını TEK kanonik
-    // handler yapar (webhook/worker ile aynı yol). Eskiden burada yalnız
-    // order.status=delivered set ediliyor, scheduleHoldReleaseOnDelivery ATLANIYOR ve
-    // deliveredAt yazılmıyordu → PaymentHold.releaseAt null kalıp satıcı hiç ödenmiyordu
-    // (kanonik oto-oluşturulan siparişler). Handler idempotent; re-poll deliveredAt'i
-    // taşımaz. PaymentService/NotificationService circular import'u önlemek için lazy. (#83)
-    if (isDelivered) {
-      const deliveredAt =
-        updateData.deliveredAt instanceof Date
-          ? updateData.deliveredAt
-          : new Date();
+    // 48h teslim-onay bildirimi — POST-COMMIT best-effort (dış I/O tx'e girmez).
+    const dr = deliveryResult as {
+      acted: boolean;
+      use48h: boolean;
+      confirmationDeadline: Date | null;
+      buyerId: string | null;
+    } | null;
+    if (
+      isDelivered &&
+      dr?.acted &&
+      dr.use48h &&
+      dr.confirmationDeadline &&
+      dr.buyerId
+    ) {
       try {
-        const { PaymentService } = await import("../payment/payment.service");
-        const paymentService = this.moduleRef.get(PaymentService, {
+        const { NotificationService } =
+          await import("../notification/notification.service");
+        const notificationService = this.moduleRef.get(NotificationService, {
           strict: false,
         });
-        if (paymentService) {
-          const res = await paymentService.handleOrderDelivered(
-            shipment.orderId,
-            deliveredAt,
-          );
-          if (
-            res.acted &&
-            res.use48h &&
-            res.confirmationDeadline &&
-            res.buyerId
-          ) {
-            try {
-              const { NotificationService } =
-                await import("../notification/notification.service");
-              const notificationService = this.moduleRef.get(
-                NotificationService,
-                {
-                  strict: false,
-                },
-              );
-              await notificationService?.notifyOrderDeliveredConfirm(
-                res.buyerId,
-                shipment.orderId,
-                res.confirmationDeadline,
-              );
-            } catch (e: any) {
-              this.logger.warn(
-                `notify delivered-confirm failed (poll) for ${shipment.orderId}: ${e?.message}`,
-              );
-            }
-          }
-        }
-      } catch (error: any) {
-        this.logger.error(
-          `handleOrderDelivered failed (poll) for order ${shipment.orderId}: ${error.message}. Manual intervention may be needed.`,
+        await notificationService?.notifyOrderDeliveredConfirm(
+          dr.buyerId,
+          shipment.orderId,
+          dr.confirmationDeadline,
+        );
+      } catch (e: any) {
+        this.logger.warn(
+          `notify delivered-confirm failed (poll) for ${shipment.orderId}: ${e?.message}`,
         );
       }
     }
