@@ -426,6 +426,12 @@ export class TradeReconciliationService {
           const allItems = await tx.tradeItem.findMany({
             where: { tradeId: trade.id },
           });
+          // #2 (LOST-UPDATE FIX): okumadan ÖNCE ürünleri FOR UPDATE ile (id-sıralı) kilitle →
+          // eşzamanlı satış/takas düşümü stale mutlak-set yazamaz; deadlock önlenir.
+          const lockIds = [...new Set(allItems.map((i) => i.productId))].sort();
+          for (const pid of lockIds) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${pid} FOR UPDATE`;
+          }
           const products = await tx.product.findMany({
             where: { id: { in: allItems.map((i) => i.productId) } },
           });
