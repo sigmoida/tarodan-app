@@ -89,6 +89,123 @@ export class PaymentRefundService {
   }
 
   /**
+   * 11.2b — Atomik iade "slot" claim'i (eşzamanlı kısmi-iade çift-PayTR koruması).
+   *
+   * Payment satırını `FOR UPDATE` ile kilitler, `metadata`'yı TX İÇİNDE TAZE okur (çağıranın
+   * elindeki stale in-memory snapshot değil), sonra KİLİT ALTINDA: (a) kümülatif tavanı taze
+   * `refundedOrders`'a göre doğrular, (b) order-başı `refundInProgressOrders` marker'ını
+   * kontrol eder — yoksa MONEY-M4 formatında (amount+at) yazar. Kilit tx commit'iyle serbest
+   * kalır; PayTR çağrısı DIŞARIDA yapılır (HTTP gecikmesi kilidi tutmaz). Aynı marker/CAS/
+   * clearRefundInProgress sözleşmesi korunur (obje truthy marker; tutar farklıysa reddet).
+   *
+   * @returns `"proceed"` marker yeni yazıldı → PayTR çağır · `"recovered"` marker zaten vardı
+   *          (aynı tutar) → PayTR atla, persist-recovery. Reddi `BadRequestException` ile atar.
+   */
+  private async claimRefundSlot(
+    paymentId: string,
+    orderId: string,
+    amountToRefund: number,
+    refundCap: number,
+    isGroupPayment: boolean,
+  ): Promise<"proceed" | "recovered"> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Payment satırını kilitle — eşzamanlı claim'ler burada serileşir.
+        await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+        const fresh = await tx.payment.findUnique({
+          where: { id: paymentId },
+          select: { metadata: true },
+        });
+        const meta = (fresh?.metadata as Record<string, any>) || {};
+        const inProgressOrders =
+          (meta.refundInProgressOrders as Record<
+            string,
+            { amount?: number; at?: string } | string
+          >) || {};
+        const refundedOrders =
+          (meta.refundedOrders as Record<string, number>) || {};
+
+        // Kümülatif tavan — TAZE refundedOrders (kilit altında) → cap race'i kapatır.
+        if (isGroupPayment) {
+          if (refundedOrders[orderId]) {
+            throw new BadRequestException(
+              i18nMessage("server.payment.orderAlreadyRefunded"),
+            );
+          }
+        } else {
+          const prior = Number(refundedOrders[orderId] || 0);
+          if (prior + amountToRefund > refundCap + MONEY_EPSILON) {
+            throw new BadRequestException(
+              i18nMessage("server.payment.refundAmountExceedsLimit", {
+                amountToRefund,
+                refundCap: Math.max(
+                  Math.round((refundCap - prior) * 100) / 100,
+                  0,
+                ),
+              }),
+            );
+          }
+        }
+
+        const existingMarker = inProgressOrders[orderId];
+        if (existingMarker) {
+          // Finding 1: marker order-BAŞINA; MONEY-H4 tek ödemede çoklu kısmi iadeye izin verir.
+          // Marker tutarı YENİ tutardan FARKLIYSA başka (takılı) bir iadeye aittir → "recovered"
+          // sanıp PayTR'ı atlarsak SAHTE iade olur. Tutar eşitse gerçek retry (kurtarma).
+          const markerAmount =
+            existingMarker &&
+            typeof existingMarker === "object" &&
+            typeof existingMarker.amount === "number"
+              ? existingMarker.amount
+              : undefined;
+          if (
+            markerAmount !== undefined &&
+            Math.abs(markerAmount - amountToRefund) > MONEY_EPSILON
+          ) {
+            this.logger.warn(
+              `claimRefundSlot: order ${orderId} için farklı tutarlı iade kurtarma bekliyor ` +
+                `(marker=${markerAmount}, istenen=${amountToRefund}) — REDDEDİLDİ (payment=${paymentId}).`,
+            );
+            throw new BadRequestException(
+              i18nMessage("server.payment.refundInitiationFailed"),
+            );
+          }
+          return "recovered" as const;
+        }
+
+        // Marker'ı KİLİT ALTINDA + TAZE meta üzerine yaz (concurrent clobber yok).
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: {
+            metadata: {
+              ...meta,
+              refundInProgressOrders: {
+                ...inProgressOrders,
+                [orderId]: {
+                  amount: amountToRefund,
+                  at: new Date().toISOString(),
+                },
+              },
+            },
+          },
+        });
+        return "proceed" as const;
+      });
+    } catch (e) {
+      // Reddi (cap/marker) aynen ilet; DB/kilit hatasında para hareketi OLMADAN abort et
+      // (orijinal marker-yazım-hatası davranışıyla simetrik → çağıran güvenle retry eder).
+      if (e instanceof BadRequestException) throw e;
+      this.logger.error(
+        `claimRefundSlot: kilit/marker tx hatası, PayTR çağrısı yapılmadan abort ` +
+          `(payment=${paymentId}, order=${orderId}): ${(e as Error)?.message}`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.payment.refundInitiationFailed"),
+      );
+    }
+  }
+
+  /**
    * Process refund
    * Requirement: Refund handling (project.md)
    */
@@ -267,41 +384,19 @@ export class PaymentRefundService {
           // persist-recovery'ye geç. Grup ödemesinde tek payment birden çok siparişi
           // kapsadığından marker SİPARİŞ BAŞINA tutulur (refundedOrders map'i gibi) —
           // kardeş siparişin markerı bu siparişin PayTR çağrısını engellemesin.
-          const existingMeta = (payment.metadata as Record<string, any>) || {};
-          const inProgressOrders =
-            (existingMeta.refundInProgressOrders as Record<
-              string,
-              { amount?: number; at?: string } | string
-            >) || {};
-
-          const existingMarker = inProgressOrders[orderId];
-          if (existingMarker) {
-            // Finding 1: marker order-BAŞINA tutulur ama MONEY-H4 tek ödemede ÇOKLU kısmi
-            // iadeye izin verir. Marker'daki tutar YENİ iade tutarından FARKLIYSA, bu marker
-            // kurtarma bekleyen BAŞKA (takılı) bir iadeye aittir; onu "recovered" sanıp PayTR'ı
-            // atlarsak SAHTE iade olur (para dönmez ama DB'ye yazılır). O yüzden:
-            //  - tutar EŞİTSE → gerçek retry → kurtarma yolu (PayTR atla),
-            //  - tutar FARKLIYSA → REDDET; reconcileStuckRefundMarkers takılıyı finalize edince
-            //    çağıran tekrar dener. Böylece order başına her an ≤1 in-flight marker olur.
-            const markerAmount =
-              existingMarker &&
-              typeof existingMarker === "object" &&
-              typeof existingMarker.amount === "number"
-                ? existingMarker.amount
-                : undefined;
-            if (
-              markerAmount !== undefined &&
-              Math.abs(markerAmount - amountToRefund) > MONEY_EPSILON
-            ) {
-              this.logger.warn(
-                `processRefund: order ${orderId} için farklı tutarlı iade kurtarma bekliyor ` +
-                  `(marker=${markerAmount}, istenen=${amountToRefund}) — yeni iade REDDEDİLDİ; ` +
-                  `süpürme finalize edince tekrar deneyin (payment=${payment.id}).`,
-              );
-              throw new BadRequestException(
-                i18nMessage("server.payment.refundInitiationFailed"),
-              );
-            }
+          // 11.2b: iade "slot" claim'i ATOMİK — payment satırını FOR UPDATE ile kilitle,
+          // metadata'yı TAZE oku (in-memory stale snapshot değil), kümülatif tavan + order-başı
+          // marker'ı KİLİT ALTINDA kontrol et, yoksa marker'ı yaz. Böylece EŞZAMANLI kısmi
+          // iadeler artık marker'ı yarışarak oku-yaz edemez → çift-PayTR penceresi kapanır.
+          // PayTR çağrısı kilit DIŞINDA (aşağıda) yapılır — HTTP gecikmesi DB kilidini tutmaz.
+          const claim = await this.claimRefundSlot(
+            payment.id,
+            orderId,
+            amountToRefund,
+            refundCap,
+            isGroupPayment,
+          );
+          if (claim === "recovered") {
             this.logger.warn(
               `processRefund: refundInProgressOrders[${orderId}] zaten set — PayTR ` +
                 `çağrısı atlanıyor, yalnız persist-recovery denenecek (payment=${payment.id}).`,
@@ -313,38 +408,6 @@ export class PaymentRefundService {
               recovered: true,
             };
           } else {
-            // Marker'ı PayTR'den ÖNCE kalıcı yaz. Yazım başarısızsa para hareketi
-            // olmadan abort et — çağıran güvenle tekrar deneyebilir.
-            try {
-              await this.prisma.payment.update({
-                where: { id: payment.id },
-                data: {
-                  metadata: {
-                    ...existingMeta,
-                    refundInProgressOrders: {
-                      ...inProgressOrders,
-                      // MONEY-M4: tutarı da sakla — PayTR sonrası tx patlarsa
-                      // reconcileStuckRefundMarkers doğru tutarla finalize edebilsin
-                      // (yalnız timestamp'ten tam/kısmi ayırt edilemezdi). Truthiness
-                      // guard'ı (obje truthy) ve clearRefundInProgress etkilenmez.
-                      [orderId]: {
-                        amount: amountToRefund,
-                        at: new Date().toISOString(),
-                      },
-                    },
-                  },
-                },
-              });
-            } catch (markerErr: any) {
-              this.logger.error(
-                `processRefund: refundInProgress marker yazılamadı, PayTR çağrısı ` +
-                  `yapılmadan abort (payment=${payment.id}, order=${orderId}): ${markerErr?.message}`,
-              );
-              throw new BadRequestException(
-                i18nMessage("server.payment.refundInitiationFailed"),
-              );
-            }
-
             const paytrOid =
               payment.providerConversationId?.trim() ||
               orderId.replace(/-/g, "");

@@ -465,10 +465,11 @@
       çalışır (kapalıyken 404 → uç görünmez) + gövde doğrulama (trackingNumber+status string zorunlu). Sürat
       poll-tabanlı olduğundan gerçek callback yok → forge edilmiş "delivered" ile escrow-erken-başlatma yüzeyi
       varsayılan olarak kalktı; gerçek imzalı callback gelirse flag ile açılır. `shipping/shipping.controller.ts:142`.
-- [~] **11.2b (G6)** → **11.3b'ye taşındı.** Atomik `FOR UPDATE` claim (cap + marker'ı kilit altında taze oku-yaz)
-  processRefund'ın böleceğimiz tam bloğuna denk geliyor; yerinde yapıp 11.3b'de tekrar bölmek en kritik para
-  yolunda riski ikiye katlar. 11.3b'de `RefundCapPolicy`/claim bileşeninde kilitle (test'li). Pencere dar +
-  çok-katmanlı savunuluyor (marker/CAS/completed-lookup/over-refund alarm). `payment/payment-refund.service.ts:146-346`.
+- [x] **11.2b (G6)** ✓ Atomik `FOR UPDATE` iade claim'i (`claimRefundSlot`): payment satırını kilitle, metadata'yı
+      TX İÇİNDE TAZE oku, kümülatif tavan + order-başı marker'ı KİLİT ALTINDA kontrol et, yoksa yaz. Eşzamanlı kısmi
+      iadeler artık marker'ı yarışarak oku-yaz edemez → çift-PayTR penceresi kapandı. PayTR çağrısı kilit DIŞINDA (HTTP
+      gecikmesi kilidi tutmaz). Marker/recovery/reject sözleşmesi korundu; bu metod 11.3b `RefundCapPolicy`/claim
+      bileşeninin tohumu. **Spec:** refund-partial mock stateful (claim yazar, finalize tazeler) → 130 test yeşil.
 - [x] **11.2c** ✓ Poll `delivered`→escrow ATOMİK: CAS flip + `handleOrderDelivered(tx)` tek `$transaction`'da
       (webhook yoluyla aynı desen; hata → rollback → sonraki poll retry). Bildirim + event-sync POST-COMMIT.
       Artık çökme escrow'u askıda bırakmaz. `surat-cargo/surat-tracking.service.ts`.
