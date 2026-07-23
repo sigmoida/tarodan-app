@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
+import { createHash } from "crypto";
 import { OrderService } from "./order.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCheckoutService } from "./order-checkout.service";
@@ -37,6 +38,9 @@ describe("OrderService checkout group (batch checkout)", () => {
   const productB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2";
   const addressId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
   const idempotencyKey = "11111111-1111-4111-8111-111111111111";
+  // Misafir OTP hash pepper'ı: ConfigService.getOrThrow bunu döndürür; testte aynı
+  // değerle beklenen hash'i üretip Redis kaydını taklit ederiz (OTP tüketimini geçmek için).
+  const OTP_SECRET = "test-otp-secret";
 
   const makeProduct = (
     id: string,
@@ -58,6 +62,7 @@ describe("OrderService checkout group (batch checkout)", () => {
   });
 
   let mockTx: any;
+  let cache: any;
 
   const mockPrisma: any = {
     user: { findUnique: jest.fn() },
@@ -176,9 +181,18 @@ describe("OrderService checkout group (batch checkout)", () => {
         { provide: PrismaService, useValue: mockPrisma },
         {
           provide: CacheService,
-          useValue: { del: jest.fn(), delPattern: jest.fn() },
+          useValue: {
+            del: jest.fn(),
+            delPattern: jest.fn(),
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn(),
+            ttl: jest.fn().mockResolvedValue(300),
+          },
         },
-        { provide: ConfigService, useValue: { get: jest.fn() } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn(), getOrThrow: jest.fn(() => OTP_SECRET) },
+        },
         { provide: EventService, useValue: { emitOrderCreated: jest.fn() } },
         { provide: NotificationService, useValue: {} },
         {
@@ -206,6 +220,7 @@ describe("OrderService checkout group (batch checkout)", () => {
     }).compile();
 
     service = module.get(OrderService);
+    cache = module.get(CacheService);
   });
 
   const baseDto = () => ({
@@ -496,6 +511,100 @@ describe("OrderService checkout group (batch checkout)", () => {
       }),
     ).rejects.toMatchObject({
       response: { i18nKey: "server.order.couponNotSupportedForGuest" },
+    });
+  });
+
+  // ── Misafir GRUP checkout (POST /orders/checkout/guest → checkoutGuest) ──────────
+  // checkoutGuest, dto.items içindeki quantity'yi createCheckoutGroup'a birebir
+  // devreder → adet mantığı ÜYE grup checkout ile aynıdır. Bu blok, adet'in
+  // fiyat*adet (subtotal), order.quantity, stok rezervasyonu ve birleşik üst-sınır
+  // (HARD_CAP=20 / maxQuantityPerOrder) boyunca gerçekten aktığını uçtan uca doğrular.
+  describe("guest group checkout (checkoutGuest) honors per-item quantity", () => {
+    const guestEmail = "guest@example.com";
+    const guestCode = "123456";
+
+    // Misafir OTP tüketimini geç: Redis kaydını doğru hash ile taklit et (aynı pepper).
+    const primeGuestOtp = () => {
+      const normEmail = guestEmail.trim().toLowerCase();
+      const h = createHash("sha256")
+        .update(`${OTP_SECRET}:${normEmail}:${guestCode}`, "utf8")
+        .digest("hex");
+      cache.get.mockResolvedValue({ h, a: 0, c: 1, v: 5 });
+      cache.ttl.mockResolvedValue(300);
+    };
+
+    const guestDto = (
+      items: Array<{ productId: string; quantity?: number }>,
+    ) => ({
+      items,
+      idempotencyKey,
+      email: guestEmail,
+      emailVerificationCode: guestCode,
+      phone: "+905551234567",
+      guestName: "Guest User",
+      // Misafir grup checkout inline adres ister (kayıtlı adres ID yok).
+      shippingAddress: {
+        fullName: "Guest User",
+        phone: "+905551234567",
+        city: "İstanbul",
+        district: "Kadıköy",
+        address: "Test cad. 1",
+      },
+    });
+
+    beforeEach(() => {
+      // Tek ürün, bol stok: adet doğrulaması stoktan değil sınır/geçişten sınansın.
+      mockTx.$queryRaw.mockResolvedValue([{ id: productA }]);
+      mockTx.product.findMany.mockResolvedValue([
+        makeProduct(productA, { quantity: 100 }),
+      ]);
+      primeGuestOtp();
+    });
+
+    it("quantity=3 → order.quantity=3, subtotal=fiyat*3, rezervasyon +3 (1 değil)", async () => {
+      await service.checkoutGuest(
+        guestDto([{ productId: productA, quantity: 3 }]) as any,
+      );
+
+      expect(mockTx.order.create).toHaveBeenCalledTimes(1);
+      const orderData = mockTx.order.create.mock.calls[0][0].data;
+      expect(orderData.quantity).toBe(3);
+      expect(orderData.unitPrice).toBe(100);
+      // subtotal = originalPrice * adet = 100 * 3
+      expect(orderData.subtotal).toBe(300);
+      // Satır toplamı fiyat*adet üzerinden → totalAmount en az 300 (+ kargo/fee/vergi)
+      expect(orderData.totalAmount).toBeGreaterThanOrEqual(300);
+
+      // Stok rezervasyonu adet kadar artar (eskiden sabit 1 idi).
+      expect(mockTx.product.update).toHaveBeenCalledWith({
+        where: { id: productA },
+        data: { reservedQuantity: { increment: 3 } },
+      });
+    });
+
+    it("adet verilmezse (===1) davranış değişmez: order.quantity=1, rezervasyon +1", async () => {
+      await service.checkoutGuest(guestDto([{ productId: productA }]) as any);
+
+      const orderData = mockTx.order.create.mock.calls[0][0].data;
+      expect(orderData.quantity).toBe(1);
+      expect(orderData.subtotal).toBe(100);
+      expect(mockTx.product.update).toHaveBeenCalledWith({
+        where: { id: productA },
+        data: { reservedQuantity: { increment: 1 } },
+      });
+    });
+
+    it("birleşik adet üst sınırı (20) misafirde de zorlanır: aynı ürün 15+15 → reddedilir", async () => {
+      await expect(
+        service.checkoutGuest(
+          guestDto([
+            { productId: productA, quantity: 15 },
+            { productId: productA, quantity: 15 },
+          ]) as any,
+        ),
+      ).rejects.toThrow(/maksimum 20 adet/i);
+
+      expect(mockTx.order.create).not.toHaveBeenCalled();
     });
   });
 });

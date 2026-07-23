@@ -208,6 +208,10 @@ export class OrderCommonService {
         (typeof order.shippingAddress === "object" &&
           (order.shippingAddress as any)?.type === "membership"),
       checkoutGroupId: order.checkoutGroupId ?? null,
+      // Satıcı paketi (çatı): aynı checkout grubunda aynı satıcının order'ları tek pakette.
+      // Kargo pakete bir kez yüklenir → kardeş order'ın shippingCost'u 0 olabilir; UI bunu
+      // "ücretsiz" değil "pakete dahil" göstermek için packageId'ye bakar.
+      packageId: order.packageId ?? null,
       amount: totalAmount,
       totalAmount,
       commissionAmount,

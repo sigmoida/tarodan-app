@@ -464,13 +464,12 @@ export class OrderCheckoutGroupService {
               (sellerLineSubtotals.get(entry.product.sellerId) ?? 0) + line,
             );
           }
-          const sellerShipping = new Map<string, number>();
-          for (const [sellerId, subtotal] of sellerLineSubtotals) {
-            sellerShipping.set(
-              sellerId,
-              await this.orderPricing.calculateShippingCost(subtotal),
+          // Satıcı-başına kargo: quote ile ORTAK yardımcı (DRY) → önizleme ve tahsilat
+          // aynı; ikisi ayrı hesaplayınca oluşan az-göster/fazla-tahsil bug'ı kapandı.
+          const sellerShipping =
+            await this.orderPricing.calculateShippingBySeller(
+              sellerLineSubtotals,
             );
-          }
           const sellerShippingCharged = new Set<string>();
 
           for (const entry of pricing) {

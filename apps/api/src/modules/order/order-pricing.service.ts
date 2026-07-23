@@ -91,6 +91,27 @@ export class OrderPricingService {
   }
 
   /**
+   * Satıcı-BAŞINA kargo: her satıcının kargosu KENDİ ürün alt-toplamına göre hesaplanır
+   * (serbest-kargo eşiği satıcı bazında değerlendirilir), toplam = Σ. Sepette 2 satıcı
+   * varsa 2 kargo, 3 değil.
+   *
+   * TEK KAYNAK (DRY): hem checkout QUOTE (önizleme) hem sipariş CREATE bu yardımcıyı
+   * çağırır. Eskiden quote birleşik alt-toplamda TEK kargo, create satıcı-başına
+   * hesaplıyordu → çoklu-satıcı sepette alıcıya AZ gösterilip FAZLA tahsil ediliyordu.
+   * Ayarlar tek kez okunur (N satıcı için N sorgu yerine 1).
+   */
+  async calculateShippingBySeller(
+    sellerSubtotals: Map<string, number>,
+  ): Promise<Map<string, number>> {
+    const { baseCost, freeThreshold } = await this.getShippingSettings();
+    const out = new Map<string, number>();
+    for (const [sellerId, subtotal] of sellerSubtotals) {
+      out.set(sellerId, subtotal >= freeThreshold ? 0 : baseCost);
+    }
+    return out;
+  }
+
+  /**
    * Get free shipping info for frontend display
    */
   async getFreeShippingInfo(orderAmount: number): Promise<{
@@ -124,6 +145,7 @@ export class OrderPricingService {
     sellerNetAmount: number;
     items: Array<{
       productId: string;
+      sellerId: string;
       quantity: number;
       unitPrice: number;
       subtotal: number;
@@ -133,6 +155,9 @@ export class OrderPricingService {
       taxAmount: number;
       title?: string;
     }>;
+    // Satıcı-başına kargo kırılımı (sepetteki her satıcı için tek kargo). UI "çatı"
+    // görünümü ve doğru toplam için; `shippingAmount` bunların toplamıdır.
+    shippingBySeller: Array<{ sellerId: string; shippingCost: number }>;
     pricing: {
       subtotal: number;
       shippingAmount: number;
@@ -156,6 +181,7 @@ export class OrderPricingService {
     let totalTax = 0;
     const quoteItems: Array<{
       productId: string;
+      sellerId: string;
       quantity: number;
       unitPrice: number;
       subtotal: number;
@@ -165,6 +191,8 @@ export class OrderPricingService {
       taxAmount: number;
       title?: string;
     }> = [];
+    // Satıcı-başına kargo alt-toplamı (create ile aynı mantık — calculateShippingBySeller).
+    const sellerSubtotals = new Map<string, number>();
 
     for (const { productId, quantity = 1 } of dto.items) {
       const product = await this.prisma.product.findUnique({
@@ -227,9 +255,14 @@ export class OrderPricingService {
       totalBuyerFee += lineBuyerFee;
       totalSellerFee += lineSellerFee;
       totalTax += lineTax;
+      sellerSubtotals.set(
+        product.sellerId,
+        (sellerSubtotals.get(product.sellerId) ?? 0) + lineSubtotal,
+      );
 
       quoteItems.push({
         productId: product.id,
+        sellerId: product.sellerId,
         quantity,
         unitPrice,
         subtotal: lineSubtotal,
@@ -241,7 +274,15 @@ export class OrderPricingService {
       });
     }
 
-    const shippingAmount = await this.calculateShippingCost(itemsSubtotal);
+    // Satıcı-BAŞINA kargo (create ile ortak yardımcı) → çoklu-satıcı sepette doğru toplam.
+    const shippingMap = await this.calculateShippingBySeller(sellerSubtotals);
+    const shippingBySeller = [...shippingMap.entries()].map(
+      ([sellerId, shippingCost]) => ({ sellerId, shippingCost }),
+    );
+    const shippingAmount = shippingBySeller.reduce(
+      (sum, s) => sum + s.shippingCost,
+      0,
+    );
     const commissionAmount = totalBuyerFee + totalSellerFee;
     const totalAmount =
       itemsSubtotal + shippingAmount + totalBuyerFee + totalTax;
@@ -268,6 +309,7 @@ export class OrderPricingService {
       totalAmount,
       sellerNetAmount,
       items: quoteItems,
+      shippingBySeller,
       pricing,
     };
   }
