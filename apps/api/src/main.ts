@@ -8,6 +8,7 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { json, urlencoded } from "express";
 import { setupBullBoard } from "./bull-board.setup";
 import { AppNestLogger } from "./common/logging/nest-logger";
+import { getProcessRole } from "./process-role";
 
 /**
  * Hard guard: PAYMENT_BYPASS allows completing payments without going through
@@ -165,7 +166,10 @@ async function bootstrap() {
     const port = process.env.PORT || 3000;
     // 0.0.0.0 — telefonun LAN IP üzerinden erişebilmesi için tüm arayüzleri dinle.
     await app.listen(port, "0.0.0.0");
-    logger.log(`Application running on port ${port}`);
+    // Faz 7.2: hangi rolde koştuğumuzu logla (`all`=HTTP+worker'lar, `web`=yalnız HTTP).
+    logger.log(
+      `Application running on port ${port} (PROCESS_ROLE=${getProcessRole()})`,
+    );
   } catch (error) {
     logger.error("Failed to start application:", error);
     process.exit(1);

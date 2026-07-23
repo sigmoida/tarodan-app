@@ -62,6 +62,7 @@ import { I18nModule } from "./modules/i18n";
 
 // Background Workers (BullMQ)
 import { WorkerModule } from "./workers";
+import { runsQueueWorkers } from "./process-role";
 
 // WebSocket for real-time communication
 import { WebSocketModule } from "./modules/websocket";
@@ -204,8 +205,10 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     // GraphQLAppModule,   // GAP-L02: GraphQL API Support - Temporarily disabled
     I18nModule, // GAP-L03: Multi-language Support
 
-    // Background Workers (BullMQ)
-    WorkerModule, // Email, Push, Image, Payment, Shipping, Search workers
+    // Background Workers (BullMQ) — Faz 7.2: `PROCESS_ROLE=web` iken YÜKLENMEZ (ağır
+    // kuyruk worker'ları ayrı worker process'ine taşınır). Varsayılan (`all`) + `worker`
+    // rollerinde yüklenir → tek-process deploy'da davranış değişmez.
+    ...(runsQueueWorkers() ? [WorkerModule] : []),
 
     // WebSocket for real-time communication
     WebSocketModule, // Messaging, Notifications, Live updates

@@ -350,10 +350,16 @@
       `featured-scheduler` (`15 3 * * *`), `search-sync` saatlik reconcile (EVERY_HOUR). Kod tabanında
       artık **HİÇ saf `@Cron` YOK** — her zamanlanmış iş `@TrackedCron` (gate) + Bull repeatable +
       `@Process` handler'a sahip. Flag açılınca (Faz 0 sonrası) hepsi Bull'a geçer, in-process temizlenir.
-- [ ] **7.2** (OPS) Worker'ı ayrı process olarak deploy et (`worker.ts` → `node dist/worker`, ayrı
-      Coolify servisi) + `AppModule`'den `WorkerModule`'ü çıkar. Not: `scheduled` kuyruğu processor'ları
-      şu an ANA API process'inde koşar; ayrı worker'a taşımak worker.ts'in ilgili modülleri
-      yüklemesini gerektirir (deploy + Coolify işi).
+- [~] **7.2** ✓ (KOD) Process-rol ayrımı env ile yapılabilir hâle geldi (`PROCESS_ROLE`: `all`
+  varsayılan tek-process | `web` yalnız HTTP | `worker` başsız). `src/process-role.ts` helper +
+  spec. `AppModule` `WorkerModule`'ü artık `runsQueueWorkers()` ile koşullu import ediyor →
+  `PROCESS_ROLE=web`'de API ağır kuyruk worker'larını (email/push/image/payment/search/analytics/
+  moderation) YÜKLEMEZ; varsayılan `all`'da yüklenir (davranış değişmez, tek-process deploy bozulmaz).
+  `worker.ts` artık `WorkerModule` yerine `AppModule`'ü BAŞSIZ application-context olarak yüklüyor →
+  ayrı worker hem klasik kuyrukları hem de feature modüllerine gömülü `scheduled` processor'ları
+  (outbox-drain, ledger-reconcile, payout, membership, boost, …) koşturur ("worker.ts ilgili modülleri
+  yüklesin" karşılandı). **KALAN (OPS):** ayrı Coolify servisi `node dist/worker` + API'ye
+  `PROCESS_ROLE=web`, worker'a `PROCESS_ROLE=worker` env'i + Faz 0 (ayrı Redis) — deploy adımı.
 - [x] **7.3** Idempotency: para job'ları Faz 1-2 CAS ile idempotent; yeni outbox (CAS claim +
       dedupeKey + idempotent handler) ve ledger (dengeli record + best-effort capture) tasarımca
       idempotent — Bull at-least-once güvenli.
