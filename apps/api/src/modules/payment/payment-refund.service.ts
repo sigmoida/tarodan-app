@@ -41,6 +41,15 @@ import { i18nMessage } from "../i18n";
  * scheduleHoldReleaseOnDelivery hold penceresi hesabı için holdDays/returnWindowDays/
  * payoutGraceDays alanlarını KENDİ constructor'ında bayt-bayt aynı mantıkla yeniden üretir.
  */
+/**
+ * 11.4c — Kısmi iade ORANI (TEK otorite): hold tüketimi ve ledger pro-rate AYNI formülü
+ * kullanır. `amount/threshold`, [0,1] arasına clamp'li; threshold ≤ 0 iken 1 (tam). Eskiden
+ * iki yerde birebir kopyalanıyordu → drift riski; artık tek yerden.
+ */
+function refundPortion(amountToRefund: number, threshold: number): number {
+  return threshold > 0 ? Math.min(amountToRefund / threshold, 1) : 1;
+}
+
 @Injectable()
 export class PaymentRefundService {
   private readonly logger = new Logger(PaymentRefundService.name);
@@ -614,10 +623,7 @@ export class PaymentRefundService {
             // amount - refundedAmount ödenir. orderRefundThreshold = siparişin tutarı
             // (grup'ta order.totalAmount, tekilde payment.amount) — tx başında hesaplandı.
             const sellerAmount = Number(activeHold.amount);
-            const portion =
-              orderRefundThreshold > 0
-                ? Math.min(amountToRefund / orderRefundThreshold, 1)
-                : 1;
+            const portion = refundPortion(amountToRefund, orderRefundThreshold);
             const refundedSeller =
               Math.round(sellerAmount * portion * 100) / 100;
             const newRefunded =
@@ -644,10 +650,10 @@ export class PaymentRefundService {
           // (elogo net faturalar). Kümülatif tam iadeye ulaşınca status=refunded olur ve
           // e-Arşiv reverse tetiklenir (eski davranış: yalnız tam iadede reverse — korunur).
           // ledger threshold = siparişin tutarı (orderRefundThreshold, tx başında).
-          const ledgerPortion =
-            orderRefundThreshold > 0
-              ? Math.min(amountToRefund / orderRefundThreshold, 1)
-              : 1;
+          const ledgerPortion = refundPortion(
+            amountToRefund,
+            orderRefundThreshold,
+          );
           await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
 
           // Faz 6.2 (ledger): `refund_issued` oransal ters kayıt (best-effort — defter

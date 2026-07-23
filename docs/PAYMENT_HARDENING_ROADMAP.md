@@ -495,8 +495,9 @@
       Ölü Sürat enum import'ları temizlendi. tsc temiz; surat/payment/refund/trade 163 test yeşil.
 - [ ] **11.4b** Tracking sync/apply **3× kopya** (order/trade/refund-return: `syncAllActive*` + `applyTrackingUpdate`
       / `syncTradeShipmentTracking` + `sync*Events`) → entity-adapter'lı generic sync core.
-- [ ] **11.4c** Refund proration **3+ yerde farklı yuvarlama** (`portion`/`ledgerPortion`/`ledger.recordRefund` ratio/
-      `refund.computeRefundAmount`) → tek yuvarlama otoritesi.
+- [x] **11.4c** ✓ İkiz `portion`/`ledgerPortion` (hold tüketimi + ledger pro-rate, birebir aynı formül) tek
+      `refundPortion(amount, threshold)` otoritesine indi. NOT: `ledger.recordRefund` ratio'su (refund/orderTotal)
+      ve `refund.computeRefundAmount` (adet formülü) FARKLI semantik → bilinçli ayrı bırakıldı. tsc temiz; refund 28 test yeşil.
 - [ ] **11.4d** Para nesneleri `any` (`payment: any`/`order: any`/`metadata as any` yaygın) → mevcut `PaymentMetadata` + tipli order shape'i tutarlı uygula (derleme-zamanı `amount`/`status` güvenliği).
 
 ### 11.5 — DIP / abstraction
