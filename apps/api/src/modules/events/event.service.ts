@@ -48,6 +48,10 @@ export interface OrderPaidPayload {
   productId: string;
   productTitle: string;
   totalAmount: number;
+  /** Sipariş adedi (çoklu-adet sepet). Varsayılan 1; e-postada adet gösterimi için. */
+  quantity?: number;
+  /** Birim fiyat (opsiyonel; adet>1'de satır kırılımı için). */
+  unitPrice?: number;
   commissionAmount: number;
   buyerEmail: string;
   buyerName: string;
@@ -89,7 +93,21 @@ export interface GroupBuyerOrderPaidPayload {
   groupTotal: number;
   paymentMethod: string;
   transactionId: string;
-  items: Array<{ productTitle: string; totalAmount: number }>;
+  items: Array<{
+    productTitle: string;
+    totalAmount: number;
+    /** Sipariş adedi (çoklu-adet). Varsayılan 1. */
+    quantity?: number;
+    /** Bu order satırına yüklü kargo (satıcı paketinin TEK kargosu; kardeşlerde 0). */
+    shippingCost?: number;
+  }>;
+  /**
+   * Satıcı-bazlı kargo dökümü — her satıcı = bir OrderPackage = TEK kargo ücreti.
+   * Konsolide kardeş order'ların shippingCost'u 0 ("pakete dahil"). Opsiyonel (geriye dönük).
+   */
+  sellerShipments?: Array<{ sellerName: string; shippingCost: number }>;
+  /** Tüm satıcı paketlerinin toplam kargosu. Opsiyonel. */
+  shippingTotal?: number;
   shippingAddress: {
     fullName: string;
     phone: string;
@@ -305,6 +323,8 @@ export class EventService {
             buyerName: payload.buyerName,
             buyerEmail: payload.buyerEmail,
             productTitle: payload.productTitle,
+            quantity: payload.quantity ?? 1,
+            unitPrice: payload.unitPrice,
             totalAmount: payload.totalAmount,
             paymentMethod: payload.paymentMethod,
             transactionId: payload.transactionId,
@@ -333,6 +353,7 @@ export class EventService {
           orderNumber: payload.orderNumber,
           sellerName: payload.sellerName,
           productTitle: payload.productTitle,
+          quantity: payload.quantity ?? 1,
           totalAmount: payload.totalAmount,
           commissionAmount: payload.commissionAmount,
           netAmount: payload.totalAmount - payload.commissionAmount,
@@ -438,6 +459,9 @@ export class EventService {
           buyerName: payload.buyerName,
           buyerEmail: payload.buyerEmail,
           items: payload.items,
+          // Satıcı-bazlı kargo dökümü + toplam (satıcı = paket = tek kargo).
+          sellerShipments: payload.sellerShipments ?? [],
+          shippingTotal: payload.shippingTotal ?? 0,
           groupTotal: payload.groupTotal,
           paymentMethod: payload.paymentMethod,
           transactionId: payload.transactionId,

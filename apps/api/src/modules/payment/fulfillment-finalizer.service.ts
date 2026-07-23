@@ -96,6 +96,10 @@ export class FulfillmentFinalizer {
         productId: order.productId,
         productTitle: order.product.title,
         totalAmount: Number(order.totalAmount),
+        // Çoklu-adet: e-postada "Ürün × N" gösterimi için adet + birim fiyat.
+        quantity: Number(order.quantity ?? 1),
+        unitPrice:
+          order.unitPrice != null ? Number(order.unitPrice) : undefined,
         commissionAmount: Number(order.commissionAmount),
         buyerEmail: actualBuyerEmail,
         buyerName: actualBuyerName,

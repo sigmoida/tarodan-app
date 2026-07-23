@@ -567,6 +567,31 @@ export class PaymentFulfillmentService {
           where: { id: payment.checkoutGroupId },
           select: { groupNumber: true },
         });
+        // Satıcı-bazlı kargo dökümü: her satıcı = bir OrderPackage = TEK kargo ücreti.
+        // Konsolide kardeş order'ların shippingCost'u 0 ("pakete dahil") → satıcı
+        // bazında toplayınca o paketin tek kargosu çıkar (OrderPackage.shippingCost ile eş).
+        const shippingBySeller = new Map<
+          string,
+          { sellerName: string; shippingCost: number }
+        >();
+        for (const o of result.aliveOrders) {
+          const sellerName = o.seller.displayName || o.seller.email || "Satıcı";
+          const cost = Number(o.shippingCost ?? 0);
+          const existing = shippingBySeller.get(o.sellerId);
+          if (existing) {
+            existing.shippingCost += cost;
+          } else {
+            shippingBySeller.set(o.sellerId, {
+              sellerName,
+              shippingCost: cost,
+            });
+          }
+        }
+        const sellerShipments = Array.from(shippingBySeller.values());
+        const shippingTotal = sellerShipments.reduce(
+          (sum, s) => sum + s.shippingCost,
+          0,
+        );
         await this.eventService.emitGroupBuyerOrderPaid({
           checkoutGroupId: payment.checkoutGroupId,
           groupNumber: group?.groupNumber || payment.checkoutGroupId,
@@ -583,7 +608,12 @@ export class PaymentFulfillmentService {
           items: result.aliveOrders.map((o) => ({
             productTitle: o.product.title,
             totalAmount: Number(o.totalAmount),
+            quantity: o.quantity ?? 1,
+            // Bu satıra yüklü kargo (satıcı paketinin tek kargosu; kardeşlerde 0).
+            shippingCost: Number(o.shippingCost ?? 0),
           })),
+          sellerShipments,
+          shippingTotal,
           shippingAddress: {
             fullName: firstAddr?.fullName || "",
             phone: firstAddr?.phone || "",
