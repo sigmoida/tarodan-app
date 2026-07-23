@@ -130,12 +130,18 @@ const envSchema = z
             "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (live/soap do not support barcode creation)",
         });
       }
-      if ((env.SURAT_KARGO_TEST_MODE ?? "").trim() !== "false") {
+      // SURAT_KARGO_TEST_MODE'un AÇIKÇA set edilmesini zorunlu tut ('true' | 'false').
+      // Asıl tehlike, hiç set edilmemesi: default 'true' → stub/test SESSİZCE devreye
+      // girer (siparişler "kargolandı" görünür, fiziksel gönderi olmaz). Açıkça 'true'
+      // demek ise BİLİNÇLİ bir seçim (staging/test ortamı: gerçek gönderi istemiyoruz);
+      // 'false' gerçek üretim gönderisi. İkisi de kabul; yalnız belirsiz/boş reddedilir.
+      const testMode = (env.SURAT_KARGO_TEST_MODE ?? "").trim().toLowerCase();
+      if (testMode !== "false" && testMode !== "true") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["SURAT_KARGO_TEST_MODE"],
           message:
-            "SURAT_KARGO_TEST_MODE must be explicitly 'false' in production (it defaults to test mode -> no real shipments)",
+            "SURAT_KARGO_TEST_MODE must be explicitly 'true' or 'false' in production when SURAT_CARGO_ENABLED is set (unset defaults to test mode -> silent no-op shipments). Use 'false' for real production shipments; 'true' for a staging/test environment (no real shipments).",
         });
       }
       for (const key of [

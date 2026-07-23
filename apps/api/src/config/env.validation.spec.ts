@@ -39,15 +39,28 @@ describe("validateEnv", () => {
     ).toThrow(/SURAT_SOAP_MODE/);
   });
 
-  it("throws when cargo enabled in prod but SURAT_KARGO_TEST_MODE is not 'false'", () => {
+  it("throws when cargo enabled in prod but SURAT_KARGO_TEST_MODE is UNSET (silent-default footgun)", () => {
     expect(() =>
       validateEnv({
         ...cargoOn,
         SURAT_SOAP_MODE: "rest",
         SURAT_KARGO_CARI_KODU: "c",
         SURAT_KARGO_SIFRE: "s",
+        // SURAT_KARGO_TEST_MODE deliberately unset → defaults to test → rejected
       }),
     ).toThrow(/SURAT_KARGO_TEST_MODE/);
+  });
+
+  it("passes with cargo enabled + explicit TEST_MODE='true' (staging: no real shipments)", () => {
+    expect(() =>
+      validateEnv({
+        ...cargoOn,
+        SURAT_SOAP_MODE: "rest",
+        SURAT_KARGO_TEST_MODE: "true",
+        SURAT_KARGO_CARI_KODU: "c",
+        SURAT_KARGO_SIFRE: "s",
+      }),
+    ).not.toThrow();
   });
 
   it("throws when cargo enabled in prod but credentials missing", () => {
