@@ -177,6 +177,7 @@ export const queryKeys = {
   },
   boost: {
     pricing: () => ["boost-pricing"] as const,
+    options: (productId: string) => ["boost-options", productId] as const,
   },
   bankAccount: {
     detail: () => ["bank-account"] as const,

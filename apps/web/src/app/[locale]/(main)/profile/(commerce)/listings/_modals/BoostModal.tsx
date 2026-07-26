@@ -1,22 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
-import { Button, Checkbox, Modal, Radio, Spinner } from "@tarodan/ui";
+import { Badge, Button, Checkbox, Modal, Radio, Spinner } from "@tarodan/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 
-interface BoostOption {
+interface BoostDurationOption {
   durationDays: number;
   price: number;
+  listPrice: number;
+  campaign: boolean;
   label: string;
 }
 
-interface BoostPricing {
-  options?: BoostOption[];
+interface BoostPackage {
+  id: string;
+  name: string;
+  slug: string;
+  showcaseOnHome: boolean;
+  options: BoostDurationOption[];
+}
+
+interface BoostOptionsResponse {
   enabled?: boolean;
+  productPrice?: number;
+  packages?: BoostPackage[];
+}
+
+interface Selection {
+  packageId: string;
+  durationDays: number;
 }
 
 interface BoostModalProps {
@@ -30,9 +47,16 @@ interface BoostModalProps {
   onClose: () => void;
 }
 
+const fmtPrice = (v: number) =>
+  `${v.toLocaleString("tr-TR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })} ₺`;
+
 /**
- * İlanı öne çıkar (boost) modalı: süre/fiyat seçimi → ödeme başlat → paymentUrl'e yönlendir.
- * Backend: GET /products/boost/pricing, POST /products/:id/boost/initiate
+ * İlanı öne çıkar (boost) modalı: ürünün fiyatına göre değişen paketlerden
+ * (Ekonomik / Vitrin) paket + süre seç → ödeme başlat → /payment ekranına git.
+ * Backend: GET /products/:id/boost/options, POST /products/:id/boost/initiate
  */
 export default function BoostModal({
   listingId,
@@ -42,49 +66,54 @@ export default function BoostModal({
   open,
   onClose,
 }: BoostModalProps) {
+  const t = useTranslations();
   const router = useRouter();
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Selection | null>(null);
   const [autoRenew, setAutoRenew] = useState(false);
 
-  // Pricing options — fetched only while the modal is open, cached across reopens.
-  const pricingQuery = useQuery({
-    queryKey: queryKeys.boost.pricing(),
-    queryFn: async (): Promise<BoostPricing> => {
-      const res = await api.get("/products/boost/pricing");
+  // Per-product package/price matrix — fetched only while open, cached per product.
+  const optionsQuery = useQuery({
+    queryKey: queryKeys.boost.options(listingId),
+    queryFn: async (): Promise<BoostOptionsResponse> => {
+      const res = await api.get(`/products/${listingId}/boost/options`);
       return res.data || {};
     },
     enabled: open,
     staleTime: 5 * 60 * 1000,
-    meta: { page: "boost-pricing" },
+    meta: { page: "boost-options" },
   });
 
-  const options: BoostOption[] = pricingQuery.data?.options ?? [];
-  const enabled = pricingQuery.data
-    ? pricingQuery.data.enabled !== false
+  const packages: BoostPackage[] = useMemo(
+    () => optionsQuery.data?.packages ?? [],
+    [optionsQuery.data],
+  );
+  const enabled = optionsQuery.data
+    ? optionsQuery.data.enabled !== false
     : true;
-  const loadingPricing = open && pricingQuery.isLoading;
+  const loadingOptions = open && optionsQuery.isLoading;
 
   useEffect(() => {
-    if (pricingQuery.isError) toast.error("Fiyatlar yüklenemedi");
-  }, [pricingQuery.isError]);
+    if (optionsQuery.isError) toast.error(t("profile.boost.pricingLoadError"));
+  }, [optionsQuery.isError, t]);
 
-  // Default selection once options arrive: 7 days if present, else the first —
-  // without overriding a choice the user already made.
+  // Default selection once options arrive: first package's 7-day tier if present,
+  // else its first tier — without overriding a choice the user already made.
   useEffect(() => {
-    const opts = pricingQuery.data?.options;
-    if (!opts?.length) return;
-    setSelected(
-      (cur) =>
-        cur ??
-        opts.find((o) => o.durationDays === 7)?.durationDays ??
-        opts[0].durationDays,
-    );
-  }, [pricingQuery.data]);
+    if (!packages.length) return;
+    setSelected((cur) => {
+      if (cur) return cur;
+      const pkg = packages[0];
+      const opt =
+        pkg.options.find((o) => o.durationDays === 7) ?? pkg.options[0];
+      return opt ? { packageId: pkg.id, durationDays: opt.durationDays } : null;
+    });
+  }, [packages]);
 
   const boost = useMutation({
-    mutationFn: (durationDays: number) =>
+    mutationFn: (sel: Selection) =>
       api.post(`/products/${listingId}/boost/initiate`, {
-        durationDays,
+        packageId: sel.packageId,
+        durationDays: sel.durationDays,
         autoRenew: isPremium ? autoRenew : false,
       }),
     // Üyelik/sipariş akışıyla parite: tüm tarayıcıyı PayTR'a atmak yerine uygulama-içi
@@ -96,12 +125,12 @@ export default function BoostModal({
         onClose();
         router.push(`/payment/${paymentId}?type=boost`);
       } else {
-        toast.error("Ödeme başlatılamadı");
+        toast.error(t("profile.boost.paymentStartFailed"));
       }
     },
     onError: (error: any) =>
       toast.error(
-        error?.response?.data?.message || "Öne çıkarma başlatılamadı",
+        error?.response?.data?.message || t("profile.boost.initiateFailed"),
       ),
   });
 
@@ -113,87 +142,134 @@ export default function BoostModal({
     : 0;
   const hasActiveBoost = remainingDays > 0;
 
+  const isSelected = (packageId: string, durationDays: number) =>
+    selected?.packageId === packageId &&
+    selected?.durationDays === durationDays;
+
   const handleConfirm = () => {
-    if (selected != null) boost.mutate(selected);
+    if (selected) boost.mutate(selected);
   };
 
   return (
     <Modal
       isOpen={open}
       onClose={onClose}
-      title="İlanı Öne Çıkar"
-      maxWidth="max-w-md"
+      title={t("profile.boost.title")}
+      maxWidth="max-w-lg"
     >
-      <p className="text-sm text-muted mb-4 line-clamp-2">
-        <span className="font-medium text-heading">{listingTitle}</span> ilanını
-        seçtiğiniz süre boyunca arama, kategori ve ana sayfa vitrininde üst
-        sıralarda gösterin.
+      <p className="text-sm text-muted mb-1 font-medium text-heading line-clamp-2">
+        {listingTitle}
       </p>
+      <p className="text-sm text-muted mb-4">{t("profile.boost.intro")}</p>
 
       {hasActiveBoost && (
         <div className="mb-4 p-3 rounded bg-warning-50 border border-warning-200 text-sm text-warning-800">
-          Bu ilanda aktif öne çıkarma var:{" "}
-          <span className="font-semibold">~{remainingDays} gün</span> kaldı.
-          Seçtiğiniz süre kalan sürenin üstüne eklenir.
+          {t("profile.boost.activeBoostInfo", { days: remainingDays })}
           {selected != null && (
             <div className="mt-1 font-semibold">
-              Kalan {remainingDays} günün üstüne {selected} gün eklenecektir →
-              toplam ~{remainingDays + selected} gün
+              {t("profile.boost.extendSummary", {
+                remaining: remainingDays,
+                selected: selected.durationDays,
+                total: remainingDays + selected.durationDays,
+              })}
             </div>
           )}
         </div>
       )}
 
-      {loadingPricing ? (
+      {loadingOptions ? (
         <div className="flex justify-center py-8">
           <Spinner size="lg" />
         </div>
       ) : !enabled ? (
         <div className="text-center py-6 text-muted">
-          Öne çıkarma şu anda kullanılamıyor.
+          {t("profile.boost.unavailable")}
         </div>
-      ) : options.length === 0 ? (
+      ) : packages.length === 0 ? (
         <div className="text-center py-6 text-muted">
-          Uygun bir öne çıkarma paketi bulunamadı.
+          {t("profile.boost.noPackages")}
         </div>
       ) : (
-        <div className="space-y-2">
-          {options.map((opt) => (
-            <label
-              key={opt.durationDays}
-              className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-colors ${
-                selected === opt.durationDays
-                  ? "border-warning-500 bg-warning-50"
-                  : "border-border hover:border-warning-300"
-              }`}
+        <div className="space-y-4">
+          {packages.map((pkg) => (
+            <div
+              key={pkg.id}
+              className="rounded-lg border border-border overflow-hidden"
             >
-              <div className="flex items-center gap-3">
-                <Radio
-                  name="boost-duration"
-                  checked={selected === opt.durationDays}
-                  onChange={() => setSelected(opt.durationDays)}
-                />
-                <span className="font-medium text-heading">{opt.label}</span>
+              <div className="flex items-center justify-between gap-2 bg-surface-alt/60 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-heading">{pkg.name}</span>
+                  {pkg.showcaseOnHome && (
+                    <Badge variant="primary" size="sm">
+                      {t("profile.boost.showcaseBadge")}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs text-muted">
+                  {pkg.showcaseOnHome
+                    ? t("profile.boost.showcaseHint")
+                    : t("profile.boost.searchHint")}
+                </span>
               </div>
-              <span className="font-bold text-primary-600">
-                {opt.price.toLocaleString("tr-TR", {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                ₺
-              </span>
-            </label>
+
+              <div className="divide-y divide-border">
+                {pkg.options.map((opt) => {
+                  const active = isSelected(pkg.id, opt.durationDays);
+                  return (
+                    <label
+                      key={opt.durationDays}
+                      className={`flex items-center justify-between px-3 py-3 cursor-pointer transition-colors ${
+                        active ? "bg-warning-50" : "hover:bg-surface-alt/40"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Radio
+                          name={`boost-${pkg.id}`}
+                          checked={active}
+                          onChange={() =>
+                            setSelected({
+                              packageId: pkg.id,
+                              durationDays: opt.durationDays,
+                            })
+                          }
+                        />
+                        <span className="font-medium text-heading">
+                          {t("profile.boost.daysValue", {
+                            days: opt.durationDays,
+                          })}
+                        </span>
+                        {opt.campaign && (
+                          <Badge variant="danger" size="sm">
+                            {t("profile.boost.campaign")}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        {opt.campaign && (
+                          <span className="text-xs text-subtle line-through">
+                            {fmtPrice(opt.listPrice)}
+                          </span>
+                        )}
+                        <span className="font-bold text-primary-600">
+                          {fmtPrice(opt.price)}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      {isPremium && enabled && options.length > 0 && (
+      {isPremium && enabled && packages.length > 0 && (
         <label className="mt-4 flex items-center gap-2 text-sm text-body cursor-pointer">
           <Checkbox
             checked={autoRenew}
             onChange={(e) => setAutoRenew(e.target.checked)}
           />
-          Süre bitince otomatik yenileme hatırlatması al (Premium)
+          {t("profile.boost.autoRenewLabel")}
         </label>
       )}
 
@@ -204,20 +280,20 @@ export default function BoostModal({
           onClick={onClose}
           disabled={boost.isPending}
         >
-          Vazgeç
+          {t("common.cancel")}
         </Button>
         <Button
           className="flex-1"
           onClick={handleConfirm}
           disabled={
-            boost.isPending || loadingPricing || !enabled || selected == null
+            boost.isPending || loadingOptions || !enabled || selected == null
           }
         >
           {boost.isPending
-            ? "Yönlendiriliyor..."
+            ? t("profile.boost.redirecting")
             : hasActiveBoost
-              ? "Süreyi Uzat ve Öde"
-              : "Öne Çıkar ve Öde"}
+              ? t("profile.boost.extendAndPay")
+              : t("profile.boost.featureAndPay")}
         </Button>
       </div>
     </Modal>

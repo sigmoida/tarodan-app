@@ -120,7 +120,9 @@ export default async function HomePage({
     featuredBusiness,
     topCollections,
   ] = await Promise.allSettled([
-    fetchProducts({ limit: 20, page: 1, boostedOnly: true, status: "active" }),
+    // Vitrin (home showcase): yalnızca "ana sayfada vitrinlensin" paketini alan
+    // ürünler, en son satın alınan en başta olacak şekilde (LIFO — boostedAt DESC).
+    fetchProducts({ limit: 20, page: 1, homeShowcase: true, status: "active" }),
     fetchProducts({ limit: 24, page: 1, tradeOnly: true, status: "active" }),
     fetchDiscountedProducts(),
     fetch(`${API_BASE}/api/products/popular?limit=20&page=1`, {
