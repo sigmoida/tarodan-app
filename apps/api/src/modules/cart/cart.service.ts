@@ -30,9 +30,6 @@ const CART_EXPIRY_HOURS = 24;
 const FREE_SHIPPING_THRESHOLD = 500;
 const BASE_SHIPPING_COST = 29.99;
 
-// Max discount percentage
-const MAX_DISCOUNT_PERCENT = 0.5; // 50%
-
 @Injectable()
 export class CartService {
   private readonly logger = new Logger(CartService.name);
@@ -556,18 +553,10 @@ export class CartService {
     // The subtotal already uses discounted prices (effectivePrice), so we only subtract:
     // - couponDiscountTotal: additional coupon discount on top of current prices
     // - campaignDiscountTotal: (currently 0, campaigns reflected in effectivePrice)
-    let totalDiscount = couponDiscountTotal + campaignDiscountTotal;
-
-    // Apply max discount cap (50% of original subtotal)
-    const originalSubtotal = availableItems.reduce(
-      (sum, i) => sum + i.originalPrice * i.quantity,
-      0,
-    );
-    const maxDiscount = originalSubtotal * MAX_DISCOUNT_PERCENT;
-    if (totalDiscount > maxDiscount) {
-      totalDiscount = maxDiscount;
-      warnings.push("Maksimum indirim limitine ulaşıldı (%50)");
-    }
+    const totalDiscount = couponDiscountTotal + campaignDiscountTotal;
+    // İndirim tavanı YOK: checkout (tahsil edilen) hiçbir tavan uygulamıyor, bu
+    // yüzden sepet önizlemesi de uygulamaz → önizleme = tahsilat. Toplam yalnızca
+    // grandTotal'da 0'a taban yapılır (Math.max(0, ...)).
 
     // Calculate shipping
     const hasAvailableItems = availableItems.length > 0;
@@ -680,7 +669,9 @@ export class CartService {
         }
 
         if (isEligible) {
-          eligibleAmount += item.lineTotal;
+          // Kupon BAZ fiyat üzerinden hesaplanır (kampanyalı/efektif fiyat değil)
+          // → checkout'taki validateCoupon ile aynı taban (product.price * adet).
+          eligibleAmount += item.originalPrice * item.quantity;
           affectedProductIds.push(item.productId);
         }
       }
