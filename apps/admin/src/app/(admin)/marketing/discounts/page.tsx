@@ -15,11 +15,31 @@ import {
 import { DiscountsStats } from "./_components/DiscountsStats";
 import { DiscountsTable } from "./_components/DiscountsTable";
 import { DiscountFormModal } from "./_modals/DiscountFormModal";
+import { GenerateCodesModal } from "./_modals/GenerateCodesModal";
 import { useTranslations } from "next-intl";
+import toast from "react-hot-toast";
 
 export default function DiscountsPage() {
   const t = useTranslations();
   const [modal, setModal] = useState<{ discount?: Discount } | null>(null);
+  const [codesFor, setCodesFor] = useState<Discount | null>(null);
+
+  /** Download a discount's voucher codes as CSV (auth via adminApi). */
+  const exportCodes = async (d: Discount) => {
+    try {
+      const res = await adminApi.get(`/admin/discounts/${d.id}/codes/export`, {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `voucher-codes-${d.code || d.id}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error(t("admin.marketing.discounts.codes.generateFailed"));
+    }
+  };
 
   return (
     <AdminPage>
@@ -81,7 +101,11 @@ export default function DiscountsPage() {
             className="sm:w-40"
           />
         </ResourceList.Toolbar>
-        <DiscountsTable onEdit={(discount) => setModal({ discount })} />
+        <DiscountsTable
+          onEdit={(discount) => setModal({ discount })}
+          onGenerateCodes={(discount) => setCodesFor(discount)}
+          onExportCodes={exportCodes}
+        />
         <ResourceList.Pagination />
       </ResourceList>
 
@@ -91,6 +115,15 @@ export default function DiscountsPage() {
           open
           onClose={() => setModal(null)}
           discount={modal.discount}
+        />
+      )}
+
+      {codesFor && (
+        <GenerateCodesModal
+          key={codesFor.id}
+          open
+          onClose={() => setCodesFor(null)}
+          discount={codesFor}
         />
       )}
     </AdminPage>

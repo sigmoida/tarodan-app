@@ -231,6 +231,59 @@ export class AdminProductController {
     return this.discountService.delete(id, adminId, true);
   }
 
+  // ==================== VOUCHER CODES (bulk single-use) ====================
+
+  @Post("discounts/:id/codes")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Generate bulk single-use voucher codes (admin)" })
+  @ApiParam({ name: "id", description: "Discount (template) ID" })
+  async generateVoucherCodes(
+    @Param("id") id: string,
+    @Body() body: { count: number; prefix?: string },
+  ) {
+    return this.discountService.generateCodes(
+      id,
+      Number(body?.count) || 0,
+      body?.prefix,
+    );
+  }
+
+  @Get("discounts/:id/codes")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "List a discount's voucher codes (admin)" })
+  @ApiParam({ name: "id", description: "Discount (template) ID" })
+  async getVoucherCodes(@Param("id") id: string) {
+    return this.discountService.listCodes(id);
+  }
+
+  @Get("discounts/:id/codes/export")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Export a discount's voucher codes as CSV (admin)" })
+  @ApiParam({ name: "id", description: "Discount (template) ID" })
+  async exportVoucherCodes(
+    @Param("id") id: string,
+    @Res() res: import("express").Response,
+  ) {
+    const { data } = await this.discountService.listCodes(id);
+    const rows = [
+      "code,isRedeemed,redeemedAt,orderId",
+      ...data.map((c) =>
+        [
+          c.code,
+          c.isRedeemed ? "1" : "0",
+          c.redeemedAt ? new Date(c.redeemedAt).toISOString() : "",
+          c.orderId ?? "",
+        ].join(","),
+      ),
+    ].join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="voucher-codes-${id}.csv"`,
+    );
+    res.send(rows);
+  }
+
   @Post("products/:id/approve")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)

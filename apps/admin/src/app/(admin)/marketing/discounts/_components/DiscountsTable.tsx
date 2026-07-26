@@ -10,7 +10,15 @@ import { type Discount } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
 /** Discount table — active/inactive toggle + delete live here as mutations. */
-export function DiscountsTable({ onEdit }: { onEdit: (d: Discount) => void }) {
+export function DiscountsTable({
+  onEdit,
+  onGenerateCodes,
+  onExportCodes,
+}: {
+  onEdit: (d: Discount) => void;
+  onGenerateCodes: (d: Discount) => void;
+  onExportCodes: (d: Discount) => void;
+}) {
   const t = useTranslations();
   const confirm = useConfirm();
 
@@ -49,12 +57,17 @@ export function DiscountsTable({ onEdit }: { onEdit: (d: Discount) => void }) {
   };
 
   const columns = discountColumns(
-    discountRowMenu({
-      onToggle: (d) => toggle.mutate(d),
-      onEdit,
-      onDelete,
-      busyId: toggle.isPending ? toggle.variables?.id : undefined,
-    }),
+    discountRowMenu(
+      {
+        onToggle: (d) => toggle.mutate(d),
+        onEdit,
+        onDelete,
+        onGenerateCodes,
+        onExportCodes,
+        busyId: toggle.isPending ? toggle.variables?.id : undefined,
+      },
+      t,
+    ),
     t,
   );
 
