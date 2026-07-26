@@ -151,8 +151,10 @@ export class ProductQueryService {
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
       where,
-      // Sponsorlu (rankTier=2) → Premium (1) → Standart (0); kademe içinde kalite + popülerlik
+      // Aktif boost'lar EN SON alınan önde (LIFO: boostedAt desc); boost bitince
+      // boostedAt temizlenir (scheduler) → null'lar relevanceScore'a düşer.
       orderBy: [
+        { boostedAt: { sort: "desc", nulls: "last" } },
         { relevanceScore: { sort: "desc", nulls: "last" } },
         { viewCount: "desc" },
         { likeCount: "desc" },
@@ -415,7 +417,10 @@ export class ProductQueryService {
         // Açık sortBy seçildiğinde (price/created/title/view/rating) bu öncelik uygulanmaz.
         // Harmanlanmış relevance skoru: boost/premium bonusu + kalite + etkileşim tek skorda.
         // Öne çıkanlar normalde önde; çok popüler ürün de geri kalmaz (viral geçebilir).
+        // Aktif boost'lar EN SON alınan önde (LIFO). boostedAt yalnız aktif boost'ta
+        // dolu (bitince scheduler null'lar) → boostsuz ürünler relevanceScore'a düşer.
         orderBy = [
+          { boostedAt: { sort: "desc", nulls: "last" } },
           { relevanceScore: { sort: "desc", nulls: "last" } },
           { viewCount: "desc" }, // relevance eşitse: çok görüntülenen önde (canlı)
           { likeCount: "desc" },
