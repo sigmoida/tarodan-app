@@ -41,6 +41,7 @@ export function useCheckoutSubmit({
   paymentProvider,
   authToken,
   directProductId,
+  appliedCouponCode,
   clearCart,
   onCheckoutSubmitted,
 }: {
@@ -67,6 +68,8 @@ export function useCheckoutSubmit({
   paymentProvider: "paytr";
   authToken: string | null;
   directProductId: string | null;
+  /** Applied cart coupon (from useCart); forwarded to the group order payload. */
+  appliedCouponCode: string | null;
   clearCart: () => Promise<void>;
   /** Marks the checkout as submitted so the cart-empty guard stops redirecting. */
   onCheckoutSubmitted: () => void;
@@ -278,6 +281,13 @@ export function useCheckoutSubmit({
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
             };
+
+            // Forward the applied cart coupon so the order is created at the
+            // discounted total (server re-validates authoritatively). Without this
+            // the coupon shows in the preview but the buyer is charged full price.
+            if (appliedCouponCode) {
+              payload.couponCode = appliedCouponCode;
+            }
 
             if (validAddressId) {
               payload.shippingAddressId = validAddressId;

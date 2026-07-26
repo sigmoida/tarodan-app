@@ -459,6 +459,10 @@ export class OrderLifecycleService {
    * - If paid, triggers refund process
    */
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
+    // KUPON KURALI: iptal/iade edilen siparişte kupon geri kazanılmaz — burada
+    // (ve iade akışında) bilerek Discount.usedCount düşürülmez / DiscountUsage
+    // silinmez. İade tutarı da order.totalAmount (kupon düşülmüş net) üzerinden
+    // hesaplanır, yani kupon payı iade edilmez. Bkz. DiscountService.recordUsage.
     let productIdToInvalidate: string | null = null;
     const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({

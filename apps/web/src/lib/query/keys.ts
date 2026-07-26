@@ -158,6 +158,9 @@ export const queryKeys = {
   cart: {
     /** The authenticated cart. One invalidate refreshes it after every write. */
     all: () => ["cart"] as const,
+    /** Guest coupon validation, keyed on code + items so it refreshes on change. */
+    guestCoupon: (code: string | null, itemsKey: string) =>
+      ["guest-coupon", code, itemsKey] as const,
   },
   checkout: {
     addresses: () => ["checkout-addresses"] as const,

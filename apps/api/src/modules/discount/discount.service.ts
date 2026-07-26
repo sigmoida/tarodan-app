@@ -436,7 +436,13 @@ export class DiscountService {
    */
   async validateCoupon(
     dto: ValidateCouponDto,
-    userId: string,
+    /**
+     * Kuponu uygulayan kullanıcı. Misafir (giriş yapmamış) sepet doğrulamasında
+     * `null` gelir — bu durumda kişi-başı kullanım limiti kontrol EDİLEMEZ (kimlik
+     * yok), yalnızca toplam limit + tarih + min sepet uygulanır. Kişi-başı limit
+     * checkout'ta (giriş/e-posta ile) devreye girer.
+     */
+    userId: string | null,
   ): Promise<ValidationResultDto> {
     const code = dto.code.toUpperCase();
     const sellerCategoryInclude = {
@@ -489,8 +495,9 @@ export class DiscountService {
       return { isValid: false, error: "Bu kupon kullanım limitine ulaştı" };
     }
 
-    // Check per-user usage limit
-    if (discount.usageLimitPerUser) {
+    // Check per-user usage limit — only when we know who is applying (auth).
+    // Misafir doğrulamasında (userId=null) atlanır; checkout'ta yeniden denetlenir.
+    if (userId && discount.usageLimitPerUser) {
       const userUsageCount = await this.prisma.discountUsage.count({
         where: { discountId: discount.id, userId },
       });
@@ -587,6 +594,11 @@ export class DiscountService {
   /**
    * Record discount usage after order completion.
    *
+   * INVARIANT (kupon geri kazanılmaz): coupon usage is intentionally
+   * NON-REVERSIBLE. On order refund/cancellation we deliberately DO NOT
+   * decrement `usedCount` nor delete the `DiscountUsage` row — the coupon stays
+   * consumed. Do not add usage-restoration logic to any refund/cancel path.
+   *
    * @param voucherCodeId - Tek-kullanımlık voucher kodu ise ilgili DiscountCode
    *   id'si. Verilirse kod ATOMİK olarak "kullanıldı" işaretlenir (zaten
    *   kullanılmışsa throw) → aynı voucher iki siparişte kullanılamaz.
@@ -614,6 +626,19 @@ export class DiscountService {
           throw new BadRequestException("Bu kupon kodu daha önce kullanıldı");
         }
       }
+      // Atomik toplam-limit koruması: usedCount artışı, limit dolmadıysa TEK
+      // ifadede yapılır (column-to-column karşılaştırma Prisma where'de olmadığı
+      // için raw SQL). validateCoupon ile recordUsage arasındaki yarışta iki
+      // eşzamanlı sipariş limiti aşamaz — limit doluysa 0 satır etkilenir → throw.
+      const updated = await tx.$executeRaw`
+        UPDATE discounts
+        SET used_count = used_count + 1, updated_at = NOW()
+        WHERE id = ${discountId}
+          AND (usage_limit_total IS NULL OR used_count < usage_limit_total)
+      `;
+      if (updated === 0) {
+        throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
+      }
       await tx.discountUsage.create({
         data: {
           discountId,
@@ -621,10 +646,6 @@ export class DiscountService {
           orderId,
           amount: new Prisma.Decimal(amount),
         },
-      });
-      await tx.discount.update({
-        where: { id: discountId },
-        data: { usedCount: { increment: 1 } },
       });
     });
 

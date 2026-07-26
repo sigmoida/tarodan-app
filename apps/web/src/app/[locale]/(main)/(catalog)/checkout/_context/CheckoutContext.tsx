@@ -221,6 +221,7 @@ function useCheckoutValue() {
     paymentProvider,
     authToken,
     directProductId,
+    appliedCouponCode: directProduct ? null : appliedCouponCode,
     clearCart,
     onCheckoutSubmitted: () => {
       checkoutSubmittedRef.current = true;

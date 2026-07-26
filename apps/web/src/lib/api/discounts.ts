@@ -30,5 +30,28 @@ export const discountsApi = {
     code: string;
     cartItems: Array<{ productId: string; quantity: number; price: number }>;
   }) => api.post("/discounts/validate", data),
+  /**
+   * Validate a coupon for a GUEST cart (no auth). Per-user limit is not checked
+   * (no identity); the final authoritative check happens server-side at checkout.
+   */
+  validateGuest: (data: {
+    code: string;
+    cartItems: Array<{ productId: string; quantity: number }>;
+  }) => api.post("/discounts/validate-guest", data),
   getActiveCampaigns: () => api.get("/discounts/active"),
 };
+
+/** Shape returned by `/discounts/validate*` (ValidationResultDto). */
+export interface CouponValidationResult {
+  isValid: boolean;
+  error?: string;
+  discount?: {
+    id: string;
+    name: string;
+    code: string;
+    type: "percentage" | "fixed_amount" | "bogo" | "bulk_quantity";
+    value: number;
+    scope: "global" | "category" | "product" | "seller";
+    estimatedDiscount: number;
+  };
+}

@@ -63,6 +63,7 @@ describe("OrderService checkout group (batch checkout)", () => {
 
   let mockTx: any;
   let cache: any;
+  let discountService: any;
 
   const mockPrisma: any = {
     user: { findUnique: jest.fn() },
@@ -221,6 +222,7 @@ describe("OrderService checkout group (batch checkout)", () => {
 
     service = module.get(OrderService);
     cache = module.get(CacheService);
+    discountService = module.get(DiscountService);
   });
 
   const baseDto = () => ({
@@ -498,22 +500,6 @@ describe("OrderService checkout group (batch checkout)", () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it("guest checkout rejects coupon codes", async () => {
-    // OTP tüketimi öncesi idempotensi: yeni anahtar → null
-    mockPrisma.checkoutGroup.findUnique.mockResolvedValue(null);
-
-    await expect(
-      (service as any).createCheckoutGroup({
-        buyerId,
-        dto: { ...baseDto(), couponCode: "INDIRIM10" },
-        isGuest: true,
-        guest: { email: "g@test.com" },
-      }),
-    ).rejects.toMatchObject({
-      response: { i18nKey: "server.order.couponNotSupportedForGuest" },
-    });
-  });
-
   // ── Misafir GRUP checkout (POST /orders/checkout/guest → checkoutGuest) ──────────
   // checkoutGuest, dto.items içindeki quantity'yi createCheckoutGroup'a birebir
   // devreder → adet mantığı ÜYE grup checkout ile aynıdır. Bu blok, adet'in
@@ -605,6 +591,36 @@ describe("OrderService checkout group (batch checkout)", () => {
       ).rejects.toThrow(/maksimum 20 adet/i);
 
       expect(mockTx.order.create).not.toHaveBeenCalled();
+    });
+
+    it("misafir kuponu ARTIK reddedilmez: validateCoupon userId=null ile çağrılır ve indirim uygulanır", async () => {
+      discountService.validateCoupon.mockResolvedValue({
+        isValid: true,
+        discount: {
+          id: "disc-1",
+          name: "İndirim",
+          code: "INDIRIM10",
+          type: "percentage",
+          value: 10,
+          scope: "global",
+          estimatedDiscount: 10,
+        },
+      });
+
+      await service.checkoutGuest({
+        ...guestDto([{ productId: productA }]),
+        couponCode: "INDIRIM10",
+      } as any);
+
+      // Kişi-başı limit atlanır: validateCoupon userId=null ile çağrılır.
+      expect(discountService.validateCoupon).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "INDIRIM10" }),
+        null,
+      );
+      // Kupon indirimi siparişe yansır (usedCount artışı için recordUsage çağrılır).
+      expect(discountService.recordUsage).toHaveBeenCalled();
+      const orderData = mockTx.order.create.mock.calls[0][0].data;
+      expect(orderData.discountAmount).toBeGreaterThan(0);
     });
   });
 });

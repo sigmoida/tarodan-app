@@ -110,11 +110,8 @@ export class OrderCheckoutGroupService {
         i18nMessage("server.order.shippingAddressRequiredWithFields"),
       );
     }
-    if (isGuest && dto.couponCode) {
-      throw new BadRequestException(
-        i18nMessage("server.order.couponNotSupportedForGuest"),
-      );
-    }
+    // Misafir kuponu: kişi-başı limit uygulanamaz (kimlik yok) — validateCoupon'a
+    // userId=null geçilir; toplam limit + tarih + min sepet yine denetlenir.
 
     // Dedupe + sıralı kilitleme (deadlock önleme)
     const productIds = [...new Set(dto.items.map((i) => i.productId))].sort();
@@ -395,7 +392,8 @@ export class OrderCheckoutGroupService {
                   quantity: qtyByProduct.get(productId) ?? 1,
                 })),
               },
-              buyerId,
+              // Misafirde kişi-başı limit atlanır (paylaşımlı guest kimliği anlamsız).
+              isGuest ? null : buyerId,
             );
             if (!validation.isValid) {
               throw new BadRequestException(
