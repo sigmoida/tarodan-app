@@ -336,14 +336,17 @@ export class ElogoInvoicingService {
     );
   }
 
-  /** Boost faturası → SATICIYA (boost.price). */
+  /** Boost faturası → SATICIYA (boost.price). Kalem açıklamasına paket adı eklenir. */
   async issueBoostInvoice(boostId: string): Promise<void> {
     const boost = await this.prisma.productBoost.findUnique({
       where: { id: boostId },
-      select: { userId: true, price: true },
+      select: { userId: true, price: true, packageName: true },
     });
     if (!boost) return;
-    await this.cut("boost", boostId, boost.userId, Number(boost.price));
+    const desc = boost.packageName
+      ? `${LINE_DESCRIPTION.boost} — ${boost.packageName}`
+      : LINE_DESCRIPTION.boost;
+    await this.cut("boost", boostId, boost.userId, Number(boost.price), desc);
   }
 
   /** Takas nakit komisyon faturası → ÖDEYENE (TradeCashPayment.commission; payer taşır). */
@@ -463,12 +466,13 @@ export class ElogoInvoicingService {
         status: true,
         sourceId: true,
         ettn: true,
+        lineDescription: true,
       },
     });
     return rows.map((r) => ({
       id: r.id,
       type: r.type,
-      label: LINE_DESCRIPTION[r.type] || "Fatura",
+      label: r.lineDescription || LINE_DESCRIPTION[r.type] || "Fatura",
       invoiceNumber: r.invoiceNumber,
       documentType: r.documentType,
       total: r.total,
@@ -488,6 +492,7 @@ export class ElogoInvoicingService {
       type: true,
       total: true,
       issuedAt: true,
+      lineDescription: true,
     } as const;
     // 1) Sipariş/üyelik e-Arşivleri: sourceId = orderId (komisyon/hizmet/platform satış/üyelik).
     //    (Üyelik alımı MEM- order üzerinden kesilir; sourceId=orderId.)
@@ -526,7 +531,7 @@ export class ElogoInvoicingService {
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
       type: inv.type,
-      label: LINE_DESCRIPTION[inv.type] || "Fatura",
+      label: inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Fatura",
       total: inv.total,
       issuedAt: inv.issuedAt,
     };
@@ -604,6 +609,8 @@ export class ElogoInvoicingService {
     sourceId: string,
     recipientUserId: string,
     grossAmount: number,
+    /** Kesim anında snapshot'lanan kalem açıklaması; boşsa LINE_DESCRIPTION[type]. */
+    lineDescription?: string,
   ): Promise<void> {
     try {
       if (!this.elogo.isEnabled()) {
@@ -650,6 +657,7 @@ export class ElogoInvoicingService {
           total: this.round2(net * (1 + vatRate / 100)),
           vatRate,
           status: "pending",
+          lineDescription: lineDescription?.trim() || null,
         },
       });
       await this.sendRecord(record);
@@ -674,6 +682,7 @@ export class ElogoInvoicingService {
     recipientName: string | null;
     recipientUserId: string | null;
     billingReference?: string | null;
+    lineDescription?: string | null;
   }): Promise<void> {
     if (!inv.invoiceNumber || !inv.ettn || !inv.recipientVknTckn) return;
     const now = new Date();
@@ -709,7 +718,8 @@ export class ElogoInvoicingService {
       recipientUser?.email,
       addr,
     );
-    const desc = LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
+    const desc =
+      inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
 
     let billingRef: { invoiceId: string; issueDate: string } | undefined;
     if (isReturn && inv.billingReference) {
@@ -785,6 +795,7 @@ export class ElogoInvoicingService {
               total: totals.payable,
               currentPdfUrl: (inv as any).pdfUrl ?? null,
               recipientName: inv.recipientName,
+              lineDescription: inv.lineDescription ?? null,
             },
             recipientUser?.email ?? null,
           ).catch((e) =>
@@ -872,6 +883,7 @@ export class ElogoInvoicingService {
       total: any;
       currentPdfUrl: string | null;
       recipientName?: string | null;
+      lineDescription?: string | null;
     },
     recipientEmail: string | null,
   ): Promise<void> {
@@ -921,7 +933,8 @@ export class ElogoInvoicingService {
     let emailedAt: Date | null = null;
     try {
       if (recipientEmail && this.smtp) {
-        const desc = LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
+        const desc =
+          inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
         const tplKey = "elogo-invoice";
         const tplData = {
           recipientName: inv.recipientName || "Değerli Müşterimiz",

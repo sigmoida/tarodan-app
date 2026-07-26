@@ -1520,6 +1520,9 @@ model ElogoInvoice {
   elogoResultMsg   String?            @map("elogo_result_msg")
   /// İADE faturasında iadesi yapılan orijinal faturanın numarası.
   billingReference String?            @map("billing_reference")
+  /// Fatura kaleminin açıklaması — kesim anında snapshot'lanır (ör. boost için
+  /// paket adını içerir). Boşsa tipin varsayılan etiketi (LINE_DESCRIPTION) kullanılır.
+  lineDescription  String?            @map("line_description")
   /// eLogo'dan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
   pdfUrl           String?            @map("pdf_url")
   /// PDF alıcıya kendi SMTP'mizden e-postalandığı an.
