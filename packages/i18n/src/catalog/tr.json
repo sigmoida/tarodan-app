@@ -1386,7 +1386,27 @@
     "invalidCode": "Kod hatalı",
     "phoneVerified": "Telefon doğrulandı",
     "cannotDeleteAccount": "Hesap silinemez",
-    "deleteAccountFailed": "Hesap silinemedi"
+    "deleteAccountFailed": "Hesap silinemedi",
+    "boost": {
+      "title": "İlanı Öne Çıkar",
+      "intro": "Bu ilanı seçtiğiniz paket ve süre boyunca arama, kategori ve ana sayfa vitrininde üst sıralarda gösterin.",
+      "showcaseBadge": "Vitrin",
+      "showcaseHint": "Ana sayfa vitrininde ve aramada üst sıralarda gösterilir",
+      "searchHint": "Aramada üst sıralarda gösterilir",
+      "activeBoostInfo": "Bu ilanda aktif öne çıkarma var: ~{days} gün kaldı. Seçtiğiniz süre kalan sürenin üstüne eklenir.",
+      "extendSummary": "Kalan {remaining} günün üstüne {selected} gün eklenecektir → toplam ~{total} gün",
+      "daysValue": "{days} gün",
+      "campaign": "Kampanya",
+      "unavailable": "Öne çıkarma şu anda kullanılamıyor.",
+      "noPackages": "Uygun bir öne çıkarma paketi bulunamadı.",
+      "pricingLoadError": "Fiyatlar yüklenemedi",
+      "paymentStartFailed": "Ödeme başlatılamadı",
+      "initiateFailed": "Öne çıkarma başlatılamadı",
+      "autoRenewLabel": "Süre bitince otomatik yenileme hatırlatması al (Premium)",
+      "redirecting": "Yönlendiriliyor...",
+      "extendAndPay": "Süreyi Uzat ve Öde",
+      "featureAndPay": "Öne Çıkar ve Öde"
+    }
   },
   "review": {
     "reviews": "Değerlendirmeler",

@@ -1386,7 +1386,27 @@
     "invalidCode": "Invalid code",
     "phoneVerified": "Phone verified",
     "cannotDeleteAccount": "Cannot delete account",
-    "deleteAccountFailed": "Failed to delete account"
+    "deleteAccountFailed": "Failed to delete account",
+    "boost": {
+      "title": "Feature Listing",
+      "intro": "Show this listing at the top of search, category and the home showcase for the package and duration you choose.",
+      "showcaseBadge": "Showcase",
+      "showcaseHint": "Shown in the home showcase and at the top of search",
+      "searchHint": "Shown at the top of search",
+      "activeBoostInfo": "This listing already has an active boost: ~{days} days left. Your selected duration is added on top of the remaining time.",
+      "extendSummary": "{selected} days will be added on top of the remaining {remaining} days → total ~{total} days",
+      "daysValue": "{days} days",
+      "campaign": "Campaign",
+      "unavailable": "Boosting is currently unavailable.",
+      "noPackages": "No suitable boost package found.",
+      "pricingLoadError": "Failed to load prices",
+      "paymentStartFailed": "Failed to start payment",
+      "initiateFailed": "Failed to start boost",
+      "autoRenewLabel": "Get an auto-renew reminder when it expires (Premium)",
+      "redirecting": "Redirecting...",
+      "extendAndPay": "Extend and Pay",
+      "featureAndPay": "Feature and Pay"
+    }
   },
   "review": {
     "reviews": "Reviews",
