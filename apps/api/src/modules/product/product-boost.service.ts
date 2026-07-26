@@ -77,9 +77,115 @@ export class ProductBoostService {
     return { enabled, options };
   }
 
+  /** Kampanya fiyatı geçerli mi (opsiyonel tarih penceresi açık)? → efektif fiyat. */
+  private effectiveTierPrice(tier: {
+    price: unknown;
+    campaignPrice: unknown;
+    campaignStartsAt: Date | null;
+    campaignEndsAt: Date | null;
+  }): number {
+    const base = Number(tier.price);
+    if (tier.campaignPrice == null) return base;
+    const now = new Date();
+    if (tier.campaignStartsAt && now < tier.campaignStartsAt) return base;
+    if (tier.campaignEndsAt && now > tier.campaignEndsAt) return base;
+    return Number(tier.campaignPrice);
+  }
+
+  /** Ürün fiyatına göre (paket, süre) için aktif kademeyi çöz → efektif fiyat. */
+  private async resolvePackagePrice(
+    packageId: string,
+    durationDays: number,
+    productPrice: number,
+  ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }> {
+    const pkg = await this.prisma.adPackage.findFirst({
+      where: { id: packageId, isActive: true },
+      select: { id: true, name: true, showcaseOnHome: true },
+    });
+    if (!pkg) {
+      throw new BadRequestException(
+        i18nMessage("server.product.boostPackageNotFound"),
+      );
+    }
+    const tier = await this.prisma.adPackageTier.findFirst({
+      where: {
+        packageId,
+        durationDays,
+        isActive: true,
+        minAmount: { lte: productPrice },
+        OR: [{ maxAmount: null }, { maxAmount: { gte: productPrice } }],
+      },
+    });
+    if (!tier) {
+      throw new BadRequestException(
+        i18nMessage("server.product.boostPriceUndefined"),
+      );
+    }
+    return {
+      price: this.effectiveTierPrice(tier),
+      packageName: pkg.name,
+      showcaseOnHome: pkg.showcaseOnHome,
+    };
+  }
+
+  /**
+   * Bir ürün için satın alınabilir paket seçenekleri: ürünün fiyatına uyan
+   * kademeleri paket + süre bazında döndürür (modal bunu render eder).
+   */
+  async getBoostOptions(productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, price: true },
+    });
+    if (!product) {
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
+    }
+    const productPrice = Number(product.price);
+    const enabled = await this.isBoostEnabled();
+
+    const packages = await this.prisma.adPackage.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+      include: {
+        tiers: {
+          where: {
+            isActive: true,
+            minAmount: { lte: productPrice },
+            OR: [{ maxAmount: null }, { maxAmount: { gte: productPrice } }],
+          },
+          orderBy: { durationDays: "asc" },
+        },
+      },
+    });
+
+    return {
+      enabled,
+      productPrice,
+      packages: packages
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          showcaseOnHome: p.showcaseOnHome,
+          options: p.tiers.map((t) => ({
+            durationDays: t.durationDays,
+            price: this.effectiveTierPrice(t),
+            listPrice: Number(t.price),
+            campaign: this.effectiveTierPrice(t) < Number(t.price),
+            label: `${t.durationDays} gün`,
+          })),
+        }))
+        // paketin bu fiyat için hiç kademesi yoksa listeleme
+        .filter((p) => p.options.length > 0),
+    };
+  }
+
   /**
    * Boost satın almayı başlatır: doğrula → ProductBoost(pending) + sanal ürün + Order →
    * ödeme başlat. Ödeme URL'sini döndürür.
+   *
+   * `packageId` verilirse yeni paket/kademe fiyatlandırması (ürün fiyatına göre);
+   * verilmezse eski düz `boost_price_*` fiyatı (geçiş dönemi geriye-dönük uyumu).
    */
   async initiateBoost(
     userId: string,
@@ -88,8 +194,9 @@ export class ProductBoostService {
     provider: PaymentProvider = PaymentProvider.paytr,
     autoRenew = false,
     req?: Request,
+    packageId?: string,
   ) {
-    if (!BOOST_DURATIONS.includes(durationDays as any)) {
+    if (!packageId && !BOOST_DURATIONS.includes(durationDays as any)) {
       throw new BadRequestException(
         i18nMessage("server.product.invalidBoostDuration"),
       );
@@ -110,6 +217,7 @@ export class ProductBoostService {
         status: true,
         title: true,
         categoryId: true,
+        price: true,
       },
     });
     if (!product) {
@@ -124,7 +232,22 @@ export class ProductBoostService {
       );
     }
 
-    const price = await this.getPriceForDuration(durationDays);
+    // Fiyat + paket bilgisi HER ZAMAN serverda çözülür (istemciye güvenilmez).
+    let price: number;
+    let packageName: string | null = null;
+    let showcaseOnHome = false;
+    if (packageId) {
+      const resolved = await this.resolvePackagePrice(
+        packageId,
+        durationDays,
+        Number(product.price),
+      );
+      price = resolved.price;
+      packageName = resolved.packageName;
+      showcaseOnHome = resolved.showcaseOnHome;
+    } else {
+      price = await this.getPriceForDuration(durationDays);
+    }
     if (price <= 0) {
       throw new BadRequestException(
         i18nMessage("server.product.boostPriceUndefined"),
@@ -168,6 +291,9 @@ export class ProductBoostService {
       data: {
         productId: product.id,
         userId,
+        packageId: packageId ?? null,
+        packageName,
+        showcaseOnHome,
         durationDays,
         price,
         status: "pending",
@@ -183,8 +309,12 @@ export class ProductBoostService {
           id: virtualProductId,
           sellerId: platformSeller.id,
           categoryId: defaultCategory.id,
-          title: `İlan Öne Çıkarma (${durationDays} gün)`,
-          description: `"${product.title}" ilanı için ${durationDays} günlük öne çıkarma`,
+          title: packageName
+            ? `${packageName} — İlan Öne Çıkarma (${durationDays} gün)`
+            : `İlan Öne Çıkarma (${durationDays} gün)`,
+          description: `"${product.title}" ilanı için ${
+            packageName ? `${packageName} ` : ""
+          }${durationDays} günlük öne çıkarma`,
           price,
           condition: "new",
           status: ProductStatus.active,

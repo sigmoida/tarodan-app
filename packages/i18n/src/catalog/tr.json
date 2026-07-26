@@ -2299,7 +2299,10 @@
       "reviews": {
         "title": "Yorumlar",
         "description": "Ürün ve satıcı yorumlarını yönetin",
-        "tabs": { "product": "Ürün Yorumları", "seller": "Satıcı Yorumları" },
+        "tabs": {
+          "product": "Ürün Yorumları",
+          "seller": "Satıcı Yorumları"
+        },
         "allStatuses": "Tüm Durumlar",
         "filters": {
           "pending": "Bekleyenler",
@@ -2426,7 +2429,10 @@
           "approved": "Onaylananlar",
           "rejected": "Reddedilenler"
         },
-        "status": { "sent": "Gönderildi", "pending": "Onay Bekliyor" },
+        "status": {
+          "sent": "Gönderildi",
+          "pending": "Onay Bekliyor"
+        },
         "summary": {
           "approved": "onaylanmış mesaj",
           "rejected": "reddedilen mesaj",
@@ -2437,7 +2443,10 @@
       "support": {
         "title": "Destek Merkezi",
         "subtitle": "Destek taleplerini ve misafir mesajlarını yönetin",
-        "tabs": { "tickets": "Destek Talepleri", "guest": "Misafir Mesajları" },
+        "tabs": {
+          "tickets": "Destek Talepleri",
+          "guest": "Misafir Mesajları"
+        },
         "notFound": "Destek talebi bulunamadı",
         "guestNotFound": "Misafir mesajı bulunamadı",
         "ticketNumber": "Talep No",
@@ -2961,7 +2970,10 @@
           "inline": "İçerik Arası",
           "popup": "Popup"
         },
-        "device": { "desktop": "Masaüstü", "mobile": "Mobil" },
+        "device": {
+          "desktop": "Masaüstü",
+          "mobile": "Mobil"
+        },
         "upload": {
           "formats": "Sadece JPG, PNG ve WebP desteklenir",
           "maxSize": "Dosya en fazla 2MB olmalı",
@@ -2971,7 +2983,9 @@
           "chooseFile": "Dosya Seç",
           "urlPlaceholder": "veya görsel URL'si yapıştırın"
         },
-        "validation": { "titleRequired": "Başlık gerekli" }
+        "validation": {
+          "titleRequired": "Başlık gerekli"
+        }
       },
       "discounts": {
         "title": "İndirim Yönetimi",
@@ -3041,7 +3055,10 @@
           "product": "Ürün",
           "seller": "Satıcı"
         },
-        "status": { "expired": "Süresi Doldu", "unknown": "Belirsiz" },
+        "status": {
+          "expired": "Süresi Doldu",
+          "unknown": "Belirsiz"
+        },
         "type": {
           "percentage": "Yüzde (%)",
           "fixedAmount": "Sabit Tutar (TL)",
@@ -5726,7 +5743,8 @@
       "updateConflict": "Ürün başka bir işlem tarafından güncellendi. Lütfen yenileyin.",
       "userIdNotFound": "Kullanıcı kimliği bulunamadı",
       "userNotFound": "Kullanıcı bulunamadı",
-      "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok"
+      "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok",
+      "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil"
     },
     "refund": {
       "alreadyActive": "Bu sipariş için zaten aktif bir iade talebi var",
