@@ -443,6 +443,8 @@ export class OrderCheckoutGroupService {
             orderNumber: string;
             commissionResult: CommissionResult;
             shippingCost: number;
+            buyerShippingAmount: number;
+            sellerShippingAmount: number;
             taxAmount: number;
             withholdingTaxAmount: number;
             totalAmount: number;
@@ -485,11 +487,21 @@ export class OrderCheckoutGroupService {
               );
             // Satıcı-bazlı kargo ücreti: yalnız satıcının İLK satırına yükle, kardeşlere 0.
             const entrySellerId = entry.product.sellerId;
-            let shippingCost = 0;
+            let fullShipping = 0;
             if (!sellerShippingCharged.has(entrySellerId)) {
-              shippingCost = sellerShipping.get(entrySellerId) ?? 0;
+              fullShipping = sellerShipping.get(entrySellerId) ?? 0;
               sellerShippingCharged.add(entrySellerId);
             }
+            // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
+            const buyerShippingAmount =
+              Math.round(
+                fullShipping *
+                  (commissionResult.shippingBuyerShare / 100) *
+                  100,
+              ) / 100;
+            const sellerShippingAmount =
+              Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
+            const shippingCost = buyerShippingAmount; // buyer-charged shipping
             const { taxAmount, withholdingTaxAmount } =
               await this.checkoutCommon.resolveSellerTaxes(
                 entry.product.sellerId,
@@ -527,6 +539,8 @@ export class OrderCheckoutGroupService {
               orderNumber,
               commissionResult,
               shippingCost,
+              buyerShippingAmount,
+              sellerShippingAmount,
               taxAmount,
               withholdingTaxAmount,
               totalAmount,
@@ -651,8 +665,8 @@ export class OrderCheckoutGroupService {
                   input.commissionResult.sellerCommissionAmount,
                 sellerPlatformFeeAmount:
                   input.commissionResult.sellerPlatformFeeAmount,
-                buyerShippingAmount: input.shippingCost,
-                sellerShippingAmount: 0,
+                buyerShippingAmount: input.buyerShippingAmount,
+                sellerShippingAmount: input.sellerShippingAmount,
                 status: OrderStatus.pending_payment,
                 paymentExpiresAt,
                 shippingAddressId,
