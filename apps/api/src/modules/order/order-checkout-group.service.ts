@@ -643,6 +643,16 @@ export class OrderCheckoutGroupService {
                 commissionAmount: input.commissionResult.commissionAmount,
                 buyerFeeAmount: input.commissionResult.buyerFeeAmount,
                 sellerFeeAmount: input.commissionResult.sellerFeeAmount,
+                buyerCommissionAmount:
+                  input.commissionResult.buyerCommissionAmount,
+                buyerServiceFeeAmount:
+                  input.commissionResult.buyerServiceFeeAmount,
+                sellerCommissionAmount:
+                  input.commissionResult.sellerCommissionAmount,
+                sellerPlatformFeeAmount:
+                  input.commissionResult.sellerPlatformFeeAmount,
+                buyerShippingAmount: input.shippingCost,
+                sellerShippingAmount: 0,
                 status: OrderStatus.pending_payment,
                 paymentExpiresAt,
                 shippingAddressId,

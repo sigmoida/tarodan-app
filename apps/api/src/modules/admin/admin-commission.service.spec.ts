@@ -72,6 +72,7 @@ describe("AdminCommissionService commission rule priority", () => {
     commissionRule: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -107,6 +108,8 @@ describe("AdminCommissionService commission rule priority", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     audit.createAuditLog.mockResolvedValue(undefined);
+    // No sibling rules → no amount-range overlap (v2 multi-rule validation).
+    prisma.commissionRule.findMany.mockResolvedValue([]);
   });
 
   it("persists and returns priority when creating a rule", async () => {

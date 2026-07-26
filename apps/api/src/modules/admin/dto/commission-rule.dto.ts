@@ -8,7 +8,6 @@ import {
   IsInt,
   Min,
   Max,
-  ValidateIf,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
@@ -16,6 +15,7 @@ import {
   CommissionRuleType,
   CommissionAppliesTo,
   CommissionSellerType,
+  CommissionTaxpayerType,
 } from "@prisma/client";
 
 export class CreateCommissionRuleDto {
@@ -53,13 +53,11 @@ export class CreateCommissionRuleDto {
   @ApiPropertyOptional({
     example: 5.0,
     description:
-      "Seller commission rate (%) - Required if appliesTo is SELLER or BOTH",
+      "Legacy seller rate (%). v2 rules use sellerCommissionRate instead; " +
+      "the service requires at least one seller/buyer rate.",
   })
-  @ValidateIf((o) => o.appliesTo === "SELLER" || o.appliesTo === "BOTH")
-  @IsNumber(
-    {},
-    { message: "sellerRate is required when appliesTo is SELLER or BOTH" },
-  )
+  @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   @Min(0)
   @Max(100)
@@ -68,13 +66,10 @@ export class CreateCommissionRuleDto {
   @ApiPropertyOptional({
     example: 2.0,
     description:
-      "Buyer commission rate (%) - Required if appliesTo is BUYER or BOTH",
+      "Legacy buyer rate (%). v2 rules use buyerServiceFeeRate instead.",
   })
-  @ValidateIf((o) => o.appliesTo === "BUYER" || o.appliesTo === "BOTH")
-  @IsNumber(
-    {},
-    { message: "buyerRate is required when appliesTo is BUYER or BOTH" },
-  )
+  @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   @Min(0)
   @Max(100)
@@ -136,6 +131,122 @@ export class CreateCommissionRuleDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // ── v2: kesinti profili (opsiyonel; verilmezse legacy oranlar kullanılır) ──
+  @ApiPropertyOptional({
+    enum: CommissionTaxpayerType,
+    example: "all",
+    description: "Taxpayer axis: individual / corporate / all",
+  })
+  @IsOptional()
+  @IsEnum(CommissionTaxpayerType)
+  taxpayerType?: CommissionTaxpayerType;
+
+  @ApiPropertyOptional({
+    example: 5000,
+    description: "Tiered range upper bound (TRY); minAmount = lower bound",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  maxAmount?: number;
+
+  @ApiPropertyOptional({
+    example: 2.0,
+    description: "Buyer commission rate (%)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerCommissionRate?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerCommissionMin?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerCommissionMax?: number;
+
+  @ApiPropertyOptional({
+    example: 3.0,
+    description: "Buyer protection service fee rate (%)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerServiceFeeRate?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerServiceFeeMin?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerServiceFeeMax?: number;
+
+  @ApiPropertyOptional({
+    example: 8.0,
+    description: "Seller commission rate (%)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerCommissionRate?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerCommissionMin?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerCommissionMax?: number;
+
+  @ApiPropertyOptional({
+    example: 2.0,
+    description: "Seller platform service fee rate (%)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerPlatformFeeRate?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerPlatformFeeMin?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerPlatformFeeMax?: number;
+
+  @ApiPropertyOptional({
+    example: 100,
+    description:
+      "Buyer share (%) of the single shipping cost (seller = 100 - this)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  shippingBuyerShare?: number;
 
   // Legacy fields (optional for backward compatibility)
   @ApiPropertyOptional({
@@ -256,6 +367,99 @@ export class UpdateCommissionRuleDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // ── v2: kesinti profili ──
+  @ApiPropertyOptional({ enum: CommissionTaxpayerType })
+  @IsOptional()
+  @IsEnum(CommissionTaxpayerType)
+  taxpayerType?: CommissionTaxpayerType;
+
+  @ApiPropertyOptional({ example: 5000 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  maxAmount?: number;
+
+  @ApiPropertyOptional({ example: 2.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerCommissionRate?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerCommissionMin?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerCommissionMax?: number;
+
+  @ApiPropertyOptional({ example: 3.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerServiceFeeRate?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerServiceFeeMin?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerServiceFeeMax?: number;
+
+  @ApiPropertyOptional({ example: 8.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerCommissionRate?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerCommissionMin?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerCommissionMax?: number;
+
+  @ApiPropertyOptional({ example: 2.0 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerPlatformFeeRate?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerPlatformFeeMin?: number;
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerPlatformFeeMax?: number;
+
+  @ApiPropertyOptional({ example: 100 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  shippingBuyerShare?: number;
 
   // Legacy fields
   @ApiPropertyOptional({ example: 3.5 })
