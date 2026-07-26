@@ -5,11 +5,10 @@
 import { useEffect } from "react";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
-import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
+import { Form, FormInput, FormIban, useZodForm } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useAuthStore } from "@/stores/authStore";
-import { formatIbanDisplay } from "../_lib/iban";
 import { bankAccountSchema, type BankAccountValues } from "../_lib/schemas";
 import {
   useBankAccount,
@@ -38,7 +37,7 @@ export default function BankAccountSection() {
     if (account) {
       form.reset({
         accountHolder: account.accountHolder || "",
-        iban: formatIbanDisplay(account.iban || ""),
+        iban: account.iban || "",
         tcKimlikNo: account.tcKimlikNo || "",
         taxId: account.taxId || "",
       });
@@ -100,12 +99,7 @@ export default function BankAccountSection() {
           label="Hesap Sahibi"
           placeholder="Ad Soyad / Firma Ünvanı"
         />
-        <FormInput
-          name="iban"
-          label="IBAN"
-          placeholder="TR.. .... .... ...."
-          className="font-mono"
-        />
+        <FormIban name="iban" label="IBAN" className="font-mono" />
         <div className="grid gap-4 md:grid-cols-2">
           <FormInput
             name="tcKimlikNo"

@@ -4,7 +4,17 @@
 
 import { useEffect, useState } from "react";
 import { PlusIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
-import { Badge, Button, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
+import {
+  Badge,
+  Button,
+  Input,
+  Radio,
+  Spinner,
+  Textarea,
+  PhoneInput,
+  splitPhone,
+  combinePhone,
+} from "@tarodan/ui";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import { formatTL } from "@/lib/format";
 import { useTranslations } from "next-intl";
@@ -198,19 +208,24 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
                     placeholder={t("address.fullNamePlaceholder")}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-body mb-1">
-                    {t("address.phone")} *
-                  </label>
-                  <Input
-                    type="tel"
-                    value={newAddress.phone}
-                    onChange={(e) =>
-                      setNewAddress((a) => ({ ...a, phone: e.target.value }))
-                    }
-                    placeholder="05XX XXX XX XX"
-                  />
-                </div>
+                <PhoneInput
+                  label={`${t("address.phone")} *`}
+                  countryCode={splitPhone(newAddress.phone).countryCode}
+                  onCountryCodeChange={(code) =>
+                    setNewAddress((a) => ({
+                      ...a,
+                      phone: combinePhone(code, splitPhone(a.phone).national),
+                    }))
+                  }
+                  phone={splitPhone(newAddress.phone).national}
+                  onPhoneChange={(nat) =>
+                    setNewAddress((a) => ({
+                      ...a,
+                      phone: combinePhone(splitPhone(a.phone).countryCode, nat),
+                    }))
+                  }
+                  placeholder="5XX XXX XX XX"
+                />
               </div>
               <CityDistrictSelector
                 city={newAddress.city}

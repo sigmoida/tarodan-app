@@ -7,6 +7,7 @@ import { Button } from "@tarodan/ui";
 import {
   Form,
   FormInput,
+  FormPhone,
   FormSelect,
   FormCheckbox,
   FormError,
@@ -235,11 +236,7 @@ export function RegisterBusinessForm() {
             placeholder={t("auth.emailPlaceholder")}
           />
 
-          <FormInput
-            name="phone"
-            label={`${t("auth.phone")} *`}
-            placeholder="5XX XXX XX XX"
-          />
+          <FormPhone name="phone" label={`${t("auth.phone")} *`} required />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
