@@ -147,10 +147,22 @@ export class ProductController {
    */
   @Get("boost/pricing")
   @Public()
-  @ApiOperation({ summary: "Boost süre/fiyat listesi" })
+  @ApiOperation({ summary: "Boost süre/fiyat listesi (eski düz-fiyat)" })
   @ApiResponse({ status: 200, description: "Boost fiyatlandırması" })
   async getBoostPricing() {
     return this.productBoostService.getPricing();
+  }
+
+  /**
+   * GET /products/:id/boost/options
+   * İlanın fiyatına göre satın alınabilir paket/süre/fiyat seçenekleri (yeni model).
+   */
+  @Get(":id/boost/options")
+  @Public()
+  @ApiOperation({ summary: "İlan için boost paket seçenekleri" })
+  @ApiResponse({ status: 200, description: "Paket + süre + fiyat listesi" })
+  async getBoostOptions(@Param("id") id: string) {
+    return this.productBoostService.getBoostOptions(id);
   }
 
   /**
@@ -457,6 +469,7 @@ export class ProductController {
       dto.provider ?? PaymentProvider.paytr,
       dto.autoRenew ?? false,
       req,
+      dto.packageId,
     );
   }
 

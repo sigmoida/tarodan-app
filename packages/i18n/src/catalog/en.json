@@ -2299,7 +2299,10 @@
       "reviews": {
         "title": "Reviews",
         "description": "Manage product and seller reviews",
-        "tabs": { "product": "Product Reviews", "seller": "Seller Reviews" },
+        "tabs": {
+          "product": "Product Reviews",
+          "seller": "Seller Reviews"
+        },
         "allStatuses": "All Statuses",
         "filters": {
           "pending": "Pending",
@@ -2426,7 +2429,10 @@
           "approved": "Approved",
           "rejected": "Rejected"
         },
-        "status": { "sent": "Sent", "pending": "Pending Approval" },
+        "status": {
+          "sent": "Sent",
+          "pending": "Pending Approval"
+        },
         "summary": {
           "approved": "approved messages",
           "rejected": "rejected messages",
@@ -2437,7 +2443,10 @@
       "support": {
         "title": "Support Center",
         "subtitle": "Manage support tickets and guest messages",
-        "tabs": { "tickets": "Support Tickets", "guest": "Guest Messages" },
+        "tabs": {
+          "tickets": "Support Tickets",
+          "guest": "Guest Messages"
+        },
         "notFound": "No support tickets found",
         "guestNotFound": "No guest messages found",
         "ticketNumber": "Ticket No.",
@@ -2961,7 +2970,10 @@
           "inline": "Inline",
           "popup": "Popup"
         },
-        "device": { "desktop": "Desktop", "mobile": "Mobile" },
+        "device": {
+          "desktop": "Desktop",
+          "mobile": "Mobile"
+        },
         "upload": {
           "formats": "Only JPG, PNG, and WebP are supported",
           "maxSize": "File size must not exceed 2MB",
@@ -2971,7 +2983,9 @@
           "chooseFile": "Choose File",
           "urlPlaceholder": "or paste an image URL"
         },
-        "validation": { "titleRequired": "Title is required" }
+        "validation": {
+          "titleRequired": "Title is required"
+        }
       },
       "discounts": {
         "title": "Discount Management",
@@ -3041,7 +3055,10 @@
           "product": "Product",
           "seller": "Seller"
         },
-        "status": { "expired": "Expired", "unknown": "Unknown" },
+        "status": {
+          "expired": "Expired",
+          "unknown": "Unknown"
+        },
         "type": {
           "percentage": "Percentage (%)",
           "fixedAmount": "Fixed Amount (TL)",
@@ -5726,7 +5743,8 @@
       "updateConflict": "The product was updated by another process. Please refresh.",
       "userIdNotFound": "User ID not found",
       "userNotFound": "User not found",
-      "viewForbidden": "You do not have permission to view this product"
+      "viewForbidden": "You do not have permission to view this product",
+      "boostPackageNotFound": "The selected package was not found or is inactive"
     },
     "refund": {
       "alreadyActive": "There is already an active refund request for this order",

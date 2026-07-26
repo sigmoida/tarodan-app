@@ -150,12 +150,16 @@ export class VirtualOrderFulfillmentService {
     );
     await tx.productBoost.update({
       where: { id: boost.id },
-      data: { status: "active", startsAt: nowTs, endsAt },
+      data: { status: "active", startsAt: nowTs, endsAt, purchasedAt: nowTs },
     });
     await tx.product.update({
       where: { id: boost.productId },
       data: {
         boostedUntil: endsAt,
+        // LIFO ordering key (most-recently purchased first) for search + home.
+        boostedAt: nowTs,
+        // A Vitrin (showcaseOnHome) package also lights up the home showcase.
+        ...(boost.showcaseOnHome ? { homeShowcaseUntil: endsAt } : {}),
         rankTier: 2,
         relevanceScore: computeRelevanceScore({
           rankTier: 2,
