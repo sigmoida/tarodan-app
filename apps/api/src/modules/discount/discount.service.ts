@@ -565,7 +565,12 @@ export class DiscountService {
   }
 
   /**
-   * Record discount usage after order completion
+   * Record discount usage after order completion.
+   *
+   * INVARIANT (kupon geri kazanılmaz): coupon usage is intentionally
+   * NON-REVERSIBLE. On order refund/cancellation we deliberately DO NOT
+   * decrement `usedCount` nor delete the `DiscountUsage` row — the coupon stays
+   * consumed. Do not add usage-restoration logic to any refund/cancel path.
    */
   async recordUsage(
     discountId: string,
@@ -573,20 +578,29 @@ export class DiscountService {
     orderId: string,
     amount: number,
   ): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.discountUsage.create({
+    await this.prisma.$transaction(async (tx) => {
+      // Atomik toplam-limit koruması: usedCount artışı, limit dolmadıysa TEK
+      // ifadede yapılır (column-to-column karşılaştırma Prisma where'de olmadığı
+      // için raw SQL). validateCoupon ile recordUsage arasındaki yarışta iki
+      // eşzamanlı sipariş limiti aşamaz — limit doluysa 0 satır etkilenir → throw.
+      const updated = await tx.$executeRaw`
+        UPDATE discounts
+        SET used_count = used_count + 1, updated_at = NOW()
+        WHERE id = ${discountId}
+          AND (usage_limit_total IS NULL OR used_count < usage_limit_total)
+      `;
+      if (updated === 0) {
+        throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
+      }
+      await tx.discountUsage.create({
         data: {
           discountId,
           userId,
           orderId,
           amount: new Prisma.Decimal(amount),
         },
-      }),
-      this.prisma.discount.update({
-        where: { id: discountId },
-        data: { usedCount: { increment: 1 } },
-      }),
-    ]);
+      });
+    });
 
     this.logger.log(
       `Discount usage recorded: ${discountId} by ${userId} for order ${orderId}`,

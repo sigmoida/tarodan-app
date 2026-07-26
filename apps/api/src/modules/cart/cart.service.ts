@@ -4,10 +4,10 @@ import {
   BadRequestException,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { DiscountService } from '../discount/discount.service';
-import { StorageService } from '../storage/storage.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { DiscountService } from "../discount/discount.service";
+import { StorageService } from "../storage/storage.service";
 import {
   AddToCartDto,
   UpdateCartItemDto,
@@ -16,12 +16,12 @@ import {
   CartCalculationResponseDto,
   CartItemResponseDto,
   AppliedDiscountDto,
-} from './dto';
-import { ProductStatus, DiscountScope, Prisma } from '@prisma/client';
+} from "./dto";
+import { ProductStatus, DiscountScope, Prisma } from "@prisma/client";
 import {
   getAvailableQuantity,
   canAddRequestedQuantityToCart,
-} from '../product/helpers/product-availability.helper';
+} from "../product/helpers/product-availability.helper";
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
@@ -42,7 +42,7 @@ export class CartService {
     private readonly discountService: DiscountService,
     @Optional()
     private readonly storageService: StorageService,
-  ) { }
+  ) {}
 
   /**
    * Get or create a cart for user
@@ -55,7 +55,7 @@ export class CartService {
           include: {
             product: {
               include: {
-                images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                images: { take: 1, orderBy: { sortOrder: "asc" } },
                 seller: { select: { id: true, displayName: true } },
               },
             },
@@ -76,7 +76,7 @@ export class CartService {
             include: {
               product: {
                 include: {
-                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                  images: { take: 1, orderBy: { sortOrder: "asc" } },
                   seller: { select: { id: true, displayName: true } },
                 },
               },
@@ -98,7 +98,7 @@ export class CartService {
             include: {
               product: {
                 include: {
-                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                  images: { take: 1, orderBy: { sortOrder: "asc" } },
                   seller: { select: { id: true, displayName: true } },
                 },
               },
@@ -121,31 +121,29 @@ export class CartService {
     const product = await this.prisma.product.findUnique({
       where: { id: dto.productId },
       include: {
-        images: { take: 1, orderBy: { sortOrder: 'asc' } },
+        images: { take: 1, orderBy: { sortOrder: "asc" } },
         seller: { select: { id: true, displayName: true } },
       },
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException("Ürün bulunamadı");
     }
 
     if (product.status !== ProductStatus.active) {
-      throw new BadRequestException('Bu ürün şu an satışa uygun değil');
+      throw new BadRequestException("Bu ürün şu an satışa uygun değil");
     }
 
     // Check if user is trying to buy their own product
     if (product.sellerId === userId) {
-      throw new BadRequestException('Kendi ürününüzü satın alamazsınız');
+      throw new BadRequestException("Kendi ürününüzü satın alamazsınız");
     }
 
     // Sepet: fiziksel stok üst sınırı kontrolü
-    if (
-      !canAddRequestedQuantityToCart(product, dto.quantity || 1)
-    ) {
+    if (!canAddRequestedQuantityToCart(product, dto.quantity || 1)) {
       throw new BadRequestException(
         product.quantity === 0
-          ? 'Ürün stokta yok'
+          ? "Ürün stokta yok"
           : `Bu üründen en fazla ${product.quantity} adet sipariş verilebilir`,
       );
     }
@@ -184,7 +182,10 @@ export class CartService {
       }
     } else {
       // Check max quantity per order
-      if (product.maxQuantityPerOrder && (dto.quantity || 1) > product.maxQuantityPerOrder) {
+      if (
+        product.maxQuantityPerOrder &&
+        (dto.quantity || 1) > product.maxQuantityPerOrder
+      ) {
         throw new BadRequestException(
           `Bu üründen maksimum ${product.maxQuantityPerOrder} adet alabilirsiniz`,
         );
@@ -227,7 +228,7 @@ export class CartService {
     });
 
     if (!item) {
-      throw new NotFoundException('Ürün sepette bulunamadı');
+      throw new NotFoundException("Ürün sepette bulunamadı");
     }
 
     if (dto.quantity === 0) {
@@ -235,7 +236,10 @@ export class CartService {
       await this.prisma.cartItem.delete({ where: { id: item.id } });
     } else {
       // Check stock
-      if (item.product.quantity !== null && dto.quantity > item.product.quantity) {
+      if (
+        item.product.quantity !== null &&
+        dto.quantity > item.product.quantity
+      ) {
         throw new BadRequestException(
           `Stokta sadece ${item.product.quantity} adet var`,
         );
@@ -265,7 +269,10 @@ export class CartService {
   /**
    * Remove item from cart
    */
-  async removeItem(userId: string, productId: string): Promise<CartResponseDto> {
+  async removeItem(
+    userId: string,
+    productId: string,
+  ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
     const item = await this.prisma.cartItem.findUnique({
@@ -278,7 +285,7 @@ export class CartService {
     });
 
     if (!item) {
-      throw new NotFoundException('Ürün sepette bulunamadı');
+      throw new NotFoundException("Ürün sepette bulunamadı");
     }
 
     await this.prisma.cartItem.delete({ where: { id: item.id } });
@@ -289,7 +296,10 @@ export class CartService {
   /**
    * Apply coupon code to cart
    */
-  async applyCoupon(userId: string, dto: ApplyCouponDto): Promise<CartResponseDto> {
+  async applyCoupon(
+    userId: string,
+    dto: ApplyCouponDto,
+  ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
     // Get cart items for validation
@@ -305,7 +315,7 @@ export class CartService {
     });
 
     if (!cartWithItems?.items.length) {
-      throw new BadRequestException('Sepetiniz boş');
+      throw new BadRequestException("Sepetiniz boş");
     }
 
     // Validate coupon
@@ -369,7 +379,9 @@ export class CartService {
   /**
    * Get cart with full calculations (used by checkout)
    */
-  async getCartWithCalculations(userId: string): Promise<CartCalculationResponseDto> {
+  async getCartWithCalculations(
+    userId: string,
+  ): Promise<CartCalculationResponseDto> {
     const cart = await this.getOrCreate(userId);
     return cart.calculation;
   }
@@ -454,7 +466,9 @@ export class CartService {
       const hasDiscount = effectivePrice < originalPrice;
 
       const lineTotal = effectivePrice * item.quantity;
-      const productDiscount = hasDiscount ? (originalPrice - effectivePrice) * item.quantity : 0;
+      const productDiscount = hasDiscount
+        ? (originalPrice - effectivePrice) * item.quantity
+        : 0;
 
       const available = getAvailableQuantity(product);
       let isAvailable = product.status === ProductStatus.active;
@@ -463,11 +477,11 @@ export class CartService {
       if (available !== null) {
         if (available === 0) {
           isAvailable = false;
-          stockWarning = 'Stokta yok';
+          stockWarning = "Stokta yok";
         } else if (available < item.quantity) {
           stockWarning = `Stokta sadece ${available} adet var`;
         } else if (available <= 5) {
-          stockWarning = 'Son birkaç ürün!';
+          stockWarning = "Son birkaç ürün!";
         }
       }
 
@@ -479,7 +493,9 @@ export class CartService {
       }
 
       // Resolve product image URL (S3 key -> presigned URL)
-      const resolvedImage = this.resolveProductImageUrl(product.images?.[0]?.cardKey);
+      const resolvedImage = this.resolveProductImageUrl(
+        product.images?.[0]?.cardKey,
+      );
 
       // Bu satırda sipariş edilebilecek üst sınır = fiziksel stok ∧ sipariş-başına-maks.
       // updateItem/addItem backend doğrulamasıyla BİREBİR aynı sınır (product.quantity +
@@ -498,7 +514,7 @@ export class CartService {
         productTitle: product.title,
         productImage: resolvedImage,
         sellerId: product.sellerId,
-        sellerName: product.seller?.displayName || 'Satıcı',
+        sellerName: product.seller?.displayName || "Satıcı",
         quantity: item.quantity,
         originalPrice,
         salePrice: hasDiscount ? effectivePrice : undefined,
@@ -550,7 +566,7 @@ export class CartService {
     const maxDiscount = originalSubtotal * MAX_DISCOUNT_PERCENT;
     if (totalDiscount > maxDiscount) {
       totalDiscount = maxDiscount;
-      warnings.push('Maksimum indirim limitine ulaşıldı (%50)');
+      warnings.push("Maksimum indirim limitine ulaşıldı (%50)");
     }
 
     // Calculate shipping
@@ -606,18 +622,34 @@ export class CartService {
       });
 
       if (!discount || !discount.isActive) {
-        return { discountAmount: 0, warning: 'Kupon artık geçerli değil' };
+        return { discountAmount: 0, warning: "Kupon artık geçerli değil" };
       }
 
       const now = new Date();
       if (now < discount.startDate || now > discount.endDate) {
-        return { discountAmount: 0, warning: 'Kuponun süresi doldu' };
+        return { discountAmount: 0, warning: "Kuponun süresi doldu" };
       }
 
       // Check usage limits
-      const canUse = await this.discountService.checkUsageLimit(discount.id, userId);
+      const canUse = await this.discountService.checkUsageLimit(
+        discount.id,
+        userId,
+      );
       if (!canUse) {
-        return { discountAmount: 0, warning: 'Bu kuponu zaten kullandınız' };
+        return { discountAmount: 0, warning: "Bu kuponu zaten kullandınız" };
+      }
+
+      // Category scope needs each product's categoryId — fetch it once so the
+      // eligibility check below matches the authoritative checkout path
+      // (DiscountService.isProductEligibleForDiscount). Previously the category
+      // branch ignored the product's category entirely and behaved like global.
+      const categoryByProduct = new Map<string, string | null>();
+      if (discount.scope === DiscountScope.category) {
+        const prods = await this.prisma.product.findMany({
+          where: { id: { in: items.map((i) => i.productId) } },
+          select: { id: true, categoryId: true },
+        });
+        for (const p of prods) categoryByProduct.set(p.id, p.categoryId);
       }
 
       // Calculate discount based on scope
@@ -631,7 +663,8 @@ export class CartService {
 
         switch (discount.scope) {
           case DiscountScope.global:
-            isEligible = discount.sellerId === null || discount.sellerId === item.sellerId;
+            isEligible =
+              discount.sellerId === null || discount.sellerId === item.sellerId;
             break;
           case DiscountScope.seller:
             isEligible = discount.sellerId === item.sellerId;
@@ -640,8 +673,9 @@ export class CartService {
             isEligible = discount.targetProductIds.includes(item.productId);
             break;
           case DiscountScope.category:
-            // Would need to check product's category
-            isEligible = discount.sellerId === null;
+            isEligible =
+              discount.categoryId != null &&
+              categoryByProduct.get(item.productId) === discount.categoryId;
             break;
         }
 
@@ -652,11 +686,17 @@ export class CartService {
       }
 
       if (eligibleAmount === 0) {
-        return { discountAmount: 0, warning: 'Bu kupon sepetinizdeki ürünlere uygulanamaz' };
+        return {
+          discountAmount: 0,
+          warning: "Bu kupon sepetinizdeki ürünlere uygulanamaz",
+        };
       }
 
       // Check minimum cart value
-      if (discount.minCartValue && eligibleAmount < Number(discount.minCartValue)) {
+      if (
+        discount.minCartValue &&
+        eligibleAmount < Number(discount.minCartValue)
+      ) {
         return {
           discountAmount: 0,
           warning: `Minimum sepet tutarı: ${Number(discount.minCartValue).toFixed(2)} TL`,
@@ -665,14 +705,17 @@ export class CartService {
 
       // Calculate discount amount
       let discountAmount = 0;
-      if (discount.type === 'percentage') {
+      if (discount.type === "percentage") {
         discountAmount = eligibleAmount * (Number(discount.value) / 100);
       } else {
         discountAmount = Number(discount.value);
       }
 
       // Apply max discount cap
-      if (discount.maxDiscountAmount && discountAmount > Number(discount.maxDiscountAmount)) {
+      if (
+        discount.maxDiscountAmount &&
+        discountAmount > Number(discount.maxDiscountAmount)
+      ) {
         discountAmount = Number(discount.maxDiscountAmount);
       }
 
@@ -695,7 +738,7 @@ export class CartService {
       };
     } catch (error) {
       this.logger.error(`Error applying coupon: ${error}`);
-      return { discountAmount: 0, warning: 'Kupon uygulanırken hata oluştu' };
+      return { discountAmount: 0, warning: "Kupon uygulanırken hata oluştu" };
     }
   }
 
@@ -732,18 +775,25 @@ export class CartService {
           startDate: { lte: now },
           endDate: { gte: now },
         },
-        orderBy: { priority: 'asc' },
+        orderBy: { priority: "asc" },
       });
 
       for (const campaign of campaigns) {
-        if (campaign.minCartValue && sellerSubtotal < Number(campaign.minCartValue)) continue;
+        if (
+          campaign.minCartValue &&
+          sellerSubtotal < Number(campaign.minCartValue)
+        )
+          continue;
         let discountAmount = 0;
-        if (campaign.type === 'percentage') {
+        if (campaign.type === "percentage") {
           discountAmount = sellerSubtotal * (Number(campaign.value) / 100);
         } else {
           discountAmount = Math.min(Number(campaign.value), sellerSubtotal);
         }
-        if (campaign.maxDiscountAmount && discountAmount > Number(campaign.maxDiscountAmount)) {
+        if (
+          campaign.maxDiscountAmount &&
+          discountAmount > Number(campaign.maxDiscountAmount)
+        ) {
           discountAmount = Number(campaign.maxDiscountAmount);
         }
         if (discountAmount > 0) {
@@ -785,7 +835,7 @@ export class CartService {
         endDate: { gte: now },
         scope: { in: [DiscountScope.global, DiscountScope.category] },
       },
-      orderBy: { priority: 'asc' },
+      orderBy: { priority: "asc" },
     });
 
     for (const campaign of campaigns) {
@@ -796,14 +846,17 @@ export class CartService {
 
       // Calculate discount
       let discountAmount = 0;
-      if (campaign.type === 'percentage') {
+      if (campaign.type === "percentage") {
         discountAmount = subtotal * (Number(campaign.value) / 100);
       } else {
         discountAmount = Number(campaign.value);
       }
 
       // Apply max cap
-      if (campaign.maxDiscountAmount && discountAmount > Number(campaign.maxDiscountAmount)) {
+      if (
+        campaign.maxDiscountAmount &&
+        discountAmount > Number(campaign.maxDiscountAmount)
+      ) {
         discountAmount = Number(campaign.maxDiscountAmount);
       }
 
@@ -834,10 +887,17 @@ export class CartService {
   /**
    * Resolve product image URL (S3 key -> presigned URL)
    */
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes("dev/") || imageKeyOrUrl.includes("prod/")) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
