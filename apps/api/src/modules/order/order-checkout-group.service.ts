@@ -382,6 +382,7 @@ export class OrderCheckoutGroupService {
           // Kupon: tüm sepetle bir kez doğrula, indirimi fiyat oranında dağıt
           let appliedCouponCode: string | null = null;
           let appliedDiscountId: string | null = null;
+          let appliedVoucherCodeId: string | undefined;
           if (dto.couponCode) {
             const validation = await this.discountService.validateCoupon(
               {
@@ -405,6 +406,7 @@ export class OrderCheckoutGroupService {
             if (validation.discount) {
               appliedCouponCode = dto.couponCode.toUpperCase();
               appliedDiscountId = validation.discount.id;
+              appliedVoucherCodeId = validation.discount.voucherCodeId;
               const totalCoupon = validation.discount.estimatedDiscount;
               // Kupon, satır toplamına (birim fiyat * adet) oranla dağıtılır.
               const priceSum = pricing.reduce(
@@ -664,7 +666,12 @@ export class OrderCheckoutGroupService {
                 buyerId,
                 order.id,
                 entry.couponDiscount,
+                appliedVoucherCodeId,
               );
+              // Voucher tek kullanımlık: grup içinde yalnızca İLK siparişte redeem
+              // edilir; sonraki siparişlerde tekrar denenmez (aksi halde "zaten
+              // kullanıldı" fırlatır).
+              appliedVoucherCodeId = undefined;
             }
 
             await tx.product.update({

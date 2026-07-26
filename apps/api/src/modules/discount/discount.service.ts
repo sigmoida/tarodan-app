@@ -438,16 +438,34 @@ export class DiscountService {
     dto: ValidateCouponDto,
     userId: string,
   ): Promise<ValidationResultDto> {
-    const discount = await this.prisma.discount.findUnique({
-      where: { code: dto.code.toUpperCase() },
-      include: {
-        seller: { select: { id: true, displayName: true } },
-        category: { select: { id: true, name: true } },
-      },
+    const code = dto.code.toUpperCase();
+    const sellerCategoryInclude = {
+      seller: { select: { id: true, displayName: true } },
+      category: { select: { id: true, name: true } },
+    };
+
+    let discount = await this.prisma.discount.findUnique({
+      where: { code },
+      include: sellerCategoryInclude,
     });
 
+    // Voucher (tek-kullanımlık) kodu: paylaşımlı Discount.code bulunamazsa
+    // DiscountCode tablosuna bak → parent Discount kuralları geçerli, ek olarak
+    // kod tek kullanımlıktır (isRedeemed).
+    let voucherCodeId: string | undefined;
     if (!discount) {
-      return { isValid: false, error: "Kupon kodu bulunamadı" };
+      const voucher = await this.prisma.discountCode.findUnique({
+        where: { code },
+        include: { discount: { include: sellerCategoryInclude } },
+      });
+      if (!voucher) {
+        return { isValid: false, error: "Kupon kodu bulunamadı" };
+      }
+      if (voucher.isRedeemed) {
+        return { isValid: false, error: "Bu kupon kodu daha önce kullanıldı" };
+      }
+      discount = voucher.discount;
+      voucherCodeId = voucher.id;
     }
 
     if (!discount.isActive) {
@@ -536,11 +554,13 @@ export class DiscountService {
       discount: {
         id: discount.id,
         name: discount.name,
-        code: discount.code!,
+        // Voucher'da parent şablonun `code`'u null'dır → girilen kodu döndür.
+        code: discount.code ?? code,
         type: discount.type,
         value: Number(discount.value),
         scope: discount.scope,
         estimatedDiscount,
+        voucherCodeId,
       },
     };
   }
@@ -565,32 +585,138 @@ export class DiscountService {
   }
 
   /**
-   * Record discount usage after order completion
+   * Record discount usage after order completion.
+   *
+   * @param voucherCodeId - Tek-kullanımlık voucher kodu ise ilgili DiscountCode
+   *   id'si. Verilirse kod ATOMİK olarak "kullanıldı" işaretlenir (zaten
+   *   kullanılmışsa throw) → aynı voucher iki siparişte kullanılamaz.
    */
   async recordUsage(
     discountId: string,
     userId: string,
     orderId: string,
     amount: number,
+    voucherCodeId?: string,
   ): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.discountUsage.create({
+    await this.prisma.$transaction(async (tx) => {
+      if (voucherCodeId) {
+        // Atomik tek-kullanım: yalnızca henüz kullanılmamışsa işaretle.
+        const claimed = await tx.discountCode.updateMany({
+          where: { id: voucherCodeId, isRedeemed: false },
+          data: {
+            isRedeemed: true,
+            redeemedById: userId,
+            redeemedAt: new Date(),
+            orderId,
+          },
+        });
+        if (claimed.count === 0) {
+          throw new BadRequestException("Bu kupon kodu daha önce kullanıldı");
+        }
+      }
+      await tx.discountUsage.create({
         data: {
           discountId,
           userId,
           orderId,
           amount: new Prisma.Decimal(amount),
         },
-      }),
-      this.prisma.discount.update({
+      });
+      await tx.discount.update({
         where: { id: discountId },
         data: { usedCount: { increment: 1 } },
-      }),
-    ]);
+      });
+    });
 
     this.logger.log(
       `Discount usage recorded: ${discountId} by ${userId} for order ${orderId}`,
     );
+  }
+
+  /**
+   * Toplu voucher kodu üret: parent Discount (şablon) altında N adet benzersiz
+   * tek-kullanımlık kod. Çakışma-güvenli (unique index + toplu dene, çakışanları
+   * yeniden üret). Parent `isBatch` işaretlenir.
+   */
+  async generateCodes(
+    discountId: string,
+    count: number,
+    prefix?: string,
+  ): Promise<{ generated: number; total: number }> {
+    const discount = await this.prisma.discount.findUnique({
+      where: { id: discountId },
+      select: { id: true },
+    });
+    if (!discount) throw new NotFoundException("İndirim bulunamadı");
+    if (count < 1 || count > 10000) {
+      throw new BadRequestException("Kod adedi 1 ile 10000 arasında olmalı");
+    }
+
+    const cleanPrefix = (prefix ?? "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 12);
+
+    let generated = 0;
+    let guard = 0;
+    while (generated < count && guard < 50) {
+      guard += 1;
+      const need = count - generated;
+      const candidates = new Set<string>();
+      while (candidates.size < need) {
+        candidates.add(this.randomVoucherCode(cleanPrefix));
+      }
+      const res = await this.prisma.discountCode.createMany({
+        data: Array.from(candidates).map((c) => ({ discountId, code: c })),
+        skipDuplicates: true, // unique çakışmalar sessizce atlanır → döngü tekrar dener
+      });
+      generated += res.count;
+    }
+
+    await this.prisma.discount.update({
+      where: { id: discountId },
+      data: { isBatch: true },
+    });
+
+    const total = await this.prisma.discountCode.count({
+      where: { discountId },
+    });
+    this.logger.log(`Generated ${generated} voucher codes for ${discountId}`);
+    return { generated, total };
+  }
+
+  /** URL/insan dostu benzersiz-olması muhtemel kod (çakışma DB'de yakalanır). */
+  private randomVoucherCode(prefix: string): string {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 0/O, 1/I çıkarıldı
+    let body = "";
+    for (let i = 0; i < 10; i += 1) {
+      body += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    return prefix ? `${prefix}-${body}` : body;
+  }
+
+  /** Bir batch'in kodları (admin listeleme + CSV export). */
+  async listCodes(discountId: string) {
+    const codes = await this.prisma.discountCode.findMany({
+      where: { discountId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        code: true,
+        isRedeemed: true,
+        redeemedById: true,
+        redeemedAt: true,
+        orderId: true,
+        createdAt: true,
+      },
+    });
+    return {
+      data: codes,
+      meta: {
+        total: codes.length,
+        redeemed: codes.filter((c) => c.isRedeemed).length,
+      },
+    };
   }
 
   /**

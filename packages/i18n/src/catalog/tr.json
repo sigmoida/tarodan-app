@@ -3090,6 +3090,18 @@
           "valueRequired": "Değer gerekli",
           "startDateRequired": "Başlangıç tarihi gerekli",
           "endDateRequired": "Bitiş tarihi gerekli"
+        },
+        "codes": {
+          "title": "Voucher Kodu Üret",
+          "help": "Bu indirim şablonu için tek-kullanımlık benzersiz kodlar üretilir. Her kod yalnızca bir kez kullanılabilir.",
+          "count": "Kod Adedi",
+          "prefix": "Ön Ek (opsiyonel)",
+          "prefixHelper": "Örn. YILBASI → YILBASI-A7K2M9PQRS",
+          "generate": "Üret",
+          "generated": "{count} kod üretildi (toplam {total})",
+          "generateFailed": "Kod üretilemedi",
+          "rowGenerate": "Kod Üret",
+          "rowExport": "Kodları İndir (CSV)"
         }
       },
       "emailTemplates": {

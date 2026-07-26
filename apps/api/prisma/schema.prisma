@@ -2109,7 +2109,11 @@ model Discount {
   getQuantity       Int?            @map("get_quantity")
   isFlashSale       Boolean         @default(false) @map("is_flash_sale")
   minQuantity       Int?            @default(1) @map("min_quantity")
+  /// Toplu üretilen tek-kullanımlık voucher kodları için "batch şablonu" işareti.
+  /// true ise bu Discount'ın paylaşımlı `code`'u yoktur; kodlar `codes` altındadır.
+  isBatch           Boolean         @default(false) @map("is_batch")
   usages            DiscountUsage[]
+  codes             DiscountCode[]
   category          Category?       @relation(fields: [categoryId], references: [id])
   seller            User?           @relation(fields: [sellerId], references: [id])
 
@@ -2118,6 +2122,24 @@ model Discount {
   @@index([code])
   @@index([scope])
   @@map("discounts")
+}
+
+/// Tek-kullanımlık voucher kodu (kampanya/hediye). Parent Discount = şablon
+/// (tür/değer/tarih/scope/limitler). Her kod bir kez kullanılır (isRedeemed).
+model DiscountCode {
+  id           String    @id @default(uuid())
+  discountId   String    @map("discount_id")
+  code         String    @unique
+  isRedeemed   Boolean   @default(false) @map("is_redeemed")
+  redeemedById String?   @map("redeemed_by_id")
+  redeemedAt   DateTime? @map("redeemed_at")
+  orderId      String?   @map("order_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  discount     Discount  @relation(fields: [discountId], references: [id], onDelete: Cascade)
+
+  @@index([discountId])
+  @@index([isRedeemed])
+  @@map("discount_codes")
 }
 
 model DiscountUsage {

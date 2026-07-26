@@ -280,6 +280,7 @@ export class OrderCheckoutDirectService {
       let couponDiscount = 0;
       let appliedCouponCode: string | null = null;
       let appliedDiscountId: string | null = null;
+      let appliedVoucherCodeId: string | undefined;
 
       if (dto.couponCode) {
         const validation = await this.discountService.validateCoupon(
@@ -294,6 +295,7 @@ export class OrderCheckoutDirectService {
           couponDiscount = validation.discount.estimatedDiscount;
           appliedCouponCode = dto.couponCode.toUpperCase();
           appliedDiscountId = validation.discount.id;
+          appliedVoucherCodeId = validation.discount.voucherCodeId;
         } else if (!validation.isValid) {
           throw new BadRequestException(
             validation.error || i18nMessage("server.order.invalidCouponCode"),
@@ -484,6 +486,7 @@ export class OrderCheckoutDirectService {
           buyerId,
           order.id,
           couponDiscount,
+          appliedVoucherCodeId,
         );
         this.logger.log(
           `Discount usage recorded: ${appliedDiscountId} for order ${orderNumber}`,

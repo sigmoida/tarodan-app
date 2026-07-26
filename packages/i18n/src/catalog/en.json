@@ -3090,6 +3090,18 @@
           "valueRequired": "Value is required",
           "startDateRequired": "Start date is required",
           "endDateRequired": "End date is required"
+        },
+        "codes": {
+          "title": "Generate Voucher Codes",
+          "help": "Generates unique single-use codes for this discount template. Each code can be redeemed once.",
+          "count": "Number of Codes",
+          "prefix": "Prefix (optional)",
+          "prefixHelper": "e.g. NEWYEAR → NEWYEAR-A7K2M9PQRS",
+          "generate": "Generate",
+          "generated": "{count} codes generated (total {total})",
+          "generateFailed": "Failed to generate codes",
+          "rowGenerate": "Generate Codes",
+          "rowExport": "Export Codes (CSV)"
         }
       },
       "emailTemplates": {
