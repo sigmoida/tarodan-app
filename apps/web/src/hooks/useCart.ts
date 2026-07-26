@@ -5,10 +5,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
 import {
   cartApi,
+  discountsApi,
   listingsApi,
   type CartItem,
   type CartResponse,
   type AppliedDiscount,
+  type CouponValidationResult,
   type OfflineCartItem,
 } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
@@ -69,6 +71,8 @@ export function useCart() {
   const isAuthLoading = useAuthStore((s) => s.isLoading);
 
   const offlineItems = useCartStore((s) => s.offlineItems);
+  const offlineCouponCode = useCartStore((s) => s.offlineCouponCode);
+  const setOfflineCouponCode = useCartStore((s) => s.setOfflineCouponCode);
   const addToOfflineCart = useCartStore((s) => s.addToOfflineCart);
   const updateOfflineQuantity = useCartStore((s) => s.updateOfflineQuantity);
   const removeFromOfflineCart = useCartStore((s) => s.removeFromOfflineCart);
@@ -86,6 +90,29 @@ export function useCart() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.cart.all() });
 
+  // Guest coupon: the store keeps only the code; the discount is (re)computed
+  // server-side against the CURRENT offline items, so changing quantities can
+  // never leave a stale amount (and a coupon that stops qualifying surfaces as
+  // invalid). Keyed on code + items so it refreshes whenever either changes.
+  const guestItemsKey = offlineItems
+    .map((i) => `${i.productId}:${i.quantity}`)
+    .join(",");
+  const guestCouponQuery = useQuery({
+    queryKey: queryKeys.cart.guestCoupon(offlineCouponCode, guestItemsKey),
+    queryFn: async (): Promise<CouponValidationResult> =>
+      (
+        await discountsApi.validateGuest({
+          code: offlineCouponCode!,
+          cartItems: offlineItems.map((i) => ({
+            productId: i.productId,
+            quantity: i.quantity,
+          })),
+        })
+      ).data as CouponValidationResult,
+    enabled: !isAuthenticated && !!offlineCouponCode && offlineItems.length > 0,
+    staleTime: 30_000,
+  });
+
   useEffect(() => {
     if (!isAuthenticated || offlineItems.length === 0) return;
     if (offlineCartMergePromise) return;
@@ -94,6 +121,8 @@ export function useCart() {
       productId,
       quantity,
     }));
+
+    const couponToMerge = offlineCouponCode;
 
     offlineCartMergePromise = (async () => {
       // Add sequentially so a brand-new account cannot race multiple attempts
@@ -106,6 +135,15 @@ export function useCart() {
           // to skip; the authenticated session itself remains successful.
         }
       }
+      // Carry the guest coupon onto the now-authenticated cart (best-effort —
+      // a per-user limit or expiry may reject it, which must not break login).
+      if (couponToMerge) {
+        try {
+          await cartApi.applyCoupon(couponToMerge);
+        } catch {
+          // ignore — user can re-enter it in the cart
+        }
+      }
       await queryClient.invalidateQueries({ queryKey: queryKeys.cart.all() });
     })()
       // A failed merge or refresh must not interrupt the completed login flow.
@@ -114,7 +152,13 @@ export function useCart() {
         clearOfflineCart();
         offlineCartMergePromise = null;
       });
-  }, [clearOfflineCart, isAuthenticated, offlineItems, queryClient]);
+  }, [
+    clearOfflineCart,
+    isAuthenticated,
+    offlineItems,
+    offlineCouponCode,
+    queryClient,
+  ]);
 
   // A single effective list feeds every cart signal. Authenticated users only
   // see server lines; persisted guest lines are deliberately ignored.
@@ -187,24 +231,57 @@ export function useCart() {
         canCheckout,
         appliedCouponCode: calc?.appliedCouponCode ?? null,
         appliedDiscounts: calc?.appliedDiscounts ?? [],
+        couponDiscount: calc?.couponDiscountTotal ?? 0,
+        couponError: null as string | null,
         warnings: calc?.warnings ?? [],
       };
     }
+
+    // Guest coupon: derive from the reactive validation query (fresh vs items).
+    const guestCoupon = guestCouponQuery.data;
+    const guestCouponValid = !!guestCoupon?.isValid && !!offlineCouponCode;
+    const guestCouponDiscount = guestCouponValid
+      ? Math.min(guestCoupon!.discount?.estimatedDiscount ?? 0, subtotal)
+      : 0;
 
     return {
       items: [] as CartItem[],
       offlineItems,
       subtotal,
-      totalDiscount: 0,
+      totalDiscount: guestCouponDiscount,
       shippingCost,
-      grandTotal: subtotal + shippingCost,
+      grandTotal: Math.max(0, subtotal - guestCouponDiscount) + shippingCost,
       itemCount,
       canCheckout,
-      appliedCouponCode: null as string | null,
-      appliedDiscounts: [] as AppliedDiscount[],
+      appliedCouponCode: guestCouponValid ? offlineCouponCode : null,
+      appliedDiscounts: guestCouponValid
+        ? [
+            {
+              discountId: guestCoupon!.discount!.id,
+              discountName: guestCoupon!.discount!.name,
+              discountCode: guestCoupon!.discount!.code,
+              appliedAmount: guestCouponDiscount,
+            } as AppliedDiscount,
+          ]
+        : [],
+      couponDiscount: guestCouponDiscount,
+      // Applied code that no longer validates (e.g. items dropped below min) →
+      // surface the reason so the coupon box can show it / prompt removal.
+      couponError:
+        offlineCouponCode && guestCoupon && !guestCoupon.isValid
+          ? (guestCoupon.error ?? null)
+          : null,
       warnings: [] as string[],
     };
-  }, [isAuthenticated, isAuthLoading, query.data, offlineItems, lines]);
+  }, [
+    isAuthenticated,
+    isAuthLoading,
+    query.data,
+    offlineItems,
+    lines,
+    offlineCouponCode,
+    guestCouponQuery.data,
+  ]);
 
   // ── Writes ── (branch on auth; keep the old throw/return contracts so the
   // cart-page stepper and coupon box behave exactly as before)
@@ -282,22 +359,48 @@ export function useCart() {
   const applyCoupon = async (
     code: string,
   ): Promise<{ success: boolean; error?: string }> => {
-    if (!isAuthenticated)
-      return { success: false, error: "Giriş yapmanız gerekiyor" };
+    // Error strings are intentionally NOT hardcoded here — the hook returns the
+    // backend's (localized) message or undefined, and the caller (CouponBox)
+    // renders a translated fallback via `t()`.
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) return { success: false };
+
+    // Guest: validate against the offline cart (no per-user limit), then persist
+    // only the CODE — the discount is recomputed reactively from current items.
+    if (!isAuthenticated) {
+      if (offlineItems.length === 0) return { success: false };
+      try {
+        const result = (
+          await discountsApi.validateGuest({
+            code: trimmed,
+            cartItems: offlineItems.map((i) => ({
+              productId: i.productId,
+              quantity: i.quantity,
+            })),
+          })
+        ).data as CouponValidationResult;
+        if (!result.isValid) return { success: false, error: result.error };
+        setOfflineCouponCode(trimmed);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: cartErrorMessage(error, "") };
+      }
+    }
+
     try {
-      await cartApi.applyCoupon(code);
+      await cartApi.applyCoupon(trimmed);
       await invalidate();
       return { success: true };
     } catch (error) {
-      return {
-        success: false,
-        error: cartErrorMessage(error, "Kupon uygulanamadı"),
-      };
+      return { success: false, error: cartErrorMessage(error, "") };
     }
   };
 
   const removeCoupon = async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setOfflineCouponCode(null);
+      return;
+    }
     await cartApi.removeCoupon();
     await invalidate();
   };

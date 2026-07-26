@@ -436,7 +436,13 @@ export class DiscountService {
    */
   async validateCoupon(
     dto: ValidateCouponDto,
-    userId: string,
+    /**
+     * Kuponu uygulayan kullanıcı. Misafir (giriş yapmamış) sepet doğrulamasında
+     * `null` gelir — bu durumda kişi-başı kullanım limiti kontrol EDİLEMEZ (kimlik
+     * yok), yalnızca toplam limit + tarih + min sepet uygulanır. Kişi-başı limit
+     * checkout'ta (giriş/e-posta ile) devreye girer.
+     */
+    userId: string | null,
   ): Promise<ValidationResultDto> {
     const discount = await this.prisma.discount.findUnique({
       where: { code: dto.code.toUpperCase() },
@@ -471,8 +477,9 @@ export class DiscountService {
       return { isValid: false, error: "Bu kupon kullanım limitine ulaştı" };
     }
 
-    // Check per-user usage limit
-    if (discount.usageLimitPerUser) {
+    // Check per-user usage limit — only when we know who is applying (auth).
+    // Misafir doğrulamasında (userId=null) atlanır; checkout'ta yeniden denetlenir.
+    if (userId && discount.usageLimitPerUser) {
       const userUsageCount = await this.prisma.discountUsage.count({
         where: { discountId: discount.id, userId },
       });

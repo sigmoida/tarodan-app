@@ -16,6 +16,13 @@ import type { OfflineCartItem } from "@/lib/api";
  */
 interface CartStoreState {
   offlineItems: OfflineCartItem[];
+  /**
+   * Guest cart coupon — only the CODE is stored; the discount amount is derived
+   * reactively in `useCart` (server re-validates against current items), so a
+   * quantity change never leaves a stale amount. Cleared on login-merge & clear.
+   */
+  offlineCouponCode: string | null;
+  setOfflineCouponCode: (code: string | null) => void;
   /** Optimistic badge hint (last shown item count). Written by `useCart`. */
   itemCount: number;
   setItemCount: (count: number) => void;
@@ -31,8 +38,10 @@ export const useCartStore = create<CartStoreState>()(
   persist(
     (set, get) => ({
       offlineItems: [],
+      offlineCouponCode: null,
       itemCount: 0,
 
+      setOfflineCouponCode: (code) => set({ offlineCouponCode: code }),
       setItemCount: (count) => set({ itemCount: count }),
 
       addToOfflineCart: (item) => {
@@ -83,7 +92,8 @@ export const useCartStore = create<CartStoreState>()(
         });
       },
 
-      clearOfflineCart: () => set({ offlineItems: [] }),
+      clearOfflineCart: () =>
+        set({ offlineItems: [], offlineCouponCode: null }),
     }),
     {
       name: "cart-storage",
@@ -91,6 +101,7 @@ export const useCartStore = create<CartStoreState>()(
       // the header count doesn't flash to 0 before the authed query resolves).
       partialize: (state) => ({
         offlineItems: state.offlineItems,
+        offlineCouponCode: state.offlineCouponCode,
         itemCount: state.itemCount,
       }),
     },
