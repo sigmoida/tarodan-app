@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
-import { Input, Select } from "@tarodan/ui";
+import { Input } from "@tarodan/ui";
 import {
   FormModal,
   FormError,
@@ -18,196 +17,257 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
 import { extractErrorMessage } from "@/lib/error";
 import { fmtTry } from "@/lib/format";
-import { adminKeys } from "@/lib/query/keys";
 import {
   type CommissionRule,
   type CommissionFormValues,
-  type Category,
-  type SellerType,
   commissionSchema,
   emptyCommissionForm,
   ruleToForm,
   commissionFormToPayload,
   sellerTypes,
+  taxpayerTypes,
   appliesToOptions,
 } from "../_lib/types";
 
-interface CommissionPreview {
-  sellerFeeAmount: number;
-  buyerFeeAmount: number;
-  commissionAmount: number;
+/** rate% of amount, clamped by optional [min,max] TL. */
+function feeFor(
+  amount: number,
+  rate: string,
+  min: string,
+  max: string,
+): number {
+  const r = parseFloat(rate);
+  if (!r || Number.isNaN(r)) return 0;
+  let val = amount * (r / 100);
+  const lo = parseFloat(min);
+  const hi = parseFloat(max);
+  if (!Number.isNaN(lo) && val < lo) val = lo;
+  if (!Number.isNaN(hi) && val > hi) val = hi;
+  return Math.round(val * 100) / 100;
 }
 
-/** Live checkout-equivalent preview, including independently matched buyer/seller rules. */
-function PreviewCalculator({
-  ruleId,
-  categories,
+/** Reusable rate + TL floor/cap block. */
+function RateBlock({
+  title,
+  rateName,
+  minName,
+  maxName,
 }: {
-  ruleId?: string;
-  categories: Category[];
+  title: string;
+  rateName: string;
+  minName: string;
+  maxName: string;
 }) {
   const t = useTranslations();
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <h3 className="text-sm font-medium text-heading">{title}</h3>
+      <div className="grid grid-cols-3 gap-3">
+        <FormInput
+          name={rateName}
+          label={t("admin.finance.commission.ratePercent")}
+          type="number"
+          step="0.01"
+          min="0"
+        />
+        <FormInput
+          name={minName}
+          label={t("admin.finance.commission.minTl")}
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder={t("common.optional")}
+        />
+        <FormInput
+          name={maxName}
+          label={t("admin.finance.commission.maxTl")}
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder={t("common.optional")}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Live client-side breakdown for an example order — commission + shipping split + VAT/stopaj. */
+function BreakdownPreview() {
+  const t = useTranslations();
   const { watch } = useFormContext<CommissionFormValues>();
-  const [price, setPrice] = useState("");
-  const [debouncedPrice, setDebouncedPrice] = useState(0);
-  const [previewCategoryId, setPreviewCategoryId] = useState("");
-  const [previewSellerType, setPreviewSellerType] =
-    useState<Exclude<SellerType, "ALL">>("FREE");
-  const values = watch();
+  const v = watch();
+  const [price, setPrice] = useState("1000");
+  const [ship, setShip] = useState("29.99");
+  const [vat, setVat] = useState("20");
+  const [withholding, setWithholding] = useState("1");
 
-  useEffect(() => {
-    const parsedPrice = parseFloat(price);
-    const timer = setTimeout(
-      () =>
-        setDebouncedPrice(
-          Number.isNaN(parsedPrice) || parsedPrice <= 0 ? 0 : parsedPrice,
-        ),
-      300,
-    );
-    return () => clearTimeout(timer);
-  }, [price]);
+  const amount = parseFloat(price) || 0;
+  const shipping = parseFloat(ship) || 0;
+  const vatRate = parseFloat(vat) || 0;
+  const whRate = parseFloat(withholding) || 0;
 
-  const effectiveCategoryId = values.categoryId || previewCategoryId;
-  const effectiveSellerType =
-    values.sellerType === "ALL" ? previewSellerType : values.sellerType;
-  const hasRequiredRates =
-    !(
-      (values.appliesTo === "SELLER" || values.appliesTo === "BOTH") &&
-      !values.sellerRate
-    ) &&
-    !(
-      (values.appliesTo === "BUYER" || values.appliesTo === "BOTH") &&
-      !values.buyerRate
-    );
-  const draft = commissionFormToPayload(values);
+  const buyerCommission = feeFor(
+    amount,
+    v.buyerCommissionRate,
+    v.buyerCommissionMin,
+    v.buyerCommissionMax,
+  );
+  const buyerServiceFee = feeFor(
+    amount,
+    v.buyerServiceFeeRate,
+    v.buyerServiceFeeMin,
+    v.buyerServiceFeeMax,
+  );
+  const sellerCommission = feeFor(
+    amount,
+    v.sellerCommissionRate,
+    v.sellerCommissionMin,
+    v.sellerCommissionMax,
+  );
+  const sellerPlatformFee = feeFor(
+    amount,
+    v.sellerPlatformFeeRate,
+    v.sellerPlatformFeeMin,
+    v.sellerPlatformFeeMax,
+  );
+  const buyerShare = Math.min(
+    100,
+    Math.max(0, parseFloat(v.shippingBuyerShare) || 0),
+  );
+  const buyerShipping = Math.round(shipping * (buyerShare / 100) * 100) / 100;
+  const sellerShipping = Math.round((shipping - buyerShipping) * 100) / 100;
+  const isCorporate = v.taxpayerType === "corporate";
+  // KDV = sale VAT (corporate only); stopaj = withholding (corporate only); komisyon KDV on the seller fees.
+  const saleVat = isCorporate
+    ? Math.round(amount * (vatRate / 100) * 100) / 100
+    : 0;
+  const stopaj = isCorporate
+    ? Math.round(amount * (whRate / 100) * 100) / 100
+    : 0;
+  const commissionVat =
+    Math.round((sellerCommission + sellerPlatformFee) * (vatRate / 100) * 100) /
+    100;
 
-  const previewQuery = useQuery<CommissionPreview>({
-    queryKey: adminKeys.preview("commission-rules", {
-      ruleId: ruleId ?? "new",
-      amount: debouncedPrice,
-      categoryId: effectiveCategoryId,
-      sellerType: effectiveSellerType,
-      draft: {
-        categoryId: draft.categoryId,
-        sellerType: draft.sellerType,
-        appliesTo: draft.appliesTo,
-        sellerRate: draft.sellerRate,
-        buyerRate: draft.buyerRate,
-        sellerMin: draft.sellerMin,
-        sellerMax: draft.sellerMax,
-        buyerMin: draft.buyerMin,
-        buyerMax: draft.buyerMax,
-        isActive: draft.isActive,
-      },
-    }),
-    queryFn: async () => {
-      const response = await adminApi.previewCommission({
-        amount: debouncedPrice,
-        ruleId,
-        categoryId: draft.categoryId,
-        sellerType: draft.sellerType,
-        appliesTo: draft.appliesTo,
-        sellerRate: draft.sellerRate,
-        buyerRate: draft.buyerRate,
-        sellerMin: draft.sellerMin,
-        sellerMax: draft.sellerMax,
-        buyerMin: draft.buyerMin,
-        buyerMax: draft.buyerMax,
-        isActive: draft.isActive,
-        previewCategoryId: effectiveCategoryId || null,
-        previewSellerType: effectiveSellerType,
-      });
-      return response.data;
-    },
-    enabled: debouncedPrice > 0 && hasRequiredRates,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
+  const buyerPays =
+    amount + buyerCommission + buyerServiceFee + buyerShipping + saleVat;
+  const sellerReceives =
+    amount +
+    saleVat -
+    sellerCommission -
+    sellerPlatformFee -
+    sellerShipping -
+    stopaj;
 
-  const preview = previewQuery.data;
-  const categoryOptions = [
-    { value: "", label: t("admin.finance.commission.noCategorySelected") },
-    ...categories.map((category) => ({
-      value: category.id,
-      label: category.name,
-    })),
-  ];
+  const Row = ({
+    label,
+    value,
+    tone,
+  }: {
+    label: string;
+    value: number;
+    tone?: string;
+  }) => (
+    <div className="flex justify-between">
+      <span className="text-muted">{label}</span>
+      <span className={tone ?? "text-heading"}>{fmtTry(value)}</span>
+    </div>
+  );
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
       <h3 className="text-sm font-medium text-muted">
         {t("admin.finance.commission.previewCalculator")}
       </h3>
-      <p className="text-xs text-muted">
-        {t("admin.finance.commission.previewDescription")}
-      </p>
-      {values.categoryId === "" && (
-        <Select
-          label={t("admin.finance.commission.exampleCategory")}
-          value={previewCategoryId}
-          onChange={(event) => setPreviewCategoryId(event.target.value)}
-          options={categoryOptions}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          label={t("admin.finance.commission.examplePrice")}
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
         />
-      )}
-      {values.sellerType === "ALL" && (
-        <Select
-          label={t("admin.finance.commission.exampleSellerType")}
-          value={previewSellerType}
-          onChange={(event) =>
-            setPreviewSellerType(
-              event.target.value as Exclude<SellerType, "ALL">,
-            )
-          }
-          options={sellerTypes(t).filter((option) => option.value !== "ALL")}
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          label={t("admin.finance.commission.exampleShipping")}
+          value={ship}
+          onChange={(e) => setShip(e.target.value)}
         />
-      )}
-      <Input
-        type="number"
-        step="0.01"
-        min="0"
-        label={t("admin.finance.commission.examplePrice")}
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-        placeholder="1000"
-      />
-      {previewQuery.isFetching && (
-        <p className="text-sm text-muted">
-          {t("admin.finance.commission.calculating")}
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          label={t("admin.finance.commission.exampleVat")}
+          value={vat}
+          onChange={(e) => setVat(e.target.value)}
+        />
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          label={t("admin.finance.commission.exampleWithholding")}
+          value={withholding}
+          onChange={(e) => setWithholding(e.target.value)}
+        />
+      </div>
+      {!isCorporate && (
+        <p className="text-xs text-muted">
+          {t("admin.finance.commission.corporateOnlyNote")}
         </p>
       )}
-      {previewQuery.isError && (
-        <p className="text-sm text-danger-600">
-          {t("admin.finance.commission.previewFailed")}
-        </p>
-      )}
-      {preview && (
-        <div className="space-y-2 rounded-lg bg-surface-alt p-4 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted">
-              {t("admin.finance.commission.sellerCommission")}:
-            </span>
-            <span className="font-medium text-heading">
-              {fmtTry(preview.sellerFeeAmount)}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted">
-              {t("admin.finance.commission.buyerCommission")}:
-            </span>
-            <span className="font-medium text-heading">
-              {fmtTry(preview.buyerFeeAmount)}
-            </span>
-          </div>
-          <div className="flex justify-between border-t border-border pt-2">
-            <span className="font-medium text-muted">
-              {t("admin.finance.commission.totalCommission")}:
-            </span>
-            <span className="font-bold text-primary-700">
-              {fmtTry(preview.commissionAmount)}
-            </span>
-          </div>
+      <div className="space-y-1.5 rounded-lg bg-surface-alt p-4 text-sm">
+        <Row
+          label={t("admin.finance.commission.buyerCommission")}
+          value={buyerCommission}
+        />
+        <Row
+          label={t("admin.finance.commission.buyerServiceFee")}
+          value={buyerServiceFee}
+        />
+        <Row
+          label={t("admin.finance.commission.buyerShipping")}
+          value={buyerShipping}
+        />
+        {saleVat > 0 && (
+          <Row label={t("admin.finance.commission.vat")} value={saleVat} />
+        )}
+        <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
+          <span>{t("admin.finance.commission.buyerPays")}</span>
+          <span className="text-primary-700">{fmtTry(buyerPays)}</span>
         </div>
-      )}
+        <div className="pt-2" />
+        <Row
+          label={t("admin.finance.commission.sellerCommission")}
+          value={sellerCommission}
+        />
+        <Row
+          label={t("admin.finance.commission.sellerPlatformFee")}
+          value={sellerPlatformFee}
+        />
+        <Row
+          label={t("admin.finance.commission.sellerShipping")}
+          value={sellerShipping}
+        />
+        <Row
+          label={t("admin.finance.commission.commissionVat")}
+          value={commissionVat}
+        />
+        {stopaj > 0 && (
+          <Row
+            label={t("admin.finance.commission.withholding")}
+            value={stopaj}
+          />
+        )}
+        <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
+          <span>{t("admin.finance.commission.sellerReceives")}</span>
+          <span className="text-success-700">{fmtTry(sellerReceives)}</span>
+        </div>
+      </div>
+      <p className="text-xs text-muted">
+        {t("admin.finance.commission.previewTaxNote")}
+      </p>
     </div>
   );
 }
@@ -227,9 +287,6 @@ export function CommissionRuleFormModal({
   const form = useZodForm(commissionSchema(t), {
     defaultValues: rule ? ruleToForm(rule) : emptyCommissionForm,
   });
-  const appliesTo = form.watch("appliesTo");
-  const showSeller = appliesTo === "SELLER" || appliesTo === "BOTH";
-  const showBuyer = appliesTo === "BUYER" || appliesTo === "BOTH";
 
   const { data: categories = [] } = useCategories();
 
@@ -285,7 +342,8 @@ export function CommissionRuleFormModal({
     >
       <FormError />
       <FormInput name="name" label={t("admin.finance.commission.ruleName")} />
-      <div className="grid grid-cols-2 gap-4">
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <FormSelect
           name="categoryId"
           label={t("common.category")}
@@ -296,74 +354,78 @@ export function CommissionRuleFormModal({
           label={t("admin.finance.commission.sellerType")}
           options={sellerTypes(t)}
         />
+        <FormSelect
+          name="taxpayerType"
+          label={t("admin.finance.commission.taxpayerType")}
+          options={taxpayerTypes(t)}
+        />
       </div>
-      <FormSelect
-        name="appliesTo"
-        label={t("admin.finance.commission.appliesTo")}
-        options={appliesToOptions(t)}
-      />
 
-      {showSeller && (
-        <div className="space-y-4 rounded-lg border border-border p-4">
-          <h3 className="text-sm font-medium text-muted">
-            {t("admin.finance.commission.sellerCommission")}
-          </h3>
-          <FormInput
-            name="sellerRate"
-            label={t("admin.finance.commission.sellerRatePercent")}
-            type="number"
-            step="0.01"
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <FormInput
-              name="sellerMin"
-              label={t("admin.finance.commission.sellerMinimum")}
-              type="number"
-              step="0.01"
-              placeholder={t("common.optional")}
-            />
-            <FormInput
-              name="sellerMax"
-              label={t("admin.finance.commission.sellerMaximum")}
-              type="number"
-              step="0.01"
-              placeholder={t("common.optional")}
-            />
-          </div>
-        </div>
-      )}
+      {/* Kademeli eşleşme: ürün/satır tutar aralığı */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <FormInput
+          name="minAmount"
+          label={t("admin.finance.commission.minAmountLabel")}
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder={t("common.optional")}
+        />
+        <FormInput
+          name="maxAmount"
+          label={t("admin.finance.commission.maxAmountLabel")}
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder={t("common.optional")}
+        />
+        <FormSelect
+          name="appliesTo"
+          label={t("admin.finance.commission.appliesTo")}
+          options={appliesToOptions(t)}
+        />
+      </div>
 
-      {showBuyer && (
-        <div className="space-y-4 rounded-lg border border-border p-4">
-          <h3 className="text-sm font-medium text-muted">
-            {t("admin.finance.commission.buyerCommission")}
-          </h3>
-          <FormInput
-            name="buyerRate"
-            label={t("admin.finance.commission.buyerRatePercent")}
-            type="number"
-            step="0.01"
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <FormInput
-              name="buyerMin"
-              label={t("admin.finance.commission.buyerMinimum")}
-              type="number"
-              step="0.01"
-              placeholder={t("common.optional")}
-            />
-            <FormInput
-              name="buyerMax"
-              label={t("admin.finance.commission.buyerMaximum")}
-              type="number"
-              step="0.01"
-              placeholder={t("common.optional")}
-            />
-          </div>
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RateBlock
+          title={t("admin.finance.commission.sellerCommission")}
+          rateName="sellerCommissionRate"
+          minName="sellerCommissionMin"
+          maxName="sellerCommissionMax"
+        />
+        <RateBlock
+          title={t("admin.finance.commission.sellerPlatformFee")}
+          rateName="sellerPlatformFeeRate"
+          minName="sellerPlatformFeeMin"
+          maxName="sellerPlatformFeeMax"
+        />
+        <RateBlock
+          title={t("admin.finance.commission.buyerServiceFee")}
+          rateName="buyerServiceFeeRate"
+          minName="buyerServiceFeeMin"
+          maxName="buyerServiceFeeMax"
+        />
+        <RateBlock
+          title={t("admin.finance.commission.buyerCommission")}
+          rateName="buyerCommissionRate"
+          minName="buyerCommissionMin"
+          maxName="buyerCommissionMax"
+        />
+      </div>
 
-      <PreviewCalculator ruleId={rule?.id} categories={categories} />
+      <div className="rounded-lg border border-border p-4">
+        <FormInput
+          name="shippingBuyerShare"
+          label={t("admin.finance.commission.shippingBuyerShareLabel")}
+          type="number"
+          step="1"
+          min="0"
+          max="100"
+          helperText={t("admin.finance.commission.shippingShareHelper")}
+        />
+      </div>
+
+      <BreakdownPreview />
       <FormCheckbox
         name="isActive"
         label={t("admin.finance.commission.ruleActive")}

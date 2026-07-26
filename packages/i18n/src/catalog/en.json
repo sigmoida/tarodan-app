@@ -3454,8 +3454,34 @@
           "nameRequired": "Rule name is required",
           "sellerRateRequired": "Seller rate is required",
           "buyerRateRequired": "Buyer rate is required",
-          "maxBelowMin": "Maximum cannot be less than minimum"
-        }
+          "maxBelowMin": "Maximum cannot be less than minimum",
+          "atLeastOneRate": "Enter at least one deduction rate."
+        },
+        "taxpayerType": "Taxpayer Type",
+        "taxpayer": {
+          "individual": "Individual",
+          "corporate": "Corporate"
+        },
+        "minAmountLabel": "Min. Amount (tier)",
+        "maxAmountLabel": "Max. Amount (tier)",
+        "ratePercent": "Rate (%)",
+        "minTl": "Floor (₺)",
+        "maxTl": "Cap (₺)",
+        "sellerPlatformFee": "Seller Platform Service Fee",
+        "shippingBuyerShareLabel": "Buyer Shipping Share (%)",
+        "shippingShareHelper": "Buyer percentage of the single shipping cost; the seller bears the rest.",
+        "exampleShipping": "Example Shipping (₺)",
+        "exampleVat": "Example VAT (%)",
+        "exampleWithholding": "Example Withholding (%)",
+        "buyerShipping": "Buyer Shipping Share",
+        "sellerShipping": "Seller Shipping Share",
+        "buyerPays": "Buyer Pays",
+        "sellerReceives": "Seller Receives",
+        "vat": "VAT",
+        "commissionVat": "Commission VAT",
+        "withholding": "Withholding",
+        "corporateOnlyNote": "VAT and withholding apply only to corporate sellers (0 for individuals).",
+        "previewTaxNote": "VAT/withholding are example values; actual rates come from Finance -> Tax."
       },
       "invoices": {
         "title": "Invoices",
