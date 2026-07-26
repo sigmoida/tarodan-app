@@ -5,7 +5,6 @@
 import { bankAccountApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
-import { normalizeIban } from "../_lib/iban";
 import type { BankAccountValues } from "../_lib/schemas";
 
 export interface BankAccount {
@@ -37,7 +36,8 @@ export function useSaveBankAccount() {
     async (values: BankAccountValues) => {
       await bankAccountApi.upsert({
         accountHolder: values.accountHolder.trim(),
-        iban: normalizeIban(values.iban),
+        // FormIban stores the normalized raw value (TR + digits, uppercased, no spaces).
+        iban: values.iban,
         ...(values.tcKimlikNo ? { tcKimlikNo: values.tcKimlikNo } : {}),
         ...(values.taxId ? { taxId: values.taxId } : {}),
       });

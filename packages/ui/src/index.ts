@@ -26,6 +26,20 @@ export {
   QuantityStepper,
   type QuantityStepperProps,
 } from "./components/QuantityStepper";
+export { PhoneInput, type PhoneInputProps } from "./components/PhoneInput";
+export {
+  countryCodes,
+  DEFAULT_COUNTRY_CODE,
+  formatPhoneNumber,
+  getFullPhoneNumber,
+  hasCountryCodePrefix,
+  normalizePhoneForPayload,
+  getPhoneMaxLength,
+  getPhonePlaceholder,
+  splitPhone,
+  combinePhone,
+  type CountryCode,
+} from "./lib/phone";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Textarea, type TextareaProps } from "./components/Textarea";
 export {

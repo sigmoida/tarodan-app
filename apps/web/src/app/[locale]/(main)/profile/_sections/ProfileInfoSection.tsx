@@ -5,7 +5,13 @@
 import { useEffect, useRef, useState } from "react";
 import { CameraIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner } from "@tarodan/ui";
-import { Form, FormInput, FormTextarea, useZodForm } from "@tarodan/ui/form";
+import {
+  Form,
+  FormInput,
+  FormPhone,
+  FormTextarea,
+  useZodForm,
+} from "@tarodan/ui/form";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import SectionCard from "@/components/ui/SectionCard";
@@ -150,11 +156,7 @@ export default function ProfileInfoSection() {
             placeholder="Adınız"
           />
           <div className="grid gap-4 md:grid-cols-2">
-            <FormInput
-              name="phone"
-              label="Telefon"
-              placeholder="+90 555 123 4567"
-            />
+            <FormPhone name="phone" label="Telefon" />
             <FormInput name="birthDate" type="date" label="Doğum Tarihi" />
           </div>
           <FormTextarea name="bio" label="Hakkımda" rows={4} maxLength={500} />

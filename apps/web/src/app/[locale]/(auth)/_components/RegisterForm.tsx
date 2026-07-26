@@ -8,6 +8,7 @@ import { Button, Spinner } from "@tarodan/ui";
 import {
   Form,
   FormInput,
+  FormPhone,
   FormCheckbox,
   FormError,
   useZodForm,
@@ -164,13 +165,7 @@ export function RegisterForm() {
         />
 
         <div className="grid grid-cols-2 gap-4">
-          <FormInput
-            name="phone"
-            type="tel"
-            label={t("auth.phone")}
-            placeholder="5XX XXX XX XX"
-            autoComplete="tel"
-          />
+          <FormPhone name="phone" label={t("auth.phone")} />
 
           <FormInput
             name="birthDate"

@@ -2,9 +2,9 @@
 
 "use client";
 
-import { Input } from "@tarodan/ui";
 import {
   FormInput,
+  FormPhone,
   FormTextarea,
   FormCheckbox,
   FormModal,
@@ -25,14 +25,6 @@ const EMPTY: AddressValues = {
   isDefault: false,
 };
 
-const displayPhone = (phone: string) =>
-  phone
-    .replace("+90", "")
-    .replace(/\s/g, "")
-    .slice(0, 10)
-    .replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, "$1 $2 $3 $4")
-    .trim();
-
 interface AddressFormModalProps {
   open: boolean;
   onClose: () => void;
@@ -51,10 +43,8 @@ export default function AddressFormModal({
   const { register, setValue, watch, formState } = form;
 
   // Custom-driven fields still need to live in the form state.
-  register("phone");
   register("city");
   register("district");
-  const phone = watch("phone") ?? "";
   const city = watch("city") ?? "";
   const district = watch("district") ?? "";
 
@@ -76,27 +66,7 @@ export default function AddressFormModal({
 
       <div className="grid gap-4 md:grid-cols-2">
         <FormInput name="fullName" label="Ad Soyad" />
-        <div>
-          <label className="mb-1 block text-sm font-medium text-body">
-            Telefon
-          </label>
-          <div className="flex">
-            <span className="inline-flex items-center rounded-l-lg border border-r-0 border-border bg-surface-alt px-3 font-medium text-muted">
-              +90
-            </span>
-            <Input
-              type="tel"
-              value={displayPhone(phone)}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-                setValue("phone", "+90" + digits, { shouldValidate: true });
-              }}
-              placeholder="5XX XXX XX XX"
-              className="rounded-l-none"
-              error={formState.errors.phone?.message as string | undefined}
-            />
-          </div>
-        </div>
+        <FormPhone name="phone" label="Telefon" />
       </div>
 
       <div>

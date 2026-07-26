@@ -1,7 +1,7 @@
 /** @format */
 
 import { z } from "zod";
-import { isValidTrIban } from "./iban";
+import { isValidIban } from "@tarodan/ui";
 
 /**
  * Zod schemas for the profile dashboard forms. One source of truth for both
@@ -50,7 +50,7 @@ export const bankAccountSchema = z.object({
     .min(2, "Hesap sahibi en az 2 karakter olmalı"),
   iban: z
     .string()
-    .refine(isValidTrIban, "Geçerli bir TR IBAN giriniz (TR + 24 rakam)"),
+    .refine(isValidIban, "Geçerli bir TR IBAN giriniz (TR + 24 rakam)"),
   tcKimlikNo: z
     .string()
     .optional()

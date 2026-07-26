@@ -11,6 +11,8 @@ export {
   type FormInputProps,
 } from "./components/form/Form";
 export { FormSelect, type FormSelectProps } from "./components/form/FormSelect";
+export { FormPhone, type FormPhoneProps } from "./components/form/FormPhone";
+export { FormIban, type FormIbanProps } from "./components/form/FormIban";
 export {
   FormTextarea,
   type FormTextareaProps,

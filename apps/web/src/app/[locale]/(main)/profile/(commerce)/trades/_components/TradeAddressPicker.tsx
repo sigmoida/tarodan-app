@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPinIcon, PlusIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { Button, Input, Textarea } from "@tarodan/ui";
+import {
+  Button,
+  Input,
+  Textarea,
+  PhoneInput,
+  splitPhone,
+  combinePhone,
+} from "@tarodan/ui";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import { useAddresses, useSaveAddress } from "../../../_hooks/useAddresses";
 
@@ -173,30 +180,25 @@ export default function TradeAddressPicker({
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
           />
-          {/* Telefon — kayıtlı adres formundaki (+90 önekli, 10 hane, formatlı)
-              yerleşik pattern. Ham input "sonsuz karakter" alıyordu. */}
-          <div className="flex">
-            <span className="inline-flex items-center px-3 bg-surface-alt border border-r-0 border-border rounded-l text-muted font-medium">
-              +90
-            </span>
-            <Input
-              type="tel"
-              inputMode="tel"
-              value={form.phone
-                .replace("+90", "")
-                .replace(/\s/g, "")
-                .slice(0, 10)
-                .replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, "$1 $2 $3 $4")
-                .trim()}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-                setForm({ ...form, phone: "+90" + digits });
-              }}
-              placeholder="5XX XXX XX XX"
-              maxLength={14}
-              className="rounded-l-none"
-            />
-          </div>
+          {/* Telefon — ortak PhoneInput (ülke kodu + formatlı numara). Tek kaynak
+              form.phone'daki tam değer ("+90"+haneler); splitPhone/combinePhone. */}
+          <PhoneInput
+            countryCode={splitPhone(form.phone).countryCode}
+            onCountryCodeChange={(code) =>
+              setForm({
+                ...form,
+                phone: combinePhone(code, splitPhone(form.phone).national),
+              })
+            }
+            phone={splitPhone(form.phone).national}
+            onPhoneChange={(nat) =>
+              setForm({
+                ...form,
+                phone: combinePhone(splitPhone(form.phone).countryCode, nat),
+              })
+            }
+            placeholder="5XX XXX XX XX"
+          />
           <CityDistrictSelector
             city={form.city}
             district={form.district}

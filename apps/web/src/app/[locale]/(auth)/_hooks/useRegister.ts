@@ -30,9 +30,8 @@ export function useRegister() {
 
   const registerMutation = useMutation({
     mutationFn: (input: RegisterInput) => {
-      const formattedPhone = input.phone
-        ? "+90" + input.phone.replace(/\s/g, "")
-        : undefined;
+      // FormPhone stores the normalized full number ("+90" + digits) or "".
+      const formattedPhone = input.phone || undefined;
       return api.post("/auth/register", {
         displayName: input.displayName,
         email: input.email,
