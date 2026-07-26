@@ -7,6 +7,7 @@ import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import CouponBox from "./CouponBox";
 
 interface AppliedDiscount {
   discountId: string;
@@ -60,6 +61,10 @@ export default function CartSummary({
             </span>
           </div>
         ))}
+
+        <div className="pt-1">
+          <CouponBox />
+        </div>
 
         {buyerFee > 0 && (
           <div className="flex justify-between">
