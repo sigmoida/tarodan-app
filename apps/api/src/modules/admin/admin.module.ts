@@ -21,6 +21,7 @@ import { AdminShippingController } from "./admin-shipping.controller";
 import { AdminLogsController } from "./admin-logs.controller";
 import { AdminReviewController } from "./admin-review.controller";
 import { AdminSellerApplicationController } from "./admin-seller-application.controller";
+import { AdminAdPackageController } from "./admin-ad-package.controller";
 import { AdminService } from "./admin.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCommissionService } from "./admin-commission.service";
@@ -55,6 +56,7 @@ import { AdminLogsService } from "./admin-logs.service";
 import { AdminShippingService } from "./admin-shipping.service";
 import { AdminReviewService } from "./admin-review.service";
 import { AdminSellerApplicationService } from "./admin-seller-application.service";
+import { AdminAdPackageService } from "./admin-ad-package.service";
 import { ScheduledNotificationScheduler } from "./scheduled-notification.scheduler";
 import { ScheduledNotificationProcessor } from "./scheduled-notification.processor";
 import { QUEUE_NAMES } from "../../workers/constants";
@@ -123,6 +125,7 @@ import { ElogoModule } from "../elogo/elogo.module";
     AdminLogsController,
     AdminReviewController,
     AdminSellerApplicationController,
+    AdminAdPackageController,
   ],
   providers: [
     AdminService,
@@ -159,6 +162,7 @@ import { ElogoModule } from "../elogo/elogo.module";
     AdminShippingService,
     AdminReviewService,
     AdminSellerApplicationService,
+    AdminAdPackageService,
     ScheduledNotificationScheduler,
     ScheduledNotificationProcessor,
   ],

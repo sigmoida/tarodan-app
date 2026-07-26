@@ -3288,6 +3288,81 @@
           "privacy": "<p><em>Son güncelleme: Ocak 2026</em></p><h2>1. Giriş</h2><p>TARODAN kişisel verilerinizin korunmasına önem verir. Bu politika verilerin nasıl toplandığını, kullanıldığını ve korunduğunu açıklar.</p><h2>2. Toplanan Veriler</h2><p>Kimlik ve iletişim bilgileri, adres, işlem geçmişi, kullanım verileri ve çerezler toplanabilir. Kart numaraları tarafımızca saklanmaz.</p><h2>3. Kullanım Amaçları</h2><p>Veriler hizmet sunumu, sipariş ve ödeme işlemleri, müşteri desteği, güvenlik ve yasal yükümlülükler için kullanılır.</p><h2>4. Veri Paylaşımı</h2><p>Veriler yalnızca hizmet için gerekli ödeme, kargo ve altyapı sağlayıcılarıyla paylaşılır; reklam amacıyla satılmaz.</p><h2>5. Güvenlik ve Çerezler</h2><p>Teknik ve idari güvenlik önlemleri uygulanır. Çerez tercihlerinizi tarayıcınızdan yönetebilirsiniz.</p><h2>6. Haklarınız</h2><p>KVKK kapsamında verilerinize erişme, düzeltme, silme, işlemeye itiraz etme ve bilgi talep etme haklarına sahipsiniz.</p><h2>7. İletişim</h2><p>Sorularınız için <a href=\"/contact\">iletişim sayfamızdan</a> bize ulaşın.</p>",
           "terms": "<p><em>Son güncelleme: Ocak 2026</em></p><h2>1. Kabul</h2><p>Platformu kullanarak bu koşulları kabul etmiş olursunuz.</p><h2>2. Üyelik</h2><p>Üyeler doğru ve güncel bilgi vermek ve hesap güvenliğini korumakla yükümlüdür.</p><h2>3. İlan Kuralları</h2><p>Yalnızca yasal, size ait ve doğru açıklanmış ürünler listelenebilir.</p><h2>4. Ödeme ve Komisyon</h2><p>Komisyon oranları üyelik planına göre değişir. Ödemeler güvenli escrow sistemiyle işlenir.</p><h2>5. İade ve İptal</h2><p>İade ve iptal talepleri yürürlükteki mevzuat ve platform politikalarına göre değerlendirilir.</p><h2>6. Yasaklı Davranışlar</h2><p>Dolandırıcılık, platform dışı ödeme, spam, sahte değerlendirme ve altyapıya zarar verme girişimleri yasaktır.</p><h2>7. Fikri Mülkiyet</h2><p>TARODAN markası ve platform içeriği ilgili hak sahiplerine aittir.</p><h2>8. Hesap İşlemleri</h2><p>Koşulları ihlal eden hesaplar askıya alınabilir veya kapatılabilir.</p><h2>9. Değişiklikler</h2><p>Koşullar güncellenebilir; güncel metin yayınlandığı tarihte yürürlüğe girer.</p><h2>10. İletişim</h2><p>Sorularınız için <a href=\"/contact\">iletişim sayfamızı</a> ziyaret edin.</p>"
         }
+      },
+      "adPackages": {
+        "title": "Öne Çıkarma Paketleri",
+        "subtitle": "Ürün fiyat aralığına göre değişen öne çıkarma paketlerini ve fiyat kademelerini yönetin",
+        "newPackage": "Yeni Paket",
+        "new": "Yeni Paket",
+        "edit": "Paketi Düzenle",
+        "created": "Paket oluşturuldu",
+        "updated": "Paket güncellendi",
+        "saveFailed": "Paket kaydedilemedi",
+        "deleted": "Paket silindi",
+        "deleteFailed": "Paket silinemedi",
+        "deleteTitle": "Paketi Sil",
+        "deleteConfirm": "Bu paket silinecek. Geçmiş satın alımlar korunur. Devam edilsin mi?",
+        "empty": "Henüz paket tanımlanmamış",
+        "showcaseBadge": "Vitrin",
+        "home": "Ana sayfa vitrini",
+        "name": "Paket Adı",
+        "namePlaceholder": "Örn. Vitrin Paketi",
+        "slug": "Slug",
+        "slugPlaceholder": "vitrin",
+        "slugHelper": "URL dostu benzersiz kod (örn. vitrin)",
+        "sortOrder": "Sıralama",
+        "showcaseOnHomeLabel": "Ana sayfada vitrinlensin",
+        "showcaseOnHomeHelper": "İşaretlenirse bu paketi alan ürünler ana sayfa vitrininde gösterilir",
+        "tiers": "Fiyat Kademeleri",
+        "tiersHelper": "Her satır bir gün süresi ve ürün fiyat aralığı için paket fiyatını belirler",
+        "addTier": "Satır Ekle",
+        "removeTier": "Satırı Sil",
+        "noTiers": "Henüz kademe yok. 'Satır Ekle' ile ekleyin.",
+        "tierCount": "{count} kademe",
+        "duration": "Süre",
+        "durationDays": "Süre (gün)",
+        "days": "gün",
+        "minAmount": "Min. Fiyat",
+        "maxAmount": "Maks. Fiyat",
+        "unlimited": "Sınırsız",
+        "priceRange": "Fiyat Aralığı",
+        "price": "Fiyat",
+        "campaign": "Kampanya",
+        "campaignPrice": "Kampanya Fiyatı",
+        "campaignStartsAt": "Kampanya Başlangıç",
+        "campaignEndsAt": "Kampanya Bitiş",
+        "campaignHelper": "Boş bırakılırsa kampanya her zaman geçerlidir",
+        "tierActive": "Aktif",
+        "validation": {
+          "nameRequired": "Paket adı gerekli",
+          "slugRequired": "Slug gerekli",
+          "durationMin": "Süre en az 1 gün olmalı",
+          "priceMin": "Fiyat 0 veya üzeri olmalı"
+        }
+      },
+      "boostPurchases": {
+        "title": "Paket Satın Alımları",
+        "subtitle": "Hangi kullanıcı hangi ürün için hangi paketi aldı",
+        "empty": "Henüz satın alım yok",
+        "searchPlaceholder": "Ürün veya alıcı ara",
+        "buyer": "Alıcı",
+        "product": "Ürün",
+        "package": "Paket",
+        "price": "Tutar",
+        "duration": "Süre",
+        "daysValue": "{days} gün",
+        "purchasedAt": "Satın Alma",
+        "period": "Dönem",
+        "showcaseBadge": "Vitrin",
+        "allPackages": "Tüm Paketler",
+        "allStatuses": "Tüm Durumlar",
+        "status": {
+          "pending": "Bekliyor",
+          "active": "Aktif",
+          "expired": "Süresi Doldu",
+          "cancelled": "İptal",
+          "failed": "Başarısız"
+        }
       }
     },
     "finance": {
@@ -4922,6 +4997,16 @@
           "name": "Test Araçları",
           "description": "Geliştirici test ve simülasyon araçları",
           "keywords": "test,zaman,cron,süre,boost,üyelik,iade,time"
+        },
+        "adPackages": {
+          "name": "Öne Çıkarma Paketleri",
+          "description": "Vitrin ve ekonomik öne çıkarma paketlerini yönetin",
+          "keywords": "paket,vitrin,ekonomik,öne çıkarma,boost,showcase"
+        },
+        "boostPurchases": {
+          "name": "Paket Satın Alımları",
+          "description": "Alınan öne çıkarma paketlerini ve alıcıları takip edin",
+          "keywords": "satın alım,boost,paket,vitrin,purchase"
         }
       }
     },

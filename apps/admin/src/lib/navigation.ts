@@ -28,6 +28,7 @@ import {
   FlagIcon,
   BeakerIcon,
   TicketIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 
 /**
@@ -329,6 +330,26 @@ export function getNavGroups(t: T): NavGroup[] {
             .split(",")
             .map((k) => k.trim()),
           permission: "discounts",
+        },
+        {
+          name: t("admin.nav.items.adPackages.name"),
+          href: "/marketing/ad-packages",
+          icon: SparklesIcon,
+          description: t("admin.nav.items.adPackages.description"),
+          keywords: t("admin.nav.items.adPackages.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "ads",
+        },
+        {
+          name: t("admin.nav.items.boostPurchases.name"),
+          href: "/marketing/boost-purchases",
+          icon: ShoppingBagIcon,
+          description: t("admin.nav.items.boostPurchases.description"),
+          keywords: t("admin.nav.items.boostPurchases.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "ads",
         },
         {
           name: t("admin.nav.items.notifications.name"),
