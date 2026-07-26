@@ -12,6 +12,7 @@ import {
   calculateCommissionFromRules,
   CommissionCalculationResult,
   mapSellerTypeForCommission,
+  resolveTaxpayerType,
 } from "./order-commission.helper";
 import { TaxService } from "../tax/tax.service";
 
@@ -420,6 +421,8 @@ export class OrderPricingService {
       where: { id: sellerId },
       select: {
         sellerType: true,
+        businessStatus: true,
+        taxId: true,
         membership: {
           include: {
             tier: {
@@ -430,11 +433,16 @@ export class OrderPricingService {
       },
     });
 
-    // Map User.sellerType to CommissionSellerType
+    // Map User.sellerType to CommissionSellerType (membership axis)
     const commissionSellerType = mapSellerTypeForCommission(
       seller?.sellerType ?? null,
       seller?.membership?.tier?.type ?? null,
     );
+    // v2 taxpayer axis (individual/corporate) — same test as VAT/withholding.
+    const taxpayerType = resolveTaxpayerType({
+      businessStatus: seller?.businessStatus,
+      taxId: seller?.taxId,
+    });
 
     // Tüm aktif kuralları çek (Faz 5.1)
     const allActive = await this.prisma.commissionRule.findMany({
@@ -447,8 +455,8 @@ export class OrderPricingService {
     const result = calculateCommissionFromRules(
       amount,
       allActive,
-      categoryId,
-      commissionSellerType,
+      { categoryId, sellerType: commissionSellerType, taxpayerType, amount },
+      undefined,
       this.logger,
     );
 
