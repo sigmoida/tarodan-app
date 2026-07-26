@@ -8,6 +8,7 @@ import {
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataList, Field } from "@/components/detail/DataList";
+import { ShipmentProducts } from "@/components/detail/ShipmentProducts";
 import type { OrderDetail } from "../types";
 import { hasRealShipment } from "../_lib/status";
 
@@ -46,6 +47,19 @@ export function ShippingSection({
         )}
         {statusLabel && <Field label={t("common.status")}>{statusLabel}</Field>}
       </DataList>
+      {order.product && (
+        <ShipmentProducts
+          products={[
+            {
+              id: order.product.id,
+              title: order.product.title,
+              price: order.product.price,
+              image: order.product.images?.[0]?.url ?? null,
+            },
+          ]}
+          label={t("admin.operations.orders.shipmentProduct")}
+        />
+      )}
     </SectionCard>
   );
 }

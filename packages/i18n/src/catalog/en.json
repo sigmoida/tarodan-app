@@ -3781,7 +3781,8 @@
           "total": "TOTAL: {amount}",
           "tracking": "Shipment Tracking",
           "error": "Failed to generate invoice"
-        }
+        },
+        "shipmentProduct": "Product in this shipment"
       },
       "trades": {
         "title": "Trades",
@@ -3893,7 +3894,8 @@
         "company": "Carrier",
         "shippedAt": "Shipped: {date}",
         "deliveredAt": "Delivered: {date}",
-        "lost": "Lost"
+        "lost": "Lost",
+        "shipmentProducts": "Products in this shipment"
       },
       "refundRequests": {
         "title": "Refund Tracking",

@@ -11,7 +11,11 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { Timeline } from "@/components/detail/Timeline";
 import type { TradeDetail } from "./types";
-import { groupShipmentsByLeg, mapTradePayload } from "./_lib/trade";
+import {
+  groupShipmentsByLeg,
+  mapTradePayload,
+  productsByShipment,
+} from "./_lib/trade";
 import { CompensationPanel } from "./_sections/CompensationPanel";
 import { RefundFailurePanel } from "./_sections/RefundFailurePanel";
 import { StuckPanel } from "./_sections/StuckPanel";
@@ -115,6 +119,7 @@ export default function TradeDetailPage() {
         const toWarehouse = legs["to_warehouse"] || [];
         const fromWarehouse = legs["from_warehouse"] || [];
         const returns = legs["return"] || [];
+        const shipmentProducts = productsByShipment(trade);
         const canMarkWarehouse = trade.status === "shipping_to_warehouse";
         const canApproveReject =
           trade.status === "at_warehouse" || trade.status === "admin_reviewing";
@@ -193,6 +198,7 @@ export default function TradeDetailPage() {
                     }
                     onAction={canMarkWarehouse ? handleMarkWarehouse : null}
                     processingShipmentId={processingShipmentId}
+                    productsByShipmentId={shipmentProducts}
                   />
                 )}
                 {fromWarehouse.length > 0 && (
@@ -202,6 +208,7 @@ export default function TradeDetailPage() {
                     actionLabel={null}
                     onAction={null}
                     processingShipmentId={processingShipmentId}
+                    productsByShipmentId={shipmentProducts}
                     infoMessage={
                       isShippingToRecipients
                         ? t("admin.operations.trades.recipientsWillConfirm")
@@ -220,6 +227,7 @@ export default function TradeDetailPage() {
                     }
                     onAction={isReturning ? handleMarkReturnDelivered : null}
                     processingShipmentId={processingShipmentId}
+                    productsByShipmentId={shipmentProducts}
                     secondaryActionLabel={
                       isReturning
                         ? t("admin.operations.trades.markLost")

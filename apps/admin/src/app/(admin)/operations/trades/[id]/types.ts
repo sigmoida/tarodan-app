@@ -1,6 +1,8 @@
 export interface TradeShipment {
   id: string;
   leg?: "to_warehouse" | "from_warehouse" | "return";
+  /** Sender of this shipment (always set) — used to map to_warehouse legs to items. */
+  shipperId?: string;
   recipientUserId?: string;
   recipientType?: string;
   trackingNumber?: string;

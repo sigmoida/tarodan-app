@@ -5,6 +5,10 @@ import { Button, cn, enumLabel, shipmentStatusConfig } from "@tarodan/ui";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
+import {
+  ShipmentProducts,
+  type ShipmentProductInfo,
+} from "@/components/detail/ShipmentProducts";
 import type { TradeShipment } from "../types";
 import { isShipmentDelivered } from "../_lib/trade";
 
@@ -18,6 +22,8 @@ export interface ShipmentLegCardProps {
   infoMessage?: string;
   secondaryActionLabel?: string;
   onSecondaryAction?: (shipmentId: string) => void;
+  /** shipmentId → product(s) that cargo carries, so admins see which product it's for. */
+  productsByShipmentId?: Record<string, ShipmentProductInfo[]>;
 }
 
 /** One shipment leg (to-warehouse / from-warehouse / return) with per-shipment actions. */
@@ -30,6 +36,7 @@ export function ShipmentLegCard({
   infoMessage,
   secondaryActionLabel,
   onSecondaryAction,
+  productsByShipmentId,
 }: ShipmentLegCardProps) {
   const t = useTranslations();
   return (
@@ -175,6 +182,10 @@ export function ShipmentLegCard({
                     )}
                 </div>
               </div>
+              <ShipmentProducts
+                products={productsByShipmentId?.[s.id] ?? []}
+                label={t("admin.operations.trades.shipmentProducts")}
+              />
             </div>
           );
         })}

@@ -3781,7 +3781,8 @@
           "total": "TOPLAM: {amount}",
           "tracking": "Kargo Takip",
           "error": "Fatura oluşturulamadı"
-        }
+        },
+        "shipmentProduct": "Gönderiye konu ürün"
       },
       "trades": {
         "title": "Takaslar",
@@ -3893,7 +3894,8 @@
         "company": "Firma",
         "shippedAt": "Gönderim: {date}",
         "deliveredAt": "Teslim: {date}",
-        "lost": "Kayıp"
+        "lost": "Kayıp",
+        "shipmentProducts": "Gönderiye konu ürün(ler)"
       },
       "refundRequests": {
         "title": "İade Takibi",
