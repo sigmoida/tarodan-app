@@ -1,4 +1,4 @@
-import { Prisma, ProductStatus } from '@prisma/client';
+import { Prisma, ProductStatus } from "@prisma/client";
 
 /**
  * Shared interface for product filter params.
@@ -26,6 +26,8 @@ export interface ProductFilterParams {
   carModelId?: string;
   tradeOnly?: boolean;
   boostedOnly?: boolean;
+  /** Home showcase (Vitrin) — only products with an active `showcaseOnHome` boost. */
+  homeShowcase?: boolean;
   preOrder?: boolean;
   limited?: boolean;
   set?: boolean;
@@ -68,10 +70,28 @@ export function buildProductWhere(
   options: BuildWhereOptions = {},
 ): Prisma.ProductWhereInput {
   const {
-    search, categoryId, sellerId, status, brandId, condition,
-    brand, scale, material, manufacturer, manufacturerId,
-    carModelId, tradeOnly, boostedOnly, preOrder, limited,
-    set: setFilter, minPrice, maxPrice, attributeSlugs, attrGroups,
+    search,
+    categoryId,
+    sellerId,
+    status,
+    brandId,
+    condition,
+    brand,
+    scale,
+    material,
+    manufacturer,
+    manufacturerId,
+    carModelId,
+    tradeOnly,
+    boostedOnly,
+    homeShowcase,
+    preOrder,
+    limited,
+    set: setFilter,
+    minPrice,
+    maxPrice,
+    attributeSlugs,
+    attrGroups,
   } = params;
 
   const andConditions: Prisma.ProductWhereInput[] = [];
@@ -79,8 +99,8 @@ export function buildProductWhere(
   const where: Prisma.ProductWhereInput = {
     // Sanal ürünler (membership-* / boost-* sipariş kalemleri) listelemelerden hariç
     NOT: [
-      { id: { startsWith: 'membership-' } },
-      { id: { startsWith: 'boost-' } },
+      { id: { startsWith: "membership-" } },
+      { id: { startsWith: "boost-" } },
     ],
   };
 
@@ -107,9 +127,13 @@ export function buildProductWhere(
   // ── Full-text search results (pre-filtered via tsvector/tsquery) ──
   if (options.fulltextIds && options.fulltextIds.length > 0) {
     andConditions.push({ id: { in: options.fulltextIds } });
-  } else if (options.fulltextIds && options.fulltextIds.length === 0 && search) {
+  } else if (
+    options.fulltextIds &&
+    options.fulltextIds.length === 0 &&
+    search
+  ) {
     // Search was requested but full-text returned nothing – force empty result
-    andConditions.push({ id: { equals: '__NO_MATCH__' } });
+    andConditions.push({ id: { equals: "__NO_MATCH__" } });
   }
 
   // ── ID-based filters (exact match on indexed foreign keys) ──
@@ -120,19 +144,22 @@ export function buildProductWhere(
   if (brandId) {
     where.brandId = brandId;
   } else if (brand) {
-    where.brand = { name: { equals: brand, mode: 'insensitive' as const } };
+    where.brand = { name: { equals: brand, mode: "insensitive" as const } };
   }
 
   if (manufacturerId) {
     where.manufacturerId = manufacturerId;
   } else if (manufacturer) {
-    where.manufacturer = { name: { equals: manufacturer, mode: 'insensitive' as const } };
+    where.manufacturer = {
+      name: { equals: manufacturer, mode: "insensitive" as const },
+    };
   }
 
   // ── Enum/boolean filters (indexed columns) ──
   if (condition) where.condition = condition as any;
   if (tradeOnly) where.isTradeEnabled = true;
   if (boostedOnly) where.boostedUntil = { gt: new Date() };
+  if (homeShowcase) where.homeShowcaseUntil = { gt: new Date() };
   if (preOrder) where.isPreorder = true;
   if (limited) where.isLimited = true;
   if (setFilter) where.isSet = true;
@@ -150,14 +177,14 @@ export function buildProductWhere(
   // Scale: match via attribute group "scale" (value, displayValue, or slug)
   if (scale) {
     const scaleTrim = scale.trim();
-    const scaleSlugNorm = scaleTrim.replace(/\s/g, '').replace(/[:\/]/g, ''); // "1:64" -> "164"
-    const scaleSlugAlt = scaleTrim.replace(':', '-'); // "1:64" -> "1-64" (seed format)
+    const scaleSlugNorm = scaleTrim.replace(/\s/g, "").replace(/[:\/]/g, ""); // "1:64" -> "164"
+    const scaleSlugAlt = scaleTrim.replace(":", "-"); // "1:64" -> "1-64" (seed format)
     andConditions.push({
       productAttributes: {
         some: {
           attribute: {
             isActive: true,
-            group: { slug: 'scale', isActive: true },
+            group: { slug: "scale", isActive: true },
             OR: [
               { value: scaleTrim },
               { displayValue: scaleTrim },
@@ -177,7 +204,7 @@ export function buildProductWhere(
         some: {
           attribute: {
             isActive: true,
-            group: { slug: 'material', isActive: true },
+            group: { slug: "material", isActive: true },
             slug: material,
           },
         },
@@ -196,10 +223,10 @@ export function buildProductWhere(
   // prevents accidental matches if the same Attribute.slug ever exists under multiple groups.
   let parsedAttrGroups: Record<string, string[]> | null = null;
   if (attrGroups) {
-    if (typeof attrGroups === 'string') {
+    if (typeof attrGroups === "string") {
       try {
         const parsed = JSON.parse(attrGroups);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           parsedAttrGroups = parsed as Record<string, string[]>;
         }
       } catch {
@@ -233,7 +260,7 @@ export function buildProductWhere(
     // Legacy/fallback path — flat slug list, all AND-combined.
     // Use only when `attrGroups` is absent.
     const slugs = attributeSlugs
-      .split(',')
+      .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
     for (const slug of slugs) {

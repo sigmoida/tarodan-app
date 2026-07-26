@@ -321,6 +321,10 @@ export class ProductSchedulerService implements OnModuleInit {
           where: { id: p.id },
           data: {
             rankTier: newRankTier,
+            // Clear the LIFO key + home-showcase window so an expired boost no
+            // longer ranks by recency or shows in the home showcase area.
+            boostedAt: null,
+            homeShowcaseUntil: null,
             relevanceScore: computeRelevanceScore({
               rankTier: newRankTier,
               qualityScore: p.qualityScore ?? 0,
