@@ -3268,6 +3268,81 @@
           "privacy": "<p><em>Last updated: January 2026</em></p><h2>1. Introduction</h2><p>TARODAN values the protection of your personal data. This policy explains how data is collected, used, and protected.</p><h2>2. Data We Collect</h2><p>We may collect identity and contact details, addresses, transaction history, usage data, and cookies. We do not store card numbers.</p><h2>3. Purposes</h2><p>Data is used to provide services, process orders and payments, support customers, maintain security, and meet legal obligations.</p><h2>4. Sharing</h2><p>Data is shared only with payment, shipping, and infrastructure providers needed for the service; it is not sold for advertising.</p><h2>5. Security and Cookies</h2><p>Technical and organizational safeguards are applied. You can manage cookie preferences in your browser.</p><h2>6. Your Rights</h2><p>Under KVKK, you may request access, correction, deletion, information, or object to processing.</p><h2>7. Contact</h2><p>Use our <a href=\"/contact\">contact page</a> with any questions.</p>",
           "terms": "<p><em>Last updated: January 2026</em></p><h2>1. Acceptance</h2><p>By using the platform, you agree to these terms.</p><h2>2. Membership</h2><p>Members must provide accurate, current information and protect account security.</p><h2>3. Listing Rules</h2><p>Only legal products that you own and describe accurately may be listed.</p><h2>4. Payments and Commission</h2><p>Commission rates vary by membership plan. Payments are processed through a secure escrow system.</p><h2>5. Returns and Cancellation</h2><p>Requests are handled under applicable law and platform policies.</p><h2>6. Prohibited Conduct</h2><p>Fraud, off-platform payments, spam, fake reviews, and attempts to damage infrastructure are prohibited.</p><h2>7. Intellectual Property</h2><p>The TARODAN brand and platform content belong to their respective rights holders.</p><h2>8. Account Actions</h2><p>Accounts that violate these terms may be suspended or closed.</p><h2>9. Changes</h2><p>Terms may be updated; the current text takes effect when published.</p><h2>10. Contact</h2><p>Visit our <a href=\"/contact\">contact page</a> with any questions.</p>"
         }
+      },
+      "adPackages": {
+        "title": "Ad Packages",
+        "subtitle": "Manage boost packages and their price tiers that vary by product price range",
+        "newPackage": "New Package",
+        "new": "New Package",
+        "edit": "Edit Package",
+        "created": "Package created",
+        "updated": "Package updated",
+        "saveFailed": "Failed to save package",
+        "deleted": "Package deleted",
+        "deleteFailed": "Failed to delete package",
+        "deleteTitle": "Delete Package",
+        "deleteConfirm": "This package will be deleted. Past purchases are preserved. Continue?",
+        "empty": "No packages defined yet",
+        "showcaseBadge": "Showcase",
+        "home": "Home showcase",
+        "name": "Package Name",
+        "namePlaceholder": "e.g. Showcase Package",
+        "slug": "Slug",
+        "slugPlaceholder": "showcase",
+        "slugHelper": "URL-friendly unique code (e.g. showcase)",
+        "sortOrder": "Sort Order",
+        "showcaseOnHomeLabel": "Show on home page",
+        "showcaseOnHomeHelper": "If checked, products that buy this package appear in the home showcase",
+        "tiers": "Price Tiers",
+        "tiersHelper": "Each row sets the package price for a duration and product price range",
+        "addTier": "Add Row",
+        "removeTier": "Remove Row",
+        "noTiers": "No tiers yet. Add one with 'Add Row'.",
+        "tierCount": "{count} tiers",
+        "duration": "Duration",
+        "durationDays": "Duration (days)",
+        "days": "days",
+        "minAmount": "Min. Price",
+        "maxAmount": "Max. Price",
+        "unlimited": "Unlimited",
+        "priceRange": "Price Range",
+        "price": "Price",
+        "campaign": "Campaign",
+        "campaignPrice": "Campaign Price",
+        "campaignStartsAt": "Campaign Start",
+        "campaignEndsAt": "Campaign End",
+        "campaignHelper": "Leave empty for an always-on campaign",
+        "tierActive": "Active",
+        "validation": {
+          "nameRequired": "Package name is required",
+          "slugRequired": "Slug is required",
+          "durationMin": "Duration must be at least 1 day",
+          "priceMin": "Price must be 0 or more"
+        }
+      },
+      "boostPurchases": {
+        "title": "Boost Purchases",
+        "subtitle": "Which user bought which package for which product",
+        "empty": "No purchases yet",
+        "searchPlaceholder": "Search product or buyer",
+        "buyer": "Buyer",
+        "product": "Product",
+        "package": "Package",
+        "price": "Amount",
+        "duration": "Duration",
+        "daysValue": "{days} days",
+        "purchasedAt": "Purchased",
+        "period": "Period",
+        "showcaseBadge": "Showcase",
+        "allPackages": "All Packages",
+        "allStatuses": "All Statuses",
+        "status": {
+          "pending": "Pending",
+          "active": "Active",
+          "expired": "Expired",
+          "cancelled": "Cancelled",
+          "failed": "Failed"
+        }
       }
     },
     "finance": {
@@ -4902,6 +4977,16 @@
           "name": "Test Tools",
           "description": "Developer test and simulation tools",
           "keywords": "test,time,cron,duration,boost,membership,refund"
+        },
+        "adPackages": {
+          "name": "Ad Packages",
+          "description": "Manage showcase and economy boost packages",
+          "keywords": "package,showcase,economy,boost,vitrin"
+        },
+        "boostPurchases": {
+          "name": "Boost Purchases",
+          "description": "Track purchased boost packages and their buyers",
+          "keywords": "purchase,boost,package,showcase"
         }
       }
     },
