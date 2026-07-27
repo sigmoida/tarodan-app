@@ -87,6 +87,27 @@ export class ShippingTariffService {
     }
   }
 
+  /**
+   * Active-tariff snapshot metadata for order-create: the tariff id + version to
+   * stamp onto the OrderPackage. Null id/version when falling back to the safety
+   * default (no active tariff) — a historical order that can't be tied to a tariff.
+   */
+  async getActiveTariffSnapshot(provider = DEFAULT_PROVIDER): Promise<{
+    tariffId: string | null;
+    tariffVersion: number | null;
+    tariff: OutboundTariffLike;
+  }> {
+    try {
+      const t = await this.getActiveTariff(provider);
+      return { tariffId: t.id, tariffVersion: t.version, tariff: t };
+    } catch {
+      this.logger.warn(
+        `No active ${provider} shipping tariff; snapshot has null id/version.`,
+      );
+      return { tariffId: null, tariffVersion: null, tariff: SAFETY_DEFAULT };
+    }
+  }
+
   /** Drop the cached active tariff (call after any activation). */
   invalidateActiveCache(provider?: string): void {
     if (provider) this.activeCache.delete(provider);

@@ -330,6 +330,7 @@ export class OrderCheckoutDirectService {
       const sellerShippingAmount =
         Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
+      const tariffMeta = await this.orderPricing.getShippingTariffMeta();
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const { taxAmount, withholdingTaxAmount } =
         await this.checkoutCommon.resolveSellerTaxes(
@@ -423,6 +424,11 @@ export class OrderCheckoutDirectService {
           sellerId: product.sellerId,
           buyerId,
           shippingCost,
+          shippingTariffId: tariffMeta.tariffId,
+          shippingTariffVersion: tariffMeta.tariffVersion,
+          fullShippingAmount: fullShipping,
+          buyerShippingAmount,
+          sellerShippingAmount,
         },
       });
 

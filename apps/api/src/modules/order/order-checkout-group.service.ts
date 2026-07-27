@@ -473,6 +473,13 @@ export class OrderCheckoutGroupService {
               sellerLineSubtotals,
             );
           const sellerShippingCharged = new Set<string>();
+          // Per-seller shipping breakdown captured on the charged line, used to write
+          // the OrderPackage with the SAME buyer-share semantics as direct/guest
+          // (previously the group path stored the full undivided shipping here).
+          const sellerShippingBreakdown = new Map<
+            string,
+            { full: number; buyer: number; seller: number }
+          >();
 
           for (const entry of pricing) {
             // Satır toplamı = birim fiyat * adet - (satıra düşen kupon). Komisyon,
@@ -488,9 +495,11 @@ export class OrderCheckoutGroupService {
             // Satıcı-bazlı kargo ücreti: yalnız satıcının İLK satırına yükle, kardeşlere 0.
             const entrySellerId = entry.product.sellerId;
             let fullShipping = 0;
+            let chargedThisLine = false;
             if (!sellerShippingCharged.has(entrySellerId)) {
               fullShipping = sellerShipping.get(entrySellerId) ?? 0;
               sellerShippingCharged.add(entrySellerId);
+              chargedThisLine = true;
             }
             // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
             const buyerShippingAmount =
@@ -502,6 +511,13 @@ export class OrderCheckoutGroupService {
             const sellerShippingAmount =
               Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
             const shippingCost = buyerShippingAmount; // buyer-charged shipping
+            if (chargedThisLine) {
+              sellerShippingBreakdown.set(entrySellerId, {
+                full: fullShipping,
+                buyer: buyerShippingAmount,
+                seller: sellerShippingAmount,
+              });
+            }
             const { taxAmount, withholdingTaxAmount } =
               await this.checkoutCommon.resolveSellerTaxes(
                 entry.product.sellerId,
@@ -564,15 +580,28 @@ export class OrderCheckoutGroupService {
           });
 
           // Satıcı başına OrderPackage (çatı): o satıcının order'ları + tek kargo ücreti.
-          // Faz 2'de fiziksel Sürat gönderisi de bu paket başına konsolide olacak.
+          // shippingCost KANONİK olarak alıcı payıdır (direct/guest ile aynı) + tarife
+          // snapshot'ı. Faz 2'de fiziksel Sürat gönderisi de bu paket başına konsolide olacak.
+          const groupTariffMeta =
+            await this.orderPricing.getShippingTariffMeta();
           const packageBySeller = new Map<string, string>();
           for (const [sellerId, shipping] of sellerShipping) {
+            const bd = sellerShippingBreakdown.get(sellerId) ?? {
+              full: shipping,
+              buyer: shipping,
+              seller: 0,
+            };
             const pkg = await tx.orderPackage.create({
               data: {
                 checkoutGroupId: group.id,
                 sellerId,
                 buyerId,
-                shippingCost: shipping,
+                shippingCost: bd.buyer,
+                shippingTariffId: groupTariffMeta.tariffId,
+                shippingTariffVersion: groupTariffMeta.tariffVersion,
+                fullShippingAmount: bd.full,
+                buyerShippingAmount: bd.buyer,
+                sellerShippingAmount: bd.seller,
               },
             });
             packageBySeller.set(sellerId, pkg.id);

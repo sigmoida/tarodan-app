@@ -319,6 +319,7 @@ export class OrderGuestCheckoutService {
       const sellerShippingAmount =
         Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
+      const tariffMeta = await this.orderPricing.getShippingTariffMeta();
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const {
         taxAmount: guestTaxAmount,
@@ -410,6 +411,11 @@ export class OrderGuestCheckoutService {
           sellerId: product.sellerId,
           buyerId: guestUser.id,
           shippingCost,
+          shippingTariffId: tariffMeta.tariffId,
+          shippingTariffVersion: tariffMeta.tariffVersion,
+          fullShippingAmount: fullShipping,
+          buyerShippingAmount,
+          sellerShippingAmount,
         },
       });
 

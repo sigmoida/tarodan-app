@@ -71,6 +71,19 @@ export class OrderPricingService {
   }
 
   /**
+   * Active shipping-tariff snapshot metadata (id/version) to stamp onto the
+   * OrderPackage at order-create, so the charged shipping can be tied to the exact
+   * tariff version and audited/re-quoted (409) even after the tariff changes.
+   */
+  async getShippingTariffMeta(): Promise<{
+    tariffId: string | null;
+    tariffVersion: number | null;
+  }> {
+    const s = await this.shippingTariffs.getActiveTariffSnapshot();
+    return { tariffId: s.tariffId, tariffVersion: s.tariffVersion };
+  }
+
+  /**
    * Get free shipping info for frontend display
    */
   async getFreeShippingInfo(orderAmount: number): Promise<{

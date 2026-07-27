@@ -1195,8 +1195,18 @@ model OrderPackage {
   sellerId        String         @map("seller_id")
   buyerId         String         @map("buyer_id")
   // Bu satıcı paketi için TEK kargo ücreti (satıcının paket-içi satır toplamı bedava
-  // eşiğini geçerse 0). Buyer toplamı bu değerle beslenir; iade paket bazında ele alınır.
+  // eşiğini geçerse 0). KANONİK olarak ALICI payıdır (buyerShippingAmount) — tüm
+  // checkout yolları (direct/group/guest) artık aynı semantiği yazar.
   shippingCost    Decimal        @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  // Kargo tarife snapshot'ı: sipariş anındaki aktif tarife (yoksa güvenli default → null).
+  // Geçmişe dönük tarife değişiminden bağımsız audit/yeniden-hesap ve 409 kontrolü için.
+  shippingTariffId       String?  @map("shipping_tariff_id")
+  shippingTariffVersion  Int?     @map("shipping_tariff_version")
+  // Tam paket kargosu (alıcı/satıcı payına bölünmeden önce) + taraf payları + indirim.
+  fullShippingAmount     Decimal  @default(0) @map("full_shipping_amount")     @db.Decimal(10, 2)
+  buyerShippingAmount    Decimal  @default(0) @map("buyer_shipping_amount")    @db.Decimal(10, 2)
+  sellerShippingAmount   Decimal  @default(0) @map("seller_shipping_amount")   @db.Decimal(10, 2)
+  shippingDiscountAmount Decimal  @default(0) @map("shipping_discount_amount") @db.Decimal(10, 2)
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
   checkoutGroup   CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id])
