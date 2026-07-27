@@ -14,6 +14,7 @@ import {
   PaymentStatus,
   SavedCardStatus,
   TradeStatus,
+  type MembershipTier,
 } from "@prisma/client";
 import { SubscribeDto, UserMembershipResponseDto } from "./dto";
 import { PaymentService } from "../payment/payment.service";
@@ -203,10 +204,33 @@ export class MembershipSubscriptionService {
       return this.common.getUserMembership(userId);
     }
 
-    // For paid tiers, create membership in pending state and initiate payment
-    let membership;
+    // === ÜCRETLİ TIER ÖDEME AKIŞI ===
+    // KRİTİK: Aktif ve ödenmiş (entitled) bir üyeliği ödemeden ÖNCE hedef tier'a
+    // çevirMEyiz. Aksi halde (a) ödeme onaylanmadan yüksek tier'ın komisyon/limitleri
+    // açılır, (b) kullanıcı ödemeyi terk ederse mevcut ödenmiş hakkı bozulur. Bunun
+    // yerine canlı satır olduğu gibi kalır; hedef tier'a ait sipariş açılır ve ödeme
+    // onaylanınca fulfillment satırı ÖDENEN tier'a geçirir.
+    if (existingMembership && isPremiumEntitled(existingMembership)) {
+      const paymentResult = await this.initiateMembershipPayment(
+        userId,
+        PaymentProvider.paytr,
+        undefined,
+        { tier, billingPeriod: dto.billingPeriod },
+      );
+      return {
+        ...(await this.common.getUserMembership(userId)),
+        paymentId: paymentResult.paymentId,
+        orderId: (paymentResult as any).orderId,
+        provider: paymentResult.provider,
+        useBypass: paymentResult.useBypass === true,
+      } as any;
+    }
+
+    // Entitled OLMAYAN durumlar (yeni / free / past_due / expired): kaybedilecek bir
+    // hak yok → hedef tier'ı past_due olarak hazırla. Efektif üyelik ve komisyon,
+    // ödeme onaylanana kadar bunu free kabul eder (isPremiumEntitled false).
     if (existingMembership) {
-      membership = await this.prisma.userMembership.update({
+      await this.prisma.userMembership.update({
         where: { userId },
         data: {
           tierId: tier.id,
@@ -220,7 +244,7 @@ export class MembershipSubscriptionService {
         },
       });
     } else {
-      membership = await this.prisma.userMembership.create({
+      await this.prisma.userMembership.create({
         data: {
           userId,
           tierId: tier.id,
@@ -248,14 +272,29 @@ export class MembershipSubscriptionService {
         useBypass: paymentResult.useBypass === true,
       } as any;
     } catch (error) {
-      // If payment initiation fails, rollback membership
-      await this.prisma.userMembership
-        .delete({
-          where: { userId },
-        })
-        .catch(() => {
-          // Ignore if already deleted or doesn't exist
-        });
+      // Ödeme başlatma hatasında kaydı SİLME; önceki duruma geri al (yoksa yeni
+      // oluşturulan past_due satırı kaldır). Ödenmiş üyeliği yok etmek yerine korur.
+      if (existingMembership) {
+        await this.prisma.userMembership
+          .update({
+            where: { userId },
+            data: {
+              tierId: existingMembership.tierId,
+              status: existingMembership.status,
+              currentPeriodStart: existingMembership.currentPeriodStart,
+              currentPeriodEnd: existingMembership.currentPeriodEnd,
+              cancelledAt: existingMembership.cancelledAt,
+              autoRenew: existingMembership.autoRenew,
+              scheduledTierType: existingMembership.scheduledTierType,
+              scheduledBillingPeriod: existingMembership.scheduledBillingPeriod,
+            },
+          })
+          .catch(() => {});
+      } else {
+        await this.prisma.userMembership
+          .delete({ where: { userId } })
+          .catch(() => {});
+      }
       throw error;
     }
   }
@@ -267,6 +306,10 @@ export class MembershipSubscriptionService {
     userId: string,
     provider: PaymentProvider,
     req?: Request,
+    // Ödeme HEDEF tier için yapılır. Upgrade akışında (override verilir) canlı üyelik
+    // satırına dokunmadan hedef tier'a ait sipariş açılır; override yoksa mevcut satırın
+    // tier'ı ve periyodu kullanılır (ör. "Ödemeyi tamamla" ile past_due satırı yenileme).
+    override?: { tier: MembershipTier; billingPeriod: string },
   ): Promise<MembershipPaymentInitResponseDto> {
     const membership = await this.prisma.userMembership.findUnique({
       where: { userId },
@@ -277,23 +320,30 @@ export class MembershipSubscriptionService {
       throw new NotFoundException(i18nMessage("server.membership.notFound"));
     }
 
-    if (membership.tier.type === MembershipTierType.free) {
+    const targetTier = override?.tier ?? membership.tier;
+
+    if (targetTier.type === MembershipTierType.free) {
       throw new BadRequestException(
         i18nMessage("server.membership.freeTierNoPaymentNeeded"),
       );
     }
 
-    // Determine billing period from membership period (monthly or yearly)
-    const periodDays = Math.round(
-      (membership.currentPeriodEnd.getTime() -
-        membership.currentPeriodStart.getTime()) /
-        (1000 * 60 * 60 * 24),
-    );
-    const isYearly = periodDays > 180; // More than 6 months = yearly
+    // Determine billing period from the override, else from the membership period.
+    let isYearly: boolean;
+    if (override) {
+      isYearly = override.billingPeriod === "yearly";
+    } else {
+      const periodDays = Math.round(
+        (membership.currentPeriodEnd.getTime() -
+          membership.currentPeriodStart.getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      isYearly = periodDays > 180; // More than 6 months = yearly
+    }
 
     const price = isYearly
-      ? membership.tier.yearlyPrice.toNumber()
-      : membership.tier.monthlyPrice.toNumber();
+      ? targetTier.yearlyPrice.toNumber()
+      : targetTier.monthlyPrice.toNumber();
 
     if (price === 0) {
       throw new BadRequestException(
@@ -328,7 +378,7 @@ export class MembershipSubscriptionService {
     }
 
     // Create or find virtual product for membership
-    const virtualProductId = `membership-${membership.tierId}`;
+    const virtualProductId = `membership-${targetTier.id}`;
     let product = await this.prisma.product.findUnique({
       where: { id: virtualProductId },
     });
@@ -340,9 +390,9 @@ export class MembershipSubscriptionService {
           sellerId: platformSeller.id,
           categoryId: defaultCategory.id,
           // tier.name zaten "… Üyelik" içerir ("Premium Üyelik Üyelik" olmasın)
-          title: membership.tier.name.includes("Üyelik")
-            ? membership.tier.name
-            : `${membership.tier.name} Üyelik`,
+          title: targetTier.name.includes("Üyelik")
+            ? targetTier.name
+            : `${targetTier.name} Üyelik`,
           description: `Üyelik ödemesi için sanal ürün`,
           price: price,
           condition: "new",

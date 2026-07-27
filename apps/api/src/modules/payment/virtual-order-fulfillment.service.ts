@@ -47,14 +47,53 @@ export class VirtualOrderFulfillmentService {
     });
 
     if (membership) {
+      // The paid order encodes the tier it was bought for (`membership-<tierId>`).
+      // Activation MUST honor the PAID tier — never whatever the live row happens to
+      // point to now. Otherwise paying an older, cheaper pending order could activate
+      // a pricier tier the membership was switched to by a later subscribe call.
+      const paidTierId =
+        typeof payment.order.productId === "string" &&
+        payment.order.productId.startsWith("membership-")
+          ? payment.order.productId.slice("membership-".length)
+          : null;
+
+      const paidTier =
+        paidTierId && paidTierId !== membership.tierId
+          ? await tx.membershipTier.findUnique({ where: { id: paidTierId } })
+          : null;
+
+      let effectiveTierType = membership.tier.type;
+      let tierPatch: Prisma.UserMembershipUpdateInput = {};
+      if (paidTier) {
+        const start = new Date();
+        const end = new Date(start);
+        // Term derived from the amount actually paid (yearly price ⇒ yearly term).
+        const isYearly =
+          Number(payment.order.totalAmount) >= Number(paidTier.yearlyPrice);
+        if (isYearly) end.setFullYear(end.getFullYear() + 1);
+        else end.setMonth(end.getMonth() + 1);
+        effectiveTierType = paidTier.type;
+        tierPatch = {
+          tier: { connect: { id: paidTier.id } },
+          currentPeriodStart: start,
+          currentPeriodEnd: end,
+          scheduledTierType: null,
+          scheduledBillingPeriod: null,
+        };
+      }
+
       await tx.userMembership.update({
         where: { userId: payment.order.buyerId },
-        data: { status: SubscriptionStatus.active, cancelledAt: null },
+        data: {
+          status: SubscriptionStatus.active,
+          cancelledAt: null,
+          ...tierPatch,
+        },
       });
 
       // Premium (free olmayan) üyelik aktifleşti: satıcının boost'suz aktif ilanlarını
       // premium kademesine (rankTier=1) yükselt. Boost'lu (2) ürünlere dokunma.
-      if (membership.tier.type !== "free") {
+      if (effectiveTierType !== "free") {
         await tx.product.updateMany({
           where: {
             sellerId: payment.order.buyerId,
