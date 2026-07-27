@@ -8,7 +8,16 @@ import {
   DevicePhoneMobileIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, Input, Modal } from "@tarodan/ui";
+import {
+  Badge,
+  Button,
+  Input,
+  Modal,
+  PhoneInput,
+  splitPhone,
+  getFullPhoneNumber,
+  DEFAULT_COUNTRY_CODE,
+} from "@tarodan/ui";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
 import { useAuthStore } from "@/stores/authStore";
@@ -39,13 +48,19 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuthStore();
   const { sendCode, verify } = usePhoneVerification();
   const [step, setStep] = useState<"enter" | "verify">("enter");
-  const [phone, setPhone] = useState(user?.phone || "");
+  const initial = splitPhone(user?.phone || "");
+  const [countryCode, setCountryCode] = useState(
+    initial.countryCode || DEFAULT_COUNTRY_CODE,
+  );
+  const [phone, setPhone] = useState(initial.national);
   const [code, setCode] = useState("");
 
   useEffect(() => {
     if (open) {
+      const p = splitPhone(user?.phone || "");
       setStep("enter");
-      setPhone(user?.phone || "");
+      setCountryCode(p.countryCode || DEFAULT_COUNTRY_CODE);
+      setPhone(p.national);
       setCode("");
     }
   }, [open, user?.phone]);
@@ -54,18 +69,21 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Modal isOpen={open} onClose={onClose} title="Telefon Doğrulama">
       {step === "enter" ? (
         <div className="space-y-4">
-          <Input
+          <PhoneInput
             label="Telefon numarası"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+905551234567"
+            countryCode={countryCode}
+            onCountryCodeChange={setCountryCode}
+            phone={phone}
+            onPhoneChange={setPhone}
           />
           <Button
             className="w-full"
             disabled={!phone}
             isLoading={sendCode.isPending}
             onClick={() =>
-              sendCode.mutate(phone, { onSuccess: () => setStep("verify") })
+              sendCode.mutate(getFullPhoneNumber(countryCode, phone), {
+                onSuccess: () => setStep("verify"),
+              })
             }
           >
             Kod Gönder
