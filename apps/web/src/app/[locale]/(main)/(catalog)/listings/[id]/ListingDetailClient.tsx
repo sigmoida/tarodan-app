@@ -13,13 +13,20 @@ import {
 } from "./_context/ListingDetailContext";
 import ProductBreadcrumbs from "./_sections/ProductBreadcrumbs";
 import ProductGallery from "./_sections/ProductGallery";
+import ProductActionIcons from "./_sections/ProductActionIcons";
 import ProductInfo from "./_sections/ProductInfo";
 import ProductReviews from "./_sections/ProductReviews";
+import ProductRelated from "./_sections/ProductRelated";
 import CollectionPickerModal from "./_modals/CollectionPickerModal";
 import TradePremiumModal from "./_modals/TradePremiumModal";
 
 const ProductStaticInfoFallback = dynamic(
   () => import("./_sections/ProductStaticInfoFallback"),
+  { ssr: false },
+);
+
+const ProductSpecsFallback = dynamic(
+  () => import("./_sections/ProductSpecsFallback"),
   { ssr: false },
 );
 
@@ -52,7 +59,13 @@ const ReportModal = dynamic(
   { ssr: false },
 );
 
-function ListingDetailLayout({ staticInfo }: { staticInfo: ReactNode }) {
+function ListingDetailLayout({
+  staticInfo,
+  specs,
+}: {
+  staticInfo: ReactNode;
+  specs: ReactNode;
+}) {
   const {
     t,
     locale,
@@ -112,18 +125,29 @@ function ListingDetailLayout({ staticInfo }: { staticInfo: ReactNode }) {
         </div>
       )}
 
+      {/* Top: gallery (left) + primary info (right) */}
       <div className="grid lg:grid-cols-2 gap-8">
-        {/* Left: gallery + product reviews under it */}
-        <div className="space-y-6">
-          <ProductGallery />
-          <ProductReviews />
-        </div>
-        {/* Right: info + spec cards (rendered under the seller card in ProductInfo) */}
         <div>
+          <ProductGallery />
+        </div>
+        {/* Right: action icons up top, then title/price/description, actions, seller */}
+        <div>
+          <ProductActionIcons />
           {staticInfo ?? <ProductStaticInfoFallback />}
           <ProductInfo />
         </div>
       </div>
+
+      {/* Specs: Özellikler + Teknik özellikler side by side, full width */}
+      <div className="mt-8">{specs ?? <ProductSpecsFallback />}</div>
+
+      {/* Reviews: full width across both spec columns */}
+      <div className="mt-8">
+        <ProductReviews />
+      </div>
+
+      {/* Related items: full-width card grid, like the home page */}
+      <ProductRelated />
 
       {/* Overlays & modals */}
       {isLightboxOpen && <ProductLightbox />}
@@ -150,12 +174,14 @@ function ListingDetailLayout({ staticInfo }: { staticInfo: ReactNode }) {
 
 export default function ListingDetailClient({
   staticInfo,
+  specs,
 }: {
   staticInfo: ReactNode;
+  specs: ReactNode;
 }) {
   return (
     <ListingDetailProvider>
-      <ListingDetailLayout staticInfo={staticInfo} />
+      <ListingDetailLayout staticInfo={staticInfo} specs={specs} />
     </ListingDetailProvider>
   );
 }

@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
 import { listingsApi, wishlistApi, userApi, api } from "@/lib/api";
 import { getProductEffectivePrice } from "@/lib/productPrice";
+import type { Product } from "@/types/product";
 import { buildImages } from "../_lib/images";
 import type { Listing } from "../_lib/types";
 
@@ -119,6 +120,19 @@ export function useListingData(id: string, isAuthenticated: boolean) {
     meta: { page: "listing-detail-reviews" },
   });
 
+  // Similar products (same category, in stock) for the "Benzer Ürünler" grid.
+  // Response is already the canonical card shape, so it drops straight into
+  // ProductCard.
+  const similarQuery = useQuery({
+    queryKey: queryKeys.product.similar(id),
+    queryFn: async (): Promise<Product[]> => {
+      const response = await listingsApi.getSimilar(id, 12);
+      return (response.data as Product[]) ?? [];
+    },
+    enabled: !!id,
+    meta: { page: "listing-detail-similar" },
+  });
+
   return {
     listingQuery,
     listing,
@@ -134,5 +148,7 @@ export function useListingData(id: string, isAuthenticated: boolean) {
     setReviewSortBy,
     reviewFilterScore,
     setReviewFilterScore,
+    similar: similarQuery.data ?? [],
+    similarLoading: similarQuery.isLoading,
   };
 }

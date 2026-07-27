@@ -4,11 +4,9 @@ import ProductStaticInfoView from "./ProductStaticInfoView";
 
 export default async function ProductStaticInfo({
   listing,
-  locale,
 }: {
   listing: Listing;
-  locale: string;
 }) {
   const t = await getTranslations();
-  return <ProductStaticInfoView listing={listing} locale={locale} t={t} />;
+  return <ProductStaticInfoView listing={listing} t={t} />;
 }

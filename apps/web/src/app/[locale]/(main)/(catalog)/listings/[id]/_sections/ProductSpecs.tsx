@@ -117,7 +117,9 @@ export default function ProductSpecs({
   const hasTechnical = technicalAttrs.length > 0 || Boolean(listing.carModel);
 
   return (
-    <div className="space-y-6 mb-6">
+    <div
+      className={`grid gap-6 ${hasTechnical ? "md:grid-cols-2" : "grid-cols-1"}`}
+    >
       {/* Details — brand / scale / material / … row by row */}
       <SectionCard title={t("product.detailsSection")}>
         <dl className="divide-y divide-border">

@@ -1,8 +1,9 @@
 import {
-  HeartIcon,
+  EyeIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
+import { HeartIcon } from "@heroicons/react/24/solid";
 import { Alert } from "@tarodan/ui/alert";
 import SectionCard from "@/components/ui/SectionCard";
 import {
@@ -11,17 +12,14 @@ import {
   isProductOnSaleDisplay,
 } from "@/lib/productPrice";
 import type { Listing } from "../_lib/types";
-import ProductSpecs from "./ProductSpecs";
 
 type Translator = (key: any) => string;
 
 export default function ProductStaticInfoView({
   listing,
-  locale,
   t,
 }: {
   listing: Listing;
-  locale: string;
   t: Translator;
 }) {
   const effectivePrice = getProductEffectivePrice(listing);
@@ -71,12 +69,13 @@ export default function ProductStaticInfoView({
         </p>
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-muted mb-6">
-        <span>
+      <div className="flex items-center gap-4 text-sm text-body mb-6">
+        <span className="flex items-center gap-1">
+          <EyeIcon className="w-4 h-4 text-primary-500" />
           {listing.viewCount || 0} {t("product.views")}
         </span>
         <span className="flex items-center gap-1">
-          <HeartIcon className="w-4 h-4" />
+          <HeartIcon className="w-4 h-4 text-danger-500" />
           {listing.likeCount || 0} {t("product.likes")}
         </span>
       </div>
@@ -86,8 +85,6 @@ export default function ProductStaticInfoView({
           {listing.description || t("product.noDescription")}
         </div>
       </SectionCard>
-
-      <ProductSpecs listing={listing} locale={locale} t={t} />
 
       {listing.status && listing.status !== "active" && (
         <Alert

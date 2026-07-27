@@ -5,6 +5,7 @@ import { queryKeys } from "@/lib/query/keys";
 import { getServerApiOrigin } from "@/lib/api/origin";
 import ListingDetailClient from "./ListingDetailClient";
 import ProductStaticInfo from "./_sections/ProductStaticInfo";
+import ProductStaticSpecs from "./_sections/ProductStaticSpecs";
 import type { Listing } from "./_lib/types";
 
 const API_BASE = getServerApiOrigin();
@@ -92,9 +93,10 @@ export default async function ListingPage({ params }: Props) {
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <ListingDetailClient
-        staticInfo={
+        staticInfo={product ? <ProductStaticInfo listing={product} /> : null}
+        specs={
           product ? (
-            <ProductStaticInfo listing={product} locale={locale} />
+            <ProductStaticSpecs listing={product} locale={locale} />
           ) : null
         }
       />
