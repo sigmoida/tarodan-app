@@ -23,8 +23,7 @@ import {
   type OrderStatusFilter,
 } from "./_lib/types";
 import { type OrderActionHandlers } from "./_components/OrderActions";
-import OrderCard from "./_components/OrderCard";
-import OrderGroupAccordion from "./_components/OrderGroupAccordion";
+import OrderGroupCard from "./_components/OrderGroupCard";
 import ReviewModal from "./_modals/ReviewModal";
 import ShippingModal from "./_modals/ShippingModal";
 import CancelOrderModal from "./_modals/CancelOrderModal";
@@ -136,21 +135,9 @@ export default function OrdersPage() {
         />
       ) : (
         <div className="space-y-4">
-          {groups.map((group) =>
-            group.orders.length === 1 ? (
-              <OrderCard
-                key={group.key}
-                order={group.orders[0]}
-                actions={actions}
-              />
-            ) : (
-              <OrderGroupAccordion
-                key={group.key}
-                group={group}
-                actions={actions}
-              />
-            ),
-          )}
+          {groups.map((group) => (
+            <OrderGroupCard key={group.key} group={group} actions={actions} />
+          ))}
         </div>
       )}
 
