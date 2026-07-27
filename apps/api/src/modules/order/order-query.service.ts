@@ -266,6 +266,8 @@ export class OrderQueryService {
         refundRequests: {
           orderBy: { createdAt: "desc" },
         },
+        // Cati (checkout group) numarasi liste kartinin cati basliginda gosterilir.
+        checkoutGroup: { select: { groupNumber: true } },
       },
     });
 

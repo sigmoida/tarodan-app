@@ -216,6 +216,8 @@ export class OrderCommonService {
         (typeof order.shippingAddress === "object" &&
           (order.shippingAddress as any)?.type === "membership"),
       checkoutGroupId: order.checkoutGroupId ?? null,
+      // Cati/sepet numarasi (CheckoutGroup.groupNumber) — UI cati basliginda gosterir.
+      groupNumber: order.checkoutGroup?.groupNumber ?? null,
       // Satıcı paketi (çatı): aynı checkout grubunda aynı satıcının order'ları tek pakette.
       // Kargo pakete bir kez yüklenir → kardeş order'ın shippingCost'u 0 olabilir; UI bunu
       // "ücretsiz" değil "pakete dahil" göstermek için packageId'ye bakar.
