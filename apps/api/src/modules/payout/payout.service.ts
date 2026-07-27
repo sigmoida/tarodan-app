@@ -330,6 +330,22 @@ export class PayoutService {
         continue;
       }
 
+      // IBAN cooldown (F2.1): satıcı IBAN'ını YAKIN ZAMANDA değiştirdiyse bu turda
+      // ödeme YAPMA — beklet (status pending kalır, sonraki cron tekrar dener).
+      // Çalınan oturumla IBAN'ı değiştirip anında para çekme saldırısına karşı pencere;
+      // satıcı değişikliği fark edip itiraz edebilir. İlk kayıtta ibanChangedAt null →
+      // beklemez (ödemeler zaten teslimden ~14 gün sonra yapıldığından legit gecikme yok).
+      const IBAN_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 gün
+      if (
+        bankAccount?.ibanChangedAt &&
+        Date.now() - bankAccount.ibanChangedAt.getTime() < IBAN_COOLDOWN_MS
+      ) {
+        this.logger.warn(
+          `Payout ${payout.id} beklemede: IBAN yakın zamanda değişti (cooldown). Sonraki turda denenecek.`,
+        );
+        continue;
+      }
+
       try {
         const result = await this.paymentProviders
           .resolve()

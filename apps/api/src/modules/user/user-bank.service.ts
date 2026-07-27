@@ -29,7 +29,16 @@ export class UserBankService {
   ) {
     const normalizedIban = data.iban.replace(/\s/g, "").toUpperCase();
 
-    return this.prisma.sellerBankAccount.upsert({
+    // Yalnız IBAN GERÇEKTEN değişince cooldown saatini başlat (isim/tc güncellemesi
+    // ödemeleri geciktirmesin). İlk kayıtta (create) ibanChangedAt null kalır → ilk
+    // ödeme takılmaz; ödemeler zaten teslimden ~14 gün sonra yapılır (F2.1).
+    const existing = await this.prisma.sellerBankAccount.findUnique({
+      where: { userId },
+      select: { iban: true },
+    });
+    const ibanChanged = !!existing && existing.iban !== normalizedIban;
+
+    const account = await this.prisma.sellerBankAccount.upsert({
       where: { userId },
       create: {
         userId,
@@ -45,8 +54,16 @@ export class UserBankService {
         taxId: data.taxId || null,
         isVerified: false,
         verifiedAt: null,
+        ...(ibanChanged ? { ibanChangedAt: new Date() } : {}),
       },
     });
+
+    if (ibanChanged) {
+      this.logger.warn(
+        `Seller ${userId} payout IBAN changed — payout cooldown started (anti-fraud).`,
+      );
+    }
+    return account;
   }
 
   async deleteBankAccount(userId: string) {

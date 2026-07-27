@@ -1384,6 +1384,10 @@ model SellerBankAccount {
   taxId         String?   @map("tax_id")
   isVerified    Boolean   @default(false) @map("is_verified")
   verifiedAt    DateTime? @map("verified_at")
+  // Son IBAN DEĞİŞİKLİĞİ zamanı (ilk kayıtta null). Payout, değişimden sonra kısa bir
+  // bekleme (cooldown) uygular → çalınan oturumla IBAN'ı değiştirip anında para
+  // çekme engellenir; satıcı değişiklik bildirimini görüp itiraz edebilir (F2.1).
+  ibanChangedAt DateTime? @map("iban_changed_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
