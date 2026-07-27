@@ -4,7 +4,7 @@ import { StorageService } from "../storage/storage.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminOrderQueryDto, ResolveDisputeDto } from "./dto";
 import { OrderStatus, Prisma } from "@prisma/client";
-import { paginate, resolveOrderBy } from "../../common/list";
+import { paginate } from "../../common/list";
 
 /**
  * Sipariş yönetimi (liste, ihtilaflar, ihtilaf çözümü) — AdminService'in
@@ -109,81 +109,74 @@ export class AdminOrderService {
       }
     }
 
-    const orderBy = resolveOrderBy<Prisma.OrderOrderByWithRelationInput>(
-      "Order",
-      query,
+    // Grup (CheckoutGroup) bazında sayfala: bir sepet asla sayfa sınırına
+    // bölünmez. `orders.some` order-seviye filtreyle eşleşen EN AZ bir siparişi
+    // olan grupları getirir; sonra o grupların TÜM siparişlerini (eksiksiz sepet)
+    // çekeriz. Sıralama: grup createdAt (en yeni). Her order backfill ile bir
+    // CheckoutGroup'a bağlıdır (grupsuz order admin listesinde görünmez).
+    const groupPage = await paginate(
+      this.prisma.checkoutGroup,
       {
-        defaultSort: { createdAt: "desc" },
-        sortMap: {
-          "buyer.displayName": (direction) => ({
-            buyer: { displayName: direction },
-          }),
-          "seller.displayName": (direction) => ({
-            seller: { displayName: direction },
-          }),
-          "product.title": (direction) => ({ product: { title: direction } }),
-        },
+        where: { orders: { some: where } },
+        orderBy: { createdAt: "desc" as const },
+        select: { id: true },
       },
+      query,
     );
-    const result = await paginate(
-      this.prisma.order,
-      {
-        where,
-        include: {
-          buyer: { select: { id: true, displayName: true, email: true } },
-          seller: { select: { id: true, displayName: true, email: true } },
-          product: {
-            select: {
-              id: true,
-              title: true,
-              images: {
-                take: 1,
-                orderBy: { sortOrder: "asc" },
-                select: { cardKey: true },
+    const groupIds = groupPage.data.map((g) => g.id);
+
+    const orders = groupIds.length
+      ? await this.prisma.order.findMany({
+          where: { checkoutGroupId: { in: groupIds } },
+          include: {
+            buyer: { select: { id: true, displayName: true, email: true } },
+            seller: { select: { id: true, displayName: true, email: true } },
+            product: {
+              select: {
+                id: true,
+                title: true,
+                images: {
+                  take: 1,
+                  orderBy: { sortOrder: "asc" },
+                  select: { cardKey: true },
+                },
               },
             },
-          },
-          checkoutGroup: { select: { groupNumber: true } },
-          // Kargo durumu — admin listede "Kargo Durumu" kolonu için.
-          shipment: { select: { status: true } },
-          // Açık (aktif) iade talebi — admin listede "İade Sürecinde" rozeti için.
-          refundRequests: {
-            where: {
-              status: { notIn: ["refunded", "rejected", "cancelled"] as any },
+            checkoutGroup: { select: { groupNumber: true } },
+            // Kargo durumu — admin listede "Kargo Durumu" kolonu için.
+            shipment: { select: { status: true } },
+            // Açık (aktif) iade talebi — "İade Sürecinde" rozeti için.
+            refundRequests: {
+              where: {
+                status: {
+                  notIn: ["refunded", "rejected", "cancelled"] as any,
+                },
+              },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { id: true, status: true, refundNumber: true },
             },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { id: true, status: true, refundNumber: true },
           },
-        },
-        orderBy,
-      },
-      query,
-    );
-    const orders = result.data;
-
-    // Çoklu-ürün sepetlerini admin listede gruplu gösterebilmek için her siparişin
-    // ait olduğu CheckoutGroup'taki TOPLAM sipariş adedini ekle (grubun gerçek
-    // boyutu). groupItemCount>1 → "çoklu sipariş" rozeti + görsel gruplama.
-    const groupIds = [
-      ...new Set(
-        orders.map((o) => o.checkoutGroupId).filter((x): x is string => !!x),
-      ),
-    ];
-    const groupCounts = groupIds.length
-      ? await this.prisma.order.groupBy({
-          by: ["checkoutGroupId"],
-          where: { checkoutGroupId: { in: groupIds } },
-          _count: { _all: true },
+          orderBy: { createdAt: "asc" },
         })
       : [];
-    const groupCountMap = new Map(
-      groupCounts.map((g) => [g.checkoutGroupId, g._count._all]),
+
+    // Grup üyelerini sayfadaki grup sırasına (grup createdAt desc) göre bitişik
+    // diz ki client-side gruplama sırayı korusun; her grubun gerçek boyutunu tut.
+    const byGroup = new Map<string, typeof orders>();
+    for (const o of orders) {
+      const k = o.checkoutGroupId as string;
+      const bucket = byGroup.get(k);
+      if (bucket) bucket.push(o);
+      else byGroup.set(k, [o]);
+    }
+    const ordered = groupIds.flatMap((id) => byGroup.get(id) ?? []);
+    const groupSize = new Map(
+      groupIds.map((id) => [id, byGroup.get(id)?.length ?? 0]),
     );
 
     return {
-      ...result,
-      data: orders.map((o) => ({
+      data: ordered.map((o) => ({
         ...o,
         // Misafir siparişlerinde alıcı, ortak sistem kullanıcısı (GUEST_SYSTEM /
         // guest@tarodan.system). Admin listede placeholder yerine gerçek misafir
@@ -196,9 +189,8 @@ export class AdminOrderService {
         // bazında gruplayabilmek için (checkoutGroupId zaten ...o ile geliyor).
         packageId: o.packageId ?? null,
         groupNumber: o.checkoutGroup?.groupNumber ?? null,
-        groupItemCount: o.checkoutGroupId
-          ? (groupCountMap.get(o.checkoutGroupId) ?? 1)
-          : 1,
+        // Grup artık eksiksiz döndüğü için gerçek üye sayısı = grubun boyutu.
+        groupItemCount: groupSize.get(o.checkoutGroupId as string) ?? 1,
         productImageUrl: this.resolveProductImageUrl(
           (o.product as any)?.images?.[0]?.cardKey,
         ),
@@ -210,6 +202,7 @@ export class AdminOrderService {
             }
           : null,
       })),
+      meta: groupPage.meta,
     };
   }
 
