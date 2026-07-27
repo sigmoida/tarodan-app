@@ -54,6 +54,12 @@ export class ValidationResultDto {
     scope: string;
     estimatedDiscount: number;
     /**
+     * Kupon için UYGUN (scope: seller/category/product) ürünlerin id'leri. Checkout
+     * indirimi YALNIZ bu satırlara dağıtır → kapsamlı bir kupon uygun olmayan
+     * satıcıların/kategorilerin payout tabanını düşürmez.
+     */
+    eligibleProductIds: string[];
+    /**
      * Tek-kullanımlık voucher kodu ise ilgili DiscountCode id'si. recordUsage'a
      * geçilir → sipariş kesinleşince kod atomik olarak "kullanıldı" işaretlenir.
      */

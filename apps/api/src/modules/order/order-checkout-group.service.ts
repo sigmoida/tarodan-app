@@ -405,25 +405,37 @@ export class OrderCheckoutGroupService {
               appliedDiscountId = validation.discount.id;
               appliedVoucherCodeId = validation.discount.voucherCodeId;
               const totalCoupon = validation.discount.estimatedDiscount;
-              // Kupon, satır toplamına (birim fiyat * adet) oranla dağıtılır.
-              const priceSum = pricing.reduce(
+              // Kupon YALNIZ uygun (scope) satırlara, satır toplamı oranında
+              // dağıtılır — uygun olmayan satıcı/kategori satırları indirim payı
+              // ALMAZ (aksi halde kapsamlı bir kupon başka satıcıların payout
+              // tabanını düşürürdü). Son uygun satıra yuvarlama artığı yazılır.
+              const eligibleIds = new Set(
+                validation.discount.eligibleProductIds,
+              );
+              const eligibleLines = pricing.filter((p) =>
+                eligibleIds.has(p.productId),
+              );
+              const eligiblePriceSum = eligibleLines.reduce(
                 (sum, p) => sum + p.productPrice * p.quantity,
                 0,
               );
-              let allocated = 0;
-              pricing.forEach((p, idx) => {
-                if (idx === pricing.length - 1) {
-                  p.couponDiscount =
-                    Math.round((totalCoupon - allocated) * 100) / 100;
-                } else {
-                  p.couponDiscount =
-                    Math.round(
-                      ((totalCoupon * p.productPrice * p.quantity) / priceSum) *
-                        100,
-                    ) / 100;
-                  allocated += p.couponDiscount;
-                }
-              });
+              if (eligiblePriceSum > 0) {
+                let allocated = 0;
+                eligibleLines.forEach((p, idx) => {
+                  if (idx === eligibleLines.length - 1) {
+                    p.couponDiscount =
+                      Math.round((totalCoupon - allocated) * 100) / 100;
+                  } else {
+                    p.couponDiscount =
+                      Math.round(
+                        ((totalCoupon * p.productPrice * p.quantity) /
+                          eligiblePriceSum) *
+                          100,
+                      ) / 100;
+                    allocated += p.couponDiscount;
+                  }
+                });
+              }
             }
           }
 
@@ -458,8 +470,10 @@ export class OrderCheckoutGroupService {
           // grup toplamı formülü değişmeden per-seller olur.
           const sellerLineSubtotals = new Map<string, number>();
           for (const entry of pricing) {
-            const line =
-              entry.productPrice * entry.quantity - entry.couponDiscount;
+            const line = Math.max(
+              0,
+              entry.productPrice * entry.quantity - entry.couponDiscount,
+            );
             sellerLineSubtotals.set(
               entry.product.sellerId,
               (sellerLineSubtotals.get(entry.product.sellerId) ?? 0) + line,
@@ -484,7 +498,12 @@ export class OrderCheckoutGroupService {
             // Satır toplamı = birim fiyat * adet - (satıra düşen kupon). Komisyon,
             // kargo ve vergi satır toplamı üzerinden hesaplanır (adet>1 ölçeklenir).
             const lineSubtotal = entry.productPrice * entry.quantity;
-            const discountedPrice = lineSubtotal - entry.couponDiscount;
+            // Negatif-koruma: kupon satır başına eligible-subtotal ile capli olsa da
+            // yuvarlama artığına karşı floor (order.totalAmount asla negatif olamaz).
+            const discountedPrice = Math.max(
+              0,
+              lineSubtotal - entry.couponDiscount,
+            );
             const commissionResult =
               await this.orderPricing.calculateCommission(
                 discountedPrice,

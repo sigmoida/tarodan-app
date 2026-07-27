@@ -533,9 +533,12 @@ export class DiscountService {
       }
     }
 
-    // Calculate estimated discount based on cart
-    let estimatedDiscount = 0;
+    // Sum the full cart total and, separately, the subtotal of items ELIGIBLE for
+    // this discount (respecting seller/category/product scope). Eligible ids are
+    // returned so checkout distributes the discount ONLY across eligible lines.
     let cartTotal = 0;
+    let eligibleSubtotal = 0;
+    const eligibleProductIds: string[] = [];
 
     if (dto.cartItems?.length) {
       const products = await this.prisma.product.findMany({
@@ -547,18 +550,9 @@ export class DiscountService {
         if (product) {
           const itemPrice = Number(product.price) * item.quantity;
           cartTotal += itemPrice;
-
-          // Check if this item is eligible for the discount
-          const isEligible = this.isProductEligibleForDiscount(
-            product,
-            discount,
-          );
-          if (isEligible) {
-            if (discount.type === "percentage") {
-              estimatedDiscount += itemPrice * (Number(discount.value) / 100);
-            } else {
-              estimatedDiscount += Number(discount.value);
-            }
+          if (this.isProductEligibleForDiscount(product, discount)) {
+            eligibleSubtotal += itemPrice;
+            eligibleProductIds.push(product.id);
           }
         }
       }
@@ -572,13 +566,18 @@ export class DiscountService {
       };
     }
 
-    // Apply max discount cap
-    if (
-      discount.maxDiscountAmount &&
-      estimatedDiscount > Number(discount.maxDiscountAmount)
-    ) {
-      estimatedDiscount = Number(discount.maxDiscountAmount);
-    }
+    // Fixed-amount coupons are applied ONCE, capped to the eligible subtotal — never
+    // multiplied per eligible line and never exceeding the discountable amount (so a
+    // multi-item cart can't drive the order total negative). maxDiscountAmount is the
+    // final cap. Single source of truth for coupon math (see computeCouponDiscount).
+    const estimatedDiscount = this.computeCouponDiscount(
+      discount.type,
+      Number(discount.value),
+      eligibleSubtotal,
+      discount.maxDiscountAmount != null
+        ? Number(discount.maxDiscountAmount)
+        : null,
+    );
 
     return {
       isValid: true,
@@ -591,9 +590,34 @@ export class DiscountService {
         value: Number(discount.value),
         scope: discount.scope,
         estimatedDiscount,
+        eligibleProductIds,
         voucherCodeId,
       },
     };
+  }
+
+  /**
+   * Single source of truth for coupon discount math. Fixed-amount coupons are
+   * capped to the eligible (discountable) subtotal so they are applied at most once
+   * and can never exceed what is discountable; percentage coupons scale with it.
+   * `maxDiscountAmount` (when set) is the final ceiling. Returns 0 when nothing is
+   * eligible.
+   */
+  computeCouponDiscount(
+    type: string,
+    value: number,
+    eligibleSubtotal: number,
+    maxDiscountAmount?: number | null,
+  ): number {
+    if (eligibleSubtotal <= 0 || value <= 0) return 0;
+    let discount =
+      type === "percentage"
+        ? eligibleSubtotal * (value / 100)
+        : Math.min(value, eligibleSubtotal);
+    if (maxDiscountAmount != null && discount > maxDiscountAmount) {
+      discount = maxDiscountAmount;
+    }
+    return discount;
   }
 
   /**

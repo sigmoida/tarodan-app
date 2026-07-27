@@ -310,7 +310,9 @@ export class OrderCheckoutDirectService {
       // Calculate total discount and subtotal
       const totalDiscount = productDiscount + couponDiscount;
       const subtotal = originalPrice;
-      const discountedPrice = productPrice - couponDiscount;
+      // Negatif-koruma: couponDiscount validateCoupon'da eligible-subtotal (= ürün
+      // fiyatı) ile capli, yine de floor ile discountedPrice asla negatif olmaz.
+      const discountedPrice = Math.max(0, productPrice - couponDiscount);
 
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on discounted product price, not including shipping
