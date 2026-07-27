@@ -11,6 +11,7 @@ import {
   NotificationChannel,
 } from "../notification/dto/notification.dto";
 import { AdminAuditService } from "./admin-audit.service";
+import { StorageService } from "../storage/storage.service";
 import { RatingStatus, SellerApplicationQueryDto } from "./dto";
 import { OrderStatus, Prisma, BusinessStatus } from "@prisma/client";
 import { paginate, resolveOrderBy } from "../../common/list";
@@ -28,7 +29,64 @@ export class AdminSellerApplicationService {
     private readonly eventService: EventService,
     private readonly notificationService: NotificationService,
     private readonly audit: AdminAuditService,
+    private readonly storage: StorageService,
   ) {}
+
+  /**
+   * Full application detail for review: company info, bank/IBAN, and the uploaded
+   * documents with short-lived presigned URLs (private `documents` bucket).
+   */
+  async getSellerApplicationDetail(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        phone: true,
+        companyName: true,
+        taxId: true,
+        companyType: true,
+        taxOffice: true,
+        companyCity: true,
+        companyDistrict: true,
+        businessStatus: true,
+        isSeller: true,
+        createdAt: true,
+        bankAccount: {
+          select: {
+            accountHolder: true,
+            iban: true,
+            tcKimlikNo: true,
+            taxId: true,
+            isVerified: true,
+          },
+        },
+        sellerDocuments: true,
+      },
+    });
+    if (!user || !user.companyName) {
+      throw new NotFoundException("Başvuru bulunamadı");
+    }
+
+    const documents = await Promise.all(
+      (user.sellerDocuments ?? []).map(async (d) => ({
+        documentType: d.documentType,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+        status: d.status,
+        uploadedAt: d.uploadedAt,
+        url: await this.storage.getPresignedDownloadUrl(
+          "documents",
+          d.s3Key,
+          3600,
+        ),
+      })),
+    );
+
+    const { sellerDocuments, ...rest } = user;
+    return { ...rest, documents };
+  }
 
   // ==================== SELLER APPLICATIONS ====================
 

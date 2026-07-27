@@ -131,6 +131,7 @@ describe("admin system and user list sorting", () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
     await service.getSellerApplications({

@@ -456,6 +456,10 @@ export class AuthService {
         displayName: dto.companyName,
         companyName: dto.companyName,
         taxId: dto.taxId,
+        // Kurumsal başvuru detayları (admin incelemesi için saklanır).
+        companyType: dto.companyType ?? null,
+        companyCity: dto.city ?? null,
+        companyDistrict: dto.district ?? null,
         isSeller: false,
         businessStatus: "pending",
         isVerified: false, // Email verification required

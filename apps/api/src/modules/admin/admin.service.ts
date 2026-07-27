@@ -1677,6 +1677,10 @@ export class AdminService {
     return this.sellerApplicationService.getSellerApplications(query);
   }
 
+  async getSellerApplicationDetail(userId: string) {
+    return this.sellerApplicationService.getSellerApplicationDetail(userId);
+  }
+
   async approveSellerApplication(adminId: string, userId: string) {
     return this.sellerApplicationService.approveSellerApplication(
       adminId,

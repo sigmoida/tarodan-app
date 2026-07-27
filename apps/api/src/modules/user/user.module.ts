@@ -12,6 +12,8 @@ import { UserDiscoveryService } from "./user-discovery.service";
 import { UserBankService } from "./user-bank.service";
 import { UserEngagementService } from "./user-engagement.service";
 import { UserController } from "./user.controller";
+import { SellerDocumentController } from "./seller-document.controller";
+import { SellerDocumentService } from "./seller-document.service";
 import { FeaturedSchedulerService } from "./featured-scheduler.service";
 import { FeaturedScheduledProcessor } from "./featured-scheduled.processor";
 import { NotificationModule } from "../notification/notification.module";
@@ -27,9 +29,10 @@ import { ModerationModule } from "../moderation/moderation.module";
     ModerationModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
-  controllers: [UserController],
+  controllers: [UserController, SellerDocumentController],
   providers: [
     UserService,
+    SellerDocumentService,
     UserCommonService,
     UserProfileService,
     UserAddressService,

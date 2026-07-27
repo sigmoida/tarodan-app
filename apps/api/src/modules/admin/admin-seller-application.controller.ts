@@ -125,6 +125,17 @@ export class AdminSellerApplicationController {
     return this.adminService.getSellerApplications(query);
   }
 
+  @Get("seller-applications/:id")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "Corporate seller application detail (docs + IBAN + company)",
+  })
+  @ApiParam({ name: "id", description: "User ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Application detail" })
+  async getSellerApplicationDetail(@Param("id") id: string) {
+    return this.adminService.getSellerApplicationDetail(id);
+  }
+
   @Post("seller-applications/:id/approve")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Approve a corporate seller application" })

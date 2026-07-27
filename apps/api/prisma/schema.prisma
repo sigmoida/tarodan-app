@@ -24,6 +24,12 @@ model User {
   taxId                   String?                  @map("tax_id")
   companyName             String?                  @unique @map("company_name")
   businessStatus          BusinessStatus?          @map("business_status")
+  // Kurumsal başvuru detayları (register'da alınıyordu ama saklanmıyordu; admin
+  // incelemesi + belge ekranı için kalıcılaştırıldı).
+  companyType             String?                  @map("company_type")
+  taxOffice               String?                  @map("tax_office")
+  companyCity             String?                  @map("company_city")
+  companyDistrict         String?                  @map("company_district")
   fcmToken                String?                  @map("fcm_token")
   createdAt               DateTime                 @default(now()) @map("created_at")
   updatedAt               DateTime                 @updatedAt @map("updated_at")
@@ -78,6 +84,7 @@ model User {
   membership              UserMembership?
   wishlist                Wishlist?
   bankAccount             SellerBankAccount?
+  sellerDocuments         SellerDocument[]
   payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
   savedCards              SavedCard[]
@@ -1353,6 +1360,43 @@ model SellerBankAccount {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("seller_bank_accounts")
+}
+
+/// Kurumsal satıcı başvuru belgesi (vergi levhası, sözleşme, imza sirküleri,
+/// faaliyet belgesi, kimlik). Private `documents` S3 bucket'ında saklanır (key);
+/// admin presigned URL ile görüntüler. (userId, documentType) tekil → yeniden
+/// yükleme eskisini değiştirir.
+model SellerDocument {
+  id           String               @id @default(uuid())
+  userId       String               @map("user_id")
+  documentType SellerDocumentType   @map("document_type")
+  s3Key        String               @map("s3_key")
+  fileName     String               @map("file_name")
+  mimeType     String               @map("mime_type")
+  size         Int                  @default(0)
+  status       SellerDocumentStatus @default(pending)
+  reviewNote   String?              @map("review_note")
+  uploadedAt   DateTime             @default(now()) @map("uploaded_at")
+  reviewedAt   DateTime?            @map("reviewed_at")
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentType])
+  @@index([userId])
+  @@map("seller_documents")
+}
+
+enum SellerDocumentType {
+  tax_plate // vergi levhası
+  contract // sözleşme
+  signature_circular // imza sirküleri
+  activity_certificate // faaliyet belgesi
+  identity // kimlik
+}
+
+enum SellerDocumentStatus {
+  pending
+  approved
+  rejected
 }
 
 // PayTR CAPI kayıtlı kart (recurring/oto-yenileme için). PAN/CVV ASLA saklanmaz —
