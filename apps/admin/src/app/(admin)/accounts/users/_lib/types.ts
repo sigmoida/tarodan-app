@@ -13,6 +13,8 @@ export interface User {
   createdAt: string;
   lastLoginAt?: string;
   membershipTier?: string;
+  membershipStatus?: string;
+  membershipEndsAt?: string;
   ordersCount: number;
   productsCount: number;
   tradesCount: number;
@@ -33,6 +35,8 @@ export function mapUsers(raw: any[]): User[] {
     createdAt: u.createdAt,
     lastLoginAt: u.lastLoginAt,
     membershipTier: u.membership?.tier?.type ?? "free",
+    membershipStatus: u.membership?.status,
+    membershipEndsAt: u.membership?.currentPeriodEnd ?? undefined,
     ordersCount: (u._count?.buyerOrders ?? 0) + (u._count?.sellerOrders ?? 0),
     productsCount: u._count?.products ?? 0,
     tradesCount:
@@ -62,4 +66,34 @@ export function userFilterParams(filter?: string) {
       filter === "sellers" ? true : filter === "buyers" ? false : undefined,
     isBanned: filter === "banned" ? true : undefined,
   };
+}
+
+/** Membership tier filter options (Tüm Katmanlar + each tier). */
+export const getMembershipTierFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.users.filterTierAll") },
+  { value: "free", label: t("admin.users.membershipFree") },
+  { value: "basic", label: t("admin.users.membershipBasic") },
+  { value: "premium", label: "Premium" },
+  { value: "business", label: "Business" },
+];
+
+/** Membership lifecycle filter options (expiring soon / cancelled). */
+export const getMembershipLifecycleOptions = (t: T) => [
+  { value: "all", label: t("admin.users.filterLifecycleAll") },
+  { value: "expiring7", label: t("admin.users.filterExpiring7") },
+  { value: "expiring30", label: t("admin.users.filterExpiring30") },
+  { value: "cancelled", label: t("admin.users.filterCancelled") },
+];
+
+/** Map the membership-tier chip to a getUsers query param ("all" → no filter). */
+export function membershipTierParams(tier?: string) {
+  return tier && tier !== "all" ? { membershipTier: tier } : {};
+}
+
+/** Map the lifecycle chip to getUsers query params ("expiring soon" / cancelled). */
+export function membershipLifecycleParams(lifecycle?: string) {
+  if (lifecycle === "expiring7") return { expiringInDays: 7 };
+  if (lifecycle === "expiring30") return { expiringInDays: 30 };
+  if (lifecycle === "cancelled") return { membershipStatus: "cancelled" };
+  return {};
 }

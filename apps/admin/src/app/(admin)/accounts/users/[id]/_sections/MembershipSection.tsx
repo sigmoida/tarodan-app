@@ -9,6 +9,7 @@ import {
   Button,
   Select,
   enumLabel,
+  membershipTierConfig,
   subscriptionStatusConfig,
 } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
@@ -75,6 +76,34 @@ export function MembershipSection({
           {membership.endDate && (
             <Field label={t("admin.users.detail.endDateLabel")}>
               {new Date(membership.endDate).toLocaleDateString("tr-TR")}
+            </Field>
+          )}
+          {membership.tier.type !== "free" && (
+            <Field label={t("admin.users.detail.autoRenewLabel")}>
+              {membership.autoRenew
+                ? t("admin.users.detail.autoRenewOn")
+                : t("admin.users.detail.autoRenewOff")}
+            </Field>
+          )}
+          {membership.cancelledAt && (
+            <Field label={t("admin.users.detail.cancelledAtLabel")}>
+              {new Date(membership.cancelledAt).toLocaleDateString("tr-TR")}
+            </Field>
+          )}
+          {membership.scheduledTierType && (
+            <Field label={t("admin.users.detail.scheduledChangeLabel")}>
+              {enumLabel(
+                membershipTierConfig,
+                membership.scheduledTierType,
+                membership.scheduledTierType,
+              )}
+              {membership.scheduledBillingPeriod
+                ? ` · ${
+                    membership.scheduledBillingPeriod === "yearly"
+                      ? t("admin.users.billingYearly")
+                      : t("admin.users.billingMonthly")
+                  }`
+                : ""}
             </Field>
           )}
         </DataList>

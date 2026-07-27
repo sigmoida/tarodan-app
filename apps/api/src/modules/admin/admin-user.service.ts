@@ -14,6 +14,7 @@ import {
   ADMIN_LIST_DEFAULT_LIMIT,
   ADMIN_LIST_DEFAULT_PAGE,
   ADMIN_LIST_MAX_LIMIT,
+  dateRangeWhere,
   paginate,
   resolveOrderBy,
 } from "../../common/list";
@@ -102,6 +103,32 @@ export class AdminUserService {
     if (query.isBanned === true) {
       where.isBanned = true;
     }
+
+    // Membership lifecycle filters (tier / status / "expiring soon"). All narrow
+    // the to-one membership relation, so they compose within a single relation
+    // filter (implicitly AND-ed).
+    const membershipWhere: Prisma.UserMembershipWhereInput = {};
+    if (query.membershipStatus) {
+      membershipWhere.status = query.membershipStatus;
+    }
+    if (query.expiringInDays && query.expiringInDays > 0) {
+      const until = new Date();
+      until.setDate(until.getDate() + query.expiringInDays);
+      membershipWhere.currentPeriodEnd = { gte: new Date(), lte: until };
+    }
+    if (query.membershipTier) {
+      membershipWhere.tier = { type: query.membershipTier };
+    } else if (query.expiringInDays && query.expiringInDays > 0) {
+      // "Expiring" only makes sense for paid tiers — a free plan never lapses.
+      membershipWhere.tier = { type: { not: MembershipTierType.free } };
+    }
+    if (Object.keys(membershipWhere).length > 0) {
+      where.membership = membershipWhere;
+    }
+
+    // Registration date-range filter — wires the table's DateRange control
+    // (previously a no-op on this endpoint) to the user's `createdAt`.
+    Object.assign(where, dateRangeWhere(query));
 
     const select = {
       id: true,
@@ -215,6 +242,17 @@ export class AdminUserService {
         // Backward-compatible alias used by the general users table.
         ordersCount: (direction) => ({
           sellerOrders: { _count: direction },
+        }),
+        // Membership columns (tier / status / expiry) sort through the to-one
+        // membership relation.
+        "membership.tier.type": (direction) => ({
+          membership: { tier: { type: direction } },
+        }),
+        "membership.status": (direction) => ({
+          membership: { status: direction },
+        }),
+        "membership.currentPeriodEnd": (direction) => ({
+          membership: { currentPeriodEnd: direction },
         }),
       },
     });
@@ -456,6 +494,8 @@ export class AdminUserService {
           endDate: (u as any).membership.currentPeriodEnd,
           autoRenew: (u as any).membership.autoRenew,
           cancelledAt: (u as any).membership.cancelledAt,
+          scheduledTierType: (u as any).membership.scheduledTierType,
+          scheduledBillingPeriod: (u as any).membership.scheduledBillingPeriod,
         }
       : undefined;
 

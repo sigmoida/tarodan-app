@@ -1,14 +1,21 @@
 import {
   IsOptional,
   IsEnum,
+  IsInt,
   IsString,
   IsDateString,
   IsBoolean,
   IsIn,
+  Min,
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
-import { ProductStatus, OrderStatus } from "@prisma/client";
+import { Transform, Type } from "class-transformer";
+import {
+  ProductStatus,
+  OrderStatus,
+  MembershipTierType,
+  SubscriptionStatus,
+} from "@prisma/client";
 import { AdminListQueryDto } from "../../../common/list";
 
 export class AdminUserQueryDto extends AdminListQueryDto {
@@ -30,6 +37,26 @@ export class AdminUserQueryDto extends AdminListQueryDto {
   @Transform(({ value }) => value === "true" || value === true)
   @IsBoolean()
   isBanned?: boolean;
+
+  /** Filter by current membership tier (free/basic/premium/business). */
+  @ApiPropertyOptional({ enum: MembershipTierType })
+  @IsOptional()
+  @IsEnum(MembershipTierType)
+  membershipTier?: MembershipTierType;
+
+  /** Filter by membership lifecycle status (active/cancelled/expired/past_due). */
+  @ApiPropertyOptional({ enum: SubscriptionStatus })
+  @IsOptional()
+  @IsEnum(SubscriptionStatus)
+  membershipStatus?: SubscriptionStatus;
+
+  /** Only paid memberships whose period ends within the next N days ("expiring soon"). */
+  @ApiPropertyOptional({ example: 7 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expiringInDays?: number;
 }
 
 export class SellerApplicationQueryDto extends AdminListQueryDto {

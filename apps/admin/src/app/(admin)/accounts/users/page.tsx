@@ -15,7 +15,11 @@ import {
   mapUsers,
   getUserTabs,
   getUserFilterOptions,
+  getMembershipTierFilterOptions,
+  getMembershipLifecycleOptions,
   userFilterParams,
+  membershipTierParams,
+  membershipLifecycleParams,
 } from "./_lib/types";
 import { UsersSummary } from "./_components/UsersSummary";
 import { UsersTable } from "./_components/UsersTable";
@@ -38,9 +42,14 @@ export default function UsersPage() {
         <ResourceList<User>
           resource="users"
           fetcher={(params) => {
-            const { filter, ...rest } = params;
+            const { filter, membershipTier, lifecycle, ...rest } = params;
             return adminApi
-              .getUsers({ ...rest, ...userFilterParams(filter) })
+              .getUsers({
+                ...rest,
+                ...userFilterParams(filter),
+                ...membershipTierParams(membershipTier),
+                ...membershipLifecycleParams(lifecycle),
+              })
               .then((res) => {
                 const root = res.data ?? {};
                 const raw = root.data ?? root.users ?? root.items ?? [];
@@ -53,7 +62,13 @@ export default function UsersPage() {
           }}
           getRowId={(u) => u.id}
           syncUrl
-          initialFilters={{ filter: "all", startDate: "", endDate: "" }}
+          initialFilters={{
+            filter: "all",
+            membershipTier: "all",
+            lifecycle: "all",
+            startDate: "",
+            endDate: "",
+          }}
         >
           <ResourceList.Toolbar>
             <ResourceList.Search />
@@ -61,6 +76,16 @@ export default function UsersPage() {
               name="filter"
               options={getUserFilterOptions(t)}
               className="sm:w-48"
+            />
+            <ResourceList.FilterSelect
+              name="membershipTier"
+              options={getMembershipTierFilterOptions(t)}
+              className="sm:w-44"
+            />
+            <ResourceList.FilterSelect
+              name="lifecycle"
+              options={getMembershipLifecycleOptions(t)}
+              className="sm:w-52"
             />
             <ResourceList.DateRange />
           </ResourceList.Toolbar>
