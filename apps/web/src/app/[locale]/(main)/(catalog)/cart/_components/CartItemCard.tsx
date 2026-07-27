@@ -46,7 +46,7 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
           />
         </div>
       </Link>
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <Link href={href}>
           <h3
             className={`font-semibold line-clamp-2 ${item.isAvailable ? "text-heading hover:text-primary-500" : "text-muted"}`}
@@ -81,10 +81,12 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
             )}
           </div>
         )}
-
-        {/* Stok-duyarlı adet: + `maxQuantity`'de kilit. Adet > 1 ise satır toplamı da göster. */}
-        {item.isAvailable && (
-          <div className="mt-3 flex flex-wrap items-center gap-3">
+      </div>
+      {/* Adet stepper + sil ikonu kartın sağında birlikte; satır toplamı altında.
+          Stok-duyarlı adet: + `maxQuantity`'de kilitlenir. */}
+      <div className="flex flex-shrink-0 flex-col items-end gap-2 self-center">
+        <div className="flex items-center gap-2">
+          {item.isAvailable && (
             <QuantityStepper
               value={item.quantity}
               max={item.maxQuantity}
@@ -93,26 +95,25 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
               decreaseLabel={t("cart.decreaseQuantity")}
               increaseLabel={t("cart.increaseQuantity")}
             />
-            {item.quantity > 1 && (
-              <span className="text-sm text-muted">
-                {t("cart.lineTotal")}:{" "}
-                <span className="font-semibold text-body">
-                  {fmtTL(item.price * item.quantity)} TL
-                </span>
-              </span>
-            )}
-          </div>
+          )}
+          <IconButton
+            variant="danger"
+            size="sm"
+            onClick={item.onRemove}
+            aria-label={t("cart.removeItem")}
+          >
+            <TrashIcon className="w-5 h-5" />
+          </IconButton>
+        </div>
+        {item.isAvailable && item.quantity > 1 && (
+          <span className="whitespace-nowrap text-sm text-muted">
+            {t("cart.lineTotal")}:{" "}
+            <span className="font-semibold text-body">
+              {fmtTL(item.price * item.quantity)} TL
+            </span>
+          </span>
         )}
       </div>
-      <IconButton
-        variant="danger"
-        size="sm"
-        onClick={item.onRemove}
-        className="self-start"
-        aria-label={t("cart.removeItem")}
-      >
-        <TrashIcon className="w-5 h-5" />
-      </IconButton>
     </SectionCard>
   );
 }
