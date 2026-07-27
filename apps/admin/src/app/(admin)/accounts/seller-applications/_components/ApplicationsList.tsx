@@ -3,12 +3,6 @@
 "use client";
 
 import { useState } from "react";
-import {
-  BuildingOfficeIcon,
-  PhoneIcon,
-  CalendarIcon,
-  HashtagIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { useConfirm } from "@/provider/ConfirmProvider";
@@ -17,6 +11,7 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { applicationColumns } from "../_lib/columns";
 import { applicationRowMenu } from "../_lib/rowActions";
 import { type Application } from "../_lib/types";
+import { ApplicationDetail } from "./ApplicationDetail";
 import { useTranslations } from "next-intl";
 
 /** The applications list for one status tab — expandable rows + approve/reject. */
@@ -85,65 +80,7 @@ export function ApplicationsList({ status }: { status: string }) {
     t,
   );
 
-  const renderExpanded = (app: Application) => (
-    <div className="grid grid-cols-1 gap-6 border-t border-border bg-surface-alt/40 p-6 md:grid-cols-3">
-      <div>
-        <h4 className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted">
-          <BuildingOfficeIcon className="h-4 w-4" />{" "}
-          {t("admin.accounts.sellerApplications.companyInformation")}
-        </h4>
-        <div className="space-y-2 text-sm">
-          <div>
-            <span className="block text-xs text-muted">
-              {t("admin.accounts.sellerApplications.companyName")}
-            </span>
-            <span className="font-medium text-heading">{app.companyName}</span>
-          </div>
-          {app.taxId && (
-            <div>
-              <span className="flex items-center gap-1 text-xs text-muted">
-                <HashtagIcon className="h-3 w-3" />
-                {t("admin.accounts.sellerApplications.taxNumber")}
-              </span>
-              <span className="font-medium text-heading">{app.taxId}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div>
-        <h4 className="mb-3 text-xs font-semibold text-muted">
-          {t("admin.accounts.sellerApplications.communication")}
-        </h4>
-        <div className="space-y-2 text-sm">
-          <div>
-            <span className="block text-xs text-muted">
-              {t("common.email")}
-            </span>
-            <span className="text-heading">{app.email}</span>
-          </div>
-          {app.phone && (
-            <div>
-              <span className="flex items-center gap-1 text-xs text-muted">
-                <PhoneIcon className="h-3 w-3" />
-                {t("common.phone")}
-              </span>
-              <span className="text-heading">{app.phone}</span>
-            </div>
-          )}
-          <div>
-            <span className="flex items-center gap-1 text-xs text-muted">
-              <CalendarIcon className="h-3 w-3" />
-              {t("admin.accounts.sellerApplications.applicationDate")}
-            </span>
-            <span className="text-heading">
-              {new Date(app.createdAt).toLocaleString(t("common.dateLocale"))}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const renderExpanded = (app: Application) => <ApplicationDetail app={app} />;
 
   return (
     <ResourceList<Application>

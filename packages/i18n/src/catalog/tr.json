@@ -2421,7 +2421,22 @@
         "companyName": "Firma Adı",
         "taxNumber": "Vergi No",
         "communication": "İletişim",
-        "empty": "Başvuru bulunamadı"
+        "empty": "Başvuru bulunamadı",
+        "documents": "Belgeler",
+        "bankAccount": "Banka Hesabı",
+        "noDocuments": "Henüz belge yüklenmemiş",
+        "view": "Görüntüle",
+        "notUploaded": "Yüklenmedi",
+        "iban": "IBAN",
+        "accountHolder": "Hesap Sahibi",
+        "tcKimlikNo": "TC Kimlik No",
+        "verified": "Doğrulandı",
+        "unverified": "Doğrulanmadı",
+        "companyType": "Şirket Türü",
+        "taxOffice": "Vergi Dairesi",
+        "city": "İl",
+        "district": "İlçe",
+        "loadError": "Detaylar yüklenemedi"
       },
       "sellerPerformance": {
         "title": "Satıcı Performansı",

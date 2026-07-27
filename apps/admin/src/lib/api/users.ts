@@ -47,6 +47,8 @@ export const usersApi = {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }) => api.get("/admin/seller-applications", { params }),
+  getSellerApplication: (id: string) =>
+    api.get(`/admin/seller-applications/${id}`),
   approveSellerApplication: (id: string) =>
     api.post(`/admin/seller-applications/${id}/approve`),
   rejectSellerApplication: (id: string, reason: string) =>

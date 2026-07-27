@@ -2421,7 +2421,22 @@
         "companyName": "Company Name",
         "taxNumber": "Tax Number",
         "communication": "Contact Information",
-        "empty": "No applications found"
+        "empty": "No applications found",
+        "documents": "Documents",
+        "bankAccount": "Bank Account",
+        "noDocuments": "No documents uploaded yet",
+        "view": "View",
+        "notUploaded": "Not uploaded",
+        "iban": "IBAN",
+        "accountHolder": "Account Holder",
+        "tcKimlikNo": "National ID",
+        "verified": "Verified",
+        "unverified": "Not verified",
+        "companyType": "Company Type",
+        "taxOffice": "Tax Office",
+        "city": "City",
+        "district": "District",
+        "loadError": "Failed to load details"
       },
       "sellerPerformance": {
         "title": "Seller Performance",
