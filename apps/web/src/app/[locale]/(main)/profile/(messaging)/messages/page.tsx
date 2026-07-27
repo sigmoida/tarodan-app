@@ -31,7 +31,7 @@ export default function MessagesPage() {
   const { selectedThread } = vm;
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] bg-surface text-heading flex flex-col">
+    <div className="h-[calc(100vh-8rem)] bg-surface text-heading flex flex-col">
       <div className="flex-1 flex min-h-0 mx-auto w-full max-w-full overflow-hidden bg-surface-elevated rounded-lg border border-border sm:shadow-sm">
         <ThreadList
           className={`${selectedThread ? "hidden sm:flex" : "flex"} w-full sm:w-80`}
