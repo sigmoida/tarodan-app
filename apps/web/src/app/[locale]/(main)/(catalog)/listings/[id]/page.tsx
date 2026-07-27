@@ -29,7 +29,9 @@ async function fetchProduct(id: string): Promise<Listing | null> {
     const res = await fetch(
       `${API_BASE}/api/products/${encodeURIComponent(id)}`,
       {
-        next: { revalidate: 60 },
+        // Tagged so the backend can on-demand revalidate this product's page when
+        // its price/discount changes (see app/api/revalidate); revalidate = fallback.
+        next: { revalidate: 60, tags: [`product:${id}`] },
       },
     );
     if (!res.ok) return null;
