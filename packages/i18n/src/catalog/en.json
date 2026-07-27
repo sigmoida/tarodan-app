@@ -6081,6 +6081,7 @@
     },
     "shipping": {
       "noActiveTariff": "No active shipping tariff found ({provider})",
+      "pricingChanged": "Shipping price has changed. Please refresh your cart and confirm the new amount.",
       "tariffNotFound": "Shipping tariff not found",
       "tariffNotEditable": "Only draft tariffs can be edited",
       "tariffArchived": "An archived tariff cannot be reactivated",

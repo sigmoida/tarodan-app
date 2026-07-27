@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
@@ -136,6 +137,9 @@ export class OrderPricingService {
     // Satıcı-başına kargo kırılımı (sepetteki her satıcı için tek kargo). UI "çatı"
     // görünümü ve doğru toplam için; `shippingAmount` bunların toplamıdır.
     shippingBySeller: Array<{ sellerId: string; shippingCost: number }>;
+    // Aktif tarife sürümü — istemci order-create'e geri gönderir; sürüm değiştiyse
+    // create 409 PRICING_CHANGED döner (sessiz farklı tahsil yok). Aktif tarife yoksa null.
+    shippingTariffVersion: number | null;
     pricing: {
       subtotal: number;
       shippingAmount: number;
@@ -279,6 +283,7 @@ export class OrderPricingService {
     const totalAmount =
       itemsSubtotal + shippingAmount + totalBuyerFee + totalTax;
     const sellerNetAmount = Math.max(0, itemsSubtotal - totalSellerFee);
+    const { tariffVersion } = await this.getShippingTariffMeta();
 
     const pricing = {
       subtotal: itemsSubtotal,
@@ -302,8 +307,27 @@ export class OrderPricingService {
       sellerNetAmount,
       items: quoteItems,
       shippingBySeller,
+      shippingTariffVersion: tariffVersion,
       pricing,
     };
+  }
+
+  /**
+   * Pricing-change guard (409 PRICING_CHANGED). If the client passed the tariff
+   * version its quote was built on and the active tariff has since moved, order
+   * creation is refused so the buyer re-fetches the quote and confirms the new
+   * amount — never a silent different charge. No expected version → skipped.
+   */
+  async assertShippingTariffUnchanged(
+    expectedVersion?: number | null,
+  ): Promise<void> {
+    if (expectedVersion == null) return;
+    const { tariffVersion } = await this.getShippingTariffMeta();
+    if (tariffVersion != null && tariffVersion !== expectedVersion) {
+      throw new ConflictException(
+        i18nMessage("server.shipping.pricingChanged"),
+      );
+    }
   }
 
   /**

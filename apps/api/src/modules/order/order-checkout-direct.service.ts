@@ -62,6 +62,11 @@ export class OrderCheckoutDirectService {
     this.logger.log(`[createDirectOrder] Starting order for buyer: ${buyerId}`);
     this.logger.log(`[createDirectOrder] DTO: ${JSON.stringify(dto)}`);
 
+    // 409 PRICING_CHANGED: shipping tariff moved since the quote was built.
+    await this.orderPricing.assertShippingTariffUnchanged(
+      dto.expectedShippingTariffVersion,
+    );
+
     // Validate DTO has necessary address info
     if (!dto.shippingAddressId && !dto.shippingAddress) {
       this.logger.error("[createDirectOrder] No shipping address provided");
@@ -578,6 +583,10 @@ export class OrderCheckoutDirectService {
     if (buyer?.isBanned) {
       throw new ForbiddenException(i18nMessage("server.order.accountBanned"));
     }
+    // 409 PRICING_CHANGED: shipping tariff moved since the quote was built.
+    await this.orderPricing.assertShippingTariffUnchanged(
+      dto.expectedShippingTariffVersion,
+    );
 
     return this.group.createCheckoutGroup({ buyerId, dto, isGuest: false });
   }

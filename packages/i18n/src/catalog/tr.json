@@ -6081,6 +6081,7 @@
     },
     "shipping": {
       "noActiveTariff": "Aktif kargo tarifesi bulunamadı ({provider})",
+      "pricingChanged": "Kargo fiyatı güncellendi. Lütfen sepeti yenileyip yeni tutarı onaylayın.",
       "tariffNotFound": "Kargo tarifesi bulunamadı",
       "tariffNotEditable": "Yalnızca taslak tarifeler düzenlenebilir",
       "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",

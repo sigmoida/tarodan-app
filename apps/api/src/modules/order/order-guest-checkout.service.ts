@@ -149,6 +149,10 @@ export class OrderGuestCheckoutService {
     if (replayed) {
       return replayed;
     }
+    // 409 PRICING_CHANGED: shipping tariff moved since the quote was built.
+    await this.orderPricing.assertShippingTariffUnchanged(
+      dto.expectedShippingTariffVersion,
+    );
 
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
@@ -179,6 +183,10 @@ export class OrderGuestCheckoutService {
    */
   async guestCheckout(dto: GuestCheckoutDto) {
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+    // 409 PRICING_CHANGED: shipping tariff moved since the quote was built.
+    await this.orderPricing.assertShippingTariffUnchanged(
+      dto.expectedShippingTariffVersion,
+    );
     // Savunma derinliği: kod gönderildikten sonra bu e-postayla kayıt olunmuş
     // olabilir → siparişi oluşturmadan önce tekrar kontrol et.
     await this.assertGuestEmailNotRegistered(normEmail);
