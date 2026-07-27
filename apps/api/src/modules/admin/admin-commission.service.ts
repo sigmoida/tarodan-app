@@ -44,7 +44,14 @@ export class AdminCommissionService {
     return rules.map((r) => this.serializeRule(r));
   }
 
-  /** Quote an unsaved draft with the exact independent matching used at checkout. */
+  /**
+   * @deprecated Legacy single-rate preview — NOT wired to any UI (the admin rule
+   * form uses the client-side `BreakdownPreview`, which reflects the full v2
+   * rates/taxpayer/amount/shipping). This builds the draft from only the old
+   * `sellerRate/buyerRate` fields and calls the engine via the legacy positional
+   * overload, so it would reproduce the old preview != checkout drift. Do not
+   * re-wire it; either delete it or upgrade it to the v2 draft before reuse.
+   */
   async previewCommission(dto: PreviewCommissionDto) {
     const activeRules = await this.prisma.commissionRule.findMany({
       where: { isActive: true },
