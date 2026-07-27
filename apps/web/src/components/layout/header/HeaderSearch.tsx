@@ -8,7 +8,7 @@ import { useRouter, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import { Button, Input } from "@tarodan/ui";
+import { IconButton, Input } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { searchApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
@@ -458,18 +458,20 @@ export default function HeaderSearch() {
             autoComplete="off"
           />
           {searchQuery && (
-            <Button
-              variant="secondary"
+            <IconButton
+              variant="ghost"
+              size="sm"
               type="button"
+              aria-label={t("common.clear")}
               onClick={() => {
                 setSearchQuery("");
                 setDebouncedQuery("");
                 searchInputRef.current?.focus();
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-muted"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full text-subtle hover:text-heading"
             >
               <XMarkIcon className="w-4 h-4" />
-            </Button>
+            </IconButton>
           )}
         </form>
 
