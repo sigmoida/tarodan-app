@@ -1472,7 +1472,31 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
     });
 
     scenario("USR-084", async () => {
+      const prisma = getPrisma();
+
+      // Analytics is a premium/business-only feature → free user gets 403.
+      const free = await createUser(ctx.module);
+      await request(server())
+        .get("/api/users/me/analytics")
+        .set(authHeader(free))
+        .expect(403);
+
+      // Entitled (active paid) member → 200 with the full payload.
       const user = await createUser(ctx.module);
+      const paidTier = await prisma.membershipTier.findFirst({
+        where: { type: { not: "free" }, isActive: true },
+      });
+      const now = new Date();
+      await prisma.userMembership.create({
+        data: {
+          userId: user.id,
+          tierId: paidTier!.id,
+          status: "active" as any,
+          currentPeriodStart: now,
+          currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          autoRenew: false,
+        },
+      });
       const fields = [
         "totalViews",
         "totalFavorites",
