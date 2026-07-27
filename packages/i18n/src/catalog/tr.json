@@ -717,6 +717,7 @@
   "order": {
     "myOrders": "Siparişlerim",
     "orderNumber": "Sipariş No",
+    "groupNumber": "Çatı No",
     "orderDate": "Sipariş Tarihi",
     "orderStatus": "Durum",
     "orderDetails": "Sipariş Detayları",

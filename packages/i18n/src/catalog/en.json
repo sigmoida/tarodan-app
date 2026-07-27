@@ -717,6 +717,7 @@
   "order": {
     "myOrders": "My Orders",
     "orderNumber": "Order Number",
+    "groupNumber": "Group No",
     "orderDate": "Order Date",
     "orderStatus": "Status",
     "orderDetails": "Order Details",

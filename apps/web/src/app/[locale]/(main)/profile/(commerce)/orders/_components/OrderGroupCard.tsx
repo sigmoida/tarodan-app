@@ -37,11 +37,9 @@ const PLACEHOLDER =
 function OrderLine({
   order,
   actions,
-  showOrderNumber,
 }: {
   order: Order;
   actions: OrderActionHandlers;
-  showOrderNumber?: boolean;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -79,11 +77,9 @@ function OrderLine({
           <p className="text-sm text-muted">
             {quantity} {t("order.unitTimes")} {formatTL(unitPrice)}
           </p>
-          {showOrderNumber && (
-            <p className="mt-0.5 text-xs text-subtle">
-              {t("order.orderNumber")} #{order.orderNumber}
-            </p>
-          )}
+          <p className="mt-0.5 text-xs text-subtle">
+            {t("order.orderNumber")} #{order.orderNumber}
+          </p>
           <p className="mt-1.5 text-sm text-muted">
             {order.isSeller
               ? `${t("order.buyer")}: ${order.buyer?.displayName || "-"}`
@@ -107,15 +103,6 @@ function OrderLine({
           )}
         </div>
       </div>
-
-      {hasVisibleShipment(order) && (
-        <div className="mt-3 rounded-lg bg-surface-alt p-3 text-sm">
-          <p>
-            <span className="text-muted">{t("order.trackingNumber")}:</span>{" "}
-            <span className="font-mono">{order.shipment!.trackingNumber}</span>
-          </p>
-        </div>
-      )}
 
       <OrderActions order={order} {...actions} />
     </div>
@@ -141,6 +128,7 @@ export default function OrderGroupCard({
   const isMulti = group.orders.length > 1;
   const total = group.orders.reduce((sum, o) => sum + orderAmount(o), 0);
   const date = group.orders[0]?.createdAt;
+  const groupNumber = group.orders[0]?.groupNumber;
   const packages = groupByPackage(group.orders);
   const multiPackage = packages.length > 1;
 
@@ -152,9 +140,11 @@ export default function OrderGroupCard({
           <>
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm text-muted">
-                  {t("order.multiItemOrder")}
-                </p>
+                {groupNumber && (
+                  <p className="text-sm text-muted">
+                    {t("order.groupNumber")} #{groupNumber}
+                  </p>
+                )}
                 <p className="text-sm text-subtle">{formatDate(date)}</p>
               </div>
               <Badge variant="outline" size="sm">
@@ -198,56 +188,57 @@ export default function OrderGroupCard({
             </div>
           </>
         ) : (
-          <div className="flex items-start justify-between gap-3">
-            <div>
+          <div>
+            {groupNumber && (
               <p className="text-sm text-muted">
-                {t("order.orderNumber")} #{group.orders[0]?.orderNumber}
+                {t("order.groupNumber")} #{groupNumber}
               </p>
-              <p className="text-sm text-subtle">{formatDate(date)}</p>
-            </div>
+            )}
+            <p className="text-sm text-subtle">{formatDate(date)}</p>
           </div>
         )}
       </div>
 
-      {/* Body — always-visible product line(s) */}
-      <div className="border-t border-border-subtle p-4 sm:p-6">
-        {multiPackage ? (
-          <div className="space-y-4">
-            {packages.map((pkg) => (
-              <div
-                key={pkg.key}
-                className="ml-3 border-l-2 border-primary-300 pl-4"
-              >
+      {/* Body — product line(s) grouped per seller-package ("çatı"). Same seller =
+          one parcel = ONE tracking number, so it is shown once per package (not
+          repeated on each line). */}
+      <div className="space-y-4 border-t border-border-subtle p-4 sm:p-6">
+        {packages.map((pkg) => {
+          const shipped = pkg.orders.find((o) => hasVisibleShipment(o));
+          return (
+            <div
+              key={pkg.key}
+              className={
+                multiPackage ? "ml-3 border-l-2 border-primary-300 pl-4" : ""
+              }
+            >
+              {multiPackage && (
                 <p className="mb-2 text-sm font-medium text-heading">
                   {pkg.seller?.displayName
                     ? t("order.sellerPackage", { name: pkg.seller.displayName })
                     : t("order.multiItemOrder")}
                 </p>
-                <div className="space-y-3">
-                  {pkg.orders.map((order) => (
-                    <OrderLine
-                      key={order.id}
-                      order={order}
-                      actions={actions}
-                      showOrderNumber
-                    />
-                  ))}
-                </div>
+              )}
+              <div className="space-y-3">
+                {pkg.orders.map((order) => (
+                  <OrderLine key={order.id} order={order} actions={actions} />
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {group.orders.map((order) => (
-              <OrderLine
-                key={order.id}
-                order={order}
-                actions={actions}
-                showOrderNumber={isMulti}
-              />
-            ))}
-          </div>
-        )}
+              {shipped && (
+                <div className="mt-3 rounded-lg bg-surface-alt p-3 text-sm">
+                  <p>
+                    <span className="text-muted">
+                      {t("order.trackingNumber")}:
+                    </span>{" "}
+                    <span className="font-mono">
+                      {shipped.shipment!.trackingNumber}
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -5,6 +5,8 @@ export interface Order {
   orderNumber: string;
   /** Çok ürünlü checkout grubu: aynı gruptaki siparişler tek kart altında gösterilir */
   checkoutGroupId?: string | null;
+  /** Çatı (checkout group) numarası — GRP-… ; kart başlığında gösterilir. */
+  groupNumber?: string | null;
   /** Satıcı paketi (çatı): aynı grupta aynı satıcının order'ları tek paket. Kargo pakete
    * bir kez yüklenir → kardeş order shippingCost=0 olabilir ("ücretsiz" değil, pakete dahil). */
   packageId?: string | null;
