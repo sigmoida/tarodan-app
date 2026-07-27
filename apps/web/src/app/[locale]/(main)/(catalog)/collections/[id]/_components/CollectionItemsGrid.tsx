@@ -3,7 +3,7 @@
 "use client";
 
 import { TrashIcon } from "@heroicons/react/24/outline";
-import { Badge, Button } from "@tarodan/ui";
+import { Badge, Button, IconButton } from "@tarodan/ui";
 import { ProductCard } from "@/components/ui";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
 import { itemToProduct, type CollectionItem } from "../_lib/types";
@@ -24,15 +24,15 @@ function ItemOverlay({ item }: { item: CollectionItem }) {
         </Badge>
       )}
       {isOwner && (
-        <Button
-          variant="danger"
-          size="sm"
+        <IconButton
+          variant="secondary"
           onClick={() => handleRemoveItem(item.id)}
           aria-label={t("collection.removeItem")}
-          className="opacity-0 transition-opacity group-hover:opacity-100"
+          title={t("collection.removeItem")}
+          className="rounded-full bg-surface-elevated shadow-md hover:bg-danger-50"
         >
-          <TrashIcon className="h-3.5 w-3.5" />
-        </Button>
+          <TrashIcon className="h-4 w-4 text-danger-500 sm:h-5 sm:w-5" />
+        </IconButton>
       )}
     </div>
   );

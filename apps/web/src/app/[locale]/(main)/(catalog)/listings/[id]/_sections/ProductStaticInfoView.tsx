@@ -1,7 +1,9 @@
 import {
   HeartIcon,
   ExclamationTriangleIcon,
+  InformationCircleIcon,
 } from "@heroicons/react/24/outline";
+import { Alert } from "@tarodan/ui/alert";
 import SectionCard from "@/components/ui/SectionCard";
 import {
   getProductEffectivePrice,
@@ -26,22 +28,6 @@ export default function ProductStaticInfoView({
 
   return (
     <>
-      {listing.status === "sold" && (
-        <div className="bg-danger-50 border border-danger-200 rounded p-4 mb-4 flex items-center gap-3">
-          <div className="w-10 h-10 bg-danger-100 rounded-full flex items-center justify-center">
-            <ExclamationTriangleIcon className="w-5 h-5 text-danger-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-danger-800">
-              {t("product.soldOut")}
-            </p>
-            <p className="text-sm text-danger-600">
-              {t("product.productNoLongerAvailable")}
-            </p>
-          </div>
-        </div>
-      )}
-
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <h1 className="text-2xl lg:text-3xl font-bold text-heading">
           {listing.title}
@@ -104,42 +90,44 @@ export default function ProductStaticInfoView({
       <ProductSpecs listing={listing} locale={locale} t={t} />
 
       {listing.status && listing.status !== "active" && (
-        <div
-          className={`rounded p-4 mb-4 ${
+        <Alert
+          variant={
             listing.status === "reserved"
-              ? "bg-warning-50 border border-warning-200"
+              ? "warning"
               : listing.status === "sold"
-                ? "bg-danger-50 border border-danger-200"
-                : "bg-surface border border-border"
-          }`}
+                ? "danger"
+                : "default"
+          }
+          icon={
+            listing.status === "sold" ? (
+              <ExclamationTriangleIcon className="h-5 w-5 text-danger-600" />
+            ) : listing.status === "reserved" ? (
+              <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
+            ) : (
+              <InformationCircleIcon className="h-5 w-5 text-muted" />
+            )
+          }
+          title={
+            listing.status === "reserved"
+              ? t("product.statusReserved")
+              : listing.status === "sold"
+                ? t("product.statusSold")
+                : listing.status === "pending"
+                  ? t("product.statusPending")
+                  : listing.status === "inactive"
+                    ? t("product.statusInactive")
+                    : listing.status === "rejected"
+                      ? t("product.statusRejected")
+                      : t("common.removed")
+          }
+          className="mb-4"
         >
-          <div className="flex items-center gap-3">
-            <ExclamationTriangleIcon
-              className={`w-6 h-6 ${
-                listing.status === "reserved"
-                  ? "text-warning-600"
-                  : listing.status === "sold"
-                    ? "text-danger-600"
-                    : "text-muted"
-              }`}
-            />
-            <div>
-              <p className="font-semibold text-body">
-                {listing.status === "reserved" && t("product.statusReserved")}
-                {listing.status === "sold" && t("product.statusSold")}
-                {listing.status === "pending" && t("product.statusPending")}
-                {listing.status === "inactive" && t("product.statusInactive")}
-                {listing.status === "rejected" && t("product.statusRejected")}
-                {listing.status === "deleted" && t("common.removed")}
-              </p>
-              <p className="text-sm text-muted">
-                {listing.status === "reserved" &&
-                  t("product.statusReservedDesc")}
-                {listing.status === "sold" && t("product.statusSoldDesc")}
-              </p>
-            </div>
-          </div>
-        </div>
+          {listing.status === "reserved"
+            ? t("product.statusReservedDesc")
+            : listing.status === "sold"
+              ? t("product.statusSoldDesc")
+              : null}
+        </Alert>
       )}
     </>
   );

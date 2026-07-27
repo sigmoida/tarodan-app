@@ -139,25 +139,6 @@ export default function ProductInfo() {
 
       <div className="space-y-3 mb-6">
         {isOwner && (
-          <div className="bg-info-50 border border-info-200 rounded p-4 text-center">
-            <p className="text-info-800 font-medium">
-              {t("product.thisIsYourListing")}
-            </p>
-            <div className="flex gap-2 justify-center mt-3">
-              <ButtonLink
-                variant="secondary"
-                href={`/listings/${listing.id}/edit`}
-              >
-                {t("product.editListing")}
-              </ButtonLink>
-              <ButtonLink variant="secondary" href="/profile/listings">
-                {t("nav.myListings")}
-              </ButtonLink>
-            </div>
-          </div>
-        )}
-
-        {isOwner && (
           <>
             <ButtonLink
               href={`/listings/${listing.id}/edit`}
@@ -179,38 +160,34 @@ export default function ProductInfo() {
           </>
         )}
 
-        {showQuantityStepper && (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-body">
-              {t("common.quantity")}
-            </span>
-            <QuantityStepper
-              value={quantity}
-              onChange={setQuantity}
-              max={maxQuantity}
-              decreaseLabel={t("cart.decreaseQuantity")}
-              increaseLabel={t("cart.increaseQuantity")}
-            />
-          </div>
-        )}
-
         {!isOwner && (
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={handleBuyNow}
-            disabled={listing.status !== "active" || !hasStock}
-            leftIcon={<BoltIcon className="w-5 h-5" />}
-            className="w-full"
-          >
-            {listing.status === "sold"
-              ? t("product.sold")
-              : listing.status === "reserved"
-                ? t("product.reserved")
-                : !hasStock
-                  ? t("product.stockFinished")
-                  : t("product.buyNow")}
-          </Button>
+          <div className="flex items-center gap-3">
+            {showQuantityStepper && (
+              <QuantityStepper
+                value={quantity}
+                onChange={setQuantity}
+                max={maxQuantity}
+                decreaseLabel={t("cart.decreaseQuantity")}
+                increaseLabel={t("cart.increaseQuantity")}
+              />
+            )}
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleBuyNow}
+              disabled={listing.status !== "active" || !hasStock}
+              leftIcon={<BoltIcon className="w-5 h-5" />}
+              className="flex-1"
+            >
+              {listing.status === "sold"
+                ? t("product.sold")
+                : listing.status === "reserved"
+                  ? t("product.reserved")
+                  : !hasStock
+                    ? t("product.stockFinished")
+                    : t("product.buyNow")}
+            </Button>
+          </div>
         )}
 
         {!isOwner && (

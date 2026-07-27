@@ -105,11 +105,15 @@ export default function BankAccountSection() {
             name="tcKimlikNo"
             label="TC Kimlik No (opsiyonel)"
             placeholder="11 rakam"
+            inputMode="numeric"
+            maxLength={11}
           />
           <FormInput
             name="taxId"
             label="Vergi No (opsiyonel)"
-            placeholder="Kurumsal hesaplar için"
+            placeholder="Kurumsal hesaplar için (10 rakam)"
+            inputMode="numeric"
+            maxLength={10}
           />
         </div>
         {account && (

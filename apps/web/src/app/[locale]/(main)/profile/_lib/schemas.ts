@@ -56,7 +56,12 @@ export const bankAccountSchema = z.object({
     .optional()
     .or(z.literal(""))
     .refine((v) => !v || /^\d{11}$/.test(v), "TC Kimlik No 11 rakam olmalıdır"),
-  taxId: z.string().trim().optional().or(z.literal("")),
+  taxId: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .refine((v) => !v || /^\d{10}$/.test(v), "Vergi No 10 rakam olmalıdır"),
 });
 export type BankAccountValues = z.infer<typeof bankAccountSchema>;
 
