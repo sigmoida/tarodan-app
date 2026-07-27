@@ -6118,6 +6118,9 @@
       "tariffNotEditable": "Only draft tariffs can be edited",
       "tariffArchived": "An archived tariff cannot be reactivated",
       "tariffNegativeAmount": "Tariff amounts cannot be negative"
+    },
+    "commission": {
+      "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later."
     }
   }
 }

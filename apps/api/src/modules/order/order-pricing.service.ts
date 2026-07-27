@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ServiceUnavailableException,
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
@@ -485,10 +486,17 @@ export class OrderPricingService {
     );
 
     if (!result.ruleId) {
-      this.logger.warn(
-        "No matching commission rule found; applying 0 commission fallback",
+      // Fail closed: a missing commission rule is a configuration error, not a
+      // reason to silently apply 0 commission — that would zero platform revenue
+      // AND undercharge the buyer fee. Abort so no order is ever created at the
+      // wrong price; ops is alerted by the error log. In normal operation a
+      // catch-all default rule always matches, so this never fires.
+      this.logger.error(
+        `No matching commission rule (amount=${amount} category=${categoryId} sellerType=${commissionSellerType} taxpayer=${taxpayerType}). Configure a default commission rule. Failing closed.`,
       );
-      return result;
+      throw new ServiceUnavailableException(
+        i18nMessage("server.commission.noRuleConfigured"),
+      );
     }
 
     this.logger.log(

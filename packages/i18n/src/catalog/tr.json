@@ -6118,6 +6118,9 @@
       "tariffNotEditable": "Yalnızca taslak tarifeler düzenlenebilir",
       "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",
       "tariffNegativeAmount": "Tarife tutarları negatif olamaz"
+    },
+    "commission": {
+      "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin."
     }
   }
 }
