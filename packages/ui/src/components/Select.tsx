@@ -42,7 +42,11 @@ const sizeClasses = {
   lg: "h-12 px-4 text-base",
 };
 
-const triggerClasses = (
+/**
+ * The Select trigger's class string — exported so other controls (e.g.
+ * `SearchableSelect`) can render a visually identical trigger.
+ */
+export const selectTriggerClasses = (
   error?: string,
   selectSize: "sm" | "md" | "lg" = "md",
 ) =>
@@ -170,7 +174,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         <RadixSelect.Trigger
           ref={ref}
           id={selectId}
-          className={cn(triggerClasses(error, selectSize), className)}
+          className={cn(selectTriggerClasses(error, selectSize), className)}
         >
           <RadixSelect.Value placeholder={placeholder} />
           <RadixSelect.Icon>

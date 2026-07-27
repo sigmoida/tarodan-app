@@ -47,6 +47,12 @@ export {
   type SelectProps,
   type SelectOption,
 } from "./components/Select";
+export {
+  SearchableSelect,
+  type SearchableSelectProps,
+  type SearchableSelectOption,
+} from "./components/SearchableSelect";
+export { foldForSearch, matchesSearch } from "./lib/search";
 export { Toggle, type ToggleProps } from "./components/Toggle";
 export { Checkbox, type CheckboxProps } from "./components/Checkbox";
 export {
