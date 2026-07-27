@@ -53,6 +53,21 @@ function LineItem({ item }: { item: OrderLineItem }) {
   );
 }
 
+/** Same seller = one parcel = ONE tracking number → shown once per package. */
+function PackageTracking({ items }: { items: OrderLineItem[] }) {
+  const t = useTranslations();
+  const tracking = items.find((i) => i.trackingNumber)?.trackingNumber;
+  if (!tracking) return null;
+  return (
+    <div className="border-t border-border-subtle px-3 py-1.5 text-xs">
+      <span className="text-muted">
+        {t("admin.operations.common.trackingNumber")}:
+      </span>{" "}
+      <span className="font-mono text-body">{tracking}</span>
+    </div>
+  );
+}
+
 /** One satıcı-paketi block: seller subheader + that seller's line items. */
 function PackageBlock({ pkg }: { pkg: SellerPackage }) {
   const t = useTranslations();
@@ -77,6 +92,7 @@ function PackageBlock({ pkg }: { pkg: SellerPackage }) {
           <LineItem key={item.id} item={item} />
         ))}
       </div>
+      <PackageTracking items={pkg.items} />
     </div>
   );
 }
@@ -98,10 +114,13 @@ export function OrderGroupDetail({ row }: { row: OrderGroupRow }) {
   }
   return (
     <div className="bg-surface-alt/40 px-4 py-2">
-      <div className="divide-y divide-border-subtle rounded-lg border border-border-subtle bg-surface">
-        {row.items.map((item) => (
-          <LineItem key={item.id} item={item} />
-        ))}
+      <div className="rounded-lg border border-border-subtle bg-surface">
+        <div className="divide-y divide-border-subtle">
+          {row.items.map((item) => (
+            <LineItem key={item.id} item={item} />
+          ))}
+        </div>
+        <PackageTracking items={row.items} />
       </div>
     </div>
   );

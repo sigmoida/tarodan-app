@@ -14,6 +14,7 @@ export interface Order {
   subtotal: number;
   commission: number;
   shipmentStatus?: string | null;
+  shipmentTrackingNumber?: string | null;
   buyer: { id: string; displayName: string };
   seller: { id: string; displayName: string };
   product?: { id: string; title: string };
@@ -41,6 +42,7 @@ export interface OrderLineItem {
   status: string;
   totalAmount: number;
   shipmentStatus?: string | null;
+  trackingNumber?: string | null;
   product?: { id: string; title: string };
   productImageUrl?: string | null;
   seller: { id: string; displayName: string };
@@ -102,6 +104,7 @@ export function mapOrders(raw: any[], t: T): Order[] {
     subtotal: Number(o.subtotal ?? 0),
     commission: Number(o.commissionAmount || 0),
     shipmentStatus: o.shipmentStatus ?? null,
+    shipmentTrackingNumber: o.shipmentTrackingNumber ?? null,
     buyer: o.buyer || {
       id: "",
       displayName: t("admin.operations.orders.buyer"),
@@ -134,6 +137,7 @@ function toLineItem(o: Order): OrderLineItem {
     status: o.status,
     totalAmount: o.totalAmount,
     shipmentStatus: o.shipmentStatus,
+    trackingNumber: o.shipmentTrackingNumber ?? null,
     product: o.product,
     productImageUrl: o.productImageUrl,
     seller: o.seller,
@@ -206,9 +210,9 @@ export function useOrderGroups(orders: Order[]): OrderGroupRow[] {
         isGroup,
         isMultiSeller: packages.length > 1,
         checkoutGroupId: head.checkoutGroupId ?? null,
-        displayNumber: isGroup
-          ? (head.groupNumber ?? head.orderNumber)
-          : head.orderNumber,
+        // Cati (checkout group) numarasi her satirda gorunur (tekli de dahil);
+        // grup numarasi yoksa (eski veri) order numarasina duser.
+        displayNumber: head.groupNumber ?? head.orderNumber,
         buyer: head.buyer,
         createdAt: head.createdAt,
         itemCount,
