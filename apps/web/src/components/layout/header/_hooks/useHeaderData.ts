@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
+import { hasAuthMarker } from "@/lib/authMarker";
 import { useCart } from "@/hooks/useCart";
 import { wishlistApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
@@ -19,11 +21,48 @@ import { useHeaderBadgeCounts } from "@/hooks/useHeaderBadgeCounts";
  * NavbarContext + useNavbarCounts split (no context layer).
  */
 export function useHeaderData() {
-  const { isAuthenticated, user, checkAuth } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const pathname = usePathname();
 
+  // Initial auth check + self-heal. `checkAuth` runs once on mount, then again
+  // whenever the session marker says "logged in" but the client store has
+  // fallen out of sync to guest — on tab focus/visibility, bfcache restore
+  // (pageshow) and SPA route changes. Without this, a single transient guest
+  // resolution (e.g. the `tarodan_authed` marker briefly unreadable while the
+  // BFF proxy refreshes the session) would stick for the whole SPA session,
+  // showing "Giriş Yap" until a hard reload.
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    const reconcile = () => {
+      const s = useAuthStore.getState();
+      if (!s.isAuthenticated && hasAuthMarker()) s.checkAuth();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") reconcile();
+    };
+
+    useAuthStore.getState().checkAuth();
+
+    window.addEventListener("focus", reconcile);
+    window.addEventListener("pageshow", reconcile);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", reconcile);
+      window.removeEventListener("pageshow", reconcile);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  // Re-check on client-side navigation: the header never remounts across SPA
+  // route changes, so a stale guest store would otherwise never recover.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const s = useAuthStore.getState();
+    if (!s.isAuthenticated && hasAuthMarker()) s.checkAuth();
+  }, [pathname]);
 
   // Defer auth-dependent UI until after hydration so server and first client
   // render always match (avoids hydration error).
