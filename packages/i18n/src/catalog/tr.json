@@ -6078,6 +6078,13 @@
       "tierNotActive": "Bu üyelik tipi aktif değil",
       "tierNotFound": "Üyelik tipi bulunamadı: {type}",
       "userIdNotFound": "Kullanıcı kimliği bulunamadı"
+    },
+    "shipping": {
+      "noActiveTariff": "Aktif kargo tarifesi bulunamadı ({provider})",
+      "tariffNotFound": "Kargo tarifesi bulunamadı",
+      "tariffNotEditable": "Yalnızca taslak tarifeler düzenlenebilir",
+      "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",
+      "tariffNegativeAmount": "Tarife tutarları negatif olamaz"
     }
   }
 }

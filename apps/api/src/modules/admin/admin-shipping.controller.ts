@@ -27,6 +27,12 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AdminService } from "./admin.service";
+import { AdminShippingTariffService } from "./admin-shipping-tariff.service";
+import {
+  CreateShippingTariffDto,
+  UpdateShippingTariffDto,
+  PreviewShippingTariffDto,
+} from "./dto/shipping-tariff.dto";
 import { AdvertisementService } from "../advertisement/advertisement.service";
 import { MediaService } from "../media/media.service";
 import {
@@ -110,7 +116,80 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminShippingController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly tariffs: AdminShippingTariffService,
+  ) {}
+
+  // ==================== SHIPPING TARIFFS (typed pricing) ====================
+  // Replaces editing shipping via the generic, unvalidated /admin/settings endpoint.
+
+  @Get("shipping/tariffs")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "List shipping tariffs" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Tariffs" })
+  async listTariffs(@Query("provider") provider?: string) {
+    return this.tariffs.list(provider);
+  }
+
+  @Get("shipping/tariffs/:id")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Get a shipping tariff" })
+  @ApiParam({ name: "id", description: "Tariff ID" })
+  async getTariff(@Param("id") id: string) {
+    return this.tariffs.getById(id);
+  }
+
+  @Post("shipping/tariffs")
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: "Create a draft shipping tariff" })
+  @ApiResponse({ status: HttpStatus.CREATED, description: "Draft tariff" })
+  async createTariff(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: CreateShippingTariffDto,
+  ) {
+    return this.tariffs.create(dto, adminId);
+  }
+
+  @Patch("shipping/tariffs/:id")
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: "Update a draft shipping tariff" })
+  @ApiParam({ name: "id", description: "Tariff ID" })
+  async updateTariff(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: UpdateShippingTariffDto,
+  ) {
+    return this.tariffs.update(id, dto, adminId);
+  }
+
+  @Post("shipping/tariffs/:id/activate")
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Activate a tariff (archives the current active one atomically)",
+  })
+  @ApiParam({ name: "id", description: "Tariff ID" })
+  async activateTariff(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.tariffs.activate(id, adminId);
+  }
+
+  @Post("shipping/tariffs/:id/preview")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Preview a tariff's outbound shipping for sample subtotals",
+  })
+  @ApiParam({ name: "id", description: "Tariff ID" })
+  async previewTariff(
+    @Param("id") id: string,
+    @Body() dto: PreviewShippingTariffDto,
+  ) {
+    return this.tariffs.preview(id, dto.subtotals);
+  }
 
   // ==================== SHIPPING (view-only) ====================
 

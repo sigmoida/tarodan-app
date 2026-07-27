@@ -1693,6 +1693,38 @@ model Shipment {
   @@map("shipments")
 }
 
+// Tipli, versiyonlanmış kargo tarifesi — kargo fiyatlandırmasının TEK kaynağı.
+// Generic PlatformSetting anahtarlarının (shipping_base_cost / free_shipping_threshold)
+// yerini alır. "Tam bedel" burada tutulur; alıcı/satıcı payı komisyon kuralındaki
+// shippingBuyerShare ile ayrışır; iade kararları iade politikasında kalır.
+// Provider başına aynı anda yalnız BİR active tarife olur (kısmi unique index).
+// Sipariş oluşturulurken OrderPackage'a tariffId + version snapshot'ı alınır.
+model ShippingTariff {
+  id                    String               @id @default(uuid())
+  provider              String               @default("surat")
+  name                  String
+  status                ShippingTariffStatus @default(draft)
+  // Provider başına monoton artan sürüm; snapshot bu değeri saklar (audit + reconstruct).
+  version               Int                  @default(1)
+  currency              String               @default("TRY")
+  // Bir fiziksel satıcı paketinin TAM kargo bedeli (alıcı+satıcı payı dağıtılmadan önce).
+  outboundPackageFee    Decimal              @map("outbound_package_fee") @db.Decimal(10, 2)
+  freeShippingEnabled   Boolean              @default(true) @map("free_shipping_enabled")
+  freeShippingThreshold Decimal              @map("free_shipping_threshold") @db.Decimal(10, 2)
+  // Faz 2: iade dönüş-bacağı ve takas-bacağı tahmini bedelleri (MVP'de seed'lenir, kullanılmaz).
+  returnPackageFee      Decimal              @default(0) @map("return_package_fee") @db.Decimal(10, 2)
+  tradeLegFee           Decimal              @default(0) @map("trade_leg_fee") @db.Decimal(10, 2)
+  effectiveFrom         DateTime             @map("effective_from")
+  createdBy             String?              @map("created_by")
+  updatedBy             String?              @map("updated_by")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+
+  @@unique([provider, version])
+  @@index([provider, status])
+  @@map("shipping_tariffs")
+}
+
 model ShipmentEvent {
   id          String   @id @default(uuid())
   shipmentId  String   @map("shipment_id")
@@ -2408,6 +2440,12 @@ enum ReturnShippingPayer {
   buyer
   seller
   platform
+}
+
+enum ShippingTariffStatus {
+  draft
+  active
+  archived
 }
 
 enum RefundRequestStatus {

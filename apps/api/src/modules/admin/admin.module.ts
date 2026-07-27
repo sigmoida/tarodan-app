@@ -54,6 +54,7 @@ import { AdminCollectionService } from "./admin-collection.service";
 import { AdminNotificationService } from "./admin-notification.service";
 import { AdminLogsService } from "./admin-logs.service";
 import { AdminShippingService } from "./admin-shipping.service";
+import { AdminShippingTariffService } from "./admin-shipping-tariff.service";
 import { AdminReviewService } from "./admin-review.service";
 import { AdminSellerApplicationService } from "./admin-seller-application.service";
 import { AdminAdPackageService } from "./admin-ad-package.service";
@@ -79,6 +80,7 @@ import { RefundModule } from "../refund/refund.module";
 import { NotificationModule } from "../notification/notification.module";
 import { OrderModule } from "../order/order.module";
 import { ElogoModule } from "../elogo/elogo.module";
+import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 
 @Module({
   imports: [
@@ -101,6 +103,7 @@ import { ElogoModule } from "../elogo/elogo.module";
     OrderModule,
     ModerationModule,
     ElogoModule,
+    ShippingTariffModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [
@@ -160,6 +163,7 @@ import { ElogoModule } from "../elogo/elogo.module";
     AdminNotificationService,
     AdminLogsService,
     AdminShippingService,
+    AdminShippingTariffService,
     AdminReviewService,
     AdminSellerApplicationService,
     AdminAdPackageService,

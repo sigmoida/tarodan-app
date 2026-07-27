@@ -69,3 +69,4 @@ export * from "./refund-request.dto";
 
 // Role permissions matrix
 export * from "./role-permissions.dto";
+export * from "./shipping-tariff.dto";

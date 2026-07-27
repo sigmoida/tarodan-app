@@ -6078,6 +6078,13 @@
       "tierNotActive": "This membership tier is not active",
       "tierNotFound": "Membership tier not found: {type}",
       "userIdNotFound": "User ID not found"
+    },
+    "shipping": {
+      "noActiveTariff": "No active shipping tariff found ({provider})",
+      "tariffNotFound": "Shipping tariff not found",
+      "tariffNotEditable": "Only draft tariffs can be edited",
+      "tariffArchived": "An archived tariff cannot be reactivated",
+      "tariffNegativeAmount": "Tariff amounts cannot be negative"
     }
   }
 }
