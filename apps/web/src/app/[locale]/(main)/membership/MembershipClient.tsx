@@ -25,7 +25,8 @@ import RequiredBusinessBanner from "./_sections/RequiredBusinessBanner";
 export default function MembershipClient() {
   const t = useTranslations();
   const { isAuthenticated, user } = useAuthStore();
-  const { prices, limits } = useMembershipTiers();
+  const tierData = useMembershipTiers();
+  const { prices } = tierData;
   const { membership } = useMyMembership(isAuthenticated);
   const actions = useMembershipActions();
 
@@ -47,10 +48,7 @@ export default function MembershipClient() {
     onDowngradeToFree: actions.cancelMembership,
   });
 
-  const allTiers = useMemo(
-    () => buildTiers(prices, limits, t),
-    [prices, limits, t],
-  );
+  const allTiers = useMemo(() => buildTiers(tierData, t), [tierData, t]);
   const tiers = useMemo(
     () => visibleTiers(allTiers, { isBusinessAccount, currentTier }),
     [allTiers, isBusinessAccount, currentTier],

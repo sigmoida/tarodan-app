@@ -23,10 +23,20 @@ export interface TierPrices {
   yearly_discount_percentage?: number;
 }
 
-/** Normalized tier data the server hands the client (prices + limits together). */
+/** Per-tier capabilities (single source: DB MembershipTier), drives plan features. */
+export interface TierCapabilities {
+  maxTotalListings?: number;
+  maxImagesPerListing?: number;
+  canTrade?: boolean;
+  canCreateCollections?: boolean;
+  isAdFree?: boolean;
+}
+
+/** Normalized tier data the server hands the client (prices + limits + capabilities). */
 export interface TierData {
   prices: TierPrices;
   limits: ListingLimits;
+  capabilities: Record<TierId, TierCapabilities>;
 }
 
 /** The current user's membership (from `/membership/me`). */

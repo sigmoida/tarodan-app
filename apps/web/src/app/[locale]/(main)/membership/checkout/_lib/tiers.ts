@@ -6,31 +6,8 @@ export const TIER_NAMES: Record<string, string> = {
   business: "İş Üyeliği",
 };
 
-export const TIER_FEATURES: Record<string, string[]> = {
-  basic: [
-    "50 ilan limiti",
-    "6 resim/ilan",
-    "Takas yapma",
-    "Koleksiyonlar",
-    "2 öne çıkan ilan",
-  ],
-  premium: [
-    "Sınırsız aktif ilan",
-    "15 resim/ilan",
-    "Takas yapma",
-    "Sınırsız koleksiyon (Digital Garage)",
-    "Reklamsız deneyim",
-    "3 öne çıkan ilan",
-  ],
-  business: [
-    "1000 aktif ilan hakkı",
-    "Takas yapma",
-    "Sınırsız koleksiyon",
-    "Reklamsız deneyim",
-    "7/24 öncelikli destek",
-    "Özel API erişimi",
-  ],
-};
+// Plan features are derived from the tier DTO via the shared buildTierFeatures
+// (membership/_lib/tiers) so the checkout never drifts from the membership page.
 
 export const PAID_TIERS = ["basic", "premium", "business"] as const;
 

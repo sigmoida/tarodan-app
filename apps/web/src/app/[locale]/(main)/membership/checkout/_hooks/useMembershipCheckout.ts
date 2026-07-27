@@ -6,22 +6,25 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { queryKeys } from "@/lib/query/keys";
 import { membershipApi, api, paymentsApi } from "@/lib/api";
 import { tierChangeKind } from "../../_lib/membershipTiers";
+import { buildTierFeatures } from "../../_lib/tiers";
+import type { TierId } from "../../_lib/types";
 import { useAuthStore } from "@/stores/authStore";
-import {
-  TIER_FEATURES,
-  TIER_NAMES,
-  PAID_TIERS,
-  type TierInfo,
-} from "../_lib/tiers";
+import { TIER_NAMES, PAID_TIERS, type TierInfo } from "../_lib/tiers";
 
 interface TierRow {
   type: string;
   monthlyPrice: number | string;
   yearlyPrice: number | string;
+  maxTotalListings?: number;
+  maxImagesPerListing?: number;
+  canTrade?: boolean;
+  canCreateCollections?: boolean;
+  isAdFree?: boolean;
 }
 
 /**
@@ -32,6 +35,7 @@ interface TierRow {
  */
 export function useMembershipCheckout() {
   const router = useRouter();
+  const t = useTranslations();
   const searchParams = useSearchParams();
   const {
     isAuthenticated,
@@ -87,10 +91,23 @@ export function useMembershipCheckout() {
                 ? Number(tierRow.monthlyPrice)
                 : Number(tierRow.yearlyPrice),
             basePrice: Number(tierRow.monthlyPrice),
-            features: TIER_FEATURES[tier] || [],
+            // Same DTO-driven source the membership page uses (no divergent copy).
+            features: buildTierFeatures(
+              {
+                maxTotalListings: tierRow.maxTotalListings,
+                maxImagesPerListing: tierRow.maxImagesPerListing,
+                canTrade: tierRow.canTrade,
+                canCreateCollections: tierRow.canCreateCollections,
+                isAdFree: tierRow.isAdFree,
+              },
+              tier as TierId,
+              t,
+            )
+              .filter((f) => f.included)
+              .map((f) => f.text),
           }
         : null,
-    [isPaidTier, tierRow, tier, period],
+    [isPaidTier, tierRow, tier, period, t],
   );
 
   // Guard against a mis-configured (absurd) price.

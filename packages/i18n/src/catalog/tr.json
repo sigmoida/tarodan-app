@@ -1211,6 +1211,7 @@
     "savePercent": "% Tasarruf",
     "features": "Özellikler",
     "listingsLimit": "İlan Limiti",
+    "imagesPerListing": "{count} resim/ilan",
     "tradesLimit": "Takas Limiti",
     "featuredListings": "Öne Çıkan İlanlar",
     "prioritySupport": "Öncelikli Destek",

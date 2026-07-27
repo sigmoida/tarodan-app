@@ -4,7 +4,9 @@ import type {
   ListingLimits,
   Period,
   Tier,
+  TierCapabilities,
   TierData,
+  TierFeature,
   TierId,
   TierPrices,
 } from "./types";
@@ -49,6 +51,22 @@ export function normalizeTierData(raw: unknown): TierData {
     business_listing_limit: business?.maxTotalListings,
   };
 
+  // Per-tier capabilities from the admin-driven tier row — the single source the
+  // plan cards (page + checkout) derive their features from, so nothing drifts.
+  const caps = (row: any): TierCapabilities => ({
+    maxTotalListings: row?.maxTotalListings,
+    maxImagesPerListing: row?.maxImagesPerListing,
+    canTrade: row?.canTrade,
+    canCreateCollections: row?.canCreateCollections,
+    isAdFree: row?.isAdFree,
+  });
+  const capabilities: Record<TierId, TierCapabilities> = {
+    free: caps(free),
+    basic: caps(basic),
+    premium: caps(premium),
+    business: caps(business),
+  };
+
   const prices: TierPrices = {
     basic_monthly_price: num(basic?.monthlyPrice),
     basic_yearly_price: num(basic?.yearlyPrice),
@@ -60,29 +78,62 @@ export function normalizeTierData(raw: unknown): TierData {
       pct(num(premium?.monthlyPrice), num(premium?.yearlyPrice)) ?? 20,
   };
 
-  return { prices, limits };
+  return { prices, limits, capabilities };
 }
 
-/** "50 ilan" / "Sınırsız ilan" text for a tier's active-listing cap. */
-export function listingLimitText(
+/**
+ * Canonical plan-card features for a tier, derived ENTIRELY from the admin-driven
+ * tier row (DB MembershipTier). The SINGLE source both the membership page and the
+ * checkout page use, so the two never contradict and an admin toggle (limits /
+ * images / canTrade / canCreateCollections / isAdFree) is reflected everywhere.
+ * No hardcoded capability copy — the earlier drift (200 vs unlimited listings,
+ * 10 vs 15 images, differing trade/collection flags) came from duplicating these.
+ */
+export function buildTierFeatures(
+  caps: TierCapabilities,
   tierId: TierId,
-  limits: ListingLimits,
   t: TFn,
-): string {
-  const key = `${tierId}_listing_limit` as keyof ListingLimits;
-  const limit = limits[key] ?? LIMIT_FALLBACK[tierId];
-  const suffix = t("membership.listingsLimit");
-  return limit === -1
-    ? `${t("membership.unlimited")} ${suffix}`
-    : `${limit} ${suffix}`;
+): TierFeature[] {
+  const cap = caps.maxTotalListings ?? LIMIT_FALLBACK[tierId];
+  const listingText =
+    cap === -1
+      ? `${t("membership.unlimited")} ${t("membership.listingsLimit")}`
+      : `${cap} ${t("membership.listingsLimit")}`;
+  const images = caps.maxImagesPerListing;
+  return [
+    { text: listingText, included: true },
+    ...(images
+      ? [
+          {
+            text: t("membership.imagesPerListing", { count: images }),
+            included: true,
+          },
+        ]
+      : []),
+    { text: t("nav.trades"), included: !!caps.canTrade },
+    {
+      text: t("collection.collections"),
+      included: !!caps.canCreateCollections,
+    },
+    { text: t("membership.noAds"), included: !!caps.isAdFree },
+  ];
 }
 
-/** Build all four display tiers. Runs client-side (needs the i18n `t`). */
-export function buildTiers(
-  prices: TierPrices,
-  limits: ListingLimits,
-  t: TFn,
-): Tier[] {
+/** Static marketing extras that are NOT membership entitlements (no DTO field). */
+const TIER_EXTRAS: Partial<Record<TierId, (t: TFn) => TierFeature[]>> = {
+  business: (t) => [
+    { text: `24/7 ${t("membership.prioritySupport")}`, included: true },
+    { text: "API", included: true },
+  ],
+};
+
+/** Build all four display tiers from the normalized (admin-driven) tier data. */
+export function buildTiers(data: TierData, t: TFn): Tier[] {
+  const { prices, capabilities } = data;
+  const featuresFor = (id: TierId): TierFeature[] => [
+    ...buildTierFeatures(capabilities[id], id, t),
+    ...(TIER_EXTRAS[id]?.(t) ?? []),
+  ];
   return [
     {
       id: "free",
@@ -90,14 +141,7 @@ export function buildTiers(
       price: 0,
       description: t("membership.subtitle"),
       popular: false,
-      features: [
-        { text: listingLimitText("free", limits, t), included: true },
-        { text: t("search.search"), included: true },
-        { text: t("message.messages"), included: true },
-        { text: t("nav.trades"), included: false },
-        { text: t("collection.collections"), included: false },
-        { text: t("membership.noAds"), included: false },
-      ],
+      features: featuresFor("free"),
     },
     {
       id: "basic",
@@ -105,14 +149,7 @@ export function buildTiers(
       price: prices.basic_monthly_price ?? 49,
       description: "Koleksiyoncular için başlangıç",
       popular: false,
-      features: [
-        { text: listingLimitText("basic", limits, t), included: true },
-        { text: "6 resim/ilan", included: true },
-        { text: t("nav.trades"), included: true },
-        { text: t("collection.collections"), included: true },
-        { text: t("membership.noAds"), included: false },
-        { text: "2 öne çıkan ilan", included: true },
-      ],
+      features: featuresFor("basic"),
     },
     {
       id: "premium",
@@ -120,17 +157,7 @@ export function buildTiers(
       price: prices.premium_monthly_price ?? 99,
       description: t("membership.mostPopular"),
       popular: true,
-      features: [
-        { text: listingLimitText("premium", limits, t), included: true },
-        { text: "10 resim/ilan", included: true },
-        { text: t("nav.trades"), included: true },
-        {
-          text: `${t("membership.unlimited")} ${t("collection.collections")}`,
-          included: true,
-        },
-        { text: t("membership.noAds"), included: true },
-        { text: "10 öne çıkan ilan", included: true },
-      ],
+      features: featuresFor("premium"),
     },
     {
       id: "business",
@@ -138,19 +165,7 @@ export function buildTiers(
       price: prices.business_monthly_price ?? 499,
       description: t("membership.business"),
       popular: false,
-      features: [
-        { text: listingLimitText("business", limits, t), included: true },
-        { text: t("search.search"), included: true },
-        { text: t("message.messages"), included: true },
-        { text: t("nav.trades"), included: true },
-        {
-          text: `${t("membership.unlimited")} ${t("collection.collections")}`,
-          included: true,
-        },
-        { text: t("membership.noAds"), included: true },
-        { text: `24/7 ${t("membership.prioritySupport")}`, included: true },
-        { text: "API", included: true },
-      ],
+      features: featuresFor("business"),
     },
   ];
 }

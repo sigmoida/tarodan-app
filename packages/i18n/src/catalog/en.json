@@ -1211,6 +1211,7 @@
     "savePercent": "Savings",
     "features": "Features",
     "listingsLimit": "Listing Limit",
+    "imagesPerListing": "{count} images/listing",
     "tradesLimit": "Trade Limit",
     "featuredListings": "Featured Listings",
     "prioritySupport": "Priority Support",
