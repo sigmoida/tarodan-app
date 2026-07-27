@@ -13,7 +13,7 @@ import { useTranslations } from "next-intl";
 import CreateCollectionModal from "@/components/CreateCollectionModal";
 import { EmptyStateCard } from "@/components/ui";
 import { useMyCollections } from "./_hooks/useMyCollections";
-import CollectionCard from "./_components/CollectionCard";
+import CollectionCard from "../../../(catalog)/collections/_components/CollectionCard";
 import CollectionsToolbar from "./_components/CollectionsToolbar";
 import PremiumRequiredModal from "./_modals/PremiumRequiredModal";
 
@@ -117,7 +117,14 @@ export default function MyCollectionsPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {displayedCollections.map((collection) => (
-            <CollectionCard key={collection.id} collection={collection} />
+            <CollectionCard
+              key={collection.id}
+              collection={{
+                ...collection,
+                userId: user?.id,
+                userName: collection.userName ?? user?.displayName,
+              }}
+            />
           ))}
         </div>
       )}

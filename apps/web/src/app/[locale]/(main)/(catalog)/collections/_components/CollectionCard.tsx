@@ -10,8 +10,8 @@ import { useTranslations } from "next-intl";
 import OptimizedImage from "@/components/OptimizedImage";
 import CollectionVisibilityBadge from "./CollectionVisibilityBadge";
 
-/** The fields the collection card needs — a superset of both the public list and
- *  the liked-collections shapes, so either can be passed straight in. */
+/** The fields the collection card needs — a superset of the public list, the
+ *  liked-collections and the my-collections shapes, so any can be passed in. */
 export interface CollectionCardData {
   id: string;
   name: string;
@@ -21,16 +21,18 @@ export interface CollectionCardData {
   itemCount?: number;
   viewCount?: number;
   likeCount?: number;
+  userId?: string;
   userName?: string;
-  user?: { displayName?: string } | null;
+  user?: { id?: string; displayName?: string } | null;
 }
 
 /**
- * The single collection card for the collections grid + the liked-collections
- * grid. Mirrors the marketplace `ProductCard` design language (square cover,
- * same frame/hover, same text scale and colored view/like icons) so both grids
- * read consistently. `footer` is a click-isolated slot below the card for
- * actions (e.g. unlike), exactly like ProductCard.
+ * The single collection card for every collection grid (public collections,
+ * liked collections, my collections). Mirrors the marketplace `ProductCard`
+ * design language (square cover, same frame/hover, same text scale, colored
+ * view/like icons). The owner handle is a click-isolated link to the owner's
+ * public profile — a sibling of the card link, never nested. `footer` is a
+ * click-isolated slot inside the card frame for actions (e.g. unlike).
  */
 export default function CollectionCard({
   collection,
@@ -40,24 +42,25 @@ export default function CollectionCard({
   footer?: ReactNode;
 }) {
   const t = useTranslations();
-  const owner =
+  const ownerId = collection.user?.id ?? collection.userId;
+  const ownerName =
     collection.userName ||
     collection.user?.displayName ||
     t("collection.anonymous");
 
   return (
-    <div className="relative group h-full flex flex-col">
+    <div className="relative group flex h-full flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
       <Link
         href={`/collections/${collection.id}`}
-        className="block h-full bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all"
+        className="flex flex-1 flex-col"
       >
-        <div className="relative aspect-square bg-surface-alt overflow-hidden">
+        <div className="relative aspect-square overflow-hidden bg-surface-alt">
           {collection.coverImageUrl ? (
             <OptimizedImage
               src={collection.coverImageUrl}
               alt={collection.name}
               fill
-              className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
+              className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
               fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Koleksiyon"
               logContext={{ collectionId: collection.id, page: "collections" }}
             />
@@ -66,7 +69,7 @@ export default function CollectionCard({
               🚗
             </div>
           )}
-          <div className="absolute top-1.5 right-1.5">
+          <div className="absolute right-1.5 top-1.5">
             <CollectionVisibilityBadge
               isPublic={collection.isPublic}
               label={
@@ -78,43 +81,51 @@ export default function CollectionCard({
           </div>
         </div>
 
-        <div className="p-2.5 flex-1 flex flex-col">
-          <h3 className="font-medium text-heading line-clamp-2 text-sm sm:text-md leading-tight group-hover:text-primary-600 transition-colors">
+        <div className="flex flex-1 flex-col p-2.5">
+          <h3 className="line-clamp-2 text-sm font-medium leading-tight text-heading transition-colors group-hover:text-primary-600 sm:text-md">
             {collection.name}
           </h3>
           {collection.description && (
-            <p className="text-subtle text-xs mt-0.5 line-clamp-1">
+            <p className="mt-0.5 line-clamp-1 text-xs text-subtle">
               {collection.description}
             </p>
           )}
-
-          <div className="mt-auto">
-            <div className="pt-2 flex items-center justify-between text-xs sm:text-sm text-subtle">
-              <span className="font-medium">
-                {collection.itemCount ?? 0} {t("collection.items")}
-              </span>
-              <div className="flex items-center gap-3">
-                {collection.viewCount !== undefined && (
-                  <span className="flex items-center gap-1">
-                    <EyeIcon className="w-4 h-4 text-primary-500" />
-                    {collection.viewCount}
-                  </span>
-                )}
-                {collection.likeCount !== undefined && (
-                  <span className="flex items-center gap-1">
-                    <HeartIcon className="w-4 h-4 text-danger-500" />
-                    {collection.likeCount}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="mt-1.5 pt-1.5 border-t border-border-subtle">
-              <span className="text-xs text-subtle">@{owner}</span>
+          <div className="mt-auto flex items-center justify-between pt-2 text-xs text-subtle sm:text-sm">
+            <span className="font-medium">
+              {collection.itemCount ?? 0} {t("collection.items")}
+            </span>
+            <div className="flex items-center gap-3">
+              {collection.viewCount !== undefined && (
+                <span className="flex items-center gap-1">
+                  <EyeIcon className="h-4 w-4 text-primary-500" />
+                  {collection.viewCount}
+                </span>
+              )}
+              {collection.likeCount !== undefined && (
+                <span className="flex items-center gap-1">
+                  <HeartIcon className="h-4 w-4 text-danger-500" />
+                  {collection.likeCount}
+                </span>
+              )}
             </div>
           </div>
         </div>
       </Link>
-      {footer && <div className="mt-2">{footer}</div>}
+
+      <div className="border-t border-border-subtle px-2.5 py-1.5">
+        {ownerId ? (
+          <Link
+            href={`/seller/${ownerId}`}
+            className="text-xs text-subtle transition-colors hover:text-primary-600"
+          >
+            @{ownerName}
+          </Link>
+        ) : (
+          <span className="text-xs text-subtle">@{ownerName}</span>
+        )}
+      </div>
+
+      {footer && <div className="px-2.5 pb-2.5">{footer}</div>}
     </div>
   );
 }
