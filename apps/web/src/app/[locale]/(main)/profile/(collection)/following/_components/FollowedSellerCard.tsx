@@ -3,7 +3,6 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { UserMinusIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import type { FollowedUser } from "../_lib/types";
@@ -47,10 +46,8 @@ export default function FollowedSellerCard({
         variant="outline"
         onClick={() => onUnfollow(item.following.id)}
         disabled={busy}
-        className="gap-2"
       >
-        <UserMinusIcon className="h-5 w-5" />
-        <span className="hidden sm:inline">Takibi Bırak</span>
+        Takibi Bırak
       </Button>
     </div>
   );

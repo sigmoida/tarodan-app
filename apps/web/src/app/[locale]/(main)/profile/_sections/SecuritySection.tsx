@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import {
   DevicePhoneMobileIcon,
-  KeyIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button, Input, Modal } from "@tarodan/ui";
@@ -122,10 +121,6 @@ export default function SecuritySection() {
         </Button>
       }
     >
-      <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-heading">
-        <KeyIcon className="h-5 w-5 text-primary-500" />
-        Şifre Değiştir
-      </div>
       <Form form={form} onSubmit={onSubmit} className="space-y-4">
         <FormInput
           name="currentPassword"
