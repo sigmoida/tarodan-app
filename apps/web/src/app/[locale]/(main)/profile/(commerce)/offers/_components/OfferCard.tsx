@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
 } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
-import UserAvatar from "@/components/UserAvatar";
+import { SellerChip } from "@/components/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import {
@@ -84,7 +84,7 @@ export default function OfferCard({
     if (offer.status === "accepted") {
       const showPay = activeTab === "sent" && !isOfferOrderPaid(offer);
       return (
-        <Button asChild variant={showPay ? "success" : "primary"} size="sm">
+        <Button asChild variant="primary" size="sm">
           <Link
             href={
               offer.orderId
@@ -92,7 +92,7 @@ export default function OfferCard({
                 : "/profile/orders"
             }
           >
-            {showPay ? "Ödeme Yap" : "Siparişi Görüntüle"}
+            {showPay ? t("payment.pay") : t("offer.viewOrder")}
           </Link>
         </Button>
       );
@@ -103,8 +103,8 @@ export default function OfferCard({
     // Received counter sent → waiting on the buyer.
     if (isReceived && offer.buyerMustAccept) {
       return (
-        <span className="rounded-lg bg-warning-50 px-3 py-2 text-xs text-warning-700">
-          Alıcının karşı teklifinizi yanıtlaması bekleniyor.
+        <span className="rounded-lg bg-surface-alt px-3 py-2 text-xs text-muted">
+          {t("offer.waitingBuyerCounter")}
         </span>
       );
     }
@@ -113,7 +113,7 @@ export default function OfferCard({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <IconButton
-            aria-label="İşlemler"
+            aria-label={t("common.actions")}
             variant="ghost"
             size="sm"
             isLoading={busy}
@@ -126,11 +126,11 @@ export default function OfferCard({
             <>
               <DropdownMenuItem onSelect={() => onAction(offer.id, "accept")}>
                 <CheckIcon className="mr-2 h-4 w-4" />
-                Kabul Et
+                {t("offer.acceptOffer")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onSellerCounter(offer)}>
                 <ArrowTrendingUpIcon className="mr-2 h-4 w-4" />
-                Karşı Teklif
+                {t("offer.counterOffer")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -138,18 +138,18 @@ export default function OfferCard({
                 onSelect={() => onAction(offer.id, "reject")}
               >
                 <XMarkIcon className="mr-2 h-4 w-4" />
-                Reddet
+                {t("offer.rejectOffer")}
               </DropdownMenuItem>
             </>
           ) : offer.buyerMustAccept ? (
             <>
               <DropdownMenuItem onSelect={() => onAction(offer.id, "accept")}>
                 <CheckIcon className="mr-2 h-4 w-4" />
-                Karşı Teklifi Kabul Et
+                {t("offer.acceptCounter")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onBuyerCounter(offer)}>
                 <ArrowTrendingDownIcon className="mr-2 h-4 w-4" />
-                Daha Düşük Teklif
+                {t("offer.lowerOffer")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -157,7 +157,7 @@ export default function OfferCard({
                 onSelect={() => onAction(offer.id, "reject")}
               >
                 <XMarkIcon className="mr-2 h-4 w-4" />
-                Reddet
+                {t("offer.rejectOffer")}
               </DropdownMenuItem>
             </>
           ) : (
@@ -166,7 +166,7 @@ export default function OfferCard({
               onSelect={() => onAction(offer.id, "cancel")}
             >
               <XMarkIcon className="mr-2 h-4 w-4" />
-              İptal Et
+              {t("offer.cancelOffer")}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -175,7 +175,7 @@ export default function OfferCard({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated transition-shadow hover:shadow-md">
+    <div className="group overflow-hidden rounded-lg border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
       <div className="flex flex-col md:flex-row">
         {/* Media */}
         <Link
@@ -187,13 +187,13 @@ export default function OfferCard({
               src={src}
               alt={offer.product.title}
               fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
               fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
               logContext={{ productId: offer.product.id, page: "offers" }}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-primary-100">
-              <TagIcon className="h-10 w-10 text-primary-400" />
+            <div className="flex h-full w-full items-center justify-center bg-surface-alt">
+              <TagIcon className="h-10 w-10 text-muted" />
             </div>
           )}
           {discount > 0 && (
@@ -215,12 +215,12 @@ export default function OfferCard({
             <div className="min-w-0 flex-1">
               <Link
                 href={`/listings/${offer.product.id}`}
-                className="line-clamp-1 text-lg font-semibold text-heading transition-colors hover:text-primary-500"
+                className="line-clamp-1 text-lg font-semibold text-heading transition-colors group-hover:text-primary-600"
               >
                 {offer.product.title}
               </Link>
               <p className="mt-1 text-sm text-muted">
-                İlan Fiyatı:{" "}
+                {t("offer.listingPriceLabel")}:{" "}
                 <span className="line-through">
                   ₺{listingPrice.toLocaleString("tr-TR")}
                 </span>
@@ -239,9 +239,9 @@ export default function OfferCard({
           </div>
 
           <div className="mb-4 flex flex-wrap items-center gap-3 sm:gap-6">
-            <div className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 sm:px-4 sm:py-3">
+            <div className="rounded-lg border border-border bg-surface-alt px-3 py-2 sm:px-4 sm:py-3">
               <p className="mb-0.5 text-2xs text-muted sm:mb-1 sm:text-xs">
-                Teklif Tutarı
+                {t("offer.offerAmountLabel")}
               </p>
               <p className="text-lg font-bold text-primary-600 sm:text-2xl">
                 ₺{offer.amount.toLocaleString("tr-TR")}
@@ -250,7 +250,7 @@ export default function OfferCard({
                 offer.status === "pending" &&
                 estimatedNet != null && (
                   <p className="mt-1 text-xs text-success-600">
-                    Tahmini net: ₺
+                    {t("offer.estimatedNetLabel")}: ₺
                     {Number(estimatedNet).toLocaleString("tr-TR", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
@@ -260,28 +260,20 @@ export default function OfferCard({
             </div>
 
             {otherUser && (
-              <div className="flex items-center gap-2 sm:gap-3">
-                <UserAvatar
-                  displayName={otherUser.displayName}
-                  avatarUrl={otherUser.avatarUrl}
-                  size="sm"
-                />
-                <div>
-                  <p className="text-2xs text-muted sm:text-xs">
-                    {isReceived ? "Teklif Veren" : "Satıcı"}
-                  </p>
-                  <p className="text-sm font-medium text-heading sm:text-base">
-                    {otherUser.displayName}
-                  </p>
-                </div>
-              </div>
+              <SellerChip
+                id={otherUser.id}
+                displayName={otherUser.displayName}
+                avatarUrl={otherUser.avatarUrl}
+                role={isReceived ? t("offer.offerer") : t("product.seller")}
+                size="sm"
+              />
             )}
 
             {timeRemaining && (
               <div className="flex items-center gap-1.5 rounded-lg bg-warning-50 px-2 py-1.5 text-warning-600 sm:gap-2 sm:px-3 sm:py-2">
                 <ClockIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="whitespace-nowrap text-xs font-medium sm:text-sm">
-                  {timeRemaining} kaldı
+                  {t("offer.timeLeft", { time: timeRemaining })}
                 </span>
               </div>
             )}
