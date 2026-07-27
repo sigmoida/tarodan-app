@@ -41,4 +41,6 @@ export interface CheckoutQuote {
     totalAmount: number;
     sellerNetAmount: number;
   };
+  /** Active shipping-tariff version this quote was priced with (sent back on submit). */
+  shippingTariffVersion?: number | null;
 }

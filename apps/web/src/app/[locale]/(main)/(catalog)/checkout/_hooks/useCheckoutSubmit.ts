@@ -44,6 +44,7 @@ export function useCheckoutSubmit({
   appliedCouponCode,
   clearCart,
   onCheckoutSubmitted,
+  expectedShippingTariffVersion,
 }: {
   checkoutItems: CheckoutItem[];
   t: Translate;
@@ -73,6 +74,8 @@ export function useCheckoutSubmit({
   clearCart: () => Promise<void>;
   /** Marks the checkout as submitted so the cart-empty guard stops redirecting. */
   onCheckoutSubmitted: () => void;
+  /** Active shipping-tariff version from the quote; enables the 409 PRICING_CHANGED guard. */
+  expectedShippingTariffVersion?: number | null;
 }) {
   // Checkout idempotency: retries for the same cart (double click, retry after a
   // network error) return the SAME group server-side. Generated on first submit.
@@ -277,10 +280,18 @@ export function useCheckoutSubmit({
                 zipCode?: string;
               };
               couponCode?: string;
+              expectedShippingTariffVersion?: number;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
             };
+
+            // Send the tariff version the quote was priced with; the server returns
+            // 409 PRICING_CHANGED (handled below) if the active tariff has moved.
+            if (typeof expectedShippingTariffVersion === "number") {
+              payload.expectedShippingTariffVersion =
+                expectedShippingTariffVersion;
+            }
 
             // Forward the applied cart coupon so the order is created at the
             // discounted total (server re-validates authoritatively). Without this
@@ -397,6 +408,7 @@ export function useCheckoutSubmit({
                 address: string;
                 zipCode?: string;
               };
+              expectedShippingTariffVersion?: number;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
@@ -428,6 +440,11 @@ export function useCheckoutSubmit({
                 address: newBillingAddress.address.trim(),
                 zipCode: newBillingAddress.zipCode?.trim() || undefined,
               };
+            }
+
+            if (typeof expectedShippingTariffVersion === "number") {
+              guestPayload.expectedShippingTariffVersion =
+                expectedShippingTariffVersion;
             }
 
             orderResponse = await ordersApi.checkoutGuest(guestPayload);

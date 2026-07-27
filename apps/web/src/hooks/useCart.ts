@@ -16,12 +16,6 @@ import {
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 
-const FREE_SHIPPING_THRESHOLD = 500;
-const FLAT_SHIPPING = 29.99;
-
-const calculateShipping = (subtotal: number, count: number) =>
-  count === 0 ? 0 : subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING;
-
 // `useCart` is mounted by the header and may also be mounted by the current
 // page. Keep the login merge single-flight so those consumers cannot submit the
 // same persisted guest quantities more than once.
@@ -215,11 +209,13 @@ export function useCart() {
       (sum, line) => sum + line.quantity,
       0,
     );
-    const shippingCost = calculateShipping(subtotal, payableLines.length);
 
     if (isAuthenticated || isAuthLoading) {
       const calc = isAuthenticated ? query.data?.calculation : undefined;
       const totalDiscount = calc?.totalDiscount ?? 0;
+      // Shipping comes from the server cart calculation (active shipping tariff) —
+      // no hardcoded fee/threshold on the client.
+      const shippingCost = calc?.shippingCost ?? 0;
       return {
         items: calc?.items ?? [],
         offlineItems: [] as OfflineCartItem[],
@@ -249,8 +245,10 @@ export function useCart() {
       offlineItems,
       subtotal,
       totalDiscount: guestCouponDiscount,
-      shippingCost,
-      grandTotal: Math.max(0, subtotal - guestCouponDiscount) + shippingCost,
+      // Guest cart has no server calculation; shipping is computed at checkout
+      // (from the tariff, once the subtotal is known). Preview total excludes it.
+      shippingCost: 0,
+      grandTotal: Math.max(0, subtotal - guestCouponDiscount),
       itemCount,
       canCheckout,
       appliedCouponCode: guestCouponValid ? offlineCouponCode : null,

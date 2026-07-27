@@ -226,6 +226,9 @@ function useCheckoutValue() {
     onCheckoutSubmitted: () => {
       checkoutSubmittedRef.current = true;
     },
+    // Tariff version the quote was priced with — server returns 409 PRICING_CHANGED
+    // if it moved before order-create, so the buyer confirms the new amount.
+    expectedShippingTariffVersion: quote?.shippingTariffVersion ?? undefined,
   });
 
   // Direct product failed to load → bounce back to listings.

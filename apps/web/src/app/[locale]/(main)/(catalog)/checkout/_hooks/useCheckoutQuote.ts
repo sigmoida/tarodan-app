@@ -25,7 +25,11 @@ export function useCheckoutQuote(
           quantity: i.quantity,
         })),
       });
-      if (res.data?.pricing) return { pricing: res.data.pricing };
+      if (res.data?.pricing)
+        return {
+          pricing: res.data.pricing,
+          shippingTariffVersion: res.data.shippingTariffVersion ?? null,
+        };
       return (res.data ?? null) as CheckoutQuote | null;
     },
     enabled: items.length > 0,
