@@ -29,11 +29,14 @@ interface SupportTicketDetail {
   category: string;
   priority: string;
   status: string;
-  creator: { id: string; displayName: string; email: string };
-  assignee?: { id: string; displayName: string };
+  creatorId: string;
+  creatorName: string;
+  assigneeId?: string;
+  assigneeName?: string;
   messages: Array<{
     id: string;
-    sender: { id: string; displayName: string };
+    senderId: string;
+    senderName: string;
     content: string;
     isInternal: boolean;
     createdAt: string;
@@ -109,7 +112,7 @@ export default function SupportTicketDetailPage() {
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-heading">
-                            {message.sender.displayName}
+                            {message.senderName}
                           </span>
                           {message.isInternal && (
                             <span className="rounded bg-warning-200 px-2 py-0.5 text-xs text-warning-800">
@@ -165,11 +168,11 @@ export default function SupportTicketDetailPage() {
                       config={supportTicketStatusConfig(translate)}
                     />
                   </Field>
-                  {ticket.assignee && (
+                  {ticket.assigneeName && (
                     <Field
                       label={translate("admin.messaging.support.assignee")}
                     >
-                      {ticket.assignee.displayName}
+                      {ticket.assigneeName}
                     </Field>
                   )}
                 </DataList>
@@ -177,9 +180,8 @@ export default function SupportTicketDetailPage() {
 
               <PartyCard
                 title={translate("admin.messaging.support.creator")}
-                name={ticket.creator.displayName}
-                userHref={`/accounts/users/${ticket.creator.id}`}
-                email={ticket.creator.email}
+                name={ticket.creatorName}
+                userHref={`/accounts/users/${ticket.creatorId}`}
               />
 
               <Timeline
