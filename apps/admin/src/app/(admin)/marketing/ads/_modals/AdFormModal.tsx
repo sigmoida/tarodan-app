@@ -5,6 +5,7 @@ import { useFormContext } from "react-hook-form";
 import {
   FormModal,
   FormInput,
+  FormDatePicker,
   FormSelect,
   FormCheckbox,
   useZodForm,
@@ -295,15 +296,13 @@ export function AdFormModal({
         type="number"
       />
       <div className="grid grid-cols-2 gap-4">
-        <FormInput
+        <FormDatePicker
           name="startDate"
           label={t("admin.marketing.ads.startDate")}
-          type="date"
         />
-        <FormInput
+        <FormDatePicker
           name="endDate"
           label={t("admin.marketing.ads.endDate")}
-          type="date"
         />
       </div>
       <FormCheckbox name="isActive" label={t("common.active")} />

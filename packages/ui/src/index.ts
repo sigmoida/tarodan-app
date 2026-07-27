@@ -3,6 +3,7 @@ export { Button, buttonVariants, type ButtonProps } from "./components/Button";
 export { IconButton, iconButtonVariants } from "./components/IconButton";
 export type { IconButtonProps } from "./components/IconButton";
 export { Input, type InputProps } from "./components/Input";
+export { DatePicker, type DatePickerProps } from "./components/DatePicker";
 export {
   CardNumberInput,
   type CardNumberInputProps,

@@ -8,6 +8,7 @@ import { Button, Spinner } from "@tarodan/ui";
 import {
   Form,
   FormInput,
+  FormDatePicker,
   FormPhone,
   FormCheckbox,
   FormError,
@@ -167,9 +168,8 @@ export function RegisterForm() {
         <div className="grid grid-cols-2 gap-4">
           <FormPhone name="phone" label={t("auth.phone")} />
 
-          <FormInput
+          <FormDatePicker
             name="birthDate"
-            type="date"
             label={`${t("auth.birthDate")} *`}
             max={getMaxBirthDate()}
           />

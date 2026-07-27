@@ -2,7 +2,7 @@
 
 "use client";
 
-import { Button, Input, Select } from "@tarodan/ui";
+import { Button, DatePicker, Select } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import type { PaymentFilterState } from "../_lib/types";
 
@@ -52,10 +52,9 @@ export default function PaymentFilters({ filters, onChange, onClear }: Props) {
           <span className="mb-2 block text-sm font-medium text-body">
             {t("payment.startDate")}
           </span>
-          <Input
-            type="date"
+          <DatePicker
             value={filters.startDate}
-            onChange={(e) => onChange("startDate", e.target.value)}
+            onChange={(v) => onChange("startDate", v)}
           />
         </label>
 
@@ -63,10 +62,9 @@ export default function PaymentFilters({ filters, onChange, onClear }: Props) {
           <span className="mb-2 block text-sm font-medium text-body">
             {t("payment.endDate")}
           </span>
-          <Input
-            type="date"
+          <DatePicker
             value={filters.endDate}
-            onChange={(e) => onChange("endDate", e.target.value)}
+            onChange={(v) => onChange("endDate", v)}
           />
         </label>
       </div>

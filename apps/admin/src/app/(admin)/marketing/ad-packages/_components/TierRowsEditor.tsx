@@ -2,7 +2,7 @@
 
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { Button } from "@tarodan/ui";
-import { FormInput, FormCheckbox } from "@tarodan/ui/form";
+import { FormInput, FormDatePicker, FormCheckbox } from "@tarodan/ui/form";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { emptyTierRow, type PackageFormValues } from "../_lib/types";
@@ -87,14 +87,12 @@ export function TierRowsEditor() {
                 step="0.01"
                 label={t("admin.marketing.adPackages.campaignPrice")}
               />
-              <FormInput
+              <FormDatePicker
                 name={`tiers.${index}.campaignStartsAt`}
-                type="date"
                 label={t("admin.marketing.adPackages.campaignStartsAt")}
               />
-              <FormInput
+              <FormDatePicker
                 name={`tiers.${index}.campaignEndsAt`}
-                type="date"
                 label={t("admin.marketing.adPackages.campaignEndsAt")}
               />
               <div className="flex items-end justify-between gap-2">

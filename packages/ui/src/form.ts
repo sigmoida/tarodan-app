@@ -12,6 +12,10 @@ export {
 } from "./components/form/Form";
 export { FormSelect, type FormSelectProps } from "./components/form/FormSelect";
 export {
+  FormDatePicker,
+  type FormDatePickerProps,
+} from "./components/form/FormDatePicker";
+export {
   FormSearchableSelect,
   type FormSearchableSelectProps,
 } from "./components/form/FormSearchableSelect";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Input, Select } from "@tarodan/ui";
+import { DatePicker, Select } from "@tarodan/ui";
 import {
   CurrencyDollarIcon,
   ChartBarIcon,
@@ -59,17 +59,15 @@ function TaxReportControls() {
   return (
     <SectionCard>
       <div className="flex flex-wrap items-end gap-4">
-        <Input
-          type="date"
+        <DatePicker
           label={t("admin.finance.common.start")}
           value={filters.fromDate ?? INITIAL_FILTERS.fromDate}
-          onChange={(event) => setFilter("fromDate", event.target.value)}
+          onChange={(v) => setFilter("fromDate", v)}
         />
-        <Input
-          type="date"
+        <DatePicker
           label={t("admin.finance.common.end")}
           value={filters.toDate ?? INITIAL_FILTERS.toDate}
-          onChange={(event) => setFilter("toDate", event.target.value)}
+          onChange={(v) => setFilter("toDate", v)}
         />
         <Select
           label={t("admin.finance.tax.groupByLabel")}

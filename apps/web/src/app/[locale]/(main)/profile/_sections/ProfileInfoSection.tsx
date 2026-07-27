@@ -7,6 +7,7 @@ import { CameraIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner } from "@tarodan/ui";
 import {
   Form,
+  FormDatePicker,
   FormInput,
   FormPhone,
   FormTextarea,
@@ -157,7 +158,7 @@ export default function ProfileInfoSection() {
           />
           <div className="grid gap-4 md:grid-cols-2">
             <FormPhone name="phone" label="Telefon" />
-            <FormInput name="birthDate" type="date" label="Doğum Tarihi" />
+            <FormDatePicker name="birthDate" label="Doğum Tarihi" />
           </div>
           <FormTextarea name="bio" label="Hakkımda" rows={4} maxLength={500} />
 

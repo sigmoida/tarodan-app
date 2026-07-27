@@ -5,6 +5,7 @@
 import { Button, Checkbox, Input } from "@tarodan/ui";
 import {
   FormInput,
+  FormDatePicker,
   FormSelect,
   FormTextarea,
   FormCheckbox,
@@ -249,8 +250,8 @@ export default function DiscountFormModal({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <FormInput name="startDate" label="Başlangıç Tarihi *" type="date" />
-        <FormInput name="endDate" label="Bitiş Tarihi *" type="date" />
+        <FormDatePicker name="startDate" label="Başlangıç Tarihi *" />
+        <FormDatePicker name="endDate" label="Bitiş Tarihi *" />
       </div>
 
       <div className="flex items-center gap-6">

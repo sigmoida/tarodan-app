@@ -7,7 +7,7 @@ import {
   ChevronUpIcon,
   ReceiptPercentIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, Input } from "@tarodan/ui";
+import { Badge, Button, DatePicker, Input } from "@tarodan/ui";
 import type { SaleData } from "../_lib/types";
 
 interface DiscountSectionProps {
@@ -98,11 +98,10 @@ export default function DiscountSection({
                 <label className="block text-xs font-medium text-body mb-1">
                   Başlangıç
                 </label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={saleData.saleStartDate}
-                  onChange={(e) =>
-                    setSaleData({ ...saleData, saleStartDate: e.target.value })
+                  onChange={(v) =>
+                    setSaleData({ ...saleData, saleStartDate: v })
                   }
                 />
               </div>
@@ -110,12 +109,9 @@ export default function DiscountSection({
                 <label className="block text-xs font-medium text-body mb-1">
                   Bitiş
                 </label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={saleData.saleEndDate}
-                  onChange={(e) =>
-                    setSaleData({ ...saleData, saleEndDate: e.target.value })
-                  }
+                  onChange={(v) => setSaleData({ ...saleData, saleEndDate: v })}
                 />
               </div>
             </div>

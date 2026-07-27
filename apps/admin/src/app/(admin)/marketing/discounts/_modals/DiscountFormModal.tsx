@@ -3,6 +3,7 @@
 import {
   FormModal,
   FormInput,
+  FormDatePicker,
   FormSelect,
   FormTextarea,
   FormCheckbox,
@@ -297,14 +298,12 @@ export function DiscountFormModal({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormInput
+        <FormDatePicker
           name="startDate"
-          type="date"
           label={t("admin.marketing.discounts.startDate")}
         />
-        <FormInput
+        <FormDatePicker
           name="endDate"
-          type="date"
           label={t("admin.marketing.discounts.endDate")}
         />
       </div>

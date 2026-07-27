@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Button,
   Select,
-  Input,
+  DatePicker,
   enumLabel,
   paymentStatusConfig,
   paymentProviderConfig,
@@ -128,21 +128,15 @@ export default function PaymentStatisticsPage() {
             }
             options={periodOptions}
           />
-          <Input
-            type="date"
+          <DatePicker
             label={t("admin.finance.common.startDate")}
             value={filters.startDate}
-            onChange={(e) =>
-              setFilters({ ...filters, startDate: e.target.value })
-            }
+            onChange={(v) => setFilters({ ...filters, startDate: v })}
           />
-          <Input
-            type="date"
+          <DatePicker
             label={t("admin.finance.common.endDate")}
             value={filters.endDate}
-            onChange={(e) =>
-              setFilters({ ...filters, endDate: e.target.value })
-            }
+            onChange={(v) => setFilters({ ...filters, endDate: v })}
           />
           <div className="flex items-end">
             <Button
