@@ -114,7 +114,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         onChange={(e) => onCountryCodeChange(e.target.value)}
         disabled={disabled}
         aria-label="Ülke kodu"
-        className="w-auto shrink-0 cursor-pointer rounded-lg rounded-r-none border-0 bg-surface-alt focus:ring-0 focus:ring-offset-0 disabled:opacity-100"
+        className="w-auto shrink-0 cursor-pointer gap-1 border-0 bg-transparent pl-3 pr-2 font-medium focus:ring-0 focus:ring-offset-0 disabled:opacity-100"
       >
         {countryCodes.map((cc) => (
           <option key={cc.code} value={cc.code}>
@@ -122,7 +122,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           </option>
         ))}
       </Select>
-      <div className="h-6 w-px shrink-0 bg-border" aria-hidden />
+      <div className="h-5 w-px shrink-0 bg-border" aria-hidden />
       <Input
         ref={inputRef}
         id={inputId}
@@ -136,7 +136,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         maxLength={getPhoneMaxLength(countryCode)}
         required={required}
         disabled={disabled}
-        className="min-w-0 flex-1 rounded-lg rounded-l-none border-0 bg-transparent focus:ring-0 focus:ring-offset-0 disabled:opacity-100"
+        className="min-w-0 flex-1 border-0 bg-transparent focus:ring-0 focus:ring-offset-0 disabled:opacity-100"
       />
     </div>
   );
