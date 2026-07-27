@@ -134,8 +134,11 @@ export default function ListingCard({
           )}
         </div>
 
-        <div className="mb-3 flex items-center justify-between text-sm text-muted">
-          <span>{formatDate(listing.createdAt)}</span>
+        <div className="mb-3 flex items-center justify-between border-t border-border-subtle pt-3 text-sm text-muted">
+          <span className="flex items-center gap-1.5">
+            <CalendarDaysIcon className="h-4 w-4 text-subtle" />
+            {formatDate(listing.createdAt)}
+          </span>
           <div className="flex items-center gap-3">
             {listing.rating &&
               listing.rating.average !== null &&
@@ -152,7 +155,7 @@ export default function ListingCard({
               )}
             {listing.viewCount !== undefined && (
               <span className="flex items-center gap-1">
-                <EyeIcon className="h-4 w-4" />
+                <EyeIcon className="h-4 w-4 text-primary-500" />
                 {listing.viewCount}
               </span>
             )}
