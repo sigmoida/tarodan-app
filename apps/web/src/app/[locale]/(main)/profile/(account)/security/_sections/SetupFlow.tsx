@@ -53,6 +53,7 @@ export default function SetupFlow({
                 alt="2FA QR Code"
                 width={200}
                 height={200}
+                unoptimized
               />
             ) : (
               <div className="flex h-[200px] w-[200px] items-center justify-center bg-surface-alt text-subtle">
@@ -102,24 +103,18 @@ export default function SetupFlow({
               setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
             }
             placeholder="000000"
-            className="max-w-xs text-center text-2xl tracking-widest"
+            className="max-w-xs text-center text-lg tracking-widest"
             maxLength={6}
           />
         </div>
       </div>
 
-      <div className="flex space-x-4">
-        <Button
-          variant="secondary"
-          size="lg"
-          className="flex-1"
-          onClick={onCancel}
-        >
+      <div className="flex gap-3">
+        <Button variant="secondary" className="flex-1" onClick={onCancel}>
           İptal
         </Button>
         <Button
           variant="primary"
-          size="lg"
           className="flex-1"
           onClick={handleVerify}
           disabled={isVerifying || code.length !== 6}
