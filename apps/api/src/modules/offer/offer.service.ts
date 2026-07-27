@@ -379,6 +379,13 @@ export class OfferService {
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
+          // v2 4-way breakdown (mirrors the direct-buy / cart paths) so the
+          // granular columns + eLogo composite fee lines are correct for
+          // offer-accepted orders instead of falling to @default(0).
+          buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+          buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+          sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+          sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },

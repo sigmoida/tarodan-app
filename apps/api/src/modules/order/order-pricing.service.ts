@@ -194,6 +194,9 @@ export class OrderPricingService {
     }> = [];
     // Satıcı-başına kargo alt-toplamı (create ile aynı mantık — calculateShippingBySeller).
     const sellerSubtotals = new Map<string, number>();
+    // Kargo payı: satıcının kuralındaki alıcı payı (%). Create yolu ile aynı
+    // bölüşüm; önizleme toplamı oluşan siparişle birebir eşleşsin.
+    const sellerShippingShare = new Map<string, number>();
 
     for (const { productId, quantity = 1 } of dto.items) {
       const product = await this.prisma.product.findUnique({
@@ -232,6 +235,10 @@ export class OrderPricingService {
         product.categoryId,
       );
 
+      sellerShippingShare.set(
+        product.sellerId,
+        commissionResult.shippingBuyerShare,
+      );
       const lineBuyerFee = commissionResult.buyerFeeAmount;
       const lineSellerFee = commissionResult.sellerFeeAmount;
       const lineSellerNet = lineSubtotal - lineSellerFee;
@@ -277,8 +284,15 @@ export class OrderPricingService {
 
     // Satıcı-BAŞINA kargo (create ile ortak yardımcı) → çoklu-satıcı sepette doğru toplam.
     const shippingMap = await this.calculateShippingBySeller(sellerSubtotals);
+    // Alıcı yalnız kendi kargo payını öder (create yolundaki yuvarlamayla birebir).
+    // buyerShare=100 → tam kargo (mevcut davranış korunur).
     const shippingBySeller = [...shippingMap.entries()].map(
-      ([sellerId, shippingCost]) => ({ sellerId, shippingCost }),
+      ([sellerId, fullShipping]) => {
+        const share = sellerShippingShare.get(sellerId) ?? 100;
+        const buyerShipping =
+          Math.round(fullShipping * (share / 100) * 100) / 100;
+        return { sellerId, shippingCost: buyerShipping };
+      },
     );
     const shippingAmount = shippingBySeller.reduce(
       (sum, s) => sum + s.shippingCost,
