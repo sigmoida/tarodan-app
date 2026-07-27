@@ -24,6 +24,67 @@ export default function ProductStaticInfoView({
 }) {
   const effectivePrice = getProductEffectivePrice(listing);
 
+  // Stock / status notice shown above the action buttons — same Alert card for
+  // every case (icon + title + subtitle). "Out of stock" only applies when the
+  // listing is otherwise active (a non-active status takes precedence).
+  const available =
+    listing.availableQuantity !== undefined &&
+    listing.availableQuantity !== null
+      ? listing.availableQuantity
+      : listing.quantity;
+  const noticeKey =
+    listing.status && listing.status !== "active"
+      ? listing.status
+      : available === 0
+        ? "stockFinished"
+        : null;
+  const NOTICES: Record<
+    string,
+    {
+      variant: "warning" | "danger" | "default";
+      title: string;
+      subtitle: string | null;
+    }
+  > = {
+    reserved: {
+      variant: "warning",
+      title: t("product.statusReserved"),
+      subtitle: t("product.statusReservedDesc"),
+    },
+    sold: {
+      variant: "danger",
+      title: t("product.statusSold"),
+      subtitle: t("product.statusSoldDesc"),
+    },
+    pending: {
+      variant: "default",
+      title: t("product.statusPending"),
+      subtitle: t("product.statusPendingDesc"),
+    },
+    inactive: {
+      variant: "default",
+      title: t("product.statusInactive"),
+      subtitle: t("product.statusInactiveDesc"),
+    },
+    rejected: {
+      variant: "danger",
+      title: t("product.statusRejected"),
+      subtitle: t("product.statusRejectedDesc"),
+    },
+    stockFinished: {
+      variant: "warning",
+      title: t("product.stockFinished"),
+      subtitle: t("product.stockFinishedDesc"),
+    },
+  };
+  const notice = noticeKey
+    ? (NOTICES[noticeKey] ?? {
+        variant: "default" as const,
+        title: t("common.removed"),
+        subtitle: null,
+      })
+    : null;
+
   return (
     <>
       <div className="flex items-center gap-3 flex-wrap mb-4">
@@ -86,44 +147,22 @@ export default function ProductStaticInfoView({
         </div>
       </SectionCard>
 
-      {listing.status && listing.status !== "active" && (
+      {notice && (
         <Alert
-          variant={
-            listing.status === "reserved"
-              ? "warning"
-              : listing.status === "sold"
-                ? "danger"
-                : "default"
-          }
+          variant={notice.variant}
           icon={
-            listing.status === "sold" ? (
+            notice.variant === "danger" ? (
               <ExclamationTriangleIcon className="h-5 w-5 text-danger-600" />
-            ) : listing.status === "reserved" ? (
+            ) : notice.variant === "warning" ? (
               <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
             ) : (
               <InformationCircleIcon className="h-5 w-5 text-muted" />
             )
           }
-          title={
-            listing.status === "reserved"
-              ? t("product.statusReserved")
-              : listing.status === "sold"
-                ? t("product.statusSold")
-                : listing.status === "pending"
-                  ? t("product.statusPending")
-                  : listing.status === "inactive"
-                    ? t("product.statusInactive")
-                    : listing.status === "rejected"
-                      ? t("product.statusRejected")
-                      : t("common.removed")
-          }
+          title={notice.title}
           className="mb-4"
         >
-          {listing.status === "reserved"
-            ? t("product.statusReservedDesc")
-            : listing.status === "sold"
-              ? t("product.statusSoldDesc")
-              : null}
+          {notice.subtitle}
         </Alert>
       )}
     </>

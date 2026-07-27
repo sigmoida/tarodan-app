@@ -107,23 +107,9 @@ function ListingDetailLayout({
     );
   }
 
-  const available =
-    listing.availableQuantity !== undefined &&
-    listing.availableQuantity !== null
-      ? listing.availableQuantity
-      : listing.quantity;
-
   return (
     <PageShell>
       <PageHeader breadcrumb={<ProductBreadcrumbs />} />
-
-      {available === 0 && (
-        <div className="p-4 bg-warning-50 border border-warning-200 rounded-xl">
-          <p className="text-warning-800 font-medium">
-            {t("product.stockFinished")}
-          </p>
-        </div>
-      )}
 
       {/* Top: gallery (left) + primary info (right) */}
       <div className="grid lg:grid-cols-2 gap-8">
