@@ -1830,7 +1830,9 @@
     "reasonCardError": "Card information error",
     "reason3dSecureFailed": "3D Secure verification failed",
     "reasonBankRejected": "Transaction rejected by bank",
-    "reasonConnectionProblem": "Internet connection problem"
+    "reasonConnectionProblem": "Internet connection problem",
+    "itemsRefunded": "{count} refunded",
+    "itemsCancelled": "{count} cancelled"
   },
   "seller": {
     "sellerProfile": "Seller Profile",

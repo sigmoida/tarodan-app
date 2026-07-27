@@ -2,17 +2,21 @@
 
 "use client";
 
+import { useState } from "react";
 import { Link } from "@/i18n/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   CreditCardIcon,
   CalendarIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import {
+  Badge,
   Button,
   StatusBadge,
   paymentStatusConfig,
+  orderStatusConfig,
   Accordion,
   AccordionItem,
   AccordionTrigger,
@@ -24,6 +28,7 @@ import { formatTL } from "@/lib/format";
 import {
   groupOrdersOf,
   paymentStatusEnLabels,
+  type GroupOrder,
   type Payment,
   type PaymentActionCb,
 } from "../_lib/types";
@@ -31,7 +36,7 @@ import {
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
   if (src) {
     return (
-      <div className="relative h-12 w-12 overflow-hidden rounded-lg">
+      <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
         <OptimizedImage
           src={src}
           alt={alt}
@@ -43,7 +48,7 @@ function Thumb({ src, alt }: { src?: string | null; alt: string }) {
     );
   }
   return (
-    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-surface-alt">
+    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-surface-alt">
       <CreditCardIcon className="h-6 w-6 text-subtle" />
     </div>
   );
@@ -64,11 +69,39 @@ export default function PaymentCard({
   const locale = useLocale();
   const groupOrders = groupOrdersOf(payment);
   const isGroup = groupOrders.length > 0;
+  // A group has no single order detail — its "all details" is the item list, so
+  // the card-level Detaylar toggles this accordion open instead of navigating.
+  const [open, setOpen] = useState(false);
 
   const statusLabel =
     locale === "en"
       ? paymentStatusEnLabels[payment.status] || payment.status
       : paymentStatusConfig[payment.status]?.label || payment.status;
+
+  // Per-item display-status label (backend already sends the display status key,
+  // consistent with the orders list: refund_requested / refunded / cancelled / …).
+  const itemStatusLabel = (s: string): string =>
+    (
+      ({
+        pending_payment: t("order.statusPending"),
+        paid: t("order.statusPaid"),
+        preparing: t("order.statusProcessing"),
+        shipped: t("order.statusShipped"),
+        delivered: t("order.statusDelivered"),
+        completed: t("order.statusCompleted"),
+        cancelled: t("order.statusCancelled"),
+        refund_requested: t("order.refundInProgress"),
+        refunded: t("order.statusRefunded"),
+      }) as Record<string, string>
+    )[s] ?? s;
+
+  // "Kaçı iade/iptal oldu" özeti.
+  const refundedCount = groupOrders.filter(
+    (o) => o.status === "refunded" || o.status === "refund_requested",
+  ).length;
+  const cancelledCount = groupOrders.filter(
+    (o) => o.status === "cancelled",
+  ).length;
 
   const counterparty =
     payment.buyer && payment.seller
@@ -169,17 +202,35 @@ export default function PaymentCard({
       )}
 
       {/* Actions */}
-      {(payment.status === "pending" ||
+      {(isGroup ||
+        payment.status === "pending" ||
         payment.status === "failed" ||
         payment.orderId) && (
         <div className="mt-3 flex items-center justify-end gap-2 border-t border-border pt-3">
-          {payment.orderId && (
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/profile/orders/${payment.orderId}`}>
-                {t("common.details")}
-                <ChevronRightIcon className="h-4 w-4" />
-              </Link>
+          {/* Card-level "Detaylar": group → open the item list (all details);
+              single order → navigate to its detail. */}
+          {isGroup ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+            >
+              {t("common.details")}
+              <ChevronDownIcon
+                className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+              />
             </Button>
+          ) : (
+            payment.orderId && (
+              <Button asChild variant="outline" size="sm" className="gap-1">
+                <Link href={`/profile/orders/${payment.orderId}`}>
+                  {t("common.details")}
+                  <ChevronRightIcon className="h-4 w-4" />
+                </Link>
+              </Button>
+            )
           )}
           {payment.status === "pending" && (
             <Button
@@ -204,48 +255,75 @@ export default function PaymentCard({
         </div>
       )}
 
-      {/* Cart (checkout_group) sub-orders */}
+      {/* Cart (checkout_group) sub-orders — each a compact, status-aware row. */}
       {isGroup && (
-        <Accordion type="single" collapsible className="mt-2">
+        <Accordion
+          type="single"
+          collapsible
+          value={open ? "items" : ""}
+          onValueChange={(v) => setOpen(v === "items")}
+          className="mt-2"
+        >
           <AccordionItem value="items" className="border-none">
             <AccordionTrigger className="py-2 text-sm text-primary-600">
-              {t("payment.viewItemsCount", { count: groupOrders.length })}
+              <span className="flex flex-wrap items-center gap-2">
+                {t("payment.viewItemsCount", { count: groupOrders.length })}
+                {refundedCount > 0 && (
+                  <Badge variant="warning" size="sm">
+                    {t("payment.itemsRefunded", { count: refundedCount })}
+                  </Badge>
+                )}
+                {cancelledCount > 0 && (
+                  <Badge variant="danger" size="sm">
+                    {t("payment.itemsCancelled", { count: cancelledCount })}
+                  </Badge>
+                )}
+              </span>
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-2">
-                {groupOrders.map((o) => (
+                {groupOrders.map((o: GroupOrder) => (
                   <div
                     key={o.id}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-surface p-2"
+                    className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 transition-colors hover:border-primary-300"
                   >
-                    <div className="h-10 w-10 flex-shrink-0">
-                      <Thumb src={o.image} alt={o.title} />
-                    </div>
+                    <Thumb src={o.image} alt={o.title} />
                     <div className="min-w-0 flex-1">
                       <Link
                         href={`/profile/orders/${o.id}`}
-                        className="block truncate text-sm font-medium text-heading hover:text-primary-600"
+                        className="block truncate text-sm font-medium text-heading transition-colors hover:text-primary-600"
                       >
                         {o.title}
                       </Link>
-                      <p className="truncate text-xs text-muted">
-                        {o.orderNumber ? `#${o.orderNumber}` : ""}
-                        {o.sellerName
-                          ? `${o.orderNumber ? " · " : ""}${t(
-                              "product.seller",
-                            )}: ${o.sellerName}`
-                          : ""}
-                      </p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                        {o.orderNumber && <span>#{o.orderNumber}</span>}
+                        {o.sellerName && (
+                          <span>
+                            · {t("product.seller")}: {o.sellerName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5">
+                        <StatusBadge
+                          status={o.status}
+                          config={orderStatusConfig}
+                          label={itemStatusLabel(o.status)}
+                          size="sm"
+                        />
+                      </div>
                     </div>
-                    <span className="whitespace-nowrap text-sm font-medium text-heading">
-                      {formatTL(o.amount)}
-                    </span>
-                    <Link
-                      href={`/profile/orders/${o.id}`}
-                      className="whitespace-nowrap text-sm font-medium text-primary-600 hover:text-primary-700"
-                    >
-                      {t("common.details")}
-                    </Link>
+                    <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+                      <span className="whitespace-nowrap text-sm font-semibold text-heading">
+                        {formatTL(o.amount)}
+                      </span>
+                      <Link
+                        href={`/profile/orders/${o.id}`}
+                        className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-primary-600 hover:text-primary-700"
+                      >
+                        {t("common.details")}
+                        <ChevronRightIcon className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
                   </div>
                 ))}
               </div>

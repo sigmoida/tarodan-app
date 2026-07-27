@@ -1830,7 +1830,9 @@
     "reasonCardError": "Kart bilgilerinde hata",
     "reason3dSecureFailed": "3D Secure doğrulaması başarısız",
     "reasonBankRejected": "Banka tarafından işlem reddedildi",
-    "reasonConnectionProblem": "İnternet bağlantı problemi"
+    "reasonConnectionProblem": "İnternet bağlantı problemi",
+    "itemsRefunded": "{count} iade",
+    "itemsCancelled": "{count} iptal"
   },
   "seller": {
     "sellerProfile": "Satıcı Profili",
