@@ -3,12 +3,11 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
+import { EyeIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import {
-  EyeIcon,
-  HeartIcon,
-  ArrowsRightLeftIcon,
-} from "@heroicons/react/24/outline";
-import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+  StarIcon as StarIconSolid,
+  HeartIcon as HeartSolidIcon,
+} from "@heroicons/react/24/solid";
 import { ProductBadge } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import OutOfStockOverlay from "@/components/ui/OutOfStockOverlay";
@@ -183,11 +182,11 @@ export default function ProductCard({
               {showMeta && (
                 <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-subtle">
                   <span className="flex items-center gap-1">
-                    <EyeIcon className="w-4 h-4" />
+                    <EyeIcon className="w-4 h-4 text-primary-500" />
                     {product.viewCount ?? 0}
                   </span>
                   <span className="flex items-center gap-1">
-                    <HeartIcon className="w-4 h-4" />
+                    <HeartSolidIcon className="w-4 h-4 text-danger-500" />
                     {product.likeCount ?? 0}
                   </span>
                   {ratingBlock("w-4 h-4")}
@@ -277,11 +276,11 @@ export default function ProductCard({
                 <div className="flex items-center gap-3 mb-1.5 text-xs sm:text-sm text-subtle">
                   {ratingBlock("w-4 h-4")}
                   <span className="flex items-center gap-0.5">
-                    <HeartIcon className="w-4 h-4" />
+                    <HeartSolidIcon className="w-4 h-4 text-danger-500" />
                     {product.likeCount ?? 0}
                   </span>
                   <span className="flex items-center gap-0.5">
-                    <EyeIcon className="w-4 h-4" />
+                    <EyeIcon className="w-4 h-4 text-primary-500" />
                     {product.viewCount ?? 0}
                   </span>
                 </div>
