@@ -11,8 +11,7 @@ import {
 import { ProductBadge } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import OutOfStockOverlay from "@/components/ui/OutOfStockOverlay";
-import { useLocale, useTranslations } from "next-intl";
-import { formatCondition } from "@/lib/format";
+import { useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
@@ -118,7 +117,6 @@ export default function ProductCard({
   footer,
   href,
 }: ProductCardProps) {
-  const locale = useLocale();
   const t = useTranslations();
 
   const linkHref = href === undefined ? `/listings/${product.id}` : href;
@@ -176,11 +174,11 @@ export default function ProductCard({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-heading line-clamp-2 text-lg sm:text-xl leading-tight">
+              <h3 className="font-semibold text-heading line-clamp-2 text-xl sm:text-2xl leading-tight">
                 {product.title}
               </h3>
               {showMeta && (
-                <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-subtle">
+                <div className="flex items-center gap-4 mt-2 text-sm sm:text-base text-subtle">
                   <span className="flex items-center gap-1">
                     <EyeIcon className="w-4 h-4 text-primary-500" />
                     {product.viewCount ?? 0}
@@ -192,19 +190,19 @@ export default function ProductCard({
                   {ratingBlock("w-4 h-4")}
                 </div>
               )}
-              {showMeta && (
-                <ProductBadge variant="default" className="mt-2">
-                  {formatCondition(product.condition, locale)}
-                </ProductBadge>
+              {showMeta && product.description && (
+                <p className="mt-2 line-clamp-2 text-sm text-muted sm:text-base">
+                  {product.description}
+                </p>
               )}
             </div>
             <div className="ml-4 flex flex-col items-end text-right flex-shrink-0">
               {onSale && (
-                <span className="text-xs text-subtle line-through">
+                <span className="text-sm text-subtle line-through">
                   {fmtTL(originalPrice)}
                 </span>
               )}
-              <p className="text-lg sm:text-xl font-bold text-primary-600 whitespace-nowrap">
+              <p className="text-xl sm:text-2xl font-bold text-primary-600 whitespace-nowrap">
                 {fmtTL(effectivePrice)}
               </p>
               {onSale && (
