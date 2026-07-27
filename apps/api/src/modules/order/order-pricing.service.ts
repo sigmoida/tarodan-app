@@ -15,6 +15,7 @@ import {
   resolveTaxpayerType,
 } from "./order-commission.helper";
 import { TaxService } from "../tax/tax.service";
+import { isPremiumEntitled } from "../membership/membership.util";
 
 /**
  * Commission calculation result interface
@@ -438,7 +439,9 @@ export class OrderPricingService {
         businessStatus: true,
         taxId: true,
         membership: {
-          include: {
+          select: {
+            status: true,
+            currentPeriodEnd: true,
             tier: {
               select: { type: true },
             },
@@ -447,10 +450,17 @@ export class OrderPricingService {
       },
     });
 
+    // Paid-tier commission (PREMIUM/BUSINESS) applies only to an ENTITLED membership.
+    // A past_due / expired row (e.g. an unpaid upgrade) must NOT unlock the cheaper
+    // paid-tier commission — gate the tier type through isPremiumEntitled first.
+    const effectiveTierType = isPremiumEntitled(seller?.membership ?? null)
+      ? (seller?.membership?.tier?.type ?? null)
+      : null;
+
     // Map User.sellerType to CommissionSellerType (membership axis)
     const commissionSellerType = mapSellerTypeForCommission(
       seller?.sellerType ?? null,
-      seller?.membership?.tier?.type ?? null,
+      effectiveTierType,
     );
     // v2 taxpayer axis (individual/corporate) — same test as VAT/withholding.
     const taxpayerType = resolveTaxpayerType({
