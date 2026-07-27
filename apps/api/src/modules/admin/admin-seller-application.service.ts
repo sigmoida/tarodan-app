@@ -276,109 +276,128 @@ export class AdminSellerApplicationService {
 
     if (!order) throw new NotFoundException("Sipariş bulunamadı");
 
-    // Kuponu kaldırma
-    if (!code) {
-      const previous = {
-        discountCode: order.discountCode,
-        discountAmount: order.discountAmount,
-      };
-      const baseTotal =
-        Number(order.totalAmount) + Number(order.discountAmount ?? 0);
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: {
-          discountCode: null,
-          discountAmount: new Prisma.Decimal(0),
-          discountBreakdown: Prisma.JsonNull,
-          ...(order.status === OrderStatus.pending_payment
-            ? { totalAmount: new Prisma.Decimal(baseTotal) }
-            : {}),
-        },
+    // Admin kupon değişikliği YALNIZ ödemesi beklenen siparişte yapılabilir (F4.6):
+    // ödenmiş siparişte totalAmount + Payment zaten tahsil edildiğinden metadata'yı
+    // değiştirmek order↔payment↔group tutarsızlığı doğurur (müşteri çekilen tutar ≠
+    // gösterilen indirim). Ödenmiş siparişte iade/ayarlama akışı kullanılmalıdır.
+    if (order.status !== OrderStatus.pending_payment) {
+      throw new BadRequestException(
+        "Kupon yalnızca ödemesi beklenen siparişlerde değiştirilebilir",
+      );
+    }
+
+    // Kupon değişiminde ürün (indirim/sale) payı KORUNUR; yalnız kupon payı değişir.
+    // Eski hata: kaldırmada tüm discountAmount (ürün indirimi dahil) geri eklenip
+    // tutar fazla yükseliyordu. totalAmount yalnız couponDiscount kadar düşürülmüştü.
+    const breakdown =
+      (order.discountBreakdown as Record<string, unknown>) ?? {};
+    const productDiscount = Number(breakdown.productDiscount ?? 0);
+    const oldCouponDiscount = Number(
+      breakdown.couponDiscount ?? order.discountAmount ?? 0,
+    );
+    // Kupon yokken toplam = mevcut toplam + eski kupon payı (ürün indirimi ürün
+    // fiyatına zaten gömülü, geri eklenmez).
+    const baseTotal = Number(order.totalAmount) + oldCouponDiscount;
+    const quantity = order.quantity ?? 1;
+    const lineSubtotal = Number(order.product.price) * quantity;
+
+    let newCouponDiscount = 0;
+    let discountCode: string | null = null;
+    let appliedDiscountId: string | undefined;
+    let discountName: string | undefined;
+
+    if (code) {
+      const discount = await this.prisma.discount.findUnique({
+        where: { code: code.toUpperCase() },
       });
-      await this.audit.createAuditLog(
-        adminId,
-        "order_coupon_removed",
-        "Order",
-        orderId,
-        previous,
-        { discountCode: null },
-      );
-      return { success: true, discountCode: null, discountAmount: 0 };
+      if (!discount) throw new BadRequestException("Kupon kodu bulunamadı");
+      if (!discount.isActive)
+        throw new BadRequestException("Bu kupon aktif değil");
+      const now = new Date();
+      if (now < discount.startDate)
+        throw new BadRequestException("Bu kupon henüz başlamadı");
+      if (now > discount.endDate)
+        throw new BadRequestException("Bu kuponun süresi doldu");
+      if (
+        discount.usageLimitTotal &&
+        discount.usedCount >= discount.usageLimitTotal
+      ) {
+        throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
+      }
+
+      // Kupon payı: satır toplamına (fiyat × adet) capli — birim fiyata değil (adet
+      // yoksayımı düzeltildi). fixed_amount tek seferde ve eligible-subtotal ile capli.
+      if (discount.type === "percentage") {
+        newCouponDiscount = lineSubtotal * (Number(discount.value) / 100);
+      } else if (discount.type === "fixed_amount") {
+        newCouponDiscount = Math.min(Number(discount.value), lineSubtotal);
+      }
+      if (discount.maxDiscountAmount) {
+        newCouponDiscount = Math.min(
+          newCouponDiscount,
+          Number(discount.maxDiscountAmount),
+        );
+      }
+      discountCode = discount.code;
+      appliedDiscountId = discount.id;
+      discountName = discount.name;
     }
 
-    const discount = await this.prisma.discount.findUnique({
-      where: { code: code.toUpperCase() },
-    });
-
-    if (!discount) throw new BadRequestException("Kupon kodu bulunamadı");
-    if (!discount.isActive)
-      throw new BadRequestException("Bu kupon aktif değil");
-    const now = new Date();
-    if (now < discount.startDate)
-      throw new BadRequestException("Bu kupon henüz başlamadı");
-    if (now > discount.endDate)
-      throw new BadRequestException("Bu kuponun süresi doldu");
-    if (
-      discount.usageLimitTotal &&
-      discount.usedCount >= discount.usageLimitTotal
-    ) {
-      throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
-    }
-
-    const productPrice = Number(order.product.price);
-    const baseTotal =
-      Number(order.totalAmount) + Number(order.discountAmount ?? 0);
-    const subtotal = productPrice;
-
-    let discountAmount = 0;
-    if (discount.type === "percentage") {
-      discountAmount = subtotal * (Number(discount.value) / 100);
-    } else if (discount.type === "fixed_amount") {
-      discountAmount = Math.min(Number(discount.value), subtotal);
-    }
-
-    if (discount.maxDiscountAmount) {
-      discountAmount = Math.min(
-        discountAmount,
-        Number(discount.maxDiscountAmount),
-      );
-    }
-
-    const newTotal = Math.max(0, baseTotal - discountAmount);
+    const newTotal = Math.max(0, baseTotal - newCouponDiscount);
+    const newDiscountAmount = productDiscount + newCouponDiscount;
 
     const previous = {
       discountCode: order.discountCode,
       discountAmount: order.discountAmount,
       totalAmount: order.totalAmount,
     };
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        discountCode: discount.code,
-        discountAmount: new Prisma.Decimal(discountAmount),
-        discountBreakdown: {
-          couponDiscount: discountAmount,
-          appliedDiscountId: discount.id,
-        } as any,
-        ...(order.status === OrderStatus.pending_payment
-          ? { totalAmount: new Prisma.Decimal(newTotal) }
-          : {}),
-      },
+
+    // Sipariş + grup toplamını ATOMİK güncelle — grup toplamı üyelerin totalAmount
+    // toplamıdır; senkronsuz kalırsa PayTR yanlış tutarla başlatılır.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          discountCode,
+          discountAmount: new Prisma.Decimal(newDiscountAmount),
+          discountBreakdown:
+            newDiscountAmount > 0
+              ? ({
+                  productDiscount,
+                  couponDiscount: newCouponDiscount,
+                  ...(appliedDiscountId ? { appliedDiscountId } : {}),
+                } as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+          totalAmount: new Prisma.Decimal(newTotal),
+        },
+      });
+      if (order.checkoutGroupId) {
+        const agg = await tx.order.aggregate({
+          where: { checkoutGroupId: order.checkoutGroupId },
+          _sum: { totalAmount: true },
+        });
+        await tx.checkoutGroup.update({
+          where: { id: order.checkoutGroupId },
+          data: {
+            totalAmount: agg._sum.totalAmount ?? new Prisma.Decimal(newTotal),
+          },
+        });
+      }
     });
 
     await this.audit.createAuditLog(
       adminId,
-      "order_coupon_applied",
+      code ? "order_coupon_applied" : "order_coupon_removed",
       "Order",
       orderId,
       previous,
-      { discountCode: discount.code, discountAmount },
+      { discountCode, discountAmount: newCouponDiscount },
     );
     return {
       success: true,
-      discountCode: discount.code,
-      discountAmount,
-      discountName: discount.name,
+      discountCode,
+      discountAmount: newCouponDiscount,
+      discountName,
     };
   }
 }
