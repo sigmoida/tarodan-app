@@ -18,5 +18,6 @@ export * from "./support";
 export * from "./discounts";
 export * from "./media";
 export * from "./pages";
+export * from "./seller";
 import api from "./client";
 export default api;

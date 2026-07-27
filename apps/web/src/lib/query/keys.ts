@@ -185,6 +185,9 @@ export const queryKeys = {
   bankAccount: {
     detail: () => ["bank-account"] as const,
   },
+  sellerDocuments: {
+    all: () => ["seller-documents"] as const,
+  },
   search: {
     autocomplete: (query: string) => ["autocomplete-rich", query] as const,
   },

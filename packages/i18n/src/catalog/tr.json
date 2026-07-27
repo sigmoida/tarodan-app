@@ -1819,7 +1819,40 @@
     "newMember": "Yeni üye",
     "monthsCount": "{count} ay",
     "yearsCount": "{count}+ yıl",
-    "notFoundDesc": "Aradığınız satıcı bulunamadı veya kaldırılmış olabilir."
+    "notFoundDesc": "Aradığınız satıcı bulunamadı veya kaldırılmış olabilir.",
+    "documents": {
+      "title": "Kurumsal Belgeler",
+      "subtitle": "Başvurunuzun onaylanması için gerekli belgeleri yükleyin.",
+      "documentsTitle": "Belgeler",
+      "allowedTypes": "PDF, JPG, PNG veya WebP · en fazla 10MB",
+      "types": {
+        "tax_plate": "Vergi Levhası",
+        "contract": "Sözleşme",
+        "signature_circular": "İmza Sirküleri",
+        "activity_certificate": "Faaliyet Belgesi",
+        "identity": "Kimlik Belgesi"
+      },
+      "notUploaded": "Yüklenmedi",
+      "upload": "Yükle",
+      "replace": "Değiştir",
+      "statusPending": "İncelemede",
+      "statusApproved": "Onaylandı",
+      "statusRejected": "Reddedildi",
+      "uploadSuccess": "Belge yüklendi",
+      "uploadFailed": "Belge yüklenemedi",
+      "ibanTitle": "Kurumsal IBAN",
+      "accountHolder": "Hesap Sahibi",
+      "accountHolderRequired": "Hesap sahibi gerekli",
+      "iban": "IBAN",
+      "ibanInvalid": "Geçerli bir IBAN girin",
+      "taxIdOptional": "Vergi No (opsiyonel)",
+      "saveIban": "IBAN Kaydet",
+      "ibanSaved": "IBAN kaydedildi",
+      "ibanSaveFailed": "IBAN kaydedilemedi",
+      "ibanVerified": "Doğrulandı",
+      "ibanUnverified": "Doğrulanmadı",
+      "pendingLink": "Belgeleri Yükle / Tamamla"
+    }
   },
   "sellerDashboard": {
     "title": "Satıcı Panosu",

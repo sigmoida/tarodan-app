@@ -51,7 +51,10 @@ export default function BusinessPendingPage() {
         </ol>
       </div>
       <div className="flex flex-col gap-3">
-        <ButtonLink href="/contact" className="w-full">
+        <ButtonLink href="/seller/documents" className="w-full">
+          Belgeleri Yükle / Tamamla
+        </ButtonLink>
+        <ButtonLink variant="secondary" href="/contact" className="w-full">
           Destek Ekibiyle İletişime Geç
         </ButtonLink>
         <Button variant="secondary" onClick={handleLogout}>
