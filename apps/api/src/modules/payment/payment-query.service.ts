@@ -10,6 +10,37 @@ import { StorageService } from "../storage/storage.service";
 import { i18nMessage, I18nService } from "../i18n";
 import { type Locale, defaultLocale } from "@tarodan/i18n";
 
+// Aktif (devam eden) iade talebi durumları — order-common.pickActiveRefundRequest
+// ile aynı liste. "refunded" burada YOK; tamamlanmış iade ayrı ele alınır.
+const ACTIVE_REFUND_STATUSES = [
+  "pending_review",
+  "approved",
+  "wait_for_delivery",
+  "return_shipment_open",
+  "return_in_transit",
+  "return_delivered",
+  "disputed",
+];
+
+/**
+ * Bir sepet alt-siparişinin listede gösterilecek DURUMU — orders listesindeki
+ * getDisplayStatus ile aynı mantık: aktif iade → refund_requested, tamamlanmış
+ * iade → refunded, kargo öncesi iptal (cancellationType='iptal') → cancelled,
+ * aksi halde ham sipariş durumu.
+ */
+function groupOrderDisplayStatus(o: {
+  status: string;
+  cancellationType?: string | null;
+  refundRequests?: Array<{ status: string }> | null;
+}): string {
+  const reqs = o.refundRequests ?? [];
+  if (reqs.some((r) => ACTIVE_REFUND_STATUSES.includes(r.status)))
+    return "refund_requested";
+  if (reqs.some((r) => r.status === "refunded")) return "refunded";
+  if (o.cancellationType === "iptal") return "cancelled";
+  return o.status;
+}
+
 /**
  * Ödeme sorguları (durum sorgu, detay, satıcı hold listesi, kullanıcı ödeme
  * geçmişi, sipariş tarafları) — PaymentService'ten birebir taşındı. PaymentService
@@ -454,6 +485,11 @@ export class PaymentQueryService {
                     },
                   },
                   seller: { select: { id: true, displayName: true } },
+                  // Alt-siparişin display durumu (İade Sürecinde/Edildi/İptal) için.
+                  refundRequests: {
+                    orderBy: { createdAt: "desc" as const },
+                    select: { status: true },
+                  },
                 },
               },
             },
@@ -568,7 +604,9 @@ export class PaymentQueryService {
                 image: toImageUrls(o.product)?.images?.[0] ?? null,
                 amount: Number(o.totalAmount ?? 0),
                 sellerName: o.seller?.displayName ?? null,
-                status: o.status,
+                // Ham status yerine display status → İade Sürecinde/Edildi/İptal
+                // ayrımı orders listesiyle tutarlı olur.
+                status: groupOrderDisplayStatus(o),
               }))
             : undefined,
           buyer: p.order?.buyer ?? group?.buyer ?? null,
