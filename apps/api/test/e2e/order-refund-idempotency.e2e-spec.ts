@@ -1,12 +1,17 @@
-import { Prisma, PaymentStatus, PaymentHoldStatus, OrderStatus } from '@prisma/client';
-import { PrismaService } from '../../src/prisma';
-import { PaymentRefundService } from '../../src/modules/payment/payment-refund.service';
+import {
+  Prisma,
+  PaymentStatus,
+  PaymentHoldStatus,
+  OrderStatus,
+} from "@prisma/client";
+import { PrismaService } from "../../src/prisma";
+import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
+} from "../test-utils/db";
 
 /**
  * #85 — order-refund yolu idempotent olmalı: PayTR createRefund idempotency anahtarı
@@ -16,19 +21,21 @@ import {
  *
  * Hafif harness (ES/app bootstrap yok): gerçek DB + mock PayTR.
  */
-describe('Order refund idempotency (#85) [P0]', () => {
+describe("Order refund idempotency (#85) [P0]", () => {
   let prisma: PrismaService;
   let refund: PaymentRefundService;
   const createRefund = jest.fn();
 
   const configStub = {
     get: (k: string) =>
-      (({
-        RETURN_WINDOW_DAYS: '14',
-        PAYOUT_GRACE_DAYS: '1',
-        PAYMENT_HOLD_DAYS: '7',
-        PAYMENT_BYPASS: 'false',
-      }) as Record<string, string>)[k],
+      (
+        ({
+          RETURN_WINDOW_DAYS: "14",
+          PAYOUT_GRACE_DAYS: "1",
+          PAYMENT_HOLD_DAYS: "7",
+          PAYMENT_BYPASS: "false",
+        }) as Record<string, string>
+      )[k],
   };
 
   beforeAll(() => {
@@ -57,6 +64,7 @@ describe('Order refund idempotency (#85) [P0]', () => {
         issuePlatformSaleInvoice: async () => {},
       } as any, // elogoInvoicing
       { cancelSuratShipmentIfExists: async () => {} } as any, // paymentCommon
+      {} as any, // providerEvents
     );
   });
 
@@ -68,7 +76,7 @@ describe('Order refund idempotency (#85) [P0]', () => {
     await truncateAll();
     await seedBaseline();
     createRefund.mockReset();
-    createRefund.mockResolvedValue({ status: 'success', err_msg: null });
+    createRefund.mockResolvedValue({ status: "success", err_msg: null });
   });
 
   async function setupPaidOrder(opts?: {
@@ -76,13 +84,13 @@ describe('Order refund idempotency (#85) [P0]', () => {
   }): Promise<{ orderId: string; paymentId: string }> {
     const uniq = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const buyer = await prisma.user.create({
-      data: { email: `b-${uniq}@t.local`, passwordHash: 'x', displayName: 'B' },
+      data: { email: `b-${uniq}@t.local`, passwordHash: "x", displayName: "B" },
     });
     const seller = await prisma.user.create({
       data: {
         email: `s-${uniq}@t.local`,
-        passwordHash: 'x',
-        displayName: 'S',
+        passwordHash: "x",
+        displayName: "S",
         isSeller: true,
       },
     });
@@ -92,10 +100,10 @@ describe('Order refund idempotency (#85) [P0]', () => {
         sellerId: seller.id,
         categoryId: category!.id,
         title: `P-${uniq}`,
-        description: 'x',
+        description: "x",
         price: new Prisma.Decimal(100),
-        condition: 'new' as any,
-        status: 'active' as any,
+        condition: "new" as any,
+        status: "active" as any,
         quantity: 1,
         reservedQuantity: 0,
       },
@@ -118,7 +126,7 @@ describe('Order refund idempotency (#85) [P0]', () => {
     const payment = await prisma.payment.create({
       data: {
         orderId: order.id,
-        provider: 'paytr',
+        provider: "paytr",
         providerConversationId: `oid-${uniq}`,
         amount: order.totalAmount,
         status: PaymentStatus.completed,
@@ -140,7 +148,7 @@ describe('Order refund idempotency (#85) [P0]', () => {
     return { orderId: order.id, paymentId: payment.id };
   }
 
-  it('taze iade: PayTR bir kez çağrılır, marker yazılır, payment refunded olur', async () => {
+  it("taze iade: PayTR bir kez çağrılır, marker yazılır, payment refunded olur", async () => {
     const { orderId, paymentId } = await setupPaidOrder();
 
     await refund.processRefund(orderId);
@@ -151,8 +159,10 @@ describe('Order refund idempotency (#85) [P0]', () => {
     expect((p!.metadata as any).refundInProgressOrders[orderId]).toBeTruthy();
   });
 
-  it('retry (marker önceden set = PayTR yapılmış ama persist başarısız): PayTR TEKRAR çağrılmaz, recovery ile refunded olur', async () => {
-    const { orderId, paymentId } = await setupPaidOrder({ inProgressMarker: true });
+  it("retry (marker önceden set = PayTR yapılmış ama persist başarısız): PayTR TEKRAR çağrılmaz, recovery ile refunded olur", async () => {
+    const { orderId, paymentId } = await setupPaidOrder({
+      inProgressMarker: true,
+    });
 
     await refund.processRefund(orderId);
 
@@ -162,11 +172,11 @@ describe('Order refund idempotency (#85) [P0]', () => {
     expect(p!.status).toBe(PaymentStatus.refunded);
   });
 
-  it('PayTR kesin başarısız: marker geri alınır (retry PayTR yeniden çağırabilsin), payment completed kalır', async () => {
+  it("PayTR kesin başarısız: marker geri alınır (retry PayTR yeniden çağırabilsin), payment completed kalır", async () => {
     const { orderId, paymentId } = await setupPaidOrder();
     createRefund.mockResolvedValueOnce({
-      status: 'failed',
-      err_msg: 'insufficient',
+      status: "failed",
+      err_msg: "insufficient",
     });
 
     await expect(refund.processRefund(orderId)).rejects.toThrow();
@@ -178,7 +188,7 @@ describe('Order refund idempotency (#85) [P0]', () => {
     expect(inProg[orderId]).toBeUndefined(); // marker temizlendi → retry mümkün
   });
 
-  it('reconciliation-retry simülasyonu: iki ardışık processRefund çağrısı toplam TEK PayTR iadesi yapar', async () => {
+  it("reconciliation-retry simülasyonu: iki ardışık processRefund çağrısı toplam TEK PayTR iadesi yapar", async () => {
     const { orderId } = await setupPaidOrder();
 
     await refund.processRefund(orderId); // 1. çağrı: PayTR + refunded

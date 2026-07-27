@@ -1,15 +1,16 @@
-import { Prisma, OrderStatus, PaymentHoldStatus } from '@prisma/client';
-import { PrismaService } from '../../src/prisma';
-import { PaymentRefundService } from '../../src/modules/payment/payment-refund.service';
-import { PaymentService } from '../../src/modules/payment/payment.service';
-import { NotificationService } from '../../src/modules/notification/notification.service';
-import { SuratTrackingService } from '../../src/modules/surat-cargo/surat-tracking.service';
+import { Prisma, OrderStatus, PaymentHoldStatus } from "@prisma/client";
+import { PrismaService } from "../../src/prisma";
+import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
+import { PaymentService } from "../../src/modules/payment/payment.service";
+import { NotificationService } from "../../src/modules/notification/notification.service";
+import { OrderTrackingSyncService } from "../../src/modules/surat-cargo/order-tracking-sync.service";
+import { SuratTrackingClient } from "../../src/modules/surat-cargo/surat-tracking.client";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
+} from "../test-utils/db";
 
 /**
  * #83 + #84 — Sürat teslim poll'u escrow release'ini planlar (satıcı ödenir) VE
@@ -20,22 +21,25 @@ import {
  * beslenir; fetchTrackingInfo mock'lanıp Sürat "teslim" cevabı döndürülür ve sorgu
  * referansı yakalanır. [P0]
  */
-describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
+describe("Surat poll delivery → escrow release (#83/#84) [P0]", () => {
   let prisma: PrismaService;
   let paymentRefund: PaymentRefundService;
-  let surat: SuratTrackingService;
+  let surat: OrderTrackingSyncService;
+  let suratClient: SuratTrackingClient;
   let capturedRefs: string[];
 
   const configStub = {
     get: (k: string) =>
-      (({
-        RETURN_WINDOW_DAYS: '14',
-        PAYOUT_GRACE_DAYS: '1',
-        PAYMENT_HOLD_DAYS: '7',
-        FEATURE_48H_CONFIRMATION_WINDOW: 'false',
-        SURAT_KARGO_CARI_KODU: 'x',
-        SURAT_KARGO_SIFRE: 'x',
-      }) as Record<string, string>)[k],
+      (
+        ({
+          RETURN_WINDOW_DAYS: "14",
+          PAYOUT_GRACE_DAYS: "1",
+          PAYMENT_HOLD_DAYS: "7",
+          FEATURE_48H_CONFIRMATION_WINDOW: "false",
+          SURAT_KARGO_CARI_KODU: "x",
+          SURAT_KARGO_SIFRE: "x",
+        }) as Record<string, string>
+      )[k],
   };
 
   beforeAll(() => {
@@ -50,6 +54,7 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
       {} as any, // commissionLedger
       {} as any, // elogoInvoicing
       {} as any, // paymentCommon
+      {} as any, // providerEvents
     );
 
     // ModuleRef stub: poll PaymentService/NotificationService'i lazy resolve eder.
@@ -65,10 +70,14 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
         return undefined;
       },
     };
-    surat = new SuratTrackingService(
-      configStub as any,
+    // Sürat poll logic moved from SuratTrackingService (now a thin delegate) into
+    // OrderTrackingSyncService(prisma, moduleRef, client). fetchTrackingInfo now
+    // lives on the SuratTrackingClient, so we spy on the client below.
+    suratClient = new SuratTrackingClient(configStub as any);
+    surat = new OrderTrackingSyncService(
       prisma,
       moduleRefStub as any,
+      suratClient,
     );
   });
 
@@ -82,7 +91,7 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
     capturedRefs = [];
     // Sürat HTTP'sini by-pass et: teslim cevabı döndür + sorgu referansını yakala.
     jest
-      .spyOn(surat as any, 'fetchTrackingInfo')
+      .spyOn(suratClient as any, "fetchTrackingInfo")
       .mockImplementation(async (...args: any[]) => {
         capturedRefs.push(args[0] as string);
         return {
@@ -91,15 +100,15 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
           Gonderiler: [
             {
               KargonunDurumuSayi: 6, // delivered
-              KargonunDurumu: 'Teslim Edildi',
-              KargoTakipNo: 'SURAT-KTN-1',
-              TakipUrl: 'https://takip/x',
-              TeslimAlan: 'Alici',
+              KargonunDurumu: "Teslim Edildi",
+              KargoTakipNo: "SURAT-KTN-1",
+              TakipUrl: "https://takip/x",
+              TeslimAlan: "Alici",
               // 20 gün önce teslim → releaseAt = teslim+15g geçmişte → cron release eder.
               TeslimTarihi: new Date(
                 Date.now() - 20 * 24 * 60 * 60 * 1000,
               ).toISOString(),
-              PlanlananTeslimTarihi: '',
+              PlanlananTeslimTarihi: "",
               Hareketler: [],
             },
           ],
@@ -117,15 +126,15 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
     const buyer = await prisma.user.create({
       data: {
         email: `b-${uniq}@test.local`,
-        passwordHash: 'x',
-        displayName: 'Buyer',
+        passwordHash: "x",
+        displayName: "Buyer",
       },
     });
     const seller = await prisma.user.create({
       data: {
         email: `s-${uniq}@test.local`,
-        passwordHash: 'x',
-        displayName: 'Seller',
+        passwordHash: "x",
+        displayName: "Seller",
         isSeller: true,
       },
     });
@@ -135,10 +144,10 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
         sellerId: seller.id,
         categoryId: category!.id,
         title: `P-${uniq}`,
-        description: 'x',
+        description: "x",
         price: new Prisma.Decimal(100),
-        condition: 'new' as any,
-        status: 'active' as any,
+        condition: "new" as any,
+        status: "active" as any,
         quantity: 1,
         reservedQuantity: 0,
       },
@@ -161,17 +170,17 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
     const payment = await prisma.payment.create({
       data: {
         orderId: order.id,
-        provider: 'test',
+        provider: "test",
         amount: order.totalAmount,
-        status: 'completed' as any,
+        status: "completed" as any,
       },
     });
     // Kanonik oto-oluşturulan shipment: trackingNumber = orderNumber, providerTrackingId = null.
     const shipment = await prisma.shipment.create({
       data: {
         orderId: order.id,
-        provider: 'surat',
-        status: 'in_transit' as any,
+        provider: "surat",
+        status: "in_transit" as any,
         trackingNumber: orderNumber,
         providerTrackingId: null,
       },
@@ -195,7 +204,7 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
     };
   }
 
-  it('poll teslimde: trackingNumber ile sorgular (orderId UUID değil) + releaseAt planlar (#83/#84)', async () => {
+  it("poll teslimde: trackingNumber ile sorgular (orderId UUID değil) + releaseAt planlar (#83/#84)", async () => {
     const { orderId, shipmentId, orderNumber, holdId } =
       await setupAutoCreatedShipment();
 
@@ -215,7 +224,7 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
     expect(hold!.releaseAt).not.toBeNull(); // eski bug: null kalıp satıcı hiç ödenmezdi
   });
 
-  it('teslim sonrası releaseHoldsDue satıcı hold\'unu serbest bırakır (para akar)', async () => {
+  it("teslim sonrası releaseHoldsDue satıcı hold'unu serbest bırakır (para akar)", async () => {
     const { shipmentId, holdId } = await setupAutoCreatedShipment();
     await surat.syncShipmentTracking(shipmentId);
 
@@ -227,16 +236,20 @@ describe('Surat poll delivery → escrow release (#83/#84) [P0]', () => {
     expect(hold!.releasedAt).not.toBeNull();
   });
 
-  it('re-poll idempotent: ikinci teslim çağrısı deliveredAt/releaseAt taşımaz', async () => {
+  it("re-poll idempotent: ikinci teslim çağrısı deliveredAt/releaseAt taşımaz", async () => {
     const { orderId, shipmentId, holdId } = await setupAutoCreatedShipment();
 
     await surat.syncShipmentTracking(shipmentId);
     const order1 = await prisma.order.findUnique({ where: { id: orderId } });
-    const hold1 = await prisma.paymentHold.findUnique({ where: { id: holdId } });
+    const hold1 = await prisma.paymentHold.findUnique({
+      where: { id: holdId },
+    });
 
     await surat.syncShipmentTracking(shipmentId); // replay
     const order2 = await prisma.order.findUnique({ where: { id: orderId } });
-    const hold2 = await prisma.paymentHold.findUnique({ where: { id: holdId } });
+    const hold2 = await prisma.paymentHold.findUnique({
+      where: { id: holdId },
+    });
 
     expect(order2!.deliveredAt!.getTime()).toBe(order1!.deliveredAt!.getTime());
     expect(hold2!.releaseAt!.getTime()).toBe(hold1!.releaseAt!.getTime());

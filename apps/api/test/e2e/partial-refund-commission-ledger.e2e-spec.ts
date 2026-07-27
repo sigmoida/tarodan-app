@@ -188,6 +188,7 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
         issuePlatformSaleInvoice: async () => {},
       } as any,
       { cancelSuratShipmentIfExists: async () => {} } as any,
+      {} as any, // providerEvents
     );
 
     // 100 üzerinden 50 kısmi iade → portion 0.5

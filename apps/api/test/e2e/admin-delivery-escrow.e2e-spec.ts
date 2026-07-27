@@ -1,30 +1,32 @@
-import { Prisma, OrderStatus, PaymentHoldStatus } from '@prisma/client';
-import { PrismaService } from '../../src/prisma';
-import { PaymentRefundService } from '../../src/modules/payment/payment-refund.service';
-import { AdminAnalyticsOrderService } from '../../src/modules/admin/admin-analytics-order.service';
+import { Prisma, OrderStatus, PaymentHoldStatus } from "@prisma/client";
+import { PrismaService } from "../../src/prisma";
+import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
+import { AdminAnalyticsOrderService } from "../../src/modules/admin/admin-analytics-order.service";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
+} from "../test-utils/db";
 
 /**
  * Admin ELLE teslim/awaiting geçişi de escrow release'ini planlamalı (poll'daki #83 ile
  * aynı boşluk) VE awaiting'e geçerken confirmationDeadline set etmeli (yoksa auto-complete
  * cron'u siparişi asla almaz → stall). Hafif harness (ES/app bootstrap yok).
  */
-describe('Admin updateOrderStatus → escrow release + confirmationDeadline', () => {
+describe("Admin updateOrderStatus → escrow release + confirmationDeadline", () => {
   let prisma: PrismaService;
   let admin: AdminAnalyticsOrderService;
 
   const configStub = {
     get: (k: string) =>
-      (({
-        RETURN_WINDOW_DAYS: '14',
-        PAYOUT_GRACE_DAYS: '1',
-        PAYMENT_HOLD_DAYS: '7',
-      }) as Record<string, string>)[k],
+      (
+        ({
+          RETURN_WINDOW_DAYS: "14",
+          PAYOUT_GRACE_DAYS: "1",
+          PAYMENT_HOLD_DAYS: "7",
+        }) as Record<string, string>
+      )[k],
   };
 
   beforeAll(() => {
@@ -38,9 +40,14 @@ describe('Admin updateOrderStatus → escrow release + confirmationDeadline', ()
       {} as any,
       {} as any,
       {} as any,
+      {} as any, // providerEvents
     );
     const paymentFacade = {
-      scheduleHoldReleaseOnDelivery: (orderId: string, deliveredAt: Date, tx?: any) =>
+      scheduleHoldReleaseOnDelivery: (
+        orderId: string,
+        deliveredAt: Date,
+        tx?: any,
+      ) =>
         paymentRefund.scheduleHoldReleaseOnDelivery(orderId, deliveredAt, tx),
     };
     admin = new AdminAnalyticsOrderService(
@@ -66,13 +73,13 @@ describe('Admin updateOrderStatus → escrow release + confirmationDeadline', ()
   async function setup(): Promise<{ orderId: string; holdId: string }> {
     const uniq = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const buyer = await prisma.user.create({
-      data: { email: `b-${uniq}@t.local`, passwordHash: 'x', displayName: 'B' },
+      data: { email: `b-${uniq}@t.local`, passwordHash: "x", displayName: "B" },
     });
     const seller = await prisma.user.create({
       data: {
         email: `s-${uniq}@t.local`,
-        passwordHash: 'x',
-        displayName: 'S',
+        passwordHash: "x",
+        displayName: "S",
         isSeller: true,
       },
     });
@@ -82,10 +89,10 @@ describe('Admin updateOrderStatus → escrow release + confirmationDeadline', ()
         sellerId: seller.id,
         categoryId: category!.id,
         title: `P-${uniq}`,
-        description: 'x',
+        description: "x",
         price: new Prisma.Decimal(100),
-        condition: 'new' as any,
-        status: 'active' as any,
+        condition: "new" as any,
+        status: "active" as any,
         quantity: 1,
         reservedQuantity: 0,
       },
@@ -107,17 +114,17 @@ describe('Admin updateOrderStatus → escrow release + confirmationDeadline', ()
     await prisma.shipment.create({
       data: {
         orderId: order.id,
-        provider: 'surat',
-        status: 'in_transit' as any,
+        provider: "surat",
+        status: "in_transit" as any,
         trackingNumber: order.orderNumber,
       },
     });
     const payment = await prisma.payment.create({
       data: {
         orderId: order.id,
-        provider: 'test',
+        provider: "test",
         amount: order.totalAmount,
-        status: 'completed' as any,
+        status: "completed" as any,
       },
     });
     const hold = await prisma.paymentHold.create({
@@ -133,9 +140,9 @@ describe('Admin updateOrderStatus → escrow release + confirmationDeadline', ()
     return { orderId: order.id, holdId: hold.id };
   }
 
-  it('delivered: deliveredAt + hold.releaseAt set (satıcı ödeme yolu açılır)', async () => {
+  it("delivered: deliveredAt + hold.releaseAt set (satıcı ödeme yolu açılır)", async () => {
     const { orderId, holdId } = await setup();
-    await admin.updateOrderStatus('admin-1', orderId, {
+    await admin.updateOrderStatus("admin-1", orderId, {
       status: OrderStatus.delivered,
     } as any);
 
@@ -147,9 +154,9 @@ describe('Admin updateOrderStatus → escrow release + confirmationDeadline', ()
     expect(hold!.releaseAt).not.toBeNull();
   });
 
-  it('awaiting_buyer_confirmation: confirmationDeadline + releaseAt set (stall yok)', async () => {
+  it("awaiting_buyer_confirmation: confirmationDeadline + releaseAt set (stall yok)", async () => {
     const { orderId, holdId } = await setup();
-    await admin.updateOrderStatus('admin-1', orderId, {
+    await admin.updateOrderStatus("admin-1", orderId, {
       status: OrderStatus.awaiting_buyer_confirmation,
     } as any);
 
