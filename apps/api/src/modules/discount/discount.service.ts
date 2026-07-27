@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
+import { SearchService } from "../search/search.service";
+import { notifyWebRevalidate } from "../../common/revalidate";
 import { fulltextDiscountSearch } from "../../common/helpers/fulltext-search";
 import { resolveOrderBy } from "../../common/list";
 import {
@@ -28,12 +30,15 @@ export class DiscountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly searchService: SearchService,
   ) {}
 
   /**
    * İndirim değişince ürün listesi/detay cache'lerini temizle (fiyatlar kampanyaya göre hesaplanıyor)
    */
-  private async invalidateProductCaches(): Promise<void> {
+  private async invalidateProductCaches(
+    productIds: string[] = [],
+  ): Promise<void> {
     try {
       const listCount = await this.cache.delPattern("products:list:*");
       const detailCount = await this.cache.delPattern("products:detail:*");
@@ -45,6 +50,19 @@ export class DiscountService {
     } catch (e) {
       this.logger.warn("Product cache invalidation failed", e);
     }
+
+    // Ürün-scope indirimlerde etkilenen ürünlerin ES dokümanını da senkronla
+    // (best-effort). NOT: kampanya-etkili fiyat ES dokümanında tutulmuyor;
+    // aramada kampanya fiyatının görünmesi ayrı bir iş (buildProductDocument).
+    for (const pid of productIds) {
+      this.searchService.syncProduct(pid).catch(() => {});
+    }
+    // Web ISR'yi anında tazele: ana sayfa rail'leri her indirim değişiminde,
+    // ürün-scope'ta ilgili ürün sayfaları da (WEB_REVALIDATE_URL yoksa no-op).
+    void notifyWebRevalidate([
+      "products:list",
+      ...productIds.map((pid) => `product:${pid}`),
+    ]);
   }
 
   /**
@@ -156,7 +174,9 @@ export class DiscountService {
       `Discount created: ${discount.id} by ${isAdmin ? "admin" : actorId}`,
     );
 
-    await this.invalidateProductCaches();
+    await this.invalidateProductCaches(
+      discount.scope === DiscountScope.product ? discount.targetProductIds : [],
+    );
     return this.mapToResponse(discount);
   }
 
@@ -266,7 +286,9 @@ export class DiscountService {
 
     this.logger.log(`Discount updated: ${id}`);
 
-    await this.invalidateProductCaches();
+    await this.invalidateProductCaches(
+      updated.scope === DiscountScope.product ? updated.targetProductIds : [],
+    );
     return this.mapToResponse(updated);
   }
 
@@ -293,7 +315,9 @@ export class DiscountService {
 
     await this.prisma.discount.delete({ where: { id } });
     this.logger.log(`Discount deleted: ${id}`);
-    await this.invalidateProductCaches();
+    await this.invalidateProductCaches(
+      discount.scope === DiscountScope.product ? discount.targetProductIds : [],
+    );
   }
 
   /**

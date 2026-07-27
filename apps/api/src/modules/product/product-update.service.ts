@@ -10,6 +10,7 @@ import { i18nMessage } from "../i18n";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { SearchService } from "../search/search.service";
+import { notifyWebRevalidate } from "../../common/revalidate";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { SmtpProvider } from "../notification/providers/smtp.provider";
@@ -442,6 +443,10 @@ export class ProductUpdateService {
         .catch((err) =>
           this.logger.warn(`ES sync failed for ${id}: ${err?.message}`),
         );
+
+      // Web ISR'yi anında tazele: fiyat/indirim değişimi ana sayfa rail'lerine +
+      // ürün sayfasına hemen yansısın (WEB_REVALIDATE_URL yoksa no-op).
+      void notifyWebRevalidate(["products:list", `product:${id}`]);
 
       // If price changed, notify users who have this product in their wishlist
       if (priceChanged && updated.status === ProductStatus.active) {

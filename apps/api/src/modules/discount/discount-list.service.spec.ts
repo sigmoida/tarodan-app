@@ -12,7 +12,11 @@ describe("DiscountService admin list contract", () => {
       discount,
       $queryRawUnsafe: jest.fn().mockResolvedValue([]),
     };
-    const service = new DiscountService(prisma as any, {} as any);
+    const service = new DiscountService(
+      prisma as any,
+      {} as any, // cache
+      { syncProduct: jest.fn() } as any, // searchService
+    );
 
     await service.findAll(
       {

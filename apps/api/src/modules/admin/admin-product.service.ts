@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
+import { notifyWebRevalidate } from "../../common/revalidate";
 import { AdminAuditService } from "./admin-audit.service";
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
@@ -343,7 +344,7 @@ export class AdminProductService {
 
     // Invalidate caches
     if (this.cache) {
-      await this.cache.del(`product:${productId}`);
+      await this.cache.del(`products:detail:${productId}`);
       await this.cache.delPattern("products:list:*");
     }
 
@@ -354,6 +355,9 @@ export class AdminProductService {
       .catch((err) =>
         this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`),
       );
+
+    // Web ISR'yi anında tazele (fiyat/indirim değişimi web'e hemen yansısın).
+    void notifyWebRevalidate(["products:list", `product:${productId}`]);
 
     return updated;
   }
@@ -394,7 +398,7 @@ export class AdminProductService {
     );
 
     // Invalidate product cache so the product appears in listings
-    await this.cache.del(`product:${productId}`);
+    await this.cache.del(`products:detail:${productId}`);
     await this.cache.delPattern("products:list:*");
 
     // Arama index'ini güncelle: onaylanan ürün artık aktif → ES'e indexlensin
@@ -403,6 +407,9 @@ export class AdminProductService {
       .catch((err) =>
         this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`),
       );
+
+    // Web ISR'yi anında tazele (fiyat/indirim değişimi web'e hemen yansısın).
+    void notifyWebRevalidate(["products:list", `product:${productId}`]);
 
     // Yeniden satışa açılan (eski sold/inactive) ilan onaylanıp yayına girince
     // wishlist + son 7 gün stockout-cancelled alıcılara back-in-stock bildirimi
@@ -463,7 +470,7 @@ export class AdminProductService {
     }
 
     // Invalidate product cache
-    await this.cache.del(`product:${productId}`);
+    await this.cache.del(`products:detail:${productId}`);
     await this.cache.delPattern("products:list:*");
 
     // Arama index'ini güncelle: reddedilen ürün listelenemez → ES'ten kaldır
@@ -472,6 +479,9 @@ export class AdminProductService {
       .catch((err) =>
         this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`),
       );
+
+    // Web ISR'yi anında tazele (fiyat/indirim değişimi web'e hemen yansısın).
+    void notifyWebRevalidate(["products:list", `product:${productId}`]);
 
     return { success: true, productId, status: "rejected", reason: dto.reason };
   }
@@ -525,7 +535,7 @@ export class AdminProductService {
         );
 
         // Invalidate product cache
-        await this.cache.del(`product:${productId}`);
+        await this.cache.del(`products:detail:${productId}`);
 
         // Arama index'ini güncelle: onaylanan ürün aktif → ES'e indexlensin
         this.searchService
@@ -599,7 +609,7 @@ export class AdminProductService {
         );
 
         // Invalidate product cache
-        await this.cache.del(`product:${productId}`);
+        await this.cache.del(`products:detail:${productId}`);
 
         // Arama index'ini güncelle: reddedilen ürün listelenemez → ES'ten kaldır
         this.searchService
@@ -784,7 +794,7 @@ export class AdminProductService {
 
     // Invalidate caches
     if (this.cache) {
-      await this.cache.del(`product:${productId}`);
+      await this.cache.del(`products:detail:${productId}`);
       await this.cache.delPattern("products:list:*");
     }
 
@@ -795,6 +805,9 @@ export class AdminProductService {
       .catch((err) =>
         this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`),
       );
+
+    // Web ISR'yi anında tazele (fiyat/indirim değişimi web'e hemen yansısın).
+    void notifyWebRevalidate(["products:list", `product:${productId}`]);
 
     return { success: true, productId, status: ProductStatus.pending };
   }
