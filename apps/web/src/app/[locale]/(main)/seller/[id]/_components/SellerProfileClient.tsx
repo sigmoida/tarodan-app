@@ -36,6 +36,7 @@ export default function SellerProfileClient() {
     isLoading,
     products,
     isFollowing,
+    followPending,
     reviews,
     reviewsLoading,
     collections,
@@ -88,6 +89,7 @@ export default function SellerProfileClient() {
         seller={seller}
         listingCount={products.length}
         isFollowing={isFollowing}
+        followLoading={followPending}
         isOwnProfile={isOwnProfile}
         membershipDuration={membershipDuration}
         onMessage={handleMessage}
@@ -147,6 +149,7 @@ export default function SellerProfileClient() {
         <CollectionsTab
           collections={collections}
           loading={collectionsLoading}
+          seller={seller}
         />
       )}
 

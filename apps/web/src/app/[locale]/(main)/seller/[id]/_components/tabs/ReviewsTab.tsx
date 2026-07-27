@@ -5,6 +5,7 @@
 import { StarIcon } from "@heroicons/react/24/solid";
 import { Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { EmptyStateCard, SectionCard } from "@/components/ui";
 import UserAvatar from "@/components/UserAvatar";
 import type { RatingStats, UserRating } from "../../_lib/types";
@@ -116,24 +117,45 @@ export default function ReviewsTab({
         {reviews.map((review) => {
           const reviewerName =
             review.giverName || review.giver?.displayName || "";
+          const giverId = review.giver?.id;
           return (
             <div
               key={review.id}
               className="rounded-xl border border-border-subtle bg-surface-elevated p-5"
             >
               <div className="flex items-start gap-4">
-                <UserAvatar
-                  displayName={reviewerName}
-                  avatarUrl={review.giver?.avatarUrl}
-                  size="sm"
-                  className="!h-11 !w-11 flex-shrink-0 rounded-xl"
-                />
+                {giverId ? (
+                  <Link href={`/seller/${giverId}`} className="flex-shrink-0">
+                    <UserAvatar
+                      displayName={reviewerName}
+                      avatarUrl={review.giver?.avatarUrl}
+                      size="sm"
+                      className="!h-11 !w-11 rounded-xl"
+                    />
+                  </Link>
+                ) : (
+                  <UserAvatar
+                    displayName={reviewerName}
+                    avatarUrl={review.giver?.avatarUrl}
+                    size="sm"
+                    className="!h-11 !w-11 flex-shrink-0 rounded-xl"
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-heading">
-                        {reviewerName || t("common.user")}
-                      </p>
+                      {giverId ? (
+                        <Link
+                          href={`/seller/${giverId}`}
+                          className="font-semibold text-heading transition-colors hover:text-primary-600"
+                        >
+                          {reviewerName || t("common.user")}
+                        </Link>
+                      ) : (
+                        <p className="font-semibold text-heading">
+                          {reviewerName || t("common.user")}
+                        </p>
+                      )}
                       <p className="text-xs text-muted">
                         {new Date(review.createdAt).toLocaleDateString(
                           DATE_LOCALES[locale] ?? "tr-TR",

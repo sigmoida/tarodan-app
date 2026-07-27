@@ -172,8 +172,10 @@ export function useSellerProfile() {
     meta: { page: "seller-rating-stats" },
   });
 
+  const [followPending, setFollowPending] = useState(false);
   const handleFollow = async () => {
     if (!requireAuth({ message: t("auth.authRequiredMessage") })) return;
+    setFollowPending(true);
     try {
       if (isFollowing) {
         await api.delete(`/users/${sellerId}/follow`);
@@ -182,6 +184,7 @@ export function useSellerProfile() {
         await api.post(`/users/${sellerId}/follow`);
         toast.success(t("seller.followed"));
       }
+      // Keep the button disabled until the follow state has actually refetched.
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: queryKeys.seller.follow(sellerId),
@@ -192,6 +195,8 @@ export function useSellerProfile() {
       ]);
     } catch {
       toast.error(t("common.operationFailed"));
+    } finally {
+      setFollowPending(false);
     }
   };
 
@@ -225,6 +230,7 @@ export function useSellerProfile() {
     isLoading: sellerQuery.isLoading,
     products,
     isFollowing,
+    followPending,
     reviews: reviewsQuery.data ?? [],
     reviewsLoading: reviewsQuery.isLoading,
     collections: collectionsQuery.data ?? [],

@@ -8,7 +8,6 @@ import {
   ArrowsRightLeftIcon,
   StarIcon,
   ChatBubbleLeftRightIcon,
-  HeartIcon,
   FlagIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button, IconButton } from "@tarodan/ui";
@@ -21,6 +20,7 @@ interface SellerHeaderProps {
   seller: Seller;
   listingCount: number;
   isFollowing: boolean;
+  followLoading: boolean;
   isOwnProfile: boolean;
   membershipDuration: string;
   onMessage: () => void;
@@ -34,6 +34,7 @@ export default function SellerHeader({
   seller,
   listingCount,
   isFollowing,
+  followLoading,
   isOwnProfile,
   membershipDuration,
   onMessage,
@@ -107,7 +108,7 @@ export default function SellerHeader({
               variant={isFollowing ? "secondary" : "outline"}
               size="sm"
               onClick={onFollow}
-              leftIcon={<HeartIcon className="h-4 w-4" />}
+              disabled={followLoading}
             >
               {isFollowing ? t("seller.following") : t("seller.follow")}
             </Button>
