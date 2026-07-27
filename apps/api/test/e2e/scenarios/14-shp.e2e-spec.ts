@@ -246,7 +246,8 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
         .get("/api/shipping/rates")
         .query({ city: "İstanbul", carrier: "surat", weight: "1" })
         .expect(200);
-      expect(res.body.rate).toBe(23.99); // 29.99 × 0.8 (aynı şehir) = 23.992 → 23.99
+      // Rate artık AKTİF TARİFEDEN düz gelir; eski aynı-şehir indirimi kaldırıldı.
+      expect(res.body.rate).toBe(29.99);
     });
 
     scenario("SHP-004", async () => {
@@ -254,7 +255,8 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
         .get("/api/shipping/rates")
         .query({ city: "Ankara", carrier: "surat", weight: "3" })
         .expect(200);
-      expect(res.body.rate).toBe(38.99); // 29.99 × 1.3 = 38.987 → 38.99
+      // Ağırlık faktörü kaldırıldı (üründe ağırlık/desi yok) → düz tarife ücreti.
+      expect(res.body.rate).toBe(29.99);
     });
 
     scenario("SHP-005", async () => {
@@ -282,16 +284,17 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
     });
 
     scenario("SHP-007", async () => {
-      // city boş → toCity 'İstanbul' = origin → aynı şehir indirimi
+      // city boş → düz tarife ücreti (şehir bazlı indirim yok).
       const res = await request(server())
         .get("/api/shipping/rates")
         .query({ city: "", carrier: "surat", weight: "1" })
         .expect(200);
-      expect(res.body.rate).toBe(23.99);
+      expect(res.body.rate).toBe(29.99);
     });
 
     scenario("SHP-008", async () => {
-      // PlatformSetting override: base 49.9 → şehirler arası (Ankara) × 1 × 1
+      // Kargo fiyatı artık AKTİF TARİFEDEN gelir; eski shipping_base_cost PlatformSetting'i
+      // (retired) rate'i DEĞİŞTİRMEZ — gösterilen = tahsil edilen.
       const prisma = getPrisma();
       await prisma.platformSetting.create({
         data: {
@@ -304,7 +307,7 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
         .get("/api/shipping/rates")
         .query({ city: "Ankara", carrier: "surat", weight: "1" })
         .expect(200);
-      expect(res.body.rate).toBe(49.9);
+      expect(res.body.rate).toBe(29.99);
     });
   });
 
@@ -395,6 +398,32 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
         .expect(403);
       expect(res.body.message).toContain(
         "Bu sipariş için kargo oluşturamazsınız",
+      );
+    });
+
+    // PR-3b: sipariş oluşturulurken OrderPackage'a AKTİF tarife snapshot'ı yazılır.
+    it("OrderPackage taşır: tarife snapshot + kanonik alıcı-payı kargo", async () => {
+      const { productId } = await makeSellerWithProduct({ price: 100 });
+      const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
+      const { orderId } = await buyAndPay(ctx, buyer, productId, addressId);
+
+      const prisma = getPrisma();
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { packageId: true },
+      });
+      const pkg = await prisma.orderPackage.findUnique({
+        where: { id: order!.packageId! },
+      });
+
+      // Aktif tarife (seed edilen v1) snapshot'ı pakete yazıldı.
+      expect(pkg!.shippingTariffId).toBeTruthy();
+      expect(typeof pkg!.shippingTariffVersion).toBe("number");
+      // shippingCost KANONİK olarak alıcı payıdır (direct/guest/group aynı semantik).
+      expect(Number(pkg!.shippingCost)).toBe(Number(pkg!.buyerShippingAmount));
+      // Tam bedel >= alıcı payı (buyerShare<=100).
+      expect(Number(pkg!.fullShippingAmount)).toBeGreaterThanOrEqual(
+        Number(pkg!.buyerShippingAmount),
       );
     });
 

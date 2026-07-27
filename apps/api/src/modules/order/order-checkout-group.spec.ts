@@ -4,6 +4,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { createHash } from "crypto";
 import { OrderService } from "./order.service";
 import { OrderPricingService } from "./order-pricing.service";
+import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import { OrderCheckoutService } from "./order-checkout.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderCheckoutDirectService } from "./order-checkout-direct.service";
@@ -24,6 +25,25 @@ import { CommissionLedgerService } from "../commission/commission-ledger.service
 import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
 import { OrderStatus, ProductStatus } from "@prisma/client";
+
+// Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
+// resolves without a DB; snapshot id/version null (no persisted tariff in unit tests).
+const SHIPPING_TARIFF_MOCK = {
+  getActiveOutboundTariff: async () => ({
+    outboundPackageFee: 29.99,
+    freeShippingEnabled: true,
+    freeShippingThreshold: 500,
+  }),
+  getActiveTariffSnapshot: async () => ({
+    tariffId: null,
+    tariffVersion: null,
+    tariff: {
+      outboundPackageFee: 29.99,
+      freeShippingEnabled: true,
+      freeShippingThreshold: 500,
+    },
+  }),
+};
 
 /**
  * Toplu checkout (CheckoutGroup): sepetteki tüm ürünler tek grupta sipariş edilir,
@@ -155,6 +175,7 @@ describe("OrderService checkout group (batch checkout)", () => {
       providers: [
         OrderService,
         OrderPricingService,
+        { provide: ShippingTariffService, useValue: SHIPPING_TARIFF_MOCK },
         OrderCheckoutService,
         OrderCheckoutCommonService,
         OrderCheckoutDirectService,
