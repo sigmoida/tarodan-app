@@ -24,10 +24,10 @@ export function DiscountsStats() {
     queryKey: adminKeys.stats("discounts"),
     queryFn: async () => {
       const res = await adminApi.get("/admin/discounts", {
-        params: { limit: 1000 },
+        params: { limit: 500 },
       });
-      const list: Discount[] = res.data?.data ?? res.data ?? [];
-      const total = res.data?.meta?.total ?? list.length;
+      const list: Discount[] = res.data?.items ?? res.data?.data ?? [];
+      const total = res.data?.total ?? res.data?.meta?.total ?? list.length;
       return {
         total,
         active: list.filter((d) => d.isCurrentlyValid).length,
