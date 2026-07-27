@@ -409,6 +409,7 @@ export function useCheckoutSubmit({
                 zipCode?: string;
               };
               expectedShippingTariffVersion?: number;
+              couponCode?: string;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
@@ -445,6 +446,13 @@ export function useCheckoutSubmit({
             if (typeof expectedShippingTariffVersion === "number") {
               guestPayload.expectedShippingTariffVersion =
                 expectedShippingTariffVersion;
+            }
+
+            // Forward the guest's applied coupon so the order is created at the
+            // discounted total (server re-validates authoritatively). Without this
+            // the discount shows in the preview but the guest is charged full price.
+            if (appliedCouponCode) {
+              guestPayload.couponCode = appliedCouponCode;
             }
 
             orderResponse = await ordersApi.checkoutGuest(guestPayload);

@@ -127,6 +127,7 @@ export const ordersApi = {
       address: string;
       zipCode?: string;
     };
+    couponCode?: string;
     expectedShippingTariffVersion?: number;
   }) => api.post("/orders/checkout/guest", data),
   /** Alıcının sipariş grupları (gruplu liste) */
