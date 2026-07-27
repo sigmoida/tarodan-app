@@ -12,6 +12,7 @@ import {
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { Button } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
+import UserAvatar from "@/components/UserAvatar";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
 import CollectionVisibilityBadge from "../../_components/CollectionVisibilityBadge";
 
@@ -104,10 +105,22 @@ export default function CollectionHeaderCard() {
                 {collection.description}
               </p>
             )}
+            <div className="mb-3">
+              <Link
+                href={`/seller/${collection.userId}`}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-2.5 py-1 transition-colors hover:border-primary-300 hover:bg-surface-alt"
+              >
+                <UserAvatar
+                  displayName={collection.userName}
+                  size="xs"
+                  className="!h-6 !w-6"
+                />
+                <span className="text-sm font-medium text-body">
+                  @{collection.userName}
+                </span>
+              </Link>
+            </div>
             <div className="flex flex-wrap items-center gap-4 text-sm text-subtle">
-              <span className="font-medium text-muted">
-                @{collection.userName}
-              </span>
               <span className="flex items-center gap-1">
                 <EyeIcon className="h-4 w-4 text-primary-500" />
                 {collection.viewCount} {t("collection.views")}
