@@ -157,6 +157,20 @@ export class OrderTrackingSyncService {
       updateData.providerTrackingId = gonderi.KargoTakipNo;
     }
 
+    // Faz 2 taşıyıcı mutabakatı: Sürat'ın GERÇEK faturaladığı tutar/desi. Her poll'de
+    // gelir ama önceden düşürülüyordu → müşteriden alınan kargo ile karşılaştırılamıyordu.
+    const carrierGross = Number(gonderi.Tutar ?? 0);
+    if (Number.isFinite(carrierGross) && carrierGross > 0) {
+      updateData.carrierActualCost = carrierGross;
+      const net = Number(gonderi.TutarKdvsiz ?? 0);
+      const tax = Number(gonderi.KdvTutar ?? 0);
+      const desi = Number(gonderi.ToplamDesiKg ?? 0);
+      if (Number.isFinite(net) && net > 0) updateData.carrierNetCost = net;
+      if (Number.isFinite(tax) && tax > 0) updateData.carrierTaxAmount = tax;
+      if (Number.isFinite(desi) && desi > 0) updateData.carrierDesi = desi;
+      updateData.carrierCostSyncedAt = new Date();
+    }
+
     // Delivery info. H1: tarih parse edilemezse teslim gerçeği kaybolmasın —
     // yaklaşık zaman olarak şimdi'yi yaz (Invalid Date update'i patlatıyordu).
     if (isDelivered && gonderi.TeslimTarihi) {

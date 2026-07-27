@@ -1684,6 +1684,15 @@ model Shipment {
   trackingUrl        String?         @map("tracking_url")
   labelUrl           String?         @map("label_url")
   cost               Decimal?        @db.Decimal(10, 2)
+  // Faz 2 taşıyıcı mutabakatı: müşteriden alınan kargo (cost) ile Sürat'ın GERÇEK
+  // faturaladığı tutar ayrı tutulur. Sürat takip cevabındaki Tutar/TutarKdvsiz/KdvTutar/
+  // ToplamDesiKg her poll'de geliyordu ama düşürülüyordu; artık buraya yazılır.
+  quotedCarrierCost   Decimal?       @map("quoted_carrier_cost")    @db.Decimal(10, 2)
+  carrierActualCost   Decimal?       @map("carrier_actual_cost")    @db.Decimal(10, 2)
+  carrierNetCost      Decimal?       @map("carrier_net_cost")       @db.Decimal(10, 2)
+  carrierTaxAmount    Decimal?       @map("carrier_tax_amount")     @db.Decimal(10, 2)
+  carrierDesi         Decimal?       @map("carrier_desi")           @db.Decimal(10, 3)
+  carrierCostSyncedAt DateTime?      @map("carrier_cost_synced_at")
   status             ShipmentStatus  @default(pending)
   estimatedDelivery  DateTime?       @map("estimated_delivery")
   shippedAt          DateTime?       @map("shipped_at")
