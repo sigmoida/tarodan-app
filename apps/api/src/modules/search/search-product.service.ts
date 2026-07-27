@@ -2,13 +2,17 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { ProductStatus } from '@prisma/client';
-import { StorageService } from '../storage/storage.service';
-import { buildProductWhere } from '../product/helpers/build-product-where';
-import { fulltextProductSearch } from '../product/helpers/fulltext-search';
-import { SearchCommonService, SearchOptions, SearchResponse } from './search-common.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { ProductStatus } from "@prisma/client";
+import { StorageService } from "../storage/storage.service";
+import { buildProductWhere } from "../product/helpers/build-product-where";
+import { fulltextProductSearch } from "../product/helpers/fulltext-search";
+import {
+  SearchCommonService,
+  SearchOptions,
+  SearchResponse,
+} from "./search-common.service";
 
 /**
  * Ürün arama + indeksleme alt servisi (search.service.ts'ten birebir taşındı):
@@ -32,17 +36,28 @@ export class SearchProductService {
     if (!this.common.isAvailable()) return;
     try {
       const [esRes, dbCount] = await Promise.all([
-        this.common.client.count({ index: this.common.productsIndex }).catch(() => ({ count: 0 })),
-        this.prisma.product.count({ where: this.common.indexableProductWhere() }),
+        this.common.client
+          .count({ index: this.common.productsIndex })
+          .catch(() => ({ count: 0 })),
+        this.prisma.product.count({
+          where: this.common.indexableProductWhere(),
+        }),
       ]);
       const esCount = esRes?.count ?? 0;
       if (esCount === 0 && dbCount > 0) {
-        this.logger.log(`Elasticsearch index boş, DB'de ${dbCount} listelenebilir ürün var – reindex başlatılıyor...`);
+        this.logger.log(
+          `Elasticsearch index boş, DB'de ${dbCount} listelenebilir ürün var – reindex başlatılıyor...`,
+        );
         const indexed = await this.reindexAll();
-        this.logger.log(`Elasticsearch reindex tamamlandı: ${indexed} ürün index'lendi.`);
+        this.logger.log(
+          `Elasticsearch reindex tamamlandı: ${indexed} ürün index'lendi.`,
+        );
       }
     } catch (err) {
-      this.logger.warn('syncIndexIfEmpty failed', err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        "syncIndexIfEmpty failed",
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 
@@ -73,14 +88,20 @@ export class SearchProductService {
       set: setFilter,
       sellerId,
       status,
-      sortBy = 'relevance',
+      sortBy = "relevance",
     } = options;
 
     // Sayfalama parametrelerini güvenli tamsayıya indirge: geçersiz/NaN/≤0 girişlerde
     // (örn. ?page=abc → parseInt→NaN) `from = (page-1)*pageSize` NaN olur ve ES/Prisma
     // çöker. Varsayılan: page=1, pageSize=20.
-    const page = Number.isFinite(options.page) && (options.page as number) >= 1 ? Math.floor(options.page as number) : 1;
-    const pageSize = Number.isFinite(options.pageSize) && (options.pageSize as number) >= 1 ? Math.floor(options.pageSize as number) : 20;
+    const page =
+      Number.isFinite(options.page) && (options.page as number) >= 1
+        ? Math.floor(options.page as number)
+        : 1;
+    const pageSize =
+      Number.isFinite(options.pageSize) && (options.pageSize as number) >= 1
+        ? Math.floor(options.pageSize as number)
+        : 20;
 
     const must: any[] = [];
     const filter: any[] = [];
@@ -91,23 +112,30 @@ export class SearchProductService {
         bool: {
           should: [
             { match: { title: { query, boost: 5 } } },
-            { match: { 'title.edge_ngram': { query, boost: 3 } } },
-            { match: { 'title.ngram': { query, boost: 2 } } },
+            { match: { "title.edge_ngram": { query, boost: 3 } } },
+            { match: { "title.ngram": { query, boost: 2 } } },
             { match: { description: { query, boost: 1 } } },
-            { match: { 'description.edge_ngram': { query, boost: 0.5 } } },
+            { match: { "description.edge_ngram": { query, boost: 0.5 } } },
             { match: { categoryName: { query, boost: 2 } } },
-            { match: { 'categoryName.edge_ngram': { query, boost: 1 } } },
+            { match: { "categoryName.edge_ngram": { query, boost: 1 } } },
             { match: { brandName: { query, boost: 2 } } },
-            { match: { 'brandName.edge_ngram': { query, boost: 1 } } },
+            { match: { "brandName.edge_ngram": { query, boost: 1 } } },
             { match: { manufacturerName: { query, boost: 2 } } },
-            { match: { 'manufacturerName.edge_ngram': { query, boost: 1 } } },
+            { match: { "manufacturerName.edge_ngram": { query, boost: 1 } } },
             { match: { carModelName: { query, boost: 2 } } },
-            { match: { 'carModelName.edge_ngram': { query, boost: 1 } } },
-            { match: { 'carModelName.ngram': { query, boost: 2 } } },
+            { match: { "carModelName.edge_ngram": { query, boost: 1 } } },
+            { match: { "carModelName.ngram": { query, boost: 2 } } },
             {
               multi_match: {
                 query,
-                fields: ['title^3', 'description', 'categoryName^2', 'brandName^2', 'manufacturerName^2', 'carModelName^2'],
+                fields: [
+                  "title^3",
+                  "description",
+                  "categoryName^2",
+                  "brandName^2",
+                  "manufacturerName^2",
+                  "carModelName^2",
+                ],
                 fuzziness: 2,
                 prefix_length: 1,
                 boost: 1.5,
@@ -115,7 +143,12 @@ export class SearchProductService {
             },
             {
               fuzzy: {
-                title: { value: query.toLowerCase(), fuzziness: 'AUTO', prefix_length: 1, boost: 1 },
+                title: {
+                  value: query.toLowerCase(),
+                  fuzziness: "AUTO",
+                  prefix_length: 1,
+                  boost: 1,
+                },
               },
             },
           ],
@@ -162,8 +195,8 @@ export class SearchProductService {
     // Support value ("1:18"), slug with hyphen ("1-18"), and slug normalized ("118")
     if (scale) {
       const scaleTrim = scale.trim();
-      const scaleSlugHyphen = scaleTrim.replace(':', '-');
-      const scaleSlugNorm = scaleTrim.replace(/\s/g, '').replace(/[:\/]/g, '');
+      const scaleSlugHyphen = scaleTrim.replace(":", "-");
+      const scaleSlugNorm = scaleTrim.replace(/\s/g, "").replace(/[:\/]/g, "");
       filter.push({
         bool: {
           should: [
@@ -192,49 +225,94 @@ export class SearchProductService {
     if (preOrder) filter.push({ term: { isPreorder: true } });
     if (limited) filter.push({ term: { isLimited: true } });
     if (setFilter) filter.push({ term: { isSet: true } });
-    if (discountOnly) filter.push({ exists: { field: 'oldPrice' } });
+    if (discountOnly) filter.push({ exists: { field: "oldPrice" } });
 
     // Text-based fallback filters (when ID is not available)
     if (brand && !brandId) {
-      filter.push({ term: { 'brandName.keyword': brand } });
+      filter.push({ term: { "brandName.keyword": brand } });
     }
     if (manufacturer && !manufacturerId) {
-      filter.push({ term: { 'manufacturerName.keyword': manufacturer } });
+      filter.push({ term: { "manufacturerName.keyword": manufacturer } });
     }
 
     // Sorting
     let sort: any[] = [];
     switch (sortBy) {
-      case 'price_asc': sort = [{ price: 'asc' }]; break;
-      case 'price_desc': sort = [{ price: 'desc' }]; break;
-      case 'newest':
-      case 'created_desc': sort = [{ createdAt: 'desc' }]; break;
-      case 'created_asc': sort = [{ createdAt: 'asc' }]; break;
-      case 'view_count_desc': sort = [{ viewCount: 'desc' }]; break;
-      case 'view_count_asc': sort = [{ viewCount: 'asc' }]; break;
-      case 'title_asc': sort = [{ 'title.keyword': 'asc' }]; break;
-      case 'title_desc': sort = [{ 'title.keyword': 'desc' }]; break;
-      case 'rating_desc': sort = [{ ratingAverage: 'desc' }, { ratingCount: 'desc' }]; break;
+      case "price_asc":
+        sort = [{ price: "asc" }];
+        break;
+      case "price_desc":
+        sort = [{ price: "desc" }];
+        break;
+      case "newest":
+      case "created_desc":
+        sort = [{ createdAt: "desc" }];
+        break;
+      case "created_asc":
+        sort = [{ createdAt: "asc" }];
+        break;
+      case "view_count_desc":
+        sort = [{ viewCount: "desc" }];
+        break;
+      case "view_count_asc":
+        sort = [{ viewCount: "asc" }];
+        break;
+      case "title_asc":
+        sort = [{ "title.keyword": "asc" }];
+        break;
+      case "title_desc":
+        sort = [{ "title.keyword": "desc" }];
+        break;
+      case "rating_desc":
+        sort = [{ ratingAverage: "desc" }, { ratingCount: "desc" }];
+        break;
       default:
         // Alaka sıralaması: metin aramasında _score birincil kalır (relevance korunur),
         // boost/kalite eşitlik bozucu olur; gezinmede (query yok) sponsorlu kademe öne geçer.
         sort = query
-          ? [{ _score: 'desc' }, { relevanceScore: 'desc' }, { viewCount: 'desc' }]
-          : [{ relevanceScore: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }];
+          ? [
+              { _score: "desc" },
+              // Eşit alaka içinde aktif boost'lular önde (LIFO — en son alan üstte).
+              // Eski/boş boostedAt en sona düşer.
+              { boostedAt: { order: "desc", missing: "_last" } },
+              { relevanceScore: "desc" },
+              { viewCount: "desc" },
+            ]
+          : [
+              { relevanceScore: "desc" },
+              { viewCount: "desc" },
+              { createdAt: "desc" },
+            ];
     }
 
     // Stoktakiler her zaman önce: stoğu biten (tükenen/satıldı/aktif-ama-stoksuz)
     // ürünler hangi sıralama seçilirse seçilsin en alta iner. Tek-statülü
     // sorgularda (örn. status=active) zaten çoğunlukla no-op'tur. Eski indeks
     // dokümanlarında alan bulunmayabilir → missing '_first' ile stok-içi sayılır.
-    sort = [{ inStock: { order: 'desc', missing: '_first' } }, ...sort];
+    sort = [{ inStock: { order: "desc", missing: "_first" } }, ...sort];
 
     try {
       const searchBody: any = {
         query: {
-          bool: {
-            must: must.length > 0 ? must : [{ match_all: {} }],
-            filter,
+          // Aktif boost'lu ürünleri (Ekonomik + Vitrin) alaka sıralamasında HAFİF
+          // öne al: boostedUntil > now olanların _score'unu ×1.5. Alaka birincil
+          // kalır (alakasız boosted ürünler tepeye yığılmaz); süre bitince range
+          // eşleşmez → expiry-safe, reindex gerektirmez.
+          function_score: {
+            query: {
+              bool: {
+                must: must.length > 0 ? must : [{ match_all: {} }],
+                filter,
+              },
+            },
+            functions: [
+              {
+                filter: { range: { boostedUntil: { gt: "now" } } },
+                weight: 1.5,
+              },
+            ],
+            boost_mode: "multiply",
+            score_mode: "sum",
           },
         },
         sort,
@@ -247,15 +325,15 @@ export class SearchProductService {
             title: { fragment_size: 120, number_of_fragments: 1 },
             description: { fragment_size: 200, number_of_fragments: 2 },
           },
-          pre_tags: ['<em>'],
-          post_tags: ['</em>'],
+          pre_tags: ["<em>"],
+          post_tags: ["</em>"],
         };
       }
       searchBody.aggs = {
-        categories: { terms: { field: 'categoryId', size: 50 } },
-        brands: { terms: { field: 'brandId', size: 50 } },
-        conditions: { terms: { field: 'condition', size: 10 } },
-        price_range: { stats: { field: 'price' } },
+        categories: { terms: { field: "categoryId", size: 50 } },
+        brands: { terms: { field: "brandId", size: 50 } },
+        conditions: { terms: { field: "condition", size: 10 } },
+        price_range: { stats: { field: "price" } },
       };
 
       const response = await this.common.client.search({
@@ -265,13 +343,13 @@ export class SearchProductService {
 
       const hits = response.hits.hits;
       const total =
-        typeof response.hits.total === 'number'
+        typeof response.hits.total === "number"
           ? response.hits.total
           : (response.hits.total as any)?.value || 0;
       const aggs = (response as any).aggregations;
 
       if (hits.length === 0 && query) {
-        this.logger.debug('ES returned 0 results, falling back to database');
+        this.logger.debug("ES returned 0 results, falling back to database");
         return this.fallbackSearch(options);
       }
 
@@ -293,7 +371,10 @@ export class SearchProductService {
           imageUrl: hit._source.imageUrl,
           score: hit._score || 0,
           highlight: hit.highlight
-            ? { title: hit.highlight.title, description: hit.highlight.description }
+            ? {
+                title: hit.highlight.title,
+                description: hit.highlight.description,
+              }
             : undefined,
         })),
         total,
@@ -310,7 +391,7 @@ export class SearchProductService {
           : undefined,
       };
     } catch (error) {
-      this.logger.debug('Elasticsearch search error, falling back to database');
+      this.logger.debug("Elasticsearch search error, falling back to database");
       return this.fallbackSearch(options);
     }
   }
@@ -318,7 +399,9 @@ export class SearchProductService {
   /**
    * Search and return only product IDs (used by product.service for full-data hydration)
    */
-  async searchProductIds(options: SearchOptions): Promise<{ ids: string[]; total: number }> {
+  async searchProductIds(
+    options: SearchOptions,
+  ): Promise<{ ids: string[]; total: number }> {
     if (!this.common.isAvailable()) {
       return { ids: [], total: 0 };
     }
@@ -334,13 +417,13 @@ export class SearchProductService {
 
   private buildProductDocument(product: any): Record<string, any> {
     const scaleAttr = product.productAttributes?.find(
-      (pa: any) => pa.attribute?.group?.slug === 'scale',
+      (pa: any) => pa.attribute?.group?.slug === "scale",
     );
     const materialAttr = product.productAttributes?.find(
-      (pa: any) => pa.attribute?.group?.slug === 'material',
+      (pa: any) => pa.attribute?.group?.slug === "material",
     );
     const vehicleTypeAttr = product.productAttributes?.find(
-      (pa: any) => pa.attribute?.group?.slug === 'vehicle_type',
+      (pa: any) => pa.attribute?.group?.slug === "vehicle_type",
     );
 
     return {
@@ -348,7 +431,10 @@ export class SearchProductService {
       title: product.title,
       description: product.description,
       price: parseFloat(product.price.toString()),
-      oldPrice: product.oldPrice != null ? parseFloat(product.oldPrice.toString()) : undefined,
+      oldPrice:
+        product.oldPrice != null
+          ? parseFloat(product.oldPrice.toString())
+          : undefined,
       condition: product.condition,
       status: product.status,
       categoryId: product.categoryId,
@@ -361,10 +447,16 @@ export class SearchProductService {
       carModelName: product.carModel?.name || undefined,
       sellerId: product.sellerId,
       sellerName: product.seller?.displayName,
-      imageUrl: product.images?.[0]?.cardKey ? this.storageService.getPublicAssetUrl(product.images[0].cardKey) : undefined,
-      scale: scaleAttr?.attribute?.value || scaleAttr?.attribute?.slug || undefined,
+      imageUrl: product.images?.[0]?.cardKey
+        ? this.storageService.getPublicAssetUrl(product.images[0].cardKey)
+        : undefined,
+      scale:
+        scaleAttr?.attribute?.value || scaleAttr?.attribute?.slug || undefined,
       viewCount: product.viewCount || 0,
-      ratingAverage: product.averageRating != null ? parseFloat(product.averageRating.toString()) : 0,
+      ratingAverage:
+        product.averageRating != null
+          ? parseFloat(product.averageRating.toString())
+          : 0,
       ratingCount: product.ratingCount ?? 0,
       rankTier: product.rankTier ?? 0,
       qualityScore: product.qualityScore ?? 0,
@@ -384,6 +476,11 @@ export class SearchProductService {
         (product.quantity == null ||
           product.quantity - (product.reservedQuantity ?? 0) > 0),
       quantity: product.quantity,
+      // Boost pencereleri: aramada aktif-boost lift'i (`boostedUntil > now`) + LIFO
+      // eşitlik bozucu (`boostedAt` desc). Süre bitince range eşleşmez → reindex
+      // gerekmeden düşer (expiry-safe).
+      boostedUntil: product.boostedUntil ?? undefined,
+      boostedAt: product.boostedAt ?? undefined,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     };
@@ -395,7 +492,11 @@ export class SearchProductService {
     manufacturer: { select: { id: true, name: true } },
     carModel: { select: { id: true, name: true } },
     seller: { select: { id: true, displayName: true } },
-    images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { cardKey: true } },
+    images: {
+      take: 1,
+      orderBy: { sortOrder: "asc" as const },
+      select: { cardKey: true },
+    },
     productAttributes: {
       include: {
         attribute: { include: { group: { select: { slug: true } } } },
@@ -447,7 +548,9 @@ export class SearchProductService {
     if (!this.common.isAvailable()) return;
     try {
       const indexable = await this.prisma.product.count({
-        where: { AND: [{ id: productId }, this.common.indexableProductWhere()] },
+        where: {
+          AND: [{ id: productId }, this.common.indexableProductWhere()],
+        },
       });
       if (indexable > 0) {
         await this.indexProduct(productId);
@@ -462,17 +565,21 @@ export class SearchProductService {
   }
 
   async forceRecreateIndex(): Promise<void> {
-    this.logger.log('Force recreating Elasticsearch index');
+    this.logger.log("Force recreating Elasticsearch index");
     try {
-      const exists = await this.common.client.indices.exists({ index: this.common.productsIndex });
+      const exists = await this.common.client.indices.exists({
+        index: this.common.productsIndex,
+      });
       if (exists) {
-        await this.common.client.indices.delete({ index: this.common.productsIndex });
-        this.logger.log('Deleted old index');
+        await this.common.client.indices.delete({
+          index: this.common.productsIndex,
+        });
+        this.logger.log("Deleted old index");
       }
       await this.common.ensureIndexExists();
-      this.logger.log('Index recreated with updated settings');
+      this.logger.log("Index recreated with updated settings");
     } catch (error) {
-      this.logger.error('Failed to recreate index');
+      this.logger.error("Failed to recreate index");
       throw error;
     }
   }
@@ -480,8 +587,12 @@ export class SearchProductService {
   async reindexAll(): Promise<number> {
     await this.prisma.searchIndex.upsert({
       where: { indexName: this.common.productsIndex },
-      update: { status: 'rebuilding' },
-      create: { indexName: this.common.productsIndex, status: 'rebuilding', settings: {} },
+      update: { status: "rebuilding" },
+      create: {
+        indexName: this.common.productsIndex,
+        status: "rebuilding",
+        settings: {},
+      },
     });
 
     try {
@@ -504,7 +615,7 @@ export class SearchProductService {
       await this.prisma.searchIndex.update({
         where: { indexName: this.common.productsIndex },
         data: {
-          status: 'active',
+          status: "active",
           documentCount: products.length,
           lastSyncedAt: new Date(),
         },
@@ -513,12 +624,12 @@ export class SearchProductService {
       this.logger.log(`Reindexed ${products.length} products`);
       return products.length;
     } catch (error) {
-      this.logger.error('Elasticsearch reindex error');
+      this.logger.error("Elasticsearch reindex error");
       await this.prisma.searchIndex.update({
         where: { indexName: this.common.productsIndex },
-        data: { status: 'error' },
+        data: { status: "error" },
       });
-      throw new InternalServerErrorException('Reindex başarısız');
+      throw new InternalServerErrorException("Reindex başarısız");
     }
   }
 
@@ -529,17 +640,22 @@ export class SearchProductService {
    * Uses the shared buildProductWhere helper for index-friendly filters.
    * Full-text search uses tsvector/tsquery with GIN index (replaces ILIKE contains).
    */
-  private async fallbackSearch(options: SearchOptions): Promise<SearchResponse> {
-    const {
-      query, discountOnly,
-      sortBy = 'relevance',
-    } = options;
+  private async fallbackSearch(
+    options: SearchOptions,
+  ): Promise<SearchResponse> {
+    const { query, discountOnly, sortBy = "relevance" } = options;
 
     // Sayfalama parametrelerini güvenli tamsayıya indirge: geçersiz/NaN/≤0 girişlerde
     // `skip = (page-1)*pageSize` NaN olur ve Prisma "Argument skip is missing" ile çöker.
     // Varsayılan: page=1, pageSize=20.
-    const page = Number.isFinite(options.page) && (options.page as number) >= 1 ? Math.floor(options.page as number) : 1;
-    const pageSize = Number.isFinite(options.pageSize) && (options.pageSize as number) >= 1 ? Math.floor(options.pageSize as number) : 20;
+    const page =
+      Number.isFinite(options.page) && (options.page as number) >= 1
+        ? Math.floor(options.page as number)
+        : 1;
+    const pageSize =
+      Number.isFinite(options.pageSize) && (options.pageSize as number) >= 1
+        ? Math.floor(options.pageSize as number)
+        : 20;
 
     let fulltextIds: string[] | undefined;
     if (query) {
@@ -575,12 +691,21 @@ export class SearchProductService {
 
     let orderBy: any;
     switch (sortBy) {
-      case 'price_asc': orderBy = { price: 'asc' }; break;
-      case 'price_desc': orderBy = { price: 'desc' }; break;
-      case 'newest':
-      case 'created_desc': orderBy = { createdAt: 'desc' }; break;
-      case 'created_asc': orderBy = { createdAt: 'asc' }; break;
-      default: orderBy = { createdAt: 'desc' };
+      case "price_asc":
+        orderBy = { price: "asc" };
+        break;
+      case "price_desc":
+        orderBy = { price: "desc" };
+        break;
+      case "newest":
+      case "created_desc":
+        orderBy = { createdAt: "desc" };
+        break;
+      case "created_asc":
+        orderBy = { createdAt: "asc" };
+        break;
+      default:
+        orderBy = { createdAt: "desc" };
     }
 
     const [products, total] = await Promise.all([
@@ -617,7 +742,9 @@ export class SearchProductService {
           manufacturerId: p.manufacturerId || undefined,
           manufacturerName: (p as any).manufacturer?.name || undefined,
           sellerName: p.seller.displayName,
-          imageUrl: p.images[0]?.cardKey ? this.storageService.getPublicAssetUrl(p.images[0].cardKey) : undefined,
+          imageUrl: p.images[0]?.cardKey
+            ? this.storageService.getPublicAssetUrl(p.images[0].cardKey)
+            : undefined,
           score: 0,
         };
       }),

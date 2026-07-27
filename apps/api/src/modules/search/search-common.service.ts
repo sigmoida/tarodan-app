@@ -360,6 +360,10 @@ export class SearchCommonService implements OnModuleInit {
               qualityScore: { type: "integer" },
               popularityScore: { type: "integer" },
               relevanceScore: { type: "integer" },
+              // Aktif boost penceresi (Ekonomik/Vitrin) — aramada boost lift'i için
+              // `boostedUntil > now` range'iyle kullanılır; `boostedAt` LIFO eşitlik bozucu.
+              boostedUntil: { type: "date" },
+              boostedAt: { type: "date" },
               createdAt: { type: "date" },
               updatedAt: { type: "date" },
             },
