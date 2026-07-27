@@ -257,4 +257,75 @@ export class AdminShippingService {
       return { ok: false, error: "Takip servisi kullanılamıyor" };
     return this.suratTrackingService.probeGonderiSil(ref.trim());
   }
+
+  /**
+   * Kargo mutabakatı: müşteriden alınan kargo (alıcı payı) ile Sürat'ın gerçek
+   * faturaladığı tutarı karşılaştırır. delta > 0 platform kârı, < 0 zarar. Yalnız
+   * taşıyıcı maliyeti senkronlanmış (carrierActualCost dolu) gönderiler.
+   */
+  async getShippingReconciliation(limit = 100) {
+    const take = Math.min(Math.max(limit, 1), 500);
+    const shipments = await this.prisma.shipment.findMany({
+      where: { carrierActualCost: { not: null } },
+      orderBy: { carrierCostSyncedAt: "desc" },
+      take,
+      select: {
+        id: true,
+        provider: true,
+        carrierActualCost: true,
+        carrierNetCost: true,
+        carrierTaxAmount: true,
+        carrierDesi: true,
+        carrierCostSyncedAt: true,
+        order: {
+          select: {
+            orderNumber: true,
+            shippingCost: true,
+            buyerShippingAmount: true,
+          },
+        },
+      },
+    });
+
+    const round = (n: number) => Math.round(n * 100) / 100;
+    const rows = shipments.map((s) => {
+      const charged = Number(
+        s.order?.buyerShippingAmount ?? s.order?.shippingCost ?? 0,
+      );
+      const carrier = Number(s.carrierActualCost ?? 0);
+      return {
+        shipmentId: s.id,
+        orderNumber: s.order?.orderNumber ?? null,
+        provider: s.provider,
+        chargedShipping: charged,
+        carrierActualCost: carrier,
+        carrierNetCost:
+          s.carrierNetCost != null ? Number(s.carrierNetCost) : null,
+        carrierTaxAmount:
+          s.carrierTaxAmount != null ? Number(s.carrierTaxAmount) : null,
+        carrierDesi: s.carrierDesi != null ? Number(s.carrierDesi) : null,
+        delta: round(charged - carrier),
+        syncedAt: s.carrierCostSyncedAt,
+      };
+    });
+
+    const totals = rows.reduce(
+      (acc, r) => ({
+        chargedTotal: acc.chargedTotal + r.chargedShipping,
+        carrierTotal: acc.carrierTotal + r.carrierActualCost,
+        deltaTotal: acc.deltaTotal + r.delta,
+      }),
+      { chargedTotal: 0, carrierTotal: 0, deltaTotal: 0 },
+    );
+
+    return {
+      rows,
+      totals: {
+        chargedTotal: round(totals.chargedTotal),
+        carrierTotal: round(totals.carrierTotal),
+        deltaTotal: round(totals.deltaTotal),
+        count: rows.length,
+      },
+    };
+  }
 }

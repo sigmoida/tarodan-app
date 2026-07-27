@@ -108,6 +108,29 @@ export class ShippingTariffService {
     }
   }
 
+  /**
+   * Estimated RETURN-leg shipping cost from the active tariff (Phase 2). Consumed by
+   * refund flows to price the return shipment; falls back to the outbound fee if the
+   * tariff has no return fee configured.
+   */
+  async quoteReturnShipment(provider = DEFAULT_PROVIDER): Promise<number> {
+    const tariff = await this.getActiveTariff(provider).catch(() => null);
+    if (!tariff) return Number(SAFETY_DEFAULT.outboundPackageFee);
+    const fee = Number(tariff.returnPackageFee);
+    return fee > 0 ? fee : Number(tariff.outboundPackageFee);
+  }
+
+  /**
+   * Estimated TRADE-leg shipping cost from the active tariff (Phase 2). Consumed by
+   * trade flows; falls back to the outbound fee if no trade fee is configured.
+   */
+  async quoteTradeShipment(provider = DEFAULT_PROVIDER): Promise<number> {
+    const tariff = await this.getActiveTariff(provider).catch(() => null);
+    if (!tariff) return Number(SAFETY_DEFAULT.outboundPackageFee);
+    const fee = Number(tariff.tradeLegFee);
+    return fee > 0 ? fee : Number(tariff.outboundPackageFee);
+  }
+
   /** Drop the cached active tariff (call after any activation). */
   invalidateActiveCache(provider?: string): void {
     if (provider) this.activeCache.delete(provider);

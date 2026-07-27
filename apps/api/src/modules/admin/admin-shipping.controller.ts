@@ -27,6 +27,7 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AdminService } from "./admin.service";
+import { AdminShippingService } from "./admin-shipping.service";
 import { AdminShippingTariffService } from "./admin-shipping-tariff.service";
 import {
   CreateShippingTariffDto,
@@ -118,8 +119,23 @@ import {
 export class AdminShippingController {
   constructor(
     private readonly adminService: AdminService,
+    private readonly shippingSvc: AdminShippingService,
     private readonly tariffs: AdminShippingTariffService,
   ) {}
+
+  // ==================== SHIPPING RECONCILIATION (charged vs carrier) ============
+
+  @Get("shipping/reconciliation")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({
+    summary: "Charged shipping vs Surat carrier cost (delta = platform P/L)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Reconciliation rows" })
+  async getShippingReconciliation(@Query("limit") limit?: string) {
+    return this.shippingSvc.getShippingReconciliation(
+      limit ? parseInt(limit, 10) : 100,
+    );
+  }
 
   // ==================== SHIPPING TARIFFS (typed pricing) ====================
   // Replaces editing shipping via the generic, unvalidated /admin/settings endpoint.
