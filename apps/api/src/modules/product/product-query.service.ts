@@ -81,6 +81,10 @@ export class ProductQueryService {
       material: materialSlug,
       tradeOnly,
       discountOnly,
+      // Boost filters change the result set (home Vitrin rail vs a plain browse)
+      // yet share page/limit/status — must be part of the key or they'd collide.
+      homeShowcase: query.homeShowcase,
+      boostedOnly: query.boostedOnly,
       preOrder,
       limited,
       set: query.set,
