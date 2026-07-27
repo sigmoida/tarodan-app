@@ -317,8 +317,19 @@ export class OrderCheckoutDirectService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost =
+      const fullShipping =
         await this.orderPricing.calculateShippingCost(discountedPrice);
+      // Kargo payı: tek kargo tutarı alıcı/satıcı arasında bölünür (kurala göre).
+      // buyerShare=100 → alıcı tümünü öder (mevcut davranış). Alıcı yalnız kendi
+      // payını öder; kalanı satıcı üstlenir (payout formülü değişmeden buyerShipping
+      // satıcıya akar; satıcı kargoyu öderken sellerShipping kadarını absorbe eder).
+      const buyerShippingAmount =
+        Math.round(
+          fullShipping * (commissionResult.shippingBuyerShare / 100) * 100,
+        ) / 100;
+      const sellerShippingAmount =
+        Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
+      const shippingCost = buyerShippingAmount; // buyer-charged shipping
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const { taxAmount, withholdingTaxAmount } =
         await this.checkoutCommon.resolveSellerTaxes(
@@ -443,6 +454,12 @@ export class OrderCheckoutDirectService {
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
+          buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+          buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+          sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+          sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
+          buyerShippingAmount,
+          sellerShippingAmount,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: shippingAddressId,
@@ -745,6 +762,12 @@ export class OrderCheckoutDirectService {
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
+          buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+          buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+          sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+          sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
+          buyerShippingAmount: 0,
+          sellerShippingAmount: 0,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: dto.shippingAddressId,

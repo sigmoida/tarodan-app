@@ -1207,6 +1207,15 @@ model Order {
   version                Int                    @default(1)
   buyerFeeAmount         Decimal                @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
   sellerFeeAmount        Decimal                @default(0) @map("seller_fee_amount") @db.Decimal(10, 2)
+  // v2 kesinti kırılımı (CommissionRule v2). buyerFeeAmount = buyerCommission + buyerServiceFee,
+  // sellerFeeAmount = sellerCommission + sellerPlatformFee (geriye-uyum için toplamlar korunur).
+  buyerCommissionAmount   Decimal               @default(0) @map("buyer_commission_amount") @db.Decimal(10, 2)
+  buyerServiceFeeAmount   Decimal               @default(0) @map("buyer_service_fee_amount") @db.Decimal(10, 2)
+  sellerCommissionAmount  Decimal               @default(0) @map("seller_commission_amount") @db.Decimal(10, 2)
+  sellerPlatformFeeAmount Decimal               @default(0) @map("seller_platform_fee_amount") @db.Decimal(10, 2)
+  // Kargo tutarının taraflara dağılımı (shippingCost = buyerShippingAmount + sellerShippingAmount).
+  buyerShippingAmount     Decimal               @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
+  sellerShippingAmount    Decimal               @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
   discountAmount         Decimal                @default(0) @map("discount_amount") @db.Decimal(10, 2)
   discountBreakdown      Json?                  @map("discount_breakdown")
   discountCode           String?                @map("discount_code")
@@ -1709,11 +1718,34 @@ model CommissionRule {
   sellerMin      Decimal?              @map("seller_min") @db.Decimal(10, 2)
   sellerRate     Decimal?              @map("seller_rate") @db.Decimal(7, 4)
   sellerType     CommissionSellerType? @map("seller_type")
+
+  // ── v2 (kesinti profili) ──
+  // Ek eşleşme ekseni: bireysel/kurumsal (businessStatus+taxId), üyelikten (sellerType) bağımsız.
+  taxpayerType          CommissionTaxpayerType @default(all) @map("taxpayer_type")
+  // Kademeli eşleşme: ürün/satır tutarı [minAmount, maxAmount] aralığı (minAmount legacy sütunu yeniden kullanılır).
+  maxAmount             Decimal?               @map("max_amount") @db.Decimal(12, 2)
+  // Dört ayrı kesinti oranı (%) + opsiyonel TL taban/tavan.
+  buyerCommissionRate   Decimal?               @map("buyer_commission_rate") @db.Decimal(7, 4)
+  buyerCommissionMin    Decimal?               @map("buyer_commission_min") @db.Decimal(10, 2)
+  buyerCommissionMax    Decimal?               @map("buyer_commission_max") @db.Decimal(10, 2)
+  buyerServiceFeeRate   Decimal?               @map("buyer_service_fee_rate") @db.Decimal(7, 4)
+  buyerServiceFeeMin    Decimal?               @map("buyer_service_fee_min") @db.Decimal(10, 2)
+  buyerServiceFeeMax    Decimal?               @map("buyer_service_fee_max") @db.Decimal(10, 2)
+  sellerCommissionRate  Decimal?               @map("seller_commission_rate") @db.Decimal(7, 4)
+  sellerCommissionMin   Decimal?               @map("seller_commission_min") @db.Decimal(10, 2)
+  sellerCommissionMax   Decimal?               @map("seller_commission_max") @db.Decimal(10, 2)
+  sellerPlatformFeeRate Decimal?               @map("seller_platform_fee_rate") @db.Decimal(7, 4)
+  sellerPlatformFeeMin  Decimal?               @map("seller_platform_fee_min") @db.Decimal(10, 2)
+  sellerPlatformFeeMax  Decimal?               @map("seller_platform_fee_max") @db.Decimal(10, 2)
+  // Tek kargo tutarının alıcı payı (%). Satıcı payı = 100 - buyerShare. Varsayılan 100 = alıcı öder (mevcut davranış).
+  shippingBuyerShare    Decimal                @default(100) @map("shipping_buyer_share") @db.Decimal(5, 2)
+
   category       Category?             @relation(fields: [categoryId], references: [id])
 
   @@index([isActive])
   @@index([categoryId, sellerType, isActive])
   @@index([sellerType, isActive])
+  @@index([categoryId, taxpayerType, sellerType, isActive])
   @@map("commission_rules")
 }
 
@@ -2364,6 +2396,14 @@ enum CommissionSellerType {
   PREMIUM
   BUSINESS
   ALL
+}
+
+/// Vergi mükellefiyeti ekseni (üyelikten ayrı): bireysel vs kurumsal satıcı.
+/// Kurumsal = businessStatus=approved && taxId. `all` = ayrım yapma.
+enum CommissionTaxpayerType {
+  individual
+  corporate
+  all
 }
 
 enum TradeStatus {

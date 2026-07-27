@@ -3454,8 +3454,34 @@
           "nameRequired": "Kural adı gerekli",
           "sellerRateRequired": "Satıcı oranı gerekli",
           "buyerRateRequired": "Alıcı oranı gerekli",
-          "maxBelowMin": "Maksimum, minimumdan küçük olamaz"
-        }
+          "maxBelowMin": "Maksimum, minimumdan küçük olamaz",
+          "atLeastOneRate": "En az bir kesinti oranı girmelisiniz."
+        },
+        "taxpayerType": "Vergi Tipi",
+        "taxpayer": {
+          "individual": "Bireysel",
+          "corporate": "Kurumsal"
+        },
+        "minAmountLabel": "Min. Tutar (kademe)",
+        "maxAmountLabel": "Maks. Tutar (kademe)",
+        "ratePercent": "Oran (%)",
+        "minTl": "Alt Sınır (₺)",
+        "maxTl": "Üst Sınır (₺)",
+        "sellerPlatformFee": "Satıcı Platform Hizmet Bedeli",
+        "shippingBuyerShareLabel": "Kargo Alıcı Payı (%)",
+        "shippingShareHelper": "Tek kargo tutarının alıcıya düşen yüzdesi; kalanı satıcı üstlenir.",
+        "exampleShipping": "Örnek Kargo (₺)",
+        "exampleVat": "Örnek KDV (%)",
+        "exampleWithholding": "Örnek Stopaj (%)",
+        "buyerShipping": "Alıcı Kargo Payı",
+        "sellerShipping": "Satıcı Kargo Payı",
+        "buyerPays": "Alıcı Öder",
+        "sellerReceives": "Satıcı Alır",
+        "vat": "KDV",
+        "commissionVat": "Komisyon KDV",
+        "withholding": "Stopaj",
+        "corporateOnlyNote": "KDV ve stopaj yalnızca kurumsal satıcılara uygulanır (bireysel için 0).",
+        "previewTaxNote": "KDV/stopaj örnek değerlerdir; gerçek oranlar Finans → Vergi ekranından gelir."
       },
       "invoices": {
         "title": "Faturalar",

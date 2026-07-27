@@ -309,8 +309,16 @@ export class OrderGuestCheckoutService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost =
+      const fullShipping =
         await this.orderPricing.calculateShippingCost(finalPrice);
+      // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
+      const buyerShippingAmount =
+        Math.round(
+          fullShipping * (commissionResult.shippingBuyerShare / 100) * 100,
+        ) / 100;
+      const sellerShippingAmount =
+        Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
+      const shippingCost = buyerShippingAmount; // buyer-charged shipping
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const {
         taxAmount: guestTaxAmount,
@@ -422,6 +430,12 @@ export class OrderGuestCheckoutService {
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
+          buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+          buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+          sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+          sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
+          buyerShippingAmount,
+          sellerShippingAmount,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,

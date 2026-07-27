@@ -235,7 +235,11 @@ export class ElogoInvoicingService {
     const [order, ledger] = await Promise.all([
       this.prisma.order.findUnique({
         where: { id: orderId },
-        select: { sellerId: true },
+        select: {
+          sellerId: true,
+          sellerCommissionAmount: true,
+          sellerPlatformFeeAmount: true,
+        },
       }),
       this.prisma.commissionLedger.findUnique({
         where: { orderId },
@@ -251,7 +255,17 @@ export class ElogoInvoicingService {
       Number(ledger.sellerCommission) -
       Number(ledger.refundedSellerCommission ?? 0);
     if (netCommission <= 0) return;
-    await this.cut("commission", orderId, order.sellerId, netCommission);
+    // v2: satıcı kesintisi komisyon + platform hizmet bedelinden oluşabilir —
+    // fatura kalem açıklaması bileşimi yansıtır (tek toplam tutar kesilir).
+    const hasCommission = Number(order.sellerCommissionAmount ?? 0) > 0;
+    const hasPlatformFee = Number(order.sellerPlatformFeeAmount ?? 0) > 0;
+    const desc =
+      hasCommission && hasPlatformFee
+        ? "Aracılık komisyonu ve platform hizmet bedeli"
+        : hasPlatformFee
+          ? "Platform hizmet bedeli"
+          : undefined; // komisyon-only → varsayılan LINE_DESCRIPTION.commission
+    await this.cut("commission", orderId, order.sellerId, netCommission, desc);
   }
 
   /**
@@ -285,7 +299,12 @@ export class ElogoInvoicingService {
     const [order, ledger] = await Promise.all([
       this.prisma.order.findUnique({
         where: { id: orderId },
-        select: { buyerId: true, sellerId: true },
+        select: {
+          buyerId: true,
+          sellerId: true,
+          buyerServiceFeeAmount: true,
+          buyerCommissionAmount: true,
+        },
       }),
       this.prisma.commissionLedger.findUnique({
         where: { orderId },
@@ -300,7 +319,16 @@ export class ElogoInvoicingService {
     const netBuyerFee =
       Number(ledger.buyerFee) - Number(ledger.refundedBuyerFee ?? 0);
     if (netBuyerFee <= 0) return;
-    await this.cut("service_fee", orderId, order.buyerId, netBuyerFee);
+    // v2: alıcı kesintisi koruma hizmet bedeli + alıcı komisyonundan oluşabilir.
+    const hasService = Number(order.buyerServiceFeeAmount ?? 0) > 0;
+    const hasBuyerCommission = Number(order.buyerCommissionAmount ?? 0) > 0;
+    const desc =
+      hasService && hasBuyerCommission
+        ? "Alıcı koruma hizmet bedeli ve komisyonu"
+        : hasBuyerCommission
+          ? "Alıcı komisyonu"
+          : undefined; // service-only → varsayılan LINE_DESCRIPTION.service_fee
+    await this.cut("service_fee", orderId, order.buyerId, netBuyerFee, desc);
   }
 
   /** Üyelik faturası → ÜYEYE (membershipPayment.amount). */
