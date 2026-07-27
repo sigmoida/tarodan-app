@@ -1202,8 +1202,6 @@ export class AdminService {
       canCreateCollections?: boolean;
       canTrade?: boolean;
       isAdFree?: boolean;
-      featuredListingSlots?: number;
-      commissionDiscount?: number;
       isActive?: boolean;
       sortOrder?: number;
     },

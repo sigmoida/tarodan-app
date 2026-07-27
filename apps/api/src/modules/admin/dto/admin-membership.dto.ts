@@ -6,7 +6,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  Max,
   MaxLength,
   Min,
 } from "class-validator";
@@ -75,17 +74,10 @@ export class UpdateMembershipTierDto {
   @IsBoolean()
   isAdFree?: boolean;
 
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  featuredListingSlots?: number;
-
-  // Decimal(5,4) — indirim oranı 0..1 aralığında bir kesirdir.
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  commissionDiscount?: number;
+  // featuredListingSlots + commissionDiscount are intentionally NOT editable here:
+  // the former is superseded by the paid ad-packages boost system, the latter was
+  // never applied by the commission engine (commission-rules-v2). The DB columns are
+  // retained (deprecated) but the admin can no longer set misleading values.
 
   @IsOptional()
   @IsBoolean()

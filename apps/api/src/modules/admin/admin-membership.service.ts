@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { AdminAuditService } from './admin-audit.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { AdminAuditService } from "./admin-audit.service";
 
 /**
  * Üyelik seviyesi admin operasyonları (liste, güncelleme) —
@@ -29,7 +26,7 @@ export class AdminMembershipService {
           select: { userMemberships: true },
         },
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sortOrder: "asc" },
     });
 
     return {
@@ -59,28 +56,30 @@ export class AdminMembershipService {
   /**
    * Update membership tier
    */
-  async updateMembershipTier(adminId: string, tierId: string, dto: {
-    name?: string;
-    description?: string;
-    monthlyPrice?: number;
-    yearlyPrice?: number;
-    maxFreeListings?: number;
-    maxTotalListings?: number;
-    maxImagesPerListing?: number;
-    canCreateCollections?: boolean;
-    canTrade?: boolean;
-    isAdFree?: boolean;
-    featuredListingSlots?: number;
-    commissionDiscount?: number;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
+  async updateMembershipTier(
+    adminId: string,
+    tierId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      monthlyPrice?: number;
+      yearlyPrice?: number;
+      maxFreeListings?: number;
+      maxTotalListings?: number;
+      maxImagesPerListing?: number;
+      canCreateCollections?: boolean;
+      canTrade?: boolean;
+      isAdFree?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
     const tier = await this.prisma.membershipTier.findUnique({
       where: { id: tierId },
     });
 
     if (!tier) {
-      throw new NotFoundException('Üyelik seviyesi bulunamadı');
+      throw new NotFoundException("Üyelik seviyesi bulunamadı");
     }
 
     const oldTier = { ...tier };
@@ -90,25 +89,33 @@ export class AdminMembershipService {
       data: {
         name: dto.name,
         description: dto.description,
-        monthlyPrice: dto.monthlyPrice !== undefined ? dto.monthlyPrice : undefined,
-        yearlyPrice: dto.yearlyPrice !== undefined ? dto.yearlyPrice : undefined,
+        monthlyPrice:
+          dto.monthlyPrice !== undefined ? dto.monthlyPrice : undefined,
+        yearlyPrice:
+          dto.yearlyPrice !== undefined ? dto.yearlyPrice : undefined,
         maxFreeListings: dto.maxFreeListings,
         maxTotalListings: dto.maxTotalListings,
         maxImagesPerListing: dto.maxImagesPerListing,
         canCreateCollections: dto.canCreateCollections,
         canTrade: dto.canTrade,
         isAdFree: dto.isAdFree,
-        featuredListingSlots: dto.featuredListingSlots,
-        commissionDiscount: dto.commissionDiscount !== undefined ? dto.commissionDiscount : undefined,
+        // featuredListingSlots + commissionDiscount are no longer admin-editable
+        // (dead entitlement / never applied); DB columns retained but left untouched.
         isActive: dto.isActive,
         sortOrder: dto.sortOrder,
       },
     });
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'membership_tier_update', 'MembershipTier', tierId, oldTier, updatedTier);
+    await this.audit.createAuditLog(
+      adminId,
+      "membership_tier_update",
+      "MembershipTier",
+      tierId,
+      oldTier,
+      updatedTier,
+    );
 
     return updatedTier;
   }
-
 }

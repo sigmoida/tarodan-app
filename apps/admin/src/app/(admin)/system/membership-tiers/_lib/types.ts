@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { useTranslations } from 'next-intl';
+import { z } from "zod";
+import { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -25,9 +25,9 @@ export interface MembershipTier {
 
 /** platform_settings monthly-price key — only paid tiers have one (free has none). */
 export const PRICE_KEY: Record<string, string> = {
-  basic: 'basic_monthly_price',
-  premium: 'premium_monthly_price',
-  business: 'business_monthly_price',
+  basic: "basic_monthly_price",
+  premium: "premium_monthly_price",
+  business: "business_monthly_price",
 };
 
 /** Yearly price = monthly × 12 × (1 − discount%). */
@@ -37,15 +37,13 @@ export const computedYearly = (monthly: number, discountPct: number) =>
 /** Form schema — validation-only; numbers are shaped in the mutationFn. */
 export const tierSchema = (t: T) =>
   z.object({
-    name: z.string().min(1, t('admin.tiers.validation.nameRequired')),
-    description: z.string().optional().default(''),
-    monthlyPrice: z.string().optional().default('0'),
-    maxFreeListings: z.string().optional().default('0'),
-    maxTotalListings: z.string().optional().default('0'),
-    maxImagesPerListing: z.string().optional().default('0'),
-    featuredListingSlots: z.string().optional().default('0'),
-    commissionDiscount: z.string().optional().default('0'),
-    sortOrder: z.string().optional().default('0'),
+    name: z.string().min(1, t("admin.tiers.validation.nameRequired")),
+    description: z.string().optional().default(""),
+    monthlyPrice: z.string().optional().default("0"),
+    maxFreeListings: z.string().optional().default("0"),
+    maxTotalListings: z.string().optional().default("0"),
+    maxImagesPerListing: z.string().optional().default("0"),
+    sortOrder: z.string().optional().default("0"),
     canCreateCollections: z.boolean().default(false),
     canTrade: z.boolean().default(false),
     isAdFree: z.boolean().default(false),
@@ -57,13 +55,11 @@ export type TierFormValues = z.infer<ReturnType<typeof tierSchema>>;
 export function tierToForm(t: MembershipTier): TierFormValues {
   return {
     name: t.name,
-    description: t.description ?? '',
+    description: t.description ?? "",
     monthlyPrice: String(t.monthlyPrice ?? 0),
     maxFreeListings: String(t.maxFreeListings ?? 0),
     maxTotalListings: String(t.maxTotalListings ?? 0),
     maxImagesPerListing: String(t.maxImagesPerListing ?? 0),
-    featuredListingSlots: String(t.featuredListingSlots ?? 0),
-    commissionDiscount: String(t.commissionDiscount ?? 0),
     sortOrder: String(t.sortOrder ?? 0),
     canCreateCollections: t.canCreateCollections,
     canTrade: t.canTrade,
@@ -85,8 +81,6 @@ export function tierFormToPayload(v: TierFormValues, yearlyPrice: number) {
     maxFreeListings: int(v.maxFreeListings),
     maxTotalListings: int(v.maxTotalListings),
     maxImagesPerListing: int(v.maxImagesPerListing),
-    featuredListingSlots: int(v.featuredListingSlots),
-    commissionDiscount: flt(v.commissionDiscount),
     sortOrder: int(v.sortOrder),
     canCreateCollections: v.canCreateCollections,
     canTrade: v.canTrade,
