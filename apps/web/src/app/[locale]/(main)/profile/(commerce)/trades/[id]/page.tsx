@@ -131,8 +131,8 @@ export default function TradeDetailPage() {
         }
       />
 
-      <div className="mb-6 rounded-lg border border-primary-200 bg-primary-50 p-4">
-        <p className="text-sm text-primary-800">{statusMeta.description}</p>
+      <div className="mb-6 rounded-lg border border-border bg-surface-alt p-4">
+        <p className="text-sm text-muted">{statusMeta.description}</p>
         {(trade.status === "cancelled" || trade.status === "rejected") &&
           trade.cancelReason && (
             <p className="mt-2 text-sm text-muted">

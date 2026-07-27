@@ -29,11 +29,11 @@ export default function CashDifferenceCard({
   const isPayer = !!userId && trade.cashPayerId === userId;
 
   return (
-    <div className="card p-6 mb-6 bg-success-50 border-success-200">
+    <div className="card p-6 mb-6 bg-surface-alt border-border">
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="text-sm text-muted">{t("trade.cashDifference")}</p>
-          <p className="text-2xl font-bold text-success-700">
+          <p className="text-2xl font-bold text-primary-600">
             {formatTL(Math.abs(trade.cashAmount))}
           </p>
           {trade.cashPayment && trade.cashPayment.commission > 0 && (
@@ -67,7 +67,7 @@ export default function CashDifferenceCard({
         userId &&
         trade.cashPayerId !== userId &&
         trade.cashPayment?.status !== "completed" && (
-          <div className="pt-4 border-t border-success-200">
+          <div className="pt-4 border-t border-border">
             <div className="flex items-center gap-3 px-4 py-3 bg-surface-elevated/70 rounded-lg">
               <ClockIcon className="w-5 h-5 text-success-700" />
               <p className="text-sm text-body">
@@ -81,19 +81,19 @@ export default function CashDifferenceCard({
       {(trade.status === "accepted" || trade.status === "awaiting_payment") &&
         isPayer &&
         trade.cashPayment?.status !== "completed" && (
-          <div className="pt-4 border-t border-success-200 space-y-5">
-            <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-5 py-3 rounded-lg -mx-1">
-              <h3 className="text-base font-semibold text-inverted">
+          <div className="pt-4 border-t border-border space-y-5">
+            <div className="bg-surface px-5 py-3 rounded-lg -mx-1 border border-border">
+              <h3 className="text-base font-semibold text-heading">
                 {t("payment.completeYourPayment")}
               </h3>
-              <p className="text-sm text-primary-100 mt-0.5">
+              <p className="text-sm text-muted mt-0.5">
                 {t("trade.completePaymentDesc")}
               </p>
             </div>
 
             {/* Pay Button */}
             <Button
-              variant="success"
+              variant="primary"
               size="lg"
               className="w-full flex items-center justify-center gap-2 text-base"
               onClick={onPay}

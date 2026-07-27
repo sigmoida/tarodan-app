@@ -24,7 +24,7 @@ export default function ShipInfoForm({
 }: ShipInfoFormProps) {
   const t = useTranslations();
   return (
-    <div className="card p-6 mb-6 bg-primary-50 border-primary-200">
+    <div className="card p-6 mb-6 bg-surface-alt border-border">
       <h2 className="text-lg font-semibold text-heading mb-4">
         {t("trade.enterShipInfo")}
       </h2>

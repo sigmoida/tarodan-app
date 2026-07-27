@@ -27,28 +27,28 @@ export default function TradeInfoBanners({
       {(trade.status === "pending" ||
         trade.status === "accepted" ||
         trade.status === "awaiting_payment") && (
-        <div className="card p-4 mb-6 bg-info-50 border-info-200">
-          <h3 className="font-semibold text-info-900 mb-2 flex items-center gap-2">
-            <CheckCircleIcon className="w-5 h-5 text-info-600" />
+        <div className="card p-4 mb-6 bg-surface-alt border-border">
+          <h3 className="font-semibold text-heading mb-2 flex items-center gap-2">
+            <CheckCircleIcon className="w-5 h-5 text-muted" />
             {t("trade.safeTradeTitle")}
           </h3>
-          <p className="text-sm text-info-800">{t("trade.safeTradeDesc")}</p>
+          <p className="text-sm text-muted">{t("trade.safeTradeDesc")}</p>
         </div>
       )}
 
       {/* Safe-trade (escrow) warehouse info banner */}
       {(trade.status === "at_warehouse" ||
         trade.status === "admin_reviewing") && (
-        <div className="card p-6 mb-6 bg-info-50 border-2 border-info-200">
+        <div className="card p-6 mb-6 bg-surface-alt border border-border">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-info-500 flex items-center justify-center">
-              <ShieldCheckIcon className="w-7 h-7 text-inverted" />
+            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-surface flex items-center justify-center">
+              <ShieldCheckIcon className="w-7 h-7 text-muted" />
             </div>
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-info-900 mb-1">
+              <h2 className="text-xl font-bold text-heading mb-1">
                 {t("trade.warehouseBannerTitle")}
               </h2>
-              <p className="text-sm text-info-800">
+              <p className="text-sm text-muted">
                 {t("trade.warehouseBannerDesc")}
               </p>
             </div>

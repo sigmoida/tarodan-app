@@ -9,9 +9,9 @@ export default function TradeCountdown({
 }) {
   if (!countdown) return null;
   return (
-    <div className="card p-4 mb-6 bg-primary-50 border-primary-200">
+    <div className="card p-4 mb-6 bg-warning-50 border-warning-200">
       <div className="flex items-center gap-3">
-        <ClockIcon className="w-6 h-6 text-primary-600" />
+        <ClockIcon className="w-6 h-6 text-warning-600" />
         <div>
           <p className="font-semibold text-primary-800 text-lg font-mono">
             {countdown}

@@ -1,7 +1,6 @@
 /** @format */
 
 import { Link } from "@/i18n/navigation";
-import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import OptimizedImage from "@/components/OptimizedImage";
 import { formatTL } from "@/lib/format";
 import {
@@ -9,6 +8,7 @@ import {
   getItemImage,
   type TradeItem,
 } from "../../_lib/types";
+import { TradeSwapBadge } from "../../_components/TradeSwapBadge";
 
 function ItemColumn({
   heading,
@@ -29,7 +29,7 @@ function ItemColumn({
           <Link
             key={item.id}
             href={`/listings/${item.productId}`}
-            className="flex items-center gap-3 p-3 bg-surface rounded-lg hover:bg-surface-alt transition-colors"
+            className="group/item flex items-center gap-3 rounded-lg p-2 transition-colors"
           >
             <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-border-subtle flex-shrink-0">
               <OptimizedImage
@@ -47,7 +47,7 @@ function ItemColumn({
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-heading truncate">
+              <p className="font-medium text-heading truncate transition-colors group-hover/item:text-primary-600">
                 {item.productTitle}
               </p>
               <p className="text-sm text-muted">
@@ -90,9 +90,7 @@ export default function TradeItemsComparison({
 
       {/* ORTA - Takas İkonu */}
       <div className="flex items-center justify-center py-4 lg:py-0">
-        <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
-          <ArrowsRightLeftIcon className="w-8 h-8 text-primary-600" />
-        </div>
+        <TradeSwapBadge size="lg" />
       </div>
 
       {/* SAĞ - Benim Teklifim */}

@@ -26,7 +26,7 @@ export default function TradeSummary({
   const total = cashPayer === "me" ? productsTotal + cashAmount : productsTotal;
 
   return (
-    <div className="rounded-lg border border-primary-200 bg-primary-50 p-6">
+    <div className="rounded-lg border border-border bg-surface-alt p-6">
       <h2 className="mb-4 text-lg font-semibold text-heading">Teklif Özeti</h2>
       <div className="space-y-2 text-body">
         <div className="flex justify-between">
@@ -52,7 +52,7 @@ export default function TradeSummary({
             <span className="font-medium">{formatTL(cashAmount)}</span>
           </div>
         )}
-        <div className="mt-2 border-t border-primary-200 pt-2">
+        <div className="mt-2 border-t border-border pt-2">
           <div className="flex justify-between text-lg font-bold">
             <span>Toplam Teklif:</span>
             <span className="text-primary-600">{formatTL(total)}</span>

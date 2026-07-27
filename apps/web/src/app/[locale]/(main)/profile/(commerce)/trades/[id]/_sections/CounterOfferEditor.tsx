@@ -1,8 +1,11 @@
 /** @format */
 
 import { Link } from "@/i18n/navigation";
-import { ArrowsRightLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
-import { Button, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
+import {
+  ArrowsRightLeftIcon,
+  ChevronLeftIcon,
+} from "@heroicons/react/24/outline";
+import { Button, Checkbox, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { getProductImage } from "../_lib/types";
@@ -42,12 +45,12 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
           <Button
             variant="secondary"
             onClick={handleExitCounterMode}
-            className="text-primary-500 hover:text-primary-600 mb-4 inline-block"
+            className="mb-4 gap-1"
           >
-            ← {t("trade.backToTrade")}
+            <ChevronLeftIcon className="h-4 w-4" />
+            {t("trade.backToTrade")}
           </Button>
-          <h1 className="text-3xl font-bold text-heading flex items-center gap-3">
-            <ArrowsRightLeftIcon className="w-8 h-8 text-primary-500" />
+          <h1 className="text-3xl font-bold text-heading">
             {t("trade.counterOffer")}
           </h1>
           <p className="text-muted mt-2">{t("trade.counterOfferModify")}</p>
@@ -84,21 +87,22 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                         product.id,
                       );
                       return (
-                        <button
-                          type="button"
+                        <label
                           key={product.id}
-                          onClick={() => toggleCounterTargetProduct(product.id)}
-                          className={`relative block w-full rounded-xl border-2 p-4 transition-all ${
+                          className={`relative block w-full cursor-pointer rounded-xl border-2 p-4 transition-all ${
                             isSelected
                               ? "border-primary-500 ring-2 ring-primary-200"
                               : "border-border hover:border-primary-300"
                           }`}
                         >
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
-                              <CheckIcon className="w-4 h-4 text-inverted" />
-                            </div>
-                          )}
+                          <div className="absolute top-2 right-2 z-10">
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() =>
+                                toggleCounterTargetProduct(product.id)
+                              }
+                            />
+                          </div>
                           <div className="flex flex-col items-center gap-3">
                             <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
                               <OptimizedImage
@@ -127,7 +131,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                               </p>
                             </div>
                           </div>
-                        </button>
+                        </label>
                       );
                     })}
                   </div>
@@ -165,21 +169,20 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                         product.id,
                       );
                       return (
-                        <button
-                          type="button"
+                        <label
                           key={product.id}
-                          onClick={() => toggleCounterProduct(product.id)}
-                          className={`relative block w-full rounded-xl border-2 p-4 transition-all ${
+                          className={`relative block w-full cursor-pointer rounded-xl border-2 p-4 transition-all ${
                             isSelected
                               ? "border-primary-500 ring-2 ring-primary-200"
                               : "border-border hover:border-primary-300"
                           }`}
                         >
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
-                              <CheckIcon className="w-4 h-4 text-inverted" />
-                            </div>
-                          )}
+                          <div className="absolute top-2 right-2 z-10">
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() => toggleCounterProduct(product.id)}
+                            />
+                          </div>
                           <div className="flex flex-col items-center gap-3">
                             <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
                               <OptimizedImage
@@ -208,7 +211,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                               </p>
                             </div>
                           </div>
-                        </button>
+                        </label>
                       );
                     })}
                   </div>

@@ -32,13 +32,13 @@ export default function RecipientsShipmentCard({
   }
 
   return (
-    <div className="card p-6 mb-6 bg-info-50 border-info-200">
+    <div className="card p-6 mb-6 bg-surface-alt border-border">
       <h2 className="text-lg font-semibold text-heading mb-4">
         {t("trade.shipmentOnWay")}
       </h2>
 
       {myFromWarehouseShipment ? (
-        <div className="p-4 bg-surface-elevated rounded-lg border border-info-200 mb-4">
+        <div className="p-4 bg-surface-elevated rounded-lg border border-border mb-4">
           <p className="text-sm text-muted mb-1">{t("trade.shippedToYou")}</p>
           <p className="font-medium text-heading">
             {myFromWarehouseShipment.carrier === "surat"
@@ -75,13 +75,13 @@ export default function RecipientsShipmentCard({
             )}
         </div>
       ) : (
-        <div className="p-4 bg-surface-elevated rounded-lg border border-info-200 mb-4">
+        <div className="p-4 bg-surface-elevated rounded-lg border border-border mb-4">
           <p className="text-sm text-muted">{t("trade.trackingSoon")}</p>
         </div>
       )}
 
       {otherFromWarehouseShipment && (
-        <div className="p-3 bg-surface-elevated/70 rounded-lg border border-info-100 mb-4 text-sm text-muted">
+        <div className="p-3 bg-surface-elevated/70 rounded-lg border border-border-subtle mb-4 text-sm text-muted">
           <p className="font-medium text-body mb-0.5">
             {t("trade.otherPartyShipment")}
           </p>
@@ -102,7 +102,7 @@ export default function RecipientsShipmentCard({
       )}
 
       <Button
-        variant="success"
+        variant="primary"
         size="lg"
         className="w-full flex items-center justify-center gap-2"
         onClick={onConfirmReceipt}
