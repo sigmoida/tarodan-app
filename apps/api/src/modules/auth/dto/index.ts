@@ -9,3 +9,4 @@ export * from "./google-auth.dto";
 export * from "./check-email.dto";
 export * from "./apple-auth.dto";
 export * from "./phone-verification.dto";
+export * from "./email-change.dto";

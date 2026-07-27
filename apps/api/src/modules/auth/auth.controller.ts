@@ -20,6 +20,7 @@ import {
 import { type Locale } from "@tarodan/i18n";
 import { AuthService } from "./auth.service";
 import { PhoneVerificationService } from "./phone-verification.service";
+import { EmailChangeService } from "./email-change.service";
 import { I18nService, ReqLocale } from "../i18n";
 import {
   RegisterDto,
@@ -35,6 +36,8 @@ import {
   AppleAuthDto,
   SendPhoneCodeDto,
   VerifyPhoneDto,
+  RequestEmailChangeDto,
+  VerifyEmailChangeDto,
 } from "./dto";
 import { JwtAuthGuard, JwtRefreshGuard } from "./guards";
 import { Public, CurrentUser } from "./decorators";
@@ -52,6 +55,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly phoneVerificationService: PhoneVerificationService,
+    private readonly emailChangeService: EmailChangeService,
     private readonly i18n: I18nService,
   ) {}
 
@@ -395,6 +399,48 @@ export class AuthController {
         locale,
       ),
       isPhoneVerified: result.isPhoneVerified,
+    };
+  }
+
+  /**
+   * POST /auth/email/request-change
+   * Kullanıcının e-postasını değiştirmek için YENİ adrese aktivasyon kodu gönderir.
+   * Mevcut e-posta doğrulanana kadar aktif kalır.
+   */
+  @Post("email/request-change")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOperation({ summary: "E-posta değişikliği kodu gönder" })
+  async requestEmailChange(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: RequestEmailChangeDto,
+    @ReqLocale() locale: Locale,
+  ): Promise<{ message: string }> {
+    await this.emailChangeService.requestChange(user.id, dto.newEmail);
+    return {
+      message: this.i18n.translate("server.auth.emailChangeCodeSent", locale),
+    };
+  }
+
+  /**
+   * POST /auth/email/verify-change
+   * Aktivasyon kodunu doğrular ve e-postayı yeni adresle değiştirir.
+   */
+  @Post("email/verify-change")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: "E-posta değişikliği kodunu doğrula" })
+  async verifyEmailChange(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: VerifyEmailChangeDto,
+    @ReqLocale() locale: Locale,
+  ): Promise<{ message: string; email: string }> {
+    const result = await this.emailChangeService.verify(user.id, dto.code);
+    return {
+      message: this.i18n.translate("server.auth.emailChangeSuccess", locale),
+      email: result.email,
     };
   }
 

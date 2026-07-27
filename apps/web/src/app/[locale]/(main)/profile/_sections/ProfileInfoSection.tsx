@@ -2,9 +2,8 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { CameraIcon } from "@heroicons/react/24/outline";
-import { Button, Spinner } from "@tarodan/ui";
+import { useEffect, useState } from "react";
+import { Button, Input, Modal } from "@tarodan/ui";
 import {
   Form,
   FormDatePicker,
@@ -13,15 +12,13 @@ import {
   FormTextarea,
   useZodForm,
 } from "@tarodan/ui/form";
-import OptimizedImage from "@/components/OptimizedImage";
-import UserAvatar from "@/components/UserAvatar";
 import SectionCard from "@/components/ui/SectionCard";
 import { useAuthStore } from "@/stores/authStore";
 import { profileInfoSchema, type ProfileInfoValues } from "../_lib/schemas";
 import {
   useProfileInfo,
   useUpdateProfile,
-  useUploadAvatar,
+  useEmailChange,
 } from "../_hooks/useProfileInfo";
 
 const EMPTY: ProfileInfoValues = {
@@ -34,17 +31,103 @@ const EMPTY: ProfileInfoValues = {
   taxOffice: "",
 };
 
+/** Two-step email change: send a code to the NEW address, then verify it. The
+ *  current email keeps working until the code is confirmed. */
+function EmailChangeModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { sendCode, verify } = useEmailChange();
+  const [step, setStep] = useState<"enter" | "verify">("enter");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setStep("enter");
+      setEmail("");
+      setCode("");
+    }
+  }, [open]);
+
+  return (
+    <Modal isOpen={open} onClose={onClose} title="E-posta Değiştir">
+      {step === "enter" ? (
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Yeni e-posta adresinize 6 haneli bir doğrulama kodu göndereceğiz.
+            Mevcut e-postanız kod doğrulanana kadar geçerli kalır.
+          </p>
+          <Input
+            label="Yeni e-posta"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="yeni@ornek.com"
+            autoComplete="email"
+          />
+          <Button
+            className="w-full"
+            disabled={!email.trim()}
+            isLoading={sendCode.isPending}
+            onClick={() =>
+              sendCode.mutate(email.trim(), {
+                onSuccess: () => setStep("verify"),
+              })
+            }
+          >
+            Kod Gönder
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            <strong className="text-heading">{email}</strong> adresine
+            gönderilen 6 haneli kodu girin.
+          </p>
+          <Input
+            label="Doğrulama kodu"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            placeholder="123456"
+            maxLength={6}
+            inputMode="numeric"
+          />
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => setStep("enter")}
+            >
+              Geri
+            </Button>
+            <Button
+              className="flex-1"
+              disabled={code.length !== 6}
+              isLoading={verify.isPending}
+              onClick={() => verify.mutate(code, { onSuccess: onClose })}
+            >
+              Doğrula
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 /** Personal (+ business) info — independent query, RHF+zod form, own save button. */
 export default function ProfileInfoSection() {
   const { isAuthenticated, user } = useAuthStore();
   const { profile, isLoading } = useProfileInfo(isAuthenticated);
   const updateProfile = useUpdateProfile();
-  const uploadAvatar = useUploadAvatar();
 
   const isBusiness =
     (profile?.membershipTier ?? user?.membershipTier) === "business";
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const form = useZodForm(profileInfoSchema, { defaultValues: EMPTY });
 
@@ -61,7 +144,6 @@ export default function ProfileInfoSection() {
       taxId: profile.taxId || "",
       taxOffice: "",
     });
-    if (profile.avatarUrl) setPhoto((p) => p ?? profile.avatarUrl!);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
@@ -73,15 +155,6 @@ export default function ProfileInfoSection() {
       delete payload.taxOffice;
     }
     updateProfile.mutate(payload);
-  };
-
-  const onPickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
-    if (file.size > 5 * 1024 * 1024) return;
-    uploadAvatar.mutate(file, { onSuccess: (url) => setPhoto(url) });
   };
 
   return (
@@ -98,55 +171,6 @@ export default function ProfileInfoSection() {
         </Button>
       }
     >
-      <div className="mb-5 flex items-center gap-4">
-        <div className="relative">
-          <div className="h-20 w-20 overflow-hidden rounded-xl bg-surface-alt">
-            {photo ? (
-              <OptimizedImage
-                src={photo}
-                alt="Profil"
-                fill
-                className="object-cover"
-                logContext={{ page: "profile-avatar" }}
-              />
-            ) : (
-              <UserAvatar
-                displayName={profile?.displayName}
-                avatarUrl={profile?.avatarUrl}
-                size="lg"
-                className="!h-full !w-full"
-              />
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploadAvatar.isPending}
-            className="absolute -bottom-2 -right-2 h-9 w-9 rounded-lg p-0"
-          >
-            {uploadAvatar.isPending ? (
-              <Spinner size="sm" />
-            ) : (
-              <CameraIcon className="h-4 w-4" />
-            )}
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            onChange={onPickPhoto}
-            className="hidden"
-          />
-        </div>
-        <div>
-          <p className="font-medium text-heading">
-            {profile?.displayName || "—"}
-          </p>
-          <p className="text-sm text-muted">{profile?.email}</p>
-        </div>
-      </div>
-
       {isLoading ? (
         <div className="h-40 animate-pulse rounded-lg bg-surface" />
       ) : (
@@ -156,6 +180,26 @@ export default function ProfileInfoSection() {
             label="Görünen İsim"
             placeholder="Adınız"
           />
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-heading">
+              E-posta
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="flex h-10 flex-1 items-center truncate rounded-lg border border-border bg-surface px-3 text-sm text-muted">
+                {profile?.email || "—"}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEmailModalOpen(true)}
+              >
+                Değiştir
+              </Button>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <FormPhone name="phone" label="Telefon" />
             <FormDatePicker name="birthDate" label="Doğum Tarihi" />
@@ -188,6 +232,11 @@ export default function ProfileInfoSection() {
           )}
         </Form>
       )}
+
+      <EmailChangeModal
+        open={emailModalOpen}
+        onClose={() => setEmailModalOpen(false)}
+      />
     </SectionCard>
   );
 }

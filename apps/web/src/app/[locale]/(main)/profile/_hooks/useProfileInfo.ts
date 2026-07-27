@@ -2,6 +2,7 @@
 
 "use client";
 
+import toast from "react-hot-toast";
 import { api, mediaApi, userApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
@@ -62,6 +63,39 @@ export function useUpdateProfile() {
   );
 }
 
+/**
+ * Email change with an activation code: `sendCode` mails a 6-digit code to the
+ * NEW address (the current email stays active until verified), then `verify`
+ * commits the change. Server error messages (email taken, same as current, …)
+ * surface via useWebMutation.
+ */
+export function useEmailChange() {
+  const t = useTranslations();
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+
+  const sendCode = useWebMutation(
+    (newEmail: string) => api.post("/auth/email/request-change", { newEmail }),
+    {
+      errorMessage: t("profile.sendCodeFailed"),
+      onSuccess: () => toast.success(t("profile.emailChangeCodeSent")),
+    },
+  );
+
+  const verify = useWebMutation(
+    (code: string) => api.post("/auth/email/verify-change", { code }),
+    {
+      invalidates: [RESOURCE, OVERVIEW_RESOURCE],
+      errorMessage: t("profile.invalidCode"),
+      onSuccess: async () => {
+        toast.success(t("profile.emailChanged"));
+        await refreshUser();
+      },
+    },
+  );
+
+  return { sendCode, verify };
+}
+
 /** Upload a new avatar → save the S3 key → return a display URL. */
 export function useUploadAvatar() {
   const t = useTranslations();
@@ -75,7 +109,7 @@ export function useUploadAvatar() {
       return displayUrl || URL.createObjectURL(file);
     },
     {
-      invalidates: [RESOURCE],
+      invalidates: [RESOURCE, OVERVIEW_RESOURCE],
       successMessage: t("profile.photoUpdated"),
       errorMessage: t("profile.photoUploadFailed"),
       onSuccess: () => {

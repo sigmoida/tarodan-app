@@ -62,6 +62,7 @@ export function getEmailTemplateSubject(
     "trade-shipped": "Takasınız Kargoya Verildi",
     "trade-completed": "Takasınız Tamamlandı",
     "guest-checkout-otp": "Misafir Sipariş Doğrulama Kodu",
+    "email-change-otp": "E-posta Değişikliği Doğrulama Kodu",
     "invoice-buyer": `Faturanız - ${data?.invoiceNumber || ""}`,
     "invoice-seller": `Satış Faturası - ${data?.invoiceNumber || ""}`,
     "elogo-invoice": `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ""}`,
@@ -830,6 +831,21 @@ export function renderEmailTemplate(
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Bu kodu siz talep etmediyseniz bu e-postayı görmezden gelebilirsiniz.</p>
     `,
       "Misafir Sipariş Doğrulama Kodu",
+    ),
+
+    "email-change-otp": wrapEmail(
+      `
+      ${titleBlock("E-posta Değişikliği Doğrulama Kodu", "📧")}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Hesabınızın e-posta adresini bu adresle değiştirmek için doğrulama kodunuz:</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <div style="display: inline-block; background: #f3f4f6; border: 2px dashed #d1d5db; border-radius: 16px; padding: 24px 48px;">
+          <p style="font-size: 40px; font-weight: 700; letter-spacing: 12px; color: #111827; margin: 0; font-family: monospace;">${data?.code || ""}</p>
+        </div>
+      </div>
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⏱️ Bu kod <strong>${data?.expiresInMinutes || 15} dakika</strong> geçerlidir. Başkasıyla paylaşmayın.</p>`)}
+      <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Bu değişikliği siz talep etmediyseniz bu e-postayı görmezden gelebilirsiniz; hesabınız etkilenmez.</p>
+    `,
+      "E-posta Değişikliği Doğrulama Kodu",
     ),
 
     "invoice-buyer": wrapEmail(
