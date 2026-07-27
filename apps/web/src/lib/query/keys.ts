@@ -34,6 +34,8 @@ export const queryKeys = {
     all: () => ["listings"] as const,
   },
   home: {
+    /** The home "Öne Çıkan Ürünler" (Vitrin) infinite rail. */
+    featuredRail: () => ["featured-rail"] as const,
     featured: () => ["home", "featured"] as const,
     discounted: () => ["home", "discounted"] as const,
     trade: () => ["home", "trade"] as const,
