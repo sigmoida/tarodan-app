@@ -11,6 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { Button } from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
@@ -129,20 +130,18 @@ export default function CollectionHeaderCard() {
                 <HeartIconSolid className="h-4 w-4 text-danger-500" />
                 {collection.likeCount} {t("collection.likes")}
               </span>
-              <span className="font-medium">
-                {collection.itemCount} {t("collection.products")}
-              </span>
             </div>
           </div>
 
           {isOwner && (
             <div className="mt-4 flex items-center gap-2">
-              <Link
+              <ButtonLink
                 href={`/collections/${collection.id ?? collectionIdOrSlug}/edit`}
-                className="rounded bg-surface-alt px-4 py-2 text-sm font-medium text-body transition-colors hover:bg-border-subtle"
+                variant="secondary"
+                size="md"
               >
                 {t("collection.edit")}
-              </Link>
+              </ButtonLink>
               {/* Empty-state CTA already offers "Add product"; only show here
 							    when the collection has items to avoid a duplicate button. */}
               {sortedItems.length > 0 && (

@@ -8,11 +8,11 @@ import { ProductCard } from "@/components/ui";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
 import { itemToProduct, type CollectionItem } from "../_lib/types";
 
-/** Badges + owner remove control layered over each card (click-isolated slot). */
-function ItemOverlay({ item }: { item: CollectionItem }) {
-  const { t, isOwner, handleRemoveItem } = useCollectionDetail();
+/** Status badges shown at the top-left of a card (click-isolated slot). */
+function ItemBadges({ item }: { item: CollectionItem }) {
+  const { t } = useCollectionDetail();
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-start gap-1">
       {item.isCustom && (
         <Badge variant="info" appearance="solid" size="sm">
           {t("collection.collection")}
@@ -23,18 +23,23 @@ function ItemOverlay({ item }: { item: CollectionItem }) {
           {t("product.statusSold")}
         </Badge>
       )}
-      {isOwner && (
-        <IconButton
-          variant="secondary"
-          onClick={() => handleRemoveItem(item.id)}
-          aria-label={t("collection.removeItem")}
-          title={t("collection.removeItem")}
-          className="rounded-full bg-surface-elevated shadow-md hover:bg-danger-50"
-        >
-          <TrashIcon className="h-4 w-4 text-danger-500 sm:h-5 sm:w-5" />
-        </IconButton>
-      )}
     </div>
+  );
+}
+
+/** Owner remove control shown at the top-right of a card (click-isolated slot). */
+function ItemRemove({ item }: { item: CollectionItem }) {
+  const { t, handleRemoveItem } = useCollectionDetail();
+  return (
+    <IconButton
+      variant="secondary"
+      onClick={() => handleRemoveItem(item.id)}
+      aria-label={t("collection.removeItem")}
+      title={t("collection.removeItem")}
+      className="rounded-full bg-surface-elevated shadow-md hover:bg-danger-50"
+    >
+      <TrashIcon className="h-4 w-4 text-danger-500 sm:h-5 sm:w-5" />
+    </IconButton>
   );
 }
 
@@ -69,7 +74,8 @@ export default function CollectionItemsGrid() {
           index={index}
           showMeta={false}
           href={item.productId ? undefined : null}
-          overlay={<ItemOverlay item={item} />}
+          overlayStart={<ItemBadges item={item} />}
+          overlay={isOwner ? <ItemRemove item={item} /> : undefined}
         />
       ))}
     </div>

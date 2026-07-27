@@ -80,6 +80,8 @@ export interface ProductCardProps {
   showMeta?: boolean;
   /** Click-isolated slot pinned to the top-right of the card (badges, remove). */
   overlay?: React.ReactNode;
+  /** Click-isolated slot pinned to the top-left of the card (e.g. a SOLD badge). */
+  overlayStart?: React.ReactNode;
   /** Click-isolated slot below the card (e.g. an add-to-cart button). */
   footer?: React.ReactNode;
   /**
@@ -114,6 +116,7 @@ export default function ProductCard({
   priority,
   showMeta = true,
   overlay,
+  overlayStart,
   footer,
   href,
 }: ProductCardProps) {
@@ -298,6 +301,9 @@ export default function ProductCard({
       {footer && <div className="px-2.5 pb-2.5">{footer}</div>}
       {overlay && (
         <div className="absolute top-1.5 right-1.5 z-10">{overlay}</div>
+      )}
+      {overlayStart && (
+        <div className="absolute top-1.5 left-1.5 z-10">{overlayStart}</div>
       )}
     </div>
   );
