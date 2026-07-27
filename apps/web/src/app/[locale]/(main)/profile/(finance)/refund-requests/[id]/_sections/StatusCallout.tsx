@@ -21,10 +21,10 @@ const TONE: Record<
   { wrap: string; icon: string; title: string; body: string }
 > = {
   success: {
-    wrap: "bg-success-50 border-success-200",
+    wrap: "bg-surface-alt border-border",
     icon: "text-success-600",
-    title: "text-success-800",
-    body: "text-success-700",
+    title: "text-heading",
+    body: "text-muted",
   },
   danger: {
     wrap: "bg-danger-50 border-danger-200",

@@ -22,7 +22,7 @@ export default function SetupIntro({
         girmenizi gerektirir.
       </p>
 
-      <div className="mb-6 rounded-lg bg-primary-50 p-4">
+      <div className="mb-6 rounded-lg border border-border bg-surface-alt p-4">
         <h4 className="mb-2 font-medium text-primary-900">Gereksinimler:</h4>
         <ul className="space-y-1 text-sm text-primary-800">
           {REQUIREMENTS.map((req) => (

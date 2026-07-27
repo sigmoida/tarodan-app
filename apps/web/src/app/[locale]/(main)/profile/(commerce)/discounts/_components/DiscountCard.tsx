@@ -44,7 +44,7 @@ export default function DiscountCard({
   onDelete,
 }: DiscountCardProps) {
   return (
-    <div className="rounded-lg border border-border bg-surface-elevated p-5 transition-shadow hover:shadow-md">
+    <div className="rounded-lg border border-border bg-surface-elevated p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex items-center gap-3">

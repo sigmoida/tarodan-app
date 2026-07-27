@@ -6,41 +6,51 @@ import {
   CheckBadgeIcon,
 } from "@heroicons/react/24/outline";
 import { formatTL } from "@/lib/format";
+import { useTranslations } from "next-intl";
 import type { UserStats } from "../_lib/types";
 
 /** The two headline money cards: total earned (sales) + total spent (purchases). */
 export default function FinancialCards({ stats }: { stats: UserStats }) {
+  const t = useTranslations();
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-      <div className="rounded-lg bg-gradient-to-br from-success-500 to-success-600 p-6 text-inverted shadow-lg">
+      <div className="rounded-lg border border-border bg-surface-elevated p-6 shadow-sm">
         <div className="mb-4 flex items-center gap-4">
-          <div className="rounded-xl bg-surface-elevated/20 p-3">
-            <ArrowTrendingUpIcon className="h-8 w-8" />
+          <div className="rounded-xl bg-surface-alt p-3">
+            <ArrowTrendingUpIcon className="h-8 w-8 text-primary-600" />
           </div>
           <div>
-            <p className="text-success-100">Toplam Kazanç</p>
-            <p className="text-4xl font-bold">{formatTL(stats.totalRevenue)}</p>
+            <p className="text-muted">{t("analytics.totalEarnings")}</p>
+            <p className="text-4xl font-bold text-heading">
+              {formatTL(stats.totalRevenue)}
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-success-100">
+        <div className="flex items-center gap-2 text-sm text-muted">
           <CheckBadgeIcon className="h-5 w-5" />
-          <span>{stats.salesCount} satıştan</span>
+          <span>
+            {t("analytics.fromSalesCount", { count: stats.salesCount })}
+          </span>
         </div>
       </div>
 
-      <div className="rounded-lg bg-gradient-to-br from-primary-500 to-warning-500 p-6 text-inverted shadow-lg">
+      <div className="rounded-lg border border-border bg-surface-elevated p-6 shadow-sm">
         <div className="mb-4 flex items-center gap-4">
-          <div className="rounded-xl bg-surface-elevated/20 p-3">
-            <ShoppingCartIcon className="h-8 w-8" />
+          <div className="rounded-xl bg-surface-alt p-3">
+            <ShoppingCartIcon className="h-8 w-8 text-primary-600" />
           </div>
           <div>
-            <p className="text-primary-100">Toplam Harcama</p>
-            <p className="text-4xl font-bold">{formatTL(stats.totalSpent)}</p>
+            <p className="text-muted">{t("analytics.totalSpent")}</p>
+            <p className="text-4xl font-bold text-heading">
+              {formatTL(stats.totalSpent)}
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-primary-100">
+        <div className="flex items-center gap-2 text-sm text-muted">
           <CheckBadgeIcon className="h-5 w-5" />
-          <span>{stats.purchasesCount} siparişten</span>
+          <span>
+            {t("analytics.fromOrdersCount", { count: stats.purchasesCount })}
+          </span>
         </div>
       </div>
     </div>

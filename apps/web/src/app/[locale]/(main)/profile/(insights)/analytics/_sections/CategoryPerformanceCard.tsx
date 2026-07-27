@@ -1,6 +1,5 @@
 /** @format */
 
-import { ChartBarIcon } from "@heroicons/react/24/outline";
 import SectionCard from "@/components/ui/SectionCard";
 import type { CategoryStat } from "../_lib/types";
 
@@ -12,10 +11,7 @@ export default function CategoryPerformanceCard({
   const maxViews = Math.max(...categories.map((c) => c.views), 1);
 
   return (
-    <SectionCard
-      title="Kategori Performansı"
-      badge={<ChartBarIcon className="h-5 w-5 text-primary-500" />}
-    >
+    <SectionCard title="Kategori Performansı">
       <div className="space-y-4">
         {categories.map((cat, index) => (
           <div key={index}>

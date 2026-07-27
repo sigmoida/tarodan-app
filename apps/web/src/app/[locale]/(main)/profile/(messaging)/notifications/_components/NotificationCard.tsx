@@ -2,10 +2,9 @@
 
 "use client";
 
-import { Link } from "@/i18n/navigation";
-import { CheckIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Badge, IconButton } from "@tarodan/ui";
-import { SectionCard } from "@/components/ui";
+import { SectionCard, ButtonLink } from "@/components/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { getTimeAgo, type Notification } from "../_lib/notifications";
 
@@ -58,14 +57,16 @@ export default function NotificationCard({
       </div>
 
       {href && (
-        <Link
+        <ButtonLink
           href={href}
           onClick={() => !isRead && onMarkRead(notification.id)}
-          className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary-500 hover:text-primary-600"
+          variant="outline"
+          size="sm"
+          className="mt-2 gap-1"
         >
           {t("common.viewDetails")}
-          <span>→</span>
-        </Link>
+          <ChevronRightIcon className="h-4 w-4" />
+        </ButtonLink>
       )}
     </SectionCard>
   );

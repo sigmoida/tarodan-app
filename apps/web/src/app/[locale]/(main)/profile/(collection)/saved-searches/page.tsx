@@ -11,8 +11,10 @@ import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useSavedSearches } from "./_hooks/useSavedSearches";
 import SavedSearchCard from "./_components/SavedSearchCard";
+import { useTranslations } from "next-intl";
 
 export default function SavedSearchesPage() {
+  const t = useTranslations();
   const { ready } = useRequireAuth();
   const user = useAuthStore((s) => s.user);
 
@@ -46,24 +48,27 @@ export default function SavedSearchesPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="Kayıtlı Aramalarım"
-        description="Kayıtlı aramalarınızı buradan yönetebilir, bildirim tercihlerini değiştirebilirsiniz."
+        title={t("search.savedTitle")}
+        description={t("search.savedDescription")}
         actions={
           <span className="text-sm text-muted">
-            {savedSearches.length} / {searchLimit} arama
+            {t("search.countOfLimit", {
+              count: savedSearches.length,
+              limit: searchLimit,
+            })}
           </span>
         }
       />
 
       {savedSearches.length === 0 ? (
         <EmptyStateCard
-          title="Kayıtlı Arama Yok"
-          description='İlanları ararken sonuç sayfasındaki "Bu aramayı kaydet" butonuyla aramanı kaydet; buradan yönetip yeni sonuçlarda bildirim alabilirsin.'
+          title={t("search.savedEmptyTitle")}
+          description={t("search.savedEmptyDescription")}
           action={
             <Button asChild className="gap-2">
               <Link href="/listings">
                 <MagnifyingGlassIcon className="h-5 w-5" />
-                İlan Ara
+                {t("search.searchListings")}
               </Link>
             </Button>
           }
@@ -85,10 +90,10 @@ export default function SavedSearchesPage() {
       {savedSearches.length >= searchLimit && (
         <div className="rounded-lg border border-warning-200 bg-warning-50 p-4">
           <p className="text-sm text-warning-800">
-            Kayıtlı arama limitinize ulaştınız ({searchLimit} arama).{" "}
+            {t("search.savedLimitReached", { limit: searchLimit })}{" "}
             {user?.membershipTier === "free" && (
               <Link href="/membership" className="font-medium underline">
-                Premium üyelikle daha fazla arama kaydedin →
+                {t("search.premiumMoreSearches")}
               </Link>
             )}
           </p>

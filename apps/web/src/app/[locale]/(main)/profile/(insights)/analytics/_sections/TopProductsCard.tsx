@@ -1,7 +1,7 @@
 /** @format */
 
 import { Link } from "@/i18n/navigation";
-import { TrophyIcon, EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
+import { EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import { Badge, type BadgeVariant } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import { getProductEffectivePrice } from "@/lib/productPrice";
@@ -26,10 +26,7 @@ export default function TopProductsCard({
   products: TopProduct[];
 }) {
   return (
-    <SectionCard
-      title="En Popüler İlanlar"
-      badge={<TrophyIcon className="h-5 w-5 text-warning-500" />}
-    >
+    <SectionCard title="En Popüler İlanlar">
       <div className="space-y-3">
         {products.map((product, index) => {
           const badge = statusBadge(product.status);

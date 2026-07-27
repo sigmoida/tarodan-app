@@ -20,7 +20,7 @@ export default function BackupCodesModal({
       maxWidth="max-w-md"
     >
       <div className="mb-4 text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success-100">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-alt">
           <CheckCircleIcon className="h-6 w-6 text-success-600" />
         </div>
         <p className="mt-1 text-sm text-muted">

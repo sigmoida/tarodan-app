@@ -1,6 +1,5 @@
 /** @format */
 
-import { FireIcon } from "@heroicons/react/24/outline";
 import SectionCard from "@/components/ui/SectionCard";
 import { formatTL } from "@/lib/format";
 import {
@@ -16,10 +15,7 @@ export default function RecentActivityCard({
   activity: Activity[];
 }) {
   return (
-    <SectionCard
-      title="Son Aktiviteler"
-      badge={<FireIcon className="h-5 w-5 text-primary-500" />}
-    >
+    <SectionCard title="Son Aktiviteler">
       <div className="max-h-[300px] space-y-3 overflow-y-auto">
         {activity.map((item, index) => {
           const cfg = ACTIVITY_CONFIG[item.type] ?? FALLBACK_ACTIVITY;

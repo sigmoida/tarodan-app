@@ -22,7 +22,7 @@ export default function RefundRequestCard({
   return (
     <Link
       href={`/profile/refund-requests/${request.id}`}
-      className="block rounded-lg border border-border bg-surface-elevated p-4 transition-shadow hover:shadow-md"
+      className="group block rounded-lg border border-border bg-surface-elevated p-4 transition-all hover:border-primary-300 hover:shadow-md"
     >
       <div className="flex items-start gap-3">
         <div className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface">
@@ -32,7 +32,7 @@ export default function RefundRequestCard({
               alt={request.order?.product?.title ?? ""}
               fill
               sizes="56px"
-              className="object-cover"
+              className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             />
           ) : (
             <span className="text-2xl">📦</span>
@@ -42,7 +42,7 @@ export default function RefundRequestCard({
           <p className="text-sm text-muted">
             {t("refund.label")} #{request.refundNumber}
           </p>
-          <p className="mt-1 truncate font-medium text-heading">
+          <p className="mt-1 truncate font-medium text-heading transition-colors group-hover:text-primary-600">
             {request.order?.product?.title ?? "—"}
           </p>
           <p className="mt-1 text-sm text-muted">

@@ -147,7 +147,7 @@ export default function SecuritySection() {
                 key={r.label}
                 className={`rounded-full px-2 py-0.5 text-xs ${
                   met
-                    ? "bg-success-100 text-success-700"
+                    ? "bg-surface-alt text-success-700"
                     : "bg-surface-alt text-subtle"
                 }`}
               >

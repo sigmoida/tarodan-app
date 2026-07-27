@@ -3,7 +3,6 @@
 import { Link } from "@/i18n/navigation";
 import type { ComponentType, SVGProps } from "react";
 import {
-  FireIcon,
   TagIcon,
   ShoppingBagIcon,
   ArrowsRightLeftIcon,
@@ -22,10 +21,7 @@ const LINKS: { href: string; label: string; icon: Icon }[] = [
 
 export default function QuickLinksCard() {
   return (
-    <SectionCard
-      title="Hızlı Erişim"
-      badge={<FireIcon className="h-5 w-5 text-primary-500" />}
-    >
+    <SectionCard title="Hızlı Erişim">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {LINKS.map(({ href, label, icon: Icon }) => (
           <Link
