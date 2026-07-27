@@ -24,8 +24,14 @@ export default function FavoritesPage() {
   const t = useTranslations();
   const { ready } = useRequireAuth();
 
-  const { items, isLoading, isSharedView, handleRemove, handleAddToCart } =
-    useFavorites();
+  const {
+    items,
+    isLoading,
+    isSharedView,
+    handleRemove,
+    handleCartToggle,
+    isInCart,
+  } = useFavorites();
 
   // Private favorites require auth; a shared (?ids=) view is public.
   if (!isSharedView && !ready) {
@@ -59,7 +65,8 @@ export default function FavoritesPage() {
           items={items}
           isSharedView={isSharedView}
           onRemove={handleRemove}
-          onAddToCart={handleAddToCart}
+          onCartToggle={handleCartToggle}
+          isInCart={isInCart}
         />
       )}
     </PageShell>

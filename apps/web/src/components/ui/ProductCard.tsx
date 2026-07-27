@@ -224,85 +224,83 @@ export default function ProductCard({
   }
 
   return (
-    <div className="relative group h-full flex flex-col">
-      <CardLink href={linkHref} className="flex-1">
-        <div className="bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all h-full flex flex-col">
-          <div className="relative aspect-square bg-surface-alt">
-            <OptimizedImage
-              src={imageUrl}
-              alt={product.title}
-              fill
-              className={`object-cover group-hover:scale-[1.03] transition-transform duration-300${outOfStock ? " opacity-50" : ""}`}
-              fallbackSrc={CARD_PLACEHOLDERS[index % CARD_PLACEHOLDERS.length]}
-              logContext={{ listingId: product.id, page: "product-card" }}
-              priority={priority}
-            />
-            {outOfStock && <OutOfStockOverlay />}
-            <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
-              {product.isBoosted && (
-                <ProductBadge
-                  variant="sponsored"
-                  className="text-sm px-1.5 py-0.5"
-                >
-                  {t("product.sponsored")}
-                </ProductBadge>
-              )}
-              {isTrade && (
-                <ProductBadge
-                  variant="trade"
-                  className="text-sm px-1.5 py-0.5"
-                  icon={<ArrowsRightLeftIcon className="w-2.5 h-2.5" />}
-                >
-                  <span className="hidden sm:inline">{t("faq.trade")}</span>
-                </ProductBadge>
-              )}
-            </div>
-            {onSale && (
-              <div className="absolute top-1.5 right-1.5">
-                <ProductBadge variant="sale" className="text-sm px-1.5 py-0.5">
-                  %{product.discountPercent ?? 0}
-                </ProductBadge>
-              </div>
+    <div className="relative group h-full flex flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
+      <CardLink href={linkHref} className="flex flex-1 flex-col">
+        <div className="relative aspect-square bg-surface-alt">
+          <OptimizedImage
+            src={imageUrl}
+            alt={product.title}
+            fill
+            className={`object-cover group-hover:scale-[1.03] transition-transform duration-300${outOfStock ? " opacity-50" : ""}`}
+            fallbackSrc={CARD_PLACEHOLDERS[index % CARD_PLACEHOLDERS.length]}
+            logContext={{ listingId: product.id, page: "product-card" }}
+            priority={priority}
+          />
+          {outOfStock && <OutOfStockOverlay />}
+          <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
+            {product.isBoosted && (
+              <ProductBadge
+                variant="sponsored"
+                className="text-sm px-1.5 py-0.5"
+              >
+                {t("product.sponsored")}
+              </ProductBadge>
+            )}
+            {isTrade && (
+              <ProductBadge
+                variant="trade"
+                className="text-sm px-1.5 py-0.5"
+                icon={<ArrowsRightLeftIcon className="w-2.5 h-2.5" />}
+              >
+                <span className="hidden sm:inline">{t("faq.trade")}</span>
+              </ProductBadge>
             )}
           </div>
-          <div className="p-2.5 flex-1 flex flex-col">
-            <h3 className="font-medium text-heading line-clamp-2 text-sm sm:text-md leading-tight mb-1 group-hover:text-primary-600 transition-colors">
-              {product.title}
-            </h3>
-            {/* Meta + price pinned to the bottom so views/likes align across
+          {onSale && (
+            <div className="absolute top-1.5 right-1.5">
+              <ProductBadge variant="sale" className="text-sm px-1.5 py-0.5">
+                %{product.discountPercent ?? 0}
+              </ProductBadge>
+            </div>
+          )}
+        </div>
+        <div className="p-2.5 flex-1 flex flex-col">
+          <h3 className="font-medium text-heading line-clamp-2 text-sm sm:text-md leading-tight mb-1 group-hover:text-primary-600 transition-colors">
+            {product.title}
+          </h3>
+          {/* Meta + price pinned to the bottom so views/likes align across
 						    cards regardless of a 1- or 2-line title. */}
-            <div className="mt-auto">
-              {showMeta && (
-                <div className="flex items-center gap-3 mb-1.5 text-xs sm:text-sm text-subtle">
-                  {ratingBlock("w-4 h-4")}
-                  <span className="flex items-center gap-0.5">
-                    <HeartSolidIcon className="w-4 h-4 text-danger-500" />
-                    {product.likeCount ?? 0}
-                  </span>
-                  <span className="flex items-center gap-0.5">
-                    <EyeIcon className="w-4 h-4 text-primary-500" />
-                    {product.viewCount ?? 0}
-                  </span>
-                </div>
-              )}
-              <div className="pt-1.5 border-t border-border-subtle">
-                {onSale && (
-                  <span className="text-sm text-subtle line-through ml-1.5">
-                    {fmtTL(originalPrice)}
-                  </span>
-                )}
-                <p className="font-bold text-primary-600 text-md sm:text-lg">
-                  {fmtTL(effectivePrice)}
-                </p>
+          <div className="mt-auto">
+            {showMeta && (
+              <div className="flex items-center gap-3 mb-1.5 text-xs sm:text-sm text-subtle">
+                {ratingBlock("w-4 h-4")}
+                <span className="flex items-center gap-0.5">
+                  <HeartSolidIcon className="w-4 h-4 text-danger-500" />
+                  {product.likeCount ?? 0}
+                </span>
+                <span className="flex items-center gap-0.5">
+                  <EyeIcon className="w-4 h-4 text-primary-500" />
+                  {product.viewCount ?? 0}
+                </span>
               </div>
+            )}
+            <div className="pt-1.5 border-t border-border-subtle">
+              {onSale && (
+                <span className="text-sm text-subtle line-through ml-1.5">
+                  {fmtTL(originalPrice)}
+                </span>
+              )}
+              <p className="font-bold text-primary-600 text-md sm:text-lg">
+                {fmtTL(effectivePrice)}
+              </p>
             </div>
           </div>
         </div>
       </CardLink>
+      {footer && <div className="px-2.5 pb-2.5">{footer}</div>}
       {overlay && (
         <div className="absolute top-1.5 right-1.5 z-10">{overlay}</div>
       )}
-      {footer && <div className="mt-2">{footer}</div>}
     </div>
   );
 }

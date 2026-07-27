@@ -22,7 +22,13 @@ export function useFavorites() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { addToCart } = useCart();
+  const {
+    addToCart,
+    removeFromCart,
+    removeFromOfflineCart,
+    items: cartItems,
+    offlineItems,
+  } = useCart();
   const t = useTranslations();
 
   const sharedIds = useMemo(() => {
@@ -110,13 +116,34 @@ export function useFavorites() {
     },
   });
 
-  const handleAddToCart = async (item: WishlistItem) => {
+  const inCartIds = useMemo(
+    () =>
+      new Set<string>([
+        ...cartItems.map((ci) => ci.productId),
+        ...offlineItems.map((ci) => ci.productId),
+      ]),
+    [cartItems, offlineItems],
+  );
+  const isInCart = (productId: string) => inCartIds.has(productId);
+
+  // Toggle like the product detail page: add when absent, remove (from the
+  // authed or the guest cart, whichever holds it) when present.
+  const handleCartToggle = async (item: WishlistItem) => {
     try {
-      await addToCart(item.productId);
-      toast.success(t("product.addedToCart"));
+      if (isInCart(item.productId)) {
+        if (cartItems.some((ci) => ci.productId === item.productId)) {
+          await removeFromCart(item.productId);
+        } else {
+          removeFromOfflineCart(item.productId);
+        }
+        toast.success(t("product.removedFromCart"));
+      } else {
+        await addToCart(item.productId);
+        toast.success(t("product.addedToCart"));
+      }
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
-        console.error("Failed to add to cart:", error);
+        console.error("Failed to update cart:", error);
       toast.error(
         error?.response?.data?.message || t("common.operationFailed"),
       );
@@ -130,6 +157,7 @@ export function useFavorites() {
     isAuthenticated,
     authLoading,
     handleRemove: (productId: string) => removeMutation.mutate(productId),
-    handleAddToCart,
+    handleCartToggle,
+    isInCart,
   };
 }
