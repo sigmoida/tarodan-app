@@ -3,8 +3,12 @@
 "use client";
 
 import toast from "react-hot-toast";
-import { TruckIcon, ClipboardDocumentIcon } from "@heroicons/react/24/outline";
-import { Button } from "@tarodan/ui";
+import {
+  TruckIcon,
+  ClipboardDocumentIcon,
+  InformationCircleIcon,
+} from "@heroicons/react/24/outline";
+import { Alert, Button } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import type { MessageKey } from "@tarodan/i18n";
 import type { RefundRequest } from "../../_lib/types";
@@ -38,18 +42,20 @@ export default function ReturnShipmentCard({
   const side = isBuyer ? "buyer" : "seller";
 
   return (
-    <div className="rounded-lg border-2 border-info-200 bg-info-50 p-5">
-      <h2 className="mb-3 text-base font-semibold text-info-900">
-        {isBuyer
+    <Alert
+      variant="default"
+      icon={<InformationCircleIcon className="h-5 w-5 text-muted" />}
+      title={
+        isBuyer
           ? t("refund.return.yourShipment")
-          : t("refund.return.incomingShipment")}
-      </h2>
-
-      {copy && <p className="mb-3 text-sm text-info-900">{t(copy[side])}</p>}
+          : t("refund.return.incomingShipment")
+      }
+    >
+      {copy && <p className="mb-3 text-body">{t(copy[side])}</p>}
 
       {refund.returnTrackingNumber ? (
         <>
-          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-surface-elevated p-4">
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-alt p-4">
             <span className="break-all font-mono text-lg font-bold text-heading">
               {refund.returnTrackingNumber}
             </span>
@@ -81,10 +87,8 @@ export default function ReturnShipmentCard({
           )}
         </>
       ) : (
-        <p className="text-sm text-info-700">
-          {t("refund.trackingGenerating")}
-        </p>
+        <p className="text-muted">{t("refund.trackingGenerating")}</p>
       )}
-    </div>
+    </Alert>
   );
 }

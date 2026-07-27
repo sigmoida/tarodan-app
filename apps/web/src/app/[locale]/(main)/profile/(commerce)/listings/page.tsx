@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PlusIcon, ClockIcon } from "@heroicons/react/24/outline";
 import {
+  Alert,
   Badge,
   Button,
   Spinner,
@@ -104,19 +105,13 @@ export default function ProfileListingsPage() {
       </Tabs>
 
       {pendingCount > 0 && activeFilter !== "pending" && (
-        <div className="rounded-lg border border-warning-200 bg-warning-50 p-4">
-          <div className="flex items-center gap-3">
-            <ClockIcon className="h-6 w-6 text-warning-600" />
-            <div>
-              <p className="font-medium text-warning-800">
-                {pendingCount} ilanınız onay bekliyor
-              </p>
-              <p className="text-sm text-warning-600">
-                İlanlar admin tarafından onaylandıktan sonra yayına alınacaktır.
-              </p>
-            </div>
-          </div>
-        </div>
+        <Alert
+          variant="warning"
+          icon={<ClockIcon className="h-5 w-5 text-warning-600" />}
+          title={`${pendingCount} ilanınız onay bekliyor`}
+        >
+          İlanlar admin tarafından onaylandıktan sonra yayına alınacaktır.
+        </Alert>
       )}
 
       {isLoading ? (

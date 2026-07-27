@@ -2,8 +2,8 @@
 
 "use client";
 
-import { TruckIcon } from "@heroicons/react/24/outline";
-import { Button } from "@tarodan/ui";
+import { TruckIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { Alert, Button } from "@tarodan/ui";
 import { SectionCard, CopyButton } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import type { OrderDetail } from "../_lib/types";
@@ -96,9 +96,12 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
       )}
 
       {isCancelled && (
-        <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 text-sm text-danger-800">
+        <Alert
+          variant="danger"
+          icon={<XCircleIcon className="h-5 w-5 text-danger-600" />}
+        >
           {t("order.shipmentCancelled")}
-        </div>
+        </Alert>
       )}
 
       {(isShippedActive || isDelivered) && (
@@ -117,7 +120,7 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
           <div className="flex justify-between">
             <span className="text-muted">{t("common.status")}:</span>
             <span
-              className={`font-medium ${isDelivered ? "text-success-700" : "text-info-700"}`}
+              className={`font-medium ${isDelivered ? "text-success-700" : "text-body"}`}
             >
               {statusLbl}
             </span>

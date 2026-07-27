@@ -42,7 +42,7 @@ export default function CollectionRow({
         <p className="text-sm text-muted">{collection.itemCount} ürün</p>
       </div>
       <div className="flex items-center gap-4 text-sm">
-        <span className="flex items-center gap-1 text-info-600">
+        <span className="flex items-center gap-1 text-primary-600">
           <EyeIcon className="h-4 w-4" />
           {collection.viewCount.toLocaleString("tr-TR")}
         </span>

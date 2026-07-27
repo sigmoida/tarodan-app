@@ -50,7 +50,7 @@ export default function SavedCardCard({
             </Badge>
           )}
           {card.businessCard && (
-            <Badge variant="info" size="sm">
+            <Badge variant="outline" size="sm">
               Kurumsal
             </Badge>
           )}

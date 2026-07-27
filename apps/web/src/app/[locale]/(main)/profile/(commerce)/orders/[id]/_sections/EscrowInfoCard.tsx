@@ -2,6 +2,8 @@
 
 "use client";
 
+import { InformationCircleIcon } from "@heroicons/react/24/outline";
+import { Alert } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import {
   computePayoutDate,
@@ -32,20 +34,21 @@ export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
   });
 
   return (
-    <div className="bg-surface-alt border border-border rounded-xl shadow-sm p-6">
-      <h2 className="mb-2 text-lg font-semibold text-heading">
-        {t("order.statusDelivered")}
-      </h2>
-      <p className="text-sm text-muted">
+    <Alert
+      variant="default"
+      icon={<InformationCircleIcon className="h-5 w-5 text-muted" />}
+      title={t("order.statusDelivered")}
+    >
+      <p className="text-muted">
         {payoutDateStr
           ? t("order.payoutReleaseWithDate", { date: payoutDateStr })
           : t("order.payoutRelease")}
       </p>
       {order.activeRefundRequest && (
-        <p className="text-sm text-muted mt-2 font-medium">
+        <p className="mt-2 font-medium text-muted">
           {t("order.paymentOnHoldRefund")}
         </p>
       )}
-    </div>
+    </Alert>
   );
 }

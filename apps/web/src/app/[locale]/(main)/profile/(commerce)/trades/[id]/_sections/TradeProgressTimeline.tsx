@@ -2,7 +2,8 @@
 
 "use client";
 
-import { Stepper, type StepperStep } from "@tarodan/ui";
+import { Alert, Stepper, type StepperStep } from "@tarodan/ui";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import type { Trade } from "../_lib/types";
 
@@ -54,9 +55,15 @@ export default function TradeProgressTimeline({ trade }: { trade: Trade }) {
         {t("trade.tradeProgress")}
       </h3>
       {isReturning ? (
-        <p className="rounded border border-warning-200 bg-warning-50 p-3 text-sm text-warning-700">
+        <Alert
+          variant="warning"
+          icon={
+            <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
+          }
+          title={t("trade.returningBannerTitle")}
+        >
           {t("trade.progressReturning")}
-        </p>
+        </Alert>
       ) : (
         <Stepper steps={steps} current={current} />
       )}

@@ -1,8 +1,11 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { Button } from "@tarodan/ui";
+import {
+  MagnifyingGlassIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+import { Alert, Button } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
@@ -88,16 +91,20 @@ export default function SavedSearchesPage() {
       )}
 
       {savedSearches.length >= searchLimit && (
-        <div className="rounded-lg border border-warning-200 bg-warning-50 p-4">
-          <p className="text-sm text-warning-800">
-            {t("search.savedLimitReached", { limit: searchLimit })}{" "}
-            {user?.membershipTier === "free" && (
-              <Link href="/membership" className="font-medium underline">
-                {t("search.premiumMoreSearches")}
-              </Link>
-            )}
-          </p>
-        </div>
+        <Alert
+          variant="warning"
+          icon={
+            <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
+          }
+          title="Limit doldu"
+        >
+          {t("search.savedLimitReached", { limit: searchLimit })}{" "}
+          {user?.membershipTier === "free" && (
+            <Link href="/membership" className="font-medium underline">
+              {t("search.premiumMoreSearches")}
+            </Link>
+          )}
+        </Alert>
       )}
     </PageShell>
   );

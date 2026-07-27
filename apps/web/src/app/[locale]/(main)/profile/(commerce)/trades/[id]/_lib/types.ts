@@ -206,7 +206,7 @@ export const SHIPMENT_STATUS_CHIP: Record<
   },
   in_transit: {
     label: "Yolda",
-    className: "bg-info-50 text-info-700 border border-info-200",
+    className: "bg-surface-alt text-body border border-border",
   },
   delivered: {
     label: "Depoya Ulaştı",

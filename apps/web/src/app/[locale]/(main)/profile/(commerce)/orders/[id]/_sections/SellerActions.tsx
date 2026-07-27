@@ -3,7 +3,8 @@
 "use client";
 
 import toast from "react-hot-toast";
-import { Button } from "@tarodan/ui";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { Alert, Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import { useUpdateOrderStatus } from "../_hooks/useOrderDetail";
@@ -56,9 +57,13 @@ export default function SellerActions({ order }: { order: OrderDetail }) {
             </div>
             {/* İnsani senaryolar A5/A6: tek koli-tek sipariş uyarısı + ücret bilgisi. */}
             <div className="mt-4 space-y-2">
-              <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-3 py-2">
-                {t("order.cargoOneParcelPerOrder")}
-              </p>
+              <Alert
+                variant="warning"
+                icon={
+                  <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
+                }
+                title={t("order.cargoOneParcelPerOrder")}
+              />
               <p className="text-xs text-muted">
                 {t("order.cargoFeeCoveredNotice")}
               </p>

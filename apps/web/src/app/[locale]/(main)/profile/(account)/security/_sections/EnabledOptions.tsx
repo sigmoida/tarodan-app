@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Input } from "@tarodan/ui";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { Alert, Button, Input } from "@tarodan/ui";
 
 type MutateFn = (code: string, options?: { onSuccess?: () => void }) => void;
 
@@ -128,12 +129,17 @@ export default function EnabledOptions({
           </Button>
         ) : (
           <div>
-            <div className="mb-4 rounded-lg border border-danger-200 bg-danger-50 p-4">
-              <p className="text-sm text-danger-800">
-                ⚠️ Bu işlem geri alınamaz. Devam etmek için doğrulama
-                uygulamanızdaki 6 haneli kodu girin.
-              </p>
-            </div>
+            <Alert
+              variant="danger"
+              title="Dikkat"
+              icon={
+                <ExclamationTriangleIcon className="h-5 w-5 text-danger-600" />
+              }
+              className="mb-4"
+            >
+              Bu işlem geri alınamaz. Devam etmek için doğrulama uygulamanızdaki
+              6 haneli kodu girin.
+            </Alert>
             <Input
               type="text"
               inputMode="numeric"

@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { XMarkIcon, PhotoIcon } from "@heroicons/react/24/outline";
-import { Button, Textarea, IconButton } from "@tarodan/ui";
+import {
+  XMarkIcon,
+  PhotoIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+import { Alert, Button, Textarea, IconButton } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 
 export default function MessageComposer({
@@ -44,9 +48,16 @@ export default function MessageComposer({
   return (
     <div className="flex-shrink-0 px-6 py-3 bg-surface-elevated border-t border-border">
       {contentWarning && (
-        <div className="mb-3 px-3 py-2 bg-warning-50 border border-warning-200 rounded-lg text-warning-800 text-xs">
+        <Alert
+          variant="warning"
+          icon={
+            <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
+          }
+          title="Uyarı"
+          className="mb-3"
+        >
           {contentWarning}
-        </div>
+        </Alert>
       )}
       {attachedUrls.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">

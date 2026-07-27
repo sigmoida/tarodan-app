@@ -8,7 +8,7 @@ interface StatSummaryCardProps {
   title: string;
   value: string | number;
   icon: Icon;
-  /** Text-color utility for the icon (e.g. `text-info-600`). */
+  /** Text-color utility for the icon (e.g. `text-primary-600`). */
   accent?: string;
   extraInfo?: { label: string; value: string | number }[];
 }

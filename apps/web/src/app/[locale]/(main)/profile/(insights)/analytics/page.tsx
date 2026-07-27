@@ -81,9 +81,9 @@ export default function AnalyticsPage() {
               value={analytics.totalViews.toLocaleString("tr-TR")}
               change={analytics.viewsChange}
               icon={EyeIcon}
-              accent="text-info-600"
+              accent="text-primary-600"
               chartData={analytics.dailyViews.map((d) => d.views)}
-              chartColor="bg-info-400"
+              chartColor="bg-primary-400"
               subtitle={`Günlük ort. ${analytics.avgViewsPerListing}`}
             />
             <AnalyticsStatCard
@@ -130,13 +130,13 @@ export default function AnalyticsPage() {
               icon={UserGroupIcon}
               label="Tekrar Müşteri"
               value={`%${analytics.repeatCustomerRate}`}
-              accent="text-info-600"
+              accent="text-primary-600"
             />
             <MetricCard
               icon={ShoppingCartIcon}
               label="Bekleyen Sipariş"
               value={analytics.pendingOrders}
-              accent="text-info-600"
+              accent="text-primary-600"
             />
           </div>
 

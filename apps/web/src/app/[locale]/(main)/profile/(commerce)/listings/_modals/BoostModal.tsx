@@ -5,7 +5,16 @@ import { useRouter } from "@/i18n/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
-import { Badge, Button, Checkbox, Modal, Radio, Spinner } from "@tarodan/ui";
+import { ClockIcon } from "@heroicons/react/24/outline";
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Modal,
+  Radio,
+  Spinner,
+} from "@tarodan/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 
@@ -163,7 +172,12 @@ export default function BoostModal({
       <p className="text-sm text-muted mb-4">{t("profile.boost.intro")}</p>
 
       {hasActiveBoost && (
-        <div className="mb-4 p-3 rounded bg-warning-50 border border-warning-200 text-sm text-warning-800">
+        <Alert
+          variant="warning"
+          icon={<ClockIcon className="h-5 w-5 text-warning-600" />}
+          title="Aktif Öne Çıkarma"
+          className="mb-4"
+        >
           {t("profile.boost.activeBoostInfo", { days: remainingDays })}
           {selected != null && (
             <div className="mt-1 font-semibold">
@@ -174,7 +188,7 @@ export default function BoostModal({
               })}
             </div>
           )}
-        </div>
+        </Alert>
       )}
 
       {loadingOptions ? (

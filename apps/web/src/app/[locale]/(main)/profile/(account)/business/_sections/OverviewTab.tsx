@@ -23,7 +23,7 @@ export default function OverviewTab({ stats }: { stats: BusinessStats }) {
           icon={EyeIcon}
           label="Toplam Görüntülenme"
           value={overview.totalViews.toLocaleString("tr-TR")}
-          accent="text-info-600"
+          accent="text-primary-600"
         />
         <MetricCard
           icon={HeartIcon}
@@ -65,7 +65,7 @@ export default function OverviewTab({ stats }: { stats: BusinessStats }) {
             icon={EyeIcon}
             label="Görüntülenme"
             value={weekly.views.toLocaleString("tr-TR")}
-            accent="text-info-600"
+            accent="text-primary-600"
           />
           <MetricCard
             icon={HeartIcon}
@@ -83,7 +83,7 @@ export default function OverviewTab({ stats }: { stats: BusinessStats }) {
             icon={EyeIcon}
             label="Toplam Görüntülenme"
             value={overview.collectionViews.toLocaleString("tr-TR")}
-            accent="text-info-600"
+            accent="text-primary-600"
           />
           <MetricCard
             icon={HeartIcon}

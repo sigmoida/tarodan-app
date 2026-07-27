@@ -81,7 +81,7 @@ export default function DiscountCard({
                 : `${discount.value} TL`}
             </Badge>
 
-            <Badge variant="info" size="sm">
+            <Badge variant="outline" size="sm">
               {SCOPE_LABELS[discount.scope] || discount.scope}
             </Badge>
 

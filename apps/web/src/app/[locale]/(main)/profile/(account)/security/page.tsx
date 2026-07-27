@@ -9,7 +9,8 @@
  * Allows users to enable/disable TOTP-based two-factor authentication.
  */
 
-import { Spinner } from "@tarodan/ui";
+import { Alert, Spinner } from "@tarodan/ui";
+import { XCircleIcon } from "@heroicons/react/24/outline";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { use2FA } from "./_hooks/use2FA";
@@ -53,9 +54,14 @@ export default function SecuritySettingsPage() {
       />
 
       {error && (
-        <div className="mb-6 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-danger-700">
+        <Alert
+          variant="danger"
+          title="Hata"
+          icon={<XCircleIcon className="h-5 w-5 text-danger-600" />}
+          className="mb-6"
+        >
           {error}
-        </div>
+        </Alert>
       )}
 
       <div className="space-y-6">

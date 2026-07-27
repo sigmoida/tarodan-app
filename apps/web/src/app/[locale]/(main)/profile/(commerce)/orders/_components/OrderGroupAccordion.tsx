@@ -67,7 +67,7 @@ export default function OrderGroupAccordion({
                   {formatDate(date)}
                 </p>
               </div>
-              <Badge variant="info" size="sm">
+              <Badge variant="outline" size="sm">
                 {group.orders.length} {t("collection.items")}
               </Badge>
             </div>

@@ -116,7 +116,7 @@ export const ACTIVITY_CONFIG: Record<
 > = {
   view: {
     icon: EyeIcon,
-    color: "bg-info-100 text-info-600",
+    color: "bg-primary-100 text-primary-600",
     text: "görüntülendi",
   },
   favorite: {

@@ -1,6 +1,10 @@
 /** @format */
 
-import { TruckIcon } from "@heroicons/react/24/outline";
+import {
+  TruckIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+import { Alert } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import type { Trade, TradeShipment } from "../_lib/types";
 
@@ -17,11 +21,13 @@ export default function ReturnShipmentCard({
   if (trade.status !== "returning" || !myReturnShipment) return null;
 
   return (
-    <div className="card p-6 mb-6 bg-warning-50 border-warning-200">
-      <h3 className="font-semibold text-warning-900 mb-2">
-        {t("trade.returnShipment")}
-      </h3>
-      <p className="text-sm text-body">
+    <Alert
+      variant="warning"
+      icon={<ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />}
+      title={t("trade.returnShipment")}
+      className="mb-6"
+    >
+      <p className="text-body">
         {myReturnShipment.carrier === "surat"
           ? "Sürat Kargo"
           : myReturnShipment.carrier || "—"}
@@ -36,7 +42,7 @@ export default function ReturnShipmentCard({
         })()}
       </p>
       {myReturnShipment.carrier === "surat" && !myReturnShipment.cargoCode && (
-        <p className="text-xs text-muted italic mt-1">
+        <p className="mt-1 text-xs italic text-muted">
           {t("order.cargoCodePending")}
         </p>
       )}
@@ -45,12 +51,12 @@ export default function ReturnShipmentCard({
           href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myReturnShipment.cargoCode)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+          className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
         >
-          <TruckIcon className="w-4 h-4" />
+          <TruckIcon className="h-4 w-4" />
           {t("order.trackOnSurat")}
         </a>
       )}
-    </div>
+    </Alert>
   );
 }

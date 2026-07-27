@@ -73,7 +73,7 @@ export default function StatisticsPage() {
           title="İlanlarım"
           value={stats.productsCount}
           icon={TagIcon}
-          accent="text-info-600"
+          accent="text-primary-600"
           extraInfo={[
             { label: "Aktif", value: stats.activeProductsCount },
             { label: "Satıldı", value: stats.soldProductsCount },
@@ -114,7 +114,7 @@ export default function StatisticsPage() {
           icon={EyeIcon}
           label="Görüntüleme"
           value={stats.totalViews.toLocaleString("tr-TR")}
-          accent="text-info-600"
+          accent="text-primary-600"
         />
         <MetricCard
           icon={HeartIcon}

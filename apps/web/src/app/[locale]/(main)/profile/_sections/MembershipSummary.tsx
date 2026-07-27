@@ -89,7 +89,7 @@ export default function MembershipSummary() {
           icon={TagIcon}
           label="Sipariş"
           value={stats?.ordersCount ?? 0}
-          accent="text-info-600"
+          accent="text-primary-600"
         />
         <MetricCard
           icon={ArrowsRightLeftIcon}

@@ -54,7 +54,7 @@ export default function ProductRow({
       <div className="flex items-center gap-4 text-sm">
         <span
           className={`flex items-center gap-1 ${
-            metric === "views" ? "text-info-600" : "text-muted"
+            metric === "views" ? "text-primary-600" : "text-muted"
           }`}
         >
           <EyeIcon className="h-4 w-4" />

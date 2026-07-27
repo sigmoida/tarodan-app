@@ -7,7 +7,7 @@
 export default function MessageTicks({ read }: { read: boolean }) {
   return (
     <span
-      className={`inline-flex shrink-0 ${read ? "text-info-400" : "text-inverted/60"}`}
+      className={`inline-flex shrink-0 ${read ? "text-primary-400" : "text-inverted/60"}`}
       title={read ? "Okundu" : "İletildi"}
       aria-label={read ? "Okundu" : "İletildi"}
     >

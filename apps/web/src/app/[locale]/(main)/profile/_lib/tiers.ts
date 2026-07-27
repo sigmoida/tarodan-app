@@ -70,7 +70,11 @@ export const TIER_COLORS: Record<
   { bg: string; text: string; border: string }
 > = {
   free: { bg: "bg-surface-alt", text: "text-body", border: "border-border" },
-  basic: { bg: "bg-info-50", text: "text-info-700", border: "border-info-300" },
+  basic: {
+    bg: "bg-primary-50",
+    text: "text-primary-700",
+    border: "border-primary-300",
+  },
   premium: {
     bg: "bg-primary-50",
     text: "text-primary-700",

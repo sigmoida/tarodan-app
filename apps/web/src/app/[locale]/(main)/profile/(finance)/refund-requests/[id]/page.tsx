@@ -3,7 +3,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Badge, Button, Spinner } from "@tarodan/ui";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { Alert, Badge, Button, Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { formatTL } from "@/lib/format";
@@ -94,14 +95,17 @@ export default function RefundRequestDetailPage() {
       <ReasonCard refund={refund} />
 
       {refund.sellerResponse && (
-        <div className="rounded-lg border border-warning-200 bg-warning-50 p-5">
-          <h2 className="mb-2 text-sm font-semibold text-warning-900">
-            {t("refund.sellerResponse")}
-          </h2>
-          <p className="whitespace-pre-wrap text-sm text-warning-900">
+        <Alert
+          variant="warning"
+          icon={
+            <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
+          }
+          title={t("refund.sellerResponse")}
+        >
+          <p className="whitespace-pre-wrap text-warning-900">
             {refund.sellerResponse}
           </p>
-        </div>
+        </Alert>
       )}
 
       {!isTerminal && <WhatsNextCard status={refund.status} />}

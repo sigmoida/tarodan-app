@@ -1,7 +1,10 @@
 "use client";
 
-import { CheckCircleIcon } from "@heroicons/react/24/outline";
-import { Button, Modal } from "@tarodan/ui";
+import {
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+import { Alert, Button, Modal } from "@tarodan/ui";
 
 export default function BackupCodesModal({
   isOpen,
@@ -28,13 +31,16 @@ export default function BackupCodesModal({
         </p>
       </div>
 
-      <div className="mb-4 rounded-lg border border-warning-200 bg-warning-50 p-4">
-        <p className="text-sm text-warning-800">
-          ⚠️ Bu kodlar sadece bir kez gösterilecek. Telefonunuza erişiminizi
-          kaybederseniz hesabınıza giriş yapmak için bu kodlara ihtiyacınız
-          olacak.
-        </p>
-      </div>
+      <Alert
+        variant="warning"
+        title="Önemli"
+        icon={<ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />}
+        className="mb-4"
+      >
+        Bu kodlar sadece bir kez gösterilecek. Telefonunuza erişiminizi
+        kaybederseniz hesabınıza giriş yapmak için bu kodlara ihtiyacınız
+        olacak.
+      </Alert>
 
       <div className="mb-4 grid grid-cols-2 gap-2">
         {codes.map((code, index) => (
