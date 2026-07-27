@@ -52,7 +52,14 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
       resolveTaxRate: jest.fn(),
       calculateTaxAmount: jest.fn(),
     } as any;
-    const svc = new OrderPricingService(prisma, taxService);
+    const shippingTariffs = {
+      getActiveOutboundTariff: async () => ({
+        outboundPackageFee: BASE,
+        freeShippingEnabled: true,
+        freeShippingThreshold: THRESHOLD,
+      }),
+    } as any;
+    const svc = new OrderPricingService(prisma, taxService, shippingTariffs);
     // Komisyonu izole et — bu spec yalnız kargoyu ölçer.
     jest
       .spyOn(svc, "calculateCommission")

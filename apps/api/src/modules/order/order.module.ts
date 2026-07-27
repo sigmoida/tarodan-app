@@ -27,6 +27,7 @@ import { ProductModule } from "../product/product.module";
 import { CommissionModule } from "../commission/commission.module";
 import { TaxModule } from "../tax/tax.module";
 import { ElogoModule } from "../elogo";
+import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ElogoModule } from "../elogo";
     CommissionModule,
     TaxModule,
     ElogoModule,
+    ShippingTariffModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OrderController, SellerInvoiceController],

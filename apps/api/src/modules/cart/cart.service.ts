@@ -22,13 +22,11 @@ import {
   getAvailableQuantity,
   canAddRequestedQuantityToCart,
 } from "../product/helpers/product-availability.helper";
+import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
-
-// Shipping configuration
-const FREE_SHIPPING_THRESHOLD = 500;
-const BASE_SHIPPING_COST = 29.99;
 
 @Injectable()
 export class CartService {
@@ -37,6 +35,7 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly discountService: DiscountService,
+    private readonly shippingTariffs: ShippingTariffService,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
@@ -558,15 +557,18 @@ export class CartService {
     // yüzden sepet önizlemesi de uygulamaz → önizleme = tahsilat. Toplam yalnızca
     // grandTotal'da 0'a taban yapılır (Math.max(0, ...)).
 
-    // Calculate shipping
+    // Calculate shipping from the ACTIVE shipping tariff (single source; same base
+    // fee + threshold the order-create charge uses). Cart preview keeps its whole-cart
+    // threshold model; the per-seller charge is confirmed by the checkout quote.
     const hasAvailableItems = availableItems.length > 0;
-    const qualifiesForFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
-    const shippingCost =
-      !hasAvailableItems || qualifiesForFreeShipping ? 0 : BASE_SHIPPING_COST;
+    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
+    const shippingCost = hasAvailableItems
+      ? outboundPackageShipping(tariff, subtotal).toNumber()
+      : 0;
     const amountToFreeShipping =
-      !hasAvailableItems || qualifiesForFreeShipping
+      shippingCost === 0
         ? 0
-        : FREE_SHIPPING_THRESHOLD - subtotal;
+        : Math.max(0, Number(tariff.freeShippingThreshold) - subtotal);
 
     // Grand total
     const grandTotal = subtotal - totalDiscount + shippingCost;

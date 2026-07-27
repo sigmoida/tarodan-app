@@ -7,10 +7,22 @@ import {
 import { Prisma, ShippingTariff, ShippingTariffStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
-import { outboundPackageShipping } from "./shipping-tariff.helper";
+import {
+  outboundPackageShipping,
+  type OutboundTariffLike,
+} from "./shipping-tariff.helper";
 
 const DEFAULT_PROVIDER = "surat";
 const ACTIVE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+// Safety net used ONLY when no active tariff exists (misconfiguration). Mirrors the
+// seeded first tariff so checkout stays available; a warning is logged so it's noticed.
+// This is the SINGLE remaining hardcoded shipping default in the codebase.
+const SAFETY_DEFAULT: OutboundTariffLike = {
+  outboundPackageFee: 29.99,
+  freeShippingEnabled: true,
+  freeShippingThreshold: 500,
+};
 
 export interface ShippingTariffInput {
   provider?: string;
@@ -55,6 +67,24 @@ export class ShippingTariffService {
     }
     this.activeCache.set(provider, { tariff, at: Date.now() });
     return tariff;
+  }
+
+  /**
+   * The active outbound tariff for pricing — never throws. Falls back to the safety
+   * default (with a warning) if no active tariff is configured, so a misconfiguration
+   * cannot take checkout down. Pricing/quote code should use THIS, not getActiveTariff.
+   */
+  async getActiveOutboundTariff(
+    provider = DEFAULT_PROVIDER,
+  ): Promise<OutboundTariffLike> {
+    try {
+      return await this.getActiveTariff(provider);
+    } catch {
+      this.logger.warn(
+        `No active ${provider} shipping tariff; using safety default (29.99/500). Configure a tariff.`,
+      );
+      return SAFETY_DEFAULT;
+    }
   }
 
   /** Drop the cached active tariff (call after any activation). */

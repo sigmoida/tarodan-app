@@ -3,6 +3,7 @@ import { CartService } from "./cart.service";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
 import { StorageService } from "../storage/storage.service";
+import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import { ProductStatus } from "@prisma/client";
 
 /**
@@ -51,6 +52,16 @@ describe("CartService.addItem — idempotent re-add", () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: DiscountService, useValue: {} },
         { provide: StorageService, useValue: {} },
+        {
+          provide: ShippingTariffService,
+          useValue: {
+            getActiveOutboundTariff: async () => ({
+              outboundPackageFee: 29.99,
+              freeShippingEnabled: true,
+              freeShippingThreshold: 500,
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -174,6 +185,13 @@ describe("CartService.calculateCart — unavailable items", () => {
     const service = new CartService(
       mockPrisma,
       mockDiscountService,
+      {
+        getActiveOutboundTariff: async () => ({
+          outboundPackageFee: 29.99,
+          freeShippingEnabled: true,
+          freeShippingThreshold: 500,
+        }),
+      } as any,
       {} as StorageService,
     );
 

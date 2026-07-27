@@ -16,6 +16,8 @@ import {
 } from "./order-commission.helper";
 import { TaxService } from "../tax/tax.service";
 import { isPremiumEntitled } from "../membership/membership.util";
+import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
 
 /**
  * Commission calculation result interface
@@ -34,62 +36,17 @@ export class OrderPricingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly taxService: TaxService,
+    private readonly shippingTariffs: ShippingTariffService,
   ) {}
 
-  // Shipping cost defaults (overridden by PlatformSetting)
-  private readonly DEFAULT_SHIPPING_COST = 29.99;
-  private readonly DEFAULT_FREE_THRESHOLD = 500;
-  private shippingSettingsCache: {
-    baseCost: number;
-    freeThreshold: number;
-    cachedAt: number;
-  } | null = null;
-
   /**
-   * Load shipping cost settings from PlatformSetting (cached for 5 minutes).
-   */
-  private async getShippingSettings(): Promise<{
-    baseCost: number;
-    freeThreshold: number;
-  }> {
-    const now = Date.now();
-    if (
-      this.shippingSettingsCache &&
-      now - this.shippingSettingsCache.cachedAt < 5 * 60 * 1000
-    ) {
-      return this.shippingSettingsCache;
-    }
-
-    const [baseSetting, thresholdSetting] = await Promise.all([
-      this.prisma.platformSetting.findUnique({
-        where: { settingKey: "shipping_base_cost" },
-      }),
-      this.prisma.platformSetting.findUnique({
-        where: { settingKey: "free_shipping_threshold" },
-      }),
-    ]);
-
-    const baseCost = baseSetting
-      ? parseFloat(baseSetting.settingValue)
-      : this.DEFAULT_SHIPPING_COST;
-    const freeThreshold = thresholdSetting
-      ? parseFloat(thresholdSetting.settingValue)
-      : this.DEFAULT_FREE_THRESHOLD;
-
-    this.shippingSettingsCache = { baseCost, freeThreshold, cachedAt: now };
-    return { baseCost, freeThreshold };
-  }
-
-  /**
-   * Calculate shipping cost based on order amount.
-   * Reads from PlatformSetting (admin-configurable), falls back to defaults.
+   * Calculate shipping cost for one package/order subtotal from the ACTIVE shipping
+   * tariff (the single source of truth; replaces the old PlatformSetting keys). Free
+   * over the tariff's threshold, else the flat per-package fee.
    */
   async calculateShippingCost(orderAmount: number): Promise<number> {
-    const { baseCost, freeThreshold } = await this.getShippingSettings();
-    if (orderAmount >= freeThreshold) {
-      return 0;
-    }
-    return baseCost;
+    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
+    return outboundPackageShipping(tariff, orderAmount).toNumber();
   }
 
   /**
@@ -105,10 +62,10 @@ export class OrderPricingService {
   async calculateShippingBySeller(
     sellerSubtotals: Map<string, number>,
   ): Promise<Map<string, number>> {
-    const { baseCost, freeThreshold } = await this.getShippingSettings();
+    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
     const out = new Map<string, number>();
     for (const [sellerId, subtotal] of sellerSubtotals) {
-      out.set(sellerId, subtotal >= freeThreshold ? 0 : baseCost);
+      out.set(sellerId, outboundPackageShipping(tariff, subtotal).toNumber());
     }
     return out;
   }
@@ -122,13 +79,19 @@ export class OrderPricingService {
     threshold: number;
     amountToFreeShipping: number;
   }> {
-    const { baseCost, freeThreshold } = await this.getShippingSettings();
-    const shippingCost = orderAmount >= freeThreshold ? 0 : baseCost;
+    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
+    const shippingCost = outboundPackageShipping(
+      tariff,
+      orderAmount,
+    ).toNumber();
+    const threshold = Number(tariff.freeShippingThreshold);
     return {
       isFreeShipping: shippingCost === 0,
       shippingCost,
-      threshold: freeThreshold,
-      amountToFreeShipping: Math.max(0, freeThreshold - orderAmount),
+      threshold,
+      amountToFreeShipping: tariff.freeShippingEnabled
+        ? Math.max(0, threshold - orderAmount)
+        : 0,
     };
   }
 

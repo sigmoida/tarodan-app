@@ -103,6 +103,13 @@ describe("commission rule matching by membership tier", () => {
   const service = new OrderPricingService(
     prisma as unknown as PrismaService,
     {} as TaxService,
+    {
+      getActiveOutboundTariff: async () => ({
+        outboundPackageFee: 29.99,
+        freeShippingEnabled: true,
+        freeShippingThreshold: 500,
+      }),
+    } as any,
   );
 
   beforeEach(() => {
@@ -120,7 +127,13 @@ describe("commission rule matching by membership tier", () => {
     async (membershipTier, expectedRuleId, expectedFee) => {
       prisma.user.findUnique.mockResolvedValue({
         sellerType: SellerType.individual,
-        membership: { tier: { type: membershipTier } },
+        // Paid-tier commission requires an ENTITLED membership (active + in-period);
+        // a raw past_due/expired tier no longer unlocks premium/business commission.
+        membership: {
+          tier: { type: membershipTier },
+          status: "active",
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
       });
 
       const result = await service.calculateCommission(100, "seller-id");
