@@ -80,7 +80,7 @@ export default function ProductStaticInfoView({
         </span>
       </div>
 
-      <SectionCard title={t("product.description")} className="p-6 mb-6">
+      <SectionCard title={t("product.description")} className="mb-6">
         <div className="prose prose-sm max-w-none text-muted whitespace-pre-line leading-relaxed">
           {listing.description || t("product.noDescription")}
         </div>

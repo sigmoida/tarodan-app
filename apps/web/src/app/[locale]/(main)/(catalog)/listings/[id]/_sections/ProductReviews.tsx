@@ -27,7 +27,6 @@ export default function ProductReviews() {
   return (
     <SectionCard
       title={t("product.productReviews")}
-      className="p-4 sm:p-6 md:p-8"
       action={
         reviewStats ? (
           <div className="flex items-center gap-2">
