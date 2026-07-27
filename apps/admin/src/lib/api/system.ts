@@ -19,6 +19,18 @@ export const systemApi = {
   updateMembershipTier: (id: string, data: any) =>
     api.patch(`/admin/membership-tiers/${id}`, data),
 
+  // Shipping Tariffs (typed shipping pricing)
+  getShippingTariffs: (provider?: string) =>
+    api.get("/admin/shipping/tariffs", {
+      params: provider ? { provider } : {},
+    }),
+  createShippingTariff: (data: any) =>
+    api.post("/admin/shipping/tariffs", data),
+  updateShippingTariff: (id: string, data: any) =>
+    api.patch(`/admin/shipping/tariffs/${id}`, data),
+  activateShippingTariff: (id: string) =>
+    api.post(`/admin/shipping/tariffs/${id}/activate`),
+
   // Audit Logs
   getAuditLogs: (params?: any) => api.get("/admin/audit-logs", { params }),
 

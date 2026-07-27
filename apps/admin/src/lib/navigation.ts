@@ -450,6 +450,14 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "membership_tiers",
         },
         {
+          name: t("admin.shippingTariffs.title"),
+          href: "/system/shipping-tariffs",
+          icon: TruckIcon,
+          description: t("admin.shippingTariffs.description"),
+          keywords: ["shipping", "tariff"],
+          permission: "settings",
+        },
+        {
           name: t("admin.nav.items.settings.name"),
           href: "/system/settings",
           icon: Cog6ToothIcon,

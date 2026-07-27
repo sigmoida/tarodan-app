@@ -4534,6 +4534,38 @@
         "invalidValue": "Enter a valid value"
       }
     },
+    "shippingTariffs": {
+      "title": "Shipping Tariffs",
+      "description": "The single source of shipping pricing. Only one active tariff per provider; activation archives the current active one. Existing orders are unaffected.",
+      "new": "New Tariff",
+      "loading": "Loading…",
+      "empty": "No tariffs yet.",
+      "providerVersion": "Provider / Version",
+      "packageFee": "Package fee",
+      "freeShipping": "Free shipping",
+      "freeOver": "over {amount}",
+      "freeDisabled": "Off",
+      "returnTrade": "Return / Trade (Phase 2)",
+      "edit": "Edit",
+      "activate": "Activate",
+      "activated": "Tariff activated",
+      "editTitle": "Edit Tariff",
+      "newTitle": "New Tariff (Draft)",
+      "nameLabel": "Tariff name",
+      "nameRequired": "Tariff name is required",
+      "outboundFeeLabel": "Package shipping fee (TRY)",
+      "thresholdLabel": "Free-shipping threshold (TRY)",
+      "freeEnabledLabel": "Free shipping enabled",
+      "returnFeeLabel": "Return shipping fee (TRY, Phase 2)",
+      "tradeFeeLabel": "Trade leg fee (TRY, Phase 2)",
+      "update": "Update",
+      "create": "Create",
+      "updated": "Tariff updated",
+      "created": "Draft tariff created",
+      "statusDraft": "Draft",
+      "statusActive": "Active",
+      "statusArchived": "Archived"
+    },
     "tiers": {
       "page": {
         "title": "Membership Tiers",

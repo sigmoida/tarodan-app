@@ -4534,6 +4534,38 @@
         "invalidValue": "Geçerli bir değer girin"
       }
     },
+    "shippingTariffs": {
+      "title": "Kargo Tarifeleri",
+      "description": "Kargo fiyatlandırmasının tek kaynağı. Sağlayıcı başına yalnız bir aktif tarife olur; aktivasyon mevcut aktifi arşivler. Eski siparişler etkilenmez.",
+      "new": "Yeni Tarife",
+      "loading": "Yükleniyor…",
+      "empty": "Henüz tarife yok.",
+      "providerVersion": "Sağlayıcı / Sürüm",
+      "packageFee": "Paket ücreti",
+      "freeShipping": "Ücretsiz kargo",
+      "freeOver": "{amount} üzeri",
+      "freeDisabled": "Kapalı",
+      "returnTrade": "İade / Takas (Faz 2)",
+      "edit": "Düzenle",
+      "activate": "Aktive Et",
+      "activated": "Tarife aktive edildi",
+      "editTitle": "Tarifeyi Düzenle",
+      "newTitle": "Yeni Tarife (Taslak)",
+      "nameLabel": "Tarife adı",
+      "nameRequired": "Tarife adı gerekli",
+      "outboundFeeLabel": "Paket kargo ücreti (₺)",
+      "thresholdLabel": "Ücretsiz kargo eşiği (₺)",
+      "freeEnabledLabel": "Ücretsiz kargo aktif",
+      "returnFeeLabel": "İade kargo ücreti (₺, Faz 2)",
+      "tradeFeeLabel": "Takas bacağı ücreti (₺, Faz 2)",
+      "update": "Güncelle",
+      "create": "Oluştur",
+      "updated": "Tarife güncellendi",
+      "created": "Taslak tarife oluşturuldu",
+      "statusDraft": "Taslak",
+      "statusActive": "Aktif",
+      "statusArchived": "Arşiv"
+    },
     "tiers": {
       "page": {
         "title": "Üyelik Katmanları",
