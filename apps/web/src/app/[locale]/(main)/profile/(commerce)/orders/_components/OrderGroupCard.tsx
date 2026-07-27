@@ -141,9 +141,7 @@ export default function OrderGroupCard({
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 {groupNumber && (
-                  <p className="text-sm text-muted">
-                    {t("order.groupNumber")} #{groupNumber}
-                  </p>
+                  <p className="text-sm text-muted">#{groupNumber}</p>
                 )}
                 <p className="text-sm text-subtle">{formatDate(date)}</p>
               </div>
@@ -190,9 +188,7 @@ export default function OrderGroupCard({
         ) : (
           <div>
             {groupNumber && (
-              <p className="text-sm text-muted">
-                {t("order.groupNumber")} #{groupNumber}
-              </p>
+              <p className="text-sm text-muted">#{groupNumber}</p>
             )}
             <p className="text-sm text-subtle">{formatDate(date)}</p>
           </div>
