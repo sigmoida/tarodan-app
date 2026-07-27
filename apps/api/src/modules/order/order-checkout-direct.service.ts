@@ -495,7 +495,9 @@ export class OrderCheckoutDirectService {
         commissionResult,
       );
 
-      // Record discount usage if a coupon was applied
+      // Record discount usage if a coupon was applied. Pass the outer tx so it is
+      // ATOMIC with order creation (F4.4) — a rolled-back checkout no longer leaves
+      // the coupon phantom-consumed.
       if (appliedDiscountId && couponDiscount > 0) {
         await this.discountService.recordUsage(
           appliedDiscountId,
@@ -503,6 +505,7 @@ export class OrderCheckoutDirectService {
           order.id,
           couponDiscount,
           appliedVoucherCodeId,
+          tx,
         );
         this.logger.log(
           `Discount usage recorded: ${appliedDiscountId} for order ${orderNumber}`,

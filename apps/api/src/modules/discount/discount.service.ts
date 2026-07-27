@@ -519,9 +519,16 @@ export class DiscountService {
       return { isValid: false, error: "Bu kupon kullanım limitine ulaştı" };
     }
 
-    // Check per-user usage limit — only when we know who is applying (auth).
-    // Misafir doğrulamasında (userId=null) atlanır; checkout'ta yeniden denetlenir.
-    if (userId && discount.usageLimitPerUser) {
+    // Per-user-limited coupons require an IDENTIFIED user. Guests share one system
+    // identity, so the per-user limit can't be enforced for them (F4.5) — require
+    // login rather than silently letting guests bypass the limit.
+    if (discount.usageLimitPerUser) {
+      if (!userId) {
+        return {
+          isValid: false,
+          error: "Bu kupon için giriş yapmanız gerekir",
+        };
+      }
       const userUsageCount = await this.prisma.discountUsage.count({
         where: { discountId: discount.id, userId },
       });
@@ -657,8 +664,9 @@ export class DiscountService {
     orderId: string,
     amount: number,
     voucherCodeId?: string,
+    client?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const run = async (tx: Prisma.TransactionClient) => {
       if (voucherCodeId) {
         // Atomik tek-kullanım: yalnızca henüz kullanılmamışsa işaretle.
         const claimed = await tx.discountCode.updateMany({
@@ -687,6 +695,23 @@ export class DiscountService {
       if (updated === 0) {
         throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
       }
+      // Per-user limit (F4.5): the UPDATE above locked the discount row, so this
+      // count-then-insert is serialized across concurrent redemptions of the SAME
+      // coupon → no TOCTOU race. This is the authoritative enforcement (validateCoupon
+      // only pre-checks for UX). Guests never reach here for per-user coupons — they
+      // are rejected up front in validateCoupon (shared identity is unenforceable).
+      const perUser = await tx.discount.findUnique({
+        where: { id: discountId },
+        select: { usageLimitPerUser: true },
+      });
+      if (perUser?.usageLimitPerUser) {
+        const userUsage = await tx.discountUsage.count({
+          where: { discountId, userId },
+        });
+        if (userUsage >= perUser.usageLimitPerUser) {
+          throw new BadRequestException("Bu kuponu zaten kullandınız");
+        }
+      }
       await tx.discountUsage.create({
         data: {
           discountId,
@@ -695,7 +720,16 @@ export class DiscountService {
           amount: new Prisma.Decimal(amount),
         },
       });
-    });
+    };
+    // Join the caller's transaction so usage is ATOMIC with order creation (F4.4):
+    // if the order tx rolls back, the usedCount increment / voucher redeem / usage
+    // row roll back too — no phantom-consumed coupon on a rolled-back checkout.
+    // Standalone callers (no tx) still get their own transaction.
+    if (client) {
+      await run(client);
+    } else {
+      await this.prisma.$transaction(run);
+    }
 
     this.logger.log(
       `Discount usage recorded: ${discountId} by ${userId} for order ${orderId}`,

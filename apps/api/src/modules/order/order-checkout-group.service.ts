@@ -715,20 +715,6 @@ export class OrderCheckoutGroupService {
               input.commissionResult,
             );
 
-            if (appliedDiscountId && entry.couponDiscount > 0) {
-              await this.discountService.recordUsage(
-                appliedDiscountId,
-                buyerId,
-                order.id,
-                entry.couponDiscount,
-                appliedVoucherCodeId,
-              );
-              // Voucher tek kullanımlık: grup içinde yalnızca İLK siparişte redeem
-              // edilir; sonraki siparişlerde tekrar denenmez (aksi halde "zaten
-              // kullanıldı" fırlatır).
-              appliedVoucherCodeId = undefined;
-            }
-
             await tx.product.update({
               where: { id: entry.productId },
               data: { reservedQuantity: { increment: entry.quantity } },
@@ -746,6 +732,26 @@ export class OrderCheckoutGroupService {
               sellerEmail: entry.product.seller?.email ?? null,
               sellerName: entry.product.seller?.displayName ?? null,
             });
+          }
+
+          // Kupon kullanımı: grup başına BİR KEZ ve BU tx içinde kaydedilir (F4.4).
+          // Eskiden satır başına + ayrı bir bağımsız tx'te yapılıyordu → usedCount
+          // çoklu artıyor ve outer tx geri alınsa bile kupon "kullanıldı" kalıyordu.
+          if (appliedDiscountId) {
+            const totalCouponDiscount = pricing.reduce(
+              (sum, p) => sum + p.couponDiscount,
+              0,
+            );
+            if (totalCouponDiscount > 0 && createdOrders.length > 0) {
+              await this.discountService.recordUsage(
+                appliedDiscountId,
+                buyerId,
+                createdOrders[0].id,
+                totalCouponDiscount,
+                appliedVoucherCodeId,
+                tx,
+              );
+            }
           }
 
           // Sipariş(ler) oluşturuldu → alıcının sepetindeki bu ürünleri server-side kaldır.
