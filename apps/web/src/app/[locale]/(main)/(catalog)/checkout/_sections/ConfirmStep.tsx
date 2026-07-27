@@ -7,6 +7,7 @@ import { CreditCardIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useCheckout } from "../_context/CheckoutContext";
+import CouponBox from "../../cart/_components/CouponBox";
 
 const fmtTL = (n: number) =>
   n.toLocaleString("tr-TR", {
@@ -18,6 +19,7 @@ export default function ConfirmStep() {
   const {
     t,
     isAuthenticated,
+    isCartCheckout,
     checkoutItems,
     addresses,
     selectedAddressId,
@@ -86,6 +88,14 @@ export default function ConfirmStep() {
         <p className="font-medium">{t("checkout.payWithPaytr")}</p>
       </div>
 
+      {/* Coupon — sepet checkout'unda. Direkt-alim (Hemen Al) kupon destegi ayri
+          bir adimda gelecek (backend). */}
+      {isCartCheckout && (
+        <div className="mb-6">
+          <CouponBox />
+        </div>
+      )}
+
       {/* Security Notice */}
       <div className="flex items-start gap-3 p-4 bg-success-50 rounded mb-6">
         <ShieldCheckIcon className="w-6 h-6 text-success-600 flex-shrink-0" />
@@ -104,7 +114,7 @@ export default function ConfirmStep() {
           isLoading={isLoading}
           leftIcon={<CreditCardIcon className="w-5 h-5" />}
         >
-          Onayla ve Öde (₺{grandTotal.toFixed(2)})
+          Onayla ve Öde ({fmtTL(grandTotal)} TL)
         </Button>
       </div>
     </SectionCard>

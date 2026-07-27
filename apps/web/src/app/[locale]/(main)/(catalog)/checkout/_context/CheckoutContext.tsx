@@ -65,8 +65,8 @@ function useCheckoutValue() {
   // in-flight payment navigation with a redirect back to /cart.
   const checkoutSubmittedRef = useRef(false);
 
-  // 0: Address, 1: Payment, 2: Confirm — the clickable Stepper drives this.
-  const stepper = useStepper(3, 0);
+  // 0: Address, 1: Confirm — payment (PayTR) is triggered from the Confirm step.
+  const stepper = useStepper(2, 0);
   const step = stepper.current;
   const goToStep = stepper.goTo;
   const nextStep = stepper.next;

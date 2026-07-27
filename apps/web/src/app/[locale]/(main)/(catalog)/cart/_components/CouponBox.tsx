@@ -93,7 +93,7 @@ export default function CouponBox() {
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           placeholder={t("cart.couponPlaceholder")}
-          className="font-mono uppercase"
+          className="font-mono"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
