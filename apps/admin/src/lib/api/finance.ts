@@ -28,8 +28,6 @@ export const financeApi = {
   getCommissionRevenue: (params?: { fromDate?: string; toDate?: string }) =>
     api.get("/admin/commission/revenue", { params }),
   getCommissionRules: () => api.get("/admin/commission-rules"),
-  previewCommission: (data: unknown) =>
-    api.post("/admin/commission-rules/preview", data),
   createCommissionRule: (data: any) =>
     api.post("/admin/commission-rules", data),
   updateCommissionRule: (id: string, data: any) =>
