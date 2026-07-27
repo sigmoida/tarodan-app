@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException, Optional } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Optional,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { AdminAuditService } from "./admin-audit.service";
+import { PaymentService } from "../payment/payment.service";
 import { AdminOrderQueryDto, ResolveDisputeDto } from "./dto";
 import { OrderStatus, Prisma } from "@prisma/client";
 import { paginate } from "../../common/list";
@@ -18,6 +24,8 @@ export class AdminOrderService {
     private readonly audit: AdminAuditService,
     @Optional()
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly paymentService?: PaymentService,
   ) {}
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -300,29 +308,50 @@ export class AdminOrderService {
       throw new NotFoundException("Sipariş bulunamadı");
     }
 
-    // Handle resolution based on type
-    let newStatus: OrderStatus;
+    // Refund resolutions MUST go through the canonical refund orchestrator (F3.2):
+    // PayTR refund + payout void + hold release + stock restore + ledger. A bare
+    // status write would leave money/hold/stock/ledger inconsistent. Money moves
+    // FIRST — if the refund fails (e.g. payout already started) the dispute is NOT
+    // marked resolved (fail-closed).
+    let newStatus: OrderStatus = order.status;
     switch (dto.resolution) {
       case "buyer_refund":
+        if (!this.paymentService) {
+          throw new Error("PaymentService kullanılamıyor: iade işlenemedi");
+        }
+        await this.paymentService.processRefund(orderId);
         newStatus = OrderStatus.refunded;
+        break;
+      case "partial_refund":
+        if (dto.refundAmount == null || dto.refundAmount <= 0) {
+          throw new BadRequestException(
+            "Kısmi iade için geçerli bir iade tutarı gerekir",
+          );
+        }
+        if (!this.paymentService) {
+          throw new Error("PaymentService kullanılamıyor: iade işlenemedi");
+        }
+        await this.paymentService.processRefund(orderId, dto.refundAmount);
+        // Kısmi iade siparişi tamamen 'refunded' yapmaz — durum korunur; iade
+        // ödeme/ledger'a kaydedilir.
+        newStatus = order.status;
         break;
       case "seller_favor":
         newStatus = OrderStatus.completed;
         break;
-      case "partial_refund":
-        newStatus = OrderStatus.refunded;
-        break;
       case "dismissed":
+      default:
         newStatus = order.status; // Keep current status
         break;
-      default:
-        newStatus = order.status;
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: newStatus },
-    });
+    const updated =
+      newStatus === order.status
+        ? order
+        : await this.prisma.order.update({
+            where: { id: orderId },
+            data: { status: newStatus },
+          });
 
     await this.audit.createAuditLog(
       adminId,
