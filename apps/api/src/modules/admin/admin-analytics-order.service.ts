@@ -6,8 +6,10 @@ import {
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 import { AdminAuditService } from "./admin-audit.service";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
+import { isAdminOrderTransitionAllowed } from "../order/order-state-machine";
 import { UpdateOrderStatusDto } from "./dto";
 import { OrderStatus, ProductStatus, ShipmentStatus } from "@prisma/client";
 import { SearchService } from "../search/search.service";
@@ -319,6 +321,19 @@ export class AdminAnalyticsOrderService {
       throw new BadRequestException("Geçersiz sipariş durumu");
     }
 
+    // Enforce the canonical state graph (F3.1): admin is privileged but still
+    // cannot make impossible jumps (e.g. pending_payment → completed) or move a
+    // terminal order. This closes the previous any-status → any-status hole.
+    const newStatus = dto.status as OrderStatus;
+    if (!isAdminOrderTransitionAllowed(order.status, newStatus)) {
+      throw new BadRequestException(
+        i18nMessage("server.order.statusTransitionNotAllowed", {
+          from: order.status,
+          to: newStatus,
+        }),
+      );
+    }
+
     // Sipariş durumu elle ilerletildiğinde kargo (shipment) durumunu da senkronize et.
     // Aksi halde web tarafında kargo kartı shipment.status'e bakıp "Satıcı hazırlıyor"
     // gibi yanıltıcı bilgi göstermeye devam ediyor (kaynak: tutarsız shipment.status).
@@ -384,7 +399,6 @@ export class AdminAnalyticsOrderService {
     // Admin durumu ELLE ilerlettiğinde deliveredAt/completedAt de set edilmeli — aksi halde
     // deliveredAt NULL kalıp teslim faturası cron'unu (deliveredAt bazlı tamamlama) ve raporları bozar.
     const now = new Date();
-    const newStatus = dto.status as OrderStatus;
     const extra: any = {};
     if (
       (newStatus === OrderStatus.delivered ||
@@ -409,31 +423,33 @@ export class AdminAnalyticsOrderService {
       extra.completedAt = now;
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: newStatus,
-        version: { increment: 1 },
-        ...extra,
-      },
-    });
-
-    // Escrow release'i teslimde planla — para akışının TEK tetikleyicisi. Admin ELLE
-    // teslim/tamamlandıya çektiğinde de releaseAt set edilmeli; aksi halde PaymentHold
-    // releaseAt null kalıp satıcı hiç ödenmez (poll'daki #83 ile aynı boşluk). Yalnız
-    // yeni teslimde (deliveredAt taze) ve best-effort — status update'i bloklamaz.
-    if (extra.deliveredAt) {
-      try {
-        await this.paymentService?.scheduleHoldReleaseOnDelivery(
-          orderId,
-          extra.deliveredAt,
-        );
-      } catch (e: any) {
-        this.logger.warn(
-          `admin durum→escrow schedule hatası ${orderId}: ${e?.message}`,
-        );
-      }
-    }
+    // Teslim geçişinde durum güncellemesi + escrow release planlaması ATOMİK olmalı
+    // (F3.4): aksi halde deliveredAt set olup releaseAt null kalırsa PaymentHold asla
+    // serbest bırakılmaz ve satıcı HİÇ ödenmez (kurtarılamaz boşluk). Tek tx'te
+    // yaparız (scheduleHoldReleaseOnDelivery tx client kabul eder). Escrow artık
+    // best-effort değil — başarısızsa durum güncellemesi de geri alınır (fail-closed).
+    const updated = extra.deliveredAt
+      ? await this.prisma.$transaction(async (tx) => {
+          const u = await tx.order.update({
+            where: { id: orderId },
+            data: { status: newStatus, version: { increment: 1 }, ...extra },
+          });
+          if (!this.paymentService) {
+            throw new Error(
+              `PaymentService kullanılamıyor: ${orderId} teslim/escrow planlaması yapılamadı`,
+            );
+          }
+          await this.paymentService.scheduleHoldReleaseOnDelivery(
+            orderId,
+            extra.deliveredAt,
+            tx,
+          );
+          return u;
+        })
+      : await this.prisma.order.update({
+          where: { id: orderId },
+          data: { status: newStatus, version: { increment: 1 }, ...extra },
+        });
 
     await this.audit.createAuditLog(
       adminId,

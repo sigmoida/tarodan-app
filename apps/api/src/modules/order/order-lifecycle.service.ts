@@ -18,6 +18,7 @@ import { CommissionLedgerService } from "../commission/commission-ledger.service
 import { ElogoInvoicingService } from "../elogo";
 import { OrderCommonService } from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
+import { ORDER_TRANSITION_RULES } from "./order-state-machine";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -116,52 +117,10 @@ export class OrderLifecycleService {
       throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
-    // Validate state transitions
-    const allowedTransitions: Record<
-      OrderStatus,
-      {
-        nextStatuses: OrderStatus[];
-        allowedBy: "buyer" | "seller" | "system";
-      }[]
-    > = {
-      [OrderStatus.pending_payment]: [
-        { nextStatuses: [OrderStatus.paid], allowedBy: "system" },
-        { nextStatuses: [OrderStatus.preparing], allowedBy: "system" }, // Payment success → preparing (first state after purchase)
-        { nextStatuses: [OrderStatus.cancelled], allowedBy: "buyer" },
-      ],
-      [OrderStatus.paid]: [
-        { nextStatuses: [OrderStatus.preparing], allowedBy: "seller" },
-        {
-          nextStatuses: [OrderStatus.cancelled, OrderStatus.refunded],
-          allowedBy: "system",
-        },
-      ],
-      [OrderStatus.preparing]: [
-        { nextStatuses: [OrderStatus.shipped], allowedBy: "system" }, // Triggered by shipping
-      ],
-      [OrderStatus.shipped]: [
-        { nextStatuses: [OrderStatus.delivered], allowedBy: "system" }, // Triggered by shipping update
-      ],
-      [OrderStatus.delivered]: [
-        { nextStatuses: [OrderStatus.completed], allowedBy: "buyer" },
-      ],
-      [OrderStatus.awaiting_buyer_confirmation]: [
-        { nextStatuses: [OrderStatus.completed], allowedBy: "buyer" }, // manual_ok (confirmReceipt)
-        { nextStatuses: [OrderStatus.completed], allowedBy: "system" }, // auto_timeout (cron)
-        { nextStatuses: [OrderStatus.refund_requested], allowedBy: "buyer" },
-      ],
-      [OrderStatus.completed]: [],
-      [OrderStatus.cancelled]: [],
-      [OrderStatus.refund_requested]: [
-        { nextStatuses: [OrderStatus.refunded], allowedBy: "system" },
-      ],
-      [OrderStatus.refunded]: [],
-    };
-
-    const currentTransitions = allowedTransitions[order.status] || [];
-    const transition = currentTransitions.find((t) =>
-      t.nextStatuses.includes(dto.status),
-    );
+    // Validate state transitions against the canonical order state graph
+    // (single source of truth — see order-state-machine.ts).
+    const currentTransitions = ORDER_TRANSITION_RULES[order.status] ?? [];
+    const transition = currentTransitions.find((t) => t.to === dto.status);
 
     if (!transition) {
       throw new BadRequestException(
