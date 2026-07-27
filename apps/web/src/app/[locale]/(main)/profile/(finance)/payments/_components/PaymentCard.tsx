@@ -17,10 +17,6 @@ import {
   StatusBadge,
   paymentStatusConfig,
   orderStatusConfig,
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
   ThumbnailStack,
 } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";
@@ -70,7 +66,7 @@ export default function PaymentCard({
   const groupOrders = groupOrdersOf(payment);
   const isGroup = groupOrders.length > 0;
   // A group has no single order detail — its "all details" is the item list, so
-  // the card-level Detaylar toggles this accordion open instead of navigating.
+  // the single "Detaylar" toggle reveals the items in place instead of navigating.
   const [open, setOpen] = useState(false);
 
   const statusLabel =
@@ -201,135 +197,129 @@ export default function PaymentCard({
         <p className="mt-2 text-xs text-danger-600">{payment.failureReason}</p>
       )}
 
-      {/* Actions */}
+      {/* Actions: for a group the item-count / refund summary sits on the LEFT and
+          a single "Detaylar" toggle on the right — one control reveals the items. */}
       {(isGroup ||
         payment.status === "pending" ||
         payment.status === "failed" ||
         payment.orderId) && (
-        <div className="mt-3 flex items-center justify-end gap-2 border-t border-border pt-3">
-          {/* Card-level "Detaylar": group → open the item list (all details);
-              single order → navigate to its detail. */}
-          {isGroup ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-            >
-              {t("common.details")}
-              <ChevronDownIcon
-                className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
-              />
-            </Button>
-          ) : (
-            payment.orderId && (
-              <Button asChild variant="outline" size="sm" className="gap-1">
-                <Link href={`/profile/orders/${payment.orderId}`}>
-                  {t("common.details")}
-                  <ChevronRightIcon className="h-4 w-4" />
-                </Link>
+        <div
+          className={`mt-3 flex items-center gap-2 border-t border-border pt-3 ${
+            isGroup ? "justify-between" : "justify-end"
+          }`}
+        >
+          {isGroup && (
+            <span className="flex flex-wrap items-center gap-2 text-sm text-primary-600">
+              {t("payment.viewItemsCount", { count: groupOrders.length })}
+              {refundedCount > 0 && (
+                <Badge variant="warning" size="sm">
+                  {t("payment.itemsRefunded", { count: refundedCount })}
+                </Badge>
+              )}
+              {cancelledCount > 0 && (
+                <Badge variant="danger" size="sm">
+                  {t("payment.itemsCancelled", { count: cancelledCount })}
+                </Badge>
+              )}
+            </span>
+          )}
+          <div className="flex items-center gap-2">
+            {/* group → toggle the item list; single order → navigate to its detail. */}
+            {isGroup ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+              >
+                {t("common.details")}
+                <ChevronDownIcon
+                  className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+                />
               </Button>
-            )
-          )}
-          {payment.status === "pending" && (
-            <Button
-              variant="danger"
-              size="sm"
-              disabled={pending}
-              onClick={() => onAction("cancel", payment.id)}
-            >
-              {t("common.cancel")}
-            </Button>
-          )}
-          {payment.status === "failed" && (
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={pending}
-              onClick={() => onAction("retry", payment.id)}
-            >
-              {t("payment.retry")}
-            </Button>
-          )}
+            ) : (
+              payment.orderId && (
+                <Button asChild variant="outline" size="sm" className="gap-1">
+                  <Link href={`/profile/orders/${payment.orderId}`}>
+                    {t("common.details")}
+                    <ChevronRightIcon className="h-4 w-4" />
+                  </Link>
+                </Button>
+              )
+            )}
+            {payment.status === "pending" && (
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={pending}
+                onClick={() => onAction("cancel", payment.id)}
+              >
+                {t("common.cancel")}
+              </Button>
+            )}
+            {payment.status === "failed" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pending}
+                onClick={() => onAction("retry", payment.id)}
+              >
+                {t("payment.retry")}
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Cart (checkout_group) sub-orders — each a compact, status-aware row. */}
-      {isGroup && (
-        <Accordion
-          type="single"
-          collapsible
-          value={open ? "items" : ""}
-          onValueChange={(v) => setOpen(v === "items")}
-          className="mt-2"
-        >
-          <AccordionItem value="items" className="border-none">
-            <AccordionTrigger className="py-2 text-sm text-primary-600">
-              <span className="flex flex-wrap items-center gap-2">
-                {t("payment.viewItemsCount", { count: groupOrders.length })}
-                {refundedCount > 0 && (
-                  <Badge variant="warning" size="sm">
-                    {t("payment.itemsRefunded", { count: refundedCount })}
-                  </Badge>
-                )}
-                {cancelledCount > 0 && (
-                  <Badge variant="danger" size="sm">
-                    {t("payment.itemsCancelled", { count: cancelledCount })}
-                  </Badge>
-                )}
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-2">
-                {groupOrders.map((o: GroupOrder) => (
-                  <div
-                    key={o.id}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 transition-colors hover:border-primary-300"
-                  >
-                    <Thumb src={o.image} alt={o.title} />
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/profile/orders/${o.id}`}
-                        className="block truncate text-sm font-medium text-heading transition-colors hover:text-primary-600"
-                      >
-                        {o.title}
-                      </Link>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
-                        {o.orderNumber && <span>#{o.orderNumber}</span>}
-                        {o.sellerName && (
-                          <span>
-                            · {t("product.seller")}: {o.sellerName}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1.5">
-                        <StatusBadge
-                          status={o.status}
-                          config={orderStatusConfig}
-                          label={itemStatusLabel(o.status)}
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-                      <span className="whitespace-nowrap text-sm font-semibold text-heading">
-                        {formatTL(o.amount)}
-                      </span>
-                      <Link
-                        href={`/profile/orders/${o.id}`}
-                        className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-primary-600 hover:text-primary-700"
-                      >
-                        {t("common.details")}
-                        <ChevronRightIcon className="h-3.5 w-3.5" />
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+      {/* Cart (checkout_group) sub-orders — revealed in place by "Detaylar". */}
+      {isGroup && open && (
+        <div className="mt-2 space-y-2">
+          {groupOrders.map((o: GroupOrder) => (
+            <div
+              key={o.id}
+              className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 transition-colors hover:border-primary-300"
+            >
+              <Thumb src={o.image} alt={o.title} />
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/profile/orders/${o.id}`}
+                  className="block truncate text-sm font-medium text-heading transition-colors hover:text-primary-600"
+                >
+                  {o.title}
+                </Link>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                  {o.orderNumber && <span>#{o.orderNumber}</span>}
+                  {o.sellerName && (
+                    <span>
+                      · {t("product.seller")}: {o.sellerName}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1.5">
+                  <StatusBadge
+                    status={o.status}
+                    config={orderStatusConfig}
+                    label={itemStatusLabel(o.status)}
+                    size="sm"
+                  />
+                </div>
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+              <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+                <span className="whitespace-nowrap text-sm font-semibold text-heading">
+                  {formatTL(o.amount)}
+                </span>
+                <Link
+                  href={`/profile/orders/${o.id}`}
+                  className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-primary-600 hover:text-primary-700"
+                >
+                  {t("common.details")}
+                  <ChevronRightIcon className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
