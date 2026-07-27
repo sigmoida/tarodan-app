@@ -40,8 +40,10 @@ export default function MyCollectionsPage() {
     setSortBy,
   } = useMyCollections(isAuthenticated);
 
-  const canCreateCollection =
-    user?.membershipTier !== "free" || limits?.canCreateCollections;
+  // Gate on the actual capability (effective, admin-driven) — never on "any non-free
+  // tier". A `||` here would re-open a capability an admin disabled, and a past_due
+  // tier is already presented as free by the API, so the capability is authoritative.
+  const canCreateCollection = Boolean(limits?.canCreateCollections);
 
   const handleCreateClick = () => {
     if (!canCreateCollection) {

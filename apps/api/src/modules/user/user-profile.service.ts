@@ -132,40 +132,48 @@ export class UserProfileService {
       isVerified: user.isVerified,
     });
 
-    // Format membership info for frontend
+    // Format membership info for frontend — EFFECTIVE view. The web gates its UI
+    // (Takas / Koleksiyon / limits) off this payload, so it must match the backend's
+    // own gates: an unpaid (past_due) or expired membership grants NO premium
+    // capability. `isPremium` (isPremiumEntitled) is the single source of truth —
+    // when it's false the tier is presented as free, while the real status/period is
+    // still returned for display. Detailed plan/pending info lives in /membership/me.
+    const FREE_TIER_VIEW = {
+      type: "free",
+      name: "Ücretsiz",
+      maxFreeListings: 5,
+      maxTotalListings: 10,
+      maxImagesPerListing: 3,
+      canTrade: false,
+      canCreateCollections: false,
+      isAdFree: false,
+      featuredListingSlots: 0,
+      commissionDiscount: 0,
+    };
     const membershipInfo = user.membership
       ? {
           id: user.membership.id,
           status: user.membership.status,
           currentPeriodStart: user.membership.currentPeriodStart,
           currentPeriodEnd: user.membership.currentPeriodEnd,
-          tier: {
-            id: user.membership.tier.id,
-            type: user.membership.tier.type,
-            name: user.membership.tier.name,
-            maxFreeListings: user.membership.tier.maxFreeListings,
-            maxTotalListings: user.membership.tier.maxTotalListings,
-            maxImagesPerListing: user.membership.tier.maxImagesPerListing,
-            canCreateCollections: user.membership.tier.canCreateCollections,
-            canTrade: user.membership.tier.canTrade,
-            isAdFree: user.membership.tier.isAdFree,
-            featuredListingSlots: user.membership.tier.featuredListingSlots,
-            commissionDiscount: user.membership.tier.commissionDiscount,
-          },
+          tier: isPremium
+            ? {
+                id: user.membership.tier.id,
+                type: user.membership.tier.type,
+                name: user.membership.tier.name,
+                maxFreeListings: user.membership.tier.maxFreeListings,
+                maxTotalListings: user.membership.tier.maxTotalListings,
+                maxImagesPerListing: user.membership.tier.maxImagesPerListing,
+                canCreateCollections: user.membership.tier.canCreateCollections,
+                canTrade: user.membership.tier.canTrade,
+                isAdFree: user.membership.tier.isAdFree,
+                featuredListingSlots: user.membership.tier.featuredListingSlots,
+                commissionDiscount: user.membership.tier.commissionDiscount,
+              }
+            : { id: user.membership.tier.id, ...FREE_TIER_VIEW },
         }
       : {
-          tier: {
-            type: "free",
-            name: "Ücretsiz",
-            maxFreeListings: 5,
-            maxTotalListings: 10,
-            maxImagesPerListing: 3,
-            canTrade: false,
-            canCreateCollections: false,
-            featuredListingSlots: 0,
-            commissionDiscount: 0,
-            isAdFree: false,
-          },
+          tier: FREE_TIER_VIEW,
           status: "active",
           expiresAt: null,
         };
