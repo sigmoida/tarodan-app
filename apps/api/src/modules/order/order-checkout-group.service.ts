@@ -5,7 +5,6 @@ import {
   BadRequestException,
   Logger,
 } from "@nestjs/common";
-import { randomUUID } from "crypto";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
@@ -535,20 +534,6 @@ export class OrderCheckoutGroupService {
                 dto.idempotencyKey,
                 entry.productId,
               ]);
-
-            // Sürat gönderisi sipariş satırlarından ÖNCE fail-fast: biri başarısızsa hiç sipariş oluşmaz
-            await this.checkoutCommon.assertSuratShipmentSucceeded({
-              correlationId: randomUUID(),
-              idempotencyKey: suratIdempotencyKey,
-              recipientFullName: shippingAddress.fullName,
-              recipientPhone: shippingAddress.phone,
-              recipientCity: shippingAddress.city,
-              recipientDistrict: shippingAddress.district,
-              recipientAddressLine: shippingAddress.address,
-              productId: entry.productId,
-              productTitle: entry.product.title ?? undefined,
-              orderNumberPreview: orderNumber,
-            });
 
             orderInputs.push({
               pricingEntry: entry,

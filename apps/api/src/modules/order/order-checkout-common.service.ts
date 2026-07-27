@@ -72,29 +72,6 @@ export class OrderCheckoutCommonService {
   }
 
   /**
-   * DEPRECATED / no-op. Sürat gönderisi artık ödeme ÖNCESİ ön-kayıt yerine, ödeme
-   * onaylanınca (payment-fulfillment → PaymentCommonService.createSuratBarcodeForOrder)
-   * `OrtakBarkodOlustur` ile GERÇEK kargo kodu döndürerek oluşturuluyor. Ödeme öncesi
-   * fail-fast kaldırıldı: (1) aynı OzelKargoTakipNo ile çift kayıt olmasın, (2) Sürat
-   * anlık hatası alıcının siparişini/checkout'unu düşürmesin (non-blocking). Adres
-   * geçerliliği DTO doğrulamasıyla sağlanır. İmza uyumu için çağıranlar kalır.
-   */
-  async assertSuratShipmentSucceeded(_ctx: {
-    correlationId: string;
-    idempotencyKey: string;
-    recipientFullName: string;
-    recipientPhone: string;
-    recipientCity: string;
-    recipientDistrict: string;
-    recipientAddressLine: string;
-    productId: string;
-    productTitle?: string;
-    orderNumberPreview: string;
-  }): Promise<void> {
-    return;
-  }
-
-  /**
    * Generate a non-guessable, unique order number (e.g. "ORD-K7X9M2QF3N").
    * Random by design so the value leaks no sequence/order-count information and
    * cannot be enumerated. The `order_number` column's @unique constraint is the

@@ -5,7 +5,6 @@ import {
   BadRequestException,
   Logger,
 } from "@nestjs/common";
-import { randomUUID } from "crypto";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
@@ -365,19 +364,6 @@ export class OrderCheckoutDirectService {
           dto.couponCode || "",
         ]);
 
-      await this.checkoutCommon.assertSuratShipmentSucceeded({
-        correlationId: randomUUID(),
-        idempotencyKey: suratIdempotencyKey,
-        recipientFullName: shippingAddress.fullName,
-        recipientPhone: shippingAddress.phone,
-        recipientCity: shippingAddress.city,
-        recipientDistrict: shippingAddress.district,
-        recipientAddressLine: shippingAddress.address,
-        productId: dto.productId,
-        productTitle: product.title ?? undefined,
-        orderNumberPreview: orderNumber,
-      });
-
       // Adet bazlı rezervasyon: 1 adet rezerve et (stok ödeme tamamlanınca düşer)
       // Invalidation yapılmıyor — cron halledecek (stock_plan.md)
       await tx.product.update({
@@ -696,19 +682,6 @@ export class OrderCheckoutDirectService {
           dto.offerId,
           dto.shippingAddressId,
         ]);
-
-      await this.checkoutCommon.assertSuratShipmentSucceeded({
-        correlationId: randomUUID(),
-        idempotencyKey: suratIdempotencyKeyOffer,
-        recipientFullName: shippingAddress.fullName,
-        recipientPhone: shippingAddress.phone,
-        recipientCity: shippingAddress.city,
-        recipientDistrict: shippingAddress.district,
-        recipientAddressLine: shippingAddress.address,
-        productId: offer.productId,
-        productTitle: offer.product.title ?? undefined,
-        orderNumberPreview: orderNumber,
-      });
 
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const {

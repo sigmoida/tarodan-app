@@ -5,7 +5,7 @@ import {
   ConflictException,
   Logger,
 } from "@nestjs/common";
-import { createHash, randomInt, randomUUID, timingSafeEqual } from "crypto";
+import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
@@ -355,19 +355,6 @@ export class OrderGuestCheckoutService {
           dto.offerId || "",
           `${dto.shippingAddress.city}|${dto.shippingAddress.phone}|${dto.shippingAddress.address}`,
         ]);
-
-      await this.checkoutCommon.assertSuratShipmentSucceeded({
-        correlationId: randomUUID(),
-        idempotencyKey: guestSuratKey,
-        recipientFullName: dto.shippingAddress.fullName.trim(),
-        recipientPhone: dto.shippingAddress.phone.trim(),
-        recipientCity: dto.shippingAddress.city.trim(),
-        recipientDistrict: dto.shippingAddress.district.trim(),
-        recipientAddressLine: dto.shippingAddress.address.trim(),
-        productId: dto.productId,
-        productTitle: product.title ?? undefined,
-        orderNumberPreview: orderNumber,
-      });
 
       // Build guest shippingAddress JSON; add billing when provided and different
       const guestShippingJson: Record<string, unknown> = {
