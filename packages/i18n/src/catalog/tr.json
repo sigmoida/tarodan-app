@@ -4455,6 +4455,14 @@
       },
       "saveButton": "Ayarları Kaydet",
       "saved": "Ayarlar kaydedildi",
+      "search": {
+        "title": "Arama Dizini (Elasticsearch)",
+        "description": "Ürün arama dizinini sıfırdan yeniden oluşturur; fiyat ve öne çıkarma değişikliklerini mevcut ürünlere uygular. Genellikle deploy sonrası bir kez çalıştırılır.",
+        "reindexButton": "Yeniden Dizinle",
+        "confirmTitle": "Aramayı yeniden dizinle",
+        "confirmDescription": "Tüm ürün arama dizini silinip yeniden oluşturulacak. Bu işlem birkaç dakika sürebilir. Devam edilsin mi?",
+        "success": "{count} ürün yeniden dizinlendi"
+      },
       "tabs": {
         "listing": "İlan",
         "trade": "Takas",

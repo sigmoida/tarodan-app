@@ -11,6 +11,9 @@ export const systemApi = {
   updateSetting: (key: string, value: string) =>
     api.patch(`/admin/settings/${key}`, { value }),
 
+  // Search index (Elasticsearch) — drops + rebuilds the product index.
+  reindexSearch: () => api.post("/search/admin/reindex"),
+
   // Membership Tiers
   getMembershipTiers: () => api.get("/admin/membership-tiers"),
   updateMembershipTier: (id: string, data: any) =>

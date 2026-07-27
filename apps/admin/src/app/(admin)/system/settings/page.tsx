@@ -9,6 +9,7 @@ import { PageLoading } from "@/components/PageLoading";
 import { AdminTabs } from "@/components/AdminTabs";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { useSettingsPage } from "./_lib/useSettingsPage";
+import { SearchIndexCard } from "./_components/SearchIndexCard";
 
 export default function SettingsPage() {
   const { t, tab, setTab, activeTab, tabs, title, fields, query, form, save } =
@@ -63,6 +64,10 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Form>
+
+      <div className="mt-6">
+        <SearchIndexCard />
+      </div>
     </AdminPage>
   );
 }
