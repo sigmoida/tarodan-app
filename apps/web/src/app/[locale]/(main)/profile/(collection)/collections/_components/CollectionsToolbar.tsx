@@ -33,8 +33,7 @@ export default function CollectionsToolbar({
       <Select
         value={sortBy}
         onChange={(e) => onSortChange(e.target.value as SortOption)}
-        className="w-auto"
-        selectSize="sm"
+        className="w-full sm:w-44"
       >
         <option value="recent">{t("common.newest")}</option>
         <option value="popular">{t("common.popular")}</option>
