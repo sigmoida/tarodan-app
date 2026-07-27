@@ -115,7 +115,8 @@
     "opening": "Opening...",
     "uploading": "Uploading...",
     "replace": "Replace",
-    "language": "Language"
+    "language": "Language",
+    "deleting": "Deleting..."
   },
   "nav": {
     "home": "Home",
@@ -561,7 +562,15 @@
     "multipleImagesRequired360": "Multiple images required for 360° view",
     "conditionPoor": "Poor",
     "statusDeleted": "Removed",
-    "upToImages": "Up to {count} images"
+    "upToImages": "Up to {count} images",
+    "boostedBadge": "Featured",
+    "boostListing": "Feature",
+    "extendBoost": "Extend",
+    "estimatedNet": "Estimated net earnings: {amount}",
+    "soldOn": "Sold: {date}",
+    "buyerHandle": "Buyer: @{name}",
+    "orderDetail": "Order Details",
+    "relist": "Relist"
   },
   "cart": {
     "myCart": "My Cart",
@@ -885,7 +894,8 @@
     "refundReasonLostInTransit": "Lost in transit",
     "refundReasonOther": "Other",
     "statusPendingPayment": "Pending Payment",
-    "statusRefundRequested": "Refund Requested"
+    "statusRefundRequested": "Refund Requested",
+    "track": "Track"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -1105,7 +1115,8 @@
     "statusAtWarehouse": "At Warehouse",
     "statusAdminReviewing": "Under Review",
     "statusShippingToRecipients": "Shipping to Recipients",
-    "statusReturning": "Returning"
+    "statusReturning": "Returning",
+    "payingParty": "Paying party"
   },
   "offer": {
     "makeOffer": "Make Offer",
@@ -1133,7 +1144,16 @@
     "cancelFailed": "Failed to cancel offer",
     "counterFailed": "Failed to send counter",
     "statusExpired": "Expired",
-    "statusCounterOffered": "Counter Offered"
+    "statusCounterOffered": "Counter Offered",
+    "waitingBuyerCounter": "Waiting for the buyer to respond to your counter-offer.",
+    "acceptCounter": "Accept Counter-Offer",
+    "lowerOffer": "Lower Offer",
+    "viewOrder": "View Order",
+    "listingPriceLabel": "Listing Price",
+    "offerer": "Offerer",
+    "timeLeft": "{time} left",
+    "offerAmountLabel": "Offer Amount",
+    "estimatedNetLabel": "Estimated net"
   },
   "message": {
     "messages": "Messages",
@@ -1561,7 +1581,15 @@
     "popularSearches": "Popular Searches",
     "searchAction": "search for",
     "browseAllListings": "Browse all listings",
-    "relatedResults": "Related Results"
+    "relatedResults": "Related Results",
+    "savedLimitReached": "You have reached your saved-search limit ({limit} searches).",
+    "premiumMoreSearches": "Save more searches with Premium",
+    "savedTitle": "My Saved Searches",
+    "savedDescription": "Manage your saved searches and change notification preferences here.",
+    "savedEmptyTitle": "No Saved Searches",
+    "savedEmptyDescription": "While browsing listings, save a search with the \"Save this search\" button on the results page; manage it here and get notified about new results.",
+    "countOfLimit": "{count} / {limit} searches",
+    "searchListings": "Search Listings"
   },
   "error": {
     "pageNotFound": "Page Not Found",
@@ -1714,7 +1742,10 @@
     "enable": "Enable",
     "disable": "Disable",
     "activeSessions": "Active Sessions",
-    "loginHistory": "Login History"
+    "loginHistory": "Login History",
+    "twoFactorTitle": "Two-Factor Authentication",
+    "twoFactorEnabledDesc": "Your account is protected with 2FA",
+    "twoFactorDisabledDesc": "Make your account more secure"
   },
   "analytics": {
     "analytics": "Analytics",
@@ -1725,7 +1756,15 @@
     "viewsToday": "Views Today",
     "salesThisMonth": "Sales This Month",
     "popularProducts": "Popular Products",
-    "recentActivity": "Recent Activity"
+    "recentActivity": "Recent Activity",
+    "totalEarnings": "Total earnings",
+    "totalSpent": "Total spent",
+    "fromSalesCount": "from {count} sales",
+    "fromOrdersCount": "from {count} orders",
+    "tipsTitle": "Performance Tips",
+    "tipPhotos": "Shoot your product photos in high quality and from different angles",
+    "tipTitles": "Include complete brand and model info in titles",
+    "tipPricing": "Research market prices to set a competitive price"
   },
   "payment": {
     "paymentMethods": "Payment Methods",

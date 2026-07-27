@@ -115,7 +115,8 @@
     "opening": "Açılıyor...",
     "uploading": "Yükleniyor...",
     "replace": "Değiştir",
-    "language": "Dil"
+    "language": "Dil",
+    "deleting": "Siliniyor..."
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -561,7 +562,15 @@
     "multipleImagesRequired360": "360° görüntüleme için birden fazla resim gerekli",
     "conditionPoor": "Kötü",
     "statusDeleted": "Kaldırıldı",
-    "upToImages": "En fazla {count} görsel"
+    "upToImages": "En fazla {count} görsel",
+    "boostedBadge": "Öne Çıkan",
+    "boostListing": "Öne Çıkar",
+    "extendBoost": "Süre Ekle",
+    "estimatedNet": "Tahmini net kazanç: {amount}",
+    "soldOn": "Satış: {date}",
+    "buyerHandle": "Alıcı: @{name}",
+    "orderDetail": "Sipariş Detayı",
+    "relist": "Yeniden Satışa Aç"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -885,7 +894,8 @@
     "refundReasonLostInTransit": "Kargoda kayboldu",
     "refundReasonOther": "Diğer",
     "statusPendingPayment": "Ödeme Bekleniyor",
-    "statusRefundRequested": "İade Talep Edildi"
+    "statusRefundRequested": "İade Talep Edildi",
+    "track": "Takip Et"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -1105,7 +1115,8 @@
     "statusAtWarehouse": "Depoda",
     "statusAdminReviewing": "İnceleniyor",
     "statusShippingToRecipients": "Alıcılara Gönderiliyor",
-    "statusReturning": "İade Ediliyor"
+    "statusReturning": "İade Ediliyor",
+    "payingParty": "Ödeyen Taraf"
   },
   "offer": {
     "makeOffer": "Teklif Ver",
@@ -1133,7 +1144,16 @@
     "cancelFailed": "Teklif iptal edilirken hata oluştu",
     "counterFailed": "Karşı teklif gönderilemedi",
     "statusExpired": "Süresi Doldu",
-    "statusCounterOffered": "Karşı Teklif Yapıldı"
+    "statusCounterOffered": "Karşı Teklif Yapıldı",
+    "waitingBuyerCounter": "Alıcının karşı teklifinizi yanıtlaması bekleniyor.",
+    "acceptCounter": "Karşı Teklifi Kabul Et",
+    "lowerOffer": "Daha Düşük Teklif",
+    "viewOrder": "Siparişi Görüntüle",
+    "listingPriceLabel": "İlan Fiyatı",
+    "offerer": "Teklif Veren",
+    "timeLeft": "{time} kaldı",
+    "offerAmountLabel": "Teklif Tutarı",
+    "estimatedNetLabel": "Tahmini net"
   },
   "message": {
     "messages": "Mesajlar",
@@ -1561,7 +1581,15 @@
     "popularSearches": "Popüler Aramalar",
     "searchAction": "ile ara",
     "browseAllListings": "Tüm ilanları gör",
-    "relatedResults": "İlgili Sonuçlar"
+    "relatedResults": "İlgili Sonuçlar",
+    "savedLimitReached": "Kayıtlı arama limitinize ulaştınız ({limit} arama).",
+    "premiumMoreSearches": "Premium üyelikle daha fazla arama kaydedin",
+    "savedTitle": "Kayıtlı Aramalarım",
+    "savedDescription": "Kayıtlı aramalarınızı buradan yönetebilir, bildirim tercihlerini değiştirebilirsiniz.",
+    "savedEmptyTitle": "Kayıtlı Arama Yok",
+    "savedEmptyDescription": "İlanları ararken sonuç sayfasındaki \"Bu aramayı kaydet\" butonuyla aramanı kaydet; buradan yönetip yeni sonuçlarda bildirim alabilirsin.",
+    "countOfLimit": "{count} / {limit} arama",
+    "searchListings": "İlan Ara"
   },
   "error": {
     "pageNotFound": "Sayfa Bulunamadı",
@@ -1714,7 +1742,10 @@
     "enable": "Etkinleştir",
     "disable": "Devre Dışı Bırak",
     "activeSessions": "Aktif Oturumlar",
-    "loginHistory": "Giriş Geçmişi"
+    "loginHistory": "Giriş Geçmişi",
+    "twoFactorTitle": "İki Faktörlü Kimlik Doğrulama",
+    "twoFactorEnabledDesc": "Hesabınız 2FA ile korunuyor",
+    "twoFactorDisabledDesc": "Hesabınızı daha güvenli hale getirin"
   },
   "analytics": {
     "analytics": "Analitikler",
@@ -1725,7 +1756,15 @@
     "viewsToday": "Bugünkü Görüntülenme",
     "salesThisMonth": "Bu Ayki Satışlar",
     "popularProducts": "Popüler Ürünler",
-    "recentActivity": "Son Aktiviteler"
+    "recentActivity": "Son Aktiviteler",
+    "totalEarnings": "Toplam Kazanç",
+    "totalSpent": "Toplam Harcama",
+    "fromSalesCount": "{count} satıştan",
+    "fromOrdersCount": "{count} siparişten",
+    "tipsTitle": "Performans İpuçları",
+    "tipPhotos": "Ürün fotoğraflarınızı kaliteli ve farklı açılardan çekin",
+    "tipTitles": "Başlıklarda marka ve model bilgilerini eksiksiz yazın",
+    "tipPricing": "Piyasa fiyatlarını araştırarak rekabetçi fiyat belirleyin"
   },
   "payment": {
     "paymentMethods": "Ödeme Yöntemleri",
