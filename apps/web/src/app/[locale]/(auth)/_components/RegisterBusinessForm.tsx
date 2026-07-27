@@ -9,6 +9,7 @@ import {
   FormInput,
   FormPhone,
   FormSelect,
+  FormSearchableSelect,
   FormCheckbox,
   FormError,
   useZodForm,
@@ -17,94 +18,10 @@ import {
   businessRegisterSchema,
   type BusinessRegisterValues,
 } from "../_lib/auth";
+import { getCityNames } from "@/lib/turkeyLocations";
 import { AuthCard } from "./AuthCard";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useRegisterBusiness } from "../_hooks/useRegisterBusiness";
-
-// Turkish cities (major ones)
-const TURKISH_CITIES = [
-  "Adana",
-  "Adıyaman",
-  "Afyonkarahisar",
-  "Ağrı",
-  "Amasya",
-  "Ankara",
-  "Antalya",
-  "Artvin",
-  "Aydın",
-  "Balıkesir",
-  "Bilecik",
-  "Bingöl",
-  "Bitlis",
-  "Bolu",
-  "Burdur",
-  "Bursa",
-  "Çanakkale",
-  "Çankırı",
-  "Çorum",
-  "Denizli",
-  "Diyarbakır",
-  "Edirne",
-  "Elazığ",
-  "Erzincan",
-  "Erzurum",
-  "Eskişehir",
-  "Gaziantep",
-  "Giresun",
-  "Gümüşhane",
-  "Hakkari",
-  "Hatay",
-  "Isparta",
-  "İçel (Mersin)",
-  "İstanbul",
-  "İzmir",
-  "Kars",
-  "Kastamonu",
-  "Kayseri",
-  "Kırklareli",
-  "Kırşehir",
-  "Kocaeli",
-  "Konya",
-  "Kütahya",
-  "Malatya",
-  "Manisa",
-  "Kahramanmaraş",
-  "Mardin",
-  "Muğla",
-  "Muş",
-  "Nevşehir",
-  "Niğde",
-  "Ordu",
-  "Rize",
-  "Sakarya",
-  "Samsun",
-  "Siirt",
-  "Sinop",
-  "Sivas",
-  "Tekirdağ",
-  "Tokat",
-  "Trabzon",
-  "Tunceli",
-  "Şanlıurfa",
-  "Uşak",
-  "Van",
-  "Yozgat",
-  "Zonguldak",
-  "Aksaray",
-  "Bayburt",
-  "Karaman",
-  "Kırıkkale",
-  "Batman",
-  "Şırnak",
-  "Bartın",
-  "Ardahan",
-  "Iğdır",
-  "Yalova",
-  "Karabük",
-  "Kilis",
-  "Osmaniye",
-  "Düzce",
-];
 
 // Company types
 const COMPANY_TYPES = [
@@ -259,14 +176,17 @@ export function RegisterBusinessForm() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <FormSelect name="city" label={`${t("checkout.city")} *`}>
-            <option value="">{t("common.selectCity")}</option>
-            {TURKISH_CITIES.map((cityName) => (
-              <option key={cityName} value={cityName}>
-                {cityName}
-              </option>
-            ))}
-          </FormSelect>
+          <FormSearchableSelect
+            name="city"
+            label={`${t("checkout.city")} *`}
+            options={getCityNames().map((cityName) => ({
+              value: cityName,
+              label: cityName,
+            }))}
+            placeholder={t("common.selectCity")}
+            searchPlaceholder={t("common.searchCity")}
+            emptyText={t("common.noResults")}
+          />
 
           <FormInput
             name="district"

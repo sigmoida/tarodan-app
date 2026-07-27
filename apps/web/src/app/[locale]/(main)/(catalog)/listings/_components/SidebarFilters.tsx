@@ -10,6 +10,7 @@ import {
   Checkbox,
   Input,
   Radio,
+  matchesSearch,
 } from "@tarodan/ui";
 import { useSidebarFilters } from "../_hooks/useSidebarFilters";
 import type { Filters } from "../_lib/params";
@@ -316,9 +317,7 @@ export default function SidebarFilters({
           );
           const searchTerm = customAttrSearch[group.slug] ?? "";
           const filteredAttrs = searchTerm
-            ? group.attributes.filter((a) =>
-                a.label.toLowerCase().includes(searchTerm.toLowerCase()),
-              )
+            ? group.attributes.filter((a) => matchesSearch(a.label, searchTerm))
             : group.attributes;
           const showSearch = group.attributes.length > 15;
           return (

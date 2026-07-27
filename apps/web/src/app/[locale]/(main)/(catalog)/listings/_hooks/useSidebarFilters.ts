@@ -6,6 +6,7 @@ import { queryKeys } from "@/lib/query/keys";
 import { useLocale, useTranslations } from "next-intl";
 import { categoriesApi, manufacturersApi, listingsApi } from "@/lib/api";
 import { SCALE_FALLBACK } from "@/lib/constants";
+import { matchesSearch } from "@tarodan/ui";
 import type { Filters } from "../_lib/params";
 
 interface Category {
@@ -301,24 +302,22 @@ export function useSidebarFilters({
 
   const filteredBrands =
     brandList.length > 0
-      ? brandList.filter((b) =>
-          b.name.toLowerCase().includes(brandSearch.toLowerCase()),
-        )
+      ? brandList.filter((b) => matchesSearch(b.name, brandSearch))
       : [];
 
   const modelsForBrand = carModelList.filter(
     (m) =>
       (!filters.brandId || m.brandId === filters.brandId) &&
-      m.name.toLowerCase().includes(modelSearch.toLowerCase()),
+      matchesSearch(m.name, modelSearch),
   );
 
   const displayManufacturers =
     manufacturerList.length > 0
       ? manufacturerList.filter((m) =>
-          m.name.toLowerCase().includes(manufacturerSearch.toLowerCase()),
+          matchesSearch(m.name, manufacturerSearch),
         )
       : MANUFACTURERS_FALLBACK.filter((m) =>
-          m.toLowerCase().includes(manufacturerSearch.toLowerCase()),
+          matchesSearch(m, manufacturerSearch),
         ).map((name) => ({
           id: "",
           name,
@@ -326,16 +325,16 @@ export function useSidebarFilters({
         }));
 
   const filteredCategories = categories.filter((c) =>
-    c.name.toLowerCase().includes(categorySearch.toLowerCase()),
+    matchesSearch(c.name, categorySearch),
   );
   const scaleOptions = scaleList.length > 0 ? scaleList : SCALE_FALLBACK;
   const filteredScales = scaleOptions.filter((s) =>
-    s.toLowerCase().includes(scaleSearch.toLowerCase()),
+    matchesSearch(s, scaleSearch),
   );
   const materialOptions =
     materialList.length > 0 ? materialList : MATERIAL_FALLBACK;
   const filteredMaterials = materialOptions.filter((m) =>
-    m.label.toLowerCase().includes(materialSearch.toLowerCase()),
+    matchesSearch(m.label, materialSearch),
   );
 
   return {
