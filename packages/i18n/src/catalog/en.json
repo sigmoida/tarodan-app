@@ -6070,6 +6070,7 @@
       "noPendingChange": "There is no pending membership change",
       "notFound": "Membership not found",
       "platformSellerNotFound": "Platform seller not found",
+      "premiumFeatureOnly": "This feature is available to premium memberships and above",
       "savedCardNotFound": "Saved card not found",
       "tierAlreadyExists": "Membership tier already exists: {type}",
       "tierNoPaymentNeeded": "No payment is required for this membership tier",

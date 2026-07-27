@@ -33,10 +33,13 @@ export default function AnalyticsPage() {
   const user = useAuthStore((s) => s.user);
   const [period, setPeriod] = useState<AnalyticsPeriod>("30d");
 
+  // Analytics is a premium/business-only feature. `membershipTier` is the EFFECTIVE
+  // tier from the API (a past_due/expired paid tier reads as free), so this gate
+  // matches the API's own 403 — the data query is skipped entirely for free users.
   const isPremium =
     user?.membershipTier === "premium" || user?.membershipTier === "business";
 
-  const { analytics, isLoading } = useAnalytics(period, ready);
+  const { analytics, isLoading } = useAnalytics(period, ready && isPremium);
 
   if (!ready) {
     return (
@@ -68,7 +71,9 @@ export default function AnalyticsPage() {
         </TabsList>
       </Tabs>
 
-      {isLoading || !analytics ? (
+      {!isPremium ? (
+        <PremiumUpsell />
+      ) : isLoading || !analytics ? (
         <div className="flex justify-center py-16">
           <Spinner size="xl" color="border-primary-500 border-t-transparent" />
         </div>
@@ -159,7 +164,6 @@ export default function AnalyticsPage() {
             <CategoryPerformanceCard categories={analytics.categoryStats} />
           </div>
 
-          {!isPremium && <PremiumUpsell />}
           <TipsSection />
         </>
       )}

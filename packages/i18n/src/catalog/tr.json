@@ -6070,6 +6070,7 @@
       "noPendingChange": "Bekleyen bir üyelik değişikliği yok",
       "notFound": "Üyelik bulunamadı",
       "platformSellerNotFound": "Platform seller bulunamadı",
+      "premiumFeatureOnly": "Bu özellik premium ve üzeri üyelikler içindir",
       "savedCardNotFound": "Kayıtlı kart bulunamadı",
       "tierAlreadyExists": "Üyelik tipi zaten mevcut: {type}",
       "tierNoPaymentNeeded": "Bu üyelik seviyesi için ödeme gerekmez",

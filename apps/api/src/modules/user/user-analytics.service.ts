@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { UserCommonService } from "./user-common.service";
+import { isPremiumEntitled } from "../membership/membership.util";
 import { i18nMessage } from "../i18n";
 
 /**
@@ -28,6 +30,19 @@ export class UserAnalyticsService {
   ) {}
 
   async getUserAnalytics(userId: string, period: "7d" | "30d" | "90d" = "30d") {
+    // Analytics is a paid (premium/business) feature — gate at the source so a free
+    // user cannot call the endpoint directly (the web merely hides the UI). Entitlement
+    // uses the single source of truth: an active, in-period paid membership.
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      include: { tier: true },
+    });
+    if (!isPremiumEntitled(membership)) {
+      throw new ForbiddenException(
+        i18nMessage("server.membership.premiumFeatureOnly"),
+      );
+    }
+
     const now = new Date();
     const daysMap = { "7d": 7, "30d": 30, "90d": 90 };
     const days = daysMap[period];
