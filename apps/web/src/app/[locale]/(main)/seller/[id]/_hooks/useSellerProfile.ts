@@ -197,7 +197,7 @@ export function useSellerProfile() {
 
   const handleMessage = () => {
     if (!requireAuth({ message: t("auth.authRequiredMessage") })) return;
-    window.location.href = `/profile/messages?to=${sellerId}`;
+    window.location.href = `/profile/messages?user=${sellerId}`;
   };
 
   const handleReport = () => {
