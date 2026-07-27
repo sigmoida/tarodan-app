@@ -9,6 +9,10 @@ import { Toggle } from "@tarodan/ui";
 import { FormInput } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/ui";
 
+// Set / Paket (bundle) is temporarily disabled and hidden from the form.
+// Flip to `true` to bring the toggle + piece-count input back.
+const SET_BUNDLE_ENABLED: boolean = false;
+
 interface OptionsCardProps {
   locale: string;
   canTrade: boolean;
@@ -29,13 +33,7 @@ export default function OptionsCard({
     <SectionCard title={t("product.options")}>
       <div className="space-y-4">
         {/* Trade */}
-        <div
-          className={`flex items-center justify-between p-4 rounded-xl border ${
-            canTrade
-              ? "bg-success-50 border-success-200"
-              : "bg-surface border-border"
-          }`}
-        >
+        <div className="flex items-center justify-between p-4 rounded-xl border bg-surface border-border">
           <div>
             <label className="font-medium text-heading">
               {t("product.tradeEnabled")}
@@ -91,37 +89,43 @@ export default function OptionsCard({
           </div>
         )}
 
-        {/* Set / bundle */}
-        <div className="flex items-center justify-between p-4 bg-surface rounded-xl border border-border">
-          <div>
-            <label className="font-medium text-heading">
-              {t("product.setBundle")}
-            </label>
-            <p className="text-sm text-muted">{t("product.setBundleHelper")}</p>
-          </div>
-          <Controller
-            name="isSet"
-            render={({ field }) => (
-              <Toggle
-                checked={!!field.value}
-                onChange={field.onChange}
-                size="md"
+        {/* Set / bundle — temporarily disabled (see SET_BUNDLE_ENABLED). */}
+        {SET_BUNDLE_ENABLED && (
+          <>
+            <div className="flex items-center justify-between p-4 bg-surface rounded-xl border border-border">
+              <div>
+                <label className="font-medium text-heading">
+                  {t("product.setBundle")}
+                </label>
+                <p className="text-sm text-muted">
+                  {t("product.setBundleHelper")}
+                </p>
+              </div>
+              <Controller
+                name="isSet"
+                render={({ field }) => (
+                  <Toggle
+                    checked={!!field.value}
+                    onChange={field.onChange}
+                    size="md"
+                  />
+                )}
               />
-            )}
-          />
-        </div>
+            </div>
 
-        {isSet && (
-          <div className="p-4 bg-surface rounded-xl border border-border">
-            <FormInput
-              name="bundleSize"
-              type="number"
-              min={2}
-              label={t("product.setPieceCount")}
-              placeholder={t("product.setPiecePlaceholder")}
-              helperText={t("product.setSizeHelper")}
-            />
-          </div>
+            {isSet && (
+              <div className="p-4 bg-surface rounded-xl border border-border">
+                <FormInput
+                  name="bundleSize"
+                  type="number"
+                  min={2}
+                  label={t("product.setPieceCount")}
+                  placeholder={t("product.setPiecePlaceholder")}
+                  helperText={t("product.setSizeHelper")}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </SectionCard>

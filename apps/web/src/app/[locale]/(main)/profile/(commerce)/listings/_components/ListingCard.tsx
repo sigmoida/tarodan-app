@@ -18,6 +18,7 @@ import { StarIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
@@ -50,6 +51,7 @@ export default function ListingCard({
   onDelete,
   onBoost,
 }: ListingCardProps) {
+  const t = useTranslations();
   const status = getListingStatus(listing.status);
   const StatusIcon = status.icon;
   const viewable = VIEWABLE.includes(listing.status);
@@ -61,14 +63,14 @@ export default function ListingCard({
     listing.status === "inactive";
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface-elevated transition-shadow hover:shadow-lg">
+    <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
       {/* Media */}
       <div className="relative aspect-square bg-surface-alt">
         <OptimizedImage
           src={getListingImage(listing)}
           alt={listing.title}
           fill
-          className="object-cover"
+          className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün"
           logContext={{ listingId: listing.id, page: "profile-listings" }}
         />
@@ -88,7 +90,7 @@ export default function ListingCard({
               size="sm"
               icon={<RocketLaunchIcon className="h-3 w-3" />}
             >
-              Öne Çıkan
+              {t("product.boostedBadge")}
             </Badge>
           </div>
         )}
@@ -99,7 +101,7 @@ export default function ListingCard({
         {viewable ? (
           <Link
             href={`/listings/${listing.id}`}
-            className="mb-2 line-clamp-2 font-semibold text-heading after:absolute after:inset-0 hover:text-primary-600"
+            className="mb-2 line-clamp-2 font-semibold text-heading transition-colors after:absolute after:inset-0 group-hover:text-primary-600"
           >
             {listing.title}
           </Link>
@@ -116,7 +118,7 @@ export default function ListingCard({
                 {formatTL(getProductOriginalPriceForDisplay(listing))}
               </span>
               <Badge variant="danger" size="sm">
-                İndirim
+                {t("product.discount")}
               </Badge>
             </div>
           )}
@@ -125,7 +127,9 @@ export default function ListingCard({
           </p>
           {listing.status !== "sold" && estimatedNet != null && (
             <p className="mt-0.5 text-xs text-success-600">
-              Tahmini net kazanç: {formatTL(estimatedNet.sellerNetAmount)}
+              {t("product.estimatedNet", {
+                amount: formatTL(estimatedNet.sellerNetAmount),
+              })}
             </p>
           )}
         </div>
@@ -156,17 +160,23 @@ export default function ListingCard({
         </div>
 
         {listing.status === "sold" && (
-          <div className="mb-3 space-y-1.5 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm">
+          <div className="mb-3 space-y-1.5 rounded-lg border border-border bg-surface-alt p-3 text-sm">
             {listing.soldAt && (
               <div className="flex items-center gap-2 text-muted">
                 <CalendarDaysIcon className="h-4 w-4 text-primary-500" />
-                <span>Satış: {formatDate(listing.soldAt)}</span>
+                <span>
+                  {t("product.soldOn", { date: formatDate(listing.soldAt) })}
+                </span>
               </div>
             )}
             {listing.buyer && (
               <div className="flex items-center gap-2 text-muted">
                 <UserIcon className="h-4 w-4 text-primary-500" />
-                <span>Alıcı: @{listing.buyer.displayName}</span>
+                <span>
+                  {t("product.buyerHandle", {
+                    name: listing.buyer.displayName,
+                  })}
+                </span>
               </div>
             )}
             {listing.soldPrice != null && (
@@ -188,7 +198,7 @@ export default function ListingCard({
               className="flex-1 gap-1"
             >
               <PencilIcon className="h-4 w-4" />
-              Düzenle
+              {t("common.edit")}
             </ButtonLink>
           )}
           {listing.status === "active" && (
@@ -199,7 +209,9 @@ export default function ListingCard({
               className="flex-1 gap-1"
             >
               <RocketLaunchIcon className="h-4 w-4" />
-              {listing.isBoosted ? "Süre Ekle" : "Öne Çıkar"}
+              {listing.isBoosted
+                ? t("product.extendBoost")
+                : t("product.boostListing")}
             </Button>
           )}
           {listing.status === "sold" && listing.orderId && (
@@ -209,7 +221,7 @@ export default function ListingCard({
               className="flex-1 gap-1"
             >
               <TruckIcon className="h-4 w-4" />
-              Sipariş Detayı
+              {t("product.orderDetail")}
             </ButtonLink>
           )}
           {relist && (
@@ -219,7 +231,7 @@ export default function ListingCard({
               size="sm"
               className="flex-1 gap-1"
             >
-              Yeniden Satışa Aç
+              {t("product.relist")}
             </ButtonLink>
           )}
           {listing.status === "rejected" && (
@@ -231,7 +243,7 @@ export default function ListingCard({
               disabled={isDeleting}
             >
               <TrashIcon className="h-4 w-4" />
-              {isDeleting ? "Siliniyor..." : "Sil"}
+              {isDeleting ? t("common.deleting") : t("common.delete")}
             </Button>
           )}
         </div>
