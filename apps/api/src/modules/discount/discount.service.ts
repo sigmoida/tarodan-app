@@ -21,7 +21,20 @@ import {
   ValidationResultDto,
   ActiveCampaignDto,
 } from "./dto";
-import { DiscountScope, Prisma } from "@prisma/client";
+import { DiscountScope, DiscountType, Prisma } from "@prisma/client";
+
+/**
+ * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
+ * logic (they fall through to the flat fixed-amount branch → mispricing). Reject them
+ * at create/update until proper buy-X-get-Y / quantity-tier support exists (F4.2).
+ */
+function assertSupportedDiscountType(type?: DiscountType | null): void {
+  if (type === DiscountType.bogo || type === DiscountType.bulk_quantity) {
+    throw new BadRequestException(
+      "Bu indirim tipi henüz desteklenmiyor (bogo/bulk_quantity)",
+    );
+  }
+}
 
 @Injectable()
 export class DiscountService {
@@ -76,6 +89,12 @@ export class DiscountService {
     actorId: string | null,
     isAdmin: boolean,
   ): Promise<DiscountResponseDto> {
+    // bogo / bulk_quantity are NOT implemented in the redemption engine — they would
+    // be silently treated as a flat fixed-amount discount (mispricing, and compounds
+    // the per-line bug). Block their creation until real buy-X-get-Y / quantity-tier
+    // logic exists (F4.2).
+    assertSupportedDiscountType(dto.type);
+
     // Sellers can only create discounts for their own products
     if (!isAdmin && dto.scope === DiscountScope.global) {
       throw new ForbiddenException("Satıcılar global indirim oluşturamazlar");
@@ -196,6 +215,9 @@ export class DiscountService {
     if (!discount) {
       throw new NotFoundException("İndirim bulunamadı");
     }
+
+    // bogo/bulk_quantity unsupported (F4.2) — reject switching to an unimplemented type.
+    assertSupportedDiscountType(dto.type);
 
     // Sellers can only update their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
