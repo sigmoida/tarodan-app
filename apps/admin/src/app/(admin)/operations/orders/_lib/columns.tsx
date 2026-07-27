@@ -58,16 +58,13 @@ export function orderColumns({
                 open ? "rotate-90" : ""
               }`}
             />
-            {o.isGroup ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-primary-600">
-                <ShoppingBagIcon className="h-3.5 w-3.5" />
-                {t("admin.operations.orders.cartItems", { count: o.itemCount })}
-              </span>
-            ) : (
-              <TruncatedText className="font-mono text-sm text-primary-600">
-                {o.displayNumber}
-              </TruncatedText>
-            )}
+            <TruncatedText className="font-mono text-sm text-primary-600">
+              {o.displayNumber}
+            </TruncatedText>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-surface-alt px-1.5 py-0.5 text-[11px] font-medium text-muted">
+              <ShoppingBagIcon className="h-3 w-3" />
+              {t("admin.operations.orders.cartItems", { count: o.itemCount })}
+            </span>
           </Button>
         );
       },
@@ -82,17 +79,14 @@ export function orderColumns({
       t("common.status"),
       (o) =>
         o.isGroup ? (
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              o.groupStatus === "done"
-                ? "bg-success-100 text-success-700"
-                : "bg-info-100 text-info-700"
-            }`}
+          <Badge
+            variant={o.groupStatus === "done" ? "success" : "default"}
+            size="sm"
           >
             {o.groupStatus === "done"
               ? t("admin.operations.orders.groupDone")
               : t("admin.operations.orders.groupOngoing")}
-          </span>
+          </Badge>
         ) : (
           <div className="flex min-w-0 max-w-full flex-col items-start gap-1">
             {o.activeRefundRequest ? (
@@ -164,41 +158,31 @@ export function orderColumns({
     col.custom<OrderGroupRow>(
       t("admin.catalog.common.product"),
       (o) => {
-        if (o.isGroup) {
-          const thumbs = o.thumbs;
-          const extra = o.itemCount - thumbs.length;
-          return (
-            <div className="flex items-center gap-1">
-              {thumbs.length > 0 ? (
-                thumbs.map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={i}
-                    src={src}
-                    alt=""
-                    className="h-8 w-8 rounded border border-border-subtle bg-surface-alt object-cover"
-                  />
-                ))
-              ) : (
-                <span className="flex h-8 w-8 items-center justify-center rounded border border-border-subtle bg-surface-alt text-muted">
-                  <ShoppingBagIcon className="h-4 w-4" />
-                </span>
-              )}
-              {extra > 0 && (
-                <span className="flex h-8 min-w-8 items-center justify-center rounded border border-border-subtle bg-surface-alt px-1 text-[11px] font-medium text-muted">
-                  +{extra}
-                </span>
-              )}
-            </div>
-          );
-        }
+        const thumbs = o.thumbs;
+        const extra = o.itemCount - thumbs.length;
         return (
-          <CellText
-            value={
-              o.items[0]?.product?.title ||
-              t("admin.operations.orders.itemCountUnit", { count: o.itemCount })
-            }
-          />
+          <div className="flex items-center gap-1">
+            {thumbs.length > 0 ? (
+              thumbs.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={i}
+                  src={src}
+                  alt=""
+                  className="h-8 w-8 rounded border border-border-subtle bg-surface-alt object-cover"
+                />
+              ))
+            ) : (
+              <span className="flex h-8 w-8 items-center justify-center rounded border border-border-subtle bg-surface-alt text-muted">
+                <ShoppingBagIcon className="h-4 w-4" />
+              </span>
+            )}
+            {extra > 0 && (
+              <span className="flex h-8 min-w-8 items-center justify-center rounded border border-border-subtle bg-surface-alt px-1 text-[11px] font-medium text-muted">
+                +{extra}
+              </span>
+            )}
+          </div>
         );
       },
       { grow: 2, sortKey: "product.title", sortType: "text" },
