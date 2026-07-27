@@ -196,10 +196,14 @@ export function useCheckout() {
   };
 
   useEffect(() => {
+    // The server quote (threshold-applied) is authoritative; the city estimate is
+    // only a pre-quote placeholder and must not override it (e.g. show a base fee
+    // when the order actually qualifies for free shipping).
+    if (quoteQuery.data?.shippingAmount != null) return;
     if (effectiveShippingCity) calculateShipping(effectiveShippingCity);
     else setShippingCost(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveShippingCity, selectedCarrier]);
+  }, [effectiveShippingCity, selectedCarrier, quoteQuery.data?.shippingAmount]);
 
   const showSnackbar = (message: string) =>
     setSnackbar({ visible: true, message });
