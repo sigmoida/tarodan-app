@@ -17,6 +17,7 @@ import {
 } from "./dto";
 import { resolveShippingDestinationCity } from "./shipping-destination.util";
 import { canTransitionShipmentStatus } from "./shipment-state-machine";
+import { ShippingTariffService } from "./shipping-tariff.service";
 import { ShipmentStatus, OrderStatus } from "@prisma/client";
 
 @Injectable()
@@ -39,6 +40,7 @@ export class ShippingService {
     private readonly configService: ConfigService,
     private readonly paymentService: PaymentService,
     private readonly notificationService: NotificationService,
+    private readonly shippingTariffs: ShippingTariffService,
   ) {}
 
   /**
@@ -142,50 +144,23 @@ export class ShippingService {
 
   private async calculateProviderRate(
     provider: ShippingProvider,
-    fromCity: string,
-    toCity: string,
-    weight: number,
+    _fromCity: string,
+    _toCity: string,
+    _weight: number,
   ) {
-    // Base rate from PlatformSetting or default
-    const baseSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "shipping_base_cost" },
-    });
-    // L5: bozuk PlatformSetting ("abc" vb.) NaN üretip checkout'a {rate: NaN}
-    // sızdırıyordu — finite değilse default'a düş + warn.
-    const parsedBase = baseSetting
-      ? Number.parseFloat(baseSetting.settingValue)
-      : NaN;
-    const baseRate = Number.isFinite(parsedBase) ? parsedBase : 29.99;
-    if (baseSetting && !Number.isFinite(parsedBase)) {
-      this.logger.warn(
-        `Invalid shipping_base_cost setting "${baseSetting.settingValue}"; falling back to 29.99`,
-      );
-    }
-
-    const baseRates: Record<ShippingProvider, number> = {
-      [ShippingProvider.surat]: baseRate,
-    };
-
-    // Same city discount
-    const isSameCity = fromCity.toLowerCase() === toCity.toLowerCase();
-    const cityMultiplier = isSameCity ? 0.8 : 1;
-
-    // Weight factor
-    const weightFactor = weight > 1 ? 1 + (weight - 1) * 0.15 : 1;
-
-    const cost =
-      Math.round(baseRates[provider] * cityMultiplier * weightFactor * 100) /
-      100;
-
-    // Estimated delivery
-    const deliveryDays = isSameCity ? "1-2" : "2-3";
+    // Kargo bedeli artık AKTİF TARİFEDEN (tek kaynak) gelir; eski şehir×ağırlık mock'u
+    // kaldırıldı (ürünlerde ağırlık/desi yok, gösterilen ≠ tahsil edilen bug'ına yol
+    // açıyordu). Bu önizleme paket başına TABAN ücrettir; ücretsiz-kargo eşiği alt-toplam
+    // bilindiğinde checkout QUOTE'ta uygulanır.
+    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
+    const cost = Number(tariff.outboundPackageFee);
 
     return {
       provider,
       providerName: this.providerNames[provider],
       cost,
       currency: "TRY",
-      estimatedDelivery: `${deliveryDays} iş günü`,
+      estimatedDelivery: "2-3 iş günü",
     };
   }
 

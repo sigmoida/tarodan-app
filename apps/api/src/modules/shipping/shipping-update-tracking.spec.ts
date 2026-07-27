@@ -36,6 +36,13 @@ describe("ShippingService.updateTracking — #5 tracking-key koruması", () => {
       {} as any, // configService
       {} as any, // paymentService
       notificationService,
+      {
+        getActiveOutboundTariff: async () => ({
+          outboundPackageFee: 29.99,
+          freeShippingEnabled: true,
+          freeShippingThreshold: 500,
+        }),
+      } as any, // shippingTariffs
     );
     return { svc, captured };
   };
