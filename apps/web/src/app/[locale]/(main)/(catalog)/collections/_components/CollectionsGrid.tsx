@@ -2,18 +2,11 @@
 
 "use client";
 
-import { Link } from "@/i18n/navigation";
-import { motion } from "framer-motion";
-import {
-  FolderPlusIcon,
-  EyeIcon,
-  HeartIcon,
-} from "@heroicons/react/24/outline";
-import OptimizedImage from "@/components/OptimizedImage";
+import { FolderPlusIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { useCollections } from "../_context/CollectionsContext";
-import CollectionVisibilityBadge from "./CollectionVisibilityBadge";
+import CollectionCard from "./CollectionCard";
 
 export default function CollectionsGrid() {
   const t = useTranslations();
@@ -32,9 +25,9 @@ export default function CollectionsGrid() {
         {[...Array(12)].map((_, i) => (
           <div
             key={i}
-            className="bg-surface-elevated rounded-lg border border-border-subtle overflow-hidden animate-pulse"
+            className="bg-surface-elevated rounded border border-border-subtle overflow-hidden animate-pulse"
           >
-            <div className="aspect-[4/3] bg-border-subtle" />
+            <div className="aspect-square bg-border-subtle" />
             <div className="p-3 space-y-2">
               <div className="h-3 bg-border-subtle rounded w-3/4" />
               <div className="h-3 bg-border-subtle rounded w-1/2" />
@@ -83,80 +76,8 @@ export default function CollectionsGrid() {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-      {displayedCollections.map((collection, index) => (
-        <div key={collection.id}>
-          <Link
-            href={`/collections/${collection.id}`}
-            className="block bg-surface-elevated rounded-lg border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all group h-full"
-          >
-            <div className="aspect-[4/3] bg-surface-alt relative overflow-hidden">
-              {collection.coverImageUrl ? (
-                <OptimizedImage
-                  src={collection.coverImageUrl}
-                  alt={collection.name}
-                  fill
-                  className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                  fallbackSrc="https://placehold.co/400x300/f3f4f6/9ca3af?text=Koleksiyon"
-                  logContext={{
-                    collectionId: collection.id,
-                    page: "collections",
-                  }}
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 text-4xl">
-                  🚗
-                </div>
-              )}
-              <div className="absolute top-1.5 right-1.5">
-                <CollectionVisibilityBadge
-                  isPublic={collection.isPublic}
-                  label={
-                    collection.isPublic
-                      ? t("collection.isPublic")
-                      : t("collection.isPrivate")
-                  }
-                />
-              </div>
-            </div>
-            <div className="p-2.5">
-              <h3 className="font-medium text-heading text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">
-                {collection.name}
-              </h3>
-              {collection.description && (
-                <p className="text-subtle text-2xs mt-0.5 line-clamp-1">
-                  {collection.description}
-                </p>
-              )}
-              <div className="flex items-center justify-between mt-2 text-2xs text-subtle">
-                <span className="font-medium">
-                  {collection.itemCount} {t("collection.items")}
-                </span>
-                <div className="flex items-center gap-2">
-                  {collection.viewCount !== undefined && (
-                    <span className="flex items-center gap-0.5">
-                      <EyeIcon className="w-3 h-3" />
-                      {collection.viewCount}
-                    </span>
-                  )}
-                  {collection.likeCount !== undefined && (
-                    <span className="flex items-center gap-0.5">
-                      <HeartIcon className="w-3 h-3" />
-                      {collection.likeCount}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="mt-1.5 pt-1.5 border-t border-border-subtle">
-                <span className="text-2xs text-subtle">
-                  @
-                  {collection.userName ||
-                    collection.user?.displayName ||
-                    "Kullanıcı"}
-                </span>
-              </div>
-            </div>
-          </Link>
-        </div>
+      {displayedCollections.map((collection) => (
+        <CollectionCard key={collection.id} collection={collection} />
       ))}
     </div>
   );

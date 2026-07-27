@@ -104,16 +104,16 @@ export default function CollectionHeaderCard() {
                 {collection.description}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-4 text-xs text-subtle">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-subtle">
               <span className="font-medium text-muted">
                 @{collection.userName}
               </span>
               <span className="flex items-center gap-1">
-                <EyeIcon className="h-3.5 w-3.5" />
+                <EyeIcon className="h-4 w-4 text-primary-500" />
                 {collection.viewCount} {t("collection.views")}
               </span>
               <span className="flex items-center gap-1">
-                <HeartIcon className="h-3.5 w-3.5" />
+                <HeartIconSolid className="h-4 w-4 text-danger-500" />
                 {collection.likeCount} {t("collection.likes")}
               </span>
               <span className="font-medium">

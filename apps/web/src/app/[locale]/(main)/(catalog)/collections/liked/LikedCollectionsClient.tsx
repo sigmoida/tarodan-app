@@ -3,22 +3,15 @@
 import { useEffect, useState } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import OptimizedImage from "@/components/OptimizedImage";
-import UserAvatar from "@/components/UserAvatar";
-import {
-  BookOpenIcon,
-  ArchiveBoxIcon,
-  ArrowLeftIcon,
-  EyeIcon,
-  HeartIcon,
-} from "@heroicons/react/24/outline";
+import { BookOpenIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { useAuthStore } from "@/stores/authStore";
-import { api, collectionsApi } from "@/lib/api";
+import { collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Button } from "@tarodan/ui";
+import CollectionCard from "../_components/CollectionCard";
 
 interface Collection {
   id: string;
@@ -158,7 +151,7 @@ export default function LikedCollectionsClient() {
                 key={i}
                 className="bg-surface-elevated rounded border border-border-subtle overflow-hidden animate-pulse"
               >
-                <div className="aspect-[4/3] bg-border-subtle" />
+                <div className="aspect-square bg-border-subtle" />
                 <div className="p-3 space-y-2">
                   <div className="h-3 bg-border-subtle rounded w-3/4" />
                   <div className="h-3 bg-border-subtle rounded w-1/2" />
@@ -204,124 +197,18 @@ export default function LikedCollectionsClient() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.02 }}
               >
-                <div className="bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all group h-full flex flex-col">
-                  <Link href={`/collections/${collection.id}`}>
-                    <div className="aspect-[4/3] bg-surface-alt relative overflow-hidden">
-                      {collection.coverImageUrl ? (
-                        <OptimizedImage
-                          src={collection.coverImageUrl}
-                          alt={collection.name}
-                          fill
-                          className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                          fallbackSrc="https://placehold.co/400x300/f3f4f6/9ca3af?text=Koleksiyon"
-                          logContext={{
-                            collectionId: collection.id,
-                            page: "collections-liked",
-                          }}
-                        />
-                      ) : collection.items && collection.items.length > 0 ? (
-                        <div className="grid grid-cols-2 h-full">
-                          {collection.items.slice(0, 4).map((item) => (
-                            <div
-                              key={item.id}
-                              className="relative overflow-hidden"
-                            >
-                              {(() => {
-                                const img0 = item.product?.images?.[0];
-                                const url =
-                                  (img0 as any)?.cardUrl ??
-                                  (img0 as any)?.detailUrl ??
-                                  (img0 as any)?.url;
-                                return url ? (
-                                  <OptimizedImage
-                                    src={url}
-                                    alt={item.product!.title}
-                                    fill
-                                    className="object-cover"
-                                    fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün"
-                                    logContext={{
-                                      productId: item.product.id,
-                                      page: "collections-liked-item",
-                                    }}
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-border-subtle flex items-center justify-center">
-                                    <ArchiveBoxIcon className="w-4 h-4 text-subtle" />
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          ))}
-                          {collection.items.length < 4 &&
-                            Array(4 - collection.items.length)
-                              .fill(0)
-                              .map((_, i) => (
-                                <div
-                                  key={`empty-${i}`}
-                                  className="bg-border-subtle"
-                                />
-                              ))}
-                        </div>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 text-3xl">
-                          🚗
-                        </div>
-                      )}
-                      <div className="absolute bottom-1.5 right-1.5 bg-heading/60 px-1.5 py-0.5 rounded text-2xs text-inverted">
-                        {collection.itemCount || 0} {t("collection.items")}
-                      </div>
-                    </div>
-                  </Link>
-
-                  <div className="p-2.5 flex-1 flex flex-col">
-                    <Link href={`/collections/${collection.id}`}>
-                      <h3 className="font-medium text-heading text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">
-                        {collection.name}
-                      </h3>
-                    </Link>
-                    {collection.description && (
-                      <p className="text-subtle text-2xs mt-0.5 line-clamp-1">
-                        {collection.description}
-                      </p>
-                    )}
-
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                      <UserAvatar
-                        displayName={
-                          collection.user?.displayName || collection.userName
-                        }
-                        avatarUrl={collection.user?.avatarUrl}
-                        size="xs"
-                        className="!w-4 !h-4 !text-2xs"
-                      />
-                      <span className="text-2xs text-subtle">
-                        {collection.user?.displayName ||
-                          collection.userName ||
-                          t("collection.anonymous")}
-                      </span>
-                    </div>
-
-                    <div className="mt-auto pt-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-2xs text-subtle">
-                        <span className="flex items-center gap-0.5">
-                          <HeartIcon className="w-3 h-3" />
-                          {collection.likeCount || 0}
-                        </span>
-                        <span className="flex items-center gap-0.5">
-                          <EyeIcon className="w-3 h-3" />
-                          {collection.viewCount || 0}
-                        </span>
-                      </div>
-                      <Button
-                        variant="secondary"
-                        onClick={() => handleUnlike(collection.id)}
-                        className="px-2 py-1 bg-danger-50 hover:bg-danger-100 text-danger-500 rounded text-2xs font-medium transition-colors"
-                      >
-                        {t("collection.unlike")}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <CollectionCard
+                  collection={collection}
+                  footer={
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleUnlike(collection.id)}
+                      className="w-full bg-danger-50 hover:bg-danger-100 text-danger-500 rounded text-sm font-medium transition-colors"
+                    >
+                      {t("collection.unlike")}
+                    </Button>
+                  }
+                />
               </motion.div>
             ))}
           </div>
