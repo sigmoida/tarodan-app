@@ -418,6 +418,15 @@ export class PaymentRefundService {
       },
     });
     if (inFlightPayout) {
+      // Para satıcıya gitti/gidiyor → otomatik iade çift-ödeme olur. Borç/negatif-bakiye
+      // (clawback) defteri henüz YOK (ertelendi) → iade OTOMATİK yapılamaz; satıcıdan
+      // manuel geri-tahsilat gerekir. Ops aksiyon alabilsin diye AÇIKÇA logla (F2.2).
+      this.logger.error(
+        `CLAWBACK_REQUIRED: order ${orderId} iadesi engellendi — payout ` +
+          `${inFlightPayout.id} zaten '${inFlightPayout.status}' (net ` +
+          `${Number(inFlightPayout.netAmount)}, satıcı ${inFlightPayout.sellerId}). ` +
+          `Satıcıdan manuel geri-tahsilat gerekiyor.`,
+      );
       throw new BadRequestException(
         i18nMessage("server.payment.transferAlreadyStarted"),
       );
