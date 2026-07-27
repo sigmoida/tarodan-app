@@ -4,8 +4,13 @@
 
 import { Link } from "@/i18n/navigation";
 import toast from "react-hot-toast";
-import { ArrowUturnLeftIcon, TruckIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowUturnLeftIcon,
+  ChevronRightIcon,
+  TruckIcon,
+} from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import type { OrderDetail } from "../_lib/types";
 
@@ -31,20 +36,10 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
   const lbl = labelMap[rr.status] ?? rr.status;
 
   return (
-    <div
-      className={`rounded-xl shadow-sm p-6 border-2 ${
-        isRefunded
-          ? "bg-success-50 border-success-200"
-          : "bg-info-50 border-info-200"
-      }`}
-    >
+    <div className="rounded-xl shadow-sm p-6 border border-border bg-surface-alt">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
-          <h2
-            className={`text-lg font-semibold flex items-center gap-2 ${
-              isRefunded ? "text-success-800" : "text-info-800"
-            }`}
-          >
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-heading">
             <ArrowUturnLeftIcon className="w-5 h-5" />
             {t("order.refundRequest")}
           </h2>
@@ -53,13 +48,7 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
             {new Date(rr.createdAt).toLocaleDateString(t("common.dateLocale"))}
           </p>
         </div>
-        <span
-          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${
-            isRefunded
-              ? "bg-success-100 text-success-800 border-success-300"
-              : "bg-info-100 text-info-800 border-info-300"
-          }`}
-        >
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border bg-surface text-body border-border">
           {lbl}
         </span>
       </div>
@@ -118,12 +107,15 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
         </a>
       )}
 
-      <Link
+      <ButtonLink
         href={`/profile/refund-requests/${rr.id}`}
-        className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
+        variant="outline"
+        size="sm"
+        className="gap-1"
       >
-        {t("common.viewDetails")} →
-      </Link>
+        {t("common.viewDetails")}
+        <ChevronRightIcon className="h-4 w-4" />
+      </ButtonLink>
     </div>
   );
 }

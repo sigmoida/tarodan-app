@@ -2,7 +2,6 @@
 
 "use client";
 
-import { CreditCardIcon } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/ui";
 import { formatPriceNumber, formatTL } from "@/lib/format";
 import { useTranslations } from "next-intl";
@@ -27,14 +26,7 @@ export default function OrderSummaryCard({ order }: { order: OrderDetail }) {
   const sellerFee = p?.sellerFeeAmount ?? order.sellerFeeAmount ?? 0;
 
   return (
-    <SectionCard
-      title={
-        <span className="flex items-center gap-2">
-          <CreditCardIcon className="w-5 h-5" />
-          {t("checkout.orderSummary")}
-        </span>
-      }
-    >
+    <SectionCard title={t("checkout.orderSummary")}>
       <div className="space-y-3">
         <div className="flex justify-between text-muted">
           <span>{t("order.productAmount")}</span>

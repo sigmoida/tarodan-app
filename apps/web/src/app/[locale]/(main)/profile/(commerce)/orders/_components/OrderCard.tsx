@@ -80,7 +80,7 @@ export default function OrderCard({ order, actions, compact }: OrderCardProps) {
           <div className="min-w-0 flex-1">
             <Link
               href={`/listings/${product.id}`}
-              className="font-medium text-heading transition-colors hover:text-primary-500"
+              className="font-medium text-heading transition-colors hover:text-primary-600"
             >
               {product.title || t("order.product")}
             </Link>
@@ -117,10 +117,6 @@ export default function OrderCard({ order, actions, compact }: OrderCardProps) {
 
       {hasVisibleShipment(order) && (
         <div className="mt-4 rounded-lg bg-surface p-3 text-sm">
-          <p>
-            <span className="text-muted">{t("order.shippingCompany")}:</span>{" "}
-            {order.shipment!.carrier || order.shipment!.provider}
-          </p>
           <p>
             <span className="text-muted">{t("order.trackingNumber")}:</span>{" "}
             <span className="font-mono">{order.shipment!.trackingNumber}</span>

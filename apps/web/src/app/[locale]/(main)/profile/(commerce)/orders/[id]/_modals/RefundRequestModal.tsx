@@ -173,7 +173,7 @@ export default function RefundRequestModal({
           </p>
         </div>
 
-        <div className="bg-info-50 border border-info-200 rounded-lg p-3 text-sm text-info-800">
+        <div className="bg-surface-alt border border-border rounded-lg p-3 text-sm text-muted">
           {phaseDescription}
         </div>
 

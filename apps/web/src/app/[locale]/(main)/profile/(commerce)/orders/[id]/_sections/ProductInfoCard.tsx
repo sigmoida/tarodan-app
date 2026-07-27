@@ -41,7 +41,7 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
         <div className="flex-1">
           <Link
             href={`/listings/${productInfo?.id}`}
-            className="text-lg font-medium text-heading hover:text-primary-500 transition-colors"
+            className="text-lg font-medium text-heading hover:text-primary-600 transition-colors"
           >
             {productInfo?.title || t("order.product")}
           </Link>

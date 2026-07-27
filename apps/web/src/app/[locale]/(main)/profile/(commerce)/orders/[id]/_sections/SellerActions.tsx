@@ -3,7 +3,6 @@
 "use client";
 
 import toast from "react-hot-toast";
-import { TruckIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
@@ -34,14 +33,7 @@ export default function SellerActions({ order }: { order: OrderDetail }) {
   if (order.status === "preparing") {
     const cargoCode = order.shipment?.cargoCode ?? null;
     return (
-      <SectionCard
-        title={
-          <span className="flex items-center gap-2">
-            <TruckIcon className="w-5 h-5" />
-            {t("order.cargoReference")}
-          </span>
-        }
-      >
+      <SectionCard title={t("order.cargoReference")}>
         {cargoCode ? (
           <>
             <p className="text-muted mb-4">

@@ -3,7 +3,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PlusIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import {
+  ChevronLeftIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+} from "@heroicons/react/24/outline";
 import {
   Badge,
   Button,
@@ -106,11 +110,11 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
   return (
     <div className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden">
       {/* Header banner */}
-      <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
-        <h2 className="text-lg font-semibold text-inverted">
+      <div className="bg-surface-alt px-6 py-4 border-b border-border">
+        <h2 className="text-lg font-semibold text-heading">
           {t("payment.completeYourPayment")}
         </h2>
-        <p className="text-sm text-primary-100 mt-1">
+        <p className="text-sm text-muted mt-1">
           {t("order.offerAcceptedCompletePayment")}
         </p>
       </div>
@@ -189,9 +193,10 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
                       setSelectedAddressId(savedAddresses[0].id);
                     }
                   }}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  className="gap-1"
                 >
-                  &larr; {t("address.backToSaved")}
+                  <ChevronLeftIcon className="h-4 w-4" />
+                  {t("address.backToSaved")}
                 </Button>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -55,27 +55,8 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
     <>
       {/* Invoice Section - yalnız gerçek e-Arşiv HAZIRSA çıkar */}
       {elogoInvoice && (
-        <SectionCard
-          title={
-            <span className="flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-success-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              {t("order.invoice")}
-            </span>
-          }
-        >
-          <div className="flex items-start gap-3 p-3 bg-success-50 rounded-lg border border-success-100">
+        <SectionCard title={t("order.invoice")}>
+          <div className="flex items-start gap-3 p-3 bg-surface-alt rounded-lg border border-border-subtle">
             <svg
               className="w-5 h-5 text-success-600 mt-0.5 flex-shrink-0"
               fill="none"
@@ -90,16 +71,16 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
               />
             </svg>
             <div className="flex-1">
-              <p className="text-sm text-success-800 mb-1">
+              <p className="text-sm text-body mb-1">
                 {t("order.invoiceSentToEmail")}
               </p>
               {elogoInvoice.invoiceNumber && (
-                <p className="text-xs text-success-700 mb-2">
+                <p className="text-xs text-muted mb-2">
                   {t("order.invoiceNo") + elogoInvoice.invoiceNumber}
                 </p>
               )}
               <Button
-                variant="success"
+                variant="primary"
                 size="sm"
                 onClick={() => downloadElogo.mutate(elogoInvoice.id)}
                 disabled={downloadElogo.isPending}
@@ -118,26 +99,7 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
         (sellerInvoice.canUpload ||
           (sellerInvoice.invoice &&
             (sellerInvoice.isBuyer || sellerInvoice.isSeller))) && (
-          <SectionCard
-            title={
-              <span className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5 text-brand-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                {t("order.sellerInvoice")}
-              </span>
-            }
-          >
+          <SectionCard title={t("order.sellerInvoice")}>
             {sellerInvoice.invoice ? (
               <div className="flex items-start gap-3 p-3 bg-surface rounded-lg border border-default">
                 <svg

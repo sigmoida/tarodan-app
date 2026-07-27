@@ -2,9 +2,7 @@
 
 "use client";
 
-import { Link } from "@/i18n/navigation";
-import { SectionCard } from "@/components/ui";
-import UserAvatar from "@/components/UserAvatar";
+import { SectionCard, SellerChip } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import type { OrderDetail } from "../_lib/types";
 
@@ -15,20 +13,12 @@ export default function PartyCard({ order }: { order: OrderDetail }) {
 
   return (
     <SectionCard title={order.isBuyer ? t("product.seller") : t("order.buyer")}>
-      <Link
-        href={`/seller/${party.id}`}
-        className="flex items-center gap-3 hover:bg-surface -mx-2 px-2 py-2 rounded-lg transition-colors"
-      >
-        <UserAvatar
-          displayName={party.displayName}
-          avatarUrl={party.avatarUrl}
-          size="md"
-        />
-        <div>
-          <p className="font-medium text-heading">{party.displayName}</p>
-          <p className="text-sm text-muted">{t("seller.viewProfile")}</p>
-        </div>
-      </Link>
+      <SellerChip
+        id={party.id}
+        displayName={party.displayName}
+        avatarUrl={party.avatarUrl}
+        className="-mx-2"
+      />
     </SectionCard>
   );
 }

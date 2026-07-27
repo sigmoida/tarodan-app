@@ -32,17 +32,17 @@ export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
   });
 
   return (
-    <div className="bg-info-50 border border-info-200 rounded-xl shadow-sm p-6">
-      <h2 className="mb-2 text-lg font-semibold text-info-800">
+    <div className="bg-surface-alt border border-border rounded-xl shadow-sm p-6">
+      <h2 className="mb-2 text-lg font-semibold text-heading">
         {t("order.statusDelivered")}
       </h2>
-      <p className="text-sm text-info-800">
+      <p className="text-sm text-muted">
         {payoutDateStr
           ? t("order.payoutReleaseWithDate", { date: payoutDateStr })
           : t("order.payoutRelease")}
       </p>
       {order.activeRefundRequest && (
-        <p className="text-sm text-info-800 mt-2 font-medium">
+        <p className="text-sm text-muted mt-2 font-medium">
           {t("order.paymentOnHoldRefund")}
         </p>
       )}

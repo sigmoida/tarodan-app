@@ -106,11 +106,17 @@ export default function OrderActions({
   const downloading = downloadingId === order.id;
   const cancelling = cancellingId === order.id;
 
+  // Variant scheme: one filled `primary` CTA per state, `danger` for the
+  // destructive action, and a uniform `outline` for every neutral/navigational
+  // action. Reorder yields its primary emphasis to Review when both apply, so
+  // there is never more than one orange button.
+  const reorderVariant = show.review ? "outline" : "primary";
+
   return (
     <div className="mt-4 flex flex-wrap gap-2">
       <ButtonLink
         href={`/profile/orders/${order.id}`}
-        variant="secondary"
+        variant="outline"
         size="sm"
       >
         {t("common.details")}
@@ -124,7 +130,7 @@ export default function OrderActions({
 
       {show.invoiceBuyer && (
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           onClick={() => onInvoice(order.id)}
           disabled={downloading}
@@ -134,7 +140,11 @@ export default function OrderActions({
       )}
 
       {show.reorder && (
-        <Button variant="primary" size="sm" onClick={() => onReorder(order)}>
+        <Button
+          variant={reorderVariant}
+          size="sm"
+          onClick={() => onReorder(order)}
+        >
           {t("order.reorder")}
         </Button>
       )}
@@ -162,7 +172,7 @@ export default function OrderActions({
           {show.requestRefund && (
             <ButtonLink
               href={`/profile/orders/${order.id}`}
-              variant="secondary"
+              variant="outline"
               size="sm"
             >
               {t("order.requestRefund")}
@@ -185,7 +195,7 @@ export default function OrderActions({
 
       {show.sellerInvoice && (
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           className="gap-1"
           onClick={() => onInvoice(order.id)}

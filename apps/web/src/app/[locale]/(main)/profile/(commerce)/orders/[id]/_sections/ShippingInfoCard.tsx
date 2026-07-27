@@ -3,7 +3,8 @@
 "use client";
 
 import { TruckIcon } from "@heroicons/react/24/outline";
-import { SectionCard } from "@/components/ui";
+import { Button } from "@tarodan/ui";
+import { SectionCard, CopyButton } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import type { OrderDetail } from "../_lib/types";
 
@@ -87,16 +88,9 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
   const statusLbl = statusLabelMap[s] ?? s;
 
   return (
-    <SectionCard
-      title={
-        <span className="flex items-center gap-2">
-          <TruckIcon className="w-5 h-5" />
-          {t("order.shippingInfo")}
-        </span>
-      }
-    >
+    <SectionCard title={t("order.shippingInfo")}>
       {isPending && order.isBuyer && (
-        <div className="bg-info-50 border border-info-200 rounded-lg p-4 text-sm text-info-800">
+        <div className="bg-surface-alt border border-border rounded-lg p-4 text-sm text-muted">
           {t("order.shipmentPreparingBuyer")}
         </div>
       )}
@@ -109,19 +103,14 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
 
       {(isShippedActive || isDelivered) && (
         <div className="space-y-3">
-          <div className="flex justify-between">
-            <span className="text-muted">{t("order.shippingCompany")}:</span>
-            <span className="font-medium">
-              {order.shipment.provider === "surat"
-                ? "Sürat Kargo"
-                : order.shipment.provider}
-            </span>
-          </div>
           {order.shipment.trackingNumber && (
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center gap-2">
               <span className="text-muted">{t("order.trackingNumber")}:</span>
-              <span className="font-mono bg-surface-alt px-2 py-1 rounded text-sm">
-                {order.shipment.trackingNumber}
+              <span className="flex items-center gap-1">
+                <span className="font-mono bg-surface-alt px-2 py-1 rounded text-sm">
+                  {order.shipment.trackingNumber}
+                </span>
+                <CopyButton value={order.shipment.trackingNumber} />
               </span>
             </div>
           )}
@@ -133,21 +122,22 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
               {statusLbl}
             </span>
           </div>
-          {order.isBuyer && order.shipment.trackingNumber && (
-            <div className="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-border-default">
-              {order.shipment.provider === "surat" && (
-                <a
-                  href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-inverted rounded-lg text-sm font-medium transition-colors"
-                >
-                  <TruckIcon className="w-4 h-4" />
-                  {t("order.trackOnSurat")}
-                </a>
-              )}
-            </div>
-          )}
+          {order.isBuyer &&
+            order.shipment.trackingNumber &&
+            order.shipment.provider === "surat" && (
+              <div className="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-border-default">
+                <Button asChild variant="primary" size="sm" className="gap-2">
+                  <a
+                    href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <TruckIcon className="w-4 h-4" />
+                    {t("order.track")}
+                  </a>
+                </Button>
+              </div>
+            )}
         </div>
       )}
     </SectionCard>

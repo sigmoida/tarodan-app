@@ -2,8 +2,8 @@
 
 "use client";
 
-import { MapPinIcon } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/ui";
+import { useTranslations } from "next-intl";
 import { isMembershipOrder, type OrderDetail } from "../_lib/types";
 
 /**
@@ -11,6 +11,7 @@ import { isMembershipOrder, type OrderDetail } from "../_lib/types";
  * ödeme kartının içinde). Üyelik/dijital siparişlerde teslimat adresi yoktur.
  */
 export default function ShippingAddressCard({ order }: { order: OrderDetail }) {
+  const t = useTranslations();
   if (
     !order.shippingAddress ||
     isMembershipOrder(order) ||
@@ -21,14 +22,7 @@ export default function ShippingAddressCard({ order }: { order: OrderDetail }) {
   const addr = order.shippingAddress;
 
   return (
-    <SectionCard
-      title={
-        <span className="flex items-center gap-2">
-          <MapPinIcon className="w-5 h-5" />
-          Teslimat Adresi
-        </span>
-      }
-    >
+    <SectionCard title={t("address.deliveryAddress")}>
       <div className="text-body">
         <p className="font-medium">{addr.title}</p>
         <p>{addr.addressLine1}</p>
