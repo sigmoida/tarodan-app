@@ -517,6 +517,7 @@
     "listPriceLine": "Liste fiyatı",
     "commissionLine": "Komisyon",
     "shippingBuyerPaidHint": "Kargoyu alıcı öder ({amount}) · net kazancınızı etkilemez",
+    "shippingLine": "Kargo bedeli (alıcı öder)",
     "productDetails": "Ürün Detayları",
     "categoryRequired": "Kategori *",
     "selectCategory": "Kategori Seçin",

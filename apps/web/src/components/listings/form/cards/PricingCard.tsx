@@ -72,47 +72,25 @@ export default function PricingCard({
   );
 }
 
-/** Itemized per-sale breakdown: list price → commission/withholding deductions →
- *  net, plus a buyer-paid shipping note. The entered price is reconstructed from
- *  the preview (net + fees) so no extra prop threading is needed. */
+/** Per-sale summary shown to the seller: only the net take-home ("elde kalan"),
+ *  with all commission/withholding deductions already folded in, plus the
+ *  (buyer-paid) shipping fee line. No itemised commission/list-price rows. */
 function PricingBreakdown({
   preview,
 }: {
   preview: NonNullable<PricingCardProps["commissionPreview"]>;
 }) {
   const t = useTranslations();
-  const {
-    sellerFeeAmount,
-    withholdingTaxAmount,
-    shippingAmount,
-    sellerNetAmount,
-  } = preview;
-  const listPrice = sellerNetAmount + sellerFeeAmount + withholdingTaxAmount;
+  const { shippingAmount, sellerNetAmount } = preview;
 
   return (
     <div className="space-y-2">
-      <Row label={t("product.listPriceLine")} value={fmt(listPrice)} />
-      <Row
-        label={t("product.commissionLine")}
-        value={`−${fmt(sellerFeeAmount)}`}
-        tone="deduction"
-      />
-      {withholdingTaxAmount > 0 && (
-        <Row
-          label={t("product.platformDeduction")}
-          value={`−${fmt(withholdingTaxAmount)}`}
-          tone="deduction"
-        />
-      )}
-      <div className="my-2 border-t border-border-subtle" />
       <Row
         label={t("product.netToYou")}
         value={fmt(sellerNetAmount)}
         tone="net"
       />
-      <p className="pt-2 text-xs text-subtle">
-        {t("product.shippingBuyerPaidHint", { amount: fmt(shippingAmount) })}
-      </p>
+      <Row label={t("product.shippingLine")} value={fmt(shippingAmount)} />
     </div>
   );
 }

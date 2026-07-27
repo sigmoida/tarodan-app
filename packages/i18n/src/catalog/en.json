@@ -517,6 +517,7 @@
     "listPriceLine": "List price",
     "commissionLine": "Commission",
     "shippingBuyerPaidHint": "Buyer pays shipping ({amount}) · does not affect your net",
+    "shippingLine": "Shipping fee (buyer pays)",
     "productDetails": "Product Details",
     "categoryRequired": "Category *",
     "selectCategory": "Select category",
