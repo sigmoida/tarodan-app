@@ -3864,6 +3864,7 @@
         "productTitle": "Ürün Bilgileri",
         "shippingTitle": "Kargo Bilgileri",
         "carrier": "Kargo Firması",
+        "carrierSurat": "Sürat Kargo",
         "infoTitle": "Sipariş Bilgileri",
         "addressTitle": "Teslimat Adresi",
         "postalCode": "Posta Kodu: {code}",

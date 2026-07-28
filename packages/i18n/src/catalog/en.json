@@ -3864,6 +3864,7 @@
         "productTitle": "Product Details",
         "shippingTitle": "Shipping Details",
         "carrier": "Carrier",
+        "carrierSurat": "Sürat Cargo",
         "infoTitle": "Order Details",
         "addressTitle": "Delivery Address",
         "postalCode": "Postal Code: {code}",

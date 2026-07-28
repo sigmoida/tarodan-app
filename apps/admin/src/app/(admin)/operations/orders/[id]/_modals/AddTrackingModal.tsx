@@ -46,7 +46,9 @@ export function AddTrackingModal({
           value="surat"
           disabled
         >
-          <option value="surat">Sürat Kargo</option>
+          <option value="surat">
+            {t("admin.operations.orders.carrierSurat")}
+          </option>
         </Select>
         <Input
           label={t("admin.operations.common.trackingNumber")}
