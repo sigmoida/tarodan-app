@@ -90,7 +90,7 @@ sonra veritabanını siler, migrate + seed çalıştırır ve uygulamaları baş
 - **"port already in use"** → `pnpm dev:stop`, sonra tekrar `pnpm dev`
 - **"Cannot connect to the Docker daemon"** → Docker Desktop'ı başlat
 - **"Invalid environment configuration"** → `apps/api/.env` dosyanı
-  `apps/api/env.example.txt` içindeki yeni zorunlu anahtarlarla eşleştir
+  `apps/api/.env.example` içindeki yeni zorunlu anahtarlarla eşleştir
 - **Arama sonuçları boş** → Elasticsearch hâlâ ısınıyor olabilir: `curl localhost:9200/_cluster/health`
 - **Giden e-postalar görünmüyor** → Mailpit UI: http://localhost:8025
 - **PayTR callback'i yerelde test** → `pnpm ngrok` (3001'i dışarı tünneler)
