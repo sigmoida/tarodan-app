@@ -51,10 +51,15 @@ Altyapı zaten ayaktaysa ve sadece uygulamaları başlatmak istersen: `pnpm dev:
 İlk kurulumda şema boş gelir; örnek veri için:
 
 ```bash
-pnpm db:seed
+pnpm dev:seed
 ```
 
-Sıfırdan başlamak istersen: `pnpm dev:reset` — veritabanını siler, migrate + seed çalıştırır ve uygulamaları başlatır. S3 credential'ları boşken seed'in görsel yükleme uyarıları zararsızdır.
+Bu komut Docker servislerini başlatır, migration'ları uygular ve S3 erişimi
+gerektirmeden yerel veritabanını doldurur. Yalnızca `localhost` üzerindeki
+`tarodan` veya `tarodan_*` veritabanlarına çalışır.
+
+Sıfırdan başlamak istersen: `pnpm dev:reset` — aynı yerel hedef kontrolünden
+sonra veritabanını siler, migrate + seed çalıştırır ve uygulamaları başlatır.
 
 ## Durdurma
 
@@ -68,6 +73,7 @@ Sıfırdan başlamak istersen: `pnpm dev:reset` — veritabanını siler, migrat
 | `pnpm dev`                         | Tek komut: altyapı + migrate + tüm uygulamalar       |
 | `pnpm dev:only`                    | Sadece uygulamalar (`turbo run dev`)                 |
 | `pnpm dev:tools`                   | Opsiyonel Kibana arayüzünü başlat                    |
+| `pnpm dev:seed`                    | Yerel DB'ye migration + S3'süz seed uygula           |
 | `pnpm dev:reset`                   | DB'yi sıfırla (migrate + seed) ve başlat             |
 | `pnpm dev:stop`                    | Uygulamaları ve docker altyapıyı durdur              |
 | `pnpm db:studio`                   | Prisma Studio                                        |
@@ -79,6 +85,8 @@ Sıfırdan başlamak istersen: `pnpm dev:reset` — veritabanını siler, migrat
 
 - **"port already in use"** → `pnpm dev:stop`, sonra tekrar `pnpm dev`
 - **"Cannot connect to the Docker daemon"** → Docker Desktop'ı başlat
+- **"Invalid environment configuration"** → `apps/api/.env` dosyanı
+  `apps/api/env.example.txt` içindeki yeni zorunlu anahtarlarla eşleştir
 - **Arama sonuçları boş** → Elasticsearch hâlâ ısınıyor olabilir: `curl localhost:9200/_cluster/health`
 - **Giden e-postalar görünmüyor** → Mailpit UI: http://localhost:8025
 - **PayTR callback'i yerelde test** → `pnpm ngrok` (3001'i dışarı tünneler)

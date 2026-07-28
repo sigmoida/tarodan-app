@@ -6564,8 +6564,17 @@ async function main() {
 
   // Mesajlar: içerik filtresi → pending_approval (telefon paylaşımı) + rejected.
   {
-    const mThread = await prisma.messageThread.create({
-      data: {
+    const mThread = await prisma.messageThread.upsert({
+      where: {
+        participant1Id_participant2Id: {
+          participant1Id: users[3].id,
+          participant2Id: users[8].id,
+        },
+      },
+      update: {
+        lastMessageAt: daysAgoDate(1),
+      },
+      create: {
         participant1Id: users[3].id,
         participant2Id: users[8].id,
         productId: null,

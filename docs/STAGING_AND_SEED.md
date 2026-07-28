@@ -82,6 +82,11 @@ görselleri + koleksiyon kapakları + avatarlar atlanır (key alanları boş kal
 ve seed sonuna kadar akar. e2e global-setup bunu set eder; seed hatası artık
 yutulmaz — seed patlarsa e2e setup da patlar.
 
+Yerel geliştirmede doğrudan `pnpm dev:seed` kullanılır. Bu komut
+`SEED_SKIP_IMAGES=1` değerini kendisi geçirir ve uzak bir veritabanına karşı
+çalışmayı reddeder. Mevcut yerel veritabanını tamamen yenilemek için
+`pnpm dev:reset` kullanılır.
+
 ## S3 çöp temizliği (dev prefix)
 
 `apps/api/scripts/prune-dev-s3.ts`: `dev/products/product-images/` ve
