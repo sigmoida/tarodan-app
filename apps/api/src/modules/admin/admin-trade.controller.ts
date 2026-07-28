@@ -184,7 +184,7 @@ export class AdminTradeController {
   }
 
   @Post("trades/:id/approve")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
