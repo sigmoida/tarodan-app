@@ -45,6 +45,9 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       # fetch-depth 0 so Turbo can diff the working tree against the PR base
       # commit for affected-package detection (#171).
