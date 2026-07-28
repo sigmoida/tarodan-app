@@ -9,6 +9,7 @@ export interface GuestOrderDetail {
   shipment?: {
     provider: string;
     trackingNumber: string | null;
+    cargoCode?: string | null;
     trackingUrl: string | null;
     status: string;
     estimatedDelivery?: string | null;

@@ -166,6 +166,18 @@ export class StubSuratSoapClient extends SuratCarrierClient {
       (err as any).statusCode = 500;
       throw err;
     }
+    if (sim === "SOAP_FAULT") {
+      throw new Error("SOAP Fault: server");
+    }
+    if (sim === "PARSE_ERROR") {
+      throw new Error("Unexpected XML");
+    }
+    if (sim === "EMPTY") {
+      return undefined as unknown as SuratBarcodeRaw;
+    }
+    if (sim === "UNKNOWN") {
+      throw new Error("unknown stub error");
+    }
     if (sim === "BUSINESS") {
       return {
         isError: true,

@@ -298,6 +298,17 @@ export class SuratCargoService implements CargoProvider {
       };
     }
 
+    if (!raw || typeof raw !== "object") {
+      return {
+        ok: false,
+        kind: "technical",
+        code: "EMPTY_RESPONSE",
+        cause: undefined,
+        correlationId,
+        idempotencyKey,
+      };
+    }
+
     if (raw.isError || !raw.kargoTakipNo) {
       this.logger.warn({
         msg: "Surat barcode business failure",

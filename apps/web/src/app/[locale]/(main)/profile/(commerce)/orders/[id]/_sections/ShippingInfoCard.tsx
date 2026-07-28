@@ -16,11 +16,16 @@ const SHIPPED_ORDER_STATUSES = [
 ];
 
 /**
- * Kargo bilgileri — SADECE gerçek gönderi varken: shipment + dolu trackingNumber +
+ * Kargo bilgileri — SADECE gerçek gönderi varken: shipment + taşıyıcı takip kodu +
  * sipariş durumu kargolanmış/teslim. İptal ya da teslim öncesi durumlarda gizli.
  */
 export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
+  const displayTrackingCode =
+    order.shipment?.cargoCode ??
+    (order.shipment?.provider !== "surat"
+      ? order.shipment?.trackingNumber
+      : null);
 
   const statusLabelMap: Record<string, string> = {
     pending: t("order.shipStatusPending"),
@@ -39,7 +44,7 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
   const isIptalOrder = order.cancellationType === "iptal";
   if (
     !order.shipment ||
-    !order.shipment.trackingNumber ||
+    !displayTrackingCode ||
     isIptalOrder ||
     order.status === "cancelled" ||
     !SHIPPED_ORDER_STATUSES.includes(order.status)
@@ -106,14 +111,14 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
 
       {(isShippedActive || isDelivered) && (
         <div className="space-y-3">
-          {order.shipment.trackingNumber && (
+          {displayTrackingCode && (
             <div className="flex justify-between items-center gap-2">
               <span className="text-muted">{t("order.trackingNumber")}:</span>
               <span className="flex items-center gap-1">
                 <span className="font-mono bg-surface-alt px-2 py-1 rounded text-sm">
-                  {order.shipment.trackingNumber}
+                  {displayTrackingCode}
                 </span>
-                <CopyButton value={order.shipment.trackingNumber} />
+                <CopyButton value={displayTrackingCode} />
               </span>
             </div>
           )}
@@ -126,12 +131,12 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
             </span>
           </div>
           {order.isBuyer &&
-            order.shipment.trackingNumber &&
+            order.shipment.cargoCode &&
             order.shipment.provider === "surat" && (
               <div className="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-border-default">
                 <Button asChild variant="primary" size="sm" className="gap-2">
                   <a
-                    href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber)}`}
+                    href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.cargoCode)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

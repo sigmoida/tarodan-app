@@ -209,8 +209,12 @@ export default function TrackOrderClient() {
 
               const isPending = s === "pending";
               const isCancelled = s === "cancelled" || s === "failed";
-              const showTracking =
-                !isPending && !isCancelled && !!order.shipment.trackingNumber;
+              const trackingCode =
+                order.shipment.cargoCode ??
+                (order.shipment.provider !== "surat"
+                  ? order.shipment.trackingNumber
+                  : null);
+              const showTracking = !isPending && !isCancelled && !!trackingCode;
 
               return (
                 <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
@@ -243,7 +247,7 @@ export default function TrackOrderClient() {
                           {t("order.trackingNumber")}:
                         </span>{" "}
                         <span className="font-mono bg-surface-alt px-2 py-1 rounded">
-                          {order.shipment.trackingNumber}
+                          {trackingCode}
                         </span>
                       </p>
                       {(order.shipment.trackingUrl ||
@@ -251,7 +255,7 @@ export default function TrackOrderClient() {
                         <a
                           href={
                             order.shipment.trackingUrl ||
-                            `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.trackingNumber!)}`
+                            `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(trackingCode!)}`
                           }
                           target="_blank"
                           rel="noopener noreferrer"

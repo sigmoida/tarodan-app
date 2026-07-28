@@ -15,6 +15,7 @@ import { formatDate } from "@/lib/format";
 import {
   formatTL,
   getOrderPrimary,
+  getVisibleTrackingCode,
   groupByPackage,
   hasVisibleShipment,
   orderAmount,
@@ -227,7 +228,7 @@ export default function OrderGroupCard({
                       {t("order.trackingNumber")}:
                     </span>{" "}
                     <span className="font-mono">
-                      {shipped.shipment!.trackingNumber}
+                      {getVisibleTrackingCode(shipped)}
                     </span>
                   </p>
                 </div>

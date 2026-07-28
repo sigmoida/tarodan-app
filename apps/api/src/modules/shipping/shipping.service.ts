@@ -381,7 +381,10 @@ export class ShippingService {
     const shipment = await this.prisma.shipment.findFirst({
       where: {
         provider,
-        trackingNumber: payload.trackingNumber || payload.tracking_no,
+        OR: [
+          { trackingNumber: payload.trackingNumber || payload.tracking_no },
+          { providerTrackingId: payload.trackingNumber || payload.tracking_no },
+        ],
       },
       include: { order: true },
     });
@@ -539,6 +542,7 @@ export class ShippingService {
       orderId: shipment.orderId,
       provider: shipment.provider,
       trackingNumber: shipment.trackingNumber,
+      providerTrackingId: shipment.providerTrackingId,
       trackingUrl: shipment.trackingUrl,
       status: shipment.status,
       cost: shipment.cost ? Number(shipment.cost) : undefined,

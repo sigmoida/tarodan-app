@@ -10,6 +10,7 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   formatTL,
   getOrderPrimary,
+  getVisibleTrackingCode,
   hasVisibleShipment,
   orderAmount,
   sellerNetOf,
@@ -30,6 +31,7 @@ export default function OrderCard({ order, actions, compact }: OrderCardProps) {
   const locale = useLocale();
   const display = getDisplayStatus(order, t, locale);
   const { product, image } = getOrderPrimary(order);
+  const trackingCode = getVisibleTrackingCode(order);
   const net = sellerNetOf(order);
   // Çok adetli sipariş: gerçek adet + birim fiyat (satır tutarı / adet).
   const amount = orderAmount(order);
@@ -119,7 +121,7 @@ export default function OrderCard({ order, actions, compact }: OrderCardProps) {
         <div className="mt-4 rounded-lg bg-surface p-3 text-sm">
           <p>
             <span className="text-muted">{t("order.trackingNumber")}:</span>{" "}
-            <span className="font-mono">{order.shipment!.trackingNumber}</span>
+            <span className="font-mono">{trackingCode}</span>
           </p>
         </div>
       )}

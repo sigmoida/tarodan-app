@@ -38,12 +38,19 @@ const basePayload: SuratGonderiPayload = {
 describe("SuratCargoService", () => {
   let service: SuratCargoService;
   let soapCall: jest.Mock;
+  let barcodeCall: jest.Mock;
   let cacheGet: jest.Mock;
   let cacheSet: jest.Mock;
   let configGet: jest.Mock;
 
   beforeEach(async () => {
     soapCall = jest.fn().mockResolvedValue("Tamam");
+    barcodeCall = jest.fn().mockResolvedValue({
+      isError: false,
+      message: "Tamam",
+      kargoTakipNo: "SURAT-123",
+      labelZpl: null,
+    });
     cacheGet = jest.fn().mockResolvedValue(null);
     cacheSet = jest.fn().mockResolvedValue(undefined);
     configGet = jest.fn((key: string, defaultValue?: string) => {
@@ -58,7 +65,11 @@ describe("SuratCargoService", () => {
         SuratCargoService,
         {
           provide: SURAT_CARRIER_CLIENT,
-          useValue: { callGonderiyiKargoyaGonderYeni: soapCall },
+          useValue: {
+            supportsBarcode: () => true,
+            callGonderiyiKargoyaGonderYeni: soapCall,
+            callOrtakBarkodOlustur: barcodeCall,
+          },
         },
         { provide: CacheService, useValue: { get: cacheGet, set: cacheSet } },
         { provide: ConfigService, useValue: { get: configGet } },
@@ -176,5 +187,20 @@ describe("SuratCargoService", () => {
     });
     expect(r.ok).toBe(false);
     expect(soapCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("classifies an empty barcode response and retries it only once", async () => {
+    barcodeCall.mockResolvedValue(undefined);
+
+    const result = await service.createShipmentWithBarcode({
+      idempotencyKey: "barcode-empty",
+      correlationId: "barcode-empty",
+      payload: basePayload,
+    });
+
+    expect(result.ok).toBe(false);
+    expect((result as SuratTechnicalFailure).code).toBe("EMPTY_RESPONSE");
+    expect(barcodeCall).toHaveBeenCalledTimes(2);
+    expect(cacheSet).not.toHaveBeenCalled();
   });
 });

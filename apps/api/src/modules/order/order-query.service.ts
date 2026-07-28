@@ -144,7 +144,12 @@ export class OrderQueryService {
         ? {
             provider: order.shipment.provider,
             trackingNumber: order.shipment.trackingNumber,
-            trackingUrl: order.shipment.trackingUrl,
+            cargoCode: order.shipment.providerTrackingId,
+            trackingUrl:
+              order.shipment.provider === "surat" &&
+              order.shipment.providerTrackingId
+                ? `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.providerTrackingId)}`
+                : order.shipment.trackingUrl,
             status: order.shipment.status,
             estimatedDelivery: order.shipment.estimatedDelivery,
           }

@@ -31,7 +31,8 @@ export interface Order {
   seller?: { id: string; displayName: string };
   buyer?: { id: string; displayName: string };
   shipment?: {
-    trackingNumber: string;
+    trackingNumber: string | null;
+    cargoCode?: string | null;
     carrier?: string;
     provider?: string;
     status: string;
@@ -95,6 +96,13 @@ export const sellerNetOf = (order: Order): number | null => {
 export const isCancelledOrder = (order: Order): boolean =>
   order.cancellationType === "iptal" || order.status === "cancelled";
 
+/** Sürat'ta yalnız taşıyıcının gerçek kodu gösterilir; iç paket referansı gösterilmez. */
+export const getVisibleTrackingCode = (order: Order): string | null =>
+  order.shipment?.cargoCode ??
+  (order.shipment?.provider !== "surat"
+    ? (order.shipment?.trackingNumber ?? null)
+    : null);
+
 /** Kargo öncesi = iptal, kargo sonrası = iade. */
 export const hasShipped = (order: Order): boolean => {
   if (["shipped", "delivered", "completed"].includes(order.status)) return true;
@@ -104,7 +112,7 @@ export const hasShipped = (order: Order): boolean => {
 
 /** Kargo/takip satırı yalnız gerçek gönderi varken. */
 export const hasVisibleShipment = (order: Order): boolean =>
-  !!order.shipment?.trackingNumber &&
+  !!getVisibleTrackingCode(order) &&
   !isCancelledOrder(order) &&
   ["shipped", "delivered", "awaiting_buyer_confirmation", "completed"].includes(
     order.status,
