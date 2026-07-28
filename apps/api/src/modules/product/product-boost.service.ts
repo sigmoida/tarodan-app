@@ -280,10 +280,17 @@ export class ProductBoostService {
         select: {
           status: true,
           currentPeriodEnd: true,
-          tier: { select: { type: true } },
+          tier: { select: { type: true, isActive: true } },
+          user: {
+            select: {
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+            },
+          },
         },
       });
-      effectiveAutoRenew = isPremiumEntitled(membership);
+      effectiveAutoRenew = isPremiumEntitled(membership, membership?.user);
     }
 
     // ProductBoost kaydı (pending)

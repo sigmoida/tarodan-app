@@ -195,7 +195,7 @@ export interface ListingLimits {
 }
 
 /** The seller's listing-quota stats (new-listing limit banner). */
-export function useListingLimits(enabled: boolean, membershipTier: string) {
+export function useListingLimits(enabled: boolean) {
   const query = useWebList<ListingLimits>({
     resource: "listing-form-limits",
     fetcher: async () => {
@@ -216,12 +216,11 @@ export function useListingLimits(enabled: boolean, membershipTier: string) {
       } catch {
         return {
           currentCount: 0,
-          maxListings: -1,
-          canCreateListing: true,
-          isPremium:
-            membershipTier === "premium" || membershipTier === "business",
-          membershipTier,
-          remainingListings: -1,
+          maxListings: 0,
+          canCreateListing: false,
+          isPremium: false,
+          membershipTier: "Free",
+          remainingListings: 0,
         };
       }
     },

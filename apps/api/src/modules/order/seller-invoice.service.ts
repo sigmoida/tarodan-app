@@ -16,6 +16,7 @@ import {
   substituteEmailVariables,
   getEmailTemplateSubject,
 } from "../../common/helpers/email-template-renderer";
+import { isBusinessMembershipEntitled } from "../membership/membership.util";
 
 /**
  * Kurumsal (şirket) satıcının siparişe ELLE yüklediği ÜRÜN faturası (PDF).
@@ -43,23 +44,26 @@ export class SellerInvoiceService {
     private readonly config: ConfigService,
   ) {}
 
-  /**
-   * Kullanıcı kurumsal (şirket) hesap mı? Yalnız bunlar fatura yükleyebilir.
-   * Kanonik tanım (bkz. UserService.isBusinessAccount): aktif "iş üyeliği"
-   * (business üyelik katmanı) + companyName. businessStatus'a bakmayız — o
-   * ayrı bir KYC alanıdır ve iş üyeliği olan hesaplarda dahi boş olabilir.
-   */
+  /** Yalnız efektif Business üyeliği ve onaylı şirket kimliği fatura yükleyebilir. */
   private async isCorporateSeller(userId: string): Promise<boolean> {
     const u = await this.prisma.user
       .findUnique({
         where: { id: userId },
         select: {
           companyName: true,
-          membership: { select: { tier: { select: { type: true } } } },
+          taxId: true,
+          businessStatus: true,
+          membership: {
+            select: {
+              status: true,
+              currentPeriodEnd: true,
+              tier: { select: { type: true, isActive: true } },
+            },
+          },
         },
       })
       .catch(() => null);
-    return !!u?.companyName && u.membership?.tier?.type === "business";
+    return isBusinessMembershipEntitled(u?.membership, u);
   }
 
   async uploadForOrder(

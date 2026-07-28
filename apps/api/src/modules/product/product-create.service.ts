@@ -206,10 +206,20 @@ export class ProductCreateService {
       select: {
         status: true,
         currentPeriodEnd: true,
-        tier: { select: { type: true } },
+        tier: { select: { type: true, isActive: true } },
+        user: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+          },
+        },
       },
     });
-    const isPremiumSeller = isPremiumEntitled(sellerMembership);
+    const isPremiumSeller = isPremiumEntitled(
+      sellerMembership,
+      sellerMembership?.user,
+    );
     const FRESH_POPULARITY_BASELINE = 10;
 
     try {

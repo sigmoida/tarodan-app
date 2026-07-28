@@ -93,10 +93,8 @@ function useNewListingValue() {
   const { manufacturerAttrGroups } = useManufacturerAttributes(
     selectedManufacturerSlug,
   );
-  const { listingLimits, limitsLoading, refetchLimits } = useListingLimits(
-    queryEnabled,
-    user?.membershipTier || "free",
-  );
+  const { listingLimits, limitsLoading, refetchLimits } =
+    useListingLimits(queryEnabled);
   const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
     price,
     categoryId,

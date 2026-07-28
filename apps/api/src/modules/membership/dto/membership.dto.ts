@@ -6,37 +6,44 @@ import {
   IsBoolean,
   Min,
   Max,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { MembershipTierType, SubscriptionStatus } from '@prisma/client';
+  MaxLength,
+  IsNotEmpty,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { MembershipTierType, SubscriptionStatus } from "@prisma/client";
 
 export class SubscribeDto {
   @IsEnum(MembershipTierType)
   tierType: MembershipTierType;
 
   @IsString()
-  billingPeriod: 'monthly' | 'yearly';
+  billingPeriod: "monthly" | "yearly";
 }
 
 export class UpdateMembershipTierDto {
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
   name?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   description?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
+  @Max(1000000)
   monthlyPrice?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
+  @Max(12000000)
   yearlyPrice?: number;
 
   @IsOptional()
@@ -48,7 +55,7 @@ export class UpdateMembershipTierDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(1)
+  @Min(-1)
   maxTotalListings?: number;
 
   @IsOptional()
@@ -71,21 +78,15 @@ export class UpdateMembershipTierDto {
   isAdFree?: boolean;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  featuredListingSlots?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  commissionDiscount?: number;
-
-  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(10000)
+  sortOrder?: number;
 }
 
 export class CreateMembershipTierDto {
@@ -198,8 +199,8 @@ export class MembershipLimitsDto {
   canCreateCollection: boolean;
   isAdFree: boolean;
   maxImages: number;
-  maxFreeListings: number;      // Total max free listings for tier
-  maxTotalListings: number;     // Total max listings for tier
+  maxFreeListings: number; // Total max free listings for tier
+  maxTotalListings: number; // Total max listings for tier
   remainingFreeListings: number;
   remainingTotalListings: number;
   remainingFeaturedSlots: number;
@@ -209,4 +210,4 @@ export class MembershipLimitsDto {
 }
 
 // Re-export payment DTOs
-export * from './membership-payment.dto';
+export * from "./membership-payment.dto";

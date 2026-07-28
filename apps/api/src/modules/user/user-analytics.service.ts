@@ -9,7 +9,10 @@ import {
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { UserCommonService } from "./user-common.service";
-import { isPremiumEntitled } from "../membership/membership.util";
+import {
+  isBusinessMembershipEntitled,
+  isPremiumEntitled,
+} from "../membership/membership.util";
 import { i18nMessage } from "../i18n";
 
 /**
@@ -35,9 +38,18 @@ export class UserAnalyticsService {
     // uses the single source of truth: an active, in-period paid membership.
     const membership = await this.prisma.userMembership.findUnique({
       where: { userId },
-      include: { tier: true },
+      include: {
+        tier: true,
+        user: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+          },
+        },
+      },
     });
-    if (!isPremiumEntitled(membership)) {
+    if (!isPremiumEntitled(membership, membership?.user)) {
       throw new ForbiddenException(
         i18nMessage("server.membership.premiumFeatureOnly"),
       );
@@ -418,19 +430,9 @@ export class UserAnalyticsService {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
-    // Check if user has business tier
-    const hasBusinessTier = user.membership?.tier?.type === "business";
-    const hasCompanyName = !!user.companyName;
-
-    if (!hasBusinessTier) {
+    if (!isBusinessMembershipEntitled(user.membership, user)) {
       throw new BadRequestException(
         i18nMessage("server.user.businessFeatureOnly"),
-      );
-    }
-
-    if (!hasCompanyName) {
-      throw new BadRequestException(
-        i18nMessage("server.user.companyNameRequired"),
       );
     }
 

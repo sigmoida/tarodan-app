@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { isPremiumEntitled } from '../membership/membership.util';
-import { computeQualityScore } from './helpers/quality-score';
-import { computeRelevanceScore } from './helpers/relevance-score';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { isPremiumEntitled } from "../membership/membership.util";
+import { computeQualityScore } from "./helpers/quality-score";
+import { computeRelevanceScore } from "./helpers/relevance-score";
 
 /**
  * ProductRankingService — İlan Kalite Skoru + rankTier + relevanceScore yeniden
@@ -14,9 +14,7 @@ import { computeRelevanceScore } from './helpers/relevance-score';
 export class ProductRankingService {
   private readonly logger = new Logger(ProductRankingService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-  ) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * İlan Kalite Skoru + rankTier'ı yeniden hesaplar ve Product'a yazar.
@@ -41,7 +39,7 @@ export class ProductRankingService {
     // Satıcının onaylı ortalama güven puanı (0..5)
     let sellerRating: number | null = null;
     const ratingStats = await this.prisma.rating.aggregate({
-      where: { receiverId: product.sellerId, status: 'approved' },
+      where: { receiverId: product.sellerId, status: "approved" },
       _avg: { score: true },
       _count: true,
     });
@@ -66,9 +64,20 @@ export class ProductRankingService {
     } else {
       const membership = await this.prisma.userMembership.findUnique({
         where: { userId: product.sellerId },
-        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
+        select: {
+          status: true,
+          currentPeriodEnd: true,
+          tier: { select: { type: true, isActive: true } },
+          user: {
+            select: {
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+            },
+          },
+        },
       });
-      rankTier = isPremiumEntitled(membership) ? 1 : 0;
+      rankTier = isPremiumEntitled(membership, membership?.user) ? 1 : 0;
     }
 
     const relevanceScore = computeRelevanceScore({

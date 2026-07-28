@@ -23,13 +23,6 @@ export interface MembershipTier {
   userCount: number;
 }
 
-/** platform_settings monthly-price key — only paid tiers have one (free has none). */
-export const PRICE_KEY: Record<string, string> = {
-  basic: "basic_monthly_price",
-  premium: "premium_monthly_price",
-  business: "business_monthly_price",
-};
-
 /** Yearly price = monthly × 12 × (1 − discount%). */
 export const computedYearly = (monthly: number, discountPct: number) =>
   Math.round(monthly * 12 * (1 - discountPct / 100) * 100) / 100;

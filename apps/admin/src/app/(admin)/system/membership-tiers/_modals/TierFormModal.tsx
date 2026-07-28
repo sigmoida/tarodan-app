@@ -18,7 +18,6 @@ import {
   tierToForm,
   tierFormToPayload,
   computedYearly,
-  PRICE_KEY,
 } from "../_lib/types";
 
 /** Edit a membership tier. Mount with `key={tier.id}` so defaults seed fresh. */
@@ -48,12 +47,6 @@ export function TierFormModal({
           computedYearly(parseFloat(v.monthlyPrice) || 0, yearlyDiscount),
         ),
       );
-      const priceKey = PRICE_KEY[tier.type];
-      if (priceKey)
-        await adminApi.updateSetting(
-          priceKey,
-          String(parseFloat(v.monthlyPrice) || 0),
-        );
     },
     {
       invalidates: ["membership-tiers"],

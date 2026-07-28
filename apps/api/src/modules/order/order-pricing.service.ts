@@ -588,13 +588,14 @@ export class OrderPricingService {
       select: {
         sellerType: true,
         businessStatus: true,
+        companyName: true,
         taxId: true,
         membership: {
           select: {
             status: true,
             currentPeriodEnd: true,
             tier: {
-              select: { type: true },
+              select: { type: true, isActive: true },
             },
           },
         },
@@ -604,7 +605,10 @@ export class OrderPricingService {
     // Paid-tier commission (PREMIUM/BUSINESS) applies only to an ENTITLED membership.
     // A past_due / expired row (e.g. an unpaid upgrade) must NOT unlock the cheaper
     // paid-tier commission — gate the tier type through isPremiumEntitled first.
-    const effectiveTierType = isPremiumEntitled(seller?.membership ?? null)
+    const effectiveTierType = isPremiumEntitled(
+      seller?.membership ?? null,
+      seller,
+    )
       ? (seller?.membership?.tier?.type ?? null)
       : null;
 

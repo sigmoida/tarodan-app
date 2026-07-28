@@ -18,7 +18,6 @@ import {
 import { PaymentProvider } from "../payment/dto";
 import { Request } from "express";
 import { MembershipPaymentInitResponseDto } from "./dto/membership-payment.dto";
-import { isPremiumEntitled } from "./membership.util";
 import { MembershipCommonService } from "./membership-common.service";
 import { MembershipSubscriptionService } from "./membership-subscription.service";
 import { i18nMessage } from "../i18n";
@@ -295,9 +294,77 @@ export class MembershipService {
       );
     }
 
-    const updatedTier = await this.prisma.membershipTier.update({
-      where: { type: tierType },
-      data: dto,
+    if (!Object.values(dto).some((value) => value !== undefined)) {
+      throw new BadRequestException("En az bir alan güncellenmelidir");
+    }
+    if (
+      dto.maxTotalListings !== undefined &&
+      dto.maxTotalListings !== -1 &&
+      dto.maxTotalListings < 1
+    ) {
+      throw new BadRequestException(
+        "Toplam ilan limiti -1 veya en az 1 olmalıdır",
+      );
+    }
+    if (tier.type === MembershipTierType.free) {
+      if (dto.isActive === false) {
+        throw new BadRequestException(
+          "Ücretsiz üyelik seviyesi pasif yapılamaz",
+        );
+      }
+      if (
+        (dto.monthlyPrice !== undefined && dto.monthlyPrice !== 0) ||
+        (dto.yearlyPrice !== undefined && dto.yearlyPrice !== 0)
+      ) {
+        throw new BadRequestException(
+          "Ücretsiz üyelik fiyatları sıfır olmalıdır",
+        );
+      }
+    } else if (
+      (dto.monthlyPrice !== undefined && dto.monthlyPrice <= 0) ||
+      (dto.yearlyPrice !== undefined && dto.yearlyPrice <= 0)
+    ) {
+      throw new BadRequestException(
+        "Ücretli üyelik fiyatları sıfırdan büyük olmalıdır",
+      );
+    }
+
+    const updatedTier = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.membershipTier.update({
+        where: { type: tierType },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          monthlyPrice: dto.monthlyPrice,
+          yearlyPrice: dto.yearlyPrice,
+          maxFreeListings: dto.maxFreeListings,
+          maxTotalListings: dto.maxTotalListings,
+          maxImagesPerListing: dto.maxImagesPerListing,
+          canCreateCollections: dto.canCreateCollections,
+          canTrade: dto.canTrade,
+          isAdFree: dto.isAdFree,
+          isActive: dto.isActive,
+          sortOrder: dto.sortOrder,
+        },
+      });
+
+      if (
+        tier.type !== MembershipTierType.free &&
+        dto.monthlyPrice !== undefined
+      ) {
+        await tx.platformSetting.upsert({
+          where: { settingKey: `${tier.type}_monthly_price` },
+          update: { settingValue: String(dto.monthlyPrice) },
+          create: {
+            settingKey: `${tier.type}_monthly_price`,
+            settingValue: String(dto.monthlyPrice),
+            settingType: "number",
+            description: `${tier.name} monthly membership price`,
+          },
+        });
+      }
+
+      return updated;
     });
 
     return this.common.mapTierToDto(updatedTier);
@@ -386,34 +453,8 @@ export class MembershipService {
   async canCreateTrade(
     userId: string,
   ): Promise<{ allowed: boolean; reason?: string }> {
-    // Takas kapısı GERÇEK (satın alınan) tier'a bakar. getUserLimits, ödeme bekleyen (past_due)
-    // paralı üyeliği "free"ye düşürdüğü için premium üye takası yanlışlıkla engelleniyordu (BUG A).
-    // Bu yüzden ham üyeliği okuyup tier.canTrade'i kontrol ediyoruz; past_due (ödeme bekleyen)
-    // paralı üye de takas yapabilir. Sadece free / iptal / süresi dolmuş engellenir.
-    let membership = await this.prisma.userMembership.findUnique({
-      where: { userId },
-      include: { tier: true },
-    });
-    // Kayıt (register) userMembership satırı oluşturmaz; satır yalnızca
-    // getUserMembership ilk çağrıldığında lazy oluşturulur. canCreateTrade ham satırı
-    // okuduğu için, üyelik sayfasını hiç açmamış yeni free kullanıcı yanlışlıkla
-    // engelleniyordu. Satırı (free tier) garanti edip ÖYLE kontrol et — past_due
-    // premium hâlâ takas edebilsin diye sonra yine HAM tier/status okunur (BUG A).
-    if (!membership) {
-      await this.getUserMembership(userId); // free tier satırını lazy oluşturur
-      membership = await this.prisma.userMembership.findUnique({
-        where: { userId },
-        include: { tier: true },
-      });
-    }
-    // Premium hakkı tek doğruluk kaynağı isPremiumEntitled: ücretli tier + dönem
-    // bitmemiş + durum∈{active,cancelled}. past_due (ödeme onaylanmamış) takas yapamaz;
-    // ödeme onaylanınca status=active olur. tier.canTrade ayrıca tier yeteneğini doğrular.
-    if (
-      !membership ||
-      !isPremiumEntitled(membership) ||
-      !membership.tier?.canTrade
-    ) {
+    const limits = await this.getUserLimits(userId);
+    if (!limits.canTrade) {
       return {
         allowed: false,
         reason:

@@ -3,6 +3,7 @@ import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { CacheService } from "../cache/cache.service";
 import { UserCommonService } from "./user-common.service";
+import { isBusinessMembershipEntitled } from "../membership/membership.util";
 
 /**
  * Anasayfa öne çıkarma bölümlerinin (haftanın koleksiyoneri / haftanın şirketi /
@@ -417,11 +418,17 @@ export class UserDiscoveryService {
   } | null> {
     const sevenDaysAgo = featuredWindowStart();
 
-    // Find business users (membership.tier.type = 'business' AND companyName not null)
+    // Only effective, KYC-approved Business members are eligible for this placement.
     const businessMemberships = await this.prisma.userMembership.findMany({
       where: {
-        tier: { type: "business" },
-        status: "active",
+        tier: { type: "business", isActive: true },
+        status: { in: ["active", "cancelled"] },
+        currentPeriodEnd: { gt: new Date() },
+        user: {
+          businessStatus: "approved",
+          companyName: { not: null },
+          taxId: { not: null },
+        },
       },
       include: {
         user: {
@@ -436,28 +443,14 @@ export class UserDiscoveryService {
       },
     });
 
-    let businessUsers = businessMemberships
+    const businessUsers = businessMemberships
       .map((m) => m.user)
       .filter(
         (user) => user.companyName && user.isSeller && user._count.products > 0,
       );
 
     if (businessUsers.length === 0) {
-      const topSellers = await this.prisma.user.findMany({
-        where: {
-          isSeller: true,
-          products: { some: { status: "active" } },
-        },
-        include: {
-          _count: { select: { products: { where: { status: "active" } } } },
-        },
-        orderBy: { products: { _count: "desc" } },
-        take: 10,
-      });
-      businessUsers = topSellers.filter((u) => u._count.products > 0);
-      if (businessUsers.length === 0) {
-        return null;
-      }
+      return null;
     }
 
     // Score = views(1) + likes(5) + recentSales(20) + recentLikes(10) + recentUpdates(5)
@@ -522,10 +515,17 @@ export class UserDiscoveryService {
       where: { id: userId },
       include: {
         _count: { select: { products: { where: { status: "active" } } } },
+        membership: {
+          include: { tier: true },
+        },
       },
     });
 
-    if (!user || user._count.products === 0) {
+    if (
+      !user ||
+      user._count.products === 0 ||
+      !isBusinessMembershipEntitled(user.membership, user)
+    ) {
       return null;
     }
 

@@ -155,7 +155,7 @@ export class AdminUserController {
   }
 
   @Post("users/:id/membership/cancel")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Cancel a user membership (admin)" })
   @ApiParam({ name: "id", description: "User ID" })
@@ -167,7 +167,7 @@ export class AdminUserController {
   }
 
   @Patch("users/:id/membership")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin)
   @ApiOperation({
     summary: "Change a user's membership tier (admin override, no payment)",
   })
@@ -291,9 +291,9 @@ export class AdminUserController {
     return this.adminService.getMembershipTiers();
   }
 
-  // Pricing/limit edits are sensitive — restricted to super_admin/admin (no moderator).
+  // Pricing and entitlement changes directly affect charges and authorization.
   @Patch("membership-tiers/:id")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @Roles(AdminRole.super_admin)
   @ApiOperation({ summary: "Update membership tier" })
   @ApiParam({ name: "id", description: "Membership tier ID" })
   @ApiResponse({

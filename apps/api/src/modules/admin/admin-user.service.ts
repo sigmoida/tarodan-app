@@ -580,9 +580,7 @@ export class AdminUserService {
 
   /**
    * Admin: kullanıcının üyeliğini herhangi bir kademeye anında geçirir (ödeme YOK,
-   * admin override). subscribe'ın free-aktivasyon dalını yansıtır.
-   * NOT: business için şirket-hesabı (companyName/taxId) kuralı BİLİNÇLİ uygulanmaz —
-   * admin override mutlaktır.
+   * admin override). Business hakkı yalnız KYC onaylı şirkete verilebilir.
    */
   async adminChangeUserMembership(
     adminId: string,
@@ -592,7 +590,12 @@ export class AdminUserService {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true },
+      select: {
+        id: true,
+        businessStatus: true,
+        companyName: true,
+        taxId: true,
+      },
     });
     if (!user) {
       throw new NotFoundException("Kullanıcı bulunamadı");
@@ -605,6 +608,16 @@ export class AdminUserService {
     }
     if (!tier.isActive) {
       throw new BadRequestException("Bu üyelik kademesi aktif değil");
+    }
+    if (
+      tierType === MembershipTierType.business &&
+      (user.businessStatus !== "approved" ||
+        !user.companyName?.trim() ||
+        !user.taxId?.trim())
+    ) {
+      throw new BadRequestException(
+        "Business üyelik yalnız KYC onaylı şirket hesabına atanabilir",
+      );
     }
 
     const now = new Date();
@@ -630,6 +643,8 @@ export class AdminUserService {
       currentPeriodEnd: periodEnd,
       cancelledAt: null,
       autoRenew: false,
+      scheduledTierType: null,
+      scheduledBillingPeriod: null,
     };
 
     const updated = existing

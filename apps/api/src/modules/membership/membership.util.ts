@@ -1,4 +1,8 @@
-import { SubscriptionStatus, MembershipTierType } from '@prisma/client';
+import {
+  BusinessStatus,
+  SubscriptionStatus,
+  MembershipTierType,
+} from "@prisma/client";
 
 /**
  * Premium hakkı için TEK doğruluk kaynağı.
@@ -16,14 +20,25 @@ import { SubscriptionStatus, MembershipTierType } from '@prisma/client';
 export interface PremiumCheckMembership {
   status?: SubscriptionStatus | string | null;
   currentPeriodEnd?: Date | string | null;
-  tier?: { type?: MembershipTierType | string | null } | null;
+  tier?: {
+    type?: MembershipTierType | string | null;
+    isActive?: boolean | null;
+  } | null;
+}
+
+export interface BusinessEntitlementOwner {
+  businessStatus?: BusinessStatus | string | null;
+  companyName?: string | null;
+  taxId?: string | null;
 }
 
 export function isPremiumEntitled(
   membership: PremiumCheckMembership | null | undefined,
+  owner?: BusinessEntitlementOwner | null,
 ): boolean {
   if (!membership || !membership.tier) return false;
   if (membership.tier.type === MembershipTierType.free) return false;
+  if (membership.tier.isActive === false) return false;
   if (
     membership.status !== SubscriptionStatus.active &&
     membership.status !== SubscriptionStatus.cancelled
@@ -31,5 +46,41 @@ export function isPremiumEntitled(
     return false;
   }
   if (membership.currentPeriodEnd == null) return false;
-  return new Date(membership.currentPeriodEnd) > new Date();
+  if (new Date(membership.currentPeriodEnd) <= new Date()) return false;
+
+  if (membership.tier.type === MembershipTierType.business) {
+    if (!owner) return false;
+    return (
+      owner.businessStatus === BusinessStatus.approved &&
+      !!owner.companyName?.trim() &&
+      !!owner.taxId?.trim()
+    );
+  }
+
+  return true;
+}
+
+export function effectiveMembershipTierType(
+  membership: PremiumCheckMembership | null | undefined,
+  owner?: BusinessEntitlementOwner | null,
+): MembershipTierType {
+  if (
+    membership?.tier?.type === MembershipTierType.free ||
+    isPremiumEntitled(membership, owner)
+  ) {
+    return (membership?.tier?.type ??
+      MembershipTierType.free) as MembershipTierType;
+  }
+
+  return MembershipTierType.free;
+}
+
+export function isBusinessMembershipEntitled(
+  membership: PremiumCheckMembership | null | undefined,
+  owner: BusinessEntitlementOwner | null | undefined,
+): boolean {
+  return (
+    membership?.tier?.type === MembershipTierType.business &&
+    isPremiumEntitled(membership, owner)
+  );
 }

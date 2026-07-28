@@ -133,8 +133,7 @@ function useCollectionsValue(): CollectionsContextValue {
       ? publicQuery.isLoading && !publicQuery.data
       : myQuery.isLoading && !myQuery.data;
 
-  const canCreateCollection =
-    user?.membershipTier !== "free" || limits?.canCreateCollections;
+  const canCreateCollection = Boolean(limits?.canCreateCollections);
 
   const handleCreateClick = () => {
     if (!canCreateCollection) {

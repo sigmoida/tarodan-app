@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { MembershipTierType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 
@@ -82,28 +87,83 @@ export class AdminMembershipService {
       throw new NotFoundException("Üyelik seviyesi bulunamadı");
     }
 
+    if (!Object.values(dto).some((value) => value !== undefined)) {
+      throw new BadRequestException("En az bir alan güncellenmelidir");
+    }
+    if (
+      dto.maxTotalListings !== undefined &&
+      dto.maxTotalListings !== -1 &&
+      dto.maxTotalListings < 1
+    ) {
+      throw new BadRequestException(
+        "Toplam ilan limiti -1 veya en az 1 olmalıdır",
+      );
+    }
+    if (tier.type === MembershipTierType.free) {
+      if (dto.isActive === false) {
+        throw new BadRequestException(
+          "Ücretsiz üyelik seviyesi pasif yapılamaz",
+        );
+      }
+      if (
+        (dto.monthlyPrice !== undefined && dto.monthlyPrice !== 0) ||
+        (dto.yearlyPrice !== undefined && dto.yearlyPrice !== 0)
+      ) {
+        throw new BadRequestException(
+          "Ücretsiz üyelik fiyatları sıfır olmalıdır",
+        );
+      }
+    } else if (
+      (dto.monthlyPrice !== undefined && dto.monthlyPrice <= 0) ||
+      (dto.yearlyPrice !== undefined && dto.yearlyPrice <= 0)
+    ) {
+      throw new BadRequestException(
+        "Ücretli üyelik fiyatları sıfırdan büyük olmalıdır",
+      );
+    }
+
     const oldTier = { ...tier };
 
-    const updatedTier = await this.prisma.membershipTier.update({
-      where: { id: tierId },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        monthlyPrice:
-          dto.monthlyPrice !== undefined ? dto.monthlyPrice : undefined,
-        yearlyPrice:
-          dto.yearlyPrice !== undefined ? dto.yearlyPrice : undefined,
-        maxFreeListings: dto.maxFreeListings,
-        maxTotalListings: dto.maxTotalListings,
-        maxImagesPerListing: dto.maxImagesPerListing,
-        canCreateCollections: dto.canCreateCollections,
-        canTrade: dto.canTrade,
-        isAdFree: dto.isAdFree,
-        // featuredListingSlots + commissionDiscount are no longer admin-editable
-        // (dead entitlement / never applied); DB columns retained but left untouched.
-        isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
-      },
+    const updatedTier = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.membershipTier.update({
+        where: { id: tierId },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          monthlyPrice:
+            dto.monthlyPrice !== undefined ? dto.monthlyPrice : undefined,
+          yearlyPrice:
+            dto.yearlyPrice !== undefined ? dto.yearlyPrice : undefined,
+          maxFreeListings: dto.maxFreeListings,
+          maxTotalListings: dto.maxTotalListings,
+          maxImagesPerListing: dto.maxImagesPerListing,
+          canCreateCollections: dto.canCreateCollections,
+          canTrade: dto.canTrade,
+          isAdFree: dto.isAdFree,
+          // featuredListingSlots + commissionDiscount are no longer admin-editable
+          // (dead entitlement / never applied); DB columns retained but left untouched.
+          isActive: dto.isActive,
+          sortOrder: dto.sortOrder,
+        },
+      });
+
+      if (
+        tier.type !== MembershipTierType.free &&
+        dto.monthlyPrice !== undefined
+      ) {
+        await tx.platformSetting.upsert({
+          where: { settingKey: `${tier.type}_monthly_price` },
+          update: { settingValue: String(dto.monthlyPrice) },
+          create: {
+            settingKey: `${tier.type}_monthly_price`,
+            settingValue: String(dto.monthlyPrice),
+            settingType: "number",
+            description: `${tier.name} monthly membership price`,
+          },
+        });
+      }
+
+      return updated;
     });
 
     // Create audit log

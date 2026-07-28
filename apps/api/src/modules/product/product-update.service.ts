@@ -23,6 +23,7 @@ import {
 } from "../../common/helpers/email-template-renderer";
 import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
+import { isPremiumEntitled } from "../membership/membership.util";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -161,7 +162,10 @@ export class ProductUpdateService {
         include: { membership: { include: { tier: true } } },
       });
 
-      if (!seller?.membership?.tier?.canTrade) {
+      if (
+        !seller?.membership?.tier?.canTrade ||
+        !isPremiumEntitled(seller.membership, seller)
+      ) {
         throw new BadRequestException(
           i18nMessage("server.product.tradeRequiresPremium"),
         );

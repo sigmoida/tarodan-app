@@ -37,9 +37,7 @@ function NewTradeContent() {
     limits,
   } = useAuthStore();
 
-  const canTrade = limits
-    ? limits.canTrade
-    : ["basic", "premium", "business"].includes(user?.membershipTier ?? "");
+  const canTrade = Boolean(limits?.canTrade);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [cashAmount, setCashAmount] = useState("");
@@ -51,13 +49,13 @@ function NewTradeContent() {
     if (authLoading) return;
     if (!isAuthenticated) {
       router.push(`/login?redirect=/profile/trades/new?listing=${listingId}`);
-    } else if (limits !== null && !canTrade) {
+    } else if (!canTrade) {
       toast.error(t("trade.requiresPremium"));
       router.push("/membership");
     }
   }, [authLoading, isAuthenticated, limits, canTrade, listingId, router, t]);
 
-  const enabled = isAuthenticated && (limits === null || canTrade);
+  const enabled = isAuthenticated && canTrade;
   const { target, isLoading: targetLoading } = useTradeTarget(
     listingId,
     enabled,

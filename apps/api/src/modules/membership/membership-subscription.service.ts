@@ -100,7 +100,16 @@ export class MembershipSubscriptionService {
 
     const existingMembership = await this.prisma.userMembership.findUnique({
       where: { userId },
-      include: { tier: true },
+      include: {
+        tier: true,
+        user: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+          },
+        },
+      },
     });
 
     // Calculate period
@@ -127,7 +136,10 @@ export class MembershipSubscriptionService {
     // sürer. Dönem sonunda runAutoRenewals (ücretli hedef) veya checkExpiredMemberships
     // (free hedef / ödenmemiş) planlanan tier+periyoda geçirir. İlan limiti/takas/diğer
     // özellikler canlı hesaplandığı için yalnız gerçek geçiş anında değişir (tutarlı).
-    if (existingMembership && isPremiumEntitled(existingMembership)) {
+    if (
+      existingMembership &&
+      isPremiumEntitled(existingMembership, existingMembership.user)
+    ) {
       const curPeriodDays = Math.round(
         (existingMembership.currentPeriodEnd.getTime() -
           existingMembership.currentPeriodStart.getTime()) /
@@ -224,7 +236,10 @@ export class MembershipSubscriptionService {
     // açılır, (b) kullanıcı ödemeyi terk ederse mevcut ödenmiş hakkı bozulur. Bunun
     // yerine canlı satır olduğu gibi kalır; hedef tier'a ait sipariş açılır ve ödeme
     // onaylanınca fulfillment satırı ÖDENEN tier'a geçirir.
-    if (existingMembership && isPremiumEntitled(existingMembership)) {
+    if (
+      existingMembership &&
+      isPremiumEntitled(existingMembership, existingMembership.user)
+    ) {
       const paymentResult = await this.initiateMembershipPayment(
         userId,
         PaymentProvider.paytr,

@@ -157,8 +157,23 @@ export class ProductSchedulerService implements OnModuleInit {
         ? await this.prisma.userMembership.findMany({
             where: {
               userId: { in: sellerIds },
-              status: "active",
-              tier: { type: { not: MembershipTierType.free } },
+              status: { in: ["active", "cancelled"] },
+              currentPeriodEnd: { gt: new Date() },
+              tier: {
+                type: { not: MembershipTierType.free },
+                isActive: true,
+              },
+              OR: [
+                { tier: { type: { not: MembershipTierType.business } } },
+                {
+                  tier: { type: MembershipTierType.business },
+                  user: {
+                    businessStatus: "approved",
+                    companyName: { not: null },
+                    taxId: { not: null },
+                  },
+                },
+              ],
             },
             select: { userId: true },
           })
@@ -306,8 +321,23 @@ export class ProductSchedulerService implements OnModuleInit {
         const premiumMemberships = await this.prisma.userMembership.findMany({
           where: {
             userId: { in: sellerIds },
-            status: "active",
-            tier: { type: { not: MembershipTierType.free } },
+            status: { in: ["active", "cancelled"] },
+            currentPeriodEnd: { gt: now },
+            tier: {
+              type: { not: MembershipTierType.free },
+              isActive: true,
+            },
+            OR: [
+              { tier: { type: { not: MembershipTierType.business } } },
+              {
+                tier: { type: MembershipTierType.business },
+                user: {
+                  businessStatus: "approved",
+                  companyName: { not: null },
+                  taxId: { not: null },
+                },
+              },
+            ],
           },
           select: { userId: true },
         });

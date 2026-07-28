@@ -62,12 +62,7 @@ function useListingDetailValue() {
     fetchCart();
   }, [fetchCart]);
 
-  // Free members can't trade — Basic/Premium/Business can.
-  const canTrade =
-    limits?.canTrade ??
-    (user?.membershipTier === "basic" ||
-      user?.membershipTier === "premium" ||
-      user?.membershipTier === "business");
+  const canTrade = Boolean(limits?.canTrade);
 
   const isOwner = !!(
     isAuthenticated &&

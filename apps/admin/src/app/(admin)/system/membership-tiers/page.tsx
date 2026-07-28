@@ -8,6 +8,7 @@ import { TierCard } from "./_components/TierCard";
 import { YearlyDiscountForm } from "./_components/YearlyDiscountForm";
 import { TierFormModal } from "./_modals/TierFormModal";
 import { type MembershipTier } from "./_lib/types";
+import { useSession } from "@/context/SessionContext";
 import {
   membershipTiersFetcher,
   useMembershipTiersPage,
@@ -29,6 +30,8 @@ export default function MembershipTiersPage() {
 
 function MembershipTiersContent() {
   const t = useTranslations();
+  const { user } = useSession();
+  const canEdit = user.role === "super_admin";
   const {
     rows,
     yearlyDiscount,
@@ -67,10 +70,12 @@ function MembershipTiersContent() {
         <ResourceList.Search />
       </ResourceList.Toolbar>
 
-      <YearlyDiscountForm
-        value={yearlyDiscount}
-        loading={yearlyDiscountLoading}
-      />
+      {canEdit && (
+        <YearlyDiscountForm
+          value={yearlyDiscount}
+          loading={yearlyDiscountLoading}
+        />
+      )}
 
       {rows.length === 0 ? (
         <SectionCard>
@@ -86,7 +91,7 @@ function MembershipTiersContent() {
               tier={tier}
               yearlyDiscount={yearlyDiscount}
               yearlyDiscountLoading={yearlyDiscountLoading}
-              onEdit={() => setEditing(tier)}
+              onEdit={canEdit ? () => setEditing(tier) : undefined}
             />
           ))}
         </div>
@@ -94,7 +99,7 @@ function MembershipTiersContent() {
 
       <ResourceList.Pagination />
 
-      {editing && (
+      {canEdit && editing && (
         <TierFormModal
           key={editing.id}
           open

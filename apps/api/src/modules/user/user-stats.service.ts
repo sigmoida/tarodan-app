@@ -2,6 +2,10 @@ import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 import { i18nMessage } from "../i18n";
+import {
+  effectiveMembershipTierType,
+  isBusinessMembershipEntitled,
+} from "../membership/membership.util";
 
 /**
  * UserStatsService — özet istatistikler: isBusinessAccount,
@@ -14,10 +18,7 @@ export class UserStatsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Check if user is a business account
-   * Business = membershipTier.type = 'business' AND companyName is not null
-   */
+  /** Check whether the user has an effective, KYC-approved Business account. */
   async isBusinessAccount(userId: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -30,7 +31,7 @@ export class UserStatsService {
 
     if (!user) return false;
 
-    return user.membership?.tier?.type === "business" && !!user.companyName;
+    return isBusinessMembershipEntitled(user.membership, user);
   }
 
   /**
@@ -118,7 +119,16 @@ export class UserStatsService {
         where: { id: userId },
         select: {
           createdAt: true,
-          membership: { select: { tier: { select: { type: true } } } },
+          companyName: true,
+          taxId: true,
+          businessStatus: true,
+          membership: {
+            select: {
+              status: true,
+              currentPeriodEnd: true,
+              tier: { select: { type: true, isActive: true } },
+            },
+          },
         },
       }),
       this.prisma.product.count({
@@ -226,7 +236,7 @@ export class UserStatsService {
       totalRevenue: Number(revenueAgg._sum.totalAmount || 0),
       totalSpent: Number(spentAgg._sum.totalAmount || 0),
       memberSince: user.createdAt,
-      membershipTier: user.membership?.tier?.type || "free",
+      membershipTier: effectiveMembershipTierType(user.membership, user),
     };
   }
 }

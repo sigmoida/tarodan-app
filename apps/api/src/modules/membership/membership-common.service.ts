@@ -11,6 +11,7 @@ import { MembershipTierResponseDto, UserMembershipResponseDto } from "./dto";
 import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
 import { i18nMessage } from "../i18n";
+import { isPremiumEntitled } from "./membership.util";
 
 /**
  * MembershipCommonService — üyelik alt-servislerinin paylaştığı çekirdek okuma/
@@ -31,6 +32,18 @@ export class MembershipCommonService {
   // GET USER'S MEMBERSHIP
   // ==========================================================================
   async getUserMembership(userId: string): Promise<UserMembershipResponseDto> {
+    const entitlementOwner = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        businessStatus: true,
+        companyName: true,
+        taxId: true,
+      },
+    });
+    if (!entitlementOwner) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+
     let membership = await this.prisma.userMembership.findUnique({
       where: { userId },
       include: { tier: true },
@@ -67,8 +80,8 @@ export class MembershipCommonService {
       });
     }
 
-    // Ödeme beklerken (past_due) “satın alınmış” gibi gösterme: efektif planı ücretsiz yap
-    let effectiveTier = membership.tier;
+    // Ham abonelik kaydı ödeme/mutabakat için korunur; tüm özellik kapıları
+    // aşağıda hesaplanan efektif tier'ı kullanır.
     let pendingTierName: string | undefined;
     let pendingTierType: string | undefined;
     let pendingPayment = false;
@@ -148,16 +161,26 @@ export class MembershipCommonService {
           `Self-healed membership ${membership.id} past_due → active (paid order ${paidOrder.orderNumber})`,
         );
       } else {
-        const freeTier = await this.prisma.membershipTier.findUnique({
-          where: { type: MembershipTierType.free },
-        });
-        if (freeTier) {
-          effectiveTier = freeTier;
-          pendingTierName = membership.tier.name;
-          pendingTierType = membership.tier.type;
-          pendingPayment = true;
-        }
+        pendingTierName = membership.tier.name;
+        pendingTierType = membership.tier.type;
+        pendingPayment = true;
       }
+    }
+
+    let effectiveTier = { ...membership.tier };
+    if (
+      membership.tier.type !== MembershipTierType.free &&
+      !isPremiumEntitled(membership, entitlementOwner)
+    ) {
+      const freeTier = await this.prisma.membershipTier.findUnique({
+        where: { type: MembershipTierType.free },
+      });
+      if (!freeTier) {
+        throw new NotFoundException(
+          i18nMessage("server.membership.freeTierNotFound"),
+        );
+      }
+      effectiveTier = { ...freeTier };
     }
 
     // Map tier to DTO first

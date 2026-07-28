@@ -14,7 +14,10 @@ import {
 } from "@prisma/client";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { computeTrustScore } from "./helpers/trust-score";
-import { isPremiumEntitled } from "../membership/membership.util";
+import {
+  effectiveMembershipTierType,
+  isPremiumEntitled,
+} from "../membership/membership.util";
 import { i18nMessage } from "../i18n";
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -123,7 +126,19 @@ export class UserProfileService {
         },
       }),
     ]);
-    const isPremium = isPremiumEntitled(user.membership);
+    const isPremium = isPremiumEntitled(user.membership, user);
+    const freeTier = await this.prisma.membershipTier.findUnique({
+      where: { type: "free" },
+    });
+    if (!freeTier) {
+      throw new NotFoundException(
+        i18nMessage("server.membership.freeTierNotFound"),
+      );
+    }
+    const effectiveTier =
+      user.membership && (user.membership.tier.type === "free" || isPremium)
+        ? user.membership.tier
+        : freeTier;
     const trust = computeTrustScore({
       averageRating: ratingAgg._avg?.score || 0,
       totalRatings: ratingAgg._count,
@@ -138,17 +153,18 @@ export class UserProfileService {
     // capability. `isPremium` (isPremiumEntitled) is the single source of truth —
     // when it's false the tier is presented as free, while the real status/period is
     // still returned for display. Detailed plan/pending info lives in /membership/me.
-    const FREE_TIER_VIEW = {
-      type: "free",
-      name: "Ücretsiz",
-      maxFreeListings: 5,
-      maxTotalListings: 10,
-      maxImagesPerListing: 3,
-      canTrade: false,
-      canCreateCollections: false,
-      isAdFree: false,
-      featuredListingSlots: 0,
-      commissionDiscount: 0,
+    const effectiveTierView = {
+      id: effectiveTier.id,
+      type: effectiveTier.type,
+      name: effectiveTier.name,
+      maxFreeListings: effectiveTier.maxFreeListings,
+      maxTotalListings: effectiveTier.maxTotalListings,
+      maxImagesPerListing: effectiveTier.maxImagesPerListing,
+      canCreateCollections: effectiveTier.canCreateCollections,
+      canTrade: effectiveTier.canTrade,
+      isAdFree: effectiveTier.isAdFree,
+      featuredListingSlots: effectiveTier.featuredListingSlots,
+      commissionDiscount: effectiveTier.commissionDiscount,
     };
     const membershipInfo = user.membership
       ? {
@@ -156,24 +172,10 @@ export class UserProfileService {
           status: user.membership.status,
           currentPeriodStart: user.membership.currentPeriodStart,
           currentPeriodEnd: user.membership.currentPeriodEnd,
-          tier: isPremium
-            ? {
-                id: user.membership.tier.id,
-                type: user.membership.tier.type,
-                name: user.membership.tier.name,
-                maxFreeListings: user.membership.tier.maxFreeListings,
-                maxTotalListings: user.membership.tier.maxTotalListings,
-                maxImagesPerListing: user.membership.tier.maxImagesPerListing,
-                canCreateCollections: user.membership.tier.canCreateCollections,
-                canTrade: user.membership.tier.canTrade,
-                isAdFree: user.membership.tier.isAdFree,
-                featuredListingSlots: user.membership.tier.featuredListingSlots,
-                commissionDiscount: user.membership.tier.commissionDiscount,
-              }
-            : { id: user.membership.tier.id, ...FREE_TIER_VIEW },
+          tier: effectiveTierView,
         }
       : {
-          tier: FREE_TIER_VIEW,
+          tier: effectiveTierView,
           status: "active",
           expiresAt: null,
         };
@@ -646,7 +648,14 @@ export class UserProfileService {
         select: {
           status: true,
           currentPeriodEnd: true,
-          tier: { select: { type: true } },
+          tier: { select: { type: true, isActive: true } },
+          user: {
+            select: {
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+            },
+          },
         },
       }),
       this.prisma.collection.count({ where: collectionWhere }),
@@ -661,8 +670,11 @@ export class UserProfileService {
     );
 
     // Premium (ücretli, aktif) üyelik mi?
-    const membershipTier = membership?.tier.type ?? "free";
-    const isPremium = isPremiumEntitled(membership);
+    const isPremium = isPremiumEntitled(membership, membership?.user);
+    const membershipTier = effectiveMembershipTierType(
+      membership,
+      membership?.user,
+    );
 
     // Güven Skoru (0..100) — premium avantajı
     const trust = computeTrustScore({
