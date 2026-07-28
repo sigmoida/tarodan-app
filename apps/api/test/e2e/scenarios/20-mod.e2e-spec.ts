@@ -245,7 +245,10 @@ describe('20 — Moderasyon, Destek & Şikayet (MOD)', () => {
         .get('/api/support/admin/guest-contacts')
         .set(authHeader(admin))
         .expect(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.meta).toEqual(
+        expect.objectContaining({ page: 1, limit: 20, total: expect.any(Number) }),
+      );
     });
   });
 
@@ -567,22 +570,23 @@ describe('20 — Moderasyon, Destek & Şikayet (MOD)', () => {
         .get('/api/support/admin/tickets')
         .set(authHeader(admin))
         .expect(200);
-      expect(all.body.total).toBeGreaterThanOrEqual(2);
-      expect(all.body).toHaveProperty('page');
-      expect(all.body).toHaveProperty('pageSize');
+      expect(all.body.meta.total).toBeGreaterThanOrEqual(2);
+      expect(all.body.meta).toEqual(
+        expect.objectContaining({ page: 1, limit: 20, totalPages: expect.any(Number) }),
+      );
 
       const open = await request(server())
         .get('/api/support/admin/tickets?status=open')
         .set(authHeader(admin))
         .expect(200);
-      expect(open.body.tickets.every((t: any) => t.status === 'open')).toBe(true);
+      expect(open.body.data.every((t: any) => t.status === 'open')).toBe(true);
 
       const filtered = await request(server())
         .get('/api/support/admin/tickets?priority=urgent&category=payment')
         .set(authHeader(admin))
         .expect(200);
       expect(
-        filtered.body.tickets.every((t: any) => t.priority === 'urgent' && t.category === 'payment'),
+        filtered.body.data.every((t: any) => t.priority === 'urgent' && t.category === 'payment'),
       ).toBe(true);
     });
 
@@ -987,16 +991,18 @@ describe('20 — Moderasyon, Destek & Şikayet (MOD)', () => {
         .get('/api/user-reports/admin')
         .set(authHeader(admin))
         .expect(200);
-      expect(all.body).toHaveProperty('total');
-      expect(all.body).toHaveProperty('page');
-      expect(all.body).toHaveProperty('pageSize');
-      expect(all.body.reports[0]).toHaveProperty('reporter');
+      expect(all.body.meta).toEqual(
+        expect.objectContaining({ total: 1, page: 1, limit: 20, totalPages: 1 }),
+      );
+      expect(all.body.data[0]).toHaveProperty('reporter');
 
       const filtered = await request(server())
         .get('/api/user-reports/admin?status=pending&type=product')
         .set(authHeader(admin))
         .expect(200);
-      expect(filtered.body.reports.every((r: any) => r.status === 'pending' && r.type === 'product')).toBe(true);
+      expect(
+        filtered.body.data.every((r: any) => r.status === 'pending' && r.type === 'product'),
+      ).toBe(true);
     });
 
     scenario('MOD-074', async () => {
@@ -1620,12 +1626,13 @@ describe('20 — Moderasyon, Destek & Şikayet (MOD)', () => {
         .set(authHeader(moderator))
         .send({ nsfwThreshold: 0.7 })
         .expect(403);
-      // super_admin (matris bypass) → 200/201.
+      // super_admin matris kontrolünü geçer; test ortamında AI kapalı olduğundan servis 400 döner.
       const ok = await request(server())
         .post('/api/admin/moderation/ai-config')
         .set(authHeader(superAdmin))
-        .send({ nsfwThreshold: 0.7 });
-      expect([200, 201]).toContain(ok.status);
+        .send({ nsfwThreshold: 0.7 })
+        .expect(400);
+      expect(String(ok.body.message)).toMatch(/AI moderasyon kapalı/i);
     });
 
     scenario.skip(
