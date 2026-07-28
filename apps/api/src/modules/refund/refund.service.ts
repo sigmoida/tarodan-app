@@ -17,6 +17,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { PaymentService } from "../payment/payment.service";
+import { RefundPendingReconciliationException } from "../payment-providers/refund-errors";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
@@ -602,7 +603,11 @@ export class RefundService {
       refundResult = await this.paymentService.processRefund(
         rr.orderId,
         Number(rr.amount),
-        { skipRefundEvent: true, refundQuantity: rr.refundQuantity }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
+        {
+          skipRefundEvent: true,
+          refundQuantity: rr.refundQuantity,
+          idempotencyKey: `refund-request:${rr.id}`,
+        }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
       );
     } catch (err) {
       // processRefund BAŞARISIZ → claim'i GERİ AL (return_delivered) ki cron retry etsin.
@@ -1116,13 +1121,18 @@ export class RefundService {
       refundResult = await this.paymentService.processRefund(order.id, amount, {
         skipRefundEvent: true, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
         refundQuantity,
+        idempotencyKey: `refund-request:${created.id}`,
       });
     } catch (err) {
-      // Roll back the RefundRequest so the buyer can retry without hitting
-      // the "active duplicate" guard. Sürat cancel is idempotent on retry.
-      await this.prisma.refundRequest.delete({ where: { id: created.id } });
+      // A definite provider rejection can be retried as a new request. An
+      // unknown provider outcome must remain visible and blocked until the
+      // durable refund attempt is reconciled.
+      if (!(err instanceof RefundPendingReconciliationException)) {
+        await this.prisma.refundRequest.delete({ where: { id: created.id } });
+      }
       this.logger.warn(
-        `Instant refund failed for order ${order.orderNumber}, rolled back RefundRequest ${created.refundNumber}: ${(err as Error).message}`,
+        `Instant refund failed for order ${order.orderNumber}, RefundRequest ${created.refundNumber} ` +
+          `${err instanceof RefundPendingReconciliationException ? "retained for reconciliation" : "rolled back"}: ${(err as Error).message}`,
       );
       throw err;
     }

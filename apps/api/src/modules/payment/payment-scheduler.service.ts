@@ -132,13 +132,18 @@ export class PaymentSchedulerService implements OnModuleInit {
       }
     });
 
-    // MONEY-M4: PayTR iadesi yapılıp DB finalize'ı patlayan (refundInProgress marker'ı
-    // takılı) siparişleri finalize et — yoksa payment completed kalır, payout çift-kayıp.
+    // Recover only durable safe states. Ambiguous provider submissions are
+    // quarantined for manual reconciliation and are never resubmitted.
     await this.runStep("reconcileStuckRefundMarkers", async () => {
       const stuck = await this.paymentService.reconcileStuckRefundMarkers();
       if (stuck.recovered > 0) {
         this.logger.warn(
           `Stuck refund markers finalized: ${stuck.recovered} of ${stuck.checked}`,
+        );
+      }
+      if (stuck.manualReview > 0) {
+        this.logger.error(
+          `${stuck.manualReview} refund attempt(s) require manual provider reconciliation`,
         );
       }
     });

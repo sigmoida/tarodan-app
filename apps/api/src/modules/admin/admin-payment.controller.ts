@@ -102,6 +102,9 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
+  ManualRefundDto,
+  RefundAttemptQueryDto,
+  ResolveRefundAttemptDto,
 } from "./dto";
 
 @ApiTags("admin")
@@ -162,14 +165,36 @@ export class AdminPaymentController {
   async manualRefund(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
-    @Body() body: { amount?: number; reason?: string },
+    @Body() body: ManualRefundDto,
   ) {
     return this.adminService.manualRefund(
       adminId,
       id,
       body.amount,
       body.reason,
+      body.idempotencyKey,
     );
+  }
+
+  @Get("refund-attempts")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "List durable refund attempts" })
+  async getRefundAttempts(@Query() query: RefundAttemptQueryDto) {
+    return this.adminService.getRefundAttempts(query);
+  }
+
+  @Post("refund-attempts/:id/resolve")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Resolve a refund attempt after provider reconciliation",
+  })
+  async resolveRefundAttempt(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: ResolveRefundAttemptDto,
+  ) {
+    return this.adminService.resolveRefundAttempt(adminId, id, dto);
   }
 
   @Post("payments/:id/force-cancel")

@@ -1,14 +1,13 @@
-import {
-  Injectable,
-  BadRequestException,
-  HttpException,
-  Logger,
-} from "@nestjs/common";
+import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import { i18nMessage } from "../i18n";
 import type { IPaymentProvider } from "./payment-provider.interface";
 import { PAYMENT_PROVIDER_PAYTR } from "./payment-provider.interface";
+import {
+  ProviderRefundOutcomeUnknownException,
+  ProviderRefundRejectedException,
+} from "./refund-errors";
 
 // =============================================================================
 // PAYTR API TYPES
@@ -443,13 +442,13 @@ export class PayTRService implements IPaymentProvider {
       const rawText = await response.text();
       const data = this.parsePaytrJson<PayTRRefundResponse>(rawText);
       if (!data) {
-        throw new BadRequestException(
+        throw new ProviderRefundOutcomeUnknownException(
           i18nMessage("server.payment.refundResponseInvalid"),
         );
       }
 
       if (data.status !== "success") {
-        throw new BadRequestException(
+        throw new ProviderRefundRejectedException(
           data.err_msg || i18nMessage("server.payment.refundFailed"),
         );
       }
@@ -457,8 +456,15 @@ export class PayTRService implements IPaymentProvider {
       return data;
     } catch (error: any) {
       this.logger.error("PayTR refund error:", error);
-      if (error instanceof HttpException) throw error;
-      throw new BadRequestException(i18nMessage("server.payment.refundError"));
+      if (
+        error instanceof ProviderRefundRejectedException ||
+        error instanceof ProviderRefundOutcomeUnknownException
+      ) {
+        throw error;
+      }
+      throw new ProviderRefundOutcomeUnknownException(
+        i18nMessage("server.payment.refundError"),
+      );
     }
   }
 

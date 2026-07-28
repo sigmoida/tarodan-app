@@ -72,6 +72,8 @@ import {
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
   SellerApplicationQueryDto,
+  RefundAttemptQueryDto,
+  ResolveRefundAttemptDto,
   NotificationHistoryQueryDto,
   ScheduledNotificationQueryDto,
   ErrorLogQueryDto,
@@ -632,12 +634,30 @@ export class AdminService {
     paymentId: string,
     amount?: number,
     reason?: string,
+    idempotencyKey?: string,
   ) {
     return this.adminPaymentService.manualRefund(
       adminId,
       paymentId,
       amount,
       reason,
+      idempotencyKey,
+    );
+  }
+
+  async getRefundAttempts(query: RefundAttemptQueryDto) {
+    return this.adminPaymentService.getRefundAttempts(query);
+  }
+
+  async resolveRefundAttempt(
+    adminId: string,
+    attemptId: string,
+    dto: ResolveRefundAttemptDto,
+  ) {
+    return this.adminPaymentService.resolveRefundAttempt(
+      adminId,
+      attemptId,
+      dto,
     );
   }
 

@@ -92,8 +92,24 @@ export const financeApi = {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }) => api.get("/admin/payments/failed", { params }),
-  manualRefund: (id: string, data: { amount?: number; reason?: string }) =>
-    api.post(`/admin/payments/${id}/manual-refund`, data),
+  manualRefund: (
+    id: string,
+    data: {
+      amount?: number;
+      reason?: string;
+      idempotencyKey: string;
+    },
+  ) => api.post(`/admin/payments/${id}/manual-refund`, data),
+  getRefundAttempts: (status = "manual_review") =>
+    api.get("/admin/refund-attempts", { params: { status } }),
+  resolveRefundAttempt: (
+    id: string,
+    data: {
+      resolution: "provider_succeeded" | "provider_not_processed";
+      providerRefundId?: string;
+      note: string;
+    },
+  ) => api.post(`/admin/refund-attempts/${id}/resolve`, data),
   forceCancelPayment: (id: string, reason: string) =>
     api.post(`/admin/payments/${id}/force-cancel`, { reason }),
 

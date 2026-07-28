@@ -14,8 +14,11 @@ import {
   AdminPaymentQueryDto,
   AdminRefundHistoryQueryDto,
   PaymentStatisticsQueryDto,
+  RefundAttemptQueryDto,
+  ResolveRefundAttemptDto,
+  RefundAttemptResolution,
 } from "./dto";
-import { Prisma, PaymentStatus } from "@prisma/client";
+import { Prisma, PaymentStatus, RefundAttemptStatus } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
 
@@ -416,7 +419,11 @@ export class AdminPaymentService {
     paymentId: string,
     amount?: number,
     reason?: string,
+    idempotencyKey?: string,
   ) {
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException("Idempotency key is required");
+    }
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
@@ -441,6 +448,14 @@ export class AdminPaymentService {
     if (!payment.orderId) {
       // Trade nakit ödemesi → takas iade yolu (tam tutar; kısmi trade iadesi yok).
       if (payment.tradeCashPayment?.tradeId) {
+        if (
+          amount !== undefined &&
+          Math.abs(amount - Number(payment.amount)) > 0.01
+        ) {
+          throw new BadRequestException(
+            "Takas nakit ödemelerinde yalnız tam iade yapılabilir",
+          );
+        }
         const tradeId = payment.tradeCashPayment.tradeId;
         const res = await this.paymentService.refundTradeCashTracked(tradeId);
         await this.audit.createAuditLog(
@@ -473,12 +488,16 @@ export class AdminPaymentService {
       );
     }
 
-    const refundAmount = amount || Number(payment.amount);
+    const refundAmount = amount ?? Number(payment.amount);
+    if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+      throw new BadRequestException("İade tutarı geçersiz");
+    }
 
     // Process refund via PaymentService
     const refundResult = await this.paymentService.processRefund(
       payment.orderId,
       refundAmount,
+      { idempotencyKey },
     );
 
     // Log admin action
@@ -499,6 +518,81 @@ export class AdminPaymentService {
       ...refundResult,
       reason: reason || "Admin tarafından manuel iade",
     };
+  }
+
+  async getRefundAttempts(query: RefundAttemptQueryDto) {
+    return this.prisma.refundAttempt.findMany({
+      where: {
+        status: query.status ?? RefundAttemptStatus.manual_review,
+      },
+      include: {
+        order: { select: { id: true, orderNumber: true } },
+        trade: { select: { id: true, tradeNumber: true } },
+      },
+      orderBy: { updatedAt: "asc" },
+      take: 100,
+    });
+  }
+
+  async resolveRefundAttempt(
+    adminId: string,
+    attemptId: string,
+    dto: ResolveRefundAttemptDto,
+  ) {
+    const { attempt, updated } = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM refund_attempts WHERE id = ${attemptId} FOR UPDATE`;
+      const attempt = await tx.refundAttempt.findUnique({
+        where: { id: attemptId },
+      });
+      if (!attempt) throw new NotFoundException("İade denemesi bulunamadı");
+      if (
+        attempt.status !== RefundAttemptStatus.manual_review &&
+        attempt.status !== RefundAttemptStatus.submitting
+      ) {
+        throw new BadRequestException(
+          "Yalnız manuel inceleme bekleyen iade denemeleri çözülebilir",
+        );
+      }
+
+      const providerSucceeded =
+        dto.resolution === RefundAttemptResolution.provider_succeeded;
+      const updated = await tx.refundAttempt.update({
+        where: { id: attempt.id },
+        data: providerSucceeded
+          ? {
+              status: RefundAttemptStatus.succeeded,
+              providerRefundId:
+                dto.providerRefundId ?? attempt.providerRefundId,
+              providerResponse: {
+                manualVerification: true,
+                note: dto.note,
+                resolvedBy: adminId,
+              },
+              providerSucceededAt: attempt.providerSucceededAt ?? new Date(),
+              failureReason: null,
+            }
+          : {
+              status: RefundAttemptStatus.prepared,
+              failureReason: null,
+              requestStartedAt: null,
+            },
+      });
+      return { attempt, updated };
+    });
+    await this.audit.createAuditLog(
+      adminId,
+      "refund_attempt_resolved",
+      "RefundAttempt",
+      attempt.id,
+      { status: attempt.status, failureReason: attempt.failureReason },
+      {
+        status: updated.status,
+        resolution: dto.resolution,
+        providerRefundId: dto.providerRefundId,
+        note: dto.note,
+      },
+    );
+    return updated;
   }
 
   /**

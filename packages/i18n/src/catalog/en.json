@@ -3680,6 +3680,23 @@
         "refundReasonLabel": "Refund Reason (optional)",
         "refundReasonPlaceholder": "Refund reason...",
         "refundConfirm": "Refund",
+        "refundReconciliation": {
+          "action": "Refund Reconciliation",
+          "title": "Refund Reconciliation",
+          "description": "Refunds with an unresolved PayTR outcome",
+          "empty": "No refunds are awaiting manual review",
+          "target": "Order / Trade",
+          "providerReference": "PayTR Transaction",
+          "resolve": "Resolve",
+          "resolveTitle": "Resolve Refund Attempt",
+          "resolutionLabel": "PayTR Reconciliation Result",
+          "providerSucceeded": "Refund completed at PayTR",
+          "providerNotProcessed": "Refund was not processed at PayTR",
+          "providerRefundId": "PayTR Refund Reference",
+          "note": "Reconciliation Note",
+          "confirm": "Save Reconciliation",
+          "resolved": "Refund reconciliation saved"
+        },
         "status": {
           "pending": "Pending",
           "processing": "Processing",

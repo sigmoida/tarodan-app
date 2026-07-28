@@ -4,7 +4,10 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@tarodan/ui";
-import { ChartBarIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowPathRoundedSquareIcon,
+  ChartBarIcon,
+} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
@@ -29,6 +32,13 @@ export default function PaymentsPage() {
         title={t("admin.finance.payments.title")}
         description={t("admin.finance.payments.subtitle")}
       >
+        <Button
+          variant="secondary"
+          leftIcon={<ArrowPathRoundedSquareIcon className="h-5 w-5" />}
+          onClick={() => router.push("/finance/payments/refund-reconciliation")}
+        >
+          {t("admin.finance.payments.refundReconciliation.action")}
+        </Button>
         <Button
           variant="secondary"
           leftIcon={<ChartBarIcon className="h-5 w-5" />}

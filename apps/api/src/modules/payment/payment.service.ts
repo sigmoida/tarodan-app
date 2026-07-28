@@ -112,7 +112,11 @@ export class PaymentService {
   async processRefund(
     orderId: string,
     refundAmount?: number,
-    opts?: { skipRefundEvent?: boolean; refundQuantity?: number },
+    opts?: {
+      skipRefundEvent?: boolean;
+      refundQuantity?: number;
+      idempotencyKey?: string;
+    },
   ) {
     return this.paymentRefund.processRefund(orderId, refundAmount, opts);
   }
@@ -264,6 +268,7 @@ export class PaymentService {
   async reconcileStuckRefundMarkers(): Promise<{
     checked: number;
     recovered: number;
+    manualReview: number;
   }> {
     return this.paymentReconciliation.reconcileStuckRefundMarkers();
   }

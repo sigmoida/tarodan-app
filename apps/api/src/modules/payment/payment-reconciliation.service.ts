@@ -81,6 +81,7 @@ export class PaymentReconciliationService {
   reconcileStuckRefundMarkers(): Promise<{
     checked: number;
     recovered: number;
+    manualReview: number;
   }> {
     return this.refund.reconcileStuckRefundMarkers();
   }

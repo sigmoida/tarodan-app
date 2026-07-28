@@ -3680,6 +3680,23 @@
         "refundReasonLabel": "İade Nedeni (opsiyonel)",
         "refundReasonPlaceholder": "İade nedeni...",
         "refundConfirm": "İade Et",
+        "refundReconciliation": {
+          "action": "İade Mutabakatı",
+          "title": "İade Mutabakatı",
+          "description": "PayTR sonucu kesinleşmeyen iade işlemleri",
+          "empty": "Manuel inceleme bekleyen iade işlemi yok",
+          "target": "Sipariş / Takas",
+          "providerReference": "PayTR İşlem No",
+          "resolve": "Sonuçlandır",
+          "resolveTitle": "İade İşlemini Sonuçlandır",
+          "resolutionLabel": "PayTR Mutabakat Sonucu",
+          "providerSucceeded": "İade PayTR'da gerçekleşti",
+          "providerNotProcessed": "İade PayTR'da işlenmedi",
+          "providerRefundId": "PayTR İade Referansı",
+          "note": "Mutabakat Notu",
+          "confirm": "Mutabakatı Kaydet",
+          "resolved": "İade mutabakatı kaydedildi"
+        },
         "status": {
           "pending": "Bekliyor",
           "processing": "İşleniyor",

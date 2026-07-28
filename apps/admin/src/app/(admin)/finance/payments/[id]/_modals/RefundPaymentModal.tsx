@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Modal, ModalFooter, Input, Textarea } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -19,12 +19,14 @@ export function RefundPaymentModal({
   const t = useTranslations();
   const [refundAmount, setRefundAmount] = useState("");
   const [reason, setReason] = useState("");
+  const idempotencyKey = useRef(crypto.randomUUID()).current;
 
   const refund = useAdminMutation(
     () =>
       adminApi.manualRefund(paymentId, {
         amount: refundAmount ? parseFloat(refundAmount) : undefined,
         reason: reason || undefined,
+        idempotencyKey,
       }),
     {
       invalidates: ["payments"],

@@ -1,9 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { Prisma } from "@prisma/client";
-import { PaymentStatus, OrderStatus, ShipmentStatus } from "@prisma/client";
+import {
+  PaymentStatus,
+  OrderStatus,
+  ShipmentStatus,
+  RefundAttemptStatus,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { PaymentRefundService } from "./payment-refund.service";
-import { asPaymentMetadata } from "./payment-metadata.types";
 
 /**
  * İade odaklı mutabakat süpürmeleri (cron). PaymentReconciliationService facade'i
@@ -127,70 +131,115 @@ export class RefundReconciliationService {
     return { refunded, failed };
   }
 
-  /**
-   * MONEY-M4: `refundInProgressOrders` marker'ı yazılıp PayTR iadesi YAPILDIKTAN sonra
-   * DB tx'i (finalize) hiç çalışmayan siparişleri toparlar. Böyle bir sipariş için para
-   * PayTR'de iade edildi ama payment `completed` kaldı → payout cron satıcıya ödeyebilir
-   * (çift kayıp). Marker başarılı finalize'da temizlendiğinden (undefined), marker HÂLÂ
-   * duran orderId'ler gerçekten takılıdır. processRefund'ı marker'daki TUTAR ile çağırırız:
-   * PayTR atlanır (marker recovered) ve tx bu sefer finalize eder. İdempotent.
-   */
   async reconcileStuckRefundMarkers(): Promise<{
     checked: number;
     recovered: number;
+    manualReview: number;
   }> {
-    const candidates = await this.prisma.payment.findMany({
+    const candidates = await this.prisma.refundAttempt.findMany({
       where: {
-        provider: "paytr",
-        metadata: {
-          path: ["refundInProgressOrders"],
-          not: Prisma.DbNull,
+        orderId: { not: null },
+        status: {
+          in: [RefundAttemptStatus.prepared, RefundAttemptStatus.succeeded],
         },
       },
-      select: { id: true, metadata: true },
+      orderBy: { createdAt: "asc" },
       take: 50,
     });
 
     let checked = 0;
     let recovered = 0;
-    for (const p of candidates) {
-      const meta = asPaymentMetadata(p.metadata);
-      const inProgress = meta.refundInProgressOrders || {};
-      // Finding 1: Takılı = marker VAR (finalize başarıda marker'ı siler → hâlâ duruyorsa
-      // PayTR yapıldı ama tx finalize etmedi). Eski `!(oid in refundedOrders)` guard'ı
-      // YANLIŞTI: MONEY-H4 tek ödemede çoklu kısmi iadeye izin verdiğinden, önceki bir
-      // kısmi iade refundedOrders'a yazılınca sonraki takılı marker'ı elerdi (sessizce
-      // toparlanmazdı). processRefund'ın marker-skip'i (Fix 1a) order başına ≤1 marker
-      // garantiler → her marker tek bir takılı iadedir; hepsini finalize et.
-      const stuckOrderIds = Object.keys(inProgress);
-      for (const orderId of stuckOrderIds) {
-        checked++;
-        try {
-          // Marker'daki tutar (yeni format {amount,at}); eski/timestamp formatında
-          // undefined → processRefund tam iade varsayar (eski davranış).
-          const stored = inProgress[orderId];
-          const amount =
-            stored && typeof stored === "object" && "amount" in stored
-              ? Number((stored as { amount: number }).amount)
-              : undefined;
-          await this.paymentRefund.processRefund(orderId, amount);
-          recovered++;
-          this.logger.warn(
-            `STUCK_REFUND_RECOVERED: refundInProgress marker finalize edildi ` +
-              `order=${orderId} payment=${p.id} amount=${amount ?? "full"}`,
+    for (const attempt of candidates) {
+      if (!attempt.orderId) continue;
+      checked++;
+      try {
+        const result = await this.paymentRefund.processRefund(
+          attempt.orderId,
+          Number(attempt.amount),
+          { idempotencyKey: attempt.idempotencyKey },
+        );
+        const refundRequestPrefix = "refund-request:";
+        if (attempt.idempotencyKey.startsWith(refundRequestPrefix)) {
+          const refundRequestId = attempt.idempotencyKey.slice(
+            refundRequestPrefix.length,
           );
-        } catch (e: any) {
-          this.logger.error(
-            `reconcileStuckRefundMarkers: order ${orderId} recovery başarısız (payment=${p.id}): ${e?.message}`,
-          );
+          await this.prisma.refundRequest.updateMany({
+            where: {
+              id: refundRequestId,
+              status: { not: RefundRequestStatus.refunded },
+            },
+            data: {
+              status: RefundRequestStatus.refunded,
+              refundedAt: new Date(),
+              providerRefundId: result?.providerRefundId ?? null,
+            },
+          });
         }
+        recovered++;
+        this.logger.warn(
+          `REFUND_ATTEMPT_RECOVERED: attempt=${attempt.id} order=${attempt.orderId} ` +
+            `payment=${attempt.paymentId} previousStatus=${attempt.status}`,
+        );
+      } catch (e: any) {
+        this.logger.error(
+          `Refund attempt recovery failed attempt=${attempt.id} order=${attempt.orderId}: ${e?.message}`,
+        );
       }
+    }
+
+    const tradeCandidates = await this.prisma.refundAttempt.findMany({
+      where: {
+        tradeId: { not: null },
+        status: {
+          in: [RefundAttemptStatus.prepared, RefundAttemptStatus.succeeded],
+        },
+      },
+      orderBy: { createdAt: "asc" },
+      take: 50,
+    });
+    for (const attempt of tradeCandidates) {
+      if (!attempt.tradeId) continue;
+      checked++;
+      try {
+        const result =
+          await this.paymentRefund.refundTradeCashPaymentIfCompleted(
+            attempt.tradeId,
+          );
+        if (result.refunded) recovered++;
+      } catch (e: any) {
+        this.logger.error(
+          `Trade refund attempt recovery failed attempt=${attempt.id} trade=${attempt.tradeId}: ${e?.message}`,
+        );
+      }
+    }
+
+    const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
+    const markedUnknown = await this.prisma.refundAttempt.updateMany({
+      where: {
+        status: RefundAttemptStatus.submitting,
+        requestStartedAt: { lt: staleBefore },
+      },
+      data: {
+        status: RefundAttemptStatus.manual_review,
+        failureReason:
+          "Refund submission ended without a durable provider response",
+      },
+    });
+    const manualReview = await this.prisma.refundAttempt.count({
+      where: { status: RefundAttemptStatus.manual_review },
+    });
+
+    if (markedUnknown.count > 0 || manualReview > 0) {
+      this.logger.error(
+        `REFUND_MANUAL_REVIEW: ${manualReview} unresolved refund attempt(s); ` +
+          `${markedUnknown.count} stale submission(s) newly quarantined`,
+      );
     }
     if (recovered > 0) {
       this.logger.warn(
-        `Stuck refund marker taraması: ${recovered}/${checked} finalize edildi`,
+        `Refund attempt reconciliation: ${recovered}/${checked} recovered`,
       );
     }
-    return { checked, recovered };
+    return { checked, recovered, manualReview };
   }
 }

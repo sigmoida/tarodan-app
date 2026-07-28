@@ -14,6 +14,7 @@ import {
   OrderStatus,
   TradeStatus,
   RefundRequestStatus,
+  RefundAttemptStatus,
 } from "@prisma/client";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
@@ -34,6 +35,11 @@ import {
 import { LedgerService } from "../ledger/ledger.service";
 import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
+import {
+  ProviderRefundOutcomeUnknownException,
+  ProviderRefundRejectedException,
+  RefundPendingReconciliationException,
+} from "../payment-providers/refund-errors";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -97,121 +103,233 @@ export class PaymentRefundService {
     );
   }
 
-  /**
-   * 11.2b — Atomik iade "slot" claim'i (eşzamanlı kısmi-iade çift-PayTR koruması).
-   *
-   * Payment satırını `FOR UPDATE` ile kilitler, `metadata`'yı TX İÇİNDE TAZE okur (çağıranın
-   * elindeki stale in-memory snapshot değil), sonra KİLİT ALTINDA: (a) kümülatif tavanı taze
-   * `refundedOrders`'a göre doğrular, (b) order-başı `refundInProgressOrders` marker'ını
-   * kontrol eder — yoksa MONEY-M4 formatında (amount+at) yazar. Kilit tx commit'iyle serbest
-   * kalır; PayTR çağrısı DIŞARIDA yapılır (HTTP gecikmesi kilidi tutmaz). Aynı marker/CAS/
-   * clearRefundInProgress sözleşmesi korunur (obje truthy marker; tutar farklıysa reddet).
-   *
-   * @returns `"proceed"` marker yeni yazıldı → PayTR çağır · `"recovered"` marker zaten vardı
-   *          (aynı tutar) → PayTR atla, persist-recovery. Reddi `BadRequestException` ile atar.
-   */
-  private async claimRefundSlot(
+  private async claimRefundAttempt(
     paymentId: string,
     orderId: string,
     amountToRefund: number,
     refundCap: number,
     isGroupPayment: boolean,
-  ): Promise<"proceed" | "recovered"> {
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        // Payment satırını kilitle — eşzamanlı claim'ler burada serileşir.
-        await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
-        const fresh = await tx.payment.findUnique({
-          where: { id: paymentId },
-          select: { metadata: true },
-        });
-        const meta = (fresh?.metadata as Record<string, any>) || {};
-        const inProgressOrders =
-          (meta.refundInProgressOrders as Record<
-            string,
-            { amount?: number; at?: string } | string
-          >) || {};
-        const refundedOrders =
-          (meta.refundedOrders as Record<string, number>) || {};
-
-        // Kümülatif tavan — TAZE refundedOrders (kilit altında) → cap race'i kapatır.
-        if (isGroupPayment) {
-          if (refundedOrders[orderId]) {
-            throw new BadRequestException(
-              i18nMessage("server.payment.orderAlreadyRefunded"),
-            );
-          }
-        } else {
-          const prior = Number(refundedOrders[orderId] || 0);
-          if (prior + amountToRefund > refundCap + MONEY_EPSILON) {
-            throw new BadRequestException(
-              i18nMessage("server.payment.refundAmountExceedsLimit", {
-                amountToRefund,
-                refundCap: Math.max(
-                  Math.round((refundCap - prior) * 100) / 100,
-                  0,
-                ),
-              }),
-            );
-          }
-        }
-
-        const existingMarker = inProgressOrders[orderId];
-        if (existingMarker) {
-          // Finding 1: marker order-BAŞINA; MONEY-H4 tek ödemede çoklu kısmi iadeye izin verir.
-          // Marker tutarı YENİ tutardan FARKLIYSA başka (takılı) bir iadeye aittir → "recovered"
-          // sanıp PayTR'ı atlarsak SAHTE iade olur. Tutar eşitse gerçek retry (kurtarma).
-          const markerAmount =
-            existingMarker &&
-            typeof existingMarker === "object" &&
-            typeof existingMarker.amount === "number"
-              ? existingMarker.amount
-              : undefined;
-          if (
-            markerAmount !== undefined &&
-            Math.abs(markerAmount - amountToRefund) > MONEY_EPSILON
-          ) {
-            this.logger.warn(
-              `claimRefundSlot: order ${orderId} için farklı tutarlı iade kurtarma bekliyor ` +
-                `(marker=${markerAmount}, istenen=${amountToRefund}) — REDDEDİLDİ (payment=${paymentId}).`,
-            );
-            throw new BadRequestException(
-              i18nMessage("server.payment.refundInitiationFailed"),
-            );
-          }
-          return "recovered" as const;
-        }
-
-        // Marker'ı KİLİT ALTINDA + TAZE meta üzerine yaz (concurrent clobber yok).
-        await tx.payment.update({
-          where: { id: paymentId },
-          data: {
-            metadata: {
-              ...meta,
-              refundInProgressOrders: {
-                ...inProgressOrders,
-                [orderId]: {
-                  amount: amountToRefund,
-                  at: new Date().toISOString(),
-                },
-              },
-            },
-          },
-        });
-        return "proceed" as const;
+    idempotencyKey: string,
+    provider: string,
+    providerReference: string,
+  ): Promise<{
+    action: "submit" | "finalize" | "done";
+    attempt: {
+      id: string;
+      status: RefundAttemptStatus;
+      providerRefundId: string | null;
+      providerResponse: Prisma.JsonValue | null;
+    };
+  }> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+      const fresh = await tx.payment.findUnique({
+        where: { id: paymentId },
+        select: { metadata: true },
       });
-    } catch (e) {
-      // Reddi (cap/marker) aynen ilet; DB/kilit hatasında para hareketi OLMADAN abort et
-      // (orijinal marker-yazım-hatası davranışıyla simetrik → çağıran güvenle retry eder).
-      if (e instanceof BadRequestException) throw e;
-      this.logger.error(
-        `claimRefundSlot: kilit/marker tx hatası, PayTR çağrısı yapılmadan abort ` +
-          `(payment=${paymentId}, order=${orderId}): ${(e as Error)?.message}`,
-      );
-      throw new BadRequestException(
+      const meta = (fresh?.metadata as Record<string, any>) || {};
+      const refundedOrders =
+        (meta.refundedOrders as Record<string, number>) || {};
+
+      if (isGroupPayment && refundedOrders[orderId]) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderAlreadyRefunded"),
+        );
+      }
+      if (!isGroupPayment) {
+        const prior = Number(refundedOrders[orderId] || 0);
+        if (prior + amountToRefund > refundCap + MONEY_EPSILON) {
+          throw new BadRequestException(
+            i18nMessage("server.payment.refundAmountExceedsLimit", {
+              amountToRefund,
+              refundCap: Math.max(
+                Math.round((refundCap - prior) * 100) / 100,
+                0,
+              ),
+            }),
+          );
+        }
+      }
+
+      let attempt = await tx.refundAttempt.findUnique({
+        where: { idempotencyKey },
+      });
+      if (attempt) {
+        if (
+          attempt.paymentId !== paymentId ||
+          attempt.orderId !== orderId ||
+          Math.abs(Number(attempt.amount) - amountToRefund) > MONEY_EPSILON
+        ) {
+          throw new BadRequestException(
+            i18nMessage("server.payment.refundInitiationFailed"),
+          );
+        }
+        if (attempt.status === RefundAttemptStatus.finalized) {
+          return { action: "done" as const, attempt };
+        }
+        if (attempt.status === RefundAttemptStatus.succeeded) {
+          return { action: "finalize" as const, attempt };
+        }
+        if (
+          attempt.status === RefundAttemptStatus.submitting ||
+          attempt.status === RefundAttemptStatus.manual_review
+        ) {
+          throw new RefundPendingReconciliationException(
+            i18nMessage("server.payment.refundInitiationFailed"),
+          );
+        }
+        if (attempt.status === RefundAttemptStatus.failed) {
+          attempt = await tx.refundAttempt.update({
+            where: { id: attempt.id },
+            data: {
+              status: RefundAttemptStatus.prepared,
+              failureReason: null,
+              requestStartedAt: null,
+            },
+          });
+        }
+        return { action: "submit" as const, attempt };
+      }
+
+      const unresolved = await tx.refundAttempt.findFirst({
+        where: {
+          paymentId,
+          orderId,
+          status: {
+            in: [
+              RefundAttemptStatus.prepared,
+              RefundAttemptStatus.submitting,
+              RefundAttemptStatus.succeeded,
+              RefundAttemptStatus.manual_review,
+            ],
+          },
+        },
+      });
+      if (unresolved) {
+        throw new RefundPendingReconciliationException(
+          i18nMessage("server.payment.refundInitiationFailed"),
+        );
+      }
+
+      attempt = await tx.refundAttempt.create({
+        data: {
+          paymentId,
+          orderId,
+          idempotencyKey,
+          amount: amountToRefund,
+          provider,
+          providerReference,
+        },
+      });
+      return { action: "submit" as const, attempt };
+    });
+  }
+
+  private async startRefundSubmission(attemptId: string): Promise<void> {
+    const started = await this.prisma.refundAttempt.updateMany({
+      where: { id: attemptId, status: RefundAttemptStatus.prepared },
+      data: {
+        status: RefundAttemptStatus.submitting,
+        requestStartedAt: new Date(),
+      },
+    });
+    if (started.count !== 1) {
+      throw new RefundPendingReconciliationException(
         i18nMessage("server.payment.refundInitiationFailed"),
       );
     }
+  }
+
+  private async claimTradeRefundAttempt(
+    paymentId: string,
+    tradeId: string,
+    amount: number,
+    provider: string,
+    providerReference: string,
+  ): Promise<{
+    action: "submit" | "finalize" | "done";
+    attempt: {
+      id: string;
+      status: RefundAttemptStatus;
+      providerRefundId: string | null;
+      providerResponse: Prisma.JsonValue | null;
+    };
+  }> {
+    const idempotencyKey = `trade-cash-refund:${paymentId}`;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+      let attempt = await tx.refundAttempt.findUnique({
+        where: { idempotencyKey },
+      });
+      if (attempt) {
+        if (
+          attempt.paymentId !== paymentId ||
+          attempt.tradeId !== tradeId ||
+          Math.abs(Number(attempt.amount) - amount) > MONEY_EPSILON
+        ) {
+          throw new BadRequestException(
+            i18nMessage("server.payment.refundInitiationFailed"),
+          );
+        }
+        if (attempt.status === RefundAttemptStatus.finalized) {
+          return { action: "done" as const, attempt };
+        }
+        if (attempt.status === RefundAttemptStatus.succeeded) {
+          return { action: "finalize" as const, attempt };
+        }
+        if (
+          attempt.status === RefundAttemptStatus.submitting ||
+          attempt.status === RefundAttemptStatus.manual_review
+        ) {
+          throw new RefundPendingReconciliationException(
+            i18nMessage("server.payment.refundInitiationFailed"),
+          );
+        }
+        if (attempt.status === RefundAttemptStatus.failed) {
+          attempt = await tx.refundAttempt.update({
+            where: { id: attempt.id },
+            data: {
+              status: RefundAttemptStatus.prepared,
+              failureReason: null,
+              requestStartedAt: null,
+            },
+          });
+        }
+        return { action: "submit" as const, attempt };
+      }
+
+      const unresolved = await tx.refundAttempt.findFirst({
+        where: {
+          paymentId,
+          tradeId,
+          status: {
+            in: [
+              RefundAttemptStatus.prepared,
+              RefundAttemptStatus.submitting,
+              RefundAttemptStatus.succeeded,
+              RefundAttemptStatus.manual_review,
+            ],
+          },
+        },
+      });
+      if (unresolved) {
+        throw new RefundPendingReconciliationException(
+          i18nMessage("server.payment.refundInitiationFailed"),
+        );
+      }
+
+      attempt = await tx.refundAttempt.create({
+        data: {
+          paymentId,
+          tradeId,
+          idempotencyKey,
+          amount,
+          provider,
+          providerReference,
+        },
+      });
+      return { action: "submit" as const, attempt };
+    });
   }
 
   /**
@@ -289,12 +407,16 @@ export class PaymentRefundService {
   async processRefund(
     orderId: string,
     refundAmount?: number,
-    opts?: { skipRefundEvent?: boolean; refundQuantity?: number },
+    opts?: {
+      skipRefundEvent?: boolean;
+      refundQuantity?: number;
+      idempotencyKey?: string;
+    },
   ) {
     let payment = await this.prisma.payment.findFirst({
       where: {
         orderId,
-        status: PaymentStatus.completed,
+        status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
       },
       include: {
         order: true,
@@ -315,7 +437,7 @@ export class PaymentRefundService {
       payment = await this.prisma.payment.findFirst({
         where: {
           checkoutGroupId: refundTargetOrder.checkoutGroupId,
-          status: PaymentStatus.completed,
+          status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
         },
         include: { order: true },
       });
@@ -334,10 +456,15 @@ export class PaymentRefundService {
 
     // Grup ödemesinde varsayılan iade tutarı SİPARİŞİN tutarıdır (grubun değil)
     const amountToRefund =
-      refundAmount ||
+      refundAmount ??
       (isGroupPayment
         ? Number(refundTargetOrder!.totalAmount)
         : Number(payment.amount));
+    if (!Number.isFinite(amountToRefund) || amountToRefund <= 0) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.refundInitiationFailed"),
+      );
+    }
 
     // O12: İade tutarı üst sınırı. Aksi halde tek çağrıda işlem tutarından FAZLA iade
     // talep edilebilir (yalnız PayTR reddi engelliyordu). Üst sınır = ilgili siparişin
@@ -351,6 +478,50 @@ export class PaymentRefundService {
           amountToRefund,
           refundCap,
         }),
+      );
+    }
+
+    if (payment.provider !== PaymentProvider.paytr) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.unknownProvider", {
+          provider: payment.provider,
+        }),
+      );
+    }
+    const idempotencyKey =
+      opts?.idempotencyKey?.trim() ||
+      (amountToRefund >= refundCap - MONEY_EPSILON
+        ? `full-refund:${payment.id}:${orderId}`
+        : undefined);
+    if (!idempotencyKey) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.refundInitiationFailed"),
+      );
+    }
+    const priorAttempt = await this.prisma.refundAttempt.findUnique({
+      where: { idempotencyKey },
+    });
+    if (priorAttempt?.status === RefundAttemptStatus.finalized) {
+      if (
+        priorAttempt.paymentId !== payment.id ||
+        priorAttempt.orderId !== orderId ||
+        Math.abs(Number(priorAttempt.amount) - amountToRefund) > MONEY_EPSILON
+      ) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.refundInitiationFailed"),
+        );
+      }
+      return {
+        success: true,
+        paymentId: payment.id,
+        refundAmount: amountToRefund,
+        providerRefundId: priorAttempt.providerRefundId ?? undefined,
+        idempotent: true,
+      };
+    }
+    if (payment.status !== PaymentStatus.completed) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.orderAlreadyRefunded"),
       );
     }
 
@@ -383,6 +554,35 @@ export class PaymentRefundService {
           }),
         );
       }
+    }
+
+    const paytrOid = payment.providerConversationId?.trim() ?? "";
+    if (!paytrOid) {
+      this.logger.error(
+        `processRefund: captured merchant_oid is missing payment=${payment.id} order=${orderId}`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.payment.paytrRefundFailed"),
+      );
+    }
+    const refundAttempt = await this.claimRefundAttempt(
+      payment.id,
+      orderId,
+      amountToRefund,
+      refundCap,
+      isGroupPayment,
+      idempotencyKey,
+      payment.provider,
+      paytrOid,
+    );
+    if (refundAttempt.action === "done") {
+      return {
+        success: true,
+        paymentId: payment.id,
+        refundAmount: amountToRefund,
+        providerRefundId: refundAttempt.attempt.providerRefundId ?? undefined,
+        idempotent: true,
+      };
     }
 
     // Çift-ödeme koruması (K1). Bunu PayTR/Sürat'a dokunmadan ÖNCE yap.
@@ -418,6 +618,16 @@ export class PaymentRefundService {
       },
     });
     if (inFlightPayout) {
+      await this.prisma.refundAttempt.updateMany({
+        where: {
+          id: refundAttempt.attempt.id,
+          status: RefundAttemptStatus.prepared,
+        },
+        data: {
+          status: RefundAttemptStatus.manual_review,
+          failureReason: `payout_${inFlightPayout.status}`,
+        },
+      });
       // Para satıcıya gitti/gidiyor → otomatik iade çift-ödeme olur. Borç/negatif-bakiye
       // (clawback) defteri henüz YOK (ertelendi) → iade OTOMATİK yapılamaz; satıcıdan
       // manuel geri-tahsilat gerekir. Ops aksiyon alabilsin diye AÇIKÇA logla (F2.2).
@@ -432,22 +642,20 @@ export class PaymentRefundService {
       );
     }
 
-    // MONEY-M3: PayTR gerçekten iade etti mi? Payout'ları PayTR'den ÖNCE void ettik
-    // (order_refunded). Refund PayTR'de PATLARSA (para çıkmadı) catch'te void'i geri
-    // alırız ki satıcı ödenebilsin. PayTR başardıysa (bypass dahil) geri ALMAYIZ.
     let paytrRefunded = false;
+    let providerOutcomeUncertain = false;
     try {
-      // Call provider refund API
       let refundResult: any;
-
-      if (payment.provider === "paytr") {
-        // PAYMENT_BYPASS: dev/test modunda PayTR callback olmadan ödeme tamamlandığı
-        // için PayTR tarafında oid kaydı yok. Refund'ı da bypass'la — DB'de payment
-        // direkt refunded olarak işaretlenir; provider çağrısı atlanır.
-        // 11.1b (G3/SEC-H1): PROD'da bypass ASLA aktif değil — completion'daki SEC-H1 ile
-        // simetrik ikinci savunma hattı. main.ts boot-guard'ı yalnız API process'inde koşar;
-        // refund cron'ları WORKER process'inde çalışır (o guard'ı çağırmaz). Yanlış env'de
-        // flag "true" olsa bile gerçek PayTR iadesi yapılır → "iade edildi" ama para gitmedi olmaz.
+      if (refundAttempt.action === "finalize") {
+        refundResult = (refundAttempt.attempt.providerResponse as Record<
+          string,
+          unknown
+        >) || {
+          status: "success",
+          recovered: true,
+        };
+      } else {
+        await this.startRefundSubmission(refundAttempt.attempt.id);
         const bypassEnabled =
           process.env.NODE_ENV !== "production" &&
           this.configService.get("PAYMENT_BYPASS") === "true";
@@ -462,67 +670,26 @@ export class PaymentRefundService {
             bypass: true,
           };
         } else {
-          // O-B3: Çift-iade koruması (order yolu — trade-cash B3 ile aynı desen). PayTR
-          // idempotency anahtarı taşımaz: PayTR iadesi YAPILIP tx persist edilemezse
-          // reconciliation cron order'ı (payment.status hâlâ completed) tekrar seçip
-          // processRefund'ı çağırır → PayTR TEKRAR tetiklenir → çift iade. Marker'ı
-          // PayTR'den ÖNCE kalıcı yaz; marker zaten varsa PayTR'yi ATLA, doğrudan tx
-          // persist-recovery'ye geç. Grup ödemesinde tek payment birden çok siparişi
-          // kapsadığından marker SİPARİŞ BAŞINA tutulur (refundedOrders map'i gibi) —
-          // kardeş siparişin markerı bu siparişin PayTR çağrısını engellemesin.
-          // 11.2b: iade "slot" claim'i ATOMİK — payment satırını FOR UPDATE ile kilitle,
-          // metadata'yı TAZE oku (in-memory stale snapshot değil), kümülatif tavan + order-başı
-          // marker'ı KİLİT ALTINDA kontrol et, yoksa marker'ı yaz. Böylece EŞZAMANLI kısmi
-          // iadeler artık marker'ı yarışarak oku-yaz edemez → çift-PayTR penceresi kapanır.
-          // PayTR çağrısı kilit DIŞINDA (aşağıda) yapılır — HTTP gecikmesi DB kilidini tutmaz.
-          const claim = await this.claimRefundSlot(
-            payment.id,
-            orderId,
-            amountToRefund,
-            refundCap,
-            isGroupPayment,
-          );
-          if (claim === "recovered") {
-            this.logger.warn(
-              `processRefund: refundInProgressOrders[${orderId}] zaten set — PayTR ` +
-                `çağrısı atlanıyor, yalnız persist-recovery denenecek (payment=${payment.id}).`,
-            );
-            refundResult = {
-              status: "success",
-              err_msg: null,
-              return_amount: amountToRefund,
-              recovered: true,
-            };
-          } else {
-            const paytrOid =
-              payment.providerConversationId?.trim() ||
-              orderId.replace(/-/g, "");
-            try {
-              refundResult = await this.paymentProviders
-                .resolve(payment.provider)
-                .createRefund(paytrOid, amountToRefund);
-              // Gözlemlenebilirlik: PayTR iade yanıtını denetim günlüğüne yaz (dispute/
-              // muhasebe). createRefund başarısızlıkta THROW eder → buraya ulaşmak = başarı.
-              await this.providerEvents.record({
-                eventType: "refund",
-                merchantOid: paytrOid,
-                paymentId: payment.id,
-                status: refundResult?.status ?? "success",
-                amount: amountToRefund,
-                totalAmount: amountToRefund,
-                raw: refundResult as unknown as Record<string, unknown>,
+          try {
+            refundResult = await this.paymentProviders
+              .resolve(payment.provider)
+              .createRefund(paytrOid, amountToRefund);
+          } catch (err) {
+            const reason = (err as Error).message || "refund request failed";
+            if (err instanceof ProviderRefundRejectedException) {
+              await this.prisma.refundAttempt.updateMany({
+                where: {
+                  id: refundAttempt.attempt.id,
+                  status: RefundAttemptStatus.submitting,
+                },
+                data: {
+                  status: RefundAttemptStatus.failed,
+                  failureReason: reason,
+                },
               });
-            } catch (err) {
-              // PayTR KESİN başarısız (throw) → marker'ı geri al ki kullanıcı/cron tekrar
-              // denediğinde PayTR yeniden çağrılsın (yoksa iade edilmeden refunded işaretlenir;
-              // "1-2 dakika sonra tekrar deneyin" akışı bozulur).
-              await this.clearRefundInProgress(payment.id, orderId).catch(
-                () => {},
-              );
-              const msg = (err as Error).message || "";
               if (
                 /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
-                  msg,
+                  reason,
                 )
               ) {
                 throw new BadRequestException(
@@ -532,27 +699,62 @@ export class PaymentRefundService {
               throw err;
             }
 
-            if (refundResult.status !== "success") {
-              // Kesin ret → marker geri al (retry PayTR'yi tekrar çağırabilsin).
-              await this.clearRefundInProgress(payment.id, orderId).catch(
-                () => {},
-              );
-              throw new BadRequestException(
-                refundResult.err_msg ||
-                  i18nMessage("server.payment.paytrRefundFailed"),
-              );
-            }
+            providerOutcomeUncertain = true;
+            await this.prisma.refundAttempt
+              .updateMany({
+                where: {
+                  id: refundAttempt.attempt.id,
+                  status: RefundAttemptStatus.submitting,
+                },
+                data: {
+                  status: RefundAttemptStatus.manual_review,
+                  failureReason: reason,
+                },
+              })
+              .catch(() => undefined);
+            throw err instanceof ProviderRefundOutcomeUnknownException
+              ? err
+              : new RefundPendingReconciliationException(reason);
           }
         }
-      } else {
-        throw new BadRequestException(
-          i18nMessage("server.payment.unknownProvider", {
-            provider: payment.provider,
-          }),
-        );
+
+        // Provider success is persisted before any order/hold/ledger mutation.
+        // A crash after this point is safely recoverable without calling PayTR again.
+        paytrRefunded = true;
+        const providerRefundId =
+          refundResult?.paymentId || refundResult?.merchant_oid || null;
+        const persisted = await this.prisma.refundAttempt.updateMany({
+          where: {
+            id: refundAttempt.attempt.id,
+            status: RefundAttemptStatus.submitting,
+          },
+          data: {
+            status: RefundAttemptStatus.succeeded,
+            providerRefundId,
+            providerResponse: refundResult as Prisma.InputJsonValue,
+            providerSucceededAt: new Date(),
+          },
+        });
+        if (persisted.count !== 1) {
+          providerOutcomeUncertain = true;
+          throw new RefundPendingReconciliationException(
+            i18nMessage("server.payment.refundInitiationFailed"),
+          );
+        }
+        await this.providerEvents.record({
+          eventType: "refund",
+          merchantOid: paytrOid,
+          paymentId: payment.id,
+          status: refundResult?.status ?? "success",
+          amount: amountToRefund,
+          totalAmount: amountToRefund,
+          raw: {
+            ...(refundResult as Record<string, unknown>),
+            refundAttemptId: refundAttempt.attempt.id,
+          },
+        });
       }
 
-      // PayTR (veya bypass) iade BAŞARILI — bu noktadan sonra void'i geri ALMA.
       paytrRefunded = true;
 
       // Update payment status after successful refund
@@ -564,6 +766,18 @@ export class PaymentRefundService {
           // kardeş iadeler aynı eski snapshot'ı okuyup birbirini EZMESİN diye payment
           // satırını kilitle ve metadata'yı TX İÇİNDE taze oku (lost-update guard).
           await tx.$queryRaw`SELECT id FROM payments WHERE id = ${payment.id} FOR UPDATE`;
+          await tx.$queryRaw`SELECT id FROM refund_attempts WHERE id = ${refundAttempt.attempt.id} FOR UPDATE`;
+          const freshAttempt = await tx.refundAttempt.findUnique({
+            where: { id: refundAttempt.attempt.id },
+          });
+          if (freshAttempt?.status === RefundAttemptStatus.finalized) {
+            return null;
+          }
+          if (freshAttempt?.status !== RefundAttemptStatus.succeeded) {
+            throw new RefundPendingReconciliationException(
+              i18nMessage("server.payment.refundInitiationFailed"),
+            );
+          }
           const freshPayment = await tx.payment.findUnique({
             where: { id: payment.id },
             select: { metadata: true },
@@ -572,26 +786,6 @@ export class PaymentRefundService {
           const auditHistory = existingMetadata.auditHistory || [];
           const currentRefundedOrders: Record<string, number> =
             (existingMetadata.refundedOrders as Record<string, number>) || {};
-
-          // Finding 2: MARKER-tabanlı iade idempotency. PayTR (non-bypass) yolunda marker
-          // PayTR'den ÖNCE yazılır ve finalize'da bu tx içinde silinir. Bu FOR UPDATE
-          // okumasında marker ARTIK YOKSA, EŞZAMANLI başka bir çağrı (recovery/finalize)
-          // bu iadeyi zaten finalize etmiştir → tekrar birikim (hold/ledger/refundedOrders
-          // ÇİFT tüketimi) YAPMA, idempotent no-op dön. Hem recovery-recovery hem taze-refund
-          // ⇄ recovery yarışını kapatır. (Bypass'ta marker yok → bu dal çalışmaz.)
-          if (!refundResult?.bypass) {
-            const stillMarked = (
-              existingMetadata.refundInProgressOrders as
-                Record<string, unknown> | undefined
-            )?.[orderId];
-            if (!stillMarked) {
-              this.logger.warn(
-                `processRefund: order ${orderId} iadesi eşzamanlı olarak zaten finalize ` +
-                  `edilmiş (marker yok) — idempotent no-op (payment=${payment.id}).`,
-              );
-              return null;
-            }
-          }
 
           // Kısmi iade birikimi: sipariş başına iade TOPLANIR. Grup zaten order
           // başına biriktiriyordu; MONEY-H4: tekil ödemede de biriktir — aksi halde
@@ -622,18 +816,6 @@ export class PaymentRefundService {
             Number(refundedOrders[orderId] || 0) >=
             orderRefundThreshold - MONEY_EPSILON;
 
-          // MONEY-M4: bu sipariş finalize edildi → refundInProgressOrders marker'ından
-          // sil. Böylece reconcileStuckRefundMarkers sweep'i yalnız GERÇEKTEN takılı
-          // (PayTR yapıldı ama tx hiç finalize etmedi) marker'ları görür; başarılı
-          // iadelerin marker'ı birikmez.
-          const refundInProgressAfter = {
-            ...((existingMetadata.refundInProgressOrders as Record<
-              string,
-              unknown
-            >) || {}),
-          };
-          delete refundInProgressAfter[orderId];
-
           await tx.payment.update({
             where: { id: payment.id },
             data: {
@@ -643,12 +825,6 @@ export class PaymentRefundService {
                 refundAmount: totalRefunded,
                 refundedAt: new Date().toISOString(),
                 refundResult,
-                // Boşsa key'i DÜŞÜR (undefined → JSON'da yok) ki sweep sorgusu
-                // başarılı iadelerin boş marker'larıyla şişmesin.
-                refundInProgressOrders:
-                  Object.keys(refundInProgressAfter).length > 0
-                    ? refundInProgressAfter
-                    : undefined,
                 // MONEY-H4: tekilde de persist et — kümülatif iade takibi ve tavan
                 // kontrolü buna dayanır (yoksa art arda kısmi iadeler biriktirilemez).
                 refundedOrders,
@@ -859,7 +1035,10 @@ export class PaymentRefundService {
             paymentId: payment.id,
             refundAmount: amountToRefund,
             providerRefundId:
-              refundResult.paymentId || refundResult.merchant_oid,
+              refundResult.paymentId ||
+              refundResult.merchant_oid ||
+              freshAttempt.providerRefundId ||
+              undefined,
           };
 
           // 11.2d: iade sonucu bildirimleri (payment.refunded / order_cancelled) artık
@@ -890,6 +1069,14 @@ export class PaymentRefundService {
               dedupeKey: `${OUTBOX_INVOICE_REFUND_REVERSE}:${orderId}`,
             });
           }
+
+          await tx.refundAttempt.update({
+            where: { id: freshAttempt.id },
+            data: {
+              status: RefundAttemptStatus.finalized,
+              finalizedAt: new Date(),
+            },
+          });
 
           return refundResponse;
         })
@@ -943,7 +1130,11 @@ export class PaymentRefundService {
       // başardıysa (paytrRefunded=true) void kalır — para iade edildi, satıcı ödenmemeli.
       // Finding 3: yalnız BU çağrının void'lediği ID'leri restore et — önceki bir başarılı
       // iadenin void'lediği bayat payout'u diriltip satıcıyı çift ödemeyelim.
-      if (!paytrRefunded && voidedPayoutIds.length > 0) {
+      if (
+        !paytrRefunded &&
+        !providerOutcomeUncertain &&
+        voidedPayoutIds.length > 0
+      ) {
         await this.prisma.payoutTransfer
           .updateMany({
             where: {
@@ -955,55 +1146,25 @@ export class PaymentRefundService {
           })
           .catch(() => undefined);
       }
+      if (!paytrRefunded && !providerOutcomeUncertain) {
+        await this.prisma.payoutTransfer
+          .updateMany({
+            where: {
+              paymentHold: { orderId },
+              status: "failed",
+              failureReason: "refund_pending",
+            },
+            data: { status: "pending", failureReason: null },
+          })
+          .catch(() => undefined);
+      }
+      if (paytrRefunded || providerOutcomeUncertain) {
+        throw error instanceof RefundPendingReconciliationException
+          ? error
+          : new RefundPendingReconciliationException(error.message);
+      }
       throw error;
     }
-  }
-
-  /**
-   * O-B3 marker geri-alma: PayTR KESİN başarısız olduğunda ilgili siparişin
-   * refundInProgressOrders marker'ını siler ki retry PayTR'yi yeniden çağırabilsin.
-   * Fresh metadata okur → yalnız bu siparişin key'ini kaldırır (kardeş siparişlerin
-   * marker'larını korur). Best-effort: hatası iade akışını bozmaz (çağıran .catch'ler).
-   */
-  private async clearRefundInProgress(
-    paymentId: string,
-    orderId: string,
-  ): Promise<void> {
-    const p = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      select: { metadata: true },
-    });
-    const meta = (p?.metadata as Record<string, any>) || {};
-    const inProgressOrders = {
-      ...((meta.refundInProgressOrders as Record<string, string>) || {}),
-    };
-    if (!(orderId in inProgressOrders)) return;
-    delete inProgressOrders[orderId];
-    await this.prisma.payment.update({
-      where: { id: paymentId },
-      data: { metadata: { ...meta, refundInProgressOrders: inProgressOrders } },
-    });
-  }
-
-  /**
-   * MONEY-H1 marker geri-alma (takas-nakit yolu). PayTR başarılı DÖNMEDİĞİNDE
-   * refundInProgressAt scalar marker'ını siler ki retry PayTR'yi yeniden çağırabilsin.
-   * Fresh metadata okur (kaybolan-güncelleme guard'ı). clearRefundInProgress'in
-   * (order yolu, sipariş-bazlı map) takas eşleniğidir. Best-effort: hatası iade
-   * akışını bozmaz (çağıran .catch'ler).
-   */
-  private async clearTradeRefundInProgress(paymentId: string): Promise<void> {
-    const p = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      select: { metadata: true },
-    });
-    const meta = (p?.metadata as Record<string, any>) || {};
-    if (!("refundInProgressAt" in meta)) return;
-    delete meta.refundInProgressAt;
-    await this.prisma.payment.update({
-      where: { id: paymentId },
-      data: { metadata: meta },
-    });
   }
 
   /**
@@ -1046,20 +1207,6 @@ export class PaymentRefundService {
       };
     }
 
-    // Race condition guard: eğer zaten PayoutTransfer oluşturulmuş ve processing/completed ise iade yapma
-    const existingPayout = await this.prisma.payoutTransfer.findFirst({
-      where: {
-        tradeCashPaymentId: payment.tradeCashPaymentId,
-        status: { in: ["completed", "processing"] },
-      },
-    });
-    if (existingPayout) {
-      return {
-        refunded: false,
-        skippedReason: "payout_already_in_progress",
-      };
-    }
-
     // FLOW-M5: iade GERÇEKTEN çekilen merchant_oid ile yapılmalı = tamamlanan
     // ödemenin providerConversationId'si (capture anında çekilen oid'e senkronlanır).
     // Eski `tradeId.replace(/-/g,"")` fallback'i UUID'yi oid sanıyordu (gerçek oid
@@ -1073,74 +1220,150 @@ export class PaymentRefundService {
       payment.tradeCashPayment?.totalAmount ?? payment.amount,
     );
 
-    // B3: Çift-iade koruması. PayTR çağrısı idempotency anahtarı taşımadığından,
-    // PayTR iadesi YAPILIP refundedAt persist edilemezse sonraki çağrı PayTR'yi
-    // tekrar tetikleyebilir. Bunu önlemek için PayTR'den ÖNCE payment.metadata'ya
-    // kalıcı bir "refundInProgressAt" marker'ı yazıyoruz. Marker zaten varsa, önceki
-    // bir denemede PayTR çağrısı yapılmış demektir → PayTR'yi ATLA, doğrudan
-    // persist-recovery'ye geç (yalnız refundedAt'i set et).
     const existingMeta = (payment.metadata as Record<string, unknown>) || {};
-    const refundAlreadyInitiated = Boolean(existingMeta.refundInProgressAt);
+    if (!oid) {
+      this.logger.error(
+        `refundTradeCashPaymentIfCompleted: providerConversationId yok — iade oid'i ` +
+          `belirlenemiyor (tradeId=${tradeId}, paymentId=${payment.id}). Manuel inceleme gerekir.`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.payment.paytrRefundFailed"),
+      );
+    }
+    const refundAttempt = await this.claimTradeRefundAttempt(
+      payment.id,
+      tradeId,
+      amount,
+      payment.provider,
+      oid,
+    );
+    if (refundAttempt.action === "done") {
+      return { refunded: true, paymentId: payment.id };
+    }
 
-    // PAYMENT_BYPASS: dev/test modunda PayTR'a refund çağrısı yapma.
-    // 11.1b (G3/SEC-H1): PROD'da ASLA aktif değil (worker refund cron'ları için ikinci
-    // savunma hattı) — yanlış env'de gerçek PayTR trade iadesi çalışır.
+    await this.prisma.payoutTransfer.updateMany({
+      where: {
+        tradeCashPaymentId: payment.tradeCashPaymentId,
+        status: { in: ["pending", "retry_pending"] },
+      },
+      data: {
+        status: "failed",
+        failureReason: "trade_refund_pending",
+      },
+    });
+    const existingPayout = await this.prisma.payoutTransfer.findFirst({
+      where: {
+        tradeCashPaymentId: payment.tradeCashPaymentId,
+        status: { in: ["completed", "processing"] },
+      },
+    });
+    if (existingPayout) {
+      await this.prisma.refundAttempt.updateMany({
+        where: {
+          id: refundAttempt.attempt.id,
+          status: RefundAttemptStatus.prepared,
+        },
+        data: {
+          status: RefundAttemptStatus.manual_review,
+          failureReason: `payout_${existingPayout.status}`,
+        },
+      });
+      return {
+        refunded: false,
+        skippedReason: "payout_already_in_progress",
+      };
+    }
+
     const bypassEnabled =
       process.env.NODE_ENV !== "production" &&
       this.configService.get("PAYMENT_BYPASS") === "true";
-    if (refundAlreadyInitiated) {
-      this.logger.warn(
-        `refundTradeCashPaymentIfCompleted: refundInProgressAt zaten set — PayTR çağrısı atlanıyor, ` +
-          `yalnız persist-recovery denenecek (tradeId=${tradeId}, paymentId=${payment.id}).`,
-      );
-    } else if (bypassEnabled) {
-      this.logger.warn(
-        `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,
-      );
-    } else {
-      // FLOW-M5: gerçek PayTR yolunda oid ZORUNLU — yanlış/boş oid'le çekim yapma.
-      if (!oid) {
-        this.logger.error(
-          `refundTradeCashPaymentIfCompleted: providerConversationId yok — iade oid'i ` +
-            `belirlenemiyor (tradeId=${tradeId}, paymentId=${payment.id}). Manuel inceleme gerekir.`,
+    let refundResult =
+      (refundAttempt.attempt.providerResponse as Record<string, unknown>) ||
+      null;
+    if (refundAttempt.action === "submit") {
+      await this.startRefundSubmission(refundAttempt.attempt.id);
+      if (bypassEnabled) {
+        this.logger.warn(
+          `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,
         );
-        throw new BadRequestException(
-          i18nMessage("server.payment.paytrRefundFailed"),
-        );
+        refundResult = { status: "success", bypass: true };
+      } else {
+        try {
+          refundResult = (await this.paymentProviders
+            .resolve(payment.provider)
+            .createRefund(oid, amount)) as unknown as Record<string, unknown>;
+        } catch (e: any) {
+          const reason = e?.message || "trade refund request failed";
+          if (e instanceof ProviderRefundRejectedException) {
+            await this.prisma.refundAttempt.updateMany({
+              where: {
+                id: refundAttempt.attempt.id,
+                status: RefundAttemptStatus.submitting,
+              },
+              data: {
+                status: RefundAttemptStatus.failed,
+                failureReason: reason,
+              },
+            });
+            await this.prisma.payoutTransfer.updateMany({
+              where: {
+                tradeCashPaymentId: payment.tradeCashPaymentId,
+                status: "failed",
+                failureReason: {
+                  in: ["refund_pending", "trade_refund_pending"],
+                },
+              },
+              data: { status: "pending", failureReason: null },
+            });
+            if (
+              /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
+                reason,
+              )
+            ) {
+              throw new BadRequestException(
+                i18nMessage("server.payment.paymentNotYetSynced"),
+              );
+            }
+            throw e;
+          }
+          await this.prisma.refundAttempt
+            .updateMany({
+              where: {
+                id: refundAttempt.attempt.id,
+                status: RefundAttemptStatus.submitting,
+              },
+              data: {
+                status: RefundAttemptStatus.manual_review,
+                failureReason: reason,
+              },
+            })
+            .catch(() => undefined);
+          throw new RefundPendingReconciliationException(reason);
+        }
       }
-      // Marker'ı PayTR'den ÖNCE kalıcı yaz. Bu yazım başarısızsa para hareketi
-      // olmadan abort et — çağıran güvenle tekrar deneyebilir.
-      try {
-        await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            metadata: {
-              ...existingMeta,
-              refundInProgressAt: new Date().toISOString(),
-            },
-          },
-        });
-        existingMeta.refundInProgressAt = new Date().toISOString();
-      } catch (markerErr: any) {
-        this.logger.error(
-          `refundTradeCashPaymentIfCompleted: refundInProgressAt marker yazılamadı, ` +
-            `PayTR çağrısı yapılmadan abort (tradeId=${tradeId}): ${markerErr?.message}`,
-        );
-        throw new BadRequestException(
+
+      const providerRefundId =
+        (refundResult?.paymentId as string | undefined) ||
+        (refundResult?.merchant_oid as string | undefined) ||
+        null;
+      const persisted = await this.prisma.refundAttempt.updateMany({
+        where: {
+          id: refundAttempt.attempt.id,
+          status: RefundAttemptStatus.submitting,
+        },
+        data: {
+          status: RefundAttemptStatus.succeeded,
+          providerRefundId,
+          providerResponse: refundResult as Prisma.InputJsonValue,
+          providerSucceededAt: new Date(),
+        },
+      });
+      if (persisted.count !== 1) {
+        throw new RefundPendingReconciliationException(
           i18nMessage("server.payment.refundInitiationFailed"),
         );
       }
       try {
-        const refundResult = await this.paymentProviders
-          .resolve(payment.provider)
-          .createRefund(oid, amount);
-        if (refundResult.status !== "success") {
-          throw new BadRequestException(
-            refundResult.err_msg ||
-              i18nMessage("server.payment.paytrRefundFailed"),
-          );
-        }
-        // Gözlemlenebilirlik: takas nakit iadesinin PayTR yanıtını kaydet.
         await this.providerEvents.record({
           eventType: "refund",
           merchantOid: oid,
@@ -1148,43 +1371,33 @@ export class PaymentRefundService {
           status: "success",
           amount,
           totalAmount: amount,
-          raw: refundResult as unknown as Record<string, unknown>,
+          raw: {
+            ...refundResult,
+            refundAttemptId: refundAttempt.attempt.id,
+          },
         });
       } catch (e: any) {
-        // MONEY-H1: PayTR başarılı DÖNMEDİ (throw YA DA non-success status → bu
-        // catch'e düşer). refundInProgressAt marker'ını GERİ AL. Aksi halde marker
-        // kalıcı yazılı kalır; bir sonraki deneme refundAlreadyInitiated=true görüp
-        // PayTR çağrısını ATLAR ve parayı iade ETMEDEN payment'ı refunded işaretler
-        // (sahte iade). Order yolundaki clearRefundInProgress ile AYNI invaryant:
-        // marker yalnız "PayTR gerçekten çağrıldı ve muhtemelen başardı ama persist
-        // edilemedi" durumunda kalmalı — PayTR başaramadıysa retry onu YENİDEN
-        // çağırabilmeli. "ödeme henüz bildirilmemiş" gibi GEÇİCİ hatada bu şarttır.
-        await this.clearTradeRefundInProgress(payment.id).catch(() => {});
-        const msg = (e as Error).message || "";
-        if (
-          /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
-            msg,
-          )
-        ) {
-          throw new BadRequestException(
-            i18nMessage("server.payment.paymentNotYetSynced"),
-          );
-        }
         this.logger.error(
-          `refundTradeCashPaymentIfCompleted(tradeId=${tradeId}) PayTR error: ${e?.message}`,
+          `Trade refund provider event could not be recorded attempt=${refundAttempt.attempt.id}: ${e?.message}`,
         );
-        throw e;
       }
     }
 
-    // Y6: PayTR iadesi YAPILDI. Şimdi refundedAt'i set etmek kritik — aksi halde sonraki
-    // çağrı (refundedAt hâlâ null) tekrar refund dener (PayTR çağrısı idempotency anahtarı
-    // taşımaz). tx-sonrası geçici DB hatasının refundedAt'i set etmeden bırakmasını önlemek
-    // için persist'i birkaç kez dene; hepsi başarısızsa yüksek-öncelikli alarm (manuel düzeltme).
+    // Provider success is durable. Finalize local state and the attempt together.
     let persisted = false;
     for (let attempt = 1; attempt <= 3 && !persisted; attempt++) {
       try {
         await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM refund_attempts WHERE id = ${refundAttempt.attempt.id} FOR UPDATE`;
+          const currentAttempt = await tx.refundAttempt.findUnique({
+            where: { id: refundAttempt.attempt.id },
+          });
+          if (currentAttempt?.status === RefundAttemptStatus.finalized) return;
+          if (currentAttempt?.status !== RefundAttemptStatus.succeeded) {
+            throw new RefundPendingReconciliationException(
+              i18nMessage("server.payment.refundInitiationFailed"),
+            );
+          }
           await tx.payment.update({
             where: { id: payment.id },
             data: {
@@ -1210,6 +1423,13 @@ export class PaymentRefundService {
               dedupeKey: `${OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE}:${payment.tradeCashPaymentId}`,
             });
           }
+          await tx.refundAttempt.update({
+            where: { id: currentAttempt.id },
+            data: {
+              status: RefundAttemptStatus.finalized,
+              finalizedAt: new Date(),
+            },
+          });
         });
         persisted = true;
       } catch (persistErr: any) {
@@ -1220,8 +1440,11 @@ export class PaymentRefundService {
     }
     if (!persisted) {
       this.logger.error(
-        `KRİTİK: PayTR trade-cash iadesi YAPILDI ama refundedAt SET EDİLEMEDİ ` +
-          `(tradeId=${tradeId}, paymentId=${payment.id}). Çift-iade riski — DB'de elle refunded işaretleyin.`,
+        `REFUND_MANUAL_REVIEW: trade-cash provider success could not be finalized ` +
+          `(tradeId=${tradeId}, paymentId=${payment.id}, attempt=${refundAttempt.attempt.id}).`,
+      );
+      throw new RefundPendingReconciliationException(
+        i18nMessage("server.payment.refundInitiationFailed"),
       );
     }
 

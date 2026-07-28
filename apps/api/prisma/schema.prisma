@@ -706,6 +706,7 @@ model Trade {
   items                     TradeItem[]       @relation("TradeItems")
   messages                  TradeMessage[]
   shipments                 TradeShipment[]
+  refundAttempts            RefundAttempt[]
   initiator                 User              @relation("TradeInitiator", fields: [initiatorId], references: [id])
   receiver                  User              @relation("TradeReceiver", fields: [receiverId], references: [id])
 
@@ -1284,6 +1285,7 @@ model Order {
   payment                Payment?
   shipment               Shipment?
   refundRequests         RefundRequest[]
+  refundAttempts         RefundAttempt[]
   commissionLedger       CommissionLedger?
   sellerUploadedInvoice  SellerUploadedInvoice?
   checkoutGroup          CheckoutGroup?         @relation(fields: [checkoutGroupId], references: [id])
@@ -1345,11 +1347,40 @@ model Payment {
   createdAt              DateTime          @default(now()) @map("created_at")
   updatedAt              DateTime          @updatedAt @map("updated_at")
   paymentHolds           PaymentHold[]
+  refundAttempts         RefundAttempt[]
   order                  Order?            @relation(fields: [orderId], references: [id])
   checkoutGroup          CheckoutGroup?    @relation(fields: [checkoutGroupId], references: [id])
   tradeCashPayment       TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id])
 
   @@map("payments")
+}
+
+model RefundAttempt {
+  id                  String              @id @default(uuid())
+  paymentId           String              @map("payment_id")
+  orderId             String?             @map("order_id")
+  tradeId             String?             @map("trade_id")
+  idempotencyKey      String              @unique @map("idempotency_key")
+  amount              Decimal             @db.Decimal(10, 2)
+  provider            String
+  providerReference   String?             @map("provider_reference")
+  providerRefundId    String?             @map("provider_refund_id")
+  providerResponse    Json?               @map("provider_response")
+  status              RefundAttemptStatus @default(prepared)
+  failureReason       String?             @map("failure_reason")
+  requestStartedAt    DateTime?           @map("request_started_at")
+  providerSucceededAt DateTime?           @map("provider_succeeded_at")
+  finalizedAt         DateTime?           @map("finalized_at")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  payment             Payment             @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  order               Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  trade               Trade?              @relation(fields: [tradeId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, orderId])
+  @@index([paymentId, tradeId])
+  @@index([status, updatedAt])
+  @@map("refund_attempts")
 }
 
 model PaymentHold {
@@ -2428,6 +2459,15 @@ enum PaymentStatus {
   completed
   failed
   refunded
+}
+
+enum RefundAttemptStatus {
+  prepared
+  submitting
+  succeeded
+  finalized
+  failed
+  manual_review
 }
 
 enum PaymentHoldStatus {

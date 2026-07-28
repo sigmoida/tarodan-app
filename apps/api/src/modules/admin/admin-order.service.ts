@@ -319,7 +319,9 @@ export class AdminOrderService {
         if (!this.paymentService) {
           throw new Error("PaymentService kullanılamıyor: iade işlenemedi");
         }
-        await this.paymentService.processRefund(orderId);
+        await this.paymentService.processRefund(orderId, undefined, {
+          idempotencyKey: `admin-dispute:${orderId}`,
+        });
         newStatus = OrderStatus.refunded;
         break;
       case "partial_refund":
@@ -331,7 +333,9 @@ export class AdminOrderService {
         if (!this.paymentService) {
           throw new Error("PaymentService kullanılamıyor: iade işlenemedi");
         }
-        await this.paymentService.processRefund(orderId, dto.refundAmount);
+        await this.paymentService.processRefund(orderId, dto.refundAmount, {
+          idempotencyKey: `admin-dispute:${orderId}`,
+        });
         // Kısmi iade siparişi tamamen 'refunded' yapmaz — durum korunur; iade
         // ödeme/ledger'a kaydedilir.
         newStatus = order.status;

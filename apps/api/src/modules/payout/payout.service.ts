@@ -12,6 +12,7 @@ import {
   PaymentHoldStatus,
   PaymentStatus,
   RefundRequestStatus,
+  RefundAttemptStatus,
   LedgerAccount,
   LedgerDirection,
   LedgerEventType,
@@ -155,6 +156,27 @@ export class PayoutService {
         );
         continue;
       }
+      const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
+        where: {
+          paymentId: hold.paymentId,
+          orderId: hold.orderId,
+          status: {
+            in: [
+              RefundAttemptStatus.prepared,
+              RefundAttemptStatus.submitting,
+              RefundAttemptStatus.succeeded,
+              RefundAttemptStatus.manual_review,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      if (activeRefundAttempt) {
+        this.logger.warn(
+          `Payout skipped: order ${hold.orderId} has unresolved refund attempt ${activeRefundAttempt.id}`,
+        );
+        continue;
+      }
 
       // Adet bazlı kısmi iade: satıcıya yalnız iade EDİLMEYEN kısım ödenir.
       const netPayout = Number(hold.amount) - Number(hold.refundedAmount ?? 0);
@@ -206,6 +228,24 @@ export class PayoutService {
     });
 
     for (const tcp of releasedTradeCash) {
+      if (tcp.payment) {
+        const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
+          where: {
+            paymentId: tcp.payment.id,
+            tradeId: tcp.tradeId,
+            status: {
+              in: [
+                RefundAttemptStatus.prepared,
+                RefundAttemptStatus.submitting,
+                RefundAttemptStatus.succeeded,
+                RefundAttemptStatus.manual_review,
+              ],
+            },
+          },
+          select: { id: true },
+        });
+        if (activeRefundAttempt) continue;
+      }
       const recipientId = tcp.recipientId;
       const recipient = await this.prisma.user.findUnique({
         where: { id: recipientId },
@@ -263,6 +303,15 @@ export class PayoutService {
 
     const pending = await this.prisma.payoutTransfer.findMany({
       where: { status: PayoutStatus.pending },
+      include: {
+        paymentHold: { select: { paymentId: true, orderId: true } },
+        tradeCashPayment: {
+          select: {
+            tradeId: true,
+            payment: { select: { id: true } },
+          },
+        },
+      },
       take: 50,
     });
 
@@ -270,6 +319,47 @@ export class PayoutService {
     let failed = 0;
 
     for (const payout of pending) {
+      const refundTarget = payout.paymentHold
+        ? {
+            paymentId: payout.paymentHold.paymentId,
+            orderId: payout.paymentHold.orderId,
+            tradeId: null,
+          }
+        : payout.tradeCashPayment?.payment
+          ? {
+              paymentId: payout.tradeCashPayment.payment.id,
+              orderId: null,
+              tradeId: payout.tradeCashPayment.tradeId,
+            }
+          : null;
+      if (refundTarget) {
+        const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
+          where: {
+            paymentId: refundTarget.paymentId,
+            orderId: refundTarget.orderId,
+            tradeId: refundTarget.tradeId,
+            status: {
+              in: [
+                RefundAttemptStatus.prepared,
+                RefundAttemptStatus.submitting,
+                RefundAttemptStatus.succeeded,
+                RefundAttemptStatus.manual_review,
+              ],
+            },
+          },
+          select: { id: true },
+        });
+        if (activeRefundAttempt) {
+          await this.prisma.payoutTransfer.updateMany({
+            where: { id: payout.id, status: PayoutStatus.pending },
+            data: {
+              status: PayoutStatus.failed,
+              failureReason: "refund_pending",
+            },
+          });
+          continue;
+        }
+      }
       // Atomik claim (K2): yalnızca hâlâ pending ise processing'e al. Çoklu instance
       // veya api+worker aynı cron'u koşarsa satır başına yalnızca bir koşucu kazanır;
       // count=0 → başka bir koşucu aldı ya da iade void etti → atla. PayTR'ye çift
