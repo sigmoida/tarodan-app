@@ -7,10 +7,12 @@ describe("production reference-data bootstrap", () => {
   const packageJson = JSON.parse(
     readFileSync(resolve(apiRoot, "package.json"), "utf8"),
   );
+  const entrypoint = readFileSync(resolve(apiRoot, "entrypoint.sh"), "utf8");
 
   it("uses a dedicated production bootstrap instead of the demo seed", () => {
     expect(existsSync(bootstrapPath)).toBe(true);
     expect(packageJson.scripts["seed:prod"]).toContain("seed-production");
+    expect(entrypoint).toContain("seed-production");
   });
 
   it("is idempotent, seeds required business references and contains no demo credentials", () => {

@@ -7,7 +7,7 @@
     "build": "nest build",
     "postbuild": "prisma generate",
     "build:seed": "rimraf dist-seed && tsc -p tsconfig.seed.json && node -e \"require('fs').cpSync('prisma/data','dist-seed/prisma/data',{recursive:true})\"",
-    "seed:prod": "node dist-seed/prisma/seed.js",
+    "seed:prod": "node dist-seed/prisma/seed-production.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "predev": "prisma generate",

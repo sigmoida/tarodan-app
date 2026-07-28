@@ -58,6 +58,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PROCESS_ROLE=all
 
 # Install OpenSSL (needed for Prisma)
 RUN apk add --no-cache openssl

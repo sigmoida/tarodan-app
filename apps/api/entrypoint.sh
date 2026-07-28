@@ -9,7 +9,9 @@ ROLE="${PROCESS_ROLE:-all}"
 # servis migrate deploy'da yarışmasın (migration'ı tek servis çalıştırsın).
 if [ "$ROLE" != "worker" ]; then
   echo "Running database migrations..."
-  npx prisma migrate deploy --schema=prisma/schema.prisma || echo "Migration failed or no pending migrations"
+  npx prisma migrate deploy --schema=prisma/schema.prisma
+  echo "Ensuring production reference data..."
+  node dist-seed/prisma/seed-production.js
 fi
 
 if [ "$ROLE" = "worker" ]; then

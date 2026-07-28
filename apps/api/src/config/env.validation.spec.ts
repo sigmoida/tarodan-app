@@ -200,9 +200,12 @@ describe("validateEnv", () => {
     void PROCESS_ROLE;
 
     expect(() => validateEnv(withoutRole)).toThrow(/PROCESS_ROLE/);
-    expect(() => validateEnv({ ...prodBase, PROCESS_ROLE: "all" })).toThrow(
+    expect(() => validateEnv({ ...prodBase, PROCESS_ROLE: "invalid" })).toThrow(
       /PROCESS_ROLE/,
     );
+    expect(() =>
+      validateEnv({ ...prodBase, PROCESS_ROLE: "all" }),
+    ).not.toThrow();
   });
 
   it("requires a real email provider, object storage and error reporting", () => {

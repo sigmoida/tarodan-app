@@ -33,8 +33,10 @@ const MIN_PROD_SECRET_LENGTH = 32;
 const envSchema = z
   .object({
     NODE_ENV: z.string().optional(),
+    PROCESS_ROLE: z.string().optional(),
 
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+    API_URL: z.string().optional(),
 
     // Auth realm secrets — each realm sets its own; no cross-realm fallback.
     JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
@@ -50,6 +52,9 @@ const envSchema = z
     PAYTR_MERCHANT_ID: z.string().optional(),
     PAYTR_MERCHANT_KEY: z.string().optional(),
     PAYTR_MERCHANT_SALT: z.string().optional(),
+    PAYTR_TEST_MODE: z.string().optional(),
+    PAYTR_CALLBACK_URL: z.string().optional(),
+    PAYOUTS_DISABLED: z.string().optional(),
 
     // Surat cargo — when the integration is enabled, production must ship for real
     // (mode/test-flag/credentials enforced in the production block below).
@@ -67,10 +72,51 @@ const envSchema = z
     ELOGO_WS_PASSWORD: z.string().optional(),
     ELOGO_COMPANY_VKN: z.string().optional(),
     ELOGO_COMPANY_TITLE: z.string().optional(),
+
+    // Production delivery/telemetry dependencies.
+    SENDGRID_API_KEY: z.string().optional(),
+    SMTP_HOST: z.string().optional(),
+    AWS_ACCESS_KEY_ID: z.string().optional(),
+    AWS_SECRET_ACCESS_KEY: z.string().optional(),
+    AWS_REGION: z.string().optional(),
+    S3_BUCKET: z.string().optional(),
+    SENTRY_DSN: z.string().optional(),
   })
   .strip()
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== "production") return;
+
+    if (!["all", "web", "worker"].includes(env.PROCESS_ROLE ?? "")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["PROCESS_ROLE"],
+        message:
+          "PROCESS_ROLE must be explicitly set to 'all', 'web' or 'worker' in production",
+      });
+    }
+
+    const requirePublicHttpsUrl = (
+      key: "API_URL" | "PAYTR_CALLBACK_URL",
+      value: string | undefined,
+    ) => {
+      try {
+        const parsed = new URL(value ?? "");
+        if (
+          parsed.protocol !== "https:" ||
+          ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)
+        ) {
+          throw new Error("not public HTTPS");
+        }
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} must be a public HTTPS URL in production`,
+        });
+      }
+    };
+    requirePublicHttpsUrl("API_URL", env.API_URL);
+    requirePublicHttpsUrl("PAYTR_CALLBACK_URL", env.PAYTR_CALLBACK_URL);
 
     const secrets = {
       JWT_SECRET: env.JWT_SECRET,
@@ -134,6 +180,22 @@ const envSchema = z
         });
       }
     }
+    if ((env.PAYTR_TEST_MODE ?? "").trim().toLowerCase() !== "false") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["PAYTR_TEST_MODE"],
+        message:
+          "PAYTR_TEST_MODE must be explicitly set to 'false' in production",
+      });
+    }
+    if ((env.PAYOUTS_DISABLED ?? "").trim().toLowerCase() !== "false") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["PAYOUTS_DISABLED"],
+        message:
+          "PAYOUTS_DISABLED must be explicitly set to 'false' in production",
+      });
+    }
 
     // #6: Production'da kargo ENTEGRASYONU AÇIKSA gerçek gönderi üretecek konfig ZORUNLU.
     // Aksi halde stub/test modu SESSİZCE devreye girer: siparişler "kargolandı" görünür
@@ -141,6 +203,13 @@ const envSchema = z
     const cargoEnabled = ["true", "1"].includes(
       (env.SURAT_CARGO_ENABLED ?? "").trim().toLowerCase(),
     );
+    if (!cargoEnabled) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SURAT_CARGO_ENABLED"],
+        message: "SURAT_CARGO_ENABLED must be 'true' in production",
+      });
+    }
     if (cargoEnabled) {
       if ((env.SURAT_SOAP_MODE ?? "").trim().toLowerCase() !== "rest") {
         ctx.addIssue({
@@ -176,6 +245,13 @@ const envSchema = z
     const elogoEnabled = ["true", "1"].includes(
       (env.ELOGO_ENABLED ?? "").trim().toLowerCase(),
     );
+    if (!elogoEnabled) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ELOGO_ENABLED"],
+        message: "ELOGO_ENABLED must be 'true' in production",
+      });
+    }
     if (elogoEnabled) {
       if ((env.ELOGO_SOAP_MODE ?? "").trim().toLowerCase() !== "live") {
         ctx.addIssue({
@@ -208,6 +284,30 @@ const envSchema = z
             message: `${key} is required in production when ELOGO_ENABLED is set`,
           });
         }
+      }
+    }
+
+    if (!env.SENDGRID_API_KEY?.trim() && !env.SMTP_HOST?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SENDGRID_API_KEY"],
+        message:
+          "SENDGRID_API_KEY or SMTP_HOST is required for production email delivery",
+      });
+    }
+    for (const key of [
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+      "AWS_REGION",
+      "S3_BUCKET",
+      "SENTRY_DSN",
+    ] as const) {
+      if (!env[key]?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required in production`,
+        });
       }
     }
   });
