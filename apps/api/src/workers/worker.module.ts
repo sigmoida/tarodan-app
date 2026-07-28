@@ -10,14 +10,12 @@ import { ConfigModule } from "@nestjs/config";
 import { EmailWorker } from "./email.worker";
 import { PushWorker } from "./push.worker";
 import { ImageWorker } from "./image.worker";
-import { PaymentWorker } from "./payment.worker";
 import { SearchWorker } from "./search.worker";
 import { AnalyticsWorker } from "./analytics.worker";
 import { ModerationWorker } from "./moderation.worker";
 
 // Prisma for database access
 import { PrismaModule } from "../prisma/prisma.module";
-import { PaymentModule } from "../modules/payment/payment.module";
 import { StorageModule } from "../modules/storage/storage.module";
 import { SearchModule } from "../modules/search/search.module";
 import { SuratCargoModule } from "../modules/surat-cargo/surat-cargo.module";
@@ -29,7 +27,6 @@ import { QUEUE_NAMES } from "./constants";
   imports: [
     ConfigModule,
     PrismaModule,
-    PaymentModule,
     StorageModule,
     SearchModule,
     SuratCargoModule,
@@ -43,7 +40,6 @@ import { QUEUE_NAMES } from "./constants";
       { name: QUEUE_NAMES.EMAIL },
       { name: QUEUE_NAMES.PUSH },
       { name: QUEUE_NAMES.IMAGE },
-      { name: QUEUE_NAMES.PAYMENT },
       { name: QUEUE_NAMES.SEARCH },
       { name: QUEUE_NAMES.ANALYTICS },
       { name: QUEUE_NAMES.MODERATION },
@@ -53,7 +49,6 @@ import { QUEUE_NAMES } from "./constants";
     EmailWorker,
     PushWorker,
     ImageWorker,
-    PaymentWorker,
     SearchWorker,
     AnalyticsWorker,
     ModerationWorker,
