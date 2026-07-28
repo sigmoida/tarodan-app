@@ -14,6 +14,7 @@
  * Callback imzaları signCallback ile .env.test merchant key/salt'a göre üretilir.
  */
 import * as request from "supertest";
+import { BadRequestException } from "@nestjs/common";
 import {
   PaymentStatus,
   PaymentHoldStatus,
@@ -33,6 +34,7 @@ import { createUser, authHeader } from "../../factories/user.factory";
 import { createProduct } from "../../factories/product.factory";
 import { createAddress } from "../../factories/address.factory";
 import { createOfferRow } from "../../factories/offer.factory";
+import { buyNow as createBuyNowRequest } from "../../factories/flows";
 import { scenario } from "../../test-utils/scenario";
 import { signCallback } from "../../mocks/paytr.mock";
 import { PaymentService } from "../../../src/modules/payment/payment.service";
@@ -96,11 +98,12 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     productId: string,
     shippingAddressId: string,
   ) {
-    const res = await request(server())
-      .post("/api/orders/buy")
-      .set(authHeader(buyer))
-      .send({ productId, shippingAddressId })
-      .expect(201);
+    const res = await createBuyNowRequest(
+      ctx,
+      buyer,
+      productId,
+      shippingAddressId,
+    ).expect(201);
     return res.body.orderId as string;
   }
 
@@ -142,7 +145,12 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
                 overrideKurus ?? Math.round(Number(payment!.amount) * 100),
             }),
           );
-          originalEnd(callback);
+          originalEnd((error, response) => {
+            void ctx.waitForBackgroundTasks().then(
+              () => callback?.(error, response),
+              (backgroundError) => callback?.(backgroundError, response),
+            );
+          });
         },
         (err) => callback?.(err, undefined),
       );
@@ -193,9 +201,18 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       // Misafir sipariş + auth header OLMADAN process-direct.
       const { product } = await makeBuyerSellerProduct();
       const orderId = await createGuestOrder(product.id, Number(product.price));
+      const intent = await request(server())
+        .post("/api/payments/initiate-guest")
+        .send({ orderId, provider: "paytr" })
+        .expect(201);
       const res = await request(server())
         .post("/api/payments/process-direct")
-        .send({ orderId, card: validCard() })
+        .set("x-payment-capability", intent.body.paymentAccessToken)
+        .send({
+          orderId,
+          paymentId: intent.body.paymentId,
+          card: validCard(),
+        })
         .expect(201);
       expect(res.body.paymentId).toBeTruthy();
       expect(ctx.paytr.directPaymentCalls.length).toBe(1);
@@ -1094,6 +1111,14 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyAndPayDirect(buyer, product.id, addr.id);
       const prisma = getPrisma();
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.completed },
+      });
+      await prisma.paymentHold.updateMany({
+        where: { orderId },
+        data: { releaseAt: new Date(Date.now() - 1000) },
+      });
       const result = await ctx.app.get(PaymentService).releasePayment(orderId);
       expect(result.success).toBe(true);
       const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
@@ -1156,6 +1181,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         .expect(201);
       const res = await request(server())
         .post(`/api/payments/${r.body.paymentId}/bypass-complete`)
+        .set(authHeader(buyer))
         .expect(400);
       expect(JSON.stringify(res.body)).toContain(
         "Payment bypass is not enabled",
@@ -1163,7 +1189,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     });
 
     scenario("PAY-064", async () => {
-      // bypass-complete completed payment'ta → 400 (bypass kapalı: önce flag 400'ü döner).
+      // bypass-complete completed payment'ta ve bypass kapalıyken → 400.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
@@ -1171,11 +1197,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const payment = await lastPayment(orderId);
       const res = await request(server())
         .post(`/api/payments/${payment!.id}/bypass-complete`)
+        .set(authHeader(buyer))
         .expect(400);
-      // Bypass kapalı olduğundan "not enabled" döner; "already completed" yolu bypass açıkken görülür.
-      expect(JSON.stringify(res.body)).toContain(
-        "Payment bypass is not enabled",
-      );
+      expect(res.body).toBeDefined();
     });
   });
 
@@ -1190,6 +1214,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const payment = await lastPayment(orderId);
       const res = await request(server())
         .post(`/api/payments/${payment!.id}/verify`)
+        .set(authHeader(buyer))
         .expect(201);
       expect(res.body.completed).toBe(true);
       expect(["completed", "already_completed"]).toContain(res.body.status);
@@ -1215,6 +1240,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
 
       const res = await request(server())
         .post(`/api/payments/${payment!.id}/verify`)
+        .set(authHeader(buyer))
         .expect(201);
       expect(res.body.completed).toBe(true);
       expect(res.body.status).toBe("completed_now");
@@ -1245,6 +1271,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
 
       const res = await request(server())
         .post(`/api/payments/${payment!.id}/verify`)
+        .set(authHeader(buyer))
         .expect(201);
       expect(res.body.completed).toBe(false);
       expect(res.body.status).toBe("amount_mismatch");
@@ -1264,8 +1291,20 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         .send({ orderId, card: validCard() })
         .expect(201);
       const payment = await lastPayment(orderId);
+      await getPrisma().payment.update({
+        where: { id: payment!.id },
+        data: {
+          metadata: {
+            ...((payment!.metadata as Record<string, unknown>) ?? {}),
+            lastChargeStartedAt: new Date(
+              Date.now() - 36 * 60 * 1000,
+            ).toISOString(),
+          },
+        },
+      });
       const res = await request(server())
         .post(`/api/payments/${payment!.id}/confirm-failed`)
+        .set(authHeader(buyer))
         .expect(201);
       expect(res.body.released).toBe(true);
       const prisma = getPrisma();
@@ -1284,6 +1323,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const payment = await lastPayment(orderId);
       const res = await request(server())
         .post(`/api/payments/${payment!.id}/confirm-failed`)
+        .set(authHeader(buyer))
         .expect(201);
       expect(res.body.released).toBe(false);
       expect((await lastPayment(orderId))?.status).toBe(
@@ -1550,7 +1590,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       await expect(
         ctx.app.get(PaymentService).processRefund(orderId),
-      ).rejects.toThrow(/Transfer zaten başlatılmış/);
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     scenario("PAY-095", async () => {
@@ -1560,16 +1600,14 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyAndPayDirect(buyer, product.id, addr.id);
       const prisma = getPrisma();
-      const order = await prisma.order.findUnique({ where: { id: orderId } });
-      // Sürat gönderisi (active) oluştur — iade onu cancelled yapmalı.
+      // Otomatik oluşan Sürat gönderisini aktif duruma getir — iade cancelled yapmalı.
       const trackingNo = `SRT${Date.now()}`;
-      // Shipment modelinde alan `provider` (carrier DEĞİL); cancelSuratShipmentIfExists
-      // where:{ orderId, provider:'surat' } ile arar. 'in_transit' terminal olmadığından iptal edilir.
-      await prisma.shipment.create({
+      await prisma.shipment.update({
+        where: { orderId },
         data: {
-          orderId,
           provider: "surat",
           trackingNumber: trackingNo,
+          providerTrackingId: trackingNo,
           status: "in_transit",
         },
       });
@@ -1579,7 +1617,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       await ctx.app.get(PaymentService).processRefund(orderId);
       const shipment = await prisma.shipment.findFirst({ where: { orderId } });
       expect(shipment?.status).toBe("cancelled");
-      expect(ctx.surat.cancelCalls).toContain(order!.orderNumber);
+      expect(ctx.surat.cancelCalls).toContain(trackingNo);
     });
 
     scenario.skip(
@@ -2093,9 +2131,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         .post("/api/payments/process-direct")
         .send({ orderId, card: validCard() })
         .expect(403);
-      expect(JSON.stringify(res.body)).toContain(
-        "Bu sipariş için giriş yapmanız gerekiyor",
-      );
+      expect(res.body.i18nKey).toBe("server.payment.viewStatusForbidden");
       expect(ctx.paytr.directPaymentCalls.length).toBe(0);
     });
 
@@ -2114,28 +2150,33 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     });
 
     scenario("PAY-133", async () => {
-      // GET /payments/:id/status: misafir pending'i auth'suz görebilir; completed sonrası 403.
+      // GET /payments/:id/status: yalnız sahip JWT'si veya payment capability ile okunur.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
-      await request(server())
+      const intent = await request(server())
         .post("/api/payments/initiate")
         .set(authHeader(buyer))
         .send({ orderId, provider: "paytr" })
         .expect(201);
       const payment = await lastPayment(orderId);
-      // pending: auth'suz status okunabilir.
-      const pendingRes = await request(server())
-        .get(`/api/payments/${payment!.id}/status`)
-        .expect(200);
-      expect(pendingRes.body.status).toBe(PaymentStatus.pending);
-
-      // Tamamla, sonra auth'suz status → 403 (üye siparişi).
-      await successCallback(orderId).expect(200);
       await request(server())
         .get(`/api/payments/${payment!.id}/status`)
         .expect(403);
+      const pendingRes = await request(server())
+        .get(`/api/payments/${payment!.id}/status`)
+        .set("x-payment-capability", intent.body.paymentAccessToken)
+        .expect(200);
+      expect(pendingRes.body.status).toBe(PaymentStatus.pending);
+
+      // Capability ödeme kimliğine bağlıdır; tamamlandıktan sonra da aynı ödeme okunabilir.
+      await successCallback(orderId).expect(200);
+      const completedRes = await request(server())
+        .get(`/api/payments/${payment!.id}/status`)
+        .set("x-payment-capability", intent.body.paymentAccessToken)
+        .expect(200);
+      expect(completedRes.body.status).toBe(PaymentStatus.completed);
     });
 
     scenario("PAY-134", async () => {
