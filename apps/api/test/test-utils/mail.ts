@@ -10,7 +10,10 @@
  * MailHog servisi yoksa (lokal docker kapalı) bu yardımcılar timeout atar.
  */
 
-const MAILHOG = process.env.MAILHOG_URL ?? 'http://localhost:8025';
+const MAILBOX_URL =
+  process.env.MAILPIT_URL ??
+  process.env.MAILHOG_URL ??
+  'http://localhost:8025';
 
 export interface MailMessage {
   subject: string;
@@ -59,20 +62,42 @@ function decodeMimeWord(s: string): string {
 /** Adrese gelen EN SON maili getir — mail asenkron geldiği için retry'li bekler. */
 export async function getLastEmailTo(email: string, timeoutMs = 20000): Promise<MailMessage> {
   const deadline = Date.now() + timeoutMs;
-  const url = `${MAILHOG}/api/v2/search?kind=to&query=${encodeURIComponent(email)}`;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url);
-      if (res.ok) {
-        const data: any = await res.json();
-        const items: any[] = data?.items ?? [];
-        if (items.length > 0) {
-          const m = items[0]; // MailHog en yeniyi başa koyar
-          const headers = m?.Content?.Headers ?? {};
+      const mailpitSearch = await fetch(
+        `${MAILBOX_URL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
+      );
+      if (mailpitSearch.ok) {
+        const data: any = await mailpitSearch.json();
+        const summary = data?.messages?.[0];
+        if (summary?.ID) {
+          const detailRes = await fetch(
+            `${MAILBOX_URL}/api/v1/message/${encodeURIComponent(summary.ID)}`,
+          );
+          if (detailRes.ok) {
+            const detail: any = await detailRes.json();
+            return {
+              subject: detail.Subject ?? '',
+              to: detail.To?.[0]?.Address ?? email,
+              body: detail.Text || detail.HTML || '',
+            };
+          }
+        }
+      }
+
+      // Older local environments may still run MailHog.
+      const mailhogSearch = await fetch(
+        `${MAILBOX_URL}/api/v2/search?kind=to&query=${encodeURIComponent(email)}`,
+      );
+      if (mailhogSearch.ok) {
+        const data: any = await mailhogSearch.json();
+        const message = data?.items?.[0];
+        if (message) {
+          const headers = message?.Content?.Headers ?? {};
           return {
             subject: decodeMimeWord(headers.Subject?.[0] ?? ''),
             to: headers.To?.[0] ?? email,
-            body: decodeBody(m?.Content?.Body ?? '', headers),
+            body: decodeBody(message?.Content?.Body ?? '', headers),
           };
         }
       }
@@ -105,7 +130,7 @@ export function extractCode(body: string, digits = 6): string | null {
 /** Tüm mailleri temizle (test izolasyonu için). beforeEach'te clearMailbox() çağırın. */
 export async function clearMailbox(): Promise<void> {
   try {
-    await fetch(`${MAILHOG}/api/v1/messages`, { method: 'DELETE' });
+    await fetch(`${MAILBOX_URL}/api/v1/messages`, { method: 'DELETE' });
   } catch {
     /* yok say */
   }

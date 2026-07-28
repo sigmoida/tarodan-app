@@ -9,6 +9,7 @@ import { MockPayTRService } from "../mocks/paytr.mock";
 import { SURAT_CARRIER_CLIENT } from "../../src/modules/surat-cargo/surat-cargo.service";
 import { StubSuratSoapClient } from "../../src/modules/surat-cargo/surat-soap.client";
 import { TradeShipmentService } from "../../src/modules/trade/trade-shipment.service";
+import { FulfillmentFinalizer } from "../../src/modules/payment/fulfillment-finalizer.service";
 import {
   drainE2EBackgroundTasks,
   trackE2EBackgroundTask,
@@ -36,6 +37,7 @@ export interface E2ETestApp {
   module: TestingModule;
   paytr: MockPayTRService;
   surat: StubSuratSoapClient;
+  waitForBackgroundTasks: () => Promise<void>;
   close: () => Promise<void>;
 }
 
@@ -109,6 +111,14 @@ export async function createE2ETestApp(): Promise<E2ETestApp> {
 
   app.setGlobalPrefix("api");
 
+  const fulfillmentFinalizer = module.get(FulfillmentFinalizer);
+  const finalizePaidOrder =
+    fulfillmentFinalizer.finalizePaidOrder.bind(fulfillmentFinalizer);
+  fulfillmentFinalizer.finalizePaidOrder = ((...args) =>
+    trackE2EBackgroundTask(
+      finalizePaidOrder(...args),
+    )) as FulfillmentFinalizer["finalizePaidOrder"];
+
   await app.init();
 
   // Trade acceptance deliberately dispatches Sürat shipment creation in the
@@ -131,6 +141,7 @@ export async function createE2ETestApp(): Promise<E2ETestApp> {
     module,
     paytr,
     surat,
+    waitForBackgroundTasks: drainE2EBackgroundTasks,
     close: async () => {
       await drainE2EBackgroundTasks();
       await app.close();

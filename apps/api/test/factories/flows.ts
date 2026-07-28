@@ -20,7 +20,7 @@ export function buyNow(
   ctx: E2ETestApp,
   buyer: Auth,
   productId: string,
-  shippingAddressId: string,
+  shippingAddressId?: string,
 ): request.Test {
   const req = request(server(ctx))
     .post("/api/orders/buy")
@@ -36,7 +36,7 @@ export function buyNow(
       .then((tariff) => {
         req.send({
           productId,
-          shippingAddressId,
+          ...(shippingAddressId ? { shippingAddressId } : {}),
           expectedShippingTariffVersion: tariff?.version ?? 1,
         });
       }));
@@ -105,6 +105,8 @@ export async function completePaymentByCallback(
       `completePaymentByCallback: callback failed with ${response.status}: ${JSON.stringify(response.body)}`,
     );
   }
+
+  await ctx.waitForBackgroundTasks();
 
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {

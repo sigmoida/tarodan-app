@@ -33,6 +33,7 @@ import { createUser, createAdminUser, authHeader } from '../../factories/user.fa
 import { createProduct } from '../../factories/product.factory';
 import { createAddress } from '../../factories/address.factory';
 import { createOfferRow } from '../../factories/offer.factory';
+import { buyNow as createBuyNowRequest } from '../../factories/flows';
 import { scenario } from '../../test-utils/scenario';
 import { signCallback } from '../../mocks/paytr.mock';
 import { getLastEmailTo, extractCode, clearMailbox } from '../../test-utils/mail';
@@ -87,10 +88,15 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
   }
 
   const buyNow = (buyer: { accessToken: string }, productId: string, shippingAddressId?: string) =>
-    request(server())
-      .post('/api/orders/buy')
-      .set(authHeader(buyer))
-      .send(shippingAddressId ? { productId, shippingAddressId } : { productId });
+    createBuyNowRequest(ctx, buyer, productId, shippingAddressId);
+
+  async function activeShippingTariffVersion(): Promise<number> {
+    const tariff = await getPrisma().shippingTariff.findFirst({
+      where: { provider: 'surat', status: 'active' },
+      select: { version: true },
+    });
+    return tariff?.version ?? 1;
+  }
 
   /** Sipariş için en son payment satırı (DB). */
   async function lastPayment(orderId: string) {
@@ -135,11 +141,26 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
     // Dispatch tetikleyicilerini (then/end) sararak gövde hazırlığını öne al.
     const originalThen = req.then.bind(req);
     req.then = ((onFulfilled?: any, onRejected?: any) =>
-      prepareBody().then(() => originalThen(onFulfilled, onRejected))) as typeof req.then;
+      prepareBody()
+        .then(() => originalThen())
+        .then(async (response) => {
+          await ctx.waitForBackgroundTasks();
+          return response;
+        })
+        .then(onFulfilled, onRejected)) as typeof req.then;
 
     const originalEnd = req.end.bind(req);
     req.end = ((callback?: any) => {
-      void prepareBody().then(() => originalEnd(callback), (err) => callback?.(err));
+      void prepareBody().then(
+        () =>
+          originalEnd((error, response) => {
+            void ctx.waitForBackgroundTasks().then(
+              () => callback?.(error, response),
+              (backgroundError) => callback?.(backgroundError, response),
+            );
+          }),
+        (error) => callback?.(error),
+      );
       return req;
     }) as typeof req.end;
 
@@ -244,11 +265,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
     scenario('ORD-003', async () => {
       const { seller, product } = await makeBuyerSellerProduct();
       const sellerAddr = await createAddress({ userId: seller.id });
-      const res = await request(server())
-        .post('/api/orders/buy')
-        .set(authHeader(seller))
-        .send({ productId: product.id, shippingAddressId: sellerAddr.id })
-        .expect(403);
+      const res = await buyNow(seller, product.id, sellerAddr.id).expect(403);
       expect(JSON.stringify(res.body)).toContain('Kendi ürününüzü satın alamazsınız');
       const count = await getPrisma().order.count({ where: { productId: product.id } });
       expect(count).toBe(0);
@@ -265,11 +282,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
     scenario('ORD-005', async () => {
       const { buyer, product } = await makeBuyerSellerProduct();
       // shippingAddressId/shippingAddress yok → service "Teslimat adresi gereklidir"
-      const res = await request(server())
-        .post('/api/orders/buy')
-        .set(authHeader(buyer))
-        .send({ productId: product.id })
-        .expect(400);
+      const res = await buyNow(buyer, product.id).expect(400);
       expect(JSON.stringify(res.body)).toContain('Teslimat adresi gereklidir');
     });
 
@@ -279,11 +292,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const kaan = await createUser(ctx.module);
       const other = await createUser(ctx.module);
       const otherAddr = await createAddress({ userId: other.id });
-      const res = await request(server())
-        .post('/api/orders/buy')
-        .set(authHeader(kaan))
-        .send({ productId: product.id, shippingAddressId: otherAddr.id })
-        .expect(400);
+      const res = await buyNow(kaan, product.id, otherAddr.id).expect(400);
       expect(JSON.stringify(res.body)).toContain('Geçersiz teslimat adresi');
       const count = await getPrisma().order.count({ where: { productId: product.id } });
       expect(count).toBe(0);
@@ -297,6 +306,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
         .set(authHeader(buyer))
         .send({
           productId: product.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
           shippingAddress: { fullName: 'Ali', city: 'İstanbul', district: 'Kadıköy', address: 'Cad. No:1' },
         })
         .expect(400);
@@ -308,11 +318,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const banned = await createUser(ctx.module);
       const addr = await createAddress({ userId: banned.id });
       await getPrisma().user.update({ where: { id: banned.id }, data: { isBanned: true } });
-      const res = await request(server())
-        .post('/api/orders/buy')
-        .set(authHeader(banned))
-        .send({ productId: product.id, shippingAddressId: addr.id })
-        .expect(403);
+      const res = await buyNow(banned, product.id, addr.id).expect(403);
       expect(JSON.stringify(res.body)).toContain('banlanmış');
     });
   });
@@ -343,8 +349,9 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const prisma = getPrisma();
       const order = await prisma.order.findUnique({ where: { id: res.body.id } });
       expect(order?.offerId).toBe(offer.id);
-      // totalAmount = offer.amount + buyerFee + KDV; kural/KDV yokken = 400
-      expect(Number(order?.totalAmount)).toBe(400);
+      // Teklif tutarı da normal checkout gibi aktif kargo tarifesini snapshot'lar.
+      expect(Number(order?.shippingCost)).toBe(29.99);
+      expect(Number(order?.totalAmount)).toBe(429.99);
       const group = await prisma.checkoutGroup.findUnique({ where: { id: order!.checkoutGroupId! } });
       expect(group?.groupNumber).toMatch(/^GRP/);
     });
@@ -413,6 +420,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
           items: [{ productId: a.id }, { productId: b.id }],
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
         })
         .expect(201);
       expect(res.body.checkoutGroupId).toBeTruthy();
@@ -437,7 +445,12 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const res = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items, idempotencyKey: randomUUID(), shippingAddressId: addr.id })
+        .send({
+          items,
+          idempotencyKey: randomUUID(),
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain('en fazla 20 ürün');
     });
@@ -450,7 +463,12 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const res = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items: [{ productId: product.id, quantity: 21 }], idempotencyKey: randomUUID(), shippingAddressId: addr.id })
+        .send({
+          items: [{ productId: product.id, quantity: 21 }],
+          idempotencyKey: randomUUID(),
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain('en fazla 20 adet');
     });
@@ -463,7 +481,12 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const res = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items: [{ productId: product.id, quantity: 2 }], idempotencyKey: randomUUID(), shippingAddressId: addr.id })
+        .send({
+          items: [{ productId: product.id, quantity: 2 }],
+          idempotencyKey: randomUUID(),
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain('yeterli stok yok');
       expect(res.body.productId).toBe(product.id);
@@ -493,6 +516,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
         .post('/api/orders/guest')
         .send({
           productId: product.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
           email,
           emailVerificationCode: code,
           phone: '+905551234567',
@@ -533,6 +557,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
         .post('/api/orders/guest')
         .send({
           productId: product.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
           email: 'guest2@external.com',
           emailVerificationCode: '12ab',
           phone: '+905551234567',
@@ -560,6 +585,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
         .send({
           items: [{ productId: product.id }],
           idempotencyKey: randomUUID(),
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
           email: `guest-coupon-${Date.now()}@external.com`,
           emailVerificationCode: '123456',
           phone: '+905551234567',
@@ -1128,6 +1154,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       // Yalnız BUYER %3 kuralı → buyerFee=30 (quote subtotal=1000)
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({ sellerId: seller.id, categoryId: baseline.categoryId, price: 1000 });
+      await getPrisma().commissionRule.deleteMany();
       await getPrisma().commissionRule.create({
         data: {
           name: 'buyer-3', ruleType: CommissionRuleType.default, appliesTo: CommissionAppliesTo.BUYER,
@@ -1190,28 +1217,28 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
     });
 
     scenario('ORD-109', async () => {
-      // aktif kural yoksa fee=0 (fallback)
+      // Aktif kural yoksa yanlış fiyatla devam etmek yerine fail-closed.
       const seller = await createUser(ctx.module, { isSeller: true });
+      await getPrisma().commissionRule.deleteMany();
       const res = await request(server())
         .get('/api/orders/commission-preview?amount=1000')
         .set(authHeader(seller))
-        .expect(200);
-      expect(res.body.sellerFeeAmount).toBe(0);
-      expect(res.body.buyerFeeAmount).toBe(0);
-      expect(res.body.commissionAmount).toBe(0);
+        .expect(503);
+      expect(res.body.i18nKey).toBe('server.commission.noRuleConfigured');
     });
 
     scenario('ORD-110', async () => {
-      // isActive=false kural görmezden gelinir → fee=0
+      // isActive=false kural görmezden gelinir ve aktif fallback yoksa fail-closed.
       const seller = await createUser(ctx.module, { isSeller: true });
+      await getPrisma().commissionRule.deleteMany();
       await getPrisma().commissionRule.create({
         data: { name: 'inactive', ruleType: CommissionRuleType.default, appliesTo: CommissionAppliesTo.SELLER, sellerType: CommissionSellerType.ALL, percentage: 0, sellerRate: 5, isActive: false },
       });
       const res = await request(server())
         .get('/api/orders/commission-preview?amount=1000')
         .set(authHeader(seller))
-        .expect(200);
-      expect(res.body.sellerFeeAmount).toBe(0);
+        .expect(503);
+      expect(res.body.i18nKey).toBe('server.commission.noRuleConfigured');
     });
 
     scenario('ORD-111', async () => {
@@ -1479,7 +1506,12 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items: [{ productId: a.id }, { productId: b.id }], idempotencyKey: randomUUID(), shippingAddressId: addr.id })
+        .send({
+          items: [{ productId: a.id }, { productId: b.id }],
+          idempotencyKey: randomUUID(),
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        })
         .expect(201);
       const res = await request(server()).get('/api/orders/groups').set(authHeader(buyer)).expect(200);
       expect(res.body.data).toHaveLength(1);
@@ -1496,7 +1528,12 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const co = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items: [{ productId: a.id }], idempotencyKey: randomUUID(), shippingAddressId: addr.id })
+        .send({
+          items: [{ productId: a.id }],
+          idempotencyKey: randomUUID(),
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        })
         .expect(201);
       for (const o of co.body.orders) {
         await request(server()).post(`/api/orders/${o.orderId}/cancel`).set(authHeader(buyer)).send({}).expect(200);
@@ -1514,7 +1551,12 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const co = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items: [{ productId: a.id }], idempotencyKey: randomUUID(), shippingAddressId: addr.id })
+        .send({
+          items: [{ productId: a.id }],
+          idempotencyKey: randomUUID(),
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        })
         .expect(201);
       const stranger = await createUser(ctx.module);
       const res = await request(server())
@@ -1554,6 +1596,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
         .post('/api/orders/guest')
         .send({
           productId: product.id, email, emailVerificationCode: code, phone: '+905551234567', guestName: 'Takip Test',
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
           shippingAddress: { fullName: 'Takip Test', phone: '+905551234567', city: 'İstanbul', district: 'Kadıköy', address: 'Adres' },
         })
         .expect(201);
@@ -1606,15 +1649,14 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
     });
 
     scenario('ORD-164', async () => {
-      // Platform satıcı (BUSINESS kuralı yoksa fee=0)
+      // Platform satıcı BUSINESS eksenine eşlenir; ALL fallback kuralı uygulanır.
       const seller = await createUser(ctx.module, { isSeller: true, sellerType: 'platform' });
       const product = await createProduct({ sellerId: seller.id, categoryId: baseline.categoryId, price: 500 });
       const res = await request(server())
         .post('/api/orders/quote')
         .send({ items: [{ productId: product.id }] })
         .expect(201);
-      // BUSINESS kuralı tanımsız → fee=0
-      expect(res.body.sellerFeeAmount).toBe(0);
+      expect(res.body.sellerFeeAmount).toBe(25);
       expect(res.body.buyerFeeAmount).toBe(0);
     });
   });
@@ -1647,15 +1689,26 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const product = await createProduct({ sellerId: seller.id, categoryId: baseline.categoryId });
       const addr = await createAddress({ userId: buyer.id });
       const key = randomUUID();
+      const expectedShippingTariffVersion = await activeShippingTariffVersion();
       const first = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items: [{ productId: product.id }], idempotencyKey: key, shippingAddressId: addr.id })
+        .send({
+          items: [{ productId: product.id }],
+          idempotencyKey: key,
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion,
+        })
         .expect(201);
       const second = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items: [{ productId: product.id }], idempotencyKey: key, shippingAddressId: addr.id })
+        .send({
+          items: [{ productId: product.id }],
+          idempotencyKey: key,
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion,
+        })
         .expect(201);
       expect(second.body.checkoutGroupId).toBe(first.body.checkoutGroupId);
       expect(second.body.existingGroup).toBe(true);
@@ -1672,15 +1725,26 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const denizAddr = await createAddress({ userId: deniz.id });
       const cerenAddr = await createAddress({ userId: ceren.id });
       const key = randomUUID();
+      const expectedShippingTariffVersion = await activeShippingTariffVersion();
       await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(deniz))
-        .send({ items: [{ productId: product.id }], idempotencyKey: key, shippingAddressId: denizAddr.id })
+        .send({
+          items: [{ productId: product.id }],
+          idempotencyKey: key,
+          shippingAddressId: denizAddr.id,
+          expectedShippingTariffVersion,
+        })
         .expect(201);
       const res = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(ceren))
-        .send({ items: [{ productId: product.id }], idempotencyKey: key, shippingAddressId: cerenAddr.id })
+        .send({
+          items: [{ productId: product.id }],
+          idempotencyKey: key,
+          shippingAddressId: cerenAddr.id,
+          expectedShippingTariffVersion,
+        })
         .expect(403);
       expect(JSON.stringify(res.body)).toContain('Bu işlem size ait değil');
     });
@@ -1698,6 +1762,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const body = {
         items: [{ productId: product.id }], idempotencyKey: key, email, emailVerificationCode: code,
         phone: '+905551234567', guestName: 'Misafir',
+        expectedShippingTariffVersion: await activeShippingTariffVersion(),
         shippingAddress: { fullName: 'Misafir', phone: '+905551234567', city: 'İstanbul', district: 'Kadıköy', address: 'Adres' },
       };
       const first = await request(server()).post('/api/orders/checkout/guest').send(body).expect(201);
@@ -1717,7 +1782,12 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const co = await request(server())
         .post('/api/orders/checkout')
         .set(authHeader(buyer))
-        .send({ items: [{ productId: product.id }], idempotencyKey: randomUUID(), shippingAddressId: addr.id })
+        .send({
+          items: [{ productId: product.id }],
+          idempotencyKey: randomUUID(),
+          shippingAddressId: addr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        })
         .expect(201);
       expect(co.body.checkoutGroupId).toBeTruthy();
       const prisma = getPrisma();
@@ -1886,6 +1956,7 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
         .post('/api/orders/guest')
         .send({
           productId: product.id, email, emailVerificationCode: code, phone: '+905551234567', guestName: 'Enum Test',
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
           shippingAddress: { fullName: 'Enum', phone: '+905551234567', city: 'İstanbul', district: 'Kadıköy', address: 'Adres' },
         })
         .expect(201);
@@ -1904,7 +1975,12 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       const res = await request(server())
         .post('/api/orders/buy')
         .set(authHeader(kaan))
-        .send({ productId: product.id, shippingAddressId: kaanAddr.id, billingAddressId: otherAddr.id })
+        .send({
+          productId: product.id,
+          shippingAddressId: kaanAddr.id,
+          billingAddressId: otherAddr.id,
+          expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain('Geçersiz fatura adresi');
       const count = await getPrisma().order.count({ where: { productId: product.id } });

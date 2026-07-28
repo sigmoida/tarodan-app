@@ -85,6 +85,14 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
   const post = (path: string, user: Auth) =>
     request(server()).post(path).set(authHeader(user));
 
+  async function activeShippingTariffVersion(): Promise<number> {
+    const tariff = await getPrisma().shippingTariff.findFirst({
+      where: { provider: 'surat', status: 'active' },
+      select: { version: true },
+    });
+    return tariff?.version ?? 1;
+  }
+
   /** Alıcı + satıcı + ürün + alıcı adresi (varsayılan fiyat 300, adet 1). */
   async function makeBuyerSellerProduct(
     opts: { price?: number; quantity?: number; sellerPremium?: boolean } = {},
@@ -137,11 +145,26 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     // Dispatch tetikleyicilerini (then/end) sararak gövde hazırlığını öne al.
     const originalThen = req.then.bind(req);
     req.then = ((onFulfilled?: any, onRejected?: any) =>
-      prepareBody().then(() => originalThen(onFulfilled, onRejected))) as typeof req.then;
+      prepareBody()
+        .then(() => originalThen())
+        .then(async (response) => {
+          await ctx.waitForBackgroundTasks();
+          return response;
+        })
+        .then(onFulfilled, onRejected)) as typeof req.then;
 
     const originalEnd = req.end.bind(req);
     req.end = ((callback?: any) => {
-      void prepareBody().then(() => originalEnd(callback), (err) => callback?.(err));
+      void prepareBody().then(
+        () =>
+          originalEnd((error, response) => {
+            void ctx.waitForBackgroundTasks().then(
+              () => callback?.(error, response),
+              (backgroundError) => callback?.(backgroundError, response),
+            );
+          }),
+        (error) => callback?.(error),
+      );
       return req;
     }) as typeof req.end;
 
@@ -526,9 +549,9 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     const { buyer, seller, product, addr } = await makeBuyerSellerProduct({ price: 300 });
     const prisma = getPrisma();
 
-    // 1) Alıcı teklif (100).
+    // 1) Alıcı teklif (minimum %50 = 150).
     const offerRes = await post('/api/offers', buyer)
-      .send({ productId: product.id, amount: 100 })
+      .send({ productId: product.id, amount: 150 })
       .expect(201);
 
     // 2) Satıcı karşı teklif (200) → orijinal rejected, yeni pending (buyerMustAccept).
@@ -582,16 +605,18 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
       .expect(200);
     // initiate → rezervasyon.
     await post('/api/payments/initiate', buyer).send({ orderId, provider: 'paytr' }).expect(201);
-    const payment = await lastPayment(orderId);
 
-    // 1) 30dk geçir (payment.createdAt backdate) → cancel-expired-payments.
-    await prisma.payment.update({
-      where: { id: payment!.id },
+    // 1) 30dk geçir → ödeme oturumundan bağımsız stok rezervasyonunu serbest bırak.
+    await prisma.order.update({
+      where: { id: orderId },
       data: { createdAt: new Date(Date.now() - 31 * 60 * 1000) },
     });
-    await ctx.app.get(PaymentService).cancelExpiredPayments();
+    await ctx.app.get(PaymentService).releaseExpiredOrderReservations();
     const p1 = await prisma.product.findUnique({ where: { id: product.id } });
     expect(p1?.reservedQuantity).toBe(0);
+    expect((await prisma.order.findUnique({ where: { id: orderId } }))?.status).toBe(
+      OrderStatus.pending_payment,
+    );
 
     // 2) 24 saat geçir (order.paymentExpiresAt backdate) → expireUnpaidOrders.
     await prisma.order.update({
@@ -696,6 +721,7 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
       .post('/api/orders/guest')
       .send({
         productId: product.id,
+        expectedShippingTariffVersion: await activeShippingTariffVersion(),
         email,
         emailVerificationCode: code,
         phone: '+905551234567',
@@ -749,6 +775,7 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
       .post('/api/orders/guest')
       .send({
         productId: product.id,
+        expectedShippingTariffVersion: await activeShippingTariffVersion(),
         email,
         emailVerificationCode: '000000',
         phone: '+905551234567',
@@ -780,6 +807,7 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
       .post('/api/orders/guest')
       .send({
         productId: product.id,
+        expectedShippingTariffVersion: await activeShippingTariffVersion(),
         email,
         emailVerificationCode: code,
         phone: '+905551234567',
@@ -1334,10 +1362,10 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     expect(res.body.newStatus).toBe(OrderStatus.completed);
     expect((await prisma.order.findUnique({ where: { id: orderId } }))?.status).toBe(OrderStatus.completed);
 
-    // 3) Normal kullanıcı → 403.
+    // 3) Normal kullanıcı token'ı admin JWT stratejisinde doğrulanmaz → 401.
     await post(`/api/admin/orders/${orderId}/resolve`, buyer)
       .send({ resolution: 'seller_favor', note: 'x' })
-      .expect(403);
+      .expect(401);
   }, LONG);
 
   scenario('JRN-061', async () => {
@@ -1425,8 +1453,8 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     expect((await prisma.trade.findUnique({ where: { id: tradeId } }))?.status).toBe(TradeStatus.completed);
     expect((await prisma.tradeCashPayment.findUnique({ where: { tradeId } }))?.releasedAt).toBeNull();
 
-    // 3) Yönetici olmayan → 403 (guard).
-    await post(`/api/admin/payouts/release-trade/${tradeId}`, f.initiator).send({}).expect(403);
+    // 3) Yönetici olmayan token admin JWT stratejisinde doğrulanmaz → 401.
+    await post(`/api/admin/payouts/release-trade/${tradeId}`, f.initiator).send({}).expect(401);
 
     // 2) Admin erken serbest bırakma → releasedAt dolar.
     await post(`/api/admin/payouts/release-trade/${tradeId}`, admin).send({}).expect(200);
@@ -1941,9 +1969,9 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
 
     // 1) Moderatör trades approve → 403 (approve super_admin/admin gerektirir).
     expect((await post(`/api/admin/trades/${tradeId}/approve`, moderator).send({ notes: 'x' })).status).toBe(403);
-    // 2) Normal kullanıcı orders resolve → 403.
+    // 2) Normal kullanıcı token'ı admin JWT stratejisinde doğrulanmaz → 401.
     const { orderId } = await paidOrder({ price: 100 });
-    expect((await post(`/api/admin/orders/${orderId}/resolve`, normalUser).send({ resolution: 'dismissed', note: 'x' })).status).toBe(403);
+    expect((await post(`/api/admin/orders/${orderId}/resolve`, normalUser).send({ resolution: 'dismissed', note: 'x' })).status).toBe(401);
     // 3) Moderatör force-complete (super_admin) → 403.
     expect((await post(`/api/admin/orders/${orderId}/force-complete`, moderator).send({ reason: 'x' })).status).toBe(403);
   }, LONG);
@@ -1951,11 +1979,11 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
   scenario('JRN-104', async () => {
     // Kendi ürününe sipariş/teklif/takas engeli.
     const seller = (await createUser(ctx.module, { isSeller: true, premium: true })) as Auth;
-    await createAddress({ userId: seller.id });
+    const sellerAddress = await createAddress({ userId: seller.id });
     const ownProduct = await createProduct({ sellerId: seller.id, categoryId: baseline.categoryId, price: 200, isTradeEnabled: true });
 
     // 1) Kendi ürününe buy → 403.
-    const buyRes = await post('/api/orders/buy', seller).send({ productId: ownProduct.id });
+    const buyRes = await buyNow(ctx, seller, ownProduct.id, sellerAddress.id);
     expect(buyRes.status).toBe(403);
     // 2) Kendi ürününe offer → 400.
     const offerRes = await post('/api/offers', seller).send({ productId: ownProduct.id, amount: 100 });
@@ -1991,21 +2019,30 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     // Hata mesajları tutarlı; alan adları/durum kodları (403/400) dile göre değişmez.
     // Backend tek dil (TR) döndürür; Accept-Language ile de status kodları sabit kalır.
     const seller = (await createUser(ctx.module, { isSeller: true })) as Auth;
-    await createAddress({ userId: seller.id });
+    const sellerAddress = await createAddress({ userId: seller.id });
     const ownProduct = await createProduct({ sellerId: seller.id, categoryId: baseline.categoryId, price: 200 });
+    const expectedShippingTariffVersion = await activeShippingTariffVersion();
 
     // Self-buy: TR ve EN Accept-Language ile de aynı 403.
     const trRes = await request(server())
       .post('/api/orders/buy')
       .set(authHeader(seller))
       .set('Accept-Language', 'tr')
-      .send({ productId: ownProduct.id });
+      .send({
+        productId: ownProduct.id,
+        shippingAddressId: sellerAddress.id,
+        expectedShippingTariffVersion,
+      });
     expect(trRes.status).toBe(403);
     const enRes = await request(server())
       .post('/api/orders/buy')
       .set(authHeader(seller))
       .set('Accept-Language', 'en')
-      .send({ productId: ownProduct.id });
+      .send({
+        productId: ownProduct.id,
+        shippingAddressId: sellerAddress.id,
+        expectedShippingTariffVersion,
+      });
     expect(enRes.status).toBe(403);
 
     // Düşük teklif: status 400 her dilde sabit.
