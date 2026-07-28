@@ -1,19 +1,15 @@
-import { View, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
-import { Button, Snackbar, Text, theme } from "@tarodan/ui-native";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { ScreenHeader } from "@/components/common";
-import { formatPrice } from "@/utils/format";
-import { styles } from "./_lib/styles";
-import { useCheckout } from "./_hooks/useCheckout";
-import { CheckoutProgress } from "./_components/CheckoutProgress";
-import {
-  Step1Address,
-  Step2Payment,
-  Step3Confirm,
-} from "./_components/CheckoutSteps";
-import { OrderSummary } from "./_components/OrderSummary";
-import { OtpModal } from "./_modals/OtpModal";
+import { View, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Button, Snackbar, Text, theme } from '@tarodan/ui-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { ScreenHeader } from '@/components/common';
+import { formatPrice } from '@/utils/format';
+import { styles } from './_lib/styles';
+import { useCheckout } from './_hooks/useCheckout';
+import { CheckoutProgress } from './_components/CheckoutProgress';
+import { Step1Address, Step2Payment, Step3Confirm } from './_components/CheckoutSteps';
+import { OrderSummary } from './_components/OrderSummary';
+import { OtpModal } from './_modals/OtpModal';
 
 const { colors } = theme;
 
@@ -25,32 +21,21 @@ export default function CheckoutScreen() {
       <View style={styles.emptyContainer}>
         <Ionicons name="cart-outline" size={80} color={colors.text.muted} />
         <Text style={styles.emptyTitle}>Sepetiniz Boş</Text>
-        <Text style={styles.emptySubtitle}>
-          Ödeme yapabilmek için sepetinize ürün ekleyin
-        </Text>
+        <Text style={styles.emptySubtitle}>Ödeme yapabilmek için sepetinize ürün ekleyin</Text>
         <Button
           variant="primary"
           title="Alışverişe Başla"
-          onPress={() => router.replace("/" as any)}
-          style={{ marginTop: theme.spacing[5], alignSelf: "center" }}
+          onPress={() => router.replace('/' as any)}
+          style={{ marginTop: theme.spacing[5], alignSelf: 'center' }}
         />
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader
-        title={
-          c.step === 1
-            ? "Teslimat Bilgileri"
-            : c.step === 2
-              ? "Ödeme"
-              : "Sipariş Onayı"
-        }
+        title={c.step === 1 ? 'Teslimat Bilgileri' : c.step === 2 ? 'Ödeme' : 'Sipariş Onayı'}
         onBack={() => (c.step > 1 ? c.setStep(c.step - 1) : router.back())}
       />
 
@@ -62,7 +47,7 @@ export default function CheckoutScreen() {
         {c.step === 3 ? <Step3Confirm c={c} /> : null}
 
         <OrderSummary
-          itemCount={c.itemCount}
+          itemCount={c.items.length}
           subtotal={c.subtotal}
           shippingCost={c.shippingCost}
           effectiveShippingCity={c.effectiveShippingCity}
@@ -87,16 +72,10 @@ export default function CheckoutScreen() {
         ) : (
           <Button
             variant="primary"
-            title={
-              c.quoteLoading
-                ? "Fiyat hesaplanıyor..."
-                : c.loading
-                  ? "İşleniyor..."
-                  : `Onayla ve Öde (${formatPrice(c.total)})`
-            }
+            title={c.loading ? 'İşleniyor...' : `Onayla ve Öde (${formatPrice(c.total)})`}
             onPress={c.handleCheckout}
             isLoading={c.loading}
-            disabled={c.loading || c.quoteLoading || c.quoteError}
+            disabled={c.loading}
             fullWidth
             style={styles.actionButton}
             icon="card-outline"
@@ -104,12 +83,7 @@ export default function CheckoutScreen() {
         )}
       </View>
 
-      <Snackbar
-        visible={c.snackbar.visible}
-        onDismiss={c.dismissSnackbar}
-        duration={3000}
-        variant="danger"
-      >
+      <Snackbar visible={c.snackbar.visible} onDismiss={c.dismissSnackbar} duration={3000} variant="danger">
         {c.snackbar.message}
       </Snackbar>
 
