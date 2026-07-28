@@ -45,6 +45,25 @@ const SHIPPING_TARIFF_MOCK = {
   }),
 };
 
+const DEFAULT_COMMISSION_RULE = {
+  id: "default-commission-rule",
+  name: "Default seller commission",
+  ruleType: "default",
+  categoryId: null,
+  sellerType: "ALL",
+  taxpayerType: "all",
+  minAmount: null,
+  maxAmount: null,
+  priority: 0,
+  appliesTo: "SELLER",
+  sellerRate: 10,
+  sellerMin: null,
+  sellerMax: null,
+  buyerRate: null,
+  buyerMin: null,
+  buyerMax: null,
+};
+
 /**
  * Toplu checkout (CheckoutGroup): sepetteki tüm ürünler tek grupta sipariş edilir,
  * tek ödeme grubu kapsar. Bu suite idempotensi, doğrulama ve atomiklik koruyucularını test eder.
@@ -167,6 +186,9 @@ describe("OrderService checkout group (batch checkout)", () => {
     mockPrisma.checkoutGroup.findUnique.mockResolvedValue(null);
     mockPrisma.order.count.mockResolvedValue(0);
     mockPrisma.checkoutGroup.count.mockResolvedValue(0);
+    mockPrisma.commissionRule.findMany.mockResolvedValue([
+      DEFAULT_COMMISSION_RULE,
+    ]);
     mockPrisma.$transaction.mockImplementation(
       async (fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx),
     );
@@ -504,6 +526,7 @@ describe("OrderService checkout group (batch checkout)", () => {
       items: [{ productId: productA }],
       idempotencyKey,
       shippingAddressId: addressId,
+      expectedShippingTariffVersion: 1,
     };
     const result: any = await service.checkout(buyerId, dto as any);
 
@@ -634,6 +657,8 @@ describe("OrderService checkout group (batch checkout)", () => {
           value: 10,
           scope: "global",
           estimatedDiscount: 10,
+          platformFundedShare: 1,
+          eligibleProductIds: [productA],
         },
       });
 

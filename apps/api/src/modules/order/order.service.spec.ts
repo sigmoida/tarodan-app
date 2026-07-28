@@ -421,6 +421,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
       id: "ship-1",
       provider: "surat",
       trackingNumber: "TRK123456",
+      providerTrackingId: "CARGO987654",
       status: "in_transit",
       cost: 29.99,
       shippedAt: new Date("2026-06-02T09:00:00Z"),
@@ -526,10 +527,11 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
     expect(result.shippingAddress.addressLine1).toBe("Test cad. No:1 D:2");
     expect(result.shippingAddress.postalCode).toBe("34000");
 
-    // Kargo takip: üst seviye trackingNumber + türetilmiş Sürat URL
+    // trackingNumber dahili Sürat sorgu referansıdır; dış takip URL'si gerçek
+    // providerTrackingId (KargoTakipNo) ile oluşturulur.
     expect(result.trackingNumber).toBe("TRK123456");
     expect(result.trackingUrl).toContain("suratkargo.com.tr");
-    expect(result.trackingUrl).toContain("TRK123456");
+    expect(result.trackingUrl).toContain("CARGO987654");
 
     // Zaman çizelgesi: paidAt / shippedAt üst seviyede
     expect(result.paidAt).toEqual(mockOrder.payment.paidAt);

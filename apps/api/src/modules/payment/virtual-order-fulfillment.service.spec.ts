@@ -8,12 +8,13 @@ import { SubscriptionStatus, OrderStatus, PaymentStatus } from "@prisma/client";
 describe("VirtualOrderFulfillmentService", () => {
   const makeTx = () => ({
     userMembership: { findUnique: jest.fn(), update: jest.fn() },
+    membershipTier: { findUnique: jest.fn() },
     product: {
       updateMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
     },
-    membershipPayment: { updateMany: jest.fn() },
+    membershipPayment: { findUnique: jest.fn(), updateMany: jest.fn() },
     order: {
       update: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
@@ -26,24 +27,67 @@ describe("VirtualOrderFulfillmentService", () => {
   const payment = {
     id: "pay-1",
     orderId: "ord-1",
+    amount: 100,
     providerPaymentId: "prov-1",
-    order: { buyerId: "buyer-1", productId: "membership-premium" },
+    order: {
+      buyerId: "buyer-1",
+      productId: "membership-premium",
+      totalAmount: 100,
+    },
   };
+
+  const membership = (type: "free" | "premium") => ({
+    id: "mem-1",
+    tierId: "legacy-tier",
+    tier: { id: "legacy-tier", type, isActive: true },
+    currentPeriodEnd: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    user: {
+      businessStatus: null,
+      companyName: null,
+      taxId: null,
+    },
+  });
+
+  const intent = (type: "free" | "premium") => ({
+    id: "intent-1",
+    orderId: "ord-1",
+    membershipId: "mem-1",
+    targetTierId: type,
+    status: PaymentStatus.pending,
+    amount: 100,
+    billingPeriod: "monthly",
+    periodStart: null,
+    periodEnd: null,
+    metadata: null,
+    targetTier: {
+      id: type,
+      type,
+      isActive: true,
+      monthlyPrice: 100,
+      yearlyPrice: 1000,
+    },
+  });
 
   describe("applyMembershipInTx", () => {
     it("premium üyeliği aktive eder, ilanları rankTier=1 yükseltir, siparişi completed yapar", async () => {
       const tx = makeTx() as any;
-      tx.userMembership.findUnique.mockResolvedValue({
-        id: "mem-1",
-        tier: { type: "premium" },
-      });
+      tx.userMembership.findUnique.mockResolvedValue(membership("premium"));
+      tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
+      tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
 
       await svc.applyMembershipInTx(tx, payment, "txn-9");
 
       expect(tx.userMembership.update).toHaveBeenCalledWith({
         where: { userId: "buyer-1" },
-        data: { status: SubscriptionStatus.active, cancelledAt: null },
+        data: expect.objectContaining({
+          status: SubscriptionStatus.active,
+          cancelledAt: null,
+          autoRenew: true,
+          tier: { connect: { id: "premium" } },
+          currentPeriodStart: expect.any(Date),
+          currentPeriodEnd: expect.any(Date),
+        }),
       });
       // premium → boost'suz aktif ilanları rankTier 0→1
       expect(tx.product.updateMany).toHaveBeenCalledWith(
@@ -54,7 +98,7 @@ describe("VirtualOrderFulfillmentService", () => {
       );
       expect(tx.membershipPayment.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { membershipId: "mem-1", status: "pending" },
+          where: { id: "intent-1", status: "pending" },
           data: expect.objectContaining({
             status: "completed",
             providerPaymentId: "txn-9",
@@ -70,22 +114,23 @@ describe("VirtualOrderFulfillmentService", () => {
 
     it("free üyelikte ilan rankTier'ı YÜKSELTİLMEZ", async () => {
       const tx = makeTx() as any;
-      tx.userMembership.findUnique.mockResolvedValue({
-        id: "mem-2",
-        tier: { type: "free" },
-      });
+      tx.userMembership.findUnique.mockResolvedValue(membership("free"));
+      tx.membershipPayment.findUnique.mockResolvedValue(intent("free"));
+      tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
 
-      await svc.applyMembershipInTx(tx, payment);
+      await svc.applyMembershipInTx(tx, {
+        ...payment,
+        order: { ...payment.order, productId: "membership-free" },
+      });
       expect(tx.product.updateMany).not.toHaveBeenCalled();
     });
 
     it("yetim pending kardeş siparişleri iptal + ödemeleri failed yapar", async () => {
       const tx = makeTx() as any;
-      tx.userMembership.findUnique.mockResolvedValue({
-        id: "mem-1",
-        tier: { type: "premium" },
-      });
+      tx.userMembership.findUnique.mockResolvedValue(membership("premium"));
+      tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
+      tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       tx.order.findMany.mockResolvedValue([{ id: "sib-1" }, { id: "sib-2" }]);
       const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
 
