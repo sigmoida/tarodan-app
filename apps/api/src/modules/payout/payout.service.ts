@@ -43,6 +43,8 @@ const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
   RefundRequestStatus.disputed,
 ];
 
+const IBAN_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class PayoutService {
   private readonly logger = new Logger(PayoutService.name);
@@ -404,26 +406,14 @@ export class PayoutService {
           continue;
         }
       }
-      // Atomik claim (K2): yalnızca hâlâ pending ise processing'e al. Çoklu instance
-      // veya api+worker aynı cron'u koşarsa satır başına yalnızca bir koşucu kazanır;
-      // count=0 → başka bir koşucu aldı ya da iade void etti → atla. PayTR'ye çift
-      // transfer gitmesini DB seviyesinde engeller.
-      const claim = await this.prisma.payoutTransfer.updateMany({
-        where: { id: payout.id, status: PayoutStatus.pending },
-        data: { status: PayoutStatus.processing },
-      });
-      if (claim.count === 0) {
-        continue;
-      }
-
       // Y5: İşleme anında satıcının GÜNCEL banka hesabını oku. Payout oluşturulurken
       // alınan IBAN/ad snapshot'ı bayatlamış olabilir (satıcı sonradan değiştirmiş
       // olabilir) → para eski IBAN'a gitmesin. Güncel değeri kullan + snapshot'ı tazele.
-      const bankAccount = await this.prisma.sellerBankAccount.findUnique({
+      let bankAccount = await this.prisma.sellerBankAccount.findUnique({
         where: { userId: payout.sellerId },
       });
-      const transferIban = bankAccount?.iban || "";
-      const transferName = bankAccount?.accountHolder || "";
+      let transferIban = bankAccount?.iban || "";
+      let transferName = bankAccount?.accountHolder || "";
       if (
         transferIban !== payout.transferIban ||
         transferName !== payout.transferName
@@ -435,14 +425,14 @@ export class PayoutService {
       }
 
       if (!transferIban || !transferName) {
-        await this.prisma.payoutTransfer.update({
-          where: { id: payout.id },
+        const failedClaim = await this.prisma.payoutTransfer.updateMany({
+          where: { id: payout.id, status: PayoutStatus.pending },
           data: {
             status: PayoutStatus.failed,
             failureReason: "no_bank_account",
           },
         });
-        failed++;
+        if (failedClaim.count > 0) failed++;
         continue;
       }
 
@@ -450,8 +440,8 @@ export class PayoutService {
       // gönderilmeden başarısız işaretlenir (satıcı düzeltir); kör transfer riskini azaltır.
       // (Format doğru ama yanlış hesap durumunu PayTR reddi / returned-transfer akışı yakalar.)
       if (!this.isValidTrIban(transferIban)) {
-        await this.prisma.payoutTransfer.update({
-          where: { id: payout.id },
+        const failedClaim = await this.prisma.payoutTransfer.updateMany({
+          where: { id: payout.id, status: PayoutStatus.pending },
           data: {
             status: PayoutStatus.failed,
             failureReason: "invalid_iban_format",
@@ -460,7 +450,7 @@ export class PayoutService {
         this.logger.warn(
           `Payout ${payout.id} için geçersiz IBAN formatı — transfer yapılmadı`,
         );
-        failed++;
+        if (failedClaim.count > 0) failed++;
         continue;
       }
 
@@ -469,7 +459,6 @@ export class PayoutService {
       // Çalınan oturumla IBAN'ı değiştirip anında para çekme saldırısına karşı pencere;
       // satıcı değişikliği fark edip itiraz edebilir. İlk kayıtta ibanChangedAt null →
       // beklemez (ödemeler zaten teslimden ~14 gün sonra yapıldığından legit gecikme yok).
-      const IBAN_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 gün
       if (
         bankAccount?.ibanChangedAt &&
         Date.now() - bankAccount.ibanChangedAt.getTime() < IBAN_COOLDOWN_MS
@@ -479,6 +468,45 @@ export class PayoutService {
         );
         continue;
       }
+
+      // Atomik claim (K2): yalnızca hâlâ pending ise processing'e al. Cooldown
+      // kontrolü claim'den önce yapıldığı için bekleyen payout processing'te takılmaz.
+      const claim = await this.prisma.payoutTransfer.updateMany({
+        where: { id: payout.id, status: PayoutStatus.pending },
+        data: { status: PayoutStatus.processing },
+      });
+      if (claim.count === 0) {
+        continue;
+      }
+
+      // TOCTOU guard: preflight ile sağlayıcı çağrısı arasında IBAN değişmiş olabilir.
+      // Claim sonrasında tekrar oku; değişiklik/cooldown varsa claim'i güvenle bırak.
+      bankAccount = await this.prisma.sellerBankAccount.findUnique({
+        where: { userId: payout.sellerId },
+      });
+      const confirmedIban = bankAccount?.iban || "";
+      const confirmedName = bankAccount?.accountHolder || "";
+      const changedDuringClaim =
+        confirmedIban !== transferIban || confirmedName !== transferName;
+      const coolingDownNow =
+        !!bankAccount?.ibanChangedAt &&
+        Date.now() - bankAccount.ibanChangedAt.getTime() < IBAN_COOLDOWN_MS;
+      if (changedDuringClaim || coolingDownNow) {
+        await this.prisma.payoutTransfer.updateMany({
+          where: { id: payout.id, status: PayoutStatus.processing },
+          data: {
+            status: PayoutStatus.pending,
+            transferIban: confirmedIban,
+            transferName: confirmedName,
+          },
+        });
+        this.logger.warn(
+          `Payout ${payout.id} beklemede: claim sırasında banka hesabı değişti veya cooldown başladı.`,
+        );
+        continue;
+      }
+      transferIban = confirmedIban;
+      transferName = confirmedName;
 
       try {
         const result = await this.paymentProviders
@@ -504,18 +532,18 @@ export class PayoutService {
           // Başarılı transfer = IBAN gerçek ve çalışıyor → otomatik doğrula.
           await this.syncBankAccountVerification(
             payout.sellerId,
-            payout.transferIban,
+            transferIban,
             true,
           );
           await this.sendPayoutReleasedEmail(
             payout.sellerId,
             Number(payout.netAmount),
-            payout.transferIban,
+            transferIban,
           );
           processed++;
           // 11.1c (G4/KVKK): tam IBAN loglanmaz — yalnız son 4 hane (email'le simetrik).
           this.logger.log(
-            `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${maskIban(payout.transferIban)}`,
+            `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${maskIban(transferIban)}`,
           );
           // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
           // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
