@@ -1255,6 +1255,10 @@ model Order {
   discountAmount         Decimal                @default(0) @map("discount_amount") @db.Decimal(10, 2)
   discountBreakdown      Json?                  @map("discount_breakdown")
   discountCode           String?                @map("discount_code")
+  // Bu siparişteki kupon indiriminin PLATFORM tarafından finanse edilen kısmı (F2.4).
+  // Satıcı payout tabanı bu kadar geri EKLENİR (escrow) → platform-fonlu kampanyada
+  // satıcı indirim öncesi tutar üzerinden ödenir. Varsayılan 0 (satıcı-fonlu, eski davranış).
+  platformFundedDiscount Decimal                @default(0) @map("platform_funded_discount") @db.Decimal(10, 2)
   subtotal               Decimal?               @db.Decimal(10, 2)
   taxAmount              Decimal                @default(0) @map("tax_amount") @db.Decimal(10, 2)
   // E-ticaret stopajı (GVK 94/19, varsayılan %1): yalnız vergi mükellefi (kurumsal onaylı)
@@ -2262,6 +2266,13 @@ model Discount {
   /// Toplu üretilen tek-kullanımlık voucher kodları için "batch şablonu" işareti.
   /// true ise bu Discount'ın paylaşımlı `code`'u yoktur; kodlar `codes` altındadır.
   isBatch           Boolean         @default(false) @map("is_batch")
+  /// Kampanya maliyetini KİM üstlenir (F2.4). seller (varsayılan): indirimi satıcı
+  /// yer (payout tabanı düşer, mevcut davranış). platform: platform finanse eder →
+  /// satıcıya indirim ÖNCESİ tutar üzerinden ödenir (escrow'da geri eklenir). shared:
+  /// platformFundedRatio kadar platform üstlenir.
+  fundedBy            DiscountFundedBy @default(seller) @map("funded_by")
+  /// shared için platform payı [0,1] (0.30 = %30 platform, %70 satıcı).
+  platformFundedRatio Decimal?         @map("platform_funded_ratio") @db.Decimal(5, 4)
   usages            DiscountUsage[]
   codes             DiscountCode[]
   category          Category?       @relation(fields: [categoryId], references: [id])
@@ -2611,6 +2622,15 @@ enum DiscountScope {
   category
   product
   seller
+}
+
+/// Kampanya maliyetini kim üstlenir (F2.4). seller: satıcı (varsayılan, payout tabanı
+/// düşer). platform: platform finanse eder (satıcıya indirim öncesi tutar ödenir).
+/// shared: platformFundedRatio kadarını platform üstlenir.
+enum DiscountFundedBy {
+  seller
+  platform
+  shared
 }
 
 enum RatingStatus {

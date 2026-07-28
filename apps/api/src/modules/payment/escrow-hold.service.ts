@@ -28,7 +28,11 @@ export class EscrowHoldService {
     const sellerAmount =
       Number(order.totalAmount) -
       Number(order.commissionAmount) -
-      Number(order.withholdingTaxAmount ?? 0);
+      Number(order.withholdingTaxAmount ?? 0) +
+      // F2.4: platform-fonlu kampanya payı satıcıya GERİ eklenir — satıcı indirim
+      // öncesi tutar üzerinden ödenir, farkı platform üstlenir. Satıcı-fonlu (varsayılan)
+      // kuponlarda bu 0'dır → mevcut davranış değişmez.
+      Number(order.platformFundedDiscount ?? 0);
 
     await tx.paymentHold.create({
       data: {

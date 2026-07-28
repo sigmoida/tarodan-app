@@ -1,124 +1,196 @@
-import { IsString, IsOptional, IsEnum, IsNumber, IsBoolean, IsArray, IsDateString, Min, ValidateIf } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { DiscountType, DiscountScope } from '@prisma/client';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsBoolean,
+  IsArray,
+  IsDateString,
+  Min,
+  Max,
+  ValidateIf,
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type } from "class-transformer";
+import { DiscountType, DiscountScope, DiscountFundedBy } from "@prisma/client";
 
 export class CreateDiscountDto {
-  @ApiPropertyOptional({ description: 'Kupon kodu (boş bırakılırsa otomatik kampanya olur)' })
+  @ApiPropertyOptional({
+    description: "Kupon kodu (boş bırakılırsa otomatik kampanya olur)",
+  })
   @IsOptional()
   @IsString()
   code?: string;
 
-  @ApiProperty({ description: 'Kampanya adı' })
+  @ApiProperty({ description: "Kampanya adı" })
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ description: 'Kampanya açıklaması' })
+  @ApiPropertyOptional({ description: "Kampanya açıklaması" })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({ enum: DiscountType, description: 'İndirim türü: percentage veya fixed_amount' })
+  @ApiProperty({
+    enum: DiscountType,
+    description: "İndirim türü: percentage veya fixed_amount",
+  })
   @IsEnum(DiscountType)
   type: DiscountType;
 
-  @ApiProperty({ description: 'İndirim değeri (yüzde veya tutar)', example: 10 })
+  @ApiProperty({
+    description: "İndirim değeri (yüzde veya tutar)",
+    example: 10,
+  })
   @IsNumber()
   @Min(0)
   @Type(() => Number)
   value: number;
 
-  @ApiProperty({ enum: DiscountScope, description: 'İndirim kapsamı: global, category, product, seller' })
+  @ApiProperty({
+    enum: DiscountScope,
+    description: "İndirim kapsamı: global, category, product, seller",
+  })
   @IsEnum(DiscountScope)
   scope: DiscountScope;
 
-  @ApiPropertyOptional({ description: 'Kategori ID (scope=category için)' })
-  @ValidateIf((o) => o.scope === 'category')
+  @ApiPropertyOptional({ description: "Kategori ID (scope=category için)" })
+  @ValidateIf((o) => o.scope === "category")
   @IsString()
   categoryId?: string;
 
-  @ApiPropertyOptional({ description: 'Hedef ürün ID\'leri (scope=product için)', type: [String] })
-  @ValidateIf((o) => o.scope === 'product')
+  @ApiPropertyOptional({
+    description: "Hedef ürün ID'leri (scope=product için)",
+    type: [String],
+  })
+  @ValidateIf((o) => o.scope === "product")
   @IsArray()
   @IsString({ each: true })
   targetProductIds?: string[];
 
-  @ApiPropertyOptional({ description: 'Minimum sepet tutarı (TL)', example: 100 })
+  @ApiPropertyOptional({
+    description: "Minimum sepet tutarı (TL)",
+    example: 100,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   @Type(() => Number)
   minCartValue?: number;
 
-  @ApiPropertyOptional({ description: 'Adetli alım için minimum adet', example: 5 })
+  @ApiPropertyOptional({
+    description: "Adetli alım için minimum adet",
+    example: 5,
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Type(() => Number)
   minQuantity?: number;
 
-  @ApiPropertyOptional({ description: 'BOGO: Kaç tane alınca? (Buy X)', example: 2 })
+  @ApiPropertyOptional({
+    description: "BOGO: Kaç tane alınca? (Buy X)",
+    example: 2,
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Type(() => Number)
   buyQuantity?: number;
 
-  @ApiPropertyOptional({ description: 'BOGO: Kaç tane bedava/indirimli? (Get Y)', example: 1 })
+  @ApiPropertyOptional({
+    description: "BOGO: Kaç tane bedava/indirimli? (Get Y)",
+    example: 1,
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Type(() => Number)
   getQuantity?: number;
 
-  @ApiPropertyOptional({ description: 'Max indirim tutarı (TL)', example: 500 })
+  @ApiPropertyOptional({ description: "Max indirim tutarı (TL)", example: 500 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   @Type(() => Number)
   maxDiscountAmount?: number;
 
-  @ApiPropertyOptional({ description: 'Flash Sale olarak işaretle', default: false })
+  @ApiPropertyOptional({
+    description: "Flash Sale olarak işaretle",
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   isFlashSale?: boolean;
 
-
-  @ApiPropertyOptional({ description: 'Toplam kullanım limiti' })
+  @ApiPropertyOptional({ description: "Toplam kullanım limiti" })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Type(() => Number)
   usageLimitTotal?: number;
 
-  @ApiPropertyOptional({ description: 'Kullanıcı başı kullanım limiti', default: 1 })
+  @ApiPropertyOptional({
+    description: "Kullanıcı başı kullanım limiti",
+    default: 1,
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Type(() => Number)
   usageLimitPerUser?: number;
 
-  @ApiPropertyOptional({ description: 'Diğer indirimlerle birleştirilebilir mi?', default: false })
+  @ApiPropertyOptional({
+    description: "Diğer indirimlerle birleştirilebilir mi?",
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   isStackable?: boolean;
 
-  @ApiPropertyOptional({ description: 'Öncelik (düşük değer = önce uygulanır)', default: 0 })
+  @ApiPropertyOptional({
+    description: "Öncelik (düşük değer = önce uygulanır)",
+    default: 0,
+  })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
   priority?: number;
 
-  @ApiProperty({ description: 'Başlangıç tarihi', example: '2026-01-01T00:00:00Z' })
+  @ApiProperty({
+    description: "Başlangıç tarihi",
+    example: "2026-01-01T00:00:00Z",
+  })
   @IsDateString()
   startDate: string;
 
-  @ApiProperty({ description: 'Bitiş tarihi', example: '2026-12-31T23:59:59Z' })
+  @ApiProperty({ description: "Bitiş tarihi", example: "2026-12-31T23:59:59Z" })
   @IsDateString()
   endDate: string;
 
-  @ApiPropertyOptional({ description: 'Aktif mi?', default: true })
+  @ApiPropertyOptional({ description: "Aktif mi?", default: true })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    enum: DiscountFundedBy,
+    description:
+      "Kampanya maliyetini kim üstlenir (yalnız admin). seller (varsayılan) | platform | shared",
+    default: "seller",
+  })
+  @IsOptional()
+  @IsEnum(DiscountFundedBy)
+  fundedBy?: DiscountFundedBy;
+
+  @ApiPropertyOptional({
+    description: "shared için platform payı [0,1] (0.30 = %30 platform)",
+    example: 0.5,
+  })
+  @ValidateIf((o) => o.fundedBy === "shared")
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @Type(() => Number)
+  platformFundedRatio?: number;
 }

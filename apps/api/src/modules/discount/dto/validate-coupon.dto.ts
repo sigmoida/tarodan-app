@@ -60,6 +60,12 @@ export class ValidationResultDto {
      */
     eligibleProductIds: string[];
     /**
+     * Kupon indiriminin PLATFORM tarafından finanse edilen payı [0,1] (F2.4).
+     * seller→0, platform→1, shared→platformFundedRatio. Checkout bu payı couponDiscount
+     * ile çarpıp order.platformFundedDiscount olarak saklar (escrow'da satıcıya geri eklenir).
+     */
+    platformFundedShare: number;
+    /**
      * Tek-kullanımlık voucher kodu ise ilgili DiscountCode id'si. recordUsage'a
      * geçilir → sipariş kesinleşince kod atomik olarak "kullanıldı" işaretlenir.
      */

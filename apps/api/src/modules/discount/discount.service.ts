@@ -21,7 +21,12 @@ import {
   ValidationResultDto,
   ActiveCampaignDto,
 } from "./dto";
-import { DiscountScope, DiscountType, Prisma } from "@prisma/client";
+import {
+  DiscountScope,
+  DiscountType,
+  DiscountFundedBy,
+  Prisma,
+} from "@prisma/client";
 
 /**
  * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
@@ -182,6 +187,17 @@ export class DiscountService {
         isActive: dto.isActive ?? true,
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
+        // F2.4: yalnız admin platform/shared fonlama tanımlayabilir; satıcı kuponları
+        // her zaman seller-funded (satıcı platform parasını yönlendiremez).
+        fundedBy: isAdmin
+          ? (dto.fundedBy ?? DiscountFundedBy.seller)
+          : DiscountFundedBy.seller,
+        platformFundedRatio:
+          isAdmin &&
+          dto.fundedBy === DiscountFundedBy.shared &&
+          dto.platformFundedRatio != null
+            ? new Prisma.Decimal(dto.platformFundedRatio)
+            : null,
       },
       include: {
         seller: { select: { id: true, displayName: true } },
@@ -295,6 +311,16 @@ export class DiscountService {
       ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       ...(dto.startDate && { startDate: new Date(dto.startDate) }),
       ...(dto.endDate && { endDate: new Date(dto.endDate) }),
+      // F2.4: yalnız admin fonlama modelini (kim üstlenir) değiştirebilir.
+      ...(isAdmin &&
+        dto.fundedBy !== undefined && {
+          fundedBy: dto.fundedBy,
+          platformFundedRatio:
+            dto.fundedBy === DiscountFundedBy.shared &&
+            dto.platformFundedRatio != null
+              ? new Prisma.Decimal(dto.platformFundedRatio)
+              : null,
+        }),
     };
 
     const updated = await this.prisma.discount.update({
@@ -620,6 +646,12 @@ export class DiscountService {
         scope: discount.scope,
         estimatedDiscount,
         eligibleProductIds,
+        platformFundedShare:
+          discount.fundedBy === DiscountFundedBy.platform
+            ? 1
+            : discount.fundedBy === DiscountFundedBy.shared
+              ? Number(discount.platformFundedRatio ?? 0)
+              : 0,
         voucherCodeId,
       },
     };

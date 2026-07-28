@@ -379,6 +379,9 @@ export class OrderCheckoutGroupService {
           let appliedCouponCode: string | null = null;
           let appliedDiscountId: string | null = null;
           let appliedVoucherCodeId: string | undefined;
+          // F2.4: kupon indiriminin platform payı [0,1] — her siparişin
+          // platformFundedDiscount snapshot'ını hesaplamak için.
+          let appliedPlatformFundedShare = 0;
           if (dto.couponCode) {
             const validation = await this.discountService.validateCoupon(
               {
@@ -404,6 +407,8 @@ export class OrderCheckoutGroupService {
               appliedCouponCode = dto.couponCode.toUpperCase();
               appliedDiscountId = validation.discount.id;
               appliedVoucherCodeId = validation.discount.voucherCodeId;
+              appliedPlatformFundedShare =
+                validation.discount.platformFundedShare;
               const totalCoupon = validation.discount.estimatedDiscount;
               // Kupon YALNIZ uygun (scope) satırlara, satır toplamı oranında
               // dağıtılır — uygun olmayan satıcı/kategori satırları indirim payı
@@ -684,6 +689,10 @@ export class OrderCheckoutGroupService {
                         originalPrice: entry.originalPrice,
                       }
                     : undefined,
+                platformFundedDiscount:
+                  Math.round(
+                    entry.couponDiscount * appliedPlatformFundedShare * 100,
+                  ) / 100,
                 shippingCost: input.shippingCost,
                 taxAmount: input.taxAmount,
                 withholdingTaxAmount: input.withholdingTaxAmount,

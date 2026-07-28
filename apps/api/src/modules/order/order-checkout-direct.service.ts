@@ -285,6 +285,8 @@ export class OrderCheckoutDirectService {
       let appliedCouponCode: string | null = null;
       let appliedDiscountId: string | null = null;
       let appliedVoucherCodeId: string | undefined;
+      // F2.4: kupon indiriminin platform payı [0,1].
+      let couponPlatformFundedShare = 0;
 
       if (dto.couponCode) {
         const validation = await this.discountService.validateCoupon(
@@ -300,6 +302,7 @@ export class OrderCheckoutDirectService {
           appliedCouponCode = dto.couponCode.toUpperCase();
           appliedDiscountId = validation.discount.id;
           appliedVoucherCodeId = validation.discount.voucherCodeId;
+          couponPlatformFundedShare = validation.discount.platformFundedShare;
         } else if (!validation.isValid) {
           throw new BadRequestException(
             validation.error || i18nMessage("server.order.invalidCouponCode"),
@@ -447,6 +450,8 @@ export class OrderCheckoutDirectService {
                   originalPrice,
                 }
               : undefined,
+          platformFundedDiscount:
+            Math.round(couponDiscount * couponPlatformFundedShare * 100) / 100,
           shippingCost,
           taxAmount,
           withholdingTaxAmount,
