@@ -1,52 +1,67 @@
-name: Deploy Production
+name: Release Production
 
-# When CI (ci.yml) succeeds on the master branch, trigger the Coolify
-# production applications (api/web/admin) via their deploy webhook.
-# environment: production => the "Required reviewers" set under
-# Settings > Environments > production make the deploy pass through a MANUAL
-# APPROVAL gate.
-#
-# The "Auto Deploy" toggle for the production apps MUST be OFF in Coolify.
-#
-# NOTE: workflow_run-triggered workflows only run from the version on the
-# repo's DEFAULT branch. This file must be merged into the default branch,
-# otherwise it never triggers.
-#
-# Required repo secrets:
-#   COOLIFY_URL          -> https://coolify.your-domain.com
-#   COOLIFY_TOKEN        -> Coolify API token (deploy-capable)
-#   COOLIFY_PROD_UUIDS   -> production app UUIDs, comma-separated: uuidApi,uuidWeb,uuidAdmin
+# Coolify Auto Deploy must be disabled for the production API, web and admin
+# resources. A master push reaches Coolify only after this clean-runner gate.
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: deploy-production
+  group: release-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Trigger Coolify (production)
-    # Manual dispatch, or master CI finished GREEN.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+  release:
+    name: Verify and deploy production
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    # The `production` environment has required reviewers => manual approval gate.
-    environment: production
+    timeout-minutes: 45
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v7
-      # Triggers the deploy AND waits for the result — a failed Coolify deploy
-      # fails this job, so it shows up as a failed check + GitHub failure email.
-      - name: Deploy to Coolify (production) and wait
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Verify release
+        run: pnpm verify:ci
+
+      - id: affected
+        name: Detect affected applications
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            apps="api,web,admin"
+          else
+            apps="$(node scripts/detect-affected-apps.mjs \
+              --base "$BEFORE_SHA" \
+              --head "$AFTER_SHA" \
+              --format csv)"
+          fi
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+          echo "Affected applications: ${apps:-none}"
+
+      - name: Deploy affected production applications
+        if: ${{ steps.affected.outputs.apps != '' }}
         uses: ./.github/actions/coolify-deploy
         with:
           coolify-url: ${{ secrets.COOLIFY_URL }}
           coolify-token: ${{ secrets.COOLIFY_TOKEN }}
-          uuids: ${{ secrets.COOLIFY_PROD_UUIDS }}
-      - name: Report failure
-        if: failure()
-        run: echo "::error::Production deploy failed — check the logs above (Coolify deployment did not finish successfully)."
+          all-uuids: ${{ secrets.COOLIFY_PROD_UUIDS }}
+          apps: ${{ steps.affected.outputs.apps }}
+          wait-for-result: "true"
+
+      - name: Skip deployment
+        if: ${{ steps.affected.outputs.apps == '' }}
+        run: echo "No deployable application changed."
