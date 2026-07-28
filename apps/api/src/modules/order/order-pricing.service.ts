@@ -576,24 +576,32 @@ export class OrderPricingService {
     amount: number,
     sellerId: string,
     categoryId?: string | null,
+    shippingDesi = 1,
   ): Promise<{
     sellerFeeAmount: number;
     buyerFeeAmount: number;
     commissionAmount: number;
     withholdingTaxAmount: number;
+    fullShippingAmount: number;
+    buyerShippingAmount: number;
+    sellerShippingAmount: number;
     shippingAmount: number;
     sellerNetAmount: number;
+    shippingDesi: number;
   }> {
-    const [result, seller, shippingAmount] = await Promise.all([
+    const [result, seller, fullShippingAmount] = await Promise.all([
       this.calculateCommission(amount, sellerId, categoryId),
       this.prisma.user.findUnique({
         where: { id: sellerId },
         select: { businessStatus: true, taxId: true },
       }),
-      // Buyer-paid, informational only: shown on the seller listing form so they
-      // see the shipping the buyer covers. Does NOT reduce sellerNetAmount.
-      this.calculateShippingCost(amount),
+      this.calculateShippingCost(amount, undefined, shippingDesi),
     ]);
+    const buyerShippingAmount =
+      Math.round(fullShippingAmount * (result.shippingBuyerShare / 100) * 100) /
+      100;
+    const sellerShippingAmount =
+      Math.round((fullShippingAmount - buyerShippingAmount) * 100) / 100;
     // Kurumsal satıcıda stopaj da kesileceğinden önizleme neti gerçek payout ile eşleşsin.
     let withholdingTaxAmount = 0;
     if (seller?.businessStatus === "approved" && seller?.taxId) {
@@ -602,15 +610,23 @@ export class OrderPricingService {
     }
     const sellerNetAmount = Math.max(
       0,
-      amount - result.sellerFeeAmount - withholdingTaxAmount,
+      amount -
+        result.sellerFeeAmount -
+        withholdingTaxAmount -
+        sellerShippingAmount,
     );
     return {
       sellerFeeAmount: result.sellerFeeAmount,
       buyerFeeAmount: result.buyerFeeAmount,
       commissionAmount: result.commissionAmount,
       withholdingTaxAmount,
-      shippingAmount,
+      fullShippingAmount,
+      buyerShippingAmount,
+      sellerShippingAmount,
+      // Listing UI compatibility: this line is the shipping deducted from seller.
+      shippingAmount: sellerShippingAmount,
       sellerNetAmount,
+      shippingDesi,
     };
   }
 

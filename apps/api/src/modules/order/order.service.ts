@@ -91,14 +91,25 @@ export class OrderService {
     amount: number,
     sellerId: string,
     categoryId?: string | null,
+    shippingDesi = 1,
   ): Promise<{
     sellerFeeAmount: number;
     buyerFeeAmount: number;
     commissionAmount: number;
     withholdingTaxAmount: number;
+    fullShippingAmount: number;
+    buyerShippingAmount: number;
+    sellerShippingAmount: number;
+    shippingAmount: number;
     sellerNetAmount: number;
+    shippingDesi: number;
   }> {
-    return this.orderPricing.getCommissionPreview(amount, sellerId, categoryId);
+    return this.orderPricing.getCommissionPreview(
+      amount,
+      sellerId,
+      categoryId,
+      shippingDesi,
+    );
   }
 
   async getCommissionPreviewBatch(

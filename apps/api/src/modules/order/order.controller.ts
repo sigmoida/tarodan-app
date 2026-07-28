@@ -79,16 +79,31 @@ export class OrderController {
   async getCommissionPreview(
     @Query("amount") amountStr: string,
     @Query("categoryId") categoryId: string | undefined,
+    @Query("shippingDesi") shippingDesiStr: string | undefined,
     @CurrentUser("id") userId: string,
   ) {
     const amount = parseFloat(amountStr);
     if (Number.isNaN(amount) || amount < 0) {
       throw new BadRequestException(i18nMessage("server.order.invalidAmount"));
     }
+    const shippingDesi =
+      shippingDesiStr == null || shippingDesiStr === ""
+        ? 1
+        : Number(shippingDesiStr);
+    if (
+      !Number.isInteger(shippingDesi) ||
+      shippingDesi < 1 ||
+      shippingDesi > 1000
+    ) {
+      throw new BadRequestException(
+        "Kargo desisi 1 ile 1000 arasında tam sayı olmalıdır",
+      );
+    }
     return this.orderService.getCommissionPreview(
       amount,
       userId,
       categoryId || null,
+      shippingDesi,
     );
   }
 
