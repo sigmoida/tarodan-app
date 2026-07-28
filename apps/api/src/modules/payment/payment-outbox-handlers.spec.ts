@@ -5,6 +5,7 @@ import {
   OUTBOX_INVOICE_REFUND_REVERSE,
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
   OUTBOX_ORDER_FULFILLMENT,
+  OUTBOX_REVENUE_INVOICE_ISSUE,
 } from "../outbox/outbox.types";
 
 const makeDeps = (over?: { order?: any; payment?: any }) => {
@@ -15,6 +16,7 @@ const makeDeps = (over?: { order?: any; payment?: any }) => {
   const elogoInvoicing = {
     handleOrderRefund: jest.fn().mockResolvedValue(undefined),
     handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
+    issueVirtualOrderInvoice: jest.fn().mockResolvedValue(undefined),
   } as any;
   const prisma = {
     order: {
@@ -82,11 +84,17 @@ describe("PaymentOutboxHandlers", () => {
     svc.onModuleInit();
     expect(registry.types()).toContain(OUTBOX_INVOICE_REFUND_REVERSE);
 
-    await registry.get(OUTBOX_INVOICE_REFUND_REVERSE)!(
-      { orderId: "o3" },
-      {} as any,
+    const payload = {
+      orderId: "o3",
+      refundAttemptId: "ra3",
+      refundRatio: 0.4,
+      fullyRefunded: false,
+    };
+    await registry.get(OUTBOX_INVOICE_REFUND_REVERSE)!(payload, {} as any);
+    expect(elogoInvoicing.handleOrderRefund).toHaveBeenCalledWith(
+      "o3",
+      payload,
     );
-    expect(elogoInvoicing.handleOrderRefund).toHaveBeenCalledWith("o3");
   });
 
   it("invoice.trade_cash_refund_reverse handler'ını kaydeder ve eLogo takas ters kaydına yönlendirir", async () => {
@@ -101,6 +109,21 @@ describe("PaymentOutboxHandlers", () => {
       {} as any,
     );
     expect(elogoInvoicing.handleTradeCashRefund).toHaveBeenCalledWith("tcp-9");
+  });
+
+  it("invoice.revenue_issue handler'ını sanal sipariş faturalandırmasına yönlendirir", async () => {
+    const { registry, elogoInvoicing, svc } = makeDeps();
+    svc.onModuleInit();
+    expect(registry.types()).toContain(OUTBOX_REVENUE_INVOICE_ISSUE);
+
+    await registry.get(OUTBOX_REVENUE_INVOICE_ISSUE)!(
+      { orderId: "mem-order", kind: "membership" },
+      {} as any,
+    );
+    expect(elogoInvoicing.issueVirtualOrderInvoice).toHaveBeenCalledWith(
+      "mem-order",
+      "membership",
+    );
   });
 
   describe("#8 order.fulfillment_requested backstop handler", () => {

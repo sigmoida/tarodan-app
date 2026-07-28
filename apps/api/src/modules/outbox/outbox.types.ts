@@ -11,11 +11,24 @@ export interface ShipmentCancelPayload {
   orderNumber: string;
 }
 
-/** Tam iade sonrası eLogo e-Arşiv ters kaydı (iptal/iade faturası). İdempotent. */
+/** Başarılı iade sonrası eLogo e-belge düzeltmesi. Refund-attempt bazında idempotent. */
 export const OUTBOX_INVOICE_REFUND_REVERSE = "invoice.refund_reverse";
 
 export interface InvoiceRefundReversePayload {
   orderId: string;
+  refundAttemptId: string;
+  /** Bu denemenin sipariş toplamına oranı, [0,1]. */
+  refundRatio: number;
+  /** Bu denemeyle siparişin kümülatif iadesi tamamlandı mı? */
+  fullyRefunded: boolean;
+}
+
+/** Ödenmiş sanal hizmetin gelir faturasını oluştur/gönder. */
+export const OUTBOX_REVENUE_INVOICE_ISSUE = "invoice.revenue_issue";
+
+export interface RevenueInvoiceIssuePayload {
+  orderId: string;
+  kind: "membership" | "boost";
 }
 
 /** Takas nakit iadesi sonrası eLogo komisyon e-Arşiv ters kaydı. İdempotent. */

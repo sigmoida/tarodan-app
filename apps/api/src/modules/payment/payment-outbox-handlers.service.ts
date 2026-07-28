@@ -5,10 +5,12 @@ import {
   OUTBOX_INVOICE_REFUND_REVERSE,
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
   OUTBOX_ORDER_FULFILLMENT,
+  OUTBOX_REVENUE_INVOICE_ISSUE,
   ShipmentCancelPayload,
   InvoiceRefundReversePayload,
   InvoiceTradeCashRefundReversePayload,
   OrderFulfillmentOutboxPayload,
+  RevenueInvoiceIssuePayload,
 } from "../outbox/outbox.types";
 import { PaymentCommonService } from "./payment-common.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -46,8 +48,17 @@ export class PaymentOutboxHandlers implements OnModuleInit {
     });
 
     this.registry.register(OUTBOX_INVOICE_REFUND_REVERSE, async (payload) => {
-      const { orderId } = payload as InvoiceRefundReversePayload;
-      await this.elogoInvoicing.handleOrderRefund(orderId);
+      const adjustment = payload as InvoiceRefundReversePayload;
+      // Deploy öncesinden kuyrukta kalmış `{orderId}` payload'ları tam-iade
+      // davranışıyla işlemeye devam et; yeni olaylar refundAttemptId taşır.
+      if (!adjustment.refundAttemptId) {
+        await this.elogoInvoicing.handleOrderRefund(adjustment.orderId);
+        return;
+      }
+      await this.elogoInvoicing.handleOrderRefund(
+        adjustment.orderId,
+        adjustment,
+      );
     });
 
     this.registry.register(
@@ -58,6 +69,11 @@ export class PaymentOutboxHandlers implements OnModuleInit {
         await this.elogoInvoicing.handleTradeCashRefund(tradeCashPaymentId);
       },
     );
+
+    this.registry.register(OUTBOX_REVENUE_INVOICE_ISSUE, async (payload) => {
+      const { orderId, kind } = payload as RevenueInvoiceIssuePayload;
+      await this.elogoInvoicing.issueVirtualOrderInvoice(orderId, kind);
+    });
 
     // #8: fulfillment DAYANIKLILIK backstop'u. Anlık event yolu (OrderFulfillmentListener)
     // çökme penceresinde kaybolmuşsa — satır 'pending' kaldıysa — drainer buradan

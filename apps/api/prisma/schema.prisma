@@ -1636,6 +1636,9 @@ model ElogoInvoice {
   netAmount        Decimal            @map("net_amount") @db.Decimal(10, 2)
   taxAmount        Decimal            @map("tax_amount") @db.Decimal(10, 2)
   total            Decimal            @db.Decimal(10, 2)
+  /// İlk oluşturma anındaki brüt tutar. Pending belge iadede netleştirilse bile
+  /// tekrarlı kısmi iadeler bu immutable baz üzerinden hesaplanır.
+  originalTotal    Decimal            @map("original_total") @db.Decimal(10, 2)
   vatRate          Decimal            @default(20) @map("vat_rate") @db.Decimal(5, 2)
   status           ElogoInvoiceStatus @default(pending)
   elogoRefId       String?            @map("elogo_ref_id")
@@ -1643,6 +1646,9 @@ model ElogoInvoice {
   elogoResultMsg   String?            @map("elogo_result_msg")
   /// İADE faturasında iadesi yapılan orijinal faturanın numarası.
   billingReference String?            @map("billing_reference")
+  /// İADE faturasında referans verilen orijinal faturanın düzenlenme tarihi.
+  /// Retry sırasında "bugünün tarihi" kullanılmaması için immutable snapshot.
+  billingReferenceIssueDate DateTime? @map("billing_reference_issue_date")
   /// Fatura kaleminin açıklaması — kesim anında snapshot'lanır (ör. boost için
   /// paket adını içerir). Boşsa tipin varsayılan etiketi (LINE_DESCRIPTION) kullanılır.
   lineDescription  String?            @map("line_description")
@@ -1652,6 +1658,8 @@ model ElogoInvoice {
   emailSentAt      DateTime?          @map("email_sent_at")
   attemptCount     Int                @default(0) @map("attempt_count")
   lastAttemptAt    DateTime?          @map("last_attempt_at")
+  /// Pending/failed belgenin hangi refund finalize anına kadar netleştirildiği.
+  refundAdjustedAt DateTime?          @map("refund_adjusted_at")
   issuedAt         DateTime?          @map("issued_at")
   sentAt           DateTime?          @map("sent_at")
   cancelledAt      DateTime?          @map("cancelled_at")
@@ -1711,6 +1719,7 @@ enum ElogoInvoiceType {
 
 enum ElogoInvoiceStatus {
   pending
+  processing
   sent
   signed
   failed

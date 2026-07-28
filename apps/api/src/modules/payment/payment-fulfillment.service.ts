@@ -22,7 +22,10 @@ import { EscrowHoldService } from "./escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 import { OutboxService } from "../outbox/outbox.service";
-import { OUTBOX_ORDER_FULFILLMENT } from "../outbox/outbox.types";
+import {
+  OUTBOX_ORDER_FULFILLMENT,
+  OUTBOX_REVENUE_INVOICE_ISSUE,
+} from "../outbox/outbox.types";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -343,6 +346,14 @@ export class PaymentFulfillmentService {
           dedupeKey: `${OUTBOX_ORDER_FULFILLMENT}:${order.id}`,
         });
       } else {
+        await this.outbox?.enqueue(tx, {
+          type: OUTBOX_REVENUE_INVOICE_ISSUE,
+          payload: {
+            orderId: order.id,
+            kind: isMembershipOrder ? "membership" : "boost",
+          },
+          dedupeKey: `${OUTBOX_REVENUE_INVOICE_ISSUE}:${order.id}`,
+        });
         this.logger.log(
           `Virtual order payment ${payment.id} (membership/boost) completed, no hold needed`,
         );

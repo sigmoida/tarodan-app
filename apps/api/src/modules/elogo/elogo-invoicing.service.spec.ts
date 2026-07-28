@@ -41,9 +41,17 @@ function makePrisma(seed: any = {}) {
       findMany: jest.fn(async ({ where }: any) => {
         return invoices.filter((i) => {
           if (where.sourceId && i.sourceId !== where.sourceId) return false;
+          if (
+            where.billingReference &&
+            i.billingReference !== where.billingReference
+          )
+            return false;
           if (where.type?.in && !where.type.in.includes(i.type)) return false;
+          if (typeof where.type === "string" && i.type !== where.type)
+            return false;
           if (where.status?.in && !where.status.in.includes(i.status))
             return false;
+          if (where.status?.not && i.status === where.status.not) return false;
           if (
             where.attemptCount?.lt != null &&
             !(i.attemptCount < where.attemptCount.lt)
@@ -53,7 +61,14 @@ function makePrisma(seed: any = {}) {
         });
       }),
       create: jest.fn(async ({ data }: any) => {
-        const rec = { id: `inv-${++idCounter}`, attemptCount: 0, ...data };
+        const rec = {
+          id: `inv-${++idCounter}`,
+          attemptCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          originalTotal: data.total,
+          ...data,
+        };
         invoices.push(rec);
         return rec;
       }),
@@ -67,6 +82,25 @@ function makePrisma(seed: any = {}) {
               : v;
         }
         return rec;
+      }),
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        const rec = invoices.find(
+          (i) =>
+            i.id === where.id &&
+            (where.status == null || i.status === where.status) &&
+            (where.attemptCount == null ||
+              i.attemptCount === where.attemptCount) &&
+            (where.lastAttemptAt === undefined ||
+              i.lastAttemptAt === where.lastAttemptAt),
+        );
+        if (!rec) return { count: 0 };
+        for (const [k, v] of Object.entries<any>(data)) {
+          rec[k] =
+            v && typeof v === "object" && "increment" in v
+              ? (rec[k] ?? 0) + v.increment
+              : v;
+        }
+        return { count: 1 };
       }),
     },
     elogoDocSequence: {
@@ -112,6 +146,11 @@ function makePrisma(seed: any = {}) {
         async ({ where }: any) => seed.payments?.[where.orderId] ?? null,
       ),
     },
+    refundAttempt: {
+      findUnique: jest.fn(
+        async ({ where }: any) => seed.refundAttempts?.[where.id] ?? null,
+      ),
+    },
     address: {
       findFirst: jest.fn(
         async ({ where }: any) => seed.addresses?.[where.userId] ?? null,
@@ -139,6 +178,10 @@ function makeElogo(over: Partial<Record<string, any>> = {}): ElogoService {
     })),
     cancelEArchiveInvoice: jest.fn(async () => ({ success: true, code: 1 })),
     getEArchiveInvoicePdf: jest.fn(async () => null),
+    getDocumentStatus: jest.fn(async () => ({
+      documentUuid: "u",
+      status: -1,
+    })),
     refundStrategy: jest.fn(() => "CANCEL"),
     ...over,
   } as unknown as ElogoService;
@@ -332,6 +375,121 @@ describe("ElogoInvoicingService", () => {
     expect(prisma.invoices[0].status).toBe("cancelled");
   });
 
+  it("kısmi iade: orijinali iptal etmez, attempt-bazlı tutar kadar IADE faturası keser", async () => {
+    const finalizedAt = new Date("2026-07-20T10:00:00Z");
+    const issuedAt = new Date("2026-07-18T10:00:00Z");
+    const prisma = makePrisma({
+      refundAttempts: {
+        ra1: {
+          id: "ra1",
+          orderId: "o1",
+          status: "finalized",
+          finalizedAt,
+        },
+      },
+      ledgers: {
+        o1: {
+          sellerCommission: 120,
+          refundedSellerCommission: 30,
+          buyerFee: 0,
+          refundedBuyerFee: 0,
+        },
+      },
+      users: { s1: { displayName: "Satıcı", taxId: null } },
+    });
+    prisma.invoices.push({
+      id: "i1",
+      type: "commission",
+      sourceId: "o1",
+      documentType: "EARCHIVE",
+      status: "sent",
+      ettn: "ettn-1",
+      invoiceNumber: "TRD2026000000001",
+      issuedAt,
+      sentAt: issuedAt,
+      recipientUserId: "s1",
+      recipientVknTckn: "11111111111",
+      recipientName: "Satıcı",
+      netAmount: 100,
+      taxAmount: 20,
+      total: 120,
+      originalTotal: 120,
+      vatRate: 20,
+      attemptCount: 1,
+      createdAt: issuedAt,
+      updatedAt: issuedAt,
+    });
+    const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const adjustment = {
+      orderId: "o1",
+      refundAttemptId: "ra1",
+      refundRatio: 0.25,
+      fullyRefunded: false,
+    };
+
+    await svc.handleOrderRefund("o1", adjustment);
+    await svc.handleOrderRefund("o1", adjustment);
+
+    expect(elogo.cancelEArchiveInvoice).not.toHaveBeenCalled();
+    const returns = prisma.invoices.filter((i) => i.type === "return_invoice");
+    expect(returns).toHaveLength(1);
+    expect(returns[0].sourceId).toBe("i1:ra1");
+    expect(Number(returns[0].total)).toBeCloseTo(30, 2);
+    expect(returns[0].billingReferenceIssueDate).toEqual(issuedAt);
+  });
+
+  it("pending fatura kısmi iade sonrası güncel ledger netine düşürülür", async () => {
+    const finalizedAt = new Date("2026-07-20T10:00:00Z");
+    const prisma = makePrisma({
+      refundAttempts: {
+        ra1: {
+          id: "ra1",
+          orderId: "o1",
+          status: "finalized",
+          finalizedAt,
+        },
+      },
+      ledgers: {
+        o1: {
+          sellerCommission: 120,
+          refundedSellerCommission: 30,
+          buyerFee: 0,
+          refundedBuyerFee: 0,
+        },
+      },
+    });
+    prisma.invoices.push({
+      id: "i1",
+      type: "commission",
+      sourceId: "o1",
+      documentType: "EARCHIVE",
+      status: "failed",
+      invoiceNumber: "TRD2026000000001",
+      ettn: "ettn-1",
+      netAmount: 100,
+      taxAmount: 20,
+      total: 120,
+      originalTotal: 120,
+      vatRate: 20,
+      attemptCount: 1,
+      createdAt: new Date("2026-07-18T10:00:00Z"),
+      updatedAt: new Date("2026-07-18T10:00:00Z"),
+    });
+    const svc = new ElogoInvoicingService(prisma, makeElogo(), fakeConfig());
+
+    await svc.handleOrderRefund("o1", {
+      orderId: "o1",
+      refundAttemptId: "ra1",
+      refundRatio: 0.25,
+      fullyRefunded: false,
+    });
+
+    expect(prisma.invoices[0].status).toBe("pending");
+    expect(Number(prisma.invoices[0].total)).toBeCloseTo(90, 2);
+    expect(prisma.invoices[0].refundAdjustedAt).toEqual(finalizedAt);
+  });
+
   it("takas komisyonu: ödeyene e-Arşiv keser (TradeCashPayment.commission)", async () => {
     const prisma = makePrisma({
       tradeCash: { tcp1: { payerId: "p1", commission: 60 } },
@@ -451,7 +609,7 @@ describe("ElogoInvoicingService", () => {
     expect(prisma.invoices[0].recipientUserId).toBe("b1");
   });
 
-  it("eLogo kapalıysa hiçbir şey göndermez", async () => {
+  it("eLogo kapalıysa göndermez ama retry için pending kayıt bırakır", async () => {
     const prisma = makePrisma({
       orders: { o1: { sellerId: "s1" } },
       ledgers: { o1: { sellerCommission: 120, refundedSellerCommission: 0 } },
@@ -462,6 +620,7 @@ describe("ElogoInvoicingService", () => {
 
     await svc.issueCommissionInvoice("o1");
     expect(elogo.sendDocument).not.toHaveBeenCalled();
-    expect(prisma.invoices).toHaveLength(0);
+    expect(prisma.invoices).toHaveLength(1);
+    expect(prisma.invoices[0].status).toBe("pending");
   });
 });

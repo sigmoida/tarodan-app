@@ -141,7 +141,13 @@ export class OrderSchedulerService implements OnModuleInit {
         status: { in: [OrderStatus.delivered, OrderStatus.completed] },
         commissionLedger: { isNot: null },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        commissionLedger: {
+          select: { buyerFee: true, sellerCommission: true },
+        },
+        seller: { select: { sellerType: true } },
+      },
       take: 500,
     });
     let invoiced = 0;
@@ -151,11 +157,28 @@ export class OrderSchedulerService implements OnModuleInit {
           sourceId: { in: delivered.map((o) => o.id) },
           type: { in: ["commission", "service_fee", "platform_sale"] as any },
         },
-        select: { sourceId: true },
+        select: { sourceId: true, type: true },
       });
-      const invoicedIds = new Set(invSources.map((i) => i.sourceId));
+      const invoicedKeys = new Set(
+        invSources.map((i) => `${i.sourceId}:${i.type}`),
+      );
       for (const o of delivered) {
-        if (invoicedIds.has(o.id)) continue;
+        const expectedTypes =
+          o.seller.sellerType === "platform"
+            ? ["platform_sale"]
+            : [
+                ...(Number(o.commissionLedger?.sellerCommission) > 0
+                  ? ["commission"]
+                  : []),
+                ...(Number(o.commissionLedger?.buyerFee) > 0
+                  ? ["service_fee"]
+                  : []),
+              ];
+        if (
+          expectedTypes.every((type) => invoicedKeys.has(`${o.id}:${type}`))
+        ) {
+          continue;
+        }
         try {
           await this.orderService.emitDeliveryRevenueInvoices(o.id);
           invoiced++;

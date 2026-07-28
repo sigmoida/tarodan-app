@@ -31,6 +31,7 @@ import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
+  type InvoiceRefundReversePayload,
 } from "../outbox/outbox.types";
 import { LedgerService } from "../ledger/ledger.service";
 import { MONEY_EPSILON } from "./payment.constants";
@@ -774,7 +775,7 @@ export class PaymentRefundService {
       paytrRefunded = true;
 
       // Update payment status after successful refund
-      let einvoiceReverse = false; // tam iade → e-Arşiv iptal/iade tetiği (post-commit)
+      let invoiceAdjustment: InvoiceRefundReversePayload | null = null;
       const refundCommitResult = await this.prisma
         .$transaction(async (tx) => {
           const oldStatus = payment.status;
@@ -956,15 +957,15 @@ export class PaymentRefundService {
             );
           }
 
-          // e-Arşiv reverse: siparişin KÜMÜLATİF iadesi tamamlanınca tetiklenir
-          // (MONEY-H4: art arda kısmi iadelerin sonuncusunda da; eskiden tek seferde
-          // tam tutar iade edilmezse hiç tetiklenmiyordu). Ledger'a BAĞLI DEĞİL
-          // (platform_sale gibi ledger'sız ama faturalı siparişlerde de gerekir);
-          // yalnız siparişin iade toplamına bakar. handleOrderRefund kesilmiş TÜM
-          // faturaları geri alır.
-          if (isOrderFullyRefunded) {
-            einvoiceReverse = true;
-          }
+          // Her başarılı refund attempt kendi eLogo düzeltme olayını üretir. Kısmi
+          // iadede daha önce kesilmiş faturaya oransal IADE belgesi; tam iadede
+          // mümkünse iptal veya kalan tutar için IADE uygulanır.
+          invoiceAdjustment = {
+            orderId,
+            refundAttemptId: freshAttempt.id,
+            refundRatio: ledgerPortion,
+            fullyRefunded: isOrderFullyRefunded,
+          };
 
           // Update order status + restore stock on full refund.
           // Idempotent: skip stock restore if order is already cancelled (e.g.
@@ -1076,13 +1077,14 @@ export class PaymentRefundService {
             dedupeKey: `${OUTBOX_SHIPMENT_CANCEL}:${orderId}`,
           });
 
-          // Faz 5 (outbox): tam iade → eLogo e-Arşiv ters kaydını da iade commit'iyle
-          // ATOMİK sıraya al (post-commit anlık tetik hızlı-yol kalır; handler idempotent).
-          if (einvoiceReverse) {
+          // Başarılı iadenin eLogo düzeltmesini de iade commit'iyle
+          // Para/ledger mutasyonuyla ATOMİK sıraya al. Her refund attempt ayrı
+          // dedupe anahtarı taşır; art arda kısmi iadeler birbirini ezmez.
+          if (invoiceAdjustment) {
             await this.outbox?.enqueue(tx, {
               type: OUTBOX_INVOICE_REFUND_REVERSE,
-              payload: { orderId },
-              dedupeKey: `${OUTBOX_INVOICE_REFUND_REVERSE}:${orderId}`,
+              payload: invoiceAdjustment as unknown as Prisma.InputJsonValue,
+              dedupeKey: `${OUTBOX_INVOICE_REFUND_REVERSE}:${freshAttempt.id}`,
             });
           }
 
@@ -1125,11 +1127,11 @@ export class PaymentRefundService {
           return response;
         });
 
-      // Tam iade → Tarodan'ın komisyon/hizmet bedeli e-Arşivlerini iptal et / iade faturası
-      // kes (refundStrategy: ≤8g iptal, >8g IADE). Post-commit, non-blocking, idempotent.
-      if (einvoiceReverse) {
+      // Post-commit hızlı yol. Aynı olay outbox'ta kalıcıdır; servis attempt-bazında
+      // idempotent olduğu için iki tetik güvenlidir.
+      if (invoiceAdjustment) {
         void this.elogoInvoicing
-          .handleOrderRefund(orderId)
+          .handleOrderRefund(orderId, invoiceAdjustment)
           .catch((e) =>
             this.logger.warn(
               `eLogo iade tetik hatası ${orderId}: ${e?.message}`,

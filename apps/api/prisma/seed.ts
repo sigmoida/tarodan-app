@@ -6711,6 +6711,7 @@ async function main() {
         netAmount: net,
         taxAmount: round2(net * 0.2),
         total: round2(net * 1.2),
+        originalTotal: round2(net * 1.2),
         vatRate: 20,
         status: elogoStatuses[i] ?? ElogoInvoiceStatus.sent,
         elogoRefId: `${Math.floor(Math.random() * 1e6)}`,

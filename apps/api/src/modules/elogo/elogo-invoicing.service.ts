@@ -13,6 +13,8 @@ import { StorageService } from "../storage/storage.service";
 import { SmtpProvider } from "../notification/providers/smtp.provider";
 import { buildInvoiceXml, type UblParty } from "./ubl/ubl-invoice.builder";
 import type { ElogoDocumentType } from "./elogo.types";
+import { Prisma, type ElogoInvoice } from "@prisma/client";
+import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import {
   renderEmailTemplate,
   substituteEmailVariables,
@@ -37,6 +39,13 @@ type RevenueType =
   | "boost"
   | "trade_commission"
   | "platform_sale";
+
+type ResolvedRefundAdjustment = InvoiceRefundReversePayload & {
+  finalizedAt: Date;
+};
+
+const MAX_SEND_ATTEMPTS = 8;
+const SEND_LEASE_MS = 10 * 60 * 1000;
 
 const LINE_DESCRIPTION: Record<string, string> = {
   commission: "Aracılık hizmet (komisyon) bedeli",
@@ -117,6 +126,14 @@ export class ElogoInvoicingService {
       ? this.round2(amount / (1 + vatRate / 100))
       : this.round2(amount);
   }
+  private invoiceAmounts(
+    amount: number,
+    vatRate: number,
+  ): { net: number; tax: number; total: number } {
+    const net = this.toNet(amount, vatRate);
+    const tax = this.round2(net * (vatRate / 100));
+    return { net, tax, total: this.round2(net + tax) };
+  }
   private ymd(d: Date): string {
     return d.toISOString().slice(0, 10);
   }
@@ -126,15 +143,22 @@ export class ElogoInvoicingService {
 
   /** Gap-free belge numarası: PREFIX + yıl + 9 hane (ElogoDocSequence atomik artırım). */
   private async allocateInvoiceNumber(year: number): Promise<string> {
+    return this.prisma.$transaction((tx) =>
+      this.allocateInvoiceNumberInTransaction(tx, year),
+    );
+  }
+
+  private async allocateInvoiceNumberInTransaction(
+    tx: Prisma.TransactionClient,
+    year: number,
+  ): Promise<string> {
     const prefix = this.prefix;
-    const last = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.elogoDocSequence.upsert({
-        where: { prefix_year: { prefix, year } },
-        create: { prefix, year, lastValue: 1 },
-        update: { lastValue: { increment: 1 } },
-      });
-      return row.lastValue;
+    const row = await tx.elogoDocSequence.upsert({
+      where: { prefix_year: { prefix, year } },
+      create: { prefix, year, lastValue: 1 },
+      update: { lastValue: { increment: 1 } },
     });
+    const last = row.lastValue;
     return `${prefix}${year}${String(last).padStart(9, "0")}`;
   }
 
@@ -275,16 +299,35 @@ export class ElogoInvoicingService {
   async issuePlatformSaleInvoice(orderId: string): Promise<void> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { sellerId: true, buyerId: true, totalAmount: true },
+      select: {
+        sellerId: true,
+        buyerId: true,
+        totalAmount: true,
+        checkoutGroupId: true,
+      },
     });
     if (!order) return;
     if (!(await this.isPlatformSeller(order.sellerId))) return;
-    await this.cut(
-      "platform_sale",
-      orderId,
-      order.buyerId,
-      Number(order.totalAmount),
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        OR: [
+          { orderId },
+          ...(order.checkoutGroupId
+            ? [{ checkoutGroupId: order.checkoutGroupId }]
+            : []),
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      select: { metadata: true },
+    });
+    const refundedOrders =
+      ((payment?.metadata as Record<string, unknown> | null)?.refundedOrders as
+        Record<string, number> | undefined) ?? {};
+    const netSaleAmount = Math.max(
+      0,
+      Number(order.totalAmount) - Number(refundedOrders[orderId] ?? 0),
     );
+    await this.cut("platform_sale", orderId, order.buyerId, netSaleAmount);
   }
 
   private async isPlatformSeller(sellerId: string): Promise<boolean> {
@@ -364,6 +407,42 @@ export class ElogoInvoicingService {
     );
   }
 
+  /** Outbox handler: ödenmiş sanal siparişin kaynak kaydını taze çözerek faturalandır. */
+  async issueVirtualOrderInvoice(
+    orderId: string,
+    kind: "membership" | "boost",
+  ): Promise<void> {
+    if (kind === "boost") {
+      const boost = await this.prisma.productBoost.findUnique({
+        where: { orderId },
+        select: { id: true },
+      });
+      if (!boost) {
+        throw new Error(`Boost record not found for paid order ${orderId}`);
+      }
+      await this.issueBoostInvoice(boost.id);
+      return;
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: "desc" },
+      select: { providerPaymentId: true },
+    });
+    const membershipPayment = payment?.providerPaymentId
+      ? await this.prisma.membershipPayment.findFirst({
+          where: { providerPaymentId: payment.providerPaymentId },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        })
+      : null;
+    if (membershipPayment) {
+      await this.issueMembershipInvoice(membershipPayment.id);
+    } else {
+      await this.issueMembershipInvoiceForOrder(orderId);
+    }
+  }
+
   /** Boost faturası → SATICIYA (boost.price). Kalem açıklamasına paket adı eklenir. */
   async issueBoostInvoice(boostId: string): Promise<void> {
     const boost = await this.prisma.productBoost.findUnique({
@@ -394,15 +473,48 @@ export class ElogoInvoicingService {
     );
   }
 
-  /** İade: bu siparişe ait TÜM Tarodan faturalarını (komisyon/hizmet/boost/üyelik) iptal/iade et. */
-  async handleOrderRefund(orderId: string): Promise<void> {
-    if (!this.elogo.isEnabled()) return;
-    await this.reverseByKeys(await this.relatedInvoiceKeys(orderId));
+  /**
+   * İade: siparişe ait Tarodan faturalarını refund-attempt oranında düzelt.
+   * `adjustment` verilmezse eski tam-iade çağrıları için tüm kalan tutar terslenir.
+   */
+  async handleOrderRefund(
+    orderId: string,
+    adjustment?: InvoiceRefundReversePayload,
+  ): Promise<void> {
+    let resolved: ResolvedRefundAdjustment | undefined;
+    if (adjustment) {
+      if (
+        adjustment.orderId !== orderId ||
+        !(adjustment.refundRatio > 0 && adjustment.refundRatio <= 1)
+      ) {
+        throw new Error(`Invalid eLogo refund adjustment for order ${orderId}`);
+      }
+      const attempt = await this.prisma.refundAttempt.findUnique({
+        where: { id: adjustment.refundAttemptId },
+        select: {
+          id: true,
+          orderId: true,
+          status: true,
+          finalizedAt: true,
+        },
+      });
+      if (
+        !attempt ||
+        attempt.orderId !== orderId ||
+        attempt.status !== "finalized" ||
+        !attempt.finalizedAt
+      ) {
+        throw new Error(
+          `Refund attempt ${adjustment.refundAttemptId} is not finalized`,
+        );
+      }
+      resolved = { ...adjustment, finalizedAt: attempt.finalizedAt };
+    }
+    await this.reverseByKeys(await this.relatedInvoiceKeys(orderId), resolved);
   }
 
   /** İade: takas nakit komisyon faturasını iptal/iade et. */
   async handleTradeCashRefund(tradeCashPaymentId: string): Promise<void> {
-    if (!this.elogo.isEnabled()) return;
     await this.reverseByKeys([
       { type: "trade_commission", sourceId: tradeCashPaymentId },
     ]);
@@ -416,6 +528,7 @@ export class ElogoInvoicingService {
       { type: "commission", sourceId: orderId },
       { type: "service_fee", sourceId: orderId },
       { type: "platform_sale", sourceId: orderId },
+      { type: "membership", sourceId: orderId },
     ];
     const boost = await this.prisma.productBoost
       .findUnique({ where: { orderId }, select: { id: true } })
@@ -442,34 +555,193 @@ export class ElogoInvoicingService {
 
   private async reverseByKeys(
     keys: Array<{ type: string; sourceId: string }>,
+    adjustment?: ResolvedRefundAdjustment,
   ): Promise<void> {
+    const failures: string[] = [];
     for (const k of keys) {
       const inv = await this.prisma.elogoInvoice.findUnique({
         where: { type_sourceId: { type: k.type as any, sourceId: k.sourceId } },
       });
-      if (inv && (inv.status === "sent" || inv.status === "signed")) {
-        await this.reverseInvoice(inv).catch((e) =>
-          this.logger.error(
-            `eLogo iade/iptal hata (${inv.invoiceNumber}): ${e?.message}`,
-          ),
-        );
+      if (!inv || inv.status === "cancelled") continue;
+      try {
+        if (inv.status === "processing") {
+          throw new Error(
+            `invoice ${inv.invoiceNumber ?? inv.id} is currently being sent`,
+          );
+        }
+        if (inv.status === "pending" || inv.status === "failed") {
+          await this.repriceUnsentInvoice(inv, adjustment);
+          continue;
+        }
+        if (inv.status === "sent" || inv.status === "signed") {
+          // Fatura bu refund finalize edildikten sonra kesildiyse finansal kaynaklar
+          // zaten net tutarı taşıyordu; aynı attempt için ikinci kez ters kayıt üretme.
+          if (
+            adjustment &&
+            inv.refundAdjustedAt &&
+            inv.refundAdjustedAt >= adjustment.finalizedAt
+          ) {
+            continue;
+          }
+          await this.reverseInvoice(inv, adjustment);
+        }
+      } catch (error: any) {
+        const message = `${inv.invoiceNumber ?? inv.id}: ${error?.message ?? error}`;
+        failures.push(message);
+        this.logger.error(`eLogo iade/iptal hata (${message})`);
       }
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `eLogo invoice adjustment failed: ${failures.join("; ")}`,
+      );
     }
   }
 
-  /** Cron: pending/failed kayıtları yeniden dener (aynı numara/ETTN). */
+  /**
+   * Henüz sağlayıcıya gitmemiş belgeyi güncel refund snapshot'ına netleştir.
+   * Tam iadede belge yerel olarak iptal edilir ve hiçbir zaman gönderilmez.
+   */
+  private async repriceUnsentInvoice(
+    inv: ElogoInvoice,
+    adjustment?: ResolvedRefundAdjustment,
+  ): Promise<void> {
+    const gross = adjustment ? await this.resolveCurrentInvoiceGross(inv) : 0;
+    if (gross <= 0.009) {
+      await this.prisma.elogoInvoice.update({
+        where: { id: inv.id },
+        data: {
+          status: "cancelled",
+          cancelledAt: new Date(),
+          cancelReason: "refunded_before_issue",
+          refundAdjustedAt: adjustment?.finalizedAt,
+        },
+      });
+      return;
+    }
+    const rate = Number(inv.vatRate);
+    const amounts = this.invoiceAmounts(gross, rate);
+    await this.prisma.elogoInvoice.update({
+      where: { id: inv.id },
+      data: {
+        netAmount: amounts.net,
+        taxAmount: amounts.tax,
+        total: amounts.total,
+        status: "pending",
+        elogoResultMsg: null,
+        refundAdjustedAt: adjustment?.finalizedAt,
+      },
+    });
+  }
+
+  /** İade sonrası ilgili faturanın bugün itibarıyla kesilmesi gereken net brüt tutar. */
+  private async resolveCurrentInvoiceGross(inv: ElogoInvoice): Promise<number> {
+    if (inv.type === "commission" || inv.type === "service_fee") {
+      const ledger = await this.prisma.commissionLedger.findUnique({
+        where: { orderId: inv.sourceId },
+        select: {
+          sellerCommission: true,
+          refundedSellerCommission: true,
+          buyerFee: true,
+          refundedBuyerFee: true,
+        },
+      });
+      if (!ledger) return 0;
+      return inv.type === "commission"
+        ? Math.max(
+            0,
+            Number(ledger.sellerCommission) -
+              Number(ledger.refundedSellerCommission ?? 0),
+          )
+        : Math.max(
+            0,
+            Number(ledger.buyerFee) - Number(ledger.refundedBuyerFee ?? 0),
+          );
+    }
+
+    if (inv.type === "platform_sale" || inv.type === "membership") {
+      const order = await this.prisma.order
+        .findUnique({
+          where: { id: inv.sourceId },
+          select: { id: true, totalAmount: true, checkoutGroupId: true },
+        })
+        .catch(() => null);
+      if (order) {
+        return this.resolveNetOrderAmount(
+          order.id,
+          order.checkoutGroupId,
+          Number(order.totalAmount),
+        );
+      }
+    }
+
+    if (inv.type === "boost") {
+      const boost = await this.prisma.productBoost
+        .findUnique({
+          where: { id: inv.sourceId },
+          select: { orderId: true, price: true },
+        })
+        .catch(() => null);
+      if (boost?.orderId) {
+        const order = await this.prisma.order.findUnique({
+          where: { id: boost.orderId },
+          select: { checkoutGroupId: true, totalAmount: true },
+        });
+        if (order) {
+          const orderNet = await this.resolveNetOrderAmount(
+            boost.orderId,
+            order.checkoutGroupId,
+            Number(order.totalAmount),
+          );
+          const ratio =
+            Number(order.totalAmount) > 0
+              ? orderNet / Number(order.totalAmount)
+              : 0;
+          return Math.max(0, Number(boost.price) * ratio);
+        }
+      }
+    }
+
+    return Number(inv.total);
+  }
+
+  private async resolveNetOrderAmount(
+    orderId: string,
+    checkoutGroupId: string | null,
+    orderTotal: number,
+  ): Promise<number> {
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        OR: [{ orderId }, ...(checkoutGroupId ? [{ checkoutGroupId }] : [])],
+      },
+      orderBy: { createdAt: "desc" },
+      select: { metadata: true },
+    });
+    const refundedOrders =
+      ((payment?.metadata as Record<string, unknown> | null)?.refundedOrders as
+        Record<string, number> | undefined) ?? {};
+    return Math.max(0, orderTotal - Number(refundedOrders[orderId] ?? 0));
+  }
+
+  /** Cron: pending/failed ve lease'i düşmüş processing kayıtları yeniden dener. */
   async retryPendingInvoices(maxAttempts = 8, batch = 50): Promise<void> {
     if (!this.elogo.isEnabled()) return;
+    const staleBefore = new Date(Date.now() - SEND_LEASE_MS);
     const pend = await this.prisma.elogoInvoice.findMany({
       where: {
-        status: { in: ["pending", "failed"] },
-        attemptCount: { lt: maxAttempts },
+        OR: [
+          {
+            status: { in: ["pending", "failed"] },
+            attemptCount: { lt: maxAttempts },
+          },
+          { status: "processing", lastAttemptAt: { lt: staleBefore } },
+        ],
       },
       take: batch,
       orderBy: { createdAt: "asc" },
     });
     for (const inv of pend) {
-      await this.sendRecord(inv).catch((e) =>
+      await this.sendRecord(inv.id).catch((e) =>
         this.logger.error(
           `eLogo retry hata (${inv.invoiceNumber}): ${e?.message}`,
         ),
@@ -641,11 +913,11 @@ export class ElogoInvoicingService {
     lineDescription?: string,
   ): Promise<void> {
     try {
-      if (!this.elogo.isEnabled()) {
+      const providerEnabled = this.elogo.isEnabled();
+      if (!providerEnabled) {
         this.logger.debug(
-          `eLogo kapalı — ${type} faturası atlandı (source=${sourceId})`,
+          `eLogo kapalı — ${type} faturası pending kaydedilecek (source=${sourceId})`,
         );
-        return;
       }
       if (!(grossAmount > 0)) return;
 
@@ -658,37 +930,56 @@ export class ElogoInvoicingService {
       )
         return; // zaten kesildi
       if (existing) {
-        await this.sendRecord(existing); // failed/pending → yeniden dene
+        if (providerEnabled) {
+          await this.sendRecord(existing.id); // failed/pending → yeniden dene
+        }
         return;
       }
 
       const recipient = await this.resolveRecipient(recipientUserId);
       const now = new Date();
-      const invoiceNumber = await this.allocateInvoiceNumber(now.getFullYear());
-      const ettn = randomUUID();
       const vatRate = await this.resolveVatRate();
-      const net = this.toNet(grossAmount, vatRate);
+      const amounts = this.invoiceAmounts(grossAmount, vatRate);
 
-      const record = await this.prisma.elogoInvoice.create({
-        data: {
-          type,
-          sourceId,
-          recipientUserId,
-          recipientVknTckn: recipient.vknTckn,
-          recipientName: recipient.name,
-          documentType: recipient.documentType,
-          sendType: "ELEKTRONIK",
-          invoiceNumber,
-          ettn,
-          netAmount: net,
-          taxAmount: this.round2(net * (vatRate / 100)),
-          total: this.round2(net * (1 + vatRate / 100)),
-          vatRate,
-          status: "pending",
-          lineDescription: lineDescription?.trim() || null,
+      // Sequence artışı ve unique(type,sourceId) aynı SERIALIZABLE transaction'da:
+      // yarışın kaybedeni numara tüketmez; kazanan kayıt tek ETTN ile gönderilir.
+      const record = await this.prisma.$transaction(
+        async (tx) => {
+          const raced = await tx.elogoInvoice.findUnique({
+            where: { type_sourceId: { type, sourceId } },
+          });
+          if (raced) return raced;
+          const invoiceNumber = await this.allocateInvoiceNumberInTransaction(
+            tx,
+            now.getFullYear(),
+          );
+          return tx.elogoInvoice.create({
+            data: {
+              type,
+              sourceId,
+              recipientUserId,
+              recipientVknTckn: recipient.vknTckn,
+              recipientName: recipient.name,
+              documentType: recipient.documentType,
+              sendType: "ELEKTRONIK",
+              invoiceNumber,
+              ettn: randomUUID(),
+              netAmount: amounts.net,
+              taxAmount: amounts.tax,
+              total: amounts.total,
+              originalTotal: amounts.total,
+              vatRate,
+              status: "pending",
+              lineDescription: lineDescription?.trim() || null,
+              createdAt: now,
+            },
+          });
         },
-      });
-      await this.sendRecord(record);
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      if (providerEnabled) {
+        await this.sendRecord(record.id);
+      }
     } catch (err: any) {
       // Idempotency yarışı (aynı anda iki create) veya beklenmedik hata — yut, cron toparlar.
       this.logger.error(
@@ -697,35 +988,142 @@ export class ElogoInvoicingService {
     }
   }
 
-  /** Kayıttaki bilgilerden UBL üretip gönderir, durumu günceller. Retry-safe. */
-  private async sendRecord(inv: {
-    id: string;
-    type: string;
-    documentType: string;
-    invoiceNumber: string | null;
-    ettn: string | null;
-    netAmount: any;
-    vatRate: any;
-    recipientVknTckn: string | null;
-    recipientName: string | null;
-    recipientUserId: string | null;
-    billingReference?: string | null;
-    lineDescription?: string | null;
-  }): Promise<void> {
-    if (!inv.invoiceNumber || !inv.ettn || !inv.recipientVknTckn) return;
+  /**
+   * DB tabanlı gönderim lease'i. Aynı pending/failed belgeyi yalnız bir API/worker
+   * instance'ı sağlayıcıya yollar; çöken processing lease'i cron tarafından alınabilir.
+   */
+  private async claimInvoiceForSend(
+    invoiceId: string,
+  ): Promise<{ invoice: ElogoInvoice; reconcileFirst: boolean } | null> {
+    const current = await this.prisma.elogoInvoice.findUnique({
+      where: { id: invoiceId },
+    });
+    if (!current) return null;
+    if (
+      current.status === "sent" ||
+      current.status === "signed" ||
+      current.status === "cancelled"
+    ) {
+      return null;
+    }
+    if (
+      current.status !== "processing" &&
+      current.attemptCount >= MAX_SEND_ATTEMPTS
+    ) {
+      return null;
+    }
+    const staleBefore = new Date(Date.now() - SEND_LEASE_MS);
+    if (
+      current.status === "processing" &&
+      current.lastAttemptAt &&
+      current.lastAttemptAt >= staleBefore
+    ) {
+      return null;
+    }
+
+    const claim = await this.prisma.elogoInvoice.updateMany({
+      where: {
+        id: current.id,
+        status: current.status,
+        attemptCount: current.attemptCount,
+        ...(current.status === "processing"
+          ? { lastAttemptAt: current.lastAttemptAt }
+          : {}),
+      },
+      data: {
+        status: "processing",
+        attemptCount:
+          current.status === "processing"
+            ? current.attemptCount
+            : { increment: 1 },
+        lastAttemptAt: new Date(),
+      },
+    });
+    if (claim.count !== 1) return null;
+    const invoice = await this.prisma.elogoInvoice.findUnique({
+      where: { id: current.id },
+    });
+    if (!invoice) return null;
+    return {
+      invoice,
+      reconcileFirst:
+        current.status === "processing" || current.attemptCount > 0,
+    };
+  }
+
+  /** Kayıttaki snapshot'tan UBL üretip gönderir, durumu günceller. */
+  private async sendRecord(invoiceId: string): Promise<void> {
+    const claimed = await this.claimInvoiceForSend(invoiceId);
+    if (!claimed) return;
+    const inv = claimed.invoice;
     const now = new Date();
+    const issueMoment = inv.issuedAt ?? inv.createdAt;
+    let currentNumber = inv.invoiceNumber ?? "";
+
+    if (!inv.invoiceNumber || !inv.ettn || !inv.recipientVknTckn) {
+      await this.prisma.elogoInvoice.update({
+        where: { id: inv.id },
+        data: {
+          status: "failed",
+          elogoResultMsg:
+            "Missing invoice number, ETTN or recipient identifier",
+        },
+      });
+      return;
+    }
+
     const net = Number(inv.netAmount);
     const rate = Number(inv.vatRate);
-    const isEInvoice = inv.documentType === "EINVOICE";
     const isReturn = inv.type === "return_invoice";
 
-    // e-Fatura'da ALIAS gerekli — retry'da yeniden çöz.
+    // Provider geçici olarak kapalıyken kayıt EARCHIVE açılmış olabilir. İlk gerçek
+    // gönderimde alıcı mükellefiyetini tekrar çöz; return belgesi orijinal tipini korur.
+    let documentType = inv.documentType as ElogoDocumentType;
     let alias: string | undefined;
-    if (isEInvoice) {
+    const isRealIdentifier =
+      inv.recipientVknTckn !== "11111111111" &&
+      (inv.recipientVknTckn.length === 10 ||
+        inv.recipientVknTckn.length === 11);
+    if (!isReturn && isRealIdentifier) {
+      const chk = await this.elogo
+        .checkUser(inv.recipientVknTckn)
+        .catch(() => null);
+      if (!chk) {
+        await this.prisma.elogoInvoice.update({
+          where: { id: inv.id },
+          data: {
+            status: "failed",
+            elogoResultMsg: "Recipient e-Invoice status could not be resolved",
+          },
+        });
+        return;
+      }
+      documentType = chk?.isEInvoiceUser ? "EINVOICE" : "EARCHIVE";
+      alias = chk?.isEInvoiceUser ? chk.eInvoicePkAlias : undefined;
+      if (documentType !== inv.documentType) {
+        await this.prisma.elogoInvoice.update({
+          where: { id: inv.id },
+          data: { documentType },
+        });
+      }
+    } else if (documentType === "EINVOICE") {
       const chk = await this.elogo
         .checkUser(inv.recipientVknTckn)
         .catch(() => null);
       alias = chk?.eInvoicePkAlias;
+    }
+    const isEInvoice = documentType === "EINVOICE";
+    if (isEInvoice) {
+      if (!alias) {
+        await this.prisma.elogoInvoice.update({
+          where: { id: inv.id },
+          data: {
+            status: "failed",
+            elogoResultMsg: "E-INVOICE recipient alias could not be resolved",
+          },
+        });
+        return;
+      }
     }
 
     // Alıcı e-postası + adresi UBL'e konur — eLogo e-Arşiv'i (ELEKTRONIK) bu e-postaya gönderir.
@@ -753,7 +1151,7 @@ export class ElogoInvoicingService {
     if (isReturn && inv.billingReference) {
       billingRef = {
         invoiceId: inv.billingReference,
-        issueDate: this.ymd(now),
+        issueDate: this.ymd(inv.billingReferenceIssueDate ?? issueMoment),
       };
     }
 
@@ -763,8 +1161,8 @@ export class ElogoInvoicingService {
         invoiceTypeCode: isReturn ? "IADE" : "SATIS",
         id: invoiceNumber,
         uuid: inv.ettn,
-        issueDate: this.ymd(now),
-        issueTime: this.hms(now),
+        issueDate: this.ymd(issueMoment),
+        issueTime: this.hms(issueMoment),
         currency: "TRY",
         // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da AdditionalDocumentReference yok).
         sendType: isEInvoice ? undefined : "ELEKTRONIK",
@@ -775,15 +1173,83 @@ export class ElogoInvoicingService {
         ...(billingRef ? { billingReference: billingRef } : {}),
       });
 
+    const deliver = (invoiceNumber: string, total: number) => {
+      void this.deliverPdf(
+        {
+          id: inv.id,
+          ettn: inv.ettn!,
+          invoiceNumber,
+          type: inv.type,
+          total,
+          currentPdfUrl: inv.pdfUrl,
+          recipientName: inv.recipientName,
+          lineDescription: inv.lineDescription,
+        },
+        recipientUser?.email ?? null,
+      ).catch((e) =>
+        this.logger.warn(
+          `eLogo PDF teslim hatası (${invoiceNumber}): ${e?.message}`,
+        ),
+      );
+    };
+
+    // Önceki deneme sırasında provider başarı verip DB güncellenememiş olabilir.
+    // Aynı ETTN'i yeniden yollamadan önce durum sorgusuyla mutabakat yap.
+    if (claimed.reconcileFirst) {
+      const providerStatus = await this.elogo
+        .getDocumentStatus(inv.ettn, documentType)
+        .catch(() => null);
+      if (providerStatus?.isCancel) {
+        await this.prisma.elogoInvoice.update({
+          where: { id: inv.id },
+          data: {
+            status: "cancelled",
+            cancelledAt: now,
+            elogoResultCode: providerStatus.code ?? null,
+            elogoResultMsg: providerStatus.description ?? null,
+          },
+        });
+        return;
+      }
+      if (
+        providerStatus &&
+        (providerStatus.status === 2 || providerStatus.code === 1300)
+      ) {
+        await this.prisma.elogoInvoice.update({
+          where: { id: inv.id },
+          data: {
+            status: "sent",
+            elogoResultCode: providerStatus.code ?? null,
+            elogoResultMsg: providerStatus.description ?? null,
+            issuedAt: issueMoment,
+            sentAt: now,
+          },
+        });
+        deliver(inv.invoiceNumber, Number(inv.total));
+        return;
+      }
+      if (providerStatus?.status === 1) {
+        await this.prisma.elogoInvoice.update({
+          where: { id: inv.id },
+          data: {
+            status: "processing",
+            elogoResultCode: providerStatus.code ?? null,
+            elogoResultMsg:
+              providerStatus.description ?? "Provider is still processing",
+          },
+        });
+        return;
+      }
+    }
+
     // Paylaşımlı eLogo hesabında (özellikle demo) fatura numarası çakışırsa yeni numara
     // alıp boşluğa kadar atlayarak yeniden dener. Böylece taze bir DB'nin sequence'i,
     // hesapta zaten kullanılmış numaralarla otomatik hizalanır (elle müdahale gerekmez).
-    let currentNumber = inv.invoiceNumber!;
     try {
       for (let attempt = 0; attempt < 12; attempt++) {
         const { xml, totals } = buildXml(currentNumber);
         const res = await this.elogo.sendDocument({
-          documentType: inv.documentType as ElogoDocumentType,
+          documentType,
           documentUuid: inv.ettn,
           documentNumber: currentNumber,
           ublXml: xml,
@@ -804,33 +1270,14 @@ export class ElogoInvoicingService {
               elogoRefId: res.refId != null ? String(res.refId) : null,
               elogoResultCode: res.code ?? null,
               elogoResultMsg: res.description ?? null,
-              attemptCount: { increment: 1 },
-              lastAttemptAt: now,
-              issuedAt: now,
+              issuedAt: issueMoment,
               sentAt: now,
             },
           });
           this.logger.log(
             `eLogo ${inv.type} faturası gönderildi (${currentNumber}, ref=${res.refId})`,
           );
-          // PDF'i eLogo'dan çek → S3'e kaydet → alıcıya KENDİ SMTP'mizden e-postala (best-effort).
-          void this.deliverPdf(
-            {
-              id: inv.id,
-              ettn: inv.ettn,
-              invoiceNumber: currentNumber,
-              type: inv.type,
-              total: totals.payable,
-              currentPdfUrl: (inv as any).pdfUrl ?? null,
-              recipientName: inv.recipientName,
-              lineDescription: inv.lineDescription ?? null,
-            },
-            recipientUser?.email ?? null,
-          ).catch((e) =>
-            this.logger.warn(
-              `eLogo PDF teslim hatası (${currentNumber}): ${e?.message}`,
-            ),
-          );
+          deliver(currentNumber, totals.payable);
           return;
         }
 
@@ -839,7 +1286,9 @@ export class ElogoInvoicingService {
         if (attempt < 11 && this.isDuplicateNumberError(res.description)) {
           const skip = attempt + 1;
           for (let s = 0; s < skip; s++) {
-            currentNumber = await this.allocateInvoiceNumber(now.getFullYear());
+            currentNumber = await this.allocateInvoiceNumber(
+              issueMoment.getFullYear(),
+            );
           }
           this.logger.warn(
             `eLogo numara çakışması → +${skip} atlanıp ${currentNumber} ile tekrar (${inv.type})`,
@@ -858,8 +1307,6 @@ export class ElogoInvoicingService {
             status: "failed",
             elogoResultCode: res.code ?? null,
             elogoResultMsg: res.description ?? null,
-            attemptCount: { increment: 1 },
-            lastAttemptAt: now,
           },
         });
         this.logger.error(
@@ -875,8 +1322,6 @@ export class ElogoInvoicingService {
             invoiceNumber: currentNumber,
             status: "failed",
             elogoResultMsg: String(err?.message || err).slice(0, 500),
-            attemptCount: { increment: 1 },
-            lastAttemptAt: now,
           },
         })
         .catch(() => undefined);
@@ -1009,34 +1454,50 @@ export class ElogoInvoicingService {
     );
   }
 
-  /** Kesilmiş bir faturayı tersine çevir: e-Arşiv ≤8g → İPTAL, >8g veya e-Fatura → İADE FATURASI. */
-  private async reverseInvoice(inv: {
-    id: string;
-    type: string;
-    sourceId: string;
-    documentType: string;
-    invoiceNumber: string | null;
-    ettn: string | null;
-    elogoRefId: string | null;
-    issuedAt: Date | null;
-    recipientUserId: string | null;
-    recipientVknTckn: string | null;
-    recipientName: string | null;
-    netAmount: any;
-    vatRate: any;
-  }): Promise<void> {
-    if (!inv.ettn || !inv.invoiceNumber || !inv.issuedAt) return;
+  /**
+   * Kesilmiş faturayı tersine çevir. Tam ve daha önce düzeltme almamış e-Arşiv
+   * ≤8 günde iptal edilir; diğer durumlarda attempt-bazlı IADE faturası kesilir.
+   */
+  private async reverseInvoice(
+    inv: ElogoInvoice,
+    adjustment?: ResolvedRefundAdjustment,
+  ): Promise<void> {
+    if (!inv.ettn || !inv.invoiceNumber || !inv.issuedAt) {
+      throw new Error(`Invoice ${inv.id} is missing reversal identifiers`);
+    }
+    const priorReturns = await this.prisma.elogoInvoice.findMany({
+      where: {
+        type: "return_invoice",
+        billingReference: inv.invoiceNumber,
+        status: { not: "cancelled" },
+      },
+      select: { total: true },
+    });
+    const alreadyReversed = this.round2(
+      priorReturns.reduce((sum, row) => sum + Number(row.total), 0),
+    );
+    const remaining = this.round2(
+      Math.max(0, Number(inv.total) - alreadyReversed),
+    );
+    if (remaining <= 0.009) return;
+
     const canCancel =
+      (!adjustment || adjustment.fullyRefunded) &&
+      alreadyReversed <= 0.009 &&
       inv.documentType === "EARCHIVE" &&
       this.elogo.refundStrategy(inv.issuedAt) === "CANCEL";
 
     if (canCancel) {
+      let cancellationOutcomeUnknown = false;
       const res = await this.elogo
         .cancelEArchiveInvoice(inv.ettn, inv.elogoRefId ?? undefined)
-        .catch(
-          (e: any) =>
-            ({ success: false, description: String(e?.message) }) as any,
-        );
+        .catch((e: any) => {
+          cancellationOutcomeUnknown = true;
+          return {
+            success: false,
+            description: String(e?.message),
+          } as any;
+        });
       if (res.success) {
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
@@ -1049,6 +1510,30 @@ export class ElogoInvoicingService {
         });
         this.logger.log(`eLogo iptal ${inv.invoiceNumber}: OK`);
         return;
+      }
+      // Timeout/transport hatasında provider iptali uygulamış olabilir. IADE
+      // faturasına düşmeden önce ETTN durumunu sorgula; aksi halde çift ters kayıt olur.
+      const providerStatus = await this.elogo
+        .getDocumentStatus(inv.ettn, "EARCHIVE")
+        .catch(() => null);
+      if (providerStatus?.isCancel) {
+        await this.prisma.elogoInvoice.update({
+          where: { id: inv.id },
+          data: {
+            status: "cancelled",
+            cancelledAt: new Date(),
+            cancelReason: "refund",
+            elogoResultCode: providerStatus.code ?? null,
+            elogoResultMsg:
+              providerStatus.description ?? res.description ?? null,
+          },
+        });
+        return;
+      }
+      if (cancellationOutcomeUnknown && !providerStatus) {
+        throw new Error(
+          `Cancellation outcome is unknown for ${inv.invoiceNumber}`,
+        );
       }
       // İptal BAŞARISIZ → İADE FATURASINA düş (her durumda reversal garanti; orijinali 'sent' bırak).
       this.logger.warn(
@@ -1064,37 +1549,148 @@ export class ElogoInvoicingService {
       // aşağıdaki İADE FATURASI yoluna devam (return yok)
     }
 
-    // İADE FATURASI: orijinali referans alan ters e-belge. sourceId = ORİJİNAL FATURA id'si
-    // (aynı siparişin komisyon+hizmet faturaları ayrı iade faturası alsın diye; orderId DEĞİL).
+    // İADE FATURASI: aynı refund attempt yeniden işlense bile aynı sourceId kullanılır.
+    const reversalSourceId = adjustment
+      ? `${inv.id}:${adjustment.refundAttemptId}`
+      : inv.id;
     const exists = await this.prisma.elogoInvoice.findUnique({
-      where: { type_sourceId: { type: "return_invoice", sourceId: inv.id } },
-    });
-    if (exists) return;
-    const now = new Date();
-    const number = await this.allocateInvoiceNumber(now.getFullYear());
-    const record = await this.prisma.elogoInvoice.create({
-      data: {
-        type: "return_invoice",
-        sourceId: inv.id,
-        recipientUserId: inv.recipientUserId,
-        recipientVknTckn: inv.recipientVknTckn,
-        recipientName: inv.recipientName,
-        documentType: inv.documentType,
-        sendType: "ELEKTRONIK",
-        invoiceNumber: number,
-        ettn: randomUUID(),
-        netAmount: inv.netAmount,
-        taxAmount: this.round2(
-          Number(inv.netAmount) * (Number(inv.vatRate) / 100),
-        ),
-        total: this.round2(
-          Number(inv.netAmount) * (1 + Number(inv.vatRate) / 100),
-        ),
-        vatRate: inv.vatRate,
-        status: "pending",
-        billingReference: inv.invoiceNumber,
+      where: {
+        type_sourceId: {
+          type: "return_invoice",
+          sourceId: reversalSourceId,
+        },
       },
     });
-    await this.sendRecord(record);
+    if (exists) {
+      if (exists.status === "pending" || exists.status === "failed") {
+        await this.sendRecord(exists.id);
+      } else if (exists.status === "processing") {
+        throw new Error(
+          `Return invoice ${exists.invoiceNumber ?? exists.id} is processing`,
+        );
+      }
+      return;
+    }
+
+    const baseGross = adjustment
+      ? await this.resolveInvoiceRefundBase(inv)
+      : Number(inv.total);
+    const returnTotal = adjustment?.fullyRefunded
+      ? remaining
+      : Math.min(
+          remaining,
+          this.round2(baseGross * (adjustment?.refundRatio ?? 1)),
+        );
+    if (returnTotal <= 0.009) return;
+    const originalTotal = Number(inv.total);
+    const netRatio =
+      originalTotal > 0 ? Number(inv.netAmount) / originalTotal : 0;
+    const returnNet = this.round2(returnTotal * netRatio);
+
+    const now = new Date();
+    const record = await this.prisma.$transaction(
+      async (tx) => {
+        const raced = await tx.elogoInvoice.findUnique({
+          where: {
+            type_sourceId: {
+              type: "return_invoice",
+              sourceId: reversalSourceId,
+            },
+          },
+        });
+        if (raced) return raced;
+        const number = await this.allocateInvoiceNumberInTransaction(
+          tx,
+          now.getFullYear(),
+        );
+        return tx.elogoInvoice.create({
+          data: {
+            type: "return_invoice",
+            sourceId: reversalSourceId,
+            recipientUserId: inv.recipientUserId,
+            recipientVknTckn: inv.recipientVknTckn,
+            recipientName: inv.recipientName,
+            documentType: inv.documentType,
+            sendType: "ELEKTRONIK",
+            invoiceNumber: number,
+            ettn: randomUUID(),
+            netAmount: returnNet,
+            taxAmount: this.round2(returnTotal - returnNet),
+            total: returnTotal,
+            originalTotal: returnTotal,
+            vatRate: inv.vatRate,
+            status: "pending",
+            billingReference: inv.invoiceNumber,
+            billingReferenceIssueDate: inv.issuedAt,
+            lineDescription: `İade: ${
+              inv.lineDescription ||
+              LINE_DESCRIPTION[inv.type] ||
+              "Hizmet bedeli"
+            }`,
+            createdAt: now,
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    await this.sendRecord(record.id);
+  }
+
+  /** Refund oranının uygulanacağı faturanın iade öncesi ekonomik brüt bazı. */
+  private async resolveInvoiceRefundBase(inv: ElogoInvoice): Promise<number> {
+    if (inv.type === "commission" || inv.type === "service_fee") {
+      const ledger = await this.prisma.commissionLedger.findUnique({
+        where: { orderId: inv.sourceId },
+        select: { sellerCommission: true, buyerFee: true },
+      });
+      if (ledger) {
+        const sourceAmount =
+          inv.type === "commission"
+            ? Number(ledger.sellerCommission)
+            : Number(ledger.buyerFee);
+        return this.invoiceAmounts(sourceAmount, Number(inv.vatRate)).total;
+      }
+    }
+    if (inv.type === "platform_sale" || inv.type === "membership") {
+      const order = await this.prisma.order
+        .findUnique({
+          where: { id: inv.sourceId },
+          select: { totalAmount: true },
+        })
+        .catch(() => null);
+      if (order) {
+        return this.invoiceAmounts(
+          Number(order.totalAmount),
+          Number(inv.vatRate),
+        ).total;
+      }
+      if (inv.type === "membership") {
+        const membershipPayment = await this.prisma.membershipPayment
+          .findUnique({
+            where: { id: inv.sourceId },
+            select: { amount: true },
+          })
+          .catch(() => null);
+        if (membershipPayment) {
+          return this.invoiceAmounts(
+            Number(membershipPayment.amount),
+            Number(inv.vatRate),
+          ).total;
+        }
+      }
+    }
+    if (inv.type === "boost") {
+      const boost = await this.prisma.productBoost
+        .findUnique({
+          where: { id: inv.sourceId },
+          select: { price: true },
+        })
+        .catch(() => null);
+      if (boost) {
+        return this.invoiceAmounts(Number(boost.price), Number(inv.vatRate))
+          .total;
+      }
+    }
+    return Number(inv.originalTotal ?? inv.total);
   }
 }
