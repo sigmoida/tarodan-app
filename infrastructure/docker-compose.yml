@@ -54,10 +54,11 @@ services:
       timeout: 10s
       retries: 5
 
-  # Kibana for Elasticsearch UI (dev)
+  # Kibana is optional because the application does not need it to run.
   kibana:
     image: docker.elastic.co/kibana/kibana:8.17.0
     container_name: tarodan-kibana
+    profiles: ["tools"]
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     ports:
@@ -71,10 +72,10 @@ services:
       timeout: 10s
       retries: 5
 
-  # MailHog for Email Testing
+  # Mailpit provides an ARM64-native, MailHog-compatible local SMTP inbox.
   mailhog:
-    image: mailhog/mailhog:latest
-    container_name: tarodan-mailhog
+    image: axllent/mailpit:v1.27.8
+    container_name: tarodan-mailpit
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # Web UI

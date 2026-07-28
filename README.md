@@ -12,8 +12,8 @@
 ## Gereksinimler
 
 - **Node 20** — sürüm `.nvmrc`'de sabit (`nvm use` yeterli)
-- **pnpm 8** — `corepack enable` ile gelir
-- **Docker Desktop** — Postgres, Redis, Elasticsearch ve Mailhog için
+- **pnpm 10** — `corepack enable` ile gelir
+- **Docker Desktop** — Postgres, Redis, Elasticsearch ve Mailpit için
 
 ## Hızlı başlangıç
 
@@ -40,8 +40,8 @@ Altyapı zaten ayaktaysa ve sadece uygulamaları başlatmak istersen: `pnpm dev:
 | Web           | http://localhost:3000 |                                               |
 | API           | http://localhost:3001 | Health: http://localhost:3001/api/health      |
 | Admin         | http://localhost:3002 |                                               |
-| Mailhog UI    | http://localhost:8025 | Yerel SMTP yakalayıcı (giden mailler)         |
-| Kibana        | http://localhost:5601 |                                               |
+| Mailpit UI    | http://localhost:8025 | Yerel SMTP yakalayıcı (giden mailler)         |
+| Kibana        | http://localhost:5601 | Opsiyonel: `pnpm dev:tools` ile başlatılır    |
 | Postgres      | `localhost:5432`      | user/pass/db: `postgres`/`postgres`/`tarodan` |
 | Redis         | `localhost:6379`      |                                               |
 | Elasticsearch | http://localhost:9200 | İlk açılışta ~30-60 sn ısınır                 |
@@ -67,6 +67,7 @@ Sıfırdan başlamak istersen: `pnpm dev:reset` — veritabanını siler, migrat
 | ---------------------------------- | ---------------------------------------------------- |
 | `pnpm dev`                         | Tek komut: altyapı + migrate + tüm uygulamalar       |
 | `pnpm dev:only`                    | Sadece uygulamalar (`turbo run dev`)                 |
+| `pnpm dev:tools`                   | Opsiyonel Kibana arayüzünü başlat                    |
 | `pnpm dev:reset`                   | DB'yi sıfırla (migrate + seed) ve başlat             |
 | `pnpm dev:stop`                    | Uygulamaları ve docker altyapıyı durdur              |
 | `pnpm db:studio`                   | Prisma Studio                                        |
@@ -79,5 +80,5 @@ Sıfırdan başlamak istersen: `pnpm dev:reset` — veritabanını siler, migrat
 - **"port already in use"** → `pnpm dev:stop`, sonra tekrar `pnpm dev`
 - **"Cannot connect to the Docker daemon"** → Docker Desktop'ı başlat
 - **Arama sonuçları boş** → Elasticsearch hâlâ ısınıyor olabilir: `curl localhost:9200/_cluster/health`
-- **Giden e-postalar görünmüyor** → Mailhog UI: http://localhost:8025
+- **Giden e-postalar görünmüyor** → Mailpit UI: http://localhost:8025
 - **PayTR callback'i yerelde test** → `pnpm ngrok` (3001'i dışarı tünneler)
