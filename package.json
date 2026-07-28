@@ -20,6 +20,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "audit:prod": "pnpm audit --prod --audit-level=high --json 2>/dev/null | node scripts/check-dependency-audit.mjs",
+    "docs:mobile-api": "node scripts/generate-mobile-api-doc.mjs",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "db:generate": "pnpm --filter @tarodan/api run prisma:generate",

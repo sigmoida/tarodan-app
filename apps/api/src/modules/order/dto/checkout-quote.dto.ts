@@ -47,6 +47,9 @@ export class CheckoutQuoteItemResponseDto {
   productId: string;
 
   @ApiProperty()
+  sellerId: string;
+
+  @ApiProperty()
   quantity: number;
 
   @ApiProperty({ description: "Unit price (after sale if any)" })
@@ -64,6 +67,9 @@ export class CheckoutQuoteItemResponseDto {
   @ApiProperty({ description: "Net to seller for this line" })
   sellerNetAmount: number;
 
+  @ApiProperty({ description: "Buyer tax for this line" })
+  taxAmount: number;
+
   @ApiPropertyOptional({ description: "Product title" })
   title?: string;
 }
@@ -72,7 +78,10 @@ export class CheckoutQuoteResponseDto {
   @ApiProperty({ description: "Sum of item subtotals" })
   itemsSubtotal: number;
 
-  @ApiProperty({ description: "Shipping cost (one per order)" })
+  @ApiProperty({
+    description:
+      "Total buyer shipping cost, calculated once per seller package",
+  })
   shippingAmount: number;
 
   @ApiProperty({ description: "Total buyer fee" })
@@ -83,6 +92,9 @@ export class CheckoutQuoteResponseDto {
 
   @ApiProperty({ description: "Total commission" })
   commissionAmount: number;
+
+  @ApiProperty({ description: "Total buyer tax" })
+  taxAmount: number;
 
   @ApiProperty({ description: "Coupon discount applied to the eligible items" })
   couponDiscount: number;
@@ -109,6 +121,12 @@ export class CheckoutQuoteResponseDto {
   items: CheckoutQuoteItemResponseDto[];
 
   @ApiProperty({
+    description: "Buyer shipping cost breakdown by seller package",
+    example: [{ sellerId: "seller-uuid", shippingCost: 29.99 }],
+  })
+  shippingBySeller: Array<{ sellerId: string; shippingCost: number }>;
+
+  @ApiProperty({
     description: "Standard pricing breakdown (same shape as order/payment)",
     example: {
       subtotal: 250,
@@ -116,6 +134,7 @@ export class CheckoutQuoteResponseDto {
       buyerFeeAmount: 12.5,
       sellerFeeAmount: 10,
       commissionAmount: 22.5,
+      taxAmount: 0,
       totalAmount: 292.49,
       sellerNetAmount: 240,
     },
@@ -126,6 +145,7 @@ export class CheckoutQuoteResponseDto {
     buyerFeeAmount: number;
     sellerFeeAmount: number;
     commissionAmount: number;
+    taxAmount: number;
     totalAmount: number;
     sellerNetAmount: number;
   };

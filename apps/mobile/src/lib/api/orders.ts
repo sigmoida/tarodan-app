@@ -10,6 +10,43 @@ export type OrderAddressInput = {
   zipCode?: string;
 };
 
+export type CheckoutQuoteResponse = {
+  itemsSubtotal: number;
+  shippingAmount: number;
+  buyerFeeAmount: number;
+  sellerFeeAmount: number;
+  commissionAmount: number;
+  taxAmount: number;
+  couponDiscount: number;
+  totalAmount: number;
+  sellerNetAmount: number;
+  pricingHash: string;
+  shippingTariffVersion: number;
+  items: Array<{
+    productId: string;
+    sellerId: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    sellerNetAmount: number;
+    taxAmount: number;
+    title?: string;
+  }>;
+  shippingBySeller: Array<{ sellerId: string; shippingCost: number }>;
+  pricing: {
+    subtotal: number;
+    shippingAmount: number;
+    buyerFeeAmount: number;
+    sellerFeeAmount: number;
+    commissionAmount: number;
+    taxAmount: number;
+    totalAmount: number;
+    sellerNetAmount: number;
+  };
+};
+
 export const ordersApi = {
   getAll: (params?: Record<string, any>) => api.get("/orders", { params }),
   /** Satıcı kazanç özeti (filtre/sayfalama bağımsız): { totalEarnings, pendingEarnings } */
@@ -50,7 +87,7 @@ export const ordersApi = {
     ),
   /** Toplu checkout (üye): sepetteki tüm ürünler tek CheckoutGroup altında, tek ödeme */
   checkout: (data: {
-    items: Array<{ productId: string }>;
+    items: Array<{ productId: string; quantity: number }>;
     idempotencyKey: string;
     shippingAddressId?: string;
     shippingAddress?: OrderAddressInput;
@@ -58,10 +95,11 @@ export const ordersApi = {
     billingAddress?: OrderAddressInput;
     couponCode?: string;
     expectedShippingTariffVersion: number;
+    expectedPricingHash: string;
   }) => api.post("/orders/checkout", data),
   /** Toplu checkout (misafir) */
   checkoutGuest: (data: {
-    items: Array<{ productId: string }>;
+    items: Array<{ productId: string; quantity: number }>;
     idempotencyKey: string;
     email: string;
     emailVerificationCode: string;
@@ -69,7 +107,9 @@ export const ordersApi = {
     guestName: string;
     shippingAddress: OrderAddressInput;
     billingAddress?: OrderAddressInput;
+    couponCode?: string;
     expectedShippingTariffVersion: number;
+    expectedPricingHash: string;
   }) => guestApi.post("/orders/checkout/guest", data),
   /** Alıcının sipariş grupları (gruplu liste) */
   getGroups: (params?: Record<string, any>) =>
@@ -96,7 +136,8 @@ export const ordersApi = {
   /** Checkout quote (fiyat kırılımı) */
   getQuote: (data: {
     items: Array<{ productId: string; quantity?: number }>;
-  }) => api.post("/orders/quote", data),
+    couponCode?: string;
+  }) => api.post<CheckoutQuoteResponse>("/orders/quote", data),
   /** İlan formunda komisyon önizleme (tek ürün) */
   getCommissionPreview: (params: { amount: number; categoryId?: string }) =>
     api.get("/orders/commission-preview", { params }),

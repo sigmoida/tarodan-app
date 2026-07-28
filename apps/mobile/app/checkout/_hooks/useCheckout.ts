@@ -8,6 +8,7 @@ import {
   shippingApi,
   addressesApi,
   type OrderAddressInput,
+  type CheckoutQuoteResponse,
 } from "@/lib/api";
 import { qk } from "@/lib/query";
 import { useCartStore } from "@/stores/cartStore";
@@ -93,8 +94,12 @@ export function useCheckout() {
     message: string;
   }>({ visible: false, message: "" });
 
-  const subtotal = useMemo(
+  const localSubtotal = useMemo(
     () => items.reduce((sum, it) => sum + it.price * it.quantity, 0),
+    [items],
+  );
+  const itemCount = useMemo(
+    () => items.reduce((sum, item) => sum + item.quantity, 0),
     [items],
   );
 
@@ -103,31 +108,36 @@ export function useCheckout() {
       items.map((it) => `${it.productId}:${it.quantity}`).join(","),
     ),
     queryFn: async () => {
-      const res: any = await ordersApi.getQuote({
+      const res = await ordersApi.getQuote({
         items: items.map((it) => ({
           productId: it.productId,
           quantity: it.quantity,
         })),
       });
-      const pricing = res.data?.pricing ?? res.data ?? {};
-      return {
-        ...pricing,
-        // Threshold-applied shipping + tariff version live at the quote top level.
-        shippingAmount: res.data?.shippingAmount ?? pricing?.shippingAmount,
-        shippingTariffVersion: res.data?.shippingTariffVersion ?? null,
-      } as {
-        buyerFeeAmount?: number;
-        taxAmount?: number;
-        totalAmount?: number;
-        shippingAmount?: number;
-        shippingTariffVersion?: number | null;
-      };
+      const envelope = res.data as
+        CheckoutQuoteResponse | { data: CheckoutQuoteResponse };
+      return "data" in envelope ? envelope.data : envelope;
     },
     enabled: items.length > 0,
     staleTime: 60_000,
   });
   const buyerFee = Number(quoteQuery.data?.buyerFeeAmount ?? 0);
   const taxAmount = Number(quoteQuery.data?.taxAmount ?? 0);
+  const subtotal = Number(
+    quoteQuery.data?.itemsSubtotal ??
+      quoteQuery.data?.pricing?.subtotal ??
+      localSubtotal,
+  );
+  const quotedLineTotals = useMemo(
+    () =>
+      Object.fromEntries(
+        (quoteQuery.data?.items ?? []).map((item) => [
+          item.productId,
+          item.subtotal,
+        ]),
+      ) as Record<string, number>,
+    [quoteQuery.data?.items],
+  );
 
   // The server quote's shipping (active tariff, free-shipping threshold applied) is
   // authoritative — the /shipping/rates estimate is only a pre-quote placeholder.
@@ -137,7 +147,11 @@ export function useCheckout() {
     }
   }, [quoteQuery.data?.shippingAmount]);
 
-  const total = subtotal + shippingCost + buyerFee + taxAmount;
+  const total = Number(
+    quoteQuery.data?.totalAmount ??
+      quoteQuery.data?.pricing?.totalAmount ??
+      subtotal + shippingCost + buyerFee + taxAmount,
+  );
 
   const addressesQuery = useQuery({
     queryKey: qk.addresses.mine,
@@ -312,10 +326,15 @@ export function useCheckout() {
     if (loading) return;
     const expectedShippingTariffVersion =
       quoteQuery.data?.shippingTariffVersion;
-    if (typeof expectedShippingTariffVersion !== "number") {
+    const expectedPricingHash = quoteQuery.data?.pricingHash;
+    if (
+      typeof expectedShippingTariffVersion !== "number" ||
+      typeof expectedPricingHash !== "string" ||
+      expectedPricingHash.length === 0
+    ) {
       appAlert(
         "Fiyat bilgisi güncellendi",
-        "Lütfen kargo tutarı yüklendikten sonra tekrar deneyin.",
+        "Lütfen güncel sipariş toplamı yüklendikten sonra tekrar deneyin.",
       );
       return;
     }
@@ -327,13 +346,17 @@ export function useCheckout() {
       // Tariff version the quote was priced with → server returns 409 PRICING_CHANGED
       // if it moved before order-create, so the buyer confirms the new amount.
       const checkoutPayload = {
-        items: items.map((item) => ({ productId: item.productId })),
+        items: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
         idempotencyKey: idempotencyKeyRef.current,
         shippingAddressId: shipping.id,
         shippingAddress: shipping.inline,
         billingAddressId: billing?.id,
         billingAddress: billing?.inline,
         expectedShippingTariffVersion,
+        expectedPricingHash,
       };
 
       const response =
@@ -352,6 +375,7 @@ export function useCheckout() {
               shippingAddress: shipping.inline!,
               billingAddress: billing?.inline,
               expectedShippingTariffVersion,
+              expectedPricingHash,
             });
 
       const data: any = (response.data as any)?.data ?? response.data;
@@ -454,12 +478,13 @@ export function useCheckout() {
         tags: { flow: "checkout" },
         extra: { status: error?.response?.status },
       });
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        (Array.isArray(error.response?.data?.message)
-          ? error.response?.data?.message.join(", ")
-          : "Sipariş oluşturulamadı");
+      const rawErrorMessage =
+        error.response?.data?.message || error.response?.data?.error;
+      const errorMessage = Array.isArray(rawErrorMessage)
+        ? rawErrorMessage.join(", ")
+        : typeof rawErrorMessage === "string"
+          ? rawErrorMessage
+          : "Sipariş oluşturulamadı";
       const status = error?.response?.status;
       const isStockout =
         (status === 400 || status === 409) &&
@@ -489,6 +514,22 @@ export function useCheckout() {
           } as any);
           return;
         }
+      }
+      const normalizedMessage = errorMessage.toLocaleLowerCase("tr-TR");
+      const isPricingChanged =
+        status === 409 &&
+        (error?.response?.data?.code === "PRICING_CHANGED" ||
+          normalizedMessage.includes("fiyat") ||
+          normalizedMessage.includes("price") ||
+          normalizedMessage.includes("tutar"));
+      if (isPricingChanged) {
+        await quoteQuery.refetch();
+        idempotencyKeyRef.current = generateUuidV4();
+        appAlert(
+          "Fiyat bilgisi güncellendi",
+          "Ürün veya kargo fiyatı değişti. Güncel toplamı kontrol edip tekrar onaylayın.",
+        );
+        return;
       }
       appAlert("Hata", errorMessage);
     } finally {
@@ -585,6 +626,7 @@ export function useCheckout() {
   return {
     isAuthenticated,
     items,
+    itemCount,
     step,
     setStep,
     // guest
@@ -613,9 +655,12 @@ export function useCheckout() {
     shippingLoading,
     effectiveShippingCity,
     subtotal,
+    quotedLineTotals,
     buyerFee,
     taxAmount,
     total,
+    quoteLoading: quoteQuery.isLoading || quoteQuery.isFetching,
+    quoteError: quoteQuery.isError,
     // ui
     loading,
     snackbar,
