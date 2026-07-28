@@ -83,7 +83,7 @@ export class MiscReconciliationService {
    * O6: Ödemesi tamamlanmış ama faturası oluşmamış siparişleri bulup faturayı yeniden üret.
    * processSuccessfulPayment'ta fatura üretimi tx-sonrası best-effort olduğundan (geçici hata
    * yutulup loglanır) bu sweep güvenilir bir TELAFİ/retry görevi görür. Yalnız faturası
-   * OLMAYAN (invoices:none) siparişleri seçtiğinden çift-fatura riski yoktur. Membership/boost
+   * OLMAYAN (invoice:null) siparişleri seçtiğinden çift-fatura riski yoktur. Membership/boost
    * sanal siparişlerine fatura kesilmez → hariç tutulur.
    */
   async reconcileMissingInvoices(): Promise<{ generated: number }> {
@@ -99,7 +99,7 @@ export class MiscReconciliationService {
           ],
         },
         payment: { is: { status: PaymentStatus.completed } },
-        invoices: { none: {} },
+        invoice: null,
         NOT: {
           OR: [
             { productId: { startsWith: "membership-" } },
