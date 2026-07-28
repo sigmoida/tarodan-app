@@ -268,6 +268,7 @@ export class OrderGuestCheckoutService {
           productId: dto.productId,
           unitPrice: finalPrice,
           quantity: 1,
+          shippingDesi: product.shippingDesi,
         },
       ]);
 
@@ -331,6 +332,7 @@ export class OrderGuestCheckoutService {
       const fullShipping = await this.orderPricing.calculateShippingCost(
         finalPrice,
         shippingTariff.tariff,
+        product.shippingDesi,
       );
       // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
       const buyerShippingAmount =
@@ -422,6 +424,14 @@ export class OrderGuestCheckoutService {
           shippingCost,
           shippingTariffId: shippingTariff.tariffId,
           shippingTariffVersion: shippingTariff.tariffVersion,
+          billableDesi: product.shippingDesi,
+          shippingPricingSnapshot: {
+            provider: shippingTariff.tariff.provider ?? "surat",
+            tariffId: shippingTariff.tariffId,
+            tariffVersion: shippingTariff.tariffVersion,
+            billableDesi: product.shippingDesi,
+            fullShippingAmount: fullShipping,
+          },
           fullShippingAmount: fullShipping,
           buyerShippingAmount,
           sellerShippingAmount,

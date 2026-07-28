@@ -20,7 +20,9 @@ import { TaxService } from "../tax/tax.service";
 import { isPremiumEntitled } from "../membership/membership.util";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import {
+  calculatePackageDesi,
   outboundPackageShipping,
+  ShippingDesiRateNotFoundError,
   type OutboundTariffLike,
 } from "../shipping/shipping-tariff.helper";
 import { DiscountService } from "../discount/discount.service";
@@ -61,10 +63,11 @@ export class OrderPricingService {
   async calculateShippingCost(
     orderAmount: number,
     snapshotTariff?: OutboundTariffLike,
+    billableDesi = 1,
   ): Promise<number> {
     const tariff =
       snapshotTariff ?? (await this.shippingTariffs.getActiveOutboundTariff());
-    return outboundPackageShipping(tariff, orderAmount).toNumber();
+    return this.shippingAmount(tariff, orderAmount, billableDesi);
   }
 
   /**
@@ -80,14 +83,36 @@ export class OrderPricingService {
   async calculateShippingBySeller(
     sellerSubtotals: Map<string, number>,
     snapshotTariff?: OutboundTariffLike,
+    sellerDesi?: Map<string, number>,
   ): Promise<Map<string, number>> {
     const tariff =
       snapshotTariff ?? (await this.shippingTariffs.getActiveOutboundTariff());
     const out = new Map<string, number>();
     for (const [sellerId, subtotal] of sellerSubtotals) {
-      out.set(sellerId, outboundPackageShipping(tariff, subtotal).toNumber());
+      out.set(
+        sellerId,
+        this.shippingAmount(tariff, subtotal, sellerDesi?.get(sellerId) ?? 1),
+      );
     }
     return out;
+  }
+
+  private shippingAmount(
+    tariff: OutboundTariffLike,
+    subtotal: number,
+    billableDesi: number,
+  ): number {
+    try {
+      return outboundPackageShipping(tariff, subtotal, billableDesi).toNumber();
+    } catch (error) {
+      if (error instanceof ShippingDesiRateNotFoundError) {
+        throw new ServiceUnavailableException({
+          code: "SHIPPING_DESI_RATE_NOT_CONFIGURED",
+          message: `Kargo tarifesinde ${billableDesi} desi için fiyat tanımlı değil.`,
+        });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -166,7 +191,11 @@ export class OrderPricingService {
     }>;
     // Satıcı-başına kargo kırılımı (sepetteki her satıcı için tek kargo). UI "çatı"
     // görünümü ve doğru toplam için; `shippingAmount` bunların toplamıdır.
-    shippingBySeller: Array<{ sellerId: string; shippingCost: number }>;
+    shippingBySeller: Array<{
+      sellerId: string;
+      shippingCost: number;
+      billableDesi: number;
+    }>;
     // Aktif tarife sürümü — istemci order-create'e geri gönderir; sürüm değiştiyse
     // create 409 PRICING_CHANGED döner. Aktif tarife yoksa quote fail-closed davranır.
     shippingTariffVersion: number;
@@ -209,6 +238,10 @@ export class OrderPricingService {
     }> = [];
     // Satıcı-başına kargo alt-toplamı (create ile aynı mantık — calculateShippingBySeller).
     const sellerSubtotals = new Map<string, number>();
+    const sellerDesiLines = new Map<
+      string,
+      Array<{ shippingDesi: number; quantity: number }>
+    >();
     // Kargo payı: satıcının kuralındaki alıcı payı (%). Create yolu ile aynı
     // bölüşüm; önizleme toplamı oluşan siparişle birebir eşleşsin.
     const sellerShippingShare = new Map<string, number>();
@@ -220,6 +253,7 @@ export class OrderPricingService {
         title: string | null;
         sellerId: string;
         categoryId: string | null;
+        shippingDesi: number;
         seller: { businessStatus: string | null; taxId: string | null } | null;
       };
       quantity: number;
@@ -236,6 +270,7 @@ export class OrderPricingService {
           price: true,
           sellerId: true,
           categoryId: true,
+          shippingDesi: true,
           status: true,
           seller: { select: { businessStatus: true, taxId: true } },
         },
@@ -268,6 +303,7 @@ export class OrderPricingService {
           title: product.title,
           sellerId: product.sellerId,
           categoryId: product.categoryId,
+          shippingDesi: product.shippingDesi,
           seller: product.seller,
         },
         quantity,
@@ -375,6 +411,9 @@ export class OrderPricingService {
         product.sellerId,
         (sellerSubtotals.get(product.sellerId) ?? 0) + discountedLine,
       );
+      const desiLines = sellerDesiLines.get(product.sellerId) ?? [];
+      desiLines.push({ shippingDesi: product.shippingDesi, quantity });
+      sellerDesiLines.set(product.sellerId, desiLines);
 
       quoteItems.push({
         productId: product.id,
@@ -391,9 +430,16 @@ export class OrderPricingService {
     }
 
     // Satıcı-BAŞINA kargo (create ile ortak yardımcı) → çoklu-satıcı sepette doğru toplam.
+    const sellerDesi = new Map(
+      [...sellerDesiLines.entries()].map(([sellerId, packageLines]) => [
+        sellerId,
+        calculatePackageDesi(packageLines),
+      ]),
+    );
     const shippingMap = await this.calculateShippingBySeller(
       sellerSubtotals,
       shippingTariff.tariff,
+      sellerDesi,
     );
     // Alıcı yalnız kendi kargo payını öder (create yolundaki yuvarlamayla birebir).
     // buyerShare=100 → tam kargo (mevcut davranış korunur).
@@ -402,7 +448,11 @@ export class OrderPricingService {
         const share = sellerShippingShare.get(sellerId) ?? 100;
         const buyerShipping =
           Math.round(fullShipping * (share / 100) * 100) / 100;
-        return { sellerId, shippingCost: buyerShipping };
+        return {
+          sellerId,
+          shippingCost: buyerShipping,
+          billableDesi: sellerDesi.get(sellerId) ?? 1,
+        };
       },
     );
     const shippingAmount = shippingBySeller.reduce(
@@ -427,6 +477,7 @@ export class OrderPricingService {
         productId: l.product.id,
         unitPrice: l.unitPrice,
         quantity: l.quantity,
+        shippingDesi: l.product.shippingDesi,
       })),
     );
 
@@ -468,10 +519,18 @@ export class OrderPricingService {
    * (config-derived, recomputed identically on both sides).
    */
   computePricingHash(
-    items: Array<{ productId: string; unitPrice: number; quantity: number }>,
+    items: Array<{
+      productId: string;
+      unitPrice: number;
+      quantity: number;
+      shippingDesi?: number;
+    }>,
   ): string {
     const basis = items
-      .map((i) => `${i.productId}:${i.unitPrice.toFixed(2)}:${i.quantity}`)
+      .map(
+        (i) =>
+          `${i.productId}:${i.unitPrice.toFixed(2)}:${i.quantity}:${i.shippingDesi ?? 1}`,
+      )
       .sort()
       .join("|");
     return createHash("sha256").update(basis).digest("hex").slice(0, 16);
@@ -486,7 +545,12 @@ export class OrderPricingService {
    */
   assertPricingUnchanged(
     expectedHash: string | undefined | null,
-    items: Array<{ productId: string; unitPrice: number; quantity: number }>,
+    items: Array<{
+      productId: string;
+      unitPrice: number;
+      quantity: number;
+      shippingDesi?: number;
+    }>,
   ): void {
     if (!expectedHash || this.computePricingHash(items) !== expectedHash) {
       throw new ConflictException(

@@ -95,8 +95,19 @@ export default function ShippingTariffsPage() {
                   value={`${tariff.provider} · v${tariff.version}`}
                 />
                 <Row
-                  label={t("admin.shippingTariffs.packageFee")}
-                  value={fmtTry(Number(tariff.outboundPackageFee))}
+                  label={t("admin.shippingTariffs.ratesTitle")}
+                  value={
+                    tariff.rates?.length
+                      ? tariff.rates
+                          .map(
+                            (rate) =>
+                              `${rate.desi} desi: ${fmtTry(Number(rate.amount))}`,
+                          )
+                          .join(" · ")
+                      : t("admin.shippingTariffs.legacyPackageFee", {
+                          amount: fmtTry(Number(tariff.outboundPackageFee)),
+                        })
+                  }
                 />
                 <Row
                   label={t("admin.shippingTariffs.freeShipping")}
@@ -154,7 +165,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
       <dt className="text-muted">{label}</dt>
-      <dd className="font-medium text-body">{value}</dd>
+      <dd className="break-words text-right font-medium text-body">{value}</dd>
     </div>
   );
 }

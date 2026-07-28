@@ -5,12 +5,24 @@ import {
   BadRequestException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { Prisma, ShippingTariff, ShippingTariffStatus } from "@prisma/client";
+import {
+  Prisma,
+  ShippingTariff,
+  ShippingTariffRate,
+  ShippingTariffStatus,
+} from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
-import { outboundPackageShipping } from "./shipping-tariff.helper";
+import {
+  outboundPackageShipping,
+  shippingAmountForDesi,
+} from "./shipping-tariff.helper";
 
 const DEFAULT_PROVIDER = "surat";
+export type ShippingTariffWithRates = ShippingTariff & {
+  rates: ShippingTariffRate[];
+};
+
 export interface ShippingTariffInput {
   provider?: string;
   name: string;
@@ -20,6 +32,7 @@ export interface ShippingTariffInput {
   returnPackageFee?: number;
   tradeLegFee?: number;
   effectiveFrom?: Date | string;
+  rates?: Array<{ desi: number; amount: number }>;
 }
 
 /**
@@ -39,9 +52,12 @@ export class ShippingTariffService {
    * pricing request: a process-local cache is not invalidated in sibling API instances
    * and can keep charging an archived tariff after an admin activation.
    */
-  async getActiveTariff(provider = DEFAULT_PROVIDER): Promise<ShippingTariff> {
+  async getActiveTariff(
+    provider = DEFAULT_PROVIDER,
+  ): Promise<ShippingTariffWithRates> {
     const tariff = await this.prisma.shippingTariff.findFirst({
       where: { provider, status: ShippingTariffStatus.active },
+      include: { rates: { orderBy: { desi: "asc" } } },
     });
     if (!tariff) {
       throw new NotFoundException(
@@ -57,7 +73,7 @@ export class ShippingTariffService {
    */
   async getActiveOutboundTariff(
     provider = DEFAULT_PROVIDER,
-  ): Promise<ShippingTariff> {
+  ): Promise<ShippingTariffWithRates> {
     try {
       return await this.getActiveTariff(provider);
     } catch (error) {
@@ -79,7 +95,7 @@ export class ShippingTariffService {
   async getActiveTariffSnapshot(provider = DEFAULT_PROVIDER): Promise<{
     tariffId: string;
     tariffVersion: number;
-    tariff: ShippingTariff;
+    tariff: ShippingTariffWithRates;
   }> {
     const tariff = await this.getActiveOutboundTariff(provider);
     return {
@@ -90,14 +106,14 @@ export class ShippingTariffService {
   }
 
   /**
-   * Estimated RETURN-leg shipping cost from the active tariff (Phase 2). Consumed by
-   * refund flows to price the return shipment; falls back to the outbound fee if the
-   * tariff has no return fee configured.
+   * Estimated return-leg shipping cost from the active exact desi tariff.
    */
-  async quoteReturnShipment(provider = DEFAULT_PROVIDER): Promise<number> {
+  async quoteReturnShipment(
+    provider = DEFAULT_PROVIDER,
+    billableDesi = 1,
+  ): Promise<number> {
     const tariff = await this.getActiveOutboundTariff(provider);
-    const fee = Number(tariff.returnPackageFee);
-    return fee > 0 ? fee : Number(tariff.outboundPackageFee);
+    return shippingAmountForDesi(tariff, billableDesi).toNumber();
   }
 
   /**
@@ -110,16 +126,18 @@ export class ShippingTariffService {
     return fee > 0 ? fee : Number(tariff.outboundPackageFee);
   }
 
-  async list(provider?: string): Promise<ShippingTariff[]> {
+  async list(provider?: string): Promise<ShippingTariffWithRates[]> {
     return this.prisma.shippingTariff.findMany({
       where: provider ? { provider } : undefined,
       orderBy: [{ provider: "asc" }, { version: "desc" }],
+      include: { rates: { orderBy: { desi: "asc" } } },
     });
   }
 
-  async getById(id: string): Promise<ShippingTariff> {
+  async getById(id: string): Promise<ShippingTariffWithRates> {
     const tariff = await this.prisma.shippingTariff.findUnique({
       where: { id },
+      include: { rates: { orderBy: { desi: "asc" } } },
     });
     if (!tariff) {
       throw new NotFoundException(
@@ -133,9 +151,10 @@ export class ShippingTariffService {
   async create(
     input: ShippingTariffInput,
     adminId: string,
-  ): Promise<ShippingTariff> {
+  ): Promise<ShippingTariffWithRates> {
     const provider = input.provider ?? DEFAULT_PROVIDER;
     this.assertAmounts(input);
+    this.assertRates(input.rates);
     const last = await this.prisma.shippingTariff.findFirst({
       where: { provider },
       orderBy: { version: "desc" },
@@ -158,7 +177,16 @@ export class ShippingTariffService {
           : new Date(),
         createdBy: adminId,
         updatedBy: adminId,
+        rates: input.rates?.length
+          ? {
+              create: input.rates.map((rate) => ({
+                desi: rate.desi,
+                amount: rate.amount,
+              })),
+            }
+          : undefined,
       },
+      include: { rates: { orderBy: { desi: "asc" } } },
     });
   }
 
@@ -167,7 +195,7 @@ export class ShippingTariffService {
     id: string,
     input: Partial<ShippingTariffInput>,
     adminId: string,
-  ): Promise<ShippingTariff> {
+  ): Promise<ShippingTariffWithRates> {
     const tariff = await this.getById(id);
     if (tariff.status !== ShippingTariffStatus.draft) {
       throw new BadRequestException(
@@ -175,20 +203,39 @@ export class ShippingTariffService {
       );
     }
     this.assertAmounts(input);
-    return this.prisma.shippingTariff.update({
-      where: { id },
-      data: {
-        name: input.name,
-        outboundPackageFee: input.outboundPackageFee,
-        freeShippingEnabled: input.freeShippingEnabled,
-        freeShippingThreshold: input.freeShippingThreshold,
-        returnPackageFee: input.returnPackageFee,
-        tradeLegFee: input.tradeLegFee,
-        effectiveFrom: input.effectiveFrom
-          ? new Date(input.effectiveFrom)
-          : undefined,
-        updatedBy: adminId,
-      },
+    this.assertRates(input.rates);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.shippingTariff.update({
+        where: { id },
+        data: {
+          name: input.name,
+          outboundPackageFee: input.outboundPackageFee,
+          freeShippingEnabled: input.freeShippingEnabled,
+          freeShippingThreshold: input.freeShippingThreshold,
+          returnPackageFee: input.returnPackageFee,
+          tradeLegFee: input.tradeLegFee,
+          effectiveFrom: input.effectiveFrom
+            ? new Date(input.effectiveFrom)
+            : undefined,
+          updatedBy: adminId,
+        },
+      });
+      if (input.rates !== undefined) {
+        await tx.shippingTariffRate.deleteMany({ where: { tariffId: id } });
+        if (input.rates.length) {
+          await tx.shippingTariffRate.createMany({
+            data: input.rates.map((rate) => ({
+              tariffId: id,
+              desi: rate.desi,
+              amount: rate.amount,
+            })),
+          });
+        }
+      }
+      return tx.shippingTariff.findUniqueOrThrow({
+        where: { id },
+        include: { rates: { orderBy: { desi: "asc" } } },
+      });
     });
   }
 
@@ -197,7 +244,10 @@ export class ShippingTariffService {
    * and promote this one, in a single transaction (the partial-unique DB index also
    * guards single-active). Invalidates the active-tariff cache immediately.
    */
-  async activate(id: string, adminId: string): Promise<ShippingTariff> {
+  async activate(
+    id: string,
+    adminId: string,
+  ): Promise<ShippingTariffWithRates> {
     const tariff = await this.getById(id);
     if (tariff.status === ShippingTariffStatus.archived) {
       throw new BadRequestException(
@@ -205,6 +255,20 @@ export class ShippingTariffService {
       );
     }
     if (tariff.status === ShippingTariffStatus.active) return tariff;
+    if (!tariff.rates.length) {
+      throw new BadRequestException({
+        code: "SHIPPING_DESI_RATES_REQUIRED",
+        message:
+          "Desi tarifesi aktifleştirilmeden önce en az bir fiyat satırı girilmelidir.",
+      });
+    }
+    if (!tariff.rates.some((rate) => rate.desi === 1)) {
+      throw new BadRequestException({
+        code: "SHIPPING_ONE_DESI_RATE_REQUIRED",
+        message:
+          "Mevcut ürünlerin varsayılan desisi için 1 desi fiyatı tanımlanmalıdır.",
+      });
+    }
 
     const activated = await this.prisma.$transaction(async (tx) => {
       // Archive current active FIRST so the partial-unique(active) index is satisfied.
@@ -222,6 +286,7 @@ export class ShippingTariffService {
           effectiveFrom: new Date(),
           updatedBy: adminId,
         },
+        include: { rates: { orderBy: { desi: "asc" } } },
       });
     });
     this.logger.log(
@@ -264,6 +329,29 @@ export class ShippingTariffService {
       throw new BadRequestException(
         i18nMessage("server.shipping.tariffNegativeAmount"),
       );
+    }
+  }
+
+  private assertRates(
+    rates: Array<{ desi: number; amount: number }> | undefined,
+  ): void {
+    if (rates === undefined) return;
+    const desiValues = new Set<number>();
+    for (const rate of rates) {
+      if (
+        !Number.isInteger(rate.desi) ||
+        rate.desi < 1 ||
+        !Number.isFinite(rate.amount) ||
+        rate.amount < 0 ||
+        desiValues.has(rate.desi)
+      ) {
+        throw new BadRequestException({
+          code: "INVALID_SHIPPING_DESI_RATE",
+          message:
+            "Desi değerleri pozitif ve benzersiz, tutarlar sıfır veya pozitif olmalıdır.",
+        });
+      }
+      desiValues.add(rate.desi);
     }
   }
 }

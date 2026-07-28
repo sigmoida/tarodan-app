@@ -71,6 +71,8 @@ export function buildStandardGonderiPayload(input: {
   content?: string;
   /** Iademi bayrağı — varsayılan false (standart gönderi) */
   isReturn?: boolean;
+  /** Checkout sırasında snapshot alınan paket desisi. */
+  desi?: number;
   /** Çağırana özgü sapmalar; standart değerleri ezmek için en son uygulanır */
   overrides?: Partial<SuratGonderiPayload>;
 }): SuratGonderiPayload {
@@ -85,7 +87,10 @@ export function buildStandardGonderiPayload(input: {
     OdemeTipi: SuratOdemeTipi.Pesin,
     OzelKargoTakipNo: input.ref,
     Adet: 1,
-    BirimDesi: 1,
+    BirimDesi:
+      Number.isInteger(input.desi) && Number(input.desi) > 0
+        ? Number(input.desi)
+        : 1,
     BirimKg: 1,
     KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
     TasimaSekli: SuratTasimaSekli.KaraYolu,

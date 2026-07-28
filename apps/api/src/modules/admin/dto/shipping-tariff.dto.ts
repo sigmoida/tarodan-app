@@ -1,14 +1,31 @@
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+
+export class ShippingTariffRateDto {
+  @IsInt()
+  @Min(1)
+  @Max(20000)
+  @Type(() => Number)
+  desi: number;
+
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  amount: number;
+}
 
 /**
  * Admin: create a DRAFT shipping tariff. Version + status are server-assigned.
@@ -50,6 +67,12 @@ export class CreateShippingTariffDto {
   @IsOptional()
   @IsDateString()
   effectiveFrom?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ShippingTariffRateDto)
+  rates: ShippingTariffRateDto[];
 }
 
 /** Admin: update a DRAFT tariff (all fields optional). */
@@ -86,6 +109,13 @@ export class UpdateShippingTariffDto {
   @IsOptional()
   @IsDateString()
   effectiveFrom?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ShippingTariffRateDto)
+  rates?: ShippingTariffRateDto[];
 }
 
 /** Admin: preview a tariff's outbound shipping for sample seller-package subtotals. */

@@ -57,6 +57,10 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         outboundPackageFee: BASE,
         freeShippingEnabled: true,
         freeShippingThreshold: THRESHOLD,
+        rates: [
+          { desi: 1, amount: BASE },
+          { desi: 2, amount: BASE },
+        ],
       }),
       getActiveTariffSnapshot: async () => ({
         tariffId: "tariff-1",
@@ -65,6 +69,10 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
           outboundPackageFee: BASE,
           freeShippingEnabled: true,
           freeShippingThreshold: THRESHOLD,
+          rates: [
+            { desi: 1, amount: BASE },
+            { desi: 2, amount: BASE },
+          ],
         },
       }),
     } as any;

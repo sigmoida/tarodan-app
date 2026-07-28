@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
   Optional,
   Logger,
 } from "@nestjs/common";
@@ -23,7 +24,11 @@ import {
   canAddRequestedQuantityToCart,
 } from "../product/helpers/product-availability.helper";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
-import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
+import {
+  calculatePackageDesi,
+  outboundPackageShipping,
+  ShippingDesiRateNotFoundError,
+} from "../shipping/shipping-tariff.helper";
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
@@ -520,6 +525,7 @@ export class CartService {
         isAvailable,
         stockWarning,
         maxQuantity,
+        shippingDesi: product.shippingDesi,
       });
     }
 
@@ -557,18 +563,84 @@ export class CartService {
     // yüzden sepet önizlemesi de uygulamaz → önizleme = tahsilat. Toplam yalnızca
     // grandTotal'da 0'a taban yapılır (Math.max(0, ...)).
 
-    // Calculate shipping from the ACTIVE shipping tariff (single source; same base
-    // fee + threshold the order-create charge uses). Cart preview keeps its whole-cart
-    // threshold model; the per-seller charge is confirmed by the checkout quote.
+    // Checkout ile aynı paket kuralı: aynı satıcının ürünleri tek paket, paket desisi
+    // ürün desisi × adet toplamıdır. Böylece sepet özeti ile sipariş oluşturma aynı
+    // aktif tarifeyi ve aynı satıcı-paketi sınırını kullanır.
     const hasAvailableItems = availableItems.length > 0;
     const tariff = await this.shippingTariffs.getActiveOutboundTariff();
-    const shippingCost = hasAvailableItems
-      ? outboundPackageShipping(tariff, subtotal).toNumber()
-      : 0;
-    const amountToFreeShipping =
-      shippingCost === 0
-        ? 0
-        : Math.max(0, Number(tariff.freeShippingThreshold) - subtotal);
+    const sellerPackages = new Map<
+      string,
+      {
+        subtotal: number;
+        lines: Array<{ shippingDesi: number; quantity: number }>;
+      }
+    >();
+    for (const item of availableItems) {
+      const current = sellerPackages.get(item.sellerId) ?? {
+        subtotal: 0,
+        lines: [],
+      };
+      current.subtotal += item.lineTotal;
+      current.lines.push({
+        shippingDesi: item.shippingDesi,
+        quantity: item.quantity,
+      });
+      sellerPackages.set(item.sellerId, current);
+    }
+    const affectedProductIds = new Set(
+      appliedDiscounts.flatMap((discount) => discount.affectedProductIds ?? []),
+    );
+    const eligibleLines = availableItems.filter((item) =>
+      affectedProductIds.has(item.productId),
+    );
+    const eligibleTotal = eligibleLines.reduce(
+      (sum, item) => sum + item.lineTotal,
+      0,
+    );
+    let allocatedCoupon = 0;
+    eligibleLines.forEach((item, index) => {
+      const packageEntry = sellerPackages.get(item.sellerId);
+      if (!packageEntry || eligibleTotal <= 0) return;
+      const lineCoupon =
+        index === eligibleLines.length - 1
+          ? Math.round((couponDiscountTotal - allocatedCoupon) * 100) / 100
+          : Math.round(
+              ((couponDiscountTotal * item.lineTotal) / eligibleTotal) * 100,
+            ) / 100;
+      allocatedCoupon += lineCoupon;
+      packageEntry.subtotal = Math.max(0, packageEntry.subtotal - lineCoupon);
+    });
+
+    let shippingCost = 0;
+    let amountToFreeShipping = 0;
+    try {
+      for (const sellerPackage of sellerPackages.values()) {
+        const packageShipping = outboundPackageShipping(
+          tariff,
+          sellerPackage.subtotal,
+          calculatePackageDesi(sellerPackage.lines),
+        ).toNumber();
+        shippingCost += packageShipping;
+        if (packageShipping > 0 && tariff.freeShippingEnabled) {
+          amountToFreeShipping += Math.max(
+            0,
+            Number(tariff.freeShippingThreshold) - sellerPackage.subtotal,
+          );
+        }
+      }
+    } catch (error) {
+      if (error instanceof ShippingDesiRateNotFoundError) {
+        throw new ServiceUnavailableException({
+          code: "SHIPPING_DESI_RATE_NOT_CONFIGURED",
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+    if (!hasAvailableItems) {
+      shippingCost = 0;
+      amountToFreeShipping = 0;
+    }
 
     // Grand total
     const grandTotal = subtotal - totalDiscount + shippingCost;

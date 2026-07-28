@@ -59,6 +59,7 @@ describe("CartService.addItem — idempotent re-add", () => {
               outboundPackageFee: 29.99,
               freeShippingEnabled: true,
               freeShippingThreshold: 500,
+              rates: [{ desi: 1, amount: 29.99 }],
             }),
           },
         },
@@ -162,6 +163,7 @@ describe("CartService.calculateCart — unavailable items", () => {
       quantity: 5,
       reservedQuantity: 0,
       maxQuantityPerOrder: null,
+      shippingDesi: 1,
       images: [],
       seller: { id: "seller-1", displayName: "Satıcı" },
       ...overrides,
@@ -190,6 +192,7 @@ describe("CartService.calculateCart — unavailable items", () => {
           outboundPackageFee: 29.99,
           freeShippingEnabled: true,
           freeShippingThreshold: 500,
+          rates: [{ desi: 1, amount: 29.99 }],
         }),
       } as any,
       {} as StorageService,
@@ -267,7 +270,7 @@ describe("CartService.calculateCart — unavailable items", () => {
     expect(result.couponDiscountTotal).toBe(100);
     expect(result.totalDiscount).toBe(100);
     expect(result.shippingCost).toBe(29.99);
-    expect(result.amountToFreeShipping).toBe(400);
+    expect(result.amountToFreeShipping).toBe(500);
     expect(result.grandTotal).toBeCloseTo(29.99, 2);
     expect(result.appliedDiscounts[0].affectedProductIds).toEqual([
       "product-available",

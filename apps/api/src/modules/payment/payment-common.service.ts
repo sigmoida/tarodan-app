@@ -154,7 +154,7 @@ export class PaymentCommonService {
         orderNumber: true,
         shippingAddress: true,
         packageId: true,
-        product: { select: { title: true } },
+        product: { select: { title: true, shippingDesi: true } },
       },
     });
     if (!order) {
@@ -171,9 +171,15 @@ export class PaymentCommonService {
     const ref = await this.resolveSuratRef(order.orderNumber, order.packageId);
     let content = order.product?.title ?? undefined;
     let adet = 1;
+    let desi = order.product?.shippingDesi ?? 1;
     let idempotencyKey = `surat:order:${order.orderNumber}`;
     let addrSource = order.shippingAddress;
     if (order.packageId) {
+      const orderPackage = await this.prisma.orderPackage.findUnique({
+        where: { id: order.packageId },
+        select: { billableDesi: true },
+      });
+      desi = orderPackage?.billableDesi ?? desi;
       const pkgOrders = await this.prisma.order.findMany({
         where: { packageId: order.packageId },
         select: {
@@ -217,6 +223,7 @@ export class PaymentCommonService {
       phone: String(addr.phone ?? ""),
       ref,
       content,
+      desi,
       overrides: adet > 1 ? { Adet: adet } : undefined,
     });
 

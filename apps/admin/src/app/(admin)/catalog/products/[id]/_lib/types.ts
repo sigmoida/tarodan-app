@@ -11,6 +11,7 @@ export interface ProductDetail {
   salePrice?: number | null;
   isOnSale?: boolean;
   quantity?: number;
+  shippingDesi: number;
   condition: string;
   status: string;
   category: { id: string; name: string };

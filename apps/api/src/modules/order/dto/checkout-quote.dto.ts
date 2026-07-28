@@ -122,9 +122,13 @@ export class CheckoutQuoteResponseDto {
 
   @ApiProperty({
     description: "Buyer shipping cost breakdown by seller package",
-    example: [{ sellerId: "seller-uuid", shippingCost: 29.99 }],
+    example: [{ sellerId: "seller-uuid", shippingCost: 130, billableDesi: 1 }],
   })
-  shippingBySeller: Array<{ sellerId: string; shippingCost: number }>;
+  shippingBySeller: Array<{
+    sellerId: string;
+    shippingCost: number;
+    billableDesi: number;
+  }>;
 
   @ApiProperty({
     description: "Standard pricing breakdown (same shape as order/payment)",

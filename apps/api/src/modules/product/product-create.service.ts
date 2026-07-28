@@ -233,6 +233,7 @@ export class ProductCreateService {
           condition: dto.condition,
           status: ProductStatus.pending, // Needs admin approval
           quantity: dto.quantity !== undefined ? dto.quantity : 1, // default 1 adet; sınırsız (null) yalnızca açıkça istenince
+          shippingDesi: dto.shippingDesi ?? 1,
           isTradeEnabled: dto.isTradeEnabled || false,
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,

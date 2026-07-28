@@ -54,6 +54,15 @@ export default function PricingCard({
           min={1}
           helperText={quantityHelper}
         />
+        <FormInput
+          name="shippingDesi"
+          type="number"
+          label={t("product.shippingDesi")}
+          min={1}
+          max={1000}
+          step={1}
+          helperText={t("product.shippingDesiHelper")}
+        />
       </div>
 
       {(commissionPreviewLoading || commissionPreview) && (

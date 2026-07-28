@@ -33,6 +33,10 @@ const SHIPPING_TARIFF_MOCK = {
     outboundPackageFee: 29.99,
     freeShippingEnabled: true,
     freeShippingThreshold: 500,
+    rates: Array.from({ length: 20 }, (_, index) => ({
+      desi: index + 1,
+      amount: 29.99,
+    })),
   }),
   getActiveTariffSnapshot: async () => ({
     tariffId: "tariff-1",
@@ -41,6 +45,10 @@ const SHIPPING_TARIFF_MOCK = {
       outboundPackageFee: 29.99,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
+      rates: Array.from({ length: 20 }, (_, index) => ({
+        desi: index + 1,
+        amount: 29.99,
+      })),
     },
   }),
 };
@@ -81,12 +89,19 @@ describe("OrderService checkout group (batch checkout)", () => {
   // değerle beklenen hash'i üretip Redis kaydını taklit ederiz (OTP tüketimini geçmek için).
   const OTP_SECRET = "test-otp-secret";
   const pricingHashFor = (
-    items: Array<{ productId: string; quantity?: number }>,
+    items: Array<{
+      productId: string;
+      quantity?: number;
+      shippingDesi?: number;
+    }>,
   ) =>
     createHash("sha256")
       .update(
         items
-          .map((item) => `${item.productId}:100.00:${item.quantity ?? 1}`)
+          .map(
+            (item) =>
+              `${item.productId}:100.00:${item.quantity ?? 1}:${item.shippingDesi ?? 1}`,
+          )
           .sort()
           .join("|"),
       )
@@ -108,6 +123,7 @@ describe("OrderService checkout group (batch checkout)", () => {
     saleEndDate: null,
     quantity: 5,
     reservedQuantity: 0,
+    shippingDesi: 1,
     seller: { id: sellerId, email: "seller@test.com", displayName: "Seller" },
     ...overrides,
   });
@@ -354,6 +370,16 @@ describe("OrderService checkout group (batch checkout)", () => {
     expect(
       mockTx.orderPackage.create.mock.calls[0][0].data.shippingCost,
     ).toBeCloseTo(29.99);
+    expect(mockTx.orderPackage.create.mock.calls[0][0].data.billableDesi).toBe(
+      2,
+    );
+    expect(
+      mockTx.orderPackage.create.mock.calls[0][0].data.shippingPricingSnapshot,
+    ).toMatchObject({
+      tariffVersion: 1,
+      billableDesi: 2,
+      fullShippingAmount: 29.99,
+    });
 
     // İki order da AYNI pakete bağlı
     const pkgIds = mockTx.order.create.mock.calls.map(

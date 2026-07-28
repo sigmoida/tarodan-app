@@ -53,6 +53,7 @@ export function buildListingFormData(
       listing.quantity !== undefined && listing.quantity !== null
         ? String(listing.quantity)
         : (prev.quantity ?? ""),
+    shippingDesi: (listing as any).shippingDesi ?? prev.shippingDesi ?? 1,
     images:
       listing.images?.map((img: any) => ({
         cardKey: img.cardKey ?? img.url,

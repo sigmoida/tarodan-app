@@ -44,4 +44,23 @@ describe("ShippingTariffService active tariff", () => {
       ServiceUnavailableException,
     );
   });
+
+  it("rejects activation when the mandatory legacy 1-desi rate is missing", async () => {
+    const prisma = {
+      shippingTariff: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...tariff(3),
+          status: ShippingTariffStatus.draft,
+          rates: [{ id: "rate-2", desi: 2, amount: 180 }],
+        }),
+      },
+    } as any;
+    const service = new ShippingTariffService(prisma);
+
+    await expect(service.activate("tariff-3", "admin-1")).rejects.toMatchObject(
+      {
+        response: { code: "SHIPPING_ONE_DESI_RATE_REQUIRED" },
+      },
+    );
+  });
 });

@@ -495,6 +495,7 @@ model Product {
   popularityUpdatedAt DateTime?          @map("popularity_updated_at")
   quantity            Int?               @map("quantity")
   reservedQuantity    Int?               @default(0) @map("reserved_quantity")
+  shippingDesi        Int                @default(1) @map("shipping_desi")
   slug                String?            @unique
   oldPrice            Decimal?           @map("old_price") @db.Decimal(10, 2)
   originalPrice       Decimal?           @map("original_price") @db.Decimal(10, 2)
@@ -1201,28 +1202,30 @@ model CheckoutGroup {
 // tek üründe de tek order'lı bir paket kullanılabilir (tek biçim). sellerId/buyerId düz
 // kolon (User ilişkisi yok — denormalize, sorgu için yeterli).
 model OrderPackage {
-  id                     String         @id @default(uuid())
-  checkoutGroupId        String?        @map("checkout_group_id")
-  sellerId               String         @map("seller_id")
-  buyerId                String         @map("buyer_id")
+  id                      String         @id @default(uuid())
+  checkoutGroupId         String?        @map("checkout_group_id")
+  sellerId                String         @map("seller_id")
+  buyerId                 String         @map("buyer_id")
   // Bu satıcı paketi için TEK kargo ücreti (satıcının paket-içi satır toplamı bedava
   // eşiğini geçerse 0). KANONİK olarak ALICI payıdır (buyerShippingAmount) — tüm
   // checkout yolları (direct/group/guest) artık aynı semantiği yazar.
-  shippingCost           Decimal        @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  shippingCost            Decimal        @default(0) @map("shipping_cost") @db.Decimal(10, 2)
   // Kargo tarife snapshot'ı: sipariş anındaki aktif tarife. Yeni checkout akışları
   // aktif tarife yoksa fail-closed davranır; nullable alanlar yalnız eski kayıtlar içindir.
   // Geçmişe dönük tarife değişiminden bağımsız audit/yeniden-hesap ve 409 kontrolü için.
-  shippingTariffId       String?        @map("shipping_tariff_id")
-  shippingTariffVersion  Int?           @map("shipping_tariff_version")
+  shippingTariffId        String?        @map("shipping_tariff_id")
+  shippingTariffVersion   Int?           @map("shipping_tariff_version")
   // Tam paket kargosu (alıcı/satıcı payına bölünmeden önce) + taraf payları + indirim.
-  fullShippingAmount     Decimal        @default(0) @map("full_shipping_amount") @db.Decimal(10, 2)
-  buyerShippingAmount    Decimal        @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
-  sellerShippingAmount   Decimal        @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
-  shippingDiscountAmount Decimal        @default(0) @map("shipping_discount_amount") @db.Decimal(10, 2)
-  createdAt              DateTime       @default(now()) @map("created_at")
-  updatedAt              DateTime       @updatedAt @map("updated_at")
-  checkoutGroup          CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id])
-  orders                 Order[]
+  fullShippingAmount      Decimal        @default(0) @map("full_shipping_amount") @db.Decimal(10, 2)
+  buyerShippingAmount     Decimal        @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
+  sellerShippingAmount    Decimal        @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
+  shippingDiscountAmount  Decimal        @default(0) @map("shipping_discount_amount") @db.Decimal(10, 2)
+  billableDesi            Int            @default(1) @map("billable_desi")
+  shippingPricingSnapshot Json?          @map("shipping_pricing_snapshot")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+  checkoutGroup           CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id])
+  orders                  Order[]
 
   @@index([checkoutGroupId])
   @@index([sellerId])
@@ -1802,10 +1805,25 @@ model ShippingTariff {
   updatedBy             String?              @map("updated_by")
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime             @updatedAt @map("updated_at")
+  rates                 ShippingTariffRate[]
 
   @@unique([provider, version])
   @@index([provider, status])
   @@map("shipping_tariffs")
+}
+
+model ShippingTariffRate {
+  id        String         @id @default(uuid())
+  tariffId  String         @map("tariff_id")
+  desi      Int
+  amount    Decimal        @db.Decimal(10, 2)
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  tariff    ShippingTariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
+
+  @@unique([tariffId, desi])
+  @@index([tariffId])
+  @@map("shipping_tariff_rates")
 }
 
 model ShipmentEvent {

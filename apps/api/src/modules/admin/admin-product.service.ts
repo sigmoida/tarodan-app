@@ -309,6 +309,9 @@ export class AdminProductService {
     if (dto.quantity !== undefined) {
       data.quantity = dto.quantity;
     }
+    if (dto.shippingDesi !== undefined) {
+      data.shippingDesi = dto.shippingDesi;
+    }
     // Açıkça seçilen status admin'in override'ı olarak öncelikli — aksi halde
     // düzenleme formu quantity'yi de gönderdiğinden status her zaman miktardan
     // türetilir ve stoklu ürün "Pasif"e alınamazdı. Status verilmediyse ve

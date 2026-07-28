@@ -1,8 +1,17 @@
 "use client";
 
-import { Badge, productConditionConfig, enumLabel } from "@tarodan/ui";
+import {
+  Badge,
+  Button,
+  Input,
+  productConditionConfig,
+  enumLabel,
+} from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+import { useState } from "react";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
@@ -29,6 +38,15 @@ function Row({
 
 export function ProductInfoSection({ product }: { product: ProductDetail }) {
   const t = useTranslations();
+  const [shippingDesi, setShippingDesi] = useState(product.shippingDesi ?? 1);
+  const saveShippingDesi = useAdminMutation(
+    () => adminApi.updateProduct(product.id, { shippingDesi }),
+    {
+      invalidates: ["products"],
+      successMessage: t("admin.catalog.products.shippingDesiUpdated"),
+    },
+  );
+
   return (
     <SectionCard
       title={t("admin.catalog.products.infoTab")}
@@ -76,6 +94,43 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
             ? product.quantity
             : t("admin.catalog.products.notSpecified")}
         </Row>
+      </div>
+      <div className="border-t border-border pt-3">
+        <label
+          htmlFor="admin-product-shipping-desi"
+          className="text-sm text-muted"
+        >
+          {t("admin.catalog.products.shippingDesi")}
+        </label>
+        <div className="mt-1 flex max-w-sm items-center gap-2">
+          <Input
+            id="admin-product-shipping-desi"
+            type="number"
+            min={1}
+            max={1000}
+            step={1}
+            value={shippingDesi}
+            onChange={(event) =>
+              setShippingDesi(Math.max(1, Number(event.target.value) || 1))
+            }
+          />
+          <Button
+            size="sm"
+            isLoading={saveShippingDesi.isPending}
+            disabled={
+              !Number.isInteger(shippingDesi) ||
+              shippingDesi < 1 ||
+              shippingDesi > 1000 ||
+              shippingDesi === product.shippingDesi
+            }
+            onClick={() => saveShippingDesi.mutate()}
+          >
+            {t("common.save")}
+          </Button>
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          {t("admin.catalog.products.shippingDesiHelper")}
+        </p>
       </div>
       {product.rejectionReason && (
         <div className="border-t border-border pt-3">

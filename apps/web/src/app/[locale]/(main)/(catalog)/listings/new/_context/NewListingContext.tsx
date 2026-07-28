@@ -170,6 +170,7 @@ function useNewListingValue() {
             ? Number(values.bundleSize)
             : undefined,
         quantity: values.quantity !== "" ? Number(values.quantity) : 1,
+        shippingDesi: Number(values.shippingDesi),
         images: values.images.length > 0 ? values.images : undefined,
         attributes:
           customAttributeSlugs.length > 0 ? customAttributeSlugs : undefined,

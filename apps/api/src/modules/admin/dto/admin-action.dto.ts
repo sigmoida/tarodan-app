@@ -3,6 +3,8 @@ import {
   IsEnum,
   IsOptional,
   IsUUID,
+  IsInt,
+  Max,
   MaxLength,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
@@ -113,6 +115,17 @@ export class UpdateProductDto {
   @IsOptional()
   @IsNumber()
   quantity?: number | null;
+
+  @ApiPropertyOptional({
+    example: 2,
+    description: "Kargoya hazır ürün paketinin desisi",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  @Type(() => Number)
+  shippingDesi?: number;
 
   @ApiPropertyOptional({ enum: ProductCondition, example: "new" })
   @IsOptional()

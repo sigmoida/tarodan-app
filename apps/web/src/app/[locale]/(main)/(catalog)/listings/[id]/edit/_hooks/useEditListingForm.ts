@@ -33,6 +33,10 @@ function toValues(fd: EditListingFormData): EditListingValues {
       fd.quantity !== undefined && fd.quantity !== null && fd.quantity !== ""
         ? String(fd.quantity)
         : "",
+    shippingDesi:
+      fd.shippingDesi !== undefined && fd.shippingDesi !== null
+        ? String(fd.shippingDesi)
+        : "1",
     bundleSize:
       fd.bundleSize !== undefined && fd.bundleSize !== null
         ? String(fd.bundleSize)
@@ -174,6 +178,7 @@ export function useEditListingForm({
         values.quantity && values.quantity !== ""
           ? Number(values.quantity)
           : null,
+      shippingDesi: Number(values.shippingDesi),
       images: values.images.length > 0 ? values.images : undefined,
       status: values.status,
     };

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
   ForbiddenException,
   Logger,
 } from "@nestjs/common";
@@ -18,6 +19,10 @@ import {
 import { resolveShippingDestinationCity } from "./shipping-destination.util";
 import { canTransitionShipmentStatus } from "./shipment-state-machine";
 import { ShippingTariffService } from "./shipping-tariff.service";
+import {
+  shippingAmountForDesi,
+  ShippingDesiRateNotFoundError,
+} from "./shipping-tariff.helper";
 import { ShipmentStatus, OrderStatus } from "@prisma/client";
 
 @Injectable()
@@ -153,7 +158,19 @@ export class ShippingService {
     // açıyordu). Bu önizleme paket başına TABAN ücrettir; ücretsiz-kargo eşiği alt-toplam
     // bilindiğinde checkout QUOTE'ta uygulanır.
     const tariff = await this.shippingTariffs.getActiveOutboundTariff();
-    const cost = Number(tariff.outboundPackageFee);
+    const billableDesi = Math.max(1, Math.ceil(_weight));
+    let cost: number;
+    try {
+      cost = shippingAmountForDesi(tariff, billableDesi).toNumber();
+    } catch (error) {
+      if (error instanceof ShippingDesiRateNotFoundError) {
+        throw new ServiceUnavailableException({
+          code: "SHIPPING_DESI_RATE_NOT_CONFIGURED",
+          message: error.message,
+        });
+      }
+      throw error;
+    }
 
     return {
       provider,

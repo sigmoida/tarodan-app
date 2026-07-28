@@ -278,6 +278,7 @@ export class AdminSellerApplicationService {
           select: {
             fullShippingAmount: true,
             shippingTariffId: true,
+            billableDesi: true,
             orders: {
               select: {
                 id: true,
@@ -377,6 +378,7 @@ export class AdminSellerApplicationService {
     }
     const shippingTariff = await this.prisma.shippingTariff.findUnique({
       where: { id: order.package.shippingTariffId },
+      include: { rates: true },
     });
     if (!shippingTariff) {
       throw new BadRequestException(
@@ -411,6 +413,7 @@ export class AdminSellerApplicationService {
     const repricedFullShipping = outboundPackageShipping(
       shippingTariff,
       packageSubtotalAfterCoupon,
+      order.package.billableDesi,
     ).toNumber();
     if (
       Math.abs(

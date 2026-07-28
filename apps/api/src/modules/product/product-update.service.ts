@@ -272,6 +272,8 @@ export class ProductUpdateService {
             ? null
             : Number(dto.quantity)
           : undefined,
+      shippingDesi:
+        dto.shippingDesi !== undefined ? Number(dto.shippingDesi) : undefined,
       category: dto.categoryId
         ? { connect: { id: dto.categoryId } }
         : undefined,

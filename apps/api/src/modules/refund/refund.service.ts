@@ -446,6 +446,8 @@ export class RefundService {
                 addresses: { orderBy: { isDefault: "desc" }, take: 1 },
               },
             },
+            package: { select: { billableDesi: true } },
+            product: { select: { shippingDesi: true } },
           },
         },
       },
@@ -519,6 +521,7 @@ export class RefundService {
         ref: rr.refundNumber,
         content: `İade: ${rr.order.orderNumber}`,
         isReturn: true,
+        desi: rr.order.package?.billableDesi ?? rr.order.product.shippingDesi,
         // KisiKurum fallback burada seller.displayName (builder'ın "Alıcı"sı
         // değil) ve trim uygulanmıyor → birebir korumak için override.
         overrides: {

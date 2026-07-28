@@ -21,6 +21,7 @@ import {
 } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { calculatePackageDesi } from "../shipping/shipping-tariff.helper";
 
 /**
  * Toplu checkout (CheckoutGroup) akışı: sepetteki tüm ürünler tek grup + ürün
@@ -418,6 +419,7 @@ export class OrderCheckoutGroupService {
               productId: p.productId,
               unitPrice: p.productPrice,
               quantity: p.quantity,
+              shippingDesi: p.product.shippingDesi,
             })),
           );
 
@@ -521,6 +523,10 @@ export class OrderCheckoutGroupService {
           // satıcının İLK satırına yüklenir (kardeş satırlar 0) → order.totalAmount +
           // grup toplamı formülü değişmeden per-seller olur.
           const sellerLineSubtotals = new Map<string, number>();
+          const sellerDesiLines = new Map<
+            string,
+            Array<{ shippingDesi: number; quantity: number }>
+          >();
           for (const entry of pricing) {
             const line = Math.max(
               0,
@@ -530,13 +536,27 @@ export class OrderCheckoutGroupService {
               entry.product.sellerId,
               (sellerLineSubtotals.get(entry.product.sellerId) ?? 0) + line,
             );
+            const packageLines =
+              sellerDesiLines.get(entry.product.sellerId) ?? [];
+            packageLines.push({
+              shippingDesi: entry.product.shippingDesi,
+              quantity: entry.quantity,
+            });
+            sellerDesiLines.set(entry.product.sellerId, packageLines);
           }
+          const sellerDesi = new Map(
+            [...sellerDesiLines.entries()].map(([sellerId, packageLines]) => [
+              sellerId,
+              calculatePackageDesi(packageLines),
+            ]),
+          );
           // Satıcı-başına kargo: quote ile ORTAK yardımcı (DRY) → önizleme ve tahsilat
           // aynı; ikisi ayrı hesaplayınca oluşan az-göster/fazla-tahsil bug'ı kapandı.
           const sellerShipping =
             await this.orderPricing.calculateShippingBySeller(
               sellerLineSubtotals,
               shippingTariff.tariff,
+              sellerDesi,
             );
           const sellerShippingCharged = new Set<string>();
           // Per-seller shipping breakdown captured on the charged line, used to write
@@ -655,6 +675,14 @@ export class OrderCheckoutGroupService {
                 shippingCost: bd.buyer,
                 shippingTariffId: shippingTariff.tariffId,
                 shippingTariffVersion: shippingTariff.tariffVersion,
+                billableDesi: sellerDesi.get(sellerId) ?? 1,
+                shippingPricingSnapshot: {
+                  provider: shippingTariff.tariff.provider ?? "surat",
+                  tariffId: shippingTariff.tariffId,
+                  tariffVersion: shippingTariff.tariffVersion,
+                  billableDesi: sellerDesi.get(sellerId) ?? 1,
+                  fullShippingAmount: bd.full,
+                },
                 fullShippingAmount: bd.full,
                 buyerShippingAmount: bd.buyer,
                 sellerShippingAmount: bd.seller,

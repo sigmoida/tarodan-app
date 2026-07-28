@@ -306,7 +306,12 @@ export class OrderCheckoutDirectService {
       // F1.3: quote'un birim-fiyat hash'i ile doğrula — fiyat/kampanya değiştiyse
       // 409 PRICING_CHANGED (sessiz farklı tahsil yok). Hash yoksa atlanır.
       this.orderPricing.assertPricingUnchanged(dto.expectedPricingHash, [
-        { productId: dto.productId, unitPrice: productPrice, quantity: 1 },
+        {
+          productId: dto.productId,
+          unitPrice: productPrice,
+          quantity: 1,
+          shippingDesi: product.shippingDesi,
+        },
       ]);
 
       // Apply coupon discount if provided
@@ -358,6 +363,7 @@ export class OrderCheckoutDirectService {
       const fullShipping = await this.orderPricing.calculateShippingCost(
         discountedPrice,
         shippingTariff.tariff,
+        product.shippingDesi,
       );
       // Kargo payı: tek kargo tutarı alıcı/satıcı arasında bölünür (kurala göre).
       // buyerShare=100 → alıcı tümünü öder (mevcut davranış). Alıcı yalnız kendi
@@ -452,6 +458,14 @@ export class OrderCheckoutDirectService {
           shippingCost,
           shippingTariffId: shippingTariff.tariffId,
           shippingTariffVersion: shippingTariff.tariffVersion,
+          billableDesi: product.shippingDesi,
+          shippingPricingSnapshot: {
+            provider: shippingTariff.tariff.provider ?? "surat",
+            tariffId: shippingTariff.tariffId,
+            tariffVersion: shippingTariff.tariffVersion,
+            billableDesi: product.shippingDesi,
+            fullShippingAmount: fullShipping,
+          },
           fullShippingAmount: fullShipping,
           buyerShippingAmount,
           sellerShippingAmount,
@@ -737,6 +751,7 @@ export class OrderCheckoutDirectService {
       const offerFullShipping = await this.orderPricing.calculateShippingCost(
         Number(offer.amount),
         shippingTariff.tariff,
+        offer.product.shippingDesi,
       );
       const offerBuyerShippingAmount =
         Math.round(
@@ -776,6 +791,7 @@ export class OrderCheckoutDirectService {
           productId: offer.productId,
           unitPrice: Number(offer.amount),
           quantity: 1,
+          shippingDesi: offer.product.shippingDesi,
         },
       ]);
 
@@ -815,6 +831,14 @@ export class OrderCheckoutDirectService {
           shippingCost: offerBuyerShippingAmount,
           shippingTariffId: shippingTariff.tariffId,
           shippingTariffVersion: shippingTariff.tariffVersion,
+          billableDesi: offer.product.shippingDesi,
+          shippingPricingSnapshot: {
+            provider: shippingTariff.tariff.provider ?? "surat",
+            tariffId: shippingTariff.tariffId,
+            tariffVersion: shippingTariff.tariffVersion,
+            billableDesi: offer.product.shippingDesi,
+            fullShippingAmount: offerFullShipping,
+          },
           fullShippingAmount: offerFullShipping,
           buyerShippingAmount: offerBuyerShippingAmount,
           sellerShippingAmount: offerSellerShippingAmount,

@@ -48,6 +48,16 @@ export function baseListingFields(msg: ListingFieldMessages) {
     isSet: z.boolean(),
     bundleSize: z.string(),
     quantity: z.string(),
+    shippingDesi: z
+      .string()
+      .min(1, msg.required)
+      .refine(
+        (value) =>
+          Number.isInteger(Number(value)) &&
+          Number(value) >= 1 &&
+          Number(value) <= 1000,
+        msg.required,
+      ),
     price: z
       .string()
       .min(1, msg.required)
@@ -90,5 +100,6 @@ export const emptyBaseListingValues = {
   isSet: false,
   bundleSize: "",
   quantity: "",
+  shippingDesi: "1",
   price: "",
 };
