@@ -6,6 +6,14 @@ import { validateEnv } from "./env.validation";
  * traffic and sign with a fallback/placeholder secret.
  */
 describe("validateEnv", () => {
+  const without = (
+    source: Record<string, unknown>,
+    ...keys: string[]
+  ): Record<string, unknown> =>
+    Object.fromEntries(
+      Object.entries(source).filter(([key]) => !keys.includes(key)),
+    );
+
   const strongSecrets = {
     JWT_SECRET: "a".repeat(40),
     JWT_REFRESH_SECRET: "b".repeat(40),
@@ -16,10 +24,33 @@ describe("validateEnv", () => {
   };
   const prodBase = {
     NODE_ENV: "production",
+    PROCESS_ROLE: "web",
     DATABASE_URL: "postgresql://u:p@db:5432/app",
+    API_URL: "https://api.tarodan.test",
     PAYTR_MERCHANT_ID: "id",
     PAYTR_MERCHANT_KEY: "key",
     PAYTR_MERCHANT_SALT: "salt",
+    PAYTR_TEST_MODE: "false",
+    PAYTR_CALLBACK_URL: "https://api.tarodan.test/api/payments/callback/paytr",
+    PAYOUTS_DISABLED: "false",
+    SURAT_CARGO_ENABLED: "true",
+    SURAT_SOAP_MODE: "rest",
+    SURAT_KARGO_TEST_MODE: "false",
+    SURAT_KARGO_CARI_KODU: "cargo-account",
+    SURAT_KARGO_SIFRE: "cargo-password",
+    ELOGO_ENABLED: "true",
+    ELOGO_SOAP_MODE: "live",
+    ELOGO_SOAP_URL: "https://elogo.test/PostBoxService.svc",
+    ELOGO_WS_USERNAME: "service-user",
+    ELOGO_WS_PASSWORD: "service-password",
+    ELOGO_COMPANY_VKN: "1234567890",
+    ELOGO_COMPANY_TITLE: "Tarodan",
+    SENDGRID_API_KEY: "sendgrid-key",
+    AWS_ACCESS_KEY_ID: "aws-access-key",
+    AWS_SECRET_ACCESS_KEY: "aws-secret-key",
+    AWS_REGION: "eu-west-1",
+    S3_BUCKET: "tarodan-production",
+    SENTRY_DSN: "https://public@example.ingest.sentry.io/1",
     ...strongSecrets,
   };
 
@@ -33,7 +64,7 @@ describe("validateEnv", () => {
   it("throws when cargo enabled in prod but SURAT_SOAP_MODE is not 'rest'", () => {
     expect(() =>
       validateEnv({
-        ...cargoOn,
+        ...without(cargoOn, "SURAT_SOAP_MODE"),
         SURAT_KARGO_TEST_MODE: "false",
         SURAT_KARGO_CARI_KODU: "c",
         SURAT_KARGO_SIFRE: "s",
@@ -44,7 +75,7 @@ describe("validateEnv", () => {
   it("throws when cargo enabled in prod but SURAT_KARGO_TEST_MODE is UNSET (silent-default footgun)", () => {
     expect(() =>
       validateEnv({
-        ...cargoOn,
+        ...without(cargoOn, "SURAT_KARGO_TEST_MODE"),
         SURAT_SOAP_MODE: "rest",
         SURAT_KARGO_CARI_KODU: "c",
         SURAT_KARGO_SIFRE: "s",
@@ -68,7 +99,7 @@ describe("validateEnv", () => {
   it("throws when cargo enabled in prod but credentials missing", () => {
     expect(() =>
       validateEnv({
-        ...cargoOn,
+        ...without(cargoOn, "SURAT_KARGO_CARI_KODU", "SURAT_KARGO_SIFRE"),
         SURAT_SOAP_MODE: "rest",
         SURAT_KARGO_TEST_MODE: "false",
       }),
@@ -87,10 +118,10 @@ describe("validateEnv", () => {
     ).not.toThrow();
   });
 
-  it("does not require Surat config when cargo is disabled", () => {
+  it("rejects production when the required Surat integration is disabled", () => {
     expect(() =>
       validateEnv({ ...prodBase, SURAT_CARGO_ENABLED: "false" }),
-    ).not.toThrow();
+    ).toThrow(/SURAT_CARGO_ENABLED/);
   });
 
   const elogoOn = { ...prodBase, ELOGO_ENABLED: "true" };
@@ -107,7 +138,13 @@ describe("validateEnv", () => {
   it("throws when live eLogo credentials or company identity are missing", () => {
     expect(() =>
       validateEnv({
-        ...elogoOn,
+        ...without(
+          elogoOn,
+          "ELOGO_WS_USERNAME",
+          "ELOGO_WS_PASSWORD",
+          "ELOGO_COMPANY_VKN",
+          "ELOGO_COMPANY_TITLE",
+        ),
         ELOGO_SOAP_MODE: "live",
         ELOGO_SOAP_URL: "https://pb.elogo.com.tr/PostBoxService.svc",
       }),
@@ -128,6 +165,60 @@ describe("validateEnv", () => {
         ELOGO_COMPANY_TITLE: "Tarodan",
       }),
     ).not.toThrow();
+  });
+
+  it("rejects production when the required eLogo integration is disabled", () => {
+    expect(() => validateEnv({ ...prodBase, ELOGO_ENABLED: "false" })).toThrow(
+      /ELOGO_ENABLED/,
+    );
+  });
+
+  it("requires PayTR live mode explicitly", () => {
+    const { PAYTR_TEST_MODE, ...withoutMode } = prodBase;
+    void PAYTR_TEST_MODE;
+
+    expect(() => validateEnv(withoutMode)).toThrow(/PAYTR_TEST_MODE/);
+    expect(() => validateEnv({ ...prodBase, PAYTR_TEST_MODE: "true" })).toThrow(
+      /PAYTR_TEST_MODE/,
+    );
+  });
+
+  it("requires public HTTPS API and callback URLs", () => {
+    expect(() =>
+      validateEnv({ ...prodBase, API_URL: "http://localhost:3001" }),
+    ).toThrow(/API_URL/);
+    expect(() =>
+      validateEnv({
+        ...prodBase,
+        PAYTR_CALLBACK_URL: "http://api.tarodan.test/callback",
+      }),
+    ).toThrow(/PAYTR_CALLBACK_URL/);
+  });
+
+  it("requires an explicit production process role", () => {
+    const { PROCESS_ROLE, ...withoutRole } = prodBase;
+    void PROCESS_ROLE;
+
+    expect(() => validateEnv(withoutRole)).toThrow(/PROCESS_ROLE/);
+    expect(() => validateEnv({ ...prodBase, PROCESS_ROLE: "all" })).toThrow(
+      /PROCESS_ROLE/,
+    );
+  });
+
+  it("requires a real email provider, object storage and error reporting", () => {
+    const {
+      SENDGRID_API_KEY,
+      AWS_ACCESS_KEY_ID,
+      SENTRY_DSN,
+      ...withoutProviders
+    } = prodBase;
+    void SENDGRID_API_KEY;
+    void AWS_ACCESS_KEY_ID;
+    void SENTRY_DSN;
+
+    expect(() => validateEnv(withoutProviders)).toThrow(
+      /SENDGRID_API_KEY|SMTP_HOST|AWS_ACCESS_KEY_ID|SENTRY_DSN/,
+    );
   });
 
   it("strips unrelated env vars from its return (they resolve live from process.env)", () => {

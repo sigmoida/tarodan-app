@@ -4,6 +4,8 @@ import { NewsletterController } from "../../marketing/newsletter.controller";
 import { OrderController } from "../../order/order.controller";
 import { PaymentController } from "../../payment/payment.controller";
 import { SecurityController } from "../../security/security.controller";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
 const THROTTLER_LIMIT_DEFAULT = "THROTTLER:LIMITdefault";
 const THROTTLER_TTL_DEFAULT = "THROTTLER:TTLdefault";
@@ -70,4 +72,13 @@ describe("critical public route throttles", () => {
       expect(Reflect.getMetadata(THROTTLER_TTL_DEFAULT, handler)).toBe(60000);
     },
   );
+
+  it("supports an explicit production-like throttling mode in E2E tests", () => {
+    const appModule = readFileSync(
+      resolve(__dirname, "../../../app.module.ts"),
+      "utf8",
+    );
+
+    expect(appModule).toMatch(/skipIf:[\s\S]{0,200}TEST_THROTTLING_ENABLED/);
+  });
 });
