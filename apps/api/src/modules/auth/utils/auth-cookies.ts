@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { randomBytes } from "crypto";
 
 /**
  * httpOnly cookie tabanlı auth.
@@ -17,6 +18,8 @@ export const COOKIE_NAMES = {
   user: { access: "access_token", refresh: "refresh_token" },
   admin: { access: "admin_token", refresh: "admin_refresh_token" },
 } as const;
+
+export const CSRF_COOKIE_NAME = "csrf_token";
 
 /** "30m" | "7d" | "15m" | "1h" | "900s" gibi süreyi ms'e çevirir. */
 export function parseDurationMs(
@@ -89,6 +92,14 @@ export function setAuthCookies(
   res.cookie(names.access, tokens.accessToken, { ...base, maxAge: t.access });
   res.cookie(names.refresh, tokens.refreshToken, {
     ...base,
+    maxAge: t.refresh,
+  });
+  // Double-submit token: readable by browser JavaScript, unlike auth cookies.
+  // It contains no session data and is validated only when an API auth cookie
+  // is used for a state-changing request.
+  res.cookie(CSRF_COOKIE_NAME, randomBytes(32).toString("base64url"), {
+    ...base,
+    httpOnly: false,
     maxAge: t.refresh,
   });
 }

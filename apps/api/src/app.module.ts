@@ -6,7 +6,12 @@ import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from "@nestjs/core";
 import { PrismaModule } from "./prisma";
 import { DevModule } from "./modules/dev/dev.module";
-import { AuthModule, JwtAuthGuard, BannedUserGuard } from "./modules/auth";
+import {
+  AuthModule,
+  JwtAuthGuard,
+  BannedUserGuard,
+  CsrfGuard,
+} from "./modules/auth";
 import { OutboxModule } from "./modules/outbox/outbox.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
 import { UserModule } from "./modules/user";
@@ -132,7 +137,9 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
       // direct-form's 10/min would otherwise bleed across unrelated tests
       // and 429 the later ones. Rate-limit logic itself is not exercised by
       // these functional tests. Production/dev are unaffected.
-      skipIf: () => process.env.NODE_ENV === "test",
+      skipIf: () =>
+        process.env.NODE_ENV === "test" &&
+        process.env.TEST_THROTTLING_ENABLED !== "true",
       throttlers: [
         {
           ttl: 60000, // 1 minute
@@ -260,6 +267,10 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
     // Global JWT Auth Guard (use @Public() decorator to skip)
     {

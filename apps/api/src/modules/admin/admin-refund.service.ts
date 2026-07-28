@@ -215,7 +215,7 @@ export class AdminRefundService {
     const result = await this.refundService.finalizeRefundForReturnedShipment(
       rr.id,
     );
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "refund_force_finalize",
       "RefundRequest",
@@ -246,7 +246,7 @@ export class AdminRefundService {
       adminId,
       reason,
     );
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "refund_admin_close",
       "RefundRequest",
@@ -299,7 +299,7 @@ export class AdminRefundService {
       data: { compensationResolvedAt: now },
     });
 
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "trade_compensation_resolved",
       "Trade",
@@ -372,7 +372,7 @@ export class AdminRefundService {
         where: { id: tradeId },
         data: { refundFailureReason: null, refundFailureAt: null },
       });
-      await this.audit.createAuditLog(
+      await this.audit.createRequiredAuditLog(
         adminId,
         "trade_refund_retry_success",
         "Trade",
@@ -417,7 +417,7 @@ export class AdminRefundService {
           `Failed to persist refund retry failure for trade ${tradeId}: ${persistErr?.message}`,
         );
       }
-      await this.audit.createAuditLog(
+      await this.audit.createRequiredAuditLog(
         adminId,
         "trade_refund_retry_failure",
         "Trade",

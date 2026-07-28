@@ -235,8 +235,9 @@ export class RolesGuard implements CanActivate {
       this.cache = { data, at: now };
       return data;
     } catch {
-      // DB başarısızsa varsayılanı kullan; cache'leme (bozuk yanıtı cache'leme).
-      return DEFAULT_ROLE_PERMISSIONS;
+      // A stale/default matrix must never restore financial or policy access
+      // while the permission store is unavailable or contains invalid JSON.
+      throw new ForbiddenException(i18nMessage("server.auth.noPermission"));
     }
   }
 

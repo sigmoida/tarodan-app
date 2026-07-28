@@ -78,7 +78,7 @@ describe("AdminCommissionService commission rule priority", () => {
     },
     category: { findUnique: jest.fn() },
   };
-  const audit = { createAuditLog: jest.fn() };
+  const audit = { createRequiredAuditLog: jest.fn() };
   const service = new AdminCommissionService(
     prisma as unknown as PrismaService,
     audit as unknown as AdminAuditService,
@@ -107,7 +107,7 @@ describe("AdminCommissionService commission rule priority", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    audit.createAuditLog.mockResolvedValue(undefined);
+    audit.createRequiredAuditLog.mockResolvedValue(undefined);
     // No sibling rules → no amount-range overlap (v2 multi-rule validation).
     prisma.commissionRule.findMany.mockResolvedValue([]);
   });

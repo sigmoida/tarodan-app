@@ -318,7 +318,7 @@ export class AdminPayoutService {
       );
     }
     await this.paymentService.releasePayment(orderId);
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "payout_release",
       "PaymentHold",
@@ -364,7 +364,7 @@ export class AdminPayoutService {
       where: { tradeId },
       data: { releasedAt: new Date() },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "trade_cash_hold_release",
       "TradeCashPayment",
@@ -412,7 +412,7 @@ export class AdminPayoutService {
         ...(newTransId ? { transId: newTransId } : {}),
       },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "payout_retry",
       "PayoutTransfer",

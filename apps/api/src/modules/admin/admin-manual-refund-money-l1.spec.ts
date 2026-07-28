@@ -11,7 +11,9 @@ describe("AdminPaymentService.manualRefund — MONEY-L1 group/trade routing", ()
     const prisma = {
       payment: { findUnique: jest.fn().mockResolvedValue(payment) },
     };
-    const audit = { createAuditLog: jest.fn().mockResolvedValue(undefined) };
+    const audit = {
+      createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
+    };
     const paymentService = {
       processRefund: jest
         .fn()

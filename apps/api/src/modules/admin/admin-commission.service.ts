@@ -278,7 +278,7 @@ export class AdminCommissionService {
       include: { category: { select: { id: true, name: true } } },
     });
 
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "commission_rule_create",
       "CommissionRule",
@@ -395,7 +395,7 @@ export class AdminCommissionService {
       include: { category: { select: { id: true, name: true } } },
     });
 
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "commission_rule_update",
       "CommissionRule",
@@ -423,7 +423,7 @@ export class AdminCommissionService {
       where: { id: ruleId },
     });
 
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "commission_rule_delete",
       "CommissionRule",
@@ -463,7 +463,7 @@ export class AdminCommissionService {
       },
       update: { settingValue: String(rate), updatedBy: adminId },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "trade_commission_rate_update",
       "PlatformSetting",

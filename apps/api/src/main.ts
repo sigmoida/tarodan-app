@@ -90,6 +90,7 @@ async function bootstrap() {
         "Accept-Language",
         "X-Requested-With",
         "X-Payment-Capability",
+        "X-CSRF-Token",
       ],
     });
 

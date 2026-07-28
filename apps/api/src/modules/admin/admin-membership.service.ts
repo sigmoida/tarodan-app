@@ -167,7 +167,7 @@ export class AdminMembershipService {
     });
 
     // Create audit log
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "membership_tier_update",
       "MembershipTier",

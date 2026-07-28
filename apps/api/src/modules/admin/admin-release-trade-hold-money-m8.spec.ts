@@ -23,7 +23,9 @@ describe("AdminPayoutService.releaseTradePaymentHold — MONEY-M8 trade-status g
           .mockResolvedValue(tradeStatus ? { status: tradeStatus } : null),
       },
     };
-    const audit = { createAuditLog: jest.fn().mockResolvedValue(undefined) };
+    const audit = {
+      createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new AdminPayoutService(
       prisma as any,
       audit as any,

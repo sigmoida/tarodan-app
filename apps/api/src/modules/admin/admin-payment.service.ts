@@ -458,7 +458,7 @@ export class AdminPaymentService {
         }
         const tradeId = payment.tradeCashPayment.tradeId;
         const res = await this.paymentService.refundTradeCashTracked(tradeId);
-        await this.audit.createAuditLog(
+        await this.audit.createRequiredAuditLog(
           adminId,
           "payment_manual_refund",
           "Payment",
@@ -501,7 +501,7 @@ export class AdminPaymentService {
     );
 
     // Log admin action
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "payment_manual_refund",
       "Payment",
@@ -579,7 +579,7 @@ export class AdminPaymentService {
       });
       return { attempt, updated };
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "refund_attempt_resolved",
       "RefundAttempt",
@@ -714,7 +714,7 @@ export class AdminPaymentService {
     });
 
     // Log admin action
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "payment_force_cancel",
       "Payment",

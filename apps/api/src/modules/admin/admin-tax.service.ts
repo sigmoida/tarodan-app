@@ -104,7 +104,7 @@ export class AdminTaxService {
         isActive: dto.isActive ?? true,
       },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_region_create",
       "TaxRegion",
@@ -153,7 +153,7 @@ export class AdminTaxService {
         ...(dto.isActive != null && { isActive: dto.isActive }),
       },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_region_update",
       "TaxRegion",
@@ -181,7 +181,7 @@ export class AdminTaxService {
     }
     await this.taxPrisma.taxRule.deleteMany({ where: { taxRegionId: id } });
     await this.taxPrisma.taxRegion.delete({ where: { id } });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_region_delete",
       "TaxRegion",
@@ -291,7 +291,7 @@ export class AdminTaxService {
         isActive: dto.isActive ?? true,
       },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_rate_create",
       "TaxRate",
@@ -343,7 +343,7 @@ export class AdminTaxService {
         ...(dto.isActive != null && { isActive: dto.isActive }),
       },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_rate_update",
       "TaxRate",
@@ -370,7 +370,7 @@ export class AdminTaxService {
       );
     }
     await this.taxPrisma.taxRate.delete({ where: { id } });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_rate_delete",
       "TaxRate",
@@ -453,7 +453,7 @@ export class AdminTaxService {
         isActive: dto.isActive ?? true,
       },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_rule_create",
       "TaxRule",
@@ -495,7 +495,7 @@ export class AdminTaxService {
         ...(dto.isActive != null && { isActive: dto.isActive }),
       },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_rule_update",
       "TaxRule",
@@ -514,7 +514,7 @@ export class AdminTaxService {
     const rule = await this.taxPrisma.taxRule.findUnique({ where: { id } });
     if (!rule) throw new NotFoundException("Vergi kuralı bulunamadı");
     await this.taxPrisma.taxRule.delete({ where: { id } });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "tax_rule_delete",
       "TaxRule",
@@ -740,7 +740,7 @@ export class AdminTaxService {
         },
       });
     }
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "vat_default_update",
       "TaxRule",
@@ -787,7 +787,7 @@ export class AdminTaxService {
             priority: 10,
           },
         });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "vat_override_upsert",
       "TaxRule",
@@ -814,7 +814,7 @@ export class AdminTaxService {
     if (!rule || rule.scope !== "category")
       throw new NotFoundException("KDV istisnası bulunamadı");
     await this.taxPrisma.taxRule.delete({ where: { id: ruleId } });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "vat_override_delete",
       "TaxRule",
@@ -855,7 +855,7 @@ export class AdminTaxService {
       },
       update: { settingValue: String(rate), updatedBy: adminId },
     });
-    await this.audit.createAuditLog(
+    await this.audit.createRequiredAuditLog(
       adminId,
       "withholding_tax_rate_update",
       "PlatformSetting",
