@@ -10,8 +10,6 @@
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
-    "ignoreDeprecations": "5.0",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,
@@ -20,7 +18,7 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": ["src/*"],
+      "@/*": ["./src/*"],
       "@tarodan/i18n": ["../../packages/i18n/src"],
       "@tarodan/i18n/*": ["../../packages/i18n/src/*"],
       "@tarodan/types": ["../../packages/types/src"],
