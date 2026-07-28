@@ -39,13 +39,7 @@
     "prisma:seed:local": "node scripts/run-local-prisma.mjs seed",
     "prisma:studio": "prisma studio",
     "seed:edge:auth": "ts-node -r tsconfig-paths/register prisma/seed-edge/auth-states.ts",
-    "add-images": "ts-node -r tsconfig-paths/register scripts/add-images-to-products.ts",
-    "seed:assets:build": "dotenv -e .env -- ts-node -r tsconfig-paths/register scripts/build-seed-assets.ts",
-    "fix-premium-trade": "ts-node -r tsconfig-paths/register scripts/fix-premium-trade.ts",
-    "fix-user-membership": "ts-node -r tsconfig-paths/register scripts/fix-user-membership.ts",
-    "release-reserved": "ts-node -r tsconfig-paths/register scripts/release-reserved-products.ts",
-    "diagnose-discounts": "ts-node -r tsconfig-paths/register scripts/diagnose-discounts.ts",
-    "migrate-reserved-to-quantity-based": "ts-node -r tsconfig-paths/register scripts/migrate-reserved-to-quantity-based.ts"
+    "smoke:elogo": "node --env-file=.env scripts/elogo-smoke.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1085.0",
