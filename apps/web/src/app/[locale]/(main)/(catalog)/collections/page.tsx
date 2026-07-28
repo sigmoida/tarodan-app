@@ -13,11 +13,12 @@ const TITLE = "Koleksiyonlar | Tarodan";
 const DESCRIPTION =
   "Diecast model araba koleksiyonlarını keşfedin. Kategoriye göre filtreleyin, popüler ve yeni koleksiyonları görüntüleyin, kendi koleksiyonunuzu oluşturun.";
 
-export function generateMetadata({
-  params: { locale },
+export async function generateMetadata({
+  params,
 }: {
-  params: { locale: string };
-}): Metadata {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
     title: TITLE,
     description: DESCRIPTION,
@@ -37,11 +38,11 @@ export function generateMetadata({
 }
 
 type Props = {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function CollectionsPage({ searchParams }: Props) {
-  const rawCategoryId = searchParams.categoryId;
+  const rawCategoryId = (await searchParams).categoryId;
   const categoryId =
     (Array.isArray(rawCategoryId) ? rawCategoryId[0] : rawCategoryId) || "";
 

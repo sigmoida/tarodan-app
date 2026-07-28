@@ -18,12 +18,13 @@ export const metadata: Metadata = {
 export default async function EditListingPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const session = await getSession();
   if (!session)
     redirect({
-      href: `/login?redirect=/listings/${params.id}/edit`,
+      href: `/login?redirect=/listings/${id}/edit`,
       locale: await getLocale(),
     });
   return <EditListingClient />;

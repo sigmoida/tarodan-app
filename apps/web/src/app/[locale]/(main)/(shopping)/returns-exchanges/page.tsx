@@ -4,11 +4,12 @@ import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import ReturnsExchangesClient from "./_components/ReturnsExchangesClient";
 
-export function generateMetadata({
-  params: { locale },
+export async function generateMetadata({
+  params,
 }: {
-  params: { locale: string };
-}): Metadata {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
     title: "İade ve Değişim · Tarodan",
     description:

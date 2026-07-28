@@ -33,11 +33,12 @@ export function generateStaticParams() {
  * in the right language. hreflang itself is emitted via the sitemap alternates
  * + the next-intl middleware's `Link` headers (#214c).
  */
-export function generateMetadata({
-  params: { locale },
+export async function generateMetadata({
+  params,
 }: {
-  params: { locale: string };
-}): Metadata {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   const isEn = locale === "en";
   return {
     openGraph: {
@@ -61,11 +62,12 @@ export function generateMetadata({
  */
 export default async function LocaleLayout({
   children,
-  params: { locale },
+  params,
 }: {
   children: React.ReactNode;
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }) {
+  const { locale } = await params;
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
 

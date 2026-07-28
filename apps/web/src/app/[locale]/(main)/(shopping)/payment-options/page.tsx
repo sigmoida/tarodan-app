@@ -4,11 +4,12 @@ import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import PaymentOptionsClient from "./_components/PaymentOptionsClient";
 
-export function generateMetadata({
-  params: { locale },
+export async function generateMetadata({
+  params,
 }: {
-  params: { locale: string };
-}): Metadata {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
     title: "Ödeme Seçenekleri · Tarodan",
     description:

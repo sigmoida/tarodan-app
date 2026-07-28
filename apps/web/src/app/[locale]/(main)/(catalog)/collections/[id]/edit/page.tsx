@@ -18,12 +18,13 @@ export const metadata: Metadata = {
 export default async function EditCollectionPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const session = await getSession();
   if (!session)
     redirect({
-      href: `/login?redirect=/collections/${params.id}/edit`,
+      href: `/login?redirect=/collections/${id}/edit`,
       locale: await getLocale(),
     });
   return <EditCollectionClient />;

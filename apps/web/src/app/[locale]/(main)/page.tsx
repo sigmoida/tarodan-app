@@ -19,11 +19,12 @@ const TITLE = "Tarodan - Diecast Model Araba Pazarı";
 const DESCRIPTION =
   "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu. Öne çıkan ürünler, indirimler, takas vitrini ve popüler ilanları keşfedin.";
 
-export function generateMetadata({
-  params: { locale },
+export async function generateMetadata({
+  params,
 }: {
-  params: { locale: string };
-}): Metadata {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
     title: TITLE,
     description: DESCRIPTION,
@@ -108,10 +109,11 @@ function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
 }
 
 export default async function HomePage({
-  params: { locale },
+  params,
 }: {
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }) {
+  const { locale } = await params;
   const [
     featured,
     trade,

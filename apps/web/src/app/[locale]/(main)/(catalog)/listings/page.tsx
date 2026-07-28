@@ -16,11 +16,12 @@ const TITLE = "Ürünler | Tarodan";
 const DESCRIPTION =
   "Diecast model araba, koleksiyon ve model araç ilanlarını keşfedin. Markaya, ölçeğe, fiyata ve duruma göre filtreleyin; takas ve indirimli ürünleri bulun.";
 
-export function generateMetadata({
-  params: { locale },
+export async function generateMetadata({
+  params,
 }: {
-  params: { locale: string };
-}): Metadata {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
     title: TITLE,
     description: DESCRIPTION,
@@ -40,7 +41,7 @@ export function generateMetadata({
 }
 
 type Props = {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 /**
@@ -64,7 +65,7 @@ function toSearchParams(
 }
 
 export default async function ListingsPage({ searchParams }: Props) {
-  const sp = toSearchParams(searchParams);
+  const sp = toSearchParams(await searchParams);
   const filters = parseListingsFilters(sp);
   const page = getListingsPage(sp);
 

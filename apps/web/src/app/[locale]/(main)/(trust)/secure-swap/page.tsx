@@ -4,11 +4,12 @@ import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import SecureSwapClient from "./_components/SecureSwapClient";
 
-export function generateMetadata({
-  params: { locale },
+export async function generateMetadata({
+  params,
 }: {
-  params: { locale: string };
-}): Metadata {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
     title: "Güvenli Takas Sistemi · Tarodan",
     description:
@@ -17,10 +18,11 @@ export function generateMetadata({
   };
 }
 
-export default function SecureSwapPage({
-  params: { locale },
+export default async function SecureSwapPage({
+  params,
 }: {
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }) {
+  const { locale } = await params;
   return <SecureSwapClient lang={locale === "en" ? "en" : "tr"} />;
 }

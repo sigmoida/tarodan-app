@@ -10,11 +10,12 @@ import MembershipClient from "./MembershipClient";
 
 const API_BASE = getServerApiOrigin();
 
-export function generateMetadata({
-  params: { locale },
+export async function generateMetadata({
+  params,
 }: {
-  params: { locale: string };
-}): Metadata {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
     title: "Üyelik Planları · Tarodan",
     description:
