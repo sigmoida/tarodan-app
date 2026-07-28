@@ -6,5 +6,9 @@
     "sourceMap": false,
     "incremental": false
   },
-  "include": ["prisma/seed.ts", "prisma/seed-production.ts"]
+  "include": [
+    "prisma/seed.ts",
+    "prisma/seed-media.ts",
+    "prisma/seed-production.ts"
+  ]
 }

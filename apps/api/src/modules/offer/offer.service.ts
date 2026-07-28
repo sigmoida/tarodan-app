@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
-import { StorageService } from "../storage/storage.service";
+import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { CreateOfferDto, CounterOfferDto, OfferQueryDto } from "./dto";
 import {
   OfferStatus,
@@ -1095,7 +1095,7 @@ export class OfferService {
       imageKeyOrUrl.startsWith("/")
     )
       return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes("dev/") || imageKeyOrUrl.includes("prod/")) {
+    if (isPublicStorageKey(imageKeyOrUrl)) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;

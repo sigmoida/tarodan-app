@@ -7,7 +7,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { StorageService } from "../storage/storage.service";
+import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { ContentFilterService } from "./content-filter.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
@@ -61,7 +61,7 @@ export class MessagingService {
       imageKeyOrUrl.startsWith("/")
     )
       return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes("dev/") || imageKeyOrUrl.includes("prod/")) {
+    if (isPublicStorageKey(imageKeyOrUrl)) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;

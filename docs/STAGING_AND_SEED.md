@@ -11,6 +11,8 @@
   "Staging Reset" → Run workflow → `confirm` alanına `STAGING` yaz.
 - **`SEED_SKIP_IMAGES=1`** seed'in tüm görsel adımlarını atlar (S3
   erişimi/credential gerekmez) — e2e bunu kullanır.
+- **Ortam prefix'leri ayrıdır:** yerel `dev`, staging `staging`, canlı `prod`.
+  API staging URL'siyle `S3_ENV_PREFIX=prod` görürse açılışı reddeder.
 
 ## Staging Reset butonu
 
@@ -30,9 +32,8 @@ taze DB'den kendisi doldurur (`syncIndexIfEmpty`).
 
 ### Prod guard'ları (üçü de geçmeden reset yok)
 
-1. Sunucudaki `infrastructure/.env` içinde `ENV_ROLE=staging` satırı **şart**
-   (bu satır YALNIZ staging sunucusuna eklenir; prod'da asla olmaz).
-2. `DOMAIN` tarodan.com/tarodan.shop ise veya `S3_ENV_PREFIX=prod` ise **ret**.
+1. API `FRONTEND_URL`/`API_URL` değerinde staging host'u bulunmak zorunda.
+2. Görselli seed için `S3_ENV_PREFIX=staging` zorunlu; `prod` ise işlem reddedilir.
 3. Çağıran `RESET_CONFIRM=STAGING` geçirmek zorunda (workflow bunu, dispatch
    input'una harfiyen `STAGING` yazıldıysa geçirir).
 
@@ -41,7 +42,7 @@ taze DB'den kendisi doldurur (`syncIndexIfEmpty`).
 1. GitHub'da `staging` environment'ı oluştur (istenirse required reviewers ile
    onay kapısı eklenebilir) ve secret'ları tanımla:
    `STAGING_HOST`, `STAGING_USERNAME`, `STAGING_SSH_KEY`.
-2. Staging sunucusunda `infrastructure/.env` dosyasına `ENV_ROLE=staging` ekle.
+2. Coolify staging API env'inde `S3_ENV_PREFIX=staging` kullan.
 3. (Opsiyonel) Haftalık otomatik reset için repo/environment variable:
    `STAGING_WEEKLY_RESET=true` → her Pazartesi 06:00 TRT. Tanımlı değilse cron
    no-op'tur.
@@ -80,7 +81,9 @@ görselleri + koleksiyon kapakları + avatarlar atlanır (key alanları boş kal
 ve seed sonuna kadar akar. e2e global-setup bunu set eder; seed hatası artık
 yutulmaz — seed patlarsa e2e setup da patlar.
 
-Yerel geliştirmede doğrudan `pnpm dev:seed` kullanılır. Bu komut
-`SEED_SKIP_IMAGES=1` değerini kendisi geçirir ve uzak bir veritabanına karşı
-çalışmayı reddeder. Mevcut yerel veritabanını tamamen yenilemek için
-`pnpm dev:reset` kullanılır.
+Yerel geliştirmede `pnpm dev:seed` veri seed'ini S3'süz çalıştırdıktan sonra
+`pnpm db:seed:media:local` ile eksik ürün, koleksiyon ve avatar medyalarını
+ayrı ve idempotent olarak tamamlar. Böylece medya düzeltmek için tüm seed tekrar
+çalıştırılıp sipariş/ödeme kayıtları çoğaltılmaz. Her iki komut da uzak bir
+veritabanına karşı çalışmayı reddeder. Mevcut yerel veritabanını tamamen
+yenilemek için `pnpm dev:reset` kullanılır.

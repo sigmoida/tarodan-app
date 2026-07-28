@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
-import { StorageService } from "../storage/storage.service";
+import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import {
   AddToCartDto,
   UpdateCartItemDto,
@@ -890,7 +890,7 @@ export class CartService {
       imageKeyOrUrl.startsWith("/")
     )
       return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes("dev/") || imageKeyOrUrl.includes("prod/")) {
+    if (isPublicStorageKey(imageKeyOrUrl)) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;

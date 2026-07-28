@@ -26,7 +26,9 @@ describe("validateEnv", () => {
     NODE_ENV: "production",
     PROCESS_ROLE: "web",
     DATABASE_URL: "postgresql://u:p@db:5432/app",
+    FRONTEND_URL: "https://app.tarodan.test",
     API_URL: "https://api.tarodan.test",
+    S3_ENV_PREFIX: "prod",
     PAYTR_MERCHANT_ID: "id",
     PAYTR_MERCHANT_KEY: "key",
     PAYTR_MERCHANT_SALT: "salt",
@@ -222,6 +224,32 @@ describe("validateEnv", () => {
     expect(() => validateEnv(withoutProviders)).toThrow(
       /SENDGRID_API_KEY|SMTP_HOST|AWS_ACCESS_KEY_ID|SENTRY_DSN/,
     );
+  });
+
+  it("rejects a staging deployment that writes into the production S3 prefix", () => {
+    expect(() =>
+      validateEnv({
+        ...prodBase,
+        FRONTEND_URL: "https://staging.tarodan.shop",
+        API_URL: "https://staging.tarodan.shop/api",
+        PAYTR_CALLBACK_URL:
+          "https://staging.tarodan.shop/api/payments/callback/paytr",
+        S3_ENV_PREFIX: "prod",
+      }),
+    ).toThrow(/S3_ENV_PREFIX.*staging/i);
+  });
+
+  it("accepts the isolated staging S3 prefix on staging", () => {
+    expect(() =>
+      validateEnv({
+        ...prodBase,
+        FRONTEND_URL: "https://staging.tarodan.shop",
+        API_URL: "https://staging.tarodan.shop/api",
+        PAYTR_CALLBACK_URL:
+          "https://staging.tarodan.shop/api/payments/callback/paytr",
+        S3_ENV_PREFIX: "staging",
+      }),
+    ).not.toThrow();
   });
 
   it("strips unrelated env vars from its return (they resolve live from process.env)", () => {

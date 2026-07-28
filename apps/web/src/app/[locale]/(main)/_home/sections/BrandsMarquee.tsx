@@ -4,7 +4,32 @@
 
 import { Link } from "@/i18n/navigation";
 import Image from "next/image";
+import { useState } from "react";
 import type { BrandMarqueeItem } from "../lib/types";
+
+function BrandMark({ brand }: { brand: BrandMarqueeItem }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  if (!brand.logoUrl || imageFailed) {
+    return (
+      <span className="text-center text-xs font-semibold leading-tight text-muted transition-colors group-hover:text-primary-600">
+        {brand.name}
+      </span>
+    );
+  }
+
+  return (
+    <Image
+      src={brand.logoUrl}
+      alt={brand.name}
+      fill
+      className="object-contain p-1"
+      sizes="(max-width: 640px) 96px, 112px"
+      unoptimized
+      onError={() => setImageFailed(true)}
+    />
+  );
+}
 
 export default function BrandsMarquee({
   items,
@@ -34,20 +59,7 @@ export default function BrandsMarquee({
               className="flex-shrink-0 group"
             >
               <div className="w-24 h-14 sm:w-28 sm:h-16 bg-surface-elevated border border-border hover:border-primary-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm relative rounded">
-                {brand.logoUrl ? (
-                  <Image
-                    src={brand.logoUrl}
-                    alt={brand.name}
-                    fill
-                    className="object-contain p-1"
-                    sizes="(max-width: 640px) 96px, 112px"
-                    unoptimized
-                  />
-                ) : (
-                  <span className="text-xs font-semibold text-muted group-hover:text-primary-600 transition-colors text-center leading-tight">
-                    {brand.name}
-                  </span>
-                )}
+                <BrandMark brand={brand} />
               </div>
             </Link>
           ))}

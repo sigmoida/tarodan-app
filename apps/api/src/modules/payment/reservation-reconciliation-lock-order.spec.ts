@@ -61,6 +61,13 @@ describe("ReservationReconciliationService.reconcileReservedQuantities — kilit
 
     await svc.reconcileReservedQuantities();
 
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.not.objectContaining({
+          productId: expect.anything(),
+        }),
+      }),
+    );
     // FOR UPDATE ilk; her iki aggregate ve UPDATE ondan sonra.
     expect(callOrder[0]).toBe("FOR_UPDATE");
     const forUpdateIdx = callOrder.indexOf("FOR_UPDATE");

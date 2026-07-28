@@ -200,7 +200,6 @@ export class ReservationReconciliationService {
           where: {
             status: OrderStatus.pending_payment,
             reservationReleasedAt: null,
-            productId: { not: null },
             OR: [
               { offerId: null },
               { offerId: { not: null }, payment: { isNot: null } },

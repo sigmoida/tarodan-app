@@ -1,7 +1,7 @@
 import { Injectable, Optional, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
-import { StorageService } from "../storage/storage.service";
+import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { OrderStatus, OfferStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 
@@ -58,7 +58,7 @@ export class OrderCommonService {
       imageKeyOrUrl.startsWith("/")
     )
       return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes("dev/") || imageKeyOrUrl.includes("prod/")) {
+    if (isPublicStorageKey(imageKeyOrUrl)) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;

@@ -57,9 +57,23 @@ Altyapı zaten ayaktaysa ve sadece uygulamaları başlatmak istersen: `pnpm dev:
 pnpm dev:seed
 ```
 
-Bu komut Docker servislerini başlatır, migration'ları uygular ve S3 erişimi
-gerektirmeden yerel veritabanını doldurur. Yalnızca `localhost` üzerindeki
-`tarodan` veya `tarodan_*` veritabanlarına çalışır.
+Bu komut Docker servislerini başlatır, migration'ları uygular, yerel
+veritabanını doldurur ve eksik demo medyalarını S3'teki `seed-assets/`
+kaynağından `dev/` alanına kopyalar. Yalnızca `localhost` üzerindeki `tarodan`
+veya `tarodan_*` veritabanlarına çalışır.
+
+`dev:seed` boş veya gözden çıkarılabilir geliştirme veritabanı içindir; tekrar
+çalıştırılması sipariş/ödeme gibi senaryo kayıtlarını çoğaltabilir.
+
+Veriler zaten varsa ve yalnızca eksik ürün/koleksiyon/avatar görsellerini
+tamamlamak istiyorsan idempotent medya komutunu kullan:
+
+```bash
+pnpm db:seed:media:local
+```
+
+S3 erişiminin istenmediği geçici bir seed için
+`SEED_SKIP_IMAGES=1 pnpm dev:seed` kullanılabilir.
 
 Sıfırdan başlamak istersen: `pnpm dev:reset` — aynı yerel hedef kontrolünden
 sonra veritabanını siler, migrate + seed çalıştırır ve uygulamaları başlatır.
@@ -76,8 +90,9 @@ sonra veritabanını siler, migrate + seed çalıştırır ve uygulamaları baş
 | `pnpm dev`                         | Tek komut: altyapı + migrate + tüm uygulamalar       |
 | `pnpm dev:only`                    | Sadece uygulamalar (`turbo run dev`)                 |
 | `pnpm dev:tools`                   | Opsiyonel Kibana arayüzünü başlat                    |
-| `pnpm dev:seed`                    | Yerel DB'ye migration + S3'süz seed uygula           |
-| `pnpm dev:reset`                   | DB'yi sıfırla (migrate + seed) ve başlat             |
+| `pnpm dev:seed`                    | Yerel DB'ye migration + seed + eksik medya uygula    |
+| `pnpm db:seed:media:local`         | Yalnız eksik seed medyalarını idempotent tamamla     |
+| `pnpm dev:reset`                   | DB'yi sıfırla (migrate + seed + medya) ve başlat     |
 | `pnpm dev:stop`                    | Uygulamaları ve docker altyapıyı durdur              |
 | `pnpm db:studio`                   | Prisma Studio                                        |
 | `pnpm db:migrate`                  | Yeni migration oluştur/uygula (`prisma migrate dev`) |

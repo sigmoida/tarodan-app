@@ -34,6 +34,7 @@ import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { StorageService } from "../src/modules/storage/storage.service";
 import { PrismaService } from "../src/prisma";
+import { SEED_AVATAR_BY_EMAIL } from "../src/common/seed-media-mapping";
 const prisma = new PrismaClient();
 
 // Initialize StorageService for seed script
@@ -6761,29 +6762,9 @@ async function main() {
   // ==========================================================================
   if (storageService) {
     console.log("Creating user avatars...");
-    const AVATAR_BY_EMAIL: Record<string, string> = {
-      "admin@tarodan.com": "avatar-13.webp",
-      "moderator@tarodan.com": "avatar-09.webp",
-      "ahmet@demo.com": "avatar-04.webp",
-      "mehmet@demo.com": "avatar-07.webp",
-      "ayse@demo.com": "avatar-10.webp",
-      "fatma@demo.com": "avatar-14.webp",
-      "ali@demo.com": "avatar-05.webp",
-      "zeynep@demo.com": "avatar-01.webp",
-      "mustafa@demo.com": "avatar-12.webp",
-      "elif@demo.com": "avatar-02.webp",
-      "emre@demo.com": "avatar-08.webp",
-      "selin@demo.com": "avatar-11.webp",
-      "burak@demo.com": "avatar-16.webp",
-      "deniz@demo.com": "avatar-17.webp",
-      "ceren@demo.com": "avatar-03.webp",
-      "kaan@demo.com": "avatar-18.webp",
-      "irem@demo.com": "avatar-15.webp",
-      "kurumsal@demo.com": "avatar-06.webp",
-    };
     const avatarSvc = storageService;
     const avatarResults = await Promise.all(
-      Object.entries(AVATAR_BY_EMAIL).map(async ([email, avatarFile]) => {
+      Object.entries(SEED_AVATAR_BY_EMAIL).map(async ([email, avatarFile]) => {
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return 0;
         const { key } = await avatarSvc.copyFile(

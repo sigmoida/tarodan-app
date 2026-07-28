@@ -66,7 +66,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
  * Bucket görünürlük politikası — TEK KAYNAK. S3 bucket-policy ile birebir uyumlu olmalı.
  *
  * PUBLIC: S3'te public-read (doğrudan, cache'lenebilir URL ile servis edilir).
- *   → S3 policy "PublicReadProductAndCollectionImages": {dev,prod}/{products,collections,avatars}/*.
+ *   → S3 policy "PublicReadProductAndCollectionImages":
+ *     {dev,staging,prod}/{products,collections,avatars}/*.
  *   products/collections: katalog görselleri. avatars: herkese görünür profil foto.
  * PRIVATE (bu listede OLMAYAN: documents, tickets): hassas içerik (fatura vb.) —
  *   yalnızca kendi yetkili modülünün endpoint'inden, presigned ile servis edilir.
@@ -75,6 +76,14 @@ export const PUBLIC_BUCKETS = ["products", "collections", "avatars"] as const;
 
 export function isPublicBucket(bucket: string): boolean {
   return (PUBLIC_BUCKETS as readonly string[]).includes(bucket);
+}
+
+/** Public object key: <environment>/<public bucket>/<object path>. */
+export function isPublicStorageKey(key: string): boolean {
+  const normalized = key.startsWith("/") ? key.slice(1) : key;
+  return /^[a-z0-9][a-z0-9_-]*\/(?:products|collections|avatars)\//i.test(
+    normalized,
+  );
 }
 
 @Injectable()

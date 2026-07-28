@@ -36,6 +36,7 @@ const envSchema = z
     PROCESS_ROLE: z.string().optional(),
 
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+    FRONTEND_URL: z.string().optional(),
     API_URL: z.string().optional(),
 
     // Auth realm secrets — each realm sets its own; no cross-realm fallback.
@@ -80,6 +81,7 @@ const envSchema = z
     AWS_SECRET_ACCESS_KEY: z.string().optional(),
     AWS_REGION: z.string().optional(),
     S3_BUCKET: z.string().optional(),
+    S3_ENV_PREFIX: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
   })
   .strip()
@@ -117,6 +119,31 @@ const envSchema = z
     };
     requirePublicHttpsUrl("API_URL", env.API_URL);
     requirePublicHttpsUrl("PAYTR_CALLBACK_URL", env.PAYTR_CALLBACK_URL);
+
+    const isStagingDeployment = [env.FRONTEND_URL, env.API_URL].some(
+      (value) => {
+        try {
+          const hostname = new URL(value ?? "").hostname;
+          return (
+            hostname === "staging.tarodan.shop" ||
+            hostname.endsWith(".staging.tarodan.shop")
+          );
+        } catch {
+          return false;
+        }
+      },
+    );
+    if (
+      isStagingDeployment &&
+      (env.S3_ENV_PREFIX ?? "").trim().toLowerCase() !== "staging"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["S3_ENV_PREFIX"],
+        message:
+          "S3_ENV_PREFIX must be 'staging' for a staging deployment; production media must stay isolated",
+      });
+    }
 
     const secrets = {
       JWT_SECRET: env.JWT_SECRET,
