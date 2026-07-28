@@ -102,6 +102,17 @@ function createRunDirectory(mode) {
   return { reportRoot, runDirectory };
 }
 
+function releaseMarkerPath(context) {
+  return join(context.reportRoot, "release-verification.json");
+}
+
+function writeReleaseMarker(context, marker) {
+  writeFileSync(
+    releaseMarkerPath(context),
+    `${JSON.stringify(marker, null, 2)}\n`,
+  );
+}
+
 function testReportPath(context, stage, extension = "json") {
   return join(context.runDirectory, `${stage.id}.${extension}`);
 }
@@ -428,6 +439,16 @@ function writeRunReport(context, mode, affectedApps, stages, startedAt) {
     `${JSON.stringify(report, null, 2)}\n`,
   );
 
+  if (mode === "release") {
+    writeReleaseMarker(context, {
+      status,
+      commit: report.commit,
+      tree: report.tree,
+      verifiedAt: report.finishedAt,
+      reportPath,
+    });
+  }
+
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
@@ -555,9 +576,22 @@ async function run() {
     await runWatchers();
     return;
   }
+  if (options.mode === "release" && git("status", "--porcelain")) {
+    throw new Error(
+      "Release verification requires a clean worktree. Commit or remove local changes first.",
+    );
+  }
 
   const startedAt = new Date();
   const context = createRunDirectory(options.mode);
+  if (options.mode === "release") {
+    writeReleaseMarker(context, {
+      status: "IN_PROGRESS",
+      commit: git("rev-parse", "HEAD"),
+      tree: git("rev-parse", "HEAD^{tree}"),
+      startedAt: startedAt.toISOString(),
+    });
+  }
   let apps = [...APP_ORDER];
   let stages;
   let continueOnFailure = false;

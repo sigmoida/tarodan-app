@@ -22,7 +22,7 @@
     "typecheck": "turbo run typecheck --filter='!@tarodan/mobile' --filter='!@tarodan/ui-native'",
     "test": "turbo run test --filter='!@tarodan/mobile' --filter='!@tarodan/ui-native'",
     "test:affected-apps": "node --test scripts/detect-affected-apps.test.mjs",
-    "test:verification-tools": "node --test scripts/detect-affected-apps.test.mjs scripts/test-summary.test.mjs",
+    "test:verification-tools": "node --test scripts/detect-affected-apps.test.mjs scripts/pre-push-verify.test.mjs scripts/test-summary.test.mjs",
     "verify:watch": "node scripts/verify-local.mjs watch",
     "verify:push": "node scripts/verify-local.mjs push",
     "verify:release:local": "node scripts/verify-local.mjs release",
