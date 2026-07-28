@@ -5,11 +5,11 @@
  * o zinciri gerçek endpoint'ler üzerinden (mock PayTR + Sürat stub ile) tek çağrıya indirir.
  * Kaynak pattern'ler: refund-flow.e2e-spec.ts:buyAndPay ve apps/web/e2e/support/journeys-extra.ts.
  */
-import * as request from 'supertest';
-import { E2ETestApp } from '../test-utils/create-app';
-import { getPrisma } from '../test-utils/db';
-import { authHeader } from './user.factory';
-import { signCallback } from '../mocks/paytr.mock';
+import * as request from "supertest";
+import { E2ETestApp } from "../test-utils/create-app";
+import { getPrisma } from "../test-utils/db";
+import { authHeader } from "./user.factory";
+import { signCallback } from "../mocks/paytr.mock";
 
 type Auth = { accessToken: string };
 
@@ -22,10 +22,41 @@ export function buyNow(
   productId: string,
   shippingAddressId: string,
 ): request.Test {
-  return request(server(ctx))
-    .post('/api/orders/buy')
-    .set(authHeader(buyer))
-    .send({ productId, shippingAddressId });
+  const req = request(server(ctx))
+    .post("/api/orders/buy")
+    .set(authHeader(buyer));
+
+  let prepared: Promise<void> | undefined;
+  const prepareBody = () =>
+    (prepared ??= getPrisma()
+      .shippingTariff.findFirst({
+        where: { provider: "surat", status: "active" },
+        select: { version: true },
+      })
+      .then((tariff) => {
+        req.send({
+          productId,
+          shippingAddressId,
+          expectedShippingTariffVersion: tariff?.version ?? 1,
+        });
+      }));
+
+  const originalThen = req.then.bind(req);
+  req.then = ((onFulfilled?: any, onRejected?: any) =>
+    prepareBody().then(() =>
+      originalThen(onFulfilled, onRejected),
+    )) as typeof req.then;
+
+  const originalEnd = req.end.bind(req);
+  req.end = ((callback?: any) => {
+    void prepareBody().then(
+      () => originalEnd(callback),
+      (error) => callback?.(error),
+    );
+    return req;
+  }) as typeof req.end;
+
+  return req;
 }
 
 /** POST /api/payments/initiate — siparişe PayTR ödemesi başlat (pending). */
@@ -35,32 +66,61 @@ export async function initiatePayment(
   orderId: string,
 ): Promise<{ paymentId?: string; amount?: number }> {
   const res = await request(server(ctx))
-    .post('/api/payments/initiate')
+    .post("/api/payments/initiate")
     .set(authHeader(buyer))
-    .send({ orderId, provider: 'paytr' })
+    .send({ orderId, provider: "paytr" })
     .expect(201);
-  return { paymentId: res.body.paymentId, amount: Number(res.body.amount ?? 0) };
+  return {
+    paymentId: res.body.paymentId,
+    amount: Number(res.body.amount ?? 0),
+  };
 }
 
 /** Siparişin son payment'ına başarılı PayTR callback'i gönder → completed + escrow held. */
-export async function completePaymentByCallback(ctx: E2ETestApp, orderId: string): Promise<void> {
+export async function completePaymentByCallback(
+  ctx: E2ETestApp,
+  orderId: string,
+): Promise<void> {
   const prisma = getPrisma();
   const payment = await prisma.payment.findFirst({
     where: { orderId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
   });
   if (!payment?.providerConversationId) {
-    throw new Error(`completePaymentByCallback: order ${orderId} için payment/merchantOid yok`);
+    throw new Error(
+      `completePaymentByCallback: order ${orderId} için payment/merchantOid yok`,
+    );
   }
-  await request(server(ctx))
-    .post('/api/payments/callback/paytr')
+  const response = await request(server(ctx))
+    .post("/api/payments/callback/paytr")
     .send(
       signCallback({
         merchantOid: payment.providerConversationId,
-        status: 'success',
+        status: "success",
         totalAmount: Math.round(Number(payment.amount) * 100),
       }),
     );
+  if (response.status !== 200) {
+    throw new Error(
+      `completePaymentByCallback: callback failed with ${response.status}: ${JSON.stringify(response.body)}`,
+    );
+  }
+
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const fulfillment = await prisma.outboxEvent.findFirst({
+      where: {
+        dedupeKey: `order.fulfillment_requested:${orderId}`,
+        status: "completed",
+      },
+      select: { id: true },
+    });
+    if (fulfillment) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(
+    `completePaymentByCallback: fulfillment outbox did not complete for order ${orderId}`,
+  );
 }
 
 /** orders/buy + initiate + başarılı callback → ödenmiş sipariş. Döner: { orderId }. */
@@ -70,7 +130,9 @@ export async function buyAndPay(
   productId: string,
   shippingAddressId: string,
 ): Promise<{ orderId: string }> {
-  const buyRes = await buyNow(ctx, buyer, productId, shippingAddressId).expect(201);
+  const buyRes = await buyNow(ctx, buyer, productId, shippingAddressId).expect(
+    201,
+  );
   const orderId: string = buyRes.body.orderId;
   await initiatePayment(ctx, buyer, orderId);
   await completePaymentByCallback(ctx, orderId);
@@ -84,7 +146,9 @@ export async function buyAndInitiate(
   productId: string,
   shippingAddressId: string,
 ): Promise<{ orderId: string; paymentId?: string; amount?: number }> {
-  const buyRes = await buyNow(ctx, buyer, productId, shippingAddressId).expect(201);
+  const buyRes = await buyNow(ctx, buyer, productId, shippingAddressId).expect(
+    201,
+  );
   const orderId: string = buyRes.body.orderId;
   const { paymentId, amount } = await initiatePayment(ctx, buyer, orderId);
   return { orderId, paymentId, amount };
@@ -104,7 +168,7 @@ export async function driveOrderToCompleted(
     .set(authHeader(opts.seller));
   await prisma.order.update({
     where: { id: opts.orderId },
-    data: { status: 'delivered' as any, deliveredAt: new Date() },
+    data: { status: "delivered" as any, deliveredAt: new Date() },
   });
   await request(server(ctx))
     .post(`/api/orders/${opts.orderId}/confirm`)
@@ -116,10 +180,10 @@ export async function driveOrderToCompleted(
 export function subscribeMembership(
   ctx: E2ETestApp,
   user: Auth,
-  tierType: 'basic' | 'premium' | 'business' = 'premium',
+  tierType: "basic" | "premium" | "business" = "premium",
 ): request.Test {
   return request(server(ctx))
-    .post('/api/membership/subscribe')
+    .post("/api/membership/subscribe")
     .set(authHeader(user))
     .send({ tierType });
 }

@@ -22,6 +22,7 @@ const MERCHANT_KEY = "test-key";
 const MERCHANT_SALT = "test-salt";
 
 export class MockPayTRService {
+  public readonly key = "paytr";
   public readonly iframeCalls: Array<{ orderId: string; amount: number }> = [];
   public readonly refundCalls: Array<{
     merchantOid: string;
@@ -329,9 +330,7 @@ export class MockPayTRService {
     return { status: "success" };
   }
 
-  async capiListCards(
-    utoken: string,
-  ): Promise<
+  async capiListCards(utoken: string): Promise<
     Array<{
       ctoken: string;
       last4: string;

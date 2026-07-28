@@ -101,6 +101,7 @@ const TABLES_TO_TRUNCATE = [
   "tax_rules",
   "tax_rates",
   "tax_regions",
+  "shipping_tariffs",
   // shipping_carriers/methods/rates/zones: 20260619180003_drop_shipping_config_models
   // ile kaldırıldı; truncate listesinden de çıkarıldı (aksi halde TRUNCATE 42P01 verir).
   "static_pages",
@@ -205,6 +206,42 @@ export async function seedBaseline(): Promise<{
       canCreateCollections: true,
       canTrade: true,
       isAdFree: true,
+      isActive: true,
+    },
+  });
+
+  // Keep checkout pricing deterministic after truncateAll(). These values mirror
+  // the initial production tariff inserted by the shipping-tariff migration.
+  await prisma.shippingTariff.create({
+    data: {
+      provider: "surat",
+      name: "Surat Kargo - Test v1",
+      status: "active",
+      version: 1,
+      currency: "TRY",
+      outboundPackageFee: 29.99,
+      freeShippingEnabled: true,
+      freeShippingThreshold: 500,
+      returnPackageFee: 29.99,
+      tradeLegFee: 29.99,
+      effectiveFrom: new Date(0),
+    },
+  });
+
+  // Checkout fails closed without a matching commission rule. Mirror the
+  // production seed's catch-all rule so ordinary order fixtures reach the
+  // domain behavior they intend to test.
+  await prisma.commissionRule.create({
+    data: {
+      id: "default-rule",
+      name: "Test Default Commission",
+      ruleType: "default",
+      sellerType: "ALL",
+      appliesTo: "SELLER",
+      sellerRate: 5,
+      sellerCommissionRate: 5,
+      percentage: 0.05,
+      priority: 0,
       isActive: true,
     },
   });
