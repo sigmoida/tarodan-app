@@ -19,7 +19,8 @@ export const listingFieldMessages = (locale: string) => {
     required: t("auth.fillRequiredFields"),
     validPrice: t("common.invalidPrice"),
     setSize: t("product.setMinPieces"),
-    photo: t("product.addPhoto"),
+    photo: t("product.addThreePhotos"),
+    descriptionLength: t("product.descriptionLength"),
   };
 };
 
@@ -35,14 +36,24 @@ export const listingImageSchema = z.object({
 export function baseListingFields(msg: ListingFieldMessages) {
   return {
     title: z.string().trim().min(1, msg.required).max(200),
-    description: z.string().max(5000),
+    description: z
+      .string()
+      .trim()
+      .min(30, msg.descriptionLength)
+      .max(330, msg.descriptionLength),
     categoryId: z.string().min(1, msg.required),
     condition: z.string().min(1, msg.required),
-    brandId: z.string(),
-    carModelId: z.string(),
-    scale: z.string(),
-    material: z.string(),
-    manufacturerId: z.string(),
+    brandId: z.string().min(1, msg.required),
+    carModelId: z.string().min(1, msg.required),
+    modelCode: z.string().trim().min(1, msg.required).max(100),
+    color: z.string().trim().min(1, msg.required).max(80),
+    scale: z.string().min(1, msg.required),
+    material: z.string().min(1, msg.required),
+    manufacturerId: z.string().min(1, msg.required),
+    isBoxed: z.enum(["boxed", "unboxed"], {
+      required_error: msg.required,
+      invalid_type_error: msg.required,
+    }),
     year: z.string(),
     isTradeEnabled: z.boolean(),
     isSet: z.boolean(),
@@ -92,9 +103,13 @@ export const emptyBaseListingValues = {
   condition: "",
   brandId: "",
   carModelId: "",
+  modelCode: "",
+  color: "",
   scale: "",
   material: "",
   manufacturerId: "",
+  // Runtime starts empty so the seller must make an explicit boxed/unboxed choice.
+  isBoxed: "" as "boxed",
   year: "",
   isTradeEnabled: false,
   isSet: false,

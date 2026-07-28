@@ -5,7 +5,7 @@
 import { useTranslations } from "next-intl";
 import { Controller, useFormContext } from "react-hook-form";
 import { Select } from "@tarodan/ui";
-import { FormSelect } from "@tarodan/ui/form";
+import { FormInput, FormSelect } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/ui";
 import {
   FALLBACK_MATERIALS,
@@ -77,7 +77,7 @@ export default function ProductDetailsCard({
           name="brandId"
           render={({ field }) => (
             <Select
-              label={t("product.brand")}
+              label={t("product.brandRequired")}
               value={field.value || undefined}
               onChange={(e) => {
                 field.onChange(e.target.value);
@@ -94,7 +94,7 @@ export default function ProductDetailsCard({
 
         <FormSelect
           name="carModelId"
-          label={t("product.model")}
+          label={t("product.modelRequired")}
           options={models.map((m) => ({ value: m.id, label: m.name }))}
           placeholder={
             !brandId
@@ -108,28 +108,52 @@ export default function ProductDetailsCard({
           disabled={!brandId || modelsLoading}
         />
 
+        <FormInput
+          name="modelCode"
+          label={t("product.modelCodeRequired")}
+          placeholder={t("product.modelCodePlaceholder")}
+          maxLength={100}
+        />
+
+        <FormInput
+          name="color"
+          label={t("product.colorRequired")}
+          placeholder={t("product.colorPlaceholder")}
+          maxLength={80}
+        />
+
         <FormSelect
           name="scale"
-          label={t("product.scale")}
+          label={t("product.scaleRequired")}
           placeholder={t("product.selectScale")}
           options={scales.map((s) => ({ value: s, label: s }))}
         />
 
         <FormSelect
           name="material"
-          label={t("product.material")}
+          label={t("product.materialRequired")}
           placeholder={t("product.selectMaterial")}
           options={materials.map((m) => ({ value: m.slug, label: m.label }))}
         />
 
         <FormSelect
           name="manufacturerId"
-          label={t("product.manufacturer")}
+          label={t("product.manufacturerRequired")}
           placeholder={t("product.selectManufacturer")}
           options={manufacturerList.map((m) => ({
             value: m.id,
             label: m.name,
           }))}
+        />
+
+        <FormSelect
+          name="isBoxed"
+          label={t("product.boxedRequired")}
+          placeholder={t("product.selectBoxedCondition")}
+          options={[
+            { value: "boxed", label: t("product.boxed") },
+            { value: "unboxed", label: t("product.unboxed") },
+          ]}
         />
 
         <FormSelect

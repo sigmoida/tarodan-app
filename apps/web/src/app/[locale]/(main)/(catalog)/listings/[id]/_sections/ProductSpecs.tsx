@@ -114,7 +114,12 @@ export default function ProductSpecs({
       (a) =>
         a.group !== "scale" && a.group !== "material" && a.group !== "Malzeme",
     ) ?? [];
-  const hasTechnical = technicalAttrs.length > 0 || Boolean(listing.carModel);
+  const hasTechnical =
+    technicalAttrs.length > 0 ||
+    Boolean(listing.carModel) ||
+    Boolean(listing.modelCode) ||
+    Boolean(listing.color) ||
+    listing.isBoxed != null;
 
   return (
     <div
@@ -134,7 +139,27 @@ export default function ProductSpecs({
         <SectionCard title={t("product.technicalDetails")}>
           <dl className="divide-y divide-border">
             {listing.carModel && (
-              <DetailRow label="Model" value={listing.carModel.name} />
+              <DetailRow
+                label={t("product.model")}
+                value={listing.carModel.name}
+              />
+            )}
+            {listing.modelCode && (
+              <DetailRow
+                label={t("product.modelCode")}
+                value={listing.modelCode}
+              />
+            )}
+            {listing.color && (
+              <DetailRow label={t("product.color")} value={listing.color} />
+            )}
+            {listing.isBoxed != null && (
+              <DetailRow
+                label={t("product.boxedCondition")}
+                value={
+                  listing.isBoxed ? t("product.boxed") : t("product.unboxed")
+                }
+              />
             )}
             {technicalAttrs.map((attr) => (
               <DetailRow key={attr.id} label={attr.label} value={attr.value} />

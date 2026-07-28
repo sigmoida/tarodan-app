@@ -164,8 +164,11 @@ export const ordersApi = {
     couponCode?: string;
   }) => api.post("/orders/quote", data),
   /** Commission preview for one amount/category (listing form). */
-  getCommissionPreview: (params: { amount: number; categoryId?: string }) =>
-    api.get("/orders/commission-preview", { params }),
+  getCommissionPreview: (params: {
+    amount: number;
+    categoryId?: string;
+    shippingDesi?: number;
+  }) => api.get("/orders/commission-preview", { params }),
   /** Batch commission preview for multiple items (e.g. ilanlarım list). */
   getCommissionPreviewBatch: (
     items: Array<{ amount: number; categoryId?: string | null }>,

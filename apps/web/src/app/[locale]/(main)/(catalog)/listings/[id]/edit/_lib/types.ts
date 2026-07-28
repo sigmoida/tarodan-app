@@ -28,9 +28,12 @@ export interface EditListingFormData {
   condition: string;
   brandId: string;
   carModelId: string;
+  modelCode: string;
+  color: string;
   scale: string;
   material: string;
   manufacturerId: string;
+  isBoxed: "boxed" | "unboxed";
   year: string | number;
   isTradeEnabled: boolean;
   isPreorder: boolean;

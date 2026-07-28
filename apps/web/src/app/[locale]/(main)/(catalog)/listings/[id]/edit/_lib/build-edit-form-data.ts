@@ -31,11 +31,19 @@ export function buildListingFormData(
     condition: listing.condition || prev.condition || "very_good",
     brandId: listing.brand?.id || prev.brandId || "",
     carModelId: listing.carModel?.id || prev.carModelId || "",
+    modelCode: (listing as any).modelCode ?? prev.modelCode ?? "",
+    color: (listing as any).color ?? prev.color ?? "",
     scale: listing.scale || scaleFromAttrs || prev.scale || "1:64",
     material:
       materialFromAttrs ?? (listing as any).material ?? prev.material ?? "",
     manufacturerId:
       (listing as any).manufacturer?.id ?? prev.manufacturerId ?? "",
+    isBoxed:
+      (listing as any).isBoxed === true
+        ? "boxed"
+        : (listing as any).isBoxed === false
+          ? "unboxed"
+          : (prev.isBoxed ?? "unboxed"),
     year:
       (listing as any).year ??
       ((listing as any).releaseDate

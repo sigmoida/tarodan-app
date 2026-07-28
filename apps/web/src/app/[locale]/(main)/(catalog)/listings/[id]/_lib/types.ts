@@ -32,6 +32,9 @@ export interface Listing {
   };
   scale?: string;
   material?: string;
+  modelCode?: string | null;
+  color?: string | null;
+  isBoxed?: boolean | null;
   year?: number;
   condition?: string;
   trade_available?: boolean;

@@ -58,6 +58,7 @@ function useNewListingValue() {
   const manufacturerId = watch("manufacturerId");
   const price = watch("price");
   const categoryId = watch("categoryId");
+  const shippingDesi = watch("shippingDesi");
 
   const bankAccountQuery = useQuery({
     queryKey: queryKeys.bankAccount.detail(),
@@ -98,6 +99,7 @@ function useNewListingValue() {
   const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
     price,
     categoryId,
+    shippingDesi,
   );
 
   // Auth gate: redirect out if signed out, else refresh the user once.
@@ -158,9 +160,12 @@ function useNewListingValue() {
         condition: values.condition,
         brandId: values.brandId || undefined,
         carModelId: values.carModelId || undefined,
+        modelCode: values.modelCode,
+        color: values.color,
         scale: values.scale || undefined,
         material: values.material || undefined,
         manufacturerId: values.manufacturerId || undefined,
+        isBoxed: values.isBoxed === "boxed",
         year: values.year ? Number(values.year) : undefined,
         isTradeEnabled: values.isTradeEnabled,
         isPreorder: false,

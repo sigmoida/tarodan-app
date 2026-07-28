@@ -126,9 +126,16 @@ export function useCarModels(brandSlug: string | undefined) {
 export function useCommissionPreview(
   price: string | number,
   categoryId: string,
+  shippingDesi: string | number = 1,
 ) {
   const amount = Number(price);
-  const enabled = !!price && !Number.isNaN(amount) && amount > 0;
+  const desi = Number(shippingDesi);
+  const enabled =
+    !!price &&
+    !Number.isNaN(amount) &&
+    amount > 0 &&
+    Number.isInteger(desi) &&
+    desi >= 1;
   const query = useWebList<{
     sellerFeeAmount: number;
     withholdingTaxAmount: number;
@@ -136,10 +143,14 @@ export function useCommissionPreview(
     sellerNetAmount: number;
   }>({
     resource: "listing-form-commission",
-    params: [String(price), categoryId],
+    params: [String(price), categoryId, String(shippingDesi)],
     fetcher: async () => {
       const res = await api.get("/orders/commission-preview", {
-        params: { amount: price, categoryId: categoryId || undefined },
+        params: {
+          amount: price,
+          categoryId: categoryId || undefined,
+          shippingDesi: desi,
+        },
       });
       return {
         sellerFeeAmount: Number(res.data?.sellerFeeAmount ?? 0),

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
-import { Input } from "@tarodan/ui";
+import { useQuery } from "@tanstack/react-query";
+import { Input, Select } from "@tarodan/ui";
 import {
   FormModal,
   FormError,
@@ -13,6 +14,8 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
+import { extractList } from "@/lib/extract";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
 import { extractErrorMessage } from "@/lib/error";
@@ -28,6 +31,16 @@ import {
   taxpayerTypes,
   appliesToOptions,
 } from "../_lib/types";
+
+interface ShippingTariffSummary {
+  id: string;
+  name: string;
+  provider: string;
+  version: number;
+  status: "draft" | "active" | "archived";
+  outboundPackageFee: number | string;
+  rates?: Array<{ desi: number; amount: number | string }>;
+}
 
 /** rate% of amount, clamped by optional [min,max] TL. */
 function feeFor(
@@ -97,12 +110,29 @@ function BreakdownPreview() {
   const { watch } = useFormContext<CommissionFormValues>();
   const v = watch();
   const [price, setPrice] = useState("1000");
-  const [ship, setShip] = useState("29.99");
+  const [shippingDesi, setShippingDesi] = useState("1");
   const [vat, setVat] = useState("20");
   const [withholding, setWithholding] = useState("1");
+  const tariffsQuery = useQuery({
+    queryKey: adminKeys.all("shipping-tariffs"),
+    queryFn: async () =>
+      extractList<ShippingTariffSummary>(
+        (await adminApi.getShippingTariffs()).data,
+      ),
+  });
+  const activeTariff = tariffsQuery.data?.find(
+    (tariff) => tariff.status === "active",
+  );
+  const rates = [...(activeTariff?.rates ?? [])].sort(
+    (left, right) => left.desi - right.desi,
+  );
+  const selectedRate =
+    rates.find((rate) => rate.desi === Number(shippingDesi)) ?? rates[0];
 
   const amount = parseFloat(price) || 0;
-  const shipping = parseFloat(ship) || 0;
+  const shipping = selectedRate
+    ? Number(selectedRate.amount)
+    : Number(activeTariff?.outboundPackageFee ?? 0);
   const vatRate = parseFloat(vat) || 0;
   const whRate = parseFloat(withholding) || 0;
 
@@ -187,13 +217,19 @@ function BreakdownPreview() {
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          label={t("admin.finance.commission.exampleShipping")}
-          value={ship}
-          onChange={(e) => setShip(e.target.value)}
+        <Select
+          label={t("admin.finance.commission.exampleShippingDesi")}
+          value={selectedRate ? String(selectedRate.desi) : ""}
+          onChange={(event) => setShippingDesi(event.target.value)}
+          disabled={tariffsQuery.isLoading || rates.length === 0}
+          options={rates.map((rate) => ({
+            value: String(rate.desi),
+            label: t("admin.finance.commission.shippingDesiAmount", {
+              desi: rate.desi,
+              amount: fmtTry(Number(rate.amount)),
+            }),
+          }))}
+          placeholder={t("admin.finance.commission.noActiveShippingTariff")}
         />
         <Input
           type="number"
@@ -212,6 +248,15 @@ function BreakdownPreview() {
           onChange={(e) => setWithholding(e.target.value)}
         />
       </div>
+      {activeTariff && (
+        <p className="text-xs text-muted">
+          {t("admin.finance.commission.activeShippingTariff", {
+            name: activeTariff.name,
+            version: activeTariff.version,
+            amount: fmtTry(shipping),
+          })}
+        </p>
+      )}
       {!isCorporate && (
         <p className="text-xs text-muted">
           {t("admin.finance.commission.corporateOnlyNote")}

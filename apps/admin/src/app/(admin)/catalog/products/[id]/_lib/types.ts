@@ -13,6 +13,14 @@ export interface ProductDetail {
   quantity?: number;
   shippingDesi: number;
   condition: string;
+  modelCode?: string | null;
+  color?: string | null;
+  isBoxed?: boolean | null;
+  scale?: string | null;
+  material?: string | null;
+  brand?: { id: string; name: string } | null;
+  carModel?: { id: string; name: string } | null;
+  manufacturer?: { id: string; name: string } | null;
   status: string;
   category: { id: string; name: string };
   seller: { id: string; displayName: string; email: string };

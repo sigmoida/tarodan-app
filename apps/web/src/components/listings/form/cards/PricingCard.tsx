@@ -83,7 +83,7 @@ export default function PricingCard({
 
 /** Per-sale summary shown to the seller: only the net take-home ("elde kalan"),
  *  with all commission/withholding deductions already folded in, plus the
- *  (buyer-paid) shipping fee line. No itemised commission/list-price rows. */
+ *  seller-paid shipping deduction. No itemised commission/list-price rows. */
 function PricingBreakdown({
   preview,
 }: {

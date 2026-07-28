@@ -76,6 +76,37 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
         </Row>
       </div>
       <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">
+        <Row label={t("product.brand")}>
+          {product.brand?.name ?? t("admin.catalog.products.notSpecified")}
+        </Row>
+        <Row label={t("product.model")}>
+          {product.carModel?.name ?? t("admin.catalog.products.notSpecified")}
+        </Row>
+        <Row label={t("product.modelCode")}>
+          {product.modelCode ?? t("admin.catalog.products.notSpecified")}
+        </Row>
+        <Row label={t("product.color")}>
+          {product.color ?? t("admin.catalog.products.notSpecified")}
+        </Row>
+        <Row label={t("product.scale")}>
+          {product.scale ?? t("admin.catalog.products.notSpecified")}
+        </Row>
+        <Row label={t("product.material")}>
+          {product.material ?? t("admin.catalog.products.notSpecified")}
+        </Row>
+        <Row label={t("product.manufacturer")}>
+          {product.manufacturer?.name ??
+            t("admin.catalog.products.notSpecified")}
+        </Row>
+        <Row label={t("product.boxedCondition")}>
+          {product.isBoxed == null
+            ? t("admin.catalog.products.notSpecified")
+            : product.isBoxed
+              ? t("product.boxed")
+              : t("product.unboxed")}
+        </Row>
+      </div>
+      <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">
         <Row label={t("admin.catalog.products.viewCount")}>
           {product.viewCount || 0}
         </Row>
