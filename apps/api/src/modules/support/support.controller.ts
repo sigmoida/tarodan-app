@@ -169,11 +169,7 @@ export class SupportController {
     @Request() req: any,
     @Body() dto: UpdateTicketStatusDto,
   ): Promise<TicketResponseDto> {
-    return this.supportService.updateTicketStatus(
-      id,
-      req.user.adminId || req.user.id,
-      dto,
-    );
+    return this.supportService.updateTicketStatus(id, req.user.id, dto);
   }
 
   /**
