@@ -71,7 +71,13 @@ export class PaymentOutboxHandlers implements OnModuleInit {
     );
 
     this.registry.register(OUTBOX_REVENUE_INVOICE_ISSUE, async (payload) => {
-      const { orderId, kind } = payload as RevenueInvoiceIssuePayload;
+      const { orderId, membershipPaymentId, kind } =
+        payload as RevenueInvoiceIssuePayload;
+      if (kind === "membership" && membershipPaymentId) {
+        await this.elogoInvoicing.issueMembershipInvoice(membershipPaymentId);
+        return;
+      }
+      if (!orderId) throw new Error("Revenue invoice source is missing");
       await this.elogoInvoicing.issueVirtualOrderInvoice(orderId, kind);
     });
 

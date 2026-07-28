@@ -178,6 +178,22 @@ export class PaymentExpiryReconciliationService {
                 "Sipariş 24 saat içinde ödenmediği için iptal edildi",
             },
           });
+          await tx.membershipPayment.updateMany({
+            where: {
+              orderId: order.id,
+              status: {
+                in: [PaymentStatus.pending, PaymentStatus.processing],
+              },
+            },
+            data: {
+              status: PaymentStatus.failed,
+              idempotencyKey: null,
+              metadata: {
+                failureReason: "membership_payment_window_expired",
+                failedAt: now.toISOString(),
+              },
+            },
+          });
 
           // Grup ödemesi: yalnızca gruptaki HİÇBİR kardeş sipariş pending_payment
           // kalmadıysa grup payment'ını da expire et (kardeş hâlâ ödenebilir olabilir)

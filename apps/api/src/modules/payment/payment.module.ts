@@ -96,7 +96,11 @@ import { ElogoModule } from "../elogo";
     PaymentOutboxHandlers,
     RawBodyMiddleware,
   ],
-  exports: [PaymentService, PaymentProviderEventService],
+  exports: [
+    PaymentService,
+    PaymentProviderEventService,
+    VirtualOrderFulfillmentService,
+  ],
 })
 export class PaymentModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

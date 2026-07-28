@@ -9,25 +9,25 @@ import {
   Request,
   Query,
   Req,
-} from '@nestjs/common';
-import { Request as ExpressRequest } from 'express';
-import { MembershipService } from './membership.service';
+} from "@nestjs/common";
+import { Request as ExpressRequest } from "express";
+import { MembershipService } from "./membership.service";
 import {
   SubscribeDto,
   CreateMembershipTierDto,
   UpdateMembershipTierDto,
+  ToggleAutoRenewDto,
   MembershipTierResponseDto,
   UserMembershipResponseDto,
   MembershipLimitsDto,
   InitiateMembershipPaymentDto,
   MembershipPaymentInitResponseDto,
-} from './dto';
-import { PaymentProvider } from '../payment/dto';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { Public } from '../auth/decorators/public.decorator';
-import { AdminRole, MembershipTierType } from '@prisma/client';
+} from "./dto";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { Public } from "../auth/decorators/public.decorator";
+import { AdminRole, MembershipTierType } from "@prisma/client";
 
-@Controller('membership')
+@Controller("membership")
 export class MembershipController {
   constructor(private readonly membershipService: MembershipService) {}
 
@@ -36,7 +36,7 @@ export class MembershipController {
    * GET /membership/tiers
    */
   @Public()
-  @Get('tiers')
+  @Get("tiers")
   async getAllTiers(): Promise<MembershipTierResponseDto[]> {
     return this.membershipService.getAllTiers(false);
   }
@@ -46,9 +46,9 @@ export class MembershipController {
    * GET /membership/tiers/:type
    */
   @Public()
-  @Get('tiers/:type')
+  @Get("tiers/:type")
   async getTierByType(
-    @Param('type') type: MembershipTierType,
+    @Param("type") type: MembershipTierType,
   ): Promise<MembershipTierResponseDto> {
     return this.membershipService.getTierByType(type);
   }
@@ -57,7 +57,7 @@ export class MembershipController {
    * Get current user's membership
    * GET /membership/me
    */
-  @Get('me')
+  @Get("me")
   async getMyMembership(
     @Request() req: any,
   ): Promise<UserMembershipResponseDto> {
@@ -68,7 +68,7 @@ export class MembershipController {
    * Get current user's limits
    * GET /membership/me/limits
    */
-  @Get('me/limits')
+  @Get("me/limits")
   async getMyLimits(@Request() req: any): Promise<MembershipLimitsDto> {
     return this.membershipService.getUserLimits(req.user.id);
   }
@@ -77,7 +77,7 @@ export class MembershipController {
    * Subscribe to a membership tier
    * POST /membership/subscribe
    */
-  @Post('subscribe')
+  @Post("subscribe")
   async subscribe(
     @Request() req: any,
     @Body() dto: SubscribeDto,
@@ -89,7 +89,7 @@ export class MembershipController {
    * Initiate payment for membership subscription
    * POST /membership/payments/initiate
    */
-  @Post('payments/initiate')
+  @Post("payments/initiate")
   async initiateMembershipPayment(
     @Request() req: any,
     @Body() dto: InitiateMembershipPaymentDto,
@@ -106,7 +106,7 @@ export class MembershipController {
    * Cancel subscription
    * POST /membership/cancel
    */
-  @Post('cancel')
+  @Post("cancel")
   async cancelSubscription(
     @Request() req: any,
   ): Promise<UserMembershipResponseDto> {
@@ -117,7 +117,7 @@ export class MembershipController {
    * Bekleyen plan değişikliğini (ertelemeli downgrade / period) iptal et
    * POST /membership/cancel-scheduled-change
    */
-  @Post('cancel-scheduled-change')
+  @Post("cancel-scheduled-change")
   async cancelScheduledChange(
     @Request() req: any,
   ): Promise<UserMembershipResponseDto> {
@@ -128,10 +128,10 @@ export class MembershipController {
    * Toggle auto-renew setting
    * PATCH /membership/auto-renew
    */
-  @Patch('auto-renew')
+  @Patch("auto-renew")
   async toggleAutoRenew(
     @Request() req: any,
-    @Body() dto: { autoRenew: boolean },
+    @Body() dto: ToggleAutoRenewDto,
   ): Promise<UserMembershipResponseDto> {
     return this.membershipService.toggleAutoRenew(req.user.id, dto.autoRenew);
   }
@@ -144,7 +144,7 @@ export class MembershipController {
    * Kullanıcının kayıtlı kartlarını listele (oto-yenileme için).
    * GET /membership/cards
    */
-  @Get('cards')
+  @Get("cards")
   async listSavedCards(@Request() req: any) {
     return this.membershipService.listSavedCards(req.user.id);
   }
@@ -153,10 +153,10 @@ export class MembershipController {
    * Kayıtlı kartı sil (PayTR capi/delete + yerelde revoke).
    * DELETE /membership/cards/:id
    */
-  @Delete('cards/:id')
+  @Delete("cards/:id")
   async deleteSavedCard(
     @Request() req: any,
-    @Param('id') id: string,
+    @Param("id") id: string,
   ): Promise<{ deleted: boolean }> {
     return this.membershipService.deleteSavedCard(req.user.id, id);
   }
@@ -169,10 +169,10 @@ export class MembershipController {
    * Get all tiers including inactive (Admin)
    * GET /membership/admin/tiers
    */
-  @Get('admin/tiers')
+  @Get("admin/tiers")
   @Roles(AdminRole.admin, AdminRole.super_admin)
   async getAllTiersAdmin(
-    @Query('includeInactive') includeInactive?: boolean,
+    @Query("includeInactive") includeInactive?: boolean,
   ): Promise<MembershipTierResponseDto[]> {
     return this.membershipService.getAllTiers(includeInactive);
   }
@@ -181,7 +181,7 @@ export class MembershipController {
    * Create a new membership tier (Admin)
    * POST /membership/admin/tiers
    */
-  @Post('admin/tiers')
+  @Post("admin/tiers")
   @Roles(AdminRole.super_admin)
   async createTier(
     @Body() dto: CreateMembershipTierDto,
@@ -193,10 +193,10 @@ export class MembershipController {
    * Update a membership tier (Admin)
    * PATCH /membership/admin/tiers/:type
    */
-  @Patch('admin/tiers/:type')
+  @Patch("admin/tiers/:type")
   @Roles(AdminRole.super_admin)
   async updateTier(
-    @Param('type') type: MembershipTierType,
+    @Param("type") type: MembershipTierType,
     @Body() dto: UpdateMembershipTierDto,
   ): Promise<MembershipTierResponseDto> {
     return this.membershipService.updateTier(type, dto);
@@ -206,7 +206,7 @@ export class MembershipController {
    * Check can create listing
    * GET /membership/check/listing
    */
-  @Get('check/listing')
+  @Get("check/listing")
   async checkCanCreateListing(@Request() req: any) {
     return this.membershipService.canCreateListing(req.user.id);
   }
@@ -215,7 +215,7 @@ export class MembershipController {
    * Check can create trade
    * GET /membership/check/trade
    */
-  @Get('check/trade')
+  @Get("check/trade")
   async checkCanCreateTrade(@Request() req: any) {
     return this.membershipService.canCreateTrade(req.user.id);
   }
@@ -224,7 +224,7 @@ export class MembershipController {
    * Check can create collection
    * GET /membership/check/collection
    */
-  @Get('check/collection')
+  @Get("check/collection")
   async checkCanCreateCollection(@Request() req: any) {
     return this.membershipService.canCreateCollection(req.user.id);
   }

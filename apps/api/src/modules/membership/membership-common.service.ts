@@ -83,7 +83,7 @@ export class MembershipCommonService {
     // Ham abonelik kaydı ödeme/mutabakat için korunur; tüm özellik kapıları
     // aşağıda hesaplanan efektif tier'ı kullanır.
     let pendingTierName: string | undefined;
-    let pendingTierType: string | undefined;
+    let pendingTierType: MembershipTierType | undefined;
     let pendingPayment = false;
     if (membership.status === SubscriptionStatus.past_due) {
       // SELF-HEAL: past_due görünüyor ama ödeme aslında PayTR'de başarılı olmuş
@@ -181,6 +181,24 @@ export class MembershipCommonService {
         );
       }
       effectiveTier = { ...freeTier };
+    }
+
+    const pendingIntent = await this.prisma.membershipPayment.findFirst({
+      where: {
+        membershipId: membership.id,
+        status: PaymentStatus.pending,
+        order: {
+          status: OrderStatus.pending_payment,
+          paymentExpiresAt: { gt: new Date() },
+        },
+      },
+      include: { targetTier: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (pendingIntent?.targetTier) {
+      pendingTierName = pendingIntent.targetTier.name;
+      pendingTierType = pendingIntent.targetTier.type;
+      pendingPayment = true;
     }
 
     // Map tier to DTO first

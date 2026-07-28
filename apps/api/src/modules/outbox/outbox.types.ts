@@ -27,7 +27,8 @@ export interface InvoiceRefundReversePayload {
 export const OUTBOX_REVENUE_INVOICE_ISSUE = "invoice.revenue_issue";
 
 export interface RevenueInvoiceIssuePayload {
-  orderId: string;
+  orderId?: string;
+  membershipPaymentId?: string;
   kind: "membership" | "boost";
 }
 

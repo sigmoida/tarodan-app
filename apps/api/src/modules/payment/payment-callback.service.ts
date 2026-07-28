@@ -9,6 +9,7 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { CacheService } from "../cache/cache.service";
+import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 
 @Injectable()
 export class PaymentCallbackService {
@@ -23,6 +24,7 @@ export class PaymentCallbackService {
     private readonly paymentReconciliation: PaymentReconciliationService,
     private readonly providerEvents: PaymentProviderEventService,
     private readonly cache: CacheService,
+    private readonly virtualOrder?: VirtualOrderFulfillmentService,
   ) {}
 
   /**
@@ -126,6 +128,14 @@ export class PaymentCallbackService {
     dto: PayTRCallbackDto,
   ): Promise<string> {
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
+    const recurringPayment = payment
+      ? null
+      : await this.prisma.membershipPayment.findFirst({
+          where: {
+            merchantOid: dto.merchant_oid,
+            orderId: null,
+          },
+        });
 
     // Gözlemlenebilirlik/güvenlik: hash uyuşmayan (güvenilmeyen) bildirimi de kaydet.
     // Body'ye GÜVENMEDİĞİMİZ için yalnız ham + hashValid=false; para alanları durum-sorgu
@@ -134,10 +144,43 @@ export class PaymentCallbackService {
       eventType: "callback",
       merchantOid: dto.merchant_oid,
       paymentId: payment?.id ?? null,
+      membershipPaymentId: recurringPayment?.id ?? null,
       status: dto.status,
       hashValid: false,
       raw: { ...dto },
     });
+
+    if (!payment && recurringPayment) {
+      if (
+        recurringPayment.provider !== PaymentProvider.paytr ||
+        (recurringPayment.status !== PaymentStatus.pending &&
+          recurringPayment.status !== PaymentStatus.processing) ||
+        !(await this.allowHashMismatchInquiry(dto.merchant_oid))
+      ) {
+        return "OK";
+      }
+      const inquiry = await this.paymentProviders
+        .resolve()
+        .queryPaymentStatus(dto.merchant_oid);
+      const tolerance = parseFloat(
+        this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
+      );
+      if (
+        inquiry.ok &&
+        Math.abs(inquiry.paymentTotalTl - Number(recurringPayment.amount)) <=
+          tolerance
+      ) {
+        if (!this.virtualOrder) {
+          throw new Error("Virtual order fulfillment service is unavailable");
+        }
+        await this.virtualOrder.completeRecurringMembershipPayment(
+          recurringPayment.id,
+          `paytr:${dto.merchant_oid}:${inquiry.paymentDate || "inquiry"}`,
+          inquiry,
+        );
+      }
+      return "OK";
+    }
 
     if (!payment) {
       this.logger.error(
@@ -264,6 +307,14 @@ export class PaymentCallbackService {
     }
 
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
+    const recurringPayment = payment
+      ? null
+      : await this.prisma.membershipPayment.findFirst({
+          where: {
+            merchantOid: dto.merchant_oid,
+            orderId: null,
+          },
+        });
 
     // Gözlemlenebilirlik: her doğrulanmış (hash geçerli) bildirimi denetim günlüğüne
     // yaz — başarı/başarısızlık, ödeme yöntemi, taksit, tutarlar. Best-effort.
@@ -272,6 +323,7 @@ export class PaymentCallbackService {
       eventType: "callback",
       merchantOid: dto.merchant_oid,
       paymentId: payment?.id ?? null,
+      membershipPaymentId: recurringPayment?.id ?? null,
       status: dto.status,
       paymentType: parsed.paymentType ?? null,
       installmentCount: parsed.installmentCount ?? null,
@@ -285,6 +337,67 @@ export class PaymentCallbackService {
       hashValid: true,
       raw: { ...dto },
     });
+
+    if (!payment && recurringPayment) {
+      const toleranceTl = parseFloat(
+        this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
+      );
+      const expectedKurus = Math.round(Number(recurringPayment.amount) * 100);
+      const callbackKurus = parseInt(dto.total_amount, 10);
+      if (
+        !Number.isFinite(callbackKurus) ||
+        Math.abs(callbackKurus - expectedKurus) / 100 > toleranceTl
+      ) {
+        this.logger.error(
+          `PayTR recurring callback amount mismatch membershipPayment=${recurringPayment.id} expected=${expectedKurus} received=${dto.total_amount}`,
+        );
+        await this.prisma.$transaction([
+          this.prisma.membershipPayment.update({
+            where: { id: recurringPayment.id },
+            data: {
+              metadata: {
+                ...((recurringPayment.metadata as Record<
+                  string,
+                  unknown
+                > | null) ?? {}),
+                manualReviewReason: "recurring_callback_amount_mismatch",
+                callbackAmountKurus: Number.isFinite(callbackKurus)
+                  ? callbackKurus
+                  : null,
+                expectedAmountKurus: expectedKurus,
+                callbackReceivedAt: new Date().toISOString(),
+              },
+            },
+          }),
+          this.prisma.userMembership.update({
+            where: { id: recurringPayment.membershipId },
+            data: { autoRenew: false },
+          }),
+        ]);
+        return "OK";
+      }
+
+      if (dto.status === "success") {
+        if (!this.virtualOrder) {
+          throw new Error("Virtual order fulfillment service is unavailable");
+        }
+        await this.virtualOrder.completeRecurringMembershipPayment(
+          recurringPayment.id,
+          dto.merchant_oid,
+          { ...dto },
+        );
+      } else {
+        if (!this.virtualOrder) {
+          throw new Error("Virtual order fulfillment service is unavailable");
+        }
+        await this.virtualOrder.failRecurringMembershipPayment(
+          recurringPayment.id,
+          dto.failed_reason_msg || "PayTR recurring payment failed",
+          { ...dto },
+        );
+      }
+      return "OK";
+    }
 
     if (!payment) {
       this.logger.warn(

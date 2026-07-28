@@ -8,6 +8,7 @@ import {
   Max,
   MaxLength,
   IsNotEmpty,
+  IsIn,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { MembershipTierType, SubscriptionStatus } from "@prisma/client";
@@ -17,7 +18,13 @@ export class SubscribeDto {
   tierType: MembershipTierType;
 
   @IsString()
+  @IsIn(["monthly", "yearly"])
   billingPeriod: "monthly" | "yearly";
+}
+
+export class ToggleAutoRenewDto {
+  @IsBoolean()
+  autoRenew: boolean;
 }
 
 export class UpdateMembershipTierDto {
@@ -177,12 +184,18 @@ export class UserMembershipResponseDto {
   createdAt: Date;
   /** Ödeme beklerken (past_due) yükseltilmek istenen plan adı */
   pendingTierName?: string;
+  /** Ödeme niyetinin hedef plan tipi */
+  pendingTierType?: MembershipTierType;
   /** Ödeme bekleniyor – üyelik sayfasında "satın alınmış" gibi gösterme */
   pendingPayment?: boolean;
   /** Ertelemeli downgrade: dönem sonunda geçilecek tier (null/yoksa bekleyen yok) */
   scheduledTierType?: MembershipTierType;
   /** Ertelemeli period değişimi: dönem sonunda geçilecek periyot ('monthly'|'yearly') */
   scheduledBillingPeriod?: string;
+  paymentId?: string;
+  orderId?: string;
+  provider?: string;
+  useBypass?: boolean;
   // Computed usage stats
   usedFreeListings: number;
   usedTotalListings: number;

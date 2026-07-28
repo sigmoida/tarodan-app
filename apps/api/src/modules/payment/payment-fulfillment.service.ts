@@ -911,11 +911,16 @@ export class PaymentFulfillmentService {
   async processFailedPayment(payment: any, reason: string) {
     const oldStatus = payment.status;
 
-    // Only a still-pending payment may be marked failed. A replayed or late
+    // Only a still-open payment may be marked failed. Direct payment temporarily
+    // claims `processing`, so a fast authentic failure callback must accept it too.
+    // A replayed or late
     // `failed` callback must never flip an already-`completed` payment back to
     // `failed` — mirror the success path's conditional claim (#71).
     const flipped = await this.prisma.payment.updateMany({
-      where: { id: payment.id, status: PaymentStatus.pending },
+      where: {
+        id: payment.id,
+        status: { in: [PaymentStatus.pending, PaymentStatus.processing] },
+      },
       data: {
         status: PaymentStatus.failed,
         failureReason: reason,
@@ -926,6 +931,23 @@ export class PaymentFulfillmentService {
         `processFailedPayment skipped: payment ${payment.id} is not pending (status=${oldStatus})`,
       );
       return;
+    }
+
+    if (payment.orderId) {
+      await this.prisma.membershipPayment.updateMany({
+        where: {
+          orderId: payment.orderId,
+          status: { in: [PaymentStatus.pending, PaymentStatus.processing] },
+        },
+        data: {
+          status: PaymentStatus.failed,
+          idempotencyKey: null,
+          metadata: {
+            failedReason: reason,
+            failedAt: new Date().toISOString(),
+          },
+        },
+      });
     }
 
     // Trade cash payments don't have order/product to release
@@ -1134,6 +1156,22 @@ export class PaymentFulfillmentService {
               }),
             ]
           : []),
+        this.prisma.membershipPayment.updateMany({
+          where: {
+            orderId,
+            status: {
+              in: [PaymentStatus.pending, PaymentStatus.processing],
+            },
+          },
+          data: {
+            status: PaymentStatus.failed,
+            idempotencyKey: null,
+            metadata: {
+              failureReason: "membership_order_cancelled",
+              failedAt: new Date().toISOString(),
+            },
+          },
+        }),
       ]);
       this.logger.log(
         `Order ${orderId} cancelled and product ${order.productId} reservation released after payment failure`,

@@ -16,6 +16,7 @@ import {
   TradeStatus,
   CommissionTaxpayerType,
   type MembershipTier,
+  Prisma,
 } from "@prisma/client";
 import { SubscribeDto, UserMembershipResponseDto } from "./dto";
 import { PaymentService } from "../payment/payment.service";
@@ -29,6 +30,8 @@ import { isPremiumEntitled } from "./membership.util";
 import { resolveTaxpayerType } from "../order/order-commission.helper";
 import { i18nMessage } from "../i18n";
 import { PaymentProviderEventService } from "../payment/payment-provider-event.service";
+import { createHash } from "node:crypto";
+import { VirtualOrderFulfillmentService } from "../payment/virtual-order-fulfillment.service";
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -47,6 +50,7 @@ export class MembershipSubscriptionService {
     private readonly configService: ConfigService,
     private readonly common: MembershipCommonService,
     private readonly providerEvents: PaymentProviderEventService,
+    private readonly virtualOrder?: VirtualOrderFulfillmentService,
   ) {}
 
   // ==========================================================================
@@ -200,8 +204,10 @@ export class MembershipSubscriptionService {
       // direction === 'upgrade' → aşağıdaki anında ödeme akışına düşer.
     }
 
-    // For free tier, just update
-    if (dto.tierType === MembershipTierType.free || price.toNumber() === 0) {
+    // Free tier is the only tier that may be activated without a payment.
+    if (dto.tierType === MembershipTierType.free) {
+      const freePeriodEnd = new Date(now);
+      freePeriodEnd.setFullYear(freePeriodEnd.getFullYear() + 100);
       if (existingMembership) {
         await this.prisma.userMembership.update({
           where: { userId },
@@ -209,8 +215,9 @@ export class MembershipSubscriptionService {
             tierId: tier.id,
             status: SubscriptionStatus.active,
             currentPeriodStart: now,
-            currentPeriodEnd: periodEnd,
+            currentPeriodEnd: freePeriodEnd,
             cancelledAt: null,
+            autoRenew: false,
             scheduledTierType: null, // anında geçiş: varsa bekleyen değişiklik iptal
             scheduledBillingPeriod: null,
           },
@@ -222,12 +229,18 @@ export class MembershipSubscriptionService {
             tierId: tier.id,
             status: SubscriptionStatus.active,
             currentPeriodStart: now,
-            currentPeriodEnd: periodEnd,
+            currentPeriodEnd: freePeriodEnd,
+            autoRenew: false,
           },
         });
       }
 
       return this.common.getUserMembership(userId);
+    }
+    if (price.toNumber() <= 0) {
+      throw new BadRequestException(
+        i18nMessage("server.membership.tierNoPaymentNeeded"),
+      );
     }
 
     // === ÜCRETLİ TIER ÖDEME AKIŞI ===
@@ -249,83 +262,52 @@ export class MembershipSubscriptionService {
       return {
         ...(await this.common.getUserMembership(userId)),
         paymentId: paymentResult.paymentId,
-        orderId: (paymentResult as any).orderId,
+        orderId: paymentResult.orderId,
         provider: paymentResult.provider,
         useBypass: paymentResult.useBypass === true,
-      } as any;
+      };
     }
 
-    // Entitled OLMAYAN durumlar (yeni / free / past_due / expired): kaybedilecek bir
-    // hak yok → hedef tier'ı past_due olarak hazırla. Efektif üyelik ve komisyon,
-    // ödeme onaylanana kadar bunu free kabul eder (isPremiumEntitled false).
-    if (existingMembership) {
-      await this.prisma.userMembership.update({
-        where: { userId },
-        data: {
-          tierId: tier.id,
-          status: SubscriptionStatus.past_due, // Will be activated after payment
-          currentPeriodStart: now,
-          currentPeriodEnd: periodEnd,
-          cancelledAt: null,
-          autoRenew: true, // Ücretli üyelikte oto-yenileme hatırlatması default açık
-          scheduledTierType: null, // anında upgrade: varsa bekleyen değişiklik iptal
-          scheduledBillingPeriod: null,
-        },
+    // Payment intent is separate from the live entitlement. New users get a free
+    // baseline row; existing free/expired members keep their current row unchanged.
+    // Only the captured intent may switch tier/status/period in fulfillment.
+    if (!existingMembership) {
+      const freeTier = await this.prisma.membershipTier.findUnique({
+        where: { type: MembershipTierType.free },
       });
-    } else {
+      if (!freeTier) {
+        throw new NotFoundException(
+          i18nMessage("server.membership.freeTierNotFound"),
+        );
+      }
+      const freePeriodEnd = new Date(now);
+      freePeriodEnd.setFullYear(freePeriodEnd.getFullYear() + 100);
       await this.prisma.userMembership.create({
         data: {
           userId,
-          tierId: tier.id,
-          status: SubscriptionStatus.past_due, // Will be activated after payment
+          tierId: freeTier.id,
+          status: SubscriptionStatus.active,
           currentPeriodStart: now,
-          currentPeriodEnd: periodEnd,
-          autoRenew: true, // Ücretli üyelikte oto-yenileme hatırlatması default açık
+          currentPeriodEnd: freePeriodEnd,
+          autoRenew: false,
         },
       });
     }
 
-    try {
-      const paymentResult = await this.initiateMembershipPayment(
-        userId,
-        PaymentProvider.paytr,
-        undefined,
-      );
+    const paymentResult = await this.initiateMembershipPayment(
+      userId,
+      PaymentProvider.paytr,
+      undefined,
+      { tier, billingPeriod: dto.billingPeriod },
+    );
 
-      // Üyelik bilgisi + ödeme niyeti (intent): istemci /payment/[id] kart formuna gider.
-      return {
-        ...(await this.common.getUserMembership(userId)),
-        paymentId: paymentResult.paymentId,
-        orderId: (paymentResult as any).orderId,
-        provider: paymentResult.provider,
-        useBypass: paymentResult.useBypass === true,
-      } as any;
-    } catch (error) {
-      // Ödeme başlatma hatasında kaydı SİLME; önceki duruma geri al (yoksa yeni
-      // oluşturulan past_due satırı kaldır). Ödenmiş üyeliği yok etmek yerine korur.
-      if (existingMembership) {
-        await this.prisma.userMembership
-          .update({
-            where: { userId },
-            data: {
-              tierId: existingMembership.tierId,
-              status: existingMembership.status,
-              currentPeriodStart: existingMembership.currentPeriodStart,
-              currentPeriodEnd: existingMembership.currentPeriodEnd,
-              cancelledAt: existingMembership.cancelledAt,
-              autoRenew: existingMembership.autoRenew,
-              scheduledTierType: existingMembership.scheduledTierType,
-              scheduledBillingPeriod: existingMembership.scheduledBillingPeriod,
-            },
-          })
-          .catch(() => {});
-      } else {
-        await this.prisma.userMembership
-          .delete({ where: { userId } })
-          .catch(() => {});
-      }
-      throw error;
-    }
+    return {
+      ...(await this.common.getUserMembership(userId)),
+      paymentId: paymentResult.paymentId,
+      orderId: paymentResult.orderId,
+      provider: paymentResult.provider,
+      useBypass: paymentResult.useBypass === true,
+    };
   }
 
   // ==========================================================================
@@ -342,39 +324,127 @@ export class MembershipSubscriptionService {
   ): Promise<MembershipPaymentInitResponseDto> {
     const membership = await this.prisma.userMembership.findUnique({
       where: { userId },
-      include: { tier: true },
+      include: {
+        tier: true,
+        user: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+          },
+        },
+      },
     });
 
     if (!membership) {
       throw new NotFoundException(i18nMessage("server.membership.notFound"));
     }
 
+    const now = new Date();
+    const requestedBillingPeriod = override?.billingPeriod as
+      "monthly" | "yearly" | undefined;
+    if (
+      requestedBillingPeriod &&
+      requestedBillingPeriod !== "monthly" &&
+      requestedBillingPeriod !== "yearly"
+    ) {
+      throw new BadRequestException("Geçersiz üyelik faturalama dönemi");
+    }
+
+    // An intent owns an immutable tier + billing-period + amount snapshot. Retrying
+    // returns that same intent; current admin prices never rewrite an in-flight charge.
+    let intent = await this.prisma.membershipPayment.findFirst({
+      where: {
+        membershipId: membership.id,
+        status: PaymentStatus.pending,
+        order: {
+          status: OrderStatus.pending_payment,
+          paymentExpiresAt: { gt: now },
+        },
+      },
+      include: { order: true, targetTier: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (intent?.order && intent.targetTier) {
+      if (
+        override &&
+        (intent.targetTierId !== override.tier.id ||
+          intent.billingPeriod !== requestedBillingPeriod)
+      ) {
+        throw new BadRequestException(
+          "Başka bir paket veya dönem için bekleyen üyelik ödemesi bulunuyor",
+        );
+      }
+      if (
+        intent.order.productId !== `membership-${intent.targetTier.id}` ||
+        Number(intent.order.totalAmount) !== Number(intent.amount)
+      ) {
+        throw new BadRequestException(
+          "Üyelik ödeme niyeti sipariş snapshot'ı ile uyuşmuyor",
+        );
+      }
+      const paymentResult = await this.paymentService.initiatePayment(
+        userId,
+        { orderId: intent.order.id, provider },
+        req,
+      );
+      return {
+        paymentId: paymentResult.paymentId,
+        membershipPaymentId: intent.id,
+        orderId: intent.order.id,
+        provider: paymentResult.provider,
+        expiresIn: paymentResult.expiresIn || 300,
+        useBypass:
+          (paymentResult as { useBypass?: boolean }).useBypass === true,
+      };
+    }
+
+    if (!override && membership.status !== SubscriptionStatus.past_due) {
+      throw new BadRequestException(
+        "Bekleyen bir üyelik ödeme niyeti bulunamadı",
+      );
+    }
+
+    // Legacy past_due rows created before durable intents are backfilled on retry.
     const targetTier = override?.tier ?? membership.tier;
+    const billingPeriod =
+      requestedBillingPeriod ??
+      (Math.round(
+        (membership.currentPeriodEnd.getTime() -
+          membership.currentPeriodStart.getTime()) /
+          86_400_000,
+      ) > 180
+        ? "yearly"
+        : "monthly");
 
     if (targetTier.type === MembershipTierType.free) {
       throw new BadRequestException(
         i18nMessage("server.membership.freeTierNoPaymentNeeded"),
       );
     }
-
-    // Determine billing period from the override, else from the membership period.
-    let isYearly: boolean;
-    if (override) {
-      isYearly = override.billingPeriod === "yearly";
-    } else {
-      const periodDays = Math.round(
-        (membership.currentPeriodEnd.getTime() -
-          membership.currentPeriodStart.getTime()) /
-          (1000 * 60 * 60 * 24),
+    if (!targetTier.isActive) {
+      throw new BadRequestException(
+        i18nMessage("server.membership.tierNotActive"),
       );
-      isYearly = periodDays > 180; // More than 6 months = yearly
+    }
+    if (
+      targetTier.type === MembershipTierType.business &&
+      (membership.user.businessStatus !== "approved" ||
+        !membership.user.companyName?.trim() ||
+        !membership.user.taxId?.trim())
+    ) {
+      throw new ForbiddenException(
+        i18nMessage("server.membership.businessTierRequiresCompany"),
+      );
     }
 
-    const price = isYearly
-      ? targetTier.yearlyPrice.toNumber()
-      : targetTier.monthlyPrice.toNumber();
+    const price =
+      billingPeriod === "yearly"
+        ? targetTier.yearlyPrice.toNumber()
+        : targetTier.monthlyPrice.toNumber();
 
-    if (price === 0) {
+    if (!(price > 0)) {
       throw new BadRequestException(
         i18nMessage("server.membership.tierNoPaymentNeeded"),
       );
@@ -430,52 +500,94 @@ export class MembershipSubscriptionService {
       });
     }
 
-    // Yetim sipariş birikmesini önle: kullanıcı "Ödemeyi tamamla"ya her bastığında
-    // YENİ sipariş oluşturmak yerine, bu tier için hâlâ ödeme bekleyen siparişi
-    // yeniden kullan. (Aksi halde her denemede bir pending_payment sipariş kalıyor
-    // ve sarı "ödemeyi tamamla" uyarısı asla net şekilde temizlenmiyordu.)
-    let order = await this.prisma.order.findFirst({
-      where: {
-        buyerId: userId,
-        productId: product.id,
-        status: OrderStatus.pending_payment,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (order) {
-      order = await this.prisma.order.update({
-        where: { id: order.id },
-        data: {
-          totalAmount: price,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        },
-      });
+    const periodStart = now;
+    const periodEnd = new Date(periodStart);
+    if (billingPeriod === "yearly") {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
     } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+    const idempotencyKey = [
+      "membership",
+      membership.id,
+      membership.updatedAt.getTime(),
+    ].join(":");
+
+    try {
       const orderNumber = `MEM-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-      order = await this.prisma.order.create({
-        data: {
-          orderNumber,
-          buyerId: userId,
-          sellerId: platformSeller.id,
-          productId: product.id,
-          totalAmount: price,
-          commissionAmount: 0, // No commission for membership
-          shippingCost: 0,
-          status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          shippingAddress: {
-            type: "membership",
-          } as any,
-        },
+      intent = await this.prisma.$transaction(async (tx) => {
+        const order = await tx.order.create({
+          data: {
+            orderNumber,
+            buyerId: userId,
+            sellerId: platformSeller.id,
+            productId: product.id,
+            totalAmount: price,
+            commissionAmount: 0,
+            shippingCost: 0,
+            status: OrderStatus.pending_payment,
+            paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            shippingAddress: {
+              type: "membership",
+              targetTierId: targetTier.id,
+              billingPeriod,
+              priceSnapshot: price,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return tx.membershipPayment.create({
+          data: {
+            membershipId: membership.id,
+            orderId: order.id,
+            targetTierId: targetTier.id,
+            billingPeriod,
+            idempotencyKey,
+            amount: price,
+            provider,
+            status: PaymentStatus.pending,
+            periodStart,
+            periodEnd,
+            metadata: {
+              kind: "one_time",
+              priceSnapshot: price,
+              sourceMembershipUpdatedAt: membership.updatedAt.toISOString(),
+              createdFrom: override ? "subscribe" : "legacy_past_due",
+            },
+          },
+          include: { order: true, targetTier: true },
+        });
       });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        intent = await this.prisma.membershipPayment.findUnique({
+          where: { idempotencyKey },
+          include: { order: true, targetTier: true },
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    if (!intent?.order || !intent.targetTier) {
+      throw new BadRequestException("Üyelik ödeme niyeti oluşturulamadı");
+    }
+    if (
+      intent.targetTierId !== targetTier.id ||
+      intent.billingPeriod !== billingPeriod
+    ) {
+      throw new BadRequestException(
+        "Başka bir paket veya dönem için bekleyen üyelik ödemesi bulunuyor",
+      );
     }
 
     // Initiate payment with the created order
     const paymentResult = await this.paymentService.initiatePayment(
       userId,
       {
-        orderId: order.id,
+        orderId: intent.order.id,
         provider,
       },
       req,
@@ -484,8 +596,8 @@ export class MembershipSubscriptionService {
     // Ödeme niyeti (intent): kart bilgisi /payments/process-direct ile alınır (iframe yok).
     return {
       paymentId: paymentResult.paymentId,
-      membershipPaymentId: membership.id,
-      orderId: order.id,
+      membershipPaymentId: intent.id,
+      orderId: intent.order.id,
       provider: paymentResult.provider,
       expiresIn: paymentResult.expiresIn || 300,
       useBypass: (paymentResult as { useBypass?: boolean }).useBypass === true,
@@ -522,6 +634,7 @@ export class MembershipSubscriptionService {
       data: {
         status: SubscriptionStatus.cancelled,
         cancelledAt: new Date(),
+        autoRenew: false,
         // İptal = dönem sonunda free'ye dön. Bekleyen bir değişiklik planı varsa
         // (downgrade/period) iptal onu geçersiz kılar; dönem sonunda free olur.
         scheduledTierType: null,
@@ -570,19 +683,52 @@ export class MembershipSubscriptionService {
   ): Promise<UserMembershipResponseDto> {
     const membership = await this.prisma.userMembership.findUnique({
       where: { userId },
-      include: { tier: true },
+      include: {
+        tier: true,
+        user: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+            savedCards: {
+              where: {
+                provider: "paytr",
+                status: SavedCardStatus.active,
+                requireCvv: false,
+              },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        },
+      },
     });
 
     if (!membership) {
       throw new NotFoundException(i18nMessage("server.membership.notFound"));
     }
 
-    // Otomatik yenileme yalnızca HATIRLATMA-tabanlıdır: dönem bitişinde bildirim
-    // gönderilir ve kullanıcı normal PayTR ödeme akışından tek tıkla yeniler.
-    // Kayıtlı karttan otomatik çekim YOK (saved card özelliği kaldırıldı).
+    if (autoRenew) {
+      if (!isPremiumEntitled(membership, membership.user)) {
+        throw new BadRequestException(
+          "Otomatik yenileme yalnız geçerli ücretli üyelikte açılabilir",
+        );
+      }
+      if (membership.user.savedCards.length === 0) {
+        throw new BadRequestException(
+          "Otomatik yenileme için CVV gerektirmeyen kayıtlı kart bulunamadı",
+        );
+      }
+    }
+
     await this.prisma.userMembership.update({
       where: { userId },
-      data: { autoRenew },
+      data: {
+        autoRenew,
+        ...(autoRenew
+          ? { status: SubscriptionStatus.active, cancelledAt: null }
+          : {}),
+      },
     });
 
     return this.common.getUserMembership(userId);
@@ -608,15 +754,20 @@ export class MembershipSubscriptionService {
     if (this.configService.get("PAYTR_RECURRING_ENABLED") !== "true") {
       return { renewed: 0, failed: 0, attempted: 0 };
     }
+    if (!this.virtualOrder) {
+      throw new Error("Virtual order fulfillment service is unavailable");
+    }
     const now = new Date();
+    await this.reconcilePendingRecurringPayments(now);
     const due = await this.prisma.userMembership.findMany({
       where: {
         autoRenew: true,
-        status: {
-          in: [SubscriptionStatus.active, SubscriptionStatus.past_due],
-        },
+        status: SubscriptionStatus.active,
         currentPeriodEnd: { lte: now },
-        tier: { type: { not: MembershipTierType.free } },
+        tier: {
+          type: { not: MembershipTierType.free },
+          isActive: true,
+        },
         user: {
           savedCards: {
             some: {
@@ -648,6 +799,7 @@ export class MembershipSubscriptionService {
 
     let renewed = 0;
     let failed = 0;
+    let attempted = 0;
     for (const m of due) {
       const card = m.user.savedCards[0];
       if (!card) continue;
@@ -668,6 +820,23 @@ export class MembershipSubscriptionService {
           });
           if (sched) effectiveTier = sched;
         }
+        if (!effectiveTier.isActive) {
+          this.logger.warn(
+            `Oto-yenileme atlandı: hedef tier pasif membership=${m.id}`,
+          );
+          continue;
+        }
+        if (
+          effectiveTier.type === MembershipTierType.business &&
+          (m.user.businessStatus !== "approved" ||
+            !m.user.companyName?.trim() ||
+            !m.user.taxId?.trim())
+        ) {
+          this.logger.warn(
+            `Oto-yenileme atlandı: Business KYC geçersiz membership=${m.id}`,
+          );
+          continue;
+        }
 
         const curPeriodDays = Math.round(
           (m.currentPeriodEnd.getTime() - m.currentPeriodStart.getTime()) /
@@ -682,8 +851,6 @@ export class MembershipSubscriptionService {
         const hasScheduledChange = !!(
           m.scheduledTierType || m.scheduledBillingPeriod
         );
-        const tierChanging = effectiveTier.id !== m.tierId;
-
         const price = Number(
           isYearly ? effectiveTier.yearlyPrice : effectiveTier.monthlyPrice,
         );
@@ -694,7 +861,36 @@ export class MembershipSubscriptionService {
         if (isYearly) newEnd.setFullYear(newEnd.getFullYear() + 1);
         else newEnd.setMonth(newEnd.getMonth() + 1);
 
-        const merchantOid = `REN${m.id.replace(/-/g, "").slice(0, 18)}T${Date.now().toString().slice(-6)}`;
+        const billingPeriod = isYearly ? "yearly" : "monthly";
+        const failedAttempts = await this.prisma.membershipPayment.count({
+          where: {
+            membershipId: m.id,
+            orderId: null,
+            targetTierId: effectiveTier.id,
+            billingPeriod,
+            status: PaymentStatus.failed,
+            createdAt: { gte: m.currentPeriodEnd },
+          },
+        });
+        if (failedAttempts >= 3) {
+          this.logger.error(
+            `Oto-yenileme deneme limiti doldu: membership=${m.id}`,
+          );
+          continue;
+        }
+        const attemptNumber = failedAttempts + 1;
+        const renewalKey = [
+          "membership-renewal",
+          m.id,
+          m.currentPeriodEnd.toISOString(),
+          effectiveTier.id,
+          billingPeriod,
+          attemptNumber,
+        ].join(":");
+        const merchantOid = `REN${createHash("sha256")
+          .update(renewalKey)
+          .digest("hex")
+          .slice(0, 24)}`;
         const nameParts = (m.user.displayName || "Üye").split(" ");
         const buyer = {
           id: m.userId,
@@ -717,6 +913,50 @@ export class MembershipSubscriptionService {
           },
         ];
 
+        const renewMeta = {
+          kind: "recurring",
+          recurring: true,
+          savedCardId: card.id,
+          ctokenLast4: card.last4,
+          targetTierType: effectiveTier.type,
+          sourcePeriodEnd: m.currentPeriodEnd.toISOString(),
+          hasScheduledChange,
+          renewalKey,
+          attemptNumber,
+        } as const;
+        let paymentAttempt;
+        try {
+          paymentAttempt = await this.prisma.membershipPayment.create({
+            data: {
+              membershipId: m.id,
+              targetTierId: effectiveTier.id,
+              billingPeriod,
+              idempotencyKey: renewalKey,
+              amount: price,
+              provider: "paytr",
+              providerPaymentId: merchantOid,
+              merchantOid,
+              paymentType: "card",
+              metadata: renewMeta as object,
+              status: PaymentStatus.processing,
+              periodStart: newStart,
+              periodEnd: newEnd,
+            },
+          });
+        } catch (error) {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002"
+          ) {
+            this.logger.warn(
+              `Oto-yenileme tekrarı atlandı: membership=${m.id} key=${renewalKey}`,
+            );
+            continue;
+          }
+          throw error;
+        }
+        attempted++;
+
         const result = await this.paymentProviders.resolve().chargeRecurring({
           utoken: card.utoken,
           ctoken: card.ctoken,
@@ -726,51 +966,19 @@ export class MembershipSubscriptionService {
           basketItems: basket,
         });
 
-        // Oto-yenileme ödeme yöntemi her zaman kayıtlı kart (recurring). Gözlemlenebilirlik:
-        // merchant_oid + payment_type + ham PayTR yanıtı MembershipPayment'a yazılır.
-        const renewMeta = {
-          recurring: true,
-          savedCardId: card.id,
-          ctokenLast4: card.last4,
-          providerResponse: result.raw ?? null,
-        } as const;
         if (result.status === "success") {
-          const mpId = await this.prisma.$transaction(async (tx) => {
-            await tx.userMembership.update({
-              where: { id: m.id },
-              data: {
-                status: SubscriptionStatus.active,
-                currentPeriodStart: newStart,
-                currentPeriodEnd: newEnd,
-                // Bekleyen değişiklik (tier ve/veya period) uygulandı: tier'ı geçir
-                // (değiştiyse) ve planı temizle. Değişiklik yoksa olduğu gibi kalır.
-                ...(tierChanging ? { tierId: effectiveTier.id } : {}),
-                ...(hasScheduledChange
-                  ? { scheduledTierType: null, scheduledBillingPeriod: null }
-                  : {}),
-              },
-            });
-            const mp = await tx.membershipPayment.create({
-              data: {
-                membershipId: m.id,
-                amount: price,
-                provider: "paytr",
-                providerPaymentId: merchantOid,
-                merchantOid,
-                paymentType: "card",
-                metadata: renewMeta as object,
-                status: PaymentStatus.completed,
-                periodStart: newStart,
-                periodEnd: newEnd,
-              },
-            });
-            return mp.id;
-          });
+          const completed =
+            await this.virtualOrder.completeRecurringMembershipPayment(
+              paymentAttempt.id,
+              merchantOid,
+              result.raw ?? null,
+            );
+          if (!completed) continue;
           renewed++;
           await this.providerEvents.record({
             eventType: "recurring_charge",
             merchantOid,
-            membershipPaymentId: mpId,
+            membershipPaymentId: paymentAttempt.id,
             status: "success",
             paymentType: "card",
             amount: price,
@@ -781,25 +989,21 @@ export class MembershipSubscriptionService {
             `Oto-yenileme OK: membership=${m.id} oid=${merchantOid} tutar=${price}`,
           );
         } else if (result.status === "wait_callback") {
-          // Sonuç Bildirim URL'ine düşecek; takip için pending kayıt (tam callback tamamlaması Faz 4b).
-          const mp = await this.prisma.membershipPayment.create({
+          await this.prisma.membershipPayment.update({
+            where: { id: paymentAttempt.id },
             data: {
-              membershipId: m.id,
-              amount: price,
-              provider: "paytr",
-              providerPaymentId: merchantOid,
-              merchantOid,
-              paymentType: "card",
-              metadata: renewMeta as object,
               status: PaymentStatus.pending,
-              periodStart: newStart,
-              periodEnd: newEnd,
+              metadata: {
+                ...renewMeta,
+                providerResponse: result.raw ?? null,
+                awaitingCallbackAt: new Date().toISOString(),
+              } as object,
             },
           });
           await this.providerEvents.record({
             eventType: "recurring_charge",
             merchantOid,
-            membershipPaymentId: mp.id,
+            membershipPaymentId: paymentAttempt.id,
             status: "wait_callback",
             paymentType: "card",
             amount: price,
@@ -811,27 +1015,22 @@ export class MembershipSubscriptionService {
           );
         } else {
           failed++;
-          const mp = await this.prisma.membershipPayment.create({
+          await this.prisma.membershipPayment.update({
+            where: { id: paymentAttempt.id },
             data: {
-              membershipId: m.id,
-              amount: price,
-              provider: "paytr",
-              providerPaymentId: merchantOid,
-              merchantOid,
-              paymentType: "card",
               metadata: {
                 ...renewMeta,
+                providerResponse: result.raw ?? null,
                 failureReason: result.reason,
+                failedAt: new Date().toISOString(),
               } as object,
               status: PaymentStatus.failed,
-              periodStart: newStart,
-              periodEnd: newEnd,
             },
           });
           await this.providerEvents.record({
             eventType: "recurring_charge",
             merchantOid,
-            membershipPaymentId: mp.id,
+            membershipPaymentId: paymentAttempt.id,
             status: "failed",
             paymentType: "card",
             amount: price,
@@ -860,7 +1059,81 @@ export class MembershipSubscriptionService {
         );
       }
     }
-    return { renewed, failed, attempted: due.length };
+    return { renewed, failed, attempted };
+  }
+
+  private async reconcilePendingRecurringPayments(now: Date): Promise<void> {
+    if (!this.virtualOrder) return;
+    const staleBefore = new Date(now.getTime() - 5 * 60 * 1000);
+    const pending = await this.prisma.membershipPayment.findMany({
+      where: {
+        orderId: null,
+        merchantOid: { not: null },
+        status: { in: [PaymentStatus.pending, PaymentStatus.processing] },
+        createdAt: { lt: staleBefore },
+        metadata: { path: ["kind"], equals: "recurring" },
+      },
+      take: 50,
+      orderBy: { createdAt: "asc" },
+    });
+    const tolerance = parseFloat(
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
+    );
+    for (const attempt of pending) {
+      const merchantOid = attempt.merchantOid?.trim();
+      if (!merchantOid) continue;
+      try {
+        const inquiry = await this.paymentProviders
+          .resolve()
+          .queryPaymentStatus(merchantOid);
+        if (
+          inquiry.ok &&
+          Math.abs(inquiry.paymentTotalTl - Number(attempt.amount)) <= tolerance
+        ) {
+          await this.virtualOrder.completeRecurringMembershipPayment(
+            attempt.id,
+            `paytr:${merchantOid}:${inquiry.paymentDate || "reconcile"}`,
+            inquiry,
+          );
+        } else if (inquiry.ok) {
+          await this.prisma.$transaction([
+            this.prisma.membershipPayment.update({
+              where: { id: attempt.id },
+              data: {
+                metadata: {
+                  ...((attempt.metadata as Record<string, unknown> | null) ??
+                    {}),
+                  manualReviewReason: "recurring_amount_mismatch",
+                  providerAmount: inquiry.paymentTotalTl,
+                  reconciledAt: now.toISOString(),
+                },
+              },
+            }),
+            this.prisma.userMembership.update({
+              where: { id: attempt.membershipId },
+              data: { autoRenew: false },
+            }),
+          ]);
+        } else if (
+          !inquiry.ok &&
+          attempt.createdAt.getTime() < now.getTime() - 24 * 60 * 60 * 1000
+        ) {
+          await this.virtualOrder.failRecurringMembershipPayment(
+            attempt.id,
+            "PayTR recurring sonucu 24 saat içinde doğrulanamadı",
+            inquiry,
+          );
+          await this.prisma.userMembership.update({
+            where: { id: attempt.membershipId },
+            data: { autoRenew: false },
+          });
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Recurring reconciliation failed membershipPayment=${attempt.id}: ${(error as Error)?.message}`,
+        );
+      }
+    }
   }
 
   // ==========================================================================
@@ -961,6 +1234,9 @@ export class MembershipSubscriptionService {
   // ==========================================================================
   async checkExpiredMemberships(): Promise<number> {
     const now = new Date();
+    const recurringCallbackGrace = new Date(
+      now.getTime() - 24 * 60 * 60 * 1000,
+    );
 
     // Süresi dolan paralı üyelikleri bul. İptal edilenler (cancelled) de dahil:
     // iptal "dönem sonuna kadar aktif kal, sonra free'ye düş" demek — cron yalnız
@@ -972,6 +1248,15 @@ export class MembershipSubscriptionService {
         },
         currentPeriodEnd: { lt: now },
         tier: { type: { not: MembershipTierType.free } },
+        payments: {
+          none: {
+            orderId: null,
+            status: {
+              in: [PaymentStatus.pending, PaymentStatus.processing],
+            },
+            createdAt: { gt: recurringCallbackGrace },
+          },
+        },
       },
     });
 

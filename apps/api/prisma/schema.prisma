@@ -328,6 +328,7 @@ model MembershipTier {
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
   userMemberships      UserMembership[]
+  membershipPayments   MembershipPayment[]
 
   @@map("membership_tiers")
 }
@@ -364,6 +365,10 @@ model UserMembership {
 model MembershipPayment {
   id                String         @id @default(uuid())
   membershipId      String         @map("membership_id")
+  orderId           String?        @unique @map("order_id")
+  targetTierId      String?        @map("target_tier_id")
+  billingPeriod     String?        @map("billing_period")
+  idempotencyKey    String?        @unique @map("idempotency_key")
   amount            Decimal        @db.Decimal(10, 2)
   provider          String
   providerPaymentId String?        @map("provider_payment_id")
@@ -377,8 +382,12 @@ model MembershipPayment {
   periodEnd         DateTime       @map("period_end")
   createdAt         DateTime       @default(now()) @map("created_at")
   membership        UserMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  order             Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  targetTier        MembershipTier? @relation(fields: [targetTierId], references: [id], onDelete: SetNull)
 
   @@index([merchantOid])
+  @@index([membershipId, status])
+  @@index([targetTierId])
   @@map("membership_payments")
 }
 
@@ -1290,6 +1299,7 @@ model Order {
   refundAttempts         RefundAttempt[]
   commissionLedger       CommissionLedger?
   sellerUploadedInvoice  SellerUploadedInvoice?
+  membershipPayment      MembershipPayment?
   checkoutGroup          CheckoutGroup?         @relation(fields: [checkoutGroupId], references: [id])
   package                OrderPackage?          @relation(fields: [packageId], references: [id])
 

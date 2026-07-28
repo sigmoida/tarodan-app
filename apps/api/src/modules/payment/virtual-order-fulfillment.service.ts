@@ -12,6 +12,9 @@ import {
   RELEVANCE_PREMIUM_BONUS,
 } from "../product/helpers/relevance-score";
 import { ElogoInvoicingService } from "../elogo";
+import { isPremiumEntitled } from "../membership/membership.util";
+import { OutboxService } from "../outbox/outbox.service";
+import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../outbox/outbox.types";
 
 /**
  * VirtualOrderFulfillmentService (Faz 8.2) — SANAL sipariş (üyelik / boost) fulfillment'ı.
@@ -29,6 +32,7 @@ export class VirtualOrderFulfillmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly outbox?: OutboxService,
   ) {}
 
   /**
@@ -43,10 +47,31 @@ export class VirtualOrderFulfillmentService {
   ): Promise<void> {
     const membership = await tx.userMembership.findUnique({
       where: { userId: payment.order.buyerId },
-      include: { tier: true },
+      include: {
+        tier: true,
+        user: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+          },
+        },
+      },
     });
+    if (!membership) {
+      throw new Error(
+        `Membership record not found for paid order ${payment.orderId}`,
+      );
+    }
 
     if (membership) {
+      const intent = payment.orderId
+        ? await tx.membershipPayment.findUnique({
+            where: { orderId: payment.orderId },
+            include: { targetTier: true },
+          })
+        : null;
+
       // The paid order encodes the tier it was bought for (`membership-<tierId>`).
       // Activation MUST honor the PAID tier — never whatever the live row happens to
       // point to now. Otherwise paying an older, cheaper pending order could activate
@@ -57,22 +82,59 @@ export class VirtualOrderFulfillmentService {
           ? payment.order.productId.slice("membership-".length)
           : null;
 
-      const paidTier =
-        paidTierId && paidTierId !== membership.tierId
-          ? await tx.membershipTier.findUnique({ where: { id: paidTierId } })
-          : null;
+      const paidTier = intent?.targetTier
+        ? intent.targetTier
+        : paidTierId === membership.tierId
+          ? membership.tier
+          : paidTierId
+            ? await tx.membershipTier.findUnique({ where: { id: paidTierId } })
+            : null;
 
-      let effectiveTierType = membership.tier.type;
+      if (intent) {
+        if (
+          !paidTier ||
+          intent.status !== PaymentStatus.pending ||
+          intent.orderId !== payment.orderId ||
+          paidTierId !== intent.targetTierId ||
+          Number(intent.amount) !== Number(payment.amount) ||
+          Number(intent.amount) !== Number(payment.order.totalAmount) ||
+          (intent.billingPeriod !== "monthly" &&
+            intent.billingPeriod !== "yearly")
+        ) {
+          throw new Error(
+            `Membership payment intent mismatch for order ${payment.orderId}`,
+          );
+        }
+      }
+
+      let effectiveTier = membership.tier;
+      let entitlementPeriodEnd = membership.currentPeriodEnd;
       let tierPatch: Prisma.UserMembershipUpdateInput = {};
-      if (paidTier) {
+      if (paidTier && intent) {
         const start = new Date();
         const end = new Date(start);
-        // Term derived from the amount actually paid (yearly price ⇒ yearly term).
+        if (intent.billingPeriod === "yearly")
+          end.setFullYear(end.getFullYear() + 1);
+        else end.setMonth(end.getMonth() + 1);
+        effectiveTier = paidTier;
+        entitlementPeriodEnd = end;
+        tierPatch = {
+          tier: { connect: { id: paidTier.id } },
+          currentPeriodStart: start,
+          currentPeriodEnd: end,
+          scheduledTierType: null,
+          scheduledBillingPeriod: null,
+        };
+      } else if (paidTier) {
+        // Backward compatibility for pre-intent membership orders.
+        const start = new Date();
+        const end = new Date(start);
         const isYearly =
           Number(payment.order.totalAmount) >= Number(paidTier.yearlyPrice);
         if (isYearly) end.setFullYear(end.getFullYear() + 1);
         else end.setMonth(end.getMonth() + 1);
-        effectiveTierType = paidTier.type;
+        effectiveTier = paidTier;
+        entitlementPeriodEnd = end;
         tierPatch = {
           tier: { connect: { id: paidTier.id } },
           currentPeriodStart: start,
@@ -87,13 +149,49 @@ export class VirtualOrderFulfillmentService {
         data: {
           status: SubscriptionStatus.active,
           cancelledAt: null,
+          autoRenew: true,
           ...tierPatch,
         },
       });
 
+      if (intent) {
+        const completedIntent = await tx.membershipPayment.updateMany({
+          where: { id: intent.id, status: PaymentStatus.pending },
+          data: {
+            status: PaymentStatus.completed,
+            providerPaymentId:
+              transactionId || payment.providerPaymentId || payment.id,
+            periodStart:
+              (tierPatch.currentPeriodStart as Date | undefined) ??
+              intent.periodStart,
+            periodEnd:
+              (tierPatch.currentPeriodEnd as Date | undefined) ??
+              intent.periodEnd,
+            metadata: {
+              ...((intent.metadata as Record<string, unknown> | null) ?? {}),
+              completedBy: "payment_callback",
+              completedAt: new Date().toISOString(),
+            },
+          },
+        });
+        if (completedIntent.count !== 1) {
+          throw new Error(
+            `Membership payment intent ${intent.id} was already claimed`,
+          );
+        }
+      }
+
       // Premium (free olmayan) üyelik aktifleşti: satıcının boost'suz aktif ilanlarını
       // premium kademesine (rankTier=1) yükselt. Boost'lu (2) ürünlere dokunma.
-      if (effectiveTierType !== "free") {
+      const grantsPremium = isPremiumEntitled(
+        {
+          status: SubscriptionStatus.active,
+          currentPeriodEnd: entitlementPeriodEnd,
+          tier: effectiveTier,
+        },
+        membership.user,
+      );
+      if (grantsPremium) {
         await tx.product.updateMany({
           where: {
             sellerId: payment.order.buyerId,
@@ -106,14 +204,6 @@ export class VirtualOrderFulfillmentService {
           },
         });
       }
-
-      await tx.membershipPayment.updateMany({
-        where: { membershipId: membership.id, status: "pending" },
-        data: {
-          status: "completed",
-          providerPaymentId: transactionId || payment.providerPaymentId,
-        },
-      });
 
       this.logger.log(
         `Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`,
@@ -147,6 +237,17 @@ export class VirtualOrderFulfillmentService {
         data: {
           status: PaymentStatus.failed,
           failureReason: "Üyelik başka ödeme ile tamamlandı",
+        },
+      });
+      await tx.membershipPayment.updateMany({
+        where: { orderId: { in: ids }, status: PaymentStatus.pending },
+        data: {
+          status: PaymentStatus.failed,
+          idempotencyKey: null,
+          metadata: {
+            cancelledReason: "superseded_membership_payment",
+            cancelledAt: new Date().toISOString(),
+          },
         },
       });
       this.logger.log(
@@ -215,6 +316,156 @@ export class VirtualOrderFulfillmentService {
       `Boost activated for product ${boost.productId} until ${endsAt.toISOString()} after payment ${payment.id}`,
     );
     return boost.productId;
+  }
+
+  async completeRecurringMembershipPayment(
+    membershipPaymentId: string,
+    transactionId: string,
+    providerResponse?: unknown,
+  ): Promise<boolean> {
+    if (!this.outbox) {
+      throw new Error("Outbox service is unavailable");
+    }
+    const result = await this.prisma.$transaction(async (tx) => {
+      const attempt = await tx.membershipPayment.findUnique({
+        where: { id: membershipPaymentId },
+        include: {
+          targetTier: true,
+          membership: {
+            include: {
+              tier: true,
+              user: {
+                select: {
+                  businessStatus: true,
+                  companyName: true,
+                  taxId: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      const metadata =
+        (attempt?.metadata as Record<string, unknown> | null) ?? {};
+      if (
+        !attempt ||
+        attempt.orderId ||
+        metadata.kind !== "recurring" ||
+        !attempt.targetTier ||
+        (attempt.billingPeriod !== "monthly" &&
+          attempt.billingPeriod !== "yearly")
+      ) {
+        throw new Error(
+          `Invalid recurring membership intent ${membershipPaymentId}`,
+        );
+      }
+
+      const sourcePeriodEnd =
+        typeof metadata.sourcePeriodEnd === "string"
+          ? metadata.sourcePeriodEnd
+          : null;
+      const entitlementCanApply =
+        sourcePeriodEnd === attempt.membership.currentPeriodEnd.toISOString();
+
+      const claimed = await tx.membershipPayment.updateMany({
+        where: {
+          id: attempt.id,
+          status: { in: [PaymentStatus.pending, PaymentStatus.processing] },
+        },
+        data: {
+          status: PaymentStatus.completed,
+          providerPaymentId: transactionId,
+          metadata: {
+            ...metadata,
+            providerResponse: (providerResponse ??
+              null) as Prisma.InputJsonValue,
+            completedAt: new Date().toISOString(),
+            entitlementApplied: entitlementCanApply,
+            ...(entitlementCanApply
+              ? {}
+              : { manualReviewReason: "membership_period_changed" }),
+          },
+        },
+      });
+      if (claimed.count !== 1) return false;
+
+      if (entitlementCanApply) {
+        await tx.userMembership.update({
+          where: { id: attempt.membershipId },
+          data: {
+            tierId: attempt.targetTier.id,
+            status: SubscriptionStatus.active,
+            currentPeriodStart: attempt.periodStart,
+            currentPeriodEnd: attempt.periodEnd,
+            cancelledAt: null,
+            scheduledTierType: null,
+            scheduledBillingPeriod: null,
+          },
+        });
+
+        const grantsPremium = isPremiumEntitled(
+          {
+            status: SubscriptionStatus.active,
+            currentPeriodEnd: attempt.periodEnd,
+            tier: attempt.targetTier,
+          },
+          attempt.membership.user,
+        );
+        if (grantsPremium) {
+          await tx.product.updateMany({
+            where: {
+              sellerId: attempt.membership.userId,
+              status: ProductStatus.active,
+              rankTier: 0,
+            },
+            data: {
+              rankTier: 1,
+              relevanceScore: { increment: RELEVANCE_PREMIUM_BONUS },
+            },
+          });
+        }
+      }
+      await this.outbox.enqueue(tx, {
+        type: OUTBOX_REVENUE_INVOICE_ISSUE,
+        payload: {
+          membershipPaymentId: attempt.id,
+          kind: "membership",
+        },
+        dedupeKey: `${OUTBOX_REVENUE_INVOICE_ISSUE}:membership:${attempt.id}`,
+      });
+
+      return true;
+    });
+    return result;
+  }
+
+  async failRecurringMembershipPayment(
+    membershipPaymentId: string,
+    reason: string,
+    providerResponse?: unknown,
+  ): Promise<boolean> {
+    const attempt = await this.prisma.membershipPayment.findUnique({
+      where: { id: membershipPaymentId },
+      select: { metadata: true },
+    });
+    if (!attempt) return false;
+    const metadata = (attempt.metadata as Record<string, unknown> | null) ?? {};
+    const failed = await this.prisma.membershipPayment.updateMany({
+      where: {
+        id: membershipPaymentId,
+        status: { in: [PaymentStatus.pending, PaymentStatus.processing] },
+      },
+      data: {
+        status: PaymentStatus.failed,
+        metadata: {
+          ...metadata,
+          providerResponse: (providerResponse ?? null) as Prisma.InputJsonValue,
+          failureReason: reason,
+          failedAt: new Date().toISOString(),
+        },
+      },
+    });
+    return failed.count === 1;
   }
 
   /**
