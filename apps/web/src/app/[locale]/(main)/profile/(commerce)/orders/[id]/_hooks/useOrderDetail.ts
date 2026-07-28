@@ -143,21 +143,6 @@ export function useUpdateOrderStatus(orderId: string) {
   });
 }
 
-/** Alıcı: kargo öncesi siparişi iptal et (anında geri ödeme). */
-export function useCancelOrder(orderId: string) {
-  const t = useTranslations();
-  return useWebMutation(
-    async () => {
-      await api.post(`/orders/${orderId}/cancel`, {});
-    },
-    {
-      invalidates: ["order", "orders"],
-      errorMessage: t("order.cancelFailed"),
-      onSuccess: () => toast.success(t("order.orderCancelled")),
-    },
-  );
-}
-
 /** Süre aşımına uğramış teklif siparişini yeniden aktive et. */
 export function useReactivateOrder(orderId: string) {
   const t = useTranslations();

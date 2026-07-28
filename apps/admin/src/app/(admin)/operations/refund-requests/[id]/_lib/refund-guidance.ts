@@ -7,9 +7,8 @@ import { useTranslations } from "next-intl";
 type T = ReturnType<typeof useTranslations<never>>;
 
 /**
- * Lifecycle phases (stepper order). The refund flow is now fully automatic —
- * there is no human "review/approval" step; a request is auto-approved as soon
- * as it is created and goes straight to the return shipment phase. (The "review" step was removed.)
+ * Lifecycle phases (stepper order). Buyer-remorse requests advance
+ * automatically; fault claims remain at the received phase until admin review.
  */
 export function refundLifecycle(t: T): string[] {
   return [
@@ -23,6 +22,7 @@ export function refundLifecycle(t: T): string[] {
 
 /** RefundRequestStatus → active phase index (into the refund lifecycle). */
 export const refundStatusPhase: Record<string, number> = {
+  pending_review: 0,
   approved: 1,
   wait_for_delivery: 1,
   return_shipment_open: 1,
@@ -48,6 +48,14 @@ export interface RefundGuidance {
 /** The "what should you do now?" text for each state. */
 export function guidanceForStatus(t: T, status: string): RefundGuidance {
   const map: Record<string, RefundGuidance> = {
+    pending_review: {
+      variant: "warning",
+      title: t("admin.operations.refundRequests.guidance.pendingReview.title"),
+      description: t(
+        "admin.operations.refundRequests.guidance.pendingReview.description",
+      ),
+      actionNeeded: true,
+    },
     approved: {
       variant: "info",
       title: t("admin.operations.refundRequests.guidance.approved.title"),

@@ -59,6 +59,8 @@ export const refundReasonLabelKey: Record<string, MessageKey> = {
   not_as_described: "order.refundReasonNotAsDescribed",
   missing_parts: "order.refundReasonMissingParts",
   counterfeit: "order.refundReasonCounterfeit",
+  defective: "order.refundReasonDefective",
+  buyer_damaged: "order.refundReasonBuyerDamaged",
   lost_in_transit: "order.refundReasonLostInTransit",
   other: "order.refundReasonOther",
 };

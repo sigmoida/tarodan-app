@@ -140,8 +140,10 @@ export const ordersApi = {
     api.get("/orders/groups", { params }),
   /** Tek sipariş grubu detayı */
   getGroup: (id: string) => api.get(`/orders/groups/${id}`),
-  cancel: (id: string | number, reason?: string) =>
-    api.post(`/orders/${id}/cancel`, { reason }),
+  cancel: (
+    id: string | number,
+    body: { reasonCode?: OrderCancellationReason; reason?: string },
+  ) => api.post(`/orders/${id}/cancel`, body),
   confirm: (id: string | number) => api.post(`/orders/${id}/confirm`),
   setShippingAddress: (
     id: string | number,
@@ -176,6 +178,19 @@ export type RefundReason =
   | "wrong_item"
   | "not_as_described"
   | "missing_parts"
+  | "counterfeit"
+  | "defective"
+  | "buyer_damaged"
+  | "lost_in_transit"
+  | "other";
+
+export type OrderCancellationReason =
+  | "delivery_delayed"
+  | "wrong_product_selected"
+  | "changed_mind"
+  | "wrong_card"
+  | "price_changed_mind"
+  | "unavailable_at_address"
   | "other";
 
 export const refundsApi = {

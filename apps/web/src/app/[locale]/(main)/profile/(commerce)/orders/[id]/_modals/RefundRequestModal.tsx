@@ -97,19 +97,12 @@ export default function RefundRequestModal({
     setEvidencePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 14 gün koşulsuz iade: cayma penceresinde (preparing / in_cooling_off) sebep,
-  // açıklama ve foto opsiyoneldir — backend bu pencerede koşulsuz iade işler.
-  // Sadece 14 gün sonrası (dispute) açıklama + foto zorunludur.
+  // Vazgeçme koşulsuz ilerler. Kusur/yanlış ürün iddiaları finansal tarafı
+  // değiştirdiği için kanıt ve admin incelemesi gerektirir.
   const isDispute = phase === "past_cooling_off";
-  const descriptionRequired = isDispute;
-  const evidenceRequired = isDispute;
-  // Hasar/yanlış ürün gibi sebeplerde foto yükleme alanını pencere içinde de
-  // (opsiyonel) göster; zorunluluk yalnızca dispute'ta geçerli.
-  const showEvidenceUpload =
-    evidenceRequired ||
-    ["damaged", "wrong_item", "not_as_described", "missing_parts"].includes(
-      reason,
-    );
+  const evidenceRequired = reason !== "changed_mind";
+  const descriptionRequired = isDispute || evidenceRequired;
+  const showEvidenceUpload = evidenceRequired;
 
   const reasonOptions: { value: RefundReason; label: string }[] = [
     {
@@ -133,8 +126,16 @@ export default function RefundRequestModal({
       label: t("order.refundReasonMissingParts"),
     },
     {
-      value: "other",
-      label: t("trade.dispute.reasonOther"),
+      value: "counterfeit",
+      label: t("order.refundReasonCounterfeit"),
+    },
+    {
+      value: "defective",
+      label: t("order.refundReasonDefective"),
+    },
+    {
+      value: "buyer_damaged",
+      label: t("order.refundReasonBuyerDamaged"),
     },
   ];
 

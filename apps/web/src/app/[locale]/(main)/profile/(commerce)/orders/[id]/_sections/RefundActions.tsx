@@ -3,11 +3,9 @@
 "use client";
 
 import { ArrowUturnLeftIcon, XCircleIcon } from "@heroicons/react/24/outline";
-import { Button, Spinner } from "@tarodan/ui";
+import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
-import { useConfirm } from "@/components/ConfirmProvider";
 import { useTranslations } from "next-intl";
-import { useCancelOrder } from "../_hooks/useOrderDetail";
 import {
   hasShipped,
   isMembershipOrder,
@@ -22,13 +20,13 @@ import {
 export default function RefundActions({
   order,
   onRequestRefund,
+  onCancel,
 }: {
   order: OrderDetail;
   onRequestRefund: () => void;
+  onCancel: () => void;
 }) {
   const t = useTranslations();
-  const confirm = useConfirm();
-  const cancelOrder = useCancelOrder(order.id);
 
   if (
     !order.payment ||
@@ -55,21 +53,6 @@ export default function RefundActions({
     );
   }
 
-  const handleCancel = async () => {
-    if (
-      !(await confirm({
-        title: t("order.cancelOrder"),
-        description: t("order.cancelOrderConfirm"),
-        confirmLabel: t("order.cancelConfirmYes"),
-        cancelLabel: t("order.cancelConfirmNo"),
-        destructive: true,
-      }))
-    ) {
-      return;
-    }
-    cancelOrder.mutate();
-  };
-
   return (
     <SectionCard
       title={shipped ? t("order.refundTitle") : t("order.cancelOrder")}
@@ -94,17 +77,9 @@ export default function RefundActions({
           variant="danger"
           size="lg"
           className="w-full flex items-center justify-center gap-2"
-          onClick={handleCancel}
-          disabled={cancelOrder.isPending}
+          onClick={onCancel}
         >
-          {cancelOrder.isPending ? (
-            <Spinner
-              size="sm"
-              color="border-surface-elevated border-t-transparent"
-            />
-          ) : (
-            <XCircleIcon className="w-5 h-5" />
-          )}
+          <XCircleIcon className="w-5 h-5" />
           {t("order.cancelOrder")}
         </Button>
       )}

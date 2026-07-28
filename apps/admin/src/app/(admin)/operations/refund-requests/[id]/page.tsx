@@ -34,6 +34,20 @@ export default function RefundRequestDetailPage() {
       successMessage: t("admin.operations.refundRequests.refundCompleted"),
     },
   );
+  const approveReview = useAdminMutation(
+    (note?: string) => adminApi.approveRefundRequest(id, note),
+    {
+      invalidates: ["refund-requests", "refunds"],
+      successMessage: t("admin.operations.refundRequests.reviewApproved"),
+    },
+  );
+  const rejectReview = useAdminMutation(
+    (reason: string) => adminApi.rejectRefundRequest(id, reason),
+    {
+      invalidates: ["refund-requests", "refunds"],
+      successMessage: t("admin.operations.refundRequests.reviewRejected"),
+    },
+  );
   const savePolicy = useAdminMutation(
     (payload: {
       refundProductAmount?: boolean;
@@ -120,6 +134,9 @@ export default function RefundRequestDetailPage() {
               canForceFinalize={canForceFinalize}
               finalizing={forceFinalize.isPending}
               onFinalize={handleForceFinalize}
+              reviewing={approveReview.isPending || rejectReview.isPending}
+              onApprove={(note) => approveReview.mutate(note)}
+              onReject={(reason) => rejectReview.mutate(reason)}
             />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -163,25 +180,29 @@ export default function RefundRequestDetailPage() {
               </div>
             )}
 
-            <RefundPolicyCard
-              initial={{
-                refundProductAmount: rr.refundProductAmount ?? true,
-                refundShippingFee: rr.refundShippingFee ?? true,
-                refundBuyerFee: rr.refundBuyerFee ?? true,
-                refundSellerCommission: rr.refundSellerCommission ?? true,
-                returnShippingPayer: rr.returnShippingPayer ?? null,
-              }}
-              order={{
-                subtotal:
-                  rr.order.subtotal != null ? Number(rr.order.subtotal) : null,
-                shippingCost: Number(rr.order.shippingCost ?? 0),
-                buyerFeeAmount: Number(rr.order.buyerFeeAmount ?? 0),
-                commissionAmount: Number(rr.order.commissionAmount ?? 0),
-              }}
-              onSavePolicy={handleSavePolicy}
-              onSavePayer={handleSavePayer}
-              disabled={rr.status === "refunded" || rr.status === "cancelled"}
-            />
+            {(!rr.policyCode || rr.policyCode === "legacy") && (
+              <RefundPolicyCard
+                initial={{
+                  refundProductAmount: rr.refundProductAmount ?? true,
+                  refundShippingFee: rr.refundShippingFee ?? true,
+                  refundBuyerFee: rr.refundBuyerFee ?? true,
+                  refundSellerCommission: rr.refundSellerCommission ?? true,
+                  returnShippingPayer: rr.returnShippingPayer ?? null,
+                }}
+                order={{
+                  subtotal:
+                    rr.order.subtotal != null
+                      ? Number(rr.order.subtotal)
+                      : null,
+                  shippingCost: Number(rr.order.shippingCost ?? 0),
+                  buyerFeeAmount: Number(rr.order.buyerFeeAmount ?? 0),
+                  commissionAmount: Number(rr.order.commissionAmount ?? 0),
+                }}
+                onSavePolicy={handleSavePolicy}
+                onSavePayer={handleSavePayer}
+                disabled={rr.status === "refunded" || rr.status === "cancelled"}
+              />
+            )}
 
             <RefundHistorySection history={history} />
             <RefundTechnicalDetails rr={rr} history={history} />

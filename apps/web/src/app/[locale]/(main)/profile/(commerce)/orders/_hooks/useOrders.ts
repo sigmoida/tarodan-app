@@ -87,8 +87,17 @@ export function useShipOrder() {
 export function useCancelOrder() {
   const t = useTranslations();
   return useWebMutation(
-    async ({ orderId, reason }: { orderId: string; reason?: string }) => {
+    async ({
+      orderId,
+      reasonCode,
+      reason,
+    }: {
+      orderId: string;
+      reasonCode: string;
+      reason?: string;
+    }) => {
       await api.post(`/orders/${orderId}/cancel`, {
+        reasonCode,
         reason: reason?.trim() || undefined,
       });
     },

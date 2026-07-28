@@ -32,6 +32,7 @@ import PartyCard from "./_sections/PartyCard";
 import InvoicesSection from "./_sections/InvoicesSection";
 import HelpCard from "./_sections/HelpCard";
 import ReviewModal from "./_modals/ReviewModal";
+import CancelOrderModal from "../_modals/CancelOrderModal";
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function OrderDetailPage() {
 
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const orderQuery = useOrderQuery(orderId, ready);
   const rawOrder = orderQuery.data;
@@ -134,7 +136,11 @@ export default function OrderDetailPage() {
           <EscrowInfoCard order={order} />
           <ReviewCta order={order} onReview={() => setShowReviewModal(true)} />
           <ReviewSummary order={order} />
-          <RefundActions order={order} onRequestRefund={handleRefund} />
+          <RefundActions
+            order={order}
+            onRequestRefund={handleRefund}
+            onCancel={() => setShowCancelModal(true)}
+          />
         </div>
 
         {/* Sidebar */}
@@ -164,6 +170,10 @@ export default function OrderDetailPage() {
             queryKey: queryKeys.orders.detail(),
           });
         }}
+      />
+      <CancelOrderModal
+        order={showCancelModal ? order : null}
+        onClose={() => setShowCancelModal(false)}
       />
     </PageShell>
   );

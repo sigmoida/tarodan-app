@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Alert, Button } from "@tarodan/ui";
+import { Alert, Button, Textarea } from "@tarodan/ui";
 import { fmtTry } from "@/lib/format";
 import {
   InformationCircleIcon,
@@ -30,6 +31,9 @@ export interface RefundNextActionPanelProps {
   canForceFinalize: boolean;
   finalizing: boolean;
   onFinalize: () => void;
+  reviewing: boolean;
+  onApprove: (note?: string) => void;
+  onReject: (reason: string) => void;
 }
 
 /**
@@ -43,9 +47,13 @@ export function RefundNextActionPanel({
   canForceFinalize,
   finalizing,
   onFinalize,
+  reviewing,
+  onApprove,
+  onReject,
 }: RefundNextActionPanelProps) {
   const t = useTranslations();
   const guidance = guidanceForStatus(t, status);
+  const [reviewNote, setReviewNote] = useState("");
 
   return (
     <div className="space-y-4">
@@ -75,6 +83,41 @@ export function RefundNextActionPanel({
               <BanknotesIcon className="mr-1.5 h-5 w-5" />
               {t("admin.operations.refundRequests.forceFinalizeButton")}
             </Button>
+          )}
+
+          {status === "pending_review" && (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium">
+                {t("admin.operations.refundRequests.reviewNote")}
+              </label>
+              <Textarea
+                value={reviewNote}
+                onChange={(event) =>
+                  setReviewNote(event.target.value.slice(0, 1000))
+                }
+                rows={3}
+                maxLength={1000}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="primary"
+                  onClick={() => onApprove(reviewNote)}
+                  isLoading={reviewing}
+                  disabled={reviewing}
+                >
+                  <CheckCircleIcon className="mr-1.5 h-5 w-5" />
+                  {t("admin.operations.refundRequests.approveButton")}
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => onReject(reviewNote)}
+                  disabled={reviewing || !reviewNote.trim()}
+                >
+                  <XCircleIcon className="mr-1.5 h-5 w-5" />
+                  {t("admin.operations.refundRequests.rejectButton")}
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       </Alert>

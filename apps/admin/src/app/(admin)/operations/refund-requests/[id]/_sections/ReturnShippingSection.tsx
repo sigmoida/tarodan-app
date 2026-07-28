@@ -10,7 +10,7 @@ import {
 import { payerLabel } from "../_lib/refund-guidance";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { RefundRequestDetail } from "../types";
-import { fmtDate } from "../_lib/format";
+import { fmtDate, fmtTry } from "../_lib/format";
 import { Field } from "../_components/Field";
 
 export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
@@ -51,6 +51,35 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
           </span>
         )}
       </div>
+
+      {rr.policyCode && rr.policyCode !== "legacy" && (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
+          <Field label={t("admin.operations.refundRequests.policyCode")}>
+            <span className="font-mono">{rr.policyCode}</span>
+          </Field>
+          <Field label={t("admin.operations.refundRequests.returnDesi")}>
+            {rr.returnBillableDesi ?? 1}
+          </Field>
+          <Field label={t("admin.operations.refundRequests.returnFee")}>
+            {fmtTry(rr.returnShippingAmount ?? 0)}
+          </Field>
+          <Field label={t("admin.operations.refundRequests.productRefund")}>
+            {fmtTry(rr.refundedProductAmount ?? 0)}
+          </Field>
+          <Field label={t("admin.operations.refundRequests.outboundRefund")}>
+            {fmtTry(rr.refundedOutboundShippingAmount ?? 0)}
+          </Field>
+          <Field label={t("admin.operations.refundRequests.protectionRefund")}>
+            {fmtTry(rr.refundedBuyerProtectionAmount ?? 0)}
+          </Field>
+          <Field label={t("admin.operations.refundRequests.sellerFeeRefund")}>
+            {fmtTry(rr.refundedSellerFeeAmount ?? 0)}
+          </Field>
+          <Field label={t("admin.operations.refundRequests.sellerFeeRetained")}>
+            {fmtTry(rr.retainedSellerPlatformFeeAmount ?? 0)}
+          </Field>
+        </div>
+      )}
 
       {rr.returnTrackingNumber ? (
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">

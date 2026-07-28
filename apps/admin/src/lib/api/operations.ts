@@ -84,6 +84,15 @@ export const operationsApi = {
   getRefundRequests: (params?: any) =>
     api.get("/admin/refund-requests", { params }),
   getRefundRequest: (id: string) => api.get(`/admin/refund-requests/${id}`),
+  approveRefundRequest: (id: string, note?: string) =>
+    api.post(
+      `/admin/refund-requests/${id}/approve`,
+      note?.trim() ? { note: note.trim() } : {},
+    ),
+  rejectRefundRequest: (id: string, reason: string) =>
+    api.post(`/admin/refund-requests/${id}/reject`, {
+      reason: reason.trim(),
+    }),
   forceFinalizeRefund: (id: string) =>
     api.post(`/admin/refund-requests/${id}/force-finalize`),
   markTradeReturnLost: (
