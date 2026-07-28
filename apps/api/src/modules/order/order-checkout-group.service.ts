@@ -499,6 +499,7 @@ export class OrderCheckoutGroupService {
             orderNumber: string;
             commissionResult: CommissionResult;
             shippingCost: number;
+            fullShippingAmount: number;
             buyerShippingAmount: number;
             sellerShippingAmount: number;
             taxAmount: number;
@@ -605,6 +606,7 @@ export class OrderCheckoutGroupService {
               orderNumber,
               commissionResult,
               shippingCost,
+              fullShippingAmount: fullShipping,
               buyerShippingAmount,
               sellerShippingAmount,
               taxAmount,
@@ -748,6 +750,32 @@ export class OrderCheckoutGroupService {
                   input.commissionResult.sellerPlatformFeeAmount,
                 buyerShippingAmount: input.buyerShippingAmount,
                 sellerShippingAmount: input.sellerShippingAmount,
+                financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
+                  pricingHash: dto.expectedPricingHash,
+                  productId: entry.productId,
+                  quantity: entry.quantity,
+                  unitPrice: entry.productPrice,
+                  originalUnitPrice: entry.originalPrice,
+                  subtotal: entry.originalPrice * entry.quantity,
+                  discountAmount: totalDiscount,
+                  discountCode:
+                    entry.couponDiscount > 0 ? appliedCouponCode : null,
+                  platformFundedDiscount:
+                    Math.round(
+                      entry.couponDiscount * appliedPlatformFundedShare * 100,
+                    ) / 100,
+                  shipping: {
+                    tariffId: shippingTariff.tariffId,
+                    tariffVersion: shippingTariff.tariffVersion,
+                    fullAmount: input.fullShippingAmount,
+                    buyerAmount: input.buyerShippingAmount,
+                    sellerAmount: input.sellerShippingAmount,
+                  },
+                  commission: input.commissionResult,
+                  taxAmount: input.taxAmount,
+                  withholdingTaxAmount: input.withholdingTaxAmount,
+                  totalAmount: input.totalAmount,
+                }),
                 status: OrderStatus.pending_payment,
                 paymentExpiresAt,
                 shippingAddressId,

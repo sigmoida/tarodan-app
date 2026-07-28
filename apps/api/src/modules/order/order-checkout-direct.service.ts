@@ -494,6 +494,30 @@ export class OrderCheckoutDirectService {
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           buyerShippingAmount,
           sellerShippingAmount,
+          financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
+            pricingHash: dto.expectedPricingHash,
+            productId: dto.productId,
+            quantity: 1,
+            unitPrice: productPrice,
+            originalUnitPrice: originalPrice,
+            subtotal,
+            discountAmount: totalDiscount,
+            discountCode: appliedCouponCode,
+            platformFundedDiscount:
+              Math.round(couponDiscount * couponPlatformFundedShare * 100) /
+              100,
+            shipping: {
+              tariffId: shippingTariff.tariffId,
+              tariffVersion: shippingTariff.tariffVersion,
+              fullAmount: fullShipping,
+              buyerAmount: buyerShippingAmount,
+              sellerAmount: sellerShippingAmount,
+            },
+            commission: commissionResult,
+            taxAmount,
+            withholdingTaxAmount,
+            totalAmount,
+          }),
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: shippingAddressId,
@@ -745,6 +769,13 @@ export class OrderCheckoutDirectService {
         offerBuyerShippingAmount +
         commissionResult.buyerFeeAmount +
         offerTaxAmount;
+      const offerPricingHash = this.orderPricing.computePricingHash([
+        {
+          productId: offer.productId,
+          unitPrice: Number(offer.amount),
+          quantity: 1,
+        },
+      ]);
 
       const offerShippingJson: Record<string, unknown> | undefined =
         shippingAddress
@@ -813,6 +844,27 @@ export class OrderCheckoutDirectService {
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           buyerShippingAmount: offerBuyerShippingAmount,
           sellerShippingAmount: offerSellerShippingAmount,
+          financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
+            pricingHash: offerPricingHash,
+            productId: offer.productId,
+            quantity: 1,
+            unitPrice: Number(offer.amount),
+            originalUnitPrice: Number(offer.amount),
+            subtotal: Number(offer.amount),
+            discountAmount: 0,
+            platformFundedDiscount: 0,
+            shipping: {
+              tariffId: shippingTariff.tariffId,
+              tariffVersion: shippingTariff.tariffVersion,
+              fullAmount: offerFullShipping,
+              buyerAmount: offerBuyerShippingAmount,
+              sellerAmount: offerSellerShippingAmount,
+            },
+            commission: commissionResult,
+            taxAmount: offerTaxAmount,
+            withholdingTaxAmount: offerWithholdingAmount,
+            totalAmount,
+          }),
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: dto.shippingAddressId,

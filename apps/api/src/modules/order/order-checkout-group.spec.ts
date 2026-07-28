@@ -80,6 +80,18 @@ describe("OrderService checkout group (batch checkout)", () => {
   // Misafir OTP hash pepper'ı: ConfigService.getOrThrow bunu döndürür; testte aynı
   // değerle beklenen hash'i üretip Redis kaydını taklit ederiz (OTP tüketimini geçmek için).
   const OTP_SECRET = "test-otp-secret";
+  const pricingHashFor = (
+    items: Array<{ productId: string; quantity?: number }>,
+  ) =>
+    createHash("sha256")
+      .update(
+        items
+          .map((item) => `${item.productId}:100.00:${item.quantity ?? 1}`)
+          .sort()
+          .join("|"),
+      )
+      .digest("hex")
+      .slice(0, 16);
 
   const makeProduct = (
     id: string,
@@ -274,12 +286,16 @@ describe("OrderService checkout group (batch checkout)", () => {
     discountService = module.get(DiscountService);
   });
 
-  const baseDto = () => ({
-    items: [{ productId: productA }, { productId: productB }],
-    idempotencyKey,
-    shippingAddressId: addressId,
-    expectedShippingTariffVersion: 1,
-  });
+  const baseDto = () => {
+    const items = [{ productId: productA }, { productId: productB }];
+    return {
+      items,
+      idempotencyKey,
+      shippingAddressId: addressId,
+      expectedShippingTariffVersion: 1,
+      expectedPricingHash: pricingHashFor(items),
+    };
+  };
 
   it("creates one checkout group with an order per product (2 items → 1 group + 2 orders)", async () => {
     const result: any = await service.checkout(buyerId, baseDto() as any);
@@ -527,6 +543,7 @@ describe("OrderService checkout group (batch checkout)", () => {
       idempotencyKey,
       shippingAddressId: addressId,
       expectedShippingTariffVersion: 1,
+      expectedPricingHash: pricingHashFor([{ productId: productA }]),
     };
     const result: any = await service.checkout(buyerId, dto as any);
 
@@ -573,23 +590,26 @@ describe("OrderService checkout group (batch checkout)", () => {
 
     const guestDto = (
       items: Array<{ productId: string; quantity?: number }>,
-    ) => ({
-      items,
-      idempotencyKey,
-      email: guestEmail,
-      emailVerificationCode: guestCode,
-      phone: "+905551234567",
-      guestName: "Guest User",
-      // Misafir grup checkout inline adres ister (kayıtlı adres ID yok).
-      shippingAddress: {
-        fullName: "Guest User",
+    ) => {
+      return {
+        items,
+        idempotencyKey,
+        email: guestEmail,
+        emailVerificationCode: guestCode,
         phone: "+905551234567",
-        city: "İstanbul",
-        district: "Kadıköy",
-        address: "Test cad. 1",
-      },
-      expectedShippingTariffVersion: 1,
-    });
+        guestName: "Guest User",
+        // Misafir grup checkout inline adres ister (kayıtlı adres ID yok).
+        shippingAddress: {
+          fullName: "Guest User",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+        },
+        expectedShippingTariffVersion: 1,
+        expectedPricingHash: pricingHashFor(items),
+      };
+    };
 
     beforeEach(() => {
       // Tek ürün, bol stok: adet doğrulaması stoktan değil sınır/geçişten sınansın.

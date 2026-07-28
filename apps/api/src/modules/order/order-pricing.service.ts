@@ -348,9 +348,17 @@ export class OrderPricingService {
           null,
           product.categoryId,
         );
-        lineTax = resolved
-          ? this.taxService.calculateTaxAmount(discountedLine, resolved)
-          : 0;
+        if (!resolved) {
+          this.logger.error(
+            `No active tax rule for taxable seller=${product.sellerId} category=${product.categoryId}. Quote failed closed.`,
+          );
+          throw new ServiceUnavailableException({
+            code: "TAX_CONFIGURATION_MISSING",
+            message:
+              "Vergi mükellefi satıcı için geçerli bir vergi kuralı bulunamadı.",
+          });
+        }
+        lineTax = this.taxService.calculateTaxAmount(discountedLine, resolved);
       }
 
       itemsSubtotal += lineSubtotal;
@@ -467,14 +475,14 @@ export class OrderPricingService {
    * 409 PRICING_CHANGED guard generalized beyond shipping (F1.3). If the client passed
    * the pricing hash its quote was built on and the current charged unit prices no
    * longer hash to it (a product price / campaign moved), refuse create so the buyer
-   * re-confirms. No expected hash → skipped (backward compatible).
+   * re-confirms. A missing hash is also rejected: order creation cannot bypass quote
+   * confirmation by omitting the field.
    */
   assertPricingUnchanged(
     expectedHash: string | undefined | null,
     items: Array<{ productId: string; unitPrice: number; quantity: number }>,
   ): void {
-    if (!expectedHash) return;
-    if (this.computePricingHash(items) !== expectedHash) {
+    if (!expectedHash || this.computePricingHash(items) !== expectedHash) {
       throw new ConflictException(
         i18nMessage("server.shipping.pricingChanged"),
       );
@@ -657,6 +665,10 @@ export class OrderPricingService {
       `Commission: amount=${amount} sellerFee=${result.sellerFeeAmount} buyerFee=${result.buyerFeeAmount} (primaryRule=${result.ruleId})`,
     );
 
-    return result;
+    return {
+      ...result,
+      effectiveMembershipTier: effectiveTierType,
+      taxpayerType,
+    };
   }
 }

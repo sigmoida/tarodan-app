@@ -2,8 +2,8 @@
  * Tax resolution for website/checkout/invoice.
  * Resolves applicable tax rate from admin-configured TaxRegion, TaxRate, TaxRule.
  */
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
 
 export interface ResolvedTax {
   taxRateId: string;
@@ -20,7 +20,11 @@ export class TaxService {
   }
 
   private get hasTaxModels(): boolean {
-    return !!(this.taxPrisma.taxRegion && this.taxPrisma.taxRate && this.taxPrisma.taxRule);
+    return !!(
+      this.taxPrisma.taxRegion &&
+      this.taxPrisma.taxRate &&
+      this.taxPrisma.taxRule
+    );
   }
 
   /**
@@ -32,23 +36,25 @@ export class TaxService {
    * @returns Resolved rate or null if no rules / models not available.
    */
   async resolveTaxRate(
-    countryCode: string = 'TR',
+    countryCode: string = "TR",
     regionCode?: string | null,
     categoryId?: string | null,
   ): Promise<ResolvedTax | null> {
     if (!this.hasTaxModels) return null;
 
-    const code = (countryCode || 'TR').toUpperCase();
+    const code = (countryCode || "TR").toUpperCase();
 
     // 1) Find tax region: exact match (country + region), then default, then first active
     let region = await this.taxPrisma.taxRegion.findFirst({
       where: {
         isActive: true,
         countryCode: code,
-        ...(regionCode != null && regionCode !== '' ? { regionCode } : { OR: [{ regionCode: null }, { regionCode: '' }] }),
+        ...(regionCode != null && regionCode !== ""
+          ? { regionCode }
+          : { OR: [{ regionCode: null }, { regionCode: "" }] }),
       },
     });
-    if (!region && regionCode != null && regionCode !== '') {
+    if (!region && regionCode != null && regionCode !== "") {
       region = await this.taxPrisma.taxRegion.findFirst({
         where: { isActive: true, countryCode: code },
       });
@@ -61,7 +67,7 @@ export class TaxService {
     if (!region) {
       region = await this.taxPrisma.taxRegion.findFirst({
         where: { isActive: true },
-        orderBy: { sortOrder: 'asc' },
+        orderBy: { sortOrder: "asc" },
       });
     }
     if (!region) return null;
@@ -72,20 +78,42 @@ export class TaxService {
         taxRegionId: region.id,
         isActive: true,
         OR: [
-          { scope: 'default_rate' },
-          ...(categoryId ? [{ scope: 'category', categoryId }] : []),
+          { scope: "default_rate" },
+          ...(categoryId ? [{ scope: "category", categoryId }] : []),
         ],
       },
       include: {
         taxRate: true,
       },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     });
 
-    // Prefer category rule if we have a matching one, else default_rate
-    const rule = rules.find((r: any) => r.scope === 'category' && r.categoryId === categoryId)
-      || rules.find((r: any) => r.scope === 'default_rate');
-    if (!rule || !rule.taxRate?.isActive) return null;
+    const now = new Date();
+    const effectiveRules = rules.filter((rule: any) => {
+      const rate = rule.taxRate;
+      if (!rate?.isActive) return false;
+      if (rate.effectiveFrom && new Date(rate.effectiveFrom) > now) {
+        return false;
+      }
+      if (rate.effectiveTo) {
+        const effectiveThrough = new Date(rate.effectiveTo);
+        effectiveThrough.setUTCHours(23, 59, 59, 999);
+        if (effectiveThrough < now) return false;
+      }
+      return true;
+    });
+
+    // Prefer an effective category rule, otherwise use the effective default.
+    // An expired high-priority rule must never shadow a lower-priority current rule.
+    const rule =
+      effectiveRules.find(
+        (candidate: any) =>
+          candidate.scope === "category" && candidate.categoryId === categoryId,
+      ) ||
+      effectiveRules.find(
+        (candidate: any) => candidate.scope === "default_rate",
+      );
+    if (!rule) return null;
 
     const rate = rule.taxRate;
     return {
@@ -100,6 +128,6 @@ export class TaxService {
    */
   calculateTaxAmount(subtotal: number, resolved: ResolvedTax | null): number {
     if (!resolved || resolved.rate <= 0) return 0;
-    return Math.round((subtotal * resolved.rate / 100) * 100) / 100;
+    return Math.round(((subtotal * resolved.rate) / 100) * 100) / 100;
   }
 }

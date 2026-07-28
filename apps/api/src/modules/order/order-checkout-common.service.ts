@@ -1,7 +1,12 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { createHash } from "crypto";
 import { PrismaService } from "../../prisma";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { Prisma } from "@prisma/client";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { TaxService } from "../tax/tax.service";
 import { CommissionResult } from "./order-pricing.service";
@@ -27,6 +32,76 @@ export class OrderCheckoutCommonService {
     return createHash("sha256")
       .update(parts.filter((p) => p.length > 0).join("|"))
       .digest("hex");
+  }
+
+  buildFinancialSnapshot(params: {
+    pricingHash: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    originalUnitPrice: number;
+    subtotal: number;
+    discountAmount: number;
+    discountCode?: string | null;
+    platformFundedDiscount: number;
+    shipping: {
+      tariffId: string;
+      tariffVersion: number;
+      fullAmount: number;
+      buyerAmount: number;
+      sellerAmount: number;
+    };
+    commission: CommissionResult;
+    taxAmount: number;
+    withholdingTaxAmount: number;
+    totalAmount: number;
+  }): Prisma.InputJsonObject {
+    return {
+      version: 1,
+      confirmedAt: new Date().toISOString(),
+      pricing: {
+        hash: params.pricingHash,
+        productId: params.productId,
+        quantity: params.quantity,
+        unitPrice: params.unitPrice,
+        originalUnitPrice: params.originalUnitPrice,
+        subtotal: params.subtotal,
+        discountAmount: params.discountAmount,
+        totalAmount: params.totalAmount,
+      },
+      discount: {
+        code: params.discountCode ?? null,
+        amount: params.discountAmount,
+        platformFundedAmount: params.platformFundedDiscount,
+      },
+      shipping: {
+        tariffId: params.shipping.tariffId,
+        tariffVersion: params.shipping.tariffVersion,
+        fullAmount: params.shipping.fullAmount,
+        buyerAmount: params.shipping.buyerAmount,
+        sellerAmount: params.shipping.sellerAmount,
+      },
+      commission: {
+        ruleId: params.commission.ruleId,
+        ruleName: params.commission.ruleName,
+        ruleType: params.commission.ruleType
+          ? String(params.commission.ruleType)
+          : null,
+        effectiveMembershipTier:
+          params.commission.effectiveMembershipTier ?? null,
+        taxpayerType: params.commission.taxpayerType ?? null,
+        buyerFeeAmount: params.commission.buyerFeeAmount,
+        sellerFeeAmount: params.commission.sellerFeeAmount,
+        buyerCommissionAmount: params.commission.buyerCommissionAmount,
+        buyerServiceFeeAmount: params.commission.buyerServiceFeeAmount,
+        sellerCommissionAmount: params.commission.sellerCommissionAmount,
+        sellerPlatformFeeAmount: params.commission.sellerPlatformFeeAmount,
+      },
+      tax: {
+        amount: params.taxAmount,
+        withholdingAmount: params.withholdingTaxAmount,
+      },
+    };
   }
 
   /** E-ticaret stopaj oranı (%) — PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
@@ -62,9 +137,17 @@ export class OrderCheckoutCommonService {
       null,
       categoryId,
     );
-    const taxAmount = resolved
-      ? this.taxService.calculateTaxAmount(subtotal, resolved)
-      : 0;
+    if (!resolved) {
+      this.logger.error(
+        `No active tax rule for taxable seller=${sellerId} category=${categoryId}. Failing closed.`,
+      );
+      throw new ServiceUnavailableException({
+        code: "TAX_CONFIGURATION_MISSING",
+        message:
+          "Vergi mükellefi satıcı için geçerli bir vergi kuralı bulunamadı.",
+      });
+    }
+    const taxAmount = this.taxService.calculateTaxAmount(subtotal, resolved);
     const withholdingRate = await this.getWithholdingTaxRate();
     const withholdingTaxAmount =
       withholdingRate > 0 ? Math.round(subtotal * withholdingRate) / 100 : 0;

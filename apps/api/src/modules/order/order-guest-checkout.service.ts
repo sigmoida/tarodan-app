@@ -263,6 +263,14 @@ export class OrderGuestCheckoutService {
         finalPrice = Number(offer.amount);
       }
 
+      this.orderPricing.assertPricingUnchanged(dto.expectedPricingHash, [
+        {
+          productId: dto.productId,
+          unitPrice: finalPrice,
+          quantity: 1,
+        },
+      ]);
+
       // Get or create a system guest user for all guest orders
       // This avoids unique constraint issues - actual guest info stored in shippingAddress
       const SYSTEM_GUEST_EMAIL = "guest@tarodan.system";
@@ -347,6 +355,8 @@ export class OrderGuestCheckoutService {
         shippingCost +
         commissionResult.buyerFeeAmount +
         guestTaxAmount;
+      const guestOriginalPrice = Number(product.price);
+      const guestDiscountAmount = Math.max(0, guestOriginalPrice - finalPrice);
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -429,6 +439,10 @@ export class OrderGuestCheckoutService {
           checkoutGroupId: guestOrderGroup.id,
           packageId: guestOrderPackage.id,
           totalAmount,
+          quantity: 1,
+          unitPrice: finalPrice,
+          subtotal: guestOriginalPrice,
+          discountAmount: guestDiscountAmount,
           shippingCost,
           taxAmount: guestTaxAmount,
           withholdingTaxAmount: guestWithholdingAmount,
@@ -441,6 +455,27 @@ export class OrderGuestCheckoutService {
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           buyerShippingAmount,
           sellerShippingAmount,
+          financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
+            pricingHash: dto.expectedPricingHash,
+            productId: dto.productId,
+            quantity: 1,
+            unitPrice: finalPrice,
+            originalUnitPrice: guestOriginalPrice,
+            subtotal: guestOriginalPrice,
+            discountAmount: guestDiscountAmount,
+            platformFundedDiscount: 0,
+            shipping: {
+              tariffId: shippingTariff.tariffId,
+              tariffVersion: shippingTariff.tariffVersion,
+              fullAmount: fullShipping,
+              buyerAmount: buyerShippingAmount,
+              sellerAmount: sellerShippingAmount,
+            },
+            commission: commissionResult,
+            taxAmount: guestTaxAmount,
+            withholdingTaxAmount: guestWithholdingAmount,
+            totalAmount,
+          }),
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,

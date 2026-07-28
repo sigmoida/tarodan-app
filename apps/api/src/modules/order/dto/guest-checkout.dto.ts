@@ -118,13 +118,16 @@ export class GuestCheckoutDto {
   @Min(1)
   expectedShippingTariffVersion: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description:
       "Checkout quote birim-fiyat hash'i. Ürün fiyatı/kampanya değiştiyse 409 PRICING_CHANGED.",
   })
-  @IsOptional()
   @IsString()
-  expectedPricingHash?: string;
+  @IsNotEmpty()
+  @Matches(/^[a-f0-9]{16}$/i, {
+    message: "Geçerli checkout fiyat hash'i gönderilmelidir",
+  })
+  expectedPricingHash: string;
 }
 
 export class GuestOrderTrackDto {

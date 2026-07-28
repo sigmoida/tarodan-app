@@ -66,6 +66,10 @@ export interface CommissionCalculationResult {
   appliedRate?: number;
   wasMinApplied?: boolean;
   wasMaxApplied?: boolean;
+  /** Effective paid tier used while selecting the commission rule. */
+  effectiveMembershipTier?: MembershipTierType | null;
+  /** Taxpayer classification used while selecting commission/tax policy. */
+  taxpayerType?: CommissionTaxpayerType;
 }
 
 export interface CommissionMatchContext {
