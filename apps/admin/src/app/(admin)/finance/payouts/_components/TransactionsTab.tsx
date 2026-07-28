@@ -2,30 +2,26 @@
 
 "use client";
 
+import { useState } from "react";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { transactionColumns } from "../_lib/columns";
 import {
   type PayoutTransaction,
   payoutStatusFilterOptions,
 } from "../_lib/types";
 import { useTranslations } from "next-intl";
+import { useSession } from "@/context/SessionContext";
+import { ReleasePayoutModal } from "./ReleasePayoutModal";
 
 export function TransactionsTab() {
   const t = useTranslations();
-  const release = useAdminMutation(
-    (orderId: string) => adminApi.releasePayout(orderId),
-    {
-      invalidates: ["payouts-transactions", "payouts-summary"],
-      successMessage: t("admin.finance.payouts.releasedToSeller"),
-    },
-  );
+  const { user } = useSession();
+  const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
 
   const columns = transactionColumns(
-    (orderId) => release.mutate(orderId),
+    user?.role === "super_admin" ? setReleaseOrderId : undefined,
     t,
-    release.isPending ? release.variables : undefined,
   );
 
   return (
@@ -61,6 +57,12 @@ export function TransactionsTab() {
         emptyText={t("admin.finance.payouts.empty")}
       />
       <ResourceList.Pagination />
+      {releaseOrderId && (
+        <ReleasePayoutModal
+          orderId={releaseOrderId}
+          onClose={() => setReleaseOrderId(null)}
+        />
+      )}
     </ResourceList>
   );
 }

@@ -80,6 +80,7 @@ import {
   PayoutTransactionsQueryDto,
   PayoutScheduleQueryDto,
   PayoutExportQueryDto,
+  ReleasePayoutDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -254,7 +255,7 @@ export class AdminPaymentController {
   }
 
   @Post("payouts/release/:orderId")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @Roles(AdminRole.super_admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Release payment hold to seller (manual)" })
   @ApiParam({ name: "orderId", description: "Order ID" })
@@ -262,13 +263,13 @@ export class AdminPaymentController {
   async releasePayout(
     @Param("orderId") orderId: string,
     @CurrentUser("id") adminId: string,
-    @Body("reason") reason: string,
+    @Body() dto: ReleasePayoutDto,
   ) {
-    return this.adminService.releasePayout(adminId, orderId, reason);
+    return this.adminService.releasePayout(adminId, orderId, dto.reason);
   }
 
   @Post("payouts/release-trade/:tradeId")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @Roles(AdminRole.super_admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Release trade cash payment hold (manual)" })
   @ApiParam({ name: "tradeId", description: "Trade ID" })

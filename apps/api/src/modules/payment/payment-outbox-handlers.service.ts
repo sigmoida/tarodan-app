@@ -14,6 +14,7 @@ import { PaymentCommonService } from "./payment-common.service";
 import { ElogoInvoicingService } from "../elogo";
 import { PrismaService } from "../../prisma";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { PaymentStatus } from "@prisma/client";
 
 /**
  * Ödeme/iade yan-etkilerinin outbox handler'ları. onModuleInit'te
@@ -77,7 +78,15 @@ export class PaymentOutboxHandlers implements OnModuleInit {
         return;
       }
       const payment = await this.prisma.payment.findFirst({
-        where: { orderId },
+        where: {
+          status: PaymentStatus.completed,
+          OR: [
+            { orderId },
+            ...(order.checkoutGroupId
+              ? [{ checkoutGroupId: order.checkoutGroupId }]
+              : []),
+          ],
+        },
         orderBy: { createdAt: "desc" },
       });
       if (!payment) {

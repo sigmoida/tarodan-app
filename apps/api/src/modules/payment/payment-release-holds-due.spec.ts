@@ -4,7 +4,7 @@ import { OrderStatus, PaymentHoldStatus } from "@prisma/client";
 /**
  * releaseHoldsDue escrow-release güvenlik guard'ları (çekirdek para yolu, önceden testsiz):
  * bir hold ancak (a) held + releaseAt geçmiş + frozenByRefundId null, (b) sipariş releasable
- * statüde (shipped/delivered/awaiting/completed), (c) AÇIK iade yoksa serbest bırakılır.
+ * statüde (delivered/awaiting/completed), (c) AÇIK iade yoksa serbest bırakılır.
  */
 describe("PaymentRefundService.releaseHoldsDue — escrow release guards", () => {
   const makeService = (order: any) => {

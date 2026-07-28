@@ -268,11 +268,26 @@ export class PaymentCommonService {
       select: {
         id: true,
         orderNumber: true,
+        status: true,
         shippingCost: true,
         packageId: true,
       },
     });
     if (!order) return "skipped";
+    if (
+      !(
+        [
+          OrderStatus.paid,
+          OrderStatus.preparing,
+          OrderStatus.shipped,
+        ] as OrderStatus[]
+      ).includes(order.status)
+    ) {
+      this.logger.warn(
+        `Surat shipment creation skipped for order ${orderId}: status=${order.status}`,
+      );
+      return "skipped";
+    }
 
     const existing = await this.prisma.shipment.findFirst({
       where: { orderId },

@@ -1,5 +1,12 @@
-import { IsOptional, IsString, IsIn, IsDateString } from "class-validator";
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsOptional,
+  IsString,
+  IsIn,
+  IsDateString,
+  IsNotEmpty,
+  MaxLength,
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdminListQueryDto } from "../../../common/list";
 
 export class PayoutTransactionsQueryDto extends AdminListQueryDto {
@@ -65,4 +72,12 @@ export class PayoutExportQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+}
+
+export class ReleasePayoutDto {
+  @ApiProperty({ description: "Manual release reason", maxLength: 500 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason: string;
 }

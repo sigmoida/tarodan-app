@@ -24,9 +24,8 @@ export const scheduleColumns = (t: T) => [
 ];
 
 export function transactionColumns(
-  onRelease: (orderId: string) => void,
+  onRelease: ((orderId: string) => void) | undefined,
   t: T,
-  releasingOrderId?: string,
 ) {
   return [
     col.text<PayoutTransaction>(
@@ -68,8 +67,6 @@ export function transactionColumns(
       ),
       { sortKey: "status" },
     ),
-    col.rowMenu<PayoutTransaction>(
-      transactionRowMenu(onRelease, t, releasingOrderId),
-    ),
+    col.rowMenu<PayoutTransaction>(transactionRowMenu(onRelease, t)),
   ];
 }

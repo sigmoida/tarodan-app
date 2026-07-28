@@ -56,6 +56,22 @@ function refundPortion(amountToRefund: number, threshold: number): number {
   return threshold > 0 ? Math.min(amountToRefund / threshold, 1) : 1;
 }
 
+const PAYOUT_ELIGIBLE_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.delivered,
+  OrderStatus.awaiting_buyer_confirmation,
+  OrderStatus.completed,
+];
+
+const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
+  RefundRequestStatus.pending_review,
+  RefundRequestStatus.approved,
+  RefundRequestStatus.wait_for_delivery,
+  RefundRequestStatus.return_shipment_open,
+  RefundRequestStatus.return_in_transit,
+  RefundRequestStatus.return_delivered,
+  RefundRequestStatus.disputed,
+];
+
 @Injectable()
 export class PaymentRefundService {
   private readonly logger = new Logger(PaymentRefundService.name);
@@ -1559,11 +1575,34 @@ export class PaymentRefundService {
     // bırakılamaz — aksi halde admin manuel release, açık iadeyle birlikte çift
     // kayba yol açar (satıcıya öde + alıcıya iade). releaseHoldsDue/releasePaymentIfHeld
     // ile aynı invaryant. Hem okuma hem güncelleme frozenByRefundId:null ile sınırlı.
+    const now = new Date();
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        status: true,
+        refundRequests: {
+          where: { status: { in: OPEN_REFUND_STATUSES } },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (
+      !order ||
+      !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
+      order.refundRequests.length > 0
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.holdNotReleasable"),
+      );
+    }
+
     const hold = await this.prisma.paymentHold.findFirst({
       where: {
         orderId,
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
+        releaseAt: { lte: now },
       },
     });
 
@@ -1580,10 +1619,11 @@ export class PaymentRefundService {
         id: hold.id,
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
+        releaseAt: { lte: now },
       },
       data: {
         status: PaymentHoldStatus.released,
-        releasedAt: new Date(),
+        releasedAt: now,
       },
     });
 
@@ -1742,22 +1782,6 @@ export class PaymentRefundService {
     // edilmemiş ya da iadesi açık bir siparişte (releaseAt bir şekilde geçmişte olsa bile)
     // parayı satıcıya BIRAKMAYIZ (held bırakmak, yanlış ödemekten güvenlidir). preparing'de
     // takılan siparişler zaten handleExpiredPreparingOrders tarafından iptal+iade edilir.
-    const RELEASABLE_ORDER_STATUSES: OrderStatus[] = [
-      OrderStatus.shipped,
-      OrderStatus.delivered,
-      OrderStatus.awaiting_buyer_confirmation,
-      OrderStatus.completed,
-    ];
-    const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
-      RefundRequestStatus.pending_review,
-      RefundRequestStatus.approved,
-      RefundRequestStatus.wait_for_delivery,
-      RefundRequestStatus.return_shipment_open,
-      RefundRequestStatus.return_in_transit,
-      RefundRequestStatus.return_delivered,
-      RefundRequestStatus.disputed,
-    ];
-
     let holdCount = 0;
     for (const hold of dueHolds) {
       const order = await this.prisma.order.findUnique({
@@ -1773,7 +1797,7 @@ export class PaymentRefundService {
       });
       if (
         !order ||
-        !RELEASABLE_ORDER_STATUSES.includes(order.status) ||
+        !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
         order.refundRequests.length > 0
       ) {
         // Henüz serbest bırakma — bir sonraki cron turunda tekrar denenir.
@@ -1843,13 +1867,33 @@ export class PaymentRefundService {
     // frozenByRefundId dolu (açık iade) hold ASLA serbest bırakılamaz — defansif:
     // bu metod artık teslim akışlarında çağrılmıyor (teslim→scheduleHoldReleaseOnDelivery)
     // ama başka çağıran olursa frozen invaryantı bozulmasın.
+    const now = new Date();
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        status: true,
+        refundRequests: {
+          where: { status: { in: OPEN_REFUND_STATUSES } },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (
+      !order ||
+      !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
+      order.refundRequests.length > 0
+    ) {
+      return false;
+    }
     const updated = await this.prisma.paymentHold.updateMany({
       where: {
         orderId,
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
+        releaseAt: { lte: now },
       },
-      data: { status: PaymentHoldStatus.released, releasedAt: new Date() },
+      data: { status: PaymentHoldStatus.released, releasedAt: now },
     });
     if (updated.count === 0) return false;
     this.logger.log(`Payment hold released for order ${orderId}`);

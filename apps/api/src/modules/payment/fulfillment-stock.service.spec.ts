@@ -81,7 +81,7 @@ describe("FulfillmentStockService.decrementForOrder", () => {
     expect(r.cancelledOrders[0].orderId).toBe("o9");
   });
 
-  it("negatif stok imkânsız: q=1, orderQty=3 → quantity 0 (clamp)", async () => {
+  it("oversell'de fiziksel stok tüketilmez; yalnız rezervasyon bırakılır", async () => {
     const productLock = lock() as any;
     const { tx, update } = makeTx(
       { quantity: 1, reservedQuantity: 3 },
@@ -91,9 +91,12 @@ describe("FulfillmentStockService.decrementForOrder", () => {
 
     const r = await svc.decrementForOrder(tx, "p1", 3);
 
-    expect(update.mock.calls[0][0].data.quantity).toBe(0);
-    // #5: sessiz clamp DEĞİL — oversell tespit edilip result'a işaretlenir (oto/manuel iade).
+    expect(update.mock.calls[0][0].data.quantity).toBeUndefined();
+    expect(update.mock.calls[0][0].data.reservedQuantity).toBe(0);
     expect(r.oversold).toEqual({ productId: "p1", paidQty: 3, physicalQty: 1 });
+    expect(
+      productLock.invalidatePendingOrdersForProduct,
+    ).not.toHaveBeenCalled();
   });
 
   it("stok yeterliyse oversold undefined (yanlış-pozitif yok)", async () => {

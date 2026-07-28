@@ -1,6 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
+import {
+  getProductStatusFromQuantity,
+  getReservedAwareStatus,
+} from "../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import { ProductLockService } from "../product/product-lock.service";
 import {
@@ -26,7 +29,7 @@ export interface StockoutResult {
  * tek yere alır (god-service dedup).
  *
  * KRİTİK (para/stok güvenliği): para tx'inin İÇİNDE çağrılır. Ürün satırı FOR UPDATE
- * ile kilitlenir; clamp'li mutlak set (GREATEST(q-orderQty,0)) → negatif stok imkânsız.
+ * ile kilitlenir; stok yetersizse fiziksel stok tüketilmeden rezervasyon bırakılır.
  * Stockout kaskadı yalnız FİZİKSEL stok (quantity<=0) gerçekten bitince tetiklenir —
  * available (quantity-reserved) ÜZERİNDEN DEĞİL (reserved başka alıcının geçerli
  * pending_payment siparişini de içerir; q-r üzerinden gate onları yanlışlıkla iptal ederdi).
@@ -50,21 +53,40 @@ export class FulfillmentStockService {
       throw new Error(`Product not found for order (productId=${productId})`);
     }
 
-    // #5: FİZİKSEL stok ödenen adetten AZSA bu bir OVERSELL'dir (rezervasyon drift etti).
-    // Math.max(0,...) negatifi engeller ama eskiden bunu SESSİZCE 0'a sıkıştırıp ödenmiş
-    // siparişi fulfillment'a sokuyordu (tespit yok). Artık yüksek-öncelikli alarm ver +
-    // result'a işaretle → çağıran/ops oto-iade/manuel-inceleme başlatır (capture geri
-    // alınamaz; tespit + telafi şart).
+    // FİZİKSEL stok ödenen adetten AZSA bu bir OVERSELL'dir. Sipariş bölünmediği
+    // için eldeki kısmi stoğu tüketme: rezervasyonu bırak, siparişi fulfillment'a
+    // sokma ve çağıranın tam iade başlatmasını zorunlu kıl.
     const oversoldBy =
       product.quantity !== null && product.quantity < orderQty
         ? orderQty - product.quantity
         : 0;
     if (oversoldBy > 0) {
       this.logger.error(
-        `OVERSELL_AT_CAPTURE (oto/manuel iade gerekir): productId=${productId} ` +
+        `OVERSELL_AT_CAPTURE (fulfillment blocked): productId=${productId} ` +
           `ödenen=${orderQty} fiziksel=${product.quantity} (eksik=${oversoldBy}). ` +
-          `Rezervasyon drift etmiş; sipariş ödendi ama stok yetersiz.`,
+          `Rezervasyon drift etmiş; sipariş otomatik iadeye alınacak.`,
       );
+      const newReserved = safeDecrementReserved(
+        product.reservedQuantity,
+        orderQty,
+      );
+      await tx.product.update({
+        where: { id: productId },
+        data: {
+          reservedQuantity: newReserved,
+          status: getReservedAwareStatus(product.quantity, newReserved),
+        },
+      });
+      return {
+        cancelledOrders: [],
+        cancelledOffers: [],
+        stockoutCategoryId: undefined,
+        oversold: {
+          productId,
+          paidQty: orderQty,
+          physicalQty: product.quantity ?? 0,
+        },
+      };
     }
 
     const newQuantity =
@@ -88,14 +110,7 @@ export class FulfillmentStockService {
       cancelledOrders: [],
       cancelledOffers: [],
       stockoutCategoryId: undefined,
-      oversold:
-        oversoldBy > 0
-          ? {
-              productId,
-              paidQty: orderQty,
-              physicalQty: product.quantity ?? 0,
-            }
-          : undefined,
+      oversold: undefined,
     };
 
     // Stockout kaskadı: yalnız FİZİKSEL stok bitince (quantity <= 0).

@@ -1,5 +1,5 @@
 import { PayoutService } from "./payout.service";
-import { RefundRequestStatus } from "@prisma/client";
+import { OrderStatus, RefundRequestStatus } from "@prisma/client";
 
 /**
  * MONEY-M3: createPayoutsForReleasedHolds artık AÇIK iade varken payout OLUŞTURMAZ.
@@ -25,11 +25,13 @@ describe("PayoutService.createPayoutsForReleasedHolds — MONEY-M3 open-refund g
       totalAmount: 100,
       commissionAmount: 10,
       withholdingTaxAmount: 0,
+      status: OrderStatus.delivered,
     };
     const prisma = {
       paymentHold: { findMany: jest.fn().mockResolvedValue([hold]) },
       order: { findMany: jest.fn().mockResolvedValue([order]) },
       refundRequest: { findFirst: jest.fn().mockResolvedValue(openRefund) },
+      refundAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
       payoutTransfer: { create: jest.fn().mockResolvedValue({}) },
     };

@@ -141,8 +141,8 @@ export const financeApi = {
     dateFrom?: string;
     dateTo?: string;
   }) => api.get("/admin/payouts/export", { params }),
-  releasePayout: (orderId: string) =>
-    api.post(`/admin/payouts/release/${orderId}`),
+  releasePayout: (orderId: string, reason: string) =>
+    api.post(`/admin/payouts/release/${orderId}`, { reason }),
 
   // Tax Settings — simple VAT config (the old region/rate/rule CRUD was removed
   // from the UI; the backend endpoints remain, the UI uses the tax/vat surface)

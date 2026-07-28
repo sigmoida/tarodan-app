@@ -6,6 +6,7 @@ import {
   Prisma,
   PaymentStatus,
   OrderStatus,
+  OrderCancellationType,
   ProductStatus,
   TradeStatus,
   OfferStatus,
@@ -254,6 +255,8 @@ export class PaymentFulfillmentService {
       const isBoostOrder =
         payment.order?.productId?.startsWith("boost-") ?? false;
       const productIdsToInvalidate: string[] = [];
+      let stockShortage:
+        { productId: string; paidQty: number; physicalQty: number } | undefined;
 
       if (isMembershipOrder) {
         // Faz 8.2: sanal (üyelik) aktivasyonu → VirtualOrderFulfillmentService.
@@ -279,6 +282,25 @@ export class PaymentFulfillmentService {
         if (stockout.stockoutCategoryId !== undefined) {
           stockoutCategoryId = stockout.stockoutCategoryId;
         }
+        stockShortage = stockout.oversold;
+        if (stockShortage) {
+          const now = new Date();
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: {
+              status: OrderStatus.cancelled,
+              cancellationType: OrderCancellationType.iptal,
+              cancelReason:
+                "Stok tükendi: ödeme sonrası mevcut stok sipariş adedini karşılamadı",
+              preparingDeadline: null,
+              reservationReleasedAt: now,
+              // Bu sipariş için fiziksel stok hiç tüketilmedi. İade finalizer'ının
+              // stoğu yanlışlıkla artırmaması için restore sentinel'ını doldur.
+              stockRestoredAt: now,
+              version: { increment: 1 },
+            },
+          });
+        }
       }
 
       // Get full order details for event emission
@@ -297,6 +319,17 @@ export class PaymentFulfillmentService {
 
       // Only create payment hold for regular product orders (not membership/boost orders)
       if (!isMembershipOrder && !isBoostOrder) {
+        if (stockShortage) {
+          cancelledOrders.push({
+            orderId: order.id,
+            buyerId: order.buyerId,
+            productId: order.productId,
+            productTitle: order.product.title,
+            offerId: order.offerId,
+            hadPayment: true,
+          });
+          return { order, productIdsToInvalidate, stockShortage };
+        }
         // Faz 8.2: escrow hold + pending komisyon → EscrowHoldService (tekil/grup ortak).
         await this.escrowHold.createHold(tx, order, payment.id);
         this.logger.log(
@@ -315,7 +348,7 @@ export class PaymentFulfillmentService {
         );
       }
 
-      return { order, productIdsToInvalidate };
+      return { order, productIdsToInvalidate, stockShortage };
     });
 
     if (!result) {
@@ -346,6 +379,33 @@ export class PaymentFulfillmentService {
     const resultOrder = result.order;
     for (const productId of result.productIdsToInvalidate) {
       await this.cache.del(`products:detail:${productId}`);
+    }
+
+    if (result.stockShortage) {
+      try {
+        await this.paymentRefund.processRefund(
+          resultOrder.id,
+          Number(resultOrder.totalAmount),
+          {
+            skipRefundEvent: true,
+            idempotencyKey: `stock-shortage-refund:${payment.id}:${resultOrder.id}`,
+          },
+        );
+        this.logger.warn(
+          `Stock-shortage refund completed for order ${resultOrder.id}`,
+        );
+      } catch (refundError: any) {
+        this.logger.error(
+          `STOCK-SHORTAGE REFUND PENDING for order ${resultOrder.id}: ${refundError.message}. Reconciliation/admin action required.`,
+        );
+      }
+      await this.fulfillmentNotifier.notifyStockoutCascade({
+        cancelledOrders,
+        cancelledOffers,
+        stockoutCategoryId,
+      });
+      await this.cache.delPattern("products:list:*").catch(() => {});
+      return true;
     }
 
     // Stockout cascade notifications: dispatch AFTER tx commits so failures
@@ -456,6 +516,8 @@ export class PaymentFulfillmentService {
         const refundOrders = groupOrders.filter(
           (o) => o.status === OrderStatus.cancelled,
         );
+        const fulfilledOrders: typeof aliveOrders = [];
+        const stockShortageOrders: typeof aliveOrders = [];
 
         const preparingDays = parseInt(
           this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
@@ -491,8 +553,35 @@ export class PaymentFulfillmentService {
           if (stockout.stockoutCategoryId !== undefined) {
             stockoutCategoryId = stockout.stockoutCategoryId;
           }
+          if (stockout.oversold) {
+            const now = new Date();
+            await tx.order.update({
+              where: { id: order.id },
+              data: {
+                status: OrderStatus.cancelled,
+                cancellationType: OrderCancellationType.iptal,
+                cancelReason:
+                  "Stok tükendi: ödeme sonrası mevcut stok sipariş adedini karşılamadı",
+                preparingDeadline: null,
+                reservationReleasedAt: now,
+                stockRestoredAt: now,
+                version: { increment: 1 },
+              },
+            });
+            stockShortageOrders.push(order);
+            cancelledOrders.push({
+              orderId: order.id,
+              buyerId: order.buyerId,
+              productId: order.productId,
+              productTitle: order.product.title,
+              offerId: order.offerId,
+              hadPayment: true,
+            });
+            continue;
+          }
 
           // Satıcı başına escrow hold + pending komisyon → EscrowHoldService.
+          fulfilledOrders.push(order);
           await this.escrowHold.createHold(tx, order, payment.id);
           // #8: her siparişin fulfillment'ı için ödeme tx'iyle atomik dayanıklı backstop.
           // skipBuyer:true — alıcı onayı grup başına TEK kez (emitGroupBuyerOrderPaid).
@@ -503,7 +592,12 @@ export class PaymentFulfillmentService {
           });
         }
 
-        return { aliveOrders, refundOrders, productIdsToInvalidate };
+        return {
+          fulfilledOrders,
+          refundOrders,
+          stockShortageOrders,
+          productIdsToInvalidate,
+        };
       },
       { timeout: 60000 },
     );
@@ -535,6 +629,29 @@ export class PaymentFulfillmentService {
       }
     }
 
+    for (const order of result.stockShortageOrders) {
+      this.logger.warn(
+        `Group payment ${payment.id} captured with insufficient stock for order ${order.id}. Partial auto-refund.`,
+      );
+      try {
+        await this.paymentRefund.processRefund(
+          order.id,
+          Number(order.totalAmount),
+          {
+            skipRefundEvent: true,
+            idempotencyKey: `stock-shortage-refund:${payment.id}:${order.id}`,
+          },
+        );
+        this.logger.log(
+          `Stock-shortage partial refund completed for group order ${order.id}`,
+        );
+      } catch (refundError: any) {
+        this.logger.error(
+          `STOCK-SHORTAGE PARTIAL REFUND PENDING for group order ${order.id}: ${refundError.message}. Reconciliation/admin action required.`,
+        );
+      }
+    }
+
     for (const productId of result.productIdsToInvalidate) {
       await this.cache.del(`products:detail:${productId}`);
     }
@@ -550,9 +667,9 @@ export class PaymentFulfillmentService {
     // ALICI tarafı: çoklu-ürün (sepet) ödemesinde CheckoutGroup başına TEK onay
     // maili + TEK push. Sipariş başına emitOrderPaid (skipBuyer:true) yalnız satıcı
     // tarafını işler; alıcı onayı burada bir kez üst seviyeden gönderilir.
-    if (result.aliveOrders.length > 0) {
+    if (result.fulfilledOrders.length > 0) {
       try {
-        const firstOrder = result.aliveOrders[0];
+        const firstOrder = result.fulfilledOrders[0];
         const firstAddr = firstOrder.shippingAddress as any;
         const groupIsGuest =
           firstOrder.buyer.email === "guest@tarodan.system" ||
@@ -574,7 +691,7 @@ export class PaymentFulfillmentService {
           string,
           { sellerName: string; shippingCost: number }
         >();
-        for (const o of result.aliveOrders) {
+        for (const o of result.fulfilledOrders) {
           const sellerName = o.seller.displayName || o.seller.email || "Satıcı";
           const cost = Number(o.shippingCost ?? 0);
           const existing = shippingBySeller.get(o.sellerId);
@@ -598,14 +715,14 @@ export class PaymentFulfillmentService {
           buyerId: firstOrder.buyerId,
           buyerEmail: groupBuyerEmail,
           buyerName: groupBuyerName,
-          groupTotal: result.aliveOrders.reduce(
+          groupTotal: result.fulfilledOrders.reduce(
             (sum, o) => sum + Number(o.totalAmount),
             0,
           ),
           paymentMethod: payment.provider,
           transactionId:
             transactionId || payment.providerPaymentId || payment.id,
-          items: result.aliveOrders.map((o) => ({
+          items: result.fulfilledOrders.map((o) => ({
             productTitle: o.product.title,
             totalAmount: Number(o.totalAmount),
             quantity: o.quantity ?? 1,
@@ -634,7 +751,7 @@ export class PaymentFulfillmentService {
     }
 
     // Sipariş başına: order.paid eventi (SATICI tarafı; alıcı atlanır), fatura, kargo kaydı
-    for (const resultOrder of result.aliveOrders) {
+    for (const resultOrder of result.fulfilledOrders) {
       // Faz 8.1: sepetteki HER siparişin POST-COMMIT sonlandırması EVENT ile istenir (tekil
       // yolla ortak seam — OrderFulfillmentListener tüketir). skipBuyer:true — alıcı onayı
       // grup başına TEK kez (emitGroupBuyerOrderPaid) yukarıda gönderildi.
@@ -647,7 +764,9 @@ export class PaymentFulfillmentService {
     }
 
     this.logger.log(
-      `Group payment ${payment.id} completed: ${result.aliveOrders.length} orders preparing, ${result.refundOrders.length} auto-refunded`,
+      `Group payment ${payment.id} completed: ${result.fulfilledOrders.length} orders preparing, ` +
+        `${result.refundOrders.length} expired-order refund(s), ` +
+        `${result.stockShortageOrders.length} stock-shortage refund(s)`,
     );
     return true;
   }

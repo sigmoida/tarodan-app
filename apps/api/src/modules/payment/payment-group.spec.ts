@@ -357,7 +357,7 @@ describe("PaymentService group payment (checkout group)", () => {
     expect(mockProductLock.invalidateRelatedOffers).not.toHaveBeenCalled();
   });
 
-  it("DOES cascade-cancel when physical stock is truly drained (q=0)", async () => {
+  it("stok ödeme anında yetersizse hold/kargo oluşturmaz ve satırı iadeye alır", async () => {
     mockTx.product.findUnique.mockImplementation(({ where }: any) =>
       Promise.resolve({
         id: where.id,
@@ -367,6 +367,9 @@ describe("PaymentService group payment (checkout group)", () => {
         status: ProductStatus.sold,
       }),
     );
+    const refundSpy = jest
+      .spyOn(refund as any, "processRefund")
+      .mockResolvedValue({ success: true });
 
     const did = await (fulfillment as any).processSuccessfulGroupPayment(
       basePayment(),
@@ -376,7 +379,19 @@ describe("PaymentService group payment (checkout group)", () => {
     expect(did).toBe(true);
     expect(
       mockProductLock.invalidatePendingOrdersForProduct,
-    ).toHaveBeenCalled();
+    ).not.toHaveBeenCalled();
+    expect(mockTx.paymentHold.create).not.toHaveBeenCalled();
+    expect(mockOutbox.enqueue).not.toHaveBeenCalled();
+    expect(mockEvents.emitOrderFulfillmentRequested).not.toHaveBeenCalled();
+    expect(refundSpy).toHaveBeenCalledTimes(2);
+    expect(refundSpy).toHaveBeenCalledWith(
+      "order-1",
+      101,
+      expect.objectContaining({
+        skipRefundEvent: true,
+        idempotencyKey: `stock-shortage-refund:${paymentId}:order-1`,
+      }),
+    );
   });
 
   it("is idempotent: second success callback does nothing (CAS claim fails)", async () => {

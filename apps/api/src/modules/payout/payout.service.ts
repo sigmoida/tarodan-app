@@ -11,6 +11,7 @@ import {
   PayoutStatus,
   PaymentHoldStatus,
   PaymentStatus,
+  OrderStatus,
   RefundRequestStatus,
   RefundAttemptStatus,
   LedgerAccount,
@@ -25,6 +26,22 @@ function maskIban(iban: string | null | undefined): string {
   const clean = (iban || "").replace(/\s/g, "");
   return clean ? `***${clean.slice(-4)}` : "(yok)";
 }
+
+const PAYOUT_ELIGIBLE_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.delivered,
+  OrderStatus.awaiting_buyer_confirmation,
+  OrderStatus.completed,
+];
+
+const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
+  RefundRequestStatus.pending_review,
+  RefundRequestStatus.approved,
+  RefundRequestStatus.wait_for_delivery,
+  RefundRequestStatus.return_shipment_open,
+  RefundRequestStatus.return_in_transit,
+  RefundRequestStatus.return_delivered,
+  RefundRequestStatus.disputed,
+];
 
 @Injectable()
 export class PayoutService {
@@ -127,6 +144,12 @@ export class PayoutService {
       const payment = hold.payment;
       const order = orderById.get(hold.orderId);
       if (!payment || !order) continue;
+      if (!PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status)) {
+        this.logger.warn(
+          `Payout skipped: order ${hold.orderId} is not payout eligible (status=${order.status})`,
+        );
+        continue;
+      }
 
       // MONEY-M3: Bu siparişte AÇIK bir iade talebi varsa payout OLUŞTURMA. Yarış:
       // hold releaseAt'i geçip release edildikten HEMEN SONRA bir iade açılırsa,
@@ -136,17 +159,7 @@ export class PayoutService {
       const openRefund = await this.prisma.refundRequest.findFirst({
         where: {
           orderId: hold.orderId,
-          status: {
-            in: [
-              RefundRequestStatus.pending_review,
-              RefundRequestStatus.approved,
-              RefundRequestStatus.wait_for_delivery,
-              RefundRequestStatus.return_shipment_open,
-              RefundRequestStatus.return_in_transit,
-              RefundRequestStatus.return_delivered,
-              RefundRequestStatus.disputed,
-            ],
-          },
+          status: { in: OPEN_REFUND_STATUSES },
         },
         select: { id: true },
       });
@@ -333,6 +346,37 @@ export class PayoutService {
             }
           : null;
       if (refundTarget) {
+        if (refundTarget.orderId) {
+          const [order, openRefund] = await Promise.all([
+            this.prisma.order.findUnique({
+              where: { id: refundTarget.orderId },
+              select: { status: true },
+            }),
+            this.prisma.refundRequest.findFirst({
+              where: {
+                orderId: refundTarget.orderId,
+                status: { in: OPEN_REFUND_STATUSES },
+              },
+              select: { id: true },
+            }),
+          ]);
+          if (
+            !order ||
+            !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
+            openRefund
+          ) {
+            await this.prisma.payoutTransfer.updateMany({
+              where: { id: payout.id, status: PayoutStatus.pending },
+              data: {
+                status: PayoutStatus.failed,
+                failureReason: openRefund
+                  ? "refund_pending"
+                  : "order_not_payout_eligible",
+              },
+            });
+            continue;
+          }
+        }
         const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
           where: {
             paymentId: refundTarget.paymentId,

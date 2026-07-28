@@ -1,5 +1,5 @@
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
-import { LedgerEventType } from "@prisma/client";
+import { LedgerEventType, OrderStatus } from "@prisma/client";
 
 /**
  * #8: finalize iki kez koşabilir (anlık yol + outbox backstop / drainer retry).
@@ -29,6 +29,11 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
         findFirst: jest
           .fn()
           .mockResolvedValue(existingCapture ? { id: "le-1" } : null),
+      },
+      order: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ status: OrderStatus.preparing }),
       },
     } as any;
     const eventService = {
@@ -81,5 +86,17 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
     expect(paymentCommon.ensureSuratShipmentForOrder).toHaveBeenCalledWith(
       "o1",
     );
+  });
+
+  it("iptal edilmiş siparişte bildirim ve kargo yan etkilerini çalıştırmaz", async () => {
+    const { svc, prisma, eventService, paymentCommon } = make(false);
+    prisma.order.findUnique.mockResolvedValue({
+      status: OrderStatus.cancelled,
+    });
+
+    await svc.finalizePaidOrder(order, payment, {});
+
+    expect(eventService.emitOrderPaid).not.toHaveBeenCalled();
+    expect(paymentCommon.ensureSuratShipmentForOrder).not.toHaveBeenCalled();
   });
 });

@@ -105,8 +105,14 @@ describe("PaymentOutboxHandlers", () => {
 
   describe("#8 order.fulfillment_requested backstop handler", () => {
     it("order+payment TAZE yükler ve finalizePaidOrder'a devreder (opts payload'dan)", async () => {
-      const order = { id: "o1", buyer: {}, seller: {}, product: {} };
-      const payment = { id: "p1" };
+      const order = {
+        id: "o1",
+        checkoutGroupId: "group-1",
+        buyer: {},
+        seller: {},
+        product: {},
+      };
+      const payment = { id: "p1", status: "completed" };
       const { registry, prisma, fulfillmentFinalizer, svc } = makeDeps({
         order,
         payment,
@@ -123,6 +129,13 @@ describe("PaymentOutboxHandlers", () => {
       expect(prisma.order.findUnique).toHaveBeenCalledWith({
         where: { id: "o1" },
         include: { buyer: true, seller: true, product: true },
+      });
+      expect(prisma.payment.findFirst).toHaveBeenCalledWith({
+        where: {
+          status: "completed",
+          OR: [{ orderId: "o1" }, { checkoutGroupId: "group-1" }],
+        },
+        orderBy: { createdAt: "desc" },
       });
       expect(fulfillmentFinalizer.finalizePaidOrder).toHaveBeenCalledWith(
         order,
@@ -144,7 +157,13 @@ describe("PaymentOutboxHandlers", () => {
     });
 
     it("payment yoksa NO-OP (finalize çağrılmaz)", async () => {
-      const order = { id: "o1", buyer: {}, seller: {}, product: {} };
+      const order = {
+        id: "o1",
+        checkoutGroupId: null,
+        buyer: {},
+        seller: {},
+        product: {},
+      };
       const { registry, fulfillmentFinalizer, svc } = makeDeps({
         order,
         payment: null,

@@ -1,5 +1,5 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
-import { LedgerEventType } from "@prisma/client";
+import { LedgerEventType, OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { EventService } from "../events";
 import { PaymentCommonService } from "./payment-common.service";
@@ -69,6 +69,27 @@ export class FulfillmentFinalizer {
       this.logger.warn(
         `Ledger capture kaydı başarısız (order ${order.id}): ${e?.message}`,
       );
+    }
+
+    const currentOrder = await this.prisma.order.findUnique({
+      where: { id: order.id },
+      select: { status: true },
+    });
+    if (
+      !currentOrder ||
+      (
+        [
+          OrderStatus.pending_payment,
+          OrderStatus.cancelled,
+          OrderStatus.refund_requested,
+          OrderStatus.refunded,
+        ] as OrderStatus[]
+      ).includes(currentOrder.status)
+    ) {
+      this.logger.warn(
+        `Fulfillment side effects skipped for order ${order.id}: status=${currentOrder?.status ?? "missing"}`,
+      );
+      return;
     }
 
     // 2) order.paid event (misafir tespiti dahil).
