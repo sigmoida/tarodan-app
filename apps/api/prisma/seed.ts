@@ -95,11 +95,9 @@ const randomFutureDate = (daysAhead: number) => {
 // Photo Copy Helpers
 //
 // Demo images live in S3 under the shared, env-independent `seed-assets/`
-// prefix (built once by scripts/build-seed-assets.ts). The seed never reads
-// image files from disk or processes them; it server-side-copies the
-// pre-built variants into this environment's own per-product keys, so each
-// environment owns its objects and app deletion flows can never touch the
-// shared sources.
+// prefix. The seed never reads image files from disk or processes them; it
+// server-side-copies the managed variants into this environment's own
+// per-product keys, so app deletion flows cannot touch the shared sources.
 // ==========================================================================
 
 const SEED_ASSETS_PREFIX = process.env.SEED_ASSETS_PREFIX || "seed-assets";

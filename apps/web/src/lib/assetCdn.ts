@@ -2,8 +2,8 @@
 
 /**
  * Statik pazarlama görsellerinin (hero) sunulduğu CDN/S3 kökü.
- * Görsellerin kendisi repo'da değil, S3'teki paylaşılan `seed-assets/`
- * prefix'inde yaşar (bkz. apps/api/scripts/build-seed-assets.ts).
+ * Görsellerin kendisi repo'da değil, S3'teki yönetilen `seed-assets/`
+ * prefix'inde yaşar.
  * NEXT_PUBLIC_ASSET_CDN_URL build sırasında inline edilir; CloudFront gibi
  * bir CDN öne alınırsa tek değişecek yer burasıdır.
  */

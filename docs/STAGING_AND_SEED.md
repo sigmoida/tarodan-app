@@ -46,14 +46,12 @@ taze DB'den kendisi doldurur (`syncIndexIfEmpty`).
    `STAGING_WEEKLY_RESET=true` → her Pazartesi 06:00 TRT. Tanımlı değilse cron
    no-op'tur.
 
-## seed-assets nasıl kuruldu / yeniden kurulur
+## seed-assets yönetimi
 
-`apps/api/scripts/build-seed-assets.ts` (`pnpm --filter @tarodan/api
-seed:assets:build`): dev DB'deki mevcut ürün/koleksiyon görsel key'lerini okur
-ve S3→S3 kopyayla `seed-assets/` altına kararlı isimlerle damıtır (lokalden
-yükleme yok; eksikler lokal `photos/` fallback'inden tamamlanır). Yeni demo
-görseli eklemek istersen: dosyayı `seed-assets/`e yükle ve seed'deki ilgili
-listeye (productData `img` / collectionDefs `coverFile`) adını ekle.
+Demo görselleri S3'teki yönetilen `seed-assets/` prefix'inde tutulur. Yeni demo
+görseli eklemek için dosyayı doğru kararlı anahtarla `seed-assets/` altına
+yükle ve seed'deki ilgili listeye (`productData.img` veya
+`collectionDefs.coverFile`) adını ekle.
 
 - Ürün: `seed-assets/products/<slugBase>-card.webp` + `-detail.webp`
 - Koleksiyon: `seed-assets/collections/<slug>.webp`
@@ -86,10 +84,3 @@ Yerel geliştirmede doğrudan `pnpm dev:seed` kullanılır. Bu komut
 `SEED_SKIP_IMAGES=1` değerini kendisi geçirir ve uzak bir veritabanına karşı
 çalışmayı reddeder. Mevcut yerel veritabanını tamamen yenilemek için
 `pnpm dev:reset` kullanılır.
-
-## S3 çöp temizliği (dev prefix)
-
-`apps/api/scripts/prune-dev-s3.ts`: `dev/products/product-images/` ve
-`dev/collections/` altında dev DB'nin referans etmediği objeleri bulur.
-Varsayılan **dry-run**; gerçekten silmek için `--delete`. `prod/` ve
-`seed-assets/` kapsam dışıdır.
