@@ -154,6 +154,9 @@ function useCheckoutValue() {
       productId: i.productId,
       quantity: i.quantity,
     })),
+    // Direct-buy'da kupon sunulmuyor; sepet checkout'unda uygulanan kupon quote'a
+    // gönderilir → server toplamı kuponu içerir (önizleme = tahsilat).
+    directProduct ? null : appliedCouponCode,
   );
 
   const shippingCity =
@@ -169,10 +172,13 @@ function useCheckoutValue() {
     itemCount: checkoutItems.length,
   });
 
+  // Kupon artık QUOTE'ta server-otoriter uygulanıyor (fee/tax/kargo indirimli baz):
+  // pricing.totalAmount doğrudan tahsil edilecek tutardır → client-side ÇIKARMA YOK
+  // (eski önizleme≠tahsilat hatası kapandı). Quote yoksa kaba fallback tahmini kullanılır.
   const couponDiscount = directProduct ? 0 : (cartTotalDiscount ?? 0);
   const displayTotal = Math.max(
     0,
-    (quote?.pricing?.totalAmount ?? subtotal + shippingCost) - couponDiscount,
+    quote?.pricing?.totalAmount ?? subtotal + shippingCost - couponDiscount,
   );
   const grandTotal = displayTotal;
 

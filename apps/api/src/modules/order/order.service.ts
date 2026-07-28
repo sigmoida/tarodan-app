@@ -56,6 +56,7 @@ export class OrderService {
     sellerFeeAmount: number;
     commissionAmount: number;
     taxAmount: number;
+    couponDiscount: number;
     totalAmount: number;
     sellerNetAmount: number;
     items: Array<{

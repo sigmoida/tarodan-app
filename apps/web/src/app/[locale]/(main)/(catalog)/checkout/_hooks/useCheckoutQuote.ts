@@ -13,8 +13,13 @@ import type { CheckoutQuote } from "../_lib/types";
  */
 export function useCheckoutQuote(
   items: Array<{ productId: string; quantity: number }>,
+  couponCode?: string | null,
 ) {
-  const key = items.map((i) => `${i.productId}:${i.quantity}`).join(",");
+  // Kupon da anahtara girer → kupon değişince yeniden fetch. Kupon server'da uygulanır
+  // (fee/tax/kargo indirimli baz üzerinden) → pricing.totalAmount = tahsil edilen tutar.
+  const key =
+    items.map((i) => `${i.productId}:${i.quantity}`).join(",") +
+    `|coupon:${couponCode ?? ""}`;
   const query = useWebList<CheckoutQuote | null>({
     resource: "checkout-quote",
     params: key,
@@ -24,6 +29,7 @@ export function useCheckoutQuote(
           productId: i.productId,
           quantity: i.quantity,
         })),
+        ...(couponCode ? { couponCode } : {}),
       });
       if (res.data?.pricing)
         return {

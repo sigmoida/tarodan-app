@@ -154,6 +154,7 @@ export const ordersApi = {
   /** Checkout quote (pricing breakdown). Use for order summary; same logic as order create. */
   getQuote: (data: {
     items: Array<{ productId: string; quantity?: number }>;
+    couponCode?: string;
   }) => api.post("/orders/quote", data),
   /** Commission preview for one amount/category (listing form). */
   getCommissionPreview: (params: { amount: number; categoryId?: string }) =>

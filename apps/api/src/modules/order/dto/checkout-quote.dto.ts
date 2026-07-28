@@ -1,9 +1,16 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsArray, IsNumber, IsOptional, Min, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsArray,
+  IsNumber,
+  IsOptional,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
 
 export class CheckoutQuoteItemDto {
-  @ApiProperty({ example: 'product-uuid' })
+  @ApiProperty({ example: "product-uuid" })
   @IsString()
   productId: string;
 
@@ -18,12 +25,21 @@ export class CheckoutQuoteItemDto {
 export class CheckoutQuoteDto {
   @ApiProperty({
     type: [CheckoutQuoteItemDto],
-    description: 'Product IDs and quantities (single item for direct buy, multiple for cart)',
+    description:
+      "Product IDs and quantities (single item for direct buy, multiple for cart)",
   })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CheckoutQuoteItemDto)
   items: CheckoutQuoteItemDto[];
+
+  @ApiPropertyOptional({
+    description:
+      "Applied coupon code — the quote applies it server-side (fee/tax/shipping recomputed on the discounted base) so the preview total matches the charged total.",
+  })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }
 
 export class CheckoutQuoteItemResponseDto {
@@ -33,52 +49,55 @@ export class CheckoutQuoteItemResponseDto {
   @ApiProperty()
   quantity: number;
 
-  @ApiProperty({ description: 'Unit price (after sale if any)' })
+  @ApiProperty({ description: "Unit price (after sale if any)" })
   unitPrice: number;
 
-  @ApiProperty({ description: 'Line total (unitPrice * quantity)' })
+  @ApiProperty({ description: "Line total (unitPrice * quantity)" })
   subtotal: number;
 
-  @ApiProperty({ description: 'Buyer fee for this line' })
+  @ApiProperty({ description: "Buyer fee for this line" })
   buyerFeeAmount: number;
 
-  @ApiProperty({ description: 'Seller fee for this line' })
+  @ApiProperty({ description: "Seller fee for this line" })
   sellerFeeAmount: number;
 
-  @ApiProperty({ description: 'Net to seller for this line' })
+  @ApiProperty({ description: "Net to seller for this line" })
   sellerNetAmount: number;
 
-  @ApiPropertyOptional({ description: 'Product title' })
+  @ApiPropertyOptional({ description: "Product title" })
   title?: string;
 }
 
 export class CheckoutQuoteResponseDto {
-  @ApiProperty({ description: 'Sum of item subtotals' })
+  @ApiProperty({ description: "Sum of item subtotals" })
   itemsSubtotal: number;
 
-  @ApiProperty({ description: 'Shipping cost (one per order)' })
+  @ApiProperty({ description: "Shipping cost (one per order)" })
   shippingAmount: number;
 
-  @ApiProperty({ description: 'Total buyer fee' })
+  @ApiProperty({ description: "Total buyer fee" })
   buyerFeeAmount: number;
 
-  @ApiProperty({ description: 'Total seller fee' })
+  @ApiProperty({ description: "Total seller fee" })
   sellerFeeAmount: number;
 
-  @ApiProperty({ description: 'Total commission' })
+  @ApiProperty({ description: "Total commission" })
   commissionAmount: number;
 
-  @ApiProperty({ description: 'Total amount paid by buyer' })
+  @ApiProperty({ description: "Coupon discount applied to the eligible items" })
+  couponDiscount: number;
+
+  @ApiProperty({ description: "Total amount paid by buyer (after coupon)" })
   totalAmount: number;
 
-  @ApiProperty({ description: 'Total net to seller(s)' })
+  @ApiProperty({ description: "Total net to seller(s)" })
   sellerNetAmount: number;
 
   @ApiProperty({ type: [CheckoutQuoteItemResponseDto] })
   items: CheckoutQuoteItemResponseDto[];
 
   @ApiProperty({
-    description: 'Standard pricing breakdown (same shape as order/payment)',
+    description: "Standard pricing breakdown (same shape as order/payment)",
     example: {
       subtotal: 250,
       shippingAmount: 29.99,

@@ -123,6 +123,7 @@ export class OrderPricingService {
     sellerFeeAmount: number;
     commissionAmount: number;
     taxAmount: number;
+    couponDiscount: number;
     totalAmount: number;
     sellerNetAmount: number;
     items: Array<{
@@ -182,6 +183,20 @@ export class OrderPricingService {
     // bölüşüm; önizleme toplamı oluşan siparişle birebir eşleşsin.
     const sellerShippingShare = new Map<string, number>();
 
+    // Pass 1: ürünleri çöz + EFEKTİF (kampanya) birim fiyat + satır toplamı (F1.4).
+    const lines: Array<{
+      product: {
+        id: string;
+        title: string | null;
+        sellerId: string;
+        categoryId: string | null;
+        seller: { businessStatus: string | null; taxId: string | null } | null;
+      };
+      quantity: number;
+      unitPrice: number;
+      lineSubtotal: number;
+      couponDiscount: number;
+    }> = [];
     for (const { productId, quantity = 1 } of dto.items) {
       const product = await this.prisma.product.findUnique({
         where: { id: productId },
@@ -209,8 +224,6 @@ export class OrderPricingService {
         );
       }
 
-      // F1.4: quote charged base = EFEKTİF (kampanya) fiyat — create yolları ile aynı,
-      // sepet/ürün kartıyla tutarlı. Aktif code=null kampanya yoksa efektif == baz (no-op).
       const basePrice = Number(product.price);
       const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
         product.id,
@@ -219,10 +232,72 @@ export class OrderPricingService {
         basePrice,
       );
       const unitPrice = campaignPrice ?? basePrice;
-      const lineSubtotal = unitPrice * quantity;
+      lines.push({
+        product: {
+          id: product.id,
+          title: product.title,
+          sellerId: product.sellerId,
+          categoryId: product.categoryId,
+          seller: product.seller,
+        },
+        quantity,
+        unitPrice,
+        lineSubtotal: unitPrice * quantity,
+        couponDiscount: 0,
+      });
+    }
+
+    // F1.1: kuponu quote'ta da uygula — YALNIZ uygun satırlara dağıt; fee/tax/kargo
+    // İNDİRİMLİ baz üzerinden hesaplanır (create ile aynı) → önizleme = tahsilat.
+    // userId=null (quote @Public'tir): per-user limitli kupon burada atlanır, checkout
+    // uygular (önizleme fazla gösterir — güvenli yön, fazla tahsil değil).
+    let couponDiscountTotal = 0;
+    if (dto.couponCode) {
+      const validation = await this.discountService.validateCoupon(
+        {
+          code: dto.couponCode,
+          cartItems: lines.map((l) => ({
+            productId: l.product.id,
+            quantity: l.quantity,
+          })),
+        },
+        null,
+      );
+      if (validation.isValid && validation.discount) {
+        const total = validation.discount.estimatedDiscount;
+        const eligibleIds = new Set(validation.discount.eligibleProductIds);
+        const eligibleLines = lines.filter((l) =>
+          eligibleIds.has(l.product.id),
+        );
+        const eligiblePriceSum = eligibleLines.reduce(
+          (s, l) => s + l.lineSubtotal,
+          0,
+        );
+        if (eligiblePriceSum > 0) {
+          let allocated = 0;
+          eligibleLines.forEach((l, idx) => {
+            if (idx === eligibleLines.length - 1) {
+              l.couponDiscount = Math.round((total - allocated) * 100) / 100;
+            } else {
+              l.couponDiscount =
+                Math.round(
+                  ((total * l.lineSubtotal) / eligiblePriceSum) * 100,
+                ) / 100;
+              allocated += l.couponDiscount;
+            }
+          });
+          couponDiscountTotal = total;
+        }
+      }
+    }
+
+    // Pass 2: satır ücretleri İNDİRİMLİ baz üzerinden (create yolu ile birebir).
+    for (const line of lines) {
+      const { product, quantity, unitPrice, lineSubtotal } = line;
+      const discountedLine = Math.max(0, lineSubtotal - line.couponDiscount);
 
       const commissionResult = await this.calculateCommission(
-        lineSubtotal,
+        discountedLine,
         product.sellerId,
         product.categoryId,
       );
@@ -233,7 +308,7 @@ export class OrderPricingService {
       );
       const lineBuyerFee = commissionResult.buyerFeeAmount;
       const lineSellerFee = commissionResult.sellerFeeAmount;
-      const lineSellerNet = lineSubtotal - lineSellerFee;
+      const lineSellerNet = discountedLine - lineSellerFee;
 
       // KDV: sadece kurumsal satıcılar (businessStatus=approved ve taxId dolu)
       const isCorporate =
@@ -247,7 +322,7 @@ export class OrderPricingService {
           product.categoryId,
         );
         lineTax = resolved
-          ? this.taxService.calculateTaxAmount(lineSubtotal, resolved)
+          ? this.taxService.calculateTaxAmount(discountedLine, resolved)
           : 0;
       }
 
@@ -257,7 +332,7 @@ export class OrderPricingService {
       totalTax += lineTax;
       sellerSubtotals.set(
         product.sellerId,
-        (sellerSubtotals.get(product.sellerId) ?? 0) + lineSubtotal,
+        (sellerSubtotals.get(product.sellerId) ?? 0) + discountedLine,
       );
 
       quoteItems.push({
@@ -291,9 +366,18 @@ export class OrderPricingService {
       0,
     );
     const commissionAmount = totalBuyerFee + totalSellerFee;
+    // Toplam = brüt ürün toplamı − kupon + kargo + alıcı ücreti + vergi (create ile
+    // birebir; fee/tax zaten indirimli baz üzerinden hesaplandı).
     const totalAmount =
-      itemsSubtotal + shippingAmount + totalBuyerFee + totalTax;
-    const sellerNetAmount = Math.max(0, itemsSubtotal - totalSellerFee);
+      itemsSubtotal -
+      couponDiscountTotal +
+      shippingAmount +
+      totalBuyerFee +
+      totalTax;
+    const sellerNetAmount = Math.max(
+      0,
+      itemsSubtotal - couponDiscountTotal - totalSellerFee,
+    );
     const { tariffVersion } = await this.getShippingTariffMeta();
 
     const pricing = {
@@ -314,6 +398,7 @@ export class OrderPricingService {
       sellerFeeAmount: totalSellerFee,
       commissionAmount,
       taxAmount: totalTax,
+      couponDiscount: couponDiscountTotal,
       totalAmount,
       sellerNetAmount,
       items: quoteItems,
