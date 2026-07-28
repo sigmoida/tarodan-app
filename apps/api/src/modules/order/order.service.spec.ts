@@ -22,6 +22,7 @@ import { ProductLockService } from "../product/product-lock.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
+import { RefundService } from "../refund/refund.service";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
@@ -173,6 +174,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
         { provide: SuratCargoService, useValue: {} },
         { provide: ProductLockService, useValue: {} },
         { provide: CommissionLedgerService, useValue: {} },
+        { provide: RefundService, useValue: {} },
         {
           provide: TaxService,
           useValue: {
@@ -305,6 +307,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
         { provide: SuratCargoService, useValue: {} },
         { provide: ProductLockService, useValue: {} },
         { provide: CommissionLedgerService, useValue: {} },
+        { provide: RefundService, useValue: {} },
         {
           provide: TaxService,
           useValue: {

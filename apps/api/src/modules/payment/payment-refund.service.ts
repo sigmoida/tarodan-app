@@ -63,6 +63,29 @@ const PAYOUT_ELIGIBLE_ORDER_STATUSES: OrderStatus[] = [
   OrderStatus.completed,
 ];
 
+export interface RefundSettlementOptions {
+  /** Ürünlerin tamamı fiziksel olarak döndü; nakit iade toplamdan düşük olsa da siparişi kapat. */
+  closeOrder?: boolean;
+  /** Satıcı hold'unun tüketilecek adet oranı. Nakit iade oranından bağımsızdır. */
+  holdPortion?: number;
+  /** Terslenecek satıcı kesintisinin kesin TL tutarı. */
+  sellerFeeRefundAmount?: number;
+  /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
+  buyerFeeRefundAmount?: number;
+  sellerAdjustment?: {
+    sourceKey: string;
+    amount: number;
+    refundRequestId?: string;
+  };
+}
+
+export interface ProcessRefundOptions {
+  skipRefundEvent?: boolean;
+  refundQuantity?: number;
+  idempotencyKey?: string;
+  settlement?: RefundSettlementOptions;
+}
+
 const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
   RefundRequestStatus.pending_review,
   RefundRequestStatus.approved,
@@ -424,11 +447,7 @@ export class PaymentRefundService {
   async processRefund(
     orderId: string,
     refundAmount?: number,
-    opts?: {
-      skipRefundEvent?: boolean;
-      refundQuantity?: number;
-      idempotencyKey?: string;
-    },
+    opts?: ProcessRefundOptions,
   ) {
     let payment = await this.prisma.payment.findFirst({
       where: {
@@ -477,7 +496,13 @@ export class PaymentRefundService {
       (isGroupPayment
         ? Number(refundTargetOrder!.totalAmount)
         : Number(payment.amount));
-    if (!Number.isFinite(amountToRefund) || amountToRefund <= 0) {
+    const isZeroCashSettlement =
+      amountToRefund === 0 && Boolean(opts?.settlement);
+    if (
+      !Number.isFinite(amountToRefund) ||
+      amountToRefund < 0 ||
+      (amountToRefund === 0 && !isZeroCashSettlement)
+    ) {
       throw new BadRequestException(
         i18nMessage("server.payment.refundInitiationFailed"),
       );
@@ -673,65 +698,73 @@ export class PaymentRefundService {
         };
       } else {
         await this.startRefundSubmission(refundAttempt.attempt.id);
-        const bypassEnabled =
-          process.env.NODE_ENV !== "production" &&
-          this.configService.get("PAYMENT_BYPASS") === "true";
-        if (bypassEnabled) {
-          this.logger.warn(
-            `PAYMENT_BYPASS: PayTR refund atlandı payment=${payment.id} amount=${amountToRefund}`,
-          );
+        if (isZeroCashSettlement) {
           refundResult = {
             status: "success",
-            err_msg: null,
-            return_amount: amountToRefund,
-            bypass: true,
+            return_amount: 0,
+            zeroCashSettlement: true,
           };
         } else {
-          try {
-            refundResult = await this.paymentProviders
-              .resolve(payment.provider)
-              .createRefund(paytrOid, amountToRefund);
-          } catch (err) {
-            const reason = (err as Error).message || "refund request failed";
-            if (err instanceof ProviderRefundRejectedException) {
-              await this.prisma.refundAttempt.updateMany({
-                where: {
-                  id: refundAttempt.attempt.id,
-                  status: RefundAttemptStatus.submitting,
-                },
-                data: {
-                  status: RefundAttemptStatus.failed,
-                  failureReason: reason,
-                },
-              });
-              if (
-                /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
-                  reason,
-                )
-              ) {
-                throw new BadRequestException(
-                  i18nMessage("server.payment.paymentNotYetSynced"),
-                );
+          const bypassEnabled =
+            process.env.NODE_ENV !== "production" &&
+            this.configService.get("PAYMENT_BYPASS") === "true";
+          if (bypassEnabled) {
+            this.logger.warn(
+              `PAYMENT_BYPASS: PayTR refund atlandı payment=${payment.id} amount=${amountToRefund}`,
+            );
+            refundResult = {
+              status: "success",
+              err_msg: null,
+              return_amount: amountToRefund,
+              bypass: true,
+            };
+          } else {
+            try {
+              refundResult = await this.paymentProviders
+                .resolve(payment.provider)
+                .createRefund(paytrOid, amountToRefund);
+            } catch (err) {
+              const reason = (err as Error).message || "refund request failed";
+              if (err instanceof ProviderRefundRejectedException) {
+                await this.prisma.refundAttempt.updateMany({
+                  where: {
+                    id: refundAttempt.attempt.id,
+                    status: RefundAttemptStatus.submitting,
+                  },
+                  data: {
+                    status: RefundAttemptStatus.failed,
+                    failureReason: reason,
+                  },
+                });
+                if (
+                  /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
+                    reason,
+                  )
+                ) {
+                  throw new BadRequestException(
+                    i18nMessage("server.payment.paymentNotYetSynced"),
+                  );
+                }
+                throw err;
               }
-              throw err;
-            }
 
-            providerOutcomeUncertain = true;
-            await this.prisma.refundAttempt
-              .updateMany({
-                where: {
-                  id: refundAttempt.attempt.id,
-                  status: RefundAttemptStatus.submitting,
-                },
-                data: {
-                  status: RefundAttemptStatus.manual_review,
-                  failureReason: reason,
-                },
-              })
-              .catch(() => undefined);
-            throw err instanceof ProviderRefundOutcomeUnknownException
-              ? err
-              : new RefundPendingReconciliationException(reason);
+              providerOutcomeUncertain = true;
+              await this.prisma.refundAttempt
+                .updateMany({
+                  where: {
+                    id: refundAttempt.attempt.id,
+                    status: RefundAttemptStatus.submitting,
+                  },
+                  data: {
+                    status: RefundAttemptStatus.manual_review,
+                    failureReason: reason,
+                  },
+                })
+                .catch(() => undefined);
+              throw err instanceof ProviderRefundOutcomeUnknownException
+                ? err
+                : new RefundPendingReconciliationException(reason);
+            }
           }
         }
 
@@ -758,18 +791,20 @@ export class PaymentRefundService {
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
-        await this.providerEvents.record({
-          eventType: "refund",
-          merchantOid: paytrOid,
-          paymentId: payment.id,
-          status: refundResult?.status ?? "success",
-          amount: amountToRefund,
-          totalAmount: amountToRefund,
-          raw: {
-            ...(refundResult as Record<string, unknown>),
-            refundAttemptId: refundAttempt.attempt.id,
-          },
-        });
+        if (!isZeroCashSettlement) {
+          await this.providerEvents.record({
+            eventType: "refund",
+            merchantOid: paytrOid,
+            paymentId: payment.id,
+            status: refundResult?.status ?? "success",
+            amount: amountToRefund,
+            totalAmount: amountToRefund,
+            raw: {
+              ...(refundResult as Record<string, unknown>),
+              refundAttemptId: refundAttempt.attempt.id,
+            },
+          });
+        }
       }
 
       paytrRefunded = true;
@@ -893,7 +928,14 @@ export class PaymentRefundService {
             // amount - refundedAmount ödenir. orderRefundThreshold = siparişin tutarı
             // (grup'ta order.totalAmount, tekilde payment.amount) — tx başında hesaplandı.
             const sellerAmount = Number(activeHold.amount);
-            const portion = refundPortion(amountToRefund, orderRefundThreshold);
+            const portion = Math.min(
+              Math.max(
+                opts?.settlement?.holdPortion ??
+                  refundPortion(amountToRefund, orderRefundThreshold),
+                0,
+              ),
+              1,
+            );
             const refundedSeller =
               Math.round(sellerAmount * portion * 100) / 100;
             const newRefunded =
@@ -924,7 +966,19 @@ export class PaymentRefundService {
             amountToRefund,
             orderRefundThreshold,
           );
-          await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
+          if (opts?.settlement) {
+            await this.commissionLedger.applyRefundAmounts(
+              orderId,
+              {
+                sellerFeeAmount: opts.settlement.sellerFeeRefundAmount ?? 0,
+                buyerFeeAmount: opts.settlement.buyerFeeRefundAmount ?? 0,
+                closeOrder: opts.settlement.closeOrder ?? false,
+              },
+              tx,
+            );
+          } else {
+            await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
+          }
 
           // Faz 6.2 (ledger): `refund_issued` oransal ters kayıt (best-effort — defter
           // hatası iadeyi bozmaz). orderRefundThreshold = sipariş tutarı (T); komisyon/stopaj
@@ -965,6 +1019,8 @@ export class PaymentRefundService {
             refundAttemptId: freshAttempt.id,
             refundRatio: ledgerPortion,
             fullyRefunded: isOrderFullyRefunded,
+            sellerFeeRefundAmount: opts?.settlement?.sellerFeeRefundAmount,
+            buyerFeeRefundAmount: opts?.settlement?.buyerFeeRefundAmount,
           };
 
           // Update order status + restore stock on full refund.
@@ -976,15 +1032,40 @@ export class PaymentRefundService {
               select: {
                 status: true,
                 productId: true,
+                sellerId: true,
                 quantity: true,
                 stockRestoredAt: true,
               },
             });
+            const sellerAdjustment = opts?.settlement?.sellerAdjustment;
+            if (
+              orderRow?.sellerId &&
+              sellerAdjustment &&
+              sellerAdjustment.amount > 0
+            ) {
+              await tx.sellerAccountAdjustment.upsert({
+                where: { sourceKey: sellerAdjustment.sourceKey },
+                create: {
+                  sellerId: orderRow.sellerId,
+                  orderId,
+                  refundRequestId: sellerAdjustment.refundRequestId ?? null,
+                  sourceKey: sellerAdjustment.sourceKey,
+                  type: "return_shipping",
+                  amount: sellerAdjustment.amount,
+                  remainingAmount: sellerAdjustment.amount,
+                  metadata: {
+                    refundAttemptId: freshAttempt.id,
+                  },
+                },
+                update: {},
+              });
+            }
             const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
             // MONEY-H4: sipariş cancel + stok geri-yükleme siparişin KÜMÜLATİF iadesine
             // göre (isOrderFullyRefunded, tx başında hesaplandı). Tek bir kısmi iade
             // artık "tam iade" sanılmaz; art arda kısmi iadeler tamı bulunca kapanır.
-            const isFullRefund = isOrderFullyRefunded;
+            const isFullRefund =
+              isOrderFullyRefunded || Boolean(opts?.settlement?.closeOrder);
             // Stok: adet-bazlı iadede o kadar adet; TAM iadede tüm adet; tutar-bazlı
             // KISMİ iadede (admin jest/telafi) stok geri YÜKLENMEZ — alıcı malı elinde
             // tutar. Aksi halde 50 TL jest 1000 TL siparişin TÜM stoğunu geri yükler +

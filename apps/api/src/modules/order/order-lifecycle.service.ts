@@ -10,7 +10,12 @@ import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { UpdateOrderStatusDto, CancelOrderDto } from "./dto";
-import { OrderStatus, OfferStatus, RefundRequestStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  OfferStatus,
+  RefundRequestStatus,
+  ShipmentStatus,
+} from "@prisma/client";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { ProductLockService } from "../product/product-lock.service";
@@ -21,6 +26,7 @@ import { OrderCommonService } from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
 import { ORDER_TRANSITION_RULES } from "./order-state-machine";
 import { DiscountService } from "../discount/discount.service";
+import { RefundService } from "../refund/refund.service";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -41,6 +47,7 @@ export class OrderLifecycleService {
     private readonly orderQuery: OrderQueryService,
     private readonly elogoInvoicing: ElogoInvoicingService,
     @Optional() private readonly discountService?: DiscountService,
+    private readonly refundService?: RefundService,
   ) {}
 
   /**
@@ -445,6 +452,50 @@ export class OrderLifecycleService {
    * - If paid, triggers refund process
    */
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
+    const preflight = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { shipment: { select: { status: true } } },
+    });
+    if (!preflight) {
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
+    }
+    if (preflight.buyerId !== userId) {
+      throw new ForbiddenException(i18nMessage("server.order.cancelForbidden"));
+    }
+    if (
+      preflight.status === OrderStatus.paid ||
+      preflight.status === OrderStatus.preparing
+    ) {
+      if (!dto?.reasonCode) {
+        throw new BadRequestException(
+          "Ödenmiş sipariş iptalinde neden kodu zorunludur",
+        );
+      }
+      const preHandoverShipmentStatuses: ShipmentStatus[] = [
+        ShipmentStatus.pending,
+        ShipmentStatus.cancelled,
+        ShipmentStatus.failed,
+      ];
+      const handedToCarrier =
+        preflight.shipment &&
+        !preHandoverShipmentStatuses.includes(preflight.shipment.status);
+      if (handedToCarrier) {
+        throw new BadRequestException(
+          "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
+        );
+      }
+      if (!this.refundService) {
+        throw new Error("RefundService is not available");
+      }
+      await this.refundService.createCancellationRefund(
+        orderId,
+        userId,
+        dto.reasonCode,
+        dto.reason,
+      );
+      return this.orderQuery.findOne(orderId, userId);
+    }
+
     // Ödenmiş iptal/iade gerçek kupon kullanımını geri vermez. pending_payment
     // iptalinde ise yalnız geçici CouponReservation serbest bırakılır.
     let productIdToInvalidate: string | null = null;
@@ -498,6 +549,7 @@ export class OrderLifecycleService {
         data: {
           status: newStatus,
           cancellationType: "iptal",
+          cancellationReasonCode: dto?.reasonCode,
           cancelReason: cancelReasonText,
           version: { increment: 1 },
         },

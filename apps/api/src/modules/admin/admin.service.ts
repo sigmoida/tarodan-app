@@ -205,6 +205,30 @@ export class AdminService {
     );
   }
 
+  async approveRefundRequest(
+    adminId: string,
+    refundRequestId: string,
+    note?: string,
+  ) {
+    return this.adminRefundService.approveRefundRequest(
+      adminId,
+      refundRequestId,
+      note,
+    );
+  }
+
+  async rejectRefundRequest(
+    adminId: string,
+    refundRequestId: string,
+    reason: string,
+  ) {
+    return this.adminRefundService.rejectRefundRequest(
+      adminId,
+      refundRequestId,
+      reason,
+    );
+  }
+
   // ==================== COMMISSION RULES ====================
   // Taşındı: admin-commission.service.ts — imzalar aynen korunuyor (facade delege).
 

@@ -9,6 +9,7 @@ import { PaymentModule } from "../payment/payment.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
+import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 import { RefundController } from "./refund.controller";
 import { RefundService } from "./refund.service";
 import { RefundSchedulerService } from "./refund-scheduler.service";
@@ -20,6 +21,7 @@ import { RefundScheduledProcessor } from "./refund-scheduled.processor";
     ConfigModule,
     SuratCargoModule,
     StorageModule,
+    ShippingTariffModule,
     PaymentModule,
     NotificationModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),

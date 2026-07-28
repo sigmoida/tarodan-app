@@ -5,7 +5,10 @@ import { type Locale } from "@tarodan/i18n";
 import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentQueryService } from "./payment-query.service";
-import { PaymentRefundService } from "./payment-refund.service";
+import {
+  PaymentRefundService,
+  type ProcessRefundOptions,
+} from "./payment-refund.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
@@ -112,11 +115,7 @@ export class PaymentService {
   async processRefund(
     orderId: string,
     refundAmount?: number,
-    opts?: {
-      skipRefundEvent?: boolean;
-      refundQuantity?: number;
-      idempotencyKey?: string;
-    },
+    opts?: ProcessRefundOptions,
   ) {
     return this.paymentRefund.processRefund(orderId, refundAmount, opts);
   }

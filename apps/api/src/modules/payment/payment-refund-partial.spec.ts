@@ -183,6 +183,10 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     const paytr = {
       createRefund: jest.fn().mockResolvedValue({ status: "success" }),
     };
+    const commissionLedger = {
+      applyRefund: jest.fn().mockResolvedValue(undefined),
+      applyRefundAmounts: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new PaymentRefundService(
       prisma as any,
       { get: jest.fn().mockReturnValue(undefined) } as any,
@@ -192,14 +196,21 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         createInAppNotification: jest.fn().mockResolvedValue(undefined),
         sendOrderCancelledEmails: jest.fn().mockResolvedValue(undefined),
       } as any,
-      { applyRefund: jest.fn().mockResolvedValue(undefined) } as any,
+      commissionLedger as any,
       { handleOrderRefund: jest.fn().mockResolvedValue(undefined) } as any,
       {
         cancelSuratShipmentIfExists: jest.fn().mockResolvedValue(undefined),
       } as any,
       { record: jest.fn().mockResolvedValue(undefined) } as any, // providerEvents
     );
-    return { service, captured, paytr, mockTx, prisma };
+    return {
+      service,
+      captured,
+      paytr,
+      mockTx,
+      prisma,
+      commissionLedger,
+    };
   };
 
   it("H3: 1000 TL siparişte 50 TL jest → hold'un yalnız %5'i tüketilir (950 kalır), payment completed kalır", async () => {
@@ -320,5 +331,46 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       }),
     ).rejects.toThrow();
     expect(paytr.createRefund).not.toHaveBeenCalled();
+  });
+
+  it("fiziksel tam iadeyi nakit tutardan bağımsız kapatır ve kesin komisyon tutarlarını kullanır", async () => {
+    const { service, captured, mockTx, commissionLedger } = makeService({
+      paymentAmount: 1000,
+      holdAmount: 800,
+    });
+
+    await service.processRefund(ORDER_ID, 820, {
+      idempotencyKey: "policy-refund-full-return",
+      refundQuantity: 1,
+      settlement: {
+        closeOrder: true,
+        holdPortion: 1,
+        sellerFeeRefundAmount: 100,
+        buyerFeeRefundAmount: 0,
+      },
+    });
+
+    expect(captured.paymentUpdate.data.status).toBe(PaymentStatus.completed);
+    expect(captured.holdUpdate.data).toEqual(
+      expect.objectContaining({
+        status: PaymentHoldStatus.cancelled,
+        refundedAmount: 800,
+      }),
+    );
+    expect(commissionLedger.applyRefundAmounts).toHaveBeenCalledWith(
+      ORDER_ID,
+      {
+        sellerFeeAmount: 100,
+        buyerFeeAmount: 0,
+        closeOrder: true,
+      },
+      mockTx,
+    );
+    expect(mockTx.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ORDER_ID },
+        data: { status: "cancelled" },
+      }),
+    );
   });
 });

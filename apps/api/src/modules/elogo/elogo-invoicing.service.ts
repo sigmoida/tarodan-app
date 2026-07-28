@@ -1481,8 +1481,12 @@ export class ElogoInvoicingService {
     );
     if (remaining <= 0.009) return;
 
+    const invoiceAdjustment = await this.resolveInvoiceAdjustment(
+      inv,
+      adjustment,
+    );
     const canCancel =
-      (!adjustment || adjustment.fullyRefunded) &&
+      (!adjustment || invoiceAdjustment.fullyRefunded) &&
       alreadyReversed <= 0.009 &&
       inv.documentType === "EARCHIVE" &&
       this.elogo.refundStrategy(inv.issuedAt) === "CANCEL";
@@ -1575,11 +1579,11 @@ export class ElogoInvoicingService {
     const baseGross = adjustment
       ? await this.resolveInvoiceRefundBase(inv)
       : Number(inv.total);
-    const returnTotal = adjustment?.fullyRefunded
+    const returnTotal = invoiceAdjustment.fullyRefunded
       ? remaining
       : Math.min(
           remaining,
-          this.round2(baseGross * (adjustment?.refundRatio ?? 1)),
+          this.round2(baseGross * invoiceAdjustment.refundRatio),
         );
     if (returnTotal <= 0.009) return;
     const originalTotal = Number(inv.total);
@@ -1634,6 +1638,46 @@ export class ElogoInvoicingService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
     await this.sendRecord(record.id);
+  }
+
+  private async resolveInvoiceAdjustment(
+    inv: ElogoInvoice,
+    adjustment?: ResolvedRefundAdjustment,
+  ): Promise<{ refundRatio: number; fullyRefunded: boolean }> {
+    if (!adjustment) {
+      return { refundRatio: 1, fullyRefunded: true };
+    }
+    if (
+      (inv.type === "commission" &&
+        adjustment.sellerFeeRefundAmount !== undefined) ||
+      (inv.type === "service_fee" &&
+        adjustment.buyerFeeRefundAmount !== undefined)
+    ) {
+      const ledger = await this.prisma.commissionLedger.findUnique({
+        where: { orderId: inv.sourceId },
+        select: { sellerCommission: true, buyerFee: true },
+      });
+      if (ledger) {
+        const original =
+          inv.type === "commission"
+            ? Number(ledger.sellerCommission)
+            : Number(ledger.buyerFee);
+        const refund =
+          inv.type === "commission"
+            ? Number(adjustment.sellerFeeRefundAmount)
+            : Number(adjustment.buyerFeeRefundAmount);
+        const refundRatio =
+          original > 0 ? Math.min(Math.max(refund / original, 0), 1) : 0;
+        return {
+          refundRatio,
+          fullyRefunded: refundRatio >= 0.9999,
+        };
+      }
+    }
+    return {
+      refundRatio: adjustment.refundRatio,
+      fullyRefunded: adjustment.fullyRefunded,
+    };
   }
 
   /** Refund oranının uygulanacağı faturanın iade öncesi ekonomik brüt bazı. */

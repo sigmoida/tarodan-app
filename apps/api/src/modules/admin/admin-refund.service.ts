@@ -193,6 +193,58 @@ export class AdminRefundService {
     return rr;
   }
 
+  async approveRefundRequest(
+    adminId: string,
+    refundRequestId: string,
+    note?: string,
+  ) {
+    const before = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { status: true, policyCode: true },
+    });
+    if (!before) throw new NotFoundException("İade talebi bulunamadı");
+    const result = await this.refundService.adminApproveRefundRequest(
+      refundRequestId,
+      adminId,
+      note,
+    );
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "refund_approved",
+      "RefundRequest",
+      refundRequestId,
+      { status: before.status, policyCode: before.policyCode },
+      { status: result.status, note: note?.trim() || null },
+    );
+    return result;
+  }
+
+  async rejectRefundRequest(
+    adminId: string,
+    refundRequestId: string,
+    reason: string,
+  ) {
+    const before = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { status: true, policyCode: true },
+    });
+    if (!before) throw new NotFoundException("İade talebi bulunamadı");
+    const result = await this.refundService.adminRejectRefundRequest(
+      refundRequestId,
+      adminId,
+      reason,
+    );
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "refund_rejected",
+      "RefundRequest",
+      refundRequestId,
+      { status: before.status, policyCode: before.policyCode },
+      { status: result.status, reason: reason.trim() },
+    );
+    return result;
+  }
+
   /**
    * Force-finalize a refund stuck in `return_delivered`: call the existing
    * finalize logic + audit log. Idempotent (finalizeRefundForReturnedShipment

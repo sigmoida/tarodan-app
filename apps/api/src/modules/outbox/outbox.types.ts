@@ -21,6 +21,9 @@ export interface InvoiceRefundReversePayload {
   refundRatio: number;
   /** Bu denemeyle siparişin kümülatif iadesi tamamlandı mı? */
   fullyRefunded: boolean;
+  /** Politika tablosundan gelen kesin kesinti ters kayıtları. */
+  sellerFeeRefundAmount?: number;
+  buyerFeeRefundAmount?: number;
 }
 
 /** Ödenmiş sanal hizmetin gelir faturasını oluştur/gönder. */

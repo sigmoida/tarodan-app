@@ -4,6 +4,7 @@ export interface RefundPolicyDecision {
   policyCode:
     | "seller_fault_return"
     | "buyer_remorse_return"
+    | "buyer_fault_return"
     | "manual_review_return"
     | "seller_fault_cancellation"
     | "buyer_remorse_cancellation"
@@ -84,6 +85,17 @@ const buyerRemorseReturnPolicy = (): RefundPolicyDecision => ({
   penaltyReviewRequired: false,
 });
 
+const buyerFaultReturnPolicy = (): RefundPolicyDecision => ({
+  policyCode: "buyer_fault_return",
+  returnShippingPayer: "buyer",
+  refundOutboundShipping: false,
+  refundBuyerProtectionFee: false,
+  refundSellerPlatformFee: true,
+  requiresEvidence: true,
+  requiresAdminReview: true,
+  penaltyReviewRequired: false,
+});
+
 const manualReviewReturnPolicy = (): RefundPolicyDecision => ({
   policyCode: "manual_review_return",
   returnShippingPayer: null,
@@ -102,6 +114,10 @@ export function resolveReturnPolicy(reason: string): RefundPolicyDecision {
 
   if (reason === "changed_mind") {
     return buyerRemorseReturnPolicy();
+  }
+
+  if (reason === "buyer_damaged") {
+    return buyerFaultReturnPolicy();
   }
 
   return manualReviewReturnPolicy();

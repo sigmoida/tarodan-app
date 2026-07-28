@@ -60,6 +60,18 @@ describe("refund financial policy", () => {
     });
   });
 
+  it("requires review for buyer-caused damage and charges return shipping to the buyer", () => {
+    expect(resolveReturnPolicy("buyer_damaged")).toMatchObject({
+      policyCode: "buyer_fault_return",
+      returnShippingPayer: "buyer",
+      refundOutboundShipping: false,
+      refundBuyerProtectionFee: false,
+      refundSellerPlatformFee: true,
+      requiresEvidence: true,
+      requiresAdminReview: true,
+    });
+  });
+
   it("refunds outbound shipping but retains buyer protection before handover", () => {
     expect(resolveCancellationPolicy("wrong_product_selected")).toMatchObject({
       policyCode: "buyer_remorse_cancellation",

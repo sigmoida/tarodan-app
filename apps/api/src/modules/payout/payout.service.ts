@@ -206,6 +206,28 @@ export class PayoutService {
 
       const bankAccount = hold.seller.bankAccount;
       const transId = `ORD${hold.orderId.replace(/-/g, "").slice(0, 20)}${Date.now()}`;
+      const pendingAdjustment = await (
+        this.prisma as any
+      ).sellerAccountAdjustment?.findFirst({
+        where: {
+          sellerId: hold.sellerId,
+          status: "open",
+          remainingAmount: { gt: 0 },
+        },
+        select: { id: true },
+      });
+      if (pendingAdjustment) {
+        const createdWithAdjustment = await this.createAdjustedOrderPayout({
+          hold,
+          order,
+          merchantOid,
+          transId,
+          bankAccount,
+          baseNetPayout: netPayout,
+        });
+        if (createdWithAdjustment) created++;
+        continue;
+      }
 
       await this.prisma.payoutTransfer.create({
         data: {
@@ -298,6 +320,115 @@ export class PayoutService {
       this.logger.log(`Created ${created} payout transfer(s)`);
     }
     return created;
+  }
+
+  private async createAdjustedOrderPayout(input: {
+    hold: any;
+    order: any;
+    merchantOid: string;
+    transId: string;
+    bankAccount: { iban: string; accountHolder: string } | null;
+    baseNetPayout: number;
+  }): Promise<boolean> {
+    const { hold, order, merchantOid, transId, bankAccount, baseNetPayout } =
+      input;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "seller_account_adjustments"
+        WHERE "seller_id" = ${hold.sellerId}
+          AND "status" = 'open'
+          AND "remaining_amount" > 0
+        ORDER BY "created_at" ASC
+        FOR UPDATE
+      `;
+      const existing = await tx.payoutTransfer.findUnique({
+        where: { paymentHoldId: hold.id },
+        select: { id: true },
+      });
+      if (existing) return false;
+
+      const adjustments = await tx.sellerAccountAdjustment.findMany({
+        where: {
+          sellerId: hold.sellerId,
+          status: "open",
+          remainingAmount: { gt: 0 },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      let available = Math.round(baseNetPayout * 100) / 100;
+      const allocations: Array<{
+        adjustmentId: string;
+        amount: number;
+        remainingAmount: number;
+      }> = [];
+      for (const adjustment of adjustments) {
+        if (available <= 0) break;
+        const remaining = Number(adjustment.remainingAmount);
+        const amount = Math.min(remaining, available);
+        if (amount <= 0) continue;
+        allocations.push({
+          adjustmentId: adjustment.id,
+          amount: Math.round(amount * 100) / 100,
+          remainingAmount:
+            Math.round(Math.max(0, remaining - amount) * 100) / 100,
+        });
+        available = Math.round(Math.max(0, available - amount) * 100) / 100;
+      }
+      const adjustmentDeduction =
+        Math.round(
+          allocations.reduce((sum, row) => sum + row.amount, 0) * 100,
+        ) / 100;
+      const netAmount =
+        Math.round(Math.max(0, baseNetPayout - adjustmentDeduction) * 100) /
+        100;
+      const fullyConsumed = netAmount <= 0.01;
+      const payout = await tx.payoutTransfer.create({
+        data: {
+          paymentHoldId: hold.id,
+          sellerId: hold.sellerId,
+          amount: order.totalAmount,
+          commission: order.commissionAmount,
+          withholdingTax: order.withholdingTaxAmount ?? 0,
+          netAmount: fullyConsumed ? 0 : netAmount,
+          adjustmentDeduction,
+          merchantOid,
+          transId,
+          transferIban: bankAccount?.iban || "",
+          transferName: bankAccount?.accountHolder || "",
+          status: fullyConsumed
+            ? PayoutStatus.completed
+            : bankAccount
+              ? PayoutStatus.pending
+              : PayoutStatus.failed,
+          processedAt: fullyConsumed ? new Date() : null,
+          failureReason:
+            fullyConsumed || bankAccount ? null : "no_bank_account",
+        },
+      });
+
+      if (allocations.length > 0) {
+        await tx.sellerAdjustmentApplication.createMany({
+          data: allocations.map((allocation) => ({
+            adjustmentId: allocation.adjustmentId,
+            payoutTransferId: payout.id,
+            amount: allocation.amount,
+          })),
+        });
+        for (const allocation of allocations) {
+          const settled = allocation.remainingAmount <= 0.01;
+          await tx.sellerAccountAdjustment.update({
+            where: { id: allocation.adjustmentId },
+            data: {
+              remainingAmount: settled ? 0 : allocation.remainingAmount,
+              status: settled ? "settled" : "open",
+              settledAt: settled ? new Date() : null,
+            },
+          });
+        }
+      }
+      return true;
+    });
   }
 
   /**

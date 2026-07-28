@@ -100,6 +100,8 @@ import {
   ForceCancelStuckDto,
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
+  ApproveRefundRequestDto,
+  RejectRefundRequestDto,
   AdminChangeMembershipDto,
 } from "./dto";
 
@@ -133,6 +135,30 @@ export class AdminRefundController {
   @ApiResponse({ status: HttpStatus.OK, description: "Refund request detail" })
   async getRefundRequestDetail(@Param("id") id: string) {
     return this.adminService.getRefundRequestDetail(id);
+  }
+
+  @Post("refund-requests/:id/approve")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Approve a refund waiting for admin review" })
+  async approveRefundRequest(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: ApproveRefundRequestDto,
+  ) {
+    return this.adminService.approveRefundRequest(adminId, id, dto.note);
+  }
+
+  @Post("refund-requests/:id/reject")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Reject a refund waiting for admin review" })
+  async rejectRefundRequest(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: RejectRefundRequestDto,
+  ) {
+    return this.adminService.rejectRefundRequest(adminId, id, dto.reason);
   }
 
   @Post("refund-requests/:id/force-finalize")
