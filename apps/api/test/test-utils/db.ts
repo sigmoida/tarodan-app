@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { drainE2EBackgroundTasks } from "./background-tasks";
 import Redis from "ioredis";
 
 let prismaSingleton: PrismaClient | null = null;
@@ -116,6 +117,8 @@ const TABLES_TO_TRUNCATE = [
 ];
 
 export async function truncateAll(): Promise<void> {
+  await drainE2EBackgroundTasks();
+
   // Defensive: refuse to truncate unless we're clearly on a test DB.
   if (process.env.NODE_ENV !== "test") {
     throw new Error(
@@ -177,8 +180,8 @@ export async function seedBaseline(): Promise<{
     },
   });
 
-  // Free tier — newly-created users get this automatically.
-  // canTrade=true so trade flows aren't gated behind a paywall in tests.
+  // Free tier — newly-created users get this automatically. Keep the
+  // entitlement production-like: trade is available only on paid tiers.
   await prisma.membershipTier.create({
     data: {
       type: "free",
@@ -189,7 +192,7 @@ export async function seedBaseline(): Promise<{
       maxTotalListings: 100,
       maxImagesPerListing: 10,
       canCreateCollections: true,
-      canTrade: true,
+      canTrade: false,
       isAdFree: true,
       isActive: true,
     },

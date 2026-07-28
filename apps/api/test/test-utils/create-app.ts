@@ -8,6 +8,11 @@ import { StorageService } from "../../src/modules/storage/storage.service";
 import { MockPayTRService } from "../mocks/paytr.mock";
 import { SURAT_CARRIER_CLIENT } from "../../src/modules/surat-cargo/surat-cargo.service";
 import { StubSuratSoapClient } from "../../src/modules/surat-cargo/surat-soap.client";
+import { TradeShipmentService } from "../../src/modules/trade/trade-shipment.service";
+import {
+  drainE2EBackgroundTasks,
+  trackE2EBackgroundTask,
+} from "./background-tasks";
 
 /**
  * Bootstrap a real NestJS app for E2E tests.
@@ -106,6 +111,17 @@ export async function createE2ETestApp(): Promise<E2ETestApp> {
 
   await app.init();
 
+  // Trade acceptance deliberately dispatches Sürat shipment creation in the
+  // background. Track those promises so truncateAll()/app.close() cannot delete
+  // their rows while a carrier result is still being persisted.
+  const tradeShipmentService = module.get(TradeShipmentService);
+  const createInboundTradeShipments =
+    tradeShipmentService.createInboundTradeShipments.bind(tradeShipmentService);
+  tradeShipmentService.createInboundTradeShipments = ((tradeId: string) =>
+    trackE2EBackgroundTask(
+      createInboundTradeShipments(tradeId),
+    )) as TradeShipmentService["createInboundTradeShipments"];
+
   // Sürat SOAP stub is auto-instantiated by SuratCargoModule when SURAT_SOAP_MODE!=live.
   // We resolve it from the DI container so tests can inspect/clear call history.
   const surat = module.get<StubSuratSoapClient>(SURAT_CARRIER_CLIENT);
@@ -116,6 +132,7 @@ export async function createE2ETestApp(): Promise<E2ETestApp> {
     paytr,
     surat,
     close: async () => {
+      await drainE2EBackgroundTasks();
       await app.close();
     },
   };
