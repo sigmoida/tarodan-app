@@ -394,6 +394,17 @@ export class OrderCheckoutGroupService {
             };
           });
 
+          // F1.3: quote'un birim-fiyat hash'i ile doğrula — ürün fiyatı/kampanya quote'tan
+          // sonra değiştiyse 409 PRICING_CHANGED (sessiz farklı tahsil yok). Hash yoksa atlanır.
+          this.orderPricing.assertPricingUnchanged(
+            dto.expectedPricingHash,
+            pricing.map((p) => ({
+              productId: p.productId,
+              unitPrice: p.productPrice,
+              quantity: p.quantity,
+            })),
+          );
+
           // Kupon: tüm sepetle bir kez doğrula, indirimi fiyat oranında dağıt
           let appliedCouponCode: string | null = null;
           let appliedDiscountId: string | null = null;

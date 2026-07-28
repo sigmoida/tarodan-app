@@ -125,6 +125,14 @@ export class CheckoutDto {
   @IsOptional()
   @IsInt()
   expectedShippingTariffVersion?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Checkout quote birim-fiyat hash'i. Ürün fiyatı/kampanya değiştiyse 409 PRICING_CHANGED.",
+  })
+  @IsOptional()
+  @IsString()
+  expectedPricingHash?: string;
 }
 
 export class GuestCheckoutGroupDto extends CheckoutDto {

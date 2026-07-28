@@ -21,6 +21,7 @@ import { isPremiumEntitled } from "../membership/membership.util";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
 import { DiscountService } from "../discount/discount.service";
+import { createHash } from "crypto";
 
 /**
  * Commission calculation result interface
@@ -144,6 +145,9 @@ export class OrderPricingService {
     // Aktif tarife sürümü — istemci order-create'e geri gönderir; sürüm değiştiyse
     // create 409 PRICING_CHANGED döner (sessiz farklı tahsil yok). Aktif tarife yoksa null.
     shippingTariffVersion: number | null;
+    // Birim fiyat bazının (efektif fiyatlar) stabil hash'i — istemci create'e geri
+    // gönderir; ürün fiyatı/kampanya değiştiyse create 409 PRICING_CHANGED döner (F1.3).
+    pricingHash: string;
     pricing: {
       subtotal: number;
       shippingAmount: number;
@@ -379,6 +383,13 @@ export class OrderPricingService {
       itemsSubtotal - couponDiscountTotal - totalSellerFee,
     );
     const { tariffVersion } = await this.getShippingTariffMeta();
+    const pricingHash = this.computePricingHash(
+      lines.map((l) => ({
+        productId: l.product.id,
+        unitPrice: l.unitPrice,
+        quantity: l.quantity,
+      })),
+    );
 
     const pricing = {
       subtotal: itemsSubtotal,
@@ -404,8 +415,45 @@ export class OrderPricingService {
       items: quoteItems,
       shippingBySeller,
       shippingTariffVersion: tariffVersion,
+      pricingHash,
       pricing,
     };
+  }
+
+  /**
+   * Stable, user-INDEPENDENT hash of the charged unit prices (effective/campaign
+   * prices) — the basis a quote was built on. The client echoes it into order-create;
+   * if a product price or campaign moved since the quote, the recomputed hash differs
+   * and create returns 409 PRICING_CHANGED (never a silent different charge). Excludes
+   * the coupon (user-dependent — the @Public quote can't know the user) and fees
+   * (config-derived, recomputed identically on both sides).
+   */
+  computePricingHash(
+    items: Array<{ productId: string; unitPrice: number; quantity: number }>,
+  ): string {
+    const basis = items
+      .map((i) => `${i.productId}:${i.unitPrice.toFixed(2)}:${i.quantity}`)
+      .sort()
+      .join("|");
+    return createHash("sha256").update(basis).digest("hex").slice(0, 16);
+  }
+
+  /**
+   * 409 PRICING_CHANGED guard generalized beyond shipping (F1.3). If the client passed
+   * the pricing hash its quote was built on and the current charged unit prices no
+   * longer hash to it (a product price / campaign moved), refuse create so the buyer
+   * re-confirms. No expected hash → skipped (backward compatible).
+   */
+  assertPricingUnchanged(
+    expectedHash: string | undefined | null,
+    items: Array<{ productId: string; unitPrice: number; quantity: number }>,
+  ): void {
+    if (!expectedHash) return;
+    if (this.computePricingHash(items) !== expectedHash) {
+      throw new ConflictException(
+        i18nMessage("server.shipping.pricingChanged"),
+      );
+    }
   }
 
   /**

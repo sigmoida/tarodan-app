@@ -102,6 +102,8 @@ export const ordersApi = {
     couponCode?: string;
     /** Tariff version the quote was built on; 409 PRICING_CHANGED if it moved. */
     expectedShippingTariffVersion?: number;
+    /** Unit-price hash the quote was built on; 409 PRICING_CHANGED if a price/campaign moved. */
+    expectedPricingHash?: string;
   }) => api.post("/orders/checkout", data),
   /** Toplu checkout (misafir) */
   checkoutGuest: (data: {
@@ -129,6 +131,7 @@ export const ordersApi = {
     };
     couponCode?: string;
     expectedShippingTariffVersion?: number;
+    expectedPricingHash?: string;
   }) => api.post("/orders/checkout/guest", data),
   /** Alıcının sipariş grupları (gruplu liste) */
   getGroups: (params?: Record<string, any>) =>

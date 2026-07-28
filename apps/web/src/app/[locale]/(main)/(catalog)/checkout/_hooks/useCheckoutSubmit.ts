@@ -45,6 +45,7 @@ export function useCheckoutSubmit({
   clearCart,
   onCheckoutSubmitted,
   expectedShippingTariffVersion,
+  expectedPricingHash,
 }: {
   checkoutItems: CheckoutItem[];
   t: Translate;
@@ -76,6 +77,8 @@ export function useCheckoutSubmit({
   onCheckoutSubmitted: () => void;
   /** Active shipping-tariff version from the quote; enables the 409 PRICING_CHANGED guard. */
   expectedShippingTariffVersion?: number | null;
+  /** Unit-price hash from the quote; 409 PRICING_CHANGED if a price/campaign moved. */
+  expectedPricingHash?: string | null;
 }) {
   // Checkout idempotency: retries for the same cart (double click, retry after a
   // network error) return the SAME group server-side. Generated on first submit.
@@ -281,6 +284,7 @@ export function useCheckoutSubmit({
               };
               couponCode?: string;
               expectedShippingTariffVersion?: number;
+              expectedPricingHash?: string;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
@@ -291,6 +295,9 @@ export function useCheckoutSubmit({
             if (typeof expectedShippingTariffVersion === "number") {
               payload.expectedShippingTariffVersion =
                 expectedShippingTariffVersion;
+            }
+            if (expectedPricingHash) {
+              payload.expectedPricingHash = expectedPricingHash;
             }
 
             // Forward the applied cart coupon so the order is created at the
@@ -410,6 +417,7 @@ export function useCheckoutSubmit({
               };
               expectedShippingTariffVersion?: number;
               couponCode?: string;
+              expectedPricingHash?: string;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
@@ -446,6 +454,9 @@ export function useCheckoutSubmit({
             if (typeof expectedShippingTariffVersion === "number") {
               guestPayload.expectedShippingTariffVersion =
                 expectedShippingTariffVersion;
+            }
+            if (expectedPricingHash) {
+              guestPayload.expectedPricingHash = expectedPricingHash;
             }
 
             // Forward the guest's applied coupon so the order is created at the

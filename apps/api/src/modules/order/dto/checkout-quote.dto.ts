@@ -93,6 +93,12 @@ export class CheckoutQuoteResponseDto {
   @ApiProperty({ description: "Total net to seller(s)" })
   sellerNetAmount: number;
 
+  @ApiProperty({
+    description:
+      "Stable hash of the charged unit prices; echo into order-create to get 409 PRICING_CHANGED if a price/campaign moved.",
+  })
+  pricingHash: string;
+
   @ApiProperty({ type: [CheckoutQuoteItemResponseDto] })
   items: CheckoutQuoteItemResponseDto[];
 

@@ -289,6 +289,12 @@ export class OrderCheckoutDirectService {
           : basePrice;
       const productDiscount = Math.max(0, originalPrice - productPrice);
 
+      // F1.3: quote'un birim-fiyat hash'i ile doğrula — fiyat/kampanya değiştiyse
+      // 409 PRICING_CHANGED (sessiz farklı tahsil yok). Hash yoksa atlanır.
+      this.orderPricing.assertPricingUnchanged(dto.expectedPricingHash, [
+        { productId: dto.productId, unitPrice: productPrice, quantity: 1 },
+      ]);
+
       // Apply coupon discount if provided
       let couponDiscount = 0;
       let appliedCouponCode: string | null = null;

@@ -35,6 +35,7 @@ export function useCheckoutQuote(
         return {
           pricing: res.data.pricing,
           shippingTariffVersion: res.data.shippingTariffVersion ?? null,
+          pricingHash: res.data.pricingHash,
         };
       return (res.data ?? null) as CheckoutQuote | null;
     },

@@ -43,4 +43,6 @@ export interface CheckoutQuote {
   };
   /** Active shipping-tariff version this quote was priced with (sent back on submit). */
   shippingTariffVersion?: number | null;
+  /** Unit-price hash this quote was priced with; sent back on submit → 409 if a price/campaign moved. */
+  pricingHash?: string;
 }
