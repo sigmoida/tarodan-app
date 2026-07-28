@@ -146,6 +146,27 @@ describe("VirtualOrderFulfillmentService", () => {
         }),
       );
     });
+
+    it("ödeme niyeti ile siparişteki hedef paket uyuşmazsa üyeliği aktive etmez", async () => {
+      const tx = makeTx() as any;
+      tx.userMembership.findUnique.mockResolvedValue(membership("premium"));
+      tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
+      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+
+      await expect(
+        svc.applyMembershipInTx(tx, {
+          ...payment,
+          order: {
+            ...payment.order,
+            productId: "membership-business",
+          },
+        }),
+      ).rejects.toThrow("Membership payment intent mismatch");
+
+      expect(tx.userMembership.update).not.toHaveBeenCalled();
+      expect(tx.membershipPayment.updateMany).not.toHaveBeenCalled();
+      expect(tx.order.update).not.toHaveBeenCalled();
+    });
   });
 
   describe("applyBoostInTx", () => {
