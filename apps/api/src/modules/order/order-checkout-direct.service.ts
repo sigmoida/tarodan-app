@@ -269,7 +269,16 @@ export class OrderCheckoutDirectService {
 
       // A + oldPrice: price (A) = güncel satış fiyatı; siparişte sadece price kullan
       const now = new Date();
-      const productPrice = Number(product.price);
+      const basePrice = Number(product.price);
+      // F1.4: charged base = efektif (kampanya) fiyat — ürün kartı/sepet ile aynı; kupon
+      // yine baz üzerinden. Aktif code=null kampanya yoksa efektif == baz (no-op).
+      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
+        product.id,
+        product.sellerId,
+        product.categoryId ?? "",
+        basePrice,
+      );
+      const productPrice = campaignPrice ?? basePrice;
       const isSaleActive =
         product.oldPrice != null &&
         (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
@@ -277,8 +286,8 @@ export class OrderCheckoutDirectService {
       const originalPrice =
         isSaleActive && product.oldPrice != null
           ? Number(product.oldPrice)
-          : productPrice;
-      const productDiscount = isSaleActive ? originalPrice - productPrice : 0;
+          : basePrice;
+      const productDiscount = Math.max(0, originalPrice - productPrice);
 
       // Apply coupon discount if provided
       let couponDiscount = 0;

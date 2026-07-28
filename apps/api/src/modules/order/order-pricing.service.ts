@@ -20,6 +20,7 @@ import { TaxService } from "../tax/tax.service";
 import { isPremiumEntitled } from "../membership/membership.util";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
+import { DiscountService } from "../discount/discount.service";
 
 /**
  * Commission calculation result interface
@@ -39,6 +40,7 @@ export class OrderPricingService {
     private readonly prisma: PrismaService,
     private readonly taxService: TaxService,
     private readonly shippingTariffs: ShippingTariffService,
+    private readonly discountService: DiscountService,
   ) {}
 
   /**
@@ -207,8 +209,16 @@ export class OrderPricingService {
         );
       }
 
-      const productPrice = Number(product.price);
-      const unitPrice = productPrice;
+      // F1.4: quote charged base = EFEKTİF (kampanya) fiyat — create yolları ile aynı,
+      // sepet/ürün kartıyla tutarlı. Aktif code=null kampanya yoksa efektif == baz (no-op).
+      const basePrice = Number(product.price);
+      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
+        product.id,
+        product.sellerId,
+        product.categoryId ?? "",
+        basePrice,
+      );
+      const unitPrice = campaignPrice ?? basePrice;
       const lineSubtotal = unitPrice * quantity;
 
       const commissionResult = await this.calculateCommission(

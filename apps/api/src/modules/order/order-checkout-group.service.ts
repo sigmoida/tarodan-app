@@ -350,11 +350,30 @@ export class OrderCheckoutGroupService {
             billingAddress = billing;
           }
 
+          // F1.4: charged satır bazı = EFEKTİF (kampanya) fiyat — sepet/ürün kartı
+          // hangi fiyatı gösteriyorsa checkout onu tahsil eder (aksi halde bir code=null
+          // kampanya aktifken alıcı gösterilenden fazla öderdi). Kupon YİNE baz fiyat
+          // üzerinden hesaplanır (sepet ile aynı taban → önizleme = tahsilat).
+          const effectiveMap =
+            await this.discountService.getEffectiveDisplayPriceMany(
+              productIds.map((productId) => {
+                const p = productMap.get(productId)!;
+                return {
+                  productId,
+                  sellerId: p.sellerId,
+                  categoryId: p.categoryId ?? "",
+                  currentDisplayPrice: Number(p.price),
+                };
+              }),
+            );
+
           // Fiyatlandırma (ürün başına) — createDirectOrder ile aynı kurallar
           const now = new Date();
           const pricing = productIds.map((productId) => {
             const product = productMap.get(productId)!;
-            const productPrice = Number(product.price);
+            const basePrice = Number(product.price);
+            const campaignPrice = effectiveMap.get(productId);
+            const productPrice = campaignPrice ?? basePrice;
             const isSaleActive =
               product.oldPrice != null &&
               (!product.saleStartDate ||
@@ -363,14 +382,14 @@ export class OrderCheckoutGroupService {
             const originalPrice =
               isSaleActive && product.oldPrice != null
                 ? Number(product.oldPrice)
-                : productPrice;
+                : basePrice;
             return {
               productId,
               product,
               quantity: qtyByProduct.get(productId) ?? 1,
               productPrice,
               originalPrice,
-              productDiscount: isSaleActive ? originalPrice - productPrice : 0,
+              productDiscount: Math.max(0, originalPrice - productPrice),
               couponDiscount: 0,
             };
           });

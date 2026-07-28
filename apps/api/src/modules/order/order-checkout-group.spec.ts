@@ -219,7 +219,13 @@ describe("OrderService checkout group (batch checkout)", () => {
         { provide: NotificationService, useValue: {} },
         {
           provide: DiscountService,
-          useValue: { validateCoupon: jest.fn(), recordUsage: jest.fn() },
+          useValue: {
+            validateCoupon: jest.fn(),
+            recordUsage: jest.fn(),
+            getEffectiveDisplayPriceMany: jest
+              .fn()
+              .mockResolvedValue(new Map()),
+          },
         },
         { provide: DiscountCalculator, useValue: {} },
         {

@@ -36,7 +36,10 @@ describe("OrderService.calculateCommission (BUYER + SELLER ayrı lookup) (E2E)",
         freeShippingThreshold: 500,
       }),
     } as any;
-    const pricing = new OrderPricingService(prisma, taxStub, shippingTariffs);
+    const pricing = new OrderPricingService(prisma, taxStub, shippingTariffs, {
+      getEffectiveDisplayPrice: async () => null,
+      getEffectiveDisplayPriceMany: async () => new Map(),
+    } as any);
     return new OrderService(pricing, {} as any, {} as any, {} as any);
   }
 

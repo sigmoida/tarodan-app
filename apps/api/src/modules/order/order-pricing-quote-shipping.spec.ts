@@ -59,7 +59,10 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         freeShippingThreshold: THRESHOLD,
       }),
     } as any;
-    const svc = new OrderPricingService(prisma, taxService, shippingTariffs);
+    const svc = new OrderPricingService(prisma, taxService, shippingTariffs, {
+      getEffectiveDisplayPrice: async () => null,
+      getEffectiveDisplayPriceMany: async () => new Map(),
+    } as any);
     // Komisyonu izole et — bu spec yalnız kargoyu ölçer.
     jest
       .spyOn(svc, "calculateCommission")

@@ -110,6 +110,10 @@ describe("commission rule matching by membership tier", () => {
         freeShippingThreshold: 500,
       }),
     } as any,
+    {
+      getEffectiveDisplayPrice: async () => null,
+      getEffectiveDisplayPriceMany: async () => new Map(),
+    } as any,
   );
 
   beforeEach(() => {
