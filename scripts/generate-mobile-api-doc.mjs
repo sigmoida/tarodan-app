@@ -9,10 +9,6 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, "..");
 const apiModulesDir = path.join(rootDir, "apps/api/src/modules");
 const webDir = path.join(rootDir, "apps/web/src");
-const mobileDirs = [
-  path.join(rootDir, "apps/mobile/src"),
-  path.join(rootDir, "apps/mobile/app"),
-];
 const schemaDirs = [
   path.join(rootDir, "apps/api/src"),
   path.join(rootDir, "packages"),
@@ -1031,30 +1027,23 @@ function routeShape(route) {
     .join("/");
 }
 
-function attachUsage(endpoints, webCalls, mobileCalls) {
+function attachContractCoverage(endpoints, webCalls) {
   const callMap = new Map();
-  for (const call of [...webCalls, ...mobileCalls]) {
+  for (const call of webCalls) {
     const key = `${call.method} ${routeShape(call.route)}`;
-    const current = callMap.get(key) || { web: [], mobile: [] };
-    current[call.client].push(call);
+    const current = callMap.get(key) || [];
+    current.push(call);
     callMap.set(key, current);
   }
 
   return endpoints.map((endpoint) => {
     const key = `${endpoint.method} ${routeShape(endpoint.route)}`;
-    const usage = callMap.get(key) || { web: [], mobile: [] };
-    const webUsed = usage.web.length > 0;
-    const mobileUsed = usage.mobile.length > 0;
-    let parity = "backend-only";
-    if (webUsed && mobileUsed) parity = "both";
-    else if (webUsed) parity = "mobile-gap";
-    else if (mobileUsed) parity = "mobile-only";
+    const webUsage = callMap.get(key) || [];
 
     return {
       ...endpoint,
-      parity,
-      webUsage: usage.web.slice(0, 8),
-      mobileUsage: usage.mobile.slice(0, 8),
+      coverage: webUsage.length > 0 ? "web-required" : "api-available",
+      webUsage: webUsage.slice(0, 8),
     };
   });
 }
@@ -1201,8 +1190,8 @@ function makeHtml(data) {
     }
     .metric span { color: var(--muted); font-size: 12px; }
     .metric strong { display: block; margin-top: 3px; font-size: 26px; line-height: 1; }
-    .metric.gap { border-top: 3px solid var(--brand); }
-    .metric.both { border-top: 3px solid var(--green); }
+    .metric.required { border-top: 3px solid var(--brand); }
+    .metric.available { border-top: 3px solid var(--green); }
     .section { padding-top: 30px; }
     .section-heading {
       display: flex;
@@ -1375,10 +1364,8 @@ function makeHtml(data) {
     }
     .badge.public { color: var(--green); background: var(--green-soft); }
     .badge.bearer { color: var(--blue); background: var(--blue-soft); }
-    .badge.both { color: var(--green); background: var(--green-soft); }
-    .badge.mobile-gap { color: #9d2824; background: var(--brand-soft); }
-    .badge.mobile-only { color: var(--amber); background: var(--amber-soft); }
-    .badge.backend-only { color: var(--muted); background: #e9edef; }
+    .badge.web-required { color: #9d2824; background: var(--brand-soft); }
+    .badge.api-available { color: var(--green); background: var(--green-soft); }
     .endpoint-detail {
       padding: 16px;
       background: #fbfcfc;
@@ -1485,11 +1472,11 @@ function makeHtml(data) {
       <div class="brand-mark">T</div>
       <div>
         <strong>Tarodan Mobile API Contract</strong>
-        <span>Web işlev paritesi ve tüketici endpoint kataloğu</span>
+        <span>Harici mobil istemci için tüketici API sözleşmesi</span>
       </div>
     </div>
     <div class="top-actions">
-      <button class="top-button" type="button" id="copy-gaps">Eksik uçları kopyala</button>
+      <button class="top-button" type="button" id="copy-required">Zorunlu uçları kopyala</button>
       <button class="top-button" type="button" onclick="window.print()">Yazdır / PDF</button>
     </div>
   </header>
@@ -1499,8 +1486,9 @@ function makeHtml(data) {
       <div>
         <h1>Mobil uygulama için eksiksiz API sözleşmesi</h1>
         <p class="lede">
-          Bu belge API controller’larını, web istemcisindeki çağrıları ve mobil istemcideki mevcut çağrıları
-          birlikte tarar. Hedef: tüketici web uygulamasındaki her işlevin mobilde karşılığı olması.
+          Bu belge API controller’larını ve web istemcisinin işlev yüzeyini tarar. Mobil uygulama ayrı bir
+          repoda yönetilir; bu katalog mobil implementasyon durumunu ölçmez, uygulanması gereken sunucu
+          sözleşmesini tanımlar.
         </p>
       </div>
       <aside class="scope-note">
@@ -1534,20 +1522,20 @@ function makeHtml(data) {
       <div class="status-grid" id="status-contracts"></div>
     </section>
 
-    <section class="section" id="mobile-backlog">
+    <section class="section" id="mobile-requirements">
       <div class="section-heading">
         <div>
-          <h2>Mobil endpoint parite backlog’u</h2>
+          <h2>Web işlev paritesi için zorunlu uçlar</h2>
           <p>
-            Web üretim kodunda çağrılıp mobil üretim kodunda aynı metot + rota karşılığı bulunmayan uçlar.
-            Alternatif bir rotayla sağlanan semantik eşdeğerlik otomatik olarak varsayılmaz.
+            Web üretim kodunda kullanılan tüketici uçları mobil uygulamanın işlevsel kapsamına dahildir.
+            Harici mobil repo bu listeyi kendi implementasyon ve kabul testleriyle doğrulamalıdır.
           </p>
         </div>
       </div>
       <div style="overflow-x:auto">
         <table class="gap-table">
           <thead><tr><th>Metot</th><th>Endpoint</th><th>Alan</th><th>Auth</th><th>İşlev</th></tr></thead>
-          <tbody id="gap-backlog"></tbody>
+          <tbody id="required-endpoints"></tbody>
         </table>
       </div>
     </section>
@@ -1556,17 +1544,18 @@ function makeHtml(data) {
       <div class="section-heading">
         <div>
           <h2>Ortak istemci sözleşmesi</h2>
-          <p>Web BFF cookie kullanır; mobil SecureStore içindeki access/refresh token çiftini kullanır.</p>
+          <p>Web BFF cookie kullanır; native istemci access/refresh token çiftini işletim sisteminin güvenli depolamasında tutmalıdır.</p>
         </div>
       </div>
       <div class="contract">
         <div>
           <h3>Base URL ve auth</h3>
           <ul>
-            <li>Production: <code>EXPO_PUBLIC_API_URL=${escapeHtml(data.metadata.productionApiUrl)}</code></li>
-            <li>Preview: <code>EXPO_PUBLIC_API_URL=${escapeHtml(data.metadata.previewApiUrl)}</code></li>
-            <li>Bearer token request interceptor ile eklenir.</li>
-            <li>401’de tek-uçuş <code>POST /auth/refresh</code>; rotated refresh token saklanır.</li>
+            <li>Production: <code>MOBILE_API_BASE_URL=${escapeHtml(data.metadata.productionApiUrl)}</code></li>
+            <li>Preview: <code>MOBILE_API_BASE_URL=${escapeHtml(data.metadata.previewApiUrl)}</code></li>
+            <li>Local iOS: <code>${escapeHtml(data.metadata.localIosApiUrl)}</code>; Android emulator: <code>${escapeHtml(data.metadata.localAndroidApiUrl)}</code>.</li>
+            <li>Bearer token her korumalı isteğe eklenmelidir.</li>
+            <li>401’de tek-uçuş <code>POST /auth/refresh</code> uygulanmalı ve rotated refresh token atomik olarak saklanmalıdır.</li>
             <li><code>USER_BANNED</code> 403 tam ekran ban akışına yönlendirir.</li>
           </ul>
         </div>
@@ -1588,7 +1577,7 @@ function makeHtml(data) {
             <li>Ekrandaki ara toplam, kargo, vergi ve nihai tutar quote <code>pricing</code> alanından gösterilir; istemci hesabı otorite değildir.</li>
             <li><code>409 PRICING_CHANGED</code> sonrasında quote yenilenir ve kullanıcı güncel tutarı yeniden onaylar.</li>
             <li>PayTR sonucu yalnız callback ile kesinleşir; mobil status endpointini poll eder.</li>
-            <li>Ödeme başlatma yanıtındaki <code>paymentAccessToken</code> SecureStore’da tutulur ve public ödeme uçlarına <code>X-Payment-Capability</code> olarak eklenir.</li>
+            <li>Ödeme başlatma yanıtındaki <code>paymentAccessToken</code> güvenli depoda tutulur ve public ödeme uçlarına <code>X-Payment-Capability</code> olarak eklenir.</li>
             <li>Mutation tekrarlarında checkout/idempotency anahtarı korunur.</li>
           </ul>
         </div>
@@ -1599,7 +1588,7 @@ function makeHtml(data) {
       <div class="section-heading">
         <div>
           <h2>Endpoint kataloğu</h2>
-          <p>“Mobil eksik” filtresi, web API katmanında tanımlı olup mobil API katmanında karşılığı bulunmayan sözleşmeleri gösterir.</p>
+          <p>“Web paritesi için zorunlu” filtresi web istemcisinde kullanılan uçları; “API’de ek olarak mevcut” filtresi diğer tüketici uçlarını gösterir.</p>
         </div>
       </div>
       <div class="filters" aria-label="Endpoint filtreleri">
@@ -1615,12 +1604,10 @@ function makeHtml(data) {
           <option value="public">Public</option>
           <option value="bearer">Bearer</option>
         </select>
-        <select class="control" id="parity-filter">
-          <option value="">Tüm parite durumları</option>
-          <option value="mobile-gap">Mobil eksik</option>
-          <option value="both">Web + mobil</option>
-          <option value="mobile-only">Yalnız mobil</option>
-          <option value="backend-only">İstemci katmanında yok</option>
+        <select class="control" id="coverage-filter">
+          <option value="">Tüm sözleşme kapsamı</option>
+          <option value="web-required">Web paritesi için zorunlu</option>
+          <option value="api-available">API’de ek olarak mevcut</option>
         </select>
       </div>
       <div class="results-meta">
@@ -1654,7 +1641,7 @@ function makeHtml(data) {
     <footer class="footer">
       <strong>Üretim:</strong> ${escapeHtml(generatedAt)} ·
       <strong>Kaynak:</strong> <code>apps/api/src/modules/**/*controller.ts</code>,
-      <code>apps/web/src</code>, <code>apps/mobile/src</code>, <code>apps/mobile/app</code> ·
+      <code>apps/web/src</code> · Mobil kaynak kodu bu üretimde taranmaz ·
       Yenilemek için: <code>node scripts/generate-mobile-api-doc.mjs</code>
     </footer>
   </main>
@@ -1663,11 +1650,9 @@ function makeHtml(data) {
   <script>
     const data = JSON.parse(document.getElementById("doc-data").textContent);
     const endpoints = data.endpoints;
-    const parityLabels = {
-      "both": "Web + mobil",
-      "mobile-gap": "Mobil eksik",
-      "mobile-only": "Yalnız mobil",
-      "backend-only": "İstemci katmanında yok"
+    const coverageLabels = {
+      "web-required": "Web paritesi için zorunlu",
+      "api-available": "API’de ek olarak mevcut"
     };
     const authLabels = { public: "Public", bearer: "Bearer" };
     const escapeHtml = (value) => String(value ?? "")
@@ -1746,7 +1731,7 @@ function makeHtml(data) {
           '<span class="summary-text">' + escapeHtml(endpoint.summary) + '</span>' +
           '<span class="badges">' +
             '<span class="badge ' + endpoint.auth + '">' + authLabels[endpoint.auth] + '</span>' +
-            '<span class="badge ' + endpoint.parity + '">' + parityLabels[endpoint.parity] + '</span>' +
+            '<span class="badge ' + endpoint.coverage + '">' + coverageLabels[endpoint.coverage] + '</span>' +
           '</span>' +
         '</summary>' +
         '<div class="endpoint-detail"><div class="detail-grid">' +
@@ -1770,7 +1755,6 @@ function makeHtml(data) {
               escapeHtml(endpoint.source + ":" + endpoint.line) + '</code><br>Handler: <code>' +
               escapeHtml(endpoint.handler) + '</code></p></div>' +
             usageHtml("Web kullanımı", endpoint.webUsage) +
-            usageHtml("Mobil kullanımı", endpoint.mobileUsage) +
           '</div>' +
         '</div></div>' +
       '</details>';
@@ -1783,7 +1767,7 @@ function makeHtml(data) {
         domain: document.getElementById("domain-filter").value,
         method: document.getElementById("method-filter").value,
         auth: document.getElementById("auth-filter").value,
-        parity: document.getElementById("parity-filter").value,
+        coverage: document.getElementById("coverage-filter").value,
       };
     }
 
@@ -1800,7 +1784,7 @@ function makeHtml(data) {
           (!filters.domain || endpoint.domain === filters.domain) &&
           (!filters.method || endpoint.method === filters.method) &&
           (!filters.auth || endpoint.auth === filters.auth) &&
-          (!filters.parity || endpoint.parity === filters.parity);
+          (!filters.coverage || endpoint.coverage === filters.coverage);
       });
 
       document.getElementById("result-count").textContent =
@@ -1822,13 +1806,13 @@ function makeHtml(data) {
     }
 
     function renderStats() {
-      const count = (parity) => endpoints.filter((endpoint) => endpoint.parity === parity).length;
+      const count = (coverage) => endpoints.filter((endpoint) => endpoint.coverage === coverage).length;
       const stats = [
         ["Tüketici endpointi", endpoints.length, ""],
         ["Public", endpoints.filter((endpoint) => endpoint.auth === "public").length, ""],
         ["Bearer", endpoints.filter((endpoint) => endpoint.auth === "bearer").length, ""],
-        ["Web + mobil", count("both"), "both"],
-        ["Mobil parite açığı", count("mobile-gap"), "gap"],
+        ["Web paritesi için zorunlu", count("web-required"), "required"],
+        ["API’de ek olarak mevcut", count("api-available"), "available"],
       ];
       document.getElementById("stats").innerHTML = stats.map(([label, value, style]) =>
         '<div class="metric ' + style + '"><span>' + escapeHtml(label) +
@@ -1856,9 +1840,9 @@ function makeHtml(data) {
       ).join("");
     }
 
-    function renderGapBacklog() {
-      document.getElementById("gap-backlog").innerHTML = endpoints
-        .filter((endpoint) => endpoint.parity === "mobile-gap")
+    function renderRequiredEndpoints() {
+      document.getElementById("required-endpoints").innerHTML = endpoints
+        .filter((endpoint) => endpoint.coverage === "web-required")
         .map((endpoint) =>
           '<tr><td><span class="method ' + endpoint.method + '">' + endpoint.method +
           '</span></td><td><a href="#' + stableId(endpoint) + '"><code>' +
@@ -1912,16 +1896,16 @@ function makeHtml(data) {
       const button = event.target.closest(".copy-route, .copy-curl");
       if (button) copyText(button.dataset.value, button);
     });
-    document.getElementById("gap-backlog").addEventListener("click", (event) => {
+    document.getElementById("required-endpoints").addEventListener("click", (event) => {
       const link = event.target.closest("a[href^='#ep-']");
       if (!link) return;
       const endpoint = document.querySelector(link.getAttribute("href"));
       if (endpoint) endpoint.open = true;
     });
-    document.getElementById("copy-gaps").addEventListener("click", (event) => {
-      const text = endpoints.filter((endpoint) => endpoint.parity === "mobile-gap")
+    document.getElementById("copy-required").addEventListener("click", (event) => {
+      const text = endpoints.filter((endpoint) => endpoint.coverage === "web-required")
         .map((endpoint) => endpoint.method + " " + endpoint.route + " — " + endpoint.summary).join("\\n");
-      copyText(text || "Mobil parite açığı bulunmadı.", event.currentTarget);
+      copyText(text || "Web paritesi için zorunlu endpoint bulunmadı.", event.currentTarget);
     });
     document.getElementById("socket-events").innerHTML = data.realtimeEvents.map((item) =>
       '<tr><td>' + escapeHtml(item.direction) + '</td><td><code>' + escapeHtml(item.event) +
@@ -1932,7 +1916,7 @@ function makeHtml(data) {
     renderStats();
     renderWorkflows();
     renderStatusContracts();
-    renderGapBacklog();
+    renderRequiredEndpoints();
     initializeFilters();
     renderEndpoints();
   </script>
@@ -1946,11 +1930,7 @@ const endpoints = extractEndpoints().map((endpoint) => ({
   schemas: schemasForEndpoint(endpoint, schemaIndex),
 }));
 const webCalls = extractClientCalls([webDir], "web");
-const mobileCalls = extractClientCalls(mobileDirs, "mobile");
-const endpointsWithUsage = attachUsage(endpoints, webCalls, mobileCalls);
-const easConfig = JSON.parse(
-  fs.readFileSync(path.join(rootDir, "apps/mobile/eas.json"), "utf8"),
-);
+const endpointsWithUsage = attachContractCoverage(endpoints, webCalls);
 
 const data = {
   endpoints: endpointsWithUsage,
@@ -1962,12 +1942,10 @@ const data = {
   metadata: {
     endpointCount: endpointsWithUsage.length,
     webCallCount: webCalls.length,
-    mobileCallCount: mobileCalls.length,
-    productionApiUrl:
-      easConfig.build?.production?.env?.EXPO_PUBLIC_API_URL ||
-      "<production-api>/api",
-    previewApiUrl:
-      easConfig.build?.preview?.env?.EXPO_PUBLIC_API_URL || "<preview-api>/api",
+    productionApiUrl: "<PRODUCTION_API_ORIGIN>/api",
+    previewApiUrl: "<PREVIEW_API_ORIGIN>/api",
+    localIosApiUrl: "http://localhost:3001/api",
+    localAndroidApiUrl: "http://10.0.2.2:3001/api",
     generatedAt: new Date().toISOString(),
   },
 };
@@ -1976,15 +1954,14 @@ fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, makeHtml(data), "utf8");
 
 const counts = Object.fromEntries(
-  ["both", "mobile-gap", "mobile-only", "backend-only"].map((parity) => [
-    parity,
-    endpointsWithUsage.filter((endpoint) => endpoint.parity === parity).length,
+  ["web-required", "api-available"].map((coverage) => [
+    coverage,
+    endpointsWithUsage.filter((endpoint) => endpoint.coverage === coverage)
+      .length,
   ]),
 );
 
 console.log(`Generated ${relative(outputPath)}`);
 console.log(`Endpoints: ${endpointsWithUsage.length}`);
-console.log(
-  `Client calls: web=${webCalls.length}, mobile=${mobileCalls.length}`,
-);
-console.log(`Parity: ${JSON.stringify(counts)}`);
+console.log(`Client calls: web=${webCalls.length}`);
+console.log(`Contract coverage: ${JSON.stringify(counts)}`);
