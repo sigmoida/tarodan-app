@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
@@ -19,6 +20,7 @@ import { ElogoInvoicingService } from "../elogo";
 import { OrderCommonService } from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
 import { ORDER_TRANSITION_RULES } from "./order-state-machine";
+import { DiscountService } from "../discount/discount.service";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -38,6 +40,7 @@ export class OrderLifecycleService {
     private readonly orderCommon: OrderCommonService,
     private readonly orderQuery: OrderQueryService,
     private readonly elogoInvoicing: ElogoInvoicingService,
+    @Optional() private readonly discountService?: DiscountService,
   ) {}
 
   /**
@@ -442,10 +445,8 @@ export class OrderLifecycleService {
    * - If paid, triggers refund process
    */
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
-    // KUPON KURALI: iptal/iade edilen siparişte kupon geri kazanılmaz — burada
-    // (ve iade akışında) bilerek Discount.usedCount düşürülmez / DiscountUsage
-    // silinmez. İade tutarı da order.totalAmount (kupon düşülmüş net) üzerinden
-    // hesaplanır, yani kupon payı iade edilmez. Bkz. DiscountService.recordUsage.
+    // Ödenmiş iptal/iade gerçek kupon kullanımını geri vermez. pending_payment
+    // iptalinde ise yalnız geçici CouponReservation serbest bırakılır.
     let productIdToInvalidate: string | null = null;
     const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
@@ -590,6 +591,35 @@ export class OrderLifecycleService {
       // upsert ediliyor); markWaived noop döner. Spec Bölüm 7.4 (buyer-initiated)
       // ile uyumlu — komisyon alınmaz çünkü iş tamamlanmadı.
       await this.commissionLedger.markWaived(orderId, "buyer_cancelled", tx);
+
+      if (order.status === OrderStatus.pending_payment) {
+        let reservationOrderIds = [order.id];
+        let canRelease = true;
+        if (order.checkoutGroupId) {
+          const aliveSibling = await tx.order.findFirst({
+            where: {
+              checkoutGroupId: order.checkoutGroupId,
+              status: OrderStatus.pending_payment,
+              id: { not: order.id },
+            },
+            select: { id: true },
+          });
+          canRelease = !aliveSibling;
+          if (canRelease) {
+            const groupOrders = await tx.order.findMany({
+              where: { checkoutGroupId: order.checkoutGroupId },
+              select: { id: true },
+            });
+            reservationOrderIds = groupOrders.map((item) => item.id);
+          }
+        }
+        if (canRelease) {
+          await this.discountService?.releaseReservedUsageForOrders(
+            reservationOrderIds,
+            tx,
+          );
+        }
+      }
 
       // Note: Refund will be handled by PaymentModule when status is 'refunded'
 

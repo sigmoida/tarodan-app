@@ -15,6 +15,7 @@ import CartItemCard from "./_components/CartItemCard";
 import CartSummary from "./_components/CartSummary";
 import CartSkeleton from "./_components/CartSkeleton";
 import EmptyCart from "./_components/EmptyCart";
+import CartSimilarProducts from "./_components/CartSimilarProducts";
 
 export default function CartClient() {
   const {
@@ -121,10 +122,16 @@ export default function CartClient() {
       />
 
       <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-4">
+        <div
+          className="lg:col-span-2 space-y-4"
+          data-testid="cart-products-column"
+        >
           {lines.map((line) => (
             <CartItemCard key={line.key} item={line} />
           ))}
+          <CartSimilarProducts
+            productIds={lines.map((line) => line.productId)}
+          />
         </div>
 
         <div className="lg:col-span-1">

@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
-import { NotificationModule } from '../notification/notification.module';
-import { ProductLockService } from './product-lock.service';
+import { Module } from "@nestjs/common";
+import { NotificationModule } from "../notification/notification.module";
+import { ProductLockService } from "./product-lock.service";
+import { DiscountModule } from "../discount/discount.module";
 
 /**
  * ProductLockService'i barındıran bağımsız leaf modül. Amaç: payment / order /
@@ -13,7 +14,7 @@ import { ProductLockService } from './product-lock.service';
  * olmadığından yeni döngü oluşmaz.
  */
 @Module({
-  imports: [NotificationModule],
+  imports: [NotificationModule, DiscountModule],
   providers: [ProductLockService],
   exports: [ProductLockService],
 })

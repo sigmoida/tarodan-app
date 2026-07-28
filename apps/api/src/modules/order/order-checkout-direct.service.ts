@@ -457,6 +457,7 @@ export class OrderCheckoutDirectService {
           sellerShippingAmount,
         },
       });
+      const paymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       // Create order with discount info
       const order = await tx.order.create({
@@ -519,7 +520,7 @@ export class OrderCheckoutDirectService {
             totalAmount,
           }),
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt,
           shippingAddressId: shippingAddressId,
           shippingAddress: shippingAddressJson as Prisma.InputJsonValue,
         },
@@ -554,20 +555,21 @@ export class OrderCheckoutDirectService {
         commissionResult,
       );
 
-      // Record discount usage if a coupon was applied. Pass the outer tx so it is
-      // ATOMIC with order creation (F4.4) — a rolled-back checkout no longer leaves
-      // the coupon phantom-consumed.
+      // Hold coupon capacity while payment is pending. This does NOT increment
+      // usedCount or create DiscountUsage; successful payment converts it to real
+      // usage atomically in PaymentFulfillmentService.
       if (appliedDiscountId && couponDiscount > 0) {
-        await this.discountService.recordUsage(
+        await this.discountService.reserveUsage(
           appliedDiscountId,
           buyerId,
           order.id,
           couponDiscount,
           appliedVoucherCodeId,
+          paymentExpiresAt,
           tx,
         );
         this.logger.log(
-          `Discount usage recorded: ${appliedDiscountId} for order ${orderNumber}`,
+          `Discount reserved: ${appliedDiscountId} for order ${orderNumber}`,
         );
       }
 

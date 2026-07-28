@@ -183,6 +183,12 @@ export class OrderCheckoutGroupService {
                 });
               }
             }
+            if (staleOrders.length > 0) {
+              await this.discountService.releaseReservedUsageForOrders(
+                staleOrders.map((stale) => stale.id),
+                tx,
+              );
+            }
           }
 
           const products = await tx.product.findMany({
@@ -810,21 +816,21 @@ export class OrderCheckoutGroupService {
             });
           }
 
-          // Kupon kullanımı: grup başına BİR KEZ ve BU tx içinde kaydedilir (F4.4).
-          // Eskiden satır başına + ayrı bir bağımsız tx'te yapılıyordu → usedCount
-          // çoklu artıyor ve outer tx geri alınsa bile kupon "kullanıldı" kalıyordu.
+          // Kupon kotası grup başına BİR KEZ tutulur. Gerçek kullanım ve usedCount
+          // yalnız başarılı ödeme sonrasında PaymentFulfillmentService'te yazılır.
           if (appliedDiscountId) {
             const totalCouponDiscount = pricing.reduce(
               (sum, p) => sum + p.couponDiscount,
               0,
             );
             if (totalCouponDiscount > 0 && createdOrders.length > 0) {
-              await this.discountService.recordUsage(
+              await this.discountService.reserveUsage(
                 appliedDiscountId,
                 buyerId,
                 createdOrders[0].id,
                 totalCouponDiscount,
                 appliedVoucherCodeId,
+                paymentExpiresAt,
                 tx,
               );
             }

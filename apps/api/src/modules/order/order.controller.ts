@@ -59,8 +59,11 @@ export class OrderController {
     description: "Quote with pricing breakdown",
     type: CheckoutQuoteResponseDto,
   })
-  async getCheckoutQuote(@Body() dto: CheckoutQuoteDto) {
-    return this.orderService.getCheckoutQuote(dto);
+  async getCheckoutQuote(
+    @Body() dto: CheckoutQuoteDto,
+    @CurrentUser("id") userId?: string,
+  ) {
+    return this.orderService.getCheckoutQuote(dto, userId ?? null);
   }
 
   /**

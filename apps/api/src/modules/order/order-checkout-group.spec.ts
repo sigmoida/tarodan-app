@@ -255,7 +255,8 @@ describe("OrderService checkout group (batch checkout)", () => {
           provide: DiscountService,
           useValue: {
             validateCoupon: jest.fn(),
-            recordUsage: jest.fn(),
+            reserveUsage: jest.fn(),
+            releaseReservedUsageForOrders: jest.fn(),
             getEffectiveDisplayPriceMany: jest
               .fn()
               .mockResolvedValue(new Map()),
@@ -692,8 +693,8 @@ describe("OrderService checkout group (batch checkout)", () => {
         expect.objectContaining({ code: "INDIRIM10" }),
         null,
       );
-      // Kupon indirimi siparişe yansır (usedCount artışı için recordUsage çağrılır).
-      expect(discountService.recordUsage).toHaveBeenCalled();
+      // Kupon indirimi siparişe yansır; ödeme öncesi yalnız kota rezerve edilir.
+      expect(discountService.reserveUsage).toHaveBeenCalled();
       const orderData = mockTx.order.create.mock.calls[0][0].data;
       expect(orderData.discountAmount).toBeGreaterThan(0);
     });

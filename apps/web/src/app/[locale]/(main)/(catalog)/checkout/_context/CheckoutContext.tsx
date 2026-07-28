@@ -11,7 +11,6 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStepper } from "@tarodan/ui";
@@ -28,7 +27,6 @@ import {
 import type { CheckoutItem } from "../_lib/types";
 import { useCheckoutQuote } from "../_hooks/useCheckoutQuote";
 import { useShippingCost } from "../_hooks/useShippingCost";
-import { useDirectProduct } from "../_hooks/useDirectProduct";
 import { useCheckoutAddresses } from "../_hooks/useCheckoutAddresses";
 import { useCheckoutAddressForm } from "../_hooks/useCheckoutAddressForm";
 import { useGuestOtp } from "../_hooks/useGuestOtp";
@@ -36,14 +34,13 @@ import { useCheckoutSubmit } from "../_hooks/useCheckoutSubmit";
 
 function useCheckoutValue() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const {
     lines: cartLines,
     canCheckout,
     isLoading: cartIsLoading,
     subtotal: cartSubtotal,
-    totalDiscount: cartTotalDiscount,
+    couponDiscount: cartCouponDiscount,
     clearCart,
     appliedCouponCode,
   } = useCart();
@@ -55,10 +52,6 @@ function useCheckoutValue() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
-  const directProductId = searchParams.get("productId");
-  const existingOrderId = searchParams.get("orderId");
-  const isCartCheckout = !directProductId && !existingOrderId;
 
   // Set once a checkout succeeds and clears the cart. Without this, emptying the
   // cart flips `canCheckout` to false and the guard below would replace the
@@ -79,19 +72,7 @@ function useCheckoutValue() {
 
   const [selectedCarrier] = useState<string>("surat");
 
-  // "Hemen Al" adet seçimi (yalnız direct/buy-now akışı). Sepet checkout'unda adet
-  // sepet sayfasında ayarlanır; burada satırdan gelir. Ürün sayfasından gelen
-  // `?quantity=` ilk adedi tohumlar (pozitif tam sayıya kırpılır, varsayılan 1).
-  const [directQuantity, setDirectQuantity] = useState(() => {
-    const raw = Number.parseInt(searchParams.get("quantity") ?? "", 10);
-    return Number.isFinite(raw) && raw > 0 ? raw : 1;
-  });
-
   // ---- Server data (TanStack Query) ----
-  const { directProduct, directProductError } = useDirectProduct(
-    directProductId,
-    locale,
-  );
   const { addresses, addressesLoading, addressesError } =
     useCheckoutAddresses(isAuthenticated);
 
@@ -121,31 +102,24 @@ function useCheckoutValue() {
     setShowAddressForm,
   });
 
-  // Get checkout items: direct buy > available normalized cart lines. The cart
-  // hook already hides stale guest lines for authenticated users.
-  const checkoutItems: CheckoutItem[] = directProduct
-    ? [{ ...directProduct, quantity: directQuantity }]
-    : cartLines
-        .filter((line) => line.isAvailable)
-        .map((line) => ({
-          id: line.id,
-          productId: line.productId,
-          title: line.title,
-          price: line.price,
-          quantity: line.quantity,
-          maxQuantity: line.maxQuantity,
-          originalPrice:
-            line.originalPrice != null && line.originalPrice > line.price
-              ? line.originalPrice
-              : undefined,
-          imageUrl:
-            line.imageUrl ||
-            "https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün",
-          seller: { id: line.sellerId, displayName: line.sellerName },
-        }));
-  const subtotal = Number(
-    (directProduct ? directProduct.price * directQuantity : cartSubtotal) ?? 0,
-  );
+  const checkoutItems: CheckoutItem[] = cartLines
+    .filter((line) => line.isAvailable)
+    .map((line) => ({
+      id: line.id,
+      productId: line.productId,
+      title: line.title,
+      price: line.price,
+      quantity: line.quantity,
+      maxQuantity: line.maxQuantity,
+      originalPrice:
+        line.originalPrice != null && line.originalPrice > line.price
+          ? line.originalPrice
+          : undefined,
+      imageUrl:
+        line.imageUrl || "https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün",
+      seller: { id: line.sellerId, displayName: line.sellerName },
+    }));
+  const subtotal = Number(cartSubtotal ?? 0);
 
   // Quote her item'ı GERÇEK adediyle fiyatlar (adet değişince yeniden çeker) →
   // önizleme = tahsilat. Eskiden hep quantity:1 gönderiliyordu (çok-adet yanlış).
@@ -154,9 +128,7 @@ function useCheckoutValue() {
       productId: i.productId,
       quantity: i.quantity,
     })),
-    // Direct-buy'da kupon sunulmuyor; sepet checkout'unda uygulanan kupon quote'a
-    // gönderilir → server toplamı kuponu içerir (önizleme = tahsilat).
-    directProduct ? null : appliedCouponCode,
+    appliedCouponCode,
   );
 
   const shippingCity =
@@ -175,7 +147,7 @@ function useCheckoutValue() {
   // Kupon artık QUOTE'ta server-otoriter uygulanıyor (fee/tax/kargo indirimli baz):
   // pricing.totalAmount doğrudan tahsil edilecek tutardır → client-side ÇIKARMA YOK
   // (eski önizleme≠tahsilat hatası kapandı). Quote yoksa kaba fallback tahmini kullanılır.
-  const couponDiscount = directProduct ? 0 : (cartTotalDiscount ?? 0);
+  const couponDiscount = quote?.couponDiscount ?? cartCouponDiscount ?? 0;
   const displayTotal = Math.max(
     0,
     quote?.pricing?.totalAmount ?? subtotal + shippingCost - couponDiscount,
@@ -226,8 +198,7 @@ function useCheckoutValue() {
     router,
     paymentProvider,
     authToken,
-    directProductId,
-    appliedCouponCode: directProduct ? null : appliedCouponCode,
+    appliedCouponCode,
     clearCart,
     onCheckoutSubmitted: () => {
       checkoutSubmittedRef.current = true;
@@ -239,14 +210,6 @@ function useCheckoutValue() {
     // price / campaign changes between quote and pay (F1.3).
     expectedPricingHash: quote?.pricingHash ?? undefined,
   });
-
-  // Direct product failed to load → bounce back to listings.
-  useEffect(() => {
-    if (directProductError) {
-      toast.error(t("product.loadFailed"));
-      router.push("/listings");
-    }
-  }, [directProductError, router, t]);
 
   // Default-select an address once the list first settles (default > last), or
   // open the form when there are none / the fetch failed.
@@ -269,21 +232,14 @@ function useCheckoutValue() {
     }
   }, [isAuthenticated, addressesLoading, addressesError, addresses]);
 
-  // orderId ile gelindiyse sipariş detay sayfasına yönlendir
-  useEffect(() => {
-    if (existingOrderId && isAuthenticated) {
-      router.replace(`/profile/orders/${existingOrderId}`);
-    }
-  }, [existingOrderId, isAuthenticated, router]);
-
   // Plain cart checkout requires at least one available line. Wait for auth and
   // cart hydration so a cold load cannot redirect a valid cart prematurely, and
   // skip once a submit has emptied the cart on its way to the payment page.
   useEffect(() => {
     if (checkoutSubmittedRef.current) return;
-    if (!isMounted || !isCartCheckout || cartIsLoading || canCheckout) return;
+    if (!isMounted || cartIsLoading || canCheckout) return;
     router.replace("/cart");
-  }, [canCheckout, cartIsLoading, isCartCheckout, isMounted, router]);
+  }, [canCheckout, cartIsLoading, isMounted, router]);
 
   // ---- Step-1 validation (zod) ----
   const authAddressOk =
@@ -355,19 +311,13 @@ function useCheckoutValue() {
     isMounted,
     isAuthenticated,
     user,
-    directProductId,
-    existingOrderId,
-    checkoutGuardPending: isCartCheckout && (cartIsLoading || !canCheckout),
+    checkoutGuardPending: cartIsLoading || !canCheckout,
     step,
     goToStep,
     nextStep,
     isLoading,
     // items / pricing
     checkoutItems,
-    isCartCheckout,
-    // "Hemen Al" adet seçimi (buy-now); sepet checkout'unda kullanılmaz.
-    directQuantity,
-    setDirectQuantity,
     subtotal,
     quote,
     quoteLoading,

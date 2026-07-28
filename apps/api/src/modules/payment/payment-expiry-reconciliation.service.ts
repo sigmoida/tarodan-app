@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import {
@@ -21,6 +21,7 @@ import { PaymentRefundService } from "./payment-refund.service";
 import { EventService } from "../events";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { DiscountService } from "../discount/discount.service";
 
 // SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR. Bu
 // statüler poller tarafından gerçek kargo hareketiyle set edilir — böyle bir
@@ -55,6 +56,7 @@ export class PaymentExpiryReconciliationService {
     private readonly eventService: EventService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
+    @Optional() private readonly discountService?: DiscountService,
   ) {}
 
   /**
@@ -211,6 +213,14 @@ export class PaymentExpiryReconciliationService {
               select: { id: true },
             });
             if (!aliveSibling) {
+              const groupOrders = await tx.order.findMany({
+                where: { checkoutGroupId: orderRow.checkoutGroupId },
+                select: { id: true },
+              });
+              await this.discountService?.releaseReservedUsageForOrders(
+                groupOrders.map((item) => item.id),
+                tx,
+              );
               await tx.payment.updateMany({
                 where: {
                   checkoutGroupId: orderRow.checkoutGroupId,
@@ -223,6 +233,11 @@ export class PaymentExpiryReconciliationService {
                 },
               });
             }
+          } else {
+            await this.discountService?.releaseReservedUsageForOrders(
+              [order.id],
+              tx,
+            );
           }
         });
         if (order.productId) {

@@ -4,9 +4,9 @@
 
 import Image from "next/image";
 import { TagIcon } from "@heroicons/react/24/outline";
-import { QuantityStepper } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useCheckout } from "../_context/CheckoutContext";
+import CouponBox from "../../cart/_components/CouponBox";
 
 const fmtTL = (n: number) =>
   n.toLocaleString("tr-TR", {
@@ -18,10 +18,6 @@ export default function OrderSummarySidebar() {
   const {
     t,
     checkoutItems,
-    isCartCheckout,
-    directQuantity,
-    setDirectQuantity,
-    step,
     quote,
     quoteLoading,
     subtotal,
@@ -61,20 +57,7 @@ export default function OrderSummarySidebar() {
               <p className="text-sm text-body font-medium">
                 {fmtTL(item.price)} TL
               </p>
-              {/* Adet: "Hemen Al" ilk adımda düzenlenebilir stepper (stok-duyarlı);
-                  sepet checkout'unda / sonraki adımlarda salt-okunur "Adet: N". */}
-              {!isCartCheckout && step === 0 ? (
-                <div className="mt-2">
-                  <QuantityStepper
-                    value={directQuantity}
-                    max={item.maxQuantity}
-                    onChange={setDirectQuantity}
-                    size="sm"
-                    decreaseLabel={t("cart.decreaseQuantity")}
-                    increaseLabel={t("cart.increaseQuantity")}
-                  />
-                </div>
-              ) : item.quantity > 1 ? (
+              {item.quantity > 1 ? (
                 <p className="mt-1 text-xs text-muted">
                   {t("checkout.quantityLabel", { count: item.quantity })}
                 </p>
@@ -88,6 +71,10 @@ export default function OrderSummarySidebar() {
           </p>
         )}
       </div>
+
+      <hr className="my-4" />
+
+      <CouponBox />
 
       <hr className="my-4" />
 

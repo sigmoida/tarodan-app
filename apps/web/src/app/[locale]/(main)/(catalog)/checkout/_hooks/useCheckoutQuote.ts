@@ -34,6 +34,7 @@ export function useCheckoutQuote(
       if (res.data?.pricing)
         return {
           pricing: res.data.pricing,
+          couponDiscount: res.data.couponDiscount ?? 0,
           shippingTariffVersion: res.data.shippingTariffVersion ?? null,
           pricingHash: res.data.pricingHash,
         };
@@ -44,7 +45,7 @@ export function useCheckoutQuote(
 
   return {
     quote: query.data ?? null,
-    quoteLoading: query.isLoading && items.length > 0,
+    quoteLoading: query.isFetching && items.length > 0,
     quoteError: query.isError,
   };
 }

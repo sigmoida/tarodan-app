@@ -15,11 +15,10 @@
  * that group only; until then this list is the one place to edit.
  */
 export const CATEGORY_BAR_VISIBLE_PREFIXES = [
-	'/cart',
-	'/checkout',
-	'/collections',
-	'/listings',
-	'/manufacturers',
+  "/cart",
+  "/collections",
+  "/listings",
+  "/manufacturers",
 ] as const;
 
 /**
@@ -29,8 +28,8 @@ export const CATEGORY_BAR_VISIBLE_PREFIXES = [
  * as `/listings-foo` does NOT match.
  */
 export function shouldShowCategoryBar(pathname: string): boolean {
-	if (pathname === '/') return true;
-	return CATEGORY_BAR_VISIBLE_PREFIXES.some(
-		(prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-	);
+  if (pathname === "/") return true;
+  return CATEGORY_BAR_VISIBLE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 }

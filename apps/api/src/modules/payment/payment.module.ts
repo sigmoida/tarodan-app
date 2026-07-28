@@ -42,6 +42,7 @@ import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { CommissionModule } from "../commission/commission.module";
 import { StorageModule } from "../storage/storage.module";
 import { ElogoModule } from "../elogo";
+import { DiscountModule } from "../discount";
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { ElogoModule } from "../elogo";
     StorageModule,
     ProductLockModule,
     ElogoModule,
+    DiscountModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

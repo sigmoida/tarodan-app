@@ -29,7 +29,12 @@ export const api = createApiClient({
 function shouldPreserveAuthTokenOn401(): boolean {
   if (typeof window === "undefined") return false;
   const p = window.location?.pathname || "";
-  return p === "/checkout" || p.startsWith("/payment") || p.startsWith("/cart");
+  return (
+    p === "/checkout" ||
+    p.endsWith("/checkout") ||
+    p.includes("/cart") ||
+    p.includes("/payment")
+  );
 }
 
 /**

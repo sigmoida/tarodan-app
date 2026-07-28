@@ -37,6 +37,7 @@ import { StorageService } from "../storage/storage.service";
 import { I18nService } from "../i18n";
 import { OutboxService } from "../outbox/outbox.service";
 import { OUTBOX_ORDER_FULFILLMENT } from "../outbox/outbox.types";
+import { DiscountService } from "../discount/discount.service";
 import { OrderStatus, PaymentStatus, ProductStatus } from "@prisma/client";
 
 /**
@@ -127,6 +128,10 @@ describe("PaymentService group payment (checkout group)", () => {
   };
   // #8: fulfillment backstop — ödeme tx'iyle atomik enqueue'yu doğrulamak için mock.
   const mockOutbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+  const mockDiscount = {
+    consumeReservedUsageForOrders: jest.fn().mockResolvedValue(undefined),
+    releaseReservedUsageForOrders: jest.fn().mockResolvedValue(undefined),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -252,6 +257,7 @@ describe("PaymentService group payment (checkout group)", () => {
           useValue: { record: jest.fn().mockResolvedValue(undefined) },
         },
         { provide: OutboxService, useValue: mockOutbox },
+        { provide: DiscountService, useValue: mockDiscount },
       ],
     }).compile();
 
@@ -269,6 +275,10 @@ describe("PaymentService group payment (checkout group)", () => {
     );
 
     expect(did).toBe(true);
+    expect(mockDiscount.consumeReservedUsageForOrders).toHaveBeenCalledWith(
+      ["order-1", "order-2"],
+      mockTx,
+    );
 
     // Sıralama: order.update'lerin TÜMÜ ilk product.update'ten önce gelmeli
     const firstProductUpdate = callSequence.findIndex((c) =>
@@ -377,6 +387,10 @@ describe("PaymentService group payment (checkout group)", () => {
     );
 
     expect(did).toBe(true);
+    expect(mockDiscount.releaseReservedUsageForOrders).toHaveBeenCalledWith(
+      ["order-1", "order-2"],
+      mockTx,
+    );
     expect(
       mockProductLock.invalidatePendingOrdersForProduct,
     ).not.toHaveBeenCalled();

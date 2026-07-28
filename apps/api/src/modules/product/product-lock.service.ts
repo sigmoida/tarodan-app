@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import {
   OfferStatus,
   OrderStatus,
@@ -14,6 +19,7 @@ import {
 } from "./helpers/product-availability.helper";
 import { getReservedAwareStatus } from "./helpers/product-status.helper";
 import { NotificationService } from "../notification/notification.service";
+import { DiscountService } from "../discount/discount.service";
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -80,6 +86,7 @@ export class ProductLockService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    @Optional() private readonly discountService?: DiscountService,
   ) {}
 
   /**
@@ -345,6 +352,7 @@ export class ProductLockService {
         buyerId: true,
         productId: true,
         offerId: true,
+        checkoutGroupId: true,
         product: { select: { title: true } },
         payment: { select: { id: true } },
       },
@@ -362,6 +370,32 @@ export class ProductLockService {
         cancelReason,
       },
     });
+
+    if (this.discountService) {
+      const groupIds = [
+        ...new Set(
+          orders
+            .map((order) => order.checkoutGroupId)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+      const groupOrders =
+        groupIds.length > 0
+          ? await tx.order.findMany({
+              where: { checkoutGroupId: { in: groupIds } },
+              select: { id: true },
+            })
+          : [];
+      await this.discountService.releaseReservedUsageForOrders(
+        [
+          ...new Set([
+            ...orders.map((order) => order.id),
+            ...groupOrders.map((order) => order.id),
+          ]),
+        ],
+        tx,
+      );
+    }
 
     // Release reservations only for orders that actually held one. Clamp with
     // GREATEST(..., 0) as defensive guard against pre-existing drift or the

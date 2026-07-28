@@ -49,7 +49,10 @@ export class OrderService {
     return this.orderPricing.getFreeShippingInfo(orderAmount);
   }
 
-  async getCheckoutQuote(dto: CheckoutQuoteDto): Promise<{
+  async getCheckoutQuote(
+    dto: CheckoutQuoteDto,
+    userId: string | null = null,
+  ): Promise<{
     itemsSubtotal: number;
     shippingAmount: number;
     buyerFeeAmount: number;
@@ -81,7 +84,7 @@ export class OrderService {
       sellerNetAmount: number;
     };
   }> {
-    return this.orderPricing.getCheckoutQuote(dto);
+    return this.orderPricing.getCheckoutQuote(dto, userId);
   }
 
   async getCommissionPreview(

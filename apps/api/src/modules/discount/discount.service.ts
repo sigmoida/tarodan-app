@@ -25,6 +25,7 @@ import {
   DiscountScope,
   DiscountType,
   DiscountFundedBy,
+  CouponReservationStatus,
   Prisma,
 } from "@prisma/client";
 
@@ -559,10 +560,22 @@ export class DiscountService {
       return { isValid: false, error: "Bu kuponun süresi doldu" };
     }
 
+    // Real usage is incremented only after successful payment. Active checkout
+    // reservations still count against capacity so the last coupon cannot be sold
+    // to several buyers concurrently.
+    const activeReservationWhere = {
+      discountId: discount.id,
+      status: CouponReservationStatus.active,
+      expiresAt: { gt: now },
+    };
+    const activeReservationCount = await this.prisma.couponReservation.count({
+      where: activeReservationWhere,
+    });
+
     // Check total usage limit
     if (
       discount.usageLimitTotal &&
-      discount.usedCount >= discount.usageLimitTotal
+      discount.usedCount + activeReservationCount >= discount.usageLimitTotal
     ) {
       return { isValid: false, error: "Bu kupon kullanım limitine ulaştı" };
     }
@@ -580,10 +593,32 @@ export class DiscountService {
       const userUsageCount = await this.prisma.discountUsage.count({
         where: { discountId: discount.id, userId },
       });
-      if (userUsageCount >= discount.usageLimitPerUser) {
+      const userReservationCount = await this.prisma.couponReservation.count({
+        where: {
+          ...activeReservationWhere,
+          userId,
+        },
+      });
+      if (userUsageCount + userReservationCount >= discount.usageLimitPerUser) {
         return {
           isValid: false,
           error: "Bu kuponu zaten kullandınız",
+        };
+      }
+    }
+
+    if (voucherCodeId) {
+      const voucherReserved = await this.prisma.couponReservation.count({
+        where: {
+          voucherCodeId,
+          status: CouponReservationStatus.active,
+          expiresAt: { gt: now },
+        },
+      });
+      if (voucherReserved > 0) {
+        return {
+          isValid: false,
+          error: "Bu kupon kodu başka bir ödemede ayrıldı",
         };
       }
     }
@@ -599,11 +634,21 @@ export class DiscountService {
       const products = await this.prisma.product.findMany({
         where: { id: { in: dto.cartItems.map((i) => i.productId) } },
       });
+      const effectivePrices = await this.getEffectiveDisplayPriceMany(
+        products.map((product) => ({
+          productId: product.id,
+          sellerId: product.sellerId,
+          categoryId: product.categoryId ?? "",
+          currentDisplayPrice: Number(product.price),
+        })),
+      );
 
       for (const item of dto.cartItems) {
         const product = products.find((p) => p.id === item.productId);
         if (product) {
-          const itemPrice = Number(product.price) * item.quantity;
+          const unitPrice =
+            effectivePrices.get(product.id) ?? Number(product.price);
+          const itemPrice = unitPrice * item.quantity;
           cartTotal += itemPrice;
           if (this.isProductEligibleForDiscount(product, discount)) {
             eligibleSubtotal += itemPrice;
@@ -701,9 +746,198 @@ export class DiscountService {
   }
 
   /**
-   * Record discount usage after order completion.
+   * Reserve coupon capacity for a pending-payment order without consuming it.
+   * `usedCount` and DiscountUsage are intentionally untouched here.
+   */
+  async reserveUsage(
+    discountId: string,
+    userId: string,
+    orderId: string,
+    amount: number,
+    voucherCodeId: string | undefined,
+    expiresAt: Date,
+    client?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const run = async (tx: Prisma.TransactionClient) => {
+      await tx.$queryRaw`SELECT id FROM discounts WHERE id = ${discountId} FOR UPDATE`;
+
+      const existing = await tx.couponReservation.findUnique({
+        where: { orderId },
+      });
+      if (existing) {
+        if (
+          existing.discountId === discountId &&
+          existing.status === CouponReservationStatus.active
+        ) {
+          return;
+        }
+        throw new BadRequestException(
+          "Sipariş için kupon rezervasyonu zaten var",
+        );
+      }
+
+      const now = new Date();
+      await tx.couponReservation.updateMany({
+        where: {
+          discountId,
+          status: CouponReservationStatus.active,
+          expiresAt: { lte: now },
+        },
+        data: {
+          status: CouponReservationStatus.released,
+          releasedAt: now,
+        },
+      });
+
+      const discount = await tx.discount.findUnique({
+        where: { id: discountId },
+        select: {
+          usedCount: true,
+          usageLimitTotal: true,
+          usageLimitPerUser: true,
+        },
+      });
+      if (!discount) {
+        throw new BadRequestException("Kupon bulunamadı");
+      }
+
+      const activeWhere = {
+        discountId,
+        status: CouponReservationStatus.active,
+        expiresAt: { gt: now },
+      };
+      if (discount.usageLimitTotal) {
+        const reserved = await tx.couponReservation.count({
+          where: activeWhere,
+        });
+        if (discount.usedCount + reserved >= discount.usageLimitTotal) {
+          throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
+        }
+      }
+
+      if (discount.usageLimitPerUser) {
+        const [usedByUser, reservedByUser] = await Promise.all([
+          tx.discountUsage.count({ where: { discountId, userId } }),
+          tx.couponReservation.count({
+            where: { ...activeWhere, userId },
+          }),
+        ]);
+        if (usedByUser + reservedByUser >= discount.usageLimitPerUser) {
+          throw new BadRequestException("Bu kuponu zaten kullandınız");
+        }
+      }
+
+      if (voucherCodeId) {
+        await tx.$queryRaw`SELECT id FROM discount_codes WHERE id = ${voucherCodeId} FOR UPDATE`;
+        const voucher = await tx.discountCode.findUnique({
+          where: { id: voucherCodeId },
+          select: { isRedeemed: true },
+        });
+        const reservedVoucher = await tx.couponReservation.count({
+          where: {
+            voucherCodeId,
+            status: CouponReservationStatus.active,
+            expiresAt: { gt: now },
+          },
+        });
+        if (!voucher || voucher.isRedeemed || reservedVoucher > 0) {
+          throw new BadRequestException("Bu kupon kodu daha önce kullanıldı");
+        }
+      }
+
+      await tx.couponReservation.create({
+        data: {
+          discountId,
+          userId,
+          orderId,
+          amount: new Prisma.Decimal(amount),
+          voucherCodeId: voucherCodeId ?? null,
+          expiresAt,
+        },
+      });
+    };
+
+    if (client) {
+      await run(client);
+    } else {
+      await this.prisma.$transaction(run);
+    }
+  }
+
+  /**
+   * Convert active reservations into real coupon usage after payment capture.
+   * The status CAS makes duplicate callbacks idempotent.
+   */
+  async consumeReservedUsageForOrders(
+    orderIds: string[],
+    client?: Prisma.TransactionClient,
+  ): Promise<void> {
+    if (!orderIds.length) return;
+    const run = async (tx: Prisma.TransactionClient) => {
+      const reservations = await tx.couponReservation.findMany({
+        where: {
+          orderId: { in: orderIds },
+          status: CouponReservationStatus.active,
+        },
+      });
+      for (const reservation of reservations) {
+        const consumed = await tx.couponReservation.updateMany({
+          where: {
+            id: reservation.id,
+            status: CouponReservationStatus.active,
+          },
+          data: {
+            status: CouponReservationStatus.consumed,
+            consumedAt: new Date(),
+          },
+        });
+        if (consumed.count === 0) continue;
+        await this.recordUsage(
+          reservation.discountId,
+          reservation.userId,
+          reservation.orderId,
+          Number(reservation.amount),
+          reservation.voucherCodeId ?? undefined,
+          tx,
+        );
+      }
+    };
+
+    if (client) {
+      await run(client);
+    } else {
+      await this.prisma.$transaction(run);
+    }
+  }
+
+  /** Release pending-payment reservations without changing real usage. */
+  async releaseReservedUsageForOrders(
+    orderIds: string[],
+    client?: Prisma.TransactionClient,
+  ): Promise<void> {
+    if (!orderIds.length) return;
+    const run = (tx: Prisma.TransactionClient) =>
+      tx.couponReservation.updateMany({
+        where: {
+          orderId: { in: orderIds },
+          status: CouponReservationStatus.active,
+        },
+        data: {
+          status: CouponReservationStatus.released,
+          releasedAt: new Date(),
+        },
+      });
+    if (client) {
+      await run(client);
+    } else {
+      await this.prisma.$transaction(run);
+    }
+  }
+
+  /**
+   * Record discount usage after successful payment.
    *
-   * INVARIANT (kupon geri kazanılmaz): coupon usage is intentionally
+   * INVARIANT (ödeme sonrası kupon geri kazanılmaz): coupon usage is intentionally
    * NON-REVERSIBLE. On order refund/cancellation we deliberately DO NOT
    * decrement `usedCount` nor delete the `DiscountUsage` row — the coupon stays
    * consumed. Do not add usage-restoration logic to any refund/cancel path.

@@ -31,6 +31,8 @@ export interface CheckoutItem {
 }
 
 export interface CheckoutQuote {
+  /** Coupon amount validated by the same server quote used for payment. */
+  couponDiscount?: number;
   pricing: {
     subtotal: number;
     shippingAmount: number;

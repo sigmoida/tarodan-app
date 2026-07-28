@@ -91,7 +91,13 @@ export default function ProductInfo() {
               variant="primary"
               size="lg"
               onClick={handleBuyNow}
-              disabled={listing.status !== "active" || !hasStock}
+              disabled={
+                isAddingToCart ||
+                cartLoading ||
+                listing.status !== "active" ||
+                !hasStock
+              }
+              isLoading={isAddingToCart}
               leftIcon={<BoltIcon className="w-5 h-5" />}
               className="flex-1"
             >

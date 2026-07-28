@@ -52,6 +52,7 @@ model User {
   collectionViews         CollectionView[]
   collections             Collection[]
   discountUsages          DiscountUsage[]
+  couponReservations      CouponReservation[]
   discounts               Discount[]
   emailVerificationTokens EmailVerificationToken[]
   emailChangeTokens       EmailChangeToken[]
@@ -1305,6 +1306,7 @@ model Order {
   membershipPayment       MembershipPayment?
   checkoutGroup           CheckoutGroup?         @relation(fields: [checkoutGroupId], references: [id])
   package                 OrderPackage?          @relation(fields: [packageId], references: [id])
+  couponReservation       CouponReservation?
 
   @@index([buyerId])
   @@index([sellerId])
@@ -2291,46 +2293,47 @@ model Advertisement {
 }
 
 model Discount {
-  id                  String           @id @default(uuid())
-  code                String?          @unique
+  id                  String              @id @default(uuid())
+  code                String?             @unique
   name                String
   description         String?
   type                DiscountType
-  value               Decimal          @db.Decimal(10, 2)
+  value               Decimal             @db.Decimal(10, 2)
   scope               DiscountScope
-  sellerId            String?          @map("seller_id")
-  categoryId          String?          @map("category_id")
-  targetProductIds    String[]         @default([])
-  minCartValue        Decimal?         @map("min_cart_value") @db.Decimal(10, 2)
-  maxDiscountAmount   Decimal?         @map("max_discount_amount") @db.Decimal(10, 2)
-  usageLimitTotal     Int?             @map("usage_limit_total")
-  usageLimitPerUser   Int?             @default(1) @map("usage_limit_per_user")
-  usedCount           Int              @default(0) @map("used_count")
-  isStackable         Boolean          @default(false) @map("is_stackable")
-  priority            Int              @default(0)
-  isActive            Boolean          @default(true) @map("is_active")
-  startDate           DateTime         @map("start_date")
-  endDate             DateTime         @map("end_date")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
-  buyQuantity         Int?             @map("buy_quantity")
-  getQuantity         Int?             @map("get_quantity")
-  isFlashSale         Boolean          @default(false) @map("is_flash_sale")
-  minQuantity         Int?             @default(1) @map("min_quantity")
+  sellerId            String?             @map("seller_id")
+  categoryId          String?             @map("category_id")
+  targetProductIds    String[]            @default([])
+  minCartValue        Decimal?            @map("min_cart_value") @db.Decimal(10, 2)
+  maxDiscountAmount   Decimal?            @map("max_discount_amount") @db.Decimal(10, 2)
+  usageLimitTotal     Int?                @map("usage_limit_total")
+  usageLimitPerUser   Int?                @default(1) @map("usage_limit_per_user")
+  usedCount           Int                 @default(0) @map("used_count")
+  isStackable         Boolean             @default(false) @map("is_stackable")
+  priority            Int                 @default(0)
+  isActive            Boolean             @default(true) @map("is_active")
+  startDate           DateTime            @map("start_date")
+  endDate             DateTime            @map("end_date")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  buyQuantity         Int?                @map("buy_quantity")
+  getQuantity         Int?                @map("get_quantity")
+  isFlashSale         Boolean             @default(false) @map("is_flash_sale")
+  minQuantity         Int?                @default(1) @map("min_quantity")
   /// Toplu üretilen tek-kullanımlık voucher kodları için "batch şablonu" işareti.
   /// true ise bu Discount'ın paylaşımlı `code`'u yoktur; kodlar `codes` altındadır.
-  isBatch             Boolean          @default(false) @map("is_batch")
+  isBatch             Boolean             @default(false) @map("is_batch")
   /// Kampanya maliyetini KİM üstlenir (F2.4). seller (varsayılan): indirimi satıcı
   /// yer (payout tabanı düşer, mevcut davranış). platform: platform finanse eder →
   /// satıcıya indirim ÖNCESİ tutar üzerinden ödenir (escrow'da geri eklenir). shared:
   /// platformFundedRatio kadar platform üstlenir.
-  fundedBy            DiscountFundedBy @default(seller) @map("funded_by")
+  fundedBy            DiscountFundedBy    @default(seller) @map("funded_by")
   /// shared için platform payı [0,1] (0.30 = %30 platform, %70 satıcı).
-  platformFundedRatio Decimal?         @map("platform_funded_ratio") @db.Decimal(5, 4)
+  platformFundedRatio Decimal?            @map("platform_funded_ratio") @db.Decimal(5, 4)
   usages              DiscountUsage[]
   codes               DiscountCode[]
-  category            Category?        @relation(fields: [categoryId], references: [id])
-  seller              User?            @relation(fields: [sellerId], references: [id])
+  reservations        CouponReservation[]
+  category            Category?           @relation(fields: [categoryId], references: [id])
+  seller              User?               @relation(fields: [sellerId], references: [id])
 
   @@index([sellerId])
   @@index([isActive, startDate, endDate])
@@ -2342,15 +2345,16 @@ model Discount {
 /// Tek-kullanımlık voucher kodu (kampanya/hediye). Parent Discount = şablon
 /// (tür/değer/tarih/scope/limitler). Her kod bir kez kullanılır (isRedeemed).
 model DiscountCode {
-  id           String    @id @default(uuid())
-  discountId   String    @map("discount_id")
-  code         String    @unique
-  isRedeemed   Boolean   @default(false) @map("is_redeemed")
-  redeemedById String?   @map("redeemed_by_id")
-  redeemedAt   DateTime? @map("redeemed_at")
-  orderId      String?   @map("order_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  discount     Discount  @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  id           String              @id @default(uuid())
+  discountId   String              @map("discount_id")
+  code         String              @unique
+  isRedeemed   Boolean             @default(false) @map("is_redeemed")
+  redeemedById String?             @map("redeemed_by_id")
+  redeemedAt   DateTime?           @map("redeemed_at")
+  orderId      String?             @map("order_id")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  discount     Discount            @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  reservations CouponReservation[]
 
   @@index([discountId])
   @@index([isRedeemed])
@@ -2370,6 +2374,33 @@ model DiscountUsage {
   @@index([discountId, userId])
   @@index([orderId])
   @@map("discount_usages")
+}
+
+/// Checkout sırasında kupon kotasını geçici olarak tutar. Bu kayıt gerçek kullanım
+/// değildir: Discount.usedCount ve DiscountUsage yalnız başarılı ödeme sonrasında
+/// güncellenir. Ödenmeyen/iptal edilen siparişte rezervasyon released olur.
+model CouponReservation {
+  id            String                  @id @default(uuid())
+  discountId    String                  @map("discount_id")
+  userId        String                  @map("user_id")
+  orderId       String                  @unique @map("order_id")
+  voucherCodeId String?                 @map("voucher_code_id")
+  amount        Decimal                 @db.Decimal(10, 2)
+  status        CouponReservationStatus @default(active)
+  expiresAt     DateTime                @map("expires_at")
+  consumedAt    DateTime?               @map("consumed_at")
+  releasedAt    DateTime?               @map("released_at")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  discount      Discount                @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  user          User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order         Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  voucherCode   DiscountCode?           @relation(fields: [voucherCodeId], references: [id], onDelete: SetNull)
+
+  @@index([discountId, status, expiresAt])
+  @@index([userId, discountId, status])
+  @@index([voucherCodeId, status])
+  @@map("coupon_reservations")
 }
 
 model Cart {
@@ -2694,6 +2725,12 @@ enum DiscountFundedBy {
   seller
   platform
   shared
+}
+
+enum CouponReservationStatus {
+  active
+  consumed
+  released
 }
 
 enum RatingStatus {

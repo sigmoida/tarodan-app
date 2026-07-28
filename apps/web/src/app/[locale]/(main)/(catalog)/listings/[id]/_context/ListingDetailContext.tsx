@@ -113,15 +113,16 @@ function useListingDetailValue() {
 
   // ---- Cart ----
   const handleAddToCart = async () => {
-    if (!listing) return;
+    if (!listing) return false;
     if (listing.status && listing.status !== "active") {
       toast.error(t("product.productNotForSale"));
-      return;
+      return false;
     }
     setIsAddingToCart(true);
     try {
       await addToCart(listing.id, quantity);
       toast.success(t("product.addedToCart"));
+      return true;
     } catch (error: any) {
       if (error?.message === "AUTH_REQUIRED") {
         const imgUrl = getCardImageUrl(listing.images?.[0] ?? "");
@@ -136,12 +137,14 @@ function useListingDetailValue() {
           },
         });
         toast.success(t("product.addedToCart"));
+        return true;
       } else {
         const msg =
           error instanceof Error && error.message
             ? error.message
             : t("common.operationFailed");
         toast.error(msg);
+        return false;
       }
     } finally {
       setIsAddingToCart(false);
@@ -172,21 +175,28 @@ function useListingDetailValue() {
     else handleAddToCart();
   };
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     if (!listing) return;
     if (listing.status && listing.status !== "active") {
       if (listing.status === "sold" || listing.status === "inactive") {
         router.push(`/products/unavailable/${listing.id}`);
-        return;
+        return false;
       }
       if (listing.status === "reserved") {
         toast.error(t("product.productReserved"));
       } else {
         toast.error(t("product.productNotForSale"));
       }
-      return;
+      return false;
     }
-    router.push(`/checkout?productId=${listing.id}&quantity=${quantity}`);
+    // Buy Now and Add to Cart share one physical checkout path. Do not add the
+    // line twice when it is already in the cart; simply open the cart.
+    if (!isInCart) {
+      const added = await handleAddToCart();
+      if (!added) return false;
+    }
+    router.push("/cart");
+    return true;
   };
 
   // ---- Offer ----

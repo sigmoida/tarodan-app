@@ -22,6 +22,7 @@ import { EscrowHoldService } from "./escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 import { OutboxService } from "../outbox/outbox.service";
+import { DiscountService } from "../discount/discount.service";
 import {
   OUTBOX_ORDER_FULFILLMENT,
   OUTBOX_REVENUE_INVOICE_ISSUE,
@@ -149,6 +150,9 @@ export class PaymentFulfillmentService {
     private readonly paymentRefund: PaymentRefundService,
     // Faz 8.2: yakalama/order.paid/kargo sonlandırması (ledger dahil) FulfillmentFinalizer'da.
     private readonly fulfillmentFinalizer: FulfillmentFinalizer,
+    // PaymentModule production'da DiscountModule'ü import eder. Optional yalnız
+    // dar unit test kurulumlarının kuponsuz ödeme yollarını izole tutmak içindir.
+    @Optional() private readonly discountService?: DiscountService,
     // #8: fulfillment sonlandırmasını ödeme tx'iyle atomik olarak dayanıklı kılan backstop.
     // @Optional: OutboxModule @Global; yoksa (test) anlık yol yine çalışır (graceful degrade).
     @Optional() private readonly outbox?: OutboxService,
@@ -323,6 +327,10 @@ export class PaymentFulfillmentService {
       // Only create payment hold for regular product orders (not membership/boost orders)
       if (!isMembershipOrder && !isBoostOrder) {
         if (stockShortage) {
+          await this.discountService?.releaseReservedUsageForOrders(
+            [order.id],
+            tx,
+          );
           cancelledOrders.push({
             orderId: order.id,
             buyerId: order.buyerId,
@@ -333,6 +341,10 @@ export class PaymentFulfillmentService {
           });
           return { order, productIdsToInvalidate, stockShortage };
         }
+        await this.discountService?.consumeReservedUsageForOrders(
+          [order.id],
+          tx,
+        );
         // Faz 8.2: escrow hold + pending komisyon → EscrowHoldService (tekil/grup ortak).
         await this.escrowHold.createHold(tx, order, payment.id);
         this.logger.log(
@@ -601,6 +613,18 @@ export class PaymentFulfillmentService {
             payload: { orderId: order.id, skipBuyer: true, transactionId },
             dedupeKey: `${OUTBOX_ORDER_FULFILLMENT}:${order.id}`,
           });
+        }
+
+        if (fulfilledOrders.length > 0) {
+          await this.discountService?.consumeReservedUsageForOrders(
+            groupOrders.map((order) => order.id),
+            tx,
+          );
+        } else {
+          await this.discountService?.releaseReservedUsageForOrders(
+            groupOrders.map((order) => order.id),
+            tx,
+          );
         }
 
         return {
@@ -1173,6 +1197,7 @@ export class PaymentFulfillmentService {
           },
         }),
       ]);
+      await this.discountService?.releaseReservedUsageForOrders([orderId]);
       this.logger.log(
         `Order ${orderId} cancelled and product ${order.productId} reservation released after payment failure`,
       );

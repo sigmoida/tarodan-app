@@ -7,6 +7,7 @@ import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import CouponBox from "./CouponBox";
 
 interface AppliedDiscount {
   discountId: string;
@@ -85,8 +86,12 @@ export default function CartSummary({
         </div>
       </div>
 
+      <div className="mt-5 border-t border-border-subtle pt-5">
+        <CouponBox />
+      </div>
+
       {canCheckout ? (
-        <ButtonLink href="/checkout" className="w-full mt-6 flex gap-2">
+        <ButtonLink href="/cart/payment" className="w-full mt-6 flex gap-2">
           {t("cart.proceedToCheckout")}
         </ButtonLink>
       ) : (

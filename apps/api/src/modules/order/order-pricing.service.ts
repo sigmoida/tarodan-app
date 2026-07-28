@@ -139,7 +139,10 @@ export class OrderPricingService {
    * Get checkout quote (preview) for given items. Reuses same shipping and commission logic as order create.
    * Does not create any order; for display only. Final amounts are confirmed at order create.
    */
-  async getCheckoutQuote(dto: CheckoutQuoteDto): Promise<{
+  async getCheckoutQuote(
+    dto: CheckoutQuoteDto,
+    userId: string | null = null,
+  ): Promise<{
     itemsSubtotal: number;
     shippingAmount: number;
     buyerFeeAmount: number;
@@ -276,8 +279,6 @@ export class OrderPricingService {
 
     // F1.1: kuponu quote'ta da uygula — YALNIZ uygun satırlara dağıt; fee/tax/kargo
     // İNDİRİMLİ baz üzerinden hesaplanır (create ile aynı) → önizleme = tahsilat.
-    // userId=null (quote @Public'tir): per-user limitli kupon burada atlanır, checkout
-    // uygular (önizleme fazla gösterir — güvenli yön, fazla tahsil değil).
     let couponDiscountTotal = 0;
     if (dto.couponCode) {
       const validation = await this.discountService.validateCoupon(
@@ -288,9 +289,14 @@ export class OrderPricingService {
             quantity: l.quantity,
           })),
         },
-        null,
+        userId,
       );
-      if (validation.isValid && validation.discount) {
+      if (!validation.isValid) {
+        throw new BadRequestException(
+          validation.error || i18nMessage("server.order.invalidCouponCode"),
+        );
+      }
+      if (validation.discount) {
         const total = validation.discount.estimatedDiscount;
         const eligibleIds = new Set(validation.discount.eligibleProductIds);
         const eligibleLines = lines.filter((l) =>

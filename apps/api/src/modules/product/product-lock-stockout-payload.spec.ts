@@ -1,4 +1,4 @@
-import { ProductLockService } from './product-lock.service';
+import { ProductLockService } from "./product-lock.service";
 
 /**
  * Regression: invalidatePendingOrdersForProduct must report each cancelled
@@ -9,24 +9,26 @@ import { ProductLockService } from './product-lock.service';
  * "Teklifiniz iptal edildi" (offer-cancelled), not "Siparişiniz iptal edildi".
  * Direct-buy / already-paying orders keep the order-cancelled message.
  */
-describe('ProductLockService.invalidatePendingOrdersForProduct payload', () => {
-  const productId = 'prod-1';
+describe("ProductLockService.invalidatePendingOrdersForProduct payload", () => {
+  const productId = "prod-1";
 
   const offerUnpaidOrder = {
-    id: 'order-offer',
-    buyerId: 'buyer-offer',
+    id: "order-offer",
+    buyerId: "buyer-offer",
     productId,
-    offerId: 'offer-1',
-    product: { title: 'Teklif Ürünü' },
+    offerId: "offer-1",
+    checkoutGroupId: null,
+    product: { title: "Teklif Ürünü" },
     payment: null,
   };
   const directBuyOrder = {
-    id: 'order-direct',
-    buyerId: 'buyer-direct',
+    id: "order-direct",
+    buyerId: "buyer-direct",
     productId,
     offerId: null,
-    product: { title: 'Doğrudan Ürün' },
-    payment: { id: 'pay-1' },
+    checkoutGroupId: null,
+    product: { title: "Doğrudan Ürün" },
+    payment: { id: "pay-1" },
   };
 
   function buildService(orders: any[]) {
@@ -45,36 +47,77 @@ describe('ProductLockService.invalidatePendingOrdersForProduct payload', () => {
     return { service, tx };
   }
 
-  it('flags offer-origin unpaid orders (offerId set, hadPayment=false)', async () => {
+  it("flags offer-origin unpaid orders (offerId set, hadPayment=false)", async () => {
     const { service, tx } = buildService([offerUnpaidOrder]);
 
     const result = await service.invalidatePendingOrdersForProduct(
       tx as any,
       productId,
-      'Stok tükendi',
+      "Stok tükendi",
     );
 
     expect(result.cancelledOrders).toEqual([
       expect.objectContaining({
-        orderId: 'order-offer',
-        buyerId: 'buyer-offer',
-        offerId: 'offer-1',
+        orderId: "order-offer",
+        buyerId: "buyer-offer",
+        offerId: "offer-1",
         hadPayment: false,
       }),
     ]);
   });
 
-  it('flags direct-buy / paying orders as hadPayment=true, offerId=null', async () => {
+  it("flags direct-buy / paying orders as hadPayment=true, offerId=null", async () => {
     const { service, tx } = buildService([directBuyOrder]);
 
     const result = await service.invalidatePendingOrdersForProduct(
       tx as any,
       productId,
-      'Stok tükendi',
+      "Stok tükendi",
     );
 
     expect(result.cancelledOrders[0]).toEqual(
       expect.objectContaining({ offerId: null, hadPayment: true }),
+    );
+  });
+
+  it("releases the coupon reservation for a checkout group cancelled by stockout", async () => {
+    const groupOrder = {
+      ...directBuyOrder,
+      checkoutGroupId: "group-1",
+    };
+    const groupSibling = { id: "order-sibling" };
+    const discount = {
+      releaseReservedUsageForOrders: jest.fn().mockResolvedValue(undefined),
+    };
+    const tx = {
+      order: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([groupOrder])
+          .mockResolvedValueOnce([groupOrder, groupSibling]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      offer: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+    };
+    const service = new ProductLockService(
+      {} as any,
+      {} as any,
+      discount as any,
+    );
+
+    await service.invalidatePendingOrdersForProduct(
+      tx as any,
+      productId,
+      "Stok tükendi",
+    );
+
+    expect(discount.releaseReservedUsageForOrders).toHaveBeenCalledWith(
+      ["order-direct", "order-sibling"],
+      tx,
     );
   });
 });

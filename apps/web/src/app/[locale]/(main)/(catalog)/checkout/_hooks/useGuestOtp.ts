@@ -102,11 +102,11 @@ export function useGuestOtp({
               : t("checkout.emailAlreadyRegistered"),
           );
           try {
-            sessionStorage.setItem("login_redirect", "/checkout");
+            sessionStorage.setItem("login_redirect", "/cart/payment");
           } catch {
             /* sessionStorage erişilemezse query param yine yönlendirir */
           }
-          router.push("/login?redirect=/checkout");
+          router.push("/login?redirect=/cart/payment");
           return false;
         }
         const msg =

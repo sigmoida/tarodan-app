@@ -40,7 +40,6 @@ export function useCheckoutSubmit({
   router,
   paymentProvider,
   authToken,
-  directProductId,
   appliedCouponCode,
   clearCart,
   onCheckoutSubmitted,
@@ -69,7 +68,6 @@ export function useCheckoutSubmit({
   router: { push: (href: string) => void };
   paymentProvider: "paytr";
   authToken: string | null;
-  directProductId: string | null;
   /** Applied cart coupon (from useCart); forwarded to the group order payload. */
   appliedCouponCode: string | null;
   clearCart: () => Promise<void>;
@@ -538,11 +536,9 @@ export function useCheckoutSubmit({
             const paymentData = paymentResponse.data;
             const hasSession = isAuthenticated || !!authToken;
 
-            if (!directProductId) {
-              // Guard against the cart-empty redirect before clearing the cart.
-              onCheckoutSubmitted();
-              await clearCart();
-            }
+            // Guard against the cart-empty redirect before clearing the cart.
+            onCheckoutSubmitted();
+            await clearCart();
 
             // TEK ödeme yüzeyi: misafir + üye aynı site-içi kart formuna gider.
             if (paymentData.paymentId) {
