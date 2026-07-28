@@ -147,14 +147,32 @@ export class ProductCreateService {
       });
     }
 
-    // Verify category exists
-    const category = await this.prisma.category.findUnique({
-      where: { id: dto.categoryId },
-    });
+    // Verify required catalog references together and keep model/brand consistency.
+    const [category, brand, carModel, manufacturer] = await Promise.all([
+      this.prisma.category.findUnique({ where: { id: dto.categoryId } }),
+      this.prisma.brand.findUnique({ where: { id: dto.brandId } }),
+      this.prisma.carModel.findUnique({ where: { id: dto.carModelId } }),
+      this.prisma.manufacturer.findUnique({
+        where: { id: dto.manufacturerId },
+      }),
+    ]);
 
     if (!category || !category.isActive) {
       throw new BadRequestException(
         i18nMessage("server.product.invalidCategory"),
+      );
+    }
+    if (
+      !brand ||
+      !brand.isActive ||
+      !carModel ||
+      !carModel.isActive ||
+      carModel.brandId !== brand.id ||
+      !manufacturer ||
+      !manufacturer.isActive
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.product.invalidBrandModelManufacturer"),
       );
     }
 
@@ -249,6 +267,9 @@ export class ProductCreateService {
           brandId,
           carModelId,
           manufacturerId,
+          modelCode: dto.modelCode.trim(),
+          color: dto.color.trim(),
+          isBoxed: dto.isBoxed,
           releaseDate,
           images: dto.images?.length
             ? {

@@ -149,6 +149,42 @@ export class ProductUpdateService {
       }
     }
 
+    if (
+      dto.brandId !== undefined ||
+      dto.carModelId !== undefined ||
+      dto.manufacturerId !== undefined
+    ) {
+      const nextBrandId = dto.brandId ?? product.brandId;
+      const nextCarModelId = dto.carModelId ?? product.carModelId;
+      const nextManufacturerId = dto.manufacturerId ?? product.manufacturerId;
+      const [brand, carModel, manufacturer] = await Promise.all([
+        nextBrandId
+          ? this.prisma.brand.findUnique({ where: { id: nextBrandId } })
+          : null,
+        nextCarModelId
+          ? this.prisma.carModel.findUnique({ where: { id: nextCarModelId } })
+          : null,
+        nextManufacturerId
+          ? this.prisma.manufacturer.findUnique({
+              where: { id: nextManufacturerId },
+            })
+          : null,
+      ]);
+      if (
+        !brand ||
+        !brand.isActive ||
+        !carModel ||
+        !carModel.isActive ||
+        carModel.brandId !== brand.id ||
+        !manufacturer ||
+        !manufacturer.isActive
+      ) {
+        throw new BadRequestException(
+          i18nMessage("server.product.invalidBrandModelManufacturer"),
+        );
+      }
+    }
+
     // NOT: Statü politikası resolveUpdatedStatus()'te merkezi olarak uygulanır.
     // Satıcı kendi ilanını DOĞRUDAN aktifleştiremez (aktivasyon isteği pending'e
     // gider); yalnızca pasife alabilir. Geçersiz/izinsiz statü istekleri sessizce
@@ -252,6 +288,9 @@ export class ProductUpdateService {
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
       description: dto.description,
+      modelCode: dto.modelCode?.trim(),
+      color: dto.color?.trim(),
+      isBoxed: dto.isBoxed,
       ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
       // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girsin (re-submit → pending).

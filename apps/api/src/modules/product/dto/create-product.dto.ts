@@ -12,10 +12,11 @@ import {
   MinLength,
   MaxLength,
   ArrayMaxSize,
+  ArrayMinSize,
   ValidateNested,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import { ProductCondition } from "@prisma/client";
 
 export class ImageVariantDto {
@@ -31,19 +32,21 @@ export class CreateProductDto {
     example: "Vintage Star Wars Action Figure",
     description: "Product title",
   })
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @MinLength(5, { message: "Başlık en az 5 karakter olmalıdır" })
   @MaxLength(200, { message: "Başlık en fazla 200 karakter olabilir" })
   title: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "Original 1977 Luke Skywalker figure in excellent condition...",
-    description: "Product description",
+    description: "Product description (30-330 characters)",
   })
-  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
-  @MaxLength(5000, { message: "Açıklama en fazla 5000 karakter olabilir" })
-  description?: string;
+  @MinLength(30, { message: "Açıklama en az 30 karakter olmalıdır" })
+  @MaxLength(330, { message: "Açıklama en fazla 330 karakter olabilir" })
+  description: string;
 
   @ApiProperty({
     example: 299.99,
@@ -70,7 +73,7 @@ export class CreateProductDto {
   @IsEnum(ProductCondition, { message: "Geçerli bir durum seçiniz" })
   condition: ProductCondition;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: [
       {
         cardKey: "dev/products/product-images/abc/uuid-card.webp",
@@ -79,12 +82,12 @@ export class CreateProductDto {
     ],
     description: "Array of image variants (cardKey, detailKey from upload)",
   })
-  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ImageVariantDto)
+  @ArrayMinSize(3, { message: "En az 3 resim yüklenmelidir" })
   @ArrayMaxSize(10, { message: "En fazla 10 resim yüklenebilir" })
-  images?: Array<{ cardKey: string; detailKey: string }>;
+  images: Array<{ cardKey: string; detailKey: string }>;
 
   @ApiPropertyOptional({
     example: false,
@@ -123,31 +126,49 @@ export class CreateProductDto {
   @Min(2, { message: "Set parça sayısı en az 2 olmalıdır" })
   bundleSize?: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "uuid-brand-id",
     description: "Brand ID",
   })
-  @IsOptional()
   @IsUUID("4", { message: "Geçerli bir marka ID giriniz" })
-  brandId?: string;
+  brandId: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "uuid-car-model-id",
     description: "Car Model ID",
   })
-  @IsOptional()
   @IsUUID("4", { message: "Geçerli bir model ID giriniz" })
-  carModelId?: string;
+  carModelId: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "uuid-manufacturer-id",
     description: "Manufacturer ID (e.g. Hot Wheels, Matchbox)",
   })
-  @IsOptional()
   @IsUUID("4", { message: "Geçerli bir üretici ID giriniz" })
-  manufacturerId?: string;
+  manufacturerId: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({ example: "HKG72", description: "Manufacturer model code" })
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(1, { message: "Model kodu zorunludur" })
+  @MaxLength(100, { message: "Model kodu en fazla 100 karakter olabilir" })
+  modelCode: string;
+
+  @ApiProperty({ example: "Kırmızı", description: "Product color" })
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(1, { message: "Renk zorunludur" })
+  @MaxLength(80, { message: "Renk en fazla 80 karakter olabilir" })
+  color: string;
+
+  @ApiProperty({
+    example: true,
+    description: "Whether the product is sold with its box",
+  })
+  @IsBoolean({ message: "Kutulu durumu boolean olmalıdır" })
+  isBoxed: boolean;
+
+  @ApiProperty({
     example: 5,
     description:
       "Stock quantity (defaults to 1 when omitted; null for unlimited stock)",
@@ -171,23 +192,27 @@ export class CreateProductDto {
   @Max(1000, { message: "Kargo desisi en fazla 1000 olabilir" })
   shippingDesi?: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "1:64",
     description:
       'Scale (e.g. 1:64, 1/43). Stored as ProductAttribute in group "scale".',
   })
-  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
-  scale?: string;
+  @MinLength(1, { message: "Ölçek zorunludur" })
+  @MaxLength(50, { message: "Ölçek en fazla 50 karakter olabilir" })
+  scale: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "diecast",
     description:
       'Material slug (diecast, resin, composite, plastic). Stored as ProductAttribute in group "material".',
   })
-  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
-  material?: string;
+  @MinLength(1, { message: "Malzeme zorunludur" })
+  @MaxLength(80, { message: "Malzeme en fazla 80 karakter olabilir" })
+  material: string;
 
   @ApiPropertyOptional({
     example: 2023,

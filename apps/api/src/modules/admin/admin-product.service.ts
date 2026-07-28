@@ -259,6 +259,12 @@ export class AdminProductService {
       include: {
         seller: { select: { id: true, displayName: true, email: true } },
         category: { select: { id: true, name: true, slug: true } },
+        brand: { select: { id: true, name: true, slug: true } },
+        carModel: { select: { id: true, name: true, slug: true } },
+        manufacturer: { select: { id: true, name: true, slug: true } },
+        productAttributes: {
+          include: { attribute: { include: { group: true } } },
+        },
         images: { orderBy: { sortOrder: "asc" } },
       },
     });
@@ -273,9 +279,17 @@ export class AdminProductService {
         url: this.resolveProductImageUrl(img.cardKey),
       })),
     );
+    const attributeValue = (groupSlug: string) => {
+      const attribute = product.productAttributes.find(
+        (row) => row.attribute.group.slug === groupSlug,
+      )?.attribute;
+      return attribute?.displayValue ?? attribute?.value ?? null;
+    };
 
     return {
       ...product,
+      scale: attributeValue("scale"),
+      material: attributeValue("material"),
       images: imagesWithPresignedUrls,
       price: Number(product.price),
       originalPrice:

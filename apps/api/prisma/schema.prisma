@@ -512,6 +512,9 @@ model Product {
   releaseDate         DateTime?          @map("release_date")
   carModelId          String?            @map("car_model_id")
   manufacturerId      String?            @map("manufacturer_id")
+  modelCode           String?            @map("model_code")
+  color               String?
+  isBoxed             Boolean?           @map("is_boxed")
   averageRating       Decimal?           @map("average_rating") @db.Decimal(3, 2)
   ratingCount         Int                @default(0) @map("rating_count")
   boostedUntil        DateTime?          @map("boosted_until")
@@ -531,7 +534,7 @@ model Product {
   aiCheckLabels       Json?              @map("ai_check_labels")
   aiCheckReason       String?            @map("ai_check_reason")
   aiCheckedAt         DateTime?          @map("ai_checked_at")
-  /// Denormalized concat of title + description + attribute display values.
+  /// Denormalized concat of title + description + model code + color + attribute display values.
   /// Maintained by Postgres triggers; never write directly from application code.
   /// Used for full-text search via the GIN index `products_search_text_fts_idx`.
   searchText          String?            @map("search_text")
