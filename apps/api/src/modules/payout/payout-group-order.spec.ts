@@ -1,4 +1,5 @@
 import { PayoutService } from "./payout.service";
+import { OrderStatus } from "@prisma/client";
 
 /**
  * #1 (KRİTİK — para kaybı): createPayoutsForReleasedHolds, siparişi payment.order
@@ -32,6 +33,7 @@ describe("PayoutService.createPayoutsForReleasedHolds — grup ödeme payout (#1
     const order = {
       id: "o-group-1",
       orderNumber: "GRP-0001",
+      status: OrderStatus.completed,
       totalAmount: 100,
       commissionAmount: 12,
       withholdingTaxAmount: 3,
@@ -41,6 +43,7 @@ describe("PayoutService.createPayoutsForReleasedHolds — grup ödeme payout (#1
       paymentHold: { findMany: jest.fn().mockResolvedValue([hold]) },
       order: { findMany: jest.fn().mockResolvedValue([order]) },
       refundRequest: { findFirst: jest.fn().mockResolvedValue(null) },
+      refundAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
       payoutTransfer: {
         create: jest.fn().mockImplementation((arg: any) => {

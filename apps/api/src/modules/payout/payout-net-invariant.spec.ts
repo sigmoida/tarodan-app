@@ -1,4 +1,5 @@
 import { PayoutService } from "./payout.service";
+import { OrderStatus } from "@prisma/client";
 
 /**
  * #1 (KRİTİK): DB CHECK'i `net_amount = amount - commission`'dan `<=`'ye gevşetildi.
@@ -15,6 +16,7 @@ describe("PayoutService — net_amount <= amount - commission invariant (#1)", (
       paymentHold: { findMany: jest.fn().mockResolvedValue([hold]) },
       order: { findMany: jest.fn().mockResolvedValue([order]) },
       refundRequest: { findFirst: jest.fn().mockResolvedValue(null) },
+      refundAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
       payoutTransfer: {
         create: jest.fn().mockImplementation((arg: any) => {
@@ -38,6 +40,7 @@ describe("PayoutService — net_amount <= amount - commission invariant (#1)", (
     const order = {
       id: "o1",
       orderNumber: "ORD1",
+      status: OrderStatus.completed,
       totalAmount: 100,
       commissionAmount: 12,
       withholdingTaxAmount: 3,
@@ -74,6 +77,7 @@ describe("PayoutService — net_amount <= amount - commission invariant (#1)", (
     const order = {
       id: "o2",
       orderNumber: "ORD2",
+      status: OrderStatus.completed,
       totalAmount: 100,
       commissionAmount: 12,
       withholdingTaxAmount: 0,

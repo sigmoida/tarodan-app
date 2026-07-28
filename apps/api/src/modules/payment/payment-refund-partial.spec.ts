@@ -1,5 +1,9 @@
 import { PaymentRefundService } from "./payment-refund.service";
-import { PaymentStatus } from "@prisma/client";
+import {
+  PaymentStatus,
+  RefundAttemptStatus,
+  PaymentHoldStatus,
+} from "@prisma/client";
 
 /**
  * MONEY-H3 + H4: Tekil ödemede kısmi iade doğruluğu.
@@ -16,6 +20,12 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     metadata?: Record<string, unknown>;
     holdAmount?: number;
     holdRefundedAmount?: number;
+    existingAttempt?: {
+      idempotencyKey: string;
+      amount: number;
+      status: RefundAttemptStatus;
+    };
+    unresolvedAttempt?: boolean;
   }) => {
     const captured = {
       paymentUpdate: undefined as any,
@@ -28,9 +38,63 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     // döner (PayTR çağrılır); önceden set marker "recovered" verir (PayTR atlanır) — ikisi de
     // gerçek davranış. (Eskiden findUnique sabit sahte marker döndürüp claim'i yanıltıyordu.)
     let currentMeta: Record<string, any> = { ...metadata };
+    const attempt = {
+      id: "attempt-1",
+      paymentId: "pay-1",
+      orderId: ORDER_ID,
+      amount: opts.existingAttempt?.amount ?? 0,
+      idempotencyKey:
+        opts.existingAttempt?.idempotencyKey ?? "partial-refund-1",
+      status: opts.existingAttempt?.status ?? RefundAttemptStatus.prepared,
+      providerRefundId: null,
+      providerResponse:
+        opts.existingAttempt?.status === RefundAttemptStatus.succeeded
+          ? { status: "success", merchant_oid: "REFUND1" }
+          : null,
+    };
 
     const mockTx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
+      refundAttempt: {
+        findUnique: jest
+          .fn()
+          .mockImplementation(
+            ({
+              where,
+            }: {
+              where: { id?: string; idempotencyKey?: string };
+            }) => {
+              if (where.id) {
+                return Promise.resolve({
+                  ...attempt,
+                  status: RefundAttemptStatus.succeeded,
+                });
+              }
+              return Promise.resolve(
+                opts.existingAttempt &&
+                  where.idempotencyKey === opts.existingAttempt.idempotencyKey
+                  ? attempt
+                  : null,
+              );
+            },
+          ),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(opts.unresolvedAttempt ? attempt : null),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+            Promise.resolve({
+              ...attempt,
+              ...data,
+              status: RefundAttemptStatus.prepared,
+            }),
+          ),
+        update: jest.fn().mockResolvedValue({
+          ...attempt,
+          status: RefundAttemptStatus.finalized,
+        }),
+      },
       payment: {
         findUnique: jest
           .fn()
@@ -48,7 +112,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
                 id: "hold-1",
                 amount: opts.holdAmount,
                 refundedAmount: opts.holdRefundedAmount ?? 0,
-                status: "held",
+                status: PaymentHoldStatus.held,
               }
             : null,
         ),
@@ -94,6 +158,12 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         }),
         update: jest.fn().mockResolvedValue({}),
       },
+      refundAttempt: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(opts.existingAttempt ? attempt : null),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       order: {
         findUnique: jest.fn().mockResolvedValue({
           id: ORDER_ID,
@@ -129,7 +199,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       } as any,
       { record: jest.fn().mockResolvedValue(undefined) } as any, // providerEvents
     );
-    return { service, captured, paytr, mockTx };
+    return { service, captured, paytr, mockTx, prisma };
   };
 
   it("H3: 1000 TL siparişte 50 TL jest → hold'un yalnız %5'i tüketilir (950 kalır), payment completed kalır", async () => {
@@ -138,7 +208,9 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       holdAmount: 1000, // satıcı payı = 1000 (test kolaylığı)
     });
 
-    await service.processRefund(ORDER_ID, 50);
+    await service.processRefund(ORDER_ID, 50, {
+      idempotencyKey: "partial-refund-50",
+    });
 
     // Hold TUM'ü değil, tutar oranı (50/1000 = %5) kadar tüketilir → refundedAmount=50.
     expect(captured.holdUpdate.data).toEqual(
@@ -151,7 +223,9 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
   it("H4: 1000 TL siparişte ilk 400 TL iade payment'ı refunded YAPMAZ", async () => {
     const { service, captured, paytr } = makeService({ paymentAmount: 1000 });
 
-    await service.processRefund(ORDER_ID, 400);
+    await service.processRefund(ORDER_ID, 400, {
+      idempotencyKey: "partial-refund-400",
+    });
 
     expect(paytr.createRefund).toHaveBeenCalled();
     expect(captured.paymentUpdate.data.status).toBe(PaymentStatus.completed);
@@ -167,7 +241,9 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       metadata: { refundedOrders: { [ORDER_ID]: 400 } },
     });
 
-    await service.processRefund(ORDER_ID, 600);
+    await service.processRefund(ORDER_ID, 600, {
+      idempotencyKey: "partial-refund-600",
+    });
 
     expect(captured.paymentUpdate.data.status).toBe(PaymentStatus.refunded);
     expect(captured.paymentUpdate.data.metadata.refundedOrders[ORDER_ID]).toBe(
@@ -181,43 +257,68 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       metadata: { refundedOrders: { [ORDER_ID]: 800 } },
     });
 
-    await expect(service.processRefund(ORDER_ID, 300)).rejects.toMatchObject({
+    await expect(
+      service.processRefund(ORDER_ID, 300, {
+        idempotencyKey: "partial-refund-over-cap",
+      }),
+    ).rejects.toMatchObject({
       response: { i18nKey: "server.payment.refundAmountExceedsLimit" },
     });
     // PayTR'a hiç gidilmemeli (fazladan para iade edilmesin).
     expect(paytr.createRefund).not.toHaveBeenCalled();
   });
 
-  // Finding 1: order'da FARKLI tutarlı takılı marker varken yeni (farklı) iade sahte-iade
-  // olarak geçmemeli — reddedilmeli. Aksi halde PayTR atlanır ama DB'ye yazılır (alıcı eksik alır).
-  it("Finding 1: farklı tutarlı takılı marker → yeni iade REDDEDİLİR (PayTR yok, sahte iade yok)", async () => {
+  it("aynı idempotency anahtarı farklı tutarla tekrar kullanılamaz", async () => {
     const { service, paytr } = makeService({
       paymentAmount: 1000,
-      metadata: {
-        refundInProgressOrders: { [ORDER_ID]: { amount: 200, at: "x" } },
+      existingAttempt: {
+        idempotencyKey: "partial-refund-conflict",
+        amount: 200,
+        status: RefundAttemptStatus.failed,
       },
     });
 
-    // Marker 200; yeni iade 100 (farklı) → reddedilmeli.
-    await expect(service.processRefund(ORDER_ID, 100)).rejects.toThrow();
+    await expect(
+      service.processRefund(ORDER_ID, 100, {
+        idempotencyKey: "partial-refund-conflict",
+      }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.payment.refundInitiationFailed" },
+    });
     expect(paytr.createRefund).not.toHaveBeenCalled();
   });
 
-  // Finding 1: AYNI tutarlı marker → gerçek retry (recovery): PayTR ATLANIR (marker eşleşti),
-  // tx finalize eder — sahte değil, çünkü bu gerçekten PayTR'ı yapılmış olan iadenin kurtarması.
-  it("Finding 1: aynı tutarlı marker → recovery (PayTR atlanır, finalize edilir)", async () => {
+  it("kalıcı sağlayıcı başarısını PayTR'a tekrar gitmeden finalize eder", async () => {
     const { service, captured, paytr } = makeService({
       paymentAmount: 1000,
-      metadata: {
-        refundInProgressOrders: { [ORDER_ID]: { amount: 300, at: "x" } },
+      existingAttempt: {
+        idempotencyKey: "partial-refund-recovery",
+        amount: 300,
+        status: RefundAttemptStatus.succeeded,
       },
     });
 
-    await service.processRefund(ORDER_ID, 300);
+    await service.processRefund(ORDER_ID, 300, {
+      idempotencyKey: "partial-refund-recovery",
+    });
 
-    expect(paytr.createRefund).not.toHaveBeenCalled(); // recovery → PayTR atlanır
+    expect(paytr.createRefund).not.toHaveBeenCalled();
     expect(captured.paymentUpdate.data.metadata.refundedOrders[ORDER_ID]).toBe(
       300,
     );
+  });
+
+  it("aynı ödeme için çözümlenmemiş farklı bir deneme varken yeni iade başlatmaz", async () => {
+    const { service, paytr } = makeService({
+      paymentAmount: 1000,
+      unresolvedAttempt: true,
+    });
+
+    await expect(
+      service.processRefund(ORDER_ID, 100, {
+        idempotencyKey: "partial-refund-new",
+      }),
+    ).rejects.toThrow();
+    expect(paytr.createRefund).not.toHaveBeenCalled();
   });
 });

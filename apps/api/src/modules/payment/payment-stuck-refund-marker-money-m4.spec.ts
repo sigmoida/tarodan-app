@@ -1,76 +1,146 @@
+import { RefundAttemptStatus, RefundRequestStatus } from "@prisma/client";
 import { RefundReconciliationService } from "./refund-reconciliation.service";
 
-/**
- * MONEY-M4: reconcileStuckRefundMarkers — PayTR iadesi yapılıp DB finalize'ı patlayan
- * (refundInProgressOrders marker'ı takılı, refundedOrders'ta YOK) siparişleri finalize eder.
- * Marker'daki tutarla processRefund çağrılır (PayTR marker sayesinde atlanır → tx finalize eder).
- */
-describe("RefundReconciliationService.reconcileStuckRefundMarkers — MONEY-M4", () => {
-  const makeService = (candidates: any[]) => {
+describe("RefundReconciliationService durable attempt recovery", () => {
+  const orderAttempt = (overrides: Record<string, unknown> = {}) => ({
+    id: "attempt-1",
+    paymentId: "pay-1",
+    orderId: "order-1",
+    tradeId: null,
+    amount: 50,
+    idempotencyKey: "manual-refund-1",
+    status: RefundAttemptStatus.prepared,
+    ...overrides,
+  });
+
+  const tradeAttempt = (overrides: Record<string, unknown> = {}) => ({
+    id: "attempt-trade-1",
+    paymentId: "pay-trade-1",
+    orderId: null,
+    tradeId: "trade-1",
+    amount: 75,
+    idempotencyKey: "trade-cash-refund:pay-trade-1",
+    status: RefundAttemptStatus.succeeded,
+    ...overrides,
+  });
+
+  const makeService = (opts?: {
+    orderAttempts?: Array<Record<string, unknown>>;
+    tradeAttempts?: Array<Record<string, unknown>>;
+    staleCount?: number;
+    manualReviewCount?: number;
+  }) => {
     const prisma = {
-      payment: { findMany: jest.fn().mockResolvedValue(candidates) },
+      refundAttempt: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(opts?.orderAttempts ?? [])
+          .mockResolvedValueOnce(opts?.tradeAttempts ?? []),
+        updateMany: jest
+          .fn()
+          .mockResolvedValue({ count: opts?.staleCount ?? 0 }),
+        count: jest.fn().mockResolvedValue(opts?.manualReviewCount ?? 0),
+      },
+      refundRequest: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
     };
     const paymentRefund = {
-      processRefund: jest.fn().mockResolvedValue({ success: true }),
+      processRefund: jest.fn().mockResolvedValue({
+        success: true,
+        providerRefundId: "provider-refund-1",
+      }),
+      refundTradeCashPaymentIfCompleted: jest
+        .fn()
+        .mockResolvedValue({ refunded: true, paymentId: "pay-trade-1" }),
     };
     const service = new RefundReconciliationService(
-      prisma as any, // prisma
-      paymentRefund as any, // paymentRefund
+      prisma as any,
+      paymentRefund as any,
     );
-    return { service, paymentRefund };
+    return { service, prisma, paymentRefund };
   };
 
-  it("takılı marker (refundedOrders'ta yok): tutarla processRefund çağırır", async () => {
-    const { service, paymentRefund } = makeService([
-      {
-        id: "pay-1",
-        metadata: {
-          refundInProgressOrders: { o1: { amount: 50, at: "2026-01-01" } },
-          refundedOrders: {},
-        },
-      },
-    ]);
+  it("recovers a prepared order attempt with its original idempotency key", async () => {
+    const attempt = orderAttempt();
+    const { service, paymentRefund } = makeService({
+      orderAttempts: [attempt],
+    });
 
-    const res = await service.reconcileStuckRefundMarkers();
+    const result = await service.reconcileStuckRefundMarkers();
 
-    expect(paymentRefund.processRefund).toHaveBeenCalledWith("o1", 50);
-    expect(res).toEqual({ checked: 1, recovered: 1 });
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
+      idempotencyKey: "manual-refund-1",
+    });
+    expect(result).toEqual({
+      checked: 1,
+      recovered: 1,
+      manualReview: 0,
+    });
   });
 
-  it("Finding 1: marker VAR + refundedOrders'ta ÖNCEKİ kısmi iade var → yine de recover eder", async () => {
-    // Çoklu kısmi iade: partial#1 (50) finalize oldu (refundedOrders={o1:50}, marker silindi),
-    // partial#2 (200) PayTR yapıldı ama tx patladı → marker={o1:{200}} DURUYOR. Eski buggy
-    // filtre `o1 in refundedOrders` yüzünden bunu ATLIYORDU (200 havada kalırdı). Artık marker
-    // varlığı = takılı → recover eder (marker'daki 200 tutarıyla).
-    const { service, paymentRefund } = makeService([
-      {
-        id: "pay-1",
-        metadata: {
-          refundInProgressOrders: { o1: { amount: 200, at: "x" } },
-          refundedOrders: { o1: 50 },
-        },
-      },
-    ]);
-
-    const res = await service.reconcileStuckRefundMarkers();
-
-    expect(paymentRefund.processRefund).toHaveBeenCalledWith("o1", 200);
-    expect(res).toEqual({ checked: 1, recovered: 1 });
-  });
-
-  it("eski (timestamp) marker formatı: tutar undefined ile (tam iade) çağırır", async () => {
-    const { service, paymentRefund } = makeService([
-      {
-        id: "pay-1",
-        metadata: {
-          refundInProgressOrders: { o1: "2026-01-01T00:00:00Z" },
-          refundedOrders: {},
-        },
-      },
-    ]);
+  it("finalizes the linked refund request after attempt recovery", async () => {
+    const attempt = orderAttempt({
+      status: RefundAttemptStatus.succeeded,
+      idempotencyKey: "refund-request:refund-request-1",
+    });
+    const { service, prisma } = makeService({ orderAttempts: [attempt] });
 
     await service.reconcileStuckRefundMarkers();
 
-    expect(paymentRefund.processRefund).toHaveBeenCalledWith("o1", undefined);
+    expect(prisma.refundRequest.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "refund-request-1",
+        status: { not: RefundRequestStatus.refunded },
+      },
+      data: {
+        status: RefundRequestStatus.refunded,
+        refundedAt: expect.any(Date),
+        providerRefundId: "provider-refund-1",
+      },
+    });
+  });
+
+  it("recovers trade refund attempts through the trade refund path", async () => {
+    const { service, paymentRefund } = makeService({
+      tradeAttempts: [tradeAttempt()],
+    });
+
+    const result = await service.reconcileStuckRefundMarkers();
+
+    expect(
+      paymentRefund.refundTradeCashPaymentIfCompleted,
+    ).toHaveBeenCalledWith("trade-1");
+    expect(result).toEqual({
+      checked: 1,
+      recovered: 1,
+      manualReview: 0,
+    });
+  });
+
+  it("quarantines stale submissions and reports unresolved attempts", async () => {
+    const { service, prisma } = makeService({
+      staleCount: 2,
+      manualReviewCount: 3,
+    });
+
+    const result = await service.reconcileStuckRefundMarkers();
+
+    expect(prisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: {
+        status: RefundAttemptStatus.submitting,
+        requestStartedAt: { lt: expect.any(Date) },
+      },
+      data: {
+        status: RefundAttemptStatus.manual_review,
+        failureReason:
+          "Refund submission ended without a durable provider response",
+      },
+    });
+    expect(result).toEqual({
+      checked: 0,
+      recovered: 0,
+      manualReview: 3,
+    });
   });
 });

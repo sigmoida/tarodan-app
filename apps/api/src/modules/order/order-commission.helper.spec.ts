@@ -1,4 +1,5 @@
 import {
+  BusinessStatus,
   CommissionAppliesTo,
   CommissionRuleType,
   CommissionSellerType,
@@ -131,6 +132,14 @@ describe("commission rule matching by membership tier", () => {
     async (membershipTier, expectedRuleId, expectedFee) => {
       prisma.user.findUnique.mockResolvedValue({
         sellerType: SellerType.individual,
+        businessStatus:
+          membershipTier === MembershipTierType.business
+            ? BusinessStatus.approved
+            : null,
+        companyName:
+          membershipTier === MembershipTierType.business ? "Acme A.S." : null,
+        taxId:
+          membershipTier === MembershipTierType.business ? "1234567890" : null,
         // Paid-tier commission requires an ENTITLED membership (active + in-period);
         // a raw past_due/expired tier no longer unlocks premium/business commission.
         membership: {
@@ -150,6 +159,28 @@ describe("commission rule matching by membership tier", () => {
       });
     },
   );
+
+  it("does not grant the business commission rule before KYC approval", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      sellerType: SellerType.individual,
+      businessStatus: BusinessStatus.pending,
+      companyName: "Acme A.S.",
+      taxId: "1234567890",
+      membership: {
+        tier: { type: MembershipTierType.business, isActive: true },
+        status: "active",
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const result = await service.calculateCommission(100, "seller-id");
+
+    expect(result).toMatchObject({
+      ruleId: "free-rule",
+      sellerFeeAmount: 5,
+      commissionAmount: 5,
+    });
+  });
 });
 
 describe("calculateCommissionFromRules", () => {

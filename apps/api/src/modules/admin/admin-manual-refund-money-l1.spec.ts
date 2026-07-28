@@ -37,9 +37,17 @@ describe("AdminPaymentService.manualRefund — MONEY-L1 group/trade routing", ()
       tradeCashPayment: null,
     });
 
-    await service.manualRefund("admin-1", "pay-1", 50);
+    await service.manualRefund(
+      "admin-1",
+      "pay-1",
+      50,
+      undefined,
+      "admin-refund-1",
+    );
 
-    expect(paymentService.processRefund).toHaveBeenCalledWith("o1", 50);
+    expect(paymentService.processRefund).toHaveBeenCalledWith("o1", 50, {
+      idempotencyKey: "admin-refund-1",
+    });
     expect(paymentService.refundTradeCashTracked).not.toHaveBeenCalled();
   });
 
@@ -52,7 +60,13 @@ describe("AdminPaymentService.manualRefund — MONEY-L1 group/trade routing", ()
       tradeCashPayment: { tradeId: "trade-1" },
     });
 
-    await service.manualRefund("admin-1", "pay-1");
+    await service.manualRefund(
+      "admin-1",
+      "pay-1",
+      undefined,
+      undefined,
+      "admin-refund-2",
+    );
 
     expect(paymentService.refundTradeCashTracked).toHaveBeenCalledWith(
       "trade-1",
@@ -70,7 +84,31 @@ describe("AdminPaymentService.manualRefund — MONEY-L1 group/trade routing", ()
       tradeCashPayment: null,
     });
 
-    await expect(service.manualRefund("admin-1", "pay-1")).rejects.toThrow();
+    await expect(
+      service.manualRefund(
+        "admin-1",
+        "pay-1",
+        undefined,
+        undefined,
+        "admin-refund-3",
+      ),
+    ).rejects.toThrow();
     expect(paymentService.processRefund).not.toHaveBeenCalled();
+  });
+
+  it("idempotency anahtarı olmadan sağlayıcıya gitmez", async () => {
+    const { service, paymentService } = makeService({
+      id: "pay-1",
+      status: PaymentStatus.completed,
+      amount: 100,
+      orderId: "o1",
+      tradeCashPayment: null,
+    });
+
+    await expect(service.manualRefund("admin-1", "pay-1", 50)).rejects.toThrow(
+      "Idempotency key is required",
+    );
+    expect(paymentService.processRefund).not.toHaveBeenCalled();
+    expect(paymentService.refundTradeCashTracked).not.toHaveBeenCalled();
   });
 });
