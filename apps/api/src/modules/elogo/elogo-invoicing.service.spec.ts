@@ -623,4 +623,86 @@ describe("ElogoInvoicingService", () => {
     expect(prisma.invoices).toHaveLength(1);
     expect(prisma.invoices[0].status).toBe("pending");
   });
+
+  it("pending faturayı aynı numara ve ETTN ile retry ederek gönderir", async () => {
+    const prisma = makePrisma({
+      orders: { o1: { sellerId: "s1" } },
+      ledgers: { o1: { sellerCommission: 120, refundedSellerCommission: 0 } },
+      users: { s1: { displayName: "X" } },
+    });
+    const enabled = jest.fn().mockReturnValueOnce(false).mockReturnValue(true);
+    const elogo = makeElogo({ isEnabled: enabled });
+    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+
+    await svc.issueCommissionInvoice("o1");
+    const identity = {
+      invoiceNumber: prisma.invoices[0].invoiceNumber,
+      ettn: prisma.invoices[0].ettn,
+    };
+
+    await svc.retryPendingInvoices();
+
+    expect(elogo.sendDocument).toHaveBeenCalledTimes(1);
+    expect(prisma.invoices[0]).toMatchObject({
+      ...identity,
+      status: "sent",
+      attemptCount: 1,
+    });
+  });
+
+  it("eşzamanlı retry worker'larında gönderim lease'ini yalnız biri kazanır", async () => {
+    const prisma = makePrisma({
+      orders: { o1: { sellerId: "s1" } },
+      ledgers: { o1: { sellerCommission: 120, refundedSellerCommission: 0 } },
+      users: { s1: { displayName: "X" } },
+    });
+    const enabled = jest.fn().mockReturnValueOnce(false).mockReturnValue(true);
+    const elogo = makeElogo({ isEnabled: enabled });
+    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+
+    await svc.issueCommissionInvoice("o1");
+    await Promise.all([svc.retryPendingInvoices(), svc.retryPendingInvoices()]);
+
+    expect(elogo.sendDocument).toHaveBeenCalledTimes(1);
+    expect(prisma.invoices[0].status).toBe("sent");
+  });
+
+  it("düşmüş processing lease'inde önce sağlayıcıyla mutabakat yapar", async () => {
+    const prisma = makePrisma({
+      orders: { o1: { sellerId: "s1" } },
+      ledgers: { o1: { sellerCommission: 120, refundedSellerCommission: 0 } },
+      users: { s1: { displayName: "X" } },
+    });
+    const enabled = jest.fn().mockReturnValueOnce(false).mockReturnValue(true);
+    const elogo = makeElogo({
+      isEnabled: enabled,
+      getDocumentStatus: jest.fn().mockResolvedValue({
+        documentUuid: "u",
+        status: 2,
+        code: 1300,
+        description: "accepted",
+      }),
+    });
+    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+
+    await svc.issueCommissionInvoice("o1");
+    Object.assign(prisma.invoices[0], {
+      status: "processing",
+      attemptCount: 1,
+      lastAttemptAt: new Date(Date.now() - 20 * 60 * 1000),
+    });
+
+    await svc.retryPendingInvoices();
+
+    expect(elogo.getDocumentStatus).toHaveBeenCalledWith(
+      prisma.invoices[0].ettn,
+      "EARCHIVE",
+    );
+    expect(elogo.sendDocument).not.toHaveBeenCalled();
+    expect(prisma.invoices[0]).toMatchObject({
+      status: "sent",
+      attemptCount: 1,
+      elogoResultCode: 1300,
+    });
+  });
 });
