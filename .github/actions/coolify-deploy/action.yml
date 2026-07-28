@@ -1,8 +1,7 @@
 name: 'Coolify Deploy'
 description: >-
-  Trigger a Coolify deploy for one or more apps (comma-separated UUIDs) and WAIT
-  for the result. Fails the job if any deployment ends in failed/error/cancelled,
-  so a broken deploy surfaces as a failed GitHub check (and a failure notification).
+  Trigger a Coolify deploy for one or more apps (comma-separated UUIDs), with an
+  optional wait for the deployment result.
 
 inputs:
   coolify-url:
@@ -36,11 +35,15 @@ inputs:
     description: 'Seconds between status polls'
     required: false
     default: '10'
+  wait-for-result:
+    description: 'Whether to poll Coolify until every deployment finishes'
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
   steps:
-    - name: Trigger deploy and wait for result
+    - name: Trigger Coolify deploy
       shell: bash
       env:
         COOLIFY_URL: ${{ inputs.coolify-url }}
@@ -50,6 +53,7 @@ runs:
         APPS: ${{ inputs.apps }}
         TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
         POLL_INTERVAL: ${{ inputs.poll-interval }}
+        WAIT_FOR_RESULT: ${{ inputs.wait-for-result }}
       run: |
         set -euo pipefail
 
@@ -110,6 +114,11 @@ runs:
         if [ "${#DEPLOY_UUIDS[@]}" -eq 0 ]; then
           echo "::error::No deployment_uuid returned — deploy was not queued."
           exit 1
+        fi
+
+        if [ "$WAIT_FOR_RESULT" != "true" ]; then
+          echo "Queued ${#DEPLOY_UUIDS[@]} Coolify deployment(s); result polling disabled."
+          exit 0
         fi
 
         max_polls=$(( TIMEOUT_SECONDS / POLL_INTERVAL ))
