@@ -26,6 +26,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
 import { AdminRole } from "@prisma/client";
 import { UserReportService } from "./user-report.service";
 import {
@@ -39,6 +40,7 @@ import {
 
 @ApiTags("reports")
 @Controller("user-reports")
+@RequirePermission("reports")
 export class UserReportController {
   constructor(private readonly reportService: UserReportService) {}
 

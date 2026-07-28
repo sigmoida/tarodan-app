@@ -71,6 +71,11 @@ export class AuthResponseDto {
   message?: string;
 }
 
+export class TwoFactorChallengeDto {
+  @ApiProperty({ example: true })
+  requires2FA: true;
+}
+
 export class AdminUserResponseDto extends UserResponseDto {
   @ApiProperty({ example: 'admin' })
   role: string;

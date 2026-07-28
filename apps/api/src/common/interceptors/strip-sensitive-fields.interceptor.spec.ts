@@ -29,6 +29,28 @@ describe("StripSensitiveFieldsInterceptor", () => {
     expect(out.order.user.id).toBe("u1");
   });
 
+  it("strips persisted auth, verification and provider token material", async () => {
+    const out: any = await run({
+      tokenHash: "refresh-hash",
+      codeHash: "otp-hash",
+      sessionToken: "admin-session",
+      unsubscribeToken: "newsletter-secret",
+      utoken: "paytr-user-token",
+      ctoken: "paytr-card-token",
+      refreshTokens: [{ tokenHash: "nested" }],
+      twoFactorSecret: { secret: "totp-seed" },
+      accessToken: "client-access-token",
+      refreshToken: "client-refresh-token",
+      backupCodes: ["one-time-code"],
+    });
+
+    expect(out).toEqual({
+      accessToken: "client-access-token",
+      refreshToken: "client-refresh-token",
+      backupCodes: ["one-time-code"],
+    });
+  });
+
   it("strips passwordHash from every element of an array", async () => {
     const out: any = await run([
       { id: "1", passwordHash: "a" },

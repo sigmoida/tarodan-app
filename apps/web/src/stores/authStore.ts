@@ -208,7 +208,11 @@ interface AuthState {
   isLoading: boolean;
   limits: MembershipLimits | null;
 
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    twoFactorCode?: string,
+  ) => Promise<void>;
   loginWithGoogle: (code: string) => Promise<void>;
   loginWithApple: (idToken: string, fullName?: string) => Promise<void>;
   register: (
@@ -269,11 +273,19 @@ export const useAuthStore = create<AuthState>()(
         isLoading: initial.isLoading,
         limits: null,
 
-        login: async (email: string, password: string) => {
+        login: async (
+          email: string,
+          password: string,
+          twoFactorCode?: string,
+        ) => {
           // BFF: kimlik doğrulama Server Action'da yapılır, token'lar Next'in httpOnly
           // cookie'lerine (web_at/web_rt) yazılır — JS token'ı hiç görmez. Zengin
           // kullanıcı objesi ardından checkAuth (proxy üzerinden /users/me) ile dolar.
-          const result = await loginAction({ email, password });
+          const result = await loginAction({
+            email,
+            password,
+            twoFactorCode,
+          });
           if (result.status === "error") {
             const error = new Error(result.message) as Error & {
               code: string;
@@ -281,8 +293,13 @@ export const useAuthStore = create<AuthState>()(
             error.code = result.reason;
             throw error;
           }
-          if (result.status === "2fa")
-            throw new Error("İki adımlı doğrulama gerekli");
+          if (result.status === "2fa") {
+            const error = new Error("İki adımlı doğrulama gerekli") as Error & {
+              code: string;
+            };
+            error.code = "2fa";
+            throw error;
+          }
           // loginAction (server) yazdı: web_at/web_rt + tarodan_authed. Client yazmaz.
           await get().checkAuth();
         },

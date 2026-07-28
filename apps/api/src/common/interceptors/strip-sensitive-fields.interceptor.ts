@@ -23,6 +23,19 @@ import { map } from "rxjs/operators";
  */
 export const SENSITIVE_RESPONSE_KEYS: ReadonlySet<string> = new Set([
   "passwordHash",
+  "tokenHash",
+  "codeHash",
+  "sessionToken",
+  "unsubscribeToken",
+  "utoken",
+  "ctoken",
+  "twoFactorSecret",
+  "refreshTokens",
+  "passwordResetTokens",
+  "emailVerificationTokens",
+  "phoneVerificationTokens",
+  "emailChangeTokens",
+  "adminSessions",
 ]);
 
 @Injectable()

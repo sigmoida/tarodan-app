@@ -48,6 +48,14 @@ export const passwordStepSchema = (locale: Locale) => {
   const t = translator(locale);
   return z.object({
     password: z.string().min(1, t("validation.passwordRequired")),
+    twoFactorCode: z
+      .string()
+      .regex(
+        /^(?:\d{6}|[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4})$/,
+        t("admin.auth.validation.codeInvalid"),
+      )
+      .optional()
+      .or(z.literal("")),
   });
 };
 export type PasswordStepValues = z.infer<ReturnType<typeof passwordStepSchema>>;

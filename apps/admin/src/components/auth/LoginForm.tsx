@@ -47,7 +47,8 @@ export function LoginForm({
             name="twoFactorCode"
             label={t('admin.auth.login.verificationCode')}
             placeholder="000000"
-            maxLength={6}
+            maxLength={9}
+            autoComplete="one-time-code"
           />
         )}
 

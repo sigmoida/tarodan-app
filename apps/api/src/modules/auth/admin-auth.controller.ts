@@ -62,11 +62,15 @@ export class AdminAuthController {
   @ApiResponse({ status: 401, description: "Email veya şifre hatalı" })
   async adminLogin(
     @Body() dto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.adminLogin(dto);
+    const result = await this.authService.adminLogin(dto, {
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
     // Tarayıcı için httpOnly admin cookie'leri set et (admin_token / admin_refresh_token).
-    if (result?.tokens) {
+    if ("tokens" in result) {
       setAuthCookies(res, result.tokens, { admin: true });
     }
     return result;
@@ -79,10 +83,9 @@ export class AdminAuthController {
    */
   @Post("refresh")
   @Public()
-  // Oturum yenileme brute-force hedefi değil (geçerli admin_refresh_token gerekir);
-  // SPA açılışta çağırır → global rate-limit'e takılıp 429 dönmemeli (login↔dashboard
-  // loop'unun sebebiydi).
-  @SkipThrottle()
+  // Refresh persisted token hash'ini doğrular; admin SPA'yı etkilemeyecek genişlikte
+  // sonlu limit invalid-token/DB abuse'unu engeller.
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Admin token yenileme" })
@@ -98,6 +101,7 @@ export class AdminAuthController {
       user.refreshToken,
       {
         isAdmin: true,
+        adminSessionToken: user.sessionToken,
       },
     );
     setAuthCookies(res, tokens, { admin: true });
@@ -133,7 +137,8 @@ export class AdminAuthController {
    * Public: süresi dolmuş/geçersiz token'a sahip bir istemci de oturumunu kapatıp
    * cookie'lerini temizleyebilmeli. Guard'lıyken ölü admin_token 401 alıp
    * clearAuthCookies'e hiç ulaşmıyordu → bayat httpOnly cookie tarayıcıda kalıyor ve
-   * login↔dashboard döngüsüne yol açıyordu. logout() zaten userId kullanmayan no-op.
+   * login↔dashboard döngüsüne yol açıyordu. İmzalı refresh token varsa ilişkili
+   * sunucu oturumu da sonlandırılır.
    */
   @Post("logout")
   @Public()
@@ -150,7 +155,7 @@ export class AdminAuthController {
     clearAuthCookies(res, { admin: true });
     const refreshToken =
       readCookie(req, [COOKIE_NAMES.admin.refresh]) || body?.refreshToken;
-    await this.authService.logout(refreshToken);
+    await this.authService.logout(refreshToken, { admin: true });
     return { message: this.i18n.translate("server.auth.loggedOut", locale) };
   }
 }

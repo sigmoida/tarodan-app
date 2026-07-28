@@ -89,6 +89,7 @@ async function bootstrap() {
         "Accept",
         "Accept-Language",
         "X-Requested-With",
+        "X-Payment-Capability",
       ],
     });
 

@@ -2,6 +2,7 @@
 import { Test } from "@nestjs/testing";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
+import { UnauthorizedException } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
@@ -9,6 +10,7 @@ import { PrismaService } from "../../prisma";
 import { NotificationService } from "../notification/notification.service";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
+import { SecurityService } from "../security/security.service";
 
 describe("AuthService.loginWithGoogle", () => {
   let service: AuthService;
@@ -36,6 +38,9 @@ describe("AuthService.loginWithGoogle", () => {
       create: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
     },
+    refreshToken: {
+      create: jest.fn().mockResolvedValue({ id: "rt1" }),
+    },
   };
 
   beforeEach(async () => {
@@ -46,7 +51,12 @@ describe("AuthService.loginWithGoogle", () => {
         { provide: PrismaService, useValue: prisma },
         {
           provide: JwtService,
-          useValue: { signAsync: jest.fn().mockResolvedValue("tok") },
+          useValue: {
+            signAsync: jest.fn().mockResolvedValue("tok"),
+            decode: jest
+              .fn()
+              .mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+          },
         },
         {
           provide: ConfigService,
@@ -68,6 +78,7 @@ describe("AuthService.loginWithGoogle", () => {
           provide: AppleAuthService,
           useValue: { verifyIdentityToken: jest.fn() },
         },
+        { provide: SecurityService, useValue: { validateTOTP: jest.fn() } },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
@@ -89,6 +100,26 @@ describe("AuthService.loginWithGoogle", () => {
     expect(prisma.oAuthAccount.create).not.toHaveBeenCalled();
     expect(res.user.email).toBe("a@b.com");
     expect(res.tokens.accessToken).toBe("tok");
+  });
+
+  it("does not let provider login bypass an enabled second factor", async () => {
+    google.verifyIdToken.mockResolvedValue({
+      sub: "g1",
+      email: "a@b.com",
+      name: "Ali",
+    });
+    prisma.oAuthAccount.findUnique.mockResolvedValue({
+      id: "oa1",
+      userId: "u1",
+    });
+    prisma.user.findUnique.mockResolvedValue({
+      ...baseUser,
+      twoFactorSecret: { isEnabled: true },
+    });
+
+    await expect(service.loginWithGoogle("tok")).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it("auto-links to existing user with same email", async () => {

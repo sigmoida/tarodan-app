@@ -10,6 +10,7 @@ import { Response } from 'express';
 import { ReportsService, ReportFilter } from './reports.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminRole } from '@prisma/client';
@@ -17,6 +18,7 @@ import { AdminRole } from '@prisma/client';
 @Controller('reports')
 @AdminRoute()
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
+@RequirePermission('analytics')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 

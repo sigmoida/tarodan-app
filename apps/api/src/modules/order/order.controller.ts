@@ -11,6 +11,7 @@ import {
   HttpStatus,
   BadRequestException,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import {
   ApiTags,
   ApiOperation,
@@ -51,6 +52,7 @@ export class OrderController {
    */
   @Post("quote")
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @ApiOperation({ summary: "Get checkout quote (pricing breakdown for items)" })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -126,6 +128,7 @@ export class OrderController {
    */
   @Post("guest/send-verification-code")
   @Public()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Send guest checkout email verification code" })
   @ApiResponse({
@@ -144,6 +147,7 @@ export class OrderController {
    */
   @Post("guest")
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: "Create order as guest (without registration)" })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -166,6 +170,7 @@ export class OrderController {
    */
   @Post("guest/track")
   @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Track order for guest (using order number and email)",
@@ -207,6 +212,7 @@ export class OrderController {
    */
   @Post("checkout/guest")
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({
     summary: "Batch guest checkout: one checkout group, order per product",
   })

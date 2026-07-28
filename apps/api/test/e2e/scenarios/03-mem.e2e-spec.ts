@@ -298,8 +298,7 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
   });
 
   scenario("MEM-003", async () => {
-    // Geçersiz enum doğrudan Prisma'ya gider → 500 (bilinen davranış; mevcut test de bunu doğrular).
-    await get("/api/membership/tiers/nonexistent").expect(500);
+    await get("/api/membership/tiers/nonexistent").expect(400);
   });
 
   scenario("MEM-004", async () => {
@@ -1583,13 +1582,12 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
 
   scenario("MEM-124", async () => {
     const admin = await createAdminUser("admin-mem124@test.com");
-    // Geçersiz enum tip → updateTier'da findUnique({type}) Prisma'ya gider → 500.
-    // (Risk: 404 beklenirdi; mevcut kod pre-validation yapmaz.)
+    // Geçersiz enum controller sınırında reddedilir; Prisma'ya ulaşmaz.
     await request(server())
       .patch("/api/membership/admin/tiers/nonexistent")
       .set(authHeader(admin))
       .send({ monthlyPrice: 1 })
-      .expect(500);
+      .expect(400);
   });
 
   scenario("MEM-125", async () => {
@@ -1612,19 +1610,12 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
       email: "usertierlist@test.com",
     });
     const res = await get("/api/membership/admin/tiers", user);
-    expect([200, 401, 403]).toContain(res.status);
+    expect(res.status).toBe(401);
   });
 
   scenario("MEM-131", async () => {
-    // ÜRÜN GERÇEĞİ (rol-gating boşluğu): MembershipController admin uçları @Roles ile
-    // işaretli AMA RolesGuard bu controller'da @UseGuards ile bağlı DEĞİL ve global
-    // APP_GUARD olarak da kayıtlı DEĞİL (auth.module yalnız provider olarak sunar). Bu
-    // yüzden @Roles(super_admin) EFEKTİF DEĞİLDİR: yalnız global JwtAuthGuard uygulanır →
-    // her kimlik doğrulanmış kullanıcı (moderator dahil) servise ulaşır. createTier bu
-    // yüzden 403 değil, iş-mantığı sonucunu döner: type=premium zaten seed'li → 400 "zaten mevcut".
-    // (Manifest'in beklediği 403 authz kapısı bu üründe MEVCUT DEĞİL — bilinen gap.)
     const mod = await createAdminUser("mod-mem131@test.com", "moderator");
-    const res = await request(server())
+    await request(server())
       .post("/api/membership/admin/tiers")
       .set(authHeader(mod))
       .send({
@@ -1640,23 +1631,19 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
         isAdFree: true,
         featuredListingSlots: 1,
         commissionDiscount: 0.01,
-      });
-    expect(res.status).toBe(400);
-    expect(JSON.stringify(res.body)).toContain("zaten mevcut");
+      })
+      .expect(403);
   });
 
   scenario("MEM-132", async () => {
-    // ÜRÜN GERÇEĞİ (rol-gating boşluğu — MEM-131 ile aynı sebep): updateTier RolesGuard'sız
-    // çalışır → moderator token'ı PATCH'i tamamlar (403 DEĞİL). Fiyat GERÇEKTEN değişir.
-    // (Manifest 403 + "değişmedi" beklerdi; bu authz kapısı üründe yok — bilinen gap.)
     const mod = await createAdminUser("mod-mem132@test.com", "moderator");
     await request(server())
       .patch("/api/membership/admin/tiers/premium")
       .set(authHeader(mod))
       .send({ monthlyPrice: 1 })
-      .expect(200);
+      .expect(403);
     const after = await get("/api/membership/tiers/premium").expect(200);
-    expect(after.body.monthlyPrice).toBe(1); // rol-gating olmadığı için gerçekten değişti
+    expect(after.body.monthlyPrice).toBe(99.99);
   });
 
   // ════════════════════════ GÜVENLİK / IDOR ════════════════════════

@@ -63,12 +63,23 @@ export function LoginForm() {
     defaultValues: { email: "" },
   });
   const passwordForm = useZodForm(passwordStepSchema(locale), {
-    defaultValues: { password: "" },
+    defaultValues: { password: "", twoFactorCode: "" },
   });
 
   const onIdentify = (values: EmailStepValues) => flow.identify(values.email);
-  const onLogin = (values: PasswordStepValues) =>
-    flow.submit(flow.email, values.password);
+  const onLogin = (values: PasswordStepValues) => {
+    if (flow.requires2FA && !values.twoFactorCode) {
+      passwordForm.setError("twoFactorCode", {
+        message: t("admin.auth.validation.codeInvalid"),
+      });
+      return;
+    }
+    return flow.submit(
+      flow.email,
+      values.password,
+      values.twoFactorCode || undefined,
+    );
+  };
 
   return (
     <AuthCard
@@ -169,6 +180,16 @@ export function LoginForm() {
               autoComplete="current-password"
               autoFocus
             />
+            {flow.requires2FA && (
+              <FormInput
+                name="twoFactorCode"
+                label={t("admin.auth.login.verificationCode")}
+                placeholder="000000"
+                maxLength={9}
+                autoComplete="one-time-code"
+                autoFocus
+              />
+            )}
             <div className="flex justify-end">
               <Link
                 href="/forgot-password"

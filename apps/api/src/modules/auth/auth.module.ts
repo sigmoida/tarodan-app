@@ -19,6 +19,7 @@ import { AppleAuthService } from "./apple-auth.service";
 import { RolesGuard } from "./guards/roles.guard";
 import { PhoneVerificationService } from "./phone-verification.service";
 import { EmailChangeService } from "./email-change.service";
+import { SecurityModule } from "../security/security.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { EmailChangeService } from "./email-change.service";
     NotificationModule,
     CacheModule,
     StorageModule,
+    SecurityModule,
   ],
   controllers: [AuthController, AdminAuthController],
   providers: [

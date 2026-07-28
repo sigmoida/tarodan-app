@@ -1,4 +1,5 @@
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { TestingModule } from '@nestjs/testing';
@@ -148,11 +149,18 @@ export async function createAdminUser(
   const role = opts.role ?? AdminRole.super_admin;
 
   const prisma = getPrisma();
-  await prisma.adminUser.create({
+  const adminUser = await prisma.adminUser.create({
     data: {
       userId: base.id,
       role,
       isActive: true,
+    },
+  });
+  const adminSession = await prisma.adminSession.create({
+    data: {
+      adminUserId: adminUser.id,
+      sessionToken: crypto.randomUUID(),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
     },
   });
 
@@ -162,7 +170,14 @@ export async function createAdminUser(
   const secret =
     configService.get<string>('ADMIN_JWT_SECRET') ?? configService.get<string>('JWT_SECRET');
   const accessToken = await jwtService.signAsync(
-    { sub: base.id, email: base.email, isAdmin: true, role, type: 'access' },
+    {
+      sub: base.id,
+      email: base.email,
+      isAdmin: true,
+      role,
+      sessionToken: adminSession.sessionToken,
+      type: 'access',
+    },
     { secret, expiresIn: '1h' },
   );
 

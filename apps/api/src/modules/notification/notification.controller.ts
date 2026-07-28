@@ -30,6 +30,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RegisterPushTokenDto } from './dto';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminRole } from '@prisma/client';
 
 @ApiTags('notifications')
@@ -152,10 +156,12 @@ export class NotificationController {
   /**
    * GET /notifications/admin/provider-status - Get notification provider status
    * Admin only endpoint
-   */
+  */
   @Get('admin/provider-status')
-  @UseGuards(JwtAuthGuard)
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
+  @RequirePermission('notifications')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get notification provider status (Admin)' })
   @ApiResponse({

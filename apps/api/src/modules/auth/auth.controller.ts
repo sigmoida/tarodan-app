@@ -28,6 +28,7 @@ import {
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
+  TwoFactorChallengeDto,
   TokensDto,
   ForgotPasswordDto,
   ResetPasswordDto,
@@ -91,6 +92,7 @@ export class AuthController {
    */
   @Post("register/business")
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: "Yeni şirket hesabı kaydı" })
   @ApiResponse({
     status: 201,
@@ -135,10 +137,10 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthResponseDto | TwoFactorChallengeDto> {
     const result = await this.authService.login(dto);
     // Tarayıcı için httpOnly cookie; mobil yine body'deki token'ı kullanır.
-    if (result?.tokens) {
+    if ("tokens" in result) {
       setAuthCookies(res, result.tokens, { admin: false });
     }
     return result;
@@ -206,10 +208,9 @@ export class AuthController {
    */
   @Post("refresh")
   @Public()
-  // Oturum yenileme brute-force hedefi değil (geçerli refresh token gerektirir) ve
-  // SPA'lar açılışta/periyodik çağırır → global rate-limit'e takılıp 429 dönmemeli
-  // (admin login↔dashboard loop'una yol açıyordu).
-  @SkipThrottle()
+  // Refresh doğrulaması DB'de persisted token hash'ine dokunur. SPA kullanımını
+  // engellemeyecek kadar geniş, invalid-token abuse'unu sınırlayacak kadar sonlu.
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Token yenileme" })
@@ -230,6 +231,7 @@ export class AuthController {
       user.refreshToken,
       {
         isAdmin,
+        adminSessionToken: user.sessionToken,
       },
     );
     // Rotasyonla gelen yeni token'ları doğru cookie setine yaz (admin/normal).
@@ -330,6 +332,7 @@ export class AuthController {
    */
   @Post("verify-email")
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "E-posta doğrulama" })
   @ApiResponse({ status: 200, description: "E-posta başarıyla doğrulandı" })

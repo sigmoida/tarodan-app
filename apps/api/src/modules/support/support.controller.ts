@@ -28,12 +28,14 @@ import {
 } from "./dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
 import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { AdminRole, TicketPriority, TicketStatus } from "@prisma/client";
 import { Public } from "../auth/decorators/public.decorator";
 
 @Controller("support")
+@RequirePermission("support")
 export class SupportController {
   constructor(private readonly supportService: SupportService) {}
 

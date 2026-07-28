@@ -19,6 +19,10 @@ import {
 } from '@nestjs/swagger';
 import { CategoryService } from './category.service';
 import { Public, Roles } from '../auth/decorators';
+import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 
 @ApiTags('categories')
@@ -75,9 +79,12 @@ export class CategoryController {
   /**
    * POST /categories
    * Create new category
-   */
+  */
   @Post()
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin')
+  @RequirePermission('categories')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Yeni kategori oluştur' })
   @ApiResponse({ status: 201, description: 'Kategori oluşturuldu' })
@@ -88,9 +95,12 @@ export class CategoryController {
   /**
    * PATCH /categories/:id
    * Update category
-   */
+  */
   @Patch(':id')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin')
+  @RequirePermission('categories')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Kategori güncelle' })
   @ApiResponse({ status: 200, description: 'Kategori güncellendi' })
@@ -104,9 +114,12 @@ export class CategoryController {
   /**
    * DELETE /categories/:id
    * Delete category
-   */
+  */
   @Delete(':id')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin')
+  @RequirePermission('categories')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Kategori sil' })
   @ApiResponse({ status: 200, description: 'Kategori silindi' })

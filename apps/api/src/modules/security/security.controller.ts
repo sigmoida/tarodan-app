@@ -9,7 +9,9 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { SecurityService } from './security.service';
 import {
   Verify2FADto,
@@ -26,6 +28,10 @@ import {
 } from './dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminRole } from '@prisma/client';
 
 @Controller('security')
@@ -57,8 +63,9 @@ export class SecurityController {
   /**
    * Verify 2FA code and complete setup
    * POST /security/2fa/verify
-   */
+  */
   @Post('2fa/verify')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async verify2FA(
     @Request() req: any,
     @Body() dto: Verify2FADto,
@@ -70,8 +77,9 @@ export class SecurityController {
   /**
    * Disable 2FA
    * POST /security/2fa/disable
-   */
+  */
   @Post('2fa/disable')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async disable2FA(
     @Request() req: any,
     @Body() dto: Disable2FADto,
@@ -83,8 +91,9 @@ export class SecurityController {
   /**
    * Regenerate backup codes
    * POST /security/2fa/backup-codes
-   */
+  */
   @Post('2fa/backup-codes')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async regenerateBackupCodes(
     @Request() req: any,
     @Body() dto: Verify2FADto,
@@ -106,6 +115,7 @@ export class SecurityController {
    */
   @Public()
   @Post('password/request-reset')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async requestPasswordReset(
     @Body() dto: RequestPasswordResetDto,
@@ -123,6 +133,7 @@ export class SecurityController {
    */
   @Public()
   @Post('password/reset')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async resetPassword(
     @Body() dto: ResetPasswordDto,
@@ -134,8 +145,9 @@ export class SecurityController {
   /**
    * Change password (authenticated)
    * POST /security/password/change
-   */
+  */
   @Post('password/change')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @Request() req: any,
@@ -167,8 +179,9 @@ export class SecurityController {
   /**
    * Send verification email
    * POST /security/email/send-verification
-   */
+  */
   @Post('email/send-verification')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async sendEmailVerification(
     @Request() req: any,
@@ -183,6 +196,7 @@ export class SecurityController {
    */
   @Public()
   @Post('email/verify')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
     await this.securityService.verifyEmail(dto.token);
@@ -211,9 +225,12 @@ export class SecurityController {
   /**
    * Get admin sessions
    * GET /security/admin/sessions
-   */
+  */
   @Get('admin/sessions')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
+  @RequirePermission('settings')
   async getAdminSessions(@Request() req: any): Promise<AdminSessionListDto> {
     return this.securityService.getAdminSessions(
       req.user.adminId,
@@ -224,22 +241,29 @@ export class SecurityController {
   /**
    * Terminate specific admin session
    * DELETE /security/admin/sessions/:id
-   */
+  */
   @Delete('admin/sessions/:id')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
+  @RequirePermission('settings')
   @HttpCode(HttpStatus.NO_CONTENT)
   async terminateAdminSession(
     @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: any,
   ): Promise<void> {
-    return this.securityService.terminateAdminSession(id);
+    return this.securityService.terminateAdminSession(id, req.user.adminId);
   }
 
   /**
    * Terminate all admin sessions (logout everywhere)
    * DELETE /security/admin/sessions
-   */
+  */
   @Delete('admin/sessions')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
+  @RequirePermission('settings')
   @HttpCode(HttpStatus.NO_CONTENT)
   async terminateAllAdminSessions(@Request() req: any): Promise<void> {
     return this.securityService.terminateAllAdminSessions(req.user.adminId);

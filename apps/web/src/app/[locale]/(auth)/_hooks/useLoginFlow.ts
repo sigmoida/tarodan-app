@@ -52,6 +52,7 @@ export function useLoginFlow() {
   const back = () => {
     setStep("identify");
     setNotRegistered(false);
+    login.resetTwoFactor();
   };
 
   const setPasswordMutation = useMutation({
@@ -71,6 +72,7 @@ export function useLoginFlow() {
     settingPassword: setPasswordMutation.isPending,
     // password-login engine passthrough
     submit: login.submit,
+    requires2FA: login.requires2FA,
     isLoggingIn: login.isLoading,
     showVerificationBanner: login.showVerificationBanner,
     resendVerification: login.resendVerification,

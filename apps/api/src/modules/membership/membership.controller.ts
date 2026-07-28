@@ -9,6 +9,8 @@ import {
   Request,
   Query,
   Req,
+  UseGuards,
+  ParseEnumPipe,
 } from "@nestjs/common";
 import { Request as ExpressRequest } from "express";
 import { MembershipService } from "./membership.service";
@@ -25,6 +27,10 @@ import {
 } from "./dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Public } from "../auth/decorators/public.decorator";
+import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
+import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { AdminRole, MembershipTierType } from "@prisma/client";
 
 @Controller("membership")
@@ -48,7 +54,8 @@ export class MembershipController {
   @Public()
   @Get("tiers/:type")
   async getTierByType(
-    @Param("type") type: MembershipTierType,
+    @Param("type", new ParseEnumPipe(MembershipTierType))
+    type: MembershipTierType,
   ): Promise<MembershipTierResponseDto> {
     return this.membershipService.getTierByType(type);
   }
@@ -170,7 +177,10 @@ export class MembershipController {
    * GET /membership/admin/tiers
    */
   @Get("admin/tiers")
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
+  @RequirePermission("membership_tiers")
   async getAllTiersAdmin(
     @Query("includeInactive") includeInactive?: boolean,
   ): Promise<MembershipTierResponseDto[]> {
@@ -182,7 +192,10 @@ export class MembershipController {
    * POST /membership/admin/tiers
    */
   @Post("admin/tiers")
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.super_admin)
+  @RequirePermission("membership_tiers")
   async createTier(
     @Body() dto: CreateMembershipTierDto,
   ): Promise<MembershipTierResponseDto> {
@@ -194,9 +207,13 @@ export class MembershipController {
    * PATCH /membership/admin/tiers/:type
    */
   @Patch("admin/tiers/:type")
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.super_admin)
+  @RequirePermission("membership_tiers")
   async updateTier(
-    @Param("type") type: MembershipTierType,
+    @Param("type", new ParseEnumPipe(MembershipTierType))
+    type: MembershipTierType,
     @Body() dto: UpdateMembershipTierDto,
   ): Promise<MembershipTierResponseDto> {
     return this.membershipService.updateTier(type, dto);

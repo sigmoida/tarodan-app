@@ -19,7 +19,10 @@ export function loginSchema(t: T) {
     // Only present on the 2FA step; empty on the first submit.
     twoFactorCode: z
       .string()
-      .regex(/^\d{6}$/, t('admin.auth.validation.codeInvalid'))
+      .regex(
+        /^(?:\d{6}|[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4})$/,
+        t('admin.auth.validation.codeInvalid'),
+      )
       .optional()
       .or(z.literal('')),
   });

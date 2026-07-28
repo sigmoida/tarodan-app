@@ -7,6 +7,7 @@ import { JwtPayload } from "../interfaces";
 import { PrismaService } from "../../../prisma";
 import { COOKIE_NAMES, readCookie } from "../utils/auth-cookies";
 import { i18nMessage } from "../../i18n";
+import { SecurityService } from "../../security/security.service";
 
 /** İsteğin taşıdığı refresh token'ı çıkarır: önce httpOnly cookie, yoksa body `refreshToken`
  *  (mobil/eski istemciler). Aynı tarayıcıda hem kullanıcı hem admin cookie'si bulunabilir
@@ -33,6 +34,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly securityService: SecurityService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([extractRefreshToken]),
@@ -55,8 +57,39 @@ export class JwtRefreshStrategy extends PassportStrategy(
       where: { id: payload.sub },
     });
 
-    if (!user) {
+    if (!user || user.deletedAt || user.isBanned) {
       throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
+    }
+
+    let adminId: string | undefined;
+    if (payload.isAdmin) {
+      if (!payload.sessionToken) {
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidAdminToken"),
+        );
+      }
+      adminId =
+        (await this.securityService.validateAdminSession(
+          payload.sessionToken,
+        )) ?? undefined;
+      if (!adminId) {
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidAdminToken"),
+        );
+      }
+      const adminUser = await this.prisma.adminUser.findFirst({
+        where: {
+          id: adminId,
+          userId: user.id,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!adminUser) {
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidAdminToken"),
+        );
+      }
     }
 
     // Return user info along with the refresh token for rotation.
@@ -67,6 +100,8 @@ export class JwtRefreshStrategy extends PassportStrategy(
       isSeller: user.isSeller,
       isAdmin: !!payload.isAdmin,
       role: payload.role,
+      adminId,
+      sessionToken: payload.sessionToken,
       refreshToken: extractRefreshToken(req) ?? "",
     };
   }

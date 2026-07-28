@@ -1556,6 +1556,8 @@ function makeHtml(data) {
             <li>Local iOS: <code>${escapeHtml(data.metadata.localIosApiUrl)}</code>; Android emulator: <code>${escapeHtml(data.metadata.localAndroidApiUrl)}</code>.</li>
             <li>Bearer token her korumalı isteğe eklenmelidir.</li>
             <li>401’de tek-uçuş <code>POST /auth/refresh</code> uygulanmalı ve rotated refresh token atomik olarak saklanmalıdır.</li>
+            <li><code>POST /auth/login</code> başarılı parola sonrası <code>requires2FA: true</code> dönerse token henüz verilmemiştir; aynı istek 6 haneli TOTP veya <code>XXXX-XXXX</code> yedek kodla <code>twoFactorCode</code> alanında tekrarlanmalıdır.</li>
+            <li>2FA etkin hesaplarda Google/Apple girişi token üretmez; istemci parola + ikinci faktör akışına yönlendirmelidir.</li>
             <li><code>USER_BANNED</code> 403 tam ekran ban akışına yönlendirir.</li>
           </ul>
         </div>
@@ -1626,9 +1628,9 @@ function makeHtml(data) {
       </div>
       <p class="socket-note">
         Mobil mesajlaşma, bildirim, teklif, ürün ve sipariş ekranları aşağıdaki olayları desteklemelidir.
-        <strong>Backend güvenlik notu:</strong> <code>join:thread</code> katılımcıyı doğruluyor;
-        <code>order:subscribe</code> ise mevcut gateway’de sipariş tarafı kontrolü yapmıyor. Bu kontrol backend’de
-        eklenmeden <code>order:updated</code> payload’ına hassas veri konulmamalıdır.
+        Handshake yalnız access token kabul eder ve kullanıcının güncel ban/silinme durumunu doğrular.
+        <code>join:thread</code> mesaj katılımcılığını, <code>order:subscribe</code> alıcı/satıcı sahipliğini
+        sunucuda kontrol eder; typing olayları yalnız yetkili olarak katılınmış thread odasından gönderilebilir.
       </p>
       <div style="overflow-x:auto">
         <table class="socket-table">

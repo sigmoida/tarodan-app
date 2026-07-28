@@ -41,6 +41,7 @@ const envSchema = z
     JWT_REFRESH_SECRET: z.string().min(1, "JWT_REFRESH_SECRET is required"),
     ADMIN_JWT_SECRET: z.string().min(1, "ADMIN_JWT_SECRET is required"),
     PAYMENT_CAPABILITY_SECRET: z.string().optional(),
+    TWO_FACTOR_ENCRYPTION_KEY: z.string().optional(),
     GUEST_CHECKOUT_OTP_SECRET: z
       .string()
       .min(1, "GUEST_CHECKOUT_OTP_SECRET is required"),
@@ -57,6 +58,15 @@ const envSchema = z
     SURAT_KARGO_TEST_MODE: z.string().optional(),
     SURAT_KARGO_CARI_KODU: z.string().optional(),
     SURAT_KARGO_SIFRE: z.string().optional(),
+
+    // eLogo — when enabled in production it must use the live SOAP client.
+    ELOGO_ENABLED: z.string().optional(),
+    ELOGO_SOAP_MODE: z.string().optional(),
+    ELOGO_SOAP_URL: z.string().optional(),
+    ELOGO_WS_USERNAME: z.string().optional(),
+    ELOGO_WS_PASSWORD: z.string().optional(),
+    ELOGO_COMPANY_VKN: z.string().optional(),
+    ELOGO_COMPANY_TITLE: z.string().optional(),
   })
   .strip()
   .superRefine((env, ctx) => {
@@ -67,6 +77,7 @@ const envSchema = z
       JWT_REFRESH_SECRET: env.JWT_REFRESH_SECRET,
       ADMIN_JWT_SECRET: env.ADMIN_JWT_SECRET,
       PAYMENT_CAPABILITY_SECRET: env.PAYMENT_CAPABILITY_SECRET ?? "",
+      TWO_FACTOR_ENCRYPTION_KEY: env.TWO_FACTOR_ENCRYPTION_KEY ?? "",
       GUEST_CHECKOUT_OTP_SECRET: env.GUEST_CHECKOUT_OTP_SECRET,
     };
 
@@ -94,16 +105,19 @@ const envSchema = z
       env.JWT_REFRESH_SECRET,
       env.ADMIN_JWT_SECRET,
       env.PAYMENT_CAPABILITY_SECRET,
+      env.TWO_FACTOR_ENCRYPTION_KEY,
+      env.GUEST_CHECKOUT_OTP_SECRET,
     ];
     if (
       !env.PAYMENT_CAPABILITY_SECRET ||
+      !env.TWO_FACTOR_ENCRYPTION_KEY ||
       new Set(signing).size !== signing.length
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["PAYMENT_CAPABILITY_SECRET"],
+        path: ["TWO_FACTOR_ENCRYPTION_KEY"],
         message:
-          "JWT_SECRET, JWT_REFRESH_SECRET, ADMIN_JWT_SECRET and PAYMENT_CAPABILITY_SECRET must be present and mutually distinct in production",
+          "Authentication, payment capability, guest OTP and two-factor encryption secrets must be present and mutually distinct in production",
       });
     }
 
@@ -125,7 +139,7 @@ const envSchema = z
     // Aksi halde stub/test modu SESSİZCE devreye girer: siparişler "kargolandı" görünür
     // ama Sürat'ta fiziksel gönderi HİÇ oluşmaz. (isTestMode() ayrıca default 'true'.)
     const cargoEnabled = ["true", "1"].includes(
-      (env.SURAT_CARGO_ENABLED ?? "").trim(),
+      (env.SURAT_CARGO_ENABLED ?? "").trim().toLowerCase(),
     );
     if (cargoEnabled) {
       if ((env.SURAT_SOAP_MODE ?? "").trim().toLowerCase() !== "rest") {
@@ -136,18 +150,13 @@ const envSchema = z
             "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (live/soap do not support barcode creation)",
         });
       }
-      // SURAT_KARGO_TEST_MODE'un AÇIKÇA set edilmesini zorunlu tut ('true' | 'false').
-      // Asıl tehlike, hiç set edilmemesi: default 'true' → stub/test SESSİZCE devreye
-      // girer (siparişler "kargolandı" görünür, fiziksel gönderi olmaz). Açıkça 'true'
-      // demek ise BİLİNÇLİ bir seçim (staging/test ortamı: gerçek gönderi istemiyoruz);
-      // 'false' gerçek üretim gönderisi. İkisi de kabul; yalnız belirsiz/boş reddedilir.
       const testMode = (env.SURAT_KARGO_TEST_MODE ?? "").trim().toLowerCase();
-      if (testMode !== "false" && testMode !== "true") {
+      if (testMode !== "false") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["SURAT_KARGO_TEST_MODE"],
           message:
-            "SURAT_KARGO_TEST_MODE must be explicitly 'true' or 'false' in production when SURAT_CARGO_ENABLED is set (unset defaults to test mode -> silent no-op shipments). Use 'false' for real production shipments; 'true' for a staging/test environment (no real shipments).",
+            "SURAT_KARGO_TEST_MODE must be 'false' in production when SURAT_CARGO_ENABLED is set; test mode does not create live shipments",
         });
       }
       for (const key of [
@@ -159,6 +168,44 @@ const envSchema = z
             code: z.ZodIssueCode.custom,
             path: [key],
             message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
+          });
+        }
+      }
+    }
+
+    const elogoEnabled = ["true", "1"].includes(
+      (env.ELOGO_ENABLED ?? "").trim().toLowerCase(),
+    );
+    if (elogoEnabled) {
+      if ((env.ELOGO_SOAP_MODE ?? "").trim().toLowerCase() !== "live") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["ELOGO_SOAP_MODE"],
+          message:
+            "ELOGO_SOAP_MODE must be 'live' in production when ELOGO_ENABLED is set",
+        });
+      }
+
+      if (!env.ELOGO_SOAP_URL?.trim().startsWith("https://")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["ELOGO_SOAP_URL"],
+          message:
+            "ELOGO_SOAP_URL must be an HTTPS URL in production when ELOGO_ENABLED is set",
+        });
+      }
+
+      for (const key of [
+        "ELOGO_WS_USERNAME",
+        "ELOGO_WS_PASSWORD",
+        "ELOGO_COMPANY_VKN",
+        "ELOGO_COMPANY_TITLE",
+      ] as const) {
+        if (!env[key]?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} is required in production when ELOGO_ENABLED is set`,
           });
         }
       }

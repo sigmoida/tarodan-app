@@ -327,6 +327,7 @@ export class PaymentController {
    */
   @Get(":id/status")
   @Public() // Allow guest access
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   @ApiOperation({ summary: "Get payment status (lightweight)" })
   @ApiParam({ name: "id", description: "Payment ID" })
   @ApiResponse({
@@ -349,6 +350,7 @@ export class PaymentController {
    */
   @Get(":id/status-guest")
   @Public()
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   @ApiOperation({ summary: "Get payment status for guest (lightweight)" })
   @ApiParam({ name: "id", description: "Payment ID" })
   @ApiResponse({

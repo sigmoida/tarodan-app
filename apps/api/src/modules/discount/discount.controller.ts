@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import {
   ApiTags,
   ApiOperation,
@@ -136,6 +137,7 @@ export class DiscountController {
    */
   @Post("validate-guest")
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Validate a coupon code for a guest cart" })
   @ApiResponse({

@@ -11,6 +11,8 @@ describe("validateEnv", () => {
     JWT_REFRESH_SECRET: "b".repeat(40),
     ADMIN_JWT_SECRET: "c".repeat(40),
     GUEST_CHECKOUT_OTP_SECRET: "d".repeat(40),
+    PAYMENT_CAPABILITY_SECRET: "e".repeat(40),
+    TWO_FACTOR_ENCRYPTION_KEY: "f".repeat(40),
   };
   const prodBase = {
     NODE_ENV: "production",
@@ -51,7 +53,7 @@ describe("validateEnv", () => {
     ).toThrow(/SURAT_KARGO_TEST_MODE/);
   });
 
-  it("passes with cargo enabled + explicit TEST_MODE='true' (staging: no real shipments)", () => {
+  it("throws with cargo enabled + TEST_MODE='true' in production", () => {
     expect(() =>
       validateEnv({
         ...cargoOn,
@@ -60,7 +62,7 @@ describe("validateEnv", () => {
         SURAT_KARGO_CARI_KODU: "c",
         SURAT_KARGO_SIFRE: "s",
       }),
-    ).not.toThrow();
+    ).toThrow(/SURAT_KARGO_TEST_MODE/);
   });
 
   it("throws when cargo enabled in prod but credentials missing", () => {
@@ -88,6 +90,43 @@ describe("validateEnv", () => {
   it("does not require Surat config when cargo is disabled", () => {
     expect(() =>
       validateEnv({ ...prodBase, SURAT_CARGO_ENABLED: "false" }),
+    ).not.toThrow();
+  });
+
+  const elogoOn = { ...prodBase, ELOGO_ENABLED: "true" };
+
+  it("throws when eLogo is enabled in production with the stub client", () => {
+    expect(() =>
+      validateEnv({
+        ...elogoOn,
+        ELOGO_SOAP_MODE: "stub",
+      }),
+    ).toThrow(/ELOGO_SOAP_MODE/);
+  });
+
+  it("throws when live eLogo credentials or company identity are missing", () => {
+    expect(() =>
+      validateEnv({
+        ...elogoOn,
+        ELOGO_SOAP_MODE: "live",
+        ELOGO_SOAP_URL: "https://pb.elogo.com.tr/PostBoxService.svc",
+      }),
+    ).toThrow(
+      /ELOGO_WS_USERNAME|ELOGO_WS_PASSWORD|ELOGO_COMPANY_VKN|ELOGO_COMPANY_TITLE/,
+    );
+  });
+
+  it("passes with a complete live eLogo configuration", () => {
+    expect(() =>
+      validateEnv({
+        ...elogoOn,
+        ELOGO_SOAP_MODE: "live",
+        ELOGO_SOAP_URL: "https://pb.elogo.com.tr/PostBoxService.svc",
+        ELOGO_WS_USERNAME: "service-user",
+        ELOGO_WS_PASSWORD: "service-password",
+        ELOGO_COMPANY_VKN: "1234567890",
+        ELOGO_COMPANY_TITLE: "Tarodan",
+      }),
     ).not.toThrow();
   });
 
@@ -143,6 +182,8 @@ describe("validateEnv", () => {
         JWT_SECRET: "dev",
         JWT_REFRESH_SECRET: "dev",
         ADMIN_JWT_SECRET: "dev",
+        PAYMENT_CAPABILITY_SECRET: "dev",
+        TWO_FACTOR_ENCRYPTION_KEY: "dev",
         GUEST_CHECKOUT_OTP_SECRET: "dev",
       }),
     ).not.toThrow();

@@ -5,6 +5,7 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
@@ -17,6 +18,7 @@ import {
   BusinessRegisterDto,
   LoginDto,
   AuthResponseDto,
+  TwoFactorChallengeDto,
   TokensDto,
 } from "./dto";
 import { JwtPayload } from "./interfaces";
@@ -28,6 +30,7 @@ import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
 import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
+import { SecurityService } from "../security/security.service";
 
 @Injectable()
 export class AuthService {
@@ -42,6 +45,7 @@ export class AuthService {
     private readonly storageService: StorageService,
     private readonly googleAuthService: GoogleAuthService,
     private readonly appleAuthService: AppleAuthService,
+    private readonly securityService: SecurityService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -523,7 +527,7 @@ export class AuthService {
    * Login user
    * POST /auth/login
    */
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async login(dto: LoginDto): Promise<AuthResponseDto | TwoFactorChallengeDto> {
     try {
       // Find user by email with membership info
       const user = await this.prisma.user.findUnique({
@@ -533,6 +537,9 @@ export class AuthService {
             include: {
               tier: true,
             },
+          },
+          twoFactorSecret: {
+            select: { isEnabled: true },
           },
         },
       });
@@ -590,6 +597,17 @@ export class AuthService {
         );
       }
 
+      if (user.isBanned) {
+        await this.logSecurityEvent("failed_login", "high", {
+          email: dto.email,
+          userId: user.id,
+          reason: "banned_account",
+        });
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.accountSuspended"),
+        );
+      }
+
       // Check if email is verified - require email verification before login
       if (!user.isEmailVerified) {
         throw new UnauthorizedException({
@@ -597,6 +615,13 @@ export class AuthService {
           errorCode: "EMAIL_NOT_VERIFIED",
         });
       }
+
+      const twoFactorChallenge = await this.verifyLoginSecondFactor(
+        user.id,
+        user.twoFactorSecret?.isEnabled === true,
+        dto.twoFactorCode,
+      );
+      if (twoFactorChallenge) return twoFactorChallenge;
 
       // Update lastLoginAt immediately so it's persisted before any other async work
       const now = new Date();
@@ -665,7 +690,10 @@ export class AuthService {
       };
     } catch (error) {
       // Re-throw known exceptions
-      if (error instanceof UnauthorizedException) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ServiceUnavailableException
+      ) {
         throw error;
       }
       this.logger.error(
@@ -680,7 +708,10 @@ export class AuthService {
    * Admin login (separate authentication)
    * POST /auth/admin/login
    */
-  async adminLogin(dto: LoginDto) {
+  async adminLogin(
+    dto: LoginDto,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
+  ) {
     // Find user by email – select only columns that exist in DB (avoids schema/DB drift)
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -691,8 +722,13 @@ export class AuthService {
         displayName: true,
         isVerified: true,
         isSeller: true,
+        isBanned: true,
+        deletedAt: true,
         createdAt: true,
         adminUser: true,
+        twoFactorSecret: {
+          select: { isEnabled: true },
+        },
       },
     });
 
@@ -703,17 +739,9 @@ export class AuthService {
       );
     }
 
-    if (!user.adminUser.isActive) {
-      this.logger.warn("Admin login failed: admin account inactive");
-      throw new UnauthorizedException(
-        i18nMessage("server.auth.adminAccountDeactivated"),
-      );
-    }
-
-    const isPasswordValid = await bcrypt.compare(
-      dto.password,
-      user.passwordHash,
-    );
+    const isPasswordValid =
+      !!user.passwordHash &&
+      (await bcrypt.compare(dto.password, user.passwordHash));
     if (!isPasswordValid) {
       this.logger.warn("Admin login failed: invalid password");
       throw new UnauthorizedException(
@@ -721,11 +749,35 @@ export class AuthService {
       );
     }
 
+    if (user.deletedAt || user.isBanned) {
+      this.logger.warn("Admin login failed: user account inactive");
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.adminAccountNotFoundOrInactive"),
+      );
+    }
+
+    if (!user.adminUser.isActive) {
+      this.logger.warn("Admin login failed: admin account inactive");
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.adminAccountDeactivated"),
+      );
+    }
+
+    const twoFactorChallenge = await this.verifyLoginSecondFactor(
+      user.id,
+      user.twoFactorSecret?.isEnabled === true,
+      dto.twoFactorCode,
+    );
+    if (twoFactorChallenge) return twoFactorChallenge;
+
     // Generate admin tokens (using separate secret)
     const tokens = await this.generateAdminTokens(
       user.id,
       user.email,
       user.adminUser.role,
+      user.adminUser.id,
+      undefined,
+      sessionContext,
     );
 
     await Promise.all([
@@ -766,7 +818,7 @@ export class AuthService {
   async refreshTokens(
     userId: string,
     refreshToken: string,
-    opts?: { isAdmin?: boolean },
+    opts?: { isAdmin?: boolean; adminSessionToken?: string },
   ): Promise<TokensDto> {
     // Find user (admin için adminUser ilişkisiyle güncel rol/aktiflik)
     const user = await this.prisma.user.findUnique({
@@ -776,6 +828,11 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
+    }
+    if (user.deletedAt || user.isBanned) {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.accountSuspended"),
+      );
     }
 
     // Sunulan refresh token'ı persist edilmiş duruma karşı doğrula + rotasyon için
@@ -790,7 +847,13 @@ export class AuthService {
           i18nMessage("server.auth.adminAccountNotFoundOrInactive"),
         );
       }
-      return this.generateAdminTokens(user.id, user.email, user.adminUser.role);
+      return this.generateAdminTokens(
+        user.id,
+        user.email,
+        user.adminUser.role,
+        user.adminUser.id,
+        opts.adminSessionToken,
+      );
     }
 
     // Generate new tokens (token rotation)
@@ -804,11 +867,33 @@ export class AuthService {
    * Note: With JWT, logout is typically handled client-side by removing the token.
    * For enhanced security, we could implement a token blacklist using Redis.
    */
-  async logout(refreshToken?: string): Promise<void> {
+  async logout(
+    refreshToken?: string,
+    opts?: { admin?: boolean },
+  ): Promise<void> {
     // Refresh token'ı DB'de iptal et → çalınan/logout sonrası token bir daha
     // /auth/refresh'te kullanılamaz. (Eskiden no-op'tu; token, JWT süresi dolana
     // dek — varsayılan 7 gün — geçerli kalıyordu.)
     if (refreshToken) {
+      if (opts?.admin) {
+        try {
+          const payload = await this.jwtService.verifyAsync<JwtPayload>(
+            refreshToken,
+            {
+              secret:
+                this.configService.getOrThrow<string>("JWT_REFRESH_SECRET"),
+              ignoreExpiration: true,
+            },
+          );
+          if (payload.isAdmin && payload.sessionToken) {
+            await this.securityService.terminateAdminSessionByToken(
+              payload.sessionToken,
+            );
+          }
+        } catch {
+          // Cookie yine temizlenir; doğrulanamayan token DB oturumunu silemez.
+        }
+      }
       await this.prisma.refreshToken
         .updateMany({
           where: { tokenHash: this.hashToken(refreshToken) },
@@ -916,6 +1001,9 @@ export class AuthService {
       return { accessToken, refreshToken };
     } catch (error) {
       this.logger.error("Token generation failed");
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
       throw new Error(
         `Failed to generate tokens: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -929,13 +1017,24 @@ export class AuthService {
     userId: string,
     email: string,
     role: string,
+    adminUserId: string,
+    existingSessionToken?: string,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
   ): Promise<TokensDto> {
+    const sessionToken =
+      existingSessionToken ||
+      (await this.securityService.createAdminSession(
+        adminUserId,
+        sessionContext?.ipAddress,
+        sessionContext?.userAgent,
+      ));
     const accessPayload: JwtPayload = {
       sub: userId,
       email,
       isSeller: false,
       isAdmin: true,
       role,
+      sessionToken,
       type: "access",
     };
 
@@ -945,6 +1044,7 @@ export class AuthService {
       isSeller: false,
       isAdmin: true,
       role,
+      sessionToken,
       type: "refresh",
       // Aynı saniyedeki rotasyonda bile tekil token (bkz. generateTokens).
       jti: crypto.randomUUID(),
@@ -981,9 +1081,8 @@ export class AuthService {
     return crypto.createHash("sha256").update(token).digest("hex");
   }
 
-  /** Üretilen refresh token'ı hash'leyip DB'ye yazar. Tracking tablosu auth akışını
-   *  bloke etmemeli → hata yutulur (token yine de geçerli; en kötü ihtimalle bir
-   *  sonraki refresh'te "legacy" muamelesi görür). */
+  /** Üretilen refresh token'ı hash'leyip DB'ye yazar. Persist edilemeyen token
+   *  iptal/rotasyon garantisinin dışında kalacağı için istemciye dağıtılmaz. */
   private async persistRefreshToken(
     userId: string,
     refreshToken: string,
@@ -999,10 +1098,11 @@ export class AuthService {
         data: { userId, tokenHash: this.hashToken(refreshToken), expiresAt },
       });
     } catch (error) {
-      // Aynı saniyede aynı payload → birebir aynı JWT → tokenHash unique ihlali
-      // olabilir; ya da geçici DB hatası. Auth'u düşürmeyelim, sadece logla.
-      this.logger.warn(
+      this.logger.error(
         `Refresh token persist edilemedi: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new ServiceUnavailableException(
+        "Oturum güvenli şekilde oluşturulamadı",
       );
     }
   }
@@ -1042,11 +1142,22 @@ export class AuthService {
           i18nMessage("server.auth.invalidRefreshToken"),
         );
       }
-      // Geçerli → rotasyon: eskiyi iptal et (tekrar kullanılırsa yukarıda reddedilir).
-      await this.prisma.refreshToken.update({
-        where: { tokenHash },
+      // Atomik tüketim: iki eşzamanlı refresh isteğinden yalnız biri revokedAt:null
+      // koşulunu sağlayabilir.
+      const revoked = await this.prisma.refreshToken.updateMany({
+        where: {
+          tokenHash,
+          userId,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
         data: { revokedAt: new Date() },
       });
+      if (revoked.count !== 1) {
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.refreshTokenRevoked"),
+        );
+      }
       return;
     }
 
@@ -1059,11 +1170,17 @@ export class AuthService {
     const expiresAt = decoded?.exp
       ? new Date(decoded.exp * 1000)
       : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await this.prisma.refreshToken
-      .create({ data: { userId, tokenHash, expiresAt, revokedAt: new Date() } })
-      .catch(() => {
-        /* yarış/duplicate → yok say; rotasyon yine de bir kez ilerler */
+    try {
+      await this.prisma.refreshToken.create({
+        data: { userId, tokenHash, expiresAt, revokedAt: new Date() },
       });
+    } catch {
+      // Aynı legacy tokenı eşzamanlı kullanan ikinci istek unique constraint'te
+      // kaybeder ve token üretemez.
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.refreshTokenRevoked"),
+      );
+    }
   }
 
   /**
@@ -1212,7 +1329,10 @@ export class AuthService {
   ): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { membership: { include: { tier: true } } },
+      include: {
+        membership: { include: { tier: true } },
+        twoFactorSecret: { select: { isEnabled: true } },
+      },
     });
     if (!user) {
       throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
@@ -1228,6 +1348,13 @@ export class AuthService {
       throw new UnauthorizedException(
         i18nMessage("server.auth.accountSuspended"),
       );
+    }
+    if (user.twoFactorSecret?.isEnabled) {
+      throw new UnauthorizedException({
+        message:
+          "İki faktörlü doğrulama etkin hesaplar sağlayıcı girişi yerine şifre ile giriş yapmalıdır",
+        errorCode: "TWO_FACTOR_PASSWORD_REQUIRED",
+      });
     }
 
     const tokens = await this.generateTokens(
@@ -1267,6 +1394,28 @@ export class AuthService {
       },
       tokens,
     };
+  }
+
+  private async verifyLoginSecondFactor(
+    userId: string,
+    enabled: boolean,
+    code?: string,
+  ): Promise<TwoFactorChallengeDto | null> {
+    if (!enabled) return null;
+    if (!code) return { requires2FA: true };
+
+    const valid = await this.securityService.validateTOTP(userId, code);
+    if (!valid) {
+      await this.logSecurityEvent("failed_login", "high", {
+        userId,
+        reason: "invalid_two_factor_code",
+      });
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidCredentials"),
+      );
+    }
+
+    return null;
   }
 
   /**

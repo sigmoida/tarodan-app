@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma';
 import { NotificationService } from '../notification/notification.service';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
+import { SecurityService } from '../security/security.service';
 
 describe('AuthService.login - password login edge cases', () => {
   let service: AuthService;
@@ -19,6 +20,7 @@ describe('AuthService.login - password login edge cases', () => {
     user: { findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     securityLog: { create: jest.fn().mockResolvedValue({}) },
   };
+  const security = { validateTOTP: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -33,6 +35,7 @@ describe('AuthService.login - password login edge cases', () => {
         { provide: StorageService, useValue: { getPublicAssetUrl: jest.fn().mockReturnValue(null) } },
         { provide: GoogleAuthService, useValue: {} },
         { provide: AppleAuthService, useValue: { verifyIdentityToken: jest.fn() } },
+        { provide: SecurityService, useValue: security },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
@@ -97,5 +100,87 @@ describe('AuthService.login - password login edge cases', () => {
         }),
       );
     }
+  });
+
+  it('rejects a banned account before issuing tokens', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'u-banned',
+      email: 'banned@example.com',
+      passwordHash: await bcrypt.hash('CorrectPass123!', 4),
+      isEmailVerified: true,
+      isBanned: true,
+      deletedAt: null,
+      isSeller: false,
+      sellerType: null,
+      displayName: 'Banned User',
+      avatarUrl: null,
+      phone: null,
+      isVerified: false,
+      createdAt: new Date(),
+      membership: null,
+      twoFactorSecret: null,
+    });
+
+    await expect(
+      service.login({
+        email: 'banned@example.com',
+        password: 'CorrectPass123!',
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('returns a tokenless challenge when an enabled second factor is missing', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'u3',
+      email: '2fa@example.com',
+      passwordHash: await bcrypt.hash('CorrectPass123!', 4),
+      isEmailVerified: true,
+      isSeller: false,
+      sellerType: null,
+      displayName: '2FA User',
+      avatarUrl: null,
+      phone: null,
+      isVerified: false,
+      createdAt: new Date(),
+      membership: null,
+      twoFactorSecret: { isEnabled: true },
+    });
+
+    await expect(
+      service.login({
+        email: '2fa@example.com',
+        password: 'CorrectPass123!',
+      }),
+    ).resolves.toEqual({ requires2FA: true });
+    expect(security.validateTOTP).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid second factor after a valid password', async () => {
+    security.validateTOTP.mockResolvedValue(false);
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'u4',
+      email: '2fa-invalid@example.com',
+      passwordHash: await bcrypt.hash('CorrectPass123!', 4),
+      isEmailVerified: true,
+      isSeller: false,
+      sellerType: null,
+      displayName: '2FA User',
+      avatarUrl: null,
+      phone: null,
+      isVerified: false,
+      createdAt: new Date(),
+      membership: null,
+      twoFactorSecret: { isEnabled: true },
+    });
+
+    await expect(
+      service.login({
+        email: '2fa-invalid@example.com',
+        password: 'CorrectPass123!',
+        twoFactorCode: '123456',
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+    expect(security.validateTOTP).toHaveBeenCalledWith('u4', '123456');
   });
 });

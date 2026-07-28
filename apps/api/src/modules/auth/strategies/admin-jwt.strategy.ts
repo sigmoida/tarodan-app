@@ -7,12 +7,14 @@ import { JwtPayload, RequestUser } from "../interfaces";
 import { PrismaService } from "../../../prisma";
 import { COOKIE_NAMES, readCookie } from "../utils/auth-cookies";
 import { i18nMessage } from "../../i18n";
+import { SecurityService } from "../../security/security.service";
 
 @Injectable()
 export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly securityService: SecurityService,
   ) {
     super({
       // Önce httpOnly cookie (tarayıcı), yoksa Authorization header (mobil/araçlar).
@@ -33,25 +35,48 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
       );
     }
 
+    if (!payload.sessionToken) {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidAdminToken"),
+      );
+    }
+    const sessionAdminId = await this.securityService.validateAdminSession(
+      payload.sessionToken,
+    );
+    if (!sessionAdminId) {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidAdminToken"),
+      );
+    }
+
     // Check if admin user exists and is active – select only User columns that exist in DB
     const adminUser = await this.prisma.adminUser.findFirst({
       where: {
+        id: sessionAdminId,
         userId: payload.sub,
         isActive: true,
       },
       select: {
+        id: true,
         role: true,
         user: {
           select: {
             id: true,
             email: true,
             isSeller: true,
+            isBanned: true,
+            deletedAt: true,
           },
         },
       },
     });
 
-    if (!adminUser || !adminUser.user) {
+    if (
+      !adminUser ||
+      !adminUser.user ||
+      adminUser.user.isBanned ||
+      adminUser.user.deletedAt
+    ) {
       throw new UnauthorizedException(
         i18nMessage("server.auth.adminUserNotFoundOrInactive"),
       );
@@ -62,6 +87,8 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
       email: adminUser.user.email,
       isSeller: adminUser.user.isSeller,
       isAdmin: true,
+      adminId: adminUser.id,
+      sessionToken: payload.sessionToken,
       role: adminUser.role,
     };
   }

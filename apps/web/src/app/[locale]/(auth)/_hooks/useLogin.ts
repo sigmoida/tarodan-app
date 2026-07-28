@@ -43,16 +43,19 @@ export function useLogin() {
   const { login } = useAuthStore();
 
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
 
   const loginMutation = useMutation({
     mutationFn: async ({
       email,
       password,
+      twoFactorCode,
     }: {
       email: string;
       password: string;
+      twoFactorCode?: string;
     }) => {
-      await login(email, password);
+      await login(email, password, twoFactorCode);
       // Post-login: does a business account still need to pick a tier? `login()`
       // already hydrated the store via checkAuth (`/users/me`) — read the mapped
       // user from there instead of a SECOND identical round-trip. `membershipTier`
@@ -85,6 +88,11 @@ export function useLogin() {
         console.error("[Login] Login error:", error);
       }
       const errorCode = (error as { code?: string })?.code;
+      if (errorCode === "2fa") {
+        setRequires2FA(true);
+        toast.success(t("admin.auth.login.twoFactorRequired"));
+        return;
+      }
       const apiMessage = (
         error as {
           response?: { data?: { message?: string } };
@@ -105,12 +113,14 @@ export function useLogin() {
     },
   });
 
-  const submit = (email: string, password: string) => {
+  const submit = (email: string, password: string, twoFactorCode?: string) => {
     if (!email.trim() || !password.trim()) {
       toast.error(t("auth.emailPasswordRequired"));
       return;
     }
-    return loginMutation.mutateAsync({ email, password }).catch(() => {});
+    return loginMutation
+      .mutateAsync({ email, password, twoFactorCode })
+      .catch(() => {});
   };
 
   const resendMutation = useMutation({
@@ -136,6 +146,8 @@ export function useLogin() {
 
   return {
     submit,
+    requires2FA,
+    resetTwoFactor: () => setRequires2FA(false),
     isLoading: loginMutation.isPending,
     showVerificationBanner,
     resendVerification,
