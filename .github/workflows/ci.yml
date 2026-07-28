@@ -60,7 +60,7 @@ jobs:
       - name: Lint (affected on PR, all on push)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm turbo run lint "--filter=...[${{ github.event.pull_request.base.sha }}]"
+            pnpm turbo run lint "--filter=...[${{ github.event.pull_request.base.sha }}]" "--filter=!@tarodan/mobile" "--filter=!@tarodan/ui-native"
           else
             pnpm lint
           fi
@@ -82,7 +82,7 @@ jobs:
       - name: Type Check (affected on PR, all on push)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm turbo run typecheck "--filter=...[${{ github.event.pull_request.base.sha }}]"
+            pnpm turbo run typecheck "--filter=...[${{ github.event.pull_request.base.sha }}]" "--filter=!@tarodan/mobile" "--filter=!@tarodan/ui-native"
           else
             pnpm typecheck
           fi
@@ -101,7 +101,7 @@ jobs:
           NEXT_PUBLIC_APP_URL: http://localhost:3000
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm turbo run build "--filter=...[${{ github.event.pull_request.base.sha }}]"
+            pnpm turbo run build "--filter=...[${{ github.event.pull_request.base.sha }}]" "--filter=!@tarodan/mobile" "--filter=!@tarodan/ui-native"
           else
             pnpm build
           fi

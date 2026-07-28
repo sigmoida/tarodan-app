@@ -2,12 +2,16 @@
 
 İkinci el eşya alım-satım ve takas platformu — pnpm + Turborepo monorepo'su.
 
-| Uygulama        | Yol           | Port |
-| --------------- | ------------- | ---- |
-| API (NestJS)    | `apps/api`    | 3001 |
-| Web (Next.js)   | `apps/web`    | 3000 |
-| Admin (Next.js) | `apps/admin`  | 3002 |
-| Mobile (Expo)   | `apps/mobile` | —    |
+| Uygulama        | Yol          | Port |
+| --------------- | ------------ | ---- |
+| API (NestJS)    | `apps/api`   | 3001 |
+| Web (Next.js)   | `apps/web`   | 3000 |
+| Admin (Next.js) | `apps/admin` | 3002 |
+
+Mobil istemci ayrı repository'de yönetilir. Bu repository mobil için yalnızca
+backend endpoint kontratını ve `docs/mobile-api-reference.html` dokümanını
+üretir; `apps/mobile` altındaki eski istemci kopyası build/release kaynağı
+değildir.
 
 ## Gereksinimler
 
