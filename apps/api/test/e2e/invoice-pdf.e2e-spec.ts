@@ -1,15 +1,15 @@
-import * as request from 'supertest';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+import * as request from "supertest";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { signCallback } from '../mocks/paytr.mock';
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { signCallback } from "../mocks/paytr.mock";
 
 async function buyAndPay(
   ctx: E2ETestApp,
@@ -17,16 +17,25 @@ async function buyAndPay(
   productId: string,
   shippingAddressId: string,
 ): Promise<{ orderId: string; paymentId: string }> {
+  const quote = await request(ctx.app.getHttpServer())
+    .post("/api/orders/quote")
+    .send({ items: [{ productId, quantity: 1 }] })
+    .expect(201);
   const buyRes = await request(ctx.app.getHttpServer())
-    .post('/api/orders/buy')
+    .post("/api/orders/buy")
     .set(authHeader(buyer))
-    .send({ productId, shippingAddressId })
+    .send({
+      productId,
+      shippingAddressId,
+      expectedShippingTariffVersion: quote.body.shippingTariffVersion,
+      expectedPricingHash: quote.body.pricingHash,
+    })
     .expect(201);
 
   await request(ctx.app.getHttpServer())
-    .post('/api/payments/initiate')
+    .post("/api/payments/initiate")
     .set(authHeader(buyer))
-    .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+    .send({ orderId: buyRes.body.orderId, provider: "paytr" })
     .expect(201);
 
   const prisma = getPrisma();
@@ -34,11 +43,11 @@ async function buyAndPay(
     where: { orderId: buyRes.body.orderId },
   });
   await request(ctx.app.getHttpServer())
-    .post('/api/payments/callback/paytr')
+    .post("/api/payments/callback/paytr")
     .send(
       signCallback({
         merchantOid: payment!.providerConversationId!,
-        status: 'success',
+        status: "success",
         totalAmount: Math.round(Number(payment!.amount) * 100),
       }),
     );
@@ -46,7 +55,7 @@ async function buyAndPay(
   return { orderId: buyRes.body.orderId, paymentId: payment!.id };
 }
 
-describe('Invoice PDF endpoints (E2E)', () => {
+describe("Invoice PDF endpoints (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -69,8 +78,8 @@ describe('Invoice PDF endpoints (E2E)', () => {
   // POST /api/invoices/generate/:orderId
   // ============================================================================
 
-  describe('POST /api/invoices/generate/:orderId', () => {
-    it('generates an invoice for a paid order', async () => {
+  describe("POST /api/invoices/generate/:orderId", () => {
+    it("generates an invoice for a paid order", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -91,24 +100,26 @@ describe('Invoice PDF endpoints (E2E)', () => {
       expect(res.body.pdfUrl).toBeDefined();
 
       // DB has at least one invoice for this order (payment success may also auto-generate)
-      const invoices = await getPrisma().invoice.findMany({ where: { orderId } });
+      const invoices = await getPrisma().invoice.findMany({
+        where: { orderId },
+      });
       expect(invoices.length).toBeGreaterThan(0);
       // The generated invoice number we got back exists in the DB
       const numbers = invoices.map((i) => i.invoiceNumber);
       expect(numbers).toContain(res.body.invoiceNumber);
     });
 
-    it('rejects unauthenticated (401)', async () => {
+    it("rejects unauthenticated (401)", async () => {
       await request(ctx.app.getHttpServer())
-        .post('/api/invoices/generate/a0000000-0000-4000-8000-000000000000')
+        .post("/api/invoices/generate/a0000000-0000-4000-8000-000000000000")
         .expect(401);
     });
 
-    it('returns 404 for non-existent order', async () => {
+    it("returns 404 for non-existent order", async () => {
       const buyer = await createUser(ctx.module);
 
       await request(ctx.app.getHttpServer())
-        .post('/api/invoices/generate/a0000000-0000-4000-8000-000000000000')
+        .post("/api/invoices/generate/a0000000-0000-4000-8000-000000000000")
         .set(authHeader(buyer))
         .expect(404);
     });
@@ -118,8 +129,8 @@ describe('Invoice PDF endpoints (E2E)', () => {
   // GET /api/invoices/order/:orderId — auth + ownership
   // ============================================================================
 
-  describe('GET /api/invoices/order/:orderId', () => {
-    it('returns the invoice for the buyer', async () => {
+  describe("GET /api/invoices/order/:orderId", () => {
+    it("returns the invoice for the buyer", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -145,7 +156,7 @@ describe('Invoice PDF endpoints (E2E)', () => {
       expect(res.body.invoiceNumber).toBeDefined();
     });
 
-    it('returns the invoice for the seller', async () => {
+    it("returns the invoice for the seller", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -168,7 +179,7 @@ describe('Invoice PDF endpoints (E2E)', () => {
         .expect(200);
     });
 
-    it('forbids stranger from accessing another order\'s invoice', async () => {
+    it("forbids stranger from accessing another order's invoice", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const stranger = await createUser(ctx.module);
@@ -198,8 +209,8 @@ describe('Invoice PDF endpoints (E2E)', () => {
   // GET /api/invoices — list user invoices
   // ============================================================================
 
-  describe('GET /api/invoices', () => {
-    it('returns buyer/seller invoices filtered by type query', async () => {
+  describe("GET /api/invoices", () => {
+    it("returns buyer/seller invoices filtered by type query", async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -217,14 +228,14 @@ describe('Invoice PDF endpoints (E2E)', () => {
         .expect(201);
 
       const buyerList = await request(ctx.app.getHttpServer())
-        .get('/api/invoices?type=buyer')
+        .get("/api/invoices?type=buyer")
         .set(authHeader(buyer))
         .expect(200);
       expect(Array.isArray(buyerList.body)).toBe(true);
       expect(buyerList.body.length).toBeGreaterThan(0);
 
       const sellerList = await request(ctx.app.getHttpServer())
-        .get('/api/invoices?type=seller')
+        .get("/api/invoices?type=seller")
         .set(authHeader(seller))
         .expect(200);
       expect(Array.isArray(sellerList.body)).toBe(true);

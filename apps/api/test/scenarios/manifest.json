@@ -18953,11 +18953,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "Eşzamanlı iki fatura üretimi → numara çakışma riski",
+      "title": "Eşzamanlı iki fatura üretimi tek kayda yakınsar",
       "tur": "Eşzamanlılık",
       "pri": "P1",
       "steps": "1. İki isteği paralel (race) gönder.",
-      "exp": "İdeal: ikisi de farklı numara alır. Risk: ikisi aynı -NNNNNN türetir → biri P2002 unique hatası (500/400). Davranış raporlanmalı. — invoice.service.ts:961-976 (kilitsiz read-then-increment).",
+      "exp": "İki istek de başarılı olur, aynı invoiceNumber döner ve sipariş için yalnız bir Invoice kaydı oluşur; 5xx üretilmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -18966,11 +18966,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "Aynı sipariş için çift üretim (idempotency yok) → mükerrer fatura",
+      "title": "Aynı sipariş için çift üretim idempotenttir",
       "tur": "Idempotency",
       "pri": "P1",
       "steps": "1. POST /api/invoices/generate/:orderId iki kez çağır.",
-      "exp": "Sipariş için 2 Invoice kaydı oluşur (farklı numaralı). Bilinen davranış: e2e testi de length).toBeGreaterThan(0) ve \"payment success may also auto-generate\" notu düşüyor. — invoice.service.ts:308-322; invoice-pdf.e2e-spec.ts:93-98.",
+      "exp": "Ardışık çağrılar aynı invoiceNumber değerini döndürür ve sipariş için yalnız bir Invoice kaydı kalır.",
       "gap": false,
       "gapRefs": []
     },
@@ -19577,11 +19577,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "effectiveFrom/effectiveTo çözümlemede kullanılmıyor (risk)",
+      "title": "Süresi geçmiş vergi oranı çözümlemede kullanılmaz",
       "tur": "Sınır değer",
       "pri": "P1",
       "steps": "1. GET /api/tax/calculate?countryCode=TR&subtotal=1000.",
-      "exp": "Süresi dolmuş oran yine döner (tarih filtresi yok) — bilinen açık. resolveTaxRate yalnız isActive bakar. — tax.service.ts:70-95 (effectiveFrom/To filtresi yok).",
+      "exp": "effectiveTo geçmiş oran aktif işaretli olsa bile rate ve taxRateId null döner; vergi tutarı hesaplanmaz.",
       "gap": false,
       "gapRefs": []
     },
@@ -19590,11 +19590,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "scope='product' kuralı çözümlemede uygulanmaz (risk)",
+      "title": "Desteklenmeyen product vergi kuralı oluşturulamaz",
       "tur": "Sınır değer",
       "pri": "P2",
-      "steps": "1. İlgili kategori/ürün için hesap çağır.",
-      "exp": "product kuralı dikkate alınmaz; default_rate (veya category) uygulanır. — tax.service.ts:74-77 (sorguda yalnız default_rate + category).",
+      "steps": "1. Super admin olarak scope=product vergi kuralı oluşturmayı dene.",
+      "exp": "Resolver productId desteklemediği sürece API 400 döner ve çözülemeyen kural kaydedilmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -22820,9 +22820,7 @@
       "steps": "1. score: \"abc\" gönder → 400 beklenir. 2. score: 4.5 gönder → kabul/ret davranışını gözle ve raporla (NOT: @IsNumber() ondalığı reddetmez; DB score Int olduğundan kayıt davranışını doğrula).",
       "exp": "\"abc\" → 400. 4.5 için: kabul edilirse DB'de Int'e nasıl yansıdığı raporlanır (potansiyel veri tutarsızlığı — bilinen risk).",
       "gap": true,
-      "gapRefs": [
-        "RAT-053"
-      ]
+      "gapRefs": ["RAT-053"]
     },
     {
       "id": "RAT-054",
@@ -22939,9 +22937,7 @@
       "steps": "1. Küfürlü comment ile puan ver.",
       "exp": "201, kayıt pending. Public'te görünmez; admin moderasyonu reddedebilir. (Bilinen davranış — fail-open + admin denetimi.)",
       "gap": true,
-      "gapRefs": [
-        "RAT-063"
-      ]
+      "gapRefs": ["RAT-063"]
     },
     {
       "id": "RAT-070",
@@ -23032,9 +23028,7 @@
       "steps": "1. PATCH /api/admin/reviews/ /status { status: \"spam\" }. 2. PATCH .../status { status: \"deleted\" }.",
       "exp": "Her ikisi 400 (admin DTO enum'ında yok). Bilinen kapsam farkı: spam/deleted yalnız DB seviyesinde tanımlı, admin API'sinden set edilemez — açık risk olarak raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-076"
-      ]
+      "gapRefs": ["RAT-076"]
     },
     {
       "id": "RAT-077",
@@ -23216,9 +23210,7 @@
       "steps": "1. Aynı token ile aynı ratingId'ye 3 kez POST .../helpful.",
       "exp": "Her çağrı +1; helpfulCount=3. Açık risk: kullanıcı başına benzersizlik/idempotency yok — şişirilebilir. Raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-102"
-      ]
+      "gapRefs": ["RAT-102"]
     },
     {
       "id": "RAT-103",
@@ -23244,9 +23236,7 @@
       "steps": "1. Aynı sipariş için farklı skorla tekrar POST /api/ratings/users. 2. Olası PATCH /api/ratings/users/ veya PUT dene.",
       "exp": "Tekrar POST → 400 \"Bu sipariş için zaten puan verdiniz\". PATCH/PUT → 404/405 (route yok). DB'deki orijinal skor değişmez.",
       "gap": true,
-      "gapRefs": [
-        "RAT-110, RAT-111"
-      ]
+      "gapRefs": ["RAT-110, RAT-111"]
     },
     {
       "id": "RAT-111",
@@ -23259,9 +23249,7 @@
       "steps": "1. DELETE /api/ratings/products/ veya /ratings/users/ dene.",
       "exp": "404/405 (route yok). Puan DB'de kalır. (Mantıksal silme yalnız admin rejected/DB deleted ile.)",
       "gap": true,
-      "gapRefs": [
-        "RAT-110, RAT-111"
-      ]
+      "gapRefs": ["RAT-110, RAT-111"]
     },
     {
       "id": "RAT-120",
@@ -23313,9 +23301,7 @@
       "steps": "1. FREE üyeyle mobile yorum yaz → 500 karakterde kesilir. 2. Premium üyeyle 2000 karaktere izin verilir; ancak API review 1001+ karakterde 400 döndürür.",
       "exp": "İstemci kesimi üyeliğe göre; API üst sınır 1000 (review). Premium 2000 yazsa API reddeder — bilinen parite riski, raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-123"
-      ]
+      "gapRefs": ["RAT-123"]
     },
     {
       "id": "RAT-124",
@@ -23328,9 +23314,7 @@
       "steps": "1. ahmet (satıcı) ile web/mobile sipariş detayı → değerlendirme butonu görünmez. 2. API üzerinden satıcı→alıcı puanı (RAT-003) yine de oluşturulabilir.",
       "exp": "UI satıcıya değerlendirme sunmaz; API kabul eder. Parite boşluğu/ürün kararı raporlanmalı.",
       "gap": true,
-      "gapRefs": [
-        "RAT-124"
-      ]
+      "gapRefs": ["RAT-124"]
     },
     {
       "id": "RAT-125",
@@ -23460,9 +23444,7 @@
       "steps": "1. Çeşitli hata senaryolarını tetikle, message alanını incele.",
       "exp": "Tüm backend rating hataları Türkçe sabit; Accept-Language: en gönderilse de mesaj Türkçe kalır (i18n katmanı yok). Bilinen davranış — raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-150, RAT-152"
-      ]
+      "gapRefs": ["RAT-150, RAT-152"]
     },
     {
       "id": "RAT-151",
@@ -23488,9 +23470,7 @@
       "steps": "1. Mobile dilini EN'e al, RatingModal'ı aç.",
       "exp": "Etiketler Türkçe kalır (i18n bağlanmamış). Web ile parite farkı — raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-150, RAT-152"
-      ]
+      "gapRefs": ["RAT-150, RAT-152"]
     },
     {
       "id": "MOD-001",
@@ -24998,9 +24978,7 @@
       "steps": "1. POST /api/media/upload?folder=messages ile NSFW görsel → engellenir (400). 2. Aynı görseli POST /api/media/upload/multiple?folder=messages ile yükle.",
       "exp": "Adım 1: HTTP 400 \"uygun değildir\". Adım 2: HTTP 201 (denetim yok). Fark RAPORLANIR. (media.controller.ts:48 var, 69-87 yok)",
       "gap": true,
-      "gapRefs": [
-        "MED-033"
-      ]
+      "gapRefs": ["MED-033"]
     },
     {
       "id": "MED-040",
@@ -25390,9 +25368,7 @@
       "steps": "1. ahmet@demo.com (yükleyen) ile DELETE /api/media/file/ .",
       "exp": "HTTP 404 \"Dosya bulunamadı.\" (DB'de kayıt yok). Bu durumda S3 objesi /media üzerinden silinemez — ayrı temizleme yolu olduğu raporlanır. (media.service.ts:310, media-access.service.ts:37-44)",
       "gap": true,
-      "gapRefs": [
-        "MED-075"
-      ]
+      "gapRefs": ["MED-075"]
     },
     {
       "id": "MED-076",
@@ -25483,9 +25459,7 @@
       "steps": "1. POST /api/media/upload?folder=messages ile PDF baytlarını image/jpeg MIME'ı ile gönder.",
       "exp": "MIME kontrolü image/jpeg gördüğü için GEÇER (HTTP 201) — içerik PDF olsa da. Bu bilinen spoofing yüzeyi RAPORLANIR (sharp ile işlenen uçlarda resize aşamasında patlayabilir; ham upload'ta geçer). (media.service.ts:74, storage.service.ts:171)",
       "gap": true,
-      "gapRefs": [
-        "MED-085"
-      ]
+      "gapRefs": ["MED-085"]
     },
     {
       "id": "MED-086",
@@ -25498,9 +25472,7 @@
       "steps": "1. POST /api/media/upload/product ile sahte image/jpeg (gerçek görsel değil) gönder.",
       "exp": "sharp toBuffer hatası → istek BadRequest veya 500 (gerçek davranış gözlemlenir; tercih edilen 400). media.service.ts upload try/catch'i \"File upload failed\" 400'e çevirir; uploadProductImageVariants'ta try/catch yok → ham hata 500 olabilir. Fark RAPORLANIR. (media.service.ts:84-155 vs 290-340)",
       "gap": true,
-      "gapRefs": [
-        "MED-086"
-      ]
+      "gapRefs": ["MED-086"]
     },
     {
       "id": "MED-087",
@@ -25539,9 +25511,7 @@
       "steps": "1. POST /api/media/upload?folder=messages ile 100MB jpeg gönder.",
       "exp": "Dosya tamamen buffer'a alınır, sonra media.service.ts:67 ile 400 reddedilir — ancak bellek tüketimi gerçekleşir. Framework-seviyesi sınır olmadığı RAPORLANIR (öneri: MulterModule limits.fileSize). (media.module.ts — limits yok; media.service.ts:67)",
       "gap": true,
-      "gapRefs": [
-        "MED-089"
-      ]
+      "gapRefs": ["MED-089"]
     },
     {
       "id": "MED-092",
@@ -25736,9 +25706,7 @@
       "steps": "1. Web: getPublicUrl(key) çağrısını gözlemle. 2. Mobile mediaApi'de getPublicUrl var mı kontrol et.",
       "exp": "Web GET /media/public-url/ . Mobile mediaApi'de getPublicUrl TANIMLI DEĞİL (yalnızca deleteFile var) → parite eksiği RAPORLANIR. (apps/web/src/lib/api.ts:770-771, apps/mobile/src/services/api.ts:914-955)",
       "gap": true,
-      "gapRefs": [
-        "MED-114, MED-115"
-      ]
+      "gapRefs": ["MED-114, MED-115"]
     },
     {
       "id": "MED-115",
@@ -25751,9 +25719,7 @@
       "steps": "1. Tip hatası tetikle (PDF) → \"File type ... is not allowed\" (EN). 2. Boyut hatası (>10MB) → \"File size exceeds maximum allowed\" (EN). 3. Ürün limit aşımı → \"En fazla N resim yükleyebilirsiniz\" (TR). 4. Geçersiz tip (product) → \"Geçersiz dosya tipi...\" (TR).",
       "exp": "Mesajların kaynaktaki dilleriyle eşleştiği doğrulanır; karışık dil kullanımı (genel upload EN, product/storage TR) RAPORLANIR. (media.service.ts:69,76 EN; media.service.ts:299,302 TR; media.controller.ts:104 TR)",
       "gap": true,
-      "gapRefs": [
-        "MED-114, MED-115"
-      ]
+      "gapRefs": ["MED-114, MED-115"]
     },
     {
       "id": "MED-090",
@@ -25766,9 +25732,7 @@
       "steps": "1. apps/api/test/e2e/media.e2e-spec.ts:34-38 → DELETE /api/media/test-key (gerçek yol file/*). 2. media.e2e-spec.ts:54-65 → GET /api/media/presigned/upload/products/... (controller'da böyle uç YOK). 3. media.e2e-spec.ts:41-52 → DELETE /api/media/test-file-key \"200 veya 404 kabul\" (gevşek assert).",
       "exp": "Testlerin gerçek DELETE /media/file/* ve var olan uçlarla hizalanması gerektiği RAPORLANIR. Mevcut e2e dosyasının silme IDOR'unu (MED-071) ve public-url private engelini (MED-063) KAPSAMADIĞI not edilir. (media.controller.ts:166-190 vs media.e2e-spec.ts)",
       "gap": true,
-      "gapRefs": [
-        "MED-090"
-      ]
+      "gapRefs": ["MED-090"]
     },
     {
       "id": "MED-091",
@@ -25924,9 +25888,7 @@
       "steps": "1. DB'de admin oturumunun expiresAt'ini geçmişe çek (veya süresi dolmuş token kullan). 2. GET /api/admin/dashboard çağır.",
       "exp": "HTTP 401 (token/oturum geçersiz). AdminSession modeli expiresAt ve index içerir (schema.prisma:231-245).",
       "gap": true,
-      "gapRefs": [
-        "ADM-011/012"
-      ]
+      "gapRefs": ["ADM-011/012"]
     },
     {
       "id": "ADM-012",
@@ -25939,9 +25901,7 @@
       "steps": "1. Pasifleştirilmiş admin ile token al / mevcut token'la GET /api/admin/dashboard çağır.",
       "exp": "Erişim engellenir (401/403); aksiyon yaparsa audit log atlanır (createAuditLog isActive:true filtresi — admin.service.ts:3782-3789).",
       "gap": true,
-      "gapRefs": [
-        "ADM-011/012"
-      ]
+      "gapRefs": ["ADM-011/012"]
     },
     {
       "id": "ADM-013",
@@ -26591,9 +26551,7 @@
       "steps": "1. PATCH /api/admin/settings gövde { \"key\":\"commission_rate\",\"value\":\"0.08\",\"type\":\"number\" }. 2. GET /api/admin/settings ile doğrula.",
       "exp": "HTTP 200; platform_settings commission_rate=0.08; setting_update AuditLog. (admin.controller.ts:173-182; admin.service.ts:521-658)",
       "gap": true,
-      "gapRefs": [
-        "ADM-062/073"
-      ]
+      "gapRefs": ["ADM-062/073"]
     },
     {
       "id": "ADM-063",
@@ -26736,9 +26694,7 @@
       "steps": "1. super_admin ile komisyon kuralı güncelle. 2. Yeni sipariş oluştur, sipariş detayında komisyon tutarına bak.",
       "exp": "Yeni sipariş güncel komisyon oranını uygular; eski siparişler etkilenmez. (commission-rule.dto.ts + escrow akışı)",
       "gap": true,
-      "gapRefs": [
-        "ADM-062/073"
-      ]
+      "gapRefs": ["ADM-062/073"]
     },
     {
       "id": "ADM-074",
@@ -27310,9 +27266,7 @@
       "steps": "1. POST /api/admin/payouts/release/ (reason ile) iki kez eşzamanlı gönder.",
       "exp": "Tek release; ikinci istek idempotent/no-op veya hata; satıcıya çift ödeme YOK. (admin.service.ts:5068-5077 + payment service idempotency — release akışı para denetimi referanslarıyla tutarlı)",
       "gap": true,
-      "gapRefs": [
-        "ADM-117"
-      ]
+      "gapRefs": ["ADM-117"]
     },
     {
       "id": "ADM-118",
@@ -27585,9 +27539,7 @@
       "steps": "1. TR modunda ilgili ekranı aç. 2. t('product.deactivateDesc') çıktısını gözle.",
       "exp": "",
       "gap": true,
-      "gapRefs": [
-        "OPS-018"
-      ]
+      "gapRefs": ["OPS-018"]
     },
     {
       "id": "OPS-019",
@@ -27613,9 +27565,7 @@
       "steps": "1. Parametreli bir metin render eden bileşeni aç (örn. \"Merhaba {name}\").",
       "exp": "{name} değer ile değiştirilmiş; süslü parantez kalmamış.",
       "gap": true,
-      "gapRefs": [
-        "OPS-020"
-      ]
+      "gapRefs": ["OPS-020"]
     },
     {
       "id": "OPS-021",
@@ -27667,9 +27617,7 @@
       "steps": "1. PG bağlantısını kes. 2. GET /api/health/ready çağır.",
       "exp": "HTTP 500 (fırlatılan Error global handler ile 500'e dönüşür); gövde hata mesajı taşır. ErrorLog tablosuna severity error kaydı düşer.",
       "gap": true,
-      "gapRefs": [
-        "OPS-024"
-      ]
+      "gapRefs": ["OPS-024"]
     },
     {
       "id": "OPS-025",
@@ -27838,9 +27786,7 @@
       "steps": "1. invalidateUserCache(userId) tetikleyen akışı çalıştır (örn. profil/membership değişimi). 2. Etkilenen anahtarları ve süreyi gözle.",
       "exp": "Pattern'e uyan tüm anahtarlar silinir; yan etkisi (yanlışlıkla silinen ilgisiz anahtar) ve KEYS maliyeti raporlanır. Bu bir performans/kapsam riskidir; SCAN tabanlı invalidation önerilir.",
       "gap": true,
-      "gapRefs": [
-        "OPS-037"
-      ]
+      "gapRefs": ["OPS-037"]
     },
     {
       "id": "OPS-038",
@@ -27879,9 +27825,7 @@
       "steps": "1. POST http://localhost:3001/graphql body {\"query\":\"{ __typename }\"} çağır. 2. GET http://localhost:3001/graphql (playground) çağır.",
       "exp": "HTTP 404 (uç yok). Bu mevcut durumdur; GraphQL beklenen bir aktif yetenek değildir.",
       "gap": true,
-      "gapRefs": [
-        "OPS-040"
-      ]
+      "gapRefs": ["OPS-040"]
     },
     {
       "id": "OPS-041",
@@ -27907,9 +27851,7 @@
       "steps": "1. ceren@demo.com (veya anonim) olarak { order(id:\" \"){ id totalAmount buyer{ id displayName } } } çağır.",
       "exp": "",
       "gap": true,
-      "gapRefs": [
-        "OPS-042"
-      ]
+      "gapRefs": ["OPS-042"]
     },
     {
       "id": "OPS-043",
@@ -28026,9 +27968,7 @@
       "steps": "1. SentryInterceptor'ın hangi controller'larda @UseInterceptors ile uygulandığını grep ile tespit et. 2. Uygulanmayan bir uçta 5xx tetikle; Sentry'de event olmadığını ama ErrorLog'da kayıt olduğunu doğrula.",
       "exp": "SentryInterceptor yalnız açıkça uygulandığı yerlerde çalışır; global hata kaydı ErrorLog tablosunda. Kapsam farkı belgelenmeli (global Sentry kapsamı yok).",
       "gap": true,
-      "gapRefs": [
-        "OPS-051"
-      ]
+      "gapRefs": ["OPS-051"]
     },
     {
       "id": "OPS-052",
@@ -28665,9 +28605,7 @@
       "steps": "1. Sepete iki farklı satıcının ürününü ekle. 2. POST /api/orders/checkout {idempotencyKey, shippingAddressId, ...}. 3. GET /api/orders/groups/:id ile grubu sorgula.",
       "exp": "2: HTTP 201, tek CheckoutGroup, iki ayrı Order (her biri ilgili satıcıya), her biri pending_payment, her ürün rezerve. 3: grup iki siparişi ve kargo kayıtlarını listeler.",
       "gap": true,
-      "gapRefs": [
-        "JRN-030/031/032"
-      ]
+      "gapRefs": ["JRN-030/031/032"]
     },
     {
       "id": "JRN-031",
@@ -28680,9 +28618,7 @@
       "steps": "1. JRN-030 sonrası aynı idempotencyKey ile tekrar checkout. 2. Başka bir kullanıcı (kaan) aynı idempotencyKey ile checkout.",
       "exp": "1: HTTP 201/200, existingGroup:true, AYNI grup; yeni sipariş açılmaz, çift rezervasyon yok. 2: HTTP 403 Bu işlem size ait değil.",
       "gap": true,
-      "gapRefs": [
-        "JRN-030/031/032"
-      ]
+      "gapRefs": ["JRN-030/031/032"]
     },
     {
       "id": "JRN-032",
@@ -28695,9 +28631,7 @@
       "steps": "1. Grup için ödeme başlat + PayTR success callback. 2. Bir satıcı kargolar, diğeri kargolamaz (deadline dolar). 3. Her sipariş için escrow/iade durumunu izle.",
       "exp": "1: iki sipariş de paid/preparing, iki ayrı PaymentHold(held). 2: kargolanan sipariş ilerler; kargolanmayan oto-iptal + iade (kendi hold'u cancelled). escrow her sipariş için BAĞIMSIZ serbest bırakılır (biri release olur diğeri olmaz).",
       "gap": true,
-      "gapRefs": [
-        "JRN-030/031/032"
-      ]
+      "gapRefs": ["JRN-030/031/032"]
     },
     {
       "id": "JRN-040",

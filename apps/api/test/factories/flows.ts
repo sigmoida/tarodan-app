@@ -33,11 +33,17 @@ export function buyNow(
         where: { provider: "surat", status: "active" },
         select: { version: true },
       })
-      .then((tariff) => {
+      .then(async (tariff) => {
+        const quote = await request(server(ctx))
+          .post("/api/orders/quote")
+          .send({ items: [{ productId, quantity: 1 }] });
         req.send({
           productId,
           ...(shippingAddressId ? { shippingAddressId } : {}),
           expectedShippingTariffVersion: tariff?.version ?? 1,
+          ...(quote.status === 201 && quote.body.pricingHash
+            ? { expectedPricingHash: quote.body.pricingHash }
+            : {}),
         });
       }));
 

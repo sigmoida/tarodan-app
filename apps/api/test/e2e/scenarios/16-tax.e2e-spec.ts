@@ -14,7 +14,7 @@
  *     truncateAll tax_regions/rates/rules'ı temizler). resolveTaxRate:
  *     tam (countryCode+regionCode) eşleşme → aynı ülke genel → isDefault → ilk aktif.
  *     Kural: category (priority desc) → default_rate; taxRate.isActive değilse null.
- *     effectiveFrom/To ve scope='product' çözümlemede KULLANILMAZ (bilinen açık).
+ *     effectiveFrom/To dışındaki oranlar uygulanmamalıdır.
  *   - Sipariş KDV'si resolveSellerTax: seller.businessStatus==='approved' && taxId
  *     dolu değilse 0 (order.service.ts:353). createUser business alanı set etmez →
  *     kurumsal satıcı prisma ile inline güncellenir.
@@ -24,7 +24,8 @@
  *     GET /invoices/order/:orderId veya InvoiceService.generateAndSendInvoice (bkz. generateInvoice
  *     yardımcısı, TAX-095 deseni).
  *   - Fatura uçları invoice.controller.ts: GET /invoices (JwtAuthGuard, type=buyer|seller),
- *     GET /invoices/order/:orderId (ParseUUIDPipe, lazy generate), .../public (paymentId zorunlu),
+ *     GET /invoices/order/:orderId (ParseUUIDPipe, lazy generate), .../public
+ *     (paymentId + ödeme-kapsamlı imzalı capability zorunlu),
  *     POST /invoices/generate/:orderId (JwtAuthGuard, default 201), download/:id(/public).
  *     Yetkisiz/yabancı → NotFoundException (404). Public uçta paymentId yoksa 400.
  *   - Admin uçları admin.controller.ts @Controller('admin') + AdminJwtAuthGuard + RolesGuard;
@@ -60,6 +61,8 @@ import {
   clearMailbox,
 } from "../../test-utils/mail";
 import { OfferStatus } from "@prisma/client";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
 
 describe("16 — Vergi & Fatura (TAX)", () => {
   let ctx: E2ETestApp;
@@ -153,10 +156,19 @@ describe("16 — Vergi & Fatura (TAX)", () => {
     productId: string,
     shippingAddressId: string,
   ): Promise<{ orderId: string; paymentId: string }> {
+    const quote = await request(server())
+      .post("/api/orders/quote")
+      .send({ items: [{ productId, quantity: 1 }] })
+      .expect(201);
     const buyRes = await request(server())
       .post("/api/orders/buy")
       .set(authHeader(buyer))
-      .send({ productId, shippingAddressId })
+      .send({
+        productId,
+        shippingAddressId,
+        expectedShippingTariffVersion: quote.body.shippingTariffVersion,
+        expectedPricingHash: quote.body.pricingHash,
+      })
       .expect(201);
 
     await request(server())
@@ -185,6 +197,21 @@ describe("16 — Vergi & Fatura (TAX)", () => {
     await generateInvoice(buyRes.body.orderId);
 
     return { orderId: buyRes.body.orderId, paymentId: payment!.id };
+  }
+
+  function paymentCapability(
+    paymentId: string,
+    expiresIn: string | number = "2h",
+  ): string {
+    const jwt = ctx.module.get(JwtService);
+    const config = ctx.module.get(ConfigService);
+    const secret =
+      config.get<string>("PAYMENT_CAPABILITY_SECRET") ||
+      config.getOrThrow<string>("JWT_SECRET");
+    return jwt.sign({ sub: paymentId, type: "payment_capability" }, {
+      secret,
+      expiresIn,
+    } as any);
   }
 
   /**
@@ -533,14 +560,12 @@ describe("16 — Vergi & Fatura (TAX)", () => {
     });
 
     scenario("TAX-087", async () => {
-      // effectiveFrom/To ÇÖZÜMLEMEDE KULLANILMAZ: süresi geçmiş effectiveTo'lu ama
-      // isActive=true oran yine döner (bilinen açık).
+      // Süresi geçmiş oran isActive=true kalsa bile çözümlemede uygulanmaz.
       const { regionId } = await seedTaxRegionWithDefaultRate({
         rate: 20,
         name: "Expired",
       });
       const prisma = getPrisma() as any;
-      // Rate'e geçmiş effectiveTo ata (resolveTaxRate tarih filtresi yapmaz).
       await prisma.taxRate.updateMany({
         where: { taxRegionId: regionId },
         data: {
@@ -551,44 +576,44 @@ describe("16 — Vergi & Fatura (TAX)", () => {
       const res = await request(server())
         .get("/api/tax/calculate?countryCode=TR&subtotal=1000")
         .expect(200);
-      // Süresi dolmuş olmasına rağmen yine %20 döner.
-      expect(res.body.rate).toBe(20);
-      expect(res.body.taxAmount).toBe(200);
+      expect(res.body.rate).toBeNull();
+      expect(res.body.taxRateId).toBeNull();
+      expect(res.body).not.toHaveProperty("taxAmount");
     });
 
     scenario("TAX-088", async () => {
-      // scope='product' kuralı çözümlemede UYGULANMAZ: sorgu yalnız default_rate + category.
-      // default_rate %20 var, ayrıca %5 product kuralı olsa da default_rate döner.
-      const { regionId } = await seedTaxRegionWithDefaultRate({
-        rate: 20,
-        name: "Default",
+      // Resolver ürün kimliği kabul etmediği sürece admin çözülemeyen product kuralı
+      // oluşturamaz; sessizce default orana düşmek muhasebe hatası üretir.
+      const admin = await createAdminUser(ctx.module, {
+        email: "rule-product-unsupported@test.com",
       });
       const prisma = getPrisma() as any;
-      const productRate = await prisma.taxRate.create({
+      const region = await prisma.taxRegion.create({
         data: {
-          taxRegionId: regionId,
-          name: "Product %5",
+          name: "Ürün kapsamı bölgesi",
+          countryCode: "TR",
+          regionCode: null,
+          sortOrder: 0,
+          isActive: true,
+        },
+      });
+      const rate = await prisma.taxRate.create({
+        data: {
+          taxRegionId: region.id,
+          name: "Ürün KDV",
           rate: 5,
           isActive: true,
         },
       });
-      await prisma.taxRule.create({
-        data: {
-          taxRegionId: regionId,
-          taxRateId: productRate.id,
+      await request(server())
+        .post("/api/admin/tax/rules")
+        .set(authHeader(admin))
+        .send({
+          taxRegionId: region.id,
+          taxRateId: rate.id,
           scope: "product",
-          priority: 10,
-          isActive: true,
-        },
-      });
-      const res = await request(server())
-        .get(
-          `/api/tax/calculate?countryCode=TR&categoryId=${baseline.categoryId}&subtotal=1000`,
-        )
-        .expect(200);
-      // product kuralı dikkate alınmaz → default_rate %20.
-      expect(res.body.rate).toBe(20);
-      expect(res.body.taxAmount).toBe(200);
+        })
+        .expect(400);
     });
 
     scenario("TAX-089", async () => {
@@ -1000,11 +1025,13 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         .expect(201);
       expect(buyerRes.body.invoiceNumber).toBeTruthy();
 
-      // Sahip satıcı (siparişin diğer tarafı) → 201.
-      await request(server())
+      // Sahip satıcı (siparişin diğer tarafı) → aynı faturayı idempotent alır.
+      const sellerRes = await request(server())
         .post(`/api/invoices/generate/${orderId}`)
         .set(authHeader(seller))
         .expect(201);
+      expect(sellerRes.body.invoiceNumber).toBe(buyerRes.body.invoiceNumber);
+      expect(await prisma.invoice.count({ where: { orderId } })).toBe(1);
     });
 
     scenario("TAX-030", async () => {
@@ -1121,9 +1148,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
     });
 
     scenario("TAX-039", async () => {
-      // Eşzamanlı iki üretim: kilitsiz read-then-increment → ideal iki farklı numara,
-      // risk aynı numara → biri P2002 (500). İKİSİ de 200/201 olabilir ya da biri 500.
-      // Davranış raporlanır: en az biri başarılı; başarısız olan varsa 5xx/4xx.
+      // Aynı sipariş için eşzamanlı iki üretim tek faturaya yakınsar; 5xx üretmez.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 200,
       });
@@ -1139,15 +1164,15 @@ describe("16 — Vergi & Fatura (TAX)", () => {
           .post(`/api/invoices/generate/${orderId}`)
           .set(authHeader(buyer)),
       ]);
-      const ok = [a.status, b.status].filter((s) => s === 201).length;
-      expect(ok).toBeGreaterThanOrEqual(1);
-      // Fatura sayısı 1 veya 2 (çakışma olursa 1, olmazsa 2).
+      expect(a.status).toBe(201);
+      expect(b.status).toBe(201);
+      expect(a.body.invoiceNumber).toBe(b.body.invoiceNumber);
       const count = await prisma.invoice.count({ where: { orderId } });
-      expect(count).toBeGreaterThanOrEqual(1);
+      expect(count).toBe(1);
     });
 
     scenario("TAX-040", async () => {
-      // Idempotency yok: aynı sipariş için generate iki kez → 2 farklı numaralı fatura.
+      // Aynı sipariş için ardışık üretim aynı faturayı döndürür.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 200,
       });
@@ -1163,9 +1188,9 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         .post(`/api/invoices/generate/${orderId}`)
         .set(authHeader(buyer))
         .expect(201);
-      expect(g1.body.invoiceNumber).not.toBe(g2.body.invoiceNumber);
+      expect(g1.body.invoiceNumber).toBe(g2.body.invoiceNumber);
       const count = await prisma.invoice.count({ where: { orderId } });
-      expect(count).toBe(2);
+      expect(count).toBe(1);
     });
   });
 
@@ -1272,7 +1297,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
   });
 
   // ════════════════════════════ Misafir/public fatura uçları ════════════════════════════
-  describe("Public fatura uçları (paymentId doğrulaması)", () => {
+  describe("Public fatura uçları (payment capability)", () => {
     scenario("TAX-047", async () => {
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 200,
@@ -1284,8 +1309,25 @@ describe("16 — Vergi & Fatura (TAX)", () => {
       );
       const res = await request(server())
         .get(`/api/invoices/order/${orderId}/public?paymentId=${paymentId}`)
+        .set("x-payment-capability", paymentCapability(paymentId))
         .expect(200);
       expect(res.body.invoiceNumber).toBeTruthy();
+    });
+
+    it("rejects a raw paymentId without a signed payment capability", async () => {
+      // Ham paymentId bir bearer capability değildir; tek başına PII açamaz.
+      const { buyer, product, addr } = await makeBuyerSellerProduct({
+        price: 200,
+      });
+      const { orderId, paymentId } = await buyAndPay(
+        buyer,
+        product.id,
+        addr.id,
+      );
+      const res = await request(server()).get(
+        `/api/invoices/order/${orderId}/public?paymentId=${paymentId}`,
+      );
+      expect([403, 404]).toContain(res.status);
     });
 
     scenario("TAX-048", async () => {
@@ -1302,12 +1344,15 @@ describe("16 — Vergi & Fatura (TAX)", () => {
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 200,
       });
-      const { orderId } = await buyAndPay(buyer, product.id, addr.id);
-      await request(server())
-        .get(
-          `/api/invoices/order/${orderId}/public?paymentId=${NONEXISTENT_UUID}`,
-        )
-        .expect(404);
+      const { orderId, paymentId } = await buyAndPay(
+        buyer,
+        product.id,
+        addr.id,
+      );
+      const res = await request(server())
+        .get(`/api/invoices/order/${orderId}/public?paymentId=${paymentId}`)
+        .set("x-payment-capability", paymentCapability(NONEXISTENT_UUID));
+      expect([403, 404]).toContain(res.status);
     });
 
     scenario("TAX-050", async () => {
@@ -1327,6 +1372,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         .get(
           `/api/invoices/download/${invoice!.id}/public?paymentId=${paymentId}`,
         )
+        .set("x-payment-capability", paymentCapability(paymentId))
         .expect(200);
       expect(res.headers["content-type"]).toContain("application/pdf");
       expect(res.headers["content-disposition"]).toContain("attachment");
@@ -1342,7 +1388,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
     });
 
     scenario("TAX-092", async () => {
-      // paymentId brute-force: yanlış paymentId ile public erişim → 404.
+      // Yanlış paymentId/capability ikilisi public erişim vermez.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 200,
       });
@@ -1353,11 +1399,13 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         .get(
           `/api/invoices/order/${orderId}/public?paymentId=${NONEXISTENT_UUID}`,
         )
+        .set("x-payment-capability", paymentCapability(NONEXISTENT_UUID))
         .expect(404);
       await request(server())
         .get(
           `/api/invoices/download/${invoice!.id}/public?paymentId=${NONEXISTENT_UUID}`,
         )
+        .set("x-payment-capability", paymentCapability(NONEXISTENT_UUID))
         .expect(404);
     });
 
