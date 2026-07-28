@@ -14,7 +14,11 @@ import { generateUniqueReference } from "../../common/helpers/generate-reference
 import { EventService } from "../events";
 import { DiscountService } from "../discount";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import { OrderPricingService, CommissionResult } from "./order-pricing.service";
+import {
+  OrderPricingService,
+  CommissionResult,
+  ShippingTariffSnapshot,
+} from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 
@@ -93,6 +97,7 @@ export class OrderCheckoutGroupService {
     dto: CheckoutDto;
     isGuest: boolean;
     guest?: { email: string; phone?: string; name?: string };
+    shippingTariffSnapshot?: ShippingTariffSnapshot;
   }) {
     const { buyerId, dto, isGuest, guest } = params;
 
@@ -103,12 +108,17 @@ export class OrderCheckoutGroupService {
       );
       if (replayed) return replayed;
     }
-
     if (!dto.shippingAddressId && !dto.shippingAddress) {
       throw new BadRequestException(
         i18nMessage("server.order.shippingAddressRequiredWithFields"),
       );
     }
+    const shippingTariff =
+      params.shippingTariffSnapshot ??
+      (await this.orderPricing.resolveShippingTariffSnapshot(
+        dto.expectedShippingTariffVersion,
+        true,
+      ));
     // Misafir kuponu: kişi-başı limit uygulanamaz (kimlik yok) — validateCoupon'a
     // userId=null geçilir; toplam limit + tarih + min sepet yine denetlenir.
 
@@ -519,6 +529,7 @@ export class OrderCheckoutGroupService {
           const sellerShipping =
             await this.orderPricing.calculateShippingBySeller(
               sellerLineSubtotals,
+              shippingTariff.tariff,
             );
           const sellerShippingCharged = new Set<string>();
           // Per-seller shipping breakdown captured on the charged line, used to write
@@ -621,8 +632,6 @@ export class OrderCheckoutGroupService {
           // Satıcı başına OrderPackage (çatı): o satıcının order'ları + tek kargo ücreti.
           // shippingCost KANONİK olarak alıcı payıdır (direct/guest ile aynı) + tarife
           // snapshot'ı. Faz 2'de fiziksel Sürat gönderisi de bu paket başına konsolide olacak.
-          const groupTariffMeta =
-            await this.orderPricing.getShippingTariffMeta();
           const packageBySeller = new Map<string, string>();
           for (const [sellerId, shipping] of sellerShipping) {
             const bd = sellerShippingBreakdown.get(sellerId) ?? {
@@ -636,8 +645,8 @@ export class OrderCheckoutGroupService {
                 sellerId,
                 buyerId,
                 shippingCost: bd.buyer,
-                shippingTariffId: groupTariffMeta.tariffId,
-                shippingTariffVersion: groupTariffMeta.tariffVersion,
+                shippingTariffId: shippingTariff.tariffId,
+                shippingTariffVersion: shippingTariff.tariffVersion,
                 fullShippingAmount: bd.full,
                 buyerShippingAmount: bd.buyer,
                 sellerShippingAmount: bd.seller,

@@ -19,7 +19,10 @@ import {
 import { TaxService } from "../tax/tax.service";
 import { isPremiumEntitled } from "../membership/membership.util";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
-import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
+import {
+  outboundPackageShipping,
+  type OutboundTariffLike,
+} from "../shipping/shipping-tariff.helper";
 import { DiscountService } from "../discount/discount.service";
 import { createHash } from "crypto";
 
@@ -28,6 +31,12 @@ import { createHash } from "crypto";
  * Contains full details about the applied commission rule
  */
 export type CommissionResult = CommissionCalculationResult;
+
+export interface ShippingTariffSnapshot {
+  tariffId: string;
+  tariffVersion: number;
+  tariff: OutboundTariffLike;
+}
 
 /**
  * Fiyatlandırma hesapları (kargo ücreti, komisyon, checkout quote) —
@@ -49,8 +58,12 @@ export class OrderPricingService {
    * tariff (the single source of truth; replaces the old PlatformSetting keys). Free
    * over the tariff's threshold, else the flat per-package fee.
    */
-  async calculateShippingCost(orderAmount: number): Promise<number> {
-    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
+  async calculateShippingCost(
+    orderAmount: number,
+    snapshotTariff?: OutboundTariffLike,
+  ): Promise<number> {
+    const tariff =
+      snapshotTariff ?? (await this.shippingTariffs.getActiveOutboundTariff());
     return outboundPackageShipping(tariff, orderAmount).toNumber();
   }
 
@@ -66,8 +79,10 @@ export class OrderPricingService {
    */
   async calculateShippingBySeller(
     sellerSubtotals: Map<string, number>,
+    snapshotTariff?: OutboundTariffLike,
   ): Promise<Map<string, number>> {
-    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
+    const tariff =
+      snapshotTariff ?? (await this.shippingTariffs.getActiveOutboundTariff());
     const out = new Map<string, number>();
     for (const [sellerId, subtotal] of sellerSubtotals) {
       out.set(sellerId, outboundPackageShipping(tariff, subtotal).toNumber());
@@ -76,16 +91,23 @@ export class OrderPricingService {
   }
 
   /**
-   * Active shipping-tariff snapshot metadata (id/version) to stamp onto the
-   * OrderPackage at order-create, so the charged shipping can be tied to the exact
-   * tariff version and audited/re-quoted (409) even after the tariff changes.
+   * Resolve one immutable tariff snapshot for an entire checkout request. Every
+   * shipping amount and OrderPackage snapshot in that request must use this object.
    */
-  async getShippingTariffMeta(): Promise<{
-    tariffId: string | null;
-    tariffVersion: number | null;
-  }> {
-    const s = await this.shippingTariffs.getActiveTariffSnapshot();
-    return { tariffId: s.tariffId, tariffVersion: s.tariffVersion };
+  async resolveShippingTariffSnapshot(
+    expectedVersion?: number | null,
+    requireExpectedVersion = false,
+  ): Promise<ShippingTariffSnapshot> {
+    const snapshot = await this.shippingTariffs.getActiveTariffSnapshot();
+    if (
+      (requireExpectedVersion && expectedVersion == null) ||
+      (expectedVersion != null && snapshot.tariffVersion !== expectedVersion)
+    ) {
+      throw new ConflictException(
+        i18nMessage("server.shipping.pricingChanged"),
+      );
+    }
+    return snapshot;
   }
 
   /**
@@ -143,8 +165,8 @@ export class OrderPricingService {
     // görünümü ve doğru toplam için; `shippingAmount` bunların toplamıdır.
     shippingBySeller: Array<{ sellerId: string; shippingCost: number }>;
     // Aktif tarife sürümü — istemci order-create'e geri gönderir; sürüm değiştiyse
-    // create 409 PRICING_CHANGED döner (sessiz farklı tahsil yok). Aktif tarife yoksa null.
-    shippingTariffVersion: number | null;
+    // create 409 PRICING_CHANGED döner. Aktif tarife yoksa quote fail-closed davranır.
+    shippingTariffVersion: number;
     // Birim fiyat bazının (efektif fiyatlar) stabil hash'i — istemci create'e geri
     // gönderir; ürün fiyatı/kampanya değiştiyse create 409 PRICING_CHANGED döner (F1.3).
     pricingHash: string;
@@ -164,6 +186,7 @@ export class OrderPricingService {
         i18nMessage("server.order.atLeastOneProductRequired"),
       );
     }
+    const shippingTariff = await this.resolveShippingTariffSnapshot();
 
     let itemsSubtotal = 0;
     let totalBuyerFee = 0;
@@ -354,7 +377,10 @@ export class OrderPricingService {
     }
 
     // Satıcı-BAŞINA kargo (create ile ortak yardımcı) → çoklu-satıcı sepette doğru toplam.
-    const shippingMap = await this.calculateShippingBySeller(sellerSubtotals);
+    const shippingMap = await this.calculateShippingBySeller(
+      sellerSubtotals,
+      shippingTariff.tariff,
+    );
     // Alıcı yalnız kendi kargo payını öder (create yolundaki yuvarlamayla birebir).
     // buyerShare=100 → tam kargo (mevcut davranış korunur).
     const shippingBySeller = [...shippingMap.entries()].map(
@@ -382,7 +408,6 @@ export class OrderPricingService {
       0,
       itemsSubtotal - couponDiscountTotal - totalSellerFee,
     );
-    const { tariffVersion } = await this.getShippingTariffMeta();
     const pricingHash = this.computePricingHash(
       lines.map((l) => ({
         productId: l.product.id,
@@ -414,7 +439,7 @@ export class OrderPricingService {
       sellerNetAmount,
       items: quoteItems,
       shippingBySeller,
-      shippingTariffVersion: tariffVersion,
+      shippingTariffVersion: shippingTariff.tariffVersion,
       pricingHash,
       pricing,
     };
@@ -450,24 +475,6 @@ export class OrderPricingService {
   ): void {
     if (!expectedHash) return;
     if (this.computePricingHash(items) !== expectedHash) {
-      throw new ConflictException(
-        i18nMessage("server.shipping.pricingChanged"),
-      );
-    }
-  }
-
-  /**
-   * Pricing-change guard (409 PRICING_CHANGED). If the client passed the tariff
-   * version its quote was built on and the active tariff has since moved, order
-   * creation is refused so the buyer re-fetches the quote and confirms the new
-   * amount — never a silent different charge. No expected version → skipped.
-   */
-  async assertShippingTariffUnchanged(
-    expectedVersion?: number | null,
-  ): Promise<void> {
-    if (expectedVersion == null) return;
-    const { tariffVersion } = await this.getShippingTariffMeta();
-    if (tariffVersion != null && tariffVersion !== expectedVersion) {
       throw new ConflictException(
         i18nMessage("server.shipping.pricingChanged"),
       );

@@ -149,10 +149,11 @@ export class OrderGuestCheckoutService {
     if (replayed) {
       return replayed;
     }
-    // 409 PRICING_CHANGED: shipping tariff moved since the quote was built.
-    await this.orderPricing.assertShippingTariffUnchanged(
-      dto.expectedShippingTariffVersion,
-    );
+    const shippingTariff =
+      await this.orderPricing.resolveShippingTariffSnapshot(
+        dto.expectedShippingTariffVersion,
+        true,
+      );
 
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
@@ -174,6 +175,7 @@ export class OrderGuestCheckoutService {
         phone: dto.phone?.trim(),
         name: dto.guestName?.trim(),
       },
+      shippingTariffSnapshot: shippingTariff,
     });
   }
 
@@ -183,10 +185,11 @@ export class OrderGuestCheckoutService {
    */
   async guestCheckout(dto: GuestCheckoutDto) {
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
-    // 409 PRICING_CHANGED: shipping tariff moved since the quote was built.
-    await this.orderPricing.assertShippingTariffUnchanged(
-      dto.expectedShippingTariffVersion,
-    );
+    const shippingTariff =
+      await this.orderPricing.resolveShippingTariffSnapshot(
+        dto.expectedShippingTariffVersion,
+        true,
+      );
     // Savunma derinliği: kod gönderildikten sonra bu e-postayla kayıt olunmuş
     // olabilir → siparişi oluşturmadan önce tekrar kontrol et.
     await this.assertGuestEmailNotRegistered(normEmail);
@@ -317,8 +320,10 @@ export class OrderGuestCheckoutService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const fullShipping =
-        await this.orderPricing.calculateShippingCost(finalPrice);
+      const fullShipping = await this.orderPricing.calculateShippingCost(
+        finalPrice,
+        shippingTariff.tariff,
+      );
       // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
       const buyerShippingAmount =
         Math.round(
@@ -327,7 +332,6 @@ export class OrderGuestCheckoutService {
       const sellerShippingAmount =
         Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
-      const tariffMeta = await this.orderPricing.getShippingTariffMeta();
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const {
         taxAmount: guestTaxAmount,
@@ -406,8 +410,8 @@ export class OrderGuestCheckoutService {
           sellerId: product.sellerId,
           buyerId: guestUser.id,
           shippingCost,
-          shippingTariffId: tariffMeta.tariffId,
-          shippingTariffVersion: tariffMeta.tariffVersion,
+          shippingTariffId: shippingTariff.tariffId,
+          shippingTariffVersion: shippingTariff.tariffVersion,
           fullShippingAmount: fullShipping,
           buyerShippingAmount,
           sellerShippingAmount,

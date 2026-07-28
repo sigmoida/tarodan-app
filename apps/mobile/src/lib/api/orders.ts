@@ -26,6 +26,8 @@ export const ordersApi = {
     shippingAddress?: OrderAddressInput;
     billingAddressId?: string;
     billingAddress?: OrderAddressInput;
+    expectedShippingTariffVersion: number;
+    expectedPricingHash?: string;
   }) => api.post("/orders/buy", data),
   createGuest: (data: {
     productId: string;
@@ -35,7 +37,8 @@ export const ordersApi = {
     shippingAddress: OrderAddressInput;
     billingAddress?: OrderAddressInput;
     offerId?: string;
-    price?: number;
+    expectedShippingTariffVersion: number;
+    expectedPricingHash?: string;
   }) => guestApi.post("/orders/guest", data),
   sendGuestVerificationCode: (data: {
     email: string;
@@ -54,7 +57,7 @@ export const ordersApi = {
     billingAddressId?: string;
     billingAddress?: OrderAddressInput;
     couponCode?: string;
-    expectedShippingTariffVersion?: number;
+    expectedShippingTariffVersion: number;
   }) => api.post("/orders/checkout", data),
   /** Toplu checkout (misafir) */
   checkoutGuest: (data: {
@@ -66,7 +69,7 @@ export const ordersApi = {
     guestName: string;
     shippingAddress: OrderAddressInput;
     billingAddress?: OrderAddressInput;
-    expectedShippingTariffVersion?: number;
+    expectedShippingTariffVersion: number;
   }) => guestApi.post("/orders/checkout/guest", data),
   /** Alıcının sipariş grupları (gruplu liste) */
   getGroups: (params?: Record<string, any>) =>

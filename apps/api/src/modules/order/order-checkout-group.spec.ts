@@ -27,7 +27,7 @@ import { ElogoInvoicingService } from "../elogo";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
-// resolves without a DB; snapshot id/version null (no persisted tariff in unit tests).
+// resolves without a DB.
 const SHIPPING_TARIFF_MOCK = {
   getActiveOutboundTariff: async () => ({
     outboundPackageFee: 29.99,
@@ -35,8 +35,8 @@ const SHIPPING_TARIFF_MOCK = {
     freeShippingThreshold: 500,
   }),
   getActiveTariffSnapshot: async () => ({
-    tariffId: null,
-    tariffVersion: null,
+    tariffId: "tariff-1",
+    tariffVersion: 1,
     tariff: {
       outboundPackageFee: 29.99,
       freeShippingEnabled: true,
@@ -256,6 +256,7 @@ describe("OrderService checkout group (batch checkout)", () => {
     items: [{ productId: productA }, { productId: productB }],
     idempotencyKey,
     shippingAddressId: addressId,
+    expectedShippingTariffVersion: 1,
   });
 
   it("creates one checkout group with an order per product (2 items → 1 group + 2 orders)", async () => {
@@ -381,6 +382,7 @@ describe("OrderService checkout group (batch checkout)", () => {
         ],
         idempotencyKey,
         shippingAddressId: addressId,
+        expectedShippingTariffVersion: 1,
       } as any),
     ).rejects.toThrow(/maksimum 20 adet/i);
 
@@ -563,6 +565,7 @@ describe("OrderService checkout group (batch checkout)", () => {
         district: "Kadıköy",
         address: "Test cad. 1",
       },
+      expectedShippingTariffVersion: 1,
     });
 
     beforeEach(() => {

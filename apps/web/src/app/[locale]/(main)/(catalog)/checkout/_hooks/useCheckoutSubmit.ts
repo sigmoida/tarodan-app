@@ -101,6 +101,10 @@ export function useCheckoutSubmit({
       toast.error(t("cart.empty"));
       return;
     }
+    if (typeof expectedShippingTariffVersion !== "number") {
+      toast.error(t("server.shipping.pricingChanged"));
+      return;
+    }
 
     setIsLoading(true);
 
@@ -283,19 +287,14 @@ export function useCheckoutSubmit({
                 zipCode?: string;
               };
               couponCode?: string;
-              expectedShippingTariffVersion?: number;
+              expectedShippingTariffVersion: number;
               expectedPricingHash?: string;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
+              expectedShippingTariffVersion,
             };
 
-            // Send the tariff version the quote was priced with; the server returns
-            // 409 PRICING_CHANGED (handled below) if the active tariff has moved.
-            if (typeof expectedShippingTariffVersion === "number") {
-              payload.expectedShippingTariffVersion =
-                expectedShippingTariffVersion;
-            }
             if (expectedPricingHash) {
               payload.expectedPricingHash = expectedPricingHash;
             }
@@ -415,7 +414,7 @@ export function useCheckoutSubmit({
                 address: string;
                 zipCode?: string;
               };
-              expectedShippingTariffVersion?: number;
+              expectedShippingTariffVersion: number;
               couponCode?: string;
               expectedPricingHash?: string;
             } = {
@@ -431,6 +430,7 @@ export function useCheckoutSubmit({
                 ...shippingAddress,
                 phone: formattedAddrPhone,
               },
+              expectedShippingTariffVersion,
             };
             if (
               !billingSameAsShipping &&
@@ -451,10 +451,6 @@ export function useCheckoutSubmit({
               };
             }
 
-            if (typeof expectedShippingTariffVersion === "number") {
-              guestPayload.expectedShippingTariffVersion =
-                expectedShippingTariffVersion;
-            }
             if (expectedPricingHash) {
               guestPayload.expectedPricingHash = expectedPricingHash;
             }

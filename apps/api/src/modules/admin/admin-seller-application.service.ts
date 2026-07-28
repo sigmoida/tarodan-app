@@ -15,6 +15,7 @@ import { StorageService } from "../storage/storage.service";
 import { RatingStatus, SellerApplicationQueryDto } from "./dto";
 import { OrderStatus, Prisma, BusinessStatus } from "@prisma/client";
 import { paginate, resolveOrderBy } from "../../common/list";
+import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
 
 /**
  * Satıcı başvurusu admin operasyonları — AdminService'in SELLER APPLICATIONS
@@ -271,7 +272,25 @@ export class AdminSellerApplicationService {
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { product: true },
+      include: {
+        product: true,
+        package: {
+          select: {
+            fullShippingAmount: true,
+            shippingTariffId: true,
+            orders: {
+              select: {
+                id: true,
+                quantity: true,
+                unitPrice: true,
+                discountAmount: true,
+                discountBreakdown: true,
+                product: { select: { price: true } },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!order) throw new NotFoundException("Sipariş bulunamadı");
@@ -345,6 +364,63 @@ export class AdminSellerApplicationService {
 
     const newTotal = Math.max(0, baseTotal - newCouponDiscount);
     const newDiscountAmount = productDiscount + newCouponDiscount;
+
+    // Kupon, satıcı paketinin indirimli ürün toplamını ücretsiz-kargo eşiğinin
+    // öbür tarafına taşıyabilir. Alıcı/satıcı kargo payı ayrı snapshot olmadığı için
+    // admin mutasyonu burada sessizce yeni bir kargo bedeli üretemez. Siparişin
+    // snapshot tarifesiyle yeni tutarı doğrula; değişiyorsa alıcıya yeni checkout
+    // sözleşmesi sunulması gerekir.
+    if (!order.package?.shippingTariffId) {
+      throw new BadRequestException(
+        "Siparişte doğrulanabilir kargo tarife snapshot'ı bulunmuyor",
+      );
+    }
+    const shippingTariff = await this.prisma.shippingTariff.findUnique({
+      where: { id: order.package.shippingTariffId },
+    });
+    if (!shippingTariff) {
+      throw new BadRequestException(
+        "Siparişin kargo tarifesi artık doğrulanamıyor",
+      );
+    }
+    const packageSubtotalAfterCoupon = order.package.orders.reduce(
+      (sum, packageOrder) => {
+        const packageBreakdown =
+          (packageOrder.discountBreakdown as Record<string, unknown>) ?? {};
+        const packageCouponDiscount =
+          packageOrder.id === order.id
+            ? newCouponDiscount
+            : Number(
+                packageBreakdown.couponDiscount ??
+                  packageOrder.discountAmount ??
+                  0,
+              );
+        const unitPrice = Number(
+          packageOrder.unitPrice ?? packageOrder.product.price,
+        );
+        return (
+          sum +
+          Math.max(
+            0,
+            unitPrice * (packageOrder.quantity ?? 1) - packageCouponDiscount,
+          )
+        );
+      },
+      0,
+    );
+    const repricedFullShipping = outboundPackageShipping(
+      shippingTariff,
+      packageSubtotalAfterCoupon,
+    ).toNumber();
+    if (
+      Math.abs(
+        repricedFullShipping - Number(order.package.fullShippingAmount),
+      ) > 0.001
+    ) {
+      throw new BadRequestException(
+        "Kupon kargo ücretini değiştiriyor; sipariş yeni checkout ile oluşturulmalı",
+      );
+    }
 
     const previous = {
       discountCode: order.discountCode,

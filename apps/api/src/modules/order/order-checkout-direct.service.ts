@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
@@ -58,13 +59,15 @@ export class OrderCheckoutDirectService {
    * - Cannot buy own product
    */
   async createDirectOrder(buyerId: string, dto: DirectBuyDto) {
-    this.logger.log(`[createDirectOrder] Starting order for buyer: ${buyerId}`);
-    this.logger.log(`[createDirectOrder] DTO: ${JSON.stringify(dto)}`);
-
-    // 409 PRICING_CHANGED: shipping tariff moved since the quote was built.
-    await this.orderPricing.assertShippingTariffUnchanged(
-      dto.expectedShippingTariffVersion,
+    this.logger.log(
+      `[createDirectOrder] Starting order for buyer=${buyerId} product=${dto.productId}`,
     );
+
+    const shippingTariff =
+      await this.orderPricing.resolveShippingTariffSnapshot(
+        dto.expectedShippingTariffVersion,
+        true,
+      );
 
     // Validate DTO has necessary address info
     if (!dto.shippingAddressId && !dto.shippingAddress) {
@@ -120,8 +123,19 @@ export class OrderCheckoutDirectService {
           status: OrderStatus.pending_payment,
         },
         orderBy: { createdAt: "desc" },
+        include: {
+          package: { select: { shippingTariffVersion: true } },
+        },
       });
       if (existingOrder) {
+        if (
+          existingOrder.package?.shippingTariffVersion !==
+          shippingTariff.tariffVersion
+        ) {
+          throw new ConflictException(
+            i18nMessage("server.shipping.pricingChanged"),
+          );
+        }
         const numTotal = Number(existingOrder.totalAmount);
         const numSubtotal = Number(existingOrder.subtotal);
         const numDiscount = Number(existingOrder.discountAmount || 0);
@@ -341,8 +355,10 @@ export class OrderCheckoutDirectService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const fullShipping =
-        await this.orderPricing.calculateShippingCost(discountedPrice);
+      const fullShipping = await this.orderPricing.calculateShippingCost(
+        discountedPrice,
+        shippingTariff.tariff,
+      );
       // Kargo payı: tek kargo tutarı alıcı/satıcı arasında bölünür (kurala göre).
       // buyerShare=100 → alıcı tümünü öder (mevcut davranış). Alıcı yalnız kendi
       // payını öder; kalanı satıcı üstlenir (payout formülü değişmeden buyerShipping
@@ -354,7 +370,6 @@ export class OrderCheckoutDirectService {
       const sellerShippingAmount =
         Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
-      const tariffMeta = await this.orderPricing.getShippingTariffMeta();
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const { taxAmount, withholdingTaxAmount } =
         await this.checkoutCommon.resolveSellerTaxes(
@@ -435,8 +450,8 @@ export class OrderCheckoutDirectService {
           sellerId: product.sellerId,
           buyerId,
           shippingCost,
-          shippingTariffId: tariffMeta.tariffId,
-          shippingTariffVersion: tariffMeta.tariffVersion,
+          shippingTariffId: shippingTariff.tariffId,
+          shippingTariffVersion: shippingTariff.tariffVersion,
           fullShippingAmount: fullShipping,
           buyerShippingAmount,
           sellerShippingAmount,
@@ -594,11 +609,6 @@ export class OrderCheckoutDirectService {
     if (buyer?.isBanned) {
       throw new ForbiddenException(i18nMessage("server.order.accountBanned"));
     }
-    // 409 PRICING_CHANGED: shipping tariff moved since the quote was built.
-    await this.orderPricing.assertShippingTariffUnchanged(
-      dto.expectedShippingTariffVersion,
-    );
-
     return this.group.createCheckoutGroup({ buyerId, dto, isGuest: false });
   }
 
@@ -621,6 +631,8 @@ export class OrderCheckoutDirectService {
     if (buyer?.isBanned) {
       throw new ForbiddenException(i18nMessage("server.order.accountBanned"));
     }
+    const shippingTariff =
+      await this.orderPricing.resolveShippingTariffSnapshot();
     let productIdForCache: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -696,6 +708,16 @@ export class OrderCheckoutDirectService {
         offer.sellerId,
         offer.product.categoryId, // Pass categoryId for priority-based matching
       );
+      const offerFullShipping = await this.orderPricing.calculateShippingCost(
+        Number(offer.amount),
+        shippingTariff.tariff,
+      );
+      const offerBuyerShippingAmount =
+        Math.round(
+          offerFullShipping * (commissionResult.shippingBuyerShare / 100) * 100,
+        ) / 100;
+      const offerSellerShippingAmount =
+        Math.round((offerFullShipping - offerBuyerShippingAmount) * 100) / 100;
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -719,7 +741,10 @@ export class OrderCheckoutDirectService {
       );
       // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
       const totalAmount =
-        Number(offer.amount) + commissionResult.buyerFeeAmount + offerTaxAmount;
+        Number(offer.amount) +
+        offerBuyerShippingAmount +
+        commissionResult.buyerFeeAmount +
+        offerTaxAmount;
 
       const offerShippingJson: Record<string, unknown> | undefined =
         shippingAddress
@@ -748,14 +773,18 @@ export class OrderCheckoutDirectService {
         },
       });
 
-      // Faz 1: teklif siparişi de satıcı-paketi altında (uniform model). Teklif yolunda
-      // ayrı kargo ücreti yok → shippingCost 0.
+      // Teklif siparişi de normal satışla aynı sürümlü kargo tarifesini kullanır.
       const offerOrderPackage = await tx.orderPackage.create({
         data: {
           checkoutGroupId: offerOrderGroup.id,
           sellerId: offer.sellerId,
           buyerId,
-          shippingCost: 0,
+          shippingCost: offerBuyerShippingAmount,
+          shippingTariffId: shippingTariff.tariffId,
+          shippingTariffVersion: shippingTariff.tariffVersion,
+          fullShippingAmount: offerFullShipping,
+          buyerShippingAmount: offerBuyerShippingAmount,
+          sellerShippingAmount: offerSellerShippingAmount,
         },
       });
 
@@ -770,6 +799,9 @@ export class OrderCheckoutDirectService {
           checkoutGroupId: offerOrderGroup.id,
           packageId: offerOrderPackage.id,
           totalAmount,
+          subtotal: offer.amount,
+          unitPrice: offer.amount,
+          shippingCost: offerBuyerShippingAmount,
           taxAmount: offerTaxAmount,
           withholdingTaxAmount: offerWithholdingAmount,
           commissionAmount: commissionResult.commissionAmount,
@@ -779,8 +811,8 @@ export class OrderCheckoutDirectService {
           buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
           sellerCommissionAmount: commissionResult.sellerCommissionAmount,
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
-          buyerShippingAmount: 0,
-          sellerShippingAmount: 0,
+          buyerShippingAmount: offerBuyerShippingAmount,
+          sellerShippingAmount: offerSellerShippingAmount,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: dto.shippingAddressId,

@@ -28,7 +28,7 @@ import { DirectBuyDto } from "./dto";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
-// resolves without a DB; snapshot id/version null (no persisted tariff in unit tests).
+// resolves without a DB.
 const SHIPPING_TARIFF_MOCK = {
   getActiveOutboundTariff: async () => ({
     outboundPackageFee: 29.99,
@@ -36,8 +36,8 @@ const SHIPPING_TARIFF_MOCK = {
     freeShippingThreshold: 500,
   }),
   getActiveTariffSnapshot: async () => ({
-    tariffId: null,
-    tariffVersion: null,
+    tariffId: "tariff-1",
+    tariffVersion: 1,
     tariff: {
       outboundPackageFee: 29.99,
       freeShippingEnabled: true,
@@ -62,6 +62,7 @@ describe.skip("OrderService createDirectOrder (1.6 idempotent Buy Now)", () => {
   const directBuyDto: DirectBuyDto = {
     productId,
     shippingAddressId: addressId,
+    expectedShippingTariffVersion: 1,
   };
 
   let mockTx: {
@@ -301,6 +302,7 @@ describe.skip("OrderService guest checkout OTP (1.12)", () => {
       district: "Kadıköy",
       address: "Test cad. 1",
     },
+    expectedShippingTariffVersion: 1,
   };
 
   it("sendGuestCheckoutVerificationCode blocks when rate limit exceeded", async () => {

@@ -118,13 +118,13 @@ export class CheckoutDto {
   )
   couponCode?: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description:
       "Checkout quote kargo tarife sürümü. Aktif tarife değiştiyse sipariş oluşturma 409 PRICING_CHANGED döner.",
   })
-  @IsOptional()
   @IsInt()
-  expectedShippingTariffVersion?: number;
+  @Min(1)
+  expectedShippingTariffVersion: number;
 
   @ApiPropertyOptional({
     description:

@@ -310,6 +310,15 @@ export function useCheckout() {
 
   const proceedCheckout = async (emailVerificationCode?: string) => {
     if (loading) return;
+    const expectedShippingTariffVersion =
+      quoteQuery.data?.shippingTariffVersion;
+    if (typeof expectedShippingTariffVersion !== "number") {
+      appAlert(
+        "Fiyat bilgisi güncellendi",
+        "Lütfen kargo tutarı yüklendikten sonra tekrar deneyin.",
+      );
+      return;
+    }
     setLoading(true);
     try {
       const shipping = buildShippingPayload();
@@ -317,9 +326,6 @@ export function useCheckout() {
 
       // Tariff version the quote was priced with → server returns 409 PRICING_CHANGED
       // if it moved before order-create, so the buyer confirms the new amount.
-      const expectedShippingTariffVersion =
-        quoteQuery.data?.shippingTariffVersion ?? undefined;
-
       const checkoutPayload = {
         items: items.map((item) => ({ productId: item.productId })),
         idempotencyKey: idempotencyKeyRef.current,

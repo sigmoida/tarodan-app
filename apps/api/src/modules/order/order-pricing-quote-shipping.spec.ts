@@ -58,6 +58,15 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         freeShippingEnabled: true,
         freeShippingThreshold: THRESHOLD,
       }),
+      getActiveTariffSnapshot: async () => ({
+        tariffId: "tariff-1",
+        tariffVersion: 1,
+        tariff: {
+          outboundPackageFee: BASE,
+          freeShippingEnabled: true,
+          freeShippingThreshold: THRESHOLD,
+        },
+      }),
     } as any;
     const svc = new OrderPricingService(prisma, taxService, shippingTariffs, {
       getEffectiveDisplayPrice: async () => null,

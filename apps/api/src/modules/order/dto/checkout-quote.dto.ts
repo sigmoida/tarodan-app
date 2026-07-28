@@ -99,6 +99,12 @@ export class CheckoutQuoteResponseDto {
   })
   pricingHash: string;
 
+  @ApiProperty({
+    description:
+      "Active shipping tariff version used by this quote; echo it into checkout submission.",
+  })
+  shippingTariffVersion: number;
+
   @ApiProperty({ type: [CheckoutQuoteItemResponseDto] })
   items: CheckoutQuoteItemResponseDto[];
 

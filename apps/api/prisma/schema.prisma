@@ -1199,7 +1199,8 @@ model OrderPackage {
   // eşiğini geçerse 0). KANONİK olarak ALICI payıdır (buyerShippingAmount) — tüm
   // checkout yolları (direct/group/guest) artık aynı semantiği yazar.
   shippingCost    Decimal        @default(0) @map("shipping_cost") @db.Decimal(10, 2)
-  // Kargo tarife snapshot'ı: sipariş anındaki aktif tarife (yoksa güvenli default → null).
+  // Kargo tarife snapshot'ı: sipariş anındaki aktif tarife. Yeni checkout akışları
+  // aktif tarife yoksa fail-closed davranır; nullable alanlar yalnız eski kayıtlar içindir.
   // Geçmişe dönük tarife değişiminden bağımsız audit/yeniden-hesap ve 409 kontrolü için.
   shippingTariffId       String?  @map("shipping_tariff_id")
   shippingTariffVersion  Int?     @map("shipping_tariff_version")
@@ -1250,7 +1251,8 @@ model Order {
   buyerServiceFeeAmount   Decimal               @default(0) @map("buyer_service_fee_amount") @db.Decimal(10, 2)
   sellerCommissionAmount  Decimal               @default(0) @map("seller_commission_amount") @db.Decimal(10, 2)
   sellerPlatformFeeAmount Decimal               @default(0) @map("seller_platform_fee_amount") @db.Decimal(10, 2)
-  // Kargo tutarının taraflara dağılımı (shippingCost = buyerShippingAmount + sellerShippingAmount).
+  // Kargo tutarının taraflara dağılımı. shippingCost geriye uyumlu alıcı payıdır;
+  // tam paket bedeli OrderPackage.fullShippingAmount snapshot'ında tutulur.
   buyerShippingAmount     Decimal               @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
   sellerShippingAmount    Decimal               @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
   discountAmount         Decimal                @default(0) @map("discount_amount") @db.Decimal(10, 2)

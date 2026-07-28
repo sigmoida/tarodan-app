@@ -3,27 +3,14 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { Prisma, ShippingTariff, ShippingTariffStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
-import {
-  outboundPackageShipping,
-  type OutboundTariffLike,
-} from "./shipping-tariff.helper";
+import { outboundPackageShipping } from "./shipping-tariff.helper";
 
 const DEFAULT_PROVIDER = "surat";
-const ACTIVE_CACHE_TTL_MS = 5 * 60 * 1000;
-
-// Safety net used ONLY when no active tariff exists (misconfiguration). Mirrors the
-// seeded first tariff so checkout stays available; a warning is logged so it's noticed.
-// This is the SINGLE remaining hardcoded shipping default in the codebase.
-const SAFETY_DEFAULT: OutboundTariffLike = {
-  outboundPackageFee: 29.99,
-  freeShippingEnabled: true,
-  freeShippingThreshold: 500,
-};
-
 export interface ShippingTariffInput {
   provider?: string;
   name: string;
@@ -37,26 +24,22 @@ export interface ShippingTariffInput {
 
 /**
  * ShippingTariffService — the SINGLE owner of shipping-tariff persistence + the
- * cached active-tariff read. Lives in its own leaf module (Prisma-only) so both the
+ * active-tariff read. Lives in its own leaf module (Prisma-only) so both the
  * checkout pricing path and the admin surface can depend on it without module cycles.
  * Audit logging is layered on top by the admin service (this stays audit-free domain).
  */
 @Injectable()
 export class ShippingTariffService {
   private readonly logger = new Logger(ShippingTariffService.name);
-  private activeCache = new Map<
-    string,
-    { tariff: ShippingTariff; at: number }
-  >();
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /** The active tariff for a provider (cached ~5 min). Throws if none is active. */
+  /**
+   * The active tariff for a provider. This deliberately reads the database on every
+   * pricing request: a process-local cache is not invalidated in sibling API instances
+   * and can keep charging an archived tariff after an admin activation.
+   */
   async getActiveTariff(provider = DEFAULT_PROVIDER): Promise<ShippingTariff> {
-    const cached = this.activeCache.get(provider);
-    if (cached && Date.now() - cached.at < ACTIVE_CACHE_TTL_MS) {
-      return cached.tariff;
-    }
     const tariff = await this.prisma.shippingTariff.findFirst({
       where: { provider, status: ShippingTariffStatus.active },
     });
@@ -65,47 +48,45 @@ export class ShippingTariffService {
         i18nMessage("server.shipping.noActiveTariff", { provider }),
       );
     }
-    this.activeCache.set(provider, { tariff, at: Date.now() });
     return tariff;
   }
 
   /**
-   * The active outbound tariff for pricing — never throws. Falls back to the safety
-   * default (with a warning) if no active tariff is configured, so a misconfiguration
-   * cannot take checkout down. Pricing/quote code should use THIS, not getActiveTariff.
+   * Pricing must never silently fall back to a hard-coded amount. Without an active
+   * tariff there is no auditable version to snapshot, so checkout fails closed.
    */
   async getActiveOutboundTariff(
     provider = DEFAULT_PROVIDER,
-  ): Promise<OutboundTariffLike> {
+  ): Promise<ShippingTariff> {
     try {
       return await this.getActiveTariff(provider);
-    } catch {
-      this.logger.warn(
-        `No active ${provider} shipping tariff; using safety default (29.99/500). Configure a tariff.`,
+    } catch (error) {
+      this.logger.error(
+        `No active ${provider} shipping tariff; checkout pricing is unavailable.`,
       );
-      return SAFETY_DEFAULT;
+      throw new ServiceUnavailableException(
+        i18nMessage("server.shipping.noActiveTariff", { provider }),
+        { cause: error },
+      );
     }
   }
 
   /**
    * Active-tariff snapshot metadata for order-create: the tariff id + version to
-   * stamp onto the OrderPackage. Null id/version when falling back to the safety
-   * default (no active tariff) — a historical order that can't be tied to a tariff.
+   * stamp onto the OrderPackage. The tariff object and metadata come from the same
+   * row so amount calculation cannot be paired with a different active version.
    */
   async getActiveTariffSnapshot(provider = DEFAULT_PROVIDER): Promise<{
-    tariffId: string | null;
-    tariffVersion: number | null;
-    tariff: OutboundTariffLike;
+    tariffId: string;
+    tariffVersion: number;
+    tariff: ShippingTariff;
   }> {
-    try {
-      const t = await this.getActiveTariff(provider);
-      return { tariffId: t.id, tariffVersion: t.version, tariff: t };
-    } catch {
-      this.logger.warn(
-        `No active ${provider} shipping tariff; snapshot has null id/version.`,
-      );
-      return { tariffId: null, tariffVersion: null, tariff: SAFETY_DEFAULT };
-    }
+    const tariff = await this.getActiveOutboundTariff(provider);
+    return {
+      tariffId: tariff.id,
+      tariffVersion: tariff.version,
+      tariff,
+    };
   }
 
   /**
@@ -114,8 +95,7 @@ export class ShippingTariffService {
    * tariff has no return fee configured.
    */
   async quoteReturnShipment(provider = DEFAULT_PROVIDER): Promise<number> {
-    const tariff = await this.getActiveTariff(provider).catch(() => null);
-    if (!tariff) return Number(SAFETY_DEFAULT.outboundPackageFee);
+    const tariff = await this.getActiveOutboundTariff(provider);
     const fee = Number(tariff.returnPackageFee);
     return fee > 0 ? fee : Number(tariff.outboundPackageFee);
   }
@@ -125,16 +105,9 @@ export class ShippingTariffService {
    * trade flows; falls back to the outbound fee if no trade fee is configured.
    */
   async quoteTradeShipment(provider = DEFAULT_PROVIDER): Promise<number> {
-    const tariff = await this.getActiveTariff(provider).catch(() => null);
-    if (!tariff) return Number(SAFETY_DEFAULT.outboundPackageFee);
+    const tariff = await this.getActiveOutboundTariff(provider);
     const fee = Number(tariff.tradeLegFee);
     return fee > 0 ? fee : Number(tariff.outboundPackageFee);
-  }
-
-  /** Drop the cached active tariff (call after any activation). */
-  invalidateActiveCache(provider?: string): void {
-    if (provider) this.activeCache.delete(provider);
-    else this.activeCache.clear();
   }
 
   async list(provider?: string): Promise<ShippingTariff[]> {
@@ -251,7 +224,6 @@ export class ShippingTariffService {
         },
       });
     });
-    this.invalidateActiveCache(tariff.provider);
     this.logger.log(
       `Shipping tariff ${id} (v${tariff.version}, ${tariff.provider}) activated by ${adminId}`,
     );

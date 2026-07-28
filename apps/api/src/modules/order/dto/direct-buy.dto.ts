@@ -5,6 +5,7 @@ import {
   IsString,
   IsNotEmpty,
   IsInt,
+  Min,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type, Transform } from "class-transformer";
@@ -110,13 +111,13 @@ export class DirectBuyDto {
   )
   idempotencyKey?: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description:
       "Shipping tariff version the checkout quote was built on. If it no longer matches the active tariff, order creation returns 409 PRICING_CHANGED.",
   })
-  @IsOptional()
   @IsInt()
-  expectedShippingTariffVersion?: number;
+  @Min(1)
+  expectedShippingTariffVersion: number;
 
   @ApiPropertyOptional({
     description:

@@ -6,6 +6,7 @@ import {
   ValidateNested,
   IsUUID,
   IsInt,
+  Min,
   Matches,
 } from "class-validator";
 import { Type } from "class-transformer";
@@ -109,13 +110,13 @@ export class GuestCheckoutDto {
   @IsString()
   idempotencyKey?: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description:
       "Shipping tariff version the quote was built on; 409 PRICING_CHANGED if it changed.",
   })
-  @IsOptional()
   @IsInt()
-  expectedShippingTariffVersion?: number;
+  @Min(1)
+  expectedShippingTariffVersion: number;
 
   @ApiPropertyOptional({
     description:
