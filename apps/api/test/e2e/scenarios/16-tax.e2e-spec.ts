@@ -1635,36 +1635,26 @@ describe("16 — Vergi & Fatura (TAX)", () => {
   // ════════════════════════════ İade faturası (credit note) ════════════════════════════
   describe("İade faturası (generateRefundInvoice)", () => {
     scenario("TAX-054", async () => {
-      // generateRefundInvoice: -amount, taxAmount=0, notes referanslı, status issued.
-      const { buyer, seller, product, addr } = await makeBuyerSellerProduct({
+      // Yerel Invoice sipariş başına tektir; ikinci negatif makbuz oluşturmak eLogo
+      // return_invoice idempotency/retry akışını bypass eder ve reddedilmelidir.
+      const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
       const { orderId } = await buyAndPay(buyer, product.id, addr.id);
       const prisma = getPrisma();
-      const original = await prisma.invoice.findFirst({ where: { orderId } });
 
       const { InvoiceService } =
         await import("../../../src/modules/invoice/invoice.service");
+      const { BadRequestException } = await import("@nestjs/common");
       const invoiceService = ctx.module.get(InvoiceService);
-      const refundNumber = await invoiceService.generateRefundInvoice(
-        orderId,
-        300,
-      );
-      expect(refundNumber).toBe(`${original!.invoiceNumber}-R`);
-
-      const refund = await prisma.invoice.findFirst({
-        where: { invoiceNumber: refundNumber },
-      });
-      expect(refund).toBeTruthy();
-      expect(Number(refund!.subtotal)).toBe(-300);
-      expect(Number(refund!.total)).toBe(-300);
-      expect(Number(refund!.taxAmount)).toBe(0);
-      expect(refund!.status).toBe("issued");
-      expect(refund!.notes).toContain(original!.invoiceNumber);
+      await expect(
+        invoiceService.generateRefundInvoice(orderId, 300),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(await prisma.invoice.count({ where: { orderId } })).toBe(1);
     });
 
     scenario("TAX-055", async () => {
-      // Orijinal fatura yoksa → NotFoundException.
+      // Legacy yol, kayıt varlığından bağımsız olarak fail-closed davranır.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
@@ -1674,11 +1664,11 @@ describe("16 — Vergi & Fatura (TAX)", () => {
 
       const { InvoiceService } =
         await import("../../../src/modules/invoice/invoice.service");
-      const { NotFoundException } = await import("@nestjs/common");
+      const { BadRequestException } = await import("@nestjs/common");
       const invoiceService = ctx.module.get(InvoiceService);
       await expect(
         invoiceService.generateRefundInvoice(orderId, 100),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     scenario("TAX-056", async () => {

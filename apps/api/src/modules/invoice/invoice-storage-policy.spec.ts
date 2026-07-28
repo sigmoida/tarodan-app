@@ -29,7 +29,11 @@ describe("InvoiceService storage policy", () => {
         taxId: null,
       },
       product: { title: "Product", categoryId: "category-1" },
-      payment: { provider: "paytr", paidAt: new Date() },
+      payment: {
+        provider: "paytr",
+        status: "completed",
+        paidAt: new Date(),
+      },
       checkoutGroup: null,
     };
     const prisma = {
@@ -37,6 +41,7 @@ describe("InvoiceService storage policy", () => {
         findUnique: jest.fn().mockResolvedValue(order),
       },
       invoice: {
+        findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
       },
     };
