@@ -9,7 +9,7 @@ import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { UpdateOrderStatusDto, CancelOrderDto } from "./dto";
-import { OrderStatus, OfferStatus } from "@prisma/client";
+import { OrderStatus, OfferStatus, RefundRequestStatus } from "@prisma/client";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { ProductLockService } from "../product/product-lock.service";
@@ -188,7 +188,7 @@ export class OrderLifecycleService {
 
   /**
    * 48h pencere ortak tamamlama. Spec Bölüm 6.4.
-   * Atomik: status guard + ledger.markEarned + PaymentHold release.
+   * Atomik: status guard + open-refund guard + ledger.markEarned.
    */
   async completeOrder(
     orderId: string,
@@ -196,6 +196,29 @@ export class OrderLifecycleService {
   ): Promise<{ completed: boolean }> {
     const result = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
+      const openRefund = await tx.refundRequest.findFirst({
+        where: {
+          orderId,
+          status: {
+            in: [
+              RefundRequestStatus.pending_review,
+              RefundRequestStatus.approved,
+              RefundRequestStatus.wait_for_delivery,
+              RefundRequestStatus.return_shipment_open,
+              RefundRequestStatus.return_in_transit,
+              RefundRequestStatus.return_delivered,
+              RefundRequestStatus.disputed,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      if (openRefund) {
+        throw new BadRequestException(
+          i18nMessage("server.order.openRefundExists"),
+        );
+      }
 
       const updated = await tx.order.updateMany({
         where: { id: orderId, status: OrderStatus.awaiting_buyer_confirmation },
@@ -204,6 +227,7 @@ export class OrderLifecycleService {
           completedAt: now,
           buyerConfirmedAt: now,
           buyerConfirmationType: type as any,
+          version: { increment: 1 },
         },
       });
 
@@ -716,75 +740,91 @@ export class OrderLifecycleService {
       );
     }
 
-    const updatedOrder = await this.prisma.order.update({
-      where: {
-        id: orderId,
-        version: order.version,
-      },
-      data: {
-        status: OrderStatus.completed,
-        version: { increment: 1 },
-      },
-      include: {
-        product: {
-          include: {
-            images: { take: 1, orderBy: { sortOrder: "asc" } },
-          },
-        },
-        buyer: {
-          select: {
-            id: true,
-            displayName: true,
-            isVerified: true,
-            avatarUrl: true,
-          },
-        },
-        seller: {
-          select: {
-            id: true,
-            displayName: true,
-            isVerified: true,
-            avatarUrl: true,
-          },
-        },
-        shipment: true,
-      },
-    });
-
-    // Update product status based on remaining quantity (no stock decrement - already done at payment)
-    if (order.productId) {
-      const product = await this.prisma.product.findUnique({
-        where: { id: order.productId },
-      });
-
-      if (product) {
-        const newStatus = getProductStatusFromQuantity(product.quantity);
-        await this.prisma.product.update({
-          where: { id: order.productId },
-          data: { status: newStatus },
-        });
-
-        // Invalidate cache
-        await this.cache.del(`products:detail:${order.productId}`);
-        await this.cache.delPattern("products:list:*");
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
+      const fresh = await tx.order.findUnique({ where: { id: orderId } });
+      if (!fresh) {
+        throw new NotFoundException(i18nMessage("server.order.notFound"));
       }
-    }
+      if (fresh.buyerId !== buyerId) {
+        throw new ForbiddenException(
+          i18nMessage("server.order.confirmForbidden"),
+        );
+      }
+      if (fresh.status !== OrderStatus.delivered) {
+        throw new BadRequestException(
+          i18nMessage("server.order.confirmOnlyDelivered"),
+        );
+      }
+      const openRefund = await tx.refundRequest.findFirst({
+        where: {
+          orderId,
+          status: {
+            in: [
+              RefundRequestStatus.pending_review,
+              RefundRequestStatus.approved,
+              RefundRequestStatus.wait_for_delivery,
+              RefundRequestStatus.return_shipment_open,
+              RefundRequestStatus.return_in_transit,
+              RefundRequestStatus.return_delivered,
+              RefundRequestStatus.disputed,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      if (openRefund) {
+        throw new BadRequestException(
+          i18nMessage("server.order.openRefundExists"),
+        );
+      }
+
+      const now = new Date();
+      const updated = await tx.order.update({
+        where: {
+          id: orderId,
+          version: fresh.version,
+        },
+        data: {
+          status: OrderStatus.completed,
+          completedAt: now,
+          buyerConfirmedAt: now,
+          buyerConfirmationType: "manual_ok",
+          version: { increment: 1 },
+        },
+        include: {
+          product: {
+            include: {
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
+            },
+          },
+          buyer: {
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
+          },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
+          },
+          shipment: true,
+        },
+      });
+      await this.commissionLedger.markEarned(orderId, tx);
+      return updated;
+    });
 
     // NOT: confirmDelivery satıcı payout'unu TETİKLEMEZ. Payout tek otoriteden
     // (releaseHoldsDue cron) ve yalnız releaseAt dolunca (=teslim+return+grace) yapılır;
     // releaseAt teslimde handleOrderDelivered ile set edilir, alıcı onayıyla değil.
     // Burada yalnız komisyon "earned" + e-Arşiv tetiklenir (muhasebe).
-
-    // Sipariş tamamlandı = komisyon "earned" işaretle (completeOrder ile aynı muhasebe).
-    // confirmDelivery doğrudan `completed`'e geçtiği için completeOrder'ı çağırmaz;
-    // bu yüzden ledger + e-Arşiv tetiğini burada da çalıştırmak ZORUNLU (yoksa fatura/mail çıkmaz).
-    await this.commissionLedger
-      .markEarned(orderId, this.prisma)
-      .catch((e: any) =>
-        this.logger.warn(
-          `confirmDelivery markEarned hatası ${orderId}: ${e?.message}`,
-        ),
-      );
 
     // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı, platform satışı → alıcı).
     // Fire-and-forget: tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
@@ -858,11 +898,45 @@ export class OrderLifecycleService {
   async autoCompleteDeliveredOrder(
     orderId: string,
   ): Promise<{ completed: boolean }> {
-    const updated = await this.prisma.order.updateMany({
-      where: { id: orderId, status: OrderStatus.delivered },
-      data: { status: OrderStatus.completed, completedAt: new Date() },
+    const completed = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { status: true, version: true },
+      });
+      if (!order || order.status !== OrderStatus.delivered) return false;
+      const openRefund = await tx.refundRequest.findFirst({
+        where: {
+          orderId,
+          status: {
+            in: [
+              RefundRequestStatus.pending_review,
+              RefundRequestStatus.approved,
+              RefundRequestStatus.wait_for_delivery,
+              RefundRequestStatus.return_shipment_open,
+              RefundRequestStatus.return_in_transit,
+              RefundRequestStatus.return_delivered,
+              RefundRequestStatus.disputed,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      if (openRefund) return false;
+
+      await tx.order.update({
+        where: { id: orderId, version: order.version },
+        data: {
+          status: OrderStatus.completed,
+          completedAt: new Date(),
+          buyerConfirmationType: "auto_timeout",
+          version: { increment: 1 },
+        },
+      });
+      await this.commissionLedger.markEarned(orderId, tx);
+      return true;
     });
-    if (updated.count === 0) return { completed: false };
+    if (!completed) return { completed: false };
     // Emniyet: teslimde kesilmemişse burada da tetikle (idempotent).
     await this.emitDeliveryRevenueInvoices(orderId);
     this.logger.log(

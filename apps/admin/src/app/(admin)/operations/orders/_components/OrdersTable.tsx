@@ -10,6 +10,7 @@ import { orderColumns } from "../_lib/columns";
 import { orderRowMenu } from "../_lib/rowActions";
 import { type OrderGroupRow, mapOrders, useOrderGroups } from "../_lib/orders";
 import { OrderGroupDetail } from "./OrderGroupDetail";
+import { useSession } from "@/context/SessionContext";
 
 /**
  * The orders table. Each placed order / checkout group is ONE row; the row
@@ -20,6 +21,7 @@ import { OrderGroupDetail } from "./OrderGroupDetail";
 export function OrdersTable() {
   const t = useTranslations();
   const router = useRouter();
+  const { user } = useSession();
   const { rows, isLoading, search, filters, sort, setSort } =
     useResourceList<any>();
 
@@ -36,10 +38,14 @@ export function OrdersTable() {
     t,
     expandedId,
     toggleRow,
-    rowMenu: orderRowMenu(t, {
-      onView: (o) => router.push(`/operations/orders/${o.orderId}`),
-      onEditStatus: (o) => setStatusOrder(o),
-    }),
+    rowMenu: orderRowMenu(
+      t,
+      {
+        onView: (o) => router.push(`/operations/orders/${o.orderId}`),
+        onEditStatus: (o) => setStatusOrder(o),
+      },
+      user.role === "super_admin" || user.role === "admin",
+    ),
   });
 
   const emptyText =

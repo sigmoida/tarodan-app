@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { PrinterIcon } from "@heroicons/react/24/outline";
+import { PrinterIcon, TruckIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
@@ -11,7 +11,10 @@ import { PartyCard } from "@/components/detail/PartyCard";
 import { Timeline } from "@/components/detail/Timeline";
 import { EscrowStatusCard } from "./_sections/EscrowStatusCard";
 import type { OrderDetail } from "./types";
-import { getOrderStatusInfo } from "./_lib/status";
+import {
+  canManuallyUpdateOrderStatus,
+  getOrderStatusInfo,
+} from "./_lib/status";
 import { printOrderInvoice } from "./_lib/printInvoice";
 import { OrderBanners } from "./_sections/OrderBanners";
 import { OrderInfoSection } from "./_sections/OrderInfoSection";
@@ -21,11 +24,16 @@ import { PaymentSection } from "./_sections/PaymentSection";
 import { ShippingSection } from "./_sections/ShippingSection";
 import { AddressSection } from "./_sections/AddressSection";
 import { StatusUpdateModal } from "./_modals/StatusUpdateModal";
+import { AddTrackingModal } from "./_modals/AddTrackingModal";
+import { useSession } from "@/context/SessionContext";
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const t = useTranslations();
+  const { user } = useSession();
   const [statusOpen, setStatusOpen] = useState(false);
+  const [trackingOpen, setTrackingOpen] = useState(false);
+  const canManageOrder = user.role === "super_admin" || user.role === "admin";
 
   return (
     <DetailPage<OrderDetail>
@@ -50,9 +58,20 @@ export default function OrderDetailPage() {
       }}
       actions={(order) => (
         <>
-          <Button variant="primary" onClick={() => setStatusOpen(true)}>
-            {t("admin.operations.orders.updateStatus")}
-          </Button>
+          {canManageOrder && canManuallyUpdateOrderStatus(order.status) && (
+            <Button variant="primary" onClick={() => setStatusOpen(true)}>
+              {t("admin.operations.orders.updateStatus")}
+            </Button>
+          )}
+          {canManageOrder && order.status === "preparing" && (
+            <Button
+              variant="primary"
+              leftIcon={<TruckIcon className="h-5 w-5" />}
+              onClick={() => setTrackingOpen(true)}
+            >
+              {t("admin.operations.orders.addTracking")}
+            </Button>
+          )}
           <Button
             variant="secondary"
             leftIcon={<PrinterIcon className="h-5 w-5" />}
@@ -129,6 +148,11 @@ export default function OrderDetailPage() {
               onClose={() => setStatusOpen(false)}
               orderId={order.id}
               currentStatus={order.status}
+            />
+            <AddTrackingModal
+              open={trackingOpen}
+              onClose={() => setTrackingOpen(false)}
+              orderId={order.id}
             />
           </>
         );

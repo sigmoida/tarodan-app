@@ -1,5 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { AnalyticsQueryDto, UpdateOrderStatusDto, ReportQueryDto } from "./dto";
+import {
+  AddOrderTrackingDto,
+  AnalyticsQueryDto,
+  UpdateOrderStatusDto,
+  ReportQueryDto,
+} from "./dto";
 import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
 import { AdminAnalyticsOrderService } from "./admin-analytics-order.service";
 import { AdminAnalyticsReportService } from "./admin-analytics-report.service";
@@ -78,7 +83,7 @@ export class AdminAnalyticsService {
   async addOrderTracking(
     adminId: string,
     orderId: string,
-    dto: { trackingNumber: string; carrier: string; trackingUrl?: string },
+    dto: AddOrderTrackingDto,
   ) {
     return this.order.addOrderTracking(adminId, orderId, dto);
   }

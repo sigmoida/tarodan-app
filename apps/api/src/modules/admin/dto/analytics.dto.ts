@@ -1,6 +1,16 @@
-import { IsOptional, IsDateString, IsEnum, IsString } from 'class-validator';
+import {
+  IsOptional,
+  IsDateString,
+  IsEnum,
+  IsString,
+  IsNotEmpty,
+  IsIn,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { OrderStatus } from '@prisma/client';
 
 export enum AnalyticsGroupBy {
   day = 'day',
@@ -19,7 +29,10 @@ export class AnalyticsQueryDto {
   @IsDateString()
   endDate?: string;
 
-  @ApiPropertyOptional({ enum: AnalyticsGroupBy, default: AnalyticsGroupBy.day })
+  @ApiPropertyOptional({
+    enum: AnalyticsGroupBy,
+    default: AnalyticsGroupBy.day,
+  })
   @IsOptional()
   @IsEnum(AnalyticsGroupBy)
   groupBy?: AnalyticsGroupBy = AnalyticsGroupBy.day;
@@ -68,7 +81,10 @@ export class UserAnalyticsResponseDto {
 }
 
 export class ReportQueryDto {
-  @ApiPropertyOptional({ description: 'Report format', enum: ['pdf', 'csv', 'json'] })
+  @ApiPropertyOptional({
+    description: 'Report format',
+    enum: ['pdf', 'csv', 'json'],
+  })
   @IsOptional()
   @IsString()
   format?: 'pdf' | 'csv' | 'json' = 'json';
@@ -85,12 +101,32 @@ export class ReportQueryDto {
 }
 
 export class UpdateOrderStatusDto {
-  @ApiProperty({ description: 'New order status' })
-  @IsString()
-  status: string;
+  @ApiProperty({ description: 'New order status', enum: OrderStatus })
+  @IsEnum(OrderStatus)
+  status: OrderStatus;
 
-  @ApiPropertyOptional({ description: 'Admin notes' })
-  @IsOptional()
+  @ApiProperty({ description: 'Admin operation reason', maxLength: 500 })
   @IsString()
-  notes?: string;
+  @IsNotEmpty()
+  @MaxLength(500)
+  notes: string;
+}
+
+export class AddOrderTrackingDto {
+  @ApiProperty({ description: 'Carrier tracking number', maxLength: 100 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  @Matches(/^[A-Za-z0-9_-]+$/)
+  trackingNumber: string;
+
+  @ApiProperty({ enum: ['surat'] })
+  @IsIn(['surat'])
+  carrier: 'surat';
+
+  @ApiProperty({ description: 'Admin operation reason', maxLength: 500 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  notes: string;
 }

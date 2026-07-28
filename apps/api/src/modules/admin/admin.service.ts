@@ -49,6 +49,7 @@ import {
   ResolveDisputeDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
+  AddOrderTrackingDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
   ElogoInvoiceQueryDto,
@@ -85,6 +86,7 @@ import {
   TicketPriority,
   TicketCategory,
   MembershipTierType,
+  OrderStatus,
 } from "@prisma/client";
 import { RefundService } from "../refund/refund.service";
 import { OrderService } from "../order/order.service";
@@ -132,12 +134,27 @@ export class AdminService {
   async forceCompleteOrder(
     orderId: string,
     adminId: string,
-    reason?: string,
+    reason: string,
   ): Promise<{ completed: boolean }> {
     if (!this.orderService) {
       throw new Error("OrderService not available");
     }
-    return this.orderService.forceComplete(orderId, adminId, reason);
+    const result = await this.orderService.forceComplete(
+      orderId,
+      adminId,
+      reason,
+    );
+    if (result.completed) {
+      await this.auditService.createAuditLog(
+        adminId,
+        "order_force_completed",
+        "Order",
+        orderId,
+        { status: OrderStatus.awaiting_buyer_confirmation },
+        { status: OrderStatus.completed, reason },
+      );
+    }
+    return result;
   }
 
   async extendOrderConfirmation(
@@ -434,7 +451,7 @@ export class AdminService {
   async addOrderTracking(
     adminId: string,
     orderId: string,
-    dto: { trackingNumber: string; carrier: string; trackingUrl?: string },
+    dto: AddOrderTrackingDto,
   ) {
     return this.analyticsService.addOrderTracking(adminId, orderId, dto);
   }

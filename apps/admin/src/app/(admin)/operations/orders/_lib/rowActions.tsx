@@ -2,6 +2,7 @@ import { EyeIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import type { RowActionItem } from "@/components/table";
 import type { OrderGroupRow } from "./orders";
+import { canManuallyUpdateOrderStatus } from "../[id]/_lib/status";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -15,7 +16,11 @@ export interface OrderRowActions {
  * (per-order status editing happens from each order's detail page); a standalone
  * order also exposes "Durum Güncelle".
  */
-export function orderRowMenu(t: T, { onView, onEditStatus }: OrderRowActions) {
+export function orderRowMenu(
+  t: T,
+  { onView, onEditStatus }: OrderRowActions,
+  canEditStatus = true,
+) {
   return (o: OrderGroupRow): RowActionItem[] => {
     const items: RowActionItem[] = [
       {
@@ -24,7 +29,7 @@ export function orderRowMenu(t: T, { onView, onEditStatus }: OrderRowActions) {
         onClick: () => onView(o),
       },
     ];
-    if (!o.isGroup) {
+    if (canEditStatus && !o.isGroup && canManuallyUpdateOrderStatus(o.status)) {
       items.push({
         label: t("admin.operations.orders.updateStatus"),
         icon: PencilSquareIcon,

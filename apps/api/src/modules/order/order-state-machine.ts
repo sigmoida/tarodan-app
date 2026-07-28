@@ -66,26 +66,17 @@ export function isOrderTransitionAllowed(
 }
 
 /**
- * Admin transition policy. Admin is privileged (can cancel/refund/force-progress
- * an active order for support) but still constrained so the generic admin status
- * setter cannot make nonsensical jumps:
- *   - terminal states (completed/cancelled/refunded) are frozen,
- *   - `paid`/`pending_payment` are payment-system-driven and never set by hand,
- *   - an unpaid order (pending_payment) may only be cancelled — never fast-forwarded
- *     to delivered/completed/refunded (nothing was paid to refund).
- * Everything else on an already-paid, non-terminal order is permitted.
+ * The generic admin setter is deliberately narrow. Money-changing transitions
+ * (cancel/refund/complete) have dedicated commands that run their stock, PSP,
+ * ledger and invoice side effects. Shipping requires a tracking command.
  */
 export function isAdminOrderTransitionAllowed(
   from: OrderStatus,
   to: OrderStatus,
 ): boolean {
   if (from === to) return true;
-  if (ORDER_TERMINAL_STATUSES.includes(from)) return false;
-  if (to === OrderStatus.pending_payment || to === OrderStatus.paid) {
-    return false;
-  }
-  if (from === OrderStatus.pending_payment) {
-    return to === OrderStatus.cancelled;
-  }
-  return true;
+  return (
+    (from === OrderStatus.paid && to === OrderStatus.preparing) ||
+    (from === OrderStatus.shipped && to === OrderStatus.delivered)
+  );
 }

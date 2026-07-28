@@ -19,14 +19,22 @@ export const operationsApi = {
   // Orders
   getOrders: (params?: any) => api.get("/admin/orders", { params }),
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
-  updateOrderStatus: (id: string, status: string) =>
-    api.patch(`/admin/orders/${id}`, { status }),
+  updateOrderStatus: (id: string, status: string, notes: string) =>
+    api.patch(`/admin/orders/${id}`, { status, notes }),
+  addOrderTracking: (
+    id: string,
+    payload: {
+      trackingNumber: string;
+      carrier: "surat";
+      notes: string;
+    },
+  ) => api.post(`/admin/orders/${id}/tracking`, payload),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
   applyOrderCoupon: (id: string, code: string | null) =>
     api.post(`/admin/orders/${id}/apply-coupon`, { code }),
   // 48h window (Phase 4A.1)
-  forceCompleteOrder: (id: string, reason?: string) =>
-    api.post(`/admin/orders/${id}/force-complete`, reason ? { reason } : {}),
+  forceCompleteOrder: (id: string, reason: string) =>
+    api.post(`/admin/orders/${id}/force-complete`, { reason }),
   extendOrderConfirmation: (
     id: string,
     payload: { hours: number; reason?: string },

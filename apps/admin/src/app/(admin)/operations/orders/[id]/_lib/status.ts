@@ -110,6 +110,19 @@ export function isPostShipping(status: string): boolean {
   return POST_SHIPPING.includes(status);
 }
 
+const ADMIN_MANUAL_STATUS_TARGETS: Record<string, readonly string[]> = {
+  paid: ["preparing"],
+  shipped: ["delivered"],
+};
+
+export function getAdminManualStatusTargets(status: string): readonly string[] {
+  return ADMIN_MANUAL_STATUS_TARGETS[status] ?? [];
+}
+
+export function canManuallyUpdateOrderStatus(status: string): boolean {
+  return getAdminManualStatusTargets(status).length > 0;
+}
+
 const SHIPPED_STATUSES = [
   "shipped",
   "delivered",

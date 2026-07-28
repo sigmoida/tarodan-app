@@ -8,15 +8,16 @@ import {
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { AdminAuditService } from "./admin-audit.service";
-import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { isAdminOrderTransitionAllowed } from "../order/order-state-machine";
-import { UpdateOrderStatusDto } from "./dto";
+import { AddOrderTrackingDto, UpdateOrderStatusDto } from "./dto";
 import { OrderStatus, ProductStatus, ShipmentStatus } from "@prisma/client";
+import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import { SearchService } from "../search/search.service";
 import { CacheService } from "../cache/cache.service";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { OrderService } from "../order/order.service";
 import { PaymentService } from "../payment/payment.service";
+import { NotificationService } from "../notification/notification.service";
 
 /**
  * Admin sipariş işlemleri (+ unbanUser kullanıcı moderasyonu) — AdminAnalyticsService'ten
@@ -39,6 +40,8 @@ export class AdminAnalyticsOrderService {
     private readonly orderService?: OrderService,
     @Optional()
     private readonly paymentService?: PaymentService,
+    @Optional()
+    private readonly notificationService?: NotificationService,
   ) {}
 
   /**
@@ -315,16 +318,7 @@ export class AdminAnalyticsOrderService {
       throw new NotFoundException("Sipariş bulunamadı");
     }
 
-    // Validate status transition
-    const validStatuses = Object.values(OrderStatus);
-    if (!validStatuses.includes(dto.status as OrderStatus)) {
-      throw new BadRequestException("Geçersiz sipariş durumu");
-    }
-
-    // Enforce the canonical state graph (F3.1): admin is privileged but still
-    // cannot make impossible jumps (e.g. pending_payment → completed) or move a
-    // terminal order. This closes the previous any-status → any-status hole.
-    const newStatus = dto.status as OrderStatus;
+    const newStatus = dto.status;
     if (!isAdminOrderTransitionAllowed(order.status, newStatus)) {
       throw new BadRequestException(
         i18nMessage("server.order.statusTransitionNotAllowed", {
@@ -334,122 +328,112 @@ export class AdminAnalyticsOrderService {
       );
     }
 
-    // Sipariş durumu elle ilerletildiğinde kargo (shipment) durumunu da senkronize et.
-    // Aksi halde web tarafında kargo kartı shipment.status'e bakıp "Satıcı hazırlıyor"
-    // gibi yanıltıcı bilgi göstermeye devam ediyor (kaynak: tutarsız shipment.status).
-    if (order.shipment) {
-      const current = order.shipment.status;
-      const isReturnFlow =
-        current === ShipmentStatus.return_in_progress ||
-        current === ShipmentStatus.returned;
-      let targetShipmentStatus: ShipmentStatus | null = null;
-
-      switch (dto.status as OrderStatus) {
-        case OrderStatus.shipped:
-          if (
-            current === ShipmentStatus.pending ||
-            current === ShipmentStatus.label_created
-          ) {
-            targetShipmentStatus = ShipmentStatus.in_transit;
-          }
-          break;
-        case OrderStatus.delivered:
-        case OrderStatus.awaiting_buyer_confirmation:
-        case OrderStatus.completed:
-          if (current !== ShipmentStatus.delivered && !isReturnFlow) {
-            targetShipmentStatus = ShipmentStatus.delivered;
-          }
-          break;
-        case OrderStatus.cancelled:
-          if (current === ShipmentStatus.pending) {
-            targetShipmentStatus = ShipmentStatus.cancelled;
-          }
-          break;
-        default:
-          break;
-      }
-
-      if (targetShipmentStatus && targetShipmentStatus !== current) {
-        await this.prisma.shipment.update({
-          where: { id: order.shipment.id },
-          data: { status: targetShipmentStatus },
-        });
-      }
+    if (order.status === newStatus) {
+      return {
+        success: true,
+        orderId,
+        previousStatus: order.status,
+        newStatus: order.status,
+        notes: dto.notes,
+        idempotent: true,
+      };
     }
 
-    // If order is being marked as completed, update product status based on remaining quantity
-    if (dto.status === OrderStatus.completed && order.productId) {
-      const product = await this.prisma.product.findUnique({
-        where: { id: order.productId },
+    let deliveryResult: Awaited<
+      ReturnType<PaymentService["handleOrderDelivered"]>
+    > | null = null;
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Carrier synchronization locks shipment before order. Keep the same order
+      // here so concurrent admin delivery and polling cannot deadlock.
+      if (newStatus === OrderStatus.delivered && order.shipment) {
+        await tx.$queryRaw`SELECT id FROM shipments WHERE id = ${order.shipment.id} FOR UPDATE`;
+      }
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
+      const fresh = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { shipment: true },
       });
-
-      if (product) {
-        const newStatus = getProductStatusFromQuantity(product.quantity);
-        await this.prisma.product.update({
-          where: { id: order.productId },
-          data: { status: newStatus },
-        });
-
-        // Invalidate cache
-        await this.cache.del(`products:detail:${order.productId}`);
-        await this.cache.delPattern("products:list:*");
+      if (!fresh) throw new NotFoundException("Sipariş bulunamadı");
+      if (!isAdminOrderTransitionAllowed(fresh.status, newStatus)) {
+        throw new BadRequestException(
+          i18nMessage("server.order.statusTransitionNotAllowed", {
+            from: fresh.status,
+            to: newStatus,
+          }),
+        );
       }
-    }
 
-    // Admin durumu ELLE ilerlettiğinde deliveredAt/completedAt de set edilmeli — aksi halde
-    // deliveredAt NULL kalıp teslim faturası cron'unu (deliveredAt bazlı tamamlama) ve raporları bozar.
-    const now = new Date();
-    const extra: any = {};
-    if (
-      (newStatus === OrderStatus.delivered ||
-        newStatus === OrderStatus.awaiting_buyer_confirmation ||
-        newStatus === OrderStatus.completed) &&
-      !order.deliveredAt
-    ) {
-      extra.deliveredAt = now;
-    }
-    // awaiting_buyer_confirmation'a ELLE geçişte confirmationDeadline de set edilmeli;
-    // yoksa auto-complete cron'u (confirmationDeadline < now filtreli) siparişi ASLA
-    // almaz → sonsuz stall. Yalnız yeni teslimde (deliveredAt taze set) uygula.
-    if (
-      newStatus === OrderStatus.awaiting_buyer_confirmation &&
-      extra.deliveredAt
-    ) {
-      extra.confirmationDeadline = new Date(
-        extra.deliveredAt.getTime() + 48 * 60 * 60 * 1000,
-      );
-    }
-    if (newStatus === OrderStatus.completed && !(order as any).completedAt) {
-      extra.completedAt = now;
-    }
-
-    // Teslim geçişinde durum güncellemesi + escrow release planlaması ATOMİK olmalı
-    // (F3.4): aksi halde deliveredAt set olup releaseAt null kalırsa PaymentHold asla
-    // serbest bırakılmaz ve satıcı HİÇ ödenmez (kurtarılamaz boşluk). Tek tx'te
-    // yaparız (scheduleHoldReleaseOnDelivery tx client kabul eder). Escrow artık
-    // best-effort değil — başarısızsa durum güncellemesi de geri alınır (fail-closed).
-    const updated = extra.deliveredAt
-      ? await this.prisma.$transaction(async (tx) => {
-          const u = await tx.order.update({
-            where: { id: orderId },
-            data: { status: newStatus, version: { increment: 1 }, ...extra },
-          });
-          if (!this.paymentService) {
-            throw new Error(
-              `PaymentService kullanılamıyor: ${orderId} teslim/escrow planlaması yapılamadı`,
-            );
-          }
-          await this.paymentService.scheduleHoldReleaseOnDelivery(
-            orderId,
-            extra.deliveredAt,
-            tx,
-          );
-          return u;
-        })
-      : await this.prisma.order.update({
-          where: { id: orderId },
-          data: { status: newStatus, version: { increment: 1 }, ...extra },
+      if (
+        fresh.status === OrderStatus.paid &&
+        newStatus === OrderStatus.preparing
+      ) {
+        return tx.order.update({
+          where: { id: fresh.id, version: fresh.version },
+          data: { status: OrderStatus.preparing, version: { increment: 1 } },
         });
+      }
+
+      if (!fresh.shipment) {
+        throw new BadRequestException(
+          "Teslim geçişi için siparişe bağlı kargo kaydı bulunamadı",
+        );
+      }
+      if (
+        !canTransitionShipmentStatus(
+          fresh.shipment.status,
+          ShipmentStatus.delivered,
+        )
+      ) {
+        throw new BadRequestException(
+          `Kargo ${fresh.shipment.status} durumundan teslim edildi durumuna geçirilemez`,
+        );
+      }
+      if (!this.paymentService) {
+        throw new Error(
+          `PaymentService kullanılamıyor: ${orderId} teslim/escrow planlaması yapılamadı`,
+        );
+      }
+
+      const deliveredAt = fresh.shipment.deliveredAt ?? new Date();
+      const shipmentUpdated = await tx.shipment.updateMany({
+        where: {
+          id: fresh.shipment.id,
+          status: fresh.shipment.status,
+        },
+        data: {
+          status: ShipmentStatus.delivered,
+          deliveredAt,
+        },
+      });
+      if (shipmentUpdated.count !== 1) {
+        throw new BadRequestException(
+          "Kargo durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
+        );
+      }
+      if (fresh.shipment.status !== ShipmentStatus.delivered) {
+        await tx.shipmentEvent.create({
+          data: {
+            shipmentId: fresh.shipment.id,
+            status: ShipmentStatus.delivered,
+            location: "Admin",
+            description: dto.notes,
+            occurredAt: deliveredAt,
+          },
+        });
+      }
+
+      deliveryResult = await this.paymentService.handleOrderDelivered(
+        orderId,
+        deliveredAt,
+        tx,
+      );
+      if (!deliveryResult.acted) {
+        throw new BadRequestException(
+          "Sipariş teslim durumu eşzamanlı olarak değişti",
+        );
+      }
+      return tx.order.findUniqueOrThrow({ where: { id: orderId } });
+    });
 
     await this.audit.createAuditLog(
       adminId,
@@ -463,12 +447,7 @@ export class AdminAnalyticsOrderService {
       },
     );
 
-    // Teslim/tamamlandıya geçince → Tarodan gelir e-Arşivlerini ANINDA kes (cron'u beklemeden).
-    // Fatura kesilmeden "tamamlandı" kalmasın. Fire-and-forget, idempotent (cut() type+sourceId tekil).
-    if (
-      newStatus === OrderStatus.delivered ||
-      newStatus === OrderStatus.completed
-    ) {
+    if (newStatus === OrderStatus.delivered) {
       void this.orderService
         ?.emitDeliveryRevenueInvoices(orderId)
         .catch((e: any) =>
@@ -476,13 +455,33 @@ export class AdminAnalyticsOrderService {
             `admin durum→fatura tetik hatası ${orderId}: ${e?.message}`,
           ),
         );
+      const delivered = deliveryResult as Awaited<
+        ReturnType<PaymentService["handleOrderDelivered"]>
+      > | null;
+      if (
+        delivered?.use48h &&
+        delivered.confirmationDeadline &&
+        delivered.buyerId
+      ) {
+        void this.notificationService
+          ?.notifyOrderDeliveredConfirm(
+            delivered.buyerId,
+            orderId,
+            delivered.confirmationDeadline,
+          )
+          .catch((e: any) =>
+            this.logger.warn(
+              `admin teslim bildirimi başarısız ${orderId}: ${e?.message}`,
+            ),
+          );
+      }
     }
 
     return {
       success: true,
       orderId,
       previousStatus: order.status,
-      newStatus: dto.status,
+      newStatus: updated.status,
       notes: dto.notes,
     };
   }
@@ -493,7 +492,7 @@ export class AdminAnalyticsOrderService {
   async addOrderTracking(
     adminId: string,
     orderId: string,
-    dto: { trackingNumber: string; carrier: string; trackingUrl?: string },
+    dto: AddOrderTrackingDto,
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -504,34 +503,99 @@ export class AdminAnalyticsOrderService {
       throw new NotFoundException("Sipariş bulunamadı");
     }
 
-    // Update or create shipment
-    let shipment;
-    if (order.shipment) {
-      shipment = await this.prisma.shipment.update({
-        where: { id: order.shipment.id },
-        data: {
-          trackingNumber: dto.trackingNumber,
-          provider: dto.carrier,
-          trackingUrl: dto.trackingUrl,
-          status: "in_transit",
-        },
-      });
-    } else {
-      shipment = await this.prisma.shipment.create({
-        data: {
-          orderId,
-          trackingNumber: dto.trackingNumber,
-          provider: dto.carrier,
-          trackingUrl: dto.trackingUrl,
-          status: "in_transit",
-        },
-      });
+    if (order.status !== OrderStatus.preparing) {
+      throw new BadRequestException(
+        i18nMessage("server.order.statusTransitionNotAllowed", {
+          from: order.status,
+          to: OrderStatus.shipped,
+        }),
+      );
     }
 
-    // Update order status to shipped
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.shipped },
+    const shippedAt = new Date();
+    const trackingUrl = `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(dto.trackingNumber)}`;
+    const shipment = await this.prisma.$transaction(async (tx) => {
+      // Existing carrier flows lock shipment before order.
+      if (order.shipment) {
+        await tx.$queryRaw`SELECT id FROM shipments WHERE id = ${order.shipment.id} FOR UPDATE`;
+      }
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
+      const fresh = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { shipment: true },
+      });
+      if (!fresh) throw new NotFoundException("Sipariş bulunamadı");
+      if (fresh.status !== OrderStatus.preparing) {
+        throw new BadRequestException(
+          "Sipariş durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
+        );
+      }
+
+      let updatedShipment;
+      if (fresh.shipment) {
+        if (
+          !canTransitionShipmentStatus(
+            fresh.shipment.status,
+            ShipmentStatus.in_transit,
+          )
+        ) {
+          throw new BadRequestException(
+            `Kargo ${fresh.shipment.status} durumundan yolda durumuna geçirilemez`,
+          );
+        }
+        const changed = await tx.shipment.updateMany({
+          where: {
+            id: fresh.shipment.id,
+            status: fresh.shipment.status,
+          },
+          data: {
+            provider: dto.carrier,
+            providerTrackingId: dto.trackingNumber,
+            trackingNumber: fresh.shipment.trackingNumber ?? dto.trackingNumber,
+            trackingUrl,
+            status: ShipmentStatus.in_transit,
+            shippedAt: fresh.shipment.shippedAt ?? shippedAt,
+          },
+        });
+        if (changed.count !== 1) {
+          throw new BadRequestException(
+            "Kargo durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
+          );
+        }
+        updatedShipment = await tx.shipment.findUniqueOrThrow({
+          where: { id: fresh.shipment.id },
+        });
+      } else {
+        updatedShipment = await tx.shipment.create({
+          data: {
+            orderId,
+            trackingNumber: dto.trackingNumber,
+            providerTrackingId: dto.trackingNumber,
+            provider: dto.carrier,
+            trackingUrl,
+            status: ShipmentStatus.in_transit,
+            shippedAt,
+          },
+        });
+      }
+
+      await tx.shipmentEvent.create({
+        data: {
+          shipmentId: updatedShipment.id,
+          status: ShipmentStatus.in_transit,
+          location: "Admin",
+          description: dto.notes,
+          occurredAt: shippedAt,
+        },
+      });
+      await tx.order.update({
+        where: { id: fresh.id, version: fresh.version },
+        data: {
+          status: OrderStatus.shipped,
+          version: { increment: 1 },
+        },
+      });
+      return updatedShipment;
     });
 
     await this.audit.createAuditLog(
@@ -543,8 +607,17 @@ export class AdminAnalyticsOrderService {
       {
         trackingNumber: dto.trackingNumber,
         carrier: dto.carrier,
+        notes: dto.notes,
       },
     );
+
+    void this.notificationService
+      ?.notifyOrderShipped(order.buyerId, orderId, dto.trackingNumber)
+      .catch((e: any) =>
+        this.logger.warn(
+          `admin kargoya verildi bildirimi başarısız ${orderId}: ${e?.message}`,
+        ),
+      );
 
     return { success: true, shipment };
   }

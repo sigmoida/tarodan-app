@@ -17,6 +17,7 @@ export {
   UserAnalyticsResponseDto,
   ReportQueryDto,
   UpdateOrderStatusDto,
+  AddOrderTrackingDto,
 } from "./analytics.dto";
 export {
   CreateTaxRegionDto,

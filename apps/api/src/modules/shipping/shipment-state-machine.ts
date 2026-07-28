@@ -7,12 +7,9 @@ import { ShipmentStatus } from "@prisma/client";
  * events or a manual re-submit could regress a shipment — e.g. `delivered →
  * picked_up`, which is money-critical because escrow release keys on `delivered`.
  *
- * Policy — intentionally permissive for in-transit states so it does NOT block
- * legitimate carrier sequences (e.g. `out_for_delivery → at_delivery_branch` on a
- * failed delivery attempt): idempotent same-status is always allowed; the terminal
- * statuses are locked — `delivered` may only proceed to the post-delivery return
- * legs, and `returned`/`cancelled` are final. This blocks the regressions the four
- * writers could otherwise apply while leaving forward/branch progress unconstrained.
+ * Carrier updates may skip intermediate states and a failed delivery may return
+ * to a branch. The explicit graph allows those branches while rejecting lifecycle
+ * regressions such as `in_transit -> pending` and leaving a return flow.
  */
 export const TERMINAL_SHIPMENT_STATUSES: ReadonlySet<ShipmentStatus> = new Set([
   ShipmentStatus.delivered,
@@ -29,21 +26,82 @@ export function canTransitionShipmentStatus(
   from: ShipmentStatus,
   to: ShipmentStatus,
 ): boolean {
-  // Idempotent replay (a re-delivered carrier event, a re-poll) is a no-op.
   if (from === to) return true;
 
-  // Delivered is terminal except for the post-delivery return legs.
-  if (from === ShipmentStatus.delivered) {
-    return (
-      to === ShipmentStatus.return_in_progress || to === ShipmentStatus.returned
-    );
-  }
-
-  // Returned / cancelled are fully terminal.
-  if (from === ShipmentStatus.returned || from === ShipmentStatus.cancelled) {
-    return false;
-  }
-
-  // Any non-terminal source may move forward or branch (failed / return / etc.).
-  return true;
+  const transitions: Record<ShipmentStatus, readonly ShipmentStatus[]> = {
+    [ShipmentStatus.pending]: [
+      ShipmentStatus.label_created,
+      ShipmentStatus.picked_up,
+      ShipmentStatus.in_transit,
+      ShipmentStatus.at_delivery_branch,
+      ShipmentStatus.out_for_delivery,
+      ShipmentStatus.delivered,
+      ShipmentStatus.failed,
+      ShipmentStatus.return_in_progress,
+      ShipmentStatus.returned,
+      ShipmentStatus.cancelled,
+    ],
+    [ShipmentStatus.label_created]: [
+      ShipmentStatus.picked_up,
+      ShipmentStatus.in_transit,
+      ShipmentStatus.at_delivery_branch,
+      ShipmentStatus.out_for_delivery,
+      ShipmentStatus.delivered,
+      ShipmentStatus.failed,
+      ShipmentStatus.return_in_progress,
+      ShipmentStatus.returned,
+      ShipmentStatus.cancelled,
+    ],
+    [ShipmentStatus.picked_up]: [
+      ShipmentStatus.in_transit,
+      ShipmentStatus.at_delivery_branch,
+      ShipmentStatus.out_for_delivery,
+      ShipmentStatus.delivered,
+      ShipmentStatus.failed,
+      ShipmentStatus.return_in_progress,
+      ShipmentStatus.returned,
+    ],
+    [ShipmentStatus.in_transit]: [
+      ShipmentStatus.at_delivery_branch,
+      ShipmentStatus.out_for_delivery,
+      ShipmentStatus.delivered,
+      ShipmentStatus.failed,
+      ShipmentStatus.return_in_progress,
+      ShipmentStatus.returned,
+    ],
+    [ShipmentStatus.at_delivery_branch]: [
+      ShipmentStatus.in_transit,
+      ShipmentStatus.out_for_delivery,
+      ShipmentStatus.delivered,
+      ShipmentStatus.failed,
+      ShipmentStatus.return_in_progress,
+      ShipmentStatus.returned,
+    ],
+    [ShipmentStatus.out_for_delivery]: [
+      ShipmentStatus.in_transit,
+      ShipmentStatus.at_delivery_branch,
+      ShipmentStatus.delivered,
+      ShipmentStatus.failed,
+      ShipmentStatus.return_in_progress,
+      ShipmentStatus.returned,
+    ],
+    [ShipmentStatus.delivered]: [
+      ShipmentStatus.return_in_progress,
+      ShipmentStatus.returned,
+    ],
+    [ShipmentStatus.failed]: [
+      ShipmentStatus.picked_up,
+      ShipmentStatus.in_transit,
+      ShipmentStatus.at_delivery_branch,
+      ShipmentStatus.out_for_delivery,
+      ShipmentStatus.delivered,
+      ShipmentStatus.return_in_progress,
+      ShipmentStatus.returned,
+      ShipmentStatus.cancelled,
+    ],
+    [ShipmentStatus.return_in_progress]: [ShipmentStatus.returned],
+    [ShipmentStatus.returned]: [],
+    [ShipmentStatus.cancelled]: [],
+  };
+  return transitions[from].includes(to);
 }
