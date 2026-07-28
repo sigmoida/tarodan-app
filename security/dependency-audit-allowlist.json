@@ -2,64 +2,16 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "ghsa": "GHSA-36qx-fr4f-26g5",
-      "package": "next",
-      "expires": "2026-10-31",
-      "reason": "Requires the planned Next.js 14 to 15 application migration; reverse-proxy controls and application-level authorization reduce exposure pending that tested upgrade."
-    },
-    {
-      "ghsa": "GHSA-8h8q-6873-q5fj",
-      "package": "next",
-      "expires": "2026-10-31",
-      "reason": "Requires the planned Next.js 14 to 15 application migration; accepted temporarily with the existing deployment boundary."
-    },
-    {
-      "ghsa": "GHSA-c4j6-fc7j-m34r",
-      "package": "next",
-      "expires": "2026-10-31",
-      "reason": "Requires the planned Next.js 14 to 15 application migration; accepted temporarily with the existing deployment boundary."
-    },
-    {
-      "ghsa": "GHSA-h25m-26qc-wcjf",
-      "package": "next",
-      "expires": "2026-10-31",
-      "reason": "Requires the planned Next.js 14 to 15 application migration; accepted temporarily with the existing deployment boundary."
-    },
-    {
-      "ghsa": "GHSA-q4gf-8mx6-v5v3",
-      "package": "next",
-      "expires": "2026-10-31",
-      "reason": "Requires the planned Next.js 14 to 15 application migration; accepted temporarily with the existing deployment boundary."
-    },
-    {
-      "ghsa": "GHSA-5528-5vmv-3xc2",
-      "package": "multer",
-      "expires": "2026-10-31",
-      "reason": "NestJS 10 pins Multer 1.x; forcing Multer 2 across the framework boundary is deferred to a tested NestJS upgrade."
-    },
-    {
-      "ghsa": "GHSA-72gw-mp4g-v24j",
-      "package": "multer",
-      "expires": "2026-10-31",
-      "reason": "NestJS 10 pins Multer 1.x; upload size/count limits and authenticated upload routes reduce exposure pending the framework upgrade."
-    },
-    {
-      "ghsa": "GHSA-v52c-386h-88mc",
-      "package": "multer",
-      "expires": "2026-10-31",
-      "reason": "NestJS 10 pins Multer 1.x; forcing a transitive major is deferred to a tested NestJS upgrade."
-    },
-    {
-      "ghsa": "GHSA-xf7r-hgr6-v32p",
-      "package": "multer",
-      "expires": "2026-10-31",
-      "reason": "NestJS 10 pins Multer 1.x; forcing a transitive major is deferred to a tested NestJS upgrade."
-    },
-    {
       "ghsa": "GHSA-mw96-cpmx-2vgc",
       "package": "rollup",
       "expires": "2026-10-31",
       "reason": "Build-time-only dependency of Sentry's Next.js tooling; await an SDK-compatible Rollup update instead of overriding its peer graph."
+    },
+    {
+      "ghsa": "GHSA-mh99-v99m-4gvg",
+      "package": "brace-expansion",
+      "expires": "2026-10-31",
+      "reason": "Build-time-only dependency of Sentry's webpack tooling; no attacker-controlled glob patterns are evaluated and forcing a transitive major would cross package compatibility boundaries."
     }
   ]
 }

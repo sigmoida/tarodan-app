@@ -33,6 +33,7 @@ const nextConfig = {
   },
   // standalone yalnızca prod build için; dev-server bu monorepo'da standalone ile takılıyor.
   output: env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   // Keep React's development checks enabled so effect and lifecycle issues are
   // caught before they reach production.
   reactStrictMode: true,
@@ -46,15 +47,9 @@ const nextConfig = {
     '@tarodan/api-client',
   ],
   experimental: {
-    outputFileTracingRoot: path.join(__dirname, '../../'),
     // Tree-shake the 112 barrel imports from @heroicons/react to per-icon
     // modules so unused icons don't ship (#102).
     optimizePackageImports: ['@heroicons/react'],
-    // Next 14.2 strictly requires a Suspense boundary around useSearchParams()
-    // during prerender. Admin pages are user-specific and exported via
-    // output: 'standalone' (server-rendered), so this strict bailout adds no
-    // safety. Disable to keep build green; if pages ever go static, revisit.
-    missingSuspenseWithCSRBailout: false,
   },
   images: {
     remotePatterns: [

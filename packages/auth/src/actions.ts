@@ -69,7 +69,10 @@ export function createAuthLogic<TUser>(
 
     if (res.ok && data?.requires2FA) return { status: "2fa" };
     if (res.ok && data?.tokens?.accessToken && data.tokens.refreshToken) {
-      session.writeTokens(data.tokens.accessToken, data.tokens.refreshToken);
+      await session.writeTokens(
+        data.tokens.accessToken,
+        data.tokens.refreshToken,
+      );
       return { status: "ok" };
     }
     if (
@@ -123,7 +126,10 @@ export function createAuthLogic<TUser>(
     const data = await res.json().catch(() => null);
 
     if (res.ok && data?.tokens?.accessToken) {
-      session.writeTokens(data.tokens.accessToken, data.tokens.refreshToken);
+      await session.writeTokens(
+        data.tokens.accessToken,
+        data.tokens.refreshToken,
+      );
       return { status: "ok" };
     }
     if (res.status === 401 || res.status === 400) {
@@ -133,7 +139,7 @@ export function createAuthLogic<TUser>(
   }
 
   async function logout(): Promise<void> {
-    const { refresh } = session.readTokens();
+    const { refresh } = await session.readTokens();
     try {
       await fetch(`${apiBaseUrl}${endpoints.logout}`, {
         method: "POST",
@@ -144,7 +150,7 @@ export function createAuthLogic<TUser>(
     } catch {
       /* ignore — we log out locally regardless */
     }
-    session.clearTokens();
+    await session.clearTokens();
   }
 
   async function forgotPassword(email: string): Promise<void> {

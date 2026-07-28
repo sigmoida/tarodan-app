@@ -82,6 +82,7 @@ const nextConfig = {
   // standalone yalnızca prod build için; Next 14.2 dev-server'ı bu monorepo'da
   // standalone ile "Starting..."da takılıyor → dev'de devre dışı bırak.
   output: env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,
   // Type-check + lint are gated in CI (`pnpm typecheck` / `pnpm lint`) and
   // locally; running the full type-check again inside `next build` OOM-killed the
@@ -108,16 +109,11 @@ const nextConfig = {
     return config;
   },
   experimental: {
-    outputFileTracingRoot: path.join(__dirname, '../../'),
     optimizePackageImports: [
       '@heroicons/react',
       '@heroicons/react/24/outline',
       '@heroicons/react/24/solid',
     ],
-    // Next 14.2 strictly requires Suspense around useSearchParams() during
-    // prerender. With output: 'standalone' (server-rendered) this strict
-    // bailout adds no real safety. Disable to keep build green.
-    missingSuspenseWithCSRBailout: false,
   },
   async headers() {
     return [

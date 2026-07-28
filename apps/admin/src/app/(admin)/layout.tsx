@@ -21,7 +21,7 @@ export default async function AdminRouteLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = headers().get("x-admin-pathname");
+  const pathname = (await headers()).get("x-admin-pathname");
   const user = await getSession();
   if (!user) redirect(expiredLoginHref("session", pathname ?? "/dashboard"));
 

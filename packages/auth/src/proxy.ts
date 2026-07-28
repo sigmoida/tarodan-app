@@ -16,7 +16,7 @@ interface ProxySession {
   clearSessionCookies?: (res: NextResponse) => void;
 }
 
-type RouteCtx = { params: { path: string[] } };
+type RouteCtx = { params: Promise<{ path: string[] }> };
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -145,11 +145,14 @@ export function createBffProxy(session: ProxySession) {
     return response;
   }
 
+  const handler = async (req: NextRequest, { params }: RouteCtx) =>
+    proxy(req, (await params).path);
+
   return {
-    GET: (req: NextRequest, { params }: RouteCtx) => proxy(req, params.path),
-    POST: (req: NextRequest, { params }: RouteCtx) => proxy(req, params.path),
-    PUT: (req: NextRequest, { params }: RouteCtx) => proxy(req, params.path),
-    PATCH: (req: NextRequest, { params }: RouteCtx) => proxy(req, params.path),
-    DELETE: (req: NextRequest, { params }: RouteCtx) => proxy(req, params.path),
+    GET: handler,
+    POST: handler,
+    PUT: handler,
+    PATCH: handler,
+    DELETE: handler,
   };
 }

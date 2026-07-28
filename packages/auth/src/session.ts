@@ -37,9 +37,9 @@ type RefreshOutcome =
   | { status: "transient" }; // network / 5xx / malformed → can't tell, keep session
 
 export interface SessionToolkit<TUser> {
-  readTokens: () => { access?: string; refresh?: string };
-  writeTokens: (access: string, refresh: string) => void;
-  clearTokens: () => void;
+  readTokens: () => Promise<{ access?: string; refresh?: string }>;
+  writeTokens: (access: string, refresh: string) => Promise<void>;
+  clearTokens: () => Promise<void>;
   refreshTokens: (
     refresh: string,
   ) => Promise<{ access: string; refresh: string } | null>;
@@ -81,16 +81,16 @@ export function createSession<TUser>(
   } = config;
   const isProd = config.isProd ?? process.env.NODE_ENV === "production";
 
-  const readTokens = () => {
-    const store = cookies();
+  const readTokens = async () => {
+    const store = await cookies();
     return {
       access: store.get(names.access)?.value,
       refresh: store.get(names.refresh)?.value,
     };
   };
 
-  const writeTokens = (access: string, refresh: string) => {
-    const store = cookies();
+  const writeTokens = async (access: string, refresh: string) => {
+    const store = await cookies();
     store.set(names.access, access, cookieOptions(ttls.accessMaxAge, isProd));
     store.set(
       names.refresh,
@@ -107,8 +107,8 @@ export function createSession<TUser>(
     }
   };
 
-  const clearTokens = () => {
-    const store = cookies();
+  const clearTokens = async () => {
+    const store = await cookies();
     store.delete(names.access);
     store.delete(names.refresh);
     if (indicatorCookie) store.delete(indicatorCookie);
@@ -170,7 +170,7 @@ export function createSession<TUser>(
     path: string,
     init: RequestInit = {},
   ): Promise<ApiFetchResult> {
-    const { access, refresh } = readTokens();
+    const { access, refresh } = await readTokens();
     const authHeaders = (token?: string) => {
       const h = new Headers(init.headers);
       if (token) h.set("Authorization", `Bearer ${token}`);
@@ -188,7 +188,7 @@ export function createSession<TUser>(
       if (outcome.status === "ok") {
         const next = outcome.tokens;
         try {
-          writeTokens(next.access, next.refresh);
+          await writeTokens(next.access, next.refresh);
         } catch {
           /* Server Component context can't write cookies; the proxy/middleware will. */
         }
@@ -238,7 +238,7 @@ export function createSession<TUser>(
   };
 
   async function getSession(): Promise<TUser | null> {
-    const { access } = readTokens();
+    const { access } = await readTokens();
     if (!access) return null;
     const res = await fetch(`${apiBaseUrl}${endpoints.profile}`, {
       headers: { Authorization: `Bearer ${access}` },

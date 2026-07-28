@@ -22,7 +22,7 @@
     "typecheck": "turbo run typecheck --filter='!@tarodan/mobile' --filter='!@tarodan/ui-native'",
     "test": "turbo run test --filter='!@tarodan/mobile' --filter='!@tarodan/ui-native'",
     "test:affected-apps": "node --test scripts/detect-affected-apps.test.mjs",
-    "test:verification-tools": "node --test scripts/detect-affected-apps.test.mjs scripts/pre-push-verify.test.mjs scripts/test-summary.test.mjs",
+    "test:verification-tools": "node --test scripts/check-dependency-audit.test.mjs scripts/detect-affected-apps.test.mjs scripts/pre-push-verify.test.mjs scripts/test-summary.test.mjs",
     "verify:watch": "node scripts/verify-local.mjs watch",
     "verify:push": "node scripts/verify-local.mjs push",
     "verify:release:local": "node scripts/verify-local.mjs release",
@@ -99,6 +99,7 @@
       "esbuild",
       "msgpackr-extract",
       "prisma",
+      "sharp",
       "unrs-resolver"
     ],
     "packageExtensions": {
@@ -109,6 +110,9 @@
       }
     },
     "overrides": {
+      "js-yaml@>=4.0.0 <4.3.0": "4.3.0",
+      "postcss@<8.5.18": "8.5.19",
+      "sharp@<0.35.0": "0.35.3",
       "fast-xml-parser": ">=5.3.4",
       "handlebars": ">=4.7.9",
       "shell-quote": ">=1.8.4",

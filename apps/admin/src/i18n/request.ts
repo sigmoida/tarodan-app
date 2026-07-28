@@ -14,7 +14,7 @@ import { getMessages, resolveLocale } from "@tarodan/i18n";
  * the `admin.*` namespace.
  */
 export default getRequestConfig(async () => {
-  const cookieLocale = cookies().get("NEXT_LOCALE")?.value;
+  const cookieLocale = (await cookies()).get("NEXT_LOCALE")?.value;
   const locale = resolveLocale(cookieLocale);
   return { locale, messages: getMessages(locale) };
 });
