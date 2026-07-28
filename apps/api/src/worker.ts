@@ -7,6 +7,7 @@ import { Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { AppModule } from "./app.module";
 import { AppNestLogger } from "./common/logging/nest-logger";
+import { redactSensitive } from "./common/security/redact-sensitive";
 
 /**
  * Initialize Sentry for the worker process (#71). The worker runs as a separate
@@ -26,6 +27,7 @@ function initWorkerSentry(logger: Logger): boolean {
     dsn,
     environment,
     tracesSampleRate: environment === "production" ? 0.2 : 1.0,
+    beforeSend: (event) => redactSensitive(event) as typeof event,
   });
   logger.log("Sentry initialized (worker)");
   return true;

@@ -675,7 +675,7 @@ export class NotificationDispatchService {
     email: string,
     templateKey: string,
     templateData: Record<string, any>,
-  ): Promise<void> {
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       const frontendUrl =
         this.configService.get("FRONTEND_URL") || "https://tarodan.com";
@@ -710,15 +710,21 @@ export class NotificationDispatchService {
         subject = getEmailTemplateSubject(templateKey, templateData);
       }
       if (this.sendGridProvider.isConfigured()) {
-        await this.sendGridProvider.sendEmail({ to: email, subject, html });
-      } else if (this.smtpProvider.isConfigured()) {
-        await this.smtpProvider.sendEmail({ to: email, subject, html });
+        return this.sendGridProvider.sendEmail({ to: email, subject, html });
       }
+      if (this.smtpProvider.isConfigured()) {
+        return this.smtpProvider.sendEmail({ to: email, subject, html });
+      }
+      return { success: false, error: "No email provider configured" };
     } catch (err) {
       this.logger.error(
         `Failed to send ${templateKey} email to ${email}:`,
         err,
       );
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Email delivery failed",
+      };
     }
   }
 

@@ -83,7 +83,7 @@ export class EmailChangeService {
 
     await this.prisma.emailChangeToken.deleteMany({ where: { userId } });
     const code = this.generateCode();
-    await this.prisma.emailChangeToken.create({
+    const created = await this.prisma.emailChangeToken.create({
       data: {
         userId,
         newEmail,
@@ -93,11 +93,19 @@ export class EmailChangeService {
     });
 
     // The code goes to the NEW address, never the current one.
-    await this.notification.sendEmailChangeCode(
+    const result = await this.notification.sendEmailChangeCode(
       newEmail,
       code,
       EmailChangeService.CODE_TTL_MS / 1000,
     );
+    if (!result.success) {
+      await this.prisma.emailChangeToken.delete({
+        where: { id: created.id },
+      });
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailChangeSendFailed"),
+      );
+    }
   }
 
   async verify(userId: string, code: string): Promise<{ email: string }> {

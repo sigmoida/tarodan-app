@@ -13,6 +13,7 @@ import { Observable, throwError } from "rxjs";
 import { catchError } from "rxjs/operators";
 import * as Sentry from "@sentry/node";
 import { getAppLogger } from "../../common/logging/logger";
+import { redactSensitive } from "../../common/security/redact-sensitive";
 
 @Injectable()
 export class SentryInterceptor implements NestInterceptor {
@@ -33,15 +34,20 @@ export class SentryInterceptor implements NestInterceptor {
     Sentry.setContext("request", {
       method,
       url,
-      params,
-      query,
-      body: this.sanitizeBody(body),
+      params: redactSensitive(params),
+      query: redactSensitive(query),
+      body: redactSensitive(body),
     });
 
     return next.handle().pipe(
       catchError((error) => {
         // Capture exception via the shared logger (bridges to SentryService, avoids double-capture)
-        const requestContext = { method, url, params, query };
+        const requestContext = redactSensitive({
+          method,
+          url,
+          params,
+          query,
+        }) as Record<string, unknown>;
 
         if (error instanceof HttpException) {
           const status = error.getStatus();
@@ -58,29 +64,5 @@ export class SentryInterceptor implements NestInterceptor {
         return throwError(() => error);
       }),
     );
-  }
-
-  /**
-   * Remove sensitive data from request body
-   */
-  private sanitizeBody(body: any): any {
-    if (!body) return body;
-
-    const sensitiveFields = [
-      "password",
-      "token",
-      "secret",
-      "apiKey",
-      "creditCard",
-    ];
-    const sanitized = { ...body };
-
-    sensitiveFields.forEach((field) => {
-      if (field in sanitized) {
-        sanitized[field] = "[REDACTED]";
-      }
-    });
-
-    return sanitized;
   }
 }

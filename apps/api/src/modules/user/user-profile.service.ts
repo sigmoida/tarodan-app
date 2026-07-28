@@ -11,6 +11,9 @@ import {
   ProductStatus,
   TradeStatus,
   OrderStatus,
+  RefundRequestStatus,
+  PayoutStatus,
+  PaymentHoldStatus,
 } from "@prisma/client";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { computeTrustScore } from "./helpers/trust-score";
@@ -414,7 +417,7 @@ export class UserProfileService {
       select: { id: true, title: true, status: true },
     });
 
-    // Check 2: Active trades (pending, accepted, shipped, received - not completed/cancelled/rejected/disputed)
+    // Check 2: every non-terminal legacy and escrow trade state.
     const activeTrades = await this.prisma.trade.findMany({
       where: {
         OR: [{ initiatorId: userId }, { receiverId: userId }],
@@ -427,13 +430,20 @@ export class UserProfileService {
             TradeStatus.both_shipped,
             TradeStatus.initiator_received,
             TradeStatus.receiver_received,
+            TradeStatus.awaiting_payment,
+            TradeStatus.shipping_to_warehouse,
+            TradeStatus.at_warehouse,
+            TradeStatus.admin_reviewing,
+            TradeStatus.shipping_to_recipients,
+            TradeStatus.returning,
+            TradeStatus.disputed,
           ],
         },
       },
       select: { id: true, tradeNumber: true, status: true },
     });
 
-    // Check 3: Pending orders (as buyer or seller)
+    // Check 3: every order state with an unfinished fulfilment/refund obligation.
     const pendingOrders = await this.prisma.order.findMany({
       where: {
         OR: [{ buyerId: userId }, { sellerId: userId }],
@@ -444,10 +454,58 @@ export class UserProfileService {
             OrderStatus.preparing,
             OrderStatus.shipped,
             OrderStatus.delivered,
+            OrderStatus.awaiting_buyer_confirmation,
+            OrderStatus.refund_requested,
           ],
         },
       },
       select: { id: true, orderNumber: true, status: true },
+    });
+
+    const openRefunds = await this.prisma.refundRequest.findMany({
+      where: {
+        OR: [
+          { requesterId: userId },
+          { order: { OR: [{ buyerId: userId }, { sellerId: userId }] } },
+        ],
+        status: {
+          in: [
+            RefundRequestStatus.pending_review,
+            RefundRequestStatus.approved,
+            RefundRequestStatus.wait_for_delivery,
+            RefundRequestStatus.return_shipment_open,
+            RefundRequestStatus.return_in_transit,
+            RefundRequestStatus.return_delivered,
+            RefundRequestStatus.disputed,
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    const pendingPayouts = await this.prisma.payoutTransfer.findMany({
+      where: {
+        sellerId: userId,
+        status: {
+          in: [
+            PayoutStatus.pending,
+            PayoutStatus.processing,
+            PayoutStatus.retry_pending,
+            PayoutStatus.returned,
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    const openPaymentHolds = await this.prisma.paymentHold.findMany({
+      where: {
+        sellerId: userId,
+        status: {
+          in: [PaymentHoldStatus.held, PaymentHoldStatus.released],
+        },
+      },
+      select: { id: true, status: true },
     });
 
     // Build blocking reasons as catalog payloads; AllExceptionsFilter renders
@@ -479,6 +537,30 @@ export class UserProfileService {
       );
     }
 
+    if (openRefunds.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedOpenRefunds", {
+          count: openRefunds.length,
+        }),
+      );
+    }
+
+    if (pendingPayouts.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedPendingPayouts", {
+          count: pendingPayouts.length,
+        }),
+      );
+    }
+
+    if (openPaymentHolds.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedPaymentHolds", {
+          count: openPaymentHolds.length,
+        }),
+      );
+    }
+
     if (errors.length > 0) {
       throw new BadRequestException({
         ...i18nMessage("server.user.deleteAccountBlocked"),
@@ -487,6 +569,9 @@ export class UserProfileService {
           activeProducts: activeProducts.length,
           activeTrades: activeTrades.length,
           pendingOrders: pendingOrders.length,
+          openRefunds: openRefunds.length,
+          pendingPayouts: pendingPayouts.length,
+          openPaymentHolds: openPaymentHolds.length,
         },
       });
     }

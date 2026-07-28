@@ -8,6 +8,7 @@ import * as Sentry from "@sentry/node";
 import { SentryService } from "./sentry.service";
 import { SentryInterceptor } from "./sentry.interceptor";
 import { initAppLogger } from "../../common/logging/logger";
+import { redactSensitive } from "../../common/security/redact-sensitive";
 
 @Global()
 @Module({
@@ -39,12 +40,12 @@ export class SentryModule implements OnModuleInit {
         // Sentry v8's default Node integrations include inbound and outbound
         // HTTP instrumentation; no deprecated @sentry/tracing shim is needed.
         // Filter out health check endpoints
-        beforeSend(event, hint) {
+        beforeSend(event) {
           const request = event.request;
           if (request?.url?.includes("/health")) {
             return null;
           }
-          return event;
+          return redactSensitive(event) as typeof event;
         },
         // Capture user context
         beforeBreadcrumb(breadcrumb) {
@@ -54,7 +55,7 @@ export class SentryModule implements OnModuleInit {
           ) {
             return null;
           }
-          return breadcrumb;
+          return redactSensitive(breadcrumb) as typeof breadcrumb;
         },
       });
       initAppLogger(this.sentryService);

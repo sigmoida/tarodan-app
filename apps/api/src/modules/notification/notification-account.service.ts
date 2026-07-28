@@ -288,7 +288,7 @@ export class NotificationAccountService {
     code: string,
     ttlSeconds: number,
   ) {
-    await this.dispatch.sendTemplateEmailToAddress(
+    return this.dispatch.sendTemplateEmailToAddress(
       email,
       "guest-checkout-otp",
       {
@@ -296,17 +296,15 @@ export class NotificationAccountService {
         expiresInMinutes: Math.ceil(ttlSeconds / 60),
       },
     );
-    return { success: true };
   }
 
   /**
    * E-posta değişikliği — 6 haneli aktivasyon kodunu YENİ adrese gönderir.
    */
   async sendEmailChangeCode(email: string, code: string, ttlSeconds: number) {
-    await this.dispatch.sendTemplateEmailToAddress(email, "email-change-otp", {
+    return this.dispatch.sendTemplateEmailToAddress(email, "email-change-otp", {
       code,
       expiresInMinutes: Math.ceil(ttlSeconds / 60),
     });
-    return { success: true };
   }
 }
