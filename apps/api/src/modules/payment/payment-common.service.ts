@@ -441,7 +441,7 @@ export class PaymentCommonService {
    * Payment'a merchant_oid (providerConversationId) atar — PayTR çağrısı YAPMAZ.
    * iframe kaldırıldıktan sonra ödeme niyeti (initiate) bir conversation id taşımalı ki
    * gelen callback eşleşebilsin ve reconciliation çalışsın. Eski oid'i merchantOidHistory'e
-   * taşır (kullanıcı eski oid'le öderse callback yine eşleşir). process-direct daha sonra
+   * taşır (kullanıcı eski oid'le öderse callback yine eşleşir). direct-form daha sonra
    * kendi oid'iyle bunu tazeler (aynı history mantığı).
    */
   /**

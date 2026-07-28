@@ -307,7 +307,7 @@ export class PaymentInitiationService {
       };
     }
 
-    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/direct-form ile.
     await this.paymentCommon.assignMerchantOid(
       payment.id,
       String(group.groupNumber || group.id),
@@ -340,36 +340,18 @@ export class PaymentInitiationService {
   }
 
   /**
-   * PayTR Direct API ile kart ödemesi — TÜM kullanıcılar için TEK ödeme yolu.
-   * (iframe kaldırıldı; misafir + üye aynı site-içi kart formundan öder.)
-   *
-   * Güvenlik:
-   * - Kart no/CVV YALNIZCA bu istekte PayTR'a iletilir; DB'ye/log'a ASLA yazılmaz.
-   * - Yeni kart 3D Secure ile (non3d=false). Yanıt 3DS HTML'i; kesin sonuç callback ile işlenir.
-   * - storeCard yalnız giriş yapmış kullanıcı + PAYTR_RECURRING_ENABLED açıkken (Non3D yetkisi).
-   *
-   * Hedef: orderId (satın alma/üyelik/tekliften order) | checkoutGroupId (sepet) | tradeId (takas
-   * nakit farkı). Kart: (a) yeni kart → 3D/CIT (createDirectPayment, storeCard ile saklanabilir)
-   * VEYA (b) kayıtlı kart → kayıtlı-karttan-ödeme servisi (capiPaymentByRegisteredCard, Non3D;
-   * require_cvv ise CVV ile). Recurring servisi yalnız kullanıcısız oto-yenilemede kullanılır.
-   *
-   * Kayıtlı kart (Flow B) + kart saklama, PayTR'nin Non3D/Tekrarlayan Ödeme yetkisine bağlıdır;
-   * PAYTR_RECURRING_ENABLED arkasındadır. Yetki gelene kadar yalnız yeni-kart 3D yolu canlıdır.
+   * PayTR Direct API için doğrulanmış ve imzalı POST formunu hazırlar.
+   * PAN/CVV API'ye gelmez; istemci yalnız bu yanıttaki alanlara kart alanlarını
+   * ekleyip formu doğrudan PayTR'ye gönderir. Kesin sonuç callback ile işlenir.
    */
-  async processDirectPayment(
+  async prepareDirectPayment(
     userId: string | null,
     dto: DirectPaymentDto,
     req?: Request,
     capabilityAuthorized = false,
   ) {
-    if (!dto.card && !dto.savedCardId) {
-      throw new BadRequestException(
-        i18nMessage("server.payment.cardOrSavedCardRequired"),
-      );
-    }
-
-    const recurringEnabled =
-      this.configService.get("PAYTR_RECURRING_ENABLED") === "true";
+    const cardStorageEnabled =
+      this.configService.get("PAYTR_CARD_STORAGE_ENABLED") === "true";
 
     // Kayıtlı kart yalnız giriş yapmış kullanıcıya aittir.
     if (dto.savedCardId && !userId) {
@@ -377,8 +359,8 @@ export class PaymentInitiationService {
         i18nMessage("server.payment.loginRequiredForSavedCard"),
       );
     }
-    // Kayıtlı kartla ödeme PayTR Non3D yetkisine bağlı → flag kapalıyken kullanılamaz.
-    if (dto.savedCardId && !recurringEnabled) {
+    // Kart saklama/kayıtlı kart özellikleri mağaza yetkisi doğrulanmadan açılmaz.
+    if (dto.savedCardId && !cardStorageEnabled) {
       throw new GoneException(
         i18nMessage("server.payment.savedCardPaymentUnavailable"),
       );
@@ -401,7 +383,7 @@ export class PaymentInitiationService {
     );
 
     try {
-      return await this.chargeDirectPayment(
+      return await this.buildDirectPaymentForm(
         dto,
         {
           payment,
@@ -414,9 +396,8 @@ export class PaymentInitiationService {
         userId,
       );
     } finally {
-      // H2: çekim tamamlandı — `processing` claim'ini bırak, `pending`'e döndür ki
-      // async PayTR callback ödemeyi tamamlayabilsin (CAS `pending` bekler). Yalnız
-      // hâlâ `processing` ise dokun: bu sırada hızlı callback completed yaptıysa ezme.
+      // Form hazırlama tamamlandı — `processing` claim'ini bırak, `pending`'e
+      // döndür ki asenkron PayTR callback ödemeyi tamamlayabilsin.
       await this.prisma.payment
         .updateMany({
           where: { id: payment.id, status: PaymentStatus.processing },
@@ -427,11 +408,11 @@ export class PaymentInitiationService {
   }
 
   /**
-   * processDirectPayment'ın çekim gövdesi. `processing`'e claim edilmiş payment
-   * üzerinde PayTR çekimini yapar (yeni kart 3D / kayıtlı kart recurring).
-   * Claim bırakma (processing→pending) çağıran processDirectPayment'ın finally'sinde.
+   * `processing` claim'i altındaki payment için PayTR Direct API formunu üretir.
+   * Bu metot sağlayıcıya ödeme isteği atmaz ve ham kart verisi kabul etmez.
+   * Claim bırakma (processing→pending) çağıran prepareDirectPayment'ın finally'sinde.
    */
-  private async chargeDirectPayment(
+  private async buildDirectPaymentForm(
     dto: DirectPaymentDto,
     ctx: {
       payment: any;
@@ -457,15 +438,12 @@ export class PaymentInitiationService {
       amount,
       successQueryParams,
     } = ctx;
-    const recurringEnabled =
-      this.configService.get("PAYTR_RECURRING_ENABLED") === "true";
+    const cardStorageEnabled =
+      this.configService.get("PAYTR_CARD_STORAGE_ENABLED") === "true";
 
-    // Flow B — KAYITLI KARTLA ÖDEME: kullanıcı MEVCUT (CIT) olduğundan PayTR'nin "kayıtlı
-    // karttan ödeme" servisiyle (capiPaymentByRegisteredCard) yapılır — recurring_payment
-    // GÖNDERİLMEZ (o merchant-initiated tekrarlayan çekim içindir; kullanıcı-mevcut bir
-    // ödemede yanlış işaretlemek 3DS muafiyeti/itiraz sorumluluğu açısından hatalıdır).
-    // non3d=true → mevcut senkron Non3D UX'i korunur; require_cvv ise CVV zorunlu.
-    // Sonuç callback ile kesinleşir (success/wait_callback) — sipariş/escrow ortak yoldan akar.
+    // Flow B — kayıtlı kart: tokenlar yalnız kullanıcı sahipliği doğrulandıktan
+    // sonra doğrudan PayTR'ye gönderilecek forma eklenir. Kullanıcı-mevcut ödeme
+    // olduğundan recurring_payment kullanılmaz ve checkout 3D Secure kalır.
     if (dto.savedCardId) {
       const saved = await this.prisma.savedCard.findFirst({
         where: {
@@ -478,77 +456,57 @@ export class PaymentInitiationService {
         throw new NotFoundException(
           i18nMessage("server.payment.savedCardNotFound"),
         );
-      if (saved.requireCvv && !dto.cvv) {
-        throw new BadRequestException(
-          i18nMessage("server.payment.cvvRequiredForCard"),
-        );
-      }
-      const r = await this.paymentProviders
+      const form = await this.paymentProviders
         .resolve()
-        .capiPaymentByRegisteredCard({
-          utoken: saved.utoken,
-          ctoken: saved.ctoken,
-          amount,
-          merchantOid,
-          buyer,
-          basketItems,
-          requireCvv: saved.requireCvv,
-          cvv: dto.cvv,
-          non3d: true,
+        .createDirectPaymentForm(merchantOid, amount, buyer, basketItems, {
           successQueryParams,
+          savedCard: {
+            utoken: saved.utoken,
+            ctoken: saved.ctoken,
+            requireCvv: saved.requireCvv,
+          },
         });
-      if (r.status === "failed") {
-        await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: { failureReason: r.reason || "Kayıtlı kartla ödeme başarısız" },
-        });
-      }
-      // Gözlemlenebilirlik: kayıtlı-kart (CIT) çekiminin SENKRON yanıtını kaydet.
-      // KRİTİK: senkron `failed` (ör. kart kapalı) HİÇBİR callback üretmez — bu olay
-      // yalnızca burada yakalanır; aksi halde denetim izinde görünmez olurdu.
       await this.providerEvents.record({
         eventType: "direct_payment",
         merchantOid,
         paymentId: payment.id,
-        status: r.status,
+        status: "pending",
         paymentType: "card",
         amount,
         totalAmount: amount,
-        failedReasonMsg: r.status === "failed" ? (r.reason ?? null) : null,
-        raw: { savedCard: true, ...(r.raw ?? {}) },
+        raw: { savedCard: true, formPrepared: true },
       });
       return {
         paymentId: payment.id,
-        threeDSHtml: r.threeDSHtml ?? null,
-        status: r.status,
-        reason: r.reason ?? null,
+        ...form,
+        savedCard: true,
+        status: "pending" as const,
       };
     }
 
-    // Flow A — YENİ KART (CIT): 3D ile (non3d=false). storeCard yalnız giriş yapmış kullanıcı +
-    // Non3D yetkisi (PAYTR_RECURRING_ENABLED) açıkken; aksi halde saklanan kart kullanılamaz.
-    if (!dto.card)
-      throw new BadRequestException(
-        i18nMessage("server.payment.cardInfoRequired"),
-      );
-    const storeCard = !!dto.saveCard && !!userId && recurringEnabled;
-    const result = await this.paymentProviders.resolve().createDirectPayment(
-      merchantOid,
-      amount,
-      {
-        number: dto.card.cardNumber,
-        expireMonth: dto.card.expireMonth,
-        expireYear: dto.card.expireYear,
-        cvv: dto.card.cvc,
-        holderName: dto.card.cardHolderName,
-      },
-      buyer,
-      basketItems,
-      { non3d: false, storeCard, successQueryParams },
-    );
+    // Flow A — yeni kart: store_card yalnız giriş yapmış kullanıcı ve açık
+    // PayTR CAPI yetkisiyle eklenir. Kullanıcının mevcut utoken'ı varsa yeni
+    // kart aynı PayTR kullanıcı grubuna bağlanır.
+    const storeCard = !!dto.saveCard && !!userId && cardStorageEnabled;
+    const existingCard = storeCard
+      ? await this.prisma.savedCard.findFirst({
+          where: {
+            userId: userId as string,
+            provider: "paytr",
+            status: SavedCardStatus.active,
+          },
+          select: { utoken: true },
+        })
+      : null;
+    const form = await this.paymentProviders
+      .resolve()
+      .createDirectPaymentForm(merchantOid, amount, buyer, basketItems, {
+        storeCard,
+        utoken: existingCard?.utoken,
+        successQueryParams,
+      });
 
-    // Gözlemlenebilirlik: Direkt API (CIT yeni kart) başlatıldı → 3DS'e yönlendirilecek.
-    // Nihai sonuç callback ile kesinleşir (orada ayrıca kaydedilir). 3DS HTML SAKLANMAZ.
+    // Yalnız form hazırlama olayını kaydet; kart alanları bu servise ulaşmaz.
     await this.providerEvents.record({
       eventType: "direct_payment",
       merchantOid,
@@ -557,12 +515,13 @@ export class PaymentInitiationService {
       paymentType: "card",
       amount,
       totalAmount: amount,
-      raw: { threeDS: !!(result as any).threeDSHtml, storeCard },
+      raw: { formPrepared: true, storeCard },
     });
 
     return {
       paymentId: payment.id,
-      threeDSHtml: (result as any).threeDSHtml ?? null,
+      ...form,
+      savedCard: false,
       status: "pending" as const,
     };
   }
@@ -986,10 +945,10 @@ export class PaymentInitiationService {
       oidHistory.push(payment.providerConversationId);
     }
     // H2: ÇİFT-ÇEKİM YARIŞI KORUMASI. Bu payment satırını PayTR çekiminden ÖNCE
-    // atomik olarak `processing`'e CLAIM et. Eşzamanlı ikinci bir process-direct
+    // atomik olarak `processing`'e CLAIM et. Eşzamanlı ikinci bir direct-form
     // (aynı payment satırı, ör. çift tıklama) status'ü `pending`/`failed` BULAMAZ
     // (zaten `processing`) → claim count===0 → reddedilir, ikinci PayTR çekimi
-    // yapılmaz. Çekim bitince processDirectPayment status'ü tekrar `pending`'e çeker
+    // yapılmaz. Çekim bitince prepareDirectPayment status'ü tekrar `pending`'e çeker
     // (callback CAS'ı `pending` bekler). Önceki kod burada koşulsuz `pending` yazıyordu
     // → guard ile gerçek çekim arasında kilit yoktu, iki eşzamanlı çekim mümkündü.
     const claimed = await this.prisma.payment.updateMany({
@@ -1153,7 +1112,7 @@ export class PaymentInitiationService {
         );
       }
 
-      // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+      // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/direct-form ile.
       await this.paymentCommon.assignMerchantOid(
         existingPayment.id,
         `TRADE-${trade.tradeNumber}`,
@@ -1207,7 +1166,7 @@ export class PaymentInitiationService {
       };
     }
 
-    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/direct-form ile.
     await this.paymentCommon.assignMerchantOid(
       payment.id,
       `TRADE-${trade.tradeNumber}`,
@@ -1296,7 +1255,7 @@ export class PaymentInitiationService {
         };
       }
 
-      // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+      // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/direct-form ile.
       await this.paymentCommon.assignMerchantOid(
         existingPayment.id,
         String(order.orderNumber || order.id),
@@ -1447,7 +1406,7 @@ export class PaymentInitiationService {
       };
     }
 
-    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/direct-form ile.
     await this.paymentCommon.assignMerchantOid(
       payment.id,
       String(order.orderNumber || order.id),

@@ -3044,7 +3044,7 @@
       "title": "Ödeme tamamlanınca üyelik aktive olur",
       "tur": "Happy path / Para",
       "pri": "P0",
-      "steps": "1. useBypass=true ise POST http://localhost:3001/api/payments/:id/bypass-complete; değilse POST /payments/process-direct test kartıyla. 2. GET /membership/me.",
+      "steps": "1. useBypass=true ise POST http://localhost:3001/api/payments/:id/bypass-complete; değilse POST /payments/direct-form test kartıyla. 2. GET /membership/me.",
       "exp": "Ödeme sonrası status=active, pendingPayment YOK; sipariş completed; MembershipPayment.status=completed; satıcının boost'suz aktif ilanları rankTier=1. GET /me efektif tier=premium.",
       "gap": false,
       "gapRefs": []
@@ -11468,7 +11468,7 @@
       "title": "Üye yeni kartla ödeme başlatır (mutlu yol, 3DS HTML döner)",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. POST /api/payments/process-direct (Bearer deniz) gövde: { \"orderId\": \" \", \"card\": { \"cardHolderName\":\"TEST KART\",\"cardNumber\":\"4355084355084358\",\"expireMonth\":\"12\",\"expireYear\":\"30\",\"cvc\":\"000\" } }. 2. Yanıttaki paymentId ile DB'de payments satırını kontrol et.",
+      "steps": "1. POST /api/payments/direct-form (Bearer deniz) gövde: { \"orderId\": \" \", \"card\": { \"cardHolderName\":\"TEST KART\",\"cardNumber\":\"4355084355084358\",\"expireMonth\":\"12\",\"expireYear\":\"30\",\"cvc\":\"000\" } }. 2. Yanıttaki paymentId ile DB'de payments satırını kontrol et.",
       "exp": "HTTP 201; yanıtta paymentId dolu, status:\"pending\", threeDSHtml 3DS form HTML'i (mock ortamda boş/null olabilir ama status pending). DB: payment.status=pending, payment.providerConversationId dolu (merchant_oid).",
       "gap": false,
       "gapRefs": []
@@ -11481,7 +11481,7 @@
       "title": "Misafir, misafir siparişini yeni kartla öder (auth gerekmez)",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. Auth header OLMADAN POST /api/payments/process-direct { \"orderId\":\" \", \"card\": {...test kart...} }.",
+      "steps": "1. Auth header OLMADAN POST /api/payments/direct-form { \"orderId\":\" \", \"card\": {...test kart...} }.",
       "exp": "HTTP 201; paymentId dolu; PayTR direct çağrısı 1 kez yapılır.",
       "gap": false,
       "gapRefs": []
@@ -11494,7 +11494,7 @@
       "title": "Kart ve kayıtlı kart ikisi de yoksa 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P0",
-      "steps": "1. POST /api/payments/process-direct { \"orderId\":\" \" } (kart/savedCardId YOK).",
+      "steps": "1. POST /api/payments/direct-form { \"orderId\":\" \" } (kart/savedCardId YOK).",
       "exp": "HTTP 400, mesaj \"Kart bilgisi veya kayıtlı kart seçimi zorunludur.\"; PayTR çağrılmaz.",
       "gap": false,
       "gapRefs": []
@@ -11520,7 +11520,7 @@
       "title": "saveCard + recurring AÇIK → store_card=true",
       "tur": "Happy path",
       "pri": "P1",
-      "steps": "1. POST /api/payments/process-direct { orderId, card:{...}, saveCard:true }.",
+      "steps": "1. POST /api/payments/direct-form { orderId, card:{...}, saveCard:true }.",
       "exp": "HTTP 201; PayTR direct çağrısında store_card=1 (mock: directPaymentCalls[0].storeCard=true).",
       "gap": false,
       "gapRefs": []
@@ -11533,7 +11533,7 @@
       "title": "saveCard ama recurring KAPALI → yine ödenir, store_card=false",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
-      "steps": "1. process-direct { orderId, card:{...}, saveCard:true }.",
+      "steps": "1. direct-form { orderId, card:{...}, saveCard:true }.",
       "exp": "HTTP 201; storeCard=false (kart saklanmaz).",
       "gap": false,
       "gapRefs": []
@@ -11546,7 +11546,7 @@
       "title": "saveCard belirtilmezse store_card=false",
       "tur": "Sınır değer",
       "pri": "P2",
-      "steps": "1. process-direct { orderId, card:{...} } (saveCard yok).",
+      "steps": "1. direct-form { orderId, card:{...} } (saveCard yok).",
       "exp": "HTTP 201; storeCard=false.",
       "gap": false,
       "gapRefs": []
@@ -11559,7 +11559,7 @@
       "title": "Kayıtlı kartla ödeme (recurring AÇIK, success, 3DS yok)",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. POST /api/payments/process-direct (Bearer deniz) { orderId, savedCardId:\" \" }.",
+      "steps": "1. POST /api/payments/direct-form (Bearer deniz) { orderId, savedCardId:\" \" }.",
       "exp": "HTTP 201; status:\"success\", threeDSHtml:null; recurring çağrısı 1 kez (utoken/ctoken kartınki); yeni-kart createDirectPayment ÇAĞRILMAZ.",
       "gap": false,
       "gapRefs": []
@@ -11572,7 +11572,7 @@
       "title": "Recurring KAPALI iken kayıtlı kartla ödeme 410",
       "tur": "Negatif/Doğrulama",
       "pri": "P0",
-      "steps": "1. process-direct { orderId, savedCardId:\" \" }.",
+      "steps": "1. direct-form { orderId, savedCardId:\" \" }.",
       "exp": "HTTP 410 Gone, mesaj \"Kayıtlı kartla ödeme şu an kullanılamıyor. Lütfen kart bilgilerinizi girin.\"; recurring çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -11585,7 +11585,7 @@
       "title": "Misafir kayıtlı kart kullanamaz (403)",
       "tur": "Yetki (Authz)",
       "pri": "P0",
-      "steps": "1. Auth header OLMADAN process-direct { orderId, savedCardId:\" \" }.",
+      "steps": "1. Auth header OLMADAN direct-form { orderId, savedCardId:\" \" }.",
       "exp": "HTTP 403 \"Kayıtlı kartla ödeme için giriş yapmanız gerekiyor\"; recurring çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -11598,7 +11598,7 @@
       "title": "Başkasının kayıtlı kartıyla ödeyemez (404)",
       "tur": "Yetki (Authz) / Güvenlik",
       "pri": "P0",
-      "steps": "1. process-direct (Bearer deniz) { orderId, savedCardId:\" \" }.",
+      "steps": "1. direct-form (Bearer deniz) { orderId, savedCardId:\" \" }.",
       "exp": "HTTP 404 \"Kayıtlı kart bulunamadı\"; recurring çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -11611,7 +11611,7 @@
       "title": "require_cvv kartta CVV yoksa 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
-      "steps": "1. process-direct (Bearer deniz) { orderId, savedCardId:\" \" } (cvv YOK).",
+      "steps": "1. direct-form (Bearer deniz) { orderId, savedCardId:\" \" } (cvv YOK).",
       "exp": "HTTP 400 \"Bu kart için CVV gereklidir\"; recurring çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -11624,7 +11624,7 @@
       "title": "Kayıtlı kartla ödeme başarısız → status=failed + failureReason",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
-      "steps": "1. process-direct { orderId, savedCardId:\" \" }. 2. DB'de payment satırını kontrol et.",
+      "steps": "1. direct-form { orderId, savedCardId:\" \" }. 2. DB'de payment satırını kontrol et.",
       "exp": "HTTP 201, yanıt status:\"failed\"; payment.failureReason \"Kart kapalı\" içerir.",
       "gap": false,
       "gapRefs": []
@@ -11728,7 +11728,7 @@
       "title": "Y8: eski merchant_oid ile gelen callback (oid history) eşleşir",
       "tur": "Sınır değer",
       "pri": "P1",
-      "steps": "1. process-direct (1. kez) → oid1 atanır. 2. Tekrar process-direct (2. kez) → oid2 atanır, oid1 history'ye eklenir. 3. callback/paytr merchant_oid=oid1 (eski) geçerli imzalı success ile gönder.",
+      "steps": "1. direct-form (1. kez) → oid1 atanır. 2. Tekrar direct-form (2. kez) → oid2 atanır, oid1 history'ye eklenir. 3. callback/paytr merchant_oid=oid1 (eski) geçerli imzalı success ile gönder.",
       "exp": "Ödeme eski oid ile eşleşip tamamlanır; \"OK\".",
       "gap": false,
       "gapRefs": []
@@ -11738,10 +11738,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Önceki deneme PayTR'da ödendiyse ikinci process-direct çift çekmez (durum-sorgu)",
+      "title": "Önceki deneme PayTR'da ödendiyse ikinci direct-form çift çekmez (durum-sorgu)",
       "tur": "Idempotency",
       "pri": "P0",
-      "steps": "1. process-direct (1. kez) → 201, oid atanır. 2. PayTR durum-sorgu mock'unu ödendi yap. 3. process-direct (2. kez, aynı sipariş).",
+      "steps": "1. direct-form (1. kez) → 201, oid atanır. 2. PayTR durum-sorgu mock'unu ödendi yap. 3. direct-form (2. kez, aynı sipariş).",
       "exp": "2. çağrı HTTP 400 \"Bu ödeme zaten alınmış görünüyor...\"; PayTR direct çağrısı toplam 1 (çift çekim YOK); payment completed.",
       "gap": false,
       "gapRefs": []
@@ -11751,10 +11751,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Eşzamanlı iki process-direct (H2): biri 201, biri 400",
+      "title": "Eşzamanlı iki direct-form (H2): biri 201, biri 400",
       "tur": "Eşzamanlılık",
       "pri": "P0",
-      "steps": "1. Aynı anda iki process-direct (aynı orderId, aynı kart) gönder.",
+      "steps": "1. Aynı anda iki direct-form (aynı orderId, aynı kart) gönder.",
       "exp": "Durum kodları sıralı [201, 400]; 400 mesajı \"Bu ödeme şu anda işleniyor...\"; PayTR direct çağrısı = 1.",
       "gap": false,
       "gapRefs": []
@@ -11767,7 +11767,7 @@
       "title": "Çekim bittikten sonra tekrar deneme mümkün (claim pending'e bırakılır)",
       "tur": "Idempotency",
       "pri": "P1",
-      "steps": "1. process-direct → 201; DB'de payment kontrol. 2. Tekrar process-direct (seri).",
+      "steps": "1. direct-form → 201; DB'de payment kontrol. 2. Tekrar direct-form (seri).",
       "exp": "İlk çağrı sonrası payment.status=pending; ikinci çağrı 201; PayTR direct çağrısı = 2.",
       "gap": false,
       "gapRefs": []
@@ -11819,7 +11819,7 @@
       "title": "24h içinde retry → rezervasyon CAS ile geri alınır, ödeme tamamlanır",
       "tur": "Happy path (alternatif yol)",
       "pri": "P0",
-      "steps": "1. process-direct { orderId, card:{...} }. 2. DB: rezervasyon geri alınmış mı? 3. Geçerli success callback gönder.",
+      "steps": "1. direct-form { orderId, card:{...} }. 2. DB: rezervasyon geri alınmış mı? 3. Geçerli success callback gönder.",
       "exp": "reservedQuantity=1, reservationReleasedAt=null; callback sonrası sipariş paid/preparing; product.quantity=0.",
       "gap": false,
       "gapRefs": []
@@ -12323,10 +12323,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Grup ödemesi: process-direct(checkoutGroupId) → PayTR çağrılır, payment gruba bağlı",
+      "title": "Grup ödemesi: direct-form(checkoutGroupId) → PayTR çağrılır, payment gruba bağlı",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. POST /api/payments/process-direct { checkoutGroupId, card:{...} }.",
+      "steps": "1. POST /api/payments/direct-form { checkoutGroupId, card:{...} }.",
       "exp": "HTTP 201; PayTR direct çağrısı = 1; payment.checkoutGroupId eşleşir; gönderilen tutar = payment.amount ≥ 400.",
       "gap": false,
       "gapRefs": []
@@ -12339,7 +12339,7 @@
       "title": "Grup: bir sipariş pending_payment değilse 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
-      "steps": "1. process-direct { checkoutGroupId, card:{...} }.",
+      "steps": "1. direct-form { checkoutGroupId, card:{...} }.",
       "exp": "HTTP 400 \"Gruptaki bir sipariş ödeme beklemiyor...\".",
       "gap": false,
       "gapRefs": []
@@ -12352,7 +12352,7 @@
       "title": "Grup: zaten ödenmiş grup → 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P2",
-      "steps": "1. process-direct { checkoutGroupId, card:{...} }.",
+      "steps": "1. direct-form { checkoutGroupId, card:{...} }.",
       "exp": "HTTP 400 \"Bu sipariş grubu zaten ödendi\".",
       "gap": false,
       "gapRefs": []
@@ -12362,10 +12362,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Takas nakit: process-direct(tradeId) → PayTR çağrılır, payment trade-cash'e bağlı",
+      "title": "Takas nakit: direct-form(tradeId) → PayTR çağrılır, payment trade-cash'e bağlı",
       "tur": "Happy path",
       "pri": "P1",
-      "steps": "1. POST /api/payments/process-direct (Bearer ahmet) { tradeId, card:{...} }.",
+      "steps": "1. POST /api/payments/direct-form (Bearer ahmet) { tradeId, card:{...} }.",
       "exp": "HTTP 201; PayTR direct çağrısı = 1, tutar = 100; payment.tradeCashPaymentId eşleşir, payment.status=pending.",
       "gap": false,
       "gapRefs": []
@@ -12378,7 +12378,7 @@
       "title": "Takas: ödeyen olmayan taraf ödeyemez (403)",
       "tur": "Yetki (Authz)",
       "pri": "P0",
-      "steps": "1. process-direct (Bearer ayse — ödeyen değil) { tradeId, card:{...} }.",
+      "steps": "1. direct-form (Bearer ayse — ödeyen değil) { tradeId, card:{...} }.",
       "exp": "HTTP 403 \"Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir\"; PayTR çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -12521,7 +12521,7 @@
       "title": "PayTR'a giden tutar ondalık TL'dir (kuruş DEĞİL)",
       "tur": "Para/Vergi",
       "pri": "P0",
-      "steps": "1. process-direct yap, mock'ta PayTR'a giden amount değerini kontrol et.",
+      "steps": "1. direct-form yap, mock'ta PayTR'a giden amount değerini kontrol et.",
       "exp": "PayTR'a giden tutar 300 (TL, ondalık), 30000 DEĞİL.",
       "gap": false,
       "gapRefs": []
@@ -12560,7 +12560,7 @@
       "title": "Üye başkasının siparişini ödeyemez (403)",
       "tur": "Yetki (Authz)",
       "pri": "P0",
-      "steps": "1. process-direct (Bearer kaan) { orderId:\" \", card:{...} }.",
+      "steps": "1. direct-form (Bearer kaan) { orderId:\" \", card:{...} }.",
       "exp": "HTTP 403 \"Bu sipariş için ödeme yapamazsınız\"; PayTR çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -12573,7 +12573,7 @@
       "title": "Misafir, üyeye ait siparişi ödeyemez (403)",
       "tur": "Yetki (Authz)",
       "pri": "P0",
-      "steps": "1. Auth header OLMADAN process-direct { orderId, card:{...} }.",
+      "steps": "1. Auth header OLMADAN direct-form { orderId, card:{...} }.",
       "exp": "HTTP 403 \"Bu sipariş için giriş yapmanız gerekiyor\"; PayTR çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -12752,10 +12752,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Throttle: process-direct 10/dk üstünde 429",
+      "title": "Throttle: direct-form 10/dk üstünde 429",
       "tur": "Güvenlik (rate limit)",
       "pri": "P2",
-      "steps": "1. 60sn içinde 11 process-direct isteği gönder.",
+      "steps": "1. 60sn içinde 11 direct-form isteği gönder.",
       "exp": "11. istek HTTP 429 (Too Many Requests).",
       "gap": false,
       "gapRefs": []
@@ -20854,7 +20854,7 @@
       "title": "Boost ödemesi tamamlanınca ürün rankTier=2 + boost active",
       "tur": "Para / İş kuralı",
       "pri": "P0",
-      "steps": "1. Boost order'ı için ödeme tamamla (bypass/process-direct).",
+      "steps": "1. Boost order'ı için ödeme tamamla (bypass/direct-form).",
       "exp": "ProductBoost.status=active, startsAt/endsAt dolu (endsAt = now + 7 gün); ürün rankTier=2, boostedUntil=endsAt; boost order status=completed (kargo akışına girmez).",
       "gap": false,
       "gapRefs": []

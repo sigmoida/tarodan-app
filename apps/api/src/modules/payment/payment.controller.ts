@@ -14,6 +14,7 @@ import {
   UnauthorizedException,
   Logger,
   GoneException,
+  BadRequestException,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { Request } from "express";
@@ -49,6 +50,19 @@ import {
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
   private static readonly PAYMENT_CAPABILITY_HEADER = "x-payment-capability";
+  private static readonly RAW_CARD_FIELDS = new Set([
+    "card",
+    "cardnumber",
+    "card_number",
+    "cardholdername",
+    "cc_owner",
+    "cvc",
+    "cvv",
+    "expiremonth",
+    "expireyear",
+    "expiry_month",
+    "expiry_year",
+  ]);
 
   constructor(
     private readonly paymentService: PaymentService,
@@ -124,6 +138,24 @@ export class PaymentController {
     };
   }
 
+  private assertNoRawCardData(value: unknown): void {
+    const stack: unknown[] = [value];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || typeof current !== "object") continue;
+      for (const [key, nested] of Object.entries(
+        current as Record<string, unknown>,
+      )) {
+        if (PaymentController.RAW_CARD_FIELDS.has(key.toLowerCase())) {
+          throw new BadRequestException(
+            "Kart bilgileri uygulama API'sine gönderilemez.",
+          );
+        }
+        stack.push(nested);
+      }
+    }
+  }
+
   /**
    * GET /payments/config — public, no auth.
    * Lets mobile/web detect dev-mode flags so the UI can hide irrelevant
@@ -131,15 +163,21 @@ export class PaymentController {
    */
   @Get("config")
   @Public()
-  getPublicConfig(): { bypassEnabled: boolean; recurringEnabled: boolean } {
+  getPublicConfig(): {
+    bypassEnabled: boolean;
+    cardStorageEnabled: boolean;
+    recurringEnabled: boolean;
+  } {
     return {
       // SEC-H1: bypass yalnız non-production'da GERÇEKTEN çalışır; prod'da her zaman
       // false raporla — hem yanıltıcı bir "true" sızdırma hem de UI'ı yanlış yönlendirme.
       bypassEnabled:
         this.configService.get("PAYMENT_BYPASS") === "true" &&
         process.env.NODE_ENV !== "production",
-      // Kayıtlı kart + oto-yenileme (Non3D) PayTR yetkisine bağlı; kapalıyken frontend
-      // kayıtlı-kart UI'ını ve "kartı kaydet" seçeneğini gizler.
+      // Kart saklama ve kullanıcı-mevcut kayıtlı kart ödemeleri, kullanıcı
+      // etkileşimi olmayan Non3D recurring çekimden ayrı yetkilerdir.
+      cardStorageEnabled:
+        this.configService.get("PAYTR_CARD_STORAGE_ENABLED") === "true",
       recurringEnabled:
         this.configService.get("PAYTR_RECURRING_ENABLED") === "true",
     };
@@ -223,27 +261,26 @@ export class PaymentController {
   }
 
   /**
-   * POST /payments/process-direct - PayTR Direkt API ile ödeme (TEK ödeme yolu; misafir + üye).
-   * Kart bilgisi bizim checkout sayfamızda alınır; yeni kartta yanıt 3D Secure HTML'idir
-   * (istemci render eder), sonuç callback/verify ile işlenir. Ham kart verisi taşır → throttle'lı.
-   * Kayıtlı kart (Flow B) + kart saklama PAYTR_RECURRING_ENABLED arkasındadır.
+   * POST /payments/direct-form - PayTR Direct API formunu hazırlar.
+   * PAN/CVV kabul etmez; istemci kart alanlarını yalnız PayTR formuna ekler.
    */
-  @Post("process-direct")
-  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute (ham kart verisi)
-  @Public() // Misafir + üye; servis sahiplik + flag doğrulamasını yapar.
+  @Post("direct-form")
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Public()
   @ApiOperation({
-    summary: "Direct API kart ödemesi (misafir + üye; tek ödeme yolu)",
+    summary: "PayTR Direct API için imzalı ödeme formu hazırla",
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: "Ödeme başlatıldı (yeni kartta 3DS HTML döner)",
+    description: "Doğrudan PayTR'ye POST edilecek form alanları",
   })
-  async processDirect(@Body() dto: DirectPaymentDto, @Req() req: Request) {
+  async prepareDirectForm(@Body() dto: DirectPaymentDto, @Req() req: Request) {
+    this.assertNoRawCardData(req.body);
     // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
     const userId = this.extractUserId(req);
     const capabilityAuthorized =
       !!dto.paymentId && this.hasPaymentCapability(req, dto.paymentId);
-    return this.paymentService.processDirectPayment(
+    return this.paymentService.prepareDirectPayment(
       userId,
       dto,
       req,

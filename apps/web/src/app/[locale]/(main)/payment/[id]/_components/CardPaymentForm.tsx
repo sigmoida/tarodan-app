@@ -18,16 +18,14 @@ interface CardPaymentFormProps {
   target: { orderId?: string; checkoutGroupId?: string; tradeId?: string };
   paymentId: string;
   amount?: number;
-  recurringEnabled?: boolean;
-  onSuccess?: (paymentId: string) => void;
+  cardStorageEnabled?: boolean;
 }
 
 export default function CardPaymentForm({
   target,
   paymentId,
   amount,
-  recurringEnabled = false,
-  onSuccess,
+  cardStorageEnabled = false,
 }: CardPaymentFormProps) {
   const {
     form,
@@ -41,7 +39,7 @@ export default function CardPaymentForm({
     setSaveCard,
     processing,
     submit,
-  } = useCardPayment({ target, paymentId, recurringEnabled, onSuccess });
+  } = useCardPayment({ target, paymentId, cardStorageEnabled });
 
   const amountLabel =
     amount != null
@@ -83,7 +81,7 @@ export default function CardPaymentForm({
           {selected === NEW_CARD && (
             <NewCardFields
               form={form}
-              recurringEnabled={recurringEnabled}
+              cardStorageEnabled={cardStorageEnabled}
               saveCard={saveCard}
               onSaveCardChange={setSaveCard}
             />
@@ -117,8 +115,8 @@ export default function CardPaymentForm({
           güvencesi
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <LockClosedIcon className="h-4 w-4 text-success-500" /> Kart bilgileri
-          saklanmaz
+          <LockClosedIcon className="h-4 w-4 text-success-500" /> Kart verileri
+          PayTR korumasında
         </span>
       </div>
     </SectionCard>

@@ -21,8 +21,13 @@ class StubPaymentProvider implements IPaymentProvider {
   async createRefund() {
     return { status: "success" } as any;
   }
-  async createDirectPayment() {
-    return { status: "success" as const };
+  async createDirectPaymentForm() {
+    return {
+      action: "https://example.test/pay",
+      method: "POST" as const,
+      fields: [],
+      requireCvv: false,
+    };
   }
   async chargeRecurring() {
     return { status: "success" as const };

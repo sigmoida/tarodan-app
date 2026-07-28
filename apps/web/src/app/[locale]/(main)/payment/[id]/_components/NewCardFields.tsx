@@ -18,14 +18,14 @@ import { BrandEmblem } from "./CardVisuals";
 
 interface NewCardFieldsProps {
   form: UseFormReturn<NewCardValues>;
-  recurringEnabled: boolean;
+  cardStorageEnabled: boolean;
   saveCard: boolean;
   onSaveCardChange: (v: boolean) => void;
 }
 
 export default function NewCardFields({
   form,
-  recurringEnabled,
+  cardStorageEnabled,
   saveCard,
   onSaveCardChange,
 }: NewCardFieldsProps) {
@@ -117,10 +117,10 @@ export default function NewCardFields({
         />
       </div>
 
-      {recurringEnabled && (
+      {cardStorageEnabled && (
         <div className="rounded-xl border border-border bg-surface p-3">
           <Checkbox
-            label="Kartımı sonraki ödemeler ve otomatik yenileme için kaydet"
+            label="Kartımı sonraki ödemeler için PayTR'da sakla"
             checked={saveCard}
             onChange={(e) => onSaveCardChange(e.target.checked)}
           />

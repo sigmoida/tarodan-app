@@ -26,13 +26,12 @@ export default function PaymentPageClient() {
   const {
     phase,
     payment,
-    recurringEnabled,
+    cardStorageEnabled,
     handleCancel,
     retry,
     directTarget,
     hasTarget,
     isMembershipPayment,
-    onCardSuccess,
   } = usePaymentStatus();
 
   if (phase === "auth-loading") return <AuthLoadingScreen />;
@@ -95,8 +94,7 @@ export default function PaymentPageClient() {
               target={directTarget}
               paymentId={payment.id}
               amount={payment.amount}
-              recurringEnabled={recurringEnabled}
-              onSuccess={onCardSuccess}
+              cardStorageEnabled={cardStorageEnabled}
             />
           ) : (
             <SectionCard className="text-center">

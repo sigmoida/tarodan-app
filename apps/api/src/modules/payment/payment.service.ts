@@ -48,13 +48,13 @@ export class PaymentService {
     return this.paymentInitiation.initiateGuestPayment(dto, req);
   }
 
-  async processDirectPayment(
+  async prepareDirectPayment(
     userId: string | null,
     dto: DirectPaymentDto,
     req?: Request,
     capabilityAuthorized = false,
   ) {
-    return this.paymentInitiation.processDirectPayment(
+    return this.paymentInitiation.prepareDirectPayment(
       userId,
       dto,
       req,

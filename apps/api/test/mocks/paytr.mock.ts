@@ -65,6 +65,11 @@ export class MockPayTRService {
     amount: number;
     storeCard?: boolean;
     utoken?: string;
+    savedCard?: {
+      utoken: string;
+      ctoken: string;
+      requireCvv: boolean;
+    };
   }> = [];
   /** Sonraki chargeRecurring sonucu (test kontrolü). null → success. */
   public nextRecurringResult: {
@@ -301,33 +306,55 @@ export class MockPayTRService {
     return { status: "success" };
   }
 
-  async createDirectPayment(
+  async createDirectPaymentForm(
     merchantOid: string,
     amount: number,
-    _card: {
-      number: string;
-      expireMonth: string;
-      expireYear: string;
-      cvv: string;
-      holderName: string;
-    },
     _buyer: PayTRBuyer,
     _basketItems: PayTRBasketItem[],
     options?: {
       installmentCount?: number;
-      non3d?: boolean;
       successQueryParams?: string;
       storeCard?: boolean;
       utoken?: string;
+      savedCard?: {
+        utoken: string;
+        ctoken: string;
+        requireCvv: boolean;
+      };
     },
-  ): Promise<{ status: "success"; threeDSHtml?: string }> {
+  ): Promise<{
+    action: string;
+    method: "POST";
+    fields: Array<{ name: string; value: string }>;
+    requireCvv: boolean;
+  }> {
     this.directPaymentCalls.push({
       merchantOid,
       amount,
       storeCard: options?.storeCard,
       utoken: options?.utoken,
+      savedCard: options?.savedCard,
     });
-    return { status: "success" };
+    return {
+      action: "https://www.paytr.com/odeme",
+      method: "POST",
+      fields: [
+        { name: "merchant_oid", value: merchantOid },
+        ...(options?.storeCard ? [{ name: "store_card", value: "1" }] : []),
+        ...(options?.utoken ? [{ name: "utoken", value: options.utoken }] : []),
+        ...(options?.savedCard
+          ? [
+              { name: "utoken", value: options.savedCard.utoken },
+              { name: "ctoken", value: options.savedCard.ctoken },
+              {
+                name: "require_cvv",
+                value: options.savedCard.requireCvv ? "1" : "0",
+              },
+            ]
+          : []),
+      ],
+      requireCvv: options?.savedCard?.requireCvv ?? false,
+    };
   }
 
   async capiListCards(utoken: string): Promise<

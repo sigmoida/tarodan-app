@@ -44,11 +44,13 @@ async function initiatePayment(
 
 // Payments
 export const paymentsApi = {
-  /** Public ödeme yapılandırması: bypass (dev) ve kayıtlı kart/oto-yenileme (Non3D) açık mı. */
+  /** Public ödeme yapılandırması: dev bypass, PayTR kart kasası ve recurring yetkileri. */
   getConfig: () =>
-    api.get<{ bypassEnabled: boolean; recurringEnabled: boolean }>(
-      "/payments/config",
-    ),
+    api.get<{
+      bypassEnabled: boolean;
+      cardStorageEnabled: boolean;
+      recurringEnabled: boolean;
+    }>("/payments/config"),
   initiate: (orderId: string | number, provider: "paytr") =>
     initiatePayment("/payments/initiate", { orderId }, provider),
   /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */
@@ -113,33 +115,26 @@ export const paymentsApi = {
   bypassComplete: (paymentId: string, _card?: string) =>
     api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`),
   /**
-   * Direct API (TEK ödeme yolu; misafir + üye): kendi kart formumuzdan ödeme.
-   * - Yeni kart: { orderId, card:{...}, saveCard } → yanıt 3DS HTML (threeDSHtml) içerir.
-   * - Kayıtlı kart: { orderId, savedCardId, cvv? } → Non3D, anında status (PAYTR_RECURRING_ENABLED).
+   * Direct API form hazırlığı. Kart numarası/CVV bu API çağrısına eklenmez;
+   * istemci dönen alanları kart alanlarıyla birleştirip doğrudan PayTR'ye POST eder.
    */
-  processDirect: (body: {
+  prepareDirectForm: (body: {
     paymentId?: string;
     orderId?: string;
     checkoutGroupId?: string;
     tradeId?: string;
-    card?: {
-      cardHolderName: string;
-      cardNumber: string;
-      expireMonth: string;
-      expireYear: string;
-      cvc: string;
-    };
     savedCardId?: string;
-    cvv?: string;
     saveCard?: boolean;
   }) =>
     api.post<{
       paymentId: string;
-      orderId?: string;
-      threeDSHtml: string | null;
-      status: "pending" | "success" | "failed" | "wait_callback";
-      reason?: string | null;
-    }>("/payments/process-direct", body, {
+      action: string;
+      method: "POST";
+      fields: Array<{ name: string; value: string }>;
+      requireCvv: boolean;
+      savedCard: boolean;
+      status: "pending";
+    }>("/payments/direct-form", body, {
       headers: body.paymentId
         ? paymentCapabilityHeaders(body.paymentId)
         : undefined,

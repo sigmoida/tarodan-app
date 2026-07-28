@@ -8,7 +8,7 @@
  *
  * Ortam (apps/api/.env.test):
  *   - PAYMENT_BYPASS=false        → bypass happy-path'leri (PAY-060/061/062) çalışmaz.
- *   - PAYTR_RECURRING_ENABLED yok → kayıtlı kartla ödeme 410 Gone (PAY-010/014/015 skip).
+ *   - PAYTR_CARD_STORAGE_ENABLED yok → kayıtlı kartla ödeme 410 Gone.
  *   - ThrottlerGuard skipIf NODE_ENV==='test' → rate-limit (PAY-154) çalışmaz.
  * PayTR mock'tur (ctx.paytr: directPaymentCalls/refundCalls/queryResults/...).
  * Callback imzaları signCallback ile .env.test merchant key/salt'a göre üretilir.
@@ -159,7 +159,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     return req;
   }
 
-  /** buy + process-direct(yeni kart) + başarılı callback → ödenmiş sipariş (preparing). */
+  /** buy + direct-form(yeni kart) + başarılı callback → ödenmiş sipariş (preparing). */
   async function buyAndPayDirect(
     buyer: { accessToken: string },
     productId: string,
@@ -167,23 +167,23 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
   ): Promise<string> {
     const orderId = await buyNow(buyer, productId, addrId);
     await request(server())
-      .post("/api/payments/process-direct")
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
-      .send({ orderId, card: validCard() })
+      .send({ orderId })
       .expect(201);
     await successCallback(orderId).expect(200);
     return orderId;
   }
 
-  // ──────────────────────────── process-direct (yeni kart) ────────────────────────────
-  describe("POST /api/payments/process-direct — yeni kart", () => {
+  // ──────────────────────────── direct-form (yeni kart) ────────────────────────────
+  describe("POST /api/payments/direct-form — yeni kart", () => {
     scenario("PAY-001", async () => {
       const { buyer, product, addr } = await makeBuyerSellerProduct();
       const orderId = await buyNow(buyer, product.id, addr.id);
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       expect(res.body.paymentId).toBeTruthy();
       expect(res.body.status).toBe("pending");
@@ -198,7 +198,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     });
 
     scenario("PAY-002", async () => {
-      // Misafir sipariş + auth header OLMADAN process-direct.
+      // Misafir sipariş + auth header OLMADAN direct-form.
       const { product } = await makeBuyerSellerProduct();
       const orderId = await createGuestOrder(product.id, Number(product.price));
       const intent = await request(server())
@@ -206,12 +206,11 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         .send({ orderId, provider: "paytr" })
         .expect(201);
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set("x-payment-capability", intent.body.paymentAccessToken)
         .send({
           orderId,
           paymentId: intent.body.paymentId,
-          card: validCard(),
         })
         .expect(201);
       expect(res.body.paymentId).toBeTruthy();
@@ -222,14 +221,18 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const { buyer, product, addr } = await makeBuyerSellerProduct();
       const orderId = await buyNow(buyer, product.id, addr.id);
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
         .send({ orderId })
-        .expect(400);
-      expect(JSON.stringify(res.body)).toContain(
-        "Kart bilgisi veya kayıtlı kart",
+        .expect(201);
+      expect(res.body.action).toBe("https://www.paytr.com/odeme");
+      expect(res.body.fields).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "card_number" }),
+          expect.objectContaining({ name: "cvv" }),
+        ]),
       );
-      expect(ctx.paytr.directPaymentCalls.length).toBe(0);
+      expect(ctx.paytr.directPaymentCalls.length).toBe(1);
     });
 
     scenario("PAY-004", async () => {
@@ -237,7 +240,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const orderId = await buyNow(buyer, product.id, addr.id);
       const post = (card: Record<string, unknown>) =>
         request(server())
-          .post("/api/payments/process-direct")
+          .post("/api/payments/direct-form")
           .set(authHeader(buyer))
           .send({ orderId, card })
           .expect(400);
@@ -249,16 +252,16 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
 
     scenario("PAY-005", async () => {
       // recurring KAPALI → store_card her zaman false (PAY-006 ile aynı sonuç,
-      // çünkü PAYTR_RECURRING_ENABLED yok). saveCard:true göndersek de ödenir.
+      // çünkü PAYTR_CARD_STORAGE_ENABLED yok). saveCard:true göndersek de ödenir.
       const { buyer, product, addr } = await makeBuyerSellerProduct();
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard(), saveCard: true })
+        .send({ orderId, saveCard: true })
         .expect(201);
       expect(ctx.paytr.directPaymentCalls.length).toBe(1);
-      // recurring kapalı: storeCard=false (Flow A: storeCard = saveCard && userId && recurringEnabled).
+      // Kart saklama kapalı: storeCard=false.
       expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(false);
     });
 
@@ -266,9 +269,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const { buyer, product, addr } = await makeBuyerSellerProduct();
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard(), saveCard: true })
+        .send({ orderId, saveCard: true })
         .expect(201);
       expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(false);
     });
@@ -277,19 +280,19 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const { buyer, product, addr } = await makeBuyerSellerProduct();
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(false);
     });
   });
 
-  // ──────────────────────────── process-direct (kayıtlı kart) ────────────────────────────
-  describe("POST /api/payments/process-direct — kayıtlı kart (recurring kapalı)", () => {
+  // ──────────────────────────── direct-form (kayıtlı kart) ────────────────────────────
+  describe("POST /api/payments/direct-form — kayıtlı kart (recurring kapalı)", () => {
     scenario.skip(
       "PAY-010",
-      "Mutlu yol PAYTR_RECURRING_ENABLED gerektirir; .env.test'te kapalı (savedCardId → 410). PAY-011 ters durumu kanıtlar.",
+      "Mutlu yol PAYTR_CARD_STORAGE_ENABLED gerektirir; .env.test'te kapalı (savedCardId → 410). PAY-011 ters durumu kanıtlar.",
     );
 
     scenario("PAY-011", async () => {
@@ -298,7 +301,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const orderId = await buyNow(buyer, product.id, addr.id);
       const card = await createSavedCard(buyer.id);
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
         .send({ orderId, savedCardId: card.id })
         .expect(410);
@@ -313,7 +316,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const { product } = await makeBuyerSellerProduct();
       const orderId = await createGuestOrder(product.id, Number(product.price));
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .send({ orderId, savedCardId: "00000000-0000-0000-0000-000000000000" })
         .expect(403);
       expect(JSON.stringify(res.body)).toContain(
@@ -328,7 +331,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     );
     scenario.skip(
       "PAY-014",
-      "require_cvv → 400 yolu recurring AÇIK gerektirir; kapalıyken 410 Gone önce döner.",
+      "require_cvv formu kart saklama yetkisi gerektirir; kapalıyken 410 Gone önce döner.",
     );
     scenario.skip(
       "PAY-015",
@@ -344,9 +347,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
 
       const res = await successCallback(orderId).expect(200);
@@ -380,9 +383,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const payment = await lastPayment(orderId);
       ctx.paytr.setQueryResult(payment!.providerConversationId!, {
@@ -448,9 +451,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
 
       const r1 = await successCallback(orderId).expect(200);
@@ -479,9 +482,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const payment = await lastPayment(orderId);
 
@@ -512,9 +515,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const { buyer, product, addr } = await makeBuyerSellerProduct();
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
 
       const res = await request(server())
@@ -542,22 +545,22 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     });
 
     scenario("PAY-027", async () => {
-      // Eski merchant_oid (oid history): process-direct iki kez → oid1 history'ye eklenir,
+      // Eski merchant_oid (oid history): direct-form iki kez → oid1 history'ye eklenir,
       // oid1 ile gelen geçerli success callback eşleşip tamamlar.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const oid1 = (await lastPayment(orderId))!.providerConversationId!;
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const oid2 = (await lastPayment(orderId))!.providerConversationId!;
       expect(oid2).not.toBe(oid1);
@@ -583,15 +586,15 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
   // ──────────────────────────── çift-çekim / idempotency ────────────────────────────
   describe("Çift-çekim koruması", () => {
     scenario("PAY-030", async () => {
-      // İlk deneme PayTR'da ödendiyse (durum-sorgu) ikinci process-direct 400, çift çekmez.
+      // İlk deneme PayTR'da ödendiyse (durum-sorgu) ikinci direct-form 400, çift çekmez.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const payment = await lastPayment(orderId);
       // Durum-sorgu: ödendi.
@@ -602,9 +605,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       } as any);
 
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain("Bu ödeme zaten alınmış");
       expect(ctx.paytr.directPaymentCalls.length).toBe(1); // çift çekim yok
@@ -614,16 +617,16 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     });
 
     scenario("PAY-031", async () => {
-      // Eşzamanlı iki process-direct (aynı payment satırı) → biri 201, biri 400.
+      // Eşzamanlı iki direct-form (aynı payment satırı) → biri 201, biri 400.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       const fire = () =>
         request(server())
-          .post("/api/payments/process-direct")
+          .post("/api/payments/direct-form")
           .set(authHeader(buyer))
-          .send({ orderId, card: validCard() });
+          .send({ orderId });
       const results = await Promise.all([fire(), fire()]);
       const statuses = results.map((r) => r.status).sort();
       expect(statuses).toEqual([201, 400]);
@@ -639,16 +642,16 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       expect((await lastPayment(orderId))?.status).toBe(PaymentStatus.pending);
 
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       expect(ctx.paytr.directPaymentCalls.length).toBe(2);
     });
@@ -740,11 +743,11 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       await ctx.app.get(PaymentService).releaseExpiredOrderReservations();
 
-      // Retry: process-direct rezervasyonu yeniden alır.
+      // Retry: direct-form rezervasyonu yeniden alır.
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const reReserved = await prisma.product.findUnique({
         where: { id: product.id },
@@ -801,9 +804,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
 
       // slow retry: stok yok → 400/404/409.
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(slow))
-        .send({ orderId: slowOrder, card: validCard() });
+        .send({ orderId: slowOrder });
       expect([400, 404, 409]).toContain(res.status);
     });
 
@@ -1227,9 +1230,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const payment = await lastPayment(orderId);
       ctx.paytr.setQueryResult(payment!.providerConversationId!, {
@@ -1258,9 +1261,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const payment = await lastPayment(orderId);
       ctx.paytr.setQueryResult(payment!.providerConversationId!, {
@@ -1286,9 +1289,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const payment = await lastPayment(orderId);
       await getPrisma().payment.update({
@@ -1339,9 +1342,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const payment = await lastPayment(orderId);
       const res = await request(server())
@@ -1629,14 +1632,14 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
   // ──────────────────────────── grup / takas ödemeleri ────────────────────────────
   describe("Grup & takas ödemeleri", () => {
     scenario("PAY-100", async () => {
-      // Grup ödemesi: process-direct(checkoutGroupId) → PayTR çağrılır, payment gruba bağlı.
+      // Grup ödemesi: direct-form(checkoutGroupId) → PayTR çağrılır, payment gruba bağlı.
       const { buyer, group } = await makeCheckoutGroup({
         orderTotals: [200, 250],
       });
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ checkoutGroupId: group.id, card: validCard() })
+        .send({ checkoutGroupId: group.id })
         .expect(201);
       expect(res.body.paymentId).toBeTruthy();
       expect(ctx.paytr.directPaymentCalls.length).toBe(1);
@@ -1666,9 +1669,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         data: { status: OrderStatus.cancelled },
       });
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ checkoutGroupId: group.id, card: validCard() })
+        .send({ checkoutGroupId: group.id })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain("ödeme beklemiyor");
     });
@@ -1690,22 +1693,22 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         },
       });
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ checkoutGroupId: group.id, card: validCard() })
+        .send({ checkoutGroupId: group.id })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain("zaten ödendi");
     });
 
     scenario("PAY-103", async () => {
-      // Takas nakit: process-direct(tradeId) → PayTR çağrılır, payment trade-cash'e bağlı.
+      // Takas nakit: direct-form(tradeId) → PayTR çağrılır, payment trade-cash'e bağlı.
       const { payer, tradeId } = await makeAcceptedCashTrade({
         cashAmount: 100,
       });
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(payer))
-        .send({ tradeId, card: validCard() })
+        .send({ tradeId })
         .expect(201);
       expect(res.body.paymentId).toBeTruthy();
       expect(ctx.paytr.directPaymentCalls.length).toBe(1);
@@ -1731,9 +1734,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         cashAmount: 100,
       });
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(other))
-        .send({ tradeId, card: validCard() })
+        .send({ tradeId })
         .expect(403);
       expect(JSON.stringify(res.body)).toContain("belirlenmiş ödeyen taraf");
       expect(ctx.paytr.directPaymentCalls.length).toBe(0);
@@ -1959,9 +1962,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const prisma = getPrisma();
       // Siparişi callback'ten ÖNCE cancelled yap (yarış: cron iptal etti).
@@ -1985,9 +1988,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const order = await getPrisma().order.findUnique({
         where: { id: orderId },
@@ -2009,9 +2012,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       // 350 TL = 35000 kuruş, beklenen 30000 → tolerans (0.05 TL) dışı.
       const res = await successCallback(orderId, 35000).expect(200);
@@ -2026,9 +2029,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const order = await getPrisma().order.findUnique({
         where: { id: orderId },
@@ -2049,9 +2052,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const order = await getPrisma().order.findUnique({
         where: { id: orderId },
@@ -2111,9 +2114,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       const stranger = await createUser(ctx.module);
       const orderId = await buyNow(buyer, product.id, addr.id);
       const res = await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(stranger))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(403);
       expect(JSON.stringify(res.body)).toContain(
         "Bu sipariş için ödeme yapamazsınız",
@@ -2128,8 +2131,8 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       const res = await request(server())
-        .post("/api/payments/process-direct")
-        .send({ orderId, card: validCard() })
+        .post("/api/payments/direct-form")
+        .send({ orderId })
         .expect(403);
       expect(res.body.i18nKey).toBe("server.payment.viewStatusForbidden");
       expect(ctx.paytr.directPaymentCalls.length).toBe(0);
@@ -2329,9 +2332,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       });
       const orderId = await buyNow(buyer, product.id, addr.id);
       await request(server())
-        .post("/api/payments/process-direct")
+        .post("/api/payments/direct-form")
         .set(authHeader(buyer))
-        .send({ orderId, card: validCard() })
+        .send({ orderId })
         .expect(201);
       const payment = await lastPayment(orderId);
       // Durum-sorgu set EDİLMEDİ (ok:false) → completed olmamalı.
@@ -2533,7 +2536,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
 
   /**
    * Premium tier + platform satıcı kur, kullanıcıyı subscribe et, membership ödemesini
-   * process-direct + callback ile tamamla. { user, orderId } döner.
+   * direct-form + callback ile tamamla. { user, orderId } döner.
    */
   async function subscribeAndPayMembership(): Promise<{
     user: { id: string; accessToken: string };
@@ -2579,11 +2582,11 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       where: { id: paymentId },
     });
     const orderId = payment!.orderId!;
-    // Membership ödemesi process-direct + callback ile tamamlanır.
+    // Membership ödemesi direct-form + callback ile tamamlanır.
     await request(server())
-      .post("/api/payments/process-direct")
+      .post("/api/payments/direct-form")
       .set(authHeader(user))
-      .send({ orderId, card: validCard() })
+      .send({ orderId })
       .expect(201);
     await successCallback(orderId).expect(200);
     return { user, orderId };

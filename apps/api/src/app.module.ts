@@ -129,7 +129,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     ThrottlerModule.forRoot({
       // E2E tests share one in-memory ThrottlerStorage across a whole suite
       // (single app, all requests from 127.0.0.1); per-endpoint limits like
-      // process-direct's 10/min would otherwise bleed across unrelated tests
+      // direct-form's 10/min would otherwise bleed across unrelated tests
       // and 429 the later ones. Rate-limit logic itself is not exercised by
       // these functional tests. Production/dev are unaffected.
       skipIf: () => process.env.NODE_ENV === "test",

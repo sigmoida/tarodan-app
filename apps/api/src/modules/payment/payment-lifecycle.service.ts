@@ -196,7 +196,7 @@ export class PaymentLifecycleService {
     );
 
     // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin, eski oid history'e
-    // taşınır), kart /payments/process-direct ile. providerPaymentId de sıfırlanır.
+    // taşınır), kart /payments/direct-form ile. providerPaymentId de sıfırlanır.
     await this.paymentCommon.assignMerchantOid(
       paymentId,
       String(order.orderNumber || order.id),

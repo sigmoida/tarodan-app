@@ -473,7 +473,7 @@ export class PaymentExpiryReconciliationService {
   async cancelExpiredPayments() {
     // H1: Ödeme SATIRINI `failed` yapma penceresi, REZERVASYON serbest bırakma
     // penceresinden (PAYMENT_TIMEOUT_MINUTES=5dk) AYRIDIR ve PayTR 3DS oturumundan
-    // (createDirectPayment timeout_limit=30dk) MUTLAKA UZUN olmalıdır.
+    // (createDirectPaymentForm timeout_limit=30dk) MUTLAKA UZUN olmalıdır.
     // Aksi halde: kullanıcı 3DS'i 5-30dk arası tamamlar → PayTR parayı çeker →
     // callback gelir ama bu cron payment'ı çoktan `failed` yapmıştır → CAS düşer →
     // çekilen para sipariş'e bağlanmaz, iade yok (orphan capture). Pencereyi
@@ -488,7 +488,7 @@ export class PaymentExpiryReconciliationService {
     timeoutDate.setMinutes(timeoutDate.getMinutes() - timeoutMinutes);
 
     // H2 self-heal: `processing` claim'i normalde çekim süresince (saniyeler) tutulur ve
-    // processDirectPayment finally'sinde `pending`'e döner. Süreç çekim ortasında çökerse
+    // prepareDirectPayment finally'sinde `pending`'e döner. Süreç form hazırlarken çökerse
     // (hard kill) claim `processing`'de takılı kalır. 5dk'dan eski `processing` ödemeleri
     // `pending`'e döndürerek yeniden denenebilir/işlenebilir hale getir (callback CAS pending bekler).
     const staleProcessing = new Date();

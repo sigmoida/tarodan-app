@@ -593,7 +593,7 @@ export class MembershipSubscriptionService {
       req,
     );
 
-    // Ödeme niyeti (intent): kart bilgisi /payments/process-direct ile alınır (iframe yok).
+    // Ödeme niyeti (intent): kart bilgisi /payments/direct-form ile alınır (iframe yok).
     return {
       paymentId: paymentResult.paymentId,
       membershipPaymentId: intent.id,

@@ -18,8 +18,8 @@
  *     + ctx.app.get(PayoutService).createPayoutsForReleasedHolds() (dev cron listesinde yok).
  *   - Prepare-deadline oto-iptal: PaymentService.handleExpiredPreparingOrders() (cron
  *     listesinde yok → doğrudan servis çağrısı).
- *   - Üyelik ödemesi process-direct + callback ile tamamlanır (PAYMENT_BYPASS=false →
- *     bypass-complete hep 400; gerçek yol process-direct).
+ *   - Üyelik ödemesi direct-form + callback ile tamamlanır (PAYMENT_BYPASS=false →
+ *     bypass-complete hep 400; gerçek yol direct-form).
  *   - 48h auto-complete: OrderSchedulerService.runAutoCompleteConfirmedOrders() ancak
  *     FEATURE_48H_CONFIRMATION_WINDOW=true iken çalışır (.env.test'te kapalı) → taze
  *     scheduler'ı flag ON ile kurarız (pattern 09-ord/order-48h-window).
@@ -276,7 +276,7 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     cvc: '000',
   });
 
-  /** Premium abone ol + öde (process-direct + callback → active). Döner: { orderId }. */
+  /** Premium abone ol + öde (direct-form + callback → active). Döner: { orderId }. */
   async function subscribeAndPayPremium(user: Auth): Promise<{ orderId: string }> {
     const subRes = await post('/api/membership/subscribe', user)
       .send({ tierType: 'premium', billingPeriod: 'monthly' })
@@ -284,8 +284,8 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     const prisma = getPrisma();
     const payment = await prisma.payment.findUnique({ where: { id: subRes.body.paymentId } });
     const orderId = payment!.orderId!;
-    await post('/api/payments/process-direct', user)
-      .send({ orderId, card: validCard() })
+    await post('/api/payments/direct-form', user)
+      .send({ orderId })
       .expect(201);
     await successCallback(orderId).expect(200);
     return { orderId };

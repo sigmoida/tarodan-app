@@ -27,7 +27,7 @@ export interface PayTRBuyer {
 
 export interface PayTRBasketItem {
   name: string;
-  price: number; // in TL — encodeBasket/createDirectPayment ×100 ile kuruşa çevirir (çağıran TL geçmeli)
+  price: number; // TL; her PayTR endpoint'i kendi beklediği birime serialize eder.
   quantity: number;
 }
 
@@ -373,7 +373,7 @@ export class PayTRService implements IPaymentProvider {
     // Direkt API 2. adım (bildirim) dokümanı: CALLBACK'te payment_amount ×100 (KURUŞ)
     // gelir (örn. 34.56 TL → "3456"), total_amount ile AYNI birim. Kuruş → TL: /100.
     // DİKKAT: Step 1 İSTEĞİNDE payment_amount ondalık TL'dir ("100.99") — bu parse
-    // yalnız callback içindir (createDirectPayment'taki ondalık kural değişmez).
+    // yalnız callback içindir (createDirectPaymentForm'taki ondalık kural değişmez).
     const paymentAmountKurus =
       callback.payment_amount != null && callback.payment_amount !== ""
         ? parseInt(callback.payment_amount, 10)
@@ -414,7 +414,7 @@ export class PayTRService implements IPaymentProvider {
       : merchantOid;
     // ÖNEMLİ: PayTR İade API return_amount = ONDALIK TL ("10.25"), KURUŞ DEĞİL.
     // Resmi İade doc: "Ayraç olarak yalnızca bir nokta (.) gönderilmelidir. Örnek: 10.25".
-    // Kuruş (×100) göndermek 100 KAT fazla iadeye = maddi kayba yol açar (createDirectPayment
+    // Kuruş (×100) göndermek 100 KAT fazla iadeye = maddi kayba yol açar (createDirectPaymentForm
     // ile aynı /odeme birim kuralı). Hash de aynı string ile üretilir.
     const returnAmount = amount.toFixed(2); // ONDALIK TL
 
@@ -625,35 +625,36 @@ export class PayTRService implements IPaymentProvider {
   // ==========================================================================
 
   /**
-   * PayTR Direkt API ile ödeme: kart bilgisi BİZİM sayfamızda alınır,
-   * PayTR'ye sunucudan POST edilir. non_3d=0 (varsayılan) → yanıt, kullanıcıya
-   * gösterilecek 3D Secure HTML sayfasıdır; banka doğrulaması sonrası PayTR
-   * kullanıcıyı merchant_ok_url/merchant_fail_url'e yönlendirir ve sonucu
-   * Bildirim URL'ine POST'lar (iframe akışıyla aynı callback/durum-sorgu).
+   * PayTR Direct API formunu hazırlar. Kart numarası, son kullanma ve CVV bu
+   * metoda gelmez: PayTR sözleşmesi gereği tarayıcı bu alanları doğrudan
+   * https://www.paytr.com/odeme adresine POST eder.
    */
-  async createDirectPayment(
+  async createDirectPaymentForm(
     merchantOid: string,
     amount: number, // TL
-    card: {
-      number: string;
-      expireMonth: string; // MM
-      expireYear: string; // YY veya YYYY
-      cvv: string;
-      holderName: string;
-    },
     buyer: PayTRBuyer,
     basketItems: PayTRBasketItem[],
     options?: {
       installmentCount?: number;
-      non3d?: boolean;
       /** e.g. "paymentId=...&type=membership" — success sayfası verify için kullanır */
       successQueryParams?: string;
-      /** CAPI: kartı PayTR'da sakla → ödeme bildiriminde utoken döner (recurring için). */
+      /** CAPI: kartı PayTR'da sakla → callback'te utoken döner. */
       storeCard?: boolean;
       /** Kullanıcının zaten bir utoken'ı varsa yeni kart eklerken birlikte gönderilir. */
       utoken?: string;
+      /** Kullanıcıya ait kayıtlı kart ile kullanıcı-mevcut (CIT) ödeme. */
+      savedCard?: {
+        utoken: string;
+        ctoken: string;
+        requireCvv: boolean;
+      };
     },
-  ): Promise<{ status: "success"; threeDSHtml?: string }> {
+  ): Promise<{
+    action: string;
+    method: "POST";
+    fields: Array<{ name: string; value: string }>;
+    requireCvv: boolean;
+  }> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
       throw new BadRequestException(
         i18nMessage("server.payment.notConfigured"),
@@ -674,7 +675,9 @@ export class PayTRService implements IPaymentProvider {
     );
     const currency = "TL";
     const testModeStr = this.testMode ? "1" : "0";
-    const non3d = options?.non3d ? "1" : "0";
+    // Kullanıcının başlattığı checkout her zaman 3D Secure'dur. Non3D yalnız
+    // ayrı recurring akışında, açık mağaza yetkisiyle sunucudan kullanılır.
+    const non3d = "0";
 
     const successBase = `${this.configService.get("FRONTEND_URL")}/payment/success`;
     const merchantOkUrl = options?.successQueryParams
@@ -701,24 +704,15 @@ export class PayTRService implements IPaymentProvider {
       .update(hashStr + this.merchantSalt)
       .digest("base64");
 
-    const expiryYear2 =
-      card.expireYear.length === 4
-        ? card.expireYear.slice(-2)
-        : card.expireYear;
     // Direkt API basket: ONDALIK TL birim fiyat ("50.00") — resmi örnek kodla birebir
     // (payment_amount ile aynı birim). Kuruş GÖNDERME (×100 hatasına yol açar).
-    const basketJson = JSON.stringify(
+    const userBasket = JSON.stringify(
       basketItems.map((item) => [
         item.name,
         Number(item.price).toFixed(2),
         item.quantity,
       ]),
     );
-    const userBasket = basketJson
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
 
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -732,11 +726,6 @@ export class PayTRService implements IPaymentProvider {
       test_mode: testModeStr,
       non_3d: non3d,
       paytr_token: paytrToken,
-      cc_owner: card.holderName,
-      card_number: card.number.replace(/\s/g, ""),
-      expiry_month: card.expireMonth.padStart(2, "0"),
-      expiry_year: expiryYear2,
-      cvv: card.cvv,
       merchant_ok_url: merchantOkUrl,
       merchant_fail_url: merchantFailUrl,
       user_name: `${buyer.name} ${buyer.surname}`.trim(),
@@ -745,98 +734,36 @@ export class PayTRService implements IPaymentProvider {
       user_basket: userBasket,
       debug_on: this.testMode ? "1" : "0",
       client_lang: "tr",
-      // /odeme doğrulayıcısı bu alanları da zorunlu tutuyor (iframe ortak şeması)
-      no_installment: "0",
-      max_installment: "0",
-      lang: "tr",
-      timeout_limit: "30",
+      // Hazırlanan formun fiyat/oid bilgisi uzun süre sonra kullanılamasın.
+      request_exp_date: String(Math.floor(Date.now() / 1000) + 30 * 60),
     });
 
-    // CAPI kart saklama: store_card=1 → ödeme bildiriminde (Bildirim URL) utoken döner.
-    // Kullanıcının mevcut utoken'ı varsa yeni kart onunla ilişkilendirilir.
-    if (options?.storeCard) formData.set("store_card", "1");
-    if (options?.utoken) formData.set("utoken", options.utoken);
-
-    let rawText: string;
-    let httpStatus: number;
-    try {
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString(),
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
-      httpStatus = response.status;
-      rawText = await response.text();
-    } catch (error: any) {
-      this.logger.error(`PayTR direct API connection error: ${error?.message}`);
-      throw new BadRequestException(
-        i18nMessage("server.payment.connectionError"),
-      );
+    if (options?.savedCard) {
+      formData.set("utoken", options.savedCard.utoken);
+      formData.set("ctoken", options.savedCard.ctoken);
+      formData.set("require_cvv", options.savedCard.requireCvv ? "1" : "0");
+    } else {
+      // CAPI kart saklama: store_card=1 → callback'te utoken döner. Mevcut
+      // utoken gönderilirse yeni kart aynı PayTR kullanıcısı altında gruplanır.
+      if (options?.storeCard) formData.set("store_card", "1");
+      if (options?.utoken) formData.set("utoken", options.utoken);
     }
 
-    const trimmed = (rawText || "").trim();
-    if (!trimmed) {
-      this.logger.error(`PayTR direct API boş yanıt. HTTP ${httpStatus}`);
-      throw new BadRequestException(
-        i18nMessage("server.payment.noResponse", { httpStatus }),
-      );
-    }
-
-    // Hata yanıtları JSON'dır (bazen kısa bir HTML kabuğun İÇİNE gömülü gelir);
-    // gerçek 3D yanıtı banka formunu içeren büyük bir HTML sayfasıdır.
-    const embeddedError = trimmed
-      .slice(0, 3000)
-      .match(/\{"status"\s*:\s*"failed".*?\}/);
-    const jsonText = trimmed.startsWith("{") ? trimmed : embeddedError?.[0];
-    if (jsonText) {
-      let data: any;
-      try {
-        data = JSON.parse(jsonText);
-      } catch {
-        data = null;
-      }
-      if (data?.status === "success") {
-        // non_3d=1: çekim anında yapıldı; sonuç ayrıca Bildirim URL'ine düşer.
-        return { status: "success" };
-      }
-      let reason: string | ReturnType<typeof i18nMessage> =
-        data?.err_msg ||
-        data?.reason ||
-        i18nMessage("server.payment.paymentRejected");
-      if (typeof reason === "string" && /paytr_token/i.test(reason)) {
-        // Bu hata pratikte mağazada Direkt API yetkisinin tanımlı olmamasında da
-        // dönüyor — istemci bu mesajla iframe akışına düşer.
-        reason = i18nMessage("server.payment.directApiNotAuthorized");
-      }
-      this.logger.warn(
-        `PayTR direct API failed oid=${merchantOid}: ${data?.reason || (typeof reason === "string" ? reason : "")}`,
-      );
-      throw new BadRequestException(reason);
-    }
-
-    const lower = trimmed.slice(0, 500).toLowerCase();
-    if (
-      lower.includes("<html") ||
-      lower.includes("<!doctype") ||
-      lower.includes("<form")
-    ) {
-      return { status: "success", threeDSHtml: rawText };
-    }
-
-    this.logger.error(
-      `PayTR direct API beklenmeyen yanıt oid=${merchantOid} HTTP ${httpStatus}: ${trimmed.slice(0, 300)}`,
-    );
-    throw new BadRequestException(
-      i18nMessage("server.payment.unexpectedResponse"),
-    );
+    return {
+      action: this.baseUrl,
+      method: "POST",
+      // Dizi biçimi, global response sanitizer'ın token alan adlarını nesne
+      // anahtarı sanıp silmesini engeller; endpoint sahiplik/capability kontrollüdür.
+      fields: [...formData.entries()].map(([name, value]) => ({ name, value })),
+      requireCvv: options?.savedCard?.requireCvv ?? false,
+    };
   }
 
   // ==========================================================================
   // CAPI — KART SAKLAMA / RECURRING (kullanıcısız tekrarlayan ödeme)
   // Kaynak: resmi PayTR "Kart Saklama (CAPI) + Recurring" dokümanı + NODEJS örnek kodu.
-  // UYARI: Canlıda çalışması için mağazada Non3D + recurring_payment YETKİSİ açık olmalı
-  // (PAYTR_RECURRING_ENABLED flag'i bu yetki doğrulanmadan açılmamalı).
+  // UYARI: Kart saklama PAYTR_CARD_STORAGE_ENABLED; kullanıcısız Non3D çekim
+  // ayrıca PAYTR_RECURRING_ENABLED ile açılır. İki PayTR yetkisini karıştırmayın.
   // ==========================================================================
 
   /**
@@ -845,7 +772,7 @@ export class PayTRService implements IPaymentProvider {
    * tekrarlayan çekim değil, kullanıcının o an başlattığı işlemdir) ve `require_cvv`/
    * `cvv` desteklenir. Hash Direkt API ile BİREBİR aynıdır (mid + ip + oid + email +
    * amount + payment_type + installment + currency + test_mode + non_3d, salt update
-   * içinde). payment_amount ONDALIK TL. non3d=false → 3DS HTML döner (createDirectPayment
+   * içinde). payment_amount ONDALIK TL. non3d=false → 3DS HTML döner (Direct API
    * gibi, kullanıcıya gösterilir); non3d=true → JSON status (success|failed|wait_callback),
    * kesin sonuç ayrıca Bildirim URL'ine düşer. Kaynak: PayTR "kayıtlı karttan ödeme" dok.
    */

@@ -59,6 +59,83 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
   const bodyOf = (): URLSearchParams =>
     new URLSearchParams(fetchSpy.mock.calls[0][1].body as string);
 
+  describe("createDirectPaymentForm", () => {
+    it("returns a signed PayTR form without receiving or emitting raw card data", async () => {
+      const result = await service.createDirectPaymentForm(
+        "ORDDIRECT123",
+        149.9,
+        buyer,
+        [{ name: "Ürün", price: 149.9, quantity: 1 }],
+        { storeCard: true, utoken: "UT1" },
+      );
+      const fields = Object.fromEntries(
+        result.fields.map(({ name, value }) => [name, value]),
+      );
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(result.action).toBe("https://www.paytr.com/odeme");
+      expect(result.method).toBe("POST");
+      expect(fields).toMatchObject({
+        merchant_oid: "ORDDIRECT123",
+        payment_amount: "149.90",
+        non_3d: "0",
+        store_card: "1",
+        utoken: "UT1",
+      });
+      expect(fields).not.toHaveProperty("card_number");
+      expect(fields).not.toHaveProperty("cc_owner");
+      expect(fields).not.toHaveProperty("expiry_month");
+      expect(fields).not.toHaveProperty("expiry_year");
+      expect(fields).not.toHaveProperty("cvv");
+
+      const hashStr =
+        MID +
+        buyer.ip +
+        "ORDDIRECT123" +
+        buyer.email +
+        "149.90" +
+        "card" +
+        "0" +
+        "TL" +
+        "1" +
+        "0";
+      const expected = crypto
+        .createHmac("sha256", KEY)
+        .update(hashStr + SALT)
+        .digest("base64");
+      expect(fields.paytr_token).toBe(expected);
+    });
+
+    it("adds only the owning saved-card tokens and CVV requirement", async () => {
+      const result = await service.createDirectPaymentForm(
+        "ORDDIRECT124",
+        10,
+        buyer,
+        [{ name: "Ürün", price: 10, quantity: 1 }],
+        {
+          savedCard: {
+            utoken: "UT1",
+            ctoken: "CT1",
+            requireCvv: true,
+          },
+        },
+      );
+      const fields = Object.fromEntries(
+        result.fields.map(({ name, value }) => [name, value]),
+      );
+
+      expect(result.requireCvv).toBe(true);
+      expect(fields).toMatchObject({
+        utoken: "UT1",
+        ctoken: "CT1",
+        require_cvv: "1",
+        non_3d: "0",
+      });
+      expect(fields).not.toHaveProperty("recurring_payment");
+      expect(fields).not.toHaveProperty("cvv");
+    });
+  });
+
   describe("capiPaymentByRegisteredCard", () => {
     it("posts to /odeme with utoken/ctoken/require_cvv, NO recurring_payment, and the Direkt API hash", async () => {
       fetchSpy.mockResolvedValue({ text: async () => '{"status":"success"}' });

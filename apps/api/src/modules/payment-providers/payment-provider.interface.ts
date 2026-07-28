@@ -44,26 +44,28 @@ export interface IPaymentProvider {
     amount: number,
   ): Promise<PayTRRefundResponse>;
 
-  createDirectPayment(
+  createDirectPaymentForm(
     merchantOid: string,
     amount: number,
-    card: {
-      number: string;
-      expireMonth: string;
-      expireYear: string;
-      cvv: string;
-      holderName: string;
-    },
     buyer: PayTRBuyer,
     basketItems: PayTRBasketItem[],
     options?: {
       installmentCount?: number;
-      non3d?: boolean;
       successQueryParams?: string;
       storeCard?: boolean;
       utoken?: string;
+      savedCard?: {
+        utoken: string;
+        ctoken: string;
+        requireCvv: boolean;
+      };
     },
-  ): Promise<{ status: "success"; threeDSHtml?: string }>;
+  ): Promise<{
+    action: string;
+    method: "POST";
+    fields: Array<{ name: string; value: string }>;
+    requireCvv: boolean;
+  }>;
 
   chargeRecurring(params: {
     utoken: string;

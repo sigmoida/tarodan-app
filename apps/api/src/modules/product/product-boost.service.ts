@@ -360,7 +360,7 @@ export class ProductBoostService {
         req,
       );
 
-      // Ödeme niyeti (intent): kart bilgisi /payments/process-direct ile alınır (iframe yok).
+      // Ödeme niyeti (intent): kart bilgisi /payments/direct-form ile alınır (iframe yok).
       return {
         boostId: boost.id,
         productId: product.id,

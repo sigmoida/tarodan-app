@@ -35,7 +35,7 @@ export function usePaymentStatus() {
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [recurringEnabled, setRecurringEnabled] = useState(false);
+  const [cardStorageEnabled, setCardStorageEnabled] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const redirectingRef = useRef(false);
 
@@ -48,13 +48,17 @@ export function usePaymentStatus() {
       setIsLoading(true);
       const isGuest = isGuestCheckout || urlHasGuest();
 
-      let cfg = { bypassEnabled: false, recurringEnabled: false };
+      let cfg = {
+        bypassEnabled: false,
+        cardStorageEnabled: false,
+        recurringEnabled: false,
+      };
       try {
         cfg = (await paymentsApi.getConfig()).data;
       } catch {
         /* safe default: new-card only, no bypass */
       }
-      setRecurringEnabled(cfg.recurringEnabled && !isGuest);
+      setCardStorageEnabled(cfg.cardStorageEnabled && !isGuest);
 
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId)
@@ -151,18 +155,6 @@ export function usePaymentStatus() {
     }
   };
 
-  const onCardSuccess = (pid: string) => {
-    if (isMembershipPayment) {
-      router.push(membershipSuccessUrl);
-    } else if (payment?.tradeId) {
-      router.push(`/profile/trades/${payment.tradeId}?paid=1`);
-    } else {
-      router.push(
-        `/payment/success?paymentId=${pid}${isGuestCheckout ? "&guest=true" : ""}`,
-      );
-    }
-  };
-
   const directTarget = useMemo(
     () => ({
       ...(payment?.orderId ? { orderId: payment.orderId as string } : {}),
@@ -194,13 +186,12 @@ export function usePaymentStatus() {
   return {
     phase,
     payment,
-    recurringEnabled,
+    cardStorageEnabled,
     cancelling,
     handleCancel,
     retry: fetchPayment,
     directTarget,
     hasTarget,
     isMembershipPayment,
-    onCardSuccess,
   };
 }
