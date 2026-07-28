@@ -115,6 +115,7 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
       orderUnique: {
         id: "o2",
         orderNumber: "ORD-2",
+        status: OrderStatus.preparing,
         shippingCost: 30,
         packageId: "pkg-1",
         shippingAddress: validAddr,
