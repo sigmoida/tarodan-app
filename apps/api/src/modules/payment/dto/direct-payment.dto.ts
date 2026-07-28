@@ -35,6 +35,13 @@ export class CreditCardDto {
 }
 
 export class DirectPaymentDto {
+    @ApiPropertyOptional({
+        description: 'Payment ID returned by the initiate endpoint. Required for guest payments.',
+    })
+    @IsOptional()
+    @IsString()
+    paymentId?: string;
+
     @ApiPropertyOptional({ description: 'Order ID (tekil sipariş ödemesi)' })
     @IsOptional()
     @IsString()

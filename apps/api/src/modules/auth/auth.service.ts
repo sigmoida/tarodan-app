@@ -286,7 +286,9 @@ export class AuthService {
           select: { id: true },
         });
         if (!payment) continue;
-        const res = await paymentService.verifyPaymentFromClient(payment.id);
+        const res = await paymentService.verifyPaymentFromClient(payment.id, {
+          internal: true,
+        });
         if (res.completed) {
           this.logger.log(
             `Recovered guest payment ${payment.id} for claimed order ${order.id}`,

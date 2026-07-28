@@ -360,6 +360,7 @@ export class PaymentInitiationService {
     userId: string | null,
     dto: DirectPaymentDto,
     req?: Request,
+    capabilityAuthorized = false,
   ) {
     if (!dto.card && !dto.savedCardId) {
       throw new BadRequestException(
@@ -392,7 +393,12 @@ export class PaymentInitiationService {
       merchantOid,
       amount,
       successQueryParams,
-    } = await this.resolveDirectPaymentContext(userId, dto, req);
+    } = await this.resolveDirectPaymentContext(
+      userId,
+      dto,
+      req,
+      capabilityAuthorized,
+    );
 
     try {
       return await this.chargeDirectPayment(
@@ -571,6 +577,7 @@ export class PaymentInitiationService {
     userId: string | null,
     dto: DirectPaymentDto,
     req?: Request,
+    capabilityAuthorized = false,
   ): Promise<{
     payment: any;
     buyer: PayTRBuyer;
@@ -609,6 +616,38 @@ export class PaymentInitiationService {
       };
     };
 
+    if (!userId && (!dto.paymentId || !capabilityAuthorized)) {
+      throw new ForbiddenException(
+        i18nMessage("server.payment.viewStatusForbidden"),
+      );
+    }
+    if (capabilityAuthorized) {
+      if (!dto.paymentId) {
+        throw new ForbiddenException(
+          i18nMessage("server.payment.viewStatusForbidden"),
+        );
+      }
+      const scopedPayment = await this.prisma.payment.findUnique({
+        where: { id: dto.paymentId },
+        select: {
+          orderId: true,
+          checkoutGroupId: true,
+          tradeCashPayment: { select: { tradeId: true } },
+        },
+      });
+      const targetMatches =
+        (!!dto.orderId && scopedPayment?.orderId === dto.orderId) ||
+        (!!dto.checkoutGroupId &&
+          scopedPayment?.checkoutGroupId === dto.checkoutGroupId) ||
+        (!!dto.tradeId &&
+          scopedPayment?.tradeCashPayment?.tradeId === dto.tradeId);
+      if (!targetMatches) {
+        throw new ForbiddenException(
+          i18nMessage("server.payment.viewStatusForbidden"),
+        );
+      }
+    }
+
     let payment: any;
     let buyer: PayTRBuyer;
     let basketItems: Array<{
@@ -634,12 +673,12 @@ export class PaymentInitiationService {
       // Sahiplik: üye → alıcı olmalı; misafir → sipariş misafir siparişi olmalı (iframe ile aynı kural).
       const isGuestOrder =
         (order.shippingAddress as any)?.isGuestOrder === true;
-      if (userId) {
+      if (!capabilityAuthorized && userId) {
         if (order.buyerId !== userId)
           throw new ForbiddenException(
             i18nMessage("server.payment.cannotPayForOrder"),
           );
-      } else if (!isGuestOrder) {
+      } else if (!capabilityAuthorized && !isGuestOrder) {
         throw new ForbiddenException(
           i18nMessage("server.payment.loginRequiredForOrder"),
         );
@@ -749,12 +788,12 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.orderGroupNotFound"),
         );
       // Sahiplik: üye → grup alıcısı olmalı; misafir → grup misafir grubu olmalı (iframe ile aynı kural).
-      if (userId) {
+      if (!capabilityAuthorized && userId) {
         if (group.buyerId !== userId)
           throw new ForbiddenException(
             i18nMessage("server.payment.cannotPayForOrderGroup"),
           );
-      } else if (!group.isGuest) {
+      } else if (!capabilityAuthorized && !group.isGuest) {
         throw new ForbiddenException(
           i18nMessage("server.payment.loginRequiredForOrder"),
         );
@@ -907,6 +946,15 @@ export class PaymentInitiationService {
       );
     }
 
+    if (
+      !userId &&
+      (!dto.paymentId || dto.paymentId !== payment.id || !capabilityAuthorized)
+    ) {
+      throw new ForbiddenException(
+        i18nMessage("server.payment.viewStatusForbidden"),
+      );
+    }
+
     // ÇİFT-ÇEKİM KORUMASI: bu ödemenin önceki bir denemesi (providerConversationId) varsa,
     // YENİ çekimden ÖNCE PayTR'a durum-sorgu yap. Callback gecikmiş/ulaşmamış (ör. tünel ölü)
     // olabilir ama ödeme PayTR'da BAŞARILI olmuş olabilir. Zaten ödendiyse yeni merchant_oid'le
@@ -915,6 +963,7 @@ export class PaymentInitiationService {
     if (payment.providerConversationId) {
       const verified = await this.paymentLifecycle.verifyPaymentFromClient(
         payment.id,
+        { internal: true },
       );
       if (verified.completed) {
         throw new BadRequestException(

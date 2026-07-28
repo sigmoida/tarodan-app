@@ -123,7 +123,9 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
     it("CANLI 3DS çekimi varken fail ETMEZ (orphan capture koruması)", async () => {
       const { service, processFailedPayment } = makeService(true);
 
-      const res = await service.confirmFailedFromClient("pay-1");
+      const res = await service.confirmFailedFromClient("pay-1", {
+        internal: true,
+      });
 
       expect(res.released).toBe(false);
       expect(processFailedPayment).not.toHaveBeenCalled();
@@ -132,7 +134,9 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
     it("canlı çekim yoksa fail eder ve rezervasyonu bırakır", async () => {
       const { service, processFailedPayment } = makeService(false);
 
-      const res = await service.confirmFailedFromClient("pay-1");
+      const res = await service.confirmFailedFromClient("pay-1", {
+        internal: true,
+      });
 
       expect(res.released).toBe(true);
       expect(processFailedPayment).toHaveBeenCalled();
@@ -144,7 +148,9 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
         PaymentStatus.completed,
       );
 
-      const res = await service.confirmFailedFromClient("pay-1");
+      const res = await service.confirmFailedFromClient("pay-1", {
+        internal: true,
+      });
 
       expect(res.released).toBe(false);
       expect(processFailedPayment).not.toHaveBeenCalled();

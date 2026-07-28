@@ -184,6 +184,7 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
       }
       body = {
         ...target,
+        paymentId: initialPaymentId,
         card: {
           cardHolderName: holder.trim(),
           cardNumber: digitsOnly(number),
@@ -200,6 +201,7 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
       }
       body = {
         ...target,
+        paymentId: initialPaymentId,
         savedCardId: selected,
         ...(selectedCard?.requireCvv ? { cvv: savedCvv } : {}),
       };

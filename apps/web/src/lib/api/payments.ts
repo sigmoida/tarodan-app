@@ -1,5 +1,47 @@
 import { api } from "./client";
 
+const paymentCapabilityKey = (paymentId: string) =>
+  `payment-capability.${paymentId}`;
+const volatilePaymentCapabilities = new Map<string, string>();
+
+function rememberPaymentCapability(response: any): void {
+  if (typeof window === "undefined") return;
+  const data = response?.data?.data ?? response?.data;
+  if (data?.paymentId && data?.paymentAccessToken) {
+    volatilePaymentCapabilities.set(data.paymentId, data.paymentAccessToken);
+    try {
+      sessionStorage.setItem(
+        paymentCapabilityKey(data.paymentId),
+        data.paymentAccessToken,
+      );
+    } catch {
+      // The current tab can still finish with the memory copy.
+    }
+  }
+}
+
+function paymentCapabilityHeaders(paymentId: string) {
+  let token = volatilePaymentCapabilities.get(paymentId) ?? null;
+  if (typeof window !== "undefined") {
+    try {
+      token = sessionStorage.getItem(paymentCapabilityKey(paymentId)) ?? token;
+    } catch {
+      // Fall back to the memory copy.
+    }
+  }
+  return token ? { "X-Payment-Capability": token } : {};
+}
+
+async function initiatePayment(
+  path: string,
+  target: { orderId?: string | number; checkoutGroupId?: string },
+  provider: "paytr",
+) {
+  const response = await api.post(path, { ...target, provider });
+  rememberPaymentCapability(response);
+  return response;
+}
+
 // Payments
 export const paymentsApi = {
   /** Public ödeme yapılandırması: bypass (dev) ve kayıtlı kart/oto-yenileme (Non3D) açık mı. */
@@ -8,23 +50,27 @@ export const paymentsApi = {
       "/payments/config",
     ),
   initiate: (orderId: string | number, provider: "paytr") =>
-    api.post("/payments/initiate", { orderId, provider }),
+    initiatePayment("/payments/initiate", { orderId }, provider),
   /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */
   initiateGroup: (checkoutGroupId: string, provider: "paytr") =>
-    api.post("/payments/initiate", { checkoutGroupId, provider }),
+    initiatePayment("/payments/initiate", { checkoutGroupId }, provider),
   initiateGuest: (orderId: string | number, provider: "paytr") =>
-    api.post("/payments/initiate-guest", { orderId, provider }),
+    initiatePayment("/payments/initiate-guest", { orderId }, provider),
   /** Grup ödemesi (misafir) */
   initiateGroupGuest: (checkoutGroupId: string, provider: "paytr") =>
-    api.post("/payments/initiate-guest", { checkoutGroupId, provider }),
+    initiatePayment("/payments/initiate-guest", { checkoutGroupId }, provider),
   /** Takas nakit fark ödemesi başlat (sipariş/teklif ile aynı ödeme altyapısı) */
   initiateTradeCash: (tradeId: string) =>
     api.post("/payments/initiate-trade-cash", { tradeId }),
   getStatus: (paymentId: string) => api.get(`/payments/${paymentId}`),
   getStatusLight: (paymentId: string) =>
-    api.get(`/payments/${paymentId}/status`),
+    api.get(`/payments/${paymentId}/status`, {
+      headers: paymentCapabilityHeaders(paymentId),
+    }),
   getStatusLightGuest: (paymentId: string) =>
-    api.get(`/payments/${paymentId}/status-guest`),
+    api.get(`/payments/${paymentId}/status-guest`, {
+      headers: paymentCapabilityHeaders(paymentId),
+    }),
   getMyPayments: (params?: {
     status?: string;
     provider?: string;
@@ -36,11 +82,17 @@ export const paymentsApi = {
   cancel: (paymentId: string) => api.post(`/payments/${paymentId}/cancel`),
   /** Fail sayfasından; ödeme hâlâ pending ise rezervasyonu serbest bırakır */
   confirmFailed: (paymentId: string) =>
-    api.post<{ released: boolean }>(`/payments/${paymentId}/confirm-failed`),
+    api.post<{ released: boolean }>(
+      `/payments/${paymentId}/confirm-failed`,
+      {},
+      { headers: paymentCapabilityHeaders(paymentId) },
+    ),
   /** Success sayfasından; PayTR durum-sorgu ile ödemeyi anında tamamlar */
   verify: (paymentId: string) =>
     api.post<{ completed: boolean; status: string }>(
       `/payments/${paymentId}/verify`,
+      {},
+      { headers: paymentCapabilityHeaders(paymentId) },
     ),
   /**
    * Başarısız ödemeyi yeniden başlatır: backend mevcut `failed` satırı `pending`'e
@@ -66,6 +118,7 @@ export const paymentsApi = {
    * - Kayıtlı kart: { orderId, savedCardId, cvv? } → Non3D, anında status (PAYTR_RECURRING_ENABLED).
    */
   processDirect: (body: {
+    paymentId?: string;
     orderId?: string;
     checkoutGroupId?: string;
     tradeId?: string;
@@ -86,5 +139,9 @@ export const paymentsApi = {
       threeDSHtml: string | null;
       status: "pending" | "success" | "failed" | "wait_callback";
       reason?: string | null;
-    }>("/payments/process-direct", body),
+    }>("/payments/process-direct", body, {
+      headers: body.paymentId
+        ? paymentCapabilityHeaders(body.paymentId)
+        : undefined,
+    }),
 };

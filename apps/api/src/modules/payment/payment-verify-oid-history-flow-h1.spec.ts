@@ -55,7 +55,9 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
           : { ok: false },
       );
 
-    const res = await service.verifyPaymentFromClient("pay-1");
+    const res = await service.verifyPaymentFromClient("pay-1", {
+      internal: true,
+    });
 
     expect(res).toEqual({ completed: true, status: "completed_now" });
     // Her iki oid de sorgulandı; capture oid1'de bulundu.
@@ -74,7 +76,9 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
       ok: false,
     }));
 
-    const res = await service.verifyPaymentFromClient("pay-1");
+    const res = await service.verifyPaymentFromClient("pay-1", {
+      internal: true,
+    });
 
     expect(res.completed).toBe(false);
     expect(res.status).toBe("paytr_not_found");
@@ -88,7 +92,9 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
         : { ok: false },
     );
 
-    const res = await service.verifyPaymentFromClient("pay-1");
+    const res = await service.verifyPaymentFromClient("pay-1", {
+      internal: true,
+    });
 
     expect(res.completed).toBe(false);
     expect(res.status).toBe("amount_mismatch");

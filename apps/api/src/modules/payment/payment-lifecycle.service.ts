@@ -18,6 +18,9 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { i18nMessage } from "../i18n";
 
+export type PaymentAccessContext =
+  { internal: true } | { userId: string | null; capabilityAuthorized: boolean };
+
 @Injectable()
 export class PaymentLifecycleService {
   private readonly logger = new Logger(PaymentLifecycleService.name);
@@ -34,6 +37,27 @@ export class PaymentLifecycleService {
     @Optional()
     private readonly providerEvents?: PaymentProviderEventService,
   ) {}
+
+  private assertPaymentAccess(
+    payment: {
+      order?: { buyerId: string } | null;
+      checkoutGroup?: { buyerId: string | null } | null;
+      tradeCashPayment?: { payerId: string } | null;
+    },
+    access: PaymentAccessContext,
+  ): void {
+    if ("internal" in access || access.capabilityAuthorized) return;
+    const ownerId =
+      payment.order?.buyerId ??
+      payment.checkoutGroup?.buyerId ??
+      payment.tradeCashPayment?.payerId ??
+      null;
+    if (!access.userId || ownerId !== access.userId) {
+      throw new ForbiddenException(
+        i18nMessage("server.payment.viewStatusForbidden"),
+      );
+    }
+  }
 
   /**
    * Retry a failed payment
@@ -331,14 +355,21 @@ export class PaymentLifecycleService {
    */
   async confirmFailedFromClient(
     paymentId: string,
+    access: PaymentAccessContext,
   ): Promise<{ released: boolean }> {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
-      include: { order: { select: { id: true } } },
+      include: {
+        order: { select: { id: true, buyerId: true } },
+        checkoutGroup: { select: { buyerId: true } },
+        tradeCashPayment: { select: { payerId: true } },
+      },
     });
-    if (!payment || payment.status !== PaymentStatus.pending) {
+    if (!payment) {
       return { released: false };
     }
+    this.assertPaymentAccess(payment, access);
+    if (payment.status !== PaymentStatus.pending) return { released: false };
     // SEC-M1: Bu uç PUBLIC ve idempotent (guest checkout fail sayfası da çağırır) —
     // sahiplik JWT ile doğrulanamaz. En kritik kötüye kullanımı kapat: CANLI bir 3DS
     // çekimi varken ödemeyi fail ETME. Aksi halde (a) kullanıcı erken "başarısız"
@@ -370,11 +401,13 @@ export class PaymentLifecycleService {
    */
   async verifyPaymentFromClient(
     paymentId: string,
+    access: PaymentAccessContext,
   ): Promise<{ completed: boolean; status: string }> {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
         order: { include: { buyer: true, seller: true, product: true } },
+        checkoutGroup: { select: { buyerId: true } },
         tradeCashPayment: true,
       },
     });
@@ -382,6 +415,7 @@ export class PaymentLifecycleService {
     if (!payment) {
       return { completed: false, status: "not_found" };
     }
+    this.assertPaymentAccess(payment, access);
 
     if (payment.status === PaymentStatus.completed) {
       return { completed: true, status: "already_completed" };

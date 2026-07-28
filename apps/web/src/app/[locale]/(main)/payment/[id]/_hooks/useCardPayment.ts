@@ -19,6 +19,7 @@ interface Target {
 
 interface UseCardPaymentArgs {
   target: Target;
+  paymentId: string;
   recurringEnabled: boolean;
   onSuccess?: (paymentId: string) => void;
 }
@@ -30,6 +31,7 @@ interface UseCardPaymentArgs {
  */
 export function useCardPayment({
   target,
+  paymentId,
   recurringEnabled,
   onSuccess,
 }: UseCardPaymentArgs) {
@@ -84,6 +86,7 @@ export function useCardPayment({
       const v = form.getValues();
       body = {
         ...target,
+        paymentId,
         card: {
           cardHolderName: v.holder.trim(),
           cardNumber: v.number,
@@ -100,6 +103,7 @@ export function useCardPayment({
       }
       body = {
         ...target,
+        paymentId,
         savedCardId: selected,
         ...(selectedCard?.requireCvv ? { cvv: savedCvv } : {}),
       };

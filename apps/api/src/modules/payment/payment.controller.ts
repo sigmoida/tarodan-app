@@ -48,6 +48,7 @@ import {
 @Controller("payments")
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
+  private static readonly PAYMENT_CAPABILITY_HEADER = "x-payment-capability";
 
   constructor(
     private readonly paymentService: PaymentService,
@@ -70,13 +71,57 @@ export class PaymentController {
       (authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null);
     if (!token) return null;
     try {
-      const decoded = this.jwtService.verify(token, {
-        ignoreExpiration: true,
-      }) as any;
+      const decoded = this.jwtService.verify(token) as {
+        sub?: string;
+        id?: string;
+        type?: string;
+      };
+      if (decoded.type !== "access") return null;
       return decoded.sub || decoded.id || null;
     } catch {
       return null;
     }
+  }
+
+  private paymentCapabilitySecret(): string {
+    return (
+      this.configService.get<string>("PAYMENT_CAPABILITY_SECRET") ||
+      this.configService.getOrThrow<string>("JWT_SECRET")
+    );
+  }
+
+  private issuePaymentCapability(paymentId: string): string {
+    return this.jwtService.sign(
+      { sub: paymentId, type: "payment_capability" },
+      {
+        secret: this.paymentCapabilitySecret(),
+        expiresIn: "2h",
+      },
+    );
+  }
+
+  private hasPaymentCapability(req: Request, paymentId: string): boolean {
+    const raw =
+      req.headers[PaymentController.PAYMENT_CAPABILITY_HEADER] ?? null;
+    const token = Array.isArray(raw) ? raw[0] : raw;
+    if (!token) return false;
+    try {
+      const decoded = this.jwtService.verify(token, {
+        secret: this.paymentCapabilitySecret(),
+      }) as { sub?: string; type?: string };
+      return decoded.type === "payment_capability" && decoded.sub === paymentId;
+    } catch {
+      return false;
+    }
+  }
+
+  private withPaymentCapability<T extends { paymentId: string }>(
+    result: T,
+  ): T & { paymentAccessToken: string } {
+    return {
+      ...result,
+      paymentAccessToken: this.issuePaymentCapability(result.paymentId),
+    };
   }
 
   /**
@@ -119,7 +164,12 @@ export class PaymentController {
     // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
     const userId = this.extractUserId(req);
 
-    return this.paymentService.initiatePaymentUnified(userId, dto, req);
+    const result = await this.paymentService.initiatePaymentUnified(
+      userId,
+      dto,
+      req,
+    );
+    return this.withPaymentCapability(result);
   }
 
   /**
@@ -138,7 +188,12 @@ export class PaymentController {
     @Body() dto: InitiatePaymentDto,
     @Req() req: Request,
   ): Promise<PaymentInitResponseDto> {
-    return this.paymentService.initiatePaymentUnified(null, dto, req);
+    const result = await this.paymentService.initiatePaymentUnified(
+      null,
+      dto,
+      req,
+    );
+    return this.withPaymentCapability(result);
   }
 
   /**
@@ -186,7 +241,14 @@ export class PaymentController {
   async processDirect(@Body() dto: DirectPaymentDto, @Req() req: Request) {
     // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
     const userId = this.extractUserId(req);
-    return this.paymentService.processDirectPayment(userId, dto, req);
+    const capabilityAuthorized =
+      !!dto.paymentId && this.hasPaymentCapability(req, dto.paymentId);
+    return this.paymentService.processDirectPayment(
+      userId,
+      dto,
+      req,
+      capabilityAuthorized,
+    );
   }
 
   /**
@@ -275,7 +337,11 @@ export class PaymentController {
     // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir.
     const userId = this.extractUserId(req);
 
-    return this.paymentService.getPaymentStatusUnified(id, userId);
+    return this.paymentService.getPaymentStatusUnified(
+      id,
+      userId,
+      this.hasPaymentCapability(req, id),
+    );
   }
 
   /**
@@ -289,8 +355,12 @@ export class PaymentController {
     status: HttpStatus.OK,
     description: "Payment status for guest order",
   })
-  async getGuestPaymentStatus(@Param("id") id: string) {
-    return this.paymentService.getPaymentStatusUnified(id, null);
+  async getGuestPaymentStatus(@Param("id") id: string, @Req() req: Request) {
+    return this.paymentService.getPaymentStatusUnified(
+      id,
+      null,
+      this.hasPaymentCapability(req, id),
+    );
   }
 
   /**
@@ -359,8 +429,12 @@ export class PaymentController {
   })
   async confirmFailed(
     @Param("id") paymentId: string,
+    @Req() req: Request,
   ): Promise<{ released: boolean }> {
-    return this.paymentService.confirmFailedFromClient(paymentId);
+    return this.paymentService.confirmFailedFromClient(paymentId, {
+      userId: this.extractUserId(req),
+      capabilityAuthorized: this.hasPaymentCapability(req, paymentId),
+    });
   }
 
   /**
@@ -377,8 +451,12 @@ export class PaymentController {
   @ApiResponse({ status: HttpStatus.OK, description: "Verification result" })
   async verifyPayment(
     @Param("id") paymentId: string,
+    @Req() req: Request,
   ): Promise<{ completed: boolean; status: string }> {
-    return this.paymentService.verifyPaymentFromClient(paymentId);
+    return this.paymentService.verifyPaymentFromClient(paymentId, {
+      userId: this.extractUserId(req),
+      capabilityAuthorized: this.hasPaymentCapability(req, paymentId),
+    });
   }
 
   /**

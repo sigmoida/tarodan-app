@@ -93,6 +93,7 @@ export default function PaymentPageClient() {
           {hasTarget ? (
             <CardPaymentForm
               target={directTarget}
+              paymentId={payment.id}
               amount={payment.amount}
               recurringEnabled={recurringEnabled}
               onSuccess={onCardSuccess}

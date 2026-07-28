@@ -102,6 +102,7 @@ export class MembershipCommonService {
         try {
           await this.paymentService.verifyPaymentFromClient(
             pendingPaymentRow.id,
+            { internal: true },
           );
         } catch (err) {
           this.logger.warn(

@@ -11,6 +11,7 @@ import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
+import type { PaymentAccessContext } from "./payment-lifecycle.service";
 
 @Injectable()
 export class PaymentService {
@@ -51,8 +52,14 @@ export class PaymentService {
     userId: string | null,
     dto: DirectPaymentDto,
     req?: Request,
+    capabilityAuthorized = false,
   ) {
-    return this.paymentInitiation.processDirectPayment(userId, dto, req);
+    return this.paymentInitiation.processDirectPayment(
+      userId,
+      dto,
+      req,
+      capabilityAuthorized,
+    );
   }
 
   async initiateTradeCashPayment(
@@ -88,14 +95,16 @@ export class PaymentService {
 
   async confirmFailedFromClient(
     paymentId: string,
+    access: PaymentAccessContext,
   ): Promise<{ released: boolean }> {
-    return this.paymentLifecycle.confirmFailedFromClient(paymentId);
+    return this.paymentLifecycle.confirmFailedFromClient(paymentId, access);
   }
 
   async verifyPaymentFromClient(
     paymentId: string,
+    access: PaymentAccessContext,
   ): Promise<{ completed: boolean; status: string }> {
-    return this.paymentLifecycle.verifyPaymentFromClient(paymentId);
+    return this.paymentLifecycle.verifyPaymentFromClient(paymentId, access);
   }
 
   // Taşındı: payment-refund.service.ts — iade/escrow serbest bırakma (facade delege; imzalar aynı).
@@ -194,8 +203,16 @@ export class PaymentService {
 
   // Taşındı: payment-query.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getPaymentStatusUnified(paymentId: string, userId: string | null) {
-    return this.paymentQuery.getPaymentStatusUnified(paymentId, userId);
+  async getPaymentStatusUnified(
+    paymentId: string,
+    userId: string | null,
+    capabilityAuthorized = false,
+  ) {
+    return this.paymentQuery.getPaymentStatusUnified(
+      paymentId,
+      userId,
+      capabilityAuthorized,
+    );
   }
 
   async getPaymentStatus(paymentId: string, userId: string) {

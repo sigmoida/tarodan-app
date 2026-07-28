@@ -16,6 +16,7 @@ import NewCardFields from "./NewCardFields";
 
 interface CardPaymentFormProps {
   target: { orderId?: string; checkoutGroupId?: string; tradeId?: string };
+  paymentId: string;
   amount?: number;
   recurringEnabled?: boolean;
   onSuccess?: (paymentId: string) => void;
@@ -23,6 +24,7 @@ interface CardPaymentFormProps {
 
 export default function CardPaymentForm({
   target,
+  paymentId,
   amount,
   recurringEnabled = false,
   onSuccess,
@@ -39,7 +41,7 @@ export default function CardPaymentForm({
     setSaveCard,
     processing,
     submit,
-  } = useCardPayment({ target, recurringEnabled, onSuccess });
+  } = useCardPayment({ target, paymentId, recurringEnabled, onSuccess });
 
   const amountLabel =
     amount != null

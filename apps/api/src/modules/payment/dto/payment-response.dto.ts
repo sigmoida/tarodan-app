@@ -59,6 +59,12 @@ export class PaymentInitResponseDto {
 
   @ApiPropertyOptional({ example: true })
   useBypass?: boolean;
+
+  @ApiProperty({
+    description:
+      'Short-lived bearer capability scoped to this payment. Send it in X-Payment-Capability on public payment endpoints.',
+  })
+  paymentAccessToken: string;
 }
 
 export class PaymentHoldResponseDto {

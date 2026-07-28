@@ -57,7 +57,11 @@ export class PaymentQueryService {
   /**
    * Unified get payment status (works for both auth and guest)
    */
-  async getPaymentStatusUnified(paymentId: string, userId: string | null) {
+  async getPaymentStatusUnified(
+    paymentId: string,
+    userId: string | null,
+    capabilityAuthorized = false,
+  ) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
@@ -66,7 +70,6 @@ export class PaymentQueryService {
             buyerId: true,
             sellerId: true,
             productId: true,
-            shippingAddress: true,
             totalAmount: true,
             shippingCost: true,
             buyerFeeAmount: true,
@@ -86,7 +89,6 @@ export class PaymentQueryService {
             id: true,
             groupNumber: true,
             buyerId: true,
-            isGuest: true,
             totalAmount: true,
             orders: {
               select: {
@@ -119,11 +121,11 @@ export class PaymentQueryService {
 
     // Trade cash payment (no order)
     if (!payment.order && payment.tradeCashPayment) {
-      if (
-        userId &&
-        payment.tradeCashPayment.payerId !== userId &&
-        payment.tradeCashPayment.recipientId !== userId
-      ) {
+      const ownsPayment =
+        !!userId &&
+        (payment.tradeCashPayment.payerId === userId ||
+          payment.tradeCashPayment.recipientId === userId);
+      if (!ownsPayment && !capabilityAuthorized) {
         throw new ForbiddenException(
           i18nMessage("server.payment.viewStatusForbidden"),
         );
@@ -145,19 +147,15 @@ export class PaymentQueryService {
     // Grup ödemesi (no single order)
     if (!payment.order && payment.checkoutGroup) {
       const group = payment.checkoutGroup;
-      if (userId) {
+      if (!capabilityAuthorized) {
+        if (!userId) {
+          throw new ForbiddenException(
+            i18nMessage("server.payment.loginRequiredForPayment"),
+          );
+        }
         if (group.buyerId !== userId) {
           throw new ForbiddenException(
             i18nMessage("server.payment.viewStatusForbidden"),
-          );
-        }
-      } else if (!group.isGuest) {
-        const canPollWithoutAuth =
-          payment.status === PaymentStatus.pending ||
-          payment.status === PaymentStatus.processing;
-        if (!canPollWithoutAuth) {
-          throw new ForbiddenException(
-            i18nMessage("server.payment.loginRequiredForPayment"),
           );
         }
       }
@@ -211,12 +209,13 @@ export class PaymentQueryService {
       );
     }
 
-    // Check if this is a guest order
-    const shippingAddress = payment.order.shippingAddress as any;
-    const isGuestOrder = shippingAddress?.isGuestOrder === true;
-
     // Validate access
-    if (userId) {
+    if (!capabilityAuthorized) {
+      if (!userId) {
+        throw new ForbiddenException(
+          i18nMessage("server.payment.loginRequiredForPayment"),
+        );
+      }
       if (
         payment.order.buyerId !== userId &&
         payment.order.sellerId !== userId
@@ -224,19 +223,6 @@ export class PaymentQueryService {
         throw new ForbiddenException(
           i18nMessage("server.payment.viewStatusForbidden"),
         );
-      }
-    } else {
-      if (!isGuestOrder) {
-        // Oturum yok veya JWT decode edilemedi (ör. token checkout sırasında temizlendi): yine de
-        // bekleyen/işlenen ödemede durum okunabilsin; ödeme kimliği UUID ile korunur.
-        const canPollWithoutAuth =
-          payment.status === PaymentStatus.pending ||
-          payment.status === PaymentStatus.processing;
-        if (!canPollWithoutAuth) {
-          throw new ForbiddenException(
-            i18nMessage("server.payment.loginRequiredForPayment"),
-          );
-        }
       }
     }
 

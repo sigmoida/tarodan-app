@@ -1,4 +1,47 @@
 import { api, guestApi } from './client';
+import * as SecureStore from 'expo-secure-store';
+
+const paymentCapabilityKey = (paymentId: string) =>
+  `payment-capability.${paymentId}`;
+const volatilePaymentCapabilities = new Map<string, string>();
+
+async function rememberPaymentCapability(response: any): Promise<void> {
+  const data = response?.data?.data ?? response?.data;
+  if (data?.paymentId && data?.paymentAccessToken) {
+    volatilePaymentCapabilities.set(data.paymentId, data.paymentAccessToken);
+    try {
+      await SecureStore.setItemAsync(
+        paymentCapabilityKey(data.paymentId),
+        data.paymentAccessToken,
+      );
+    } catch {
+      // The current app session can still finish with the memory copy.
+    }
+  }
+}
+
+async function paymentCapabilityHeaders(paymentId: string) {
+  let token = volatilePaymentCapabilities.get(paymentId) ?? null;
+  try {
+    token =
+      (await SecureStore.getItemAsync(paymentCapabilityKey(paymentId))) ??
+      token;
+  } catch {
+    // Fall back to the memory copy.
+  }
+  return token ? { 'X-Payment-Capability': token } : {};
+}
+
+async function initiatePayment(
+  client: typeof api,
+  path: string,
+  target: { orderId?: string | number; checkoutGroupId?: string },
+  provider: 'paytr',
+) {
+  const response = await client.post(path, { ...target, provider });
+  await rememberPaymentCapability(response);
+  return response;
+}
 
 // Addresses API - Web ile aynı endpoint'ler
 export const addressesApi = {
@@ -34,27 +77,35 @@ export const paymentsApi = {
   getConfig: () =>
     api.get<{ bypassEnabled: boolean; recurringEnabled: boolean }>('/payments/config'),
   initiate: (orderId: string | number, provider: 'paytr' = 'paytr') =>
-    api.post('/payments/initiate', { orderId, provider }),
+    initiatePayment(api, '/payments/initiate', { orderId }, provider),
   /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */
   initiateGroup: (checkoutGroupId: string, provider: 'paytr' = 'paytr') =>
-    api.post('/payments/initiate', { checkoutGroupId, provider }),
+    initiatePayment(api, '/payments/initiate', { checkoutGroupId }, provider),
   initiateGuest: (orderId: string | number, provider: 'paytr' = 'paytr') =>
-    guestApi.post('/payments/initiate-guest', { orderId, provider }),
+    initiatePayment(guestApi, '/payments/initiate-guest', { orderId }, provider),
   /** Grup ödemesi (misafir) */
   initiateGroupGuest: (checkoutGroupId: string, provider: 'paytr' = 'paytr') =>
-    guestApi.post('/payments/initiate-guest', { checkoutGroupId, provider }),
+    initiatePayment(guestApi, '/payments/initiate-guest', { checkoutGroupId }, provider),
   /** Takas nakit fark ödemesi başlat */
   initiateTradeCash: (tradeId: string) =>
     api.post('/payments/initiate-trade-cash', { tradeId }),
   getStatus: (paymentId: string) =>
     api.get(`/payments/${paymentId}`),
   /** POST /payments/:id/verify — PayTR ödemesini aktif doğrula (web ile parite) */
-  verify: (paymentId: string) =>
-    api.post(`/payments/${paymentId}/verify`),
+  verify: async (paymentId: string) =>
+    api.post(
+      `/payments/${paymentId}/verify`,
+      {},
+      { headers: await paymentCapabilityHeaders(paymentId) },
+    ),
   getStatusLight: (paymentId: string) =>
-    api.get(`/payments/${paymentId}/status`),
+    paymentCapabilityHeaders(paymentId).then((headers) =>
+      api.get(`/payments/${paymentId}/status`, { headers }),
+    ),
   getStatusLightGuest: (paymentId: string) =>
-    guestApi.get(`/payments/${paymentId}/status-guest`),
+    paymentCapabilityHeaders(paymentId).then((headers) =>
+      guestApi.get(`/payments/${paymentId}/status-guest`, { headers }),
+    ),
   getMyPayments: (params?: {
     status?: string;
     provider?: string;
@@ -66,8 +117,12 @@ export const paymentsApi = {
   cancel: (paymentId: string) =>
     api.post(`/payments/${paymentId}/cancel`),
   /** Fail sayfasında; hâlâ pending ise rezervasyonu serbest bırakır */
-  confirmFailed: (paymentId: string) =>
-    api.post(`/payments/${paymentId}/confirm-failed`),
+  confirmFailed: async (paymentId: string) =>
+    api.post(
+      `/payments/${paymentId}/confirm-failed`,
+      {},
+      { headers: await paymentCapabilityHeaders(paymentId) },
+    ),
   /** Test bypass: PAYMENT_BYPASS=true iken tek kart başarılı */
   bypassComplete: (paymentId: string, cardNumber?: string) =>
     api.post(
@@ -82,6 +137,7 @@ export const paymentsApi = {
    * (PAYTR_RECURRING_ENABLED açıkken).
    */
   processDirect: (body: {
+    paymentId?: string;
     orderId?: string;
     checkoutGroupId?: string;
     tradeId?: string;
@@ -95,5 +151,10 @@ export const paymentsApi = {
     savedCardId?: string;
     cvv?: string;
     saveCard?: boolean;
-  }) => api.post('/payments/process-direct', body),
+  }) =>
+    body.paymentId
+      ? paymentCapabilityHeaders(body.paymentId).then((headers) =>
+          api.post('/payments/process-direct', body, { headers }),
+        )
+      : api.post('/payments/process-direct', body),
 };

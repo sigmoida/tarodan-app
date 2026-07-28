@@ -40,6 +40,7 @@ const envSchema = z
     JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
     JWT_REFRESH_SECRET: z.string().min(1, "JWT_REFRESH_SECRET is required"),
     ADMIN_JWT_SECRET: z.string().min(1, "ADMIN_JWT_SECRET is required"),
+    PAYMENT_CAPABILITY_SECRET: z.string().optional(),
     GUEST_CHECKOUT_OTP_SECRET: z
       .string()
       .min(1, "GUEST_CHECKOUT_OTP_SECRET is required"),
@@ -65,6 +66,7 @@ const envSchema = z
       JWT_SECRET: env.JWT_SECRET,
       JWT_REFRESH_SECRET: env.JWT_REFRESH_SECRET,
       ADMIN_JWT_SECRET: env.ADMIN_JWT_SECRET,
+      PAYMENT_CAPABILITY_SECRET: env.PAYMENT_CAPABILITY_SECRET ?? "",
       GUEST_CHECKOUT_OTP_SECRET: env.GUEST_CHECKOUT_OTP_SECRET,
     };
 
@@ -91,13 +93,17 @@ const envSchema = z
       env.JWT_SECRET,
       env.JWT_REFRESH_SECRET,
       env.ADMIN_JWT_SECRET,
+      env.PAYMENT_CAPABILITY_SECRET,
     ];
-    if (new Set(signing).size !== signing.length) {
+    if (
+      !env.PAYMENT_CAPABILITY_SECRET ||
+      new Set(signing).size !== signing.length
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["ADMIN_JWT_SECRET"],
+        path: ["PAYMENT_CAPABILITY_SECRET"],
         message:
-          "JWT_SECRET, JWT_REFRESH_SECRET and ADMIN_JWT_SECRET must be mutually distinct in production",
+          "JWT_SECRET, JWT_REFRESH_SECRET, ADMIN_JWT_SECRET and PAYMENT_CAPABILITY_SECRET must be present and mutually distinct in production",
       });
     }
 

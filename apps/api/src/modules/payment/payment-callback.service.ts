@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentProvider, PayTRCallbackDto } from "./dto";
@@ -143,7 +143,7 @@ export class PaymentCallbackService {
       this.logger.error(
         `PayTR callback invalid hash and no payment row: merchant_oid=${dto.merchant_oid} status=${dto.status}`,
       );
-      throw new NotFoundException("Payment not found");
+      return "OK";
     }
 
     if (payment.provider !== PaymentProvider.paytr) {
