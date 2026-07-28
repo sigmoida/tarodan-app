@@ -45,7 +45,7 @@ describe("admin list primitives", () => {
     });
 
     it("rejects a limit above the maximum", async () => {
-      const query = plainToInstance(AdminListQueryDto, { limit: "251" });
+      const query = plainToInstance(AdminListQueryDto, { limit: "501" });
 
       const errors = await validate(query);
 
@@ -292,18 +292,18 @@ describe("admin list primitives", () => {
         orderBy: { createdAt: "desc" },
       };
 
-      // Over the 250 cap → clamped to 250.
+      // At the shared 500-row cap.
       const result = await paginate(delegate, options, { page: 2, limit: 500 });
 
       expect(delegate.count).toHaveBeenCalledWith({ where: options.where });
       expect(delegate.findMany).toHaveBeenCalledWith({
         ...options,
-        skip: 250,
-        take: 250,
+        skip: 500,
+        take: 500,
       });
       expect(result).toEqual({
         data: [{ id: "product-1" }],
-        meta: { total: 505, page: 2, limit: 250, totalPages: 3 },
+        meta: { total: 505, page: 2, limit: 500, totalPages: 2 },
       });
     });
   });

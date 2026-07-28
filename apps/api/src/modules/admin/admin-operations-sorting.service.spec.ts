@@ -15,10 +15,10 @@ function createDelegate() {
 }
 
 describe("admin operations list sorting", () => {
-  it("sorts orders by a mapped buyer name and paginates", async () => {
-    const order = createDelegate();
+  it("paginates orders by checkout group so a cart stays on one page", async () => {
+    const checkoutGroup = createDelegate();
     const service = new AdminOrderService(
-      { order } as any,
+      { checkoutGroup } as any,
       {} as any,
       undefined as any,
     );
@@ -26,13 +26,12 @@ describe("admin operations list sorting", () => {
     await service.getOrders({
       page: 2,
       limit: 5,
-      sortBy: "buyer.displayName",
-      sortOrder: "asc",
     });
 
-    expect(order.findMany).toHaveBeenCalledWith(
+    expect(checkoutGroup.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: { buyer: { displayName: "asc" } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
         skip: 5,
         take: 5,
       }),

@@ -55,8 +55,11 @@ describe("admin system and user list sorting", () => {
         ])
         .mockResolvedValueOnce([{ id: "user-b" }, { id: "user-a" }]),
     });
+    const order = {
+      groupBy: jest.fn().mockResolvedValue([]),
+    };
     const service = new AdminUserService(
-      { user } as any,
+      { user, order } as any,
       {} as any,
       undefined as any,
     );
