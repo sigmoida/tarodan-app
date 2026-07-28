@@ -1310,10 +1310,7 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
     "SHP-210",
     "Web takip satırı görünürlüğü salt-UI; apps/web e2e kapsamı",
   );
-  scenario.skip(
-    "SHP-211",
-    "Mobile Kargo Takip kartı salt-UI; apps/mobile e2e kapsamı",
-  );
+  scenario.skip("SHP-211", "Mobil Kargo Takip kartı harici istemci UI kapsamı");
   scenario.skip(
     "SHP-212",
     'Web "Kargo Bilgisi Ekle" → POST /orders/:id/ship (endpoint yok) salt-UI/BUG; apps/web e2e kapsamı',

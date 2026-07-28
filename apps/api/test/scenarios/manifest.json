@@ -1485,7 +1485,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "1. Web reset-password sayfasından şifre sıfırla; Network'te endpoint'i gözle. 2. Mobil reset-password ekranından şifre sıfırla; istek logunu gözle.",
-      "exp": "İkisi de POST /api/auth/reset-password'a gider (security ucuna DEĞİL). — apps/web/src/app/reset-password/page.tsx:69, apps/mobile/src/services/api.ts:196.",
+      "exp": "Web ve harici mobil istemci POST /api/auth/reset-password kontratını kullanır (security ucuna DEĞİL).",
       "gap": false,
       "gapRefs": []
     },
@@ -1498,7 +1498,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "1. Web authApi ve mobil api çağrılarını karşılaştır.",
-      "exp": "İkisi de /auth/login, /auth/register, /auth/google, /auth/logout, /auth/refresh, /auth/verify-email, /auth/forgot-password kullanır; 2FA ve şifre değiştirme /security/*. — apps/web/src/lib/api.ts:108-119, apps/mobile/src/services/api.ts:163-214.",
+      "exp": "Web ve harici mobil istemci /auth/login, /auth/register, /auth/google, /auth/logout, /auth/refresh, /auth/verify-email, /auth/forgot-password kontratlarını kullanır; 2FA ve şifre değiştirme /security/* altındadır.",
       "gap": false,
       "gapRefs": []
     },
@@ -1511,7 +1511,7 @@
       "tur": "Parite",
       "pri": "P2",
       "steps": "1. Web login sonrası Network'te Set-Cookie (access_token httpOnly) gözle; localStorage'da token OLMAMALI. 2. Mobilde login sonrası refresh isteğinin body/header ile gittiğini gözle.",
-      "exp": "Web → httpOnly cookie (XSS koruması), localStorage'da token yok; mobil → header/body. — utils/auth-cookies.ts:48-69, apps/mobile/src/services/api.ts:189.",
+      "exp": "Web → httpOnly cookie (XSS koruması), localStorage'da token yok; harici mobil istemci → Authorization header/body token.",
       "gap": false,
       "gapRefs": []
     },
@@ -5333,7 +5333,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "Mobile'da bu ürünlerin detayını aç; unavailable ekranını kontrol et.",
-      "exp": "Detay görünür, \"stok bitti\"/benzer ürünler (apps/mobile/app/products/unavailable) gösterilir — web products/unavailable/[productId] ile paralel.",
+      "exp": "Harici mobil istemcide detay ve stok-tükendi durumu gösterilir; API sold/inactive ürün kontratını sağlar.",
       "gap": false,
       "gapRefs": []
     },
@@ -6464,7 +6464,7 @@
       "tur": "Sınır değer",
       "pri": "P1",
       "steps": "GET /api/wishlist.",
-      "exp": "Ürün listede kalır; productStatus=\"sold\". Web/mobile badge: mobil \"Satıldı\" / \"Aktif değil\" (apps/mobile/app/favorites.tsx:155-158); active değilse satın al butonu gizli (:174).",
+      "exp": "Ürün listede kalır; productStatus=\"sold\". İstemciler satın alma aksiyonunu productStatus ve stok alanlarına göre kapatır.",
       "gap": false,
       "gapRefs": []
     },
@@ -14992,7 +14992,7 @@
       "tur": "i18n / Parite",
       "pri": "P2",
       "steps": "1. Mobilde İadelerim listesini aç; durum/sebep etiketlerini gözle.",
-      "exp": "Tüm metinler Türkçe (örn. \"Satıcı İncelemesinde\", \"İade Edildi\"); locale değişimi metinleri değiştirmez. — apps/mobile/app/refund-requests/index.tsx:25-45",
+      "exp": "Harici mobil istemcide tüm iade metinleri Türkçedir; locale değişimi metinleri değiştirmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -19503,7 +19503,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "1. Mobil orders/[id] aç, KDV satırını ve fatura indirme aramasını yap.",
-      "exp": "\"KDV\" satırı görünür (apps/mobile/app/orders/[id].tsx:760-765); fatura indirme butonu/akışı yok (kaynakta downloadInvoice yok). Parite açığı.",
+      "exp": "Harici mobil istemcide KDV satırı görünür; fatura indirme desteği istemci repository'sinde doğrulanır.",
       "gap": false,
       "gapRefs": []
     },
@@ -25664,8 +25664,8 @@
       "title": "Mobile ürün görseli yükleme paritesi",
       "tur": "Parite",
       "pri": "P1",
-      "steps": "1. apps/mobile/src/components/listing/ListingForm.tsx üzerinden 2 fotoğraf yükle.",
-      "exp": "POST /media/upload/product, alan adı images, multipart. Web ile aynı sonuç şekli. (apps/mobile/src/services/api.ts:915-921, ListingForm.tsx:552)",
+      "steps": "1. Harici mobil istemciden 2 ürün fotoğrafı yükle.",
+      "exp": "POST /media/upload/product, alan adı images, multipart. Web ile aynı sonuç şekli.",
       "gap": false,
       "gapRefs": []
     },
@@ -25678,7 +25678,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "1. Web'de avatar değiştir → yükle. 2. Mobile'da avatar değiştir → yükle.",
-      "exp": "İkisi de POST /media/upload/avatar alan avatar; key dev/avatars/ /.... (apps/web/src/lib/api.ts:741-749, apps/web/src/app/profile/edit/page.tsx:92, apps/mobile/src/services/api.ts:922-928, apps/mobile/app/settings/edit-profile.tsx:114)",
+      "exp": "Web ve harici mobil istemci POST /media/upload/avatar kontratını avatar alanıyla kullanır; key avatars/ altında oluşur.",
       "gap": false,
       "gapRefs": []
     },
@@ -25691,7 +25691,7 @@
       "tur": "Parite",
       "pri": "P2",
       "steps": "1. Web: mesaj görseli yükle → POST /media/upload?folder=messages, alan file. 2. Mobile: aynı akış → POST /media/upload params folder=messages, alan file. 3. İade kanıtı: folder=reviews her iki platformda.",
-      "exp": "Endpoint + alan adı (file) + folder paritesi. (apps/web/src/lib/api.ts:750-767, apps/mobile/src/services/api.ts:929-953)",
+      "exp": "Web ve harici mobil istemci için endpoint, file alanı ve folder kontratı aynıdır.",
       "gap": false,
       "gapRefs": []
     },
@@ -25704,7 +25704,7 @@
       "tur": "Parite",
       "pri": "P2",
       "steps": "1. Web: getPublicUrl(key) çağrısını gözlemle. 2. Mobile mediaApi'de getPublicUrl var mı kontrol et.",
-      "exp": "Web GET /media/public-url/ . Mobile mediaApi'de getPublicUrl TANIMLI DEĞİL (yalnızca deleteFile var) → parite eksiği RAPORLANIR. (apps/web/src/lib/api.ts:770-771, apps/mobile/src/services/api.ts:914-955)",
+      "exp": "GET /media/public-url kontratı dokümante edilir; harici mobil istemci desteği kendi repository'sinde doğrulanır.",
       "gap": true,
       "gapRefs": ["MED-114, MED-115"]
     },
@@ -29174,7 +29174,7 @@
       "title": "Üç istemci de aynı API'yi tüketir, fakat ayrı client kullanır (kök-neden teyidi)",
       "tur": "Parite",
       "pri": "P0",
-      "steps": "1. Web'de ürün detayını aç (/listings/ ), DevTools Network'te isteği incele. 2. Mobile'da aynı ürünü aç, isteği incele (Expo dev → API logu apps/mobile/src/services/api.ts:70-72). 3. Admin'de aynı ürünü aç (/products/ ), isteği incele.",
+      "steps": "1. Web'de ürün detayını aç (/listings/ ) ve isteği incele. 2. Harici mobil istemcide aynı ürünün API isteğini incele. 3. Admin'de aynı ürünü aç (/products/ ) ve isteği incele.",
       "exp": "Üçü de aynı API path'ini (/api/products/...) çağırır ve aynı gövdeyi alır. Web/Admin isteği Cookie taşır, Authorization header YOK; Mobile Authorization: Bearer ... taşır, Cookie YOK. Ham API gövdesi (alan adları/değerler) üç istemcide AYNI; sapma yalnız ekranda gösterilen biçimde olabilir.",
       "gap": false,
       "gapRefs": []

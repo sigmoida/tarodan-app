@@ -6,7 +6,7 @@
   "scripts": {
     "start": "pnpm run docker:up; pnpm run dev",
     "dev:only": "turbo run dev",
-    "build": "turbo run build --filter='!@tarodan/mobile' --filter='!@tarodan/ui-native'",
+    "build": "turbo run build",
     "dev": "pnpm dev:local",
     "dev:restart": "lsof -ti:3000 -ti:3001 -ti:3002 2>/dev/null | xargs kill -9 2>/dev/null; sleep 2; pnpm dev",
     "dev:env": "[ -f apps/api/.env ] || cp apps/api/.env.example apps/api/.env; [ -f apps/web/.env.local ] || cp apps/web/env.example.txt apps/web/.env.local; [ -f apps/admin/.env.local ] || cp apps/admin/env.example.txt apps/admin/.env.local",
@@ -18,9 +18,9 @@
     "dev:seed": "pnpm dev:env && pnpm dev:up && pnpm db:migrate:deploy && pnpm db:generate && pnpm db:seed:local",
     "dev:reset": "pnpm dev:env && pnpm dev:up && pnpm db:reset:local && pnpm db:generate && turbo run dev --filter=@tarodan/web --filter=@tarodan/admin --filter=@tarodan/api --filter=@tarodan/types",
     "dev:stop": "lsof -ti:3000 -ti:3001 -ti:3002 2>/dev/null | xargs kill -9 2>/dev/null; docker compose -f infrastructure/docker-compose.yml down",
-    "lint": "turbo run lint --filter='!@tarodan/mobile' --filter='!@tarodan/ui-native'",
-    "typecheck": "turbo run typecheck --filter='!@tarodan/mobile' --filter='!@tarodan/ui-native'",
-    "test": "turbo run test --filter='!@tarodan/mobile' --filter='!@tarodan/ui-native'",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
     "test:affected-apps": "node --test scripts/detect-affected-apps.test.mjs",
     "test:verification-tools": "node --test scripts/check-dependency-audit.test.mjs scripts/detect-affected-apps.test.mjs scripts/pre-push-verify.test.mjs scripts/test-summary.test.mjs",
     "verify:watch": "node scripts/verify-local.mjs watch",
@@ -94,7 +94,6 @@
       "@prisma/engines",
       "@sentry/cli",
       "bcrypt",
-      "detox",
       "dtrace-provider",
       "esbuild",
       "msgpackr-extract",
@@ -102,13 +101,6 @@
       "sharp",
       "unrs-resolver"
     ],
-    "packageExtensions": {
-      "react-native-worklets": {
-        "dependencies": {
-          "@babel/types": "^7.28.0"
-        }
-      }
-    },
     "overrides": {
       "js-yaml@>=4.0.0 <4.3.0": "4.3.0",
       "postcss@<8.5.18": "8.5.19",

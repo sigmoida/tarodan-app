@@ -2204,7 +2204,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
   });
 
   // ════════════════════════════ Saf-UI / parite senaryoları (skip) ════════════════════════════
-  // Bu senaryolar web (apps/web) / mobil (apps/mobile) / admin panel bileşenlerini ölçer;
+  // Bu senaryolar web, harici mobil istemci ve admin panel bileşenlerini ölçer;
   // API e2e stack'inde render/DOM yoktur → uygulanamaz.
   scenario.skip(
     "TAX-080",
@@ -2212,7 +2212,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
   );
   scenario.skip(
     "TAX-081",
-    "Saf-UI parite: mobil sipariş detayı KDV satırı + PDF indirme yok — apps/mobile bileşeni",
+    "Saf-UI parite: harici mobil istemcide KDV satırı ve PDF indirme davranışı",
   );
   scenario.skip(
     "TAX-082",

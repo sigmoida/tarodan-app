@@ -18,28 +18,8 @@ const allowlist = JSON.parse(
   ),
 );
 const entries = new Map(allowlist.entries.map((entry) => [entry.ghsa, entry]));
-const excludedWorkspaces = ["apps__mobile", "packages__ui-native"];
-const isExcludedPath = (path) =>
-  excludedWorkspaces.some(
-    (workspace) => path === workspace || path.startsWith(`${workspace}>`),
-  );
 const advisories = Object.values(report.advisories ?? {})
-  .filter((advisory) => ["high", "critical"].includes(advisory.severity))
-  .map((advisory) => {
-    if (!Array.isArray(advisory.findings) || advisory.findings.length === 0) {
-      return advisory;
-    }
-
-    const findings = advisory.findings.filter(
-      (finding) =>
-        !Array.isArray(finding.paths) ||
-        finding.paths.length === 0 ||
-        finding.paths.some((path) => !isExcludedPath(path)),
-    );
-
-    return findings.length > 0 ? { ...advisory, findings } : null;
-  })
-  .filter(Boolean);
+  .filter((advisory) => ["high", "critical"].includes(advisory.severity));
 
 const failures = [];
 const seen = new Set();

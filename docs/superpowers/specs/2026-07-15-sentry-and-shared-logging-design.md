@@ -6,10 +6,9 @@ Durum: Onaylandı (tasarım) — implementasyon planı bekliyor
 
 ## Amaç
 
-Tüm uygulamalarda (api, web, admin, mobile) Sentry'yi tam çalışır hale getirmek ve
-her app'te tutarlı, tek bir **ortak logging yapısı** kurmak. Loglar bu ortak
-katmandan Sentry'ye köprülenir. DSN'ler kullanıcı tarafından Sentry panelinden
-girilecektir; kod DSN yokken güvenle uykuda (no-op) kalır.
+Bu tarihsel tasarım API, web ve admin uygulamalarındaki Sentry entegrasyonu ile
+ortak logging yapısını kapsar. Mobil uygulama daha sonra ayrı repository'ye
+taşındığı için mobil uygulama ayrıntıları güncel monorepo kapsamı dışındadır.
 
 ## Mevcut Durum (keşif özeti)
 
@@ -22,32 +21,26 @@ girilecektir; kod DSN yokken güvenle uykuda (no-op) kalır.
   `OptimizedImage.tsx`. 52 raw `console.*`.
 - **admin** (`@tarodan/admin`, Next.js, `@sentry/nextjs ^7.91.0`): web ile aynı desen,
   in-code capture yok. 2 `console.*`.
-- **mobile** (`@tarodan/mobile`, Expo/RN): **kasıtlı no-op stub**
-  (`src/services/sentry.ts`, `SENTRY_PACKAGE_LOADED = false`, SDK import'u yorumlu —
-  Expo Go'da `@sentry/react-native` yüklenemediği için). Gerçek görünen çağrı
-  noktaları: `app/_layout.tsx`, `src/components/ErrorBoundary.tsx`,
-  `src/stores/authStore.ts`. 27 raw `console.*`.
-- **Ortak logging yok.** api NestJS `Logger`; web/admin/mobile dağınık `console.*`.
-- Env: `infrastructure/env.example.txt` ve `apps/mobile/.env.example` `SENTRY_DSN` /
-  `NEXT_PUBLIC_SENTRY_DSN` / `EXPO_PUBLIC_SENTRY_DSN` içerir.
+- **Ortak logging yok.** API NestJS `Logger`; web/admin dağınık `console.*`.
+- Env: `infrastructure/env.example.txt` `SENTRY_DSN` ve
+  `NEXT_PUBLIC_SENTRY_DSN` değerlerini içerir.
 
 ## Kararlar
 
-- Kapsam: mobil dahil tüm app'ler tam çalışsın; ortak logger Sentry'ye köprülensin.
+- Kapsam: API, web ve admin uygulamalarında ortak logger Sentry'ye köprülensin.
 - Geçiş: **kademeli** — ortak logger + köprü kurulur, giriş noktaları ve hata
   yolları bağlanır. Mevcut `console.*` / NestJS `Logger` çağrıları toplu migrate
   EDİLMEZ (kapsam dışı).
-- Mobil: gerçek `@sentry/react-native` kurulur; Expo Go'da runtime guard ile no-op.
 - Sentry sürümü: api/web/admin `^7.91.0`'da kalır (v8/v9 migration açılmaz).
 
 ## Yaklaşım — Bağımlılıksız çekirdek + app-enjekte Sentry sink
 
 Seçilen yaklaşım (A). Ortak logger paketi hiçbir `@sentry/*`'a bağımlı olmaz; her
-app kendi SDK'sını bir sink adaptörüne sarıp logger'a enjekte eder. Böylece node
-SDK'sı mobile'a sızmaz, her platform kendi SDK'sını taşır, izolasyon korunur.
+app kendi SDK'sını bir sink adaptörüne sarıp logger'a enjekte eder. Böylece her
+uygulama kendi SDK'sını taşır ve izolasyon korunur.
 
 Reddedilen: (B) paketin doğrudan `@sentry/*` import etmesi — platform başına farklı
-SDK, mobile'a node SDK bundle'lanması. (C) sadece console wrapper — "log Sentry
+SDK bağımlılıklarının ortak pakete sızması. (C) sadece console wrapper — "log Sentry
 üzerinden olmalı" isteğini ortak katmanda karşılamaz.
 
 ## Komponent 1: `@tarodan/logger` (packages/logger)

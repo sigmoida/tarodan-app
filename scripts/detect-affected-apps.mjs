@@ -151,13 +151,6 @@ export function detectAffectedApps(filePaths, options = {}) {
       continue;
     }
 
-    if (
-      filePath.startsWith("apps/mobile/") ||
-      filePath.startsWith("packages/ui-native/")
-    ) {
-      continue;
-    }
-
     if (filePath.startsWith("packages/")) {
       const workspacePackage = findPackageByPath(filePath, graph.packages);
       if (!workspacePackage) {

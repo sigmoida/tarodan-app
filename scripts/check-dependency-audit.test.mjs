@@ -9,35 +9,35 @@ const runAuditCheck = (advisories) =>
     input: JSON.stringify({ advisories }),
   });
 
-test("ignores advisories found only in excluded mobile workspaces", () => {
+test("reports high advisories from a workspace", () => {
   const result = runAuditCheck({
     1: {
-      github_advisory_id: "GHSA-test-mobile-only",
-      module_name: "mobile-only-package",
+      github_advisory_id: "GHSA-test-workspace",
+      module_name: "workspace-package",
       severity: "high",
       findings: [
         {
-          paths: [
-            "apps__mobile>expo>mobile-only-package",
-            "packages__ui-native>mobile-only-package",
-          ],
+          paths: ["apps__api>workspace-package"],
         },
       ],
     },
   });
 
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /0 reviewed high advisory/);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /GHSA-test-workspace \(workspace-package\) is a new high-severity advisory/,
+  );
 });
 
-test("retains an advisory when any finding reaches a deployed workspace", () => {
+test("reports an advisory with findings in multiple workspaces", () => {
   const result = runAuditCheck({
     1: {
       github_advisory_id: "GHSA-test-deployed-app",
       module_name: "shared-package",
       severity: "high",
       findings: [
-        { paths: ["apps__mobile>expo>shared-package"] },
+        { paths: ["apps__web>shared-package"] },
         { paths: ["apps__admin>shared-package"] },
       ],
     },

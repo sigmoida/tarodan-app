@@ -44,11 +44,9 @@ test("selects web for root brand assets", () => {
   assert.deepEqual(detect("photos/logolar/tarodan-logo.png"), ["web"]);
 });
 
-test("ignores mobile, documentation, workflow and unrelated files", () => {
+test("ignores documentation, workflow and unrelated files", () => {
   assert.deepEqual(
     detect(
-      "apps/mobile/src/App.tsx",
-      "packages/ui-native/src/index.ts",
       "docs/deployment.md",
       ".github/workflows/deploy-staging.yml",
       "README.md",

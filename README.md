@@ -10,8 +10,7 @@
 
 Mobil istemci ayrı repository'de yönetilir. Bu repository mobil için yalnızca
 backend endpoint kontratını ve `docs/mobile-api-reference.html` dokümanını
-üretir; `apps/mobile` altındaki eski istemci kopyası build/release kaynağı
-değildir.
+üretir; mobil kaynak kodu ve release süreci bu monorepo'nun kapsamında değildir.
 
 ## Gereksinimler
 

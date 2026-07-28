@@ -1141,7 +1141,7 @@ describe("21 — Medya & Dosya Yükleme (MED)", () => {
   );
   scenario.skip(
     "MED-111",
-    "Mobile ürün görseli paritesi: apps/mobile istemci kodu (alan=images); saf-istemci paritesi, API-e2e kapsamı dışı.",
+    "Mobil ürün görseli paritesi harici istemci kapsamı; API yalnız alan=images kontratını tanımlar.",
   );
   scenario.skip(
     "MED-112",

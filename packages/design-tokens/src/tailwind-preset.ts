@@ -14,8 +14,7 @@ import {
  *
  * The single source of truth for every design decision is this package's raw
  * tokens (colors, radius, spacing, typography, shadows, motion). This preset
- * is the *web adapter* that projects those tokens onto a Tailwind theme;
- * @tarodan/ui-native/lib/theme.ts is the equivalent native adapter.
+ * is the web adapter that projects those tokens onto a Tailwind theme.
  *
  * Consumed by apps/web and apps/admin via `@tarodan/design-tokens/tailwind`.
  * Apps should NOT re-declare tokens (colors/radius/spacing) in their own
