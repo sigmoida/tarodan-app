@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { ModuleRef } from "@nestjs/core";
+import { PaymentStatus, RefundAttemptStatus } from "@prisma/client";
 import { PaymentService } from "./payment.service";
 import { PaymentQueryService } from "./payment-query.service";
 import { PaymentCommonService } from "./payment-common.service";
@@ -24,6 +25,10 @@ import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
+import {
+  ProviderRefundRejectedException,
+  RefundPendingReconciliationException,
+} from "../payment-providers/refund-errors";
 import { EventService } from "../events";
 import { InvoiceService } from "../invoice/invoice.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -34,36 +39,88 @@ import { CARGO_PROVIDER } from "../surat-cargo/cargo-provider";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
 import { I18nService } from "../i18n";
-import { PaymentStatus } from "@prisma/client";
+import { OutboxService } from "../outbox/outbox.service";
 
-/**
- * B3: PayTR çift-iade koruması. refundInProgressAt marker'ı PayTR çağrısından önce
- * yazılır; marker zaten varsa (önceki denemede PayTR çağrılmış ama persist başarısız
- * olmuş) PayTR tekrar çağrılmaz, yalnız persist-recovery denenir.
- */
-describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade koruması", () => {
+describe("PaymentService trade cash refund idempotency", () => {
   let service: PaymentService;
 
+  const TRADE_ID = "550e8400-e29b-41d4-a716-446655440000";
+  const ATTEMPT_ID = "refund-attempt-1";
+
+  const refundAttempt = (
+    status: RefundAttemptStatus = RefundAttemptStatus.prepared,
+  ) => ({
+    id: ATTEMPT_ID,
+    paymentId: "pay-1",
+    tradeId: TRADE_ID,
+    idempotencyKey: "trade-cash-refund:pay-1",
+    amount: 99.5,
+    status,
+    providerRefundId: null,
+    providerResponse:
+      status === RefundAttemptStatus.succeeded ||
+      status === RefundAttemptStatus.finalized
+        ? { status: "success" }
+        : null,
+  });
+
   const mockTx = {
+    $queryRaw: jest.fn(),
+    refundAttempt: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
     payment: { update: jest.fn() },
     tradeCashPayment: { update: jest.fn() },
   };
 
   const mockPrisma = {
     payment: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
-    payoutTransfer: { findFirst: jest.fn() },
-    $transaction: jest.fn(async (fn: (tx: typeof mockTx) => Promise<void>) => {
-      await fn(mockTx);
-    }),
+    refundAttempt: { updateMany: jest.fn() },
+    payoutTransfer: { findFirst: jest.fn(), updateMany: jest.fn() },
+    $transaction: jest.fn(),
   };
 
   const mockPaytr = { createRefund: jest.fn() };
+  const mockOutbox = { enqueue: jest.fn() };
 
-  const TRADE_ID = "550e8400-e29b-41d4-a716-446655440000";
+  const basePayment = () => ({
+    id: "pay-1",
+    amount: 99.5,
+    provider: "paytr",
+    status: PaymentStatus.completed,
+    providerConversationId: "ORDER123",
+    tradeCashPaymentId: "tcp-1",
+    metadata: { checkoutGroupId: "group-1" },
+    tradeCashPayment: { id: "tcp-1", tradeId: TRADE_ID, totalAmount: 99.5 },
+  });
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockTx.$queryRaw.mockResolvedValue([]);
+    mockTx.refundAttempt.findUnique.mockImplementation(
+      ({ where }: { where: { id?: string; idempotencyKey?: string } }) =>
+        where.id
+          ? Promise.resolve(refundAttempt(RefundAttemptStatus.succeeded))
+          : Promise.resolve(null),
+    );
+    mockTx.refundAttempt.findFirst.mockResolvedValue(null);
+    mockTx.refundAttempt.create.mockResolvedValue(refundAttempt());
+    mockTx.refundAttempt.update.mockResolvedValue(
+      refundAttempt(RefundAttemptStatus.finalized),
+    );
+    mockTx.payment.update.mockResolvedValue({});
+    mockTx.tradeCashPayment.update.mockResolvedValue({});
+    mockPrisma.refundAttempt.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.payoutTransfer.findFirst.mockResolvedValue(null);
+    mockPrisma.payoutTransfer.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.$transaction.mockImplementation(
+      (fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx),
+    );
+    mockPaytr.createRefund.mockResolvedValue({ status: "success" });
+    mockOutbox.enqueue.mockResolvedValue(undefined);
 
     const noop = {} as any;
     const module: TestingModule = await Test.createTestingModule({
@@ -125,10 +182,10 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         { provide: ProductLockService, useValue: noop },
         { provide: NotificationService, useValue: noop },
         { provide: SuratCargoService, useValue: noop },
-        // Faz 11.5a: PaymentCommonService artık CARGO_PROVIDER token'ına bağlı.
         { provide: CARGO_PROVIDER, useValue: noop },
         { provide: CommissionLedgerService, useValue: noop },
         { provide: StorageService, useValue: noop },
+        { provide: OutboxService, useValue: mockOutbox },
         { provide: ModuleRef, useValue: noop },
         {
           provide: PaymentProviderEventService,
@@ -140,94 +197,132 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     service = module.get(PaymentService);
   });
 
-  const basePayment = (metadata: Record<string, unknown>) => ({
-    id: "pay-1",
-    amount: 99.5,
-    provider: "paytr",
-    status: PaymentStatus.completed,
-    providerConversationId: "ORDER123",
-    tradeCashPaymentId: "tcp-1",
-    metadata,
-    tradeCashPayment: { id: "tcp-1", tradeId: TRADE_ID, totalAmount: 99.5 },
-  });
+  it("persists a prepared attempt before calling the provider", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
 
-  it("marker yokken: önce marker yazar, sonra PayTR iadesini çağırır", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
-    mockPaytr.createRefund.mockResolvedValue({ status: "success" });
+    const result = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
 
-    const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
-
-    expect(r.refunded).toBe(true);
-    // marker, PayTR çağrısından önce kalıcı yazılmalı (prisma.payment.update, tx dışı)
-    expect(mockPrisma.payment.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "pay-1" },
-        data: expect.objectContaining({
-          metadata: expect.objectContaining({
-            refundInProgressAt: expect.any(String),
-          }),
-        }),
-      }),
-    );
+    expect(result).toEqual({ refunded: true, paymentId: "pay-1" });
+    expect(mockTx.refundAttempt.create).toHaveBeenCalledWith({
+      data: {
+        paymentId: "pay-1",
+        tradeId: TRADE_ID,
+        idempotencyKey: "trade-cash-refund:pay-1",
+        amount: 99.5,
+        provider: "paytr",
+        providerReference: "ORDER123",
+      },
+    });
+    expect(
+      mockTx.refundAttempt.create.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockPaytr.createRefund.mock.invocationCallOrder[0]);
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.prepared },
+      data: {
+        status: RefundAttemptStatus.submitting,
+        requestStartedAt: expect.any(Date),
+      },
+    });
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.submitting },
+      data: {
+        status: RefundAttemptStatus.succeeded,
+        providerRefundId: null,
+        providerResponse: { status: "success" },
+        providerSucceededAt: expect.any(Date),
+      },
+    });
     expect(mockPaytr.createRefund).toHaveBeenCalledWith("ORDER123", 99.5);
-  });
-
-  it("marker varken: PayTR tekrar ÇAĞRILMAZ, yalnız persist-recovery denenir", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(
-      basePayment({ refundInProgressAt: "2026-06-29T00:00:00.000Z" }),
-    );
-
-    const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
-
-    expect(r.refunded).toBe(true);
-    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
-    // recovery: refundedAt persist edilmeli
     expect(mockTx.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: { id: "pay-1" },
         data: expect.objectContaining({ status: PaymentStatus.refunded }),
       }),
     );
   });
 
-  it("marker yazımı başarısızsa PayTR çağrılmadan abort eder", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
-    mockPrisma.payment.update.mockRejectedValueOnce(new Error("db down"));
+  it("finalizes a durable provider success without submitting another refund", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockTx.refundAttempt.findUnique.mockResolvedValue(
+      refundAttempt(RefundAttemptStatus.succeeded),
+    );
+
+    const result = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+
+    expect(result.refunded).toBe(true);
+    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+    expect(mockTx.payment.update).toHaveBeenCalled();
+    expect(mockTx.refundAttempt.update).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID },
+      data: {
+        status: RefundAttemptStatus.finalized,
+        finalizedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it("treats an already-finalized attempt as an idempotent success", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockTx.refundAttempt.findUnique.mockResolvedValue(
+      refundAttempt(RefundAttemptStatus.finalized),
+    );
+
+    const result = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+
+    expect(result).toEqual({ refunded: true, paymentId: "pay-1" });
+    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+    expect(mockPrisma.payoutTransfer.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not call the provider when the durable attempt cannot be created", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockTx.refundAttempt.create.mockRejectedValueOnce(new Error("db down"));
 
     await expect(
       service.refundTradeCashPaymentIfCompleted(TRADE_ID),
-    ).rejects.toThrow();
+    ).rejects.toThrow("db down");
     expect(mockPaytr.createRefund).not.toHaveBeenCalled();
   });
 
-  // G5: çift-iade idempotency guard'ları — PayTR ASLA çağrılmamalı.
-  it("G5: tradeCashPayment.refundedAt zaten doluysa iade atlanır (already_refunded)", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(null); // refundedAt:null filtresi eşleşmez
-    const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
-    expect(r.refunded).toBe(false);
-    expect(r.skippedReason).toBe("no_completed_paytr_payment");
+  it("skips when no refundable completed PayTR payment exists", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(null);
+
+    const result = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+
+    expect(result).toEqual({
+      refunded: false,
+      skippedReason: "no_completed_paytr_payment",
+    });
     expect(mockPaytr.createRefund).not.toHaveBeenCalled();
   });
 
-  it("G5: PayoutTransfer processing/completed varsa iade atlanır (payout_already_in_progress)", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
+  it("moves the attempt to manual review when a payout is already in progress", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
     mockPrisma.payoutTransfer.findFirst.mockResolvedValue({
       id: "po-1",
       status: "completed",
     });
 
-    const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+    const result = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
 
-    expect(r.refunded).toBe(false);
-    expect(r.skippedReason).toBe("payout_already_in_progress");
+    expect(result).toEqual({
+      refunded: false,
+      skippedReason: "payout_already_in_progress",
+    });
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.prepared },
+      data: {
+        status: RefundAttemptStatus.manual_review,
+        failureReason: "payout_completed",
+      },
+    });
     expect(mockPaytr.createRefund).not.toHaveBeenCalled();
   });
 
-  // D3: PayTR "ödeme henüz siteye bildirilmemiş" hatasını kullanıcı-dostu
-  // "1-2 dakika sonra tekrar deneyin" mesajına çevirir (yeni tamamlanan ödemede iade).
-  it('D3: PayTR "henüz bildirilmemiş" hatası → "1-2 dakika sonra tekrar deneyin" mesajına çevrilir', async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
+  it("maps PayTR's not-yet-synced rejection and leaves a retryable failed attempt", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
     mockPaytr.createRefund.mockRejectedValue(
-      new Error("odeme henuz siteye bildirilmemis"),
+      new ProviderRefundRejectedException("odeme henuz siteye bildirilmemis"),
     );
 
     await expect(
@@ -235,72 +330,59 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     ).rejects.toMatchObject({
       response: { i18nKey: "server.payment.paymentNotYetSynced" },
     });
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.submitting },
+      data: {
+        status: RefundAttemptStatus.failed,
+        failureReason: "odeme henuz siteye bildirilmemis",
+      },
+    });
   });
 
-  // MONEY-H1: Geçici PayTR hatasında (throw) refundInProgressAt marker'ı GERİ ALINMALI.
-  // Aksi halde marker kalır, sonraki deneme refundAlreadyInitiated=true görüp PayTR'yi
-  // ATLAR ve parayı iade ETMEDEN refunded işaretler (sahte iade).
-  it("MONEY-H1: geçici PayTR hatasında marker geri alınır (retry PayTR'yi tekrar çağırabilsin)", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
-    // clearTradeRefundInProgress fresh metadata okur → marker set edilmiş hâli döner
-    mockPrisma.payment.findUnique.mockResolvedValue({
-      metadata: { foo: 1, refundInProgressAt: "2026-07-22T00:00:00.000Z" },
-    });
-    mockPaytr.createRefund.mockRejectedValue(
-      new Error("odeme henuz siteye bildirilmemis"),
-    );
+  it("requires reconciliation after an unknown provider outcome", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPaytr.createRefund.mockRejectedValue(new Error("connection reset"));
 
     await expect(
       service.refundTradeCashPaymentIfCompleted(TRADE_ID),
-    ).rejects.toMatchObject({
-      response: { i18nKey: "server.payment.paymentNotYetSynced" },
+    ).rejects.toBeInstanceOf(RefundPendingReconciliationException);
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.submitting },
+      data: {
+        status: RefundAttemptStatus.manual_review,
+        failureReason: "connection reset",
+      },
     });
-
-    // Bir payment.update çağrısı, refundInProgressAt İÇERMEYEN metadata ile yapılmalı
-    // (marker temizleme). İlk update marker'ı YAZAR (içerir); temizleme onu SİLER.
-    const clearCall = mockPrisma.payment.update.mock.calls.find(
-      ([arg]: [{ data?: { metadata?: Record<string, unknown> } }]) =>
-        arg?.data?.metadata !== undefined &&
-        !("refundInProgressAt" in arg.data.metadata),
-    );
-    expect(clearCall).toBeDefined();
   });
 
-  // FLOW-M5: iade GERÇEKTEN çekilen oid = providerConversationId ile yapılır. Bu yoksa
-  // gerçek yolda (bypass değil) eski kod UUID'yi oid sanıp yanlış çağrı yapıyordu; artık
-  // createRefund'a hiç gidilmeden reddedilir.
-  it("FLOW-M5: providerConversationId yoksa (gerçek yol) createRefund çağrılmadan reddedilir", async () => {
+  it("rejects a missing provider reference before creating an attempt", async () => {
     mockPrisma.payment.findFirst.mockResolvedValue({
-      ...basePayment({ foo: 1 }),
+      ...basePayment(),
       providerConversationId: null,
     });
 
     await expect(
       service.refundTradeCashPaymentIfCompleted(TRADE_ID),
     ).rejects.toThrow();
+    expect(mockTx.refundAttempt.create).not.toHaveBeenCalled();
     expect(mockPaytr.createRefund).not.toHaveBeenCalled();
   });
 
-  // MONEY-H1: PayTR non-success status DÖNERSE de (throw değil) marker geri alınmalı.
-  it("MONEY-H1: PayTR non-success status'ta da marker geri alınır", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
-    mockPrisma.payment.findUnique.mockResolvedValue({
-      metadata: { foo: 1, refundInProgressAt: "2026-07-22T00:00:00.000Z" },
-    });
-    mockPaytr.createRefund.mockResolvedValue({
-      status: "failed",
-      err_msg: "insufficient balance",
-    });
+  it("keeps a definitive provider rejection retryable", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPaytr.createRefund.mockRejectedValue(
+      new ProviderRefundRejectedException("insufficient balance"),
+    );
 
     await expect(
       service.refundTradeCashPaymentIfCompleted(TRADE_ID),
-    ).rejects.toThrow();
-
-    const clearCall = mockPrisma.payment.update.mock.calls.find(
-      ([arg]: [{ data?: { metadata?: Record<string, unknown> } }]) =>
-        arg?.data?.metadata !== undefined &&
-        !("refundInProgressAt" in arg.data.metadata),
-    );
-    expect(clearCall).toBeDefined();
+    ).rejects.toBeInstanceOf(ProviderRefundRejectedException);
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.submitting },
+      data: {
+        status: RefundAttemptStatus.failed,
+        failureReason: "insufficient balance",
+      },
+    });
   });
 });

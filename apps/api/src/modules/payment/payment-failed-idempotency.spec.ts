@@ -50,7 +50,12 @@ describe("PaymentFulfillmentService.processFailedPayment — idempotent guard", 
 
     // The flip is a conditional claim scoped to still-pending payments.
     expect(prisma.payment.updateMany).toHaveBeenCalledWith({
-      where: { id: "pay-1", status: PaymentStatus.pending },
+      where: {
+        id: "pay-1",
+        status: {
+          in: [PaymentStatus.pending, PaymentStatus.processing],
+        },
+      },
       data: {
         status: PaymentStatus.failed,
         failureReason: "late failed callback",
