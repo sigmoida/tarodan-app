@@ -28,9 +28,10 @@ export const adminAuthConfig: AuthConfig = {
     logout: "/auth/admin/logout",
     forgotPassword: "/auth/forgot-password",
   },
-  upstreamRefreshCookie: "admin_refresh_token",
   ttls: {
-    accessMaxAge: 60 * 30, // 30 min — matches the API access TTL
+    // Cookie retention is intentionally longer than the current 15-minute JWT.
+    // Middleware reads the JWT's own `exp` and refreshes it before expiry.
+    accessMaxAge: 60 * 30,
     refreshMaxAge: 60 * 60 * 24 * 7, // 7 days
   },
   jwtSkewMs: 30_000,

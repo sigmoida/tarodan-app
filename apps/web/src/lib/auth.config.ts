@@ -25,8 +25,6 @@ export const webAuthConfig: AuthConfig = {
     forgotPassword: "/auth/forgot-password",
     google: "/auth/google",
   },
-  // NestJS user refresh guard reads the refresh token from this cookie.
-  upstreamRefreshCookie: "refresh_token",
   ttls: {
     accessMaxAge: 60 * 15, // 15 min — matches the user JWT access TTL
     refreshMaxAge: 60 * 60 * 24 * 7, // 7 days

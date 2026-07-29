@@ -13,7 +13,6 @@ const config: AuthConfig = {
     logout: "/auth/admin/logout",
     forgotPassword: "/auth/forgot-password",
   },
-  upstreamRefreshCookie: "admin_refresh_token",
   ttls: { accessMaxAge: 1_800, refreshMaxAge: 604_800 },
   isProd: true,
 };
@@ -75,10 +74,10 @@ describe("createAuthMiddleware", () => {
   });
 
   it("clears both auth cookies when the refresh token is rejected", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 401 })),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
 
     const response = await middleware(
       request("/dashboard", {
@@ -93,6 +92,14 @@ describe("createAuthMiddleware", () => {
     expect(location.searchParams.get("redirect")).toBe("/dashboard");
     expect(location.searchParams.get("expired")).toBe("session");
     expectAuthCookiesCleared(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/auth/admin/refresh",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: "rejected-refresh" }),
+      }),
+    );
   });
 
   it("still redirects a valid session away from login", async () => {

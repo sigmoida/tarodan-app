@@ -147,7 +147,11 @@ export function createAuthMiddleware(
         `${config.apiBaseUrl}${config.endpoints.refresh}`,
         {
           method: "POST",
-          headers: { Cookie: `${config.upstreamRefreshCookie}=${refresh}` },
+          // Server-to-server refresh: body transport keeps this request outside
+          // the API's cookie-auth CSRF guard. The refresh JWT is still signed,
+          // persisted, expiry-checked, and rotated by the API.
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken: refresh }),
         },
       );
     } catch {

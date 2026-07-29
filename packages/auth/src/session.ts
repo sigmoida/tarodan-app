@@ -75,7 +75,6 @@ export function createSession<TUser>(
     cookies: names,
     apiBaseUrl,
     endpoints,
-    upstreamRefreshCookie,
     ttls,
     indicatorCookie,
   } = config;
@@ -119,7 +118,13 @@ export function createSession<TUser>(
     try {
       res = await fetch(`${apiBaseUrl}${endpoints.refresh}`, {
         method: "POST",
-        headers: { Cookie: `${upstreamRefreshCookie}=${refresh}` },
+        // This is a server-to-server BFF call. Sending the token as an upstream
+        // auth cookie makes the API's browser CSRF guard require a double-submit
+        // header and reject the refresh with 403. Body transport is already
+        // supported for native/BFF clients and remains protected by the signed,
+        // persisted, rotating refresh token itself.
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: refresh }),
         cache: "no-store",
       });
     } catch {
@@ -146,18 +151,22 @@ export function createSession<TUser>(
     return res.status >= 500 ? { status: "transient" } : { status: "dead" };
   }
 
-  // Single-flight: a page firing many /api calls after the access token expired
-  // would otherwise trigger N concurrent refreshes. Since the API ROTATES the
-  // refresh token, only the first would succeed and the rest would 401 → bounce
-  // to /login. Sharing one in-flight refresh spends the rotating token once.
-  let inflight: Promise<RefreshOutcome> | null = null;
+  // Single-flight per refresh token: a page firing many /api calls after expiry
+  // spends its rotating token once. Keying this map is essential: a process can
+  // serve multiple users concurrently and must never share one user's refreshed
+  // credentials with another user.
+  const inflight = new Map<string, Promise<RefreshOutcome>>();
   const runRefresh = (refresh: string): Promise<RefreshOutcome> => {
-    if (!inflight) {
-      inflight = doRefresh(refresh).finally(() => {
-        inflight = null;
-      });
-    }
-    return inflight;
+    const existing = inflight.get(refresh);
+    if (existing) return existing;
+
+    const pending = doRefresh(refresh).finally(() => {
+      if (inflight.get(refresh) === pending) {
+        inflight.delete(refresh);
+      }
+    });
+    inflight.set(refresh, pending);
+    return pending;
   };
   // Public toolkit method keeps its historical `tokens | null` shape (nothing
   // consumes the transient/dead nuance outside `apiFetch`).
