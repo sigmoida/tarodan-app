@@ -12,9 +12,10 @@ import { z } from "zod";
  *    the `|| JWT_SECRET` fallbacks that used to paper over a missing
  *    ADMIN_JWT_SECRET / JWT_REFRESH_SECRET / OTP pepper have been removed, so
  *    each realm must set its own secret.
- *  - Under NODE_ENV=production the secrets must additionally be long enough,
- *    mutually distinct, free of the known committed placeholder, and the
- *    active payment provider (PayTR) keys must be present.
+ *  - Under NODE_ENV=production, APP_ENV explicitly distinguishes an optimized
+ *    staging runtime from the live production environment. Both require strong
+ *    secrets and real provider credentials; staging additionally keeps payment,
+ *    payouts and cargo in safe test/disabled modes.
  *
  * The schema `.strip()`s unknown keys from the RETURNED object on purpose: the
  * value returned here becomes ConfigModule's validated layer, which takes
@@ -33,6 +34,7 @@ const MIN_PROD_SECRET_LENGTH = 32;
 const envSchema = z
   .object({
     NODE_ENV: z.string().optional(),
+    APP_ENV: z.enum(["staging", "production"]).optional(),
     PROCESS_ROLE: z.string().optional(),
 
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -88,6 +90,18 @@ const envSchema = z
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== "production") return;
 
+    if (!env.APP_ENV) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["APP_ENV"],
+        message:
+          "APP_ENV must be explicitly set to 'staging' or 'production' when NODE_ENV is production",
+      });
+    }
+
+    const isStagingDeployment = env.APP_ENV === "staging";
+    const isProductionDeployment = env.APP_ENV === "production";
+
     if (!["all", "web", "worker"].includes(env.PROCESS_ROLE ?? "")) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -120,28 +134,49 @@ const envSchema = z
     requirePublicHttpsUrl("API_URL", env.API_URL);
     requirePublicHttpsUrl("PAYTR_CALLBACK_URL", env.PAYTR_CALLBACK_URL);
 
-    const isStagingDeployment = [env.FRONTEND_URL, env.API_URL].some(
-      (value) => {
-        try {
-          const hostname = new URL(value ?? "").hostname;
-          return (
-            hostname === "staging.tarodan.shop" ||
-            hostname.endsWith(".staging.tarodan.shop")
-          );
-        } catch {
-          return false;
-        }
-      },
-    );
+    const deploymentUrls = [
+      env.FRONTEND_URL,
+      env.API_URL,
+      env.PAYTR_CALLBACK_URL,
+    ].filter((value): value is string => Boolean(value));
+    const isStagingUrl = (value: string) => {
+      try {
+        const hostname = new URL(value).hostname;
+        return (
+          hostname === "staging.tarodan.shop" ||
+          hostname.endsWith(".staging.tarodan.shop")
+        );
+      } catch {
+        return false;
+      }
+    };
     if (
-      isStagingDeployment &&
-      (env.S3_ENV_PREFIX ?? "").trim().toLowerCase() !== "staging"
+      (isStagingDeployment &&
+        deploymentUrls.some((value) => !isStagingUrl(value))) ||
+      (isProductionDeployment &&
+        deploymentUrls.some((value) => isStagingUrl(value)))
     ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["APP_ENV"],
+        message: "APP_ENV must match the configured deployment URLs",
+      });
+    }
+
+    const s3EnvPrefix = (env.S3_ENV_PREFIX ?? "").trim().toLowerCase();
+    if (isStagingDeployment && s3EnvPrefix !== "staging") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["S3_ENV_PREFIX"],
         message:
           "S3_ENV_PREFIX must be 'staging' for a staging deployment; production media must stay isolated",
+      });
+    } else if (isProductionDeployment && s3EnvPrefix !== "prod") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["S3_ENV_PREFIX"],
+        message:
+          "S3_ENV_PREFIX must be 'prod' for a production deployment; staging media must stay isolated",
       });
     }
 
@@ -207,21 +242,42 @@ const envSchema = z
         });
       }
     }
-    if ((env.PAYTR_TEST_MODE ?? "").trim().toLowerCase() !== "false") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["PAYTR_TEST_MODE"],
-        message:
-          "PAYTR_TEST_MODE must be explicitly set to 'false' in production",
-      });
-    }
-    if ((env.PAYOUTS_DISABLED ?? "").trim().toLowerCase() !== "false") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["PAYOUTS_DISABLED"],
-        message:
-          "PAYOUTS_DISABLED must be explicitly set to 'false' in production",
-      });
+    const paytrTestMode = (env.PAYTR_TEST_MODE ?? "").trim().toLowerCase();
+    const payoutsDisabled = (env.PAYOUTS_DISABLED ?? "").trim().toLowerCase();
+    if (isProductionDeployment) {
+      if (paytrTestMode !== "false") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["PAYTR_TEST_MODE"],
+          message:
+            "PAYTR_TEST_MODE must be explicitly set to 'false' in production",
+        });
+      }
+      if (payoutsDisabled !== "false") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["PAYOUTS_DISABLED"],
+          message:
+            "PAYOUTS_DISABLED must be explicitly set to 'false' in production",
+        });
+      }
+    } else if (isStagingDeployment) {
+      if (!["true", "1"].includes(paytrTestMode)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["PAYTR_TEST_MODE"],
+          message:
+            "PAYTR_TEST_MODE must be enabled in staging to prevent live charges",
+        });
+      }
+      if (payoutsDisabled !== "true") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["PAYOUTS_DISABLED"],
+          message:
+            "PAYOUTS_DISABLED must be 'true' in staging to prevent live transfers",
+        });
+      }
     }
 
     // #6: Production'da kargo ENTEGRASYONU AÇIKSA gerçek gönderi üretecek konfig ZORUNLU.
@@ -246,13 +302,25 @@ const envSchema = z
             "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (live/soap do not support barcode creation)",
         });
       }
-      const testMode = (env.SURAT_KARGO_TEST_MODE ?? "").trim().toLowerCase();
-      if (testMode !== "false") {
+      const cargoTestMode = (env.SURAT_KARGO_TEST_MODE ?? "")
+        .trim()
+        .toLowerCase();
+      if (isProductionDeployment && cargoTestMode !== "false") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["SURAT_KARGO_TEST_MODE"],
           message:
             "SURAT_KARGO_TEST_MODE must be 'false' in production when SURAT_CARGO_ENABLED is set; test mode does not create live shipments",
+        });
+      } else if (
+        isStagingDeployment &&
+        !["true", "1"].includes(cargoTestMode)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SURAT_KARGO_TEST_MODE"],
+          message:
+            "SURAT_KARGO_TEST_MODE must be enabled in staging to prevent live shipments",
         });
       }
       for (const key of [

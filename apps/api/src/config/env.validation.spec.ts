@@ -24,6 +24,7 @@ describe("validateEnv", () => {
   };
   const prodBase = {
     NODE_ENV: "production",
+    APP_ENV: "production",
     PROCESS_ROLE: "web",
     DATABASE_URL: "postgresql://u:p@db:5432/app",
     FRONTEND_URL: "https://app.tarodan.test",
@@ -55,9 +56,56 @@ describe("validateEnv", () => {
     SENTRY_DSN: "https://public@example.ingest.sentry.io/1",
     ...strongSecrets,
   };
+  const stagingBase = {
+    ...prodBase,
+    APP_ENV: "staging",
+    FRONTEND_URL: "https://staging.tarodan.shop",
+    API_URL: "https://staging.tarodan.shop/api",
+    S3_ENV_PREFIX: "staging",
+    PAYTR_TEST_MODE: "1",
+    PAYTR_CALLBACK_URL:
+      "https://staging.tarodan.shop/api/payments/callback/paytr",
+    PAYOUTS_DISABLED: "true",
+    SURAT_KARGO_TEST_MODE: "true",
+  };
 
   it("passes with a complete, strong production config", () => {
     expect(() => validateEnv({ ...prodBase })).not.toThrow();
+  });
+
+  it("requires an explicit deployment environment for production builds", () => {
+    expect(() => validateEnv(without(prodBase, "APP_ENV"))).toThrow(/APP_ENV/);
+    expect(() => validateEnv({ ...prodBase, APP_ENV: "preview" })).toThrow(
+      /APP_ENV/,
+    );
+  });
+
+  it("passes staging with test providers and payouts disabled", () => {
+    expect(() => validateEnv({ ...stagingBase })).not.toThrow();
+  });
+
+  it("rejects an APP_ENV that does not match the deployment URLs", () => {
+    expect(() =>
+      validateEnv({ ...stagingBase, APP_ENV: "production" }),
+    ).toThrow(/APP_ENV/);
+    expect(() => validateEnv({ ...prodBase, APP_ENV: "staging" })).toThrow(
+      /APP_ENV/,
+    );
+  });
+
+  it("rejects live PayTR or payouts in staging", () => {
+    expect(() =>
+      validateEnv({ ...stagingBase, PAYTR_TEST_MODE: "false" }),
+    ).toThrow(/PAYTR_TEST_MODE/);
+    expect(() =>
+      validateEnv({ ...stagingBase, PAYOUTS_DISABLED: "false" }),
+    ).toThrow(/PAYOUTS_DISABLED/);
+  });
+
+  it("rejects live cargo creation in staging", () => {
+    expect(() =>
+      validateEnv({ ...stagingBase, SURAT_KARGO_TEST_MODE: "false" }),
+    ).toThrow(/SURAT_KARGO_TEST_MODE/);
   });
 
   // #6: production'da kargo AÇIKSA gerçek gönderi üretecek konfig zorunlu.
@@ -229,27 +277,20 @@ describe("validateEnv", () => {
   it("rejects a staging deployment that writes into the production S3 prefix", () => {
     expect(() =>
       validateEnv({
-        ...prodBase,
-        FRONTEND_URL: "https://staging.tarodan.shop",
-        API_URL: "https://staging.tarodan.shop/api",
-        PAYTR_CALLBACK_URL:
-          "https://staging.tarodan.shop/api/payments/callback/paytr",
+        ...stagingBase,
         S3_ENV_PREFIX: "prod",
       }),
     ).toThrow(/S3_ENV_PREFIX.*staging/i);
   });
 
   it("accepts the isolated staging S3 prefix on staging", () => {
+    expect(() => validateEnv({ ...stagingBase })).not.toThrow();
+  });
+
+  it("rejects the staging S3 prefix in production", () => {
     expect(() =>
-      validateEnv({
-        ...prodBase,
-        FRONTEND_URL: "https://staging.tarodan.shop",
-        API_URL: "https://staging.tarodan.shop/api",
-        PAYTR_CALLBACK_URL:
-          "https://staging.tarodan.shop/api/payments/callback/paytr",
-        S3_ENV_PREFIX: "staging",
-      }),
-    ).not.toThrow();
+      validateEnv({ ...prodBase, S3_ENV_PREFIX: "staging" }),
+    ).toThrow(/S3_ENV_PREFIX.*production/i);
   });
 
   it("strips unrelated env vars from its return (they resolve live from process.env)", () => {
