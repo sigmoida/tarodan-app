@@ -2,9 +2,9 @@
 
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Controller } from "react-hook-form";
-import { Button, Select } from "@tarodan/ui";
+import { Select } from "@tarodan/ui";
 import {
   Form,
   FormInput,
@@ -28,7 +28,15 @@ import {
 /** Custom (non-listing) collection item — its own RHF+zod form + add mutation,
  *  the web modal recipe. Brand uses a Controller so changing it clears the model;
  *  the image goes through the shared FormImageUpload (uploads → URL). */
-export default function CustomItemForm({ onClose }: { onClose: () => void }) {
+export default function CustomItemForm({
+  formId,
+  onClose,
+  onPendingChange,
+}: {
+  formId: string;
+  onClose: () => void;
+  onPendingChange: (pending: boolean) => void;
+}) {
   const t = useTranslations();
   const { collection, invalidateCollection } = useCollectionDetail();
   const filters = useCollectionFilters(true);
@@ -66,13 +74,19 @@ export default function CustomItemForm({ onClose }: { onClose: () => void }) {
     },
   );
 
+  useEffect(() => {
+    onPendingChange(add.isPending);
+    return () => onPendingChange(false);
+  }, [add.isPending, onPendingChange]);
+
   if (!collection) return null;
 
   return (
     <Form
       form={form}
+      id={formId}
       onSubmit={(values) => add.mutate(values)}
-      className="max-h-[60vh] space-y-3 overflow-y-auto"
+      className="space-y-3"
     >
       <FormInput
         name="title"
@@ -159,27 +173,6 @@ export default function CustomItemForm({ onClose }: { onClose: () => void }) {
             label: m.label,
           }))}
         />
-      </div>
-
-      <div className="flex gap-3 border-t border-border pt-4">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="flex-1"
-          onClick={onClose}
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          size="sm"
-          className="flex-1"
-          isLoading={add.isPending}
-        >
-          {t("common.add")}
-        </Button>
       </div>
     </Form>
   );

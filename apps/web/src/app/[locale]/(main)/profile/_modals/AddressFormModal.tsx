@@ -11,6 +11,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
+import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { addressSchema, type AddressValues } from "../_lib/schemas";
 import { useSaveAddress, type Address } from "../_hooks/useAddresses";
 
@@ -39,6 +40,7 @@ export default function AddressFormModal({
   address,
 }: AddressFormModalProps) {
   const save = useSaveAddress();
+  const modalLabels = useFormModalLabels();
   const form = useZodForm(addressSchema, { defaultValues: EMPTY });
   const { register, setValue, watch, formState } = form;
 
@@ -61,6 +63,8 @@ export default function AddressFormModal({
       isSubmitting={save.isPending}
       resetValues={address ? { ...EMPTY, ...address } : EMPTY}
       submitLabel={address ? "Güncelle" : "Kaydet"}
+      size="lg"
+      {...modalLabels}
     >
       <FormInput name="title" label="Adres Başlığı" placeholder="Ev, İş, vb." />
 

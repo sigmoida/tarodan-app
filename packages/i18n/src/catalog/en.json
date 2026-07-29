@@ -12,6 +12,12 @@
     "error": "Error",
     "success": "Success",
     "close": "Close",
+    "unsavedChanges": "Unsaved changes",
+    "unsavedChangesDescription": "Your changes will be lost. Do you want to close the form?",
+    "discardChanges": "Discard Changes",
+    "continueEditing": "Continue Editing",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
     "back": "Back",
     "next": "Next",
     "previous": "Previous",
@@ -1388,7 +1394,9 @@
     "collection": "Collection",
     "removeProduct": "Remove product",
     "collectionsCount": "{count} collections",
-    "startBuildingToday": "Start building your collection today"
+    "startBuildingToday": "Start building your collection today",
+    "membershipRequired": "Membership Upgrade Required",
+    "membershipRequiredDesc": "Creating collections is available with Basic and higher membership tiers."
   },
   "notification": {
     "notifications": "Notifications",
@@ -1873,8 +1881,13 @@
     "profileVisibility": "Profile Visibility",
     "showEmail": "Show Email",
     "showPhone": "Show Phone",
+    "dangerZone": "Danger Zone",
     "deleteAccount": "Delete Account",
     "deleteAccountConfirm": "Are you sure you want to delete your account? This action cannot be undone.",
+    "deleteAccountDetails": "Permanently delete your account and all of its data. This action cannot be undone.",
+    "deleteAccountWarning": "All your data, listings, and order history will be permanently deleted.",
+    "deleteAccountTypePrompt": "Type {keyword} to confirm:",
+    "deleteAccountKeyword": "DELETE",
     "accountDeleted": "Your account has been deleted",
     "settingUpdated": "Setting updated",
     "settingUpdateFailed": "Failed to update setting",
@@ -4498,7 +4511,19 @@
         "orders": {
           "loadError": "Failed to load shipments",
           "empty": "No shipments found",
-          "unit": "shipments"
+          "unit": "shipments",
+          "shipment": "Shipment",
+          "products": "Products",
+          "carrierAndTracking": "Carrier & Tracking",
+          "packageSummary": "{orders} orders · {products} products",
+          "productSummary": "{products} products · {quantity} units",
+          "contentsTitle": "Package Contents",
+          "showContents": "Show package contents",
+          "hideContents": "Hide package contents",
+          "carrierPending": "Carrier pending",
+          "carrierSurat": "Sürat Kargo",
+          "trackingPending": "Tracking number pending",
+          "unknownProduct": "Product information unavailable"
         },
         "returns": {
           "loadError": "Failed to load return shipments",

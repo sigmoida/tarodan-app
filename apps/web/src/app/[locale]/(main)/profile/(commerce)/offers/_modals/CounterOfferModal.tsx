@@ -4,7 +4,8 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Button, Input, Modal } from "@tarodan/ui";
+import { Input, Modal, ModalFooter } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import { useCounterOffer } from "../_hooks/useOffers";
 import type { Offer } from "../_lib/types";
 
@@ -22,6 +23,7 @@ export default function CounterOfferModal({
   offer,
   mode,
 }: CounterOfferModalProps) {
+  const t = useTranslations();
   const counter = useCounterOffer();
   const [amount, setAmount] = useState("");
 
@@ -62,6 +64,19 @@ export default function CounterOfferModal({
       isOpen={open}
       onClose={onClose}
       title={mode === "buyer" ? "Daha Düşük Teklif" : "Karşı Teklif Gönder"}
+      size="md"
+      closeLabel={t("common.close")}
+      dismissDisabled={counter.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          cancelLabel={t("common.cancel")}
+          confirmLabel={t("common.send")}
+          isLoading={counter.isPending}
+          disabled={!amount.trim()}
+        />
+      }
     >
       <p className="mb-4 text-sm text-muted">
         {mode === "buyer" ? "Satıcının karşı teklifi:" : "Alıcının teklifi:"}{" "}
@@ -73,19 +88,10 @@ export default function CounterOfferModal({
       <Input
         type="text"
         inputMode="decimal"
-        className="mb-4"
         placeholder="Tutar (₺)"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
       />
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Vazgeç
-        </Button>
-        <Button type="button" onClick={submit} isLoading={counter.isPending}>
-          Gönder
-        </Button>
-      </div>
     </Modal>
   );
 }

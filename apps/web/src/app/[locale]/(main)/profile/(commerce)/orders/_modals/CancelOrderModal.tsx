@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Modal, Select, Spinner, Textarea } from "@tarodan/ui";
+import { Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { useCancelOrder } from "../_hooks/useOrders";
 import type { OrderCancellationReason } from "@/lib/api/orders";
@@ -59,9 +59,25 @@ export default function CancelOrderModal({
   };
 
   return (
-    <Modal isOpen={!!order} onClose={onClose} title={t("order.cancelOrder")}>
-      <p className="mb-4 text-sm text-muted">{t("order.cancelRefundNotice")}</p>
-
+    <Modal
+      isOpen={!!order}
+      onClose={onClose}
+      title={t("order.cancelOrder")}
+      description={t("order.cancelRefundNotice")}
+      size="md"
+      closeLabel={t("common.close")}
+      dismissDisabled={cancelMutation.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          cancelLabel={t("order.keepOrder")}
+          confirmLabel={t("order.cancelOrder")}
+          destructive
+          isLoading={cancelMutation.isPending}
+        />
+      }
+    >
       <Select
         value={reasonCode}
         onChange={(event) =>
@@ -83,31 +99,6 @@ export default function CancelOrderModal({
         maxLength={500}
       />
       <p className="mt-1 text-right text-xs text-subtle">{reason.length}/500</p>
-
-      <div className="mt-4 flex gap-3">
-        <Button
-          variant="secondary"
-          className="flex-1"
-          onClick={onClose}
-          disabled={cancelMutation.isPending}
-        >
-          {t("order.keepOrder")}
-        </Button>
-        <Button
-          variant="danger"
-          className="flex-1 gap-2"
-          onClick={submit}
-          disabled={cancelMutation.isPending}
-        >
-          {cancelMutation.isPending && (
-            <Spinner
-              size="sm"
-              color="border-surface-elevated border-t-transparent"
-            />
-          )}
-          {t("order.cancelOrder")}
-        </Button>
-      </div>
     </Modal>
   );
 }

@@ -23,9 +23,13 @@ const modalSizeClasses: Record<ModalSize, string> = {
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   /** Modal title (optional — renders a header) */
-  title?: string;
+  title?: React.ReactNode;
+  /** Accessible description rendered at the top of the scrollable body. */
+  description?: React.ReactNode;
+  /** Accessible fallback when the dialog intentionally has no visible title. */
+  ariaLabel?: string;
   /** Semantic dialog width. Every size remains constrained to the viewport. */
   size?: ModalSize;
   /** Max width class (default: max-w-md) */
@@ -40,6 +44,8 @@ export interface ModalProps {
   closeLabel?: string;
   /** Prevent dismissing through the header action while an operation is pending. */
   closeButtonDisabled?: boolean;
+  /** Prevent every dismiss path while a mutation or transition is pending. */
+  dismissDisabled?: boolean;
   /** Hide the close action for non-dismissible task dialogs. */
   showCloseButton?: boolean;
   bodyClassName?: string;
@@ -57,6 +63,8 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       onClose,
       children,
       title,
+      description,
+      ariaLabel,
       size = "md",
       maxWidth,
       footer,
@@ -64,79 +72,94 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       closeOnEscape = true,
       closeLabel = "Kapat",
       closeButtonDisabled = false,
+      dismissDisabled = false,
       showCloseButton = true,
       bodyClassName,
       className,
     },
     ref,
-  ) => (
-    <DialogPrimitive.Root
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogPrimitive.Portal>
-        {/* One stacking context per dialog lets a later nested dialog cover its parent. */}
-        <div className="pointer-events-none fixed inset-0 z-modal">
-          <DialogPrimitive.Overlay className="pointer-events-auto fixed inset-0 z-overlay bg-heading/50 backdrop-blur-sm" />
-          <DialogPrimitive.Content
-            ref={ref}
-            aria-describedby={undefined}
-            onEscapeKeyDown={(event) => {
-              if (!closeOnEscape) event.preventDefault();
-            }}
-            onPointerDownOutside={(event) => {
-              if (!closeOnBackdrop) event.preventDefault();
-            }}
-            className={cn(
-              "pointer-events-auto fixed left-1/2 top-1/2 z-modal flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-surface-elevated shadow-elevated focus:outline-none",
-              maxWidth ?? modalSizeClasses[size],
-              className,
-            )}
-          >
-            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-4">
-              {title ? (
-                <DialogPrimitive.Title className="min-w-0 text-lg font-semibold leading-tight text-heading">
-                  {title}
-                </DialogPrimitive.Title>
-              ) : (
-                <DialogPrimitive.Title className="sr-only">
-                  Dialog
-                </DialogPrimitive.Title>
-              )}
-              {showCloseButton && (
-                <DialogPrimitive.Close asChild>
-                  <IconButton
-                    aria-label={closeLabel}
-                    variant="ghost"
-                    size="sm"
-                    disabled={closeButtonDisabled}
-                    className="-mr-2 shrink-0 bg-transparent"
-                  >
-                    <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-                  </IconButton>
-                </DialogPrimitive.Close>
-              )}
-            </div>
-            <div
+  ) => {
+    const descriptionId = React.useId();
+
+    return (
+      <DialogPrimitive.Root
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open && !dismissDisabled) onClose();
+        }}
+      >
+        <DialogPrimitive.Portal>
+          {/* One stacking context per dialog lets a later nested dialog cover its parent. */}
+          <div className="pointer-events-none fixed inset-0 z-modal">
+            <DialogPrimitive.Overlay className="pointer-events-auto fixed inset-0 z-overlay bg-heading/50 backdrop-blur-sm" />
+            <DialogPrimitive.Content
+              ref={ref}
+              aria-describedby={description ? descriptionId : undefined}
+              onEscapeKeyDown={(event) => {
+                if (!closeOnEscape || dismissDisabled) event.preventDefault();
+              }}
+              onPointerDownOutside={(event) => {
+                if (!closeOnBackdrop || dismissDisabled) event.preventDefault();
+              }}
               className={cn(
-                "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5",
-                bodyClassName,
+                "pointer-events-auto fixed left-1/2 top-1/2 z-modal flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-surface-elevated shadow-elevated focus:outline-none",
+                maxWidth ?? modalSizeClasses[size],
+                className,
               )}
             >
-              {children}
-            </div>
-            {footer && (
-              <div className="shrink-0 border-t border-border bg-surface-elevated px-6 py-4">
-                {footer}
+              <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-4">
+                {title ? (
+                  <DialogPrimitive.Title className="min-w-0 text-lg font-semibold leading-tight text-heading">
+                    {title}
+                  </DialogPrimitive.Title>
+                ) : (
+                  <DialogPrimitive.Title className="sr-only">
+                    {ariaLabel ?? "Dialog"}
+                  </DialogPrimitive.Title>
+                )}
+                {showCloseButton && (
+                  <DialogPrimitive.Close asChild>
+                    <IconButton
+                      aria-label={closeLabel}
+                      variant="ghost"
+                      size="sm"
+                      disabled={closeButtonDisabled || dismissDisabled}
+                      className="-mr-2 shrink-0 bg-transparent"
+                    >
+                      <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+                    </IconButton>
+                  </DialogPrimitive.Close>
+                )}
               </div>
-            )}
-          </DialogPrimitive.Content>
-        </div>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
-  ),
+              <div
+                className={cn(
+                  "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5",
+                  bodyClassName,
+                )}
+              >
+                {description && (
+                  <DialogPrimitive.Description asChild>
+                    <div
+                      id={descriptionId}
+                      className={cn(children && "mb-4", "text-sm text-body")}
+                    >
+                      {description}
+                    </div>
+                  </DialogPrimitive.Description>
+                )}
+                {children}
+              </div>
+              {footer && (
+                <div className="shrink-0 border-t border-border bg-surface-elevated px-6 py-4">
+                  {footer}
+                </div>
+              )}
+            </DialogPrimitive.Content>
+          </div>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+    );
+  },
 );
 
 Modal.displayName = "Modal";

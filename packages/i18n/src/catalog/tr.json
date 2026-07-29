@@ -12,6 +12,12 @@
     "error": "Hata",
     "success": "Başarılı",
     "close": "Kapat",
+    "unsavedChanges": "Kaydedilmemiş değişiklikler",
+    "unsavedChangesDescription": "Yaptığınız değişiklikler kaybolacak. Formu kapatmak istiyor musunuz?",
+    "discardChanges": "Değişiklikleri Sil",
+    "continueEditing": "Düzenlemeye Devam Et",
+    "zoomIn": "Yakınlaştır",
+    "zoomOut": "Uzaklaştır",
     "back": "Geri",
     "next": "İleri",
     "previous": "Önceki",
@@ -1388,7 +1394,9 @@
     "collection": "Koleksiyon",
     "removeProduct": "Ürünü kaldır",
     "collectionsCount": "{count} koleksiyon",
-    "startBuildingToday": "Koleksiyonunuzu bugün oluşturmaya başlayın"
+    "startBuildingToday": "Koleksiyonunuzu bugün oluşturmaya başlayın",
+    "membershipRequired": "Üyelik Yükseltme Gerekli",
+    "membershipRequiredDesc": "Koleksiyon oluşturma özelliği Temel ve üzeri üyelikler için aktiftir."
   },
   "notification": {
     "notifications": "Bildirimler",
@@ -1873,8 +1881,13 @@
     "profileVisibility": "Profil Görünürlüğü",
     "showEmail": "E-postayı Göster",
     "showPhone": "Telefonu Göster",
+    "dangerZone": "Tehlikeli Bölge",
     "deleteAccount": "Hesabı Sil",
     "deleteAccountConfirm": "Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "deleteAccountDetails": "Hesabınızı ve tüm verilerinizi kalıcı olarak silin. Bu işlem geri alınamaz.",
+    "deleteAccountWarning": "Tüm verileriniz, ilanlarınız ve sipariş geçmişiniz kalıcı olarak silinecektir.",
+    "deleteAccountTypePrompt": "Onaylamak için {keyword} yazın:",
+    "deleteAccountKeyword": "SİL",
     "accountDeleted": "Hesabınız silindi",
     "settingUpdated": "Ayar güncellendi",
     "settingUpdateFailed": "Ayar güncellenemedi",
@@ -4498,7 +4511,19 @@
         "orders": {
           "loadError": "Gönderiler yüklenemedi",
           "empty": "Gönderi bulunamadı",
-          "unit": "gönderi"
+          "unit": "gönderi",
+          "shipment": "Gönderi",
+          "products": "Ürünler",
+          "carrierAndTracking": "Kargo ve Takip",
+          "packageSummary": "{orders} sipariş · {products} ürün",
+          "productSummary": "{products} ürün · {quantity} adet",
+          "contentsTitle": "Paket İçeriği",
+          "showContents": "Paket içeriğini göster",
+          "hideContents": "Paket içeriğini gizle",
+          "carrierPending": "Kargo bekleniyor",
+          "carrierSurat": "Sürat Kargo",
+          "trackingPending": "Takip numarası bekleniyor",
+          "unknownProduct": "Ürün bilgisi bulunamadı"
         },
         "returns": {
           "loadError": "İade kargoları yüklenemedi",

@@ -3,8 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TruckIcon } from "@heroicons/react/24/outline";
-import { Button, Input, Modal } from "@tarodan/ui";
+import { Input, Modal, ModalFooter } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { useShipOrder } from "../_hooks/useOrders";
 
@@ -36,6 +35,19 @@ export default function ShippingModal({
       isOpen={!!orderId}
       onClose={onClose}
       title={t("order.addShippingInfo")}
+      size="md"
+      closeLabel={t("common.close")}
+      dismissDisabled={shipMutation.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          cancelLabel={t("common.cancel")}
+          confirmLabel={t("order.saveAndShip")}
+          isLoading={shipMutation.isPending}
+          disabled={!trackingNumber.trim()}
+        />
+      }
     >
       <div className="space-y-4">
         <div>
@@ -59,28 +71,6 @@ export default function ShippingModal({
             className="font-mono"
           />
         </div>
-      </div>
-
-      <div className="mt-6 flex gap-3">
-        <Button
-          variant="secondary"
-          className="flex-1"
-          onClick={onClose}
-          disabled={shipMutation.isPending}
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button
-          variant="primary"
-          className="flex-1 gap-2"
-          onClick={submit}
-          disabled={shipMutation.isPending || !trackingNumber.trim()}
-        >
-          <TruckIcon className="h-4 w-4" />
-          {shipMutation.isPending
-            ? t("collection.saving")
-            : t("order.saveAndShip")}
-        </Button>
       </div>
     </Modal>
   );

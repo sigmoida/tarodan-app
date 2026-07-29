@@ -1,4 +1,7 @@
-import { Button, Modal } from "@tarodan/ui";
+"use client";
+
+import { ConfirmDialog } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 
 interface DeleteListingModalProps {
   onClose: () => void;
@@ -11,31 +14,20 @@ export default function DeleteListingModal({
   handleDelete,
   isLoading,
 }: DeleteListingModalProps) {
+  const t = useTranslations();
+
   return (
-    <Modal isOpen onClose={onClose} title="İlanı Sil" maxWidth="max-w-md">
-      <p className="mb-6 text-muted">
-        Bu ilanı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve
-        ilan kalıcı olarak silinir.
-      </p>
-      <div className="flex gap-3">
-        <Button
-          variant="secondary"
-          size="lg"
-          className="flex-1"
-          onClick={onClose}
-        >
-          İptal
-        </Button>
-        <Button
-          variant="danger"
-          size="lg"
-          className="flex-1"
-          onClick={handleDelete}
-          isLoading={isLoading}
-        >
-          Evet, Sil
-        </Button>
-      </div>
-    </Modal>
+    <ConfirmDialog
+      isOpen
+      onClose={onClose}
+      onConfirm={handleDelete}
+      title={t("product.deleteListing")}
+      description={t("product.deleteConfirm")}
+      cancelLabel={t("common.cancel")}
+      confirmLabel={t("collection.yesDelete")}
+      closeLabel={t("common.close")}
+      destructive
+      isLoading={isLoading}
+    />
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { CreditCardIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Spinner, ConfirmDialog } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
@@ -12,6 +13,7 @@ import { useSavedCards, useDeleteCard } from "./_hooks/useSavedCards";
 import SavedCardCard from "./_components/SavedCardCard";
 
 export default function PaymentMethodsPage() {
+  const t = useTranslations();
   const { ready } = useRequireAuth();
   const [toDelete, setToDelete] = useState<SavedCard | null>(null);
 
@@ -72,6 +74,7 @@ export default function PaymentMethodsPage() {
         }
         confirmLabel="Sil"
         cancelLabel="Vazgeç"
+        closeLabel={t("common.close")}
         isLoading={deleteCard.isPending}
         destructive
       />

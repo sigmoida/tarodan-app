@@ -5,6 +5,7 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { Alert, Button, Modal } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 
 export default function BackupCodesModal({
   isOpen,
@@ -15,12 +16,16 @@ export default function BackupCodesModal({
   codes: string[];
   onClose: () => void;
 }) {
+  const t = useTranslations();
+
   return (
     <Modal
       isOpen={isOpen && codes.length > 0}
       onClose={onClose}
       title="2FA Etkinleştirildi!"
-      maxWidth="max-w-md"
+      size="md"
+      closeLabel={t("common.close")}
+      footer={<Button onClick={onClose}>Tamam, Kaydettim</Button>}
     >
       <div className="mb-4 text-center">
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-alt">
@@ -54,15 +59,12 @@ export default function BackupCodesModal({
       </div>
 
       <Button
-        variant="secondary"
+        variant="outline"
         size="md"
-        className="mb-4 w-full"
+        className="w-full"
         onClick={() => navigator.clipboard.writeText(codes.join("\n"))}
       >
         Tüm Kodları Kopyala
-      </Button>
-      <Button variant="primary" size="lg" className="w-full" onClick={onClose}>
-        Tamam, Kaydettim
       </Button>
     </Modal>
   );

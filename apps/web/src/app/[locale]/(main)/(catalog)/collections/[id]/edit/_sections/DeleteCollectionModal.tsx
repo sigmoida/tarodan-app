@@ -1,7 +1,7 @@
 "use client";
 
-import { Button, Modal } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { ConfirmDialog } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 
 interface DeleteCollectionModalProps {
   show: boolean;
@@ -19,37 +19,17 @@ export default function DeleteCollectionModal({
   const t = useTranslations();
 
   return (
-    <Modal
+    <ConfirmDialog
       isOpen={show}
       onClose={onCancel}
+      onConfirm={onConfirm}
       title={t("collection.deleteCollection")}
-      maxWidth="max-w-md"
-    >
-      <p className="mb-5 text-sm text-muted">
-        {t("collection.deleteCollectionConfirm")}
-      </p>
-      <div className="flex gap-3">
-        <Button
-          type="button"
-          variant="secondary"
-          size="md"
-          className="flex-1"
-          onClick={onCancel}
-          disabled={isDeleting}
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button
-          type="button"
-          variant="danger"
-          size="md"
-          className="flex-1"
-          onClick={onConfirm}
-          isLoading={isDeleting}
-        >
-          {t("collection.yesDelete")}
-        </Button>
-      </div>
-    </Modal>
+      description={t("collection.deleteCollectionConfirm")}
+      cancelLabel={t("common.cancel")}
+      confirmLabel={t("collection.yesDelete")}
+      closeLabel={t("common.close")}
+      destructive
+      isLoading={isDeleting}
+    />
   );
 }

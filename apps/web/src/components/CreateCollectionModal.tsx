@@ -1,6 +1,7 @@
 "use client";
 
 import { z } from "zod";
+import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import {
   FormModal,
@@ -11,6 +12,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { collectionsApi } from "@/lib/api";
+import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 
 const schema = z.object({
   name: z.string().trim().min(1, "İsim zorunlu"),
@@ -29,6 +31,8 @@ export default function CreateCollectionModal({
   onCreated: (collectionId?: string) => void;
   flatCategories: { id: string; name: string; slug: string }[];
 }) {
+  const t = useTranslations();
+  const modalLabels = useFormModalLabels();
   const form = useZodForm(schema, {
     defaultValues: {
       name: "",
@@ -68,21 +72,22 @@ export default function CreateCollectionModal({
     <FormModal
       open
       onClose={onClose}
-      title="Yeni Koleksiyon"
+      title={t("collection.createNewCollection")}
       form={form}
       onSubmit={onSubmit}
-      submitLabel="Oluştur"
-      maxWidth="max-w-md"
+      submitLabel={t("common.create")}
+      size="md"
+      {...modalLabels}
     >
       <FormInput
         name="name"
-        label="İsim"
-        placeholder="Hot Wheels Koleksiyonum"
+        label={t("collection.collectionName")}
+        placeholder={t("collection.namePlaceholder")}
       />
       <FormTextarea
         name="description"
-        label="Açıklama"
-        placeholder="Koleksiyon hakkında..."
+        label={t("collection.collectionDescription")}
+        placeholder={t("collection.descriptionPlaceholder")}
         rows={3}
       />
       <FormSelect
@@ -91,7 +96,7 @@ export default function CreateCollectionModal({
         placeholder="Kategori seçin (isteğe bağlı)"
         options={flatCategories.map((c) => ({ value: c.id, label: c.name }))}
       />
-      <FormCheckbox name="isPublic" label="Herkese açık koleksiyon" />
+      <FormCheckbox name="isPublic" label={t("collection.publicCollection")} />
     </FormModal>
   );
 }

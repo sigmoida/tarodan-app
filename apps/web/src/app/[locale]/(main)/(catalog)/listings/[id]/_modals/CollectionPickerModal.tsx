@@ -22,7 +22,19 @@ export default function CollectionPickerModal() {
       isOpen={showCollectionModal}
       onClose={() => setShowCollectionModal(false)}
       title={t("collection.addToCollection")}
-      maxWidth="max-w-md"
+      size="md"
+      closeLabel={t("common.close")}
+      dismissDisabled={addingToCollection}
+      footer={
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            onClick={() => setShowCollectionModal(false)}
+          >
+            {t("common.cancel")}
+          </Button>
+        </div>
+      }
     >
       {loadingCollections ? (
         <div className="flex justify-center py-8">
@@ -68,16 +80,6 @@ export default function CollectionPickerModal() {
           </Button>
         </div>
       )}
-
-      <div className="mt-4 border-t border-border pt-4">
-        <Button
-          variant="secondary"
-          onClick={() => setShowCollectionModal(false)}
-          className="w-full"
-        >
-          {t("common.cancel")}
-        </Button>
-      </div>
     </Modal>
   );
 }

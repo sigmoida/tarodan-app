@@ -33,6 +33,7 @@ export interface FormModalProps<T extends FieldValues> {
   resetValues?: T;
   submitLabel?: string;
   cancelLabel?: string;
+  closeLabel?: string;
   size?: ModalProps["size"];
   maxWidth?: ModalProps["maxWidth"];
   /** Optional width/layout override for editor-style split panes. */
@@ -63,6 +64,7 @@ export function FormModal<T extends FieldValues>({
   resetValues,
   submitLabel = "Kaydet",
   cancelLabel = "İptal",
+  closeLabel = "Kapat",
   size = "lg",
   maxWidth,
   modalClassName,
@@ -101,7 +103,8 @@ export function FormModal<T extends FieldValues>({
       maxWidth={maxWidth}
       className={modalClassName}
       closeOnBackdrop={closeOnBackdrop}
-      closeButtonDisabled={pending}
+      closeLabel={closeLabel}
+      dismissDisabled={pending}
       footer={
         <ModalFooter
           onCancel={close}

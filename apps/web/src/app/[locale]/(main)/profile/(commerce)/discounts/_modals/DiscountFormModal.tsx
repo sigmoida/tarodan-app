@@ -13,6 +13,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { getProductEffectivePrice } from "@/lib/productPrice";
+import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { useSaveDiscount } from "../_hooks/useDiscounts";
 import {
   emptyDiscountForm,
@@ -58,6 +59,7 @@ export default function DiscountFormModal({
   products,
 }: DiscountFormModalProps) {
   const save = useSaveDiscount();
+  const modalLabels = useFormModalLabels();
   const form = useZodForm(discountSchema, {
     defaultValues: emptyDiscountForm(),
   });
@@ -96,7 +98,8 @@ export default function DiscountFormModal({
       isSubmitting={save.isPending}
       resetValues={editing ? fromDiscount(editing) : emptyDiscountForm()}
       submitLabel={editing ? "Güncelle" : "Oluştur"}
-      maxWidth="max-w-2xl"
+      size="2xl"
+      {...modalLabels}
     >
       <FormInput
         name="name"

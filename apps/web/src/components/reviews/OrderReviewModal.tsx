@@ -2,12 +2,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Controller } from "react-hook-form";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
 import { z } from "zod";
-import { Button, Modal } from "@tarodan/ui";
+import { Button, Modal, ModalFooter } from "@tarodan/ui";
 import { Form, FormInput, FormTextarea, useZodForm } from "@tarodan/ui/form";
 import OptimizedImage from "@/components/OptimizedImage";
 import { useTranslations } from "next-intl";
@@ -91,6 +91,7 @@ export default function OrderReviewModal({
   onSubmit,
 }: OrderReviewModalProps) {
   const t = useTranslations();
+  const formId = useId();
   const form = useZodForm(orderReviewSchema, { defaultValues: EMPTY });
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -123,9 +124,21 @@ export default function OrderReviewModal({
       isOpen={open}
       onClose={onClose}
       title={t("review.reviewOrder")}
-      maxWidth="max-w-lg"
+      size="lg"
+      closeLabel={t("common.close")}
+      dismissDisabled={isSubmitting}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          cancelLabel={t("common.cancel")}
+          confirmLabel={t("review.submit")}
+          confirmForm={formId}
+          isLoading={isSubmitting}
+        />
+      }
     >
       <Form
+        id={formId}
         form={form}
         onSubmit={(values) => onSubmit({ ...values, images })}
         className="space-y-6"
@@ -266,26 +279,6 @@ export default function OrderReviewModal({
               rows={3}
             />
           </div>
-        </div>
-
-        <div className="flex gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            className="flex-1"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            className="flex-1"
-            isLoading={isSubmitting}
-          >
-            {t("review.submit")}
-          </Button>
         </div>
       </Form>
     </Modal>

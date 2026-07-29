@@ -24,6 +24,8 @@ export interface ModalFooterProps {
   isLoading?: boolean;
   /** Disable the primary action (e.g. empty required field). */
   disabled?: boolean;
+  /** Associate the primary submit action with a form rendered in the dialog body. */
+  confirmForm?: string;
 }
 
 /**
@@ -39,6 +41,7 @@ export const ModalFooter: React.FC<ModalFooterProps> = ({
   destructive = false,
   isLoading = false,
   disabled = false,
+  confirmForm,
 }) => (
   <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
     <Button
@@ -52,6 +55,7 @@ export const ModalFooter: React.FC<ModalFooterProps> = ({
     </Button>
     <Button
       type={onConfirm ? "button" : "submit"}
+      form={confirmForm}
       variant={destructive ? "danger" : undefined}
       onClick={onConfirm}
       isLoading={isLoading}
@@ -71,6 +75,7 @@ export interface ConfirmDialogProps {
   description?: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  closeLabel?: string;
   /** Use danger styling for destructive confirmations. */
   destructive?: boolean;
   /** While true, confirm button shows a spinner and is disabled. */
@@ -89,6 +94,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   description,
   confirmLabel = "Onayla",
   cancelLabel = "Vazgeç",
+  closeLabel = "Kapat",
   destructive,
   isLoading,
 }) => {
@@ -101,8 +107,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
+      description={description}
       size="md"
-      closeButtonDisabled={isLoading}
+      closeLabel={closeLabel}
+      dismissDisabled={isLoading}
       footer={
         <ModalFooter
           onCancel={onClose}
@@ -113,8 +121,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           isLoading={isLoading}
         />
       }
-    >
-      {description && <p className="text-sm text-body">{description}</p>}
-    </Modal>
+    />
   );
 };

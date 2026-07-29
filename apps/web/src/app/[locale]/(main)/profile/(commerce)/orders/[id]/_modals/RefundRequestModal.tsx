@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  Button,
-  Input,
-  Modal,
-  Select,
-  Spinner,
-  Textarea,
-} from "@/components/ui";
+import { Input, Modal, Select, Textarea } from "@/components/ui";
+import { ModalFooter } from "@tarodan/ui";
 import { useMutation } from "@tanstack/react-query";
 import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
 import { useTranslations } from "next-intl";
@@ -164,7 +158,18 @@ export default function RefundRequestModal({
       isOpen={isOpen}
       onClose={onClose}
       title={t("order.requestRefundTitle")}
-      maxWidth="max-w-lg"
+      size="lg"
+      closeLabel={t("common.close")}
+      dismissDisabled={submitMutation.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={handleSubmit}
+          cancelLabel={t("trade.dispute.cancelCta")}
+          confirmLabel={t("order.submitRefund")}
+          isLoading={submitMutation.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <div className="bg-surface rounded-lg p-3 text-sm">
@@ -293,31 +298,6 @@ export default function RefundRequestModal({
             </p>
           </div>
         )}
-
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant="secondary"
-            className="flex-1"
-            onClick={onClose}
-            disabled={submitMutation.isPending}
-          >
-            {t("trade.dispute.cancelCta")}
-          </Button>
-          <Button
-            variant="primary"
-            className="flex-1 flex items-center justify-center gap-2"
-            onClick={handleSubmit}
-            disabled={submitMutation.isPending}
-          >
-            {submitMutation.isPending ? (
-              <Spinner
-                size="sm"
-                color="border-surface-elevated border-t-transparent"
-              />
-            ) : null}
-            {t("order.submitRefund")}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

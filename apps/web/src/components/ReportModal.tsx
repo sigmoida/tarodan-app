@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import { z } from "zod";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
-import { Button, Modal, Radio } from "@tarodan/ui";
-import { Form, FormTextarea, useZodForm } from "@tarodan/ui/form";
+import { Radio } from "@tarodan/ui";
+import { FormModal, FormTextarea, useZodForm } from "@tarodan/ui/form";
 import { api } from "@/lib/api";
 
 export type ReportEntityType = "product" | "user" | "collection" | "message";
@@ -113,90 +113,78 @@ export default function ReportModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="max-w-sm">
-      <Form form={form} onSubmit={onSubmit} className="space-y-4">
-        {entityName && (
-          <div className="rounded-lg bg-surface p-2">
-            <p className="text-xs text-muted">{t("report.reporting")}</p>
-            <p className="truncate text-sm font-medium text-heading">
-              {entityName}
-            </p>
-          </div>
-        )}
-
-        <div>
-          <label className="mb-2 block text-sm font-medium text-body">
-            {t("common.reason")} <span className="text-danger-500">*</span>
-          </label>
-          <div className="space-y-1.5">
-            {REPORT_REASONS.map((r) => (
-              <label
-                key={r.value}
-                className={`flex cursor-pointer items-center rounded-lg border p-2.5 text-sm transition-all ${
-                  reason === r.value
-                    ? "border-danger-500 bg-danger-50"
-                    : "border-border"
-                }`}
-              >
-                <Radio
-                  name="reportReason"
-                  value={r.value}
-                  checked={reason === r.value}
-                  onChange={() =>
-                    form.setValue("reason", r.value, { shouldValidate: true })
-                  }
-                />
-                <span className="ml-2 text-body">
-                  {t(r.labelKey as Parameters<typeof t>[0])}
-                </span>
-              </label>
-            ))}
-          </div>
-          {form.formState.errors.reason && (
-            <p className="mt-1 text-xs text-danger-600">
-              {form.formState.errors.reason.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <FormTextarea
-            name="description"
-            label={t("report.detailsLabel")}
-            placeholder={t("report.detailsPlaceholder")}
-            rows={2}
-            maxLength={500}
-          />
-          <p className="mt-0.5 text-right text-xs text-subtle">
-            {description.length}/500
+    <FormModal
+      open={isOpen}
+      onClose={onClose}
+      title={title}
+      form={form}
+      onSubmit={onSubmit}
+      size="sm"
+      submitLabel={t("report.submit")}
+      cancelLabel={t("common.cancel")}
+      closeLabel={t("common.close")}
+      discardConfirmation={false}
+    >
+      {entityName && (
+        <div className="rounded-lg bg-surface p-2">
+          <p className="text-xs text-muted">{t("report.reporting")}</p>
+          <p className="truncate text-sm font-medium text-heading">
+            {entityName}
           </p>
         </div>
+      )}
 
-        <div className="flex gap-2 pt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="flex-1"
-            onClick={onClose}
-          >
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            variant="danger"
-            size="sm"
-            className="flex-1"
-            isLoading={form.formState.isSubmitting}
-          >
-            {t("report.submit")}
-          </Button>
+      <div>
+        <label className="mb-2 block text-sm font-medium text-body">
+          {t("common.reason")} <span className="text-danger-500">*</span>
+        </label>
+        <div className="space-y-1.5">
+          {REPORT_REASONS.map((r) => (
+            <label
+              key={r.value}
+              className={`flex cursor-pointer items-center rounded-lg border p-2.5 text-sm transition-all ${
+                reason === r.value
+                  ? "border-danger-500 bg-danger-50"
+                  : "border-border"
+              }`}
+            >
+              <Radio
+                name="reportReason"
+                value={r.value}
+                checked={reason === r.value}
+                onChange={() =>
+                  form.setValue("reason", r.value, { shouldValidate: true })
+                }
+              />
+              <span className="ml-2 text-body">
+                {t(r.labelKey as Parameters<typeof t>[0])}
+              </span>
+            </label>
+          ))}
         </div>
+        {form.formState.errors.reason && (
+          <p className="mt-1 text-xs text-danger-600">
+            {form.formState.errors.reason.message}
+          </p>
+        )}
+      </div>
 
-        <p className="text-center text-xs text-subtle">
-          {t("report.reviewNotice")}
+      <div>
+        <FormTextarea
+          name="description"
+          label={t("report.detailsLabel")}
+          placeholder={t("report.detailsPlaceholder")}
+          rows={2}
+          maxLength={500}
+        />
+        <p className="mt-0.5 text-right text-xs text-subtle">
+          {description.length}/500
         </p>
-      </Form>
-    </Modal>
+      </div>
+
+      <p className="text-center text-xs text-subtle">
+        {t("report.reviewNotice")}
+      </p>
+    </FormModal>
   );
 }
