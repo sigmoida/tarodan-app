@@ -24,6 +24,12 @@ model User {
   taxId                   String?                  @map("tax_id")
   companyName             String?                  @unique @map("company_name")
   businessStatus          BusinessStatus?          @map("business_status")
+  // Kurumsal başvuru detayları (register'da alınıyordu ama saklanmıyordu; admin
+  // incelemesi + belge ekranı için kalıcılaştırıldı).
+  companyType             String?                  @map("company_type")
+  taxOffice               String?                  @map("tax_office")
+  companyCity             String?                  @map("company_city")
+  companyDistrict         String?                  @map("company_district")
   fcmToken                String?                  @map("fcm_token")
   createdAt               DateTime                 @default(now()) @map("created_at")
   updatedAt               DateTime                 @updatedAt @map("updated_at")
@@ -33,10 +39,13 @@ model User {
   bannedReason            String?                  @map("banned_reason")
   isBanned                Boolean                  @default(false) @map("is_banned")
   acceptsMarketingEmails  Boolean                  @default(false) @map("accepts_marketing_emails")
+  preferredLanguage       String?                  @map("preferred_language")
+  homeTourVersion         Int                      @default(0) @map("home_tour_version")
   notificationSettings    Json?                    @map("notification_settings")
   lastActivityAt          DateTime?                @map("last_activity_at")
   lastLoginAt             DateTime?                @map("last_login_at")
   deletedAt               DateTime?                @map("deleted_at")
+  storeViewCount          Int                      @default(0) @map("store_view_count")
   addresses               Address[]
   adminUser               AdminUser?
   cart                    Cart?
@@ -44,9 +53,11 @@ model User {
   collectionViews         CollectionView[]
   collections             Collection[]
   discountUsages          DiscountUsage[]
+  couponReservations      CouponReservation[]
   discounts               Discount[]
-  emailVerificationTokens  EmailVerificationToken[]
-  phoneVerificationTokens  PhoneVerificationToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  emailChangeTokens       EmailChangeToken[]
+  phoneVerificationTokens PhoneVerificationToken[]
   buyerInvoices           Invoice[]                @relation("BuyerInvoices")
   sellerInvoices          Invoice[]                @relation("SellerInvoices")
   receivedMessages        Message[]                @relation("MessageReceiver")
@@ -76,11 +87,13 @@ model User {
   membership              UserMembership?
   wishlist                Wishlist?
   bankAccount             SellerBankAccount?
+  sellerDocuments         SellerDocument[]
   payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
   savedCards              SavedCard[]
   oauthAccounts           OAuthAccount[]
   reports                 Report[]                 @relation("ReporterReports")
+  productBoosts           ProductBoost[]
 
   @@index([email])
   @@index([isSeller])
@@ -90,19 +103,19 @@ model User {
 /// Kullanıcıların gönderdiği içerik şikayetleri (ürün/kullanıcı/koleksiyon/mesaj).
 /// Hedef polimorfik olduğu için targetId düz string olarak tutulur (FK yok).
 model Report {
-  id          String   @id @default(uuid())
-  reporterId  String   @map("reporter_id")
+  id          String    @id @default(uuid())
+  reporterId  String    @map("reporter_id")
   type        String // product | user | collection | message
-  targetId    String   @map("target_id")
+  targetId    String    @map("target_id")
   reason      String
   description String?
-  status      String   @default("pending") // pending | under_review | resolved | dismissed
-  adminNote   String?  @map("admin_note")
+  status      String    @default("pending") // pending | under_review | resolved | dismissed
+  adminNote   String?   @map("admin_note")
   resolvedAt  DateTime? @map("resolved_at")
-  resolvedBy  String?  @map("resolved_by")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  reporter    User     @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy  String?   @map("resolved_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  reporter    User      @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([type])
@@ -194,6 +207,24 @@ model PhoneVerificationToken {
   @@map("phone_verification_tokens")
 }
 
+/// Pending email-change requests. The new email lives ONLY here (never on the
+/// user row) so the current email stays authoritative until the 6-digit code
+/// is verified. Mirrors PhoneVerificationToken.
+model EmailChangeToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  newEmail  String    @map("new_email")
+  codeHash  String    @map("code_hash")
+  expiresAt DateTime  @map("expires_at")
+  attempts  Int       @default(0)
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_change_tokens")
+}
+
 model NewsletterSubscriber {
   id               String    @id @default(uuid())
   email            String    @unique
@@ -280,52 +311,53 @@ model Address {
 }
 
 model MembershipTier {
-  id                   String             @id @default(uuid())
-  type                 MembershipTierType @unique
+  id                   String              @id @default(uuid())
+  type                 MembershipTierType  @unique
   name                 String
   description          String?
-  monthlyPrice         Decimal            @map("monthly_price") @db.Decimal(10, 2)
-  yearlyPrice          Decimal            @map("yearly_price") @db.Decimal(10, 2)
-  maxFreeListings      Int                @map("max_free_listings")
-  maxTotalListings     Int                @map("max_total_listings")
-  maxImagesPerListing  Int                @map("max_images_per_listing")
-  canCreateCollections Boolean            @default(false) @map("can_create_collections")
-  canTrade             Boolean            @default(false) @map("can_trade")
-  isAdFree             Boolean            @default(false) @map("is_ad_free")
-  featuredListingSlots Int                @default(0) @map("featured_listing_slots")
-  commissionDiscount   Decimal            @default(0) @map("commission_discount") @db.Decimal(5, 4)
-  isActive             Boolean            @default(true) @map("is_active")
-  sortOrder            Int                @default(0) @map("sort_order")
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
+  monthlyPrice         Decimal             @map("monthly_price") @db.Decimal(10, 2)
+  yearlyPrice          Decimal             @map("yearly_price") @db.Decimal(10, 2)
+  maxFreeListings      Int                 @map("max_free_listings")
+  maxTotalListings     Int                 @map("max_total_listings")
+  maxImagesPerListing  Int                 @map("max_images_per_listing")
+  canCreateCollections Boolean             @default(false) @map("can_create_collections")
+  canTrade             Boolean             @default(false) @map("can_trade")
+  isAdFree             Boolean             @default(false) @map("is_ad_free")
+  featuredListingSlots Int                 @default(0) @map("featured_listing_slots")
+  commissionDiscount   Decimal             @default(0) @map("commission_discount") @db.Decimal(5, 4)
+  isActive             Boolean             @default(true) @map("is_active")
+  sortOrder            Int                 @default(0) @map("sort_order")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
   userMemberships      UserMembership[]
+  membershipPayments   MembershipPayment[]
 
   @@map("membership_tiers")
 }
 
 model UserMembership {
-  id                 String              @id @default(uuid())
-  userId             String              @unique @map("user_id")
-  tierId             String              @map("tier_id")
-  status             SubscriptionStatus  @default(active)
-  currentPeriodStart DateTime            @map("current_period_start")
-  currentPeriodEnd   DateTime            @map("current_period_end")
-  cancelledAt        DateTime?           @map("cancelled_at")
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
-  autoRenew          Boolean             @default(false) @map("auto_renew")
+  id                     String              @id @default(uuid())
+  userId                 String              @unique @map("user_id")
+  tierId                 String              @map("tier_id")
+  status                 SubscriptionStatus  @default(active)
+  currentPeriodStart     DateTime            @map("current_period_start")
+  currentPeriodEnd       DateTime            @map("current_period_end")
+  cancelledAt            DateTime?           @map("cancelled_at")
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+  autoRenew              Boolean             @default(false) @map("auto_renew")
   // Ertelemeli downgrade: kullanıcı daha düşük bir tier'a geçmek istediğinde
   // (örn. premium→temel) tier HEMEN değişmez; mevcut ödenmiş dönem sonuna kadar
   // yüksek tier sürer, dönem sonunda bu tip'e geçilir. null = bekleyen downgrade yok.
   // Upgrade'ler anında uygulanır, bu alanı kullanmaz.
-  scheduledTierType  MembershipTierType? @map("scheduled_tier_type")
+  scheduledTierType      MembershipTierType? @map("scheduled_tier_type")
   // Ertelemeli period değişimi: dönem sonunda geçilecek faturalama periyodu
   // ('monthly' | 'yearly'). Örn. yıllık→aylık downgrade'inde aylık olarak işlenir.
   // null = period değişimi planlı değil.
-  scheduledBillingPeriod String?         @map("scheduled_billing_period")
-  payments           MembershipPayment[]
-  tier               MembershipTier      @relation(fields: [tierId], references: [id])
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduledBillingPeriod String?             @map("scheduled_billing_period")
+  payments               MembershipPayment[]
+  tier                   MembershipTier      @relation(fields: [tierId], references: [id])
+  user                   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -333,17 +365,31 @@ model UserMembership {
 }
 
 model MembershipPayment {
-  id                String         @id @default(uuid())
-  membershipId      String         @map("membership_id")
-  amount            Decimal        @db.Decimal(10, 2)
+  id                String          @id @default(uuid())
+  membershipId      String          @map("membership_id")
+  orderId           String?         @unique @map("order_id")
+  targetTierId      String?         @map("target_tier_id")
+  billingPeriod     String?         @map("billing_period")
+  idempotencyKey    String?         @unique @map("idempotency_key")
+  amount            Decimal         @db.Decimal(10, 2)
   provider          String
-  providerPaymentId String?        @map("provider_payment_id")
-  status            PaymentStatus  @default(pending)
-  periodStart       DateTime       @map("period_start")
-  periodEnd         DateTime       @map("period_end")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  membership        UserMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  providerPaymentId String?         @map("provider_payment_id")
+  // Oto-yenileme (recurring) gözlemlenebilirliği: PayTR merchant_oid + ödeme yöntemi
+  // + ham sağlayıcı yanıtı. Muhasebe/mutabakat/destek için (Faz 6.5 PSP reconciliation).
+  merchantOid       String?         @map("merchant_oid")
+  paymentType       String?         @map("payment_type") // card/eft
+  metadata          Json?
+  status            PaymentStatus   @default(pending)
+  periodStart       DateTime        @map("period_start")
+  periodEnd         DateTime        @map("period_end")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  membership        UserMembership  @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  order             Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  targetTier        MembershipTier? @relation(fields: [targetTierId], references: [id], onDelete: SetNull)
 
+  @@index([merchantOid])
+  @@index([membershipId, status])
+  @@index([targetTierId])
   @@map("membership_payments")
 }
 
@@ -450,6 +496,7 @@ model Product {
   popularityUpdatedAt DateTime?          @map("popularity_updated_at")
   quantity            Int?               @map("quantity")
   reservedQuantity    Int?               @default(0) @map("reserved_quantity")
+  shippingDesi        Int                @default(1) @map("shipping_desi")
   slug                String?            @unique
   oldPrice            Decimal?           @map("old_price") @db.Decimal(10, 2)
   originalPrice       Decimal?           @map("original_price") @db.Decimal(10, 2)
@@ -466,9 +513,18 @@ model Product {
   releaseDate         DateTime?          @map("release_date")
   carModelId          String?            @map("car_model_id")
   manufacturerId      String?            @map("manufacturer_id")
+  modelCode           String?            @map("model_code")
+  color               String?
+  isBoxed             Boolean?           @map("is_boxed")
   averageRating       Decimal?           @map("average_rating") @db.Decimal(3, 2)
   ratingCount         Int                @default(0) @map("rating_count")
   boostedUntil        DateTime?          @map("boosted_until")
+  /// Timestamp of the current active boost purchase — drives LIFO ordering
+  /// (most-recently-boosted first) in search/category and the home showcase.
+  boostedAt           DateTime?          @map("boosted_at")
+  /// Active only while a `showcaseOnHome` (Vitrin) package is running; the home
+  /// showcase area queries `homeShowcaseUntil > now` ordered by `boostedAt` desc.
+  homeShowcaseUntil   DateTime?          @map("home_showcase_until")
   qualityScore        Int                @default(0) @map("quality_score")
   rankTier            Int                @default(0) @map("rank_tier")
   relevanceScore      Int?               @map("relevance_score")
@@ -479,7 +535,7 @@ model Product {
   aiCheckLabels       Json?              @map("ai_check_labels")
   aiCheckReason       String?            @map("ai_check_reason")
   aiCheckedAt         DateTime?          @map("ai_checked_at")
-  /// Denormalized concat of title + description + attribute display values.
+  /// Denormalized concat of title + description + model code + color + attribute display values.
   /// Maintained by Postgres triggers; never write directly from application code.
   /// Used for full-text search via the GIN index `products_search_text_fts_idx`.
   searchText          String?            @map("search_text")
@@ -514,29 +570,85 @@ model Product {
   @@index([averageRating(sort: Desc), ratingCount(sort: Desc)])
   @@index([rankTier(sort: Desc), qualityScore(sort: Desc), createdAt(sort: Desc)])
   @@index([boostedUntil])
+  @@index([boostedUntil, boostedAt(sort: Desc)])
+  @@index([homeShowcaseUntil, boostedAt(sort: Desc)])
   @@index([relevanceScore(sort: Desc)])
   @@map("products")
 }
 
 model ProductBoost {
-  id           String      @id @default(uuid())
-  productId    String      @map("product_id")
-  userId       String      @map("user_id")
-  durationDays Int         @map("duration_days")
-  price        Decimal     @db.Decimal(10, 2)
-  status       BoostStatus @default(pending)
-  autoRenew    Boolean     @default(false) @map("auto_renew")
-  startsAt     DateTime?   @map("starts_at")
-  endsAt       DateTime?   @map("ends_at")
-  orderId      String?     @unique @map("order_id")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
-  product      Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id             String      @id @default(uuid())
+  productId      String      @map("product_id")
+  userId         String      @map("user_id")
+  /// Purchased ad package. Nullable for legacy boosts predating the package model.
+  packageId      String?     @map("package_id")
+  /// Snapshot of the package name at purchase time (survives later package edits).
+  packageName    String?     @map("package_name")
+  /// Snapshot of the package's `showcaseOnHome` flag — the home-showcase query
+  /// keys on the product column set from this, so a later package flip is inert.
+  showcaseOnHome Boolean     @default(false) @map("showcase_on_home")
+  durationDays   Int         @map("duration_days")
+  price          Decimal     @db.Decimal(10, 2)
+  status         BoostStatus @default(pending)
+  autoRenew      Boolean     @default(false) @map("auto_renew")
+  startsAt       DateTime?   @map("starts_at")
+  endsAt         DateTime?   @map("ends_at")
+  /// Set on activation — the LIFO ordering key for search + home showcase.
+  purchasedAt    DateTime?   @map("purchased_at")
+  orderId        String?     @unique @map("order_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package        AdPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
 
   @@index([productId])
   @@index([userId])
   @@index([status, endsAt])
+  @@index([packageId])
   @@map("product_boosts")
+}
+
+/// Admin-managed advertisement/boost package (e.g. "Ekonomik", "Vitrin"). Fully
+/// dynamic — admins add packages and price tiers; `showcaseOnHome` marks the ones
+/// that also appear in the homepage showcase area (Vitrin), on top of the search
+/// priority every active package grants.
+model AdPackage {
+  id             String          @id @default(uuid())
+  name           String
+  slug           String          @unique
+  showcaseOnHome Boolean         @default(false) @map("showcase_on_home")
+  isActive       Boolean         @default(true) @map("is_active")
+  sortOrder      Int             @default(0) @map("sort_order")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  tiers          AdPackageTier[]
+  boosts         ProductBoost[]
+
+  @@map("ad_packages")
+}
+
+/// One priced cell of a package's matrix: a duration + a product-price range →
+/// price (+ optional, possibly time-bounded, campaign price). Rows are added/
+/// removed freely by admins ("satır ekle/çıkar").
+model AdPackageTier {
+  id               String    @id @default(uuid())
+  packageId        String    @map("package_id")
+  durationDays     Int       @map("duration_days")
+  /// Product-price range this tier applies to. `maxAmount` null = no upper bound.
+  minAmount        Decimal   @map("min_amount") @db.Decimal(12, 2)
+  maxAmount        Decimal?  @map("max_amount") @db.Decimal(12, 2)
+  price            Decimal   @db.Decimal(10, 2)
+  campaignPrice    Decimal?  @map("campaign_price") @db.Decimal(10, 2)
+  campaignStartsAt DateTime? @map("campaign_starts_at")
+  campaignEndsAt   DateTime? @map("campaign_ends_at")
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  package          AdPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, durationDays])
+  @@map("ad_package_tiers")
 }
 
 model ProductImage {
@@ -566,51 +678,52 @@ model ProductLike {
 }
 
 model Trade {
-  id                   String            @id @default(uuid())
-  tradeNumber          String            @unique @map("trade_number")
-  initiatorId          String            @map("initiator_id")
-  receiverId           String            @map("receiver_id")
-  status               TradeStatus       @default(pending)
-  cashAmount           Decimal?          @map("cash_amount") @db.Decimal(10, 2)
-  cashPayerId          String?           @map("cash_payer_id")
-  cashCommission       Decimal?          @map("cash_commission") @db.Decimal(10, 2)
-  initiatorMessage     String?           @map("initiator_message")
-  receiverMessage      String?           @map("receiver_message")
+  id                        String            @id @default(uuid())
+  tradeNumber               String            @unique @map("trade_number")
+  initiatorId               String            @map("initiator_id")
+  receiverId                String            @map("receiver_id")
+  status                    TradeStatus       @default(pending)
+  cashAmount                Decimal?          @map("cash_amount") @db.Decimal(10, 2)
+  cashPayerId               String?           @map("cash_payer_id")
+  cashCommission            Decimal?          @map("cash_commission") @db.Decimal(10, 2)
+  initiatorMessage          String?           @map("initiator_message")
+  receiverMessage           String?           @map("receiver_message")
   // Tarafların TAKAS için seçtiği teslimat adresi. Depo→kullanıcı (çıkış)
   // ayağında ve gönderici etiketinde kullanılır. Null ise kullanıcının
   // varsayılan adresine düşülür (geriye dönük uyum).
-  initiatorAddressId   String?           @map("initiator_address_id")
-  receiverAddressId    String?           @map("receiver_address_id")
-  responseDeadline     DateTime          @map("response_deadline")
-  paymentDeadline      DateTime?         @map("payment_deadline")
-  shippingDeadline     DateTime?         @map("shipping_deadline")
-  confirmationDeadline DateTime?         @map("confirmation_deadline")
-  acceptedAt           DateTime?         @map("accepted_at")
-  completedAt          DateTime?         @map("completed_at")
-  cancelledAt          DateTime?         @map("cancelled_at")
-  cancelReason         String?           @map("cancel_reason")
+  initiatorAddressId        String?           @map("initiator_address_id")
+  receiverAddressId         String?           @map("receiver_address_id")
+  responseDeadline          DateTime          @map("response_deadline")
+  paymentDeadline           DateTime?         @map("payment_deadline")
+  shippingDeadline          DateTime?         @map("shipping_deadline")
+  confirmationDeadline      DateTime?         @map("confirmation_deadline")
+  acceptedAt                DateTime?         @map("accepted_at")
+  completedAt               DateTime?         @map("completed_at")
+  cancelledAt               DateTime?         @map("cancelled_at")
+  cancelReason              String?           @map("cancel_reason")
   // Stamped when the first to_warehouse shipment is delivered. Once non-null,
   // user-side cancel is locked: only admin reject/force-cancel can resolve.
-  firstWarehouseArrivalAt DateTime?      @map("first_warehouse_arrival_at")
-  cancelLockedAt       DateTime?         @map("cancel_locked_at")
+  firstWarehouseArrivalAt   DateTime?         @map("first_warehouse_arrival_at")
+  cancelLockedAt            DateTime?         @map("cancel_locked_at")
   // Populated when an admin reject's PayTR refund fails. Surfaced in admin UI
   // so the operator can retry the refund.
-  refundFailureReason  String?           @map("refund_failure_reason")
-  refundFailureAt      DateTime?         @map("refund_failure_at")
+  refundFailureReason       String?           @map("refund_failure_reason")
+  refundFailureAt           DateTime?         @map("refund_failure_at")
   // Flag set when an admin marks a return shipment lost and the affected user
   // is owed manual compensation. Cleared by admin after settling out of band.
-  compensationPendingUserId String?       @map("compensation_pending_user_id")
-  compensationResolvedAt    DateTime?     @map("compensation_resolved_at")
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
-  version              Int               @default(1)
-  cashPayment          TradeCashPayment?
-  dispute              TradeDispute?
-  items                TradeItem[]       @relation("TradeItems")
-  messages             TradeMessage[]
-  shipments            TradeShipment[]
-  initiator            User              @relation("TradeInitiator", fields: [initiatorId], references: [id])
-  receiver             User              @relation("TradeReceiver", fields: [receiverId], references: [id])
+  compensationPendingUserId String?           @map("compensation_pending_user_id")
+  compensationResolvedAt    DateTime?         @map("compensation_resolved_at")
+  createdAt                 DateTime          @default(now()) @map("created_at")
+  updatedAt                 DateTime          @updatedAt @map("updated_at")
+  version                   Int               @default(1)
+  cashPayment               TradeCashPayment?
+  dispute                   TradeDispute?
+  items                     TradeItem[]       @relation("TradeItems")
+  messages                  TradeMessage[]
+  shipments                 TradeShipment[]
+  refundAttempts            RefundAttempt[]
+  initiator                 User              @relation("TradeInitiator", fields: [initiatorId], references: [id])
+  receiver                  User              @relation("TradeReceiver", fields: [receiverId], references: [id])
 
   @@index([initiatorId])
   @@index([receiverId])
@@ -636,31 +749,36 @@ model TradeItem {
 }
 
 model TradeShipment {
-  id              String               @id @default(uuid())
-  tradeId         String               @map("trade_id")
-  shipperId       String               @map("shipper_id")
+  id                 String               @id @default(uuid())
+  tradeId            String               @map("trade_id")
+  shipperId          String               @map("shipper_id")
   // Nullable: kabulde depo etiketi otomatik oluşur (adres henüz yok), kullanıcı kargoya verirken set edilir
-  fromAddressId   String?              @map("from_address_id")
-  carrier         String
-  trackingNumber  String?              @map("tracking_number")
-  status          ShipmentStatus       @default(pending)
-  shippedAt       DateTime?            @map("shipped_at")
-  deliveredAt     DateTime?            @map("delivered_at")
-  confirmedAt     DateTime?            @map("confirmed_at")
+  fromAddressId      String?              @map("from_address_id")
+  carrier            String
+  // trackingNumber = OzelKargoTakipNo (bizim ref; poller bununla sorgular).
+  trackingNumber     String?              @map("tracking_number")
+  // Gerçek Sürat kargo kodu (KargoTakipNo) + ZPL etiket (OrtakBarkodOlustur ile
+  // takas onaylanınca anında oluşur; UI'da providerTrackingId gösterilir).
+  providerTrackingId String?              @map("provider_tracking_id")
+  labelZpl           String?              @map("label_zpl")
+  status             ShipmentStatus       @default(pending)
+  shippedAt          DateTime?            @map("shipped_at")
+  deliveredAt        DateTime?            @map("delivered_at")
+  confirmedAt        DateTime?            @map("confirmed_at")
   // Admin-set when a shipment is declared lost (typically a return leg that
   // never arrived). Drives compensation flow on the parent trade.
-  lostAt          DateTime?            @map("lost_at")
-  lostReason      String?              @map("lost_reason")
+  lostAt             DateTime?            @map("lost_at")
+  lostReason         String?              @map("lost_reason")
   // Escrow: which leg of the journey this shipment represents
-  leg             String               @default("to_warehouse")
+  leg                String               @default("to_warehouse")
   // Recipient of this shipment: null = warehouse, else initiator or receiver user id
-  recipientUserId String?              @map("recipient_user_id")
-  recipientType   String               @default("warehouse") @map("recipient_type")
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
-  events          TradeShipmentEvent[]
-  fromAddress     Address?             @relation(fields: [fromAddressId], references: [id])
-  trade           Trade                @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  recipientUserId    String?              @map("recipient_user_id")
+  recipientType      String               @default("warehouse") @map("recipient_type")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+  events             TradeShipmentEvent[]
+  fromAddress        Address?             @relation(fields: [fromAddressId], references: [id])
+  trade              Trade                @relation(fields: [tradeId], references: [id], onDelete: Cascade)
 
   @@index([tradeId])
   @@index([leg])
@@ -739,12 +857,15 @@ model MessageThread {
   id             String    @id @default(uuid())
   participant1Id String    @map("participant1_id")
   participant2Id String    @map("participant2_id")
+  // One thread per participant pair. `productId` is the most-recently discussed
+  // product (for list/header context) — product context per message lives on
+  // Message.productId, not in the thread key.
   productId      String?   @map("product_id")
   lastMessageAt  DateTime  @default(now()) @map("last_message_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   messages       Message[]
 
-  @@unique([participant1Id, participant2Id, productId])
+  @@unique([participant1Id, participant2Id])
   @@index([participant1Id])
   @@index([participant2Id])
   @@map("message_threads")
@@ -755,6 +876,9 @@ model Message {
   threadId        String        @map("thread_id")
   senderId        String        @map("sender_id")
   receiverId      String        @map("receiver_id")
+  // Optional product this message is about (per-message context). Set when the
+  // buyer opens the chat from a listing; also updates the thread's latest product.
+  productId       String?       @map("product_id")
   content         String
   filteredContent String?       @map("filtered_content")
   status          MessageStatus @default(sent)
@@ -771,6 +895,7 @@ model Message {
   @@index([threadId])
   @@index([senderId])
   @@index([receiverId])
+  @@index([productId])
   @@index([status])
   @@map("messages")
 }
@@ -939,7 +1064,6 @@ model CollectionView {
   @@map("collection_views")
 }
 
-
 model AttributeGroup {
   id               String      @id @default(uuid())
   name             String      @unique
@@ -1059,102 +1183,172 @@ model Offer {
 }
 
 model CheckoutGroup {
-  id             String   @id @default(uuid())
-  groupNumber    String   @unique @map("group_number")
-  buyerId        String   @map("buyer_id")
-  idempotencyKey String?  @unique @map("idempotency_key")
-  totalAmount    Decimal  @map("total_amount") @db.Decimal(10, 2)
-  isGuest        Boolean  @default(false) @map("is_guest")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  buyer          User     @relation("BuyerCheckoutGroups", fields: [buyerId], references: [id])
+  id             String         @id @default(uuid())
+  groupNumber    String         @unique @map("group_number")
+  buyerId        String         @map("buyer_id")
+  idempotencyKey String?        @unique @map("idempotency_key")
+  totalAmount    Decimal        @map("total_amount") @db.Decimal(10, 2)
+  isGuest        Boolean        @default(false) @map("is_guest")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  buyer          User           @relation("BuyerCheckoutGroups", fields: [buyerId], references: [id])
   orders         Order[]
+  packages       OrderPackage[]
   payment        Payment?
 
   @@index([buyerId, createdAt])
   @@map("checkout_groups")
 }
 
+// Satıcı-paketi ("çatı"): bir sepet (CheckoutGroup) içinde AYNI satıcının siparişleri
+// tek pakette birleşir. Kargo ücreti + (Faz 2'de) fiziksel Sürat gönderisi paket
+// başınadır → 2 farklı satıcı = 2 paket = 2 kargo (ürün sayısından bağımsız). Direct-buy
+// tek üründe de tek order'lı bir paket kullanılabilir (tek biçim). sellerId/buyerId düz
+// kolon (User ilişkisi yok — denormalize, sorgu için yeterli).
+model OrderPackage {
+  id                      String         @id @default(uuid())
+  checkoutGroupId         String?        @map("checkout_group_id")
+  sellerId                String         @map("seller_id")
+  buyerId                 String         @map("buyer_id")
+  // Bu satıcı paketi için TEK kargo ücreti (satıcının paket-içi satır toplamı bedava
+  // eşiğini geçerse 0). KANONİK olarak ALICI payıdır (buyerShippingAmount) — tüm
+  // checkout yolları (direct/group/guest) artık aynı semantiği yazar.
+  shippingCost            Decimal        @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  // Kargo tarife snapshot'ı: sipariş anındaki aktif tarife. Yeni checkout akışları
+  // aktif tarife yoksa fail-closed davranır; nullable alanlar yalnız eski kayıtlar içindir.
+  // Geçmişe dönük tarife değişiminden bağımsız audit/yeniden-hesap ve 409 kontrolü için.
+  shippingTariffId        String?        @map("shipping_tariff_id")
+  shippingTariffVersion   Int?           @map("shipping_tariff_version")
+  // Tam paket kargosu (alıcı/satıcı payına bölünmeden önce) + taraf payları + indirim.
+  fullShippingAmount      Decimal        @default(0) @map("full_shipping_amount") @db.Decimal(10, 2)
+  buyerShippingAmount     Decimal        @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
+  sellerShippingAmount    Decimal        @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
+  shippingDiscountAmount  Decimal        @default(0) @map("shipping_discount_amount") @db.Decimal(10, 2)
+  billableDesi            Int            @default(1) @map("billable_desi")
+  shippingPricingSnapshot Json?          @map("shipping_pricing_snapshot")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+  checkoutGroup           CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id])
+  orders                  Order[]
+
+  @@index([checkoutGroupId])
+  @@index([sellerId])
+  @@map("order_packages")
+}
+
 model Order {
-  id                     String          @id @default(uuid())
-  orderNumber            String          @unique @map("order_number")
-  buyerId                String          @map("buyer_id")
-  sellerId               String          @map("seller_id")
-  productId              String          @map("product_id")
-  offerId                String?         @unique @map("offer_id")
-  checkoutGroupId        String?         @map("checkout_group_id")
-  shippingAddressId      String?         @map("shipping_address_id")
+  id                         String                   @id @default(uuid())
+  orderNumber                String                   @unique @map("order_number")
+  buyerId                    String                   @map("buyer_id")
+  sellerId                   String                   @map("seller_id")
+  productId                  String                   @map("product_id")
+  offerId                    String?                  @unique @map("offer_id")
+  checkoutGroupId            String?                  @map("checkout_group_id")
+  // Satıcı-paketi (çatı): aynı sepet+satıcı order'ları burada birleşir. Nullable —
+  // Faz 1'de grup/direct checkout doldurur; eski/diğer yollar null kalabilir.
+  packageId                  String?                  @map("package_id")
+  shippingAddressId          String?                  @map("shipping_address_id")
   // Adet (sepet çoklu-adet): çoğu ikinci-el ürün tekildir → default 1. unitPrice
   // birim fiyatı; subtotal = unitPrice * quantity. Adet bazlı kısmi iade buna dayanır.
-  quantity               Int             @default(1)
-  unitPrice              Decimal?        @map("unit_price") @db.Decimal(10, 2)
-  totalAmount            Decimal         @map("total_amount") @db.Decimal(10, 2)
-  shippingCost           Decimal         @default(0) @map("shipping_cost") @db.Decimal(10, 2)
-  commissionAmount       Decimal         @map("commission_amount") @db.Decimal(10, 2)
-  status                 OrderStatus     @default(pending_payment)
-  shippingAddress        Json?           @map("shipping_address")
-  createdAt              DateTime        @default(now()) @map("created_at")
-  updatedAt              DateTime        @updatedAt @map("updated_at")
-  version                Int             @default(1)
-  buyerFeeAmount         Decimal         @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
-  sellerFeeAmount        Decimal         @default(0) @map("seller_fee_amount") @db.Decimal(10, 2)
-  discountAmount         Decimal         @default(0) @map("discount_amount") @db.Decimal(10, 2)
-  discountBreakdown      Json?           @map("discount_breakdown")
-  discountCode           String?         @map("discount_code")
-  subtotal               Decimal?        @db.Decimal(10, 2)
-  taxAmount              Decimal         @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  quantity                   Int                      @default(1)
+  unitPrice                  Decimal?                 @map("unit_price") @db.Decimal(10, 2)
+  totalAmount                Decimal                  @map("total_amount") @db.Decimal(10, 2)
+  shippingCost               Decimal                  @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  commissionAmount           Decimal                  @map("commission_amount") @db.Decimal(10, 2)
+  status                     OrderStatus              @default(pending_payment)
+  shippingAddress            Json?                    @map("shipping_address")
+  createdAt                  DateTime                 @default(now()) @map("created_at")
+  updatedAt                  DateTime                 @updatedAt @map("updated_at")
+  version                    Int                      @default(1)
+  buyerFeeAmount             Decimal                  @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
+  sellerFeeAmount            Decimal                  @default(0) @map("seller_fee_amount") @db.Decimal(10, 2)
+  // v2 kesinti kırılımı (CommissionRule v2). buyerFeeAmount = buyerCommission + buyerServiceFee,
+  // sellerFeeAmount = sellerCommission + sellerPlatformFee (geriye-uyum için toplamlar korunur).
+  buyerCommissionAmount      Decimal                  @default(0) @map("buyer_commission_amount") @db.Decimal(10, 2)
+  buyerServiceFeeAmount      Decimal                  @default(0) @map("buyer_service_fee_amount") @db.Decimal(10, 2)
+  sellerCommissionAmount     Decimal                  @default(0) @map("seller_commission_amount") @db.Decimal(10, 2)
+  sellerPlatformFeeAmount    Decimal                  @default(0) @map("seller_platform_fee_amount") @db.Decimal(10, 2)
+  // Kargo tutarının taraflara dağılımı. shippingCost geriye uyumlu alıcı payıdır;
+  // tam paket bedeli OrderPackage.fullShippingAmount snapshot'ında tutulur.
+  buyerShippingAmount        Decimal                  @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
+  sellerShippingAmount       Decimal                  @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
+  discountAmount             Decimal                  @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  discountBreakdown          Json?                    @map("discount_breakdown")
+  discountCode               String?                  @map("discount_code")
+  // Bu siparişteki kupon indiriminin PLATFORM tarafından finanse edilen kısmı (F2.4).
+  // Satıcı payout tabanı bu kadar geri EKLENİR (escrow) → platform-fonlu kampanyada
+  // satıcı indirim öncesi tutar üzerinden ödenir. Varsayılan 0 (satıcı-fonlu, eski davranış).
+  platformFundedDiscount     Decimal                  @default(0) @map("platform_funded_discount") @db.Decimal(10, 2)
+  subtotal                   Decimal?                 @db.Decimal(10, 2)
+  taxAmount                  Decimal                  @default(0) @map("tax_amount") @db.Decimal(10, 2)
   // E-ticaret stopajı (GVK 94/19, varsayılan %1): yalnız vergi mükellefi (kurumsal onaylı)
   // satıcıda, KDV hariç ürün bedeli üzerinden. Satıcı payout'undan kesilir; alıcı tutarını etkilemez.
-  withholdingTaxAmount   Decimal         @default(0) @map("withholding_tax_amount") @db.Decimal(10, 2)
-  cancelReason           String?         @map("cancel_reason")
-  cancellationType       OrderCancellationType? @map("cancellation_type")
-  preparingDeadline      DateTime?       @map("preparing_deadline")
-  preparingWarningSentAt DateTime?       @map("preparing_warning_sent_at")
-  reservationReleasedAt  DateTime?       @map("reservation_released_at")
-  stockRestoredAt        DateTime?       @map("stock_restored_at")
-  paymentExpiresAt       DateTime        @map("payment_expires_at")
-  deliveredAt            DateTime?       @map("delivered_at")
-  confirmationDeadline   DateTime?       @map("confirmation_deadline")
-  buyerConfirmedAt       DateTime?       @map("buyer_confirmed_at")
-  buyerConfirmationType  BuyerConfirmationType? @map("buyer_confirmation_type")
-  completedAt            DateTime?       @map("completed_at")
-  invoices               Invoice[]
-  buyer                  User            @relation("BuyerOrders", fields: [buyerId], references: [id])
-  offer                  Offer?          @relation(fields: [offerId], references: [id])
-  product                Product         @relation(fields: [productId], references: [id])
-  seller                 User            @relation("SellerOrders", fields: [sellerId], references: [id])
-  payment                Payment?
-  shipment               Shipment?
-  refundRequests         RefundRequest[]
-  commissionLedger       CommissionLedger?
-  sellerUploadedInvoice  SellerUploadedInvoice?
-  checkoutGroup          CheckoutGroup?  @relation(fields: [checkoutGroupId], references: [id])
+  withholdingTaxAmount       Decimal                  @default(0) @map("withholding_tax_amount") @db.Decimal(10, 2)
+  // Checkout anındaki fiyat, vergi, komisyon, üyelik, indirim ve kargo kararları.
+  // Sonradan değişen kurallar geçmiş siparişin finansal sonucunu değiştirmemelidir.
+  financialSnapshot          Json?                    @map("financial_snapshot")
+  cancelReason               String?                  @map("cancel_reason")
+  cancellationReasonCode     OrderCancellationReason? @map("cancellation_reason_code")
+  cancellationPolicySnapshot Json?                    @map("cancellation_policy_snapshot")
+  cancellationType           OrderCancellationType?   @map("cancellation_type")
+  preparingDeadline          DateTime?                @map("preparing_deadline")
+  preparingWarningSentAt     DateTime?                @map("preparing_warning_sent_at")
+  reservationReleasedAt      DateTime?                @map("reservation_released_at")
+  stockRestoredAt            DateTime?                @map("stock_restored_at")
+  paymentExpiresAt           DateTime                 @map("payment_expires_at")
+  deliveredAt                DateTime?                @map("delivered_at")
+  confirmationDeadline       DateTime?                @map("confirmation_deadline")
+  buyerConfirmedAt           DateTime?                @map("buyer_confirmed_at")
+  buyerConfirmationType      BuyerConfirmationType?   @map("buyer_confirmation_type")
+  completedAt                DateTime?                @map("completed_at")
+  invoice                    Invoice?
+  buyer                      User                     @relation("BuyerOrders", fields: [buyerId], references: [id])
+  offer                      Offer?                   @relation(fields: [offerId], references: [id])
+  product                    Product                  @relation(fields: [productId], references: [id])
+  seller                     User                     @relation("SellerOrders", fields: [sellerId], references: [id])
+  payment                    Payment?
+  shipment                   Shipment?
+  refundRequests             RefundRequest[]
+  refundAttempts             RefundAttempt[]
+  commissionLedger           CommissionLedger?
+  sellerUploadedInvoice      SellerUploadedInvoice?
+  membershipPayment          MembershipPayment?
+  checkoutGroup              CheckoutGroup?           @relation(fields: [checkoutGroupId], references: [id])
+  package                    OrderPackage?            @relation(fields: [packageId], references: [id])
+  couponReservation          CouponReservation?
 
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
   @@index([status, paymentExpiresAt])
   @@index([checkoutGroupId])
+  @@index([packageId])
   @@map("orders")
 }
 
 model CommissionLedger {
-  id                   String                 @id @default(uuid())
-  orderId              String                 @unique @map("order_id")
-  order                Order                  @relation(fields: [orderId], references: [id])
+  id      String @id @default(uuid())
+  orderId String @unique @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id])
 
-  sellerCommission     Decimal                @map("seller_commission") @db.Decimal(10, 2)
-  buyerFee             Decimal                @map("buyer_fee") @db.Decimal(10, 2)
-  totalPlatformRevenue Decimal                @map("total_platform_revenue") @db.Decimal(10, 2)
+  sellerCommission     Decimal @map("seller_commission") @db.Decimal(10, 2)
+  buyerFee             Decimal @map("buyer_fee") @db.Decimal(10, 2)
+  totalPlatformRevenue Decimal @map("total_platform_revenue") @db.Decimal(10, 2)
 
-  status               CommissionLedgerStatus @default(pending)
-  earnedAt             DateTime?              @map("earned_at")
-  refundedAt           DateTime?              @map("refunded_at")
-  waivedAt             DateTime?              @map("waived_at")
-  waivedReason         String?                @map("waived_reason")
+  // Kısmi (adet) iadede pro-rate edilen komisyon KÜMÜLATİF olarak burada birikir
+  // (#88). Net = sellerCommission - refundedSellerCommission; original alanlar
+  // DEĞİŞMEZ (tekrarlı kısmi iadeler compound olmasın). Tam iadede refunded = original.
+  refundedSellerCommission Decimal @default(0) @map("refunded_seller_commission") @db.Decimal(10, 2)
+  refundedBuyerFee         Decimal @default(0) @map("refunded_buyer_fee") @db.Decimal(10, 2)
 
-  createdAt            DateTime               @default(now()) @map("created_at")
-  updatedAt            DateTime               @updatedAt @map("updated_at")
+  status       CommissionLedgerStatus @default(pending)
+  earnedAt     DateTime?              @map("earned_at")
+  refundedAt   DateTime?              @map("refunded_at")
+  waivedAt     DateTime?              @map("waived_at")
+  waivedReason String?                @map("waived_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([status])
   @@index([earnedAt])
@@ -1179,6 +1373,7 @@ model Payment {
   createdAt              DateTime          @default(now()) @map("created_at")
   updatedAt              DateTime          @updatedAt @map("updated_at")
   paymentHolds           PaymentHold[]
+  refundAttempts         RefundAttempt[]
   order                  Order?            @relation(fields: [orderId], references: [id])
   checkoutGroup          CheckoutGroup?    @relation(fields: [checkoutGroupId], references: [id])
   tradeCashPayment       TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id])
@@ -1186,27 +1381,55 @@ model Payment {
   @@map("payments")
 }
 
+model RefundAttempt {
+  id                  String              @id @default(uuid())
+  paymentId           String              @map("payment_id")
+  orderId             String?             @map("order_id")
+  tradeId             String?             @map("trade_id")
+  idempotencyKey      String              @unique @map("idempotency_key")
+  amount              Decimal             @db.Decimal(10, 2)
+  provider            String
+  providerReference   String?             @map("provider_reference")
+  providerRefundId    String?             @map("provider_refund_id")
+  providerResponse    Json?               @map("provider_response")
+  status              RefundAttemptStatus @default(prepared)
+  failureReason       String?             @map("failure_reason")
+  requestStartedAt    DateTime?           @map("request_started_at")
+  providerSucceededAt DateTime?           @map("provider_succeeded_at")
+  finalizedAt         DateTime?           @map("finalized_at")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  payment             Payment             @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  order               Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  trade               Trade?              @relation(fields: [tradeId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, orderId])
+  @@index([paymentId, tradeId])
+  @@index([status, updatedAt])
+  @@map("refund_attempts")
+}
+
 model PaymentHold {
-  id             String            @id @default(uuid())
-  paymentId      String            @map("payment_id")
-  orderId        String            @map("order_id")
-  sellerId       String            @map("seller_id")
-  amount         Decimal           @db.Decimal(10, 2)
-  status         PaymentHoldStatus @default(held)
-  releaseAt      DateTime?         @map("release_at")
-  releasedAt     DateTime?         @map("released_at")
+  id               String            @id @default(uuid())
+  paymentId        String            @map("payment_id")
+  orderId          String            @map("order_id")
+  sellerId         String            @map("seller_id")
+  amount           Decimal           @db.Decimal(10, 2)
+  status           PaymentHoldStatus @default(held)
+  releaseAt        DateTime?         @map("release_at")
+  releasedAt       DateTime?         @map("released_at")
   // Adet bazlı kısmi iadede tüketilen satıcı-payı toplamı. Satıcıya ödenecek
   // tutar = amount - refundedAmount. refundedAmount >= amount → hold tamamen tükendi.
-  refundedAmount Decimal           @default(0) @map("refunded_amount") @db.Decimal(10, 2)
+  refundedAmount   Decimal           @default(0) @map("refunded_amount") @db.Decimal(10, 2)
   // Açık bir iade talebi varken hold'u atomik olarak kilitler: hiçbir release
   // yolu frozenByRefundId dolu bir hold'u serbest bırakamaz. İade reddedilir/
   // iptal edilirse temizlenir; iade tamamlanırsa hold consume edilir.
-  frozenByRefundId String?         @map("frozen_by_refund_id")
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
-  payment        Payment           @relation(fields: [paymentId], references: [id])
-  seller         User              @relation(fields: [sellerId], references: [id])
-  payoutTransfer PayoutTransfer?   @relation("HoldPayoutTransfer")
+  frozenByRefundId String?           @map("frozen_by_refund_id")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  payment          Payment           @relation(fields: [paymentId], references: [id])
+  seller           User              @relation(fields: [sellerId], references: [id])
+  payoutTransfer   PayoutTransfer?   @relation("HoldPayoutTransfer")
 
   @@unique([paymentId, orderId])
   @@index([paymentId])
@@ -1222,11 +1445,52 @@ model SellerBankAccount {
   taxId         String?   @map("tax_id")
   isVerified    Boolean   @default(false) @map("is_verified")
   verifiedAt    DateTime? @map("verified_at")
+  // Son IBAN DEĞİŞİKLİĞİ zamanı (ilk kayıtta null). Payout, değişimden sonra kısa bir
+  // bekleme (cooldown) uygular → çalınan oturumla IBAN'ı değiştirip anında para
+  // çekme engellenir; satıcı değişiklik bildirimini görüp itiraz edebilir (F2.1).
+  ibanChangedAt DateTime? @map("iban_changed_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("seller_bank_accounts")
+}
+
+/// Kurumsal satıcı başvuru belgesi (vergi levhası, sözleşme, imza sirküleri,
+/// faaliyet belgesi, kimlik). Private `documents` S3 bucket'ında saklanır (key);
+/// admin presigned URL ile görüntüler. (userId, documentType) tekil → yeniden
+/// yükleme eskisini değiştirir.
+model SellerDocument {
+  id           String               @id @default(uuid())
+  userId       String               @map("user_id")
+  documentType SellerDocumentType   @map("document_type")
+  s3Key        String               @map("s3_key")
+  fileName     String               @map("file_name")
+  mimeType     String               @map("mime_type")
+  size         Int                  @default(0)
+  status       SellerDocumentStatus @default(pending)
+  reviewNote   String?              @map("review_note")
+  uploadedAt   DateTime             @default(now()) @map("uploaded_at")
+  reviewedAt   DateTime?            @map("reviewed_at")
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentType])
+  @@index([userId])
+  @@map("seller_documents")
+}
+
+enum SellerDocumentType {
+  tax_plate // vergi levhası
+  contract // sözleşme
+  signature_circular // imza sirküleri
+  activity_certificate // faaliyet belgesi
+  identity // kimlik
+}
+
+enum SellerDocumentStatus {
+  pending
+  approved
+  rejected
 }
 
 // PayTR CAPI kayıtlı kart (recurring/oto-yenileme için). PAN/CVV ASLA saklanmaz —
@@ -1239,6 +1503,12 @@ model SavedCard {
   ctoken              String          @unique @map("c_token")
   last4               String          @map("last_4")
   brand               String?
+  // PayTR CAPI liste alanları (kayıtlı-kart-listesi dokümanı): kart gözlemlenebilirliği
+  // + UX (banka/şema göster). PAN/CVV DEĞİL — yalnız maskeli/kart-meta bilgisi.
+  bank                String? // PayTR c_bank — kartı çıkaran banka
+  cardType            String?         @map("card_type") // PayTR c_type — credit/debit
+  cardScheme          String?         @map("card_scheme") // PayTR schema — VISA/MASTERCARD/TROY/AMEX
+  businessCard        Boolean?        @map("business_card") // PayTR businessCard — kurumsal kart (y/n)
   expMonth            String?         @map("exp_month")
   expYear             String?         @map("exp_year")
   requireCvv          Boolean         @default(false) @map("require_cvv")
@@ -1262,33 +1532,80 @@ enum SavedCardStatus {
   revoked
 }
 
+// PSP (PayTR) etkileşim/yanıt kaydı — append-only denetim/gözlemlenebilirlik günlüğü.
+// Her PayTR yanıtı (bildirim callback'i, Direkt API, recurring çekim, durum-sorgu, iade,
+// kart listele/sil) yapısal alanlar + ham zarf ile buraya yazılır. Amaç: muhasebe/mutabakat
+// (Faz 6.5 ledger vs PSP raporu), destek ("hangi kart/taksit"), itiraz/chargeback savunması,
+// ödeme-yöntemi raporlaması. GÜVENLİK: PAN/CVV ASLA yazılmaz — PayTR yanıtları bunları içermez
+// ve recorder yalnızca maskeli/meta alanları alır. paymentId/membershipPaymentId YUMUŞAK bağ
+// (FK yok): re-init'te oid değişebilir ve kart listele/sil olaylarının ödemesi yoktur.
+model PaymentProviderEvent {
+  id                  String                   @id @default(uuid())
+  provider            String                   @default("paytr")
+  eventType           PaymentProviderEventType @map("event_type")
+  merchantOid         String?                  @map("merchant_oid")
+  paymentId           String?                  @map("payment_id")
+  membershipPaymentId String?                  @map("membership_payment_id")
+  status              String? // success/failed/wait_callback/error
+  paymentType         String?                  @map("payment_type") // card/eft
+  installmentCount    Int?                     @map("installment_count")
+  currency            String?
+  amount              Decimal?                 @db.Decimal(12, 2) // payment_amount (sipariş tutarı)
+  totalAmount         Decimal?                 @map("total_amount") @db.Decimal(12, 2) // total_amount (çekilen)
+  failedReasonCode    String?                  @map("failed_reason_code")
+  failedReasonMsg     String?                  @map("failed_reason_msg")
+  utoken              String?
+  testMode            Boolean?                 @map("test_mode")
+  hashValid           Boolean?                 @map("hash_valid") // yalnız callback: hash doğrulaması geçti mi
+  raw                 Json? // ham PayTR zarfı (PAN/CVV içermez; 3DS HTML saklanmaz)
+  createdAt           DateTime                 @default(now()) @map("created_at")
+
+  @@index([merchantOid])
+  @@index([paymentId])
+  @@index([membershipPaymentId])
+  @@index([provider, eventType, createdAt])
+  @@map("payment_provider_events")
+}
+
+enum PaymentProviderEventType {
+  callback // Bildirim URL POST (ödeme sonucu)
+  direct_payment // /odeme Direkt API (CIT yeni kart) yanıtı
+  recurring_charge // recurring_payment=1 (kayıtlı kart / oto-yenileme) yanıtı
+  status_inquiry // durum-sorgu yanıtı
+  refund // /odeme/iade yanıtı
+  card_list // capi/list yanıtı
+  card_delete // capi/delete yanıtı
+}
+
 model PayoutTransfer {
-  id                 String            @id @default(uuid())
-  paymentHoldId      String?           @unique @map("payment_hold_id")
-  tradeCashPaymentId String?           @unique @map("trade_cash_payment_id")
-  sellerId           String            @map("seller_id")
-  amount             Decimal           @db.Decimal(10, 2)
-  commission         Decimal           @db.Decimal(10, 2)
+  id                     String                        @id @default(uuid())
+  paymentHoldId          String?                       @unique @map("payment_hold_id")
+  tradeCashPaymentId     String?                       @unique @map("trade_cash_payment_id")
+  sellerId               String                        @map("seller_id")
+  amount                 Decimal                       @db.Decimal(10, 2)
+  commission             Decimal                       @db.Decimal(10, 2)
   // Sipariş anında hesaplanan e-ticaret stopajı snapshot'ı (muhtasar raporu bu alandan beslenir).
-  withholdingTax     Decimal           @default(0) @map("withholding_tax") @db.Decimal(10, 2)
-  netAmount          Decimal           @map("net_amount") @db.Decimal(10, 2)
-  currency           String            @default("TRY")
-  merchantOid        String            @map("merchant_oid")
-  transId            String            @unique @map("trans_id")
-  transferIban       String            @map("transfer_iban")
-  transferName       String            @map("transfer_name")
-  status             PayoutStatus      @default(pending)
-  providerResponse   Json?             @map("provider_response")
-  failureReason      String?           @map("failure_reason")
-  retryCount         Int               @default(0) @map("retry_count")
-  maxRetries         Int               @default(3) @map("max_retries")
-  nextRetryAt        DateTime?         @map("next_retry_at")
-  processedAt        DateTime?         @map("processed_at")
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
-  paymentHold        PaymentHold?      @relation("HoldPayoutTransfer", fields: [paymentHoldId], references: [id])
-  tradeCashPayment   TradeCashPayment? @relation("TradeCashPayoutTransfers", fields: [tradeCashPaymentId], references: [id])
-  seller             User              @relation("SellerPayoutTransfers", fields: [sellerId], references: [id])
+  withholdingTax         Decimal                       @default(0) @map("withholding_tax") @db.Decimal(10, 2)
+  netAmount              Decimal                       @map("net_amount") @db.Decimal(10, 2)
+  adjustmentDeduction    Decimal                       @default(0) @map("adjustment_deduction") @db.Decimal(10, 2)
+  currency               String                        @default("TRY")
+  merchantOid            String                        @map("merchant_oid")
+  transId                String                        @unique @map("trans_id")
+  transferIban           String                        @map("transfer_iban")
+  transferName           String                        @map("transfer_name")
+  status                 PayoutStatus                  @default(pending)
+  providerResponse       Json?                         @map("provider_response")
+  failureReason          String?                       @map("failure_reason")
+  retryCount             Int                           @default(0) @map("retry_count")
+  maxRetries             Int                           @default(3) @map("max_retries")
+  nextRetryAt            DateTime?                     @map("next_retry_at")
+  processedAt            DateTime?                     @map("processed_at")
+  createdAt              DateTime                      @default(now()) @map("created_at")
+  updatedAt              DateTime                      @updatedAt @map("updated_at")
+  paymentHold            PaymentHold?                  @relation("HoldPayoutTransfer", fields: [paymentHoldId], references: [id])
+  tradeCashPayment       TradeCashPayment?             @relation("TradeCashPayoutTransfers", fields: [tradeCashPaymentId], references: [id])
+  seller                 User                          @relation("SellerPayoutTransfers", fields: [sellerId], references: [id])
+  adjustmentApplications SellerAdjustmentApplication[]
 
   @@index([sellerId])
   @@index([status])
@@ -1296,10 +1613,46 @@ model PayoutTransfer {
   @@map("payout_transfers")
 }
 
+model SellerAccountAdjustment {
+  id              String                        @id @default(uuid())
+  sellerId        String                        @map("seller_id")
+  orderId         String?                       @map("order_id")
+  refundRequestId String?                       @map("refund_request_id")
+  sourceKey       String                        @unique @map("source_key")
+  type            SellerAdjustmentType
+  amount          Decimal                       @db.Decimal(10, 2)
+  remainingAmount Decimal                       @map("remaining_amount") @db.Decimal(10, 2)
+  status          SellerAdjustmentStatus        @default(open)
+  metadata        Json?
+  settledAt       DateTime?                     @map("settled_at")
+  createdAt       DateTime                      @default(now()) @map("created_at")
+  updatedAt       DateTime                      @updatedAt @map("updated_at")
+  applications    SellerAdjustmentApplication[]
+
+  @@index([sellerId, status, createdAt])
+  @@index([orderId])
+  @@index([refundRequestId])
+  @@map("seller_account_adjustments")
+}
+
+model SellerAdjustmentApplication {
+  id               String                  @id @default(uuid())
+  adjustmentId     String                  @map("adjustment_id")
+  payoutTransferId String                  @map("payout_transfer_id")
+  amount           Decimal                 @db.Decimal(10, 2)
+  createdAt        DateTime                @default(now()) @map("created_at")
+  adjustment       SellerAccountAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
+  payoutTransfer   PayoutTransfer          @relation(fields: [payoutTransferId], references: [id], onDelete: Restrict)
+
+  @@unique([adjustmentId, payoutTransferId])
+  @@index([payoutTransferId])
+  @@map("seller_adjustment_applications")
+}
+
 model Invoice {
   id            String    @id @default(uuid())
   invoiceNumber String    @unique @map("invoice_number")
-  orderId       String    @map("order_id")
+  orderId       String    @unique @map("order_id")
   buyerId       String    @map("buyer_id")
   sellerId      String    @map("seller_id")
   subtotal      Decimal   @db.Decimal(10, 2)
@@ -1318,7 +1671,6 @@ model Invoice {
   order         Order     @relation(fields: [orderId], references: [id])
   seller        User      @relation("SellerInvoices", fields: [sellerId], references: [id])
 
-  @@index([orderId])
   @@index([buyerId])
   @@index([sellerId])
   @@index([invoiceNumber])
@@ -1331,39 +1683,50 @@ model Invoice {
 /// İlişki (User/Order) bilerek eklenmedi (daha az invaziv); kimlikler düz alan olarak tutulur.
 /// Tutarlar olay anındaki KAYITLI snapshot'tan gelir (oran/fiyat sonradan değişse de etkilenmez).
 model ElogoInvoice {
-  id               String             @id @default(uuid())
-  type             ElogoInvoiceType
+  id                        String             @id @default(uuid())
+  type                      ElogoInvoiceType
   /// Kaynak kaydın id'si (orderId / membershipPaymentId / boostId). type+sourceId tekil → idempotency.
-  sourceId         String             @map("source_id")
-  recipientUserId  String?            @map("recipient_user_id")
-  recipientVknTckn String?            @map("recipient_vkn_tckn")
-  recipientName    String?            @map("recipient_name")
-  documentType     String             @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
-  sendType         String             @default("ELEKTRONIK") @map("send_type")
-  invoiceNumber    String?            @unique @map("invoice_number")
-  ettn             String?            @unique
-  netAmount        Decimal            @map("net_amount") @db.Decimal(10, 2)
-  taxAmount        Decimal            @map("tax_amount") @db.Decimal(10, 2)
-  total            Decimal            @db.Decimal(10, 2)
-  vatRate          Decimal            @default(20) @map("vat_rate") @db.Decimal(5, 2)
-  status           ElogoInvoiceStatus @default(pending)
-  elogoRefId       String?            @map("elogo_ref_id")
-  elogoResultCode  Int?               @map("elogo_result_code")
-  elogoResultMsg   String?            @map("elogo_result_msg")
+  sourceId                  String             @map("source_id")
+  recipientUserId           String?            @map("recipient_user_id")
+  recipientVknTckn          String?            @map("recipient_vkn_tckn")
+  recipientName             String?            @map("recipient_name")
+  documentType              String             @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
+  sendType                  String             @default("ELEKTRONIK") @map("send_type")
+  invoiceNumber             String?            @unique @map("invoice_number")
+  ettn                      String?            @unique
+  netAmount                 Decimal            @map("net_amount") @db.Decimal(10, 2)
+  taxAmount                 Decimal            @map("tax_amount") @db.Decimal(10, 2)
+  total                     Decimal            @db.Decimal(10, 2)
+  /// İlk oluşturma anındaki brüt tutar. Pending belge iadede netleştirilse bile
+  /// tekrarlı kısmi iadeler bu immutable baz üzerinden hesaplanır.
+  originalTotal             Decimal            @map("original_total") @db.Decimal(10, 2)
+  vatRate                   Decimal            @default(20) @map("vat_rate") @db.Decimal(5, 2)
+  status                    ElogoInvoiceStatus @default(pending)
+  elogoRefId                String?            @map("elogo_ref_id")
+  elogoResultCode           Int?               @map("elogo_result_code")
+  elogoResultMsg            String?            @map("elogo_result_msg")
   /// İADE faturasında iadesi yapılan orijinal faturanın numarası.
-  billingReference String?            @map("billing_reference")
+  billingReference          String?            @map("billing_reference")
+  /// İADE faturasında referans verilen orijinal faturanın düzenlenme tarihi.
+  /// Retry sırasında "bugünün tarihi" kullanılmaması için immutable snapshot.
+  billingReferenceIssueDate DateTime?          @map("billing_reference_issue_date")
+  /// Fatura kaleminin açıklaması — kesim anında snapshot'lanır (ör. boost için
+  /// paket adını içerir). Boşsa tipin varsayılan etiketi (LINE_DESCRIPTION) kullanılır.
+  lineDescription           String?            @map("line_description")
   /// eLogo'dan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
-  pdfUrl           String?            @map("pdf_url")
+  pdfUrl                    String?            @map("pdf_url")
   /// PDF alıcıya kendi SMTP'mizden e-postalandığı an.
-  emailSentAt      DateTime?          @map("email_sent_at")
-  attemptCount     Int                @default(0) @map("attempt_count")
-  lastAttemptAt    DateTime?          @map("last_attempt_at")
-  issuedAt         DateTime?          @map("issued_at")
-  sentAt           DateTime?          @map("sent_at")
-  cancelledAt      DateTime?          @map("cancelled_at")
-  cancelReason     String?            @map("cancel_reason")
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
+  emailSentAt               DateTime?          @map("email_sent_at")
+  attemptCount              Int                @default(0) @map("attempt_count")
+  lastAttemptAt             DateTime?          @map("last_attempt_at")
+  /// Pending/failed belgenin hangi refund finalize anına kadar netleştirildiği.
+  refundAdjustedAt          DateTime?          @map("refund_adjusted_at")
+  issuedAt                  DateTime?          @map("issued_at")
+  sentAt                    DateTime?          @map("sent_at")
+  cancelledAt               DateTime?          @map("cancelled_at")
+  cancelReason              String?            @map("cancel_reason")
+  createdAt                 DateTime           @default(now()) @map("created_at")
+  updatedAt                 DateTime           @updatedAt @map("updated_at")
 
   @@unique([type, sourceId])
   @@index([status])
@@ -1417,6 +1780,7 @@ enum ElogoInvoiceType {
 
 enum ElogoInvoiceStatus {
   pending
+  processing
   sent
   signed
   failed
@@ -1424,28 +1788,86 @@ enum ElogoInvoiceStatus {
 }
 
 model Shipment {
-  id                 String          @id @default(uuid())
-  orderId            String          @unique @map("order_id")
-  provider           String
-  trackingNumber     String?         @map("tracking_number")
-  trackingUrl        String?         @map("tracking_url")
-  labelUrl           String?         @map("label_url")
-  cost               Decimal?        @db.Decimal(10, 2)
-  status             ShipmentStatus  @default(pending)
-  estimatedDelivery  DateTime?       @map("estimated_delivery")
-  shippedAt          DateTime?       @map("shipped_at")
-  deliveredAt        DateTime?       @map("delivered_at")
-  providerTrackingId String?         @map("provider_tracking_id")
-  providerStatusCode Int?            @map("provider_status_code")
-  providerRawStatus  String?         @map("provider_raw_status")
-  receivedBy         String?         @map("received_by")
-  returnReason       String?         @map("return_reason")
-  createdAt          DateTime        @default(now()) @map("created_at")
-  updatedAt          DateTime        @updatedAt @map("updated_at")
-  events             ShipmentEvent[]
-  order              Order           @relation(fields: [orderId], references: [id])
+  id                  String          @id @default(uuid())
+  orderId             String          @unique @map("order_id")
+  provider            String
+  trackingNumber      String?         @map("tracking_number")
+  trackingUrl         String?         @map("tracking_url")
+  labelUrl            String?         @map("label_url")
+  cost                Decimal?        @db.Decimal(10, 2)
+  // Faz 2 taşıyıcı mutabakatı: müşteriden alınan kargo (cost) ile Sürat'ın GERÇEK
+  // faturaladığı tutar ayrı tutulur. Sürat takip cevabındaki Tutar/TutarKdvsiz/KdvTutar/
+  // ToplamDesiKg her poll'de geliyordu ama düşürülüyordu; artık buraya yazılır.
+  quotedCarrierCost   Decimal?        @map("quoted_carrier_cost") @db.Decimal(10, 2)
+  carrierActualCost   Decimal?        @map("carrier_actual_cost") @db.Decimal(10, 2)
+  carrierNetCost      Decimal?        @map("carrier_net_cost") @db.Decimal(10, 2)
+  carrierTaxAmount    Decimal?        @map("carrier_tax_amount") @db.Decimal(10, 2)
+  carrierDesi         Decimal?        @map("carrier_desi") @db.Decimal(10, 3)
+  carrierCostSyncedAt DateTime?       @map("carrier_cost_synced_at")
+  status              ShipmentStatus  @default(pending)
+  estimatedDelivery   DateTime?       @map("estimated_delivery")
+  shippedAt           DateTime?       @map("shipped_at")
+  deliveredAt         DateTime?       @map("delivered_at")
+  providerTrackingId  String?         @map("provider_tracking_id")
+  providerStatusCode  Int?            @map("provider_status_code")
+  providerRawStatus   String?         @map("provider_raw_status")
+  // Raw ZPL label from OrtakBarkodOlustur (stored for future printing; not shown in UI).
+  labelZpl            String?         @map("label_zpl")
+  receivedBy          String?         @map("received_by")
+  returnReason        String?         @map("return_reason")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  events              ShipmentEvent[]
+  order               Order           @relation(fields: [orderId], references: [id])
 
   @@map("shipments")
+}
+
+// Tipli, versiyonlanmış kargo tarifesi — kargo fiyatlandırmasının TEK kaynağı.
+// Generic PlatformSetting anahtarlarının (shipping_base_cost / free_shipping_threshold)
+// yerini alır. "Tam bedel" burada tutulur; alıcı/satıcı payı komisyon kuralındaki
+// shippingBuyerShare ile ayrışır; iade kararları iade politikasında kalır.
+// Provider başına aynı anda yalnız BİR active tarife olur (kısmi unique index).
+// Sipariş oluşturulurken OrderPackage'a tariffId + version snapshot'ı alınır.
+model ShippingTariff {
+  id                    String               @id @default(uuid())
+  provider              String               @default("surat")
+  name                  String
+  status                ShippingTariffStatus @default(draft)
+  // Provider başına monoton artan sürüm; snapshot bu değeri saklar (audit + reconstruct).
+  version               Int                  @default(1)
+  currency              String               @default("TRY")
+  // Bir fiziksel satıcı paketinin TAM kargo bedeli (alıcı+satıcı payı dağıtılmadan önce).
+  outboundPackageFee    Decimal              @map("outbound_package_fee") @db.Decimal(10, 2)
+  freeShippingEnabled   Boolean              @default(true) @map("free_shipping_enabled")
+  freeShippingThreshold Decimal              @map("free_shipping_threshold") @db.Decimal(10, 2)
+  // Faz 2: iade dönüş-bacağı ve takas-bacağı tahmini bedelleri (MVP'de seed'lenir, kullanılmaz).
+  returnPackageFee      Decimal              @default(0) @map("return_package_fee") @db.Decimal(10, 2)
+  tradeLegFee           Decimal              @default(0) @map("trade_leg_fee") @db.Decimal(10, 2)
+  effectiveFrom         DateTime             @map("effective_from")
+  createdBy             String?              @map("created_by")
+  updatedBy             String?              @map("updated_by")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+  rates                 ShippingTariffRate[]
+
+  @@unique([provider, version])
+  @@index([provider, status])
+  @@map("shipping_tariffs")
+}
+
+model ShippingTariffRate {
+  id        String         @id @default(uuid())
+  tariffId  String         @map("tariff_id")
+  desi      Int
+  amount    Decimal        @db.Decimal(10, 2)
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  tariff    ShippingTariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
+
+  @@unique([tariffId, desi])
+  @@index([tariffId])
+  @@map("shipping_tariff_rates")
 }
 
 model ShipmentEvent {
@@ -1478,21 +1900,41 @@ model RefundRequest {
   decidedBy      String?   @map("decided_by")
   decidedAt      DateTime? @map("decided_at")
 
-  returnProvider       String?         @map("return_provider")
-  returnTrackingNumber String?         @map("return_tracking_number")
-  returnStatus         ShipmentStatus? @map("return_status")
-  returnShippedAt      DateTime?       @map("return_shipped_at")
-  returnDeliveredAt    DateTime?       @map("return_delivered_at")
-  returnCreatedAt      DateTime?       @map("return_created_at")
+  returnProvider           String?         @map("return_provider")
+  // returnTrackingNumber = OzelKargoTakipNo (refundNumber; poller sorgu anahtarı).
+  returnTrackingNumber     String?         @map("return_tracking_number")
+  // Gerçek Sürat iade kodu (KargoTakipNo) + ZPL etiket (OrtakBarkodOlustur).
+  returnProviderTrackingId String?         @map("return_provider_tracking_id")
+  returnLabelZpl           String?         @map("return_label_zpl")
+  returnStatus             ShipmentStatus? @map("return_status")
+  returnShippedAt          DateTime?       @map("return_shipped_at")
+  returnDeliveredAt        DateTime?       @map("return_delivered_at")
+  returnCreatedAt          DateTime?       @map("return_created_at")
 
   refundedAt       DateTime? @map("refunded_at")
   providerRefundId String?   @map("provider_refund_id")
 
-  refundProductAmount    Boolean              @default(true)  @map("refund_product_amount")
-  refundShippingFee      Boolean              @default(true)  @map("refund_shipping_fee")
-  refundBuyerFee         Boolean              @default(true)  @map("refund_buyer_fee")
-  refundSellerCommission Boolean              @default(true)  @map("refund_seller_commission")
-  returnShippingPayer    ReturnShippingPayer?                 @map("return_shipping_payer")
+  // Talep oluşturulduğu andaki değişmez finansal karar. Admin ekranı, ödeme,
+  // komisyon, hold ve fatura akışları aynı TL kırılımını kullanır.
+  policyCode                      String  @default("legacy") @map("policy_code")
+  financialPolicySnapshot         Json?   @map("financial_policy_snapshot")
+  returnBillableDesi              Int     @default(1) @map("return_billable_desi")
+  returnShippingAmount            Decimal @default(0) @map("return_shipping_amount") @db.Decimal(10, 2)
+  refundedProductAmount           Decimal @default(0) @map("refunded_product_amount") @db.Decimal(10, 2)
+  refundedOutboundShippingAmount  Decimal @default(0) @map("refunded_outbound_shipping_amount") @db.Decimal(10, 2)
+  refundedBuyerProtectionAmount   Decimal @default(0) @map("refunded_buyer_protection_amount") @db.Decimal(10, 2)
+  refundedSellerFeeAmount         Decimal @default(0) @map("refunded_seller_fee_amount") @db.Decimal(10, 2)
+  retainedSellerPlatformFeeAmount Decimal @default(0) @map("retained_seller_platform_fee_amount") @db.Decimal(10, 2)
+  returnShippingChargeToBuyer     Decimal @default(0) @map("return_shipping_charge_to_buyer") @db.Decimal(10, 2)
+  returnShippingChargeToSeller    Decimal @default(0) @map("return_shipping_charge_to_seller") @db.Decimal(10, 2)
+  requiresAdminReview             Boolean @default(false) @map("requires_admin_review")
+  penaltyReviewRequired           Boolean @default(false) @map("penalty_review_required")
+
+  refundProductAmount    Boolean              @default(true) @map("refund_product_amount")
+  refundShippingFee      Boolean              @default(true) @map("refund_shipping_fee")
+  refundBuyerFee         Boolean              @default(true) @map("refund_buyer_fee")
+  refundSellerCommission Boolean              @default(true) @map("refund_seller_commission")
+  returnShippingPayer    ReturnShippingPayer? @map("return_shipping_payer")
   buyerInitiatedAmicable Boolean              @default(false) @map("buyer_initiated_amicable")
 
   metadata Json?
@@ -1517,7 +1959,7 @@ model CommissionRule {
   categoryId     String?               @map("category_id")
   membershipTier MembershipTierType?   @map("membership_tier")
   minAmount      Decimal?              @map("min_amount") @db.Decimal(10, 2)
-  percentage     Decimal               @db.Decimal(5, 4)
+  percentage     Decimal               @db.Decimal(7, 4)
   minCommission  Decimal?              @map("min_commission") @db.Decimal(10, 2)
   maxCommission  Decimal?              @map("max_commission") @db.Decimal(10, 2)
   isActive       Boolean               @default(true) @map("is_active")
@@ -1527,16 +1969,39 @@ model CommissionRule {
   appliesTo      CommissionAppliesTo   @default(SELLER) @map("applies_to")
   buyerMax       Decimal?              @map("buyer_max") @db.Decimal(10, 2)
   buyerMin       Decimal?              @map("buyer_min") @db.Decimal(10, 2)
-  buyerRate      Decimal?              @map("buyer_rate") @db.Decimal(5, 4)
+  buyerRate      Decimal?              @map("buyer_rate") @db.Decimal(7, 4)
   sellerMax      Decimal?              @map("seller_max") @db.Decimal(10, 2)
   sellerMin      Decimal?              @map("seller_min") @db.Decimal(10, 2)
-  sellerRate     Decimal?              @map("seller_rate") @db.Decimal(5, 4)
+  sellerRate     Decimal?              @map("seller_rate") @db.Decimal(7, 4)
   sellerType     CommissionSellerType? @map("seller_type")
-  category       Category?             @relation(fields: [categoryId], references: [id])
+
+  // ── v2 (kesinti profili) ──
+  // Ek eşleşme ekseni: bireysel/kurumsal (businessStatus+taxId), üyelikten (sellerType) bağımsız.
+  taxpayerType          CommissionTaxpayerType @default(all) @map("taxpayer_type")
+  // Kademeli eşleşme: ürün/satır tutarı [minAmount, maxAmount] aralığı (minAmount legacy sütunu yeniden kullanılır).
+  maxAmount             Decimal?               @map("max_amount") @db.Decimal(12, 2)
+  // Dört ayrı kesinti oranı (%) + opsiyonel TL taban/tavan.
+  buyerCommissionRate   Decimal?               @map("buyer_commission_rate") @db.Decimal(7, 4)
+  buyerCommissionMin    Decimal?               @map("buyer_commission_min") @db.Decimal(10, 2)
+  buyerCommissionMax    Decimal?               @map("buyer_commission_max") @db.Decimal(10, 2)
+  buyerServiceFeeRate   Decimal?               @map("buyer_service_fee_rate") @db.Decimal(7, 4)
+  buyerServiceFeeMin    Decimal?               @map("buyer_service_fee_min") @db.Decimal(10, 2)
+  buyerServiceFeeMax    Decimal?               @map("buyer_service_fee_max") @db.Decimal(10, 2)
+  sellerCommissionRate  Decimal?               @map("seller_commission_rate") @db.Decimal(7, 4)
+  sellerCommissionMin   Decimal?               @map("seller_commission_min") @db.Decimal(10, 2)
+  sellerCommissionMax   Decimal?               @map("seller_commission_max") @db.Decimal(10, 2)
+  sellerPlatformFeeRate Decimal?               @map("seller_platform_fee_rate") @db.Decimal(7, 4)
+  sellerPlatformFeeMin  Decimal?               @map("seller_platform_fee_min") @db.Decimal(10, 2)
+  sellerPlatformFeeMax  Decimal?               @map("seller_platform_fee_max") @db.Decimal(10, 2)
+  // Tek kargo tutarının alıcı payı (%). Satıcı payı = 100 - buyerShare. Varsayılan 100 = alıcı öder (mevcut davranış).
+  shippingBuyerShare    Decimal                @default(100) @map("shipping_buyer_share") @db.Decimal(5, 2)
+
+  category Category? @relation(fields: [categoryId], references: [id])
 
   @@index([isActive])
   @@index([categoryId, sellerType, isActive])
   @@index([sellerType, isActive])
+  @@index([categoryId, taxpayerType, sellerType, isActive])
   @@map("commission_rules")
 }
 
@@ -1906,41 +2371,72 @@ model Advertisement {
 }
 
 model Discount {
-  id                String          @id @default(uuid())
-  code              String?         @unique
-  name              String
-  description       String?
-  type              DiscountType
-  value             Decimal         @db.Decimal(10, 2)
-  scope             DiscountScope
-  sellerId          String?         @map("seller_id")
-  categoryId        String?         @map("category_id")
-  targetProductIds  String[]        @default([])
-  minCartValue      Decimal?        @map("min_cart_value") @db.Decimal(10, 2)
-  maxDiscountAmount Decimal?        @map("max_discount_amount") @db.Decimal(10, 2)
-  usageLimitTotal   Int?            @map("usage_limit_total")
-  usageLimitPerUser Int?            @default(1) @map("usage_limit_per_user")
-  usedCount         Int             @default(0) @map("used_count")
-  isStackable       Boolean         @default(false) @map("is_stackable")
-  priority          Int             @default(0)
-  isActive          Boolean         @default(true) @map("is_active")
-  startDate         DateTime        @map("start_date")
-  endDate           DateTime        @map("end_date")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-  buyQuantity       Int?            @map("buy_quantity")
-  getQuantity       Int?            @map("get_quantity")
-  isFlashSale       Boolean         @default(false) @map("is_flash_sale")
-  minQuantity       Int?            @default(1) @map("min_quantity")
-  usages            DiscountUsage[]
-  category          Category?       @relation(fields: [categoryId], references: [id])
-  seller            User?           @relation(fields: [sellerId], references: [id])
+  id                  String              @id @default(uuid())
+  code                String?             @unique
+  name                String
+  description         String?
+  type                DiscountType
+  value               Decimal             @db.Decimal(10, 2)
+  scope               DiscountScope
+  sellerId            String?             @map("seller_id")
+  categoryId          String?             @map("category_id")
+  targetProductIds    String[]            @default([])
+  minCartValue        Decimal?            @map("min_cart_value") @db.Decimal(10, 2)
+  maxDiscountAmount   Decimal?            @map("max_discount_amount") @db.Decimal(10, 2)
+  usageLimitTotal     Int?                @map("usage_limit_total")
+  usageLimitPerUser   Int?                @default(1) @map("usage_limit_per_user")
+  usedCount           Int                 @default(0) @map("used_count")
+  isStackable         Boolean             @default(false) @map("is_stackable")
+  priority            Int                 @default(0)
+  isActive            Boolean             @default(true) @map("is_active")
+  startDate           DateTime            @map("start_date")
+  endDate             DateTime            @map("end_date")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  buyQuantity         Int?                @map("buy_quantity")
+  getQuantity         Int?                @map("get_quantity")
+  isFlashSale         Boolean             @default(false) @map("is_flash_sale")
+  minQuantity         Int?                @default(1) @map("min_quantity")
+  /// Toplu üretilen tek-kullanımlık voucher kodları için "batch şablonu" işareti.
+  /// true ise bu Discount'ın paylaşımlı `code`'u yoktur; kodlar `codes` altındadır.
+  isBatch             Boolean             @default(false) @map("is_batch")
+  /// Kampanya maliyetini KİM üstlenir (F2.4). seller (varsayılan): indirimi satıcı
+  /// yer (payout tabanı düşer, mevcut davranış). platform: platform finanse eder →
+  /// satıcıya indirim ÖNCESİ tutar üzerinden ödenir (escrow'da geri eklenir). shared:
+  /// platformFundedRatio kadar platform üstlenir.
+  fundedBy            DiscountFundedBy    @default(seller) @map("funded_by")
+  /// shared için platform payı [0,1] (0.30 = %30 platform, %70 satıcı).
+  platformFundedRatio Decimal?            @map("platform_funded_ratio") @db.Decimal(5, 4)
+  usages              DiscountUsage[]
+  codes               DiscountCode[]
+  reservations        CouponReservation[]
+  category            Category?           @relation(fields: [categoryId], references: [id])
+  seller              User?               @relation(fields: [sellerId], references: [id])
 
   @@index([sellerId])
   @@index([isActive, startDate, endDate])
   @@index([code])
   @@index([scope])
   @@map("discounts")
+}
+
+/// Tek-kullanımlık voucher kodu (kampanya/hediye). Parent Discount = şablon
+/// (tür/değer/tarih/scope/limitler). Her kod bir kez kullanılır (isRedeemed).
+model DiscountCode {
+  id           String              @id @default(uuid())
+  discountId   String              @map("discount_id")
+  code         String              @unique
+  isRedeemed   Boolean             @default(false) @map("is_redeemed")
+  redeemedById String?             @map("redeemed_by_id")
+  redeemedAt   DateTime?           @map("redeemed_at")
+  orderId      String?             @map("order_id")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  discount     Discount            @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  reservations CouponReservation[]
+
+  @@index([discountId])
+  @@index([isRedeemed])
+  @@map("discount_codes")
 }
 
 model DiscountUsage {
@@ -1956,6 +2452,33 @@ model DiscountUsage {
   @@index([discountId, userId])
   @@index([orderId])
   @@map("discount_usages")
+}
+
+/// Checkout sırasında kupon kotasını geçici olarak tutar. Bu kayıt gerçek kullanım
+/// değildir: Discount.usedCount ve DiscountUsage yalnız başarılı ödeme sonrasında
+/// güncellenir. Ödenmeyen/iptal edilen siparişte rezervasyon released olur.
+model CouponReservation {
+  id            String                  @id @default(uuid())
+  discountId    String                  @map("discount_id")
+  userId        String                  @map("user_id")
+  orderId       String                  @unique @map("order_id")
+  voucherCodeId String?                 @map("voucher_code_id")
+  amount        Decimal                 @db.Decimal(10, 2)
+  status        CouponReservationStatus @default(active)
+  expiresAt     DateTime                @map("expires_at")
+  consumedAt    DateTime?               @map("consumed_at")
+  releasedAt    DateTime?               @map("released_at")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  discount      Discount                @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  user          User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order         Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  voucherCode   DiscountCode?           @relation(fields: [voucherCodeId], references: [id], onDelete: SetNull)
+
+  @@index([discountId, status, expiresAt])
+  @@index([userId, discountId, status])
+  @@index([voucherCodeId, status])
+  @@map("coupon_reservations")
 }
 
 model Cart {
@@ -2070,6 +2593,15 @@ enum PaymentStatus {
   refunded
 }
 
+enum RefundAttemptStatus {
+  prepared
+  submitting
+  succeeded
+  finalized
+  failed
+  manual_review
+}
+
 enum PaymentHoldStatus {
   held
   released
@@ -2083,6 +2615,15 @@ enum PayoutStatus {
   failed
   returned
   retry_pending
+}
+
+enum SellerAdjustmentType {
+  return_shipping
+}
+
+enum SellerAdjustmentStatus {
+  open
+  settled
 }
 
 enum ShipmentStatus {
@@ -2106,7 +2647,19 @@ enum RefundReason {
   not_as_described
   missing_parts
   counterfeit
+  defective
+  buyer_damaged
   lost_in_transit
+  other
+}
+
+enum OrderCancellationReason {
+  delivery_delayed
+  wrong_product_selected
+  changed_mind
+  wrong_card
+  price_changed_mind
+  unavailable_at_address
   other
 }
 
@@ -2114,6 +2667,12 @@ enum ReturnShippingPayer {
   buyer
   seller
   platform
+}
+
+enum ShippingTariffStatus {
+  draft
+  active
+  archived
 }
 
 enum RefundRequestStatus {
@@ -2165,6 +2724,14 @@ enum CommissionSellerType {
   PREMIUM
   BUSINESS
   ALL
+}
+
+/// Vergi mükellefiyeti ekseni (üyelikten ayrı): bireysel vs kurumsal satıcı.
+/// Kurumsal = businessStatus=approved && taxId. `all` = ayrım yapma.
+enum CommissionTaxpayerType {
+  individual
+  corporate
+  all
 }
 
 enum TradeStatus {
@@ -2250,6 +2817,21 @@ enum DiscountScope {
   seller
 }
 
+/// Kampanya maliyetini kim üstlenir (F2.4). seller: satıcı (varsayılan, payout tabanı
+/// düşer). platform: platform finanse eder (satıcıya indirim öncesi tutar ödenir).
+/// shared: platformFundedRatio kadarını platform üstlenir.
+enum DiscountFundedBy {
+  seller
+  platform
+  shared
+}
+
+enum CouponReservationStatus {
+  active
+  consumed
+  released
+}
+
 enum RatingStatus {
   pending
   approved
@@ -2289,4 +2871,95 @@ enum BuyerConfirmationType {
   manual_ok
   auto_timeout
   admin_force
+}
+
+// =============================================================================
+// OUTBOX (Faz 5) — para mutasyonuyla AYNI tx'te yazılan güvenilir yan-etki kuyruğu.
+// "post-commit best-effort .catch(log)" yan-etkilerini (PayTR iade, Sürat iptali,
+// fatura, bildirim) çökmeye dayanıklı kılar: tx commit olursa satır KESİN işlenir
+// (drainer retry+backoff+DLQ). Handler'lar idempotent olmalı. PAN/CVV asla payload'a
+// yazılmaz (yalnız id'ler + tutar). dedupeKey ile aynı yan-etki iki kez enqueue edilmez.
+// =============================================================================
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  type          String // handler dispatch anahtarı (ör. "invoice.generate")
+  payload       Json // handler girdisi (id'ler + tutar; PAN/CVV/PII minimal)
+  status        OutboxStatus @default(pending)
+  attempts      Int          @default(0)
+  maxAttempts   Int          @default(8) @map("max_attempts")
+  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at")
+  dedupeKey     String?      @unique @map("dedupe_key") // idempotency (aynı yan-etki tek satır)
+  lastError     String?      @map("last_error")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  processedAt   DateTime?    @map("processed_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([type, status])
+  @@map("outbox_events")
+}
+
+enum OutboxStatus {
+  pending
+  processing
+  completed
+  dead // maxAttempts aşıldı — DLQ (manuel inceleme + alarm)
+}
+
+// =============================================================================
+// LEDGER (Faz 6) — DEĞİŞMEZ çift-taraflı (double-entry) para defteri.
+// Her para olayı DENGELİ bir satır grubu yazar (Σdebit == Σcredit; LedgerService
+// bunu zorlar). Bakiye/tutar tutarlılığının denetim kaynağı; drift reconciliation'ın
+// (6.5) temeli. Append-only — satır GÜNCELLENMEZ/SİLİNMEZ; düzeltme ters kayıtla yapılır.
+// FK yok (soft ref) — defter, kaynak tablolar silinse bile kalıcı denetim izidir.
+// =============================================================================
+model LedgerEntry {
+  id           String          @id @default(uuid())
+  entryGroupId String          @map("entry_group_id") // aynı olayın satırlarını bağlar
+  eventType    LedgerEventType @map("event_type")
+  account      LedgerAccount
+  direction    LedgerDirection
+  amount       Decimal         @db.Decimal(12, 2) // her zaman pozitif; yön `direction`'da
+  currency     String          @default("TRY")
+  paymentId    String?         @map("payment_id")
+  orderId      String?         @map("order_id")
+  tradeId      String?         @map("trade_id")
+  payoutId     String?         @map("payout_id")
+  holdId       String?         @map("hold_id")
+  sellerId     String?         @map("seller_id")
+  buyerId      String?         @map("buyer_id")
+  memo         String?
+  metadata     Json?
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@index([entryGroupId])
+  @@index([account, createdAt])
+  @@index([eventType, createdAt])
+  @@index([orderId])
+  @@index([sellerId, account])
+  @@map("ledger_entries")
+}
+
+enum LedgerEventType {
+  payment_captured // alıcı ödedi → escrow + komisyon
+  hold_released // escrow satıcıya uygun hale geldi
+  payout_created // satıcıya transfer başlatıldı
+  payout_completed // transfer tamamlandı
+  refund_issued // alıcıya iade
+  trade_commission // takas komisyonu
+  adjustment // manuel düzeltme (ters kayıt)
+}
+
+enum LedgerAccount {
+  buyer_payment // dış para girişi (alıcının ödediği)
+  seller_escrow // satıcıya borç (tutulan)
+  platform_commission // platform geliri
+  withholding_tax // stopaj (GVK 94/19 — muhtasar ile beyan)
+  payout // dış para çıkışı (satıcıya transfer)
+  refund // dış para çıkışı (alıcıya iade)
+}
+
+enum LedgerDirection {
+  debit
+  credit
 }

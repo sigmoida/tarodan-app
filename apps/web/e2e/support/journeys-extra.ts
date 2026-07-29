@@ -141,17 +141,25 @@ export async function driveToCompleted(
 }
 
 /**
- * security.service.ts içindeki ÖZEL (non-standard) TOTP algoritmasının birebir
- * replikası — base32 karakterleri 0-31 indekslerine map'lenip HMAC anahtarı yapılır.
- * 2FA enable/verify journey'leri (J23/J47/J132) gerçek geçerli kod üretmek için kullanır.
+ * RFC 6238 TOTP kodu üretir; authenticator uygulamalarının kullandığı standart
+ * base32 çözümlemesiyle aynı davranışı test eder.
  */
 export function totpCode(secret: string, windowOffset = 0): string {
   const base32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   const time = Math.floor(Date.now() / 1000 / 30) + windowOffset;
   const secretBytes: number[] = [];
+  let value = 0;
+  let bits = 0;
   for (const ch of secret.toUpperCase()) {
     const idx = base32.indexOf(ch);
-    if (idx >= 0) secretBytes.push(idx);
+    if (idx < 0) throw new Error('Invalid base32 secret');
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      secretBytes.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+    value &= (1 << bits) - 1;
   }
   const hmac = crypto.createHmac('sha1', Buffer.from(secretBytes));
   const timeBuffer = Buffer.alloc(8);

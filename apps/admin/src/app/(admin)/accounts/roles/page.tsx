@@ -1,26 +1,25 @@
-'use client';
+"use client";
 
-import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/AdminList';
-import { AdminTabs } from '@/components/AdminTabs';
-import { useTabParam } from '@/hooks/useTabParam';
-import { ROLE_TABS } from './_lib/constants';
-import { PermissionMatrixTab } from './_components/PermissionMatrixTab';
-import { StaffAssignmentsTab } from './_components/StaffAssignmentsTab';
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/AdminList";
+import { AdminTabs } from "@/components/AdminTabs";
+import { useRolesPage } from "./_lib/useRolesPage";
+import { PermissionMatrixTab } from "./_components/PermissionMatrixTab";
+import { StaffAssignmentsTab } from "./_components/StaffAssignmentsTab";
 
 export default function RolesPage() {
-  const [tab, setTab] = useTabParam('matrix');
+  const { t, tab, setTab, tabs, showMatrix } = useRolesPage();
 
   return (
     <AdminPage>
       <PageHeader
-        title="Roller ve İzinler"
-        description="Her rolün hangi işlemleri yapabileceğini görüntüleyin ve düzenleyin"
+        title={t("admin.roles.title")}
+        description={t("admin.roles.description")}
       />
-      <AdminTabs tabs={ROLE_TABS} value={tab} onChange={setTab} />
+      <AdminTabs tabs={tabs} value={tab} onChange={setTab} />
 
-      {tab === 'users' ? (
-        <StaffAssignmentsTab onShowMatrix={() => setTab('matrix')} />
+      {tab === "users" ? (
+        <StaffAssignmentsTab onShowMatrix={showMatrix} />
       ) : (
         <PermissionMatrixTab />
       )}

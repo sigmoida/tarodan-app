@@ -1,43 +1,47 @@
-'use client';
+"use client";
 
-import { adminApi } from '@/lib/api';
-import { ResourceList } from '@/components/list';
-import { clientListFetcher } from '@/lib/query/client-list';
-import { useConfirm } from '@/provider/ConfirmProvider';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { scheduledColumns } from '../_lib/columns';
-import { type ScheduledNotification } from '../_lib/types';
+import { adminApi } from "@/lib/api";
+import { ResourceList } from "@/components/list";
+import { useConfirm } from "@/provider/ConfirmProvider";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { scheduledColumns } from "../_lib/columns";
+import { type ScheduledNotification } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function ScheduledTab() {
+  const t = useTranslations();
   const confirm = useConfirm();
   const cancel = useAdminMutation(
     (id: string) => adminApi.cancelScheduledNotification(id),
-    { invalidates: ['scheduled-notifications'], successMessage: 'Bildirim iptal edildi' },
+    {
+      invalidates: ["scheduled-notifications"],
+      successMessage: t("admin.marketing.notifications.cancelled"),
+    },
   );
 
   const onCancel = async (id: string) => {
-    if (
-      await confirm({
-        description: 'Bu zamanlanmış bildirimi iptal etmek istiyor musunuz?',
-        destructive: true,
-      })
-    )
-      cancel.mutate(id);
+    await confirm({
+      description: t("admin.marketing.notifications.cancelConfirm"),
+      destructive: true,
+      onConfirm: () => cancel.mutateAsync(id),
+    });
   };
 
   return (
     <ResourceList<ScheduledNotification>
       resource="scheduled-notifications"
-      fetcher={clientListFetcher<ScheduledNotification>(
-        () => adminApi.getScheduledNotifications({ status: 'pending' }),
-        (raw) => (Array.isArray(raw) ? raw : (raw?.data ?? [])),
-      )}
+      fetcher={(params) =>
+        adminApi.getScheduledNotifications({ ...params, status: "pending" })
+      }
       getRowId={(n) => n.id}
-      errorMessage="Zamanlanmış bildirimler yüklenemedi"
+      syncUrl
     >
+      <ResourceList.Toolbar>
+        <ResourceList.Search />
+      </ResourceList.Toolbar>
       <ResourceList.Table
-        columns={scheduledColumns(onCancel)}
-        emptyText="Zamanlanmış bildirim yok"
+        columns={scheduledColumns(onCancel, t)}
+        emptyText={t("admin.marketing.notifications.emptyScheduled")}
       />
       <ResourceList.Pagination />
     </ResourceList>

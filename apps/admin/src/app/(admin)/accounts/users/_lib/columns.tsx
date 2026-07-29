@@ -1,15 +1,24 @@
-import { Badge, enumLabel, membershipTierConfig } from '@tarodan/ui';
-import { col, type RowActionItem } from '@/components/table';
-import type { User } from './types';
+import {
+  Badge,
+  StatusBadge,
+  enumLabel,
+  membershipTierConfig,
+  subscriptionStatusConfig,
+} from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { col, type RowActionItem } from "@/components/table";
+import type { User } from "./types";
 
-export function userColumns(rowMenu: (u: User) => RowActionItem[]) {
+type T = ReturnType<typeof useTranslations<never>>;
+
+export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
   return [
     col.custom<User>(
-      'Kullanıcı',
+      t("admin.users.columnUser"),
       (u) => (
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 font-medium text-primary-600">
-            {u.displayName?.charAt(0) ?? '?'}
+            {u.displayName?.charAt(0) ?? "?"}
           </div>
           <div className="min-w-0">
             <p className="truncate font-medium text-heading">{u.displayName}</p>
@@ -17,38 +26,128 @@ export function userColumns(rowMenu: (u: User) => RowActionItem[]) {
           </div>
         </div>
       ),
-      { grow: 3, minWidth: 220 },
+      { grow: 3, minWidth: 220, sortKey: "displayName", sortType: "text" },
     ),
+    col.id<User>(t("admin.users.userId"), (u) => u.id),
     col.custom<User>(
-      'Durum',
+      t("common.status"),
       (u) => (
         <div className="flex flex-col items-start gap-1">
-          {u.isSeller && <Badge variant="info">Satıcı</Badge>}
-          {u.isVerified && <Badge variant="success">Doğrulanmış</Badge>}
-          {u.isBanned && <Badge variant="danger">Engelli</Badge>}
-          {!u.isSeller && !u.isVerified && !u.isBanned && <span className="text-muted">—</span>}
+          {u.isSeller && (
+            <Badge variant="info">{t("admin.users.seller")}</Badge>
+          )}
+          {u.isVerified && (
+            <Badge variant="success">{t("admin.users.verified")}</Badge>
+          )}
+          {u.isBanned && (
+            <Badge variant="danger">{t("admin.users.bannedBadge")}</Badge>
+          )}
+          {!u.isSeller && !u.isVerified && !u.isBanned && (
+            <span className="text-muted">—</span>
+          )}
         </div>
       ),
-      { grow: 1, minWidth: 130 },
+      { grow: 1, minWidth: 130, sortKey: "isVerified", sortType: "number" },
     ),
-    col.badge<User>('Üyelik', (u) => {
-      const tier = (u.membershipTier || '').toLowerCase();
-      const label = enumLabel(membershipTierConfig, tier, u.membershipTier || 'Ücretsiz');
-      return <Badge variant={tier === 'premium' ? 'warning' : 'default'}>{label}</Badge>;
+    col.badge<User>(
+      t("admin.users.membership"),
+      (u) => {
+        const tier = (u.membershipTier || "").toLowerCase();
+        const label = enumLabel(
+          membershipTierConfig,
+          tier,
+          u.membershipTier || t("admin.users.membershipFree"),
+        );
+        return (
+          <Badge variant={tier === "premium" ? "warning" : "default"}>
+            {label}
+          </Badge>
+        );
+      },
+      { sortKey: "membership.tier.type", sortType: "text" },
+    ),
+    col.custom<User>(
+      t("admin.users.membershipStatus"),
+      (u) =>
+        u.membershipStatus && (u.membershipTier || "free") !== "free" ? (
+          <StatusBadge
+            status={u.membershipStatus}
+            config={subscriptionStatusConfig}
+          />
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+      {
+        grow: 1,
+        minWidth: 120,
+        sortKey: "membership.status",
+        sortType: "text",
+      },
+    ),
+    col.custom<User>(
+      t("admin.users.membershipEndsAt"),
+      (u) => {
+        if ((u.membershipTier || "free") === "free" || !u.membershipEndsAt) {
+          return <span className="text-muted">—</span>;
+        }
+        const end = new Date(u.membershipEndsAt);
+        const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86_400_000);
+        const tone =
+          daysLeft < 0
+            ? "text-danger-600"
+            : daysLeft <= 7
+              ? "text-warning-700"
+              : "text-body";
+        return (
+          <span className={`whitespace-nowrap tabular-nums ${tone}`}>
+            {end.toLocaleDateString("tr-TR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            })}
+            {daysLeft >= 0 && daysLeft <= 7 && (
+              <span className="ml-1 text-xs">
+                ({t("admin.users.membershipDaysLeft", { count: daysLeft })})
+              </span>
+            )}
+          </span>
+        );
+      },
+      {
+        grow: 1,
+        minWidth: 140,
+        sortKey: "membership.currentPeriodEnd",
+        sortType: "date",
+      },
+    ),
+    col.number<User>(t("admin.operations.common.order"), (u) => u.ordersCount, {
+      sortKey: "ordersCount",
     }),
-    col.number<User>('Sipariş', (u) => u.ordersCount),
-    col.number<User>('Ürün', (u) => u.productsCount),
-    col.date<User>('Kayıt Tarihi', (u) => u.createdAt),
-    col.muted<User>('Son Giriş', (u) =>
-      u.lastLoginAt
-        ? new Date(u.lastLoginAt).toLocaleString('tr-TR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : 'Hiç giriş yapmadı',
+    col.number<User>(
+      t("admin.catalog.common.product"),
+      (u) => u.productsCount,
+      { sortKey: "productsCount" },
+    ),
+    col.number<User>(t("admin.users.tradesCount"), (u) => u.tradesCount),
+    col.number<User>(
+      t("admin.users.cancellationsCount"),
+      (u) => u.cancellationsCount,
+    ),
+    col.number<User>(t("admin.users.refundsCount"), (u) => u.refundsCount),
+    col.date<User>(t("admin.users.registeredAt"), "createdAt"),
+    col.muted<User>(
+      t("admin.users.lastLogin"),
+      (u) =>
+        u.lastLoginAt
+          ? new Date(u.lastLoginAt).toLocaleString("tr-TR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : t("admin.users.neverLoggedIn"),
+      { sortKey: "lastLoginAt", sortType: "date" },
     ),
     col.rowMenu<User>(rowMenu),
   ];

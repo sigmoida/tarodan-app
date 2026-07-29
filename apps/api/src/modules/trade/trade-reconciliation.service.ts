@@ -1,24 +1,20 @@
-import {
-  Injectable,
-  Optional,
-  Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { EventService } from '../events';
+import { Injectable, Optional, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { EventService } from "../events";
 import {
   TradeStatus,
   ProductStatus,
   ShipmentStatus,
   PaymentStatus,
-} from '@prisma/client';
-import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
-import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
-import { PaymentService } from '../payment/payment.service';
-import { TradeShipmentService } from './trade-shipment.service';
-import { TradeCommonService } from './trade-common.service';
+} from "@prisma/client";
+import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
+import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
+import { PaymentService } from "../payment/payment.service";
+import { TradeShipmentService } from "./trade-shipment.service";
+import { TradeCommonService } from "./trade-common.service";
 
 /**
  * Zamanlanmış (cron) takas mutabakat işleri — TradeService'ten birebir taşındı.
@@ -158,7 +154,7 @@ export class TradeReconciliationService {
             (t) =>
               `${t.tradeNumber}(id=${t.id} arrived=${t.firstWarehouseArrivalAt?.toISOString()} deadline=${t.shippingDeadline?.toISOString()})`,
           )
-          .join(', ')}`,
+          .join(", ")}`,
       );
       // Loglar sessiz kalmasın diye admin'lere bildirim de gönder. Cron her 5 dk
       // çalıştığından her takas için 24s cache dedup ile spam'i engelle; çözülmeyen
@@ -209,10 +205,16 @@ export class TradeReconciliationService {
             TradeStatus.awaiting_payment,
             TradeStatus.shipping_to_warehouse,
           ];
-          if (statusesWithReservation.includes(trade.status) && allItems.length > 0) {
+          if (
+            statusesWithReservation.includes(trade.status) &&
+            allItems.length > 0
+          ) {
             const byProduct = new Map<string, number>();
             for (const item of allItems) {
-              byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+              byProduct.set(
+                item.productId,
+                (byProduct.get(item.productId) ?? 0) + item.quantity,
+              );
             }
             // Auto-cancel: kabul anında yapılan rezervasyonu geri al
             for (const [productId, qty] of byProduct) {
@@ -222,12 +224,18 @@ export class TradeReconciliationService {
                 select: { reservedQuantity: true },
               });
               if (prod) {
-                const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+                const newReserved = safeDecrementReserved(
+                  prod.reservedQuantity,
+                  qty,
+                );
                 await tx.product.update({
                   where: { id: productId },
                   data: {
                     reservedQuantity: newReserved,
-                    status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+                    status:
+                      newReserved > 0
+                        ? ProductStatus.reserved
+                        : ProductStatus.active,
                   },
                 });
               }
@@ -238,7 +246,7 @@ export class TradeReconciliationService {
             where: { id: trade.id },
             data: {
               status: TradeStatus.cancelled,
-              cancelReason: 'Süre dolumu nedeniyle otomatik iptal',
+              cancelReason: "Süre dolumu nedeniyle otomatik iptal",
               cancelledAt: now,
             },
           });
@@ -257,14 +265,16 @@ export class TradeReconciliationService {
               tradeId: trade.id,
               initiatorId: trade.initiatorId,
               receiverId: trade.receiverId,
-              reason: 'Takas süresi dolduğu için otomatik iptal edildi',
+              reason: "Takas süresi dolduğu için otomatik iptal edildi",
             });
           } catch (err) {
-            this.logger.error(`Failed to emit trade.auto-cancelled for trade ${trade.id}: ${err}`);
+            this.logger.error(
+              `Failed to emit trade.auto-cancelled for trade ${trade.id}: ${err}`,
+            );
           }
         }
       } catch (error) {
-        this.logger.error('Failed to auto-cancel trade');
+        this.logger.error("Failed to auto-cancel trade");
       }
     }
 
@@ -281,7 +291,7 @@ export class TradeReconciliationService {
     const trades = await this.prisma.trade.findMany({
       where: {
         status: TradeStatus.shipping_to_warehouse,
-        shipments: { none: { leg: 'to_warehouse' } },
+        shipments: { none: { leg: "to_warehouse" } },
       },
       select: { id: true },
       take: 50,
@@ -302,6 +312,50 @@ export class TradeReconciliationService {
   }
 
   /**
+   * MONEY-H2: PayTR nakit iadesi başarısız olup `refundFailureReason` marker'ı
+   * yazılmış takasları periyodik olarak yeniden dener. cancelTrade / resolveDispute /
+   * rejectWarehouseTrade / retryTradeRefund akışlarında iade PayTR'da patlarsa para
+   * alıcıda kalır; admin elle müdahale etmese bile bu süpürme onu toparlar.
+   * `refundTradeCashTracked` başarıda marker'ı temizler, tekrar patlarsa mesajı
+   * tazeler (kalıcı hatada döngü zararsızdır: aynı takas her turda yeniden denenir
+   * ama çift-iade guard'ları PayTR'yi bir kez çağırır).
+   */
+  async retryFailedTradeRefunds(): Promise<{
+    retried: number;
+    recovered: number;
+  }> {
+    const stuck = await this.prisma.trade.findMany({
+      where: {
+        refundFailureReason: { not: null },
+        status: {
+          in: [
+            TradeStatus.cancelled,
+            TradeStatus.returning,
+            TradeStatus.disputed,
+          ],
+        },
+      },
+      select: { id: true },
+      take: 50,
+    });
+
+    let recovered = 0;
+    for (const t of stuck) {
+      const res = await this.paymentService.refundTradeCashTracked(t.id);
+      // "recovered" = marker artık temizlenmiş demektir (iade yapıldı VEYA iade
+      // edilecek tamamlanmış ödeme kalmadı). Yalnız `failed` olanlar marker'da kalır.
+      if (!res.failed) recovered++;
+    }
+
+    if (stuck.length > 0) {
+      this.logger.log(
+        `retryFailedTradeRefunds: ${stuck.length} takas denendi, ${recovered} toparlandı`,
+      );
+    }
+    return { retried: stuck.length, recovered };
+  }
+
+  /**
    * Auto-confirm receipt for trades stuck in shipping_to_recipients
    * when confirmationDeadline has passed.
    */
@@ -315,7 +369,7 @@ export class TradeReconciliationService {
       },
       include: {
         shipments: {
-          where: { leg: 'from_warehouse' },
+          where: { leg: "from_warehouse" },
         },
       },
     });
@@ -331,7 +385,10 @@ export class TradeReconciliationService {
             where: { id: trade.id },
             select: { status: true, version: true },
           });
-          if (!freshTrade || freshTrade.status !== TradeStatus.shipping_to_recipients) {
+          if (
+            !freshTrade ||
+            freshTrade.status !== TradeStatus.shipping_to_recipients
+          ) {
             return;
           }
 
@@ -339,7 +396,7 @@ export class TradeReconciliationService {
           const unconfirmedShipments = await tx.tradeShipment.findMany({
             where: {
               tradeId: trade.id,
-              leg: 'from_warehouse',
+              leg: "from_warehouse",
               confirmedAt: null,
             },
           });
@@ -366,14 +423,25 @@ export class TradeReconciliationService {
           });
 
           // Decrement product quantities (same as confirmReceipt)
-          const allItems = await tx.tradeItem.findMany({ where: { tradeId: trade.id } });
+          const allItems = await tx.tradeItem.findMany({
+            where: { tradeId: trade.id },
+          });
+          // #2 (LOST-UPDATE FIX): okumadan ÖNCE ürünleri FOR UPDATE ile (id-sıralı) kilitle →
+          // eşzamanlı satış/takas düşümü stale mutlak-set yazamaz; deadlock önlenir.
+          const lockIds = [...new Set(allItems.map((i) => i.productId))].sort();
+          for (const pid of lockIds) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${pid} FOR UPDATE`;
+          }
           const products = await tx.product.findMany({
             where: { id: { in: allItems.map((i) => i.productId) } },
           });
 
           const qtyByProduct = new Map<string, number>();
           for (const item of allItems) {
-            qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) ?? 0) + item.quantity);
+            qtyByProduct.set(
+              item.productId,
+              (qtyByProduct.get(item.productId) ?? 0) + item.quantity,
+            );
           }
 
           for (const product of products) {
@@ -389,7 +457,10 @@ export class TradeReconciliationService {
 
             const updateData: any = {
               status: getProductStatusFromQuantity(newQuantity),
-              reservedQuantity: safeDecrementReserved(product.reservedQuantity, tradedQty),
+              reservedQuantity: safeDecrementReserved(
+                product.reservedQuantity,
+                tradedQty,
+              ),
             };
             if (product.quantity !== null && product.quantity > 0) {
               updateData.quantity = newQuantity;
@@ -407,9 +478,9 @@ export class TradeReconciliationService {
           });
           if (cashPayment && cashPayment.status === PaymentStatus.completed) {
             const holdDaysSetting = await tx.platformSetting.findUnique({
-              where: { settingKey: 'payment_hold_days' },
+              where: { settingKey: "payment_hold_days" },
             });
-            const holdDays = parseInt(holdDaysSetting?.settingValue ?? '7');
+            const holdDays = parseInt(holdDaysSetting?.settingValue ?? "7");
             const holdReleaseAt = new Date();
             holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
 
@@ -434,7 +505,9 @@ export class TradeReconciliationService {
     }
 
     if (confirmedCount > 0) {
-      this.logger.log(`Auto-confirmed ${confirmedCount} expired trade receipt(s)`);
+      this.logger.log(
+        `Auto-confirmed ${confirmedCount} expired trade receipt(s)`,
+      );
     }
     return confirmedCount;
   }

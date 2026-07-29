@@ -1,13 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { User } from '@prisma/client';
-import { NotificationSettings, UpdateNotificationSettingsDto } from './dto';
-import { UserProfileService } from './user-profile.service';
-import { UserAddressService } from './user-address.service';
-import { UserSocialService } from './user-social.service';
-import { UserStatsService } from './user-stats.service';
-import { UserAnalyticsService } from './user-analytics.service';
-import { UserDiscoveryService } from './user-discovery.service';
-import { UserBankService } from './user-bank.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { User } from "@prisma/client";
+import { NotificationSettings, UpdateNotificationSettingsDto } from "./dto";
+import { UserProfileService } from "./user-profile.service";
+import { UserAddressService } from "./user-address.service";
+import { UserSocialService } from "./user-social.service";
+import { UserStatsService } from "./user-stats.service";
+import { UserAnalyticsService } from "./user-analytics.service";
+import { UserDiscoveryService } from "./user-discovery.service";
+import { UserBankService } from "./user-bank.service";
+import { UserEngagementService } from "./user-engagement.service";
 
 /**
  * UserService (facade) — her public imza aynen korunur. CORE servis; controller
@@ -29,7 +30,26 @@ export class UserService {
     private readonly analytics: UserAnalyticsService,
     private readonly discovery: UserDiscoveryService,
     private readonly bank: UserBankService,
+    private readonly engagement: UserEngagementService,
   ) {}
+
+  /**
+   * Increment a seller storefront's view counter.
+   * Self-views, bots, and repeat views inside the rate-limit window are no-ops.
+   */
+  async incrementStoreViewCount(
+    sellerId: string,
+    viewerId?: string,
+    clientIp?: string,
+    userAgent?: string,
+  ) {
+    return this.engagement.incrementStoreViewCount(
+      sellerId,
+      viewerId,
+      clientIp,
+      userAgent,
+    );
+  }
 
   /**
    * Stabil avatar endpoint'i (GET /users/:id/avatar) için kullanıcının taze
@@ -83,9 +103,14 @@ export class UserService {
       isCorporateSeller?: boolean;
       avatarUrl?: string;
       showTrustScore?: boolean;
+      preferredLanguage?: string;
     },
   ) {
     return this.profile.updateProfile(userId, data);
+  }
+
+  async completeHomeTour(userId: string, version: number) {
+    return this.profile.completeHomeTour(userId, version);
   }
 
   /**
@@ -222,14 +247,20 @@ export class UserService {
   /**
    * Block a user
    */
-  async blockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; message: string }> {
+  async blockUser(
+    blockerId: string,
+    blockedId: string,
+  ): Promise<{ success: boolean; blockedDisplayName: string }> {
     return this.social.blockUser(blockerId, blockedId);
   }
 
   /**
    * Unblock a user
    */
-  async unblockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; message: string }> {
+  async unblockUser(
+    blockerId: string,
+    blockedId: string,
+  ): Promise<{ success: boolean }> {
     return this.social.unblockUser(blockerId, blockedId);
   }
 
@@ -285,7 +316,7 @@ export class UserService {
     return this.stats.getMyStats(userId);
   }
 
-  async getUserAnalytics(userId: string, period: '7d' | '30d' | '90d' = '30d') {
+  async getUserAnalytics(userId: string, period: "7d" | "30d" | "90d" = "30d") {
     return this.analytics.getUserAnalytics(userId, period);
   }
 
@@ -319,7 +350,11 @@ export class UserService {
    * id + skor döner; ağır kısım budur, cron tarafından çağrılır).
    * Admin'in `isFeatured` işaretlediği koleksiyonlar önceliklidir.
    */
-  async selectFeaturedCollector(): Promise<{ id: string; score: number; salesCount: number } | null> {
+  async selectFeaturedCollector(): Promise<{
+    id: string;
+    score: number;
+    salesCount: number;
+  } | null> {
     return this.discovery.selectFeaturedCollector();
   }
 
@@ -337,7 +372,10 @@ export class UserService {
    * id + skor döner). Business tier önceliklidir; yoksa en çok ürünü olan
    * satıcılara düşer. Ağır skorlama burasıdır, cron tarafından çağrılır.
    */
-  async selectFeaturedBusiness(): Promise<{ id: string; score: number } | null> {
+  async selectFeaturedBusiness(): Promise<{
+    id: string;
+    score: number;
+  } | null> {
     return this.discovery.selectFeaturedBusiness();
   }
 
@@ -372,7 +410,12 @@ export class UserService {
 
   async upsertBankAccount(
     userId: string,
-    data: { accountHolder: string; iban: string; tcKimlikNo?: string; taxId?: string },
+    data: {
+      accountHolder: string;
+      iban: string;
+      tcKimlikNo?: string;
+      taxId?: string;
+    },
   ) {
     return this.bank.upsertBankAccount(userId, data);
   }

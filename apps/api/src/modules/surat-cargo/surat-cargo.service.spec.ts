@@ -1,29 +1,29 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
-import { SuratCargoService, SURAT_SOAP_CLIENT } from './surat-cargo.service';
-import { CacheService } from '../cache/cache.service';
+import { Test, TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
+import { SuratCargoService, SURAT_CARRIER_CLIENT } from "./surat-cargo.service";
+import { CacheService } from "../cache/cache.service";
 import type {
   SuratBusinessFailure,
   SuratGonderiPayload,
   SuratTechnicalFailure,
-} from './surat-cargo.types';
+} from "./surat-cargo.types";
 import {
   SuratKargoTuru,
   SuratOdemeTipi,
   SuratTasimaSekli,
   SuratTeslimSekli,
   SuratGonderiSekli,
-} from './surat-cargo.types';
+} from "./surat-cargo.types";
 
 const basePayload: SuratGonderiPayload = {
-  KisiKurum: 'Ali Veli',
-  AliciAdresi: 'Atatürk Cad. No:5',
-  Il: 'İstanbul',
-  Ilce: 'Kadıköy',
-  TelefonCep: '05551234567',
+  KisiKurum: "Ali Veli",
+  AliciAdresi: "Atatürk Cad. No:5",
+  Il: "İstanbul",
+  Ilce: "Kadıköy",
+  TelefonCep: "05551234567",
   KargoTuru: SuratKargoTuru.Koli,
   OdemeTipi: SuratOdemeTipi.Pesin,
-  OzelKargoTakipNo: 'ORD-1',
+  OzelKargoTakipNo: "ORD-1",
   Adet: 1,
   BirimDesi: 1,
   BirimKg: 1,
@@ -35,28 +35,42 @@ const basePayload: SuratGonderiPayload = {
   Iademi: false,
 };
 
-describe('SuratCargoService', () => {
+describe("SuratCargoService", () => {
   let service: SuratCargoService;
   let soapCall: jest.Mock;
+  let barcodeCall: jest.Mock;
   let cacheGet: jest.Mock;
   let cacheSet: jest.Mock;
   let configGet: jest.Mock;
 
   beforeEach(async () => {
-    soapCall = jest.fn().mockResolvedValue('Tamam');
+    soapCall = jest.fn().mockResolvedValue("Tamam");
+    barcodeCall = jest.fn().mockResolvedValue({
+      isError: false,
+      message: "Tamam",
+      kargoTakipNo: "SURAT-123",
+      labelZpl: null,
+    });
     cacheGet = jest.fn().mockResolvedValue(null);
     cacheSet = jest.fn().mockResolvedValue(undefined);
     configGet = jest.fn((key: string, defaultValue?: string) => {
-      if (key === 'SURAT_CARGO_MAX_RETRIES') return '3';
-      if (key === 'SURAT_CARGO_RETRY_BASE_MS') return '1';
-      if (key === 'SURAT_SOAP_TIMEOUT_MS') return '5000';
+      if (key === "SURAT_CARGO_MAX_RETRIES") return "3";
+      if (key === "SURAT_CARGO_RETRY_BASE_MS") return "1";
+      if (key === "SURAT_SOAP_TIMEOUT_MS") return "5000";
       return defaultValue;
     });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SuratCargoService,
-        { provide: SURAT_SOAP_CLIENT, useValue: { callGonderiyiKargoyaGonderYeni: soapCall } },
+        {
+          provide: SURAT_CARRIER_CLIENT,
+          useValue: {
+            supportsBarcode: () => true,
+            callGonderiyiKargoyaGonderYeni: soapCall,
+            callOrtakBarkodOlustur: barcodeCall,
+          },
+        },
         { provide: CacheService, useValue: { get: cacheGet, set: cacheSet } },
         { provide: ConfigService, useValue: { get: configGet } },
       ],
@@ -65,113 +79,128 @@ describe('SuratCargoService', () => {
     service = module.get(SuratCargoService);
   });
 
-  it('returns success only when response is exactly Tamam (trimmed)', async () => {
-    soapCall.mockResolvedValue('Tamam');
+  it("returns success only when response is exactly Tamam (trimmed)", async () => {
+    soapCall.mockResolvedValue("Tamam");
     const r = await service.submitShipmentWithRetry({
-      idempotencyKey: 'k1',
-      correlationId: 'c1',
+      idempotencyKey: "k1",
+      correlationId: "c1",
       payload: basePayload,
     });
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.suratMessage).toBe('Tamam');
+    if (r.ok) expect(r.suratMessage).toBe("Tamam");
     expect(cacheSet).toHaveBeenCalled();
   });
 
-  it('treats non-Tamam string as business failure', async () => {
-    soapCall.mockResolvedValue('Kullanıcı adı veya şifre hatalı');
+  it("treats non-Tamam string as business failure", async () => {
+    soapCall.mockResolvedValue("Kullanıcı adı veya şifre hatalı");
     const r = await service.submitShipmentWithRetry({
-      idempotencyKey: 'k2',
-      correlationId: 'c2',
+      idempotencyKey: "k2",
+      correlationId: "c2",
       payload: basePayload,
     });
     expect(r.ok).toBe(false);
     const b = r as SuratBusinessFailure;
-    expect(b.kind).toBe('business');
-    expect(b.suratMessage).toContain('hatalı');
+    expect(b.kind).toBe("business");
+    expect(b.suratMessage).toContain("hatalı");
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  it('EMPTY_RESPONSE for blank SOAP result', async () => {
-    soapCall.mockResolvedValue('   ');
+  it("EMPTY_RESPONSE for blank SOAP result", async () => {
+    soapCall.mockResolvedValue("   ");
     const r = await service.submitShipmentWithRetry({
-      idempotencyKey: 'k3',
-      correlationId: 'c3',
+      idempotencyKey: "k3",
+      correlationId: "c3",
       payload: basePayload,
     });
     expect(r.ok).toBe(false);
-    expect((r as SuratTechnicalFailure).code).toBe('EMPTY_RESPONSE');
+    expect((r as SuratTechnicalFailure).code).toBe("EMPTY_RESPONSE");
   });
 
-  it('classifies HTTP 500 as HTTP_5XX', async () => {
-    const err = new Error('Internal');
+  it("classifies HTTP 500 as HTTP_5XX", async () => {
+    const err = new Error("Internal");
     (err as any).statusCode = 500;
     soapCall.mockRejectedValue(err);
     const r = await service.submitShipmentWithRetry({
-      idempotencyKey: 'k4b',
-      correlationId: 'c4b',
+      idempotencyKey: "k4b",
+      correlationId: "c4b",
       payload: basePayload,
     });
     expect(r.ok).toBe(false);
-    expect((r as SuratTechnicalFailure).code).toBe('HTTP_5XX');
+    expect((r as SuratTechnicalFailure).code).toBe("HTTP_5XX");
   });
 
-  it('classifies ETIMEDOUT as TIMEOUT', async () => {
-    const err = new Error('timed out');
-    (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+  it("classifies ETIMEDOUT as TIMEOUT", async () => {
+    const err = new Error("timed out");
+    (err as NodeJS.ErrnoException).code = "ETIMEDOUT";
     soapCall.mockRejectedValue(err);
     const r = await service.submitShipmentWithRetry({
-      idempotencyKey: 'k4',
-      correlationId: 'c4',
+      idempotencyKey: "k4",
+      correlationId: "c4",
       payload: basePayload,
     });
     expect(r.ok).toBe(false);
-    expect((r as SuratTechnicalFailure).code).toBe('TIMEOUT');
+    expect((r as SuratTechnicalFailure).code).toBe("TIMEOUT");
   });
 
-  it('returns cached success without calling SOAP again', async () => {
+  it("returns cached success without calling SOAP again", async () => {
     cacheGet.mockResolvedValue({
       ok: true,
-      suratMessage: 'Tamam',
-      correlationId: 'old',
-      idempotencyKey: 'idem',
+      suratMessage: "Tamam",
+      correlationId: "old",
+      idempotencyKey: "idem",
     });
     const r = await service.submitShipmentWithRetry({
-      idempotencyKey: 'idem',
-      correlationId: 'new-corr',
+      idempotencyKey: "idem",
+      correlationId: "new-corr",
       payload: basePayload,
     });
     expect(r.ok).toBe(true);
     expect(soapCall).not.toHaveBeenCalled();
   });
 
-  it('retries technical failure then succeeds', async () => {
+  it("retries technical failure then succeeds", async () => {
     let n = 0;
     soapCall.mockImplementation(async () => {
       n += 1;
       if (n < 2) {
-        const e = new Error('e');
-        (e as NodeJS.ErrnoException).code = 'ECONNRESET';
+        const e = new Error("e");
+        (e as NodeJS.ErrnoException).code = "ECONNRESET";
         throw e;
       }
-      return 'Tamam';
+      return "Tamam";
     });
     const r = await service.submitShipmentWithRetry({
-      idempotencyKey: 'k5',
-      correlationId: 'c5',
+      idempotencyKey: "k5",
+      correlationId: "c5",
       payload: basePayload,
     });
     expect(r.ok).toBe(true);
     expect(soapCall).toHaveBeenCalledTimes(2);
   });
 
-  it('does not retry business failure', async () => {
-    soapCall.mockResolvedValue('Adres eksik');
+  it("does not retry business failure", async () => {
+    soapCall.mockResolvedValue("Adres eksik");
     const r = await service.submitShipmentWithRetry({
-      idempotencyKey: 'k6',
-      correlationId: 'c6',
+      idempotencyKey: "k6",
+      correlationId: "c6",
       payload: basePayload,
     });
     expect(r.ok).toBe(false);
     expect(soapCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("classifies an empty barcode response and retries it only once", async () => {
+    barcodeCall.mockResolvedValue(undefined);
+
+    const result = await service.createShipmentWithBarcode({
+      idempotencyKey: "barcode-empty",
+      correlationId: "barcode-empty",
+      payload: basePayload,
+    });
+
+    expect(result.ok).toBe(false);
+    expect((result as SuratTechnicalFailure).code).toBe("EMPTY_RESPONSE");
+    expect(barcodeCall).toHaveBeenCalledTimes(2);
+    expect(cacheSet).not.toHaveBeenCalled();
   });
 });

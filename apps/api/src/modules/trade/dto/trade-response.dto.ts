@@ -1,4 +1,4 @@
-import { TradeStatus, ShipmentStatus, PaymentStatus } from '@prisma/client';
+import { TradeStatus, ShipmentStatus, PaymentStatus } from "@prisma/client";
 
 export class TradeItemResponseDto {
   id: string;
@@ -17,6 +17,8 @@ export class TradeShipmentResponseDto {
   shipperName: string;
   carrier: string;
   trackingNumber?: string;
+  /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
+  cargoCode?: string;
   status: ShipmentStatus;
   shippedAt?: Date;
   deliveredAt?: Date;
@@ -25,11 +27,13 @@ export class TradeShipmentResponseDto {
 
 export class TradeEscrowShipmentResponseDto {
   id: string;
-  direction: 'to_warehouse' | 'from_warehouse' | 'return' | string;
+  direction: "to_warehouse" | "from_warehouse" | "return" | string;
   senderUserId?: string;
   recipientUserId?: string;
   carrier?: string;
   trackingNumber?: string;
+  /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
+  cargoCode?: string;
   status?: ShipmentStatus;
   shippedAt?: Date;
   deliveredAt?: Date;
@@ -58,36 +62,36 @@ export class TradeDisputeResponseDto {
 export class TradeResponseDto {
   id: string;
   tradeNumber: string;
-  
+
   initiatorId: string;
   initiatorName: string;
   receiverId: string;
   receiverName: string;
-  
+
   status: TradeStatus;
-  
+
   initiatorItems: TradeItemResponseDto[];
   receiverItems: TradeItemResponseDto[];
-  
+
   cashAmount?: number;
   cashPayerId?: string;
   cashCommission?: number;
-  
+
   initiatorMessage?: string;
   receiverMessage?: string;
-  
+
   responseDeadline: Date;
   paymentDeadline?: Date;
   shippingDeadline?: Date;
   confirmationDeadline?: Date;
-  
+
   initiatorShipment?: TradeShipmentResponseDto;
   receiverShipment?: TradeShipmentResponseDto;
   shipments?: TradeEscrowShipmentResponseDto[];
-  
+
   cashPayment?: TradeCashPaymentResponseDto;
   dispute?: TradeDisputeResponseDto;
-  
+
   acceptedAt?: Date;
   completedAt?: Date;
   cancelledAt?: Date;

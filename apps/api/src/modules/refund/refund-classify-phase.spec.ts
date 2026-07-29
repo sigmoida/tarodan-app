@@ -19,6 +19,7 @@ describe('RefundService.classifyOrderPhase', () => {
     {} as any,
     {} as any,
     {} as any,
+    {} as any,
   );
 
   const classify = (order: any): string =>

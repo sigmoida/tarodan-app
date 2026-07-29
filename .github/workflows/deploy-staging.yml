@@ -1,46 +1,59 @@
 name: Deploy Staging
 
-# When CI (ci.yml) succeeds on the development branch, trigger the Coolify
-# staging applications (api/web/admin) via their deploy webhook.
-# The "Auto Deploy" toggle for these apps MUST be OFF in Coolify — deploys are
-# no longer triggered by push, only from here when CI is green.
-#
-# NOTE: workflow_run-triggered workflows only run from the version on the
-# repo's DEFAULT branch. This file must be merged into the default branch,
-# otherwise it never triggers.
-#
-# Required repo secrets:
-#   COOLIFY_URL            -> https://coolify.your-domain.com
-#   COOLIFY_TOKEN          -> Coolify API token (deploy-capable)
-#   COOLIFY_STAGING_UUIDS  -> staging app UUIDs, comma-separated: uuidApi,uuidWeb,uuidAdmin
+# Coolify Auto Deploy must be disabled for the staging API, web and admin
+# resources. This workflow is the only deployment trigger for development.
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: deploy-staging
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
-    name: Trigger Coolify (staging)
-    # Only deploy if CI finished GREEN. Failed/cancelled -> never triggers.
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: Deploy affected staging apps
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      # Triggers the deploy AND waits for the result — a failed Coolify deploy
-      # fails this job, so it shows up as a failed check + GitHub failure email.
-      - name: Deploy to Coolify (staging) and wait
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: affected
+        name: Detect affected applications
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            apps="api,web,admin"
+          else
+            apps="$(node scripts/detect-affected-apps.mjs \
+              --base "$BEFORE_SHA" \
+              --head "$AFTER_SHA" \
+              --format csv)"
+          fi
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+          echo "Affected applications: ${apps:-none}"
+
+      - name: Trigger affected Coolify deployments
+        if: ${{ steps.affected.outputs.apps != '' }}
         uses: ./.github/actions/coolify-deploy
         with:
           coolify-url: ${{ secrets.COOLIFY_URL }}
           coolify-token: ${{ secrets.COOLIFY_TOKEN }}
-          uuids: ${{ secrets.COOLIFY_STAGING_UUIDS }}
-      - name: Report failure
-        if: failure()
-        run: echo "::error::Staging deploy failed — check the logs above (Coolify deployment did not finish successfully)."
+          all-uuids: ${{ secrets.COOLIFY_STAGING_UUIDS }}
+          apps: ${{ steps.affected.outputs.apps }}
+          wait-for-result: "false"
+
+      - name: Skip deployment
+        if: ${{ steps.affected.outputs.apps == '' }}
+        run: echo "No deployable application changed."

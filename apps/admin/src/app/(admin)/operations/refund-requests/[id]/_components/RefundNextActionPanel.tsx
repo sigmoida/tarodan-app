@@ -1,6 +1,9 @@
 "use client";
 
-import { Alert, Button } from "@tarodan/ui";
+import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { Alert, Button, Textarea } from "@tarodan/ui";
+import { fmtTry } from "@/lib/format";
 import {
   InformationCircleIcon,
   ExclamationTriangleIcon,
@@ -8,7 +11,10 @@ import {
   XCircleIcon,
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
-import { guidanceForStatus, type GuidanceVariant } from "../_lib/refund-guidance";
+import {
+  guidanceForStatus,
+  type GuidanceVariant,
+} from "../_lib/refund-guidance";
 
 const VARIANT_ICON: Record<GuidanceVariant, React.ReactNode> = {
   info: <InformationCircleIcon className="h-6 w-6" />,
@@ -18,10 +24,6 @@ const VARIANT_ICON: Record<GuidanceVariant, React.ReactNode> = {
   default: <InformationCircleIcon className="h-6 w-6" />,
 };
 
-function fmtTry(n: number): string {
-  return `₺${n.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`;
-}
-
 export interface RefundNextActionPanelProps {
   status: string;
   reason: string;
@@ -29,6 +31,9 @@ export interface RefundNextActionPanelProps {
   canForceFinalize: boolean;
   finalizing: boolean;
   onFinalize: () => void;
+  reviewing: boolean;
+  onApprove: (note?: string) => void;
+  onReject: (reason: string) => void;
 }
 
 /**
@@ -42,8 +47,13 @@ export function RefundNextActionPanel({
   canForceFinalize,
   finalizing,
   onFinalize,
+  reviewing,
+  onApprove,
+  onReject,
 }: RefundNextActionPanelProps) {
-  const guidance = guidanceForStatus(status);
+  const t = useTranslations();
+  const guidance = guidanceForStatus(t, status);
+  const [reviewNote, setReviewNote] = useState("");
 
   return (
     <div className="space-y-4">
@@ -57,7 +67,9 @@ export function RefundNextActionPanel({
 
           {status === "refunded" && (
             <p className="font-semibold">
-              Alıcıya iade edilen tutar: {fmtTry(amount)}
+              {t("admin.operations.refundRequests.refundedAmountLabel", {
+                amount: fmtTry(amount),
+              })}
             </p>
           )}
 
@@ -69,8 +81,43 @@ export function RefundNextActionPanel({
               disabled={finalizing}
             >
               <BanknotesIcon className="mr-1.5 h-5 w-5" />
-              Para İadesini Tamamla
+              {t("admin.operations.refundRequests.forceFinalizeButton")}
             </Button>
+          )}
+
+          {status === "pending_review" && (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium">
+                {t("admin.operations.refundRequests.reviewNote")}
+              </label>
+              <Textarea
+                value={reviewNote}
+                onChange={(event) =>
+                  setReviewNote(event.target.value.slice(0, 1000))
+                }
+                rows={3}
+                maxLength={1000}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="primary"
+                  onClick={() => onApprove(reviewNote)}
+                  isLoading={reviewing}
+                  disabled={reviewing}
+                >
+                  <CheckCircleIcon className="mr-1.5 h-5 w-5" />
+                  {t("admin.operations.refundRequests.approveButton")}
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => onReject(reviewNote)}
+                  disabled={reviewing || !reviewNote.trim()}
+                >
+                  <XCircleIcon className="mr-1.5 h-5 w-5" />
+                  {t("admin.operations.refundRequests.rejectButton")}
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       </Alert>
@@ -78,12 +125,10 @@ export function RefundNextActionPanel({
       {reason === "counterfeit" && (
         <Alert
           variant="danger"
-          title="Sahte / taklit ürün şikayeti"
+          title={t("admin.operations.refundRequests.counterfeitTitle")}
           icon={<ExclamationTriangleIcon className="h-6 w-6" />}
         >
-          Bu talep sahte ürün gerekçesiyle açıldı. İade onaylandıktan sonra
-          satıcı için yaptırım değerlendirin (uyarı, geçici askı veya fesih) ve
-          satıcının diğer ürünleri için risk incelemesi yapın.
+          {t("admin.operations.refundRequests.counterfeitBody")}
         </Alert>
       )}
     </div>

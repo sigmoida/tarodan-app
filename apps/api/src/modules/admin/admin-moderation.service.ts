@@ -3,12 +3,18 @@ import {
   NotFoundException,
   BadRequestException,
   Optional,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { ModerationAiClient } from '../moderation/moderation-ai.client';
-import { AdminAuditService } from './admin-audit.service';
-import { ProductStatus, Prisma } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { AdminAuditService } from "./admin-audit.service";
+import { ProductStatus, Prisma, type ModerationEvent } from "@prisma/client";
+import {
+  buildSearchWhere,
+  paginate,
+  paginateComputedRows,
+  resolveOrderBy,
+} from "../../common/list";
 
 /**
  * Moderasyon kuyruğu + AI denetim araçları — AdminService'in
@@ -27,19 +33,30 @@ export class AdminModerationService {
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
     // Strip expired presigned S3 query params to get the clean public URL
-    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+    if (
+      (imageKeyOrUrl.startsWith("http://") ||
+        imageKeyOrUrl.startsWith("https://")) &&
+      imageKeyOrUrl.includes("X-Amz-Signature")
+    ) {
       try {
         const parsed = new URL(imageKeyOrUrl);
-        parsed.search = '';
+        parsed.search = "";
         return parsed.toString();
       } catch {
         // fall through
       }
     }
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
       return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
@@ -65,18 +82,18 @@ export class AdminModerationService {
     let totalCount = 0;
 
     // Get pending products if type is 'product' or all
-    if (!type || type === 'product') {
+    if (!type || type === "product") {
       const [products, productCount] = await Promise.all([
         this.prisma.product.findMany({
           where: { status: ProductStatus.pending },
           include: {
             seller: { select: { id: true, displayName: true, email: true } },
             category: { select: { id: true, name: true } },
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
-          orderBy: { createdAt: 'asc' },
-          skip: type === 'product' ? skip : 0,
-          take: type === 'product' ? pageSize : 10,
+          orderBy: { createdAt: "asc" },
+          skip: type === "product" ? skip : 0,
+          take: type === "product" ? pageSize : 10,
         }),
         this.prisma.product.count({ where: { status: ProductStatus.pending } }),
       ]);
@@ -84,15 +101,15 @@ export class AdminModerationService {
       items.push(
         ...products.map((p) => ({
           id: p.id,
-          type: 'product',
+          type: "product",
           title: p.title,
-          description: p.description?.substring(0, 200) || '',
+          description: p.description?.substring(0, 200) || "",
           imageUrl: this.resolveProductImageUrl(p.images[0]?.cardKey) || null,
           price: Number(p.price),
           seller: p.seller,
-          category: p.category?.name || 'Kategorisiz',
+          category: p.category?.name || "Kategorisiz",
           createdAt: p.createdAt,
-          status: 'pending',
+          status: "pending",
           // AI moderasyon sonuçları (null = henüz denetlenmedi)
           aiCheckStatus: p.aiCheckStatus,
           aiRelevanceScore: p.aiRelevanceScore,
@@ -104,38 +121,38 @@ export class AdminModerationService {
     }
 
     // Get pending approval messages if type is 'message' or all
-    if (!type || type === 'message') {
+    if (!type || type === "message") {
       const [messages, messageCount] = await Promise.all([
         this.prisma.message.findMany({
-          where: { status: 'pending_approval' },
+          where: { status: "pending_approval" },
           include: {
             sender: { select: { id: true, displayName: true, email: true } },
             thread: { select: { id: true } },
           },
-          orderBy: { createdAt: 'asc' },
-          skip: type === 'message' ? skip : 0,
-          take: type === 'message' ? pageSize : 10,
+          orderBy: { createdAt: "asc" },
+          skip: type === "message" ? skip : 0,
+          take: type === "message" ? pageSize : 10,
         }),
-        this.prisma.message.count({ where: { status: 'pending_approval' } }),
+        this.prisma.message.count({ where: { status: "pending_approval" } }),
       ]);
 
       items.push(
         ...messages.map((m) => ({
           id: m.id,
-          type: 'message',
+          type: "message",
           title: `Mesaj #${m.id.substring(0, 8)}`,
-          description: m.content?.substring(0, 200) || '',
+          description: m.content?.substring(0, 200) || "",
           sender: m.sender,
           threadId: m.threadId,
           createdAt: m.createdAt,
-          status: 'pending_approval',
+          status: "pending_approval",
         })),
       );
       totalCount += messageCount;
     }
 
     // Get reviews with comments if type is 'review' or all
-    if (!type || type === 'review') {
+    if (!type || type === "review") {
       const [reviews, reviewCount] = await Promise.all([
         this.prisma.rating.findMany({
           where: {
@@ -145,9 +162,9 @@ export class AdminModerationService {
             giver: { select: { id: true, displayName: true, email: true } },
             receiver: { select: { id: true, displayName: true, email: true } },
           },
-          orderBy: { createdAt: 'desc' },
-          skip: type === 'review' ? skip : 0,
-          take: type === 'review' ? pageSize : 10,
+          orderBy: { createdAt: "desc" },
+          skip: type === "review" ? skip : 0,
+          take: type === "review" ? pageSize : 10,
         }),
         this.prisma.rating.count({
           where: {
@@ -159,21 +176,24 @@ export class AdminModerationService {
       items.push(
         ...reviews.map((r) => ({
           id: r.id,
-          type: 'review',
+          type: "review",
           title: `Değerlendirme: ${r.score}/5`,
-          description: r.comment?.substring(0, 200) || 'Yorum yok',
+          description: r.comment?.substring(0, 200) || "Yorum yok",
           score: r.score,
           reviewer: r.giver,
           reviewed: r.receiver,
           createdAt: r.createdAt,
-          status: 'active',
+          status: "active",
         })),
       );
       // Don't add to totalCount if already filtered
     }
 
     // Sort by createdAt
-    items.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    items.sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
 
     return {
       data: type ? items : items.slice(0, pageSize),
@@ -190,27 +210,23 @@ export class AdminModerationService {
    * Get moderation statistics
    */
   async getModerationStats() {
-    const [
-      pendingProducts,
-      pendingMessages,
-      recentReviews,
-      flaggedUsers,
-    ] = await Promise.all([
-      this.prisma.product.count({ where: { status: ProductStatus.pending } }),
-      this.prisma.message.count({ where: { status: 'pending_approval' } }),
-      this.prisma.rating.count({
-        where: {
-          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-        },
-      }),
-      // Count users with warnings (using audit log for ban actions)
-      this.prisma.auditLog.count({
-        where: {
-          action: { in: ['user_warn', 'user_flag'] },
-          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-        },
-      }),
-    ]);
+    const [pendingProducts, pendingMessages, recentReviews, flaggedUsers] =
+      await Promise.all([
+        this.prisma.product.count({ where: { status: ProductStatus.pending } }),
+        this.prisma.message.count({ where: { status: "pending_approval" } }),
+        this.prisma.rating.count({
+          where: {
+            createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          },
+        }),
+        // Count users with warnings (using audit log for ban actions)
+        this.prisma.auditLog.count({
+          where: {
+            action: { in: ["user_warn", "user_flag"] },
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+          },
+        }),
+      ]);
 
     return {
       pendingProducts,
@@ -238,9 +254,9 @@ export class AdminModerationService {
         where,
         include: {
           seller: { select: { id: true, displayName: true, email: true } },
-          images: { take: 1, orderBy: { sortOrder: 'asc' } },
+          images: { take: 1, orderBy: { sortOrder: "asc" } },
         },
-        orderBy: { aiCheckedAt: 'desc' },
+        orderBy: { aiCheckedAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -276,16 +292,13 @@ export class AdminModerationService {
     kind?: string;
     page?: number;
     pageSize?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
   }) {
-    const {
-      entityType,
-      entityId,
-      userId,
-      decision,
-      kind,
-      page = 1,
-      pageSize = 20,
-    } = options;
+    const { entityType, entityId, userId, decision, kind, search } = options;
     const where: Prisma.ModerationEventWhereInput = {
       ...(entityType ? { entityType } : {}),
       ...(entityId ? { entityId } : {}),
@@ -293,29 +306,94 @@ export class AdminModerationService {
       ...(decision ? { decision } : {}),
       ...(kind ? { kind } : {}),
     };
-    const [rows, total] = await Promise.all([
-      this.prisma.moderationEvent.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      this.prisma.moderationEvent.count({ where }),
-    ]);
+
+    if (search?.trim()) {
+      const term = search.trim();
+      const users = await this.prisma.user.findMany({
+        where: {
+          OR: [
+            { displayName: { contains: term, mode: "insensitive" } },
+            { email: { contains: term, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true },
+      });
+      const scalarSearch = buildSearchWhere(term, [
+        "entityType",
+        "entityId",
+        "kind",
+        "field",
+        "decision",
+        "reason",
+      ]);
+      where.OR = [
+        ...((scalarSearch?.OR ?? []) as Prisma.ModerationEventWhereInput[]),
+        ...(users.length
+          ? [{ userId: { in: users.map(({ id }) => id) } }]
+          : []),
+      ];
+    }
+
+    const listQuery = {
+      ...options,
+      limit: options.limit ?? options.pageSize,
+    };
+    let users: Array<{ id: string; displayName: string; email: string }> = [];
+    let usersLoaded = false;
+    let result;
+    if (options.sortBy === "user.displayName") {
+      const allEvents = await this.prisma.moderationEvent.findMany({ where });
+      const allUserIds = [
+        ...new Set(
+          allEvents
+            .map((event) => event.userId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+      users = await this.prisma.user.findMany({
+        where: { id: { in: allUserIds } },
+        select: { id: true, displayName: true, email: true },
+      });
+      usersLoaded = true;
+      const names = new Map(
+        users.map((user) => [user.id, user.displayName || user.email]),
+      );
+      result = paginateComputedRows(
+        allEvents,
+        (event) => (event.userId ? names.get(event.userId) : undefined),
+        { ...listQuery, sortType: "text" },
+      );
+    } else {
+      const orderBy =
+        resolveOrderBy<Prisma.ModerationEventOrderByWithRelationInput>(
+          "ModerationEvent",
+          options,
+          { defaultSort: { createdAt: "desc" } },
+        );
+      result = await paginate(
+        this.prisma.moderationEvent,
+        { where, orderBy },
+        listQuery,
+      );
+    }
+    const rows = result.data as ModerationEvent[];
 
     // Aktör (içeriği üreten) kullanıcı bilgisini tek sorguda zenginleştir
     const userIds = [
       ...new Set(rows.map((r) => r.userId).filter((x): x is string => !!x)),
     ];
-    const users = userIds.length
-      ? await this.prisma.user.findMany({
-          where: { id: { in: userIds } },
-          select: { id: true, displayName: true, email: true },
-        })
-      : [];
+    if (!usersLoaded) {
+      users = userIds.length
+        ? await this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, displayName: true, email: true },
+          })
+        : [];
+    }
     const userMap = new Map(users.map((u) => [u.id, u]));
 
     return {
+      ...result,
       data: rows.map((r) => ({
         id: r.id,
         entityType: r.entityType,
@@ -331,7 +409,6 @@ export class AdminModerationService {
         labels: r.labels,
         createdAt: r.createdAt,
       })),
-      meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
     };
   }
 
@@ -340,19 +417,19 @@ export class AdminModerationService {
    */
   async testImageModeration(imageUrl: string) {
     if (!imageUrl) {
-      throw new BadRequestException('imageUrl gerekli');
+      throw new BadRequestException("imageUrl gerekli");
     }
     if (!this.moderationAi.isEnabled) {
       return {
         enabled: false,
-        message: 'AI moderasyon kapalı (AI_MODERATION_ENABLED=false)',
+        message: "AI moderasyon kapalı (AI_MODERATION_ENABLED=false)",
       };
     }
     const result = await this.moderationAi.moderateImage(imageUrl);
     if (!result) {
       return {
         enabled: true,
-        error: 'AI servisine erişilemedi ya da görsel indirilemedi',
+        error: "AI servisine erişilemedi ya da görsel indirilemedi",
       };
     }
     return { enabled: true, ...result };
@@ -374,14 +451,14 @@ export class AdminModerationService {
   /** AI eşiklerini güncelle (canlı + kalıcı config.json). */
   async setAiConfig(relevanceThreshold?: number, nsfwThreshold?: number) {
     if (!this.moderationAi.isEnabled) {
-      throw new BadRequestException('AI moderasyon kapalı');
+      throw new BadRequestException("AI moderasyon kapalı");
     }
     const cfg = await this.moderationAi.setConfig({
       relevanceThreshold,
       nsfwThreshold,
     });
     if (!cfg) {
-      throw new BadRequestException('AI servisine erişilemedi');
+      throw new BadRequestException("AI servisine erişilemedi");
     }
     return { enabled: true, ...cfg };
   }
@@ -396,57 +473,78 @@ export class AdminModerationService {
     notes?: string,
   ) {
     switch (type) {
-      case 'product':
+      case "product":
         const product = await this.prisma.product.findUnique({
           where: { id: itemId },
         });
-        if (!product) throw new NotFoundException('Ürün bulunamadı');
+        if (!product) throw new NotFoundException("Ürün bulunamadı");
 
         await this.prisma.product.update({
           where: { id: itemId },
           data: { status: ProductStatus.active },
         });
 
-        await this.audit.createAuditLog(adminId, 'moderation_approve', 'Product', itemId, product, {
-          status: 'active',
-          notes,
-        });
+        await this.audit.createAuditLog(
+          adminId,
+          "moderation_approve",
+          "Product",
+          itemId,
+          product,
+          {
+            status: "active",
+            notes,
+          },
+        );
         break;
 
-      case 'message':
+      case "message":
         const message = await this.prisma.message.findUnique({
           where: { id: itemId },
         });
-        if (!message) throw new NotFoundException('Mesaj bulunamadı');
+        if (!message) throw new NotFoundException("Mesaj bulunamadı");
 
         await this.prisma.message.update({
           where: { id: itemId },
           data: {
-            status: 'approved',
+            status: "approved",
             reviewedById: adminId,
             reviewedAt: new Date(),
           },
         });
 
-        await this.audit.createAuditLog(adminId, 'moderation_approve', 'Message', itemId, message, {
-          status: 'approved',
-          notes,
-        });
+        await this.audit.createAuditLog(
+          adminId,
+          "moderation_approve",
+          "Message",
+          itemId,
+          message,
+          {
+            status: "approved",
+            notes,
+          },
+        );
         break;
 
-      case 'review':
+      case "review":
         // Reviews are approved by default, this marks them as "verified"
-        await this.audit.createAuditLog(adminId, 'moderation_approve', 'Rating', itemId, null, {
-          verified: true,
-          notes,
-        });
+        await this.audit.createAuditLog(
+          adminId,
+          "moderation_approve",
+          "Rating",
+          itemId,
+          null,
+          {
+            verified: true,
+            notes,
+          },
+        );
         break;
 
       default:
-        throw new BadRequestException('Geçersiz moderasyon türü');
+        throw new BadRequestException("Geçersiz moderasyon türü");
     }
 
-    return { success: true, type, id: itemId, action: 'approved' };
+    return { success: true, type, id: itemId, action: "approved" };
   }
 
   /**
@@ -460,72 +558,93 @@ export class AdminModerationService {
     notes?: string,
   ) {
     switch (type) {
-      case 'product':
+      case "product":
         const product = await this.prisma.product.findUnique({
           where: { id: itemId },
         });
-        if (!product) throw new NotFoundException('Ürün bulunamadı');
+        if (!product) throw new NotFoundException("Ürün bulunamadı");
 
         await this.prisma.product.update({
           where: { id: itemId },
           data: { status: ProductStatus.rejected },
         });
 
-        await this.audit.createAuditLog(adminId, 'moderation_reject', 'Product', itemId, product, {
-          status: 'rejected',
-          reason,
-          notes,
-        });
+        await this.audit.createAuditLog(
+          adminId,
+          "moderation_reject",
+          "Product",
+          itemId,
+          product,
+          {
+            status: "rejected",
+            reason,
+            notes,
+          },
+        );
         break;
 
-      case 'message':
+      case "message":
         const messageToReject = await this.prisma.message.findUnique({
           where: { id: itemId },
         });
-        if (!messageToReject) throw new NotFoundException('Mesaj bulunamadı');
+        if (!messageToReject) throw new NotFoundException("Mesaj bulunamadı");
 
         // Mark as rejected and hide content
         await this.prisma.message.update({
           where: { id: itemId },
           data: {
-            status: 'rejected',
-            filteredContent: '[Bu mesaj moderatör tarafından kaldırıldı]',
+            status: "rejected",
+            filteredContent: "[Bu mesaj moderatör tarafından kaldırıldı]",
             flaggedReason: reason,
             reviewedById: adminId,
             reviewedAt: new Date(),
           },
         });
 
-        await this.audit.createAuditLog(adminId, 'moderation_reject', 'Message', itemId, messageToReject, {
-          status: 'rejected',
-          reason,
-          notes,
-        });
+        await this.audit.createAuditLog(
+          adminId,
+          "moderation_reject",
+          "Message",
+          itemId,
+          messageToReject,
+          {
+            status: "rejected",
+            reason,
+            notes,
+          },
+        );
         break;
 
-      case 'review':
+      case "review":
         const review = await this.prisma.rating.findUnique({
           where: { id: itemId },
         });
-        if (!review) throw new NotFoundException('Değerlendirme bulunamadı');
+        if (!review) throw new NotFoundException("Değerlendirme bulunamadı");
 
         // Delete the review
         await this.prisma.rating.delete({
           where: { id: itemId },
         });
 
-        await this.audit.createAuditLog(adminId, 'moderation_reject', 'Rating', itemId, review, {
-          deleted: true,
-          reason,
-          notes,
-        });
+        await this.audit.createAuditLog(
+          adminId,
+          "moderation_reject",
+          "Rating",
+          itemId,
+          review,
+          {
+            deleted: true,
+            reason,
+            notes,
+          },
+        );
         break;
 
       default:
-        throw new BadRequestException('Geçersiz moderasyon türü');
+        throw new BadRequestException("Geçersiz moderasyon türü");
     }
 
-    return { success: true, type, id: itemId, action: 'rejected', reason };
+    return { success: true, type, id: itemId, action: "rejected", reason };
   }
 
   /**
@@ -538,12 +657,26 @@ export class AdminModerationService {
     reason: string,
     priority?: string,
   ) {
-    await this.audit.createAuditLog(adminId, 'moderation_flag', type, itemId, null, {
-      flagged: true,
-      reason,
-      priority: priority || 'normal',
-    });
+    await this.audit.createAuditLog(
+      adminId,
+      "moderation_flag",
+      type,
+      itemId,
+      null,
+      {
+        flagged: true,
+        reason,
+        priority: priority || "normal",
+      },
+    );
 
-    return { success: true, type, id: itemId, action: 'flagged', reason, priority };
+    return {
+      success: true,
+      type,
+      id: itemId,
+      action: "flagged",
+      reason,
+      priority,
+    };
   }
 }

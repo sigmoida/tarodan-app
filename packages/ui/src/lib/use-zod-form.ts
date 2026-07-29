@@ -1,8 +1,12 @@
-'use client';
+"use client";
 
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type UseFormProps, type UseFormReturn } from 'react-hook-form';
-import type { z } from 'zod';
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  useForm,
+  type UseFormProps,
+  type UseFormReturn,
+} from "react-hook-form";
+import type { z } from "zod";
 
 /**
  * `useForm` pre-wired with a zod schema. Form values (and their types) are
@@ -10,9 +14,11 @@ import type { z } from 'zod';
  */
 export function useZodForm<Schema extends z.ZodType>(
   schema: Schema,
-  options?: Omit<UseFormProps<z.input<Schema>>, 'resolver'>,
+  options?: Omit<UseFormProps<z.input<Schema>>, "resolver">,
 ): UseFormReturn<z.input<Schema>> {
   return useForm<z.input<Schema>>({
+    mode: "onTouched",
+    shouldFocusError: true,
     ...options,
     resolver: zodResolver(schema),
   });

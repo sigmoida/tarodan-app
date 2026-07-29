@@ -1,110 +1,152 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Alert, Button } from '@tarodan/ui';
-import { PlusIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { adminApi } from '@/lib/api';
-import { extractList } from '@/lib/extract';
-import { AdminPage } from '@/components/page/AdminPage';
-import { PageLoading } from '@/components/PageLoading';
-import { PageHeader } from '@/components/AdminList';
-import { useConfirm } from '@/provider/ConfirmProvider';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { CommissionSummary } from './_components/CommissionSummary';
-import { TradeRateCard } from './_components/TradeRateCard';
-import { CommissionTable } from './_components/CommissionTable';
-import { CommissionRuleFormModal } from './_modals/CommissionRuleFormModal';
-import { type CommissionRule, isDefaultRule } from './_lib/types';
+import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { Alert, Button } from "@tarodan/ui";
+import {
+  PlusIcon,
+  InformationCircleIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+import { adminApi } from "@/lib/api";
+import { extractList } from "@/lib/extract";
+import { clientListFetcher } from "@/lib/query/client-list";
+import { ResourceList, useResourceList } from "@/components/list";
+import { useConfirm } from "@/provider/ConfirmProvider";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { CommissionSummary } from "./_components/CommissionSummary";
+import { TradeRateCard } from "./_components/TradeRateCard";
+import { CommissionTable } from "./_components/CommissionTable";
+import { CommissionRuleFormModal } from "./_modals/CommissionRuleFormModal";
+import { type CommissionRule, isDefaultRule } from "./_lib/types";
 
-export default function CommissionPage() {
-  const confirm = useConfirm();
-  const [modal, setModal] = useState<{ rule?: CommissionRule } | null>(null);
+// Full-load (client-side sort/search/pagination): commission rules are a small,
+// bounded config set, so we fetch all and paginate in memory. Revisit (move to
+// the server contract) only if the ruleset ever grows large (#383).
+const commissionRulesFetcher = clientListFetcher<CommissionRule>(
+  () => adminApi.getCommissionRules(),
+  (raw) => extractList<CommissionRule>(raw),
+);
 
-  const { data: rules = [], isLoading } = useQuery<CommissionRule[]>({
-    queryKey: ['commission-rules'],
-    queryFn: async () => extractList<CommissionRule>(await adminApi.getCommissionRules()),
-  });
-
-  const toggle = useAdminMutation(
-    (rule: CommissionRule) => adminApi.updateCommissionRule(rule.id, { isActive: !rule.isActive }),
-    { invalidates: ['commission-rules'], successMessage: 'Kural durumu güncellendi' },
-  );
-
-  const remove = useAdminMutation((id: string) => adminApi.deleteCommissionRule(id), {
-    invalidates: ['commission-rules'],
-    successMessage: 'Komisyon kuralı silindi',
-  });
-
-  const onDelete = async (rule: CommissionRule) => {
-    if (
-      await confirm({
-        title: 'Kuralı Sil',
-        description: 'Bu komisyon kuralını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
-        confirmLabel: 'Sil',
-        destructive: true,
-      })
-    )
-      remove.mutate(rule.id);
-  };
-
-  const hasDefaultRule = rules.some(isDefaultRule);
+function CommissionRulesContent({
+  onEdit,
+  onDelete,
+  onToggle,
+  togglingId,
+}: {
+  onEdit: (rule: CommissionRule) => void;
+  onDelete: (rule: CommissionRule) => void;
+  onToggle: (rule: CommissionRule) => void;
+  togglingId?: string;
+}) {
+  const t = useTranslations();
+  const { rows } = useResourceList<CommissionRule>();
+  const hasDefaultRule = rows.some(isDefaultRule);
 
   return (
-    <AdminPage>
-      <PageHeader title="Komisyon Yönetimi" description="Platform komisyon oranlarını yönetin">
-        <Button leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setModal({})}>
-          Yeni Kural Ekle
-        </Button>
-      </PageHeader>
-
-      <CommissionSummary />
-
-      <Alert
-        variant="info"
-        title="Komisyon Hesaplama"
-        icon={<InformationCircleIcon className="h-5 w-5" />}
-      >
-        Komisyon kuralları eşleşme sırasına göre değerlendirilir. Bir sipariş için ilk eşleşen
-        kural uygulanır. Eşleşme sırası: Kategori + Satıcı Tipi &gt; Kategori + Tümü &gt; Satıcı
-        Tipi &gt; Varsayılan (Tümü + Tümü). Aynı kombinasyon (kategori + satıcı tipi) için sadece
-        bir kural oluşturulabilir.
-      </Alert>
-
-      <TradeRateCard />
-
+    <>
       {!hasDefaultRule && (
         <Alert
           variant="warning"
-          title="Varsayılan komisyon kuralı tanımlı değil"
+          title={t("admin.finance.commission.defaultMissingTitle")}
           icon={<ExclamationTriangleIcon className="h-5 w-5" />}
         >
-          Eşleşen kural olmayan siparişler 0 komisyon ile oluşturulacaktır. Checkout ve ödeme akışı
-          etkilenmez. İsterseniz &quot;Kategori: Tümü&quot; ve &quot;Satıcı Tipi: Tümü&quot; ile bir
-          varsayılan kural ekleyebilirsiniz.
+          {t("admin.finance.commission.defaultMissingDescription")}
         </Alert>
       )}
+      <CommissionTable
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onToggle={onToggle}
+        togglingId={togglingId}
+      />
+    </>
+  );
+}
 
-      {isLoading ? (
-        <PageLoading />
-      ) : (
-        <CommissionTable
-          rules={rules}
-          onEdit={(rule) => setModal({ rule })}
-          onDelete={onDelete}
-          onToggle={(rule) => toggle.mutate(rule)}
-          togglingId={toggle.isPending ? toggle.variables?.id : undefined}
-        />
-      )}
+export default function CommissionPage() {
+  const t = useTranslations();
+  const confirm = useConfirm();
+  const [modal, setModal] = useState<{ rule?: CommissionRule } | null>(null);
+
+  const toggle = useAdminMutation(
+    (rule: CommissionRule) =>
+      adminApi.updateCommissionRule(rule.id, { isActive: !rule.isActive }),
+    {
+      invalidates: ["commission-rules"],
+      successMessage: t("admin.finance.commission.ruleStatusUpdated"),
+      optimistic: {
+        resources: "commission-rules",
+        id: (rule) => rule.id,
+        patch: (rule) => ({ isActive: !rule.isActive }),
+      },
+    },
+  );
+  const remove = useAdminMutation(
+    (id: string) => adminApi.deleteCommissionRule(id),
+    {
+      invalidates: ["commission-rules"],
+      successMessage: t("admin.finance.commission.ruleDeleted"),
+    },
+  );
+
+  const onDelete = async (rule: CommissionRule) => {
+    await confirm({
+      title: t("admin.finance.commission.deleteRule"),
+      description: t("admin.finance.commission.deleteRuleDescription"),
+      confirmLabel: t("common.delete"),
+      destructive: true,
+      onConfirm: () => remove.mutateAsync(rule.id),
+    });
+  };
+
+  return (
+    <ResourceList<CommissionRule>
+      resource="commission-rules"
+      fetcher={commissionRulesFetcher}
+      getRowId={(rule) => rule.id}
+      syncUrl
+    >
+      <ResourceList.Header
+        title={t("admin.finance.commission.title")}
+        description={t("admin.finance.commission.subtitle")}
+        actions={
+          <Button
+            leftIcon={<PlusIcon className="h-5 w-5" />}
+            onClick={() => setModal({})}
+          >
+            {t("admin.finance.commission.newRule")}
+          </Button>
+        }
+      />
+      <CommissionSummary />
+      <Alert
+        variant="info"
+        title={t("admin.finance.commission.calculationTitle")}
+        icon={<InformationCircleIcon className="h-5 w-5" />}
+      >
+        {t("admin.finance.commission.calculationDescription")}
+      </Alert>
+      <TradeRateCard />
+      <ResourceList.Toolbar>
+        <ResourceList.Search />
+      </ResourceList.Toolbar>
+      <CommissionRulesContent
+        onEdit={(rule) => setModal({ rule })}
+        onDelete={onDelete}
+        onToggle={(rule) => toggle.mutate(rule)}
+        togglingId={toggle.isPending ? toggle.variables?.id : undefined}
+      />
+      <ResourceList.Pagination />
 
       {modal && (
         <CommissionRuleFormModal
-          key={modal.rule?.id ?? 'new'}
+          key={modal.rule?.id ?? "new"}
           open
           onClose={() => setModal(null)}
           rule={modal.rule}
         />
       )}
-    </AdminPage>
+    </ResourceList>
   );
 }

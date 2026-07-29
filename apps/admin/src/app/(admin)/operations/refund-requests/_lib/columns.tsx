@@ -1,10 +1,15 @@
+import Image from "next/image";
+import { useTranslations } from "next-intl";
 import {
   Badge,
   enumLabel,
   refundReasonConfig,
   refundRequestStatusConfig,
-} from '@tarodan/ui';
-import { col, TruncatedText } from '@/components/table';
+  shipmentStatusConfig,
+} from "@tarodan/ui";
+import { col, TruncatedText } from "@/components/table";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface RefundRequestRow {
   id: string;
@@ -13,6 +18,9 @@ export interface RefundRequestRow {
   amount: number | string;
   reason: string;
   createdAt: string;
+  returnStatus?: string | null;
+  returnTrackingNumber?: string | null;
+  refundedAt?: string | null;
   requester: { id: string; displayName: string; email: string };
   order: {
     id: string;
@@ -23,49 +31,106 @@ export interface RefundRequestRow {
   };
 }
 
-export const refundRequestColumns = [
-  col.link<RefundRequestRow>('İade No', (r) => ({
-    href: `/operations/refund-requests/${r.id}`,
-    label: r.refundNumber,
-  })),
-  col.link<RefundRequestRow>('Sipariş', (r) => ({
-    href: `/operations/orders/${r.order.id}`,
-    label: r.order.orderNumber,
-  })),
+export const refundRequestColumns = (t: T) => [
+  col.link<RefundRequestRow>(
+    t("admin.operations.common.refundNumber"),
+    (r) => ({
+      href: `/operations/refund-requests/${r.id}`,
+      label: r.refundNumber,
+    }),
+    { sortKey: "refundNumber", sortType: "text" },
+  ),
+  col.link<RefundRequestRow>(
+    t("admin.operations.common.order"),
+    (r) => ({
+      href: `/operations/orders/${r.order.id}`,
+      label: r.order.orderNumber,
+    }),
+    { sortKey: "order.orderNumber" },
+  ),
   col.custom<RefundRequestRow>(
-    'Ürün',
+    t("admin.catalog.common.product"),
     (r) => {
       const img = r.order.product.images?.[0]?.url;
       return (
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-alt">
             {img ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={img} alt={r.order.product.title} className="h-full w-full object-cover" />
+              <Image
+                src={img}
+                alt={r.order.product.title}
+                width={40}
+                height={40}
+                className="h-full w-full object-cover"
+              />
             ) : (
               <span className="text-base">📦</span>
             )}
           </div>
-          <TruncatedText className="text-body">{r.order.product.title}</TruncatedText>
+          <TruncatedText className="text-body">
+            {r.order.product.title}
+          </TruncatedText>
         </div>
       );
     },
-    { grow: 3, minWidth: 180 },
+    { grow: 3, minWidth: 180, sortKey: "order.product.title" },
   ),
-  col.user<RefundRequestRow>('Alıcı', (r) => ({
-    name: r.requester?.displayName,
-    secondary: r.requester?.email,
-  })),
-  col.user<RefundRequestRow>('Satıcı', (r) => ({
-    name: r.order?.seller?.displayName,
-    secondary: r.order?.seller?.email,
-  })),
-  col.money<RefundRequestRow>('Tutar', (r) => r.amount),
-  col.text<RefundRequestRow>('Sebep', (r) => enumLabel(refundReasonConfig, r.reason, r.reason), {
-    grow: 2,
-  }),
-  col.badge<RefundRequestRow>('Durum', (r) => (
-    <Badge status={r.status} config={refundRequestStatusConfig} />
-  )),
-  col.date<RefundRequestRow>('Oluşturma', (r) => r.createdAt),
+  col.user<RefundRequestRow>(
+    t("admin.operations.common.buyer"),
+    (r) => ({
+      name: r.requester?.displayName,
+      secondary: r.requester?.email,
+    }),
+    { sortKey: "requester.displayName" },
+  ),
+  col.id<RefundRequestRow>(
+    t("admin.operations.common.buyerId"),
+    (r) => r.requester?.id,
+  ),
+  col.user<RefundRequestRow>(
+    t("admin.operations.common.seller"),
+    (r) => ({
+      name: r.order?.seller?.displayName,
+      secondary: r.order?.seller?.email,
+    }),
+    { sortKey: "order.seller.displayName" },
+  ),
+  col.id<RefundRequestRow>(
+    t("admin.operations.common.sellerId"),
+    (r) => r.order?.seller?.id,
+  ),
+  col.money<RefundRequestRow>(t("common.amount"), "amount"),
+  col.text<RefundRequestRow>(
+    t("admin.operations.refundRequests.reason"),
+    (r) => enumLabel(refundReasonConfig, r.reason, r.reason),
+    {
+      grow: 2,
+      sortKey: "reason",
+      sortType: "text",
+    },
+  ),
+  col.badge<RefundRequestRow>(
+    t("common.status"),
+    (r) => <Badge status={r.status} config={refundRequestStatusConfig} />,
+    { sortKey: "status", sortType: "text" },
+  ),
+  col.badge<RefundRequestRow>(t("admin.operations.common.cargoStatus"), (r) =>
+    r.returnStatus ? (
+      <Badge status={r.returnStatus} config={shipmentStatusConfig} />
+    ) : (
+      <span className="text-subtle">—</span>
+    ),
+  ),
+  col.code<RefundRequestRow>(
+    t("admin.operations.common.trackingNumber"),
+    (r) => r.returnTrackingNumber ?? undefined,
+  ),
+  col.date<RefundRequestRow>(
+    t("admin.operations.common.createdAt"),
+    "createdAt",
+  ),
+  col.date<RefundRequestRow>(
+    t("admin.operations.common.completedAt"),
+    (r) => r.refundedAt,
+  ),
 ];

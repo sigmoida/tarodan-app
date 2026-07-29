@@ -2,8 +2,8 @@
  * Sentry Service
  * Provides methods for error tracking and custom event logging
  */
-import { Injectable } from '@nestjs/common';
-import * as Sentry from '@sentry/node';
+import { Injectable } from "@nestjs/common";
+import * as Sentry from "@sentry/node";
 
 @Injectable()
 export class SentryService {
@@ -24,7 +24,7 @@ export class SentryService {
   /**
    * Capture a message
    */
-  captureMessage(message: string, level: Sentry.SeverityLevel = 'info') {
+  captureMessage(message: string, level: Sentry.SeverityLevel = "info") {
     Sentry.captureMessage(message, level);
   }
 
@@ -59,15 +59,19 @@ export class SentryService {
   /**
    * Start a transaction for performance monitoring
    */
-  startTransaction(name: string, op: string): Sentry.Transaction {
-    return Sentry.startTransaction({ name, op });
+  startTransaction(name: string, op: string): Sentry.Span {
+    return Sentry.startInactiveSpan({ name, op, forceTransaction: true });
   }
 
   /**
    * Create a span within a transaction
    */
-  startSpan(transaction: Sentry.Transaction, op: string, description: string) {
-    return transaction.startChild({ op, description });
+  startSpan(transaction: Sentry.Span, op: string, description: string) {
+    return Sentry.startInactiveSpan({
+      name: description,
+      op,
+      parentSpan: transaction,
+    });
   }
 
   /**

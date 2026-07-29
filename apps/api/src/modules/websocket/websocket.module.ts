@@ -8,11 +8,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../../prisma';
 import { TarodanWebSocketGateway } from './websocket.gateway';
 import { RealtimeService } from './realtime.service';
+import { SecurityModule } from '../security/security.module';
 
 @Module({
   imports: [
     PrismaModule,
     ConfigModule,
+    SecurityModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

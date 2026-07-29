@@ -1,91 +1,240 @@
-import { Badge } from '@tarodan/ui';
-import { col, CellCode, Empty, type RowActionItem } from '@/components/table';
-import { shipmentStatusConfig, legLabels, formatRelative } from '../_shared';
+import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Badge, shipmentStatusConfig } from "@tarodan/ui";
+import {
+  col,
+  CellCode,
+  Empty,
+  TruncatedText,
+  type RowActionItem,
+} from "@/components/table";
+import { legLabel, formatRelative } from "../_shared";
 import type {
-  OrderShipmentRow,
+  PhysicalShipmentRow,
   ReturnShipmentRow,
   TradeShipmentRow,
   SuratShipmentRow,
-} from './types';
+} from "./types";
 
-export const orderShipmentColumns = [
-  col.link<OrderShipmentRow>('Sipariş', (r) =>
-    r.order ? { href: `/operations/orders/${r.order.id}`, label: `#${r.order.orderNumber}` } : null,
+type T = ReturnType<typeof useTranslations<never>>;
+
+/**
+ * Columns for the PHYSICAL shipment list: one row per parcel (sibling orders
+ * that share a package are already merged upstream — see `toPhysicalShipments`).
+ * The order column stacks the parcel's line-items so per-order navigation is
+ * preserved even though the rows are consolidated.
+ */
+export const physicalShipmentColumns = (t: T) => [
+  col.custom<PhysicalShipmentRow>(
+    t("admin.operations.common.order"),
+    (r) => (
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {r.items.map((it) => (
+          <div key={it.orderId} className="min-w-0">
+            <Link
+              href={`/operations/orders/${it.orderId}`}
+              className="block text-primary-600 hover:underline"
+            >
+              <TruncatedText>
+                {`#${it.orderNumber}${it.quantity > 1 ? ` ×${it.quantity}` : ""}`}
+              </TruncatedText>
+            </Link>
+            {it.productTitle ? (
+              <TruncatedText className="text-xs text-muted">
+                {it.productTitle}
+              </TruncatedText>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    ),
+    { grow: 3, minWidth: 220, sortKey: "order.orderNumber", sortType: "text" },
   ),
-  col.text<OrderShipmentRow>('Alıcı', (r) => r.order?.buyer?.displayName),
-  col.muted<OrderShipmentRow>('Kargo', (r) => r.provider),
-  col.custom<OrderShipmentRow>(
-    'Takip No',
+  col.text<PhysicalShipmentRow>(
+    t("admin.operations.common.buyer"),
+    (r) => r.buyer?.displayName,
+    { sortKey: "order.buyer.displayName" },
+  ),
+  col.id<PhysicalShipmentRow>(
+    t("admin.operations.common.buyerId"),
+    (r) => r.buyer?.id,
+  ),
+  col.id<PhysicalShipmentRow>(
+    t("admin.operations.common.sellerId"),
+    (r) => r.seller?.id,
+  ),
+  col.muted<PhysicalShipmentRow>(
+    t("admin.operations.shipping.carrier"),
+    "provider",
+  ),
+  col.custom<PhysicalShipmentRow>(
+    t("admin.operations.common.trackingNumber"),
     (r) =>
-      r.trackingNumber && r.trackingUrl ? (
+      r.providerTrackingId ? (
         <a
-          href={r.trackingUrl}
+          href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(r.providerTrackingId)}`}
           target="_blank"
           rel="noreferrer"
           className="block truncate font-mono text-xs text-primary-600 hover:underline"
-          title={r.trackingNumber}
+          title={r.providerTrackingId}
         >
-          {r.trackingNumber}
+          {r.providerTrackingId}
         </a>
       ) : (
         <CellCode value={r.trackingNumber} />
       ),
-    { grow: 2 },
+    { grow: 2, sortKey: "providerTrackingId", sortType: "text" },
   ),
-  col.badge<OrderShipmentRow>('Durum', (r) => (
-    <Badge status={(r.status || '').toLowerCase()} config={shipmentStatusConfig} />
-  )),
-];
-
-export const returnShipmentColumns = [
-  col.link<ReturnShipmentRow>('İade No', (r) => ({
-    href: `/operations/refund-requests/${r.id}`,
-    label: r.refundNumber,
-  })),
-  col.link<ReturnShipmentRow>('Sipariş', (r) =>
-    r.order ? { href: `/operations/orders/${r.order.id}`, label: r.order.orderNumber } : null,
-  ),
-  col.text<ReturnShipmentRow>('Kargo', (r) => r.returnProvider, { grow: 1 }),
-  col.code<ReturnShipmentRow>('Takip No', (r) => r.returnTrackingNumber),
-  col.badge<ReturnShipmentRow>('Durum', (r) =>
-    r.returnStatus ? <Badge status={r.returnStatus} config={shipmentStatusConfig} /> : <Empty />,
-  ),
-  col.date<ReturnShipmentRow>('Kargoya Verildi', (r) => r.returnShippedAt),
-  col.date<ReturnShipmentRow>('Teslim', (r) => r.returnDeliveredAt),
-];
-
-export const tradeShipmentColumns = [
-  col.link<TradeShipmentRow>('Takas No', (r) =>
-    r.trade
-      ? {
-          href: `/operations/trades/${r.trade.id}`,
-          label: r.trade.tradeNumber || `#${r.trade.id.slice(0, 8)}`,
-        }
-      : null,
-  ),
-  col.text<TradeShipmentRow>('Yön', (r) => legLabels[r.leg] || r.leg, { grow: 2 }),
-  col.text<TradeShipmentRow>('Kargo', (r) => r.carrier, { grow: 1 }),
-  col.code<TradeShipmentRow>('Takip No', (r) => r.trackingNumber),
-  col.badge<TradeShipmentRow>('Durum', (r) => (
-    <Badge status={r.status} config={shipmentStatusConfig} />
-  )),
-  col.user<TradeShipmentRow>('Gönderici', (r) =>
-    r.shipper ? { name: r.shipper.displayName, href: `/accounts/users/${r.shipper.id}` } : null,
-  ),
-  col.muted<TradeShipmentRow>('Güncelleme', (r) => formatRelative(r.updatedAt), {
-    grow: 1,
-    minWidth: 130,
-  }),
-];
-
-export function suratShipmentColumns(rowMenu: (r: SuratShipmentRow) => RowActionItem[]) {
-  return [
-    col.link<SuratShipmentRow>('Sipariş', (r) =>
-      r.order ? { href: `/operations/orders/${r.order.id}`, label: `#${r.order.orderNumber}` } : null,
+  col.badge<PhysicalShipmentRow>(
+    t("common.status"),
+    (r) => (
+      <Badge
+        status={(r.status || "").toLowerCase()}
+        config={shipmentStatusConfig}
+      />
     ),
-    col.text<SuratShipmentRow>('Alıcı', (r) => r.order?.buyer?.displayName),
+    { sortKey: "status", sortType: "text" },
+  ),
+];
+
+export const returnShipmentColumns = (t: T) => [
+  col.link<ReturnShipmentRow>(
+    t("admin.operations.common.refundNumber"),
+    (r) => ({
+      href: `/operations/refund-requests/${r.id}`,
+      label: r.refundNumber,
+    }),
+    { sortKey: "refundNumber", sortType: "text" },
+  ),
+  col.link<ReturnShipmentRow>(
+    t("admin.operations.common.order"),
+    (r) =>
+      r.order
+        ? {
+            href: `/operations/orders/${r.order.id}`,
+            label: r.order.orderNumber,
+          }
+        : null,
+    { sortKey: "order.orderNumber" },
+  ),
+  col.text<ReturnShipmentRow>(
+    t("admin.operations.shipping.carrier"),
+    "returnProvider",
+    { grow: 1 },
+  ),
+  col.code<ReturnShipmentRow>(
+    t("admin.operations.common.trackingNumber"),
+    (r) => r.returnProviderTrackingId ?? r.returnTrackingNumber,
+  ),
+  col.badge<ReturnShipmentRow>(
+    t("common.status"),
+    (r) =>
+      r.returnStatus ? (
+        <Badge status={r.returnStatus} config={shipmentStatusConfig} />
+      ) : (
+        <Empty />
+      ),
+    { sortKey: "returnStatus", sortType: "text" },
+  ),
+  col.date<ReturnShipmentRow>(
+    t("admin.operations.shipping.shippedAt"),
+    "returnShippedAt",
+  ),
+  col.date<ReturnShipmentRow>(
+    t("admin.operations.shipping.delivered"),
+    "returnDeliveredAt",
+  ),
+];
+
+export const tradeShipmentColumns = (t: T) => [
+  col.link<TradeShipmentRow>(
+    t("admin.operations.shipping.tradeNumber"),
+    (r) =>
+      r.trade
+        ? {
+            href: `/operations/trades/${r.trade.id}`,
+            label: r.trade.tradeNumber || `#${r.trade.id.slice(0, 8)}`,
+          }
+        : null,
+    { sortKey: "trade.tradeNumber" },
+  ),
+  col.text<TradeShipmentRow>(
+    t("admin.operations.shipping.direction"),
+    (r) => legLabel(t, r.leg),
+    {
+      grow: 2,
+      sortKey: "leg",
+      sortType: "text",
+    },
+  ),
+  col.text<TradeShipmentRow>(
+    t("admin.operations.shipping.carrier"),
+    "carrier",
+    { grow: 1 },
+  ),
+  col.code<TradeShipmentRow>(
+    t("admin.operations.common.trackingNumber"),
+    (r) => r.providerTrackingId ?? r.trackingNumber,
+  ),
+  col.badge<TradeShipmentRow>(
+    t("common.status"),
+    (r) => <Badge status={r.status} config={shipmentStatusConfig} />,
+    { sortKey: "status", sortType: "text" },
+  ),
+  col.user<TradeShipmentRow>(
+    t("admin.operations.shipping.sender"),
+    (r) =>
+      r.shipper
+        ? {
+            name: r.shipper.displayName,
+            href: `/accounts/users/${r.shipper.id}`,
+          }
+        : null,
+    { sortKey: "shipper.displayName" },
+  ),
+  col.id<TradeShipmentRow>(
+    t("admin.operations.common.buyerId"),
+    (r) => r.recipientUser?.id,
+  ),
+  col.muted<TradeShipmentRow>(
+    t("admin.operations.shipping.updated"),
+    (r) => formatRelative(t, r.updatedAt),
+    {
+      grow: 1,
+      minWidth: 130,
+      sortKey: "updatedAt",
+      sortType: "date",
+    },
+  ),
+];
+
+export function suratShipmentColumns(
+  t: T,
+  rowMenu: (r: SuratShipmentRow) => RowActionItem[],
+) {
+  return [
+    col.link<SuratShipmentRow>(
+      t("admin.operations.common.order"),
+      (r) =>
+        r.order
+          ? {
+              href: `/operations/orders/${r.order.id}`,
+              label: `#${r.order.orderNumber}`,
+            }
+          : null,
+      { sortKey: "order.orderNumber" },
+    ),
+    col.text<SuratShipmentRow>(
+      t("admin.operations.common.buyer"),
+      (r) => r.order?.buyer?.displayName,
+      { sortKey: "order.buyer.displayName" },
+    ),
+    col.id<SuratShipmentRow>(
+      t("admin.operations.common.buyerId"),
+      (r) => r.order?.buyer?.id,
+    ),
     col.custom<SuratShipmentRow>(
-      'Takip No',
+      t("admin.operations.common.trackingNumber"),
       (r) =>
         r.trackingNumber && r.trackingUrl ? (
           <a
@@ -100,27 +249,40 @@ export function suratShipmentColumns(rowMenu: (r: SuratShipmentRow) => RowAction
         ) : (
           <CellCode value={r.trackingNumber} />
         ),
-      { grow: 2 },
+      { grow: 2, sortKey: "trackingNumber", sortType: "text" },
     ),
     col.custom<SuratShipmentRow>(
-      'Sürat Durumu',
+      t("admin.operations.shipping.suratStatus"),
       (r) => (
         <div className="flex flex-col gap-0.5">
-          <Badge status={(r.status || '').toLowerCase()} config={shipmentStatusConfig} />
+          <Badge
+            status={(r.status || "").toLowerCase()}
+            config={shipmentStatusConfig}
+          />
           {r.providerRawStatus ? (
             <span className="truncate text-xs text-muted">
               {r.providerRawStatus}
-              {r.providerStatusCode != null ? ` (${r.providerStatusCode})` : ''}
+              {r.providerStatusCode != null ? ` (${r.providerStatusCode})` : ""}
             </span>
           ) : null}
         </div>
       ),
-      { grow: 2, minWidth: 150 },
+      {
+        grow: 2,
+        minWidth: 150,
+        sortKey: "status",
+        sortType: "text",
+      },
     ),
     col.muted<SuratShipmentRow>(
-      'Son Güncelleme',
-      (r) => (r.updatedAt ? formatRelative(r.updatedAt) : undefined),
-      { grow: 1, minWidth: 130 },
+      t("admin.operations.shipping.lastUpdated"),
+      (r) => (r.updatedAt ? formatRelative(t, r.updatedAt) : undefined),
+      {
+        grow: 1,
+        minWidth: 130,
+        sortKey: "updatedAt",
+        sortType: "date",
+      },
     ),
     col.rowMenu<SuratShipmentRow>(rowMenu),
   ];

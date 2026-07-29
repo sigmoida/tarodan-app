@@ -1,7 +1,15 @@
-import 'server-only';
+import "server-only";
 
-import { createSession, createAuthLogic, type ApiFetchResult } from '@tarodan/auth';
-import { adminAuthConfig, mapAdminUser, type AdminUser } from '@/lib/auth.config';
+import {
+  createSession,
+  createAuthLogic,
+  type ApiFetchResult,
+} from "@tarodan/auth";
+import {
+  adminAuthConfig,
+  mapAdminUser,
+  type AdminUser,
+} from "@/lib/auth.config";
 
 /**
  * Server-only session core for the admin BFF.
@@ -22,6 +30,7 @@ export const {
   refreshTokens,
   apiFetch,
   attachSessionCookies,
+  clearSessionCookies,
   getSession,
   apiBaseUrl,
 } = session;

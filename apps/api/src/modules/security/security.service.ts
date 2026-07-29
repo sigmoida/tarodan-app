@@ -18,6 +18,7 @@ import {
   AdminSessionDto,
   AdminSessionListDto,
 } from './dto';
+import { generateTotpSecret, verifyTotpCode } from './totp.util';
 
 @Injectable()
 export class SecurityService {
@@ -56,8 +57,13 @@ export class SecurityService {
     // Get user info for QR code label
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true },
+      select: { email: true, passwordHash: true },
     });
+    if (!user?.passwordHash) {
+      throw new BadRequestException(
+        'İki faktörlü doğrulama için önce bir hesap şifresi belirlemelisiniz',
+      );
+    }
 
     // Generate QR code URL (otpauth format)
     const issuer = 'Tarodan';
@@ -118,7 +124,12 @@ export class SecurityService {
     // Enable 2FA
     await this.prisma.twoFactorSecret.update({
       where: { userId },
-      data: { isEnabled: true },
+      data: {
+        isEnabled: true,
+        ...(twoFactor.secret.startsWith('v1:')
+          ? {}
+          : { secret: this.encryptSecret(secret) }),
+      },
     });
 
     // Update admin user if exists
@@ -178,6 +189,12 @@ export class SecurityService {
 
     // Check TOTP code
     if (this.verifyTOTP(secret, code)) {
+      if (!twoFactor.secret.startsWith('v1:')) {
+        await this.prisma.twoFactorSecret.update({
+          where: { userId },
+          data: { secret: this.encryptSecret(secret) },
+        });
+      }
       return true;
     }
 
@@ -185,14 +202,24 @@ export class SecurityService {
     for (let i = 0; i < twoFactor.backupCodes.length; i++) {
       const isMatch = await bcrypt.compare(code, twoFactor.backupCodes[i]);
       if (isMatch) {
-        // Remove used backup code
+        // Consume the backup code with compare-and-swap semantics. Two concurrent
+        // logins that present the same code cannot both succeed.
         const updatedCodes = [...twoFactor.backupCodes];
         updatedCodes.splice(i, 1);
-        await this.prisma.twoFactorSecret.update({
-          where: { userId },
-          data: { backupCodes: updatedCodes },
+        const consumed = await this.prisma.twoFactorSecret.updateMany({
+          where: {
+            userId,
+            isEnabled: true,
+            backupCodes: { equals: twoFactor.backupCodes },
+          },
+          data: {
+            backupCodes: updatedCodes,
+            ...(twoFactor.secret.startsWith('v1:')
+              ? {}
+              : { secret: this.encryptSecret(secret) }),
+          },
         });
-        return true;
+        return consumed.count === 1;
       }
     }
 
@@ -665,9 +692,18 @@ export class SecurityService {
   /**
    * Terminate admin session
    */
-  async terminateAdminSession(sessionId: string): Promise<void> {
-    await this.prisma.adminSession.delete({
-      where: { id: sessionId },
+  async terminateAdminSession(
+    sessionId: string,
+    adminUserId: string,
+  ): Promise<void> {
+    await this.prisma.adminSession.deleteMany({
+      where: { id: sessionId, adminUserId },
+    });
+  }
+
+  async terminateAdminSessionByToken(sessionToken: string): Promise<void> {
+    await this.prisma.adminSession.deleteMany({
+      where: { sessionToken },
     });
   }
 
@@ -695,14 +731,7 @@ export class SecurityService {
   // ==========================================================================
 
   private generateTOTPSecret(): string {
-    // Generate random bytes and encode to base32 manually
-    const bytes = crypto.randomBytes(this.SECRET_BYTES);
-    const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    let result = '';
-    for (let i = 0; i < bytes.length; i++) {
-      result += base32Chars[bytes[i] % 32];
-    }
-    return result.substring(0, 32);
+    return generateTotpSecret(this.SECRET_BYTES);
   }
 
   private generateBackupCodes(): string[] {
@@ -717,52 +746,52 @@ export class SecurityService {
   }
 
   private encryptSecret(secret: string): string {
-    // In production, use proper encryption with key management
-    // For now, using base64 encoding as placeholder
-    return Buffer.from(secret).toString('base64');
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv(
+      'aes-256-gcm',
+      this.getTwoFactorEncryptionKey(),
+      iv,
+    );
+    const ciphertext = Buffer.concat([
+      cipher.update(secret, 'utf8'),
+      cipher.final(),
+    ]);
+    const tag = cipher.getAuthTag();
+
+    return `v1:${iv.toString('base64')}:${tag.toString('base64')}:${ciphertext.toString('base64')}`;
   }
 
   private decryptSecret(encrypted: string): string {
-    return Buffer.from(encrypted, 'base64').toString('utf-8');
+    if (!encrypted.startsWith('v1:')) {
+      return Buffer.from(encrypted, 'base64').toString('utf8');
+    }
+
+    const [, iv, tag, ciphertext] = encrypted.split(':');
+    if (!iv || !tag || !ciphertext) {
+      throw new Error('Invalid encrypted two-factor secret');
+    }
+
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      this.getTwoFactorEncryptionKey(),
+      Buffer.from(iv, 'base64'),
+    );
+    decipher.setAuthTag(Buffer.from(tag, 'base64'));
+
+    return Buffer.concat([
+      decipher.update(Buffer.from(ciphertext, 'base64')),
+      decipher.final(),
+    ]).toString('utf8');
   }
 
   private verifyTOTP(secret: string, code: string): boolean {
-    // Simple TOTP verification (in production, use a proper TOTP library)
-    // This is a simplified implementation for demonstration
-    const time = Math.floor(Date.now() / 1000 / 30);
-    
-    // Check current and adjacent time windows
-    for (let i = -1; i <= 1; i++) {
-      const expectedCode = this.generateTOTPCode(secret, time + i);
-      if (expectedCode === code) {
-        return true;
-      }
-    }
-    return false;
+    return verifyTotpCode(secret, code);
   }
 
-  private generateTOTPCode(secret: string, time: number): string {
-    // Simplified TOTP code generation
-    // In production, use speakeasy or otplib library
-    // Decode base32 to buffer manually
-    const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    const secretBytes: number[] = [];
-    for (const char of secret.toUpperCase()) {
-      const idx = base32Chars.indexOf(char);
-      if (idx >= 0) secretBytes.push(idx);
-    }
-    const hmac = crypto.createHmac('sha1', Buffer.from(secretBytes));
-    const timeBuffer = Buffer.alloc(8);
-    timeBuffer.writeBigInt64BE(BigInt(time));
-    hmac.update(timeBuffer);
-    const hash = hmac.digest();
-    const offset = hash[hash.length - 1] & 0xf;
-    const binary =
-      ((hash[offset] & 0x7f) << 24) |
-      ((hash[offset + 1] & 0xff) << 16) |
-      ((hash[offset + 2] & 0xff) << 8) |
-      (hash[offset + 3] & 0xff);
-    const otp = binary % 1000000;
-    return otp.toString().padStart(6, '0');
+  private getTwoFactorEncryptionKey(): Buffer {
+    const material =
+      this.configService.get<string>('TWO_FACTOR_ENCRYPTION_KEY') ||
+      this.configService.getOrThrow<string>('JWT_SECRET');
+    return crypto.createHash('sha256').update(material).digest();
   }
 }

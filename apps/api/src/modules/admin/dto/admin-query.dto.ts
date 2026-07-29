@@ -1,10 +1,25 @@
-import { IsOptional, IsEnum, IsString, IsNumber, Min, Max, IsDateString, IsBoolean, IsIn } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type, Transform } from 'class-transformer';
-import { ProductStatus, OrderStatus } from '@prisma/client';
+import {
+  IsOptional,
+  IsEnum,
+  IsInt,
+  IsString,
+  IsDateString,
+  IsBoolean,
+  IsIn,
+  Min,
+} from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { Transform, Type } from "class-transformer";
+import {
+  ProductStatus,
+  OrderStatus,
+  MembershipTierType,
+  SubscriptionStatus,
+} from "@prisma/client";
+import { AdminListQueryDto } from "../../../common/list";
 
-export class AdminUserQueryDto {
-  @ApiPropertyOptional({ example: 'john' })
+export class AdminUserQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({ example: "john" })
   @IsOptional()
   @IsString()
   search?: string;
@@ -19,28 +34,45 @@ export class AdminUserQueryDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(({ value }) => value === "true" || value === true)
   @IsBoolean()
   isBanned?: boolean;
 
-  @ApiPropertyOptional({ example: 1 })
+  /** Filter by current membership tier (free/basic/premium/business). */
+  @ApiPropertyOptional({ enum: MembershipTierType })
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
+  @IsEnum(MembershipTierType)
+  membershipTier?: MembershipTierType;
 
-  @ApiPropertyOptional({ example: 20 })
+  /** Filter by membership lifecycle status (active/cancelled/expired/past_due). */
+  @ApiPropertyOptional({ enum: SubscriptionStatus })
   @IsOptional()
-  @IsNumber()
+  @IsEnum(SubscriptionStatus)
+  membershipStatus?: SubscriptionStatus;
+
+  /** Only paid memberships whose period ends within the next N days ("expiring soon"). */
+  @ApiPropertyOptional({ example: 7 })
+  @IsOptional()
   @Type(() => Number)
+  @IsInt()
   @Min(1)
-  @Max(100)
-  limit?: number;
+  expiringInDays?: number;
 }
 
-export class AdminProductQueryDto {
-  @ApiPropertyOptional({ example: 'ferrari' })
+export class SellerApplicationQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
+
+export class AdminProductQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({ example: "ferrari" })
   @IsOptional()
   @IsString()
   search?: string;
@@ -50,44 +82,29 @@ export class AdminProductQueryDto {
   @IsEnum(ProductStatus)
   status?: ProductStatus;
 
-  @ApiPropertyOptional({ example: 'uuid-category-id' })
+  @ApiPropertyOptional({ example: "uuid-category-id" })
   @IsOptional()
   @IsString()
   categoryId?: string;
 
-  @ApiPropertyOptional({ example: 'uuid-seller-id' })
+  @ApiPropertyOptional({ example: "uuid-seller-id" })
   @IsOptional()
   @IsString()
   sellerId?: string;
 
-  @ApiPropertyOptional({ example: 'uuid-brand-id' })
+  @ApiPropertyOptional({ example: "uuid-brand-id" })
   @IsOptional()
   @IsString()
   brandId?: string;
 
-  @ApiPropertyOptional({ example: 'uuid-car-model-id' })
+  @ApiPropertyOptional({ example: "uuid-car-model-id" })
   @IsOptional()
   @IsString()
   carModelId?: string;
-
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ example: 20 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number;
 }
 
-export class AdminOrderQueryDto {
-  @ApiPropertyOptional({ example: 'ORD-123' })
+export class AdminOrderQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({ example: "ORD-123" })
   @IsOptional()
   @IsString()
   search?: string;
@@ -97,144 +114,107 @@ export class AdminOrderQueryDto {
   @IsEnum(OrderStatus)
   status?: OrderStatus;
 
-  @ApiPropertyOptional({ example: '2024-01-01' })
+  @ApiPropertyOptional({ example: "2024-01-01" })
   @IsOptional()
   @IsDateString()
   fromDate?: string;
 
-  @ApiPropertyOptional({ example: '2024-12-31' })
+  @ApiPropertyOptional({ example: "2024-12-31" })
   @IsOptional()
   @IsDateString()
   toDate?: string;
 
-  @ApiPropertyOptional({ example: 'uuid-user-id' })
+  @ApiPropertyOptional({ example: "uuid-user-id" })
   @IsOptional()
   @IsString()
   userId?: string;
 
-  @ApiPropertyOptional({ enum: ['buyer', 'seller'], description: 'When filtering by userId: buyer or seller' })
+  @ApiPropertyOptional({
+    enum: ["buyer", "seller"],
+    description: "When filtering by userId: buyer or seller",
+  })
   @IsOptional()
-  @IsIn(['buyer', 'seller'])
-  userRole?: 'buyer' | 'seller';
+  @IsIn(["buyer", "seller"])
+  userRole?: "buyer" | "seller";
 
-  @ApiPropertyOptional({ example: 'uuid-product-id' })
+  @ApiPropertyOptional({ example: "uuid-product-id" })
   @IsOptional()
   @IsString()
   productId?: string;
-
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ example: 20 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number;
 }
 
-export class AuditLogQueryDto {
-  @ApiPropertyOptional({ example: 'user_update' })
-  @IsOptional()
-  @IsString()
-  action?: string;
-
-  @ApiPropertyOptional({ example: 'uuid-admin-id' })
-  @IsOptional()
-  @IsString()
-  adminId?: string;
-
-  @ApiPropertyOptional({ example: '2024-01-01' })
-  @IsOptional()
-  @IsDateString()
-  fromDate?: string;
-
-  @ApiPropertyOptional({ example: '2024-12-31' })
-  @IsOptional()
-  @IsDateString()
-  toDate?: string;
-
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ example: 50 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number;
-}
-
-export class AdminPaymentQueryDto {
-  @ApiPropertyOptional({ example: 'completed' })
-  @IsOptional()
-  @IsString()
-  status?: string;
-
-  @ApiPropertyOptional({ example: 'paytr' })
-  @IsOptional()
-  @IsString()
-  provider?: string;
-
-  @ApiPropertyOptional({ example: '2024-01-01' })
-  @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @ApiPropertyOptional({ example: '2024-12-31' })
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
-
-  @ApiPropertyOptional({ example: 'order-123' })
+export class AuditLogQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ example: 1 })
+  @ApiPropertyOptional({ example: "user_update" })
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
+  @IsString()
+  action?: string;
 
-  @ApiPropertyOptional({ example: 20 })
+  @ApiPropertyOptional({ example: "uuid-admin-id" })
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number;
+  @IsString()
+  adminId?: string;
+
+  @ApiPropertyOptional({ example: "2024-01-01" })
+  @IsOptional()
+  @IsDateString()
+  fromDate?: string;
+
+  @ApiPropertyOptional({ example: "2024-12-31" })
+  @IsOptional()
+  @IsDateString()
+  toDate?: string;
 }
 
-export enum PaymentStatisticsPeriod {
-  DAILY = 'daily',
-  WEEKLY = 'weekly',
-  MONTHLY = 'monthly',
-}
-
-export class PaymentStatisticsQueryDto {
-  @ApiPropertyOptional({ enum: PaymentStatisticsPeriod, example: 'monthly' })
+export class AdminPaymentQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({ example: "completed" })
   @IsOptional()
-  @IsEnum(PaymentStatisticsPeriod)
-  period?: PaymentStatisticsPeriod;
+  @IsString()
+  status?: string;
 
-  @ApiPropertyOptional({ example: '2024-01-01' })
+  @ApiPropertyOptional({ example: "paytr" })
+  @IsOptional()
+  @IsString()
+  provider?: string;
+
+  @ApiPropertyOptional({ example: "2024-01-01" })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ example: '2024-12-31' })
+  @ApiPropertyOptional({ example: "2024-12-31" })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ example: "order-123" })
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export enum PaymentStatisticsPeriod {
+  DAILY = "daily",
+  WEEKLY = "weekly",
+  MONTHLY = "monthly",
+}
+
+export class PaymentStatisticsQueryDto {
+  @ApiPropertyOptional({ enum: PaymentStatisticsPeriod, example: "monthly" })
+  @IsOptional()
+  @IsEnum(PaymentStatisticsPeriod)
+  period?: PaymentStatisticsPeriod;
+
+  @ApiPropertyOptional({ example: "2024-01-01" })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ example: "2024-12-31" })
   @IsOptional()
   @IsDateString()
   endDate?: string;

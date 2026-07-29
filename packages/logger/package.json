@@ -1,0 +1,29 @@
+{
+  "name": "@tarodan/logger",
+  "private": true,
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo"
+  },
+  "devDependencies": {
+    "@tarodan/eslint-config": "workspace:*",
+    "@tarodan/tsconfig": "workspace:*",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.2",
+    "vitest": "^3.2.6"
+  }
+}

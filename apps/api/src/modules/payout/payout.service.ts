@@ -2,12 +2,48 @@ import {
   Injectable,
   Logger,
   BadRequestException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { PayTRService } from '../payment-providers/paytr.service';
-import { PayoutStatus, PaymentHoldStatus, PaymentStatus } from '@prisma/client';
-import { NotificationService } from '../notification/notification.service';
+  Optional,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
+import {
+  PayoutStatus,
+  PaymentHoldStatus,
+  PaymentStatus,
+  OrderStatus,
+  RefundRequestStatus,
+  RefundAttemptStatus,
+  LedgerAccount,
+  LedgerDirection,
+  LedgerEventType,
+} from "@prisma/client";
+import { NotificationService } from "../notification/notification.service";
+import { LedgerService } from "../ledger/ledger.service";
+
+/** IBAN'ı log-güvenli hale getir (KVKK): yalnız son 4 hane. */
+function maskIban(iban: string | null | undefined): string {
+  const clean = (iban || "").replace(/\s/g, "");
+  return clean ? `***${clean.slice(-4)}` : "(yok)";
+}
+
+const PAYOUT_ELIGIBLE_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.delivered,
+  OrderStatus.awaiting_buyer_confirmation,
+  OrderStatus.completed,
+];
+
+const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
+  RefundRequestStatus.pending_review,
+  RefundRequestStatus.approved,
+  RefundRequestStatus.wait_for_delivery,
+  RefundRequestStatus.return_shipment_open,
+  RefundRequestStatus.return_in_transit,
+  RefundRequestStatus.return_delivered,
+  RefundRequestStatus.disputed,
+];
+
+const IBAN_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class PayoutService {
@@ -15,9 +51,13 @@ export class PayoutService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly paytrService: PayTRService,
+    private readonly paymentProviders: PaymentProviderRegistry,
     private readonly configService: ConfigService,
     private readonly notificationService: NotificationService,
+    // Faz 6.2: payout tamamlanınca çift-taraflı defter kaydı (escrow settle).
+    // @Optional + best-effort — defter hatası payout'u BOZMAZ; reconciliation yakalar.
+    @Optional()
+    private readonly ledger?: LedgerService,
   ) {}
 
   /**
@@ -34,14 +74,20 @@ export class PayoutService {
         where: { id: sellerId },
         select: { displayName: true },
       });
-      const last4 = (iban || '').replace(/\s/g, '').slice(-4);
-      await this.notificationService.sendTemplateEmailToUser(sellerId, 'payout-released-seller', {
-        sellerName: seller?.displayName ?? '',
-        payoutAmount: netAmount,
-        bankAccountLast4: last4 || undefined,
-      });
+      const last4 = (iban || "").replace(/\s/g, "").slice(-4);
+      await this.notificationService.sendTemplateEmailToUser(
+        sellerId,
+        "payout-released-seller",
+        {
+          sellerName: seller?.displayName ?? "",
+          payoutAmount: netAmount,
+          bankAccountLast4: last4 || undefined,
+        },
+      );
     } catch (err: any) {
-      this.logger.warn(`payout-released email failed for seller ${sellerId}: ${err?.message}`);
+      this.logger.warn(
+        `payout-released email failed for seller ${sellerId}: ${err?.message}`,
+      );
     }
   }
 
@@ -50,10 +96,12 @@ export class PayoutService {
    * PayTR'ye gitmeden yakalar (kör transfer riskini azaltır). "TR" + 24 rakam = 26 hane.
    */
   private isValidTrIban(iban: string): boolean {
-    const v = (iban || '').replace(/\s/g, '').toUpperCase();
+    const v = (iban || "").replace(/\s/g, "").toUpperCase();
     if (!/^TR\d{24}$/.test(v)) return false;
     const rearranged = v.slice(4) + v.slice(0, 4);
-    const numeric = rearranged.replace(/[A-Z]/g, (c) => (c.charCodeAt(0) - 55).toString());
+    const numeric = rearranged.replace(/[A-Z]/g, (c) =>
+      (c.charCodeAt(0) - 55).toString(),
+    );
     let remainder = 0;
     for (const ch of numeric) {
       remainder = (remainder * 10 + Number(ch)) % 97;
@@ -71,18 +119,79 @@ export class PayoutService {
       where: {
         status: PaymentHoldStatus.released,
         payoutTransfer: null,
+        // MONEY-M3: donuk (açık iade ile kilitli) hold'a payout OLUŞTURMA — defansif;
+        // releaseHoldsDue zaten frozen'ı release etmez ama katmanlı guard.
+        frozenByRefundId: null,
       },
       include: {
-        payment: { include: { order: true } },
+        payment: true,
         seller: { include: { bankAccount: true } },
       },
     });
+
+    // KRİTİK: Sipariş, payment.order üzerinden DEĞİL hold.orderId üzerinden yüklenir.
+    // Grup/sepet ödemelerinde Payment.orderId=null (checkoutGroupId'ye bağlı) olduğundan
+    // payment.order da null'dır; eski kod `if (!payment?.order) continue` ile bu hold'ları
+    // ATLIYORDU → grup siparişlerinin satıcıları HİÇ payout almıyordu (para kaybı).
+    // hold.orderId her hold için HER ZAMAN doludur (per-order hold).
+    const orderIds = [...new Set(releasedHolds.map((h) => h.orderId))];
+    const orders = orderIds.length
+      ? await this.prisma.order.findMany({ where: { id: { in: orderIds } } })
+      : [];
+    const orderById = new Map(orders.map((o) => [o.id, o]));
 
     let created = 0;
 
     for (const hold of releasedHolds) {
       const payment = hold.payment;
-      if (!payment?.order) continue;
+      const order = orderById.get(hold.orderId);
+      if (!payment || !order) continue;
+      if (!PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status)) {
+        this.logger.warn(
+          `Payout skipped: order ${hold.orderId} is not payout eligible (status=${order.status})`,
+        );
+        continue;
+      }
+
+      // MONEY-M3: Bu siparişte AÇIK bir iade talebi varsa payout OLUŞTURMA. Yarış:
+      // hold releaseAt'i geçip release edildikten HEMEN SONRA bir iade açılırsa,
+      // freeze `held` hedeflediğinden `released` hold'u kaçırır → payout cron satıcıya
+      // öder + alıcıya iade edilir → ÇİFT KAYIP. Açık iade varken bekle (iade terminal
+      // olunca hold ya cancelled olur ya da unfreeze ile normal akışa döner).
+      const openRefund = await this.prisma.refundRequest.findFirst({
+        where: {
+          orderId: hold.orderId,
+          status: { in: OPEN_REFUND_STATUSES },
+        },
+        select: { id: true },
+      });
+      if (openRefund) {
+        this.logger.warn(
+          `Payout skipped: order ${hold.orderId} has an open refund (released hold not frozen in time). Waiting for refund to terminalize.`,
+        );
+        continue;
+      }
+      const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
+        where: {
+          paymentId: hold.paymentId,
+          orderId: hold.orderId,
+          status: {
+            in: [
+              RefundAttemptStatus.prepared,
+              RefundAttemptStatus.submitting,
+              RefundAttemptStatus.succeeded,
+              RefundAttemptStatus.manual_review,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      if (activeRefundAttempt) {
+        this.logger.warn(
+          `Payout skipped: order ${hold.orderId} has unresolved refund attempt ${activeRefundAttempt.id}`,
+        );
+        continue;
+      }
 
       // Adet bazlı kısmi iade: satıcıya yalnız iade EDİLMEYEN kısım ödenir.
       const netPayout = Number(hold.amount) - Number(hold.refundedAmount ?? 0);
@@ -93,28 +202,50 @@ export class PayoutService {
 
       const merchantOid =
         payment.providerConversationId?.trim() ||
-        payment.order.orderNumber.replace(/-/g, '');
+        order.orderNumber.replace(/-/g, "");
 
       const bankAccount = hold.seller.bankAccount;
-      const transId = `ORD${hold.orderId.replace(/-/g, '').slice(0, 20)}${Date.now()}`;
+      const transId = `ORD${hold.orderId.replace(/-/g, "").slice(0, 20)}${Date.now()}`;
+      const pendingAdjustment = await (
+        this.prisma as any
+      ).sellerAccountAdjustment?.findFirst({
+        where: {
+          sellerId: hold.sellerId,
+          status: "open",
+          remainingAmount: { gt: 0 },
+        },
+        select: { id: true },
+      });
+      if (pendingAdjustment) {
+        const createdWithAdjustment = await this.createAdjustedOrderPayout({
+          hold,
+          order,
+          merchantOid,
+          transId,
+          bankAccount,
+          baseNetPayout: netPayout,
+        });
+        if (createdWithAdjustment) created++;
+        continue;
+      }
 
       await this.prisma.payoutTransfer.create({
         data: {
           paymentHoldId: hold.id,
           sellerId: hold.sellerId,
-          amount: payment.order.totalAmount,
-          commission: payment.order.commissionAmount,
+          amount: order.totalAmount,
+          commission: order.commissionAmount,
           // Sipariş anında kesilen stopaj snapshot'ı (hold.amount zaten stopaj düşülmüş).
           // Muhtasar raporu completed transferlerin bu alanından beslenir. Kısmi iadede
           // stopaj yeniden hesaplanmaz (bilinen kenar durum — satıcı beyannamede mahsup eder).
-          withholdingTax: payment.order.withholdingTaxAmount ?? 0,
+          withholdingTax: order.withholdingTaxAmount ?? 0,
           netAmount: netPayout,
           merchantOid,
           transId,
-          transferIban: bankAccount?.iban || '',
-          transferName: bankAccount?.accountHolder || '',
+          transferIban: bankAccount?.iban || "",
+          transferName: bankAccount?.accountHolder || "",
           status: bankAccount ? PayoutStatus.pending : PayoutStatus.failed,
-          failureReason: bankAccount ? null : 'no_bank_account',
+          failureReason: bankAccount ? null : "no_bank_account",
         },
       });
       created++;
@@ -134,6 +265,24 @@ export class PayoutService {
     });
 
     for (const tcp of releasedTradeCash) {
+      if (tcp.payment) {
+        const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
+          where: {
+            paymentId: tcp.payment.id,
+            tradeId: tcp.tradeId,
+            status: {
+              in: [
+                RefundAttemptStatus.prepared,
+                RefundAttemptStatus.submitting,
+                RefundAttemptStatus.succeeded,
+                RefundAttemptStatus.manual_review,
+              ],
+            },
+          },
+          select: { id: true },
+        });
+        if (activeRefundAttempt) continue;
+      }
       const recipientId = tcp.recipientId;
       const recipient = await this.prisma.user.findUnique({
         where: { id: recipientId },
@@ -144,9 +293,9 @@ export class PayoutService {
       const payment = tcp.payment;
       const merchantOid =
         payment?.providerConversationId?.trim() ||
-        tcp.tradeId.replace(/-/g, '');
+        tcp.tradeId.replace(/-/g, "");
 
-      const transId = `TRD${tcp.tradeId.replace(/-/g, '').slice(0, 20)}${Date.now()}`;
+      const transId = `TRD${tcp.tradeId.replace(/-/g, "").slice(0, 20)}${Date.now()}`;
       const bankAccount = recipient.bankAccount;
 
       await this.prisma.payoutTransfer.create({
@@ -158,10 +307,10 @@ export class PayoutService {
           netAmount: tcp.amount,
           merchantOid,
           transId,
-          transferIban: bankAccount?.iban || '',
-          transferName: bankAccount?.accountHolder || '',
+          transferIban: bankAccount?.iban || "",
+          transferName: bankAccount?.accountHolder || "",
           status: bankAccount ? PayoutStatus.pending : PayoutStatus.failed,
-          failureReason: bankAccount ? null : 'no_bank_account',
+          failureReason: bankAccount ? null : "no_bank_account",
         },
       });
       created++;
@@ -173,19 +322,142 @@ export class PayoutService {
     return created;
   }
 
+  private async createAdjustedOrderPayout(input: {
+    hold: any;
+    order: any;
+    merchantOid: string;
+    transId: string;
+    bankAccount: { iban: string; accountHolder: string } | null;
+    baseNetPayout: number;
+  }): Promise<boolean> {
+    const { hold, order, merchantOid, transId, bankAccount, baseNetPayout } =
+      input;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "seller_account_adjustments"
+        WHERE "seller_id" = ${hold.sellerId}
+          AND "status" = 'open'
+          AND "remaining_amount" > 0
+        ORDER BY "created_at" ASC
+        FOR UPDATE
+      `;
+      const existing = await tx.payoutTransfer.findUnique({
+        where: { paymentHoldId: hold.id },
+        select: { id: true },
+      });
+      if (existing) return false;
+
+      const adjustments = await tx.sellerAccountAdjustment.findMany({
+        where: {
+          sellerId: hold.sellerId,
+          status: "open",
+          remainingAmount: { gt: 0 },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      let available = Math.round(baseNetPayout * 100) / 100;
+      const allocations: Array<{
+        adjustmentId: string;
+        amount: number;
+        remainingAmount: number;
+      }> = [];
+      for (const adjustment of adjustments) {
+        if (available <= 0) break;
+        const remaining = Number(adjustment.remainingAmount);
+        const amount = Math.min(remaining, available);
+        if (amount <= 0) continue;
+        allocations.push({
+          adjustmentId: adjustment.id,
+          amount: Math.round(amount * 100) / 100,
+          remainingAmount:
+            Math.round(Math.max(0, remaining - amount) * 100) / 100,
+        });
+        available = Math.round(Math.max(0, available - amount) * 100) / 100;
+      }
+      const adjustmentDeduction =
+        Math.round(
+          allocations.reduce((sum, row) => sum + row.amount, 0) * 100,
+        ) / 100;
+      const netAmount =
+        Math.round(Math.max(0, baseNetPayout - adjustmentDeduction) * 100) /
+        100;
+      const fullyConsumed = netAmount <= 0.01;
+      const payout = await tx.payoutTransfer.create({
+        data: {
+          paymentHoldId: hold.id,
+          sellerId: hold.sellerId,
+          amount: order.totalAmount,
+          commission: order.commissionAmount,
+          withholdingTax: order.withholdingTaxAmount ?? 0,
+          netAmount: fullyConsumed ? 0 : netAmount,
+          adjustmentDeduction,
+          merchantOid,
+          transId,
+          transferIban: bankAccount?.iban || "",
+          transferName: bankAccount?.accountHolder || "",
+          status: fullyConsumed
+            ? PayoutStatus.completed
+            : bankAccount
+              ? PayoutStatus.pending
+              : PayoutStatus.failed,
+          processedAt: fullyConsumed ? new Date() : null,
+          failureReason:
+            fullyConsumed || bankAccount ? null : "no_bank_account",
+        },
+      });
+
+      if (allocations.length > 0) {
+        await tx.sellerAdjustmentApplication.createMany({
+          data: allocations.map((allocation) => ({
+            adjustmentId: allocation.adjustmentId,
+            payoutTransferId: payout.id,
+            amount: allocation.amount,
+          })),
+        });
+        for (const allocation of allocations) {
+          const settled = allocation.remainingAmount <= 0.01;
+          await tx.sellerAccountAdjustment.update({
+            where: { id: allocation.adjustmentId },
+            data: {
+              remainingAmount: settled ? 0 : allocation.remainingAmount,
+              status: settled ? "settled" : "open",
+              settledAt: settled ? new Date() : null,
+            },
+          });
+        }
+      }
+      return true;
+    });
+  }
+
   /**
    * Process pending PayoutTransfers — call PayTR Platform Transfer API.
    */
-  async processPendingPayouts(): Promise<{ processed: number; failed: number }> {
+  async processPendingPayouts(): Promise<{
+    processed: number;
+    failed: number;
+  }> {
     // Y15: Staging/test ortamında gerçek (geri alınamaz) banka transferini engelle.
     // PAYOUTS_DISABLED=true ise payout cron'u canlı transfer ATMAZ.
-    if (this.configService.get<string>('PAYOUTS_DISABLED') === 'true') {
-      this.logger.warn('Payout işleme devre dışı (PAYOUTS_DISABLED=true) — atlanıyor');
+    if (this.configService.get<string>("PAYOUTS_DISABLED") === "true") {
+      this.logger.warn(
+        "Payout işleme devre dışı (PAYOUTS_DISABLED=true) — atlanıyor",
+      );
       return { processed: 0, failed: 0 };
     }
 
     const pending = await this.prisma.payoutTransfer.findMany({
       where: { status: PayoutStatus.pending },
+      include: {
+        paymentHold: { select: { paymentId: true, orderId: true } },
+        tradeCashPayment: {
+          select: {
+            tradeId: true,
+            payment: { select: { id: true } },
+          },
+        },
+      },
       take: 50,
     });
 
@@ -193,10 +465,143 @@ export class PayoutService {
     let failed = 0;
 
     for (const payout of pending) {
-      // Atomik claim (K2): yalnızca hâlâ pending ise processing'e al. Çoklu instance
-      // veya api+worker aynı cron'u koşarsa satır başına yalnızca bir koşucu kazanır;
-      // count=0 → başka bir koşucu aldı ya da iade void etti → atla. PayTR'ye çift
-      // transfer gitmesini DB seviyesinde engeller.
+      const refundTarget = payout.paymentHold
+        ? {
+            paymentId: payout.paymentHold.paymentId,
+            orderId: payout.paymentHold.orderId,
+            tradeId: null,
+          }
+        : payout.tradeCashPayment?.payment
+          ? {
+              paymentId: payout.tradeCashPayment.payment.id,
+              orderId: null,
+              tradeId: payout.tradeCashPayment.tradeId,
+            }
+          : null;
+      if (refundTarget) {
+        if (refundTarget.orderId) {
+          const [order, openRefund] = await Promise.all([
+            this.prisma.order.findUnique({
+              where: { id: refundTarget.orderId },
+              select: { status: true },
+            }),
+            this.prisma.refundRequest.findFirst({
+              where: {
+                orderId: refundTarget.orderId,
+                status: { in: OPEN_REFUND_STATUSES },
+              },
+              select: { id: true },
+            }),
+          ]);
+          if (
+            !order ||
+            !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
+            openRefund
+          ) {
+            await this.prisma.payoutTransfer.updateMany({
+              where: { id: payout.id, status: PayoutStatus.pending },
+              data: {
+                status: PayoutStatus.failed,
+                failureReason: openRefund
+                  ? "refund_pending"
+                  : "order_not_payout_eligible",
+              },
+            });
+            continue;
+          }
+        }
+        const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
+          where: {
+            paymentId: refundTarget.paymentId,
+            orderId: refundTarget.orderId,
+            tradeId: refundTarget.tradeId,
+            status: {
+              in: [
+                RefundAttemptStatus.prepared,
+                RefundAttemptStatus.submitting,
+                RefundAttemptStatus.succeeded,
+                RefundAttemptStatus.manual_review,
+              ],
+            },
+          },
+          select: { id: true },
+        });
+        if (activeRefundAttempt) {
+          await this.prisma.payoutTransfer.updateMany({
+            where: { id: payout.id, status: PayoutStatus.pending },
+            data: {
+              status: PayoutStatus.failed,
+              failureReason: "refund_pending",
+            },
+          });
+          continue;
+        }
+      }
+      // Y5: İşleme anında satıcının GÜNCEL banka hesabını oku. Payout oluşturulurken
+      // alınan IBAN/ad snapshot'ı bayatlamış olabilir (satıcı sonradan değiştirmiş
+      // olabilir) → para eski IBAN'a gitmesin. Güncel değeri kullan + snapshot'ı tazele.
+      let bankAccount = await this.prisma.sellerBankAccount.findUnique({
+        where: { userId: payout.sellerId },
+      });
+      let transferIban = bankAccount?.iban || "";
+      let transferName = bankAccount?.accountHolder || "";
+      if (
+        transferIban !== payout.transferIban ||
+        transferName !== payout.transferName
+      ) {
+        await this.prisma.payoutTransfer.update({
+          where: { id: payout.id },
+          data: { transferIban, transferName },
+        });
+      }
+
+      if (!transferIban || !transferName) {
+        const failedClaim = await this.prisma.payoutTransfer.updateMany({
+          where: { id: payout.id, status: PayoutStatus.pending },
+          data: {
+            status: PayoutStatus.failed,
+            failureReason: "no_bank_account",
+          },
+        });
+        if (failedClaim.count > 0) failed++;
+        continue;
+      }
+
+      // Y4: Transfer öncesi IBAN format/checksum kontrolü. Yazım hatalı IBAN PayTR'ye
+      // gönderilmeden başarısız işaretlenir (satıcı düzeltir); kör transfer riskini azaltır.
+      // (Format doğru ama yanlış hesap durumunu PayTR reddi / returned-transfer akışı yakalar.)
+      if (!this.isValidTrIban(transferIban)) {
+        const failedClaim = await this.prisma.payoutTransfer.updateMany({
+          where: { id: payout.id, status: PayoutStatus.pending },
+          data: {
+            status: PayoutStatus.failed,
+            failureReason: "invalid_iban_format",
+          },
+        });
+        this.logger.warn(
+          `Payout ${payout.id} için geçersiz IBAN formatı — transfer yapılmadı`,
+        );
+        if (failedClaim.count > 0) failed++;
+        continue;
+      }
+
+      // IBAN cooldown (F2.1): satıcı IBAN'ını YAKIN ZAMANDA değiştirdiyse bu turda
+      // ödeme YAPMA — beklet (status pending kalır, sonraki cron tekrar dener).
+      // Çalınan oturumla IBAN'ı değiştirip anında para çekme saldırısına karşı pencere;
+      // satıcı değişikliği fark edip itiraz edebilir. İlk kayıtta ibanChangedAt null →
+      // beklemez (ödemeler zaten teslimden ~14 gün sonra yapıldığından legit gecikme yok).
+      if (
+        bankAccount?.ibanChangedAt &&
+        Date.now() - bankAccount.ibanChangedAt.getTime() < IBAN_COOLDOWN_MS
+      ) {
+        this.logger.warn(
+          `Payout ${payout.id} beklemede: IBAN yakın zamanda değişti (cooldown). Sonraki turda denenecek.`,
+        );
+        continue;
+      }
+
+      // Atomik claim (K2): yalnızca hâlâ pending ise processing'e al. Cooldown
+      // kontrolü claim'den önce yapıldığı için bekleyen payout processing'te takılmaz.
       const claim = await this.prisma.payoutTransfer.updateMany({
         where: { id: payout.id, status: PayoutStatus.pending },
         data: { status: PayoutStatus.processing },
@@ -205,57 +610,48 @@ export class PayoutService {
         continue;
       }
 
-      // Y5: İşleme anında satıcının GÜNCEL banka hesabını oku. Payout oluşturulurken
-      // alınan IBAN/ad snapshot'ı bayatlamış olabilir (satıcı sonradan değiştirmiş
-      // olabilir) → para eski IBAN'a gitmesin. Güncel değeri kullan + snapshot'ı tazele.
-      const bankAccount = await this.prisma.sellerBankAccount.findUnique({
+      // TOCTOU guard: preflight ile sağlayıcı çağrısı arasında IBAN değişmiş olabilir.
+      // Claim sonrasında tekrar oku; değişiklik/cooldown varsa claim'i güvenle bırak.
+      bankAccount = await this.prisma.sellerBankAccount.findUnique({
         where: { userId: payout.sellerId },
       });
-      const transferIban = bankAccount?.iban || '';
-      const transferName = bankAccount?.accountHolder || '';
-      if (transferIban !== payout.transferIban || transferName !== payout.transferName) {
-        await this.prisma.payoutTransfer.update({
-          where: { id: payout.id },
-          data: { transferIban, transferName },
-        });
-      }
-
-      if (!transferIban || !transferName) {
-        await this.prisma.payoutTransfer.update({
-          where: { id: payout.id },
+      const confirmedIban = bankAccount?.iban || "";
+      const confirmedName = bankAccount?.accountHolder || "";
+      const changedDuringClaim =
+        confirmedIban !== transferIban || confirmedName !== transferName;
+      const coolingDownNow =
+        !!bankAccount?.ibanChangedAt &&
+        Date.now() - bankAccount.ibanChangedAt.getTime() < IBAN_COOLDOWN_MS;
+      if (changedDuringClaim || coolingDownNow) {
+        await this.prisma.payoutTransfer.updateMany({
+          where: { id: payout.id, status: PayoutStatus.processing },
           data: {
-            status: PayoutStatus.failed,
-            failureReason: 'no_bank_account',
+            status: PayoutStatus.pending,
+            transferIban: confirmedIban,
+            transferName: confirmedName,
           },
         });
-        failed++;
+        this.logger.warn(
+          `Payout ${payout.id} beklemede: claim sırasında banka hesabı değişti veya cooldown başladı.`,
+        );
         continue;
       }
-
-      // Y4: Transfer öncesi IBAN format/checksum kontrolü. Yazım hatalı IBAN PayTR'ye
-      // gönderilmeden başarısız işaretlenir (satıcı düzeltir); kör transfer riskini azaltır.
-      // (Format doğru ama yanlış hesap durumunu PayTR reddi / returned-transfer akışı yakalar.)
-      if (!this.isValidTrIban(transferIban)) {
-        await this.prisma.payoutTransfer.update({
-          where: { id: payout.id },
-          data: { status: PayoutStatus.failed, failureReason: 'invalid_iban_format' },
-        });
-        this.logger.warn(`Payout ${payout.id} için geçersiz IBAN formatı — transfer yapılmadı`);
-        failed++;
-        continue;
-      }
+      transferIban = confirmedIban;
+      transferName = confirmedName;
 
       try {
-        const result = await this.paytrService.createPlatformTransfer({
-          merchantOid: payout.merchantOid,
-          transId: payout.transId,
-          submerchantAmount: Number(payout.netAmount),
-          totalAmount: Number(payout.amount),
-          transferName,
-          transferIban,
-        });
+        const result = await this.paymentProviders
+          .resolve()
+          .createPlatformTransfer({
+            merchantOid: payout.merchantOid,
+            transId: payout.transId,
+            submerchantAmount: Number(payout.netAmount),
+            totalAmount: Number(payout.amount),
+            transferName,
+            transferIban,
+          });
 
-        if (result.status === 'success') {
+        if (result.status === "success") {
           await this.prisma.payoutTransfer.update({
             where: { id: payout.id },
             data: {
@@ -265,18 +661,57 @@ export class PayoutService {
             },
           });
           // Başarılı transfer = IBAN gerçek ve çalışıyor → otomatik doğrula.
-          await this.syncBankAccountVerification(payout.sellerId, payout.transferIban, true);
+          await this.syncBankAccountVerification(
+            payout.sellerId,
+            transferIban,
+            true,
+          );
           await this.sendPayoutReleasedEmail(
             payout.sellerId,
             Number(payout.netAmount),
-            payout.transferIban,
+            transferIban,
           );
           processed++;
+          // 11.1c (G4/KVKK): tam IBAN loglanmaz — yalnız son 4 hane (email'le simetrik).
           this.logger.log(
-            `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${payout.transferIban}`,
+            `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${maskIban(transferIban)}`,
           );
+          // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
+          // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
+          // → sipariş bazında escrow net 0'a iner. Best-effort (payout'u bozmaz).
+          try {
+            const net = Number(payout.netAmount);
+            if (net > 0)
+              await this.ledger?.record(this.prisma, {
+                eventType: LedgerEventType.payout_completed,
+                entries: [
+                  {
+                    account: LedgerAccount.seller_escrow,
+                    direction: LedgerDirection.credit,
+                    amount: net,
+                  },
+                  {
+                    account: LedgerAccount.payout,
+                    direction: LedgerDirection.debit,
+                    amount: net,
+                  },
+                ],
+                refs: {
+                  payoutId: payout.id,
+                  sellerId: payout.sellerId,
+                },
+              });
+          } catch (e: any) {
+            this.logger.warn(
+              `Ledger payout kaydı başarısız (payout ${payout.id}): ${e?.message}`,
+            );
+          }
         } else {
-          await this.handlePayoutFailure(payout.id, result.err_msg || 'PayTR error', result);
+          await this.handlePayoutFailure(
+            payout.id,
+            result.err_msg || "PayTR error",
+            result,
+          );
           failed++;
         }
       } catch (error: any) {
@@ -286,7 +721,9 @@ export class PayoutService {
     }
 
     if (processed > 0 || failed > 0) {
-      this.logger.log(`Payouts processed: ${processed} success, ${failed} failed`);
+      this.logger.log(
+        `Payouts processed: ${processed} success, ${failed} failed`,
+      );
     }
     return { processed, failed };
   }
@@ -331,7 +768,13 @@ export class PayoutService {
     const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
     const stuck = await this.prisma.payoutTransfer.findMany({
       where: { status: PayoutStatus.processing, updatedAt: { lt: cutoff } },
-      select: { id: true, transId: true, sellerId: true, netAmount: true, updatedAt: true },
+      select: {
+        id: true,
+        transId: true,
+        sellerId: true,
+        netAmount: true,
+        updatedAt: true,
+      },
     });
     for (const p of stuck) {
       this.logger.error(
@@ -352,16 +795,18 @@ export class PayoutService {
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 7);
 
-    const startDate = yesterday.toISOString().replace('T', ' ').slice(0, 19);
-    const endDate = now.toISOString().replace('T', ' ').slice(0, 19);
+    const startDate = yesterday.toISOString().replace("T", " ").slice(0, 19);
+    const endDate = now.toISOString().replace("T", " ").slice(0, 19);
 
     try {
-      const result = await this.paytrService.getReturnedTransfers({
-        startDate,
-        endDate,
-      });
+      const result = await this.paymentProviders
+        .resolve()
+        .getReturnedTransfers({
+          startDate,
+          endDate,
+        });
 
-      if (result.status !== 'success' || !Array.isArray(result.data)) {
+      if (result.status !== "success" || !Array.isArray(result.data)) {
         return 0;
       }
 
@@ -375,14 +820,20 @@ export class PayoutService {
             where: { id: transfer.id },
             data: {
               status: PayoutStatus.returned,
-              failureReason: `Geri döndü: ${returned.reason || 'bilinmeyen neden'}`,
+              failureReason: `Geri döndü: ${returned.reason || "bilinmeyen neden"}`,
               providerResponse: returned as any,
             },
           });
           // Transfer geri döndü = IBAN sorunlu → doğrulamayı geri al.
-          await this.syncBankAccountVerification(transfer.sellerId, transfer.transferIban, false);
+          await this.syncBankAccountVerification(
+            transfer.sellerId,
+            transfer.transferIban,
+            false,
+          );
           updated++;
-          this.logger.warn(`Payout ${transfer.transId} returned: ${returned.reason}`);
+          this.logger.warn(
+            `Payout ${transfer.transId} returned: ${returned.reason}`,
+          );
         }
       }
 
@@ -411,7 +862,10 @@ export class PayoutService {
       if (account.isVerified === verified) return;
       await this.prisma.sellerBankAccount.update({
         where: { userId: sellerId },
-        data: { isVerified: verified, verifiedAt: verified ? new Date() : null },
+        data: {
+          isVerified: verified,
+          verifiedAt: verified ? new Date() : null,
+        },
       });
       this.logger.log(
         `Bank account for seller ${sellerId} isVerified=${verified} (payout sonucu).`,

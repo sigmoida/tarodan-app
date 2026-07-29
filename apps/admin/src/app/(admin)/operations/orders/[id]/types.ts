@@ -1,7 +1,58 @@
+/** One product line inside a consolidated checkout-group package. */
+export interface OrderPackageItem {
+  orderId: string;
+  orderNumber: string;
+  productId: string;
+  title: string | null;
+  imageUrl: string | null;
+  quantity: number;
+  unitPrice: number | null;
+  subtotal: number;
+  totalAmount: number;
+  status: string;
+  shipmentStatus?: string | null;
+}
+
+/** A satıcı-paketi (çatı) — one seller's items within a checkout group. */
+export interface OrderPackageView {
+  packageId: string | null;
+  seller: {
+    id: string;
+    displayName: string | null;
+    sellerType?: string | null;
+  };
+  shippingCost: number;
+  shipment: {
+    id: string;
+    provider: string;
+    status: string;
+    trackingNumber: string | null;
+    providerTrackingId: string | null;
+  } | null;
+  items: OrderPackageItem[];
+}
+
+/** Consolidated checkout-group view: all sibling orders grouped by seller/package. */
+export interface OrderGroup {
+  id: string;
+  groupNumber: string | null;
+  packageCount: number;
+  itemCount: number;
+  isMultiSeller: boolean;
+  isMultiItem: boolean;
+  subtotal: number;
+  shippingCost: number;
+  totalAmount: number;
+  packages: OrderPackageView[];
+}
+
 export interface OrderDetail {
   id: string;
   orderNumber: string;
   status: string;
+  checkoutGroupId?: string | null;
+  packageId?: string | null;
+  group?: OrderGroup | null;
   totalAmount: number;
   commissionAmount: number;
   shippingCost: number;
@@ -33,7 +84,14 @@ export interface OrderDetail {
   };
   shippingAddress?: any;
   payment?: { id: string; status: string; amount: number; provider: string };
-  shipment?: { id: string; trackingNumber?: string; carrier?: string; status?: string };
+  shipment?: {
+    id: string;
+    trackingNumber?: string;
+    /** Real Sürat cargo code (KargoTakipNo). */
+    providerTrackingId?: string | null;
+    carrier?: string;
+    status?: string;
+  };
   createdAt: string;
   updatedAt: string;
   cancelReason?: string | null;
@@ -42,5 +100,9 @@ export interface OrderDetail {
   deliveredAt?: string | null;
   completedAt?: string | null;
   cancellationType?: string | null;
-  activeRefundRequest?: { id: string; status: string; refundNumber?: string } | null;
+  activeRefundRequest?: {
+    id: string;
+    status: string;
+    refundNumber?: string;
+  } | null;
 }

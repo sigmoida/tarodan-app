@@ -1,18 +1,16 @@
-import {
-  Injectable,
-  NotFoundException,
-  Optional,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { RatingService } from '../rating/rating.service';
-import { AdminAuditService } from './admin-audit.service';
+import { Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { RatingService } from "../rating/rating.service";
+import { AdminAuditService } from "./admin-audit.service";
 import {
   fulltextProductRatingSearch,
-  fulltextUserDisplayNameSearch,
-} from '../../common/helpers/fulltext-search';
-import { fulltextProductSearch } from '../product/helpers/fulltext-search';
-import { RatingQueryDto, RatingStatus } from './dto';
+  fulltextUserSearch,
+} from "../../common/helpers/fulltext-search";
+import { fulltextProductSearch } from "../product/helpers/fulltext-search";
+import { AdminUserRatingQueryDto, RatingQueryDto, RatingStatus } from "./dto";
+import { Prisma } from "@prisma/client";
+import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Ürün yorumu ve satıcı puanı admin operasyonları — AdminService'in
@@ -32,19 +30,30 @@ export class AdminReviewService {
   // AdminService'teki leaf yardımcı ile birebir aynıydı (bilinçli kopya,
   // emsal: admin-user.service.ts); facade'daki son kullanıcı bu bölüm
   // olduğundan oradaki kopya silindi.
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
     // Strip expired presigned S3 query params to get the clean public URL
-    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+    if (
+      (imageKeyOrUrl.startsWith("http://") ||
+        imageKeyOrUrl.startsWith("https://")) &&
+      imageKeyOrUrl.includes("X-Amz-Signature")
+    ) {
       try {
         const parsed = new URL(imageKeyOrUrl);
-        parsed.search = '';
+        parsed.search = "";
         return parsed.toString();
       } catch {
         // fall through
       }
     }
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
       return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
@@ -58,7 +67,7 @@ export class AdminReviewService {
    * Get product reviews
    */
   async getReviews(query: RatingQueryDto) {
-    const { page = 1, limit = 20, status, productId, search, sortBy } = query;
+    const { page = 1, limit = 20, status, productId, search } = query;
 
     const where: any = {};
 
@@ -73,25 +82,48 @@ export class AdminReviewService {
     if (search) {
       const [ratingIds, userIds, productIds] = await Promise.all([
         fulltextProductRatingSearch(this.prisma, search),
-        fulltextUserDisplayNameSearch(this.prisma, search),
+        fulltextUserSearch(this.prisma, search),
         fulltextProductSearch(this.prisma, search),
       ]);
       const conditions: any[] = [];
       if (ratingIds.length > 0) conditions.push({ id: { in: ratingIds } });
       if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
-      if (productIds.length > 0) conditions.push({ productId: { in: productIds } });
+      if (productIds.length > 0)
+        conditions.push({ productId: { in: productIds } });
+      const normalized = search.trim().toLowerCase();
+      const numericScore = Number(search);
+      if (Number.isInteger(numericScore))
+        conditions.push({ score: numericScore });
+      if (Object.values(RatingStatus).includes(normalized as RatingStatus))
+        conditions.push({ status: normalized as RatingStatus });
+      if (["true", "verified", "doğrulanmış", "onaylı"].includes(normalized))
+        conditions.push({ isVerifiedPurchase: true });
+      if (["false", "unverified", "doğrulanmamış"].includes(normalized))
+        conditions.push({ isVerifiedPurchase: false });
       if (conditions.length === 0) {
         return { data: [], total: 0, page, limit, totalPages: 0 };
       }
       where.OR = conditions;
     }
 
-    const orderBy: any = {};
-    if (sortBy === 'newest') orderBy.createdAt = 'desc';
-    else if (sortBy === 'oldest') orderBy.createdAt = 'asc';
-    else if (sortBy === 'highest_score') orderBy.score = 'desc';
-    else if (sortBy === 'lowest_score') orderBy.score = 'asc';
-    else orderBy.createdAt = 'desc';
+    Object.assign(where, dateRangeWhere(query));
+
+    const orderBy =
+      resolveOrderBy<Prisma.ProductRatingOrderByWithRelationInput>(
+        "ProductRating",
+        query,
+        {
+          defaultSort: { createdAt: "desc" },
+          // Legacy preset keys still work; standard column keys (score, status,
+          // product.title, user.displayName, …) resolve via the DMMF.
+          sortMap: {
+            newest: () => ({ createdAt: "desc" }),
+            oldest: () => ({ createdAt: "asc" }),
+            highest_score: () => ({ score: "desc" }),
+            lowest_score: () => ({ score: "asc" }),
+          },
+        },
+      );
 
     const [total, reviews] = await Promise.all([
       this.prisma.productRating.count({ where }),
@@ -101,7 +133,14 @@ export class AdminReviewService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          user: { select: { id: true, displayName: true, email: true, avatarUrl: true } },
+          user: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
           product: { select: { id: true, title: true, images: { take: 1 } } },
         },
       }),
@@ -109,13 +148,18 @@ export class AdminReviewService {
 
     const resolvedReviews = reviews.map((review: any) => ({
       ...review,
-      product: review.product ? {
-        ...review.product,
-        images: (review.product.images || []).map((img: any) => ({
-          ...img,
-          url: this.resolveProductImageUrl(img.cardKey) || this.resolveProductImageUrl(img.url) || img.url,
-        })),
-      } : review.product,
+      product: review.product
+        ? {
+            ...review.product,
+            images: (review.product.images || []).map((img: any) => ({
+              ...img,
+              url:
+                this.resolveProductImageUrl(img.cardKey) ||
+                this.resolveProductImageUrl(img.url) ||
+                img.url,
+            })),
+          }
+        : review.product,
     }));
 
     return {
@@ -132,13 +176,17 @@ export class AdminReviewService {
   /**
    * Update review status
    */
-  async updateReviewStatus(adminId: string, reviewId: string, status: RatingStatus) {
+  async updateReviewStatus(
+    adminId: string,
+    reviewId: string,
+    status: RatingStatus,
+  ) {
     const review = await this.prisma.productRating.findUnique({
       where: { id: reviewId },
     });
 
     if (!review) {
-      throw new NotFoundException('Yorum bulunamadı');
+      throw new NotFoundException("Yorum bulunamadı");
     }
 
     // Cast to any to avoid TS error if prisma client is not generated
@@ -147,7 +195,14 @@ export class AdminReviewService {
       data: { status } as any,
     });
 
-    await this.audit.createAuditLog(adminId, 'review_status_update', 'Rating', reviewId, review, updated);
+    await this.audit.createAuditLog(
+      adminId,
+      "review_status_update",
+      "Rating",
+      reviewId,
+      review,
+      updated,
+    );
 
     await this.ratingService.updateProductRatingStats(review.productId);
 
@@ -157,42 +212,53 @@ export class AdminReviewService {
   /**
    * Get seller (user) ratings for admin panel
    */
-  async getUserRatings(query: { page?: number; limit?: number; search?: string; status?: string }) {
-    const p = Number(query.page) || 1;
-    const lim = Number(query.limit) || 20;
+  async getUserRatings(query: AdminUserRatingQueryDto) {
     const search = query.search;
     const status = query.status;
-    const where: any = {};
+    const where: Prisma.RatingWhereInput = {};
 
     if (search) {
+      const normalized = search.trim().toLowerCase();
+      const numericScore = Number(search);
       where.OR = [
-        { giver: { displayName: { contains: search, mode: 'insensitive' } } },
-        { receiver: { displayName: { contains: search, mode: 'insensitive' } } },
-        { comment: { contains: search, mode: 'insensitive' } },
+        { giver: { displayName: { contains: search, mode: "insensitive" } } },
+        { giver: { email: { contains: search, mode: "insensitive" } } },
+        {
+          receiver: { displayName: { contains: search, mode: "insensitive" } },
+        },
+        { receiver: { email: { contains: search, mode: "insensitive" } } },
+        { comment: { contains: search, mode: "insensitive" } },
+        { orderId: { contains: search, mode: "insensitive" } },
+        { tradeId: { contains: search, mode: "insensitive" } },
       ];
+      if (Number.isInteger(numericScore))
+        where.OR.push({ score: numericScore });
+      if (Object.values(RatingStatus).includes(normalized as RatingStatus))
+        where.OR.push({ status: normalized as RatingStatus });
     }
-    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+    if (status && ["pending", "approved", "rejected"].includes(status)) {
       where.status = status;
     }
 
-    const [total, ratings] = await Promise.all([
-      this.prisma.rating.count({ where }),
-      this.prisma.rating.findMany({
+    Object.assign(where, dateRangeWhere(query));
+
+    const orderBy = resolveOrderBy<Prisma.RatingOrderByWithRelationInput>(
+      "Rating",
+      query,
+      { defaultSort: { createdAt: "desc" } },
+    );
+
+    return paginate(
+      this.prisma.rating,
+      {
         where,
-        orderBy: { createdAt: 'desc' },
-        skip: (p - 1) * lim,
-        take: lim,
+        orderBy,
         include: {
           giver: { select: { id: true, displayName: true, email: true } },
           receiver: { select: { id: true, displayName: true, email: true } },
         },
-      }),
-    ]);
-
-    return {
-      data: ratings,
-      meta: { total, page: p, limit: lim, totalPages: Math.ceil(total / lim) },
-    };
+      },
+      query,
+    );
   }
-
 }

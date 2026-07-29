@@ -1,71 +1,85 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ShipmentEventDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   id: string;
 
-  @ApiProperty({ example: 'picked_up' })
+  @ApiProperty({ example: "picked_up" })
   status: string;
 
-  @ApiProperty({ example: 'İstanbul Dağıtım Merkezi' })
+  @ApiProperty({ example: "İstanbul Dağıtım Merkezi" })
   location: string;
 
-  @ApiPropertyOptional({ example: 'Kargo teslim alındı' })
-  description?: string;
+  @ApiPropertyOptional({ example: "Kargo teslim alındı", nullable: true })
+  description?: string | null;
 
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   occurredAt: Date;
 }
 
 export class ShipmentResponseDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   id: string;
 
-  @ApiProperty({ example: 'uuid-order-id' })
+  @ApiProperty({ example: "uuid-order-id" })
   orderId: string;
 
-  @ApiProperty({ example: 'surat' })
+  @ApiProperty({ example: "surat" })
   provider: string;
 
-  @ApiPropertyOptional({ example: '1234567890' })
-  trackingNumber?: string;
+  @ApiPropertyOptional({ example: "ORD-20260728-001", nullable: true })
+  trackingNumber?: string | null;
 
-  @ApiPropertyOptional({ example: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=1234567890' })
-  trackingUrl?: string;
+  @ApiPropertyOptional({
+    example: "1234567890",
+    description: "Carrier-issued tracking code (Sürat KargoTakipNo)",
+    nullable: true,
+  })
+  providerTrackingId?: string | null;
 
-  @ApiProperty({ example: 'pending' })
+  @ApiPropertyOptional({
+    example:
+      "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=1234567890",
+    nullable: true,
+  })
+  trackingUrl?: string | null;
+
+  @ApiProperty({ example: "pending" })
   status: string;
 
-  @ApiPropertyOptional({ example: 25.50 })
+  @ApiPropertyOptional({ example: 25.5 })
   cost?: number;
 
-  @ApiPropertyOptional({ example: '2024-01-18T10:30:00.000Z' })
-  estimatedDelivery?: Date;
+  @ApiPropertyOptional({
+    example: "2024-01-18T10:30:00.000Z",
+    nullable: true,
+  })
+  estimatedDelivery?: Date | null;
 
   @ApiProperty({ type: [ShipmentEventDto] })
   events: ShipmentEventDto[];
 
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   createdAt: Date;
 
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   updatedAt: Date;
 }
 
 export class ShippingRateDto {
-  @ApiProperty({ example: 'surat' })
+  @ApiProperty({ example: "surat" })
   provider: string;
 
-  @ApiProperty({ example: 'Sürat Kargo' })
+  @ApiProperty({ example: "Sürat Kargo" })
   providerName: string;
 
-  @ApiProperty({ example: 25.50 })
+  @ApiProperty({ example: 25.5 })
   cost: number;
 
-  @ApiProperty({ example: 'TRY' })
+  @ApiProperty({ example: "TRY" })
   currency: string;
 
-  @ApiProperty({ example: '2-3 iş günü' })
+  @ApiProperty({ example: "2-3 iş günü" })
   estimatedDelivery: string;
 }
 

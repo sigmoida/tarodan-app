@@ -8,6 +8,9 @@ export interface Category {
   children: Category[];
   isActive: boolean;
   productCount: number;
+  activeProducts: number;
+  passiveProducts: number;
+  pendingProducts: number;
   collectionCount: number;
   createdAt: string;
 }

@@ -1,11 +1,11 @@
 {
   "meta": {
-    "total": 2293,
+    "total": 2294,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
-      "P0": 699,
+      "P0": 700,
       "P1": 984,
       "P2": 610
     }
@@ -33,7 +33,7 @@
       "code": "04",
       "prefix": "PRD",
       "title": "04 — Ürün/İlan & Katalog",
-      "count": 114
+      "count": 115
     },
     {
       "code": "05",
@@ -81,7 +81,7 @@
       "code": "12",
       "prefix": "REF",
       "title": "12 — İade & İptal",
-      "count": 78
+      "count": 79
     },
     {
       "code": "13",
@@ -105,7 +105,7 @@
       "code": "16",
       "prefix": "TAX",
       "title": "16 — Vergi (KDV) & Fatura",
-      "count": 95
+      "count": 96
     },
     {
       "code": "17",
@@ -978,7 +978,7 @@
       "tur": "Happy path / Yetki",
       "pri": "P1",
       "steps": "1. POST /api/auth/admin/refresh admin_refresh_token cookie/body ile. 2. Dönen access token'ı çöz (decode) ve isAdmin/role claim'lerini incele.",
-      "exp": "HTTP 200; yeni token'larda isAdmin:true + role claim'i; admin_token/admin_refresh_token cookie'leri set edilir. — admin-auth.controller.ts:76-86, auth.service.ts:670-675.",
+      "exp": "HTTP 200; yeni token'larda isAdmin:true + role + aynı sessionToken claim'i bulunur; rotasyon yeni admin_sessions kaydı üretmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -1052,11 +1052,11 @@
       "code": "01",
       "prefix": "AUTH",
       "domTitle": "01 — Kimlik Doğrulama & Hesap Güvenliği",
-      "title": "Admin çıkışı admin cookie'lerini temizler",
+      "title": "Admin çıkışı cookie ve sunucu oturumunu sonlandırır",
       "tur": "Happy path",
       "pri": "P1",
       "steps": "1. POST /api/auth/admin/logout.",
-      "exp": "HTTP 200; admin cookie'leri temizlenir; admin refresh token DB'de iptal edilir. — admin-auth.controller.ts:125-134.",
+      "exp": "HTTP 200; admin cookie'leri temizlenir, admin_sessions kaydı silinir ve aynı access token sonraki istekte 401 alır.",
       "gap": false,
       "gapRefs": []
     },
@@ -1377,11 +1377,11 @@
       "code": "01",
       "prefix": "AUTH",
       "domTitle": "01 — Kimlik Doğrulama & Hesap Güvenliği",
-      "title": "Refresh ve profile throttle'a takılmaz (SkipThrottle)",
+      "title": "Refresh ve profile olağan kullanımda throttle'a takılmaz",
       "tur": "Negatif (regresyon)",
       "pri": "P1",
-      "steps": "1. 1 dk içinde aynı IP'den 20+ kez POST /api/auth/refresh (geçerli token) ve GET /api/auth/profile.",
-      "exp": "429 OLUŞMAZ (yalnız geçerli token gereği). — auth.controller.ts:134,191, admin-auth.controller.ts:70,96.",
+      "steps": "1. 1 dk içinde aynı IP'den 8 kez POST /api/auth/refresh (geçerli token) ve 8 kez GET /api/auth/profile.",
+      "exp": "Olağan yenileme/profil trafiğinde 429 oluşmaz; refresh uçları ayrıca 60/dk üst sınırına tabidir.",
       "gap": false,
       "gapRefs": []
     },
@@ -1403,11 +1403,11 @@
       "code": "01",
       "prefix": "AUTH",
       "domTitle": "01 — Kimlik Doğrulama & Hesap Güvenliği",
-      "title": "Banlı kullanıcı korumalı uca erişemez (403 USER_BANNED)",
+      "title": "Banlı kullanıcı erişemez ve yeni token alamaz",
       "tur": "Yetki (Authz) / Güvenlik",
       "pri": "P0",
-      "steps": "1. Banlı kullanıcı token'ı ile GET /api/auth/profile (veya başka korumalı uç).",
-      "exp": "HTTP 403; gövde errorCode:\"USER_BANNED\", bannedReason dolu. — banned-user.guard.ts:82-88.",
+      "steps": "1. Kullanıcıyı banla. 2. Eski access token ile profile çağır. 3. Yeniden login ve eski refresh token ile yenileme dene.",
+      "exp": "Profile HTTP 403 ve errorCode=USER_BANNED; login ve refresh HTTP 401, yeni token üretilmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -1485,7 +1485,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "1. Web reset-password sayfasından şifre sıfırla; Network'te endpoint'i gözle. 2. Mobil reset-password ekranından şifre sıfırla; istek logunu gözle.",
-      "exp": "İkisi de POST /api/auth/reset-password'a gider (security ucuna DEĞİL). — apps/web/src/app/reset-password/page.tsx:69, apps/mobile/src/services/api.ts:196.",
+      "exp": "Web ve harici mobil istemci POST /api/auth/reset-password kontratını kullanır (security ucuna DEĞİL).",
       "gap": false,
       "gapRefs": []
     },
@@ -1498,7 +1498,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "1. Web authApi ve mobil api çağrılarını karşılaştır.",
-      "exp": "İkisi de /auth/login, /auth/register, /auth/google, /auth/logout, /auth/refresh, /auth/verify-email, /auth/forgot-password kullanır; 2FA ve şifre değiştirme /security/*. — apps/web/src/lib/api.ts:108-119, apps/mobile/src/services/api.ts:163-214.",
+      "exp": "Web ve harici mobil istemci /auth/login, /auth/register, /auth/google, /auth/logout, /auth/refresh, /auth/verify-email, /auth/forgot-password kontratlarını kullanır; 2FA ve şifre değiştirme /security/* altındadır.",
       "gap": false,
       "gapRefs": []
     },
@@ -1511,7 +1511,7 @@
       "tur": "Parite",
       "pri": "P2",
       "steps": "1. Web login sonrası Network'te Set-Cookie (access_token httpOnly) gözle; localStorage'da token OLMAMALI. 2. Mobilde login sonrası refresh isteğinin body/header ile gittiğini gözle.",
-      "exp": "Web → httpOnly cookie (XSS koruması), localStorage'da token yok; mobil → header/body. — utils/auth-cookies.ts:48-69, apps/mobile/src/services/api.ts:189.",
+      "exp": "Web → httpOnly cookie (XSS koruması), localStorage'da token yok; harici mobil istemci → Authorization header/body token.",
       "gap": false,
       "gapRefs": []
     },
@@ -1585,11 +1585,11 @@
       "code": "01",
       "prefix": "AUTH",
       "domTitle": "01 — Kimlik Doğrulama & Hesap Güvenliği",
-      "title": "TOTP secret DB'de düz metin DEĞİL (base64 encode)",
-      "tur": "Güvenlik (OpenRisk)",
+      "title": "TOTP secret DB'de AES-GCM ile şifreli",
+      "tur": "Güvenlik",
       "pri": "P2",
-      "steps": "1. DB'de two_factor_secrets.secret değerini incele; base64 decode et.",
-      "exp": "Saklanan değer base64-encoded secret'tır; ham base32 secret değil. NOT: encryptSecret gerçek şifreleme yapmaz (yalnızca base64) → güvenlik riski olarak raporla. — security.service.ts:719-727.",
+      "steps": "1. 2FA kurulumu başlat. 2. DB'de two_factor_secrets.secret değerini ham secret ve base64 karşılığıyla karşılaştır.",
+      "exp": "Saklanan değer v1: önekli AES-256-GCM ciphertext'tir; ham base32 secret veya base64 karşılığı değildir.",
       "gap": false,
       "gapRefs": []
     },
@@ -2820,11 +2820,11 @@
       "code": "03",
       "prefix": "MEM",
       "domTitle": "03 — Üyelik & Premium (Gating)",
-      "title": "Geçersiz tier tipi → 500 (Prisma enum)",
+      "title": "Geçersiz tier tipi controller sınırında reddedilir",
       "tur": "Negatif/Doğrulama",
       "pri": "P2",
       "steps": "1. GET http://localhost:3001/api/membership/tiers/nonexistent.",
-      "exp": "HTTP 500 (NotFound veya 400 DEĞİL). Bu, mevcut testin doğruladığı bilinen davranıştır.",
+      "exp": "HTTP 400; geçersiz enum Prisma'ya gönderilmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -3044,7 +3044,7 @@
       "title": "Ödeme tamamlanınca üyelik aktive olur",
       "tur": "Happy path / Para",
       "pri": "P0",
-      "steps": "1. useBypass=true ise POST http://localhost:3001/api/payments/:id/bypass-complete; değilse POST /payments/process-direct test kartıyla. 2. GET /membership/me.",
+      "steps": "1. useBypass=true ise POST http://localhost:3001/api/payments/:id/bypass-complete; değilse POST /payments/direct-form test kartıyla. 2. GET /membership/me.",
       "exp": "Ödeme sonrası status=active, pendingPayment YOK; sipariş completed; MembershipPayment.status=completed; satıcının boost'suz aktif ilanları rankTier=1. GET /me efektif tier=premium.",
       "gap": false,
       "gapRefs": []
@@ -3691,11 +3691,11 @@
       "code": "03",
       "prefix": "MEM",
       "domTitle": "03 — Üyelik & Premium (Gating)",
-      "title": "updateTier olmayan tip → 404",
+      "title": "updateTier geçersiz tipi reddeder",
       "tur": "Negatif/Doğrulama",
       "pri": "P2",
       "steps": "1. PATCH /admin/tiers/nonexistent body {...}.",
-      "exp": "Geçersiz enum Prisma'ya gider → 500 (pre-validation yok). (Risk: 404 beklenirdi.)",
+      "exp": "HTTP 400; geçersiz enum controller sınırında reddedilir.",
       "gap": false,
       "gapRefs": []
     },
@@ -3717,11 +3717,11 @@
       "code": "03",
       "prefix": "MEM",
       "domTitle": "03 — Üyelik & Premium (Gating)",
-      "title": "Normal kullanıcı admin tier listesi (200 veya 403)",
+      "title": "Normal kullanıcı admin tier listesine erişemez",
       "tur": "Yetki (Authz)",
       "pri": "P1",
       "steps": "1. GET /api/membership/admin/tiers.",
-      "exp": "HTTP 200, 401 veya 403'ten biri (test [200,401,403] kabul eder). RolesGuard: user.isAdmin değil → 403 beklenir.",
+      "exp": "HTTP 401; normal kullanıcı token'ı admin JWT guard tarafından reddedilir.",
       "gap": false,
       "gapRefs": []
     },
@@ -5333,7 +5333,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "Mobile'da bu ürünlerin detayını aç; unavailable ekranını kontrol et.",
-      "exp": "Detay görünür, \"stok bitti\"/benzer ürünler (apps/mobile/app/products/unavailable) gösterilir — web products/unavailable/[productId] ile paralel.",
+      "exp": "Harici mobil istemcide detay ve stok-tükendi durumu gösterilir; API sold/inactive ürün kontratını sağlar.",
       "gap": false,
       "gapRefs": []
     },
@@ -5425,6 +5425,19 @@
       "pri": "P2",
       "steps": "GET /api/products/' OR 1=1--; GET /api/products?categoryId=' OR '1'='1.",
       "exp": "Bozuk UUID path → 400 (ParseUUIDPipe); query categoryId @IsUUID('4') → 400; Prisma parametreli sorgu (injection yok) (product.controller.ts:277, dto/product-query.dto.ts:29).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-265",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "N+1 batch: ürün listesinde satıcı istatistikleri ürün başına değil toplu çekilir (#67)",
+      "tur": "Performans",
+      "pri": "P0",
+      "steps": "1. Aynı satıcıdan N(=4) aktif ürün seed et. 2. userMembership.findUnique/findMany spy'la. 3. GET /api/products?limit=20.",
+      "exp": "N ürün döner; yanıt şekli/değeri DEĞİŞMEZ; per-ürün userMembership.findUnique HİÇ çağrılmaz (batch findMany 1 kez). Eskiden ürün başına 4 per-seller + 1 discount sorgu vardı → 20'lik sayfa 80+ sorgu. — product-common.service.ts formatProductResponseMany; discount.service.ts getEffectiveDisplayPriceMany",
       "gap": false,
       "gapRefs": []
     },
@@ -6451,7 +6464,7 @@
       "tur": "Sınır değer",
       "pri": "P1",
       "steps": "GET /api/wishlist.",
-      "exp": "Ürün listede kalır; productStatus=\"sold\". Web/mobile badge: mobil \"Satıldı\" / \"Aktif değil\" (apps/mobile/app/favorites.tsx:155-158); active değilse satın al butonu gizli (:174).",
+      "exp": "Ürün listede kalır; productStatus=\"sold\". İstemciler satın alma aksiyonunu productStatus ve stok alanlarına göre kapatır.",
       "gap": false,
       "gapRefs": []
     },
@@ -11455,7 +11468,7 @@
       "title": "Üye yeni kartla ödeme başlatır (mutlu yol, 3DS HTML döner)",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. POST /api/payments/process-direct (Bearer deniz) gövde: { \"orderId\": \" \", \"card\": { \"cardHolderName\":\"TEST KART\",\"cardNumber\":\"4355084355084358\",\"expireMonth\":\"12\",\"expireYear\":\"30\",\"cvc\":\"000\" } }. 2. Yanıttaki paymentId ile DB'de payments satırını kontrol et.",
+      "steps": "1. POST /api/payments/direct-form (Bearer deniz) gövde: { \"orderId\": \" \", \"card\": { \"cardHolderName\":\"TEST KART\",\"cardNumber\":\"4355084355084358\",\"expireMonth\":\"12\",\"expireYear\":\"30\",\"cvc\":\"000\" } }. 2. Yanıttaki paymentId ile DB'de payments satırını kontrol et.",
       "exp": "HTTP 201; yanıtta paymentId dolu, status:\"pending\", threeDSHtml 3DS form HTML'i (mock ortamda boş/null olabilir ama status pending). DB: payment.status=pending, payment.providerConversationId dolu (merchant_oid).",
       "gap": false,
       "gapRefs": []
@@ -11468,7 +11481,7 @@
       "title": "Misafir, misafir siparişini yeni kartla öder (auth gerekmez)",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. Auth header OLMADAN POST /api/payments/process-direct { \"orderId\":\" \", \"card\": {...test kart...} }.",
+      "steps": "1. Auth header OLMADAN POST /api/payments/direct-form { \"orderId\":\" \", \"card\": {...test kart...} }.",
       "exp": "HTTP 201; paymentId dolu; PayTR direct çağrısı 1 kez yapılır.",
       "gap": false,
       "gapRefs": []
@@ -11481,7 +11494,7 @@
       "title": "Kart ve kayıtlı kart ikisi de yoksa 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P0",
-      "steps": "1. POST /api/payments/process-direct { \"orderId\":\" \" } (kart/savedCardId YOK).",
+      "steps": "1. POST /api/payments/direct-form { \"orderId\":\" \" } (kart/savedCardId YOK).",
       "exp": "HTTP 400, mesaj \"Kart bilgisi veya kayıtlı kart seçimi zorunludur.\"; PayTR çağrılmaz.",
       "gap": false,
       "gapRefs": []
@@ -11507,7 +11520,7 @@
       "title": "saveCard + recurring AÇIK → store_card=true",
       "tur": "Happy path",
       "pri": "P1",
-      "steps": "1. POST /api/payments/process-direct { orderId, card:{...}, saveCard:true }.",
+      "steps": "1. POST /api/payments/direct-form { orderId, card:{...}, saveCard:true }.",
       "exp": "HTTP 201; PayTR direct çağrısında store_card=1 (mock: directPaymentCalls[0].storeCard=true).",
       "gap": false,
       "gapRefs": []
@@ -11520,7 +11533,7 @@
       "title": "saveCard ama recurring KAPALI → yine ödenir, store_card=false",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
-      "steps": "1. process-direct { orderId, card:{...}, saveCard:true }.",
+      "steps": "1. direct-form { orderId, card:{...}, saveCard:true }.",
       "exp": "HTTP 201; storeCard=false (kart saklanmaz).",
       "gap": false,
       "gapRefs": []
@@ -11533,7 +11546,7 @@
       "title": "saveCard belirtilmezse store_card=false",
       "tur": "Sınır değer",
       "pri": "P2",
-      "steps": "1. process-direct { orderId, card:{...} } (saveCard yok).",
+      "steps": "1. direct-form { orderId, card:{...} } (saveCard yok).",
       "exp": "HTTP 201; storeCard=false.",
       "gap": false,
       "gapRefs": []
@@ -11546,7 +11559,7 @@
       "title": "Kayıtlı kartla ödeme (recurring AÇIK, success, 3DS yok)",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. POST /api/payments/process-direct (Bearer deniz) { orderId, savedCardId:\" \" }.",
+      "steps": "1. POST /api/payments/direct-form (Bearer deniz) { orderId, savedCardId:\" \" }.",
       "exp": "HTTP 201; status:\"success\", threeDSHtml:null; recurring çağrısı 1 kez (utoken/ctoken kartınki); yeni-kart createDirectPayment ÇAĞRILMAZ.",
       "gap": false,
       "gapRefs": []
@@ -11559,7 +11572,7 @@
       "title": "Recurring KAPALI iken kayıtlı kartla ödeme 410",
       "tur": "Negatif/Doğrulama",
       "pri": "P0",
-      "steps": "1. process-direct { orderId, savedCardId:\" \" }.",
+      "steps": "1. direct-form { orderId, savedCardId:\" \" }.",
       "exp": "HTTP 410 Gone, mesaj \"Kayıtlı kartla ödeme şu an kullanılamıyor. Lütfen kart bilgilerinizi girin.\"; recurring çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -11572,7 +11585,7 @@
       "title": "Misafir kayıtlı kart kullanamaz (403)",
       "tur": "Yetki (Authz)",
       "pri": "P0",
-      "steps": "1. Auth header OLMADAN process-direct { orderId, savedCardId:\" \" }.",
+      "steps": "1. Auth header OLMADAN direct-form { orderId, savedCardId:\" \" }.",
       "exp": "HTTP 403 \"Kayıtlı kartla ödeme için giriş yapmanız gerekiyor\"; recurring çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -11585,7 +11598,7 @@
       "title": "Başkasının kayıtlı kartıyla ödeyemez (404)",
       "tur": "Yetki (Authz) / Güvenlik",
       "pri": "P0",
-      "steps": "1. process-direct (Bearer deniz) { orderId, savedCardId:\" \" }.",
+      "steps": "1. direct-form (Bearer deniz) { orderId, savedCardId:\" \" }.",
       "exp": "HTTP 404 \"Kayıtlı kart bulunamadı\"; recurring çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -11598,7 +11611,7 @@
       "title": "require_cvv kartta CVV yoksa 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
-      "steps": "1. process-direct (Bearer deniz) { orderId, savedCardId:\" \" } (cvv YOK).",
+      "steps": "1. direct-form (Bearer deniz) { orderId, savedCardId:\" \" } (cvv YOK).",
       "exp": "HTTP 400 \"Bu kart için CVV gereklidir\"; recurring çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -11611,7 +11624,7 @@
       "title": "Kayıtlı kartla ödeme başarısız → status=failed + failureReason",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
-      "steps": "1. process-direct { orderId, savedCardId:\" \" }. 2. DB'de payment satırını kontrol et.",
+      "steps": "1. direct-form { orderId, savedCardId:\" \" }. 2. DB'de payment satırını kontrol et.",
       "exp": "HTTP 201, yanıt status:\"failed\"; payment.failureReason \"Kart kapalı\" içerir.",
       "gap": false,
       "gapRefs": []
@@ -11715,7 +11728,7 @@
       "title": "Y8: eski merchant_oid ile gelen callback (oid history) eşleşir",
       "tur": "Sınır değer",
       "pri": "P1",
-      "steps": "1. process-direct (1. kez) → oid1 atanır. 2. Tekrar process-direct (2. kez) → oid2 atanır, oid1 history'ye eklenir. 3. callback/paytr merchant_oid=oid1 (eski) geçerli imzalı success ile gönder.",
+      "steps": "1. direct-form (1. kez) → oid1 atanır. 2. Tekrar direct-form (2. kez) → oid2 atanır, oid1 history'ye eklenir. 3. callback/paytr merchant_oid=oid1 (eski) geçerli imzalı success ile gönder.",
       "exp": "Ödeme eski oid ile eşleşip tamamlanır; \"OK\".",
       "gap": false,
       "gapRefs": []
@@ -11725,10 +11738,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Önceki deneme PayTR'da ödendiyse ikinci process-direct çift çekmez (durum-sorgu)",
+      "title": "Önceki deneme PayTR'da ödendiyse ikinci direct-form çift çekmez (durum-sorgu)",
       "tur": "Idempotency",
       "pri": "P0",
-      "steps": "1. process-direct (1. kez) → 201, oid atanır. 2. PayTR durum-sorgu mock'unu ödendi yap. 3. process-direct (2. kez, aynı sipariş).",
+      "steps": "1. direct-form (1. kez) → 201, oid atanır. 2. PayTR durum-sorgu mock'unu ödendi yap. 3. direct-form (2. kez, aynı sipariş).",
       "exp": "2. çağrı HTTP 400 \"Bu ödeme zaten alınmış görünüyor...\"; PayTR direct çağrısı toplam 1 (çift çekim YOK); payment completed.",
       "gap": false,
       "gapRefs": []
@@ -11738,10 +11751,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Eşzamanlı iki process-direct (H2): biri 201, biri 400",
+      "title": "Eşzamanlı iki direct-form (H2): biri 201, biri 400",
       "tur": "Eşzamanlılık",
       "pri": "P0",
-      "steps": "1. Aynı anda iki process-direct (aynı orderId, aynı kart) gönder.",
+      "steps": "1. Aynı anda iki direct-form (aynı orderId, aynı kart) gönder.",
       "exp": "Durum kodları sıralı [201, 400]; 400 mesajı \"Bu ödeme şu anda işleniyor...\"; PayTR direct çağrısı = 1.",
       "gap": false,
       "gapRefs": []
@@ -11754,7 +11767,7 @@
       "title": "Çekim bittikten sonra tekrar deneme mümkün (claim pending'e bırakılır)",
       "tur": "Idempotency",
       "pri": "P1",
-      "steps": "1. process-direct → 201; DB'de payment kontrol. 2. Tekrar process-direct (seri).",
+      "steps": "1. direct-form → 201; DB'de payment kontrol. 2. Tekrar direct-form (seri).",
       "exp": "İlk çağrı sonrası payment.status=pending; ikinci çağrı 201; PayTR direct çağrısı = 2.",
       "gap": false,
       "gapRefs": []
@@ -11806,7 +11819,7 @@
       "title": "24h içinde retry → rezervasyon CAS ile geri alınır, ödeme tamamlanır",
       "tur": "Happy path (alternatif yol)",
       "pri": "P0",
-      "steps": "1. process-direct { orderId, card:{...} }. 2. DB: rezervasyon geri alınmış mı? 3. Geçerli success callback gönder.",
+      "steps": "1. direct-form { orderId, card:{...} }. 2. DB: rezervasyon geri alınmış mı? 3. Geçerli success callback gönder.",
       "exp": "reservedQuantity=1, reservationReleasedAt=null; callback sonrası sipariş paid/preparing; product.quantity=0.",
       "gap": false,
       "gapRefs": []
@@ -12222,7 +12235,7 @@
       "title": "Alıcı iade talep eder → sipariş iptal, hold cancelled, stok geri, PayTR refund",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. processRefund(orderId) (servis düzeyi; uç: POST /api/payments/refund {orderId} Bearer deniz).",
+      "steps": "1. processRefund(orderId) servis düzeyinde çağır (paylaşılan executor; buyer-facing uç #61 ile kaldırıldı).",
       "exp": "order.status=cancelled; hold.status=cancelled; PayTR refund çağrısı ≥1; ürün stoğu geri.",
       "gap": false,
       "gapRefs": []
@@ -12232,11 +12245,11 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Yalnız alıcı iade talep edebilir (satıcı 403)",
-      "tur": "Yetki (Authz)",
+      "title": "`POST /payments/refund` KALDIRILDI (#61) → satıcı çağrısı da 404",
+      "tur": "Güvenlik / Yetki",
       "pri": "P0",
-      "steps": "1. POST /api/payments/refund { orderId } (Bearer ahmet — satıcı).",
-      "exp": "HTTP 403 \"Sadece alıcı iade talebi oluşturabilir\".",
+      "steps": "1. Satıcı token'ı ile POST /api/payments/refund { orderId } (uç kaldırıldı).",
+      "exp": "HTTP 404 (route yok; authz'a bile ulaşmadan). Buyer-facing iade ucu #61 ile kaldırıldı. — payment.controller.ts",
       "gap": false,
       "gapRefs": []
     },
@@ -12245,11 +12258,11 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "İade: tamamlanmış ödeme yoksa 404",
-      "tur": "Negatif/Doğrulama",
+      "title": "REGRESYON (#61): alıcı geçerli ödenmiş siparişi bu uçtan self-refund edemez",
+      "tur": "Güvenlik / Negatif",
       "pri": "P1",
-      "steps": "1. POST /api/payments/refund { orderId }.",
-      "exp": "HTTP 404 (sipariş yoksa) / \"Tamamlanmış ödeme bulunamadı\".",
+      "steps": "1. Alıcı, ödenmiş siparişi için POST /api/payments/refund { orderId } (uç kaldırıldı).",
+      "exp": "HTTP 404; ödeme dokunulmaz (completed kalır). Alıcı iadeleri artık POST /orders/:id/refund-requests. — payment.controller.ts (#61)",
       "gap": false,
       "gapRefs": []
     },
@@ -12258,11 +12271,11 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "İade tutarı üst sınırı aşamaz (O12, 400)",
-      "tur": "Sınır değer / Para",
+      "title": "`POST /payments/refund` KALDIRILDI (#61) → client refundAmount ile de 404",
+      "tur": "Güvenlik / Sınır değer",
       "pri": "P1",
-      "steps": "1. POST /api/payments/refund { orderId, refundAmount: 250 }.",
-      "exp": "HTTP 400 \"İade tutarı (...) izin verilen üst sınırı (...) aşıyor\".",
+      "steps": "1. Alıcı POST /api/payments/refund { orderId, refundAmount: 100000 } (uç kaldırıldı).",
+      "exp": "HTTP 404 (route yok). Client-supplied refundAmount'a güvenen buyer-facing uç kaldırıldı. — payment.controller.ts (#61)",
       "gap": false,
       "gapRefs": []
     },
@@ -12310,10 +12323,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Grup ödemesi: process-direct(checkoutGroupId) → PayTR çağrılır, payment gruba bağlı",
+      "title": "Grup ödemesi: direct-form(checkoutGroupId) → PayTR çağrılır, payment gruba bağlı",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. POST /api/payments/process-direct { checkoutGroupId, card:{...} }.",
+      "steps": "1. POST /api/payments/direct-form { checkoutGroupId, card:{...} }.",
       "exp": "HTTP 201; PayTR direct çağrısı = 1; payment.checkoutGroupId eşleşir; gönderilen tutar = payment.amount ≥ 400.",
       "gap": false,
       "gapRefs": []
@@ -12326,7 +12339,7 @@
       "title": "Grup: bir sipariş pending_payment değilse 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
-      "steps": "1. process-direct { checkoutGroupId, card:{...} }.",
+      "steps": "1. direct-form { checkoutGroupId, card:{...} }.",
       "exp": "HTTP 400 \"Gruptaki bir sipariş ödeme beklemiyor...\".",
       "gap": false,
       "gapRefs": []
@@ -12339,7 +12352,7 @@
       "title": "Grup: zaten ödenmiş grup → 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P2",
-      "steps": "1. process-direct { checkoutGroupId, card:{...} }.",
+      "steps": "1. direct-form { checkoutGroupId, card:{...} }.",
       "exp": "HTTP 400 \"Bu sipariş grubu zaten ödendi\".",
       "gap": false,
       "gapRefs": []
@@ -12349,10 +12362,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Takas nakit: process-direct(tradeId) → PayTR çağrılır, payment trade-cash'e bağlı",
+      "title": "Takas nakit: direct-form(tradeId) → PayTR çağrılır, payment trade-cash'e bağlı",
       "tur": "Happy path",
       "pri": "P1",
-      "steps": "1. POST /api/payments/process-direct (Bearer ahmet) { tradeId, card:{...} }.",
+      "steps": "1. POST /api/payments/direct-form (Bearer ahmet) { tradeId, card:{...} }.",
       "exp": "HTTP 201; PayTR direct çağrısı = 1, tutar = 100; payment.tradeCashPaymentId eşleşir, payment.status=pending.",
       "gap": false,
       "gapRefs": []
@@ -12365,7 +12378,7 @@
       "title": "Takas: ödeyen olmayan taraf ödeyemez (403)",
       "tur": "Yetki (Authz)",
       "pri": "P0",
-      "steps": "1. process-direct (Bearer ayse — ödeyen değil) { tradeId, card:{...} }.",
+      "steps": "1. direct-form (Bearer ayse — ödeyen değil) { tradeId, card:{...} }.",
       "exp": "HTTP 403 \"Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir\"; PayTR çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -12508,7 +12521,7 @@
       "title": "PayTR'a giden tutar ondalık TL'dir (kuruş DEĞİL)",
       "tur": "Para/Vergi",
       "pri": "P0",
-      "steps": "1. process-direct yap, mock'ta PayTR'a giden amount değerini kontrol et.",
+      "steps": "1. direct-form yap, mock'ta PayTR'a giden amount değerini kontrol et.",
       "exp": "PayTR'a giden tutar 300 (TL, ondalık), 30000 DEĞİL.",
       "gap": false,
       "gapRefs": []
@@ -12547,7 +12560,7 @@
       "title": "Üye başkasının siparişini ödeyemez (403)",
       "tur": "Yetki (Authz)",
       "pri": "P0",
-      "steps": "1. process-direct (Bearer kaan) { orderId:\" \", card:{...} }.",
+      "steps": "1. direct-form (Bearer kaan) { orderId:\" \", card:{...} }.",
       "exp": "HTTP 403 \"Bu sipariş için ödeme yapamazsınız\"; PayTR çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -12560,7 +12573,7 @@
       "title": "Misafir, üyeye ait siparişi ödeyemez (403)",
       "tur": "Yetki (Authz)",
       "pri": "P0",
-      "steps": "1. Auth header OLMADAN process-direct { orderId, card:{...} }.",
+      "steps": "1. Auth header OLMADAN direct-form { orderId, card:{...} }.",
       "exp": "HTTP 403 \"Bu sipariş için giriş yapmanız gerekiyor\"; PayTR çağrısı = 0.",
       "gap": false,
       "gapRefs": []
@@ -12739,10 +12752,10 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Throttle: process-direct 10/dk üstünde 429",
+      "title": "Throttle: direct-form 10/dk üstünde 429",
       "tur": "Güvenlik (rate limit)",
       "pri": "P2",
-      "steps": "1. 60sn içinde 11 process-direct isteği gönder.",
+      "steps": "1. 60sn içinde 11 direct-form isteği gönder.",
       "exp": "11. istek HTTP 429 (Too Many Requests).",
       "gap": false,
       "gapRefs": []
@@ -14325,11 +14338,11 @@
       "code": "12",
       "prefix": "REF",
       "domTitle": "12 — İade & İptal",
-      "title": "`POST /payments/refund` (legacy) yalnızca alıcı + auth + UUID kuralları",
-      "tur": "Yetki (Authz) / Negatif/Doğrulama",
+      "title": "`POST /payments/refund` KALDIRILDI (#61) → her çağrı 404; iade RefundController'dan",
+      "tur": "Güvenlik / Yetki",
       "pri": "P1",
-      "steps": "1. Satıcı ile POST /api/payments/refund body { \"orderId\": \" \" }. 2. Yabancı ile aynı. 3. Auth'suz aynı. 4. { \"orderId\": \"a0000000-0000-4000-8000-000000000000\" } (alıcı). 5. { \"orderId\": \"not-a-uuid\" } (alıcı). 6. Alıcı ile geçerli { \"orderId\": \" \" }.",
-      "exp": "(1)(2) 403, (3) 401, (4) 404, (5) 400, (6) 201 (success=true, refundAmount>0, payment refunded, order cancelled, stok geri yüklenir). — refund-extended e2e \"POST /api/payments/refund\"",
+      "steps": "1. Alıcı/satıcı/yabancı ile POST /api/payments/refund { orderId } → hepsi 404. 2. Auth'suz da 404. 3. Aynı alıcı POST /api/orders/:id/refund-requests { reason: changed_mind }.",
+      "exp": "(1)(2) route kaldırıldığından tüm çağrılar 404 (auth'suz bile 401 değil 404). (3) 201 anlık iade: payment refunded, order cancelled, PayTR 1 çağrı. — payment.controller.ts (uç kaldırıldı, #61); refund.service.ts createInstantRefund",
       "gap": false,
       "gapRefs": []
     },
@@ -14715,11 +14728,11 @@
       "code": "12",
       "prefix": "REF",
       "domTitle": "12 — İade & İptal",
-      "title": "İade tutarı üst sınır aşımı (O12) reddi",
+      "title": "Alıcı iade tutarını kontrol edemez (client refundAmount yok sayılır)",
       "tur": "Para/Vergi / Güvenlik",
       "pri": "P0",
-      "steps": "1. POST /api/payments/refund body { \"orderId\": \" \", \"refundAmount\": } (alıcı).",
-      "exp": "HTTP 400, \"İade tutarı (...) izin verilen üst sınırı (...) aşıyor\". — payment.service.ts:3019-3029",
+      "steps": "1. Alıcı POST /api/orders/:id/refund-requests body { reason: changed_mind, refundAmount: 999999 } (enjekte alan).",
+      "exp": "HTTP 201; enjekte refundAmount whitelist ValidationPipe ile strip → iade sunucunun hesapladığı sipariş toplamıyla işlenir (999999 değil). — main.ts ValidationPipe(whitelist); refund.service.ts createInstantRefund/computeRefundAmount",
       "gap": false,
       "gapRefs": []
     },
@@ -14770,8 +14783,8 @@
       "title": "Payout completed/processing iken iade reddi (çift-ödeme koruması)",
       "tur": "Eşzamanlılık / Para/Vergi / Güvenlik",
       "pri": "P0",
-      "steps": "1. processRefund(orderId) tetikle (veya POST /payments/refund).",
-      "exp": "400, \"Transfer zaten başlatılmış, iade yapılamaz\"; bekleyen (pending/retry_pending) payout'lar atomik failed (order_refunded) olur. — payment.service.ts:3043-3060",
+      "steps": "1. Ödenmiş sipariş + completed payout ekle; alıcı POST /api/orders/:id/refund-requests.",
+      "exp": "HTTP 400, \"Transfer zaten başlatılmış, iade yapılamaz\"; oluşturulan RefundRequest geri alınır, PayTR çağrısı olmaz. — payment-refund.service.ts processRefund guard; refund.service.ts createInstantRefund rollback",
       "gap": false,
       "gapRefs": []
     },
@@ -14952,8 +14965,8 @@
       "title": "Anlık iade + eşzamanlı payout cron yarışı",
       "tur": "Eşzamanlılık / Para/Vergi",
       "pri": "P1",
-      "steps": "1. processRefund(orderId) ve payout cron'unu yakın zamanlı tetikle.",
-      "exp": "Satır başına tek kazanan; pending payout failed (order_refunded) ya da iade 400 (in-flight). — payment.service.ts:3038-3060",
+      "steps": "1. Ödenmiş sipariş + pending payout ekle; alıcı POST /api/orders/:id/refund-requests.",
+      "exp": "HTTP 201; pending payout atomik failed (order_refunded) olur (iade satıcıya çift-ödeme yapmaz). — payment-refund.service.ts processRefund",
       "gap": false,
       "gapRefs": []
     },
@@ -14979,7 +14992,7 @@
       "tur": "i18n / Parite",
       "pri": "P2",
       "steps": "1. Mobilde İadelerim listesini aç; durum/sebep etiketlerini gözle.",
-      "exp": "Tüm metinler Türkçe (örn. \"Satıcı İncelemesinde\", \"İade Edildi\"); locale değişimi metinleri değiştirmez. — apps/mobile/app/refund-requests/index.tsx:25-45",
+      "exp": "Harici mobil istemcide tüm iade metinleri Türkçedir; locale değişimi metinleri değiştirmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -15066,11 +15079,11 @@
       "code": "12",
       "prefix": "REF",
       "domTitle": "12 — İade & İptal",
-      "title": "Satıcı, alıcı adına `POST /payments/refund` ile para iadesi tetikleyemez",
+      "title": "Satıcı, alıcı adına iade tetikleyemez (RefundController buyerId kontrolü)",
       "tur": "Güvenlik / Yetki",
       "pri": "P0",
-      "steps": "1. Satıcı token'ı ile POST /api/payments/refund body { \"orderId\": \" \" }.",
-      "exp": "HTTP 403, \"Sadece alıcı iade talebi oluşturabilir\". — payment.controller.ts:430-433",
+      "steps": "1. Satıcı token'ı ile POST /api/orders/:id/refund-requests body { reason: changed_mind }.",
+      "exp": "HTTP 403, \"Sadece alıcı iade talebi oluşturabilir\". (Doğrudan uç #61 ile kaldırıldı; satıcı için tek yol RefundController.) — refund.service.ts createRefundRequest",
       "gap": false,
       "gapRefs": []
     },
@@ -15079,11 +15092,24 @@
       "code": "12",
       "prefix": "REF",
       "domTitle": "12 — İade & İptal",
-      "title": "`POST /payments/refund` rate limit (5 istek/dk)",
-      "tur": "Güvenlik / Sınır deger",
+      "title": "`POST /payments/refund` KALDIRILDI (#61) → rate-limit senaryosu konusuz (skip)",
+      "tur": "Güvenlik / Sınır değer",
       "pri": "P2",
-      "steps": "1. 1 dakika içinde aynı endpoint'e 6 istek gönder.",
-      "exp": "6. istek HTTP 429 Too Many Requests. — payment.controller.ts:402",
+      "steps": "1. — (uç kaldırıldı).",
+      "exp": "Buyer-facing iade ucu #61 ile kaldırıldı → rate-limit testi konusuz. scenario.skip. — payment.controller.ts",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "REF-145",
+      "code": "12",
+      "prefix": "REF",
+      "domTitle": "12 — İade & İptal",
+      "title": "REGRESYON (#61): alıcı teslim edilmiş siparişi self-refund edip malı tutamaz",
+      "tur": "Güvenlik / Para/Vergi",
+      "pri": "P0",
+      "steps": "1. Ödenmiş+teslim edilmiş sipariş. 2. Alıcı POST /api/payments/refund { orderId } → 404 (route kaldırıldı). 3. Alıcı POST /api/orders/:id/refund-requests { reason: changed_mind }.",
+      "exp": "(2) HTTP 404, PayTR iadesi yok. (3) HTTP 201 ama status return_shipment_open (iade kargosu; mal geri gelmeli), ANINDA para iadesi YOK: PayTR çağrısı 0, ödeme completed, hold iptal edilmez. — payment.controller.ts (uç kaldırıldı, #61); refund.service.ts createCoolingOffRefund",
       "gap": false,
       "gapRefs": []
     },
@@ -18927,11 +18953,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "Eşzamanlı iki fatura üretimi → numara çakışma riski",
+      "title": "Eşzamanlı iki fatura üretimi tek kayda yakınsar",
       "tur": "Eşzamanlılık",
       "pri": "P1",
       "steps": "1. İki isteği paralel (race) gönder.",
-      "exp": "İdeal: ikisi de farklı numara alır. Risk: ikisi aynı -NNNNNN türetir → biri P2002 unique hatası (500/400). Davranış raporlanmalı. — invoice.service.ts:961-976 (kilitsiz read-then-increment).",
+      "exp": "İki istek de başarılı olur, aynı invoiceNumber döner ve sipariş için yalnız bir Invoice kaydı oluşur; 5xx üretilmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -18940,11 +18966,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "Aynı sipariş için çift üretim (idempotency yok) → mükerrer fatura",
+      "title": "Aynı sipariş için çift üretim idempotenttir",
       "tur": "Idempotency",
       "pri": "P1",
       "steps": "1. POST /api/invoices/generate/:orderId iki kez çağır.",
-      "exp": "Sipariş için 2 Invoice kaydı oluşur (farklı numaralı). Bilinen davranış: e2e testi de length).toBeGreaterThan(0) ve \"payment success may also auto-generate\" notu düşüyor. — invoice.service.ts:308-322; invoice-pdf.e2e-spec.ts:93-98.",
+      "exp": "Ardışık çağrılar aynı invoiceNumber değerini döndürür ve sipariş için yalnız bir Invoice kaydı kalır.",
       "gap": false,
       "gapRefs": []
     },
@@ -19122,11 +19148,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "generateRefundInvoice credit note üretir (-amount, taxAmount=0)",
-      "tur": "Para/Vergi",
+      "title": "Legacy generateRefundInvoice yerel ikinci faturayı reddeder",
+      "tur": "Para/Vergi/Güvenlik",
       "pri": "P1",
       "steps": "1. InvoiceService.generateRefundInvoice(orderId, 300) çağır (unit/integration).",
-      "exp": "Yeni Invoice: invoiceNumber= -R, subtotal=-300, total=-300, taxAmount=0, notes orijinal numara referanslı, status='issued'. — invoice.service.ts:1283-1313.",
+      "exp": "BadRequestException; siparişin tek yerel Invoice kaydı korunur. İade belgesi yalnız eLogo return_invoice akışından oluşturulur.",
       "gap": false,
       "gapRefs": []
     },
@@ -19135,11 +19161,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "generateRefundInvoice orijinal fatura yoksa → 404",
+      "title": "Legacy generateRefundInvoice kayıt varlığından bağımsız reddedilir",
       "tur": "Negatif/Doğrulama",
       "pri": "P2",
       "steps": "1. generateRefundInvoice(orderId, 100).",
-      "exp": "NotFoundException. — invoice.service.ts:1288-1290.",
+      "exp": "BadRequestException; legacy yol kayıt varlığını sızdırmadan fail-closed davranır.",
       "gap": false,
       "gapRefs": []
     },
@@ -19148,11 +19174,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "İade faturası akışa bağlı DEĞİL (dead code uyarısı)",
+      "title": "Yerel -R faturası oluşmaz; iade belgesi eLogo akışındadır",
       "tur": "Güvenlik / Kapsam",
       "pri": "P1",
       "steps": "1. Bir siparişte iade tamamla. 2. DB'de -R faturası oluşmuş mu kontrol et.",
-      "exp": "Hiçbir -R faturası oluşmaz (kaynak taramada generateRefundInvoice çağıran yok). Raporlama/iade muhasebesi açığı olarak kaydedilmeli. — kaynak: generateRefundInvoice/cancelInvoice yalnız tanımda, çağrı yok.",
+      "exp": "Yerel Invoice tablosunda -R faturası oluşmaz; eLogo return_invoice akışı ayrı idempotent belge kaydı üretir.",
       "gap": false,
       "gapRefs": []
     },
@@ -19477,7 +19503,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "1. Mobil orders/[id] aç, KDV satırını ve fatura indirme aramasını yap.",
-      "exp": "\"KDV\" satırı görünür (apps/mobile/app/orders/[id].tsx:760-765); fatura indirme butonu/akışı yok (kaynakta downloadInvoice yok). Parite açığı.",
+      "exp": "Harici mobil istemcide KDV satırı görünür; fatura indirme desteği istemci repository'sinde doğrulanır.",
       "gap": false,
       "gapRefs": []
     },
@@ -19551,11 +19577,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "effectiveFrom/effectiveTo çözümlemede kullanılmıyor (risk)",
+      "title": "Süresi geçmiş vergi oranı çözümlemede kullanılmaz",
       "tur": "Sınır değer",
       "pri": "P1",
       "steps": "1. GET /api/tax/calculate?countryCode=TR&subtotal=1000.",
-      "exp": "Süresi dolmuş oran yine döner (tarih filtresi yok) — bilinen açık. resolveTaxRate yalnız isActive bakar. — tax.service.ts:70-95 (effectiveFrom/To filtresi yok).",
+      "exp": "effectiveTo geçmiş oran aktif işaretli olsa bile rate ve taxRateId null döner; vergi tutarı hesaplanmaz.",
       "gap": false,
       "gapRefs": []
     },
@@ -19564,11 +19590,11 @@
       "code": "16",
       "prefix": "TAX",
       "domTitle": "16 — Vergi (KDV) & Fatura",
-      "title": "scope='product' kuralı çözümlemede uygulanmaz (risk)",
+      "title": "Desteklenmeyen product vergi kuralı oluşturulamaz",
       "tur": "Sınır değer",
       "pri": "P2",
-      "steps": "1. İlgili kategori/ürün için hesap çağır.",
-      "exp": "product kuralı dikkate alınmaz; default_rate (veya category) uygulanır. — tax.service.ts:74-77 (sorguda yalnız default_rate + category).",
+      "steps": "1. Super admin olarak scope=product vergi kuralı oluşturmayı dene.",
+      "exp": "Resolver productId desteklemediği sürece API 400 döner ve çözülemeyen kural kaydedilmez.",
       "gap": false,
       "gapRefs": []
     },
@@ -19660,6 +19686,19 @@
       "pri": "P1",
       "steps": "1. Ödeme tamamla; MailHog'da alıcı e-postasının adresini kontrol et.",
       "exp": "Alıcı e-postası shippingAddress.guestEmail'e; takip linki /track-order?orderNumber=...&email=... (login gerektirmez). — invoice.service.ts:356-376.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "TAX-096",
+      "code": "16",
+      "prefix": "TAX",
+      "domTitle": "16 — Vergi (KDV) & Fatura",
+      "title": "IDOR: başkasının siparişinin faturası POST /invoices/generate ile üretilemez (#63)",
+      "tur": "Güvenlik / Yetki",
+      "pri": "P0",
+      "steps": "1. İlgisiz kullanıcı POST /api/invoices/generate/:orderId (başka birinin siparişi). 2. Sahip alıcı aynı çağrı. 3. Sahip satıcı aynı çağrı.",
+      "exp": "(1) HTTP 403, fatura satırı OLUŞMAZ (PII/PDF sızmaz). (2)(3) HTTP 201 (sahip taraflar üretebilir). — invoice.controller.ts generateInvoice → invoice.service.ts generateForOrderAsUser sahiplik guard'ı (#63)",
       "gap": false,
       "gapRefs": []
     },
@@ -20815,7 +20854,7 @@
       "title": "Boost ödemesi tamamlanınca ürün rankTier=2 + boost active",
       "tur": "Para / İş kuralı",
       "pri": "P0",
-      "steps": "1. Boost order'ı için ödeme tamamla (bypass/process-direct).",
+      "steps": "1. Boost order'ı için ödeme tamamla (bypass/direct-form).",
       "exp": "ProductBoost.status=active, startsAt/endsAt dolu (endsAt = now + 7 gün); ürün rankTier=2, boostedUntil=endsAt; boost order status=completed (kargo akışına girmez).",
       "gap": false,
       "gapRefs": []
@@ -22781,9 +22820,7 @@
       "steps": "1. score: \"abc\" gönder → 400 beklenir. 2. score: 4.5 gönder → kabul/ret davranışını gözle ve raporla (NOT: @IsNumber() ondalığı reddetmez; DB score Int olduğundan kayıt davranışını doğrula).",
       "exp": "\"abc\" → 400. 4.5 için: kabul edilirse DB'de Int'e nasıl yansıdığı raporlanır (potansiyel veri tutarsızlığı — bilinen risk).",
       "gap": true,
-      "gapRefs": [
-        "RAT-053"
-      ]
+      "gapRefs": ["RAT-053"]
     },
     {
       "id": "RAT-054",
@@ -22900,9 +22937,7 @@
       "steps": "1. Küfürlü comment ile puan ver.",
       "exp": "201, kayıt pending. Public'te görünmez; admin moderasyonu reddedebilir. (Bilinen davranış — fail-open + admin denetimi.)",
       "gap": true,
-      "gapRefs": [
-        "RAT-063"
-      ]
+      "gapRefs": ["RAT-063"]
     },
     {
       "id": "RAT-070",
@@ -22993,9 +23028,7 @@
       "steps": "1. PATCH /api/admin/reviews/ /status { status: \"spam\" }. 2. PATCH .../status { status: \"deleted\" }.",
       "exp": "Her ikisi 400 (admin DTO enum'ında yok). Bilinen kapsam farkı: spam/deleted yalnız DB seviyesinde tanımlı, admin API'sinden set edilemez — açık risk olarak raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-076"
-      ]
+      "gapRefs": ["RAT-076"]
     },
     {
       "id": "RAT-077",
@@ -23177,9 +23210,7 @@
       "steps": "1. Aynı token ile aynı ratingId'ye 3 kez POST .../helpful.",
       "exp": "Her çağrı +1; helpfulCount=3. Açık risk: kullanıcı başına benzersizlik/idempotency yok — şişirilebilir. Raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-102"
-      ]
+      "gapRefs": ["RAT-102"]
     },
     {
       "id": "RAT-103",
@@ -23205,9 +23236,7 @@
       "steps": "1. Aynı sipariş için farklı skorla tekrar POST /api/ratings/users. 2. Olası PATCH /api/ratings/users/ veya PUT dene.",
       "exp": "Tekrar POST → 400 \"Bu sipariş için zaten puan verdiniz\". PATCH/PUT → 404/405 (route yok). DB'deki orijinal skor değişmez.",
       "gap": true,
-      "gapRefs": [
-        "RAT-110, RAT-111"
-      ]
+      "gapRefs": ["RAT-110, RAT-111"]
     },
     {
       "id": "RAT-111",
@@ -23220,9 +23249,7 @@
       "steps": "1. DELETE /api/ratings/products/ veya /ratings/users/ dene.",
       "exp": "404/405 (route yok). Puan DB'de kalır. (Mantıksal silme yalnız admin rejected/DB deleted ile.)",
       "gap": true,
-      "gapRefs": [
-        "RAT-110, RAT-111"
-      ]
+      "gapRefs": ["RAT-110, RAT-111"]
     },
     {
       "id": "RAT-120",
@@ -23274,9 +23301,7 @@
       "steps": "1. FREE üyeyle mobile yorum yaz → 500 karakterde kesilir. 2. Premium üyeyle 2000 karaktere izin verilir; ancak API review 1001+ karakterde 400 döndürür.",
       "exp": "İstemci kesimi üyeliğe göre; API üst sınır 1000 (review). Premium 2000 yazsa API reddeder — bilinen parite riski, raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-123"
-      ]
+      "gapRefs": ["RAT-123"]
     },
     {
       "id": "RAT-124",
@@ -23289,9 +23314,7 @@
       "steps": "1. ahmet (satıcı) ile web/mobile sipariş detayı → değerlendirme butonu görünmez. 2. API üzerinden satıcı→alıcı puanı (RAT-003) yine de oluşturulabilir.",
       "exp": "UI satıcıya değerlendirme sunmaz; API kabul eder. Parite boşluğu/ürün kararı raporlanmalı.",
       "gap": true,
-      "gapRefs": [
-        "RAT-124"
-      ]
+      "gapRefs": ["RAT-124"]
     },
     {
       "id": "RAT-125",
@@ -23421,9 +23444,7 @@
       "steps": "1. Çeşitli hata senaryolarını tetikle, message alanını incele.",
       "exp": "Tüm backend rating hataları Türkçe sabit; Accept-Language: en gönderilse de mesaj Türkçe kalır (i18n katmanı yok). Bilinen davranış — raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-150, RAT-152"
-      ]
+      "gapRefs": ["RAT-150, RAT-152"]
     },
     {
       "id": "RAT-151",
@@ -23449,9 +23470,7 @@
       "steps": "1. Mobile dilini EN'e al, RatingModal'ı aç.",
       "exp": "Etiketler Türkçe kalır (i18n bağlanmamış). Web ile parite farkı — raporla.",
       "gap": true,
-      "gapRefs": [
-        "RAT-150, RAT-152"
-      ]
+      "gapRefs": ["RAT-150, RAT-152"]
     },
     {
       "id": "MOD-001",
@@ -24959,9 +24978,7 @@
       "steps": "1. POST /api/media/upload?folder=messages ile NSFW görsel → engellenir (400). 2. Aynı görseli POST /api/media/upload/multiple?folder=messages ile yükle.",
       "exp": "Adım 1: HTTP 400 \"uygun değildir\". Adım 2: HTTP 201 (denetim yok). Fark RAPORLANIR. (media.controller.ts:48 var, 69-87 yok)",
       "gap": true,
-      "gapRefs": [
-        "MED-033"
-      ]
+      "gapRefs": ["MED-033"]
     },
     {
       "id": "MED-040",
@@ -25351,9 +25368,7 @@
       "steps": "1. ahmet@demo.com (yükleyen) ile DELETE /api/media/file/ .",
       "exp": "HTTP 404 \"Dosya bulunamadı.\" (DB'de kayıt yok). Bu durumda S3 objesi /media üzerinden silinemez — ayrı temizleme yolu olduğu raporlanır. (media.service.ts:310, media-access.service.ts:37-44)",
       "gap": true,
-      "gapRefs": [
-        "MED-075"
-      ]
+      "gapRefs": ["MED-075"]
     },
     {
       "id": "MED-076",
@@ -25444,9 +25459,7 @@
       "steps": "1. POST /api/media/upload?folder=messages ile PDF baytlarını image/jpeg MIME'ı ile gönder.",
       "exp": "MIME kontrolü image/jpeg gördüğü için GEÇER (HTTP 201) — içerik PDF olsa da. Bu bilinen spoofing yüzeyi RAPORLANIR (sharp ile işlenen uçlarda resize aşamasında patlayabilir; ham upload'ta geçer). (media.service.ts:74, storage.service.ts:171)",
       "gap": true,
-      "gapRefs": [
-        "MED-085"
-      ]
+      "gapRefs": ["MED-085"]
     },
     {
       "id": "MED-086",
@@ -25459,9 +25472,7 @@
       "steps": "1. POST /api/media/upload/product ile sahte image/jpeg (gerçek görsel değil) gönder.",
       "exp": "sharp toBuffer hatası → istek BadRequest veya 500 (gerçek davranış gözlemlenir; tercih edilen 400). media.service.ts upload try/catch'i \"File upload failed\" 400'e çevirir; uploadProductImageVariants'ta try/catch yok → ham hata 500 olabilir. Fark RAPORLANIR. (media.service.ts:84-155 vs 290-340)",
       "gap": true,
-      "gapRefs": [
-        "MED-086"
-      ]
+      "gapRefs": ["MED-086"]
     },
     {
       "id": "MED-087",
@@ -25500,9 +25511,7 @@
       "steps": "1. POST /api/media/upload?folder=messages ile 100MB jpeg gönder.",
       "exp": "Dosya tamamen buffer'a alınır, sonra media.service.ts:67 ile 400 reddedilir — ancak bellek tüketimi gerçekleşir. Framework-seviyesi sınır olmadığı RAPORLANIR (öneri: MulterModule limits.fileSize). (media.module.ts — limits yok; media.service.ts:67)",
       "gap": true,
-      "gapRefs": [
-        "MED-089"
-      ]
+      "gapRefs": ["MED-089"]
     },
     {
       "id": "MED-092",
@@ -25655,8 +25664,8 @@
       "title": "Mobile ürün görseli yükleme paritesi",
       "tur": "Parite",
       "pri": "P1",
-      "steps": "1. apps/mobile/src/components/listing/ListingForm.tsx üzerinden 2 fotoğraf yükle.",
-      "exp": "POST /media/upload/product, alan adı images, multipart. Web ile aynı sonuç şekli. (apps/mobile/src/services/api.ts:915-921, ListingForm.tsx:552)",
+      "steps": "1. Harici mobil istemciden 2 ürün fotoğrafı yükle.",
+      "exp": "POST /media/upload/product, alan adı images, multipart. Web ile aynı sonuç şekli.",
       "gap": false,
       "gapRefs": []
     },
@@ -25669,7 +25678,7 @@
       "tur": "Parite",
       "pri": "P1",
       "steps": "1. Web'de avatar değiştir → yükle. 2. Mobile'da avatar değiştir → yükle.",
-      "exp": "İkisi de POST /media/upload/avatar alan avatar; key dev/avatars/ /.... (apps/web/src/lib/api.ts:741-749, apps/web/src/app/profile/edit/page.tsx:92, apps/mobile/src/services/api.ts:922-928, apps/mobile/app/settings/edit-profile.tsx:114)",
+      "exp": "Web ve harici mobil istemci POST /media/upload/avatar kontratını avatar alanıyla kullanır; key avatars/ altında oluşur.",
       "gap": false,
       "gapRefs": []
     },
@@ -25682,7 +25691,7 @@
       "tur": "Parite",
       "pri": "P2",
       "steps": "1. Web: mesaj görseli yükle → POST /media/upload?folder=messages, alan file. 2. Mobile: aynı akış → POST /media/upload params folder=messages, alan file. 3. İade kanıtı: folder=reviews her iki platformda.",
-      "exp": "Endpoint + alan adı (file) + folder paritesi. (apps/web/src/lib/api.ts:750-767, apps/mobile/src/services/api.ts:929-953)",
+      "exp": "Web ve harici mobil istemci için endpoint, file alanı ve folder kontratı aynıdır.",
       "gap": false,
       "gapRefs": []
     },
@@ -25695,11 +25704,9 @@
       "tur": "Parite",
       "pri": "P2",
       "steps": "1. Web: getPublicUrl(key) çağrısını gözlemle. 2. Mobile mediaApi'de getPublicUrl var mı kontrol et.",
-      "exp": "Web GET /media/public-url/ . Mobile mediaApi'de getPublicUrl TANIMLI DEĞİL (yalnızca deleteFile var) → parite eksiği RAPORLANIR. (apps/web/src/lib/api.ts:770-771, apps/mobile/src/services/api.ts:914-955)",
+      "exp": "GET /media/public-url kontratı dokümante edilir; harici mobil istemci desteği kendi repository'sinde doğrulanır.",
       "gap": true,
-      "gapRefs": [
-        "MED-114, MED-115"
-      ]
+      "gapRefs": ["MED-114, MED-115"]
     },
     {
       "id": "MED-115",
@@ -25712,9 +25719,7 @@
       "steps": "1. Tip hatası tetikle (PDF) → \"File type ... is not allowed\" (EN). 2. Boyut hatası (>10MB) → \"File size exceeds maximum allowed\" (EN). 3. Ürün limit aşımı → \"En fazla N resim yükleyebilirsiniz\" (TR). 4. Geçersiz tip (product) → \"Geçersiz dosya tipi...\" (TR).",
       "exp": "Mesajların kaynaktaki dilleriyle eşleştiği doğrulanır; karışık dil kullanımı (genel upload EN, product/storage TR) RAPORLANIR. (media.service.ts:69,76 EN; media.service.ts:299,302 TR; media.controller.ts:104 TR)",
       "gap": true,
-      "gapRefs": [
-        "MED-114, MED-115"
-      ]
+      "gapRefs": ["MED-114, MED-115"]
     },
     {
       "id": "MED-090",
@@ -25727,9 +25732,7 @@
       "steps": "1. apps/api/test/e2e/media.e2e-spec.ts:34-38 → DELETE /api/media/test-key (gerçek yol file/*). 2. media.e2e-spec.ts:54-65 → GET /api/media/presigned/upload/products/... (controller'da böyle uç YOK). 3. media.e2e-spec.ts:41-52 → DELETE /api/media/test-file-key \"200 veya 404 kabul\" (gevşek assert).",
       "exp": "Testlerin gerçek DELETE /media/file/* ve var olan uçlarla hizalanması gerektiği RAPORLANIR. Mevcut e2e dosyasının silme IDOR'unu (MED-071) ve public-url private engelini (MED-063) KAPSAMADIĞI not edilir. (media.controller.ts:166-190 vs media.e2e-spec.ts)",
       "gap": true,
-      "gapRefs": [
-        "MED-090"
-      ]
+      "gapRefs": ["MED-090"]
     },
     {
       "id": "MED-091",
@@ -25885,9 +25888,7 @@
       "steps": "1. DB'de admin oturumunun expiresAt'ini geçmişe çek (veya süresi dolmuş token kullan). 2. GET /api/admin/dashboard çağır.",
       "exp": "HTTP 401 (token/oturum geçersiz). AdminSession modeli expiresAt ve index içerir (schema.prisma:231-245).",
       "gap": true,
-      "gapRefs": [
-        "ADM-011/012"
-      ]
+      "gapRefs": ["ADM-011/012"]
     },
     {
       "id": "ADM-012",
@@ -25900,9 +25901,7 @@
       "steps": "1. Pasifleştirilmiş admin ile token al / mevcut token'la GET /api/admin/dashboard çağır.",
       "exp": "Erişim engellenir (401/403); aksiyon yaparsa audit log atlanır (createAuditLog isActive:true filtresi — admin.service.ts:3782-3789).",
       "gap": true,
-      "gapRefs": [
-        "ADM-011/012"
-      ]
+      "gapRefs": ["ADM-011/012"]
     },
     {
       "id": "ADM-013",
@@ -26552,9 +26551,7 @@
       "steps": "1. PATCH /api/admin/settings gövde { \"key\":\"commission_rate\",\"value\":\"0.08\",\"type\":\"number\" }. 2. GET /api/admin/settings ile doğrula.",
       "exp": "HTTP 200; platform_settings commission_rate=0.08; setting_update AuditLog. (admin.controller.ts:173-182; admin.service.ts:521-658)",
       "gap": true,
-      "gapRefs": [
-        "ADM-062/073"
-      ]
+      "gapRefs": ["ADM-062/073"]
     },
     {
       "id": "ADM-063",
@@ -26697,9 +26694,7 @@
       "steps": "1. super_admin ile komisyon kuralı güncelle. 2. Yeni sipariş oluştur, sipariş detayında komisyon tutarına bak.",
       "exp": "Yeni sipariş güncel komisyon oranını uygular; eski siparişler etkilenmez. (commission-rule.dto.ts + escrow akışı)",
       "gap": true,
-      "gapRefs": [
-        "ADM-062/073"
-      ]
+      "gapRefs": ["ADM-062/073"]
     },
     {
       "id": "ADM-074",
@@ -27271,9 +27266,7 @@
       "steps": "1. POST /api/admin/payouts/release/ (reason ile) iki kez eşzamanlı gönder.",
       "exp": "Tek release; ikinci istek idempotent/no-op veya hata; satıcıya çift ödeme YOK. (admin.service.ts:5068-5077 + payment service idempotency — release akışı para denetimi referanslarıyla tutarlı)",
       "gap": true,
-      "gapRefs": [
-        "ADM-117"
-      ]
+      "gapRefs": ["ADM-117"]
     },
     {
       "id": "ADM-118",
@@ -27546,9 +27539,7 @@
       "steps": "1. TR modunda ilgili ekranı aç. 2. t('product.deactivateDesc') çıktısını gözle.",
       "exp": "",
       "gap": true,
-      "gapRefs": [
-        "OPS-018"
-      ]
+      "gapRefs": ["OPS-018"]
     },
     {
       "id": "OPS-019",
@@ -27574,9 +27565,7 @@
       "steps": "1. Parametreli bir metin render eden bileşeni aç (örn. \"Merhaba {name}\").",
       "exp": "{name} değer ile değiştirilmiş; süslü parantez kalmamış.",
       "gap": true,
-      "gapRefs": [
-        "OPS-020"
-      ]
+      "gapRefs": ["OPS-020"]
     },
     {
       "id": "OPS-021",
@@ -27628,9 +27617,7 @@
       "steps": "1. PG bağlantısını kes. 2. GET /api/health/ready çağır.",
       "exp": "HTTP 500 (fırlatılan Error global handler ile 500'e dönüşür); gövde hata mesajı taşır. ErrorLog tablosuna severity error kaydı düşer.",
       "gap": true,
-      "gapRefs": [
-        "OPS-024"
-      ]
+      "gapRefs": ["OPS-024"]
     },
     {
       "id": "OPS-025",
@@ -27799,9 +27786,7 @@
       "steps": "1. invalidateUserCache(userId) tetikleyen akışı çalıştır (örn. profil/membership değişimi). 2. Etkilenen anahtarları ve süreyi gözle.",
       "exp": "Pattern'e uyan tüm anahtarlar silinir; yan etkisi (yanlışlıkla silinen ilgisiz anahtar) ve KEYS maliyeti raporlanır. Bu bir performans/kapsam riskidir; SCAN tabanlı invalidation önerilir.",
       "gap": true,
-      "gapRefs": [
-        "OPS-037"
-      ]
+      "gapRefs": ["OPS-037"]
     },
     {
       "id": "OPS-038",
@@ -27840,9 +27825,7 @@
       "steps": "1. POST http://localhost:3001/graphql body {\"query\":\"{ __typename }\"} çağır. 2. GET http://localhost:3001/graphql (playground) çağır.",
       "exp": "HTTP 404 (uç yok). Bu mevcut durumdur; GraphQL beklenen bir aktif yetenek değildir.",
       "gap": true,
-      "gapRefs": [
-        "OPS-040"
-      ]
+      "gapRefs": ["OPS-040"]
     },
     {
       "id": "OPS-041",
@@ -27868,9 +27851,7 @@
       "steps": "1. ceren@demo.com (veya anonim) olarak { order(id:\" \"){ id totalAmount buyer{ id displayName } } } çağır.",
       "exp": "",
       "gap": true,
-      "gapRefs": [
-        "OPS-042"
-      ]
+      "gapRefs": ["OPS-042"]
     },
     {
       "id": "OPS-043",
@@ -27987,9 +27968,7 @@
       "steps": "1. SentryInterceptor'ın hangi controller'larda @UseInterceptors ile uygulandığını grep ile tespit et. 2. Uygulanmayan bir uçta 5xx tetikle; Sentry'de event olmadığını ama ErrorLog'da kayıt olduğunu doğrula.",
       "exp": "SentryInterceptor yalnız açıkça uygulandığı yerlerde çalışır; global hata kaydı ErrorLog tablosunda. Kapsam farkı belgelenmeli (global Sentry kapsamı yok).",
       "gap": true,
-      "gapRefs": [
-        "OPS-051"
-      ]
+      "gapRefs": ["OPS-051"]
     },
     {
       "id": "OPS-052",
@@ -28626,9 +28605,7 @@
       "steps": "1. Sepete iki farklı satıcının ürününü ekle. 2. POST /api/orders/checkout {idempotencyKey, shippingAddressId, ...}. 3. GET /api/orders/groups/:id ile grubu sorgula.",
       "exp": "2: HTTP 201, tek CheckoutGroup, iki ayrı Order (her biri ilgili satıcıya), her biri pending_payment, her ürün rezerve. 3: grup iki siparişi ve kargo kayıtlarını listeler.",
       "gap": true,
-      "gapRefs": [
-        "JRN-030/031/032"
-      ]
+      "gapRefs": ["JRN-030/031/032"]
     },
     {
       "id": "JRN-031",
@@ -28641,9 +28618,7 @@
       "steps": "1. JRN-030 sonrası aynı idempotencyKey ile tekrar checkout. 2. Başka bir kullanıcı (kaan) aynı idempotencyKey ile checkout.",
       "exp": "1: HTTP 201/200, existingGroup:true, AYNI grup; yeni sipariş açılmaz, çift rezervasyon yok. 2: HTTP 403 Bu işlem size ait değil.",
       "gap": true,
-      "gapRefs": [
-        "JRN-030/031/032"
-      ]
+      "gapRefs": ["JRN-030/031/032"]
     },
     {
       "id": "JRN-032",
@@ -28656,9 +28631,7 @@
       "steps": "1. Grup için ödeme başlat + PayTR success callback. 2. Bir satıcı kargolar, diğeri kargolamaz (deadline dolar). 3. Her sipariş için escrow/iade durumunu izle.",
       "exp": "1: iki sipariş de paid/preparing, iki ayrı PaymentHold(held). 2: kargolanan sipariş ilerler; kargolanmayan oto-iptal + iade (kendi hold'u cancelled). escrow her sipariş için BAĞIMSIZ serbest bırakılır (biri release olur diğeri olmaz).",
       "gap": true,
-      "gapRefs": [
-        "JRN-030/031/032"
-      ]
+      "gapRefs": ["JRN-030/031/032"]
     },
     {
       "id": "JRN-040",
@@ -29201,7 +29174,7 @@
       "title": "Üç istemci de aynı API'yi tüketir, fakat ayrı client kullanır (kök-neden teyidi)",
       "tur": "Parite",
       "pri": "P0",
-      "steps": "1. Web'de ürün detayını aç (/listings/ ), DevTools Network'te isteği incele. 2. Mobile'da aynı ürünü aç, isteği incele (Expo dev → API logu apps/mobile/src/services/api.ts:70-72). 3. Admin'de aynı ürünü aç (/products/ ), isteği incele.",
+      "steps": "1. Web'de ürün detayını aç (/listings/ ) ve isteği incele. 2. Harici mobil istemcide aynı ürünün API isteğini incele. 3. Admin'de aynı ürünü aç (/products/ ) ve isteği incele.",
       "exp": "Üçü de aynı API path'ini (/api/products/...) çağırır ve aynı gövdeyi alır. Web/Admin isteği Cookie taşır, Authorization header YOK; Mobile Authorization: Bearer ... taşır, Cookie YOK. Ham API gövdesi (alan adları/değerler) üç istemcide AYNI; sapma yalnız ekranda gösterilen biçimde olabilir.",
       "gap": false,
       "gapRefs": []

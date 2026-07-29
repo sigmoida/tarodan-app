@@ -1,11 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { PrismaService } from '../../prisma';
-import { OfferStatus } from '@prisma/client';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { PrismaService } from "../../prisma";
+import { OfferStatus } from "@prisma/client";
 
 /**
  * Offer Scheduler Service
@@ -27,22 +26,18 @@ export class OfferSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await registerRepeatableCron(this.scheduledQueue, 'expire-offers', '*/5 * * * *', cronsViaBull(), this.logger);
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "expire-offers",
+      "*/5 * * * *",
+      this.logger,
+    );
   }
 
   /**
    * Her 5 dakikada bir süresi dolmuş pending teklifleri expired'a çeker.
-   * Flag (CRONS_VIA_BULL) açıkken iş Bull repeatable'a taşınır; in-process no-op.
+   * Gerçek iş — Bull processor 'expire-offers' buradan çağırır.
    */
-  @TrackedCron('*/5 * * * *')
-  async handleExpiredOffers() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runHandleExpiredOffers();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runHandleExpiredOffers(log: (msg: string) => void = () => {}) {
     try {
       const now = new Date();
@@ -57,11 +52,20 @@ export class OfferSchedulerService implements OnModuleInit {
       if (result.count > 0) {
         this.logger.log(`Marked ${result.count} expired offer(s) as expired`);
       }
-      return { summary: `${result.count} teklif süresi doldu`, stats: { expired: result.count } };
+      return {
+        summary: `${result.count} teklif süresi doldu`,
+        stats: { expired: result.count },
+      };
     } catch (error: any) {
-      this.logger.error(`Error in expired offers job: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error in expired offers job: ${error.message}`,
+        error.stack,
+      );
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { expired: 0, errors: 1 } };
+      return {
+        summary: `Hata: ${error.message}`,
+        stats: { expired: 0, errors: 1 },
+      };
     }
   }
 }

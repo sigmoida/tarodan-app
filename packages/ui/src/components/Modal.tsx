@@ -1,101 +1,88 @@
 /** @format */
 
-import React, { useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { cn } from '../lib/utils';
+"use client";
+
+import * as React from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { cn } from "../lib/utils";
 
 export interface ModalProps {
-	isOpen: boolean;
-	onClose: () => void;
-	children: React.ReactNode;
-	/** Modal title (optional — renders a header) */
-	title?: string;
-	/** Max width class (default: max-w-md) */
-	maxWidth?: 'max-w-sm' | 'max-w-md' | 'max-w-lg' | 'max-w-xl' | 'max-w-2xl';
-	/** Close on backdrop click (default: true) */
-	closeOnBackdrop?: boolean;
-	/** Close on Escape key (default: true) */
-	closeOnEscape?: boolean;
-	/** Custom z-index class (default: z-50) */
-	zIndex?: string;
-	className?: string;
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  /** Modal title (optional — renders a header) */
+  title?: string;
+  /** Max width class (default: max-w-md) */
+  maxWidth?: "max-w-sm" | "max-w-md" | "max-w-lg" | "max-w-xl" | "max-w-2xl";
+  /** Close on backdrop click (default: true) */
+  closeOnBackdrop?: boolean;
+  /** Close on Escape key (default: true) */
+  closeOnEscape?: boolean;
+  className?: string;
 }
 
+/**
+ * Accessible modal dialog built on Radix. Radix owns focus trapping/restoration,
+ * nested-layer Escape handling, outside interaction, and ref-counted scroll lock.
+ */
 export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
-	(
-		{
-			isOpen,
-			onClose,
-			children,
-			title,
-			maxWidth = 'max-w-md',
-			closeOnBackdrop = true,
-			closeOnEscape = true,
-			zIndex = 'z-50',
-			className,
-		},
-		ref,
-	) => {
-		const handleEscape = useCallback(
-			(e: KeyboardEvent) => {
-				if (e.key === 'Escape' && closeOnEscape) onClose();
-			},
-			[closeOnEscape, onClose],
-		);
-
-		useEffect(() => {
-			if (!isOpen) return;
-			document.addEventListener('keydown', handleEscape);
-			document.body.style.overflow = 'hidden';
-			return () => {
-				document.removeEventListener('keydown', handleEscape);
-				document.body.style.overflow = '';
-			};
-		}, [isOpen, handleEscape]);
-
-		// Yalnızca client'ta ve açıkken render et.
-		if (!isOpen || typeof document === 'undefined') return null;
-
-		// Portal'la body'ye taşı: bir üst-element'in transform/filter'ı `fixed`'i
-		// hapsetmesin (aksi halde overlay viewport'u kaplamaz, üstte boşluk kalır).
-		return createPortal(
-			<div
-				ref={ref}
-				className={cn(
-					'fixed inset-0 flex items-center justify-center p-4',
-					zIndex,
-				)}
-				role='dialog'
-				aria-modal='true'
-				aria-label={title}>
-				{/* Backdrop */}
-				<div
-					className='absolute inset-0 bg-heading/50 backdrop-blur-sm'
-					onClick={closeOnBackdrop ? onClose : undefined}
-					aria-hidden='true'
-				/>
-				{/* Content */}
-				<div
-					className={cn(
-						'relative flex max-h-[90vh] w-full flex-col rounded-xl bg-surface-elevated shadow-elevated',
-						maxWidth,
-						className,
-					)}>
-					{/* Sabit başlık — gövde scroll ederken kaybolmasın */}
-					{title && (
-						<h3 className='flex-shrink-0 px-6 pb-4 pt-5 text-lg font-semibold leading-tight text-heading'>
-							{title}
-						</h3>
-					)}
-					{/* Scroll edilebilir gövde — uzun içerik (ör. değerlendirme formu) taşarsa kaydırılır */}
-					<div className={cn('overflow-y-auto px-6 pb-6', title ? '' : 'pt-5')}>
-						{children}
-					</div>
-				</div>
-			</div>,
-			document.body,
-		);
-	},
+  (
+    {
+      isOpen,
+      onClose,
+      children,
+      title,
+      maxWidth = "max-w-md",
+      closeOnBackdrop = true,
+      closeOnEscape = true,
+      className,
+    },
+    ref,
+  ) => (
+    <DialogPrimitive.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogPrimitive.Portal>
+        {/* One stacking context per dialog lets a later nested dialog cover its parent. */}
+        <div className="pointer-events-none fixed inset-0 z-modal">
+          <DialogPrimitive.Overlay className="pointer-events-auto fixed inset-0 z-overlay bg-heading/50 backdrop-blur-sm" />
+          <DialogPrimitive.Content
+            ref={ref}
+            aria-describedby={undefined}
+            onEscapeKeyDown={(event) => {
+              if (!closeOnEscape) event.preventDefault();
+            }}
+            onPointerDownOutside={(event) => {
+              if (!closeOnBackdrop) event.preventDefault();
+            }}
+            className={cn(
+              "pointer-events-auto fixed left-1/2 top-1/2 z-modal flex max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-surface-elevated shadow-elevated focus:outline-none",
+              maxWidth,
+              className,
+            )}
+          >
+            {title ? (
+              <DialogPrimitive.Title className="flex-shrink-0 px-6 pb-4 pt-5 text-lg font-semibold leading-tight text-heading">
+                {title}
+              </DialogPrimitive.Title>
+            ) : (
+              <DialogPrimitive.Title className="sr-only">
+                Dialog
+              </DialogPrimitive.Title>
+            )}
+            <div
+              className={cn("overflow-y-auto px-6 pb-6", title ? "" : "pt-5")}
+            >
+              {children}
+            </div>
+          </DialogPrimitive.Content>
+        </div>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  ),
 );
 
-Modal.displayName = 'Modal';
+Modal.displayName = "Modal";

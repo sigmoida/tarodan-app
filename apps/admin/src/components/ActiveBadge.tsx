@@ -1,5 +1,5 @@
-import { Badge, Button } from '@tarodan/ui';
-import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { Badge, Button } from "@tarodan/ui";
+import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 
 /**
  * Active/Passive badge — now delegates to the `active` mode of the shared
@@ -8,20 +8,26 @@ import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
  */
 export function ActiveBadge({
   active,
-  activeLabel = 'Aktif',
-  passiveLabel = 'Pasif',
+  activeLabel = "Aktif",
+  passiveLabel = "Pasif",
 }: {
   active: boolean;
   activeLabel?: string;
   passiveLabel?: string;
 }) {
-  return <Badge active={active} activeLabel={activeLabel} passiveLabel={passiveLabel} />;
+  return (
+    <Badge
+      active={active}
+      activeLabel={activeLabel}
+      passiveLabel={passiveLabel}
+    />
+  );
 }
 
-const activeCls = 'bg-success-100 text-success-700';
-const passiveCls = 'bg-surface-alt text-muted';
+const activeCls = "bg-success-100 text-success-700";
+const passiveCls = "bg-surface-alt text-muted";
 const pill =
-  'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium';
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium";
 
 /** Clickable Active/Passive toggle — same look, flips state on one click. */
 export function StatusToggle({
@@ -41,8 +47,12 @@ export function StatusToggle({
       onClick={onToggle}
       className={`${pill} ${active ? activeCls : passiveCls}`}
     >
-      {active ? <CheckCircleIcon className="h-4 w-4" /> : <XCircleIcon className="h-4 w-4" />}
-      {active ? 'Aktif' : 'Pasif'}
+      {active ? (
+        <CheckCircleIcon className="h-4 w-4" />
+      ) : (
+        <XCircleIcon className="h-4 w-4" />
+      )}
+      {active ? "Aktif" : "Pasif"}
     </Button>
   );
 }

@@ -12,9 +12,9 @@ import {
   IsInt,
   Min,
   Max,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type, Transform } from 'class-transformer';
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type, Transform } from "class-transformer";
 
 export class CheckoutAddressDto {
   @IsString()
@@ -43,15 +43,19 @@ export class CheckoutAddressDto {
 }
 
 export class CheckoutItemDto {
-  @ApiProperty({ description: 'Satın alınacak ürün ID' })
-  @IsUUID('4', { message: 'Geçerli bir ürün ID giriniz' })
+  @ApiProperty({ description: "Satın alınacak ürün ID" })
+  @IsUUID("4", { message: "Geçerli bir ürün ID giriniz" })
   productId: string;
 
-  @ApiPropertyOptional({ description: 'Adet (varsayılan 1)', default: 1, minimum: 1 })
+  @ApiPropertyOptional({
+    description: "Adet (varsayılan 1)",
+    default: 1,
+    minimum: 1,
+  })
   @IsOptional()
-  @IsInt({ message: 'Adet tam sayı olmalıdır' })
-  @Min(1, { message: 'Adet en az 1 olmalıdır' })
-  @Max(20, { message: 'Tek üründen en fazla 20 adet alınabilir' })
+  @IsInt({ message: "Adet tam sayı olmalıdır" })
+  @Min(1, { message: "Adet en az 1 olmalıdır" })
+  @Max(20, { message: "Tek üründen en fazla 20 adet alınabilir" })
   quantity?: number;
 }
 
@@ -60,70 +64,101 @@ export class CheckoutItemDto {
  * altında sipariş edilir; tek ödeme tüm grubu kapsar.
  */
 export class CheckoutDto {
-  @ApiProperty({ type: [CheckoutItemDto], description: 'Sepet ürünleri (max 20)' })
+  @ApiProperty({
+    type: [CheckoutItemDto],
+    description: "Sepet ürünleri (max 20)",
+  })
   @IsArray()
-  @ArrayMinSize(1, { message: 'En az bir ürün gereklidir' })
-  @ArrayMaxSize(20, { message: 'Tek siparişte en fazla 20 ürün alınabilir' })
+  @ArrayMinSize(1, { message: "En az bir ürün gereklidir" })
+  @ArrayMaxSize(20, { message: "Tek siparişte en fazla 20 ürün alınabilir" })
   @ValidateNested({ each: true })
   @Type(() => CheckoutItemDto)
   items: CheckoutItemDto[];
 
   @ApiProperty({
     description:
-      'İstemci tarafında üretilen idempotency anahtarı (uuid). Aynı anahtarla tekrar çağrı aynı grubu döndürür.',
+      "İstemci tarafında üretilen idempotency anahtarı (uuid). Aynı anahtarla tekrar çağrı aynı grubu döndürür.",
   })
-  @IsUUID('4', { message: 'Geçerli bir idempotency anahtarı giriniz' })
+  @IsUUID("4", { message: "Geçerli bir idempotency anahtarı giriniz" })
   idempotencyKey: string;
 
-  @ApiPropertyOptional({ description: 'Kayıtlı teslimat adresi ID' })
+  @ApiPropertyOptional({ description: "Kayıtlı teslimat adresi ID" })
   @IsOptional()
-  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
-  @IsUUID('4', { message: 'Geçerli bir teslimat adresi ID giriniz' })
+  @Transform(({ value }) =>
+    value === "" || value === null ? undefined : value,
+  )
+  @IsUUID("4", { message: "Geçerli bir teslimat adresi ID giriniz" })
   shippingAddressId?: string;
 
-  @ApiPropertyOptional({ description: 'Inline teslimat adresi' })
+  @ApiPropertyOptional({ description: "Inline teslimat adresi" })
   @IsOptional()
   @ValidateNested()
   @Type(() => CheckoutAddressDto)
   shippingAddress?: CheckoutAddressDto;
 
-  @ApiPropertyOptional({ description: 'Kayıtlı fatura adresi ID' })
+  @ApiPropertyOptional({ description: "Kayıtlı fatura adresi ID" })
   @IsOptional()
-  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
-  @IsUUID('4', { message: 'Geçerli bir fatura adresi ID giriniz' })
+  @Transform(({ value }) =>
+    value === "" || value === null ? undefined : value,
+  )
+  @IsUUID("4", { message: "Geçerli bir fatura adresi ID giriniz" })
   billingAddressId?: string;
 
-  @ApiPropertyOptional({ description: 'Inline fatura adresi' })
+  @ApiPropertyOptional({ description: "Inline fatura adresi" })
   @IsOptional()
   @ValidateNested()
   @Type(() => CheckoutAddressDto)
   billingAddress?: CheckoutAddressDto;
 
-  @ApiPropertyOptional({ description: 'Kupon kodu' })
+  @ApiPropertyOptional({ description: "Kupon kodu" })
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => (value === '' || value === null ? undefined : value?.toUpperCase()))
+  @Transform(({ value }) =>
+    value === "" || value === null ? undefined : value?.toUpperCase(),
+  )
   couponCode?: string;
+
+  @ApiProperty({
+    description:
+      "Checkout quote kargo tarife sürümü. Aktif tarife değiştiyse sipariş oluşturma 409 PRICING_CHANGED döner.",
+  })
+  @IsInt()
+  @Min(1)
+  expectedShippingTariffVersion: number;
+
+  @ApiProperty({
+    description:
+      "Checkout quote birim-fiyat hash'i. Ürün fiyatı/kampanya değiştiyse 409 PRICING_CHANGED.",
+  })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[a-f0-9]{16}$/i, {
+    message: "Geçerli checkout fiyat hash'i gönderilmelidir",
+  })
+  expectedPricingHash: string;
 }
 
 export class GuestCheckoutGroupDto extends CheckoutDto {
-  @ApiProperty({ example: 'guest@example.com' })
-  @IsEmail({}, { message: 'Geçerli bir e-posta adresi girin' })
+  @ApiProperty({ example: "guest@example.com" })
+  @IsEmail({}, { message: "Geçerli bir e-posta adresi girin" })
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ example: '123456', description: '6 haneli e-posta doğrulama kodu' })
+  @ApiProperty({
+    example: "123456",
+    description: "6 haneli e-posta doğrulama kodu",
+  })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\d{6}$/, { message: 'Doğrulama kodu 6 haneli olmalıdır' })
+  @Matches(/^\d{6}$/, { message: "Doğrulama kodu 6 haneli olmalıdır" })
   emailVerificationCode: string;
 
-  @ApiProperty({ example: '+905551234567' })
+  @ApiProperty({ example: "+905551234567" })
   @IsString()
   @IsNotEmpty()
   phone: string;
 
-  @ApiProperty({ description: 'Misafir ad soyad' })
+  @ApiProperty({ description: "Misafir ad soyad" })
   @IsString()
   @IsNotEmpty()
   guestName: string;

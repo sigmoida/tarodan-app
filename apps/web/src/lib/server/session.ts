@@ -1,22 +1,43 @@
-import 'server-only';
+import "server-only";
 
-import { getSession as bffGetSession } from './bff-session';
-import type { WebUser } from '@/lib/auth.config';
+import {
+  createSession,
+  createAuthLogic,
+  type ApiFetchResult,
+} from "@tarodan/auth";
+import { webAuthConfig, mapWebUser, type WebUser } from "@/lib/auth.config";
 
 /**
- * Server-only session reader for the marketplace.
+ * Server-only session core for the web app, built on the shared `@tarodan/auth`
+ * engine. This is the live server-owned-session path: the client routes through
+ * the `/gateway` proxy and login uses these actions, so the Next-owned
+ * `web_at` / `web_rt` cookies carry the session and the `Bearer` to NestJS.
  *
- * Now backed by the shared `@tarodan/auth` BFF engine: it reads the Next-owned
- * `web_at` cookie and validates it against NestJS `/auth/profile` (with a
- * server-side refresh on expiry via `bff-session`). Safe to call from Server
- * Components / layouts — it never writes cookies. The export surface is
- * preserved (`getSession`, `AuthUser`) so the `(auth)` and `profile` layout
- * guards need no changes.
+ * Safe to call `getSession` from Server Components / layouts — it never writes
+ * cookies. The public surface (`getSession`, `AuthUser`) is preserved so the
+ * `(auth)` and `profile` layout guards need no changes.
  */
+const session = createSession<WebUser>(webAuthConfig, mapWebUser);
+
+export const {
+  readTokens,
+  writeTokens,
+  clearTokens,
+  refreshTokens,
+  apiFetch,
+  attachSessionCookies,
+  clearSessionCookies,
+  getSession,
+  apiBaseUrl,
+} = session;
+
+/** Bound auth logic (email/password login, logout, forgot-password). */
+export const authLogic = createAuthLogic(webAuthConfig, session);
+
+/** The bound toolkit, for the BFF proxy route and Google login. */
+export const bffSession = session;
 
 /** Server-resolved user. Alias of the engine's `WebUser`. */
 export type AuthUser = WebUser;
 
-export async function getSession(): Promise<AuthUser | null> {
-  return bffGetSession();
-}
+export type { WebUser, ApiFetchResult };

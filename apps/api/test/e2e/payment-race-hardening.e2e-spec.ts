@@ -13,21 +13,13 @@ import { createAddress } from '../factories/address.factory';
 import { signCallback } from '../mocks/paytr.mock';
 import { PaymentService } from '../../src/modules/payment/payment.service';
 
-const TEST_CARD = {
-  cardHolderName: 'TEST KART',
-  cardNumber: '4355084355084358',
-  expireMonth: '12',
-  expireYear: '30',
-  cvc: '000',
-};
-
 /**
  * Teslim-öncesi ödeme denetiminde bulunan YARIŞ/ZAMANLAMA boşluklarının (H1-H4)
  * regresyon testleri. Her test, düzeltme geri alınırsa KIRMIZIYA döner.
  *
  *  H1 — ödeme-iptal penceresi (PAYMENT_FAIL_TIMEOUT_MINUTES) PayTR 3DS oturumundan
  *       uzun; 5dk'lık rezervasyon penceresinde payment satırı `failed` yapılmaz.
- *  H2 — eşzamanlı process-direct: payment `processing`'e claim edilir, ikinci çekim engellenir.
+ *  H2 — eşzamanlı direct-form: payment `processing`'e claim edilir, ikinci çekim engellenir.
  *  H3 — cancelExpiredPayments CAS'lı: completed payment'ı `failed`'a EZMEZ.
  *  H4 — admin releasePayment, açık iade ile DONMUŞ (frozenByRefundId) hold'u serbest bırakamaz.
  */
@@ -92,15 +84,15 @@ describe('Payment race hardening (H1-H4 regression, E2E)', () => {
       .expect(200);
   }
 
-  describe('H2 — eşzamanlı process-direct çift-çekim koruması', () => {
-    it('aynı sipariş için iki paralel process-direct: biri çeker (201), biri reddedilir (400); PayTR yalnız 1 kez çağrılır', async () => {
+  describe('H2 — eşzamanlı direct-form çift-çekim koruması', () => {
+    it('aynı sipariş için iki paralel direct-form: biri çeker (201), biri reddedilir (400); PayTR yalnız 1 kez çağrılır', async () => {
       const { buyer, orderId } = await makeOrderWithPendingPayment();
 
       // Çekimi yavaşlat: ilk istek `processing` claim'ini ~400ms tutar; ikinci istek
       // bu pencerede claim deneyip count===0 (zaten processing) → 400 alır.
-      const orig = ctx.paytr.createDirectPayment.bind(ctx.paytr);
+      const orig = ctx.paytr.createDirectPaymentForm.bind(ctx.paytr);
       jest
-        .spyOn(ctx.paytr, 'createDirectPayment')
+        .spyOn(ctx.paytr, 'createDirectPaymentForm')
         .mockImplementation(async (...args: any[]) => {
           await new Promise((r) => setTimeout(r, 400));
           return (orig as any)(...args);
@@ -108,9 +100,9 @@ describe('Payment race hardening (H1-H4 regression, E2E)', () => {
 
       const fire = () =>
         request(ctx.app.getHttpServer())
-          .post('/api/payments/process-direct')
+          .post('/api/payments/direct-form')
           .set(authHeader(buyer))
-          .send({ orderId, card: TEST_CARD });
+          .send({ orderId });
 
       const [a, b] = await Promise.all([fire(), fire()]);
       const codes = [a.status, b.status].sort();
@@ -125,9 +117,9 @@ describe('Payment race hardening (H1-H4 regression, E2E)', () => {
       const { buyer, orderId } = await makeOrderWithPendingPayment();
 
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/process-direct')
+        .post('/api/payments/direct-form')
         .set(authHeader(buyer))
-        .send({ orderId, card: TEST_CARD })
+        .send({ orderId })
         .expect(201);
 
       const prisma = getPrisma();
@@ -137,9 +129,9 @@ describe('Payment race hardening (H1-H4 regression, E2E)', () => {
 
       // İkinci deneme (seri) engellenmez.
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/process-direct')
+        .post('/api/payments/direct-form')
         .set(authHeader(buyer))
-        .send({ orderId, card: TEST_CARD })
+        .send({ orderId })
         .expect(201);
       expect(ctx.paytr.directPaymentCalls.length).toBe(2);
     });

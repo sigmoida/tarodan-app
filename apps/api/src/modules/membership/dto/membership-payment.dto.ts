@@ -19,7 +19,7 @@ export class MembershipPaymentInitResponseDto {
   @ApiProperty({ example: 'uuid' })
   membershipPaymentId: string;
 
-  @ApiPropertyOptional({ example: 'uuid', description: 'Üyelik sipariş ID — Direct API (process-direct) için' })
+  @ApiPropertyOptional({ example: 'uuid', description: 'Üyelik sipariş ID — Direct API (direct-form) için' })
   orderId?: string;
 
   @ApiProperty({ example: 'paytr' })

@@ -1,14 +1,45 @@
 version: 2
 updates:
+  # npm — ONE grouped PR per week for ALL minor/patch bumps (prod + dev together).
+  # Major upgrades are ignored: they are breaking (typescript, prisma, @nestjs/*,
+  # eslint, jest, tailwindcss, next, …) and are done deliberately by hand, not via
+  # Dependabot. This keeps the weekly npm noise to a single, always-green PR.
   - package-ecosystem: npm
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
-      dev-dependencies:
-        dependency-type: development
+      npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+      # next (and its lint config) are upgraded by hand, like majors: a Next
+      # minor tightened the build (missingSuspenseWithCSRBailout) and broke the
+      # whole grouped bump. Keep them out of the group so the weekly minor/patch
+      # PR stays green; bump Next deliberately with the required code fixes.
+      - dependency-name: "next"
+      - dependency-name: "eslint-config-next"
+      # sharp is PINNED to 0.34.5: >=0.35 prebuilt binaries require the
+      # x86-64-v2 microarchitecture and the Coolify deployment host CPU is v1 —
+      # the 0.35.3 bump shipped an image whose require('sharp') died with
+      # "Unsupported CPU". Bump only after verifying the host CPU (or moving to
+      # a build-from-source install). The api Dockerfile guard will catch a
+      # premature bump at build time.
+      - dependency-name: "sharp"
+  # github-actions — ONE grouped PR per week for all action bumps.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions-all:
+        patterns:
+          - "*"

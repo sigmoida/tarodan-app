@@ -8,21 +8,50 @@ import {
   IsEmail,
   MaxLength,
   MinLength,
-} from 'class-validator';
-import { TicketCategory, TicketPriority, TicketStatus } from '@prisma/client';
+} from "class-validator";
+import { TicketCategory, TicketPriority, TicketStatus } from "@prisma/client";
+import { AdminListQueryDto } from "../../../common/list";
+
+export class AdminTicketQueryDto extends AdminListQueryDto {
+  @IsOptional()
+  @IsEnum(TicketStatus)
+  status?: TicketStatus;
+
+  @IsOptional()
+  @IsEnum(TicketPriority)
+  priority?: TicketPriority;
+
+  @IsOptional()
+  @IsEnum(TicketCategory)
+  category?: TicketCategory;
+
+  @IsOptional()
+  @IsUUID()
+  assigneeId?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class GuestContactQueryDto extends AdminListQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
 
 // DTO for guest contact form (public, no auth required)
 export class GuestContactDto {
-  @IsEmail({}, { message: 'Geçerli bir e-posta adresi giriniz' })
+  @IsEmail({}, { message: "Geçerli bir e-posta adresi giriniz" })
   email: string;
 
   @IsString()
-  @MinLength(2, { message: 'İsim en az 2 karakter olmalıdır' })
+  @MinLength(2, { message: "İsim en az 2 karakter olmalıdır" })
   @MaxLength(100)
   name: string;
 
   @IsString()
-  @MinLength(10, { message: 'Mesaj en az 10 karakter olmalıdır' })
+  @MinLength(10, { message: "Mesaj en az 10 karakter olmalıdır" })
   @MaxLength(2000)
   message: string;
 

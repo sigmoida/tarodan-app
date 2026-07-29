@@ -45,6 +45,7 @@ import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
 import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
 import {
   CreateCommissionRuleDto,
+  PreviewCommissionDto,
   UpdateCommissionRuleDto,
   CommissionRuleResponseDto,
   UpdatePlatformSettingDto,
@@ -127,6 +128,13 @@ export class AdminCommissionController {
   @ApiResponse({ status: HttpStatus.OK, type: [CommissionRuleResponseDto] })
   async getCommissionRules() {
     return this.adminService.getCommissionRules();
+  }
+
+  @Post('commission-rules/preview')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Preview checkout commission for an unsaved rule' })
+  async previewCommission(@Body() dto: PreviewCommissionDto) {
+    return this.adminService.previewCommission(dto);
   }
 
   @Post('commission-rules')

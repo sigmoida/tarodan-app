@@ -1,6 +1,6 @@
-import React from 'react';
-import { cn } from '../lib/utils';
-import { IconButton } from './IconButton';
+import React from "react";
+import { cn } from "../lib/utils";
+import { IconButton } from "./IconButton";
 
 export interface PaginationProps {
   page: number;
@@ -31,19 +31,23 @@ export const Pagination: React.FC<PaginationProps> = ({
   const leftSibling = Math.max(firstPage, page - siblingCount);
   const rightSibling = Math.min(lastPage, page + siblingCount);
 
-  const pages: (number | 'ellipsis-left' | 'ellipsis-right')[] = [];
+  const pages: (number | "ellipsis-left" | "ellipsis-right")[] = [];
   pages.push(firstPage);
-  if (leftSibling > firstPage + 1) pages.push('ellipsis-left');
-  range(Math.max(firstPage + 1, leftSibling), Math.min(lastPage - 1, rightSibling)).forEach((p) =>
-    pages.push(p),
-  );
-  if (rightSibling < lastPage - 1) pages.push('ellipsis-right');
+  if (leftSibling > firstPage + 1) pages.push("ellipsis-left");
+  range(
+    Math.max(firstPage + 1, leftSibling),
+    Math.min(lastPage - 1, rightSibling),
+  ).forEach((p) => pages.push(p));
+  if (rightSibling < lastPage - 1) pages.push("ellipsis-right");
   if (lastPage !== firstPage) pages.push(lastPage);
 
   return (
     <nav
       aria-label="Pagination"
-      className={cn('flex items-center justify-center gap-1', className)}
+      className={cn(
+        "flex shrink-0 flex-nowrap items-center justify-center gap-1",
+        className,
+      )}
     >
       <IconButton
         aria-label="Previous page"
@@ -52,22 +56,32 @@ export const Pagination: React.FC<PaginationProps> = ({
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
       >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 19l-7-7 7-7"
+          />
         </svg>
       </IconButton>
       {pages.map((p, i) =>
-        typeof p === 'number' ? (
+        typeof p === "number" ? (
           <button
             key={`${p}-${i}`}
             type="button"
             onClick={() => onPageChange(p)}
-            aria-current={p === page ? 'page' : undefined}
+            aria-current={p === page ? "page" : undefined}
             className={cn(
-              'h-8 min-w-[2rem] rounded-md px-2 text-sm font-medium transition-colors',
+              "h-8 min-w-[2rem] rounded-md px-2 text-sm font-medium transition-colors",
               p === page
-                ? 'bg-primary-600 text-inverted hover:bg-primary-700'
-                : 'text-body hover:bg-surface-alt',
+                ? "bg-primary-600 text-inverted hover:bg-primary-700"
+                : "text-body hover:bg-surface-alt",
             )}
           >
             {p}
@@ -89,8 +103,18 @@ export const Pagination: React.FC<PaginationProps> = ({
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
       >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
         </svg>
       </IconButton>
     </nav>

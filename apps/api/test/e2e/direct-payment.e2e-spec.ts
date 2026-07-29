@@ -1,22 +1,27 @@
-import * as request from 'supertest';
-import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, SavedCardStatus } from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
-import { truncateAll, getPrisma, seedBaseline, disconnectPrisma } from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
+import * as request from "supertest";
+import { ConfigService } from "@nestjs/config";
+import { PaymentStatus, SavedCardStatus } from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
+import {
+  truncateAll,
+  getPrisma,
+  seedBaseline,
+  disconnectPrisma,
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
 
 /**
  * PayTR Direct API kart ödemesi — TEK ödeme yolu (iframe kaldırıldı; misafir + üye).
  * Mock'lu PayTRService ile davranış doğrulanır; GERÇEK PayTR çağrısı yok.
  *
  * Flag mimarisi:
- *  - Yeni kart 3D ödemesi HER ZAMAN açıktır (kill-switch yok → kesinti olmasın).
- *  - Kayıtlı kart (Flow B) + kart saklama (store_card) PAYTR_RECURRING_ENABLED arkasındadır
- *    (PayTR Non3D/Tekrarlayan Ödeme yetkisine bağlı).
+ *  - Yeni kart 3D ödemesi her zaman Direct API formu üretir.
+ *  - Kayıtlı kart + store_card PAYTR_CARD_STORAGE_ENABLED arkasındadır.
+ *  - Kullanıcısız yenileme ayrıca PAYTR_RECURRING_ENABLED gerektirir.
  */
-describe('Direct API card payment (tek yol, E2E)', () => {
+describe("Direct API card payment (tek yol, E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -34,14 +39,18 @@ describe('Direct API card payment (tek yol, E2E)', () => {
     jest.restoreAllMocks();
   });
 
-  /** PAYTR_RECURRING_ENABLED bayrağını deterministik kontrol et (diğer key'ler pass-through). */
-  function setRecurringFlag(enabled: boolean): void {
+  /** PAYTR_CARD_STORAGE_ENABLED bayrağını deterministik kontrol et. */
+  function setCardStorageFlag(enabled: boolean): void {
     const cfg = ctx.app.get(ConfigService);
     const real = cfg.get.bind(cfg);
     jest
-      .spyOn(cfg, 'get')
+      .spyOn(cfg, "get")
       .mockImplementation((key: any, def?: any) =>
-        key === 'PAYTR_RECURRING_ENABLED' ? (enabled ? 'true' : 'false') : real(key, def),
+        key === "PAYTR_CARD_STORAGE_ENABLED"
+          ? enabled
+            ? "true"
+            : "false"
+          : real(key, def),
       );
   }
 
@@ -57,243 +66,268 @@ describe('Direct API card payment (tek yol, E2E)', () => {
     });
     const addr = await createAddress({ userId: buyer.id });
     const buyRes = await request(ctx.app.getHttpServer())
-      .post('/api/orders/buy')
+      .post("/api/orders/buy")
       .set(authHeader(buyer))
       .send({ productId: product.id, shippingAddressId: addr.id })
       .expect(201);
     return { buyer, orderId: buyRes.body.orderId as string };
   }
 
-  const TEST_CARD = {
-    cardHolderName: 'TEST KART',
-    cardNumber: '4355084355084358', // PayTR test kartı
-    expireMonth: '12',
-    expireYear: '30',
-    cvc: '000',
-  };
+  // ── Flow A: yeni kart için imzalı Direct API formu ──
 
-  // ── Flow A: yeni kart (3D) — her zaman açık ──
-
-  it('yeni kartla ödeme her zaman çalışır; recurring AÇIKken store_card geçer', async () => {
-    setRecurringFlag(true);
+  it("yeni kart formu çalışır; kart saklama AÇIKken store_card geçer", async () => {
+    setCardStorageFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
 
     const res = await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
-      .send({ orderId, card: TEST_CARD, saveCard: true })
+      .send({ orderId, saveCard: true })
       .expect(201);
 
     expect(res.body.paymentId).toBeTruthy();
+    expect(res.body.action).toBe("https://www.paytr.com/odeme");
+    expect(res.body.fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "card_number" }),
+        expect.objectContaining({ name: "cvv" }),
+      ]),
+    );
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
     expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(true);
     const prisma = getPrisma();
-    const payment = await prisma.payment.findUnique({ where: { id: res.body.paymentId } });
+    const payment = await prisma.payment.findUnique({
+      where: { id: res.body.paymentId },
+    });
     expect(payment!.status).toBe(PaymentStatus.pending);
     expect(payment!.providerConversationId).toBeTruthy();
   });
 
-  it('recurring KAPALIyken yeni kart yine çalışır ama store_card=false (saklanan kart kullanılamaz)', async () => {
-    setRecurringFlag(false);
+  it("kart saklama KAPALIyken yeni kart çalışır ama store_card=false", async () => {
+    setCardStorageFlag(false);
     const { buyer, orderId } = await makeBuyerWithOrder();
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
-      .send({ orderId, card: TEST_CARD, saveCard: true })
+      .send({ orderId, saveCard: true })
       .expect(201);
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
     expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(false);
   });
 
-  it('saveCard belirtilmezse store_card=false', async () => {
-    setRecurringFlag(true);
+  it("saveCard belirtilmezse store_card=false", async () => {
+    setCardStorageFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
-      .send({ orderId, card: TEST_CARD })
+      .send({ orderId })
       .expect(201);
     expect(ctx.paytr.directPaymentCalls[0].storeCard).toBe(false);
   });
 
-  it('başkasının siparişini ödeyemez (403)', async () => {
+  it("başkasının siparişini ödeyemez (403)", async () => {
     const { orderId } = await makeBuyerWithOrder();
     const attacker = await createUser(ctx.module);
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(attacker))
-      .send({ orderId, card: TEST_CARD })
+      .send({ orderId })
       .expect(403);
     expect(ctx.paytr.directPaymentCalls.length).toBe(0);
   });
 
-  it('misafir, üyeye ait siparişi ödeyemez (403)', async () => {
+  it("misafir, üyeye ait siparişi ödeyemez (403)", async () => {
     const { orderId } = await makeBuyerWithOrder();
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
-      .send({ orderId, card: TEST_CARD })
+      .post("/api/payments/direct-form")
+      .send({ orderId })
       .expect(403);
     expect(ctx.paytr.directPaymentCalls.length).toBe(0);
   });
 
-  it('misafir, misafir siparişini yeni kartla ödeyebilir (auth gerekmez)', async () => {
+  it("misafir, misafir siparişini yeni kartla ödeyebilir (auth gerekmez)", async () => {
     const { orderId } = await makeBuyerWithOrder();
     // Siparişi misafir siparişi olarak işaretle (guest checkout marker).
     const prisma = getPrisma();
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     await prisma.order.update({
       where: { id: orderId },
-      data: { shippingAddress: { ...(order!.shippingAddress as any), isGuestOrder: true } },
+      data: {
+        shippingAddress: {
+          ...(order!.shippingAddress as any),
+          isGuestOrder: true,
+        },
+      },
     });
 
     const res = await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
-      .send({ orderId, card: TEST_CARD }) // auth header YOK
+      .post("/api/payments/direct-form")
+      .send({ orderId }) // auth header YOK
       .expect(201);
 
     expect(res.body.paymentId).toBeTruthy();
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
   });
 
-  it('çift-çekim koruması: önceki deneme PayTR\'da ödendiyse ikinci process-direct YENİ çekim yapmaz', async () => {
+  it("çift-çekim koruması: önceki deneme PayTR'da ödendiyse ikinci direct-form YENİ çekim yapmaz", async () => {
     const prisma = getPrisma();
     const { buyer, orderId } = await makeBuyerWithOrder();
 
     // 1. deneme: kart gönder → merchant_oid atanır, PayTR (mock) çağrılır.
     const first = await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
-      .send({ orderId, card: TEST_CARD })
+      .send({ orderId })
       .expect(201);
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
 
-    const payment = await prisma.payment.findUnique({ where: { id: first.body.paymentId } });
+    const payment = await prisma.payment.findUnique({
+      where: { id: first.body.paymentId },
+    });
     const oid = payment!.providerConversationId!;
     // Senaryo: callback ulaşmadı (ör. tünel ölü) AMA ödeme PayTR'da BAŞARILI. Durum-sorgu ödendi döner.
     ctx.paytr.setQueryResult(oid, {
       ok: true,
       paymentTotalTl: Number(payment!.amount),
       paymentAmountTl: Number(payment!.amount),
-      currency: 'TL',
+      currency: "TL",
     });
 
     // 2. deneme: aynı sipariş → guard durum-sorgu yapar, ödendiğini görür → 400; İKİNCİ çekim YOK.
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
-      .send({ orderId, card: TEST_CARD })
+      .send({ orderId })
       .expect(400);
 
     expect(ctx.paytr.directPaymentCalls.length).toBe(1); // hâlâ 1 — çift çekim olmadı
-    const after = await prisma.payment.findUnique({ where: { id: first.body.paymentId } });
+    const after = await prisma.payment.findUnique({
+      where: { id: first.body.paymentId },
+    });
     expect(after!.status).toBe(PaymentStatus.completed); // durum-sorgu ile tamamlandı
   });
 
-  // ── Flow B: kayıtlı kartla ödeme (Non3D recurring servisi; PAYTR_RECURRING_ENABLED) ──
+  // ── Flow B: PayTR kasasındaki kayıtlı kartla kullanıcı-mevcut ödeme ──
 
   /** Alıcıya ait aktif bir kayıtlı kart seed'le. */
-  async function seedSavedCard(userId: string, opts: { requireCvv?: boolean } = {}) {
+  async function seedSavedCard(
+    userId: string,
+    opts: { requireCvv?: boolean } = {},
+  ) {
     const prisma = getPrisma();
     return prisma.savedCard.create({
       data: {
         userId,
-        provider: 'paytr',
+        provider: "paytr",
         utoken: `UT-${userId.slice(0, 8)}`,
         ctoken: `CT-${userId.slice(0, 8)}`,
-        last4: '4358',
-        brand: 'VISA',
+        last4: "4358",
+        brand: "VISA",
         requireCvv: opts.requireCvv ?? false,
         status: SavedCardStatus.active,
       },
     });
   }
 
-  it('recurring KAPALIyken kayıtlı kartla ödeme 410 döner (PayTR Non3D yetkisi bekleniyor)', async () => {
-    setRecurringFlag(false);
+  it("kart saklama KAPALIyken kayıtlı kart formu 410 döner", async () => {
+    setCardStorageFlag(false);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const card = await seedSavedCard(buyer.id);
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
       .send({ orderId, savedCardId: card.id })
       .expect(410);
-    expect(ctx.paytr.recurringCalls.length).toBe(0);
+    expect(ctx.paytr.registeredCardCalls.length).toBe(0);
   });
 
-  it('misafir kayıtlı kart kullanamaz (403)', async () => {
-    setRecurringFlag(true);
+  it("misafir kayıtlı kart kullanamaz (403)", async () => {
+    setCardStorageFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const card = await seedSavedCard(buyer.id);
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .send({ orderId, savedCardId: card.id }) // auth yok
       .expect(403);
-    expect(ctx.paytr.recurringCalls.length).toBe(0);
+    expect(ctx.paytr.registeredCardCalls.length).toBe(0);
   });
 
-  it('kayıtlı kartla ödeme: chargeRecurring çağrılır (utoken/ctoken) ve success döner', async () => {
-    setRecurringFlag(true);
+  it("kayıtlı kartla ödeme: sahip olunan utoken/ctoken PayTR formuna eklenir", async () => {
+    setCardStorageFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const card = await seedSavedCard(buyer.id);
-    ctx.paytr.nextRecurringResult = { status: 'success' };
 
     const res = await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
       .send({ orderId, savedCardId: card.id })
       .expect(201);
 
-    expect(res.body.status).toBe('success');
-    expect(res.body.threeDSHtml).toBeNull(); // Non3D → 3D ekranı yok
-    expect(ctx.paytr.recurringCalls.length).toBe(1);
-    expect(ctx.paytr.recurringCalls[0].utoken).toBe(card.utoken);
-    expect(ctx.paytr.recurringCalls[0].ctoken).toBe(card.ctoken);
-    // Yeni kart yolu (createDirectPayment) ÇAĞRILMADI.
-    expect(ctx.paytr.directPaymentCalls.length).toBe(0);
+    expect(res.body.status).toBe("pending");
+    expect(res.body.savedCard).toBe(true);
+    expect(res.body.fields).toEqual(
+      expect.arrayContaining([
+        { name: "utoken", value: card.utoken },
+        { name: "ctoken", value: card.ctoken },
+      ]),
+    );
+    expect(ctx.paytr.registeredCardCalls.length).toBe(0);
+    expect(ctx.paytr.recurringCalls.length).toBe(0);
+    expect(ctx.paytr.directPaymentCalls.length).toBe(1);
   });
 
-  it('require_cvv kart + CVV yoksa 400; PayTR çağrılmaz', async () => {
-    setRecurringFlag(true);
+  it("require_cvv kartta API CVV almaz, forma gereksinim bilgisini koyar", async () => {
+    setCardStorageFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const card = await seedSavedCard(buyer.id, { requireCvv: true });
 
-    await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+    const res = await request(ctx.app.getHttpServer())
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
       .send({ orderId, savedCardId: card.id })
-      .expect(400);
-    expect(ctx.paytr.recurringCalls.length).toBe(0);
+      .expect(201);
+    expect(res.body.requireCvv).toBe(true);
+    expect(res.body.fields).toEqual(
+      expect.arrayContaining([{ name: "require_cvv", value: "1" }]),
+    );
+    expect(res.body.fields).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "cvv" })]),
+    );
+    expect(ctx.paytr.registeredCardCalls.length).toBe(0);
   });
 
-  it('başkasının kayıtlı kartıyla ödeyemez (404)', async () => {
-    setRecurringFlag(true);
+  it("başkasının kayıtlı kartıyla ödeyemez (404)", async () => {
+    setCardStorageFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const other = await createUser(ctx.module);
     const othersCard = await seedSavedCard(other.id);
 
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
       .send({ orderId, savedCardId: othersCard.id })
       .expect(404);
-    expect(ctx.paytr.recurringCalls.length).toBe(0);
+    expect(ctx.paytr.registeredCardCalls.length).toBe(0);
   });
 
-  it('kayıtlı kartla ödeme başarısızsa status=failed + payment.failureReason yazılır', async () => {
-    setRecurringFlag(true);
+  it("kayıtlı kart form hazırlığı sağlayıcıda senkron çekim yapmaz", async () => {
+    setCardStorageFlag(true);
     const { buyer, orderId } = await makeBuyerWithOrder();
     const card = await seedSavedCard(buyer.id);
-    ctx.paytr.nextRecurringResult = { status: 'failed', reason: 'Kart kapalı', tryAgain: false };
 
     const res = await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
       .send({ orderId, savedCardId: card.id })
       .expect(201);
 
-    expect(res.body.status).toBe('failed');
+    expect(res.body.status).toBe("pending");
+    expect(ctx.paytr.registeredCardCalls.length).toBe(0);
     const prisma = getPrisma();
-    const payment = await prisma.payment.findUnique({ where: { id: res.body.paymentId } });
-    expect(payment!.failureReason).toContain('Kart kapalı');
+    const payment = await prisma.payment.findUnique({
+      where: { id: res.body.paymentId },
+    });
+    expect(payment!.failureReason).toBeNull();
   });
 });

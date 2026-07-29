@@ -1,13 +1,21 @@
-import { IsString, IsEnum, IsOptional, IsUUID, MaxLength } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductStatus, ProductCondition } from '@prisma/client';
-import { Type } from 'class-transformer';
-import { IsNumber, Min } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsUUID,
+  IsInt,
+  Max,
+  MaxLength,
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ProductStatus, ProductCondition } from "@prisma/client";
+import { Type } from "class-transformer";
+import { IsNumber, Min } from "class-validator";
 
 export class ApproveProductDto {
   @ApiPropertyOptional({
-    example: 'Ürün onaylandı',
-    description: 'Approval note',
+    example: "Ürün onaylandı",
+    description: "Approval note",
   })
   @IsOptional()
   @IsString()
@@ -17,8 +25,8 @@ export class ApproveProductDto {
 
 export class RejectProductDto {
   @ApiProperty({
-    example: 'Ürün açıklaması yetersiz',
-    description: 'Rejection reason',
+    example: "Ürün açıklaması yetersiz",
+    description: "Rejection reason",
   })
   @IsString()
   @MaxLength(500)
@@ -28,15 +36,15 @@ export class RejectProductDto {
 export class UpdateProductStatusDto {
   @ApiProperty({
     enum: ProductStatus,
-    example: 'active',
-    description: 'New product status',
+    example: "active",
+    description: "New product status",
   })
   @IsEnum(ProductStatus)
   status: ProductStatus;
 
   @ApiPropertyOptional({
-    example: 'Durum güncellendi',
-    description: 'Status change note',
+    example: "Durum güncellendi",
+    description: "Status change note",
   })
   @IsOptional()
   @IsString()
@@ -46,8 +54,8 @@ export class UpdateProductStatusDto {
 
 export class BanUserDto {
   @ApiProperty({
-    example: 'Platformkurallarının ihlali',
-    description: 'Ban reason',
+    example: "Platformkurallarının ihlali",
+    description: "Ban reason",
   })
   @IsString()
   @MaxLength(500)
@@ -56,29 +64,38 @@ export class BanUserDto {
 
 export class ResolveDisputeDto {
   @ApiProperty({
-    example: 'buyer_refund',
-    description: 'Resolution type',
-    enum: ['buyer_refund', 'seller_favor', 'partial_refund', 'dismissed'],
+    example: "buyer_refund",
+    description: "Resolution type",
+    enum: ["buyer_refund", "seller_favor", "partial_refund", "dismissed"],
   })
   @IsString()
-  resolution: 'buyer_refund' | 'seller_favor' | 'partial_refund' | 'dismissed';
+  resolution: "buyer_refund" | "seller_favor" | "partial_refund" | "dismissed";
 
   @ApiProperty({
-    example: 'Alıcıya iade yapılacak',
-    description: 'Resolution note',
+    example: "Alıcıya iade yapılacak",
+    description: "Resolution note",
   })
   @IsString()
   @MaxLength(1000)
   note: string;
+
+  @ApiPropertyOptional({
+    example: 150.0,
+    description: "Kısmi iade tutarı (yalnızca partial_refund için)",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  refundAmount?: number;
 }
 
 export class UpdateProductDto {
-  @ApiPropertyOptional({ example: 'iPhone 15 Pro' })
+  @ApiPropertyOptional({ example: "iPhone 15 Pro" })
   @IsOptional()
   @IsString()
   title?: string;
 
-  @ApiPropertyOptional({ example: 'Yeni nesil iPhone...' })
+  @ApiPropertyOptional({ example: "Yeni nesil iPhone..." })
   @IsOptional()
   @IsString()
   description?: string;
@@ -99,17 +116,28 @@ export class UpdateProductDto {
   @IsNumber()
   quantity?: number | null;
 
-  @ApiPropertyOptional({ enum: ProductCondition, example: 'new' })
+  @ApiPropertyOptional({
+    example: 2,
+    description: "Kargoya hazır ürün paketinin desisi",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  @Type(() => Number)
+  shippingDesi?: number;
+
+  @ApiPropertyOptional({ enum: ProductCondition, example: "new" })
   @IsOptional()
   @IsEnum(ProductCondition)
   condition?: ProductCondition;
 
-  @ApiPropertyOptional({ enum: ProductStatus, example: 'active' })
+  @ApiPropertyOptional({ enum: ProductStatus, example: "active" })
   @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus;
 
-  @ApiPropertyOptional({ example: 'uuid-category-id' })
+  @ApiPropertyOptional({ example: "uuid-category-id" })
   @IsOptional()
   @IsUUID()
   categoryId?: string;

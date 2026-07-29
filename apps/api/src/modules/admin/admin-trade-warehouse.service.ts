@@ -4,26 +4,16 @@ import {
   BadRequestException,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { AdminAuditService } from './admin-audit.service';
-import {
-  ApproveWarehouseTradeDto,
-  RejectWarehouseTradeDto,
-} from './dto';
-import { PaymentStatus, TradeStatus, ShipmentStatus } from '@prisma/client';
-import { PaymentService } from '../payment/payment.service';
-import { EventService } from '../events/event.service';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-} from '../surat-cargo/surat-cargo.types';
-import { AdminTradeCommonService } from './admin-trade-common.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { AdminAuditService } from "./admin-audit.service";
+import { ApproveWarehouseTradeDto, RejectWarehouseTradeDto } from "./dto";
+import { PaymentStatus, TradeStatus, ShipmentStatus } from "@prisma/client";
+import { PaymentService } from "../payment/payment.service";
+import { EventService } from "../events/event.service";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { AdminTradeCommonService } from "./admin-trade-common.service";
 
 /**
  * Safe-trade (depo escrow) admin akışının depo-tarafı: depo teslim alma
@@ -57,12 +47,14 @@ export class AdminTradeWarehouseService {
     userId: string,
   ): Promise<any> {
     if (chosenId) {
-      const chosen = await tx.address.findFirst({ where: { id: chosenId, userId } });
+      const chosen = await tx.address.findFirst({
+        where: { id: chosenId, userId },
+      });
       if (chosen) return chosen;
     }
     return tx.address.findFirst({
       where: { userId },
-      orderBy: { isDefault: 'desc' },
+      orderBy: { isDefault: "desc" },
     });
   }
 
@@ -75,44 +67,173 @@ export class AdminTradeWarehouseService {
     oid: string,
     address: any,
     user: any,
-  ): Promise<{ carrier: string; trackingNumber: string }> {
-    if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
+  ): Promise<{
+    carrier: string;
+    trackingNumber: string;
+    providerTrackingId: string | null;
+    labelZpl: string | null;
+  }> {
+    if (
+      !this.suratCargoService ||
+      !this.suratCargoService.isIntegrationEnabled()
+    ) {
       const fallbackTracking = `TRK${Date.now().toString(36).toUpperCase()}${Math.random()
         .toString(36)
         .substring(2, 6)
         .toUpperCase()}`;
-      return { carrier: 'Tarodan Warehouse', trackingNumber: fallbackTracking };
+      return {
+        carrier: "Tarodan Warehouse",
+        trackingNumber: fallbackTracking,
+        providerTrackingId: null,
+        labelZpl: null,
+      };
     }
-    const result = await this.suratCargoService.submitShipmentWithRetry({
+    const result = await this.suratCargoService.createShipmentWithBarcode({
       idempotencyKey: `surat:trade-return:${oid}`,
       correlationId: `trade-reject-${tradeId}`,
-      payload: {
-        KisiKurum: address.fullName || user?.displayName || 'Takas İade',
-        SahisBirim: 'Takas İade Gönderisi',
-        AliciAdresi: address.address,
-        Il: normalizeSuratLocation(address.city),
-        Ilce: normalizeSuratLocation(address.district),
-        TelefonCep: normalizeSuratPhone(address.phone),
-        KargoTuru: SuratKargoTuru.Koli,
-        OdemeTipi: SuratOdemeTipi.Pesin,
-        OzelKargoTakipNo: oid,
-        Adet: 1,
-        BirimDesi: 1,
-        BirimKg: 1,
-        KapidanOdemeTahsilatTipi: 1,
-        TasimaSekli: SuratTasimaSekli.KaraYolu,
-        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-        GonderiSekli: SuratGonderiSekli.Standart,
-        Pazaryerimi: 0,
-        Iademi: true,
-      },
+      payload: buildStandardGonderiPayload({
+        recipientName: address.fullName || user?.displayName || "Takas İade",
+        address: address.address,
+        city: address.city,
+        district: address.district,
+        phone: address.phone,
+        ref: oid,
+        content: "Takas İade Gönderisi",
+        isReturn: true,
+        // KisiKurum fallback zinciri "Takas İade" (builder'ın "Alıcı"sı
+        // değil) ve trim yok → birebir korumak için override.
+        overrides: {
+          KisiKurum: address.fullName || user?.displayName || "Takas İade",
+        },
+      }),
     });
     if (!result.ok) {
       const r = result as any;
-      const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
-      throw new BadRequestException(`Sürat iade kargo siparişi reddedildi: ${errMsg}`);
+      const errMsg =
+        r.kind === "business" ? r.suratMessage : `technical: ${r.code}`;
+      throw new BadRequestException(
+        `Sürat iade kargo siparişi reddedildi: ${errMsg}`,
+      );
     }
-    return { carrier: 'surat', trackingNumber: oid };
+    return {
+      carrier: "surat",
+      trackingNumber: oid,
+      providerTrackingId: result.kargoTakipNo,
+      labelZpl: result.labelZpl,
+    };
+  }
+
+  /**
+   * H3 — Kargo kodu retry: kodsuz kalmış tek bir `return` bacağı (reject'in
+   * RET-INI/RET-REC DRAFT'ları veya force-cancel'ın RET-STK DRAFT'ı) için Sürat
+   * submit'ini yeniden dener. Sürat timeout'unda DRAFT satır korunuyor ama ne
+   * poller (trackingNumber null) ne inbound-retry (yalnız to_warehouse) ona
+   * dokunuyordu; reject'in idempotency guard'ı da re-submit etmeden erken
+   * dönüyordu → kullanıcı iade etiketini hiç alamıyordu.
+   *
+   * OID deterministik yeniden türetilir (orijinal formatla BİREBİR — idempotency
+   * OzelKargoTakipNo üzerinden): trackingNumber varsa o; yoksa trade'in return
+   * bacağı sayısına göre reject (2 bacak → RET-INI/REC, recipient'a göre) veya
+   * stuck (1 bacak → RET-STK). Manuel fallback satırları ("Tarodan Warehouse")
+   * bilinçli — dokunulmaz. Throw etmez, boolean döner.
+   */
+  async retryReturnBarcode(tradeShipmentId: string): Promise<boolean> {
+    if (
+      !this.suratCargoService ||
+      !this.suratCargoService.isIntegrationEnabled()
+    ) {
+      return false;
+    }
+
+    const ship = await this.prisma.tradeShipment.findUnique({
+      where: { id: tradeShipmentId },
+      include: {
+        trade: {
+          select: {
+            tradeNumber: true,
+            initiatorId: true,
+            receiverId: true,
+            initiatorAddressId: true,
+            receiverAddressId: true,
+          },
+        },
+      },
+    });
+    if (
+      !ship ||
+      ship.leg !== "return" ||
+      ship.providerTrackingId ||
+      !ship.recipientUserId ||
+      !["pending", "surat"].includes(ship.carrier) ||
+      ship.status === ShipmentStatus.cancelled
+    ) {
+      return false;
+    }
+
+    // OID: orijinal formatla birebir aynı türetim (TRD- çift öneki DAHİL —
+    // format değişirse idempotency anahtarı kayar, mükerrer gönderi riski doğar).
+    let oid = ship.trackingNumber;
+    if (!oid) {
+      const returnLegCount = await this.prisma.tradeShipment.count({
+        where: { tradeId: ship.tradeId, leg: "return" },
+      });
+      const suffix =
+        returnLegCount >= 2
+          ? ship.recipientUserId === ship.trade.initiatorId
+            ? "RET-INI"
+            : "RET-REC"
+          : "RET-STK";
+      oid = `TRD-${ship.trade.tradeNumber}-${suffix}`
+        .replace(/[^a-zA-Z0-9-]/g, "")
+        .slice(0, 50);
+    }
+
+    const isInitiator = ship.recipientUserId === ship.trade.initiatorId;
+    const [user, address] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: ship.recipientUserId } }),
+      this.pickTradeSideAddress(
+        this.prisma,
+        isInitiator
+          ? ship.trade.initiatorAddressId
+          : ship.trade.receiverAddressId,
+        ship.recipientUserId,
+      ),
+    ]);
+    if (!address) {
+      this.logger.warn(
+        `Retry return barcode: recipient ${ship.recipientUserId} has no address (trade-shipment=${tradeShipmentId})`,
+      );
+      return false;
+    }
+
+    try {
+      const submitted = await this.submitReturnToSuratForReject(
+        ship.tradeId,
+        oid,
+        address,
+        user,
+      );
+      await this.prisma.tradeShipment.update({
+        where: { id: tradeShipmentId },
+        data: {
+          carrier: submitted.carrier,
+          trackingNumber: submitted.trackingNumber,
+          providerTrackingId: submitted.providerTrackingId,
+          labelZpl: submitted.labelZpl,
+          status: ShipmentStatus.label_created,
+          shippedAt: ship.shippedAt ?? new Date(),
+        },
+      });
+      this.logger.log(
+        `Retry OK: trade return barcode filled ${tradeShipmentId} oid=${oid} code=${submitted.providerTrackingId}`,
+      );
+      return true;
+    } catch (e: any) {
+      this.logger.warn(
+        `Retry return barcode failed ${tradeShipmentId} oid=${oid}: ${e?.message}`,
+      );
+      return false;
+    }
   }
 
   /**
@@ -125,127 +246,129 @@ export class AdminTradeWarehouseService {
     tradeId: string,
     shipmentId: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      // Lock the trade row for the duration of the transaction
-      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+    return this.prisma
+      .$transaction(async (tx) => {
+        // Lock the trade row for the duration of the transaction
+        await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
 
-      const trade = await tx.trade.findUnique({
-        where: { id: tradeId },
-        select: {
-          id: true,
-          status: true,
-          initiatorId: true,
-          receiverId: true,
-          firstWarehouseArrivalAt: true,
-        },
-      });
-      if (!trade) {
-        throw new NotFoundException('Takas bulunamadı');
-      }
-
-      const shipment = await tx.tradeShipment.findUnique({
-        where: { id: shipmentId },
-      });
-      if (!shipment || shipment.tradeId !== tradeId) {
-        throw new NotFoundException('Gönderim bulunamadı');
-      }
-      if (shipment.leg !== 'to_warehouse') {
-        throw new BadRequestException(
-          'Bu gönderim depoya gelen bir gönderim değil',
-        );
-      }
-      if (shipment.deliveredAt) {
-        throw new BadRequestException(
-          'Bu gönderim zaten teslim alındı olarak işaretlenmiş',
-        );
-      }
-
-      const now = new Date();
-      const updatedShipment = await tx.tradeShipment.update({
-        where: { id: shipmentId },
-        data: {
-          status: ShipmentStatus.delivered,
-          deliveredAt: now,
-        },
-      });
-
-      // Check if both to_warehouse shipments are now delivered
-      const toWarehouseShipments = await tx.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
-        select: { id: true, deliveredAt: true },
-      });
-      const bothDelivered =
-        toWarehouseShipments.length >= 2 &&
-        toWarehouseShipments.every((s) => s.deliveredAt !== null);
-
-      // Lock user-side cancel on the first warehouse arrival. From this point
-      // on, only admin can unwind the trade (reject or force-cancel-stuck).
-      const isFirstArrival = trade.firstWarehouseArrivalAt === null;
-
-      let nextStatus: TradeStatus = trade.status;
-      if (bothDelivered && trade.status !== TradeStatus.at_warehouse) {
-        await tx.trade.update({
+        const trade = await tx.trade.findUnique({
           where: { id: tradeId },
-          data: {
-            status: TradeStatus.at_warehouse,
-            updatedAt: now,
-            ...(isFirstArrival
-              ? { firstWarehouseArrivalAt: now, cancelLockedAt: now }
-              : {}),
+          select: {
+            id: true,
+            status: true,
+            initiatorId: true,
+            receiverId: true,
+            firstWarehouseArrivalAt: true,
           },
         });
-        nextStatus = TradeStatus.at_warehouse;
-      } else if (isFirstArrival) {
-        await tx.trade.update({
-          where: { id: tradeId },
-          data: {
-            firstWarehouseArrivalAt: now,
-            cancelLockedAt: now,
-            updatedAt: now,
-          },
+        if (!trade) {
+          throw new NotFoundException("Takas bulunamadı");
+        }
+
+        const shipment = await tx.tradeShipment.findUnique({
+          where: { id: shipmentId },
         });
-      }
-
-      await this.audit.createAuditLog(
-        adminId,
-        'trade_warehouse_received',
-        'TradeShipment',
-        shipmentId,
-        shipment,
-        {
-          ...updatedShipment,
-          bothDelivered,
-          tradeStatus: nextStatus,
-          firstArrival: isFirstArrival,
-        },
-      );
-
-      return {
-        success: true,
-        tradeId,
-        shipmentId,
-        status: nextStatus,
-        bothDelivered,
-        firstArrival: isFirstArrival,
-        initiatorId: trade.initiatorId,
-        receiverId: trade.receiverId,
-      };
-    }).then(async (res) => {
-      if (res.firstArrival) {
-        try {
-          await this.eventService.emitTradeCancelLocked({
-            tradeId: res.tradeId,
-            initiatorId: res.initiatorId,
-            receiverId: res.receiverId,
-          });
-        } catch (err) {
-          this.logger.error(
-            `Failed to emit trade.cancel-locked for trade ${res.tradeId}: ${err}`,
+        if (!shipment || shipment.tradeId !== tradeId) {
+          throw new NotFoundException("Gönderim bulunamadı");
+        }
+        if (shipment.leg !== "to_warehouse") {
+          throw new BadRequestException(
+            "Bu gönderim depoya gelen bir gönderim değil",
           );
         }
-      }
-      return res;
-    });
+        if (shipment.deliveredAt) {
+          throw new BadRequestException(
+            "Bu gönderim zaten teslim alındı olarak işaretlenmiş",
+          );
+        }
+
+        const now = new Date();
+        const updatedShipment = await tx.tradeShipment.update({
+          where: { id: shipmentId },
+          data: {
+            status: ShipmentStatus.delivered,
+            deliveredAt: now,
+          },
+        });
+
+        // Check if both to_warehouse shipments are now delivered
+        const toWarehouseShipments = await tx.tradeShipment.findMany({
+          where: { tradeId, leg: "to_warehouse" },
+          select: { id: true, deliveredAt: true },
+        });
+        const bothDelivered =
+          toWarehouseShipments.length >= 2 &&
+          toWarehouseShipments.every((s) => s.deliveredAt !== null);
+
+        // Lock user-side cancel on the first warehouse arrival. From this point
+        // on, only admin can unwind the trade (reject or force-cancel-stuck).
+        const isFirstArrival = trade.firstWarehouseArrivalAt === null;
+
+        let nextStatus: TradeStatus = trade.status;
+        if (bothDelivered && trade.status !== TradeStatus.at_warehouse) {
+          await tx.trade.update({
+            where: { id: tradeId },
+            data: {
+              status: TradeStatus.at_warehouse,
+              updatedAt: now,
+              ...(isFirstArrival
+                ? { firstWarehouseArrivalAt: now, cancelLockedAt: now }
+                : {}),
+            },
+          });
+          nextStatus = TradeStatus.at_warehouse;
+        } else if (isFirstArrival) {
+          await tx.trade.update({
+            where: { id: tradeId },
+            data: {
+              firstWarehouseArrivalAt: now,
+              cancelLockedAt: now,
+              updatedAt: now,
+            },
+          });
+        }
+
+        await this.audit.createAuditLog(
+          adminId,
+          "trade_warehouse_received",
+          "TradeShipment",
+          shipmentId,
+          shipment,
+          {
+            ...updatedShipment,
+            bothDelivered,
+            tradeStatus: nextStatus,
+            firstArrival: isFirstArrival,
+          },
+        );
+
+        return {
+          success: true,
+          tradeId,
+          shipmentId,
+          status: nextStatus,
+          bothDelivered,
+          firstArrival: isFirstArrival,
+          initiatorId: trade.initiatorId,
+          receiverId: trade.receiverId,
+        };
+      })
+      .then(async (res) => {
+        if (res.firstArrival) {
+          try {
+            await this.eventService.emitTradeCancelLocked({
+              tradeId: res.tradeId,
+              initiatorId: res.initiatorId,
+              receiverId: res.receiverId,
+            });
+          } catch (err) {
+            this.logger.error(
+              `Failed to emit trade.cancel-locked for trade ${res.tradeId}: ${err}`,
+            );
+          }
+        }
+        return res;
+      });
   }
 
   /**
@@ -269,7 +392,7 @@ export class AdminTradeWarehouseService {
         },
       });
       if (!trade) {
-        throw new NotFoundException('Takas bulunamadı');
+        throw new NotFoundException("Takas bulunamadı");
       }
 
       if (
@@ -282,22 +405,31 @@ export class AdminTradeWarehouseService {
       }
 
       const [initiatorAddress, receiverAddress] = await Promise.all([
-        this.pickTradeSideAddress(tx, trade.initiatorAddressId, trade.initiatorId),
-        this.pickTradeSideAddress(tx, trade.receiverAddressId, trade.receiverId),
+        this.pickTradeSideAddress(
+          tx,
+          trade.initiatorAddressId,
+          trade.initiatorId,
+        ),
+        this.pickTradeSideAddress(
+          tx,
+          trade.receiverAddressId,
+          trade.receiverId,
+        ),
       ]);
 
       if (!initiatorAddress) {
         throw new BadRequestException(
-          'Takası başlatan kullanıcının kayıtlı adresi yok',
+          "Takası başlatan kullanıcının kayıtlı adresi yok",
         );
       }
       if (!receiverAddress) {
         throw new BadRequestException(
-          'Takası alan kullanıcının kayıtlı adresi yok',
+          "Takası alan kullanıcının kayıtlı adresi yok",
         );
       }
 
-      const warehouseAddressId = await this.common.resolveWarehouseAddressId(tx);
+      const warehouseAddressId =
+        await this.common.resolveWarehouseAddressId(tx);
 
       const genTrackingNumber = () =>
         `TRK${Date.now().toString(36).toUpperCase()}${Math.random()
@@ -309,57 +441,96 @@ export class AdminTradeWarehouseService {
 
       // Submit each warehouse-to-recipient leg to Sürat as a real shipment.
       // If integration is disabled, falls back to internal tracking number.
-      const initiatorOid = `TRD-${trade.tradeNumber}-INI`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
-      const receiverOid = `TRD-${trade.tradeNumber}-REC`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+      const initiatorOid = `TRD-${trade.tradeNumber}-INI`
+        .replace(/[^a-zA-Z0-9-]/g, "")
+        .slice(0, 50);
+      const receiverOid = `TRD-${trade.tradeNumber}-REC`
+        .replace(/[^a-zA-Z0-9-]/g, "")
+        .slice(0, 50);
 
-      const initiatorUser = await tx.user.findUnique({ where: { id: trade.initiatorId } });
-      const receiverUser = await tx.user.findUnique({ where: { id: trade.receiverId } });
+      const initiatorUser = await tx.user.findUnique({
+        where: { id: trade.initiatorId },
+      });
+      const receiverUser = await tx.user.findUnique({
+        where: { id: trade.receiverId },
+      });
 
-      const submitToSurat = async (oid: string, addr: any, user: any): Promise<{ carrier: string; trackingNumber: string }> => {
-        if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
-          return { carrier: 'Tarodan Warehouse', trackingNumber: genTrackingNumber() };
+      const submitToSurat = async (
+        oid: string,
+        addr: any,
+        user: any,
+      ): Promise<{
+        carrier: string;
+        trackingNumber: string;
+        providerTrackingId: string | null;
+        labelZpl: string | null;
+      }> => {
+        if (
+          !this.suratCargoService ||
+          !this.suratCargoService.isIntegrationEnabled()
+        ) {
+          return {
+            carrier: "Tarodan Warehouse",
+            trackingNumber: genTrackingNumber(),
+            providerTrackingId: null,
+            labelZpl: null,
+          };
         }
         try {
-          const result = await this.suratCargoService.submitShipmentWithRetry({
-            idempotencyKey: `surat:trade:${oid}`,
-            correlationId: `trade-approve-${tradeId}`,
-            payload: {
-              KisiKurum: addr.fullName || user?.displayName || 'Takas Alıcısı',
-              SahisBirim: 'Takas Gönderisi',
-              AliciAdresi: addr.address,
-              Il: normalizeSuratLocation(addr.city),
-              Ilce: normalizeSuratLocation(addr.district),
-              TelefonCep: normalizeSuratPhone(addr.phone),
-              KargoTuru: SuratKargoTuru.Koli,
-              OdemeTipi: SuratOdemeTipi.Pesin,
-              OzelKargoTakipNo: oid,
-              Adet: 1,
-              BirimDesi: 1,
-              BirimKg: 1,
-              KapidanOdemeTahsilatTipi: 1,
-              TasimaSekli: SuratTasimaSekli.KaraYolu,
-              TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-              GonderiSekli: SuratGonderiSekli.Standart,
-              Pazaryerimi: 0,
-              Iademi: false,
+          const result = await this.suratCargoService.createShipmentWithBarcode(
+            {
+              idempotencyKey: `surat:trade:${oid}`,
+              correlationId: `trade-approve-${tradeId}`,
+              payload: buildStandardGonderiPayload({
+                recipientName:
+                  addr.fullName || user?.displayName || "Takas Alıcısı",
+                address: addr.address,
+                city: addr.city,
+                district: addr.district,
+                phone: addr.phone,
+                ref: oid,
+                content: "Takas Gönderisi",
+                // KisiKurum fallback zinciri "Takas Alıcısı" (builder'ın
+                // "Alıcı"sı değil) ve trim yok → birebir korumak için override.
+                overrides: {
+                  KisiKurum:
+                    addr.fullName || user?.displayName || "Takas Alıcısı",
+                },
+              }),
             },
-          });
+          );
           if (!result.ok) {
             const r = result as any;
-            const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+            const errMsg =
+              r.kind === "business" ? r.suratMessage : `technical: ${r.code}`;
             throw new BadRequestException(
               `Sürat kargo onay siparişi reddedildi: ${errMsg}`,
             );
           }
-          return { carrier: 'surat', trackingNumber: oid };
+          return {
+            carrier: "surat",
+            trackingNumber: oid,
+            providerTrackingId: result.kargoTakipNo,
+            labelZpl: result.labelZpl,
+          };
         } catch (error: any) {
-          this.logger.error(`Surat shipment submit failed for trade ${tradeId}: ${error.message}`);
+          this.logger.error(
+            `Surat shipment submit failed for trade ${tradeId}: ${error.message}`,
+          );
           throw error;
         }
       };
 
-      const initiatorShipResult = await submitToSurat(initiatorOid, initiatorAddress, initiatorUser);
-      const receiverShipResult = await submitToSurat(receiverOid, receiverAddress, receiverUser);
+      const initiatorShipResult = await submitToSurat(
+        initiatorOid,
+        initiatorAddress,
+        initiatorUser,
+      );
+      const receiverShipResult = await submitToSurat(
+        receiverOid,
+        receiverAddress,
+        receiverUser,
+      );
 
       // Shipment heading to the initiator (carrying receiver's items)
       const shipmentToInitiator = await tx.tradeShipment.create({
@@ -369,10 +540,12 @@ export class AdminTradeWarehouseService {
           fromAddressId: warehouseAddressId,
           carrier: initiatorShipResult.carrier,
           trackingNumber: initiatorShipResult.trackingNumber,
+          providerTrackingId: initiatorShipResult.providerTrackingId,
+          labelZpl: initiatorShipResult.labelZpl,
           status: ShipmentStatus.label_created,
           shippedAt: now,
-          leg: 'from_warehouse',
-          recipientType: 'user',
+          leg: "from_warehouse",
+          recipientType: "user",
           recipientUserId: trade.initiatorId,
         },
       });
@@ -385,10 +558,12 @@ export class AdminTradeWarehouseService {
           fromAddressId: warehouseAddressId,
           carrier: receiverShipResult.carrier,
           trackingNumber: receiverShipResult.trackingNumber,
+          providerTrackingId: receiverShipResult.providerTrackingId,
+          labelZpl: receiverShipResult.labelZpl,
           status: ShipmentStatus.label_created,
           shippedAt: now,
-          leg: 'from_warehouse',
-          recipientType: 'user',
+          leg: "from_warehouse",
+          recipientType: "user",
           recipientUserId: trade.receiverId,
         },
       });
@@ -398,11 +573,15 @@ export class AdminTradeWarehouseService {
       // safe-trade'lerde hiç eşleşmiyordu → alıcı onaylamazsa para shipping_to_recipients'te
       // süresiz askıda kalıyordu. Direct akıştaki (both_shipped) ile aynı setting kullanılır.
       const confirmationDaysSetting = await tx.platformSetting.findUnique({
-        where: { settingKey: 'trade_confirmation_deadline_days' },
+        where: { settingKey: "trade_confirmation_deadline_days" },
       });
-      const confirmationDays = parseInt(confirmationDaysSetting?.settingValue ?? '3');
+      const confirmationDays = parseInt(
+        confirmationDaysSetting?.settingValue ?? "3",
+      );
       const confirmationDeadline = new Date(now);
-      confirmationDeadline.setDate(confirmationDeadline.getDate() + confirmationDays);
+      confirmationDeadline.setDate(
+        confirmationDeadline.getDate() + confirmationDays,
+      );
 
       const updatedTrade = await tx.trade.update({
         where: { id: tradeId },
@@ -415,8 +594,8 @@ export class AdminTradeWarehouseService {
 
       await this.audit.createAuditLog(
         adminId,
-        'trade_warehouse_approve',
-        'Trade',
+        "trade_warehouse_approve",
+        "Trade",
         tradeId,
         trade,
         {
@@ -461,7 +640,7 @@ export class AdminTradeWarehouseService {
     dto: RejectWarehouseTradeDto,
   ) {
     if (!dto?.reason || !dto.reason.trim()) {
-      throw new BadRequestException('Red nedeni zorunludur');
+      throw new BadRequestException("Red nedeni zorunludur");
     }
 
     // Idempotency: if the trade is already `returning` from a prior reject,
@@ -472,19 +651,42 @@ export class AdminTradeWarehouseService {
         id: true,
         status: true,
         refundFailureReason: true,
-        shipments: { where: { leg: 'return' }, select: { id: true } },
+        shipments: {
+          where: { leg: "return" },
+          select: { id: true, carrier: true, providerTrackingId: true },
+        },
       },
     });
     if (!existing) {
-      throw new NotFoundException('Takas bulunamadı');
+      throw new NotFoundException("Takas bulunamadı");
     }
-    if (existing.status === TradeStatus.returning && existing.shipments.length >= 2) {
+    if (
+      existing.status === TradeStatus.returning &&
+      existing.shipments.length >= 2
+    ) {
+      // H3: erken dönüş, Sürat submit'i timeout'ta kalmış kodsuz DRAFT'ları
+      // sonsuza dek kilitliyordu ("returning && >=2" hep doğru, ama bacaklar
+      // kodsuz). Kodsuz Sürat bacaklarını burada yeniden submit et; manuel
+      // fallback ("Tarodan Warehouse") bacakları bilinçli, dokunma.
+      const incomplete = existing.shipments.filter(
+        (s) =>
+          s.carrier === "pending" ||
+          (s.carrier === "surat" && !s.providerTrackingId),
+      );
+      let resubmitted = 0;
+      for (const s of incomplete) {
+        if (await this.retryReturnBarcode(s.id)) resubmitted++;
+      }
       return {
         success: true,
         tradeId,
         status: existing.status,
         refundFailure: existing.refundFailureReason,
         idempotent: true,
+        ...(incomplete.length > 0 && {
+          returnResubmitted: resubmitted,
+          returnStillPending: incomplete.length - resubmitted,
+        }),
       };
     }
 
@@ -503,7 +705,7 @@ export class AdminTradeWarehouseService {
         },
       });
       if (!trade) {
-        throw new NotFoundException('Takas bulunamadı');
+        throw new NotFoundException("Takas bulunamadı");
       }
 
       if (
@@ -516,25 +718,38 @@ export class AdminTradeWarehouseService {
       }
 
       const [initiatorAddress, receiverAddress] = await Promise.all([
-        this.pickTradeSideAddress(tx, trade.initiatorAddressId, trade.initiatorId),
-        this.pickTradeSideAddress(tx, trade.receiverAddressId, trade.receiverId),
+        this.pickTradeSideAddress(
+          tx,
+          trade.initiatorAddressId,
+          trade.initiatorId,
+        ),
+        this.pickTradeSideAddress(
+          tx,
+          trade.receiverAddressId,
+          trade.receiverId,
+        ),
       ]);
       if (!initiatorAddress) {
         throw new BadRequestException(
-          'Takası başlatan kullanıcının kayıtlı adresi yok',
+          "Takası başlatan kullanıcının kayıtlı adresi yok",
         );
       }
       if (!receiverAddress) {
         throw new BadRequestException(
-          'Takası alan kullanıcının kayıtlı adresi yok',
+          "Takası alan kullanıcının kayıtlı adresi yok",
         );
       }
 
-      const warehouseAddressId = await this.common.resolveWarehouseAddressId(tx);
+      const warehouseAddressId =
+        await this.common.resolveWarehouseAddressId(tx);
       const now = new Date();
 
-      const initiatorReturnOid = `TRD-${trade.tradeNumber}-RET-INI`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
-      const receiverReturnOid = `TRD-${trade.tradeNumber}-RET-REC`.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+      const initiatorReturnOid = `TRD-${trade.tradeNumber}-RET-INI`
+        .replace(/[^a-zA-Z0-9-]/g, "")
+        .slice(0, 50);
+      const receiverReturnOid = `TRD-${trade.tradeNumber}-RET-REC`
+        .replace(/[^a-zA-Z0-9-]/g, "")
+        .slice(0, 50);
 
       // DRAFT rows — carrier/trackingNumber set after the Sürat call returns.
       const returnToInitiator = await tx.tradeShipment.create({
@@ -542,11 +757,11 @@ export class AdminTradeWarehouseService {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: 'pending',
+          carrier: "pending",
           trackingNumber: null,
           status: ShipmentStatus.pending,
-          leg: 'return',
-          recipientType: 'user',
+          leg: "return",
+          recipientType: "user",
           recipientUserId: trade.initiatorId,
         },
       });
@@ -555,11 +770,11 @@ export class AdminTradeWarehouseService {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: 'pending',
+          carrier: "pending",
           trackingNumber: null,
           status: ShipmentStatus.pending,
-          leg: 'return',
-          recipientType: 'user',
+          leg: "return",
+          recipientType: "user",
           recipientUserId: trade.receiverId,
         },
       });
@@ -575,8 +790,8 @@ export class AdminTradeWarehouseService {
 
       await this.audit.createAuditLog(
         adminId,
-        'trade_warehouse_reject',
-        'Trade',
+        "trade_warehouse_reject",
+        "Trade",
         tradeId,
         trade,
         {
@@ -632,6 +847,8 @@ export class AdminTradeWarehouseService {
           data: {
             carrier: submitted.carrier,
             trackingNumber: submitted.trackingNumber,
+            providerTrackingId: submitted.providerTrackingId,
+            labelZpl: submitted.labelZpl,
             status: ShipmentStatus.label_created,
             shippedAt: new Date(),
           },
@@ -671,7 +888,7 @@ export class AdminTradeWarehouseService {
         }
       } catch (err: any) {
         refundFailureMessage =
-          err?.message ?? 'Bilinmeyen hata (PayTR iade başarısız)';
+          err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
         this.logger.error(
           `refundTradeCashPaymentIfCompleted failed for trade ${tradeId}: ${refundFailureMessage}`,
         );

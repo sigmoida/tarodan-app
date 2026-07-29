@@ -1,19 +1,38 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { AuditLogQueryDto } from './dto';
-import { Prisma } from '@prisma/client';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { AuditLogQueryDto } from "./dto";
+import { Prisma } from "@prisma/client";
+import { paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Admin audit log yazımı + sorgulama — tüm Admin* alt-servislerinin ortak
- * bağımlılığı. AdminService'ten birebir taşındı; davranış aynı (hata durumunda
- * ana işlemi asla bozmaz, hassas alanları redakte eder). getAuditLogs,
- * AdminService'in AUDIT LOGS bölümünden birebir taşındı.
+ * bağımlılığı. Kritik para/politika işlemleri createRequiredAuditLog ile
+ * fail-closed çalışır; düşük riskli işlemler createAuditLog ile eski best-effort
+ * davranışını korur. Hassas alanlar her iki yolda da redakte edilir.
  */
 @Injectable()
 export class AdminAuditService {
   private readonly logger = new Logger(AdminAuditService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  async createRequiredAuditLog(
+    adminUserId: string,
+    action: string,
+    entityType: string,
+    entityId: string,
+    oldValue: any,
+    newValue: any,
+  ) {
+    return this.writeAuditLog(
+      adminUserId,
+      action,
+      entityType,
+      entityId,
+      oldValue,
+      newValue,
+    );
+  }
 
   async createAuditLog(
     adminUserId: string,
@@ -24,85 +43,122 @@ export class AdminAuditService {
     newValue: any,
   ) {
     try {
-      // Resolve adminUserId: @CurrentUser('id') returns User.id, but AuditLog expects AdminUser.id
-      const adminUser = await this.prisma.adminUser.findFirst({
-        where: { userId: adminUserId, isActive: true },
-        select: { id: true },
-      });
-      if (!adminUser) {
-        this.logger.warn(`Admin user not found for userId ${adminUserId}, skipping audit log`);
-        return Promise.resolve();
+      return await this.writeAuditLog(
+        adminUserId,
+        action,
+        entityType,
+        entityId,
+        oldValue,
+        newValue,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create audit log for ${entityType}:${entityId}`,
+        error,
+      );
+      return Promise.resolve();
+    }
+  }
+
+  private async writeAuditLog(
+    adminUserId: string,
+    action: string,
+    entityType: string,
+    entityId: string,
+    oldValue: any,
+    newValue: any,
+  ) {
+    const adminUser = await this.prisma.adminUser.findFirst({
+      where: { userId: adminUserId, isActive: true },
+      select: { id: true },
+    });
+    if (!adminUser) {
+      throw new Error(`Active admin user not found for userId ${adminUserId}`);
+    }
+
+    const sensitiveKeys = new Set([
+      "password",
+      "passwordHash",
+      "passwordConfirm",
+      "newPassword",
+      "oldPassword",
+      "currentPassword",
+      "token",
+      "accessToken",
+      "refreshToken",
+      "resetToken",
+      "verifyToken",
+      "confirmToken",
+      "idToken",
+      "secret",
+      "apiKey",
+      "apiSecret",
+      "clientSecret",
+      "signingKey",
+      "creditCard",
+      "cardNumber",
+      "cvv",
+      "cvc",
+      "pin",
+      "otp",
+    ]);
+
+    const redactSensitive = (obj: any): any => {
+      if (obj === null || obj === undefined || typeof obj !== "object") {
+        return obj;
       }
-      const resolvedAdminUserId = adminUser.id;
+      if (Array.isArray(obj)) return obj.map(redactSensitive);
+      return Object.fromEntries(
+        Object.entries(obj).map(([key, value]) => [
+          key,
+          sensitiveKeys.has(key) ? "[GİZLİ]" : redactSensitive(value),
+        ]),
+      );
+    };
 
-      // Fields that must never appear in audit logs
-      const SENSITIVE_KEYS = new Set([
-        'password', 'passwordHash', 'passwordConfirm', 'newPassword', 'oldPassword', 'currentPassword',
-        'token', 'accessToken', 'refreshToken', 'resetToken', 'verifyToken', 'confirmToken', 'idToken',
-        'secret', 'apiKey', 'apiSecret', 'clientSecret', 'signingKey',
-        'creditCard', 'cardNumber', 'cvv', 'cvc', 'pin', 'otp',
-      ]);
-
-      const redactSensitive = (obj: any): any => {
-        if (obj === null || obj === undefined || typeof obj !== 'object') return obj;
-        if (Array.isArray(obj)) return obj.map(redactSensitive);
-        return Object.fromEntries(
-          Object.entries(obj).map(([k, v]) => [
-            k,
-            SENSITIVE_KEYS.has(k) ? '[GİZLİ]' : redactSensitive(v),
-          ]),
-        );
-      };
-
-      // Serialize values to ensure they can be stored as JSON
-      const serializeValue = (value: any) => {
-        if (value === null || value === undefined) {
-          return null;
-        }
-        try {
-          // Use JSON.parse/stringify to handle Date, Decimal, etc.
-          const serialized = JSON.parse(JSON.stringify(value, (key, val) => {
-            // Convert Date to ISO string
-            if (val instanceof Date) {
-              return val.toISOString();
-            }
-            // Convert Decimal to number (Prisma Decimal has toNumber method)
-            if (val && typeof val === 'object' && typeof val.toNumber === 'function') {
+    const serializeValue = (value: any) => {
+      if (value === null || value === undefined) return null;
+      try {
+        const serialized = JSON.parse(
+          JSON.stringify(value, (_key, val) => {
+            if (val instanceof Date) return val.toISOString();
+            if (
+              val &&
+              typeof val === "object" &&
+              typeof val.toNumber === "function"
+            ) {
               return val.toNumber();
             }
             return val;
-          }));
-          return redactSensitive(serialized);
-        } catch (e) {
-          // Fallback: convert to string if serialization fails
-          this.logger.warn(`Failed to serialize audit log value for ${entityType}:${entityId}`, e);
-          return String(value);
-        }
-      };
+          }),
+        );
+        return redactSensitive(serialized);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to serialize audit log value for ${entityType}:${entityId}`,
+          error,
+        );
+        return String(value);
+      }
+    };
 
-      return await this.prisma.auditLog.create({
-        data: {
-          adminUserId: resolvedAdminUserId,
-          action,
-          entityType,
-          entityId,
-          oldValue: serializeValue(oldValue),
-          newValue: serializeValue(newValue),
-        },
-      });
-    } catch (error) {
-      // Log error but don't fail the main operation
-      this.logger.error(`Failed to create audit log for ${entityType}:${entityId}`, error);
-      // Return a promise that resolves to avoid breaking the caller
-      return Promise.resolve();
-    }
+    return this.prisma.auditLog.create({
+      data: {
+        adminUserId: adminUser.id,
+        action,
+        entityType,
+        entityId,
+        oldValue: serializeValue(oldValue),
+        newValue: serializeValue(newValue),
+      },
+    });
   }
 
   /**
    * Get audit logs
    */
   async getAuditLogs(query: AuditLogQueryDto) {
-    const { action, adminId, fromDate, toDate, page = 1, limit = 50 } = query;
+    const { action, adminId, fromDate, toDate, search } = query;
 
     const where: Prisma.AuditLogWhereInput = {};
 
@@ -112,6 +168,19 @@ export class AdminAuditService {
 
     if (adminId) {
       where.adminUserId = adminId;
+    }
+
+    if (search) {
+      where.OR = [
+        { action: { contains: search, mode: "insensitive" } },
+        { entityType: { contains: search, mode: "insensitive" } },
+        { entityId: { contains: search, mode: "insensitive" } },
+        {
+          adminUser: {
+            user: { email: { contains: search, mode: "insensitive" } },
+          },
+        },
+      ];
     }
 
     if (fromDate || toDate) {
@@ -124,27 +193,41 @@ export class AdminAuditService {
       }
     }
 
-    const [total, logs] = await Promise.all([
-      this.prisma.auditLog.count({ where }),
-      this.prisma.auditLog.findMany({
+    const orderBy = resolveOrderBy<Prisma.AuditLogOrderByWithRelationInput>(
+      "AuditLog",
+      query,
+      {
+        defaultSort: { createdAt: "desc" },
+        // The admin's email lives two relations deep (AuditLog → adminUser → user).
+        sortMap: {
+          "admin.email": (direction) => ({
+            adminUser: { user: { email: direction } },
+          }),
+        },
+      },
+    );
+    const result = await paginate(
+      this.prisma.auditLog,
+      {
         where,
         include: {
-          adminUser: { select: { id: true, user: { select: { email: true } } } },
+          adminUser: {
+            select: { id: true, user: { select: { email: true } } },
+          },
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+        orderBy,
+      },
+      { ...query, limit: query.limit ?? 20 },
+    );
 
     return {
-      data: logs.map((log) => ({
+      ...result,
+      data: result.data.map((log) => ({
         ...log,
         admin: log.adminUser
           ? { id: log.adminUser.id, email: log.adminUser.user.email }
           : null,
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 }

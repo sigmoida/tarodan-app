@@ -1,19 +1,19 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { ScheduleModule } from '@nestjs/schedule';
-import { BullModule } from '@nestjs/bull';
-import { PrismaModule } from '../../prisma';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { PaymentModule } from '../payment/payment.module';
-import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
-import { NotificationModule } from '../notification/notification.module';
-import { StorageModule } from '../storage/storage.module';
-import { RefundController } from './refund.controller';
-import { RefundService } from './refund.service';
-import { RefundSchedulerService } from './refund-scheduler.service';
-import { RefundScheduledProcessor } from './refund-scheduled.processor';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { JwtModule } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import { BullModule } from "@nestjs/bull";
+import { PrismaModule } from "../../prisma";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { PaymentModule } from "../payment/payment.module";
+import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
+import { NotificationModule } from "../notification/notification.module";
+import { StorageModule } from "../storage/storage.module";
+import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
+import { RefundController } from "./refund.controller";
+import { RefundService } from "./refund.service";
+import { RefundSchedulerService } from "./refund-scheduler.service";
+import { RefundScheduledProcessor } from "./refund-scheduled.processor";
 
 @Module({
   imports: [
@@ -21,15 +21,15 @@ import { RefundScheduledProcessor } from './refund-scheduled.processor';
     ConfigModule,
     SuratCargoModule,
     StorageModule,
+    ShippingTariffModule,
     PaymentModule,
     NotificationModule,
-    ScheduleModule.forRoot(),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' },
+        secret: configService.get<string>("JWT_SECRET"),
+        signOptions: { expiresIn: "15m" },
       }),
       inject: [ConfigService],
     }),

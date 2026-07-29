@@ -3,21 +3,27 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { MediaService } from '../media/media.service';
-import { StorageService } from '../storage/storage.service';
-import { CollectionResponseDto } from './dto';
-import { CollectionCommonService } from './collection-common.service';
-import * as https from 'https';
-import * as http from 'http';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { MediaService } from "../media/media.service";
+import { isPublicStorageKey, StorageService } from "../storage/storage.service";
+import { CollectionResponseDto } from "./dto";
+import { CollectionCommonService } from "./collection-common.service";
+import * as https from "https";
+import * as http from "http";
+import { configureSharpSafety } from "../../common/image/sharp-safety";
 
-// Sharp is optional
+// Sharp is optional. Yükleme hatası sessizce yutulmasın (bkz. media.service —
+// staging'de sharp'sız imaj tek 400 ile teşhis edilemiyordu).
 let sharp: any;
 try {
-  sharp = require('sharp');
-} catch {
+  sharp = configureSharpSafety(require("sharp"));
+} catch (e: any) {
   sharp = null;
+  // eslint-disable-next-line no-console
+  console.error(
+    `[CollectionCoverService] sharp failed to load: ${e?.message ?? e}`,
+  );
 }
 
 /**
@@ -50,11 +56,11 @@ export class CollectionCoverService {
     });
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyonu düzenleme yetkiniz yok');
+      throw new ForbiddenException("Bu koleksiyonu düzenleme yetkiniz yok");
     }
 
     const updated = await this.prisma.collection.update({
@@ -65,14 +71,14 @@ export class CollectionCoverService {
         items: {
           include: {
             product: {
-              include: { 
-                images: { 
-                  take: 1
-                } 
+              include: {
+                images: {
+                  take: 1,
+                },
               },
             },
           },
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
         },
       },
     });
@@ -85,23 +91,27 @@ export class CollectionCoverService {
   // ==========================================================================
   private async downloadImage(url: string): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const protocol = url.startsWith('https') ? https : http;
-      protocol.get(url, (response) => {
-        if (response.statusCode !== 200) {
-          reject(new Error(`Failed to download image: ${response.statusCode}`));
-          return;
-        }
-        const chunks: Buffer[] = [];
-        response.on('data', (chunk) => chunks.push(chunk));
-        response.on('end', () => resolve(Buffer.concat(chunks)));
-        response.on('error', reject);
-      }).on('error', reject);
+      const protocol = url.startsWith("https") ? https : http;
+      protocol
+        .get(url, (response) => {
+          if (response.statusCode !== 200) {
+            reject(
+              new Error(`Failed to download image: ${response.statusCode}`),
+            );
+            return;
+          }
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk) => chunks.push(chunk));
+          response.on("end", () => resolve(Buffer.concat(chunks)));
+          response.on("error", reject);
+        })
+        .on("error", reject);
     });
   }
 
   async generateCoverImage(collectionId: string): Promise<string | null> {
     if (!sharp) {
-      this.logger.warn('Sharp not available, skipping cover image generation');
+      this.logger.warn("Sharp not available, skipping cover image generation");
       return null;
     }
 
@@ -115,12 +125,12 @@ export class CollectionCoverService {
                 include: {
                   images: {
                     take: 1,
-                    orderBy: { sortOrder: 'asc' },
+                    orderBy: { sortOrder: "asc" },
                   },
                 },
               },
             },
-            orderBy: { sortOrder: 'asc' },
+            orderBy: { sortOrder: "asc" },
             take: 4,
           },
         },
@@ -134,7 +144,11 @@ export class CollectionCoverService {
       const imageUrls: string[] = [];
       for (const item of collection.items) {
         const firstImg = item.product?.images?.[0];
-        const rawUrl = item.customImageUrl || (firstImg?.cardKey ? this.storageService.getPublicAssetUrl(firstImg.cardKey) : null);
+        const rawUrl =
+          item.customImageUrl ||
+          (firstImg?.cardKey
+            ? this.storageService.getPublicAssetUrl(firstImg.cardKey)
+            : null);
         if (rawUrl) {
           const resolved = await this.resolveProductImageUrl(rawUrl);
           if (resolved) imageUrls.push(resolved);
@@ -152,15 +166,18 @@ export class CollectionCoverService {
         try {
           const imageBuffer = await this.downloadImage(singleImageUrl);
           const resizedBuffer = await sharp(imageBuffer)
-            .resize(1200, 600, { fit: 'cover' })
+            .resize(1200, 600, { fit: "cover" })
             .toBuffer();
 
           // Upload to S3 using MediaService
-          const uploadResult = await this.mediaService.uploadBuffer(resizedBuffer, {
-            folder: 'collection-covers',
-            mimeType: 'image/jpeg',
-            bucket: 'collections',
-          });
+          const uploadResult = await this.mediaService.uploadBuffer(
+            resizedBuffer,
+            {
+              folder: "collection-covers",
+              mimeType: "image/jpeg",
+              bucket: "collections",
+            },
+          );
 
           await this.prisma.collection.update({
             where: { id: collectionId },
@@ -169,7 +186,9 @@ export class CollectionCoverService {
 
           return uploadResult.key;
         } catch (error) {
-          this.logger.error(`Failed to generate single cover image: ${error.message}`);
+          this.logger.error(
+            `Failed to generate single cover image: ${error.message}`,
+          );
           return null;
         }
       }
@@ -180,7 +199,7 @@ export class CollectionCoverService {
         try {
           const buffer = await this.downloadImage(url);
           const resized = await sharp(buffer)
-            .resize(400, 400, { fit: 'cover' })
+            .resize(400, 400, { fit: "cover" })
             .toBuffer();
           imageBuffers.push(resized);
         } catch (error) {
@@ -218,13 +237,16 @@ export class CollectionCoverService {
         });
       }
 
-      const finalBuffer = await composite.composite(composites).jpeg().toBuffer();
+      const finalBuffer = await composite
+        .composite(composites)
+        .jpeg()
+        .toBuffer();
 
       // Upload to S3 using MediaService
       const uploadResult = await this.mediaService.uploadBuffer(finalBuffer, {
-        folder: 'collection-covers',
-        mimeType: 'image/jpeg',
-        bucket: 'collections',
+        folder: "collection-covers",
+        mimeType: "image/jpeg",
+        bucket: "collections",
       });
 
       await this.prisma.collection.update({
@@ -239,17 +261,29 @@ export class CollectionCoverService {
     }
   }
 
-  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
+  private async resolveProductImageUrl(
+    imageUrl: string | null | undefined,
+  ): Promise<string | null> {
     if (!imageUrl) return null;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
-    // S3 key (dev/ or prod/) -> public URL
-    if (imageUrl.includes('dev/') || imageUrl.includes('prod/')) {
+    if (
+      imageUrl.startsWith("http://") ||
+      imageUrl.startsWith("https://") ||
+      imageUrl.startsWith("/")
+    )
+      return imageUrl;
+    if (isPublicStorageKey(imageUrl)) {
       return this.storageService.getPublicAssetUrl(imageUrl);
     }
     try {
-      return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
+      return await this.storageService.getPresignedDownloadUrl(
+        "products",
+        imageUrl,
+        3600,
+      );
     } catch (e: any) {
-      this.logger.warn(`Failed to resolve product image: ${imageUrl} - ${e.message}`);
+      this.logger.warn(
+        `Failed to resolve product image: ${imageUrl} - ${e.message}`,
+      );
       return null;
     }
   }

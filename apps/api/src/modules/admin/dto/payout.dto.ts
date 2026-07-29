@@ -1,58 +1,66 @@
-import { IsOptional, IsString, IsIn, IsNumber, Min, Max, IsDateString } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import {
+  IsOptional,
+  IsString,
+  IsIn,
+  IsDateString,
+  IsNotEmpty,
+  MaxLength,
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { AdminListQueryDto } from "../../../common/list";
 
-export class PayoutTransactionsQueryDto {
-  @ApiPropertyOptional({ description: 'Search by seller name, email or order number' })
+export class PayoutTransactionsQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({
+    description: "Search by seller name, email or order number",
+  })
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by seller ID' })
+  @ApiPropertyOptional({ description: "Filter by seller ID" })
   @IsOptional()
   @IsString()
   sellerId?: string;
 
-  @ApiPropertyOptional({ enum: ['held', 'released', 'cancelled'] })
+  @ApiPropertyOptional({ enum: ["held", "released", "cancelled"] })
   @IsOptional()
-  @IsIn(['held', 'released', 'cancelled'])
+  @IsIn(["held", "released", "cancelled"])
   status?: string;
 
-  @ApiPropertyOptional({ example: '2024-01-01' })
+  @ApiPropertyOptional({ example: "2024-01-01" })
   @IsOptional()
   @IsDateString()
   dateFrom?: string;
 
-  @ApiPropertyOptional({ example: '2024-12-31' })
+  @ApiPropertyOptional({ example: "2024-12-31" })
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+}
 
-  @ApiPropertyOptional({ example: 1 })
+export class PayoutScheduleQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({
+    description: "Search by seller name, email or order number",
+  })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number;
+  @IsString()
+  search?: string;
 
-  @ApiPropertyOptional({ example: 20 })
+  @ApiPropertyOptional({ description: "Filter by seller ID" })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number;
+  @IsString()
+  sellerId?: string;
 }
 
 export class PayoutExportQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by seller ID' })
+  @ApiPropertyOptional({ description: "Filter by seller ID" })
   @IsOptional()
   @IsString()
   sellerId?: string;
 
-  @ApiPropertyOptional({ enum: ['held', 'released', 'cancelled'] })
+  @ApiPropertyOptional({ enum: ["held", "released", "cancelled"] })
   @IsOptional()
-  @IsIn(['held', 'released', 'cancelled'])
+  @IsIn(["held", "released", "cancelled"])
   status?: string;
 
   @ApiPropertyOptional()
@@ -64,4 +72,12 @@ export class PayoutExportQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+}
+
+export class ReleasePayoutDto {
+  @ApiProperty({ description: "Manual release reason", maxLength: 500 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason: string;
 }

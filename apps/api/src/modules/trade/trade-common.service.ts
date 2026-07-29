@@ -1,9 +1,9 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { StorageService } from '../storage/storage.service';
-import { computeTradeCanCancel } from './trade.state-machine';
-import { TradeResponseDto } from './dto';
+import { Injectable, Optional } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { StorageService } from "../storage/storage.service";
+import { computeTradeCanCancel } from "./trade.state-machine";
+import { TradeResponseDto } from "./dto";
 
 /**
  * Takas modülü ortak yardımcıları (yanıt DTO formatlama + ürün cache
@@ -29,7 +29,7 @@ export class TradeCommonService {
     // rezerv). Bu, listelerdeki görünürlük ve "stokta yok" sıralamasını etkiler →
     // ürün listesi cache'ini temizle.
     if (productIds.length > 0) {
-      await this.cache.delPattern('products:list:*').catch(() => {});
+      await this.cache.delPattern("products:list:*").catch(() => {});
     }
   }
 
@@ -45,9 +45,16 @@ export class TradeCommonService {
   /**
    * Resolve product image URL (S3 key -> public URL). Any non-URL key is treated as S3 key.
    */
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
     return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
   }
 
@@ -62,15 +69,21 @@ export class TradeCommonService {
     valueAtTrade: number;
   } {
     const firstImg = item.product?.images?.[0];
-    const cardUrl = firstImg?.cardKey ? this.storageService.getPublicAssetUrl(firstImg.cardKey) : undefined;
-    const detailUrl = firstImg?.detailKey ? this.storageService.getPublicAssetUrl(firstImg.detailKey) : undefined;
+    const cardUrl = firstImg?.cardKey
+      ? this.storageService.getPublicAssetUrl(firstImg.cardKey)
+      : undefined;
+    const detailUrl = firstImg?.detailKey
+      ? this.storageService.getPublicAssetUrl(firstImg.detailKey)
+      : undefined;
     const productImage = this.resolveProductImageUrl(firstImg?.cardKey);
     const productImages =
-      cardUrl || detailUrl ? [{ cardUrl: cardUrl ?? '', detailUrl }] : undefined;
+      cardUrl || detailUrl
+        ? [{ cardUrl: cardUrl ?? "", detailUrl }]
+        : undefined;
     return {
       id: item.id,
       productId: item.productId,
-      productTitle: item.product?.title || '',
+      productTitle: item.product?.title || "",
       productImage: productImage ?? undefined,
       productImages,
       side: item.side,
@@ -107,8 +120,12 @@ export class TradeCommonService {
     // no filtering is applied.
     // ----------------------------------------------------------------------
     const rawShipments: any[] = trade.shipments || [];
-    const toWarehouseShipments = rawShipments.filter((s) => s.leg === 'to_warehouse');
-    const fromWarehouseShipments = rawShipments.filter((s) => s.leg === 'from_warehouse');
+    const toWarehouseShipments = rawShipments.filter(
+      (s) => s.leg === "to_warehouse",
+    );
+    const fromWarehouseShipments = rawShipments.filter(
+      (s) => s.leg === "from_warehouse",
+    );
     const bothToWarehouseShipped =
       toWarehouseShipments.length >= 2 &&
       toWarehouseShipments.every((s) => s.shippedAt);
@@ -116,23 +133,23 @@ export class TradeCommonService {
 
     const applyShipmentPrivacy = (s: any): any | null => {
       if (!viewerUserId) return s; // admin/internal view — no filtering
-      const leg = s.leg || 'to_warehouse';
+      const leg = s.leg || "to_warehouse";
 
-      if (leg === 'to_warehouse') {
+      if (leg === "to_warehouse") {
         const isMine = s.shipperId === viewerUserId;
         if (isMine || bothToWarehouseShipped) return s;
         // Hide counterparty tracking until both shipped
-        return { ...s, trackingNumber: null };
+        return { ...s, trackingNumber: null, providerTrackingId: null };
       }
 
-      if (leg === 'from_warehouse') {
+      if (leg === "from_warehouse") {
         const isForMe = s.recipientUserId === viewerUserId;
         if (!isForMe) return null; // never see counterparty's incoming leg
         if (!bothFromWarehouseCreated) return null;
         return s;
       }
 
-      if (leg === 'return') {
+      if (leg === "return") {
         const isForMe = s.recipientUserId === viewerUserId;
         if (!isForMe) return null;
         return s;
@@ -149,15 +166,15 @@ export class TradeCommonService {
       id: trade.id,
       tradeNumber: trade.tradeNumber,
       initiatorId: trade.initiatorId,
-      initiatorName: trade.initiator?.displayName || '',
+      initiatorName: trade.initiator?.displayName || "",
       receiverId: trade.receiverId,
-      receiverName: trade.receiver?.displayName || '',
+      receiverName: trade.receiver?.displayName || "",
       status: trade.status,
       initiatorItems: (trade.items || [])
-        .filter((item: any) => item.side === 'initiator')
+        .filter((item: any) => item.side === "initiator")
         .map((item: any) => this.mapTradeItemToDto(item)),
       receiverItems: (trade.items || [])
-        .filter((item: any) => item.side === 'receiver')
+        .filter((item: any) => item.side === "receiver")
         .map((item: any) => this.mapTradeItemToDto(item)),
       cashAmount: trade.cashAmount ? parseFloat(trade.cashAmount) : undefined,
       cashPayerId: trade.cashPayerId || undefined,
@@ -174,7 +191,7 @@ export class TradeCommonService {
         ? {
             id: initiatorShipment.id,
             shipperId: initiatorShipment.shipperId,
-            shipperName: trade.initiator?.displayName || '',
+            shipperName: trade.initiator?.displayName || "",
             carrier: initiatorShipment.carrier,
             // Hide counterparty tracking until both to_warehouse shipped
             trackingNumber:
@@ -183,6 +200,12 @@ export class TradeCommonService {
               bothToWarehouseShipped
                 ? initiatorShipment.trackingNumber
                 : null,
+            cargoCode:
+              !viewerUserId ||
+              viewerUserId === initiatorShipment.shipperId ||
+              bothToWarehouseShipped
+                ? initiatorShipment.providerTrackingId || undefined
+                : undefined,
             status: initiatorShipment.status,
             shippedAt: initiatorShipment.shippedAt,
             deliveredAt: initiatorShipment.deliveredAt,
@@ -193,7 +216,7 @@ export class TradeCommonService {
         ? {
             id: receiverShipment.id,
             shipperId: receiverShipment.shipperId,
-            shipperName: trade.receiver?.displayName || '',
+            shipperName: trade.receiver?.displayName || "",
             carrier: receiverShipment.carrier,
             trackingNumber:
               !viewerUserId ||
@@ -201,6 +224,12 @@ export class TradeCommonService {
               bothToWarehouseShipped
                 ? receiverShipment.trackingNumber
                 : null,
+            cargoCode:
+              !viewerUserId ||
+              viewerUserId === receiverShipment.shipperId ||
+              bothToWarehouseShipped
+                ? receiverShipment.providerTrackingId || undefined
+                : undefined,
             status: receiverShipment.status,
             shippedAt: receiverShipment.shippedAt,
             deliveredAt: receiverShipment.deliveredAt,
@@ -209,11 +238,13 @@ export class TradeCommonService {
         : undefined,
       shipments: visibleShipments.map((shipment: any) => ({
         id: shipment.id,
-        direction: shipment.leg || 'to_warehouse',
+        direction: shipment.leg || "to_warehouse",
         senderUserId: shipment.shipperId || undefined,
         recipientUserId: shipment.recipientUserId || undefined,
         carrier: shipment.carrier || undefined,
         trackingNumber: shipment.trackingNumber || undefined,
+        // Gerçek Sürat kargo kodu (KargoTakipNo) — şubede verilen numara.
+        cargoCode: shipment.providerTrackingId || undefined,
         status: shipment.status || undefined,
         shippedAt: shipment.shippedAt || undefined,
         deliveredAt: shipment.deliveredAt || undefined,
@@ -257,7 +288,7 @@ export class TradeCommonService {
     // bacaklarından biri shippedAt aldıysa kullanıcı iptali kapanır.
     const handedToCargo = Array.isArray(trade?.shipments)
       ? trade.shipments.some(
-          (s: any) => s?.leg === 'to_warehouse' && s?.shippedAt != null,
+          (s: any) => s?.leg === "to_warehouse" && s?.shippedAt != null,
         )
       : false;
     return computeTradeCanCancel({ ...trade, handedToCargo }, viewerUserId);

@@ -1,68 +1,67 @@
-name: Deploy Production
+name: Release Production
+
+# Coolify Auto Deploy must be disabled for the production API, web and admin
+# resources. A master push reaches Coolify only after this clean-runner gate.
 
 on:
-  workflow_run:
-    workflows: [Build Images]
-    types: [completed]
+  push:
     branches: [master]
   workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Image tag to deploy (e.g. sha-abc123def456 or latest)'
-        required: false
-        default: 'latest'
+
+permissions:
+  contents: read
 
 concurrency:
-  group: deploy-production
+  group: release-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy to Production
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+  release:
+    name: Verify and deploy production
     runs-on: ubuntu-latest
-    # `production` environment has required reviewers => manual approval gate.
-    environment: production
+    timeout-minutes: 45
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
-      - name: Resolve image tag
-        id: tag
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Verify release
+        run: pnpm verify:ci
+
+      - id: affected
+        name: Detect affected applications
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            apps="api,web,admin"
           else
-            echo "tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+            apps="$(node scripts/detect-affected-apps.mjs \
+              --base "$BEFORE_SHA" \
+              --head "$AFTER_SHA" \
+              --format csv)"
           fi
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+          echo "Affected applications: ${apps:-none}"
 
-      # TEMP: read-only keşif — sunucunun gerçek deploy düzenini öğrenmek için. Sonra kaldırılacak.
-      - name: Discover server layout (read-only)
-        uses: appleboy/ssh-action@v1
+      - name: Deploy affected production applications
+        if: ${{ steps.affected.outputs.apps != '' }}
+        uses: ./.github/actions/coolify-deploy
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USERNAME }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          command_timeout: 5m
-          script: |
-            echo "===== whoami / pwd ====="; whoami; pwd
-            echo "===== ls /opt ====="; ls -la /opt 2>/dev/null || echo "yok"
-            echo "===== ls /root ====="; ls -la /root 2>/dev/null || echo "yok"
-            echo "===== ls /home ====="; ls -la /home 2>/dev/null || echo "yok"
-            echo "===== docker ps ====="; docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "docker yok/erişim yok"
-            echo "===== compose dosyaları (find) ====="; find /opt /root /home /srv -maxdepth 3 -iname 'docker-compose*.y*ml' 2>/dev/null || true
-            echo "===== git repo'ları (.git) ====="; find /opt /root /home /srv -maxdepth 3 -type d -name '.git' 2>/dev/null || true
-            echo "===== tarodan içeren dizinler ====="; find /opt /root /home /srv -maxdepth 3 -iname '*tarodan*' 2>/dev/null || true
+          coolify-url: ${{ secrets.COOLIFY_URL }}
+          coolify-token: ${{ secrets.COOLIFY_TOKEN }}
+          all-uuids: ${{ secrets.COOLIFY_PROD_UUIDS }}
+          apps: ${{ steps.affected.outputs.apps }}
+          wait-for-result: "true"
 
-      - name: Backup DB then deploy over SSH
-        if: false  # keşif turunda deploy'u atla
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USERNAME }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          command_timeout: 30m
-          script: |
-            set -e
-            cd /opt/tarodan
-            git fetch origin master && git checkout master && git pull --ff-only
-            echo "==> Pre-deploy DB backup"
-            bash scripts/backup.sh || { echo "Backup failed — aborting deploy"; exit 1; }
-            ./scripts/deploy-remote.sh ${{ steps.tag.outputs.tag }}
+      - name: Skip deployment
+        if: ${{ steps.affected.outputs.apps == '' }}
+        run: echo "No deployable application changed."

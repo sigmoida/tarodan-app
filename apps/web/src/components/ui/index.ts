@@ -59,15 +59,17 @@ export {
   offerStatusConfig,
   paymentStatusConfig,
   productStatusConfig,
-} from '@tarodan/ui';
+} from "@tarodan/ui";
 
 // Web-specific components
-export { ButtonLink } from './ButtonLink';
-export { default as SectionCard } from './SectionCard';
-export type { SectionCardProps } from './SectionCard';
-export { default as ImagePreviewGrid } from './ImagePreviewGrid';
-export type { ImagePreviewGridProps } from './ImagePreviewGrid';
-export { EmptyStateCard } from './EmptyStateCard';
-export { default as ProductCard } from './ProductCard';
-export { default as MetricCard } from './MetricCard';
-export { default as SkeletonCard } from './SkeletonCard';
+export { ButtonLink } from "./ButtonLink";
+export { CopyButton } from "./CopyButton";
+export { SellerChip } from "./SellerChip";
+export { default as SectionCard } from "./SectionCard";
+export type { SectionCardProps } from "./SectionCard";
+export { default as ImagePreviewGrid } from "./ImagePreviewGrid";
+export type { ImagePreviewGridProps } from "./ImagePreviewGrid";
+export { EmptyStateCard } from "./EmptyStateCard";
+export { default as ProductCard } from "./ProductCard";
+export { default as MetricCard } from "./MetricCard";
+export { default as SkeletonCard } from "./SkeletonCard";

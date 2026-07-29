@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 
@@ -31,6 +32,7 @@ export function useRateSetting({
   min = 0,
   max = 100,
 }: UseRateSettingOptions) {
+  const t = useTranslations();
   const [value, setValue] = useState(fallback);
 
   const { data } = useQuery({ queryKey: [queryKey], queryFn: load });
@@ -46,7 +48,7 @@ export function useRateSetting({
   const onSave = () => {
     const n = Number(value);
     if (Number.isNaN(n) || n < min || n > max) {
-      toast.error(`Oran ${min} ile ${max} arasında olmalı`);
+      toast.error(t('admin.shared.rateRange', { min, max }));
       return;
     }
     mutation.mutate(n);

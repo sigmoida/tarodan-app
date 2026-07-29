@@ -1,25 +1,27 @@
-'use client';
+"use client";
 
-import { Button } from '@tarodan/ui';
-import { useResourceList } from '@/components/list';
+import { useTranslations } from "next-intl";
+import { Button } from "@tarodan/ui";
+import { useResourceList } from "@/components/list";
 
 export function TradesSummary() {
+  const t = useTranslations();
   const { total, filters, setFilter } = useResourceList<any>();
-  const userIdFilter = filters.userId ?? '';
+  const userIdFilter = filters.userId ?? "";
 
   return (
     <>
-      Toplam {total} takas
+      {t("admin.operations.trades.totalCount", { count: total })}
       {userIdFilter && (
         <span className="ml-2">
-          — Kullanıcıya göre filtreleniyor
+          — {t("admin.operations.common.filteringByUser")}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setFilter('userId', '')}
+            onClick={() => setFilter("userId", "")}
             className="ml-2 text-primary-600 hover:underline"
           >
-            Filtreyi kaldır
+            {t("admin.operations.common.removeFilter")}
           </Button>
         </span>
       )}

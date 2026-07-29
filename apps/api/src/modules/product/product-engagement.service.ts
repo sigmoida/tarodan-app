@@ -1,6 +1,12 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { i18nMessage } from "../i18n";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
 
 /**
  * ProductEngagementService — beğeni/görüntülenme sistemi (leaf; prisma + cache).
@@ -14,24 +20,29 @@ export class ProductEngagementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
-  ) { }
+  ) {}
 
   /**
    * Like a product
    * POST /products/:id/like
    */
-  async likeProduct(productId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+  async likeProduct(
+    productId: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     // Cannot like own product
     if (product.sellerId === userId) {
-      throw new BadRequestException('Kendi ürününüzü beğenemezsiniz');
+      throw new BadRequestException(
+        i18nMessage("server.product.cannotLikeOwn"),
+      );
     }
 
     // Check if already liked
@@ -45,7 +56,7 @@ export class ProductEngagementService {
     });
 
     if (existingLike) {
-      throw new BadRequestException('Bu ürünü zaten beğendiniz');
+      throw new BadRequestException(i18nMessage("server.product.alreadyLiked"));
     }
 
     // Create like and increment counter in transaction
@@ -69,7 +80,7 @@ export class ProductEngagementService {
 
     // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
-    await this.cache.delPattern('products:list:*');
+    await this.cache.delPattern("products:list:*");
 
     return { liked: true, likeCount: updatedProduct.likeCount };
   }
@@ -78,13 +89,16 @@ export class ProductEngagementService {
    * Unlike a product
    * DELETE /products/:id/unlike
    */
-  async unlikeProduct(productId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+  async unlikeProduct(
+    productId: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     // Check if liked
@@ -98,7 +112,7 @@ export class ProductEngagementService {
     });
 
     if (!existingLike) {
-      throw new BadRequestException('Bu ürünü beğenmemişsiniz');
+      throw new BadRequestException(i18nMessage("server.product.notLiked"));
     }
 
     // Delete like and decrement counter in transaction
@@ -123,7 +137,7 @@ export class ProductEngagementService {
 
     // Invalidate cache
     await this.cache.del(`products:detail:${productId}`);
-    await this.cache.delPattern('products:list:*');
+    await this.cache.delPattern("products:list:*");
 
     return { liked: false, likeCount: Math.max(0, updatedProduct.likeCount) };
   }
@@ -131,7 +145,10 @@ export class ProductEngagementService {
   /**
    * Check if user has liked a product
    */
-  async isProductLikedByUser(productId: string, userId: string): Promise<boolean> {
+  async isProductLikedByUser(
+    productId: string,
+    userId: string,
+  ): Promise<boolean> {
     const like = await this.prisma.productLike.findUnique({
       where: {
         productId_userId: {
@@ -152,14 +169,14 @@ export class ProductEngagementService {
     productId: string,
     userId?: string,
     clientIp?: string,
-    userAgent?: string
+    userAgent?: string,
   ): Promise<{ viewCount: number }> {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     if (userId && product.sellerId === userId) {
@@ -170,10 +187,14 @@ export class ProductEngagementService {
       return { viewCount: product.viewCount };
     }
 
-    const identifier = userId || clientIp || 'unknown';
+    const identifier = userId || clientIp || "unknown";
     const rateLimitKey = `viewCount:${productId}:${identifier}`;
     try {
-      const { allowed } = await this.cache.checkRateLimit(rateLimitKey, 1, 1800);
+      const { allowed } = await this.cache.checkRateLimit(
+        rateLimitKey,
+        1,
+        1800,
+      );
       if (!allowed) {
         return { viewCount: product.viewCount };
       }
@@ -192,7 +213,7 @@ export class ProductEngagementService {
     });
 
     await this.cache.del(`products:detail:${productId}`);
-    await this.cache.delPattern('products:list:*');
+    await this.cache.delPattern("products:list:*");
 
     return { viewCount: updatedProduct.viewCount };
   }
@@ -204,13 +225,29 @@ export class ProductEngagementService {
     if (!userAgent) return true; // No user agent is suspicious
 
     const botPatterns = [
-      'bot', 'crawler', 'spider', 'scraper', 'curl', 'wget',
-      'python-requests', 'java/', 'go-http-client', 'libwww',
-      'httpunit', 'nutch', 'linkwalker', 'archiver', 'fetch',
-      'slurp', 'yandex', 'bingbot', 'googlebot', 'baiduspider'
+      "bot",
+      "crawler",
+      "spider",
+      "scraper",
+      "curl",
+      "wget",
+      "python-requests",
+      "java/",
+      "go-http-client",
+      "libwww",
+      "httpunit",
+      "nutch",
+      "linkwalker",
+      "archiver",
+      "fetch",
+      "slurp",
+      "yandex",
+      "bingbot",
+      "googlebot",
+      "baiduspider",
     ];
 
     const ua = userAgent.toLowerCase();
-    return botPatterns.some(pattern => ua.includes(pattern));
+    return botPatterns.some((pattern) => ua.includes(pattern));
   }
 }

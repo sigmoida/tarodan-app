@@ -1,44 +1,118 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Test, TestingModule } from '@nestjs/testing';
-import { OrderService } from './order.service';
-import { OrderPricingService } from './order-pricing.service';
-import { OrderCheckoutService } from './order-checkout.service';
-import { OrderCheckoutCommonService } from './order-checkout-common.service';
-import { OrderCheckoutDirectService } from './order-checkout-direct.service';
-import { OrderCheckoutGroupService } from './order-checkout-group.service';
-import { OrderGuestCheckoutService } from './order-guest-checkout.service';
-import { OrderCommonService } from './order-common.service';
-import { OrderQueryService } from './order-query.service';
-import { OrderLifecycleService } from './order-lifecycle.service';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { EventService } from '../events';
-import { NotificationService } from '../notification/notification.service';
-import { DiscountService } from '../discount/discount.service';
-import { DiscountCalculator } from '../discount/discount-calculator';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { ProductLockService } from '../product/product-lock.service';
-import { CommissionLedgerService } from '../commission/commission-ledger.service';
-import { TaxService } from '../tax/tax.service';
-import { ElogoInvoicingService } from '../elogo';
-import { OrderStatus, ProductStatus } from '@prisma/client';
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Test, TestingModule } from "@nestjs/testing";
+import { createHash } from "crypto";
+import { OrderService } from "./order.service";
+import { OrderPricingService } from "./order-pricing.service";
+import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import { OrderCheckoutService } from "./order-checkout.service";
+import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderCheckoutDirectService } from "./order-checkout-direct.service";
+import { OrderCheckoutGroupService } from "./order-checkout-group.service";
+import { OrderGuestCheckoutService } from "./order-guest-checkout.service";
+import { OrderCommonService } from "./order-common.service";
+import { OrderQueryService } from "./order-query.service";
+import { OrderLifecycleService } from "./order-lifecycle.service";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { EventService } from "../events";
+import { NotificationService } from "../notification/notification.service";
+import { DiscountService } from "../discount/discount.service";
+import { DiscountCalculator } from "../discount/discount-calculator";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { ProductLockService } from "../product/product-lock.service";
+import { CommissionLedgerService } from "../commission/commission-ledger.service";
+import { TaxService } from "../tax/tax.service";
+import { ElogoInvoicingService } from "../elogo";
+import { RefundService } from "../refund/refund.service";
+import { OrderStatus, ProductStatus } from "@prisma/client";
+
+// Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
+// resolves without a DB.
+const SHIPPING_TARIFF_MOCK = {
+  getActiveOutboundTariff: async () => ({
+    outboundPackageFee: 29.99,
+    freeShippingEnabled: true,
+    freeShippingThreshold: 500,
+    rates: Array.from({ length: 20 }, (_, index) => ({
+      desi: index + 1,
+      amount: 29.99,
+    })),
+  }),
+  getActiveTariffSnapshot: async () => ({
+    tariffId: "tariff-1",
+    tariffVersion: 1,
+    tariff: {
+      outboundPackageFee: 29.99,
+      freeShippingEnabled: true,
+      freeShippingThreshold: 500,
+      rates: Array.from({ length: 20 }, (_, index) => ({
+        desi: index + 1,
+        amount: 29.99,
+      })),
+    },
+  }),
+};
+
+const DEFAULT_COMMISSION_RULE = {
+  id: "default-commission-rule",
+  name: "Default seller commission",
+  ruleType: "default",
+  categoryId: null,
+  sellerType: "ALL",
+  taxpayerType: "all",
+  minAmount: null,
+  maxAmount: null,
+  priority: 0,
+  appliesTo: "SELLER",
+  sellerRate: 10,
+  sellerMin: null,
+  sellerMax: null,
+  buyerRate: null,
+  buyerMin: null,
+  buyerMax: null,
+};
 
 /**
  * Toplu checkout (CheckoutGroup): sepetteki tüm ürünler tek grupta sipariş edilir,
  * tek ödeme grubu kapsar. Bu suite idempotensi, doğrulama ve atomiklik koruyucularını test eder.
  */
-describe('OrderService checkout group (batch checkout)', () => {
+describe("OrderService checkout group (batch checkout)", () => {
   let service: OrderService;
 
-  const buyerId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-  const sellerId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
-  const productA = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1';
-  const productB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2';
-  const addressId = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
-  const idempotencyKey = '11111111-1111-4111-8111-111111111111';
+  const buyerId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const sellerId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+  const productA = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1";
+  const productB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2";
+  const addressId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+  const idempotencyKey = "11111111-1111-4111-8111-111111111111";
+  // Misafir OTP hash pepper'ı: ConfigService.getOrThrow bunu döndürür; testte aynı
+  // değerle beklenen hash'i üretip Redis kaydını taklit ederiz (OTP tüketimini geçmek için).
+  const OTP_SECRET = "test-otp-secret";
+  const pricingHashFor = (
+    items: Array<{
+      productId: string;
+      quantity?: number;
+      shippingDesi?: number;
+    }>,
+  ) =>
+    createHash("sha256")
+      .update(
+        items
+          .map(
+            (item) =>
+              `${item.productId}:100.00:${item.quantity ?? 1}:${item.shippingDesi ?? 1}`,
+          )
+          .sort()
+          .join("|"),
+      )
+      .digest("hex")
+      .slice(0, 16);
 
-  const makeProduct = (id: string, overrides: Record<string, unknown> = {}) => ({
+  const makeProduct = (
+    id: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     id,
     title: `Ürün ${id.slice(-1)}`,
     status: ProductStatus.active,
@@ -50,11 +124,14 @@ describe('OrderService checkout group (batch checkout)', () => {
     saleEndDate: null,
     quantity: 5,
     reservedQuantity: 0,
-    seller: { id: sellerId, email: 'seller@test.com', displayName: 'Seller' },
+    shippingDesi: 1,
+    seller: { id: sellerId, email: "seller@test.com", displayName: "Seller" },
     ...overrides,
   });
 
   let mockTx: any;
+  let cache: any;
+  let discountService: any;
 
   const mockPrisma: any = {
     user: { findUnique: jest.fn() },
@@ -73,7 +150,9 @@ describe('OrderService checkout group (batch checkout)', () => {
     jest.clearAllMocks();
 
     mockTx = {
-      $queryRaw: jest.fn().mockResolvedValue([{ id: productA }, { id: productB }]),
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValue([{ id: productA }, { id: productB }]),
       product: {
         findMany: jest
           .fn()
@@ -95,19 +174,29 @@ describe('OrderService checkout group (batch checkout)', () => {
         findUnique: jest.fn().mockResolvedValue({
           id: addressId,
           userId: buyerId,
-          title: 'Ev',
-          fullName: 'Alıcı',
-          phone: '+905551112233',
-          city: 'İstanbul',
-          district: 'Kadıköy',
-          address: 'Test cad. 1',
-          zipCode: '34000',
+          title: "Ev",
+          fullName: "Alıcı",
+          phone: "+905551112233",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+          zipCode: "34000",
         }),
       },
       checkoutGroup: {
-        create: jest.fn().mockImplementation(({ data }: any) =>
-          Promise.resolve({ id: 'group-1', ...data }),
-        ),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }: any) =>
+            Promise.resolve({ id: "group-1", ...data }),
+          ),
+      },
+      // Faz 1: satıcı-paketi (çatı) — checkout satıcı başına bir OrderPackage yaratır.
+      orderPackage: {
+        create: jest
+          .fn()
+          .mockImplementation(({ data }: any) =>
+            Promise.resolve({ id: `pkg-${data.sellerId}`, ...data }),
+          ),
       },
       // Sipariş oluşturulunca alıcının sepetindeki sipariş edilen ürünler silinir.
       cartItem: {
@@ -118,14 +207,17 @@ describe('OrderService checkout group (batch checkout)', () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       id: buyerId,
       isBanned: false,
-      email: 'buyer@test.com',
-      displayName: 'Buyer',
-      sellerType: 'individual',
+      email: "buyer@test.com",
+      displayName: "Buyer",
+      sellerType: "individual",
       membership: null,
     });
     mockPrisma.checkoutGroup.findUnique.mockResolvedValue(null);
     mockPrisma.order.count.mockResolvedValue(0);
     mockPrisma.checkoutGroup.count.mockResolvedValue(0);
+    mockPrisma.commissionRule.findMany.mockResolvedValue([
+      DEFAULT_COMMISSION_RULE,
+    ]);
     mockPrisma.$transaction.mockImplementation(
       async (fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx),
     );
@@ -134,6 +226,7 @@ describe('OrderService checkout group (batch checkout)', () => {
       providers: [
         OrderService,
         OrderPricingService,
+        { provide: ShippingTariffService, useValue: SHIPPING_TARIFF_MOCK },
         OrderCheckoutService,
         OrderCheckoutCommonService,
         OrderCheckoutDirectService,
@@ -142,15 +235,49 @@ describe('OrderService checkout group (batch checkout)', () => {
         OrderCommonService,
         OrderQueryService,
         OrderLifecycleService,
-        { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
+        {
+          provide: ElogoInvoicingService,
+          useValue: {
+            issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
+            issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),
+            issueMembershipInvoice: jest.fn().mockResolvedValue(undefined),
+            issueBoostInvoice: jest.fn().mockResolvedValue(undefined),
+            handleOrderRefund: jest.fn().mockResolvedValue(undefined),
+            issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined),
+            handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
+            issueTradeCashCommissionInvoice: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            retryPendingInvoices: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: CacheService, useValue: { del: jest.fn(), delPattern: jest.fn() } },
-        { provide: ConfigService, useValue: { get: jest.fn() } },
+        {
+          provide: CacheService,
+          useValue: {
+            del: jest.fn(),
+            delPattern: jest.fn(),
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn(),
+            ttl: jest.fn().mockResolvedValue(300),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn(), getOrThrow: jest.fn(() => OTP_SECRET) },
+        },
         { provide: EventService, useValue: { emitOrderCreated: jest.fn() } },
         { provide: NotificationService, useValue: {} },
         {
           provide: DiscountService,
-          useValue: { validateCoupon: jest.fn(), recordUsage: jest.fn() },
+          useValue: {
+            validateCoupon: jest.fn(),
+            reserveUsage: jest.fn(),
+            releaseReservedUsageForOrders: jest.fn(),
+            getEffectiveDisplayPriceMany: jest
+              .fn()
+              .mockResolvedValue(new Map()),
+          },
         },
         { provide: DiscountCalculator, useValue: {} },
         {
@@ -162,30 +289,44 @@ describe('OrderService checkout group (batch checkout)', () => {
         },
         { provide: ProductLockService, useValue: {} },
         { provide: CommissionLedgerService, useValue: {} },
-        { provide: TaxService, useValue: { resolveTaxRate: jest.fn().mockResolvedValue(null), calculateTaxAmount: jest.fn().mockReturnValue(0) } },
+        { provide: RefundService, useValue: {} },
+        {
+          provide: TaxService,
+          useValue: {
+            resolveTaxRate: jest.fn().mockResolvedValue(null),
+            calculateTaxAmount: jest.fn().mockReturnValue(0),
+          },
+        },
       ],
     }).compile();
 
     service = module.get(OrderService);
+    cache = module.get(CacheService);
+    discountService = module.get(DiscountService);
   });
 
-  const baseDto = () => ({
-    items: [{ productId: productA }, { productId: productB }],
-    idempotencyKey,
-    shippingAddressId: addressId,
-  });
+  const baseDto = () => {
+    const items = [{ productId: productA }, { productId: productB }];
+    return {
+      items,
+      idempotencyKey,
+      shippingAddressId: addressId,
+      expectedShippingTariffVersion: 1,
+      expectedPricingHash: pricingHashFor(items),
+    };
+  };
 
-  it('creates one checkout group with an order per product (2 items → 1 group + 2 orders)', async () => {
+  it("creates one checkout group with an order per product (2 items → 1 group + 2 orders)", async () => {
     const result: any = await service.checkout(buyerId, baseDto() as any);
 
-    expect(result.checkoutGroupId).toBe('group-1');
+    expect(result.checkoutGroupId).toBe("group-1");
     expect(result.orders).toHaveLength(2);
     expect(mockTx.checkoutGroup.create).toHaveBeenCalledTimes(1);
     expect(mockTx.order.create).toHaveBeenCalledTimes(2);
 
     // Her sipariş gruba bağlanır
     for (const call of mockTx.order.create.mock.calls) {
-      expect(call[0].data.checkoutGroupId).toBe('group-1');
+      expect(call[0].data.checkoutGroupId).toBe("group-1");
       expect(call[0].data.status).toBe(OrderStatus.pending_payment);
     }
 
@@ -193,8 +334,11 @@ describe('OrderService checkout group (batch checkout)', () => {
     const orderTotals = mockTx.order.create.mock.calls.map(
       (c: any) => c[0].data.totalAmount,
     );
-    const groupTotal = mockTx.checkoutGroup.create.mock.calls[0][0].data.totalAmount;
-    expect(groupTotal).toBeCloseTo(orderTotals.reduce((s: number, v: number) => s + v, 0));
+    const groupTotal =
+      mockTx.checkoutGroup.create.mock.calls[0][0].data.totalAmount;
+    expect(groupTotal).toBeCloseTo(
+      orderTotals.reduce((s: number, v: number) => s + v, 0),
+    );
 
     // Her ürün için 1 adet rezervasyon
     expect(mockTx.product.update).toHaveBeenCalledWith({
@@ -209,20 +353,119 @@ describe('OrderService checkout group (batch checkout)', () => {
     // Sipariş oluşunca alıcının sepetindeki sipariş edilen ürünler server-side silinir
     // (bayat sepet satırı kalmasın; iptal sonrası "tekrar sipariş" akışı bozulmasın).
     expect(mockTx.cartItem.deleteMany).toHaveBeenCalledWith({
-      where: { cart: { userId: buyerId }, productId: { in: [productA, productB].sort() } },
+      where: {
+        cart: { userId: buyerId },
+        productId: { in: [productA, productB].sort() },
+      },
     });
   });
 
-  it('idempotency replay: same key returns the existing group without running the transaction', async () => {
+  // Faz 1: satıcı-bazlı kargo + OrderPackage (çatı) senaryoları.
+  const sellerId2 = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+
+  it("S2 aynı mağaza 2 ürün → 1 paket + TEK kargo ücreti (alıcı 2× ödemez)", async () => {
+    // varsayılan: productA ve productB aynı satıcı (sellerId)
+    await service.checkout(buyerId, baseDto() as any);
+
+    // Tek satıcı → tek OrderPackage
+    expect(mockTx.orderPackage.create).toHaveBeenCalledTimes(1);
+    expect(
+      mockTx.orderPackage.create.mock.calls[0][0].data.shippingCost,
+    ).toBeCloseTo(29.99);
+    expect(mockTx.orderPackage.create.mock.calls[0][0].data.billableDesi).toBe(
+      2,
+    );
+    expect(
+      mockTx.orderPackage.create.mock.calls[0][0].data.shippingPricingSnapshot,
+    ).toMatchObject({
+      tariffVersion: 1,
+      billableDesi: 2,
+      fullShippingAmount: 29.99,
+    });
+
+    // İki order da AYNI pakete bağlı
+    const pkgIds = mockTx.order.create.mock.calls.map(
+      (c: any) => c[0].data.packageId,
+    );
+    expect(new Set(pkgIds).size).toBe(1);
+    expect(pkgIds[0]).toBe(`pkg-${sellerId}`);
+
+    // Kargo ücreti TEK sefer (bir satırda 29.99, diğerinde 0) → toplam 29.99, 59.98 değil
+    const shippings = mockTx.order.create.mock.calls.map(
+      (c: any) => c[0].data.shippingCost,
+    );
+    expect(shippings.filter((s: number) => s > 0)).toHaveLength(1);
+    expect(shippings.reduce((a: number, b: number) => a + b, 0)).toBeCloseTo(
+      29.99,
+    );
+  });
+
+  it("S3 2 farklı mağaza birer ürün → 2 paket + 2 kargo ücreti (3 değil)", async () => {
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct(productA), // seller = sellerId
+      makeProduct(productB, {
+        sellerId: sellerId2,
+        seller: { id: sellerId2, email: "s2@test.com", displayName: "Seller2" },
+      }),
+    ]);
+
+    await service.checkout(buyerId, baseDto() as any);
+
+    // 2 satıcı → 2 OrderPackage
+    expect(mockTx.orderPackage.create).toHaveBeenCalledTimes(2);
+    const pkgSellers = mockTx.orderPackage.create.mock.calls.map(
+      (c: any) => c[0].data.sellerId,
+    );
+    expect(pkgSellers).toEqual(expect.arrayContaining([sellerId, sellerId2]));
+    for (const c of mockTx.orderPackage.create.mock.calls) {
+      expect(c[0].data.shippingCost).toBeCloseTo(29.99);
+    }
+
+    // Her order kendi satıcı-paketine bağlı + her satıcı 1 kargo ücreti → 2 ücret
+    const perOrder = mockTx.order.create.mock.calls.map((c: any) => ({
+      seller: c[0].data.sellerId,
+      shipping: c[0].data.shippingCost,
+      pkg: c[0].data.packageId,
+    }));
+    expect(perOrder.filter((o: any) => o.shipping > 0)).toHaveLength(2);
+    const aOrder = perOrder.find((o: any) => o.seller === sellerId);
+    const bOrder = perOrder.find((o: any) => o.seller === sellerId2);
+    expect(aOrder.pkg).toBe(`pkg-${sellerId}`);
+    expect(bOrder.pkg).toBe(`pkg-${sellerId2}`);
+  });
+
+  it("Medium A: aynı ürünü 2× ekleyip @Max(20) aşımı REDDEDİLİR (birleşik 30)", async () => {
+    // Aynı ürün 2 satır, 15+15=30 → perOrderCap(20) aşımı → stoktan ÖNCE max reddi.
+    mockTx.$queryRaw.mockResolvedValue([{ id: productA }]);
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct(productA, { quantity: 100 }), // bol stok: red max'tan, stoktan değil
+    ]);
+
+    await expect(
+      service.checkout(buyerId, {
+        items: [
+          { productId: productA, quantity: 15 },
+          { productId: productA, quantity: 15 },
+        ],
+        idempotencyKey,
+        shippingAddressId: addressId,
+        expectedShippingTariffVersion: 1,
+      } as any),
+    ).rejects.toThrow(/maksimum 20 adet/i);
+
+    expect(mockTx.order.create).not.toHaveBeenCalled();
+  });
+
+  it("idempotency replay: same key returns the existing group without running the transaction", async () => {
     mockPrisma.checkoutGroup.findUnique.mockResolvedValue({
-      id: 'group-existing',
-      groupNumber: 'GRP-EXISTING',
+      id: "group-existing",
+      groupNumber: "GRP-EXISTING",
       buyerId,
       totalAmount: 250,
       orders: [
         {
-          id: 'order-1',
-          orderNumber: 'ORD-1',
+          id: "order-1",
+          orderNumber: "ORD-1",
           productId: productA,
           totalAmount: 125,
           subtotal: 100,
@@ -234,16 +477,16 @@ describe('OrderService checkout group (batch checkout)', () => {
 
     const result: any = await service.checkout(buyerId, baseDto() as any);
 
-    expect(result.checkoutGroupId).toBe('group-existing');
+    expect(result.checkoutGroupId).toBe("group-existing");
     expect(result.existingGroup).toBe(true);
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('idempotency key belonging to another buyer is rejected', async () => {
+  it("idempotency key belonging to another buyer is rejected", async () => {
     mockPrisma.checkoutGroup.findUnique.mockResolvedValue({
-      id: 'group-existing',
-      groupNumber: 'GRP-EXISTING',
-      buyerId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      id: "group-existing",
+      groupNumber: "GRP-EXISTING",
+      buyerId: "ffffffff-ffff-ffff-ffff-ffffffffffff",
       totalAmount: 250,
       orders: [],
     });
@@ -254,7 +497,7 @@ describe('OrderService checkout group (batch checkout)', () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('out-of-stock product aborts the whole checkout with the failing productId (atomicity)', async () => {
+  it("out-of-stock product aborts the whole checkout with the failing productId (atomicity)", async () => {
     mockTx.product.findMany.mockResolvedValue([
       makeProduct(productA),
       makeProduct(productB, { quantity: 1, reservedQuantity: 1 }), // müsait adet 0
@@ -273,10 +516,10 @@ describe('OrderService checkout group (batch checkout)', () => {
     expect(mockTx.order.create).not.toHaveBeenCalled();
   });
 
-  it('cancels the buyer\'s stale pending order for the same product and releases its reservation', async () => {
+  it("cancels the buyer's stale pending order for the same product and releases its reservation", async () => {
     mockTx.order.findMany.mockResolvedValue([
       {
-        id: 'stale-order-1',
+        id: "stale-order-1",
         productId: productA,
         reservationReleasedAt: null,
       },
@@ -286,7 +529,7 @@ describe('OrderService checkout group (batch checkout)', () => {
 
     expect(mockTx.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'stale-order-1' },
+        where: { id: "stale-order-1" },
         data: expect.objectContaining({ status: OrderStatus.cancelled }),
       }),
     );
@@ -296,7 +539,7 @@ describe('OrderService checkout group (batch checkout)', () => {
     });
   });
 
-  it('second checkout of own still-reserved product cancels the stale order and succeeds (no false stockout)', async () => {
+  it("second checkout of own still-reserved product cancels the stale order and succeeds (no false stockout)", async () => {
     // Senaryo: kullanıcı "onayla ve öde"ye bastı (ilk sipariş ürünü rezerve etti:
     // quantity=1, reservedQuantity=1 → available=0). Geri dönüp tekrar bastı.
     // Kendi bekleyen siparişi iptal edilip rezervasyon serbest bırakılmalı, sonra
@@ -305,7 +548,10 @@ describe('OrderService checkout group (batch checkout)', () => {
     const productState = { reservedQuantity: 1 };
     mockTx.product.findMany.mockImplementation(() =>
       Promise.resolve([
-        makeProduct(productA, { quantity: 1, reservedQuantity: productState.reservedQuantity }),
+        makeProduct(productA, {
+          quantity: 1,
+          reservedQuantity: productState.reservedQuantity,
+        }),
       ]),
     );
     mockTx.product.update.mockImplementation(({ where, data }: any) => {
@@ -318,29 +564,31 @@ describe('OrderService checkout group (batch checkout)', () => {
       return Promise.resolve({});
     });
     mockTx.order.findMany.mockResolvedValue([
-      { id: 'stale-order-1', productId: productA, reservationReleasedAt: null },
+      { id: "stale-order-1", productId: productA, reservationReleasedAt: null },
     ]);
 
     const dto = {
       items: [{ productId: productA }],
       idempotencyKey,
       shippingAddressId: addressId,
+      expectedShippingTariffVersion: 1,
+      expectedPricingHash: pricingHashFor([{ productId: productA }]),
     };
     const result: any = await service.checkout(buyerId, dto as any);
 
     // Kendi bekleyen siparişi iptal edildi
     expect(mockTx.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'stale-order-1' },
+        where: { id: "stale-order-1" },
         data: expect.objectContaining({ status: OrderStatus.cancelled }),
       }),
     );
     // Stockout fırlatılmadı; yeni grup + sipariş oluştu
-    expect(result.checkoutGroupId).toBe('group-1');
+    expect(result.checkoutGroupId).toBe("group-1");
     expect(mockTx.order.create).toHaveBeenCalledTimes(1);
   });
 
-  it('missing shipping address is rejected before any transaction', async () => {
+  it("missing shipping address is rejected before any transaction", async () => {
     await expect(
       service.checkout(buyerId, {
         items: [{ productId: productA }],
@@ -350,17 +598,133 @@ describe('OrderService checkout group (batch checkout)', () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('guest checkout rejects coupon codes', async () => {
-    // OTP tüketimi öncesi idempotensi: yeni anahtar → null
-    mockPrisma.checkoutGroup.findUnique.mockResolvedValue(null);
+  // ── Misafir GRUP checkout (POST /orders/checkout/guest → checkoutGuest) ──────────
+  // checkoutGuest, dto.items içindeki quantity'yi createCheckoutGroup'a birebir
+  // devreder → adet mantığı ÜYE grup checkout ile aynıdır. Bu blok, adet'in
+  // fiyat*adet (subtotal), order.quantity, stok rezervasyonu ve birleşik üst-sınır
+  // (HARD_CAP=20 / maxQuantityPerOrder) boyunca gerçekten aktığını uçtan uca doğrular.
+  describe("guest group checkout (checkoutGuest) honors per-item quantity", () => {
+    const guestEmail = "guest@example.com";
+    const guestCode = "123456";
 
-    await expect(
-      (service as any).createCheckoutGroup({
-        buyerId,
-        dto: { ...baseDto(), couponCode: 'INDIRIM10' },
-        isGuest: true,
-        guest: { email: 'g@test.com' },
-      }),
-    ).rejects.toThrow('Kupon kodu misafir alışverişte desteklenmiyor');
+    // Misafir OTP tüketimini geç: Redis kaydını doğru hash ile taklit et (aynı pepper).
+    const primeGuestOtp = () => {
+      const normEmail = guestEmail.trim().toLowerCase();
+      const h = createHash("sha256")
+        .update(`${OTP_SECRET}:${normEmail}:${guestCode}`, "utf8")
+        .digest("hex");
+      cache.get.mockResolvedValue({ h, a: 0, c: 1, v: 5 });
+      cache.ttl.mockResolvedValue(300);
+    };
+
+    const guestDto = (
+      items: Array<{ productId: string; quantity?: number }>,
+    ) => {
+      return {
+        items,
+        idempotencyKey,
+        email: guestEmail,
+        emailVerificationCode: guestCode,
+        phone: "+905551234567",
+        guestName: "Guest User",
+        // Misafir grup checkout inline adres ister (kayıtlı adres ID yok).
+        shippingAddress: {
+          fullName: "Guest User",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+        },
+        expectedShippingTariffVersion: 1,
+        expectedPricingHash: pricingHashFor(items),
+      };
+    };
+
+    beforeEach(() => {
+      // Tek ürün, bol stok: adet doğrulaması stoktan değil sınır/geçişten sınansın.
+      mockTx.$queryRaw.mockResolvedValue([{ id: productA }]);
+      mockTx.product.findMany.mockResolvedValue([
+        makeProduct(productA, { quantity: 100 }),
+      ]);
+      primeGuestOtp();
+    });
+
+    it("quantity=3 → order.quantity=3, subtotal=fiyat*3, rezervasyon +3 (1 değil)", async () => {
+      await service.checkoutGuest(
+        guestDto([{ productId: productA, quantity: 3 }]) as any,
+      );
+
+      expect(mockTx.order.create).toHaveBeenCalledTimes(1);
+      const orderData = mockTx.order.create.mock.calls[0][0].data;
+      expect(orderData.quantity).toBe(3);
+      expect(orderData.unitPrice).toBe(100);
+      // subtotal = originalPrice * adet = 100 * 3
+      expect(orderData.subtotal).toBe(300);
+      // Satır toplamı fiyat*adet üzerinden → totalAmount en az 300 (+ kargo/fee/vergi)
+      expect(orderData.totalAmount).toBeGreaterThanOrEqual(300);
+
+      // Stok rezervasyonu adet kadar artar (eskiden sabit 1 idi).
+      expect(mockTx.product.update).toHaveBeenCalledWith({
+        where: { id: productA },
+        data: { reservedQuantity: { increment: 3 } },
+      });
+    });
+
+    it("adet verilmezse (===1) davranış değişmez: order.quantity=1, rezervasyon +1", async () => {
+      await service.checkoutGuest(guestDto([{ productId: productA }]) as any);
+
+      const orderData = mockTx.order.create.mock.calls[0][0].data;
+      expect(orderData.quantity).toBe(1);
+      expect(orderData.subtotal).toBe(100);
+      expect(mockTx.product.update).toHaveBeenCalledWith({
+        where: { id: productA },
+        data: { reservedQuantity: { increment: 1 } },
+      });
+    });
+
+    it("birleşik adet üst sınırı (20) misafirde de zorlanır: aynı ürün 15+15 → reddedilir", async () => {
+      await expect(
+        service.checkoutGuest(
+          guestDto([
+            { productId: productA, quantity: 15 },
+            { productId: productA, quantity: 15 },
+          ]) as any,
+        ),
+      ).rejects.toThrow(/maksimum 20 adet/i);
+
+      expect(mockTx.order.create).not.toHaveBeenCalled();
+    });
+
+    it("misafir kuponu ARTIK reddedilmez: validateCoupon userId=null ile çağrılır ve indirim uygulanır", async () => {
+      discountService.validateCoupon.mockResolvedValue({
+        isValid: true,
+        discount: {
+          id: "disc-1",
+          name: "İndirim",
+          code: "INDIRIM10",
+          type: "percentage",
+          value: 10,
+          scope: "global",
+          estimatedDiscount: 10,
+          platformFundedShare: 1,
+          eligibleProductIds: [productA],
+        },
+      });
+
+      await service.checkoutGuest({
+        ...guestDto([{ productId: productA }]),
+        couponCode: "INDIRIM10",
+      } as any);
+
+      // Kişi-başı limit atlanır: validateCoupon userId=null ile çağrılır.
+      expect(discountService.validateCoupon).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "INDIRIM10" }),
+        null,
+      );
+      // Kupon indirimi siparişe yansır; ödeme öncesi yalnız kota rezerve edilir.
+      expect(discountService.reserveUsage).toHaveBeenCalled();
+      const orderData = mockTx.order.create.mock.calls[0][0].data;
+      expect(orderData.discountAmount).toBeGreaterThan(0);
+    });
   });
 });

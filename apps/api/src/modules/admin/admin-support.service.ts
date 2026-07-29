@@ -1,11 +1,8 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { AdminAuditService } from './admin-audit.service';
-import { TicketStatus, TicketPriority, TicketCategory } from '@prisma/client';
-import { SupportService } from '../support/support.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { AdminAuditService } from "./admin-audit.service";
+import { TicketStatus, TicketPriority, TicketCategory } from "@prisma/client";
+import { SupportService } from "../support/support.service";
 
 /**
  * Destek talebi admin operasyonları (liste/detay, güncelleme, yanıt) —
@@ -36,23 +33,35 @@ export class AdminSupportService {
     page?: number;
     limit?: number;
   }) {
-    const { status, priority, category, assigneeId, creatorId, fromDate, toDate, page = 1, limit = 20 } = query;
+    const {
+      status,
+      priority,
+      category,
+      assigneeId,
+      creatorId,
+      fromDate,
+      toDate,
+      page = 1,
+      limit = 20,
+    } = query;
 
     // Use SupportService's getAllTickets method
-    const result = await this.supportService.getAllTickets(
+    const result = await this.supportService.getAllTickets({
       page,
       limit,
       status,
       priority,
       category,
       assigneeId,
-    );
+    });
 
     // Filter by creatorId and date range if provided
-    let filteredTickets = result.tickets;
+    let filteredTickets = result.data;
 
     if (creatorId) {
-      filteredTickets = filteredTickets.filter((t) => t.creatorId === creatorId);
+      filteredTickets = filteredTickets.filter(
+        (t) => t.creatorId === creatorId,
+      );
     }
 
     if (fromDate || toDate) {
@@ -83,24 +92,28 @@ export class AdminSupportService {
   async getSupportTicketById(ticketId: string) {
     // Use SupportService's getTicketById with admin flag
     // Pass empty string for userId since admin can view any ticket
-    return this.supportService.getTicketById(ticketId, '', true);
+    return this.supportService.getTicketById(ticketId, "", true);
   }
 
   /**
    * Update support ticket
    */
-  async updateSupportTicket(adminId: string, ticketId: string, dto: {
-    status?: TicketStatus;
-    priority?: TicketPriority;
-    assigneeId?: string;
-    note?: string;
-  }) {
+  async updateSupportTicket(
+    adminId: string,
+    ticketId: string,
+    dto: {
+      status?: TicketStatus;
+      priority?: TicketPriority;
+      assigneeId?: string;
+      note?: string;
+    },
+  ) {
     const ticket = await this.prisma.supportTicket.findUnique({
       where: { id: ticketId },
     });
 
     if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
+      throw new NotFoundException("Destek talebi bulunamadı");
     }
 
     const oldTicket = { ...ticket };
@@ -120,7 +133,9 @@ export class AdminSupportService {
 
     // Update assignee if provided
     if (dto.assigneeId !== undefined) {
-      await this.supportService.assignTicket(ticketId, { assigneeId: dto.assigneeId });
+      await this.supportService.assignTicket(ticketId, {
+        assigneeId: dto.assigneeId,
+      });
     }
 
     const updatedTicket = await this.prisma.supportTicket.findUnique({
@@ -128,7 +143,14 @@ export class AdminSupportService {
     });
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'support_ticket_update', 'SupportTicket', ticketId, oldTicket, updatedTicket);
+    await this.audit.createAuditLog(
+      adminId,
+      "support_ticket_update",
+      "SupportTicket",
+      ticketId,
+      oldTicket,
+      updatedTicket,
+    );
 
     return this.getSupportTicketById(ticketId);
   }
@@ -136,17 +158,26 @@ export class AdminSupportService {
   /**
    * Reply to support ticket
    */
-  async replyToSupportTicket(adminId: string, ticketId: string, message: string) {
+  async replyToSupportTicket(
+    adminId: string,
+    ticketId: string,
+    message: string,
+  ) {
     const ticket = await this.prisma.supportTicket.findUnique({
       where: { id: ticketId },
     });
 
     if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
+      throw new NotFoundException("Destek talebi bulunamadı");
     }
 
     // Use SupportService's addMessage with admin flag
-    await this.supportService.addMessage(ticketId, adminId, { content: message }, true);
+    await this.supportService.addMessage(
+      ticketId,
+      adminId,
+      { content: message },
+      true,
+    );
 
     // Update status to in_progress if it was waiting_customer
     if (ticket.status === TicketStatus.waiting_customer) {
@@ -156,12 +187,18 @@ export class AdminSupportService {
     }
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'support_ticket_reply', 'SupportTicket', ticketId, ticket, {
-      ...ticket,
-      message,
-    });
+    await this.audit.createAuditLog(
+      adminId,
+      "support_ticket_reply",
+      "SupportTicket",
+      ticketId,
+      ticket,
+      {
+        ...ticket,
+        message,
+      },
+    );
 
     return this.getSupportTicketById(ticketId);
   }
-
 }

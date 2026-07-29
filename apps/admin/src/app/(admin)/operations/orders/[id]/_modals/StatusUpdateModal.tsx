@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
-import { Modal, ModalFooter, Select } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { isPostShipping } from '../_lib/status';
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { getAdminManualStatusTargets } from "../_lib/status";
 
 /**
  * Self-contained order status modal: owns the form + the update mutation
@@ -22,60 +22,67 @@ export function StatusUpdateModal({
   orderId: string;
   currentStatus: string;
 }) {
-  const [newStatus, setNewStatus] = useState(currentStatus);
+  const t = useTranslations();
+  const targets = getAdminManualStatusTargets(currentStatus);
+  const [newStatus, setNewStatus] = useState(targets[0] ?? currentStatus);
+  const [notes, setNotes] = useState("");
   useEffect(() => {
-    if (open) setNewStatus(currentStatus);
-  }, [open, currentStatus]);
-
-  const postShipping = isPostShipping(currentStatus);
+    if (open) {
+      setNewStatus(targets[0] ?? currentStatus);
+      setNotes("");
+    }
+  }, [open, currentStatus, targets]);
 
   const update = useAdminMutation(
-    (status: string) => adminApi.updateOrderStatus(orderId, status),
+    () => adminApi.updateOrderStatus(orderId, newStatus, notes.trim()),
     {
-      invalidates: ['orders'],
-      successMessage: 'Sipariş durumu güncellendi',
-      errorMessage: 'Durum güncelleme başarısız',
+      invalidates: ["orders"],
+      successMessage: t("admin.operations.orders.statusUpdated"),
+      errorMessage: t("admin.operations.orders.statusUpdateFailed"),
       onSuccess: onClose,
     },
   );
 
-  const submit = () => {
-    if (newStatus === 'cancelled' && postShipping) {
-      toast.error('Kargo sonrası iptal yapılamaz — iade akışını kullanın.');
-      return;
-    }
-    update.mutate(newStatus);
-  };
-
   return (
-    <Modal isOpen={open} onClose={onClose} title="Durum Güncelle">
-      <div className="mb-4">
-        <label className="mb-2 block text-sm font-medium text-body">Yeni Durum</label>
-        <Select value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-          <option value="pending_payment">Ödeme Bekliyor</option>
-          <option value="paid">Ödendi</option>
-          <option value="preparing">Hazırlanıyor</option>
-          <option value="shipped">Kargoda</option>
-          <option value="delivered">Teslim Edildi</option>
-          <option value="completed">Tamamlandı</option>
-          <option value="cancelled" disabled={postShipping}>
-            İptal{postShipping ? ' (kargo sonrası kapalı)' : ''}
-          </option>
-          <option value="refunded">İade Edildi</option>
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      title={t("admin.operations.orders.updateStatus")}
+    >
+      <div className="space-y-4">
+        <Select
+          label={t("admin.operations.orders.newStatus")}
+          value={newStatus}
+          onChange={(e) => setNewStatus(e.target.value)}
+          disabled={update.isPending}
+        >
+          {targets.map((status) => (
+            <option key={status} value={status}>
+              {status === "preparing"
+                ? t("admin.operations.orders.status.preparing")
+                : t("admin.operations.orders.status.delivered")}
+            </option>
+          ))}
         </Select>
-        {postShipping && (
-          <p className="mt-2 text-xs text-muted">
-            Kargo sonrası iptal yapılamaz. Bu aşamada iade için İade Talepleri akışını
-            kullanın.
-          </p>
-        )}
+        <Textarea
+          label={t("admin.operations.orders.statusChangeReason")}
+          placeholder={t(
+            "admin.operations.orders.statusChangeReasonPlaceholder",
+          )}
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          maxLength={500}
+          rows={3}
+          disabled={update.isPending}
+        />
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => update.mutate()}
+          confirmLabel={t("common.update")}
+          disabled={targets.length === 0 || !notes.trim()}
+          isLoading={update.isPending}
+        />
       </div>
-      <ModalFooter
-        onCancel={onClose}
-        onConfirm={submit}
-        confirmLabel="Güncelle"
-        isLoading={update.isPending}
-      />
     </Modal>
   );
 }

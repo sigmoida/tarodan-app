@@ -1,91 +1,136 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Input, Select } from '@tarodan/ui';
+import { DatePicker, Select } from "@tarodan/ui";
 import {
   CurrencyDollarIcon,
   ChartBarIcon,
   DocumentTextIcon,
-} from '@heroicons/react/24/outline';
-import { adminApi } from '@/lib/api';
-import { SectionCard } from '@/components/detail/SectionCard';
-import { MetricCard } from '@/components/MetricCard';
-import { DataTable } from '@/components/DataTable';
-import { fmtTry } from '@/lib/format';
-import { taxReportColumns } from '../_lib/columns';
-import { type TaxReport, groupByOptions } from '../_lib/types';
+} from "@heroicons/react/24/outline";
+import { adminApi } from "@/lib/api";
+import { ResourceList, useResourceList } from "@/components/list";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { MetricCard } from "@/components/MetricCard";
+import { fmtTry } from "@/lib/format";
+import { paginateClient } from "@/lib/query/client-list";
+import { taxReportColumns } from "../_lib/columns";
+import { type TaxReport, groupByOptions } from "../_lib/types";
+import { useTranslations } from "next-intl";
+
+type TaxReportRow = TaxReport["breakdown"][number];
+type TaxReportListData = {
+  data: TaxReportRow[];
+  meta: { total: number };
+  summary: TaxReport["summary"];
+};
+
+const start = new Date();
+start.setFullYear(start.getFullYear() - 1);
+const INITIAL_FILTERS = {
+  fromDate: start.toISOString().slice(0, 10),
+  toDate: new Date().toISOString().slice(0, 10),
+  groupBy: "month",
+};
+
+// Full-load client-paginated report (#383): getTaxReport is a period-scoped
+// aggregate (bounded by fromDate/toDate + groupBy) with no server pagination —
+// the breakdown fits in memory, so we paginate client-side. Move to the server
+// contract only if a single period's breakdown ever grows unbounded.
+const taxReportFetcher = async (params: Record<string, any>) => {
+  const response = await adminApi.getTaxReport({
+    fromDate: params.fromDate ?? INITIAL_FILTERS.fromDate,
+    toDate: params.toDate ?? INITIAL_FILTERS.toDate,
+    groupBy: params.groupBy ?? INITIAL_FILTERS.groupBy,
+  });
+  const report = response.data as TaxReport;
+  const rows = report?.breakdown ?? [];
+  const page = paginateClient(rows, params);
+  return {
+    ...response,
+    data: {
+      ...page,
+      summary: report?.summary,
+    },
+  };
+};
+
+function TaxReportControls() {
+  const t = useTranslations();
+  const { filters, setFilter } = useResourceList<TaxReportRow>();
+  return (
+    <SectionCard>
+      <div className="flex flex-wrap items-end gap-4">
+        <DatePicker
+          label={t("admin.finance.common.start")}
+          value={filters.fromDate ?? INITIAL_FILTERS.fromDate}
+          onChange={(v) => setFilter("fromDate", v)}
+        />
+        <DatePicker
+          label={t("admin.finance.common.end")}
+          value={filters.toDate ?? INITIAL_FILTERS.toDate}
+          onChange={(v) => setFilter("toDate", v)}
+        />
+        <Select
+          label={t("admin.finance.tax.groupByLabel")}
+          value={filters.groupBy ?? INITIAL_FILTERS.groupBy}
+          onChange={(event) => setFilter("groupBy", event.target.value)}
+          options={groupByOptions(t)}
+        />
+      </div>
+    </SectionCard>
+  );
+}
+
+function TaxReportSummary() {
+  const t = useTranslations();
+  const { data } = useResourceList<TaxReportRow>();
+  const summary = (data as TaxReportListData)?.summary;
+  if (!summary) return null;
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <MetricCard
+        icon={CurrencyDollarIcon}
+        tone="success"
+        label={t("admin.finance.tax.totalTaxCollected")}
+        value={fmtTry(summary.totalTaxCollected)}
+      />
+      <MetricCard
+        icon={ChartBarIcon}
+        tone="primary"
+        label={t("admin.finance.tax.totalRevenue")}
+        value={fmtTry(summary.totalRevenue)}
+      />
+      <MetricCard
+        icon={DocumentTextIcon}
+        tone="info"
+        label={t("admin.finance.tax.invoiceCount")}
+        value={summary.invoiceCount}
+      />
+    </div>
+  );
+}
 
 export function TaxReportTab() {
-  const [from, setFrom] = useState(() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [groupBy, setGroupBy] = useState<'day' | 'month' | 'year'>('month');
-
-  const { data: report } = useQuery({
-    queryKey: ['tax-report', from, to, groupBy],
-    queryFn: async () =>
-      (await adminApi.getTaxReport({ fromDate: from, toDate: to, groupBy })).data as TaxReport,
-  });
-
-  const columns = taxReportColumns;
-
+  const t = useTranslations();
   return (
-    <div className="space-y-6">
-      <SectionCard>
-        <div className="flex flex-wrap items-end gap-4">
-          <Input
-            type="date"
-            label="Başlangıç"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-          <Input type="date" label="Bitiş" value={to} onChange={(e) => setTo(e.target.value)} />
-          <Select
-            label="Grupla"
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as typeof groupBy)}
-            options={groupByOptions}
-          />
-        </div>
+    <ResourceList<TaxReportRow>
+      resource="tax-report"
+      fetcher={taxReportFetcher}
+      getRowId={(row) => row.period}
+      syncUrl
+      initialFilters={INITIAL_FILTERS}
+    >
+      <TaxReportControls />
+      <ResourceList.Toolbar>
+        <ResourceList.Search />
+      </ResourceList.Toolbar>
+      <TaxReportSummary />
+      <SectionCard title={t("admin.finance.tax.taxByPeriod")}>
+        <ResourceList.Table<TaxReportRow>
+          columns={taxReportColumns(t)}
+          emptyText={t("admin.finance.tax.noInvoicesForPeriod")}
+        />
       </SectionCard>
-
-      {report && (
-        <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <MetricCard
-              icon={CurrencyDollarIcon}
-              tone="success"
-              label="Toplam Tahsil Edilen Vergi"
-              value={fmtTry(report.summary.totalTaxCollected)}
-            />
-            <MetricCard
-              icon={ChartBarIcon}
-              tone="primary"
-              label="Toplam Ciro"
-              value={fmtTry(report.summary.totalRevenue)}
-            />
-            <MetricCard
-              icon={DocumentTextIcon}
-              tone="info"
-              label="Fatura Sayısı"
-              value={report.summary.invoiceCount}
-            />
-          </div>
-
-          <SectionCard title="Dönem Bazlı Vergi">
-            <DataTable
-              columns={columns}
-              data={report.breakdown}
-              getRowId={(r) => r.period}
-              emptyText="Bu dönemde fatura yok."
-            />
-          </SectionCard>
-        </>
-      )}
-    </div>
+      <ResourceList.Pagination />
+    </ResourceList>
   );
 }

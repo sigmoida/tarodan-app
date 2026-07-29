@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { type ReactNode } from 'react';
-import { DataTable, type ColumnDef } from '@/components/DataTable';
-import { useResourceList } from '@/context/ResourceListContext';
+import { type ReactNode } from "react";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { useResourceList } from "@/context/ResourceListContext";
 
 /** The table — reads rows/loading/selection from context; columns are its prop. */
 export function ResourceListTable<T>({
@@ -22,7 +22,8 @@ export function ResourceListTable<T>({
   emptyText?: string;
   emptyAction?: ReactNode;
 }) {
-  const { rows, isLoading, getRowId, selection } = useResourceList<T>();
+  const { rows, isLoading, getRowId, selection, sort, setSort } =
+    useResourceList<T>();
   return (
     <DataTable
       columns={columns}
@@ -39,6 +40,8 @@ export function ResourceListTable<T>({
       selectedIds={selection.selectedIds}
       onToggleRow={selection.toggleRow}
       onToggleAll={selection.toggleAll}
+      sort={sort}
+      onSort={setSort}
     />
   );
 }

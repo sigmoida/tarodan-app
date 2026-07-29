@@ -1,32 +1,33 @@
-'use client';
+"use client";
 
-import { SectionCard } from '@/components/detail/SectionCard';
-import { DataTable } from '@/components/DataTable';
-import { commissionColumns } from '../_lib/columns';
-import { type CommissionRule } from '../_lib/types';
+import { SectionCard } from "@/components/detail/SectionCard";
+import { ResourceList } from "@/components/list";
+import { commissionColumns } from "../_lib/columns";
+import { type CommissionRule } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function CommissionTable({
-  rules,
   onEdit,
   onDelete,
   onToggle,
   togglingId,
 }: {
-  rules: CommissionRule[];
   onEdit: (rule: CommissionRule) => void;
   onDelete: (rule: CommissionRule) => void;
   onToggle: (rule: CommissionRule) => void;
   togglingId?: string;
 }) {
-  const columns = commissionColumns({ onEdit, onDelete, onToggle, togglingId });
+  const t = useTranslations();
+  const columns = commissionColumns(
+    { onEdit, onDelete, onToggle, togglingId },
+    t,
+  );
 
   return (
-    <SectionCard title="Komisyon Kuralları">
-      <DataTable
+    <SectionCard title={t("admin.finance.commission.rules")}>
+      <ResourceList.Table<CommissionRule>
         columns={columns}
-        data={rules}
-        getRowId={(r) => r.id}
-        emptyText="Henüz komisyon kuralı eklenmemiş"
+        emptyText={t("admin.finance.commission.emptyRules")}
       />
     </SectionCard>
   );

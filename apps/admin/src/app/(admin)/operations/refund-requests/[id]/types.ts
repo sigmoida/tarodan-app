@@ -19,21 +19,41 @@ export interface RefundRequestDetail {
   decidedAt?: string | null;
   returnProvider?: string | null;
   returnTrackingNumber?: string | null;
+  /** Real Sürat return code (KargoTakipNo). */
+  returnProviderTrackingId?: string | null;
   returnStatus?: string | null;
   returnShippedAt?: string | null;
   returnDeliveredAt?: string | null;
   returnCreatedAt?: string | null;
   refundedAt?: string | null;
   providerRefundId?: string | null;
+  policyCode?: string;
+  financialPolicySnapshot?: Record<string, unknown> | null;
+  returnBillableDesi?: number;
+  returnShippingAmount?: number | string;
+  refundedProductAmount?: number | string;
+  refundedOutboundShippingAmount?: number | string;
+  refundedBuyerProtectionAmount?: number | string;
+  refundedSellerFeeAmount?: number | string;
+  retainedSellerPlatformFeeAmount?: number | string;
+  returnShippingChargeToBuyer?: number | string;
+  returnShippingChargeToSeller?: number | string;
+  requiresAdminReview?: boolean;
+  penaltyReviewRequired?: boolean;
   metadata?: { history?: HistoryEntry[] } | null;
   refundProductAmount?: boolean;
   refundShippingFee?: boolean;
   refundBuyerFee?: boolean;
   refundSellerCommission?: boolean;
-  returnShippingPayer?: 'buyer' | 'seller' | 'platform' | null;
+  returnShippingPayer?: "buyer" | "seller" | "platform" | null;
   buyerInitiatedAmicable?: boolean;
   createdAt: string;
-  requester: { id: string; displayName: string; email: string; phone?: string | null };
+  requester: {
+    id: string;
+    displayName: string;
+    email: string;
+    phone?: string | null;
+  };
   order: {
     id: string;
     orderNumber: string;
@@ -45,7 +65,12 @@ export interface RefundRequestDetail {
     quantity?: number | null;
     unitPrice?: number | string | null;
     status: string;
-    seller: { id: string; displayName: string; email: string; phone?: string | null };
+    seller: {
+      id: string;
+      displayName: string;
+      email: string;
+      phone?: string | null;
+    };
     product: { id: string; title: string; images?: { url: string }[] };
     payment?: { id: string; status: string; amount: number | string } | null;
     shipment?: { status: string; deliveredAt?: string | null } | null;

@@ -1,15 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Checkbox,
-  Label,
-} from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { Button, Checkbox, Label, Radio } from "@tarodan/ui";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { extractErrorMessage } from "@/lib/error";
+import { fmtTry } from "@/lib/format";
 
 /**
  * Phase 4B.2 — Admin RefundRequest policy override card.
@@ -41,13 +37,6 @@ export interface RefundPolicyCardProps {
   disabled?: boolean;
 }
 
-function fmt(n: number): string {
-  return `${n.toLocaleString("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} TL`;
-}
-
 export function RefundPolicyCard({
   initial,
   order,
@@ -55,6 +44,7 @@ export function RefundPolicyCard({
   onSavePayer,
   disabled,
 }: RefundPolicyCardProps) {
+  const t = useTranslations();
   const [refundProductAmount, setRefundProductAmount] = useState(
     initial.refundProductAmount,
   );
@@ -65,9 +55,8 @@ export function RefundPolicyCard({
   const [refundSellerCommission, setRefundSellerCommission] = useState(
     initial.refundSellerCommission,
   );
-  const [returnShippingPayer, setReturnShippingPayerState] = useState<
-    ReturnShippingPayer | null
-  >(initial.returnShippingPayer);
+  const [returnShippingPayer, setReturnShippingPayerState] =
+    useState<ReturnShippingPayer | null>(initial.returnShippingPayer);
 
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [savingPayer, setSavingPayer] = useState(false);
@@ -83,7 +72,8 @@ export function RefundPolicyCard({
 
   const refundAmount = useMemo(() => {
     let total = 0;
-    if (refundProductAmount && order.subtotal != null) total += Number(order.subtotal);
+    if (refundProductAmount && order.subtotal != null)
+      total += Number(order.subtotal);
     if (refundShippingFee) total += Number(order.shippingCost);
     if (refundBuyerFee) total += Number(order.buyerFeeAmount);
     // refundSellerCommission is a seller charge — not added to the buyer's refund amount
@@ -107,8 +97,10 @@ export function RefundPolicyCard({
         refundBuyerFee,
         refundSellerCommission,
       });
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Hata oluştu");
+    } catch (error) {
+      setError(
+        extractErrorMessage(error, t("admin.operations.common.errorOccurred")),
+      );
     } finally {
       setSavingPolicy(false);
     }
@@ -120,103 +112,125 @@ export function RefundPolicyCard({
     setSavingPayer(true);
     try {
       await onSavePayer(returnShippingPayer);
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Hata oluştu");
+    } catch (error) {
+      setError(
+        extractErrorMessage(error, t("admin.operations.common.errorOccurred")),
+      );
     } finally {
       setSavingPayer(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>İade Politikası</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* 4 booleans */}
-        <div className="space-y-2">
-          <PolicyRow
-            label={`Ürün bedeli iade (${fmt(Number(order.subtotal ?? 0))})`}
-            checked={refundProductAmount}
-            onChange={setRefundProductAmount}
-            disabled={disabled || savingPolicy}
+    <SectionCard
+      title={t("admin.operations.refundRequests.policyTitle")}
+      bodyClassName="space-y-6"
+    >
+      {/* 4 booleans */}
+      <div className="space-y-2">
+        <PolicyRow
+          label={t("admin.operations.refundRequests.policy.productAmount", {
+            amount: fmtTry(Number(order.subtotal ?? 0)),
+          })}
+          checked={refundProductAmount}
+          onChange={setRefundProductAmount}
+          disabled={disabled || savingPolicy}
+        />
+        <PolicyRow
+          label={t("admin.operations.refundRequests.policy.shippingFee", {
+            amount: fmtTry(Number(order.shippingCost)),
+          })}
+          checked={refundShippingFee}
+          onChange={setRefundShippingFee}
+          disabled={disabled || savingPolicy}
+        />
+        <PolicyRow
+          label={t("admin.operations.refundRequests.policy.buyerFee", {
+            amount: fmtTry(Number(order.buyerFeeAmount)),
+          })}
+          checked={refundBuyerFee}
+          onChange={setRefundBuyerFee}
+          disabled={disabled || savingPolicy}
+        />
+        <PolicyRow
+          label={t("admin.operations.refundRequests.policy.sellerCommission", {
+            amount: fmtTry(Number(order.commissionAmount)),
+          })}
+          checked={refundSellerCommission}
+          onChange={setRefundSellerCommission}
+          disabled={disabled || savingPolicy}
+        />
+      </div>
+
+      <div className="rounded-md bg-info-50 p-3 text-sm">
+        <div className="text-muted">
+          {t("admin.operations.refundRequests.policy.refundAmountLabel")}
+        </div>
+        <div className="text-2xl font-bold text-info-700">
+          {fmtTry(refundAmount)}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={handleSavePolicy}
+          disabled={!dirtyPolicy || savingPolicy || disabled}
+        >
+          {savingPolicy
+            ? t("admin.operations.common.saving")
+            : t("admin.operations.refundRequests.policy.saveButton")}
+        </Button>
+      </div>
+
+      {/* Shipping payer */}
+      <div className="space-y-2 border-t pt-4">
+        <Label>{t("admin.operations.refundRequests.payerQuestion")}</Label>
+        <div className="flex flex-col gap-2">
+          <PayerRadio
+            value="buyer"
+            current={returnShippingPayer}
+            onChange={setReturnShippingPayerState}
+            label={t("admin.operations.common.buyer")}
+            helper={t("admin.operations.refundRequests.payerRadio.buyerHelper")}
+            disabled={disabled || savingPayer}
           />
-          <PolicyRow
-            label={`Kargo bedeli iade (${fmt(Number(order.shippingCost))})`}
-            checked={refundShippingFee}
-            onChange={setRefundShippingFee}
-            disabled={disabled || savingPolicy}
+          <PayerRadio
+            value="seller"
+            current={returnShippingPayer}
+            onChange={setReturnShippingPayerState}
+            label={t("admin.operations.common.seller")}
+            helper={t(
+              "admin.operations.refundRequests.payerRadio.sellerHelper",
+            )}
+            disabled={disabled || savingPayer}
           />
-          <PolicyRow
-            label={`Platform hizmet bedeli (%3) iade (${fmt(Number(order.buyerFeeAmount))})`}
-            checked={refundBuyerFee}
-            onChange={setRefundBuyerFee}
-            disabled={disabled || savingPolicy}
-          />
-          <PolicyRow
-            label={`Satıcı komisyonu iade (${fmt(Number(order.commissionAmount))})`}
-            checked={refundSellerCommission}
-            onChange={setRefundSellerCommission}
-            disabled={disabled || savingPolicy}
+          <PayerRadio
+            value="platform"
+            current={returnShippingPayer}
+            onChange={setReturnShippingPayerState}
+            label={t("admin.operations.refundRequests.payerRadio.platform")}
+            helper={t(
+              "admin.operations.refundRequests.payerRadio.platformHelper",
+            )}
+            disabled={disabled || savingPayer}
           />
         </div>
-
-        <div className="rounded-md bg-info-50 p-3 text-sm">
-          <div className="text-muted">Alıcıya iade edilecek tutar</div>
-          <div className="text-2xl font-bold text-info-700">{fmt(refundAmount)}</div>
-        </div>
-
         <div className="flex justify-end">
           <Button
-            onClick={handleSavePolicy}
-            disabled={!dirtyPolicy || savingPolicy || disabled}
+            onClick={handleSavePayer}
+            disabled={
+              !dirtyPayer || !returnShippingPayer || savingPayer || disabled
+            }
           >
-            {savingPolicy ? "Kaydediliyor..." : "Politikayı Kaydet"}
+            {savingPayer
+              ? t("admin.operations.common.saving")
+              : t("admin.operations.refundRequests.payerSaveButton")}
           </Button>
         </div>
+      </div>
 
-        {/* Shipping payer */}
-        <div className="space-y-2 border-t pt-4">
-          <Label>İade kargosunu kim öder?</Label>
-          <div className="flex flex-col gap-2">
-            <PayerRadio
-              value="buyer"
-              current={returnShippingPayer}
-              onChange={setReturnShippingPayerState}
-              label="Alıcı"
-              helper="Vazgeçme / keyfi iade durumunda"
-              disabled={disabled || savingPayer}
-            />
-            <PayerRadio
-              value="seller"
-              current={returnShippingPayer}
-              onChange={setReturnShippingPayerState}
-              label="Satıcı"
-              helper="Haklı iade (hatalı, eksik ya da yanlış ürün)"
-              disabled={disabled || savingPayer}
-            />
-            <PayerRadio
-              value="platform"
-              current={returnShippingPayer}
-              onChange={setReturnShippingPayerState}
-              label="Platform"
-              helper="Kargo kaybı veya istisnai durum"
-              disabled={disabled || savingPayer}
-            />
-          </div>
-          <div className="flex justify-end">
-            <Button
-              onClick={handleSavePayer}
-              disabled={!dirtyPayer || !returnShippingPayer || savingPayer || disabled}
-            >
-              {savingPayer ? "Kaydediliyor..." : "Tarafı Kaydet"}
-            </Button>
-          </div>
-        </div>
-
-        {error && <div className="text-sm text-danger-600">{error}</div>}
-      </CardContent>
-    </Card>
+      {error && <div className="text-sm text-danger-600">{error}</div>}
+    </SectionCard>
   );
 }
 
@@ -260,14 +274,13 @@ function PayerRadio({
 }) {
   return (
     <label className="flex items-start gap-2 cursor-pointer">
-      <input
-        type="radio"
+      <Radio
         name="returnShippingPayer"
         value={value}
         checked={current === value}
         onChange={() => onChange(value)}
         disabled={disabled}
-        className="mt-0.5 cursor-pointer"
+        className="mt-0.5"
       />
       <span className="text-sm">
         <span className="font-medium">{label}</span>

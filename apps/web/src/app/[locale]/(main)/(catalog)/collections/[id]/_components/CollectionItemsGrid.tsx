@@ -1,0 +1,83 @@
+/** @format */
+
+"use client";
+
+import { TrashIcon } from "@heroicons/react/24/outline";
+import { Badge, Button, IconButton } from "@tarodan/ui";
+import { ProductCard } from "@/components/ui";
+import { useCollectionDetail } from "../_context/CollectionDetailContext";
+import { itemToProduct, type CollectionItem } from "../_lib/types";
+
+/** Status badges shown at the top-left of a card (click-isolated slot). */
+function ItemBadges({ item }: { item: CollectionItem }) {
+  const { t } = useCollectionDetail();
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {item.isCustom && (
+        <Badge variant="info" appearance="solid" size="sm">
+          {t("collection.collection")}
+        </Badge>
+      )}
+      {item.productStatus === "sold" && (
+        <Badge variant="danger" appearance="solid" size="sm">
+          {t("product.statusSold")}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+/** Owner remove control shown at the top-right of a card (click-isolated slot). */
+function ItemRemove({ item }: { item: CollectionItem }) {
+  const { t, handleRemoveItem } = useCollectionDetail();
+  return (
+    <IconButton
+      variant="secondary"
+      onClick={() => handleRemoveItem(item.id)}
+      aria-label={t("collection.removeItem")}
+      title={t("collection.removeItem")}
+      className="rounded-full bg-surface-elevated shadow-md hover:bg-danger-50"
+    >
+      <TrashIcon className="h-4 w-4 text-danger-500 sm:h-5 sm:w-5" />
+    </IconButton>
+  );
+}
+
+export default function CollectionItemsGrid() {
+  const { t, isOwner, sortedItems, setShowAddModal } = useCollectionDetail();
+
+  if (sortedItems.length === 0) {
+    return (
+      <div className="rounded border border-border bg-surface-elevated py-20 text-center">
+        <p className="mb-4 text-base text-muted">
+          {t("collection.noProductsYet")}
+        </p>
+        {isOwner && (
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setShowAddModal(true)}
+          >
+            {t("collection.addProduct")}
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      {sortedItems.map((item, index) => (
+        <ProductCard
+          key={item.id}
+          product={itemToProduct(item)}
+          index={index}
+          showMeta={false}
+          href={item.productId ? undefined : null}
+          overlayStart={<ItemBadges item={item} />}
+          overlay={isOwner ? <ItemRemove item={item} /> : undefined}
+        />
+      ))}
+    </div>
+  );
+}

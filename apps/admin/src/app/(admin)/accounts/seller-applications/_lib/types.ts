@@ -1,4 +1,7 @@
-import type { StatusConfig } from '@tarodan/ui';
+import type { StatusConfig } from "@tarodan/ui";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export type Application = {
   id: string;
@@ -7,19 +10,28 @@ export type Application = {
   phone: string | null;
   companyName: string;
   taxId: string | null;
-  businessStatus: 'pending' | 'approved' | 'rejected' | null;
+  businessStatus: "pending" | "approved" | "rejected" | null;
   isSeller: boolean;
   createdAt: string;
 };
 
-export const STATUS_TABS = [
-  { key: 'pending', label: 'Bekleyenler' },
-  { key: 'approved', label: 'Onaylananlar' },
-  { key: 'rejected', label: 'Reddedilenler' },
+export const applicationStatusTabs = (t: T) => [
+  {
+    key: "pending",
+    label: t("admin.accounts.sellerApplications.tabs.pending"),
+  },
+  {
+    key: "approved",
+    label: t("admin.accounts.sellerApplications.tabs.approved"),
+  },
+  {
+    key: "rejected",
+    label: t("admin.accounts.sellerApplications.tabs.rejected"),
+  },
 ];
 
-export const businessStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: 'Bekliyor', variant: 'warning' },
-  approved: { label: 'Onaylandı', variant: 'success' },
-  rejected: { label: 'Reddedildi', variant: 'danger' },
-};
+export const businessStatusConfig = (t: T): Record<string, StatusConfig> => ({
+  pending: { label: t("common.pending"), variant: "warning" },
+  approved: { label: t("common.approved"), variant: "success" },
+  rejected: { label: t("common.rejected"), variant: "danger" },
+});

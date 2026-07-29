@@ -1,6 +1,5 @@
 import * as request from 'supertest';
 import { PaymentStatus, OrderStatus, TradeStatus } from '@prisma/client';
-import { ConfigService } from '@nestjs/config';
 import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
 import { truncateAll, getPrisma, seedBaseline, disconnectPrisma } from '../test-utils/db';
 import { createUser, authHeader } from '../factories/user.factory';
@@ -10,9 +9,9 @@ import { signCallback } from '../mocks/paytr.mock';
 
 /**
  * Direct API SENARYO testleri (mock PayTR, GERÇEK akış) — Adım 2 kapsamı:
- *  - Satın alma: yeni kart → process-direct → callback → sipariş ödendi + escrow hold (ortak yol)
- *  - Grup (sepet): checkout → process-direct(checkoutGroupId) → PayTR çağrıldı + payment grup'a bağlı
- *  - Takas nakit: trade + accept → process-direct(tradeId) → PayTR çağrıldı + payment trade-cash'e bağlı
+ *  - Satın alma: yeni kart → direct-form → callback → sipariş ödendi + escrow hold (ortak yol)
+ *  - Grup (sepet): checkout → direct-form(checkoutGroupId) → PayTR çağrıldı + payment grup'a bağlı
+ *  - Takas nakit: trade + accept → direct-form(tradeId) → PayTR çağrıldı + payment trade-cash'e bağlı
  *
  * (Tekliften ödeme ve üyelik, order hedefiyle aynı kod yolundan geçer — order path
  *  direct-payment.e2e'de zaten kapsanır; oto-yenileme recurring-renewal.e2e'de.)
@@ -33,26 +32,7 @@ describe('Direct API scenarios (E2E)', () => {
     baseline = await seedBaseline();
     ctx.paytr.reset();
     jest.restoreAllMocks();
-    setDirectFlag(true);
   });
-
-  function setDirectFlag(enabled: boolean): void {
-    const cfg = ctx.app.get(ConfigService);
-    const real = cfg.get.bind(cfg);
-    jest
-      .spyOn(cfg, 'get')
-      .mockImplementation((key: any, def?: any) =>
-        key === 'PAYTR_DIRECT_ENABLED' ? (enabled ? 'true' : 'false') : real(key, def),
-      );
-  }
-
-  const CARD = {
-    cardHolderName: 'TEST KART',
-    cardNumber: '4355084355084358',
-    expireMonth: '12',
-    expireYear: '30',
-    cvc: '000',
-  };
 
   /** Ödeme bekleyen nakit-farklı takas + TradeCashPayment seed (HTTP create/accept yerine, hafif). */
   async function seedAwaitingCashTrade(payerId: string, recipientId: string, tradeNumber: string) {
@@ -97,11 +77,11 @@ describe('Direct API scenarios (E2E)', () => {
       .expect(201);
     const orderId = buyRes.body.orderId as string;
 
-    // Direct API ile öde (yeni kart) — mock createDirectPayment success döner, payment pending kalır.
+    // Direct API ile öde (yeni kart) — mock createDirectPaymentForm success döner, payment pending kalır.
     const pay = await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post('/api/payments/direct-form')
       .set(authHeader(buyer))
-      .send({ orderId, card: CARD, saveCard: false })
+      .send({ orderId, saveCard: false })
       .expect(201);
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
 
@@ -126,7 +106,7 @@ describe('Direct API scenarios (E2E)', () => {
     expect(hold).toBeTruthy(); // escrow ortak yoldan oluştu (Direct'e özel değil)
   });
 
-  it('GRUP (sepet): checkout → process-direct(checkoutGroupId) → PayTR çağrıldı + payment gruba bağlı', async () => {
+  it('GRUP (sepet): checkout → direct-form(checkoutGroupId) → PayTR çağrıldı + payment gruba bağlı', async () => {
     const prisma = getPrisma();
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
@@ -152,9 +132,9 @@ describe('Direct API scenarios (E2E)', () => {
     expect(checkoutGroupId).toBeTruthy();
 
     const pay = await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post('/api/payments/direct-form')
       .set(authHeader(buyer))
-      .send({ checkoutGroupId, card: CARD })
+      .send({ checkoutGroupId })
       .expect(201);
 
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
@@ -165,7 +145,7 @@ describe('Direct API scenarios (E2E)', () => {
     expect(Number(payment!.amount)).toBeGreaterThanOrEqual(400);
   });
 
-  it('TAKAS nakit: process-direct(tradeId) → PayTR çağrıldı + payment trade-cash’e bağlı', async () => {
+  it('TAKAS nakit: direct-form(tradeId) → PayTR çağrıldı + payment trade-cash’e bağlı', async () => {
     const prisma = getPrisma();
     const initiator = await createUser(ctx.module, { isSeller: true });
     const receiver = await createUser(ctx.module, { isSeller: true });
@@ -173,9 +153,9 @@ describe('Direct API scenarios (E2E)', () => {
 
     // Nakit ödeyen = initiator. Direct API ile öder (yeni kart).
     const pay = await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post('/api/payments/direct-form')
       .set(authHeader(initiator))
-      .send({ tradeId: trade.id, card: CARD })
+      .send({ tradeId: trade.id })
       .expect(201);
 
     expect(ctx.paytr.directPaymentCalls.length).toBe(1);
@@ -186,16 +166,16 @@ describe('Direct API scenarios (E2E)', () => {
     expect(payment!.status).toBe(PaymentStatus.pending);
   });
 
-  it('TAKAS: nakit ödeyen olmayan taraf process-direct yapamaz (403)', async () => {
+  it('TAKAS: nakit ödeyen olmayan taraf direct-form yapamaz (403)', async () => {
     const initiator = await createUser(ctx.module, { isSeller: true });
     const receiver = await createUser(ctx.module, { isSeller: true });
     const trade = await seedAwaitingCashTrade(initiator.id, receiver.id, 'TR-SCEN-403');
 
     // receiver nakit ödeyen değil (initiator ödüyor) → 403
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post('/api/payments/direct-form')
       .set(authHeader(receiver))
-      .send({ tradeId: trade.id, card: CARD })
+      .send({ tradeId: trade.id })
       .expect(403);
     expect(ctx.paytr.directPaymentCalls.length).toBe(0);
   });

@@ -1,12 +1,21 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { Request } from 'express';
-import { ROLES_KEY } from '../decorators/roles.decorator';
-import { PERMISSION_KEY } from '../decorators/require-permission.decorator';
-import { BYPASS_PERMISSION_MATRIX_KEY } from '../decorators/bypass-permission-matrix.decorator';
-import { RequestUser } from '../interfaces';
-import { PrismaService } from '../../../prisma';
-import { DEFAULT_ROLE_PERMISSIONS, migrateLegacyPermissions } from '../../admin/dto/role-permissions.dto';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { Request } from "express";
+import { ROLES_KEY } from "../decorators/roles.decorator";
+import { PERMISSION_KEY } from "../decorators/require-permission.decorator";
+import { BYPASS_PERMISSION_MATRIX_KEY } from "../decorators/bypass-permission-matrix.decorator";
+import { RequestUser } from "../interfaces";
+import { PrismaService } from "../../../prisma";
+import {
+  DEFAULT_ROLE_PERMISSIONS,
+  migrateLegacyPermissions,
+} from "../../admin/dto/role-permissions.dto";
+import { i18nMessage } from "../../i18n";
 
 // ── URL → izin anahtarı eşleşmesi ──────────────────────────────────────────
 //
@@ -15,57 +24,78 @@ import { DEFAULT_ROLE_PERMISSIONS, migrateLegacyPermissions } from '../../admin/
 // @RequirePermission decorator varsa bu tabloyu override eder.
 //
 const PERMISSION_MAP: Record<string, string[]> = {
-  'dashboard': ['dashboard'],
-  'analytics': ['analytics'],
-  'reports': ['analytics'],
-  'orders': ['orders'],
-  'trades': ['trades'],
-  'trade-shipments': ['trades'],
-  'refund-requests': ['refund_requests'],
-  'refunds': ['refund_history', 'refund_requests'],
-  'payments': ['payments'],
-  'products': ['products'],
-  'products-export': ['products'],
-  'categories': ['categories'],
-  'brands': ['brands'],
-  'manufacturers': ['manufacturers'],
-  'car-models': ['car_models'],
-  'collections': ['collections'],
-  'attribute-groups': ['attributes'],
-  'attributes': ['attributes'],
-  'discounts': ['discounts'],
-  'ads': ['ads'],
-  'notifications': ['notifications'],
-  'email-templates': ['email_templates'],
-  'pages': ['pages'],
-  'users': ['users', 'seller_performance'],
-  'seller-applications': ['seller_applications', 'seller_performance'],
-  'user-ratings': ['reviews'],
-  'reviews': ['reviews'],
-  'messages': ['messages'],
-  'support-tickets': ['support'],
-  'commission-rules': ['commission'],
-  'commission': ['commission'],
-  'payouts': ['payouts'],
-  'tax': ['tax'],
-  'shipping': ['shipping'],
-  'settings': ['settings', 'payment_settings'],
-  'logs': ['logs'],
-  'audit-logs': ['audit_logs'],
-  'moderation': ['ai_moderation'],
-  'membership-tiers': ['membership_tiers'],
-  'staff': ['staff'],
-  'media': ['products'],
+  dashboard: ["dashboard"],
+  analytics: ["analytics"],
+  reports: ["analytics"],
+  orders: ["orders"],
+  trades: ["trades"],
+  "trade-shipments": ["trades"],
+  "refund-requests": ["refund_requests"],
+  refunds: ["refund_history", "refund_requests"],
+  payments: ["payments"],
+  products: ["products"],
+  "products-export": ["products"],
+  categories: ["categories"],
+  brands: ["brands"],
+  manufacturers: ["manufacturers"],
+  "car-models": ["car_models"],
+  collections: ["collections"],
+  "attribute-groups": ["attributes"],
+  attributes: ["attributes"],
+  discounts: ["discounts"],
+  ads: ["ads"],
+  notifications: ["notifications"],
+  "email-templates": ["email_templates"],
+  pages: ["pages"],
+  users: ["users", "seller_performance"],
+  "seller-applications": ["seller_applications", "seller_performance"],
+  "user-ratings": ["reviews"],
+  reviews: ["reviews"],
+  messages: ["messages"],
+  "support-tickets": ["support"],
+  "commission-rules": ["commission"],
+  commission: ["commission"],
+  payouts: ["payouts"],
+  tax: ["tax"],
+  shipping: ["shipping"],
+  settings: ["settings", "payment_settings"],
+  logs: ["logs"],
+  "audit-logs": ["audit_logs"],
+  moderation: ["ai_moderation"],
+  "membership-tiers": ["membership_tiers"],
+  staff: ["staff"],
+  media: ["products"],
 };
 
 /** URL'den ilk admin path segmentini çıkar: /api/admin/orders/123 → "orders" */
 function extractSegment(url: string): string {
   // url örn: /api/admin/orders veya /admin/orders/123?foo=bar
-  const clean = url.split('?')[0];
-  const parts = clean.split('/').filter(Boolean);
+  const clean = url.split("?")[0];
+  const parts = clean.split("/").filter(Boolean);
   // "api" ve "admin" segmentlerini atla
-  const adminIdx = parts.lastIndexOf('admin');
-  return parts[adminIdx + 1] ?? '';
+  const adminIdx = parts.lastIndexOf("admin");
+  return parts[adminIdx + 1] ?? "";
+}
+
+// Kanonik admin route'ları (@Controller('admin')) içinde segmenti PERMISSION_MAP'e
+// KASITLI olarak eklenmemiş, yalnızca rol ile korunan mevcut route'lar. Bunlar
+// fail-open bırakılır ki mevcut (moderator dahil) erişimleri korunsun. Bu kümenin
+// DIŞINDAKİ, eşlenmemiş yeni bir admin segmenti fail-closed olur (aşağıya bakın).
+const ROLE_ONLY_ADMIN_SEGMENTS = new Set<string>([
+  "invoices",
+  "seller-invoices",
+  "trade-commission-rate",
+]);
+
+/**
+ * URL kanonik bir admin route'u mu: /api/admin/<segment>/... yani "admin" ilk
+ * path segmenti. Modül içine gömülü /api/support/admin/tickets gibi route'lar
+ * kanonik DEĞİLDİR ve fail-closed kapsamına alınmaz (mevcut davranış korunur).
+ */
+function isCanonicalAdminUrl(url: string): boolean {
+  const parts = url.split("?")[0].split("/").filter(Boolean);
+  const p = parts[0] === "api" ? parts.slice(1) : parts;
+  return p[0] === "admin";
 }
 
 function resolveUrlPermissions(_method: string, url: string): string[] | null {
@@ -82,7 +112,7 @@ interface PermsCache {
 }
 
 const CACHE_TTL_MS = 60_000; // 60 saniye
-const SETTING_KEY = 'admin_role_permissions';
+const SETTING_KEY = "admin_role_permissions";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -94,63 +124,90 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     // @RequirePermission decorator'dan gelen explicit override
-    const explicitPermission = this.reflector.getAllAndOverride<string>(PERMISSION_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const explicitPermission = this.reflector.getAllAndOverride<string>(
+      PERMISSION_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     // @BypassPermissionMatrix — izin matrisi sorgulanmaz; rol kontrolü yeterli.
-    const bypassMatrix = this.reflector.getAllAndOverride<boolean>(BYPASS_PERMISSION_MATRIX_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const bypassMatrix = this.reflector.getAllAndOverride<boolean>(
+      BYPASS_PERMISSION_MATRIX_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     // Ne rol ne izin tanımlanmışsa — geçir (public gibi davran).
     if ((!requiredRoles || requiredRoles.length === 0) && !explicitPermission) {
       return true;
     }
 
-    const req = context.switchToHttp().getRequest<Request & { user: RequestUser }>();
+    const req = context
+      .switchToHttp()
+      .getRequest<Request & { user: RequestUser }>();
     const { user } = req;
 
     if (!user || !user.isAdmin || !user.role) {
-      throw new ForbiddenException('Bu işlem için yetkiniz yok');
+      throw new ForbiddenException(i18nMessage("server.auth.noPermission"));
     }
 
     // ── 1. Rol kontrolü (mevcut davranış, değişmedi) ──────────────────────
     if (requiredRoles && requiredRoles.length > 0) {
       const hasRole = requiredRoles.some((r) => user.role === r);
       if (!hasRole) {
-        throw new ForbiddenException(`Bu işlem için ${requiredRoles.join(' veya ')} rolü gerekiyor`);
+        throw new ForbiddenException(
+          i18nMessage("server.auth.roleRequired", {
+            roles: requiredRoles.join(" veya "),
+          }),
+        );
       }
     }
 
     // ── 2. super_admin her zaman geçer ────────────────────────────────────
-    if (user.role === 'super_admin') return true;
+    if (user.role === "super_admin") return true;
 
     // ── 2b. @BypassPermissionMatrix — rol kontrolü yeterli, matris sorgulanmaz ──
     if (bypassMatrix) return true;
 
     // ── 3. İzin matrisi kontrolü ──────────────────────────────────────────
-    const permKeys: string[] | null =
-      explicitPermission
-        ? [explicitPermission]
-        : resolveUrlPermissions(req.method, req.originalUrl ?? req.url ?? '');
+    const url = req.originalUrl ?? req.url ?? "";
+    const permKeys: string[] | null = explicitPermission
+      ? [explicitPermission]
+      : resolveUrlPermissions(req.method, url);
 
-    if (!permKeys || permKeys.length === 0) return true; // Bilinmeyen route — sadece rol yeterli
+    if (!permKeys || permKeys.length === 0) {
+      // Fail-closed: kanonik bir /api/admin/<segment> route'u PERMISSION_MAP'te
+      // eşlenmemişse (ve bilinen rol-only istisnalardan biri değilse) erişimi
+      // reddet. Aksi halde yeni eklenen ve izin haritasına yazılması unutulan
+      // bir admin route'u sessizce sadece-rol kontrolüne düşer ve moderator gibi
+      // roller izin matrisini atlayarak erişebilir. Kanonik olmayan
+      // (/module/admin/...) ve bilinen rol-only admin route'ları fail-open kalır.
+      const seg = extractSegment(url);
+      if (
+        seg &&
+        isCanonicalAdminUrl(url) &&
+        !ROLE_ONLY_ADMIN_SEGMENTS.has(seg)
+      ) {
+        throw new ForbiddenException(
+          i18nMessage("server.auth.noPermissionDefined"),
+        );
+      }
+      return true; // Bilinmeyen route — sadece rol yeterli
+    }
 
     const perms = await this.loadPermissions();
     const rolePerms = perms[user.role] ?? [];
 
     if (!permKeys.some((k) => rolePerms.includes(k))) {
       throw new ForbiddenException(
-        `Bu işlem için [${permKeys.join(', ')}] izinlerinden biri gerekiyor. Rol: ${user.role}`,
+        i18nMessage("server.auth.permissionRequired", {
+          perms: permKeys.join(", "),
+          role: user.role,
+        }),
       );
     }
 
@@ -160,7 +217,11 @@ export class RolesGuard implements CanActivate {
   /** Permission matrisini DB'den yükle; 60s cache'le. */
   private async loadPermissions(): Promise<Record<string, string[]>> {
     const now = Date.now();
-    if (this.cache && now - this.cache.at < CACHE_TTL_MS) {
+    // Testte cache'i devre dışı bırak: e2e suite'lerinde izin matrisi test-içi
+    // değiştirilir (grantAdminPermissions) ve 60s cache testler arası sızarak
+    // yük altında bayat kalabiliyor → deterministik davranış için her çağrıda taze oku.
+    const ttl = process.env.NODE_ENV === "test" ? 0 : CACHE_TTL_MS;
+    if (this.cache && now - this.cache.at < ttl) {
       return this.cache.data;
     }
     try {
@@ -174,8 +235,9 @@ export class RolesGuard implements CanActivate {
       this.cache = { data, at: now };
       return data;
     } catch {
-      // DB başarısızsa varsayılanı kullan; cache'leme (bozuk yanıtı cache'leme).
-      return DEFAULT_ROLE_PERMISSIONS;
+      // A stale/default matrix must never restore financial or policy access
+      // while the permission store is unavailable or contains invalid JSON.
+      throw new ForbiddenException(i18nMessage("server.auth.noPermission"));
     }
   }
 

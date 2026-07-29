@@ -264,7 +264,9 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
         password: 'Demo123!',
         isEmailVerified: false,
       });
-      await login('unverified@test.com', 'Demo123!').expect(401);
+      const res = await login('unverified@test.com', 'Demo123!').expect(401);
+      expect(res.body.errorCode).toBe('EMAIL_NOT_VERIFIED');
+      expect(res.body.i18nKey).toBe('server.auth.emailNotVerifiedLogin');
     });
 
     scenario('AUTH-023', async () => {
@@ -772,6 +774,9 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
         .send({ email: 'admin-refresh@test.com', password: admin.password })
         .expect(200);
       const rt = loginRes.body.tokens.refreshToken;
+      const loginPayload = ctx.module
+        .get(JwtService)
+        .decode(loginRes.body.tokens.accessToken) as { sessionToken: string };
       const r = await request(server())
         .post('/api/auth/admin/refresh')
         .send({ refreshToken: rt })
@@ -780,6 +785,17 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
       // Yenilenen access token isAdmin claim'i taşır.
       const payload = JSON.parse(Buffer.from(r.body.accessToken.split('.')[1], 'base64').toString('utf8'));
       expect(payload.isAdmin).toBe(true);
+      expect(payload.sessionToken).toBe(loginPayload.sessionToken);
+
+      // Geriye dönük genel refresh ucu da admin oturum kimliğini korumalı.
+      const generic = await request(server())
+        .post('/api/auth/refresh')
+        .send({ refreshToken: r.body.refreshToken })
+        .expect(200);
+      const genericPayload = ctx.module
+        .get(JwtService)
+        .decode(generic.body.accessToken) as { sessionToken: string };
+      expect(genericPayload.sessionToken).toBe(loginPayload.sessionToken);
     });
 
     scenario('AUTH-064', async () => {
@@ -797,11 +813,8 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
     });
 
     scenario('AUTH-065', async () => {
-      // Eşzamanlı çift refresh (rotasyon yarışı). NOT: assertAndRotateRefreshToken findUnique→update
-      // atomik değil (TOCTOU); iki eşzamanlı istek her ikisi de 200 alabilir. Bu yüzden yarışın
-      // sonucunu KESİN assert etmiyoruz (flaky olurdu) — yalnız 500 patlamadığını ve en az bir
-      // başarı olduğunu doğrularız. KESİN rotasyon garantisi ardından SIRALI olarak test edilir:
-      // orijinal token rotasyon sonrası deterministik biçimde iptaldir.
+      // Eşzamanlı çift refresh: DB'deki revokedAt:null compare-and-set koşulunu
+      // yalnız bir istek kazanabilir.
       await createUser(ctx.module, { email: 'race-refresh@test.com', password: 'Demo123!' });
       const loginRes = await login('race-refresh@test.com', 'Demo123!').expect(200);
       const rt = loginRes.body.tokens.refreshToken;
@@ -809,9 +822,7 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
         request(server()).post('/api/auth/refresh').send({ refreshToken: rt }),
         request(server()).post('/api/auth/refresh').send({ refreshToken: rt }),
       ]);
-      expect(a.status).not.toBe(500);
-      expect(b.status).not.toBe(500);
-      expect([a.status, b.status]).toContain(200);
+      expect([a.status, b.status].sort()).toEqual([200, 401]);
       // Deterministik: rotasyon sonrası ORİJİNAL token artık iptal → 401.
       await request(server()).post('/api/auth/refresh').send({ refreshToken: rt }).expect(401);
     });
@@ -853,10 +864,32 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
     });
 
     scenario('AUTH-069', async () => {
-      // Admin çıkışı admin cookie'lerini temizler (Public → token'sız da 200).
-      const res = await request(server()).post('/api/auth/admin/logout').expect(200);
+      const admin = await createAdminUser(ctx.module, {
+        email: 'admin-logout@test.com',
+      });
+      const loggedIn = await request(server())
+        .post('/api/auth/admin/login')
+        .send({ email: admin.email, password: admin.password })
+        .expect(200);
+      const payload = ctx.module
+        .get(JwtService)
+        .decode(loggedIn.body.tokens.accessToken) as { sessionToken: string };
+
+      const res = await request(server())
+        .post('/api/auth/admin/logout')
+        .send({ refreshToken: loggedIn.body.tokens.refreshToken })
+        .expect(200);
       const setCookie = (res.headers['set-cookie'] as unknown as string[]) ?? [];
       expect(setCookie.join(';')).toContain('admin_token=');
+      await expect(
+        getPrisma().adminSession.findUnique({
+          where: { sessionToken: payload.sessionToken },
+        }),
+      ).resolves.toBeNull();
+      await request(server())
+        .get('/api/auth/admin/profile')
+        .set('Authorization', `Bearer ${loggedIn.body.tokens.accessToken}`)
+        .expect(401);
     });
 
     scenario('AUTH-070', async () => {
@@ -1024,11 +1057,27 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
       await request(server()).post('/api/security/2fa/disable').send({ code: '123456' }).expect(401);
     });
 
-    // AUTH-081 "yedek kod tek kullanımlık (login'de TOTP yerine)": bu semantik yalnız
-    // SecurityService.validateTOTP içinde (backup kodu tüketip listeden çıkarma) yaşar; ancak
-    // LoginDto yalnız email/password alır — login akışına 2FA/backup kodu geçirilecek bir API
-    // ucu YOK. Dolayısıyla tek-kullanım davranışı API üzerinden tetiklenip assert edilemez → skip.
-    scenario.skip('AUTH-081', 'Backup kod tek-kullanım yalnız validateTOTP’ta; login ucu 2FA/backup kodu kabul etmiyor → API’den assert edilemez');
+    scenario('AUTH-081', async () => {
+      const user = await createUser(ctx.module);
+      const enable = await request(server())
+        .post('/api/security/2fa/enable')
+        .set(authHeader(user))
+        .expect(201);
+      const backupCode = enable.body.backupCodes[0];
+      await request(server())
+        .post('/api/security/2fa/verify')
+        .set(authHeader(user))
+        .send({ code: generateTOTPCode(enable.body.secret) })
+        .expect(201);
+
+      const credentials = {
+        email: user.email,
+        password: user.password,
+        twoFactorCode: backupCode,
+      };
+      await request(server()).post('/api/auth/login').send(credentials).expect(200);
+      await request(server()).post('/api/auth/login').send(credentials).expect(401);
+    });
   });
 
   // ──────────────────────────── CSRF ────────────────────────────
@@ -1052,25 +1101,95 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
 
   // ──────────────────────────── Admin oturum yönetimi ────────────────────────────
   describe('Admin session management', () => {
-    // GERÇEK KOD: SecurityController'daki @Roles(admin,super_admin) dekoratörleri ETKİSİZ —
-    // RolesGuard ne global (app.module) ne de @UseGuards ile bağlı. Ayrıca handler'lar
-    // req.user.adminId / sessionToken bekler ama JwtStrategy/AdminJwtStrategy bu alanları
-    // ÜRETMEZ (yalnız id/email/isSeller/isAdmin/role). Dolayısıyla admin oturum listeleme/
-    // sonlandırma uçları ne RBAC assert edilebilir ne de anlamlı veri döndürebilir → skip.
-    scenario.skip('AUTH-085', 'Admin oturum listeleme: RolesGuard bağlı değil + req.user.adminId üretilmiyor → RBAC/veri assert edilemez');
-    scenario.skip('AUTH-086', 'Belirli admin oturumu sonlandırma: adminSession seed + adminId gerektirir; strateji adminId üretmiyor');
-    scenario.skip('AUTH-088', 'Tüm admin oturumlarını sonlandırma: req.user.adminId üretilmiyor (RolesGuard da bağlı değil)');
-    scenario.skip('AUTH-089', 'Admin oturum uçlarında RBAC assert edilemez: @Roles dekoratörü RolesGuard bağlı olmadığından no-op → normal kullanıcı 403 yerine 200 alır');
+    scenario('AUTH-085', async () => {
+      const admin = await createAdminUser(ctx.module, { email: 'sess-list@test.com' });
+      const prisma = getPrisma();
+      const adminUser = await prisma.adminUser.findUniqueOrThrow({ where: { userId: admin.id } });
+      const active = await prisma.adminSession.findFirstOrThrow({ where: { adminUserId: adminUser.id } });
+      await prisma.adminSession.create({
+        data: {
+          adminUserId: adminUser.id,
+          sessionToken: crypto.randomUUID(),
+          expiresAt: new Date(Date.now() - 60_000),
+        },
+      });
+
+      const res = await request(server())
+        .get('/api/security/admin/sessions')
+        .set(authHeader(admin))
+        .expect(200);
+      expect(res.body.sessions.map((session: { id: string }) => session.id)).toEqual([active.id]);
+      expect(res.body.currentSessionId).toBe(active.id);
+    });
+
+    scenario('AUTH-086', async () => {
+      const owner = await createAdminUser(ctx.module, { email: 'sess-owner@test.com' });
+      const other = await createAdminUser(ctx.module, { email: 'sess-other@test.com' });
+      const prisma = getPrisma();
+      const ownerAdmin = await prisma.adminUser.findUniqueOrThrow({ where: { userId: owner.id } });
+      const otherAdmin = await prisma.adminUser.findUniqueOrThrow({ where: { userId: other.id } });
+      const ownerSession = await prisma.adminSession.findFirstOrThrow({ where: { adminUserId: ownerAdmin.id } });
+      const otherSession = await prisma.adminSession.findFirstOrThrow({ where: { adminUserId: otherAdmin.id } });
+
+      await request(server())
+        .delete(`/api/security/admin/sessions/${otherSession.id}`)
+        .set(authHeader(owner))
+        .expect(204);
+      await expect(
+        prisma.adminSession.findUnique({ where: { id: otherSession.id } }),
+      ).resolves.toBeTruthy();
+
+      await request(server())
+        .delete(`/api/security/admin/sessions/${ownerSession.id}`)
+        .set(authHeader(owner))
+        .expect(204);
+      await expect(
+        prisma.adminSession.findUnique({ where: { id: ownerSession.id } }),
+      ).resolves.toBeNull();
+    });
+
+    scenario('AUTH-088', async () => {
+      const owner = await createAdminUser(ctx.module, { email: 'sess-all@test.com' });
+      const other = await createAdminUser(ctx.module, { email: 'sess-all-other@test.com' });
+      const prisma = getPrisma();
+      const ownerAdmin = await prisma.adminUser.findUniqueOrThrow({ where: { userId: owner.id } });
+      const otherAdmin = await prisma.adminUser.findUniqueOrThrow({ where: { userId: other.id } });
+
+      await request(server())
+        .delete('/api/security/admin/sessions')
+        .set(authHeader(owner))
+        .expect(204);
+      await expect(
+        prisma.adminSession.count({ where: { adminUserId: ownerAdmin.id } }),
+      ).resolves.toBe(0);
+      await expect(
+        prisma.adminSession.count({ where: { adminUserId: otherAdmin.id } }),
+      ).resolves.toBe(1);
+    });
+
+    scenario('AUTH-089', async () => {
+      const moderator = await createAdminUser(ctx.module, {
+        email: 'sess-moderator@test.com',
+        role: AdminRole.moderator,
+      });
+      const user = await createUser(ctx.module, { email: 'sess-user@test.com' });
+
+      await request(server())
+        .get('/api/security/admin/sessions')
+        .set(authHeader(moderator))
+        .expect(403);
+      await request(server())
+        .get('/api/security/admin/sessions')
+        .set(authHeader(user))
+        .expect(401);
+    });
 
     scenario('AUTH-087', async () => {
-      // Geçersiz UUID ile oturum sonlandırma → ParseUUIDPipe 400. @Roles no-op olduğundan
-      // yalnız global JwtAuthGuard var; admin token JWT'yi geçer, sonra ParseUUIDPipe 400 verir.
       const admin = await createAdminUser(ctx.module, { email: 'sess-admin@test.com' });
-      const res = await request(server())
+      await request(server())
         .delete('/api/security/admin/sessions/not-a-uuid')
-        .set(authHeader(admin));
-      // Kritik olan: bozuk UUID 500 patlatmaz; 400 (pipe) beklenir.
-      expect(res.status).toBe(400);
+        .set(authHeader(admin))
+        .expect(400);
     });
   });
 
@@ -1085,8 +1204,8 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
     scenario.skip('AUTH-095', 'Throttle test env’de kapalı → admin login 429 üretilemez');
 
     scenario('AUTH-094', async () => {
-      // SkipThrottle uçları (refresh/profile) çok sayıda hızlı çağrıda 429 DÖNMEZ.
-      // Throttle test'te zaten kapalı; yine de pozitif regresyon: 429 görülmemeli.
+      // Olağan refresh/profile trafiği geniş refresh limiti içinde 429 üretmez.
+      // Throttle test'te kapalı; bu test yalnız pozitif akış regresyonunu korur.
       const user = await createUser(ctx.module, { email: 'nothrottle@test.com', password: 'Demo123!' });
       const loginRes = await login('nothrottle@test.com', 'Demo123!').expect(200);
       let rt = loginRes.body.tokens.refreshToken;
@@ -1107,10 +1226,19 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
     scenario('AUTH-096', async () => {
       // Banlı kullanıcı korumalı uca erişemez → 403 USER_BANNED.
       const prisma = getPrisma();
-      const user = await createUser(ctx.module, { email: 'banned@test.com' });
+      const user = await createUser(ctx.module, {
+        email: 'banned@test.com',
+        password: 'Demo123!',
+      });
+      const loginRes = await login('banned@test.com', 'Demo123!').expect(200);
       await prisma.user.update({ where: { id: user.id }, data: { isBanned: true, bannedReason: 'test' } });
       const res = await request(server()).get('/api/auth/profile').set(authHeader(user)).expect(403);
       expect(res.body.errorCode).toBe('USER_BANNED');
+      await login('banned@test.com', 'Demo123!').expect(401);
+      await request(server())
+        .post('/api/auth/refresh')
+        .send({ refreshToken: loginRes.body.tokens.refreshToken })
+        .expect(401);
     });
 
     scenario('AUTH-097', async () => {
@@ -1154,7 +1282,7 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
     });
 
     scenario('AUTH-110', async () => {
-      // TOTP secret DB'de düz metin DEĞİL (base64 encode). enable → DB'deki secret ham secret'a EŞİT DEĞİL.
+      // TOTP secret DB'de AES-256-GCM ciphertext olarak saklanır.
       const user = await createUser(ctx.module);
       const enable = await request(server()).post('/api/security/2fa/enable').set(authHeader(user)).expect(201);
       const rawSecret: string = enable.body.secret;
@@ -1162,8 +1290,8 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
       const row = await prisma.twoFactorSecret.findUnique({ where: { userId: user.id } });
       expect(row?.secret).toBeTruthy();
       expect(row?.secret).not.toBe(rawSecret);
-      // base64(rawSecret) ile eşleşmeli (service encryptSecret = base64).
-      expect(row?.secret).toBe(Buffer.from(rawSecret).toString('base64'));
+      expect(row?.secret).toMatch(/^v1:/);
+      expect(row?.secret).not.toBe(Buffer.from(rawSecret).toString('base64'));
     });
 
     scenario('AUTH-111', async () => {

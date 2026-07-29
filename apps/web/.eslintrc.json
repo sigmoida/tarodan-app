@@ -1,4 +1,21 @@
 {
   "root": true,
-  "extends": ["@tarodan/eslint-config/next.json"]
+  "extends": ["@tarodan/eslint-config/next.json"],
+  "plugins": ["@tarodan"],
+  "rules": {
+    "@tarodan/no-hardcoded-turkish": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.spec.*", "**/*.test.*"],
+      "rules": { "@tarodan/no-hardcoded-turkish": "off" }
+    },
+    {
+      "files": [
+        "src/lib/turkeyLocations.ts",
+        "src/app/[locale]/(main)/(catalog)/manufacturers/_lib/brands-data.ts"
+      ],
+      "rules": { "@tarodan/no-hardcoded-turkish": "off" }
+    }
+  ]
 }

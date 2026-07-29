@@ -1,19 +1,78 @@
-import { orderStatusConfig, tradeStatusConfig } from '@tarodan/ui';
-import type { StatusConfig } from '@tarodan/ui';
+import { orderStatusConfig, tradeStatusConfig } from "@tarodan/ui";
+import type { StatusConfig } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
+
+/**
+ * Yesterday / this-month / last-month + changePercent breakdown for a single
+ * metric. Mirrors the `MetricPeriods` interface returned by the API dashboard
+ * endpoint (#295).
+ */
+export interface MetricPeriods {
+  yesterday: number;
+  thisMonth: number;
+  lastMonth: number;
+  changePercent: number;
+}
+
+export const EMPTY_PERIODS: MetricPeriods = {
+  yesterday: 0,
+  thisMonth: 0,
+  lastMonth: 0,
+  changePercent: 0,
+};
 
 export interface DashboardStats {
-  totalUsers: number;
-  usersChange: number;
-  totalProducts: number;
-  activeProducts: number;
-  productsChange: number;
+  // Row 1
   totalOrders: number;
-  ordersChange: number;
-  totalRevenue: number;
-  revenueChange: number;
-  totalCommission: number;
-  commissionChange: number;
+  totalOrdersPeriods: MetricPeriods;
+  netCommissionTotal: number;
+  netCommissionPeriods: MetricPeriods;
+  activeProducts: number;
+  passiveProducts: number;
+  activeProductsPeriods: MetricPeriods;
+  passiveProductsPeriods: MetricPeriods;
+  activeUsers: number;
+  passiveUsers: number;
+  activeUsersPeriods: MetricPeriods;
+  passiveUsersPeriods: MetricPeriods;
+
+  // Row 2
+  grossSales: number;
+  grossSalesPeriods: MetricPeriods;
+  netCommissionRow2: MetricPeriods;
+  cancellations: number;
+  refunds: number;
+  cancellationsPeriods: MetricPeriods;
+  refundsPeriods: MetricPeriods;
+
   pendingApprovals: number;
+}
+
+export interface VisitorStats {
+  liveVisitors: number;
+  dailyActiveVisitors: number;
+}
+
+export interface TopProduct {
+  id: string;
+  title: string;
+  thumbnail?: string | null;
+  viewCount: number;
+  sellerId: string;
+  sellerName: string;
+  status: string;
+  price: number;
+}
+
+export interface TopSeller {
+  id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  storeViewCount: number;
+  productCount: number;
+  activeListings: number;
 }
 
 export interface RecentOrder {
@@ -30,9 +89,16 @@ export interface RecentTrade {
   id: string;
   status: string;
   createdAt: string;
-  initiator?: { id: string; displayName?: string | null; email?: string | null };
+  initiator?: {
+    id: string;
+    displayName?: string | null;
+    email?: string | null;
+  };
   receiver?: { id: string; displayName?: string | null; email?: string | null };
-  items?: Array<{ side: string; product?: { id: string; title?: string | null } }>;
+  items?: Array<{
+    side: string;
+    product?: { id: string; title?: string | null };
+  }>;
 }
 
 export interface PendingActions {
@@ -51,28 +117,45 @@ export interface DashboardAnalytics {
 
 export interface DashboardData {
   stats: DashboardStats;
+  visitors: VisitorStats;
   recentOrders: RecentOrder[];
   recentTrades: RecentTrade[];
   pendingActions: PendingActions | null;
   analytics: DashboardAnalytics;
+  topProducts: TopProduct[];
+  topSellers: TopSeller[];
 }
 
 /** Order config + refund_requested (not in the shared config). */
-export const dashboardOrderStatusConfig: Record<string, StatusConfig> = {
-  ...orderStatusConfig,
-  refund_requested: { label: 'İade Talebi', variant: 'warning' },
-};
+export function dashboardOrderStatusConfig(t: T): Record<string, StatusConfig> {
+  return {
+    ...orderStatusConfig,
+    refund_requested: {
+      label: t("admin.dashboard.status.refundRequested"),
+      variant: "warning",
+    },
+  };
+}
 
 /** Trade config + in_progress (not in the shared config). */
-export const dashboardTradeStatusConfig: Record<string, StatusConfig> = {
-  ...tradeStatusConfig,
-  in_progress: { label: 'Devam Ediyor', variant: 'info' },
-};
+export function dashboardTradeStatusConfig(t: T): Record<string, StatusConfig> {
+  return {
+    ...tradeStatusConfig,
+    in_progress: {
+      label: t("admin.dashboard.status.inProgress"),
+      variant: "info",
+    },
+  };
+}
 
-export function formatRelativeDate(dateString: string) {
+export function formatRelativeDate(dateString: string, t: T) {
   const date = new Date(dateString);
   const diffMins = Math.floor((new Date().getTime() - date.getTime()) / 60000);
-  if (diffMins < 60) return `${diffMins} dk önce`;
-  if (diffMins < 1440) return `${Math.floor(diffMins / 60)} saat önce`;
-  return date.toLocaleDateString('tr-TR');
+  if (diffMins < 60)
+    return t("admin.dashboard.relativeTime.minutesAgo", { count: diffMins });
+  if (diffMins < 1440)
+    return t("admin.dashboard.relativeTime.hoursAgo", {
+      count: Math.floor(diffMins / 60),
+    });
+  return date.toLocaleDateString("tr-TR");
 }

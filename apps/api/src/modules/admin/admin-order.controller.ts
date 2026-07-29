@@ -29,9 +29,17 @@ import {
 import { AdminService } from './admin.service';
 import { AdvertisementService } from '../advertisement/advertisement.service';
 import { MediaService } from '../media/media.service';
-import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
+import {
+  CreateAdvertisementDto,
+  UpdateAdvertisementDto,
+  ReorderAdsDto,
+} from '../advertisement/dto';
 import { DiscountService } from '../discount/discount.service';
-import { CreateDiscountDto, UpdateDiscountDto, DiscountQueryDto } from '../discount/dto';
+import {
+  CreateDiscountDto,
+  UpdateDiscountDto,
+  DiscountQueryDto,
+} from '../discount/dto';
 import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
@@ -42,7 +50,10 @@ import { AdminRoute } from '../auth/decorators/admin-route.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { AdminRole } from '@prisma/client';
 import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
-import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
+import {
+  OverrideRefundPolicyDto,
+  SetReturnShippingPayerDto,
+} from '../refund/dto';
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -63,6 +74,7 @@ import {
   ResolveDisputeDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
+  AddOrderTrackingDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
@@ -98,9 +110,7 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminOrderController {
-  constructor(
-    private readonly adminService: AdminService,
-  ) { }
+  constructor(private readonly adminService: AdminService) {}
 
   // ==================== ORDER MANAGEMENT ====================
 
@@ -127,7 +137,7 @@ export class AdminOrderController {
   }
 
   @Patch('orders/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @Roles(AdminRole.super_admin, AdminRole.admin)
   @ApiOperation({ summary: 'Update order status' })
   @ApiParam({ name: 'id', description: 'Order ID' })
   async updateOrderStatus(
@@ -139,7 +149,7 @@ export class AdminOrderController {
   }
 
   @Post('orders/:id/resolve')
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resolve order dispute' })
   @ApiParam({ name: 'id', description: 'Order ID' })
@@ -152,14 +162,14 @@ export class AdminOrderController {
   }
 
   @Post('orders/:id/tracking')
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Add tracking information to order' })
   @ApiParam({ name: 'id', description: 'Order ID' })
   async addOrderTracking(
     @Param('id') id: string,
     @CurrentUser('id') adminId: string,
-    @Body() dto: { trackingNumber: string; carrier: string; trackingUrl?: string },
+    @Body() dto: AddOrderTrackingDto,
   ) {
     return this.adminService.addOrderTracking(adminId, id, dto);
   }
@@ -183,7 +193,8 @@ export class AdminOrderController {
   @Roles(AdminRole.super_admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Force-complete an awaiting_buyer_confirmation order (super_admin only)',
+    summary:
+      'Force-complete an awaiting_buyer_confirmation order (super_admin only)',
   })
   @ApiParam({ name: 'id', description: 'Order ID' })
   async forceCompleteOrder(
@@ -223,7 +234,9 @@ export class AdminOrderController {
   @Post('orders/:id/apply-coupon')
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Apply or remove a coupon code on an order (admin override)' })
+  @ApiOperation({
+    summary: 'Apply or remove a coupon code on an order (admin override)',
+  })
   @ApiParam({ name: 'id', description: 'Order ID' })
   async applyOrderCoupon(
     @Param('id') id: string,
@@ -232,5 +245,4 @@ export class AdminOrderController {
   ) {
     return this.adminService.applyOrderCoupon(id, adminId, dto.code);
   }
-
 }

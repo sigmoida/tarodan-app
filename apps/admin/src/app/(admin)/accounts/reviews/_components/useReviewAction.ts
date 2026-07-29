@@ -1,9 +1,14 @@
-'use client';
+"use client";
 
-import toast from 'react-hot-toast';
-import { useConfirm } from '@/provider/ConfirmProvider';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { type ReviewStatus, REVIEW_ACTION_CONFIRM, statusLabels } from '../_lib/types';
+import toast from "react-hot-toast";
+import { useConfirm } from "@/provider/ConfirmProvider";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import {
+  type ReviewStatus,
+  reviewActionConfirm,
+  statusLabels,
+} from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 /**
  * Shared review moderation action — confirm dialog → status mutation → toast.
@@ -15,22 +20,26 @@ export function useReviewAction(
   updateStatus: (id: string, status: ReviewStatus) => Promise<unknown>,
   entityLabel: string,
 ) {
+  const t = useTranslations();
   const confirm = useConfirm();
 
   const mut = useAdminMutation(
     (v: { id: string; status: ReviewStatus }) => updateStatus(v.id, v.status),
     {
       invalidates: [resource],
-      errorMessage: 'Güncelleme başarısız',
-      onSuccess: (_, v) => toast.success(`${entityLabel} ${statusLabels[v.status]}`),
+      errorMessage: t("admin.accounts.reviews.updateFailed"),
+      onSuccess: (_, v) =>
+        toast.success(`${entityLabel} ${statusLabels(t)[v.status]}`),
     },
   );
 
   const act = async (id: string, status: ReviewStatus) => {
-    const ok = await confirm({ ...REVIEW_ACTION_CONFIRM[status], cancelLabel: 'Vazgeç' });
-    if (!ok) return;
-    mut.mutate({ id, status });
+    await confirm({
+      ...reviewActionConfirm(t)[status],
+      cancelLabel: t("common.cancel"),
+      onConfirm: () => mut.mutateAsync({ id, status }),
+    });
   };
 
-  return { act, isPending: mut.isPending };
+  return { act, isPending: mut.isPending, variables: mut.variables };
 }

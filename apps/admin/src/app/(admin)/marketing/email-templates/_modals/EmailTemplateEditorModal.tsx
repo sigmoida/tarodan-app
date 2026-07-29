@@ -1,22 +1,41 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Modal, Button, Input, Textarea, IconButton } from '@tarodan/ui';
+import { useCallback, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@tarodan/ui";
 import {
-  XMarkIcon,
-  PaperAirplaneIcon,
-  CheckIcon,
+  FormInput,
+  FormModal,
+  FormTextarea,
+  useZodForm,
+} from "@tarodan/ui/form";
+import {
   ArrowPathIcon,
-  EnvelopeIcon,
+  CheckIcon,
+  PaperAirplaneIcon,
   TrashIcon,
-} from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { useConfirm } from '@/provider/ConfirmProvider';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { SAMPLE_DATA } from '../_lib/sampleData';
-import { makeSourceData, type TemplateDetail } from '../_lib/types';
+} from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
+import { adminApi } from "@/lib/api";
+import { extractErrorMessage } from "@/lib/error";
+import { adminKeys } from "@/lib/query/keys";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { useConfirm } from "@/provider/ConfirmProvider";
+import { sampleData } from "../_lib/sampleData";
+import {
+  emailTemplateEditorSchema,
+  makeSourceData,
+  type EmailTemplateEditorValues,
+  type TemplateDetail,
+} from "../_lib/types";
+import { useTranslations } from "next-intl";
+
+const EMPTY_FORM: EmailTemplateEditorValues = {
+  name: "",
+  subject: "",
+  bodyHtml: "",
+  testEmail: "",
+};
 
 export function EmailTemplateEditorModal({
   templateKey,
@@ -25,371 +44,383 @@ export function EmailTemplateEditorModal({
   templateKey: string;
   onClose: () => void;
 }) {
+  const t = useTranslations();
+  const samples = sampleData(t);
   const confirm = useConfirm();
-  const queryClient = useQueryClient();
-
-  const [detail, setDetail] = useState<TemplateDetail | null>(null);
-  const [form, setForm] = useState({ name: '', subject: '', bodyHtml: '' });
-  const [testEmail, setTestEmail] = useState('');
-
-  const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState(false);
-
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const refreshList = () => queryClient.invalidateQueries({ queryKey: ['email-templates'] });
-
-  const loadPreview = useCallback(
-    async (draftHtml?: string, draftSubject?: string) => {
-      setPreviewLoading(true);
-      setPreviewError(false);
-      try {
-        const sample = SAMPLE_DATA[templateKey] || {};
-        const res = await adminApi.previewEmailTemplate(templateKey, sample as Record<string, any>, {
-          html: draftHtml,
-          subject: draftSubject,
-        });
-        setPreview(res.data);
-      } catch {
-        setPreviewError(true);
-      } finally {
-        setPreviewLoading(false);
-      }
-    },
-    [templateKey],
-  );
+  const form = useZodForm(emailTemplateEditorSchema(t), {
+    defaultValues: EMPTY_FORM,
+  });
+  const bodyHtml = form.watch("bodyHtml");
+  const subject = form.watch("subject");
+  const testEmail = form.watch("testEmail");
 
   const detailQuery = useQuery({
-    queryKey: ['email-template', templateKey],
-    queryFn: async () => (await adminApi.getEmailTemplate(templateKey)).data as TemplateDetail,
+    queryKey: adminKeys.detail("email-templates", templateKey),
+    queryFn: async () =>
+      (await adminApi.getEmailTemplate(templateKey)).data as TemplateDetail,
   });
 
-  // Close the modal on load error (legacy behavior).
-  useEffect(() => {
-    if (detailQuery.isError) {
-      toast.error('Şablon yüklenemedi');
-      onClose();
-    }
-  }, [detailQuery.isError, onClose]);
-
-  // When detail arrives, fill the form + trigger preview. If body is empty,
-  // fetch the source (default) template and seed the form.
-  useEffect(() => {
-    const d = detailQuery.data;
-    if (!d) return;
-    let alive = true;
-    setDetail(d);
-    (async () => {
-      if (d.bodyHtml) {
-        setForm({ name: d.name || templateKey, subject: d.subject || '', bodyHtml: d.bodyHtml });
-        loadPreview(d.bodyHtml, d.subject || undefined);
-      } else {
-        const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
-        const sourceRes = await adminApi.previewEmailTemplate(
+  const sourceQuery = useQuery({
+    queryKey: adminKeys.preview("email-template-source", templateKey),
+    queryFn: async () => {
+      const sourceData = makeSourceData(samples[templateKey] || {});
+      return (
+        await adminApi.previewEmailTemplate(
           templateKey,
           sourceData as Record<string, any>,
-        );
-        if (!alive) return;
-        setForm({
-          name: d.name || templateKey,
-          subject: d.subject || '',
-          bodyHtml: sourceRes.data?.html || '',
-        });
-        loadPreview();
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detailQuery.data]);
-
-  // Clear the debounce timer on unmount.
-  useEffect(() => () => clearTimeout(debounceRef.current), []);
-
-  const debouncedPreview = (html?: string, subject?: string) => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => loadPreview(html, subject), 1200);
-  };
-
-  const onBodyChange = (value: string) => {
-    setForm((f) => ({ ...f, bodyHtml: value }));
-    debouncedPreview(value || undefined, form.subject || undefined);
-  };
-  const onSubjectChange = (value: string) => {
-    setForm((f) => ({ ...f, subject: value }));
-    debouncedPreview(form.bodyHtml || undefined, value || undefined);
-  };
-
-  const onTabKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== 'Tab') return;
-    e.preventDefault();
-    const ta = e.currentTarget;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    onBodyChange(ta.value.substring(0, start) + '  ' + ta.value.substring(end));
-    requestAnimationFrame(() => {
-      ta.selectionStart = ta.selectionEnd = start + 2;
-    });
-  };
-
-  const insertVar = (v: string) => {
-    const ta = document.getElementById('html-editor') as HTMLTextAreaElement | null;
-    if (!ta) return;
-    const s = ta.selectionStart;
-    const e = ta.selectionEnd;
-    const ins = `{{${v}}}`;
-    onBodyChange(form.bodyHtml.substring(0, s) + ins + form.bodyHtml.substring(e));
-    requestAnimationFrame(() => {
-      ta.selectionStart = ta.selectionEnd = s + ins.length;
-      ta.focus();
-    });
-  };
-
-  const saveMut = useAdminMutation(() => adminApi.updateEmailTemplate(templateKey, form), {
-    successMessage: 'Şablon kaydedildi',
-    errorMessage: 'Kaydetme başarısız',
-    onSuccess: () => {
-      refreshList();
-      loadPreview(form.bodyHtml || undefined, form.subject || undefined);
+        )
+      ).data as { subject: string; html: string };
     },
+    enabled: Boolean(detailQuery.data),
+    staleTime: 5 * 60 * 1000,
   });
-  const saving = saveMut.isPending;
-  const onSave = () => saveMut.mutate();
 
-  const sendTestMut = useAdminMutation(
-    () =>
-      adminApi.sendTestEmail(templateKey, {
-        to: testEmail.trim(),
-        templateData: (SAMPLE_DATA[templateKey] || {}) as Record<string, any>,
-      }),
-    { successMessage: 'Test e-postası kuyruğa eklendi', errorMessage: 'Gönderilemedi' },
+  const preview = useAdminMutation(
+    async ({
+      html,
+      previewSubject,
+    }: {
+      html?: string;
+      previewSubject?: string;
+    }) =>
+      (
+        await adminApi.previewEmailTemplate(
+          templateKey,
+          samples[templateKey] || {},
+          { html, subject: previewSubject },
+        )
+      ).data as { subject: string; html: string },
+    { showErrorToast: false },
   );
-  const sendingTest = sendTestMut.isPending;
-  const onSendTest = () => {
-    if (!testEmail.trim()) {
-      toast.error('E-posta adresi girin');
+  const mutatePreview = preview.mutate;
+
+  const loadPreview = useCallback(
+    (html?: string, previewSubject?: string) =>
+      mutatePreview({ html, previewSubject }),
+    [mutatePreview],
+  );
+
+  // Seed the form once per open. `sourceQuery` (the default template) may resolve
+  // after `detailQuery`, so guard against a second reset that would discard edits
+  // typed in the gap between the two loads.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    const detail = detailQuery.data;
+    if (!detail) return;
+    if (!detail.bodyHtml && !sourceQuery.data) return;
+    seeded.current = true;
+    form.reset({
+      name: detail.name || templateKey,
+      subject: detail.subject || "",
+      bodyHtml: detail.bodyHtml || sourceQuery.data?.html || "",
+      testEmail: form.getValues("testEmail"),
+    });
+  }, [detailQuery.data, sourceQuery.data, form, templateKey]);
+
+  useEffect(() => {
+    if (!detailQuery.isError) return;
+    toast.error(
+      extractErrorMessage(
+        detailQuery.error,
+        t("admin.marketing.emailTemplates.loadFailed"),
+      ),
+    );
+    onClose();
+  }, [detailQuery.error, detailQuery.isError, onClose, t]);
+
+  useEffect(() => {
+    if (!detailQuery.data) return;
+    const timer = setTimeout(
+      () => loadPreview(bodyHtml || undefined, subject || undefined),
+      1200,
+    );
+    return () => clearTimeout(timer);
+  }, [bodyHtml, subject, detailQuery.data, loadPreview]);
+
+  const onTabKey = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Tab") return;
+    event.preventDefault();
+    const textarea = event.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    form.setValue(
+      "bodyHtml",
+      textarea.value.substring(0, start) + "  " + textarea.value.substring(end),
+      { shouldDirty: true },
+    );
+    requestAnimationFrame(() => {
+      textarea.selectionStart = textarea.selectionEnd = start + 2;
+    });
+  };
+
+  const insertVariable = (variable: string) => {
+    const textarea = document.getElementById(
+      "html-editor",
+    ) as HTMLTextAreaElement | null;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const insertion = `{{${variable}}}`;
+    form.setValue(
+      "bodyHtml",
+      bodyHtml.substring(0, start) + insertion + bodyHtml.substring(end),
+      { shouldDirty: true },
+    );
+    requestAnimationFrame(() => {
+      textarea.selectionStart = textarea.selectionEnd =
+        start + insertion.length;
+      textarea.focus();
+    });
+  };
+
+  const save = useAdminMutation(
+    (values: EmailTemplateEditorValues) =>
+      adminApi.updateEmailTemplate(templateKey, {
+        name: values.name,
+        subject: values.subject,
+        bodyHtml: values.bodyHtml,
+      }),
+    {
+      invalidates: ["email-templates"],
+      successMessage: t("admin.marketing.emailTemplates.saved"),
+      errorMessage: t("admin.marketing.emailTemplates.saveFailed"),
+      onSuccess: () => loadPreview(bodyHtml || undefined, subject || undefined),
+    },
+  );
+
+  const sendTest = useAdminMutation(
+    (to: string) =>
+      adminApi.sendTestEmail(templateKey, {
+        to,
+        templateData: samples[templateKey] || {},
+      }),
+    {
+      successMessage: t("admin.marketing.emailTemplates.testQueued"),
+      errorMessage: t("admin.marketing.emailTemplates.sendFailed"),
+    },
+  );
+
+  const onSendTest = async () => {
+    const valid = await form.trigger("testEmail");
+    if (!valid || !testEmail.trim()) {
+      if (!testEmail.trim())
+        toast.error(t("admin.marketing.emailTemplates.enterEmail"));
       return;
     }
-    sendTestMut.mutate();
+    sendTest.mutate(testEmail.trim());
   };
 
-  const resetMut = useAdminMutation(() => adminApi.resetEmailTemplate(templateKey), {
-    successMessage: 'Varsayılan şablona sıfırlandı',
-    errorMessage: 'Sıfırlama başarısız',
-    onSuccess: async () => {
-      setDetail((d) => (d ? { ...d, bodyHtml: null, subject: null, isCustom: false } : d));
-      refreshList();
-      const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
-      const sourceRes = await adminApi.previewEmailTemplate(
-        templateKey,
-        sourceData as Record<string, any>,
-      );
-      setForm((f) => ({ ...f, bodyHtml: sourceRes.data?.html || '', subject: '' }));
-      loadPreview();
+  const reset = useAdminMutation(
+    () => adminApi.resetEmailTemplate(templateKey),
+    {
+      invalidates: ["email-templates"],
+      successMessage: t("admin.marketing.emailTemplates.resetSuccess"),
+      errorMessage: t("admin.marketing.emailTemplates.resetFailed"),
+      onSuccess: () => {
+        form.reset({
+          name: detailQuery.data?.name || templateKey,
+          subject: "",
+          bodyHtml: sourceQuery.data?.html || "",
+          testEmail,
+        });
+        loadPreview();
+      },
     },
-  });
-  const resetting = resetMut.isPending;
+  );
+
   const onReset = async () => {
-    const ok = await confirm({
-      title: 'Varsayılana sıfırla',
-      description: 'Özel şablon silinecek ve varsayılan sistem şablonuna dönülecek. Emin misiniz?',
-      confirmLabel: 'Sıfırla',
+    await confirm({
+      title: t("admin.marketing.emailTemplates.resetTitle"),
+      description: t("admin.marketing.emailTemplates.resetConfirm"),
+      confirmLabel: t("common.reset"),
       destructive: true,
+      onConfirm: () => reset.mutateAsync(),
     });
-    if (!ok) return;
-    resetMut.mutate();
   };
 
+  const detail = detailQuery.data;
   const variables = (() => {
     if (detail?.variablesJson) {
       try {
-        const o = JSON.parse(detail.variablesJson);
-        if (typeof o === 'object' && o !== null) return Object.keys(o);
+        const parsed = JSON.parse(detail.variablesJson);
+        if (typeof parsed === "object" && parsed !== null)
+          return Object.keys(parsed);
       } catch {
-        /* empty */
+        // Fall back to sample-data keys.
       }
     }
-    return Object.keys(SAMPLE_DATA[templateKey] || {});
+    return Object.keys(samples[templateKey] || {});
   })();
 
   return (
-    <Modal
-      isOpen
+    <FormModal
+      open
       onClose={onClose}
-      closeOnBackdrop={false}
+      title={detail?.name || templateKey}
+      form={form}
+      onSubmit={(values) => save.mutate(values)}
+      isSubmitting={save.isPending}
+      submitLabel={t("common.save")}
       maxWidth="max-w-2xl"
-      className="max-w-6xl"
+      modalClassName="max-w-6xl"
+      closeOnBackdrop={false}
     >
-      {/* Header */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <EnvelopeIcon className="h-5 w-5 shrink-0 text-primary-500" />
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-heading">
-              {detail?.name || templateKey}
-            </h2>
-            <p className="font-mono text-xs text-muted">{templateKey}</p>
-          </div>
-          {detail?.isCustom && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success-500/10 px-2 py-0.5 text-xs font-medium text-success-600">
-              <CheckIcon className="h-3 w-3" /> Özel
-            </span>
-          )}
-        </div>
-        <IconButton aria-label="Kapat" variant="ghost" onClick={onClose}>
-          <XMarkIcon className="h-5 w-5" />
-        </IconButton>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <span className="font-mono">{templateKey}</span>
+        {detail?.isCustom && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-success-500/10 px-2 py-0.5 font-medium text-success-600">
+            <CheckIcon className="h-3 w-3" />{" "}
+            {t("admin.marketing.emailTemplates.custom")}
+          </span>
+        )}
       </div>
 
-      {/* Split editor / preview */}
-      <div className="grid h-[72vh] grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Editor */}
+      <div className="grid h-[68vh] grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
           {variables.length > 0 && (
             <div className="rounded-lg border border-primary-500/20 bg-primary-500/5 p-3">
-              <p className="mb-1.5 text-xs font-medium text-muted">Kullanılabilir değişkenler</p>
+              <p className="mb-1.5 text-xs font-medium text-muted">
+                {t("admin.marketing.emailTemplates.availableVariables")}
+              </p>
               <div className="flex flex-wrap gap-1.5">
-                {variables.map((v) => (
+                {variables.map((variable) => (
                   <Button
-                    key={v}
+                    key={variable}
                     type="button"
                     variant="ghost"
-                    onClick={() => insertVar(v)}
+                    onClick={() => insertVariable(variable)}
                     className="h-auto rounded bg-primary-500/10 px-1.5 py-0.5 font-mono text-xs text-primary-600 hover:bg-primary-500/20"
                   >
-                    {`{{${v}}}`}
+                    {`{{${variable}}}`}
                   </Button>
                 ))}
               </div>
             </div>
           )}
 
-          <Input
-            label="Görünen Ad"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          <FormInput
+            name="name"
+            label={t("admin.marketing.emailTemplates.displayName")}
           />
-          <Input
-            label="E-posta Konusu"
-            value={form.subject}
-            onChange={(e) => onSubjectChange(e.target.value)}
-            placeholder="Değişken kullanabilirsiniz: {{orderNumber}}"
+          <FormInput
+            name="subject"
+            label={t("admin.marketing.emailTemplates.emailSubject")}
+            placeholder={t.raw(
+              "admin.marketing.emailTemplates.subjectPlaceholder",
+            )}
           />
 
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted">HTML Gövde</span>
+              <span className="text-xs font-medium text-muted">
+                {t("admin.marketing.emailTemplates.htmlBody")}
+              </span>
               <span className="text-xs text-subtle">
-                {form.bodyHtml.length > 0
-                  ? `${form.bodyHtml.length} karakter`
-                  : 'Boş (varsayılan kullanılır)'}
+                {bodyHtml.length > 0
+                  ? t("admin.marketing.emailTemplates.characterCount", {
+                      count: bodyHtml.length,
+                    })
+                  : t("admin.marketing.emailTemplates.emptyUsesDefault")}
               </span>
             </div>
-            <Textarea
+            <FormTextarea
+              name="bodyHtml"
               bare
               id="html-editor"
-              value={form.bodyHtml}
-              onChange={(e) => onBodyChange(e.target.value)}
               onKeyDown={onTabKey}
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="off"
               className="min-h-[280px] flex-1 resize-none rounded-lg border border-border bg-heading p-3 font-mono text-xs leading-relaxed text-inverted"
-              placeholder="Boş bırakırsanız sağdaki önizlemede gözüken varsayılan şablon gönderilir. Özelleştirmek için HTML yazın ve değişkenleri {{değişkenAdı}} formatında kullanın."
             />
           </div>
 
-          <div className="flex flex-col gap-2 border-t border-border pt-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={onSave}
-                isLoading={saving}
-                leftIcon={<CheckIcon className="h-4 w-4" />}
-              >
-                Kaydet
-              </Button>
-              {detail?.isCustom && (
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={onReset}
-                  isLoading={resetting}
-                  leftIcon={<TrashIcon className="h-4 w-4" />}
-                  className="border-danger-300 text-danger-600 hover:bg-danger-50"
-                >
-                  Varsayılana sıfırla
-                </Button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="email"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-                placeholder="test@ornek.com"
-                className="flex-1"
-              />
+          <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <FormInput
+              name="testEmail"
+              type="email"
+              label={t("admin.marketing.emailTemplates.testEmail")}
+              placeholder="test@ornek.com"
+              className="flex-1"
+            />
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={onSendTest}
+              isLoading={sendTest.isPending}
+              disabled={!testEmail.trim()}
+              leftIcon={<PaperAirplaneIcon className="h-4 w-4" />}
+            >
+              {t("admin.marketing.emailTemplates.sendTest")}
+            </Button>
+            {detail?.isCustom && (
               <Button
                 variant="secondary"
                 type="button"
-                onClick={onSendTest}
-                isLoading={sendingTest}
-                disabled={!testEmail.trim()}
-                leftIcon={<PaperAirplaneIcon className="h-4 w-4" />}
+                onClick={onReset}
+                isLoading={reset.isPending}
+                leftIcon={<TrashIcon className="h-4 w-4" />}
+                className="border-danger-300 text-danger-600 hover:bg-danger-50"
               >
-                Test gönder
+                {t("admin.marketing.emailTemplates.resetTitle")}
               </Button>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Preview */}
         <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-alt/20">
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-surface-elevated px-4 py-2.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-                Önizleme
-              </span>
-              <span className="rounded bg-warning-500/10 px-1.5 py-0.5 text-xs text-warning-700">
-                Örnek veri
-              </span>
-            </div>
-            {previewLoading && (
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+              {t("admin.marketing.emailTemplates.preview")}
+            </span>
+            {preview.isPending && (
               <span className="flex items-center gap-1 text-xs text-muted">
-                <ArrowPathIcon className="h-3 w-3 animate-spin" /> Güncelleniyor
+                <ArrowPathIcon className="h-3 w-3 animate-spin" />{" "}
+                {t("common.updating")}
               </span>
             )}
           </div>
 
-          {previewError ? (
+          {preview.isError ? (
             <div className="flex flex-1 items-center justify-center p-8 text-center">
               <div>
-                <p className="text-sm text-muted">Önizleme yüklenemedi.</p>
+                <p className="text-sm text-muted">
+                  {extractErrorMessage(
+                    preview.error,
+                    t("admin.marketing.emailTemplates.previewFailed"),
+                  )}
+                </p>
                 <Button
                   variant="secondary"
                   type="button"
-                  onClick={() => loadPreview(form.bodyHtml || undefined, form.subject || undefined)}
+                  onClick={() =>
+                    loadPreview(bodyHtml || undefined, subject || undefined)
+                  }
                   className="mt-3"
                 >
-                  Tekrar dene
+                  {t("common.tryAgain")}
                 </Button>
               </div>
             </div>
-          ) : preview ? (
+          ) : preview.data ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <div className="shrink-0 border-b border-border bg-surface-elevated px-4 py-2">
                 <p className="text-xs text-muted">
-                  <span className="font-medium">Konu:</span>{' '}
-                  <span className="text-heading">{preview.subject || '(konu yok)'}</span>
+                  <span className="font-medium">
+                    {t("admin.marketing.emailTemplates.subject")}:
+                  </span>{" "}
+                  <span className="text-heading">
+                    {preview.data.subject ||
+                      t("admin.marketing.emailTemplates.noSubject")}
+                  </span>
                 </p>
               </div>
               <iframe
-                key={preview.html.substring(0, 100)}
-                srcDoc={preview.html}
+                key={preview.data.html.substring(0, 100)}
+                srcDoc={preview.data.html}
                 className="w-full flex-1 border-0"
-                title="E-posta önizlemesi"
+                title={t("admin.marketing.emailTemplates.emailPreview")}
                 sandbox="allow-same-origin allow-top-navigation-by-user-activation"
               />
             </div>
@@ -400,6 +431,6 @@ export function EmailTemplateEditorModal({
           )}
         </div>
       </div>
-    </Modal>
+    </FormModal>
   );
 }

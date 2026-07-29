@@ -4,9 +4,12 @@ import {
   XMarkIcon,
   ArrowUturnLeftIcon,
   TrashIcon,
-} from '@heroicons/react/24/outline';
-import type { RowActionItem } from '@/components/table';
-import type { Product } from './types';
+} from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
+import type { RowActionItem } from "@/components/table";
+import type { Product } from "./types";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface ProductRowActions {
   onView: (p: Product) => void;
@@ -14,31 +17,44 @@ export interface ProductRowActions {
   onReject: (p: Product) => void;
   onDelete: (p: Product) => void;
   onRestore: (p: Product) => void;
+  busyId?: string;
 }
 
 /** ⋮ row-menu items for a product — status-gated; destructive ones grouped last. */
-export function productRowMenu(a: ProductRowActions) {
+export function productRowMenu(t: T, a: ProductRowActions) {
   return (p: Product): RowActionItem[] => [
-    { label: 'Detay', icon: EyeIcon, onClick: () => a.onView(p) },
-    p.status === 'pending' && { label: 'Onayla', icon: CheckIcon, onClick: () => a.onApprove(p) },
-    p.status === 'pending' && {
-      label: 'Reddet',
+    {
+      label: t("admin.catalog.products.detail"),
+      icon: EyeIcon,
+      onClick: () => a.onView(p),
+    },
+    p.status === "pending" && {
+      label: t("admin.catalog.products.approve"),
+      icon: CheckIcon,
+      onClick: () => a.onApprove(p),
+      isLoading: a.busyId === p.id,
+    },
+    p.status === "pending" && {
+      label: t("admin.catalog.products.reject"),
       icon: XMarkIcon,
       onClick: () => a.onReject(p),
       destructive: true,
+      isLoading: a.busyId === p.id,
     },
-    p.status === 'deleted' && {
-      label: 'Geri Yükle',
+    p.status === "deleted" && {
+      label: t("admin.catalog.products.restore"),
       icon: ArrowUturnLeftIcon,
       onClick: () => a.onRestore(p),
+      isLoading: a.busyId === p.id,
     },
-    p.status !== 'deleted' &&
-      p.status !== 'sold' &&
-      p.status !== 'reserved' && {
-        label: 'Kaldır',
+    p.status !== "deleted" &&
+      p.status !== "sold" &&
+      p.status !== "reserved" && {
+        label: t("common.remove"),
         icon: TrashIcon,
         onClick: () => a.onDelete(p),
         destructive: true,
+        isLoading: a.busyId === p.id,
       },
   ];
 }

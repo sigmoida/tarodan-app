@@ -1,5 +1,4 @@
 import * as request from 'supertest';
-import * as crypto from 'crypto';
 import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
 import {
   truncateAll,
@@ -7,32 +6,16 @@ import {
   seedBaseline,
   disconnectPrisma,
 } from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
+import {
+  createAdminUser,
+  createUser,
+  authHeader,
+} from '../factories/user.factory';
+import { generateTotpCode } from '../../src/modules/security/totp.util';
 
-/**
- * Re-implements the same TOTP algorithm as SecurityService.generateTOTPCode
- * so we can produce a valid 6-digit code for any given secret.
- */
 function generateTOTPCode(secret: string, timeStep?: number): string {
-  const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  const secretBytes: number[] = [];
-  for (const char of secret.toUpperCase()) {
-    const idx = base32Chars.indexOf(char);
-    if (idx >= 0) secretBytes.push(idx);
-  }
   const time = timeStep ?? Math.floor(Date.now() / 1000 / 30);
-  const hmac = crypto.createHmac('sha1', Buffer.from(secretBytes));
-  const timeBuffer = Buffer.alloc(8);
-  timeBuffer.writeBigInt64BE(BigInt(time));
-  hmac.update(timeBuffer);
-  const hash = hmac.digest();
-  const offset = hash[hash.length - 1] & 0xf;
-  const binary =
-    ((hash[offset] & 0x7f) << 24) |
-    ((hash[offset + 1] & 0xff) << 16) |
-    ((hash[offset + 2] & 0xff) << 8) |
-    (hash[offset + 3] & 0xff);
-  return (binary % 1000000).toString().padStart(6, '0');
+  return generateTotpCode(secret, time);
 }
 
 describe('2FA flow (E2E)', () => {
@@ -208,6 +191,90 @@ describe('2FA flow (E2E)', () => {
 
     expect(fresh.body.backupCodes).toHaveLength(10);
     expect(fresh.body.backupCodes).not.toEqual(initialBackup);
+  });
+
+  it('blocks token issuance until a valid TOTP or one-time backup code is supplied', async () => {
+    const user = await createUser(ctx.module);
+    const enableRes = await request(ctx.app.getHttpServer())
+      .post('/api/security/2fa/enable')
+      .set(authHeader(user))
+      .expect(201);
+    const secret = enableRes.body.secret as string;
+    const backupCode = enableRes.body.backupCodes[0] as string;
+
+    await request(ctx.app.getHttpServer())
+      .post('/api/security/2fa/verify')
+      .set(authHeader(user))
+      .send({ code: generateTOTPCode(secret) })
+      .expect(201);
+
+    const stored = await getPrisma().twoFactorSecret.findUniqueOrThrow({
+      where: { userId: user.id },
+    });
+    expect(stored.secret).toMatch(/^v1:/);
+
+    const challenge = await request(ctx.app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: user.email, password: user.password })
+      .expect(200);
+    expect(challenge.body).toEqual({ requires2FA: true });
+    expect(challenge.body.tokens).toBeUndefined();
+
+    await request(ctx.app.getHttpServer())
+      .post('/api/auth/login')
+      .send({
+        email: user.email,
+        password: user.password,
+        twoFactorCode: generateTOTPCode(secret),
+      })
+      .expect(200)
+      .then((res) => expect(res.body.tokens.accessToken).toBeTruthy());
+
+    const backupCredentials = {
+      email: user.email,
+      password: user.password,
+      twoFactorCode: backupCode,
+    };
+    const [firstUse, secondUse] = await Promise.all([
+      request(ctx.app.getHttpServer())
+        .post('/api/auth/login')
+        .send(backupCredentials),
+      request(ctx.app.getHttpServer())
+        .post('/api/auth/login')
+        .send(backupCredentials),
+    ]);
+    expect([firstUse.status, secondUse.status].sort()).toEqual([200, 401]);
+  });
+
+  it('enforces the same second-factor challenge on admin login', async () => {
+    const admin = await createAdminUser(ctx.module);
+    const enableRes = await request(ctx.app.getHttpServer())
+      .post('/api/security/2fa/enable')
+      .set(authHeader(admin))
+      .expect(201);
+    const code = generateTOTPCode(enableRes.body.secret);
+
+    await request(ctx.app.getHttpServer())
+      .post('/api/security/2fa/verify')
+      .set(authHeader(admin))
+      .send({ code })
+      .expect(201);
+
+    await request(ctx.app.getHttpServer())
+      .post('/api/auth/admin/login')
+      .send({ email: admin.email, password: admin.password })
+      .expect(200)
+      .then((res) => expect(res.body).toEqual({ requires2FA: true }));
+
+    await request(ctx.app.getHttpServer())
+      .post('/api/auth/admin/login')
+      .send({
+        email: admin.email,
+        password: admin.password,
+        twoFactorCode: generateTOTPCode(enableRes.body.secret),
+      })
+      .expect(200)
+      .then((res) => expect(res.body.tokens.accessToken).toBeTruthy());
   });
 
   it('all 2FA endpoints reject unauthenticated requests', async () => {

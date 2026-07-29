@@ -110,21 +110,12 @@ describe('Payment Window (split 30min reservation + 24h order TTL)', () => {
     });
     await ctx.app.get(PaymentService).releaseExpiredOrderReservations();
 
-    // Buyer retries — iframe kaldırıldı: process-direct ile (kart gönderimi). resolve
-    // bağlamı bırakılmış rezervasyonu CAS ile geri alır + merchant_oid atar.
+    // Buyer retries: direct-form hazırlığı bırakılmış rezervasyonu CAS ile geri
+    // alır ve merchant_oid atar; kart alanları API'ye gönderilmez.
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/process-direct')
+      .post('/api/payments/direct-form')
       .set(authHeader(buyer))
-      .send({
-        orderId: buyRes.body.orderId,
-        card: {
-          cardHolderName: 'TEST KART',
-          cardNumber: '4355084355084358',
-          expireMonth: '12',
-          expireYear: '30',
-          cvc: '000',
-        },
-      })
+      .send({ orderId: buyRes.body.orderId })
       .expect(201);
 
     const reReserved = await prisma.product.findUnique({ where: { id: product.id } });

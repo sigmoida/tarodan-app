@@ -15,9 +15,9 @@ import {
   UploadedFile,
   BadRequestException,
   Res,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
@@ -25,24 +25,35 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
-} from '@nestjs/swagger';
-import { AdminService } from './admin.service';
-import { AdvertisementService } from '../advertisement/advertisement.service';
-import { MediaService } from '../media/media.service';
-import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
-import { DiscountService } from '../discount/discount.service';
-import { CreateDiscountDto, UpdateDiscountDto, DiscountQueryDto } from '../discount/dto';
-import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import { BypassPermissionMatrix } from '../auth/decorators/bypass-permission-matrix.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AdminRoute } from '../auth/decorators/admin-route.decorator';
-import { Public } from '../auth/decorators/public.decorator';
-import { AdminRole } from '@prisma/client';
-import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
-import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
+} from "@nestjs/swagger";
+import { AdminService } from "./admin.service";
+import { AdvertisementService } from "../advertisement/advertisement.service";
+import { MediaService } from "../media/media.service";
+import {
+  CreateAdvertisementDto,
+  UpdateAdvertisementDto,
+  ReorderAdsDto,
+} from "../advertisement/dto";
+import { DiscountService } from "../discount/discount.service";
+import {
+  CreateDiscountDto,
+  UpdateDiscountDto,
+  DiscountQueryDto,
+} from "../discount/dto";
+import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
+import { BypassPermissionMatrix } from "../auth/decorators/bypass-permission-matrix.decorator";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { Public } from "../auth/decorators/public.decorator";
+import { AdminRole } from "@prisma/client";
+import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
+import {
+  OverrideRefundPolicyDto,
+  SetReturnShippingPayerDto,
+} from "../refund/dto";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -90,70 +101,50 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
-} from './dto';
+  AdminCollectionQueryDto,
+} from "./dto";
 
-@ApiTags('admin')
-@Controller('admin')
+@ApiTags("admin")
+@Controller("admin")
 @AdminRoute() // Mark as admin route to skip global JwtAuthGuard
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminCollectionController {
-  constructor(
-    private readonly adminService: AdminService,
-  ) { }
+  constructor(private readonly adminService: AdminService) {}
 
   // ==================== COLLECTION MANAGEMENT ====================
 
-  @Get('collections')
+  @Get("collections")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get all collections with filters' })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiQuery({ name: 'userId', required: false })
-  @ApiQuery({ name: 'isPublic', required: false })
-  @ApiQuery({ name: 'isFeatured', required: false })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  @ApiQuery({ name: 'sortBy', required: false, enum: ['createdAt', 'name', 'likeCount', 'viewCount'] })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of collections' })
-  async getCollections(
-    @Query('search') search?: string,
-    @Query('userId') userId?: string,
-    @Query('isPublic') isPublic?: string,
-    @Query('isFeatured') isFeatured?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('sortBy') sortBy?: 'createdAt' | 'name' | 'likeCount' | 'viewCount',
-    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-  ) {
-    return this.adminService.getCollections({
-      search,
-      userId,
-      isPublic: isPublic === 'true' ? true : isPublic === 'false' ? false : undefined,
-      isFeatured: isFeatured === 'true' ? true : isFeatured === 'false' ? false : undefined,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      sortBy,
-      sortOrder,
-    });
+  @ApiOperation({ summary: "Get all collections with filters" })
+  @ApiResponse({ status: HttpStatus.OK, description: "List of collections" })
+  async getCollections(@Query() query: AdminCollectionQueryDto) {
+    return this.adminService.getCollections(query);
   }
 
-  @Get('collections/:id')
+  @Get("collections/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get collection details' })
-  @ApiParam({ name: 'id', description: 'Collection ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Collection details with items' })
-  async getCollectionById(@Param('id') id: string) {
+  @ApiOperation({ summary: "Get collection details" })
+  @ApiParam({ name: "id", description: "Collection ID" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Collection details with items",
+  })
+  async getCollectionById(@Param("id") id: string) {
     return this.adminService.getCollectionById(id);
   }
 
-  @Post('collections')
+  @Post("collections")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Create a new collection' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Collection created' })
+  @ApiOperation({ summary: "Create a new collection" })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: "Collection created",
+  })
   async createCollection(
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
       name: string;
       description?: string;
       isPublic?: boolean;
@@ -165,15 +156,16 @@ export class AdminCollectionController {
     return this.adminService.createAdminCollection(adminId, body);
   }
 
-  @Patch('collections/:id')
+  @Patch("collections/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update a collection' })
-  @ApiParam({ name: 'id', description: 'Collection ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Collection updated' })
+  @ApiOperation({ summary: "Update a collection" })
+  @ApiParam({ name: "id", description: "Collection ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Collection updated" })
   async updateCollection(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
       name?: string;
       description?: string;
       isPublic?: boolean;
@@ -184,71 +176,81 @@ export class AdminCollectionController {
     return this.adminService.updateAdminCollection(adminId, id, body);
   }
 
-  @Delete('collections/:id')
+  @Delete("collections/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a collection' })
-  @ApiParam({ name: 'id', description: 'Collection ID' })
+  @ApiOperation({ summary: "Delete a collection" })
+  @ApiParam({ name: "id", description: "Collection ID" })
   async deleteCollection(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.adminService.deleteAdminCollection(adminId, id);
   }
 
-  @Post('collections/:id/items')
+  @Post("collections/:id/items")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Add products to a collection' })
-  @ApiParam({ name: 'id', description: 'Collection ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Products added' })
+  @ApiOperation({ summary: "Add products to a collection" })
+  @ApiParam({ name: "id", description: "Collection ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Products added" })
   async addItemsToCollection(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() body: { productIds: string[] },
   ) {
     return this.adminService.addItemsToCollection(adminId, id, body.productIds);
   }
 
-  @Delete('collections/:collectionId/items/:itemId')
+  @Delete("collections/:collectionId/items/:itemId")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remove an item from a collection' })
-  @ApiParam({ name: 'collectionId', description: 'Collection ID' })
-  @ApiParam({ name: 'itemId', description: 'Collection Item ID' })
+  @ApiOperation({ summary: "Remove an item from a collection" })
+  @ApiParam({ name: "collectionId", description: "Collection ID" })
+  @ApiParam({ name: "itemId", description: "Collection Item ID" })
   async removeItemFromCollection(
-    @Param('collectionId') collectionId: string,
-    @Param('itemId') itemId: string,
-    @CurrentUser('id') adminId: string,
+    @Param("collectionId") collectionId: string,
+    @Param("itemId") itemId: string,
+    @CurrentUser("id") adminId: string,
   ) {
-    return this.adminService.removeItemFromAdminCollection(adminId, collectionId, itemId);
+    return this.adminService.removeItemFromAdminCollection(
+      adminId,
+      collectionId,
+      itemId,
+    );
   }
 
-  @Patch('collections/:id/visibility')
+  @Patch("collections/:id/visibility")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Set collection visibility' })
-  @ApiParam({ name: 'id', description: 'Collection ID' })
+  @ApiOperation({ summary: "Set collection visibility" })
+  @ApiParam({ name: "id", description: "Collection ID" })
   async setCollectionVisibility(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() body: { isPublic: boolean },
   ) {
-    return this.adminService.setCollectionVisibility(adminId, id, body.isPublic);
+    return this.adminService.setCollectionVisibility(
+      adminId,
+      id,
+      body.isPublic,
+    );
   }
 
-  @Patch('collections/:id/featured')
+  @Patch("collections/:id/featured")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Set collection featured status' })
-  @ApiParam({ name: 'id', description: 'Collection ID' })
+  @ApiOperation({ summary: "Set collection featured status" })
+  @ApiParam({ name: "id", description: "Collection ID" })
   async setCollectionFeatured(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() body: { isFeatured: boolean },
   ) {
-    return this.adminService.setCollectionFeatured(adminId, id, body.isFeatured);
+    return this.adminService.setCollectionFeatured(
+      adminId,
+      id,
+      body.isFeatured,
+    );
   }
-
-
 }

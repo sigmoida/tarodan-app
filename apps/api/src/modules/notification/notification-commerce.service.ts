@@ -3,12 +3,12 @@
  * Order / offer / trade / back-in-stock domain wrappers. Each builds a payload
  * and delegates delivery to the shared NotificationDispatchService engine.
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { NotificationType, NotificationChannel } from './dto';
-import { StorageService } from '../storage/storage.service';
-import { NotificationDispatchService } from './notification-dispatch.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { NotificationType, NotificationChannel } from "./dto";
+import { StorageService } from "../storage/storage.service";
+import { NotificationDispatchService } from "./notification-dispatch.service";
 
 @Injectable()
 export class NotificationCommerceService {
@@ -33,19 +33,30 @@ export class NotificationCommerceService {
     });
     // Template email — fetch order details for rich content
     const [user, order] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: buyerId }, select: { displayName: true } }),
+      this.prisma.user.findUnique({
+        where: { id: buyerId },
+        select: { displayName: true },
+      }),
       this.prisma.order.findUnique({
         where: { id: orderId },
-        select: { orderNumber: true, totalAmount: true, product: { select: { title: true } } },
+        select: {
+          orderNumber: true,
+          totalAmount: true,
+          product: { select: { title: true } },
+        },
       }),
     ]);
-    await this.dispatch.sendTemplateEmailToUser(buyerId, 'order-created-buyer', {
-      buyerName: user?.displayName || '',
-      orderNumber: order?.orderNumber || '',
-      productTitle: order?.product?.title || '',
-      totalAmount: order?.totalAmount ? Number(order.totalAmount) : amount,
-      orderId,
-    });
+    await this.dispatch.sendTemplateEmailToUser(
+      buyerId,
+      "order-created-buyer",
+      {
+        buyerName: user?.displayName || "",
+        orderNumber: order?.orderNumber || "",
+        productTitle: order?.product?.title || "",
+        totalAmount: order?.totalAmount ? Number(order.totalAmount) : amount,
+        orderId,
+      },
+    );
   }
 
   async notifyOrderPaid(sellerId: string, orderId: string, amount: number) {
@@ -57,7 +68,11 @@ export class NotificationCommerceService {
     });
   }
 
-  async notifyOrderShipped(buyerId: string, orderId: string, trackingNumber: string) {
+  async notifyOrderShipped(
+    buyerId: string,
+    orderId: string,
+    trackingNumber: string,
+  ) {
     return this.dispatch.send({
       userId: buyerId,
       type: NotificationType.ORDER_SHIPPED,
@@ -75,7 +90,10 @@ export class NotificationCommerceService {
       userId: buyerId,
       type: NotificationType.ORDER_DELIVERED_CONFIRM,
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
-      data: { orderId, confirmationDeadline: confirmationDeadline.toISOString() },
+      data: {
+        orderId,
+        confirmationDeadline: confirmationDeadline.toISOString(),
+      },
     });
   }
 
@@ -118,21 +136,35 @@ export class NotificationCommerceService {
       data: { orderId },
     });
     const [user, order] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: buyerId }, select: { displayName: true } }),
-      this.prisma.order.findUnique({ where: { id: orderId }, select: { orderNumber: true, totalAmount: true } }),
+      this.prisma.user.findUnique({
+        where: { id: buyerId },
+        select: { displayName: true },
+      }),
+      this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { orderNumber: true, totalAmount: true },
+      }),
     ]);
-    await this.dispatch.sendTemplateEmailToUser(buyerId, 'seller-did-not-ship-refunded', {
-      name: user?.displayName || '',
-      orderNumber: order?.orderNumber || orderId,
-      orderId,
-      refundAmount: order?.totalAmount ? Number(order.totalAmount) : 0,
-    });
+    await this.dispatch.sendTemplateEmailToUser(
+      buyerId,
+      "seller-did-not-ship-refunded",
+      {
+        name: user?.displayName || "",
+        orderNumber: order?.orderNumber || orderId,
+        orderId,
+        refundAmount: order?.totalAmount ? Number(order.totalAmount) : 0,
+      },
+    );
   }
 
   /**
    * Send offer notification
    */
-  async notifyOfferReceived(sellerId: string, productId: string, amount: number) {
+  async notifyOfferReceived(
+    sellerId: string,
+    productId: string,
+    amount: number,
+  ) {
     return this.dispatch.send({
       userId: sellerId,
       type: NotificationType.OFFER_RECEIVED,
@@ -141,7 +173,11 @@ export class NotificationCommerceService {
     });
   }
 
-  async notifyOfferAccepted(buyerId: string, productId: string, amount: number) {
+  async notifyOfferAccepted(
+    buyerId: string,
+    productId: string,
+    amount: number,
+  ) {
     return this.dispatch.send({
       userId: buyerId,
       type: NotificationType.OFFER_ACCEPTED,
@@ -171,7 +207,7 @@ export class NotificationCommerceService {
         categoryId: true,
         category: { select: { slug: true, name: true } },
         images: {
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
           take: 1,
           select: { cardKey: true },
         },
@@ -180,11 +216,13 @@ export class NotificationCommerceService {
     const cardKey = product?.images[0]?.cardKey ?? null;
     return {
       productId,
-      productTitle: product?.title ?? '',
+      productTitle: product?.title ?? "",
       // Resolve to a public URL — clients (notification bell, unavailable
       // page) can render <img src=...> directly. Without this, they'd get
       // a raw S3 key like "products/abc/card.jpg" which won't load.
-      productImage: cardKey ? this.storageService.getPublicAssetUrl(cardKey) : null,
+      productImage: cardKey
+        ? this.storageService.getPublicAssetUrl(cardKey)
+        : null,
       categoryId: product?.categoryId ?? null,
       categorySlug: product?.category?.slug ?? null,
       categoryName: product?.category?.name ?? null,
@@ -192,7 +230,10 @@ export class NotificationCommerceService {
   }
 
   async notifyOrderCancelledOutOfStock(
-    buyerId: string, productId: string, _productTitle: string, _categoryId: string | null,
+    buyerId: string,
+    productId: string,
+    _productTitle: string,
+    _categoryId: string | null,
   ) {
     const data = await this.buildStockoutData(productId);
     return this.dispatch.send({
@@ -203,7 +244,10 @@ export class NotificationCommerceService {
   }
 
   async notifyOfferCancelledOutOfStock(
-    buyerId: string, productId: string, _productTitle: string, _categoryId: string | null,
+    buyerId: string,
+    productId: string,
+    _productTitle: string,
+    _categoryId: string | null,
   ) {
     const data = await this.buildStockoutData(productId);
     return this.dispatch.send({
@@ -215,7 +259,9 @@ export class NotificationCommerceService {
   }
 
   async notifyReservationReleased(
-    buyerId: string, orderId: string, productTitle: string,
+    buyerId: string,
+    orderId: string,
+    productTitle: string,
   ) {
     return this.dispatch.send({
       userId: buyerId,
@@ -226,7 +272,9 @@ export class NotificationCommerceService {
   }
 
   async notifyOrderPaymentExpired(
-    buyerId: string, orderId: string, productTitle: string,
+    buyerId: string,
+    orderId: string,
+    productTitle: string,
   ) {
     return this.dispatch.send({
       userId: buyerId,
@@ -259,27 +307,37 @@ export class NotificationCommerceService {
       });
       if (!order) return;
       const reason = order.cancelReason ?? undefined;
-      const productTitle = order.product?.title ?? '';
+      const productTitle = order.product?.title ?? "";
 
-      await this.dispatch.sendTemplateEmailToUser(order.buyerId, 'order-cancelled-buyer', {
-        buyerName: order.buyer?.displayName ?? '',
-        orderNumber: order.orderNumber,
-        orderId: order.id,
-        productTitle,
-        reason,
-      });
-
-      if (order.sellerId) {
-        await this.dispatch.sendTemplateEmailToUser(order.sellerId, 'order-cancelled-seller', {
-          sellerName: order.seller?.displayName ?? '',
+      await this.dispatch.sendTemplateEmailToUser(
+        order.buyerId,
+        "order-cancelled-buyer",
+        {
+          buyerName: order.buyer?.displayName ?? "",
           orderNumber: order.orderNumber,
           orderId: order.id,
           productTitle,
           reason,
-        });
+        },
+      );
+
+      if (order.sellerId) {
+        await this.dispatch.sendTemplateEmailToUser(
+          order.sellerId,
+          "order-cancelled-seller",
+          {
+            sellerName: order.seller?.displayName ?? "",
+            orderNumber: order.orderNumber,
+            orderId: order.id,
+            productTitle,
+            reason,
+          },
+        );
       }
     } catch (err: any) {
-      this.logger.warn(`sendOrderCancelledEmails failed for order ${orderId}: ${err?.message}`);
+      this.logger.warn(
+        `sendOrderCancelledEmails failed for order ${orderId}: ${err?.message}`,
+      );
     }
   }
 
@@ -290,37 +348,42 @@ export class NotificationCommerceService {
    * Caller should only invoke this when product availability transitions
    * from <=0 to >0 (admin restock, refund, payment failure release).
    */
-  async broadcastBackInStock(productId: string, productTitle: string): Promise<void> {
+  async broadcastBackInStock(
+    productId: string,
+    productTitle: string,
+  ): Promise<void> {
     const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const STOCKOUT_REASONS = [
-      'Stok tükendi',
-      'Stok tükendiği için otomatik iptal edildi',
+      "Stok tükendi",
+      "Stok tükendiği için otomatik iptal edildi",
     ];
 
-    const [wishlistItems, cancelledOrders, cancelledOffers] = await Promise.all([
-      this.prisma.wishlistItem.findMany({
-        where: { productId },
-        include: { wishlist: { select: { userId: true } } },
-      }),
-      this.prisma.order.findMany({
-        where: {
-          productId,
-          status: 'cancelled' as any,
-          cancelReason: { in: STOCKOUT_REASONS },
-          updatedAt: { gte: SEVEN_DAYS_AGO },
-        },
-        select: { buyerId: true },
-      }),
-      this.prisma.offer.findMany({
-        where: {
-          productId,
-          status: 'cancelled' as any,
-          cancelReason: { in: STOCKOUT_REASONS },
-          updatedAt: { gte: SEVEN_DAYS_AGO },
-        },
-        select: { buyerId: true },
-      }),
-    ]);
+    const [wishlistItems, cancelledOrders, cancelledOffers] = await Promise.all(
+      [
+        this.prisma.wishlistItem.findMany({
+          where: { productId },
+          include: { wishlist: { select: { userId: true } } },
+        }),
+        this.prisma.order.findMany({
+          where: {
+            productId,
+            status: "cancelled" as any,
+            cancelReason: { in: STOCKOUT_REASONS },
+            updatedAt: { gte: SEVEN_DAYS_AGO },
+          },
+          select: { buyerId: true },
+        }),
+        this.prisma.offer.findMany({
+          where: {
+            productId,
+            status: "cancelled" as any,
+            cancelReason: { in: STOCKOUT_REASONS },
+            updatedAt: { gte: SEVEN_DAYS_AGO },
+          },
+          select: { buyerId: true },
+        }),
+      ],
+    );
 
     const userIds = Array.from(
       new Set(
@@ -338,7 +401,7 @@ export class NotificationCommerceService {
       where: {
         userId: { in: userIds },
         type: NotificationType.BACK_IN_STOCK as any,
-        channel: 'in_app',
+        channel: "in_app",
         createdAt: { gte: since },
       },
       select: { userId: true, data: true },
@@ -361,7 +424,11 @@ export class NotificationCommerceService {
     }
   }
 
-  async notifyBackInStock(userId: string, productId: string, _productTitle: string) {
+  async notifyBackInStock(
+    userId: string,
+    productId: string,
+    _productTitle: string,
+  ) {
     // Enrich payload (productImage, categorySlug, ...) so the notification
     // bell can render a thumbnail and the click-through can land on the
     // unavailable-page back-in-stock variant without an extra fetch.
@@ -372,8 +439,9 @@ export class NotificationCommerceService {
       data,
     });
     // "Stoğa geri geldi" e-postası — in-app/push'un yanında markalı mail.
-    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
-    await this.dispatch.sendTemplateEmailToUser(userId, 'back-in-stock', {
+    const frontendUrl =
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+    await this.dispatch.sendTemplateEmailToUser(userId, "back-in-stock", {
       productTitle: data.productTitle,
       productUrl: `${frontendUrl}/products/${productId}`,
     });
@@ -390,12 +458,16 @@ export class NotificationCommerceService {
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId },
     });
-    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
-    const user = await this.prisma.user.findUnique({ where: { id: receiverId }, select: { displayName: true } });
-    await this.dispatch.sendTemplateEmailToUser(receiverId, 'trade-received', {
-      name: user?.displayName || '',
+    const frontendUrl =
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+    const user = await this.prisma.user.findUnique({
+      where: { id: receiverId },
+      select: { displayName: true },
+    });
+    await this.dispatch.sendTemplateEmailToUser(receiverId, "trade-received", {
+      name: user?.displayName || "",
       tradeId,
-      tradeUrl: `${frontendUrl}/trades/${tradeId}`,
+      tradeUrl: `${frontendUrl}/profile/trades/${tradeId}`,
     });
   }
 
@@ -403,32 +475,48 @@ export class NotificationCommerceService {
     await this.dispatch.send({
       userId: initiatorId,
       type: NotificationType.TRADE_ACCEPTED,
-      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP, NotificationChannel.SMS],
+      channels: [
+        NotificationChannel.PUSH,
+        NotificationChannel.IN_APP,
+        NotificationChannel.SMS,
+      ],
       data: { tradeId },
     });
-    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
-    const user = await this.prisma.user.findUnique({ where: { id: initiatorId }, select: { displayName: true } });
-    await this.dispatch.sendTemplateEmailToUser(initiatorId, 'trade-accepted', {
-      name: user?.displayName || '',
+    const frontendUrl =
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+    const user = await this.prisma.user.findUnique({
+      where: { id: initiatorId },
+      select: { displayName: true },
+    });
+    await this.dispatch.sendTemplateEmailToUser(initiatorId, "trade-accepted", {
+      name: user?.displayName || "",
       tradeId,
-      tradeUrl: `${frontendUrl}/trades/${tradeId}`,
+      tradeUrl: `${frontendUrl}/profile/trades/${tradeId}`,
     });
   }
 
-  async notifyTradeShipped(receiverId: string, tradeId: string, trackingNumber: string) {
+  async notifyTradeShipped(
+    receiverId: string,
+    tradeId: string,
+    trackingNumber: string,
+  ) {
     await this.dispatch.send({
       userId: receiverId,
       type: NotificationType.TRADE_SHIPPED,
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId, trackingNumber },
     });
-    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
-    const user = await this.prisma.user.findUnique({ where: { id: receiverId }, select: { displayName: true } });
-    await this.dispatch.sendTemplateEmailToUser(receiverId, 'trade-shipped', {
-      name: user?.displayName || '',
+    const frontendUrl =
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+    const user = await this.prisma.user.findUnique({
+      where: { id: receiverId },
+      select: { displayName: true },
+    });
+    await this.dispatch.sendTemplateEmailToUser(receiverId, "trade-shipped", {
+      name: user?.displayName || "",
       trackingNumber,
       tradeId,
-      tradeUrl: `${frontendUrl}/trades/${tradeId}`,
+      tradeUrl: `${frontendUrl}/profile/trades/${tradeId}`,
     });
   }
 
@@ -439,12 +527,16 @@ export class NotificationCommerceService {
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId },
     });
-    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } });
-    await this.dispatch.sendTemplateEmailToUser(userId, 'trade-completed', {
-      name: user?.displayName || '',
+    const frontendUrl =
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true },
+    });
+    await this.dispatch.sendTemplateEmailToUser(userId, "trade-completed", {
+      name: user?.displayName || "",
       tradeId,
-      tradeUrl: `${frontendUrl}/trades/${tradeId}`,
+      tradeUrl: `${frontendUrl}/profile/trades/${tradeId}`,
     });
   }
 }

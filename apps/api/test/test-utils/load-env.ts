@@ -12,42 +12,44 @@
  *    our test values survive.
  */
 
-import { config as loadDotenv } from 'dotenv';
-import { existsSync } from 'fs';
-import { resolve } from 'path';
+import { config as loadDotenv } from "dotenv";
+import { existsSync } from "fs";
+import { resolve } from "path";
 
-process.env.NODE_ENV = 'test';
+process.env.NODE_ENV = "test";
 
 const ENV_KEYS_TO_RESET = [
-  'DATABASE_URL',
-  'REDIS_URL',
-  'REDIS_HOST',
-  'REDIS_PORT',
-  'ELASTICSEARCH_NODE',
-  'JWT_SECRET',
-  'JWT_REFRESH_SECRET',
-  'PAYTR_MERCHANT_ID',
-  'PAYTR_MERCHANT_KEY',
-  'PAYTR_MERCHANT_SALT',
-  'API_URL',
-  'FRONTEND_URL',
-  'ADMIN_URL',
+  "DATABASE_URL",
+  "REDIS_URL",
+  "REDIS_HOST",
+  "REDIS_PORT",
+  "ELASTICSEARCH_NODE",
+  "JWT_SECRET",
+  "JWT_REFRESH_SECRET",
+  "ADMIN_JWT_SECRET",
+  "GUEST_CHECKOUT_OTP_SECRET",
+  "PAYTR_MERCHANT_ID",
+  "PAYTR_MERCHANT_KEY",
+  "PAYTR_MERCHANT_SALT",
+  "API_URL",
+  "FRONTEND_URL",
+  "ADMIN_URL",
   // Dev-only switches that must NOT leak into tests.
-  'PAYMENT_BYPASS',
-  'SURAT_SOAP_MODE',
-  'SURAT_STUB_RESPONSE',
-  'SURAT_STUB_THROW',
-  'SURAT_CARGO_ENABLED',
-  'SURAT_WEBHOOK_SECRET',
-  'SURAT_KARGO_CARI_KODU',
-  'SURAT_KARGO_SIFRE',
+  "PAYMENT_BYPASS",
+  "SURAT_SOAP_MODE",
+  "SURAT_STUB_RESPONSE",
+  "SURAT_STUB_THROW",
+  "SURAT_CARGO_ENABLED",
+  "SURAT_WEBHOOK_SECRET",
+  "SURAT_KARGO_CARI_KODU",
+  "SURAT_KARGO_SIFRE",
 ];
 
 for (const key of ENV_KEYS_TO_RESET) {
   delete process.env[key];
 }
 
-const envTestPath = resolve(__dirname, '../../.env.test');
+const envTestPath = resolve(__dirname, "../../.env.test");
 if (!existsSync(envTestPath)) {
   // eslint-disable-next-line no-console
   console.error(`[test-setup] .env.test not found at ${envTestPath}`);
@@ -57,12 +59,15 @@ if (!existsSync(envTestPath)) {
 const result = loadDotenv({ path: envTestPath, override: true });
 if (result.error) {
   // eslint-disable-next-line no-console
-  console.error('[test-setup] failed to load .env.test:', result.error);
+  console.error("[test-setup] failed to load .env.test:", result.error);
   process.exit(1);
 }
 
 // Safety: refuse to run if DATABASE_URL still points at a non-test database.
-if (!process.env.DATABASE_URL || !/_test(\?|$)/.test(process.env.DATABASE_URL)) {
+if (
+  !process.env.DATABASE_URL ||
+  !/_test(\?|$)/.test(process.env.DATABASE_URL)
+) {
   // eslint-disable-next-line no-console
   console.error(
     `[test-setup] DATABASE_URL must point to a *_test database. Got: ${process.env.DATABASE_URL}`,

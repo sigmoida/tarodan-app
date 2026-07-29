@@ -1,5 +1,5 @@
-import { editDeleteActions, type RowActionItem } from '@/components/table';
-import type { Ad } from './types';
+import { editDeleteActions, type RowActionItem } from "@/components/table";
+import type { Ad } from "./types";
 
 export interface AdRowActions {
   onEdit: (ad: Ad) => void;
@@ -7,5 +7,6 @@ export interface AdRowActions {
 }
 
 export function adRowMenu({ onEdit, onDelete }: AdRowActions) {
-  return (ad: Ad): RowActionItem[] => editDeleteActions(ad, { onEdit, onDelete });
+  return (ad: Ad): RowActionItem[] =>
+    editDeleteActions(ad, { onEdit, onDelete });
 }

@@ -1,73 +1,130 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { FormInput } from '@tarodan/ui/form';
-import { SectionCard } from '@/components/ui';
+import { useTranslations } from "next-intl";
+import { FormInput } from "@tarodan/ui/form";
+import { SectionCard } from "@/components/ui";
 
 interface PricingCardProps {
-	locale: string;
-	commissionPreview: { sellerFeeAmount: number; sellerNetAmount: number } | null;
-	commissionPreviewLoading: boolean;
-	/** Stock-quantity placeholder + helper differ between new ("1") and edit ("unlimited"). */
-	quantityPlaceholder: string;
-	quantityHelper: string;
+  locale: string;
+  commissionPreview: {
+    sellerFeeAmount: number;
+    withholdingTaxAmount: number;
+    shippingAmount: number;
+    sellerNetAmount: number;
+  } | null;
+  commissionPreviewLoading: boolean;
+  /** Stock-quantity placeholder + helper differ between new ("1") and edit ("unlimited"). */
+  quantityPlaceholder: string;
+  quantityHelper: string;
 }
 
 const fmt = (n: number) =>
-	n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  `₺${n.toLocaleString("tr-TR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 /** "Fiyatlandırma" — price + stock quantity + commission preview. Shared. */
 export default function PricingCard({
-	locale,
-	commissionPreview,
-	commissionPreviewLoading,
-	quantityPlaceholder,
-	quantityHelper,
+  commissionPreview,
+  commissionPreviewLoading,
+  quantityPlaceholder,
+  quantityHelper,
 }: PricingCardProps) {
-	const en = locale === 'en';
-	return (
-		<SectionCard title={en ? 'Pricing' : 'Fiyatlandırma'}>
-			<div className='grid md:grid-cols-2 gap-4'>
-				<FormInput
-					name='price'
-					type='number'
-					label={en ? 'Price (₺) *' : 'Fiyat (₺) *'}
-					placeholder='0.00'
-					min={1}
-					max={9999999}
-					step='0.01'
-				/>
-				<FormInput
-					name='quantity'
-					type='number'
-					label={en ? 'Stock quantity' : 'Stok Miktarı'}
-					placeholder={quantityPlaceholder}
-					min={1}
-					helperText={quantityHelper}
-				/>
-			</div>
+  const t = useTranslations();
+  return (
+    <SectionCard title={t("product.pricing")}>
+      <div className="grid md:grid-cols-2 gap-4">
+        <FormInput
+          name="price"
+          type="number"
+          label={t("product.priceLabel")}
+          placeholder="0.00"
+          min={1}
+          max={9999999}
+          step="0.01"
+        />
+        <FormInput
+          name="quantity"
+          type="number"
+          label={t("product.stockQuantity")}
+          placeholder={quantityPlaceholder}
+          min={1}
+          helperText={quantityHelper}
+        />
+        <FormInput
+          name="shippingDesi"
+          type="number"
+          label={t("product.shippingDesi")}
+          min={1}
+          max={1000}
+          step={1}
+          helperText={t("product.shippingDesiHelper")}
+        />
+      </div>
 
-			{(commissionPreviewLoading || commissionPreview) && (
-				<div className='mt-4 p-3 bg-surface rounded-xl border border-border-subtle text-sm'>
-					<p className='text-muted font-medium mb-1'>
-						{en ? 'Estimated (per sale)' : 'Tahmini (satış başına)'}
-					</p>
-					{commissionPreviewLoading ? (
-						<span className='text-subtle'>{en ? 'Calculating...' : 'Hesaplanıyor...'}</span>
-					) : commissionPreview ? (
-						<div className='flex flex-wrap gap-x-4 gap-y-1'>
-							<span className='text-muted'>
-								{en ? 'Platform deduction' : 'Platform kesintisi'}: ₺
-								{fmt(commissionPreview.sellerFeeAmount)}
-							</span>
-							<span className='text-success-700 font-medium'>
-								{en ? 'Net to you' : 'Net kazanç'}: ₺{fmt(commissionPreview.sellerNetAmount)}
-							</span>
-						</div>
-					) : null}
-				</div>
-			)}
-		</SectionCard>
-	);
+      {(commissionPreviewLoading || commissionPreview) && (
+        <div className="mt-4 p-4 bg-surface rounded-xl border border-border-subtle text-sm">
+          <p className="text-muted font-medium mb-3">
+            {t("product.estimatedPerSale")}
+          </p>
+          {commissionPreviewLoading ? (
+            <span className="text-subtle">{t("product.calculating")}</span>
+          ) : commissionPreview ? (
+            <PricingBreakdown preview={commissionPreview} />
+          ) : null}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+/** Per-sale summary shown to the seller: only the net take-home ("elde kalan"),
+ *  with all commission/withholding deductions already folded in, plus the
+ *  seller-paid shipping deduction. No itemised commission/list-price rows. */
+function PricingBreakdown({
+  preview,
+}: {
+  preview: NonNullable<PricingCardProps["commissionPreview"]>;
+}) {
+  const t = useTranslations();
+  const { shippingAmount, sellerNetAmount } = preview;
+
+  return (
+    <div className="space-y-2">
+      <Row
+        label={t("product.netToYou")}
+        value={fmt(sellerNetAmount)}
+        tone="net"
+      />
+      <Row label={t("product.shippingLine")} value={fmt(shippingAmount)} />
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "deduction" | "net";
+}) {
+  const labelClass =
+    tone === "net" ? "text-heading font-semibold" : "text-muted";
+  const valueClass =
+    tone === "net"
+      ? "text-success-700 font-semibold"
+      : tone === "deduction"
+        ? "text-danger-700"
+        : "text-heading font-medium";
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className={labelClass}>{label}</span>
+      <span className={`tabular-nums ${valueClass}`}>{value}</span>
+    </div>
+  );
 }

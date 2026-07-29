@@ -30,6 +30,7 @@ export interface ProductAttributeEntry {
 export interface Product {
   id: string | number;
   title: string;
+  description?: string;
   price: number;
   originalPrice?: number | null;
   oldPrice?: number | null;

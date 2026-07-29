@@ -3,9 +3,13 @@ import {
   ShieldExclamationIcon,
   EnvelopeIcon,
   ClipboardDocumentIcon,
-} from '@heroicons/react/24/outline';
+} from "@heroicons/react/24/outline";
+import type { ComponentType } from "react";
+import type { useTranslations } from "next-intl";
 
-export type LogTab = 'errors' | 'security' | 'emails' | 'audit';
+type T = ReturnType<typeof useTranslations<never>>;
+
+export type LogTab = "errors" | "security" | "emails" | "audit";
 
 export interface ErrorLog {
   id: string;
@@ -78,110 +82,117 @@ export interface AuditLog {
 
 export type AnyLog = ErrorLog | SecurityLog | EmailLog | AuditLog;
 
-export const LOG_TABS: { key: LogTab; label: string; icon: React.ElementType; description: string }[] = [
+export const logTabs = (
+  t: T,
+): {
+  key: LogTab;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  description: string;
+}[] => [
   {
-    key: 'errors',
-    label: 'Hata Logları',
+    key: "errors",
+    label: t("admin.system.logs.tabs.errors.label"),
     icon: ExclamationTriangleIcon,
-    description: 'API isteklerinde oluşan HTTP 4xx/5xx hataları, stack trace ve request detayları',
+    description: t("admin.system.logs.tabs.errors.description"),
   },
   {
-    key: 'security',
-    label: 'Güvenlik Logları',
+    key: "security",
+    label: t("admin.system.logs.tabs.security.label"),
     icon: ShieldExclamationIcon,
-    description: 'Başarısız girişler, IP engellemeleri ve şüpheli aktivite gibi güvenlik olayları',
+    description: t("admin.system.logs.tabs.security.description"),
   },
   {
-    key: 'emails',
-    label: 'E-posta Logları',
+    key: "emails",
+    label: t("admin.system.logs.tabs.emails.label"),
     icon: EnvelopeIcon,
-    description: 'Sistem tarafından gönderilen tüm e-postaların gönderim durumu ve teslim bilgileri',
+    description: t("admin.system.logs.tabs.emails.description"),
   },
   {
-    key: 'audit',
-    label: 'Denetim Logları',
+    key: "audit",
+    label: t("admin.system.logs.tabs.audit.label"),
     icon: ClipboardDocumentIcon,
-    description: 'Admin kullanıcıların yaptığı işlemler — kim, ne zaman, hangi kaydı değiştirdi',
+    description: t("admin.system.logs.tabs.audit.description"),
   },
 ];
 
 export const severityColors: Record<string, string> = {
-  critical: 'bg-danger-500/10 text-danger-600 border-danger-500/20',
-  high: 'bg-danger-500/10 text-danger-600 border-danger-500/20',
-  error: 'bg-danger-500/10 text-danger-600 border-danger-500/20',
-  medium: 'bg-warning-500/10 text-warning-700 border-warning-500/20',
-  warning: 'bg-warning-500/10 text-warning-700 border-warning-500/20',
-  low: 'bg-info-500/10 text-info-700 border-info-500/20',
+  critical: "bg-danger-500/10 text-danger-600 border-danger-500/20",
+  high: "bg-danger-500/10 text-danger-600 border-danger-500/20",
+  error: "bg-danger-500/10 text-danger-600 border-danger-500/20",
+  medium: "bg-warning-500/10 text-warning-700 border-warning-500/20",
+  warning: "bg-warning-500/10 text-warning-700 border-warning-500/20",
+  low: "bg-info-500/10 text-info-700 border-info-500/20",
 };
 
 export const statusColors: Record<string, string> = {
-  sent: 'bg-success-500/10 text-success-700',
-  delivered: 'bg-success-500/10 text-success-700',
-  queued: 'bg-warning-500/10 text-warning-700',
-  bounced: 'bg-danger-500/10 text-danger-600',
-  failed: 'bg-danger-500/10 text-danger-600',
+  sent: "bg-success-500/10 text-success-700",
+  delivered: "bg-success-500/10 text-success-700",
+  queued: "bg-warning-500/10 text-warning-700",
+  bounced: "bg-danger-500/10 text-danger-600",
+  failed: "bg-danger-500/10 text-danger-600",
 };
 
-export const eventTypeLabels: Record<string, string> = {
-  failed_login: 'Başarısız Giriş',
-  ip_block: 'IP Engelleme',
-  suspicious_activity: 'Şüpheli Aktivite',
-  password_reset: 'Şifre Sıfırlama',
-  '2fa_enabled': '2FA Aktif',
-  account_locked: 'Hesap Kilitlendi',
-};
+export const eventTypeLabels = (t: T): Record<string, string> => ({
+  failed_login: t("admin.system.logs.events.failedLogin"),
+  ip_block: t("admin.system.logs.events.ipBlock"),
+  suspicious_activity: t("admin.system.logs.events.suspiciousActivity"),
+  password_reset: t("admin.system.logs.events.passwordReset"),
+  "2fa_enabled": t("admin.system.logs.events.twoFactorEnabled"),
+  account_locked: t("admin.system.logs.events.accountLocked"),
+});
 
-export const ACTION_LABELS: Record<string, string> = {
-  user_ban: 'Kullanıcı Banlandı',
-  user_unban: 'Ban Kaldırıldı',
-  product_approve: 'Ürün Onaylandı',
-  product_reject: 'Ürün Reddedildi',
-  product_delete: 'Ürün Silindi',
-  order_update: 'Sipariş Güncellendi',
-  payment_refund: 'Ödeme İadesi',
-  category_create: 'Kategori Oluşturuldu',
-  category_update: 'Kategori Güncellendi',
-  category_delete: 'Kategori Silindi',
-  commission_rule_create: 'Komisyon Kuralı Oluşturuldu',
-  commission_rule_update: 'Komisyon Kuralı Güncellendi',
-  commission_rule_delete: 'Komisyon Kuralı Silindi',
-  trade_resolve: 'Takas Çözümlendi',
-  message_approve: 'Mesaj Onaylandı',
-  message_reject: 'Mesaj Reddedildi',
-};
+export const actionLabels = (t: T): Record<string, string> => ({
+  user_ban: t("admin.system.logs.actions.userBan"),
+  user_unban: t("admin.system.logs.actions.userUnban"),
+  product_approve: t("admin.system.logs.actions.productApprove"),
+  product_reject: t("admin.system.logs.actions.productReject"),
+  product_delete: t("admin.system.logs.actions.productDelete"),
+  order_update: t("admin.system.logs.actions.orderUpdate"),
+  payment_refund: t("admin.system.logs.actions.paymentRefund"),
+  category_create: t("admin.system.logs.actions.categoryCreate"),
+  category_update: t("admin.system.logs.actions.categoryUpdate"),
+  category_delete: t("admin.system.logs.actions.categoryDelete"),
+  commission_rule_create: t("admin.system.logs.actions.commissionRuleCreate"),
+  commission_rule_update: t("admin.system.logs.actions.commissionRuleUpdate"),
+  commission_rule_delete: t("admin.system.logs.actions.commissionRuleDelete"),
+  trade_resolve: t("admin.system.logs.actions.tradeResolve"),
+  message_approve: t("admin.system.logs.actions.messageApprove"),
+  message_reject: t("admin.system.logs.actions.messageReject"),
+});
 
-export const ENTITY_LABELS: Record<string, string> = {
-  User: 'Kullanıcı',
-  Product: 'Ürün',
-  Order: 'Sipariş',
-  Payment: 'Ödeme',
-  Category: 'Kategori',
-  CommissionRule: 'Komisyon Kuralı',
-  Trade: 'Takas',
-  Message: 'Mesaj',
-  SupportTicket: 'Destek Talebi',
-};
+export const entityLabels = (t: T): Record<string, string> => ({
+  User: t("admin.system.logs.entities.user"),
+  Product: t("admin.system.logs.entities.product"),
+  Order: t("admin.system.logs.entities.order"),
+  Payment: t("admin.system.logs.entities.payment"),
+  Category: t("admin.system.logs.entities.category"),
+  CommissionRule: t("admin.system.logs.entities.commissionRule"),
+  Trade: t("admin.system.logs.entities.trade"),
+  Message: t("admin.system.logs.entities.message"),
+  SupportTicket: t("admin.system.logs.entities.supportTicket"),
+});
 
-export const SEARCH_PLACEHOLDERS: Record<LogTab, string> = {
-  errors: 'Hata mesajı ara...',
-  security: 'Olay / IP / e-posta ara...',
-  emails: 'Alıcı / konu ara...',
-  audit: 'İşlem / admin ara...',
-};
+export const searchPlaceholders = (t: T): Record<LogTab, string> => ({
+  errors: t("admin.system.logs.search.errors"),
+  security: t("admin.system.logs.search.security"),
+  emails: t("admin.system.logs.search.emails"),
+  audit: t("admin.system.logs.search.audit"),
+});
 
-export const EMPTY_TEXT: Record<LogTab, string> = {
-  errors: 'Hata logu bulunamadı',
-  security: 'Güvenlik logu bulunamadı',
-  emails: 'E-posta logu bulunamadı',
-  audit: 'Denetim logu bulunamadı',
-};
+export const emptyText = (t: T): Record<LogTab, string> => ({
+  errors: t("admin.system.logs.empty.errors"),
+  security: t("admin.system.logs.empty.security"),
+  emails: t("admin.system.logs.empty.emails"),
+  audit: t("admin.system.logs.empty.audit"),
+});
 
-export function formatDate(date: string) {
-  return new Date(date).toLocaleString('tr-TR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+export function formatDate(date: string, locale: string) {
+  return new Date(date).toLocaleString(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }

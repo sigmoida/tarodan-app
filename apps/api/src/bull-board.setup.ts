@@ -1,13 +1,13 @@
-import { Logger } from '@nestjs/common';
-import { getQueueToken } from '@nestjs/bull';
-import { Module } from 'module';
-import type { NestExpressApplication } from '@nestjs/platform-express';
-import type { Request, Response, NextFunction } from 'express';
-import { QUEUE_NAMES } from './workers/constants';
-import { CronTrackerService } from './monitoring/cron-tracker.service';
-import type { CronRunRecord } from './monitoring/cron-tracker.service';
+import { Logger } from "@nestjs/common";
+import { getQueueToken } from "@nestjs/bull";
+import { Module } from "module";
+import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { Request, Response, NextFunction } from "express";
+import { QUEUE_NAMES } from "./workers/constants";
+import { CronTrackerService } from "./monitoring/cron-tracker.service";
+import type { CronRunRecord } from "./monitoring/cron-tracker.service";
 
-const BASE_PATH = '/admin/queues';
+const BASE_PATH = "/admin/queues";
 
 /**
  * pnpm `node-linker=hoisted` altında `bull` paketinin iki fiziksel kopyası
@@ -26,15 +26,17 @@ function alignBullBoardBullCopy(logger: Logger): void {
   try {
     // Bizim (kuyrukların) bull kopyası — bu dosya apps/api bağlamında çalışır,
     // dolayısıyla @nestjs/bull ile aynı kopyayı çözer.
-    const ourBull = require('bull');
+    const ourBull = require("bull");
 
     // bull-board'un BullAdapter'ının çözeceği bull dosya yolu.
-    const adapterDir = require('path').dirname(
-      require.resolve('@bull-board/api/bullAdapter'),
+    const adapterDir = require("path").dirname(
+      require.resolve("@bull-board/api/bullAdapter"),
     );
-    const bbBullPath = Module.createRequire(adapterDir + '/x.js').resolve('bull');
+    const bbBullPath = Module.createRequire(adapterDir + "/x.js").resolve(
+      "bull",
+    );
 
-    const ourBullPath = require.resolve('bull');
+    const ourBullPath = require.resolve("bull");
     if (bbBullPath === ourBullPath) {
       return; // Zaten aynı kopya, yapacak bir şey yok.
     }
@@ -45,7 +47,9 @@ function alignBullBoardBullCopy(logger: Logger): void {
     shim.loaded = true;
     shim.exports = ourBull;
     require.cache[bbBullPath] = shim;
-    logger.log('Bull Board: bull kopyası kuyruklarla hizalandı (pnpm hoist fix).');
+    logger.log(
+      "Bull Board: bull kopyası kuyruklarla hizalandı (pnpm hoist fix).",
+    );
   } catch (e) {
     // Hizalama başarısızsa mount denemesi yine de yapılır; en kötü ihtimalle
     // adapter düzeyinde yakalanır. Açılışı bloklamaz.
@@ -66,16 +70,21 @@ function alignBullBoardBullCopy(logger: Logger): void {
  *     bull-board router'ında yanıtlanıp helmet'e hiç düşmez.
  *   - Her şey try/catch içinde: bir izleme aracı asla API açılışını bloklamaz.
  */
-export function setupBullBoard(app: NestExpressApplication, logger: Logger): void {
-  const isProduction = process.env.NODE_ENV === 'production';
+export function setupBullBoard(
+  app: NestExpressApplication,
+  logger: Logger,
+): void {
+  // Off by default on every deployed environment — including staging — so the
+  // queue dashboard is never exposed unless BULLBOARD_ENABLED=true. Local
+  // development keeps it on for convenience (unless explicitly disabled). Not
+  // driven by the negation of `production` anymore (#69).
+  const isLocalDev = process.env.NODE_ENV === "development";
   const flag = process.env.BULLBOARD_ENABLED;
 
-  if (flag === 'false') {
-    return;
-  }
-  if (isProduction && flag !== 'true') {
+  const enabled = flag === "true" || (isLocalDev && flag !== "false");
+  if (!enabled) {
     logger.log(
-      'Bull Board kapalı (production). Açmak için BULLBOARD_ENABLED=true ayarlayın.',
+      "Bull Board kapalı. Açmak için BULLBOARD_ENABLED=true ayarlayın.",
     );
     return;
   }
@@ -84,9 +93,9 @@ export function setupBullBoard(app: NestExpressApplication, logger: Logger): voi
     alignBullBoardBullCopy(logger);
 
     // Lazy require: bull kopyası hizalandıktan SONRA yüklenmeli.
-    const { createBullBoard } = require('@bull-board/api');
-    const { BullAdapter } = require('@bull-board/api/bullAdapter');
-    const { ExpressAdapter } = require('@bull-board/express');
+    const { createBullBoard } = require("@bull-board/api");
+    const { BullAdapter } = require("@bull-board/api/bullAdapter");
+    const { ExpressAdapter } = require("@bull-board/express");
 
     // Kayıtlı tüm kuyrukları Nest DI'dan çöz (WorkerModule -> AppModule).
     const adapters = Object.values(QUEUE_NAMES)
@@ -104,7 +113,7 @@ export function setupBullBoard(app: NestExpressApplication, logger: Logger): voi
       .filter((a): a is unknown => a !== null);
 
     if (adapters.length === 0) {
-      logger.warn('Bull Board: hiç kuyruk çözülemedi, mount atlandı.');
+      logger.warn("Bull Board: hiç kuyruk çözülemedi, mount atlandı.");
       return;
     }
 
@@ -112,24 +121,27 @@ export function setupBullBoard(app: NestExpressApplication, logger: Logger): voi
     serverAdapter.setBasePath(BASE_PATH);
     createBullBoard({ queues: adapters, serverAdapter });
 
-    // Basic Auth — internal ops aracı. Prod'da şifresiz mount'a izin verme.
-    const user = process.env.BULLBOARD_USER || 'admin';
-    const pass = process.env.BULLBOARD_PASS || (isProduction ? '' : 'admin');
+    // Basic Auth — internal ops aracı. Only local dev gets a default password;
+    // every deployed environment (incl. staging) must set BULLBOARD_PASS or the
+    // dashboard is refused rather than mounted unprotected (#69).
+    const user = process.env.BULLBOARD_USER || "admin";
+    const pass = process.env.BULLBOARD_PASS || (isLocalDev ? "admin" : "");
     if (!pass) {
       logger.warn(
-        "Bull Board: production'da BULLBOARD_PASS tanımsız; korumasız dashboard mount EDİLMEDİ.",
+        "Bull Board: BULLBOARD_PASS tanımsız; korumasız dashboard mount EDİLMEDİ.",
       );
       return;
     }
-    const expected = 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
+    const expected =
+      "Basic " + Buffer.from(`${user}:${pass}`).toString("base64");
 
     const auth = (req: Request, res: Response, next: NextFunction): void => {
       if (req.headers.authorization === expected) {
         next();
         return;
       }
-      res.set('WWW-Authenticate', 'Basic realm="Tarodan Queues"');
-      res.status(401).send('Authentication required');
+      res.set("WWW-Authenticate", 'Basic realm="Tarodan Queues"');
+      res.status(401).send("Authentication required");
     };
 
     app.use(BASE_PATH, auth, serverAdapter.getRouter());
@@ -147,10 +159,10 @@ export function setupBullBoard(app: NestExpressApplication, logger: Logger): voi
   }
 }
 
-const JOBS_PATH = '/admin/jobs';
+const JOBS_PATH = "/admin/jobs";
 
 /**
- * 22 @TrackedCron işini tek ekranda gösterir: son durum, son çalışma, süre,
+ * Bull cron işlerini tek ekranda gösterir (in-process ikizler kaldırıldı, Bull-only): son durum, son çalışma, süre,
  * hata, toplam çalışma/başarısızlık. Bull Board ile aynı Basic Auth'u paylaşır.
  *   - GET /admin/jobs       -> HTML tablo (3 sn'de bir otomatik yenilenir)
  *   - GET /admin/jobs/api   -> JSON (programatik erişim / Sentry karşılaştırma)
@@ -164,18 +176,22 @@ function mountCronDashboard(
   try {
     tracker = app.get(CronTrackerService, { strict: false });
   } catch {
-    logger.warn('Cron dashboard: CronTrackerService çözülemedi, /admin/jobs atlandı.');
+    logger.warn(
+      "Cron dashboard: CronTrackerService çözülemedi, /admin/jobs atlandı.",
+    );
     return;
   }
   if (!tracker) return;
 
   app.use(JOBS_PATH, auth, (req: Request, res: Response) => {
     const records = tracker!.list();
-    if (req.path === '/api' || req.path === '/api/') {
+    if (req.path === "/api" || req.path === "/api/") {
       res.json({ count: records.length, jobs: records });
       return;
     }
-    res.set('Content-Type', 'text/html; charset=utf-8').send(renderCronHtml(records));
+    res
+      .set("Content-Type", "text/html; charset=utf-8")
+      .send(renderCronHtml(records));
   });
 
   logger.log(
@@ -184,33 +200,37 @@ function mountCronDashboard(
 }
 
 function esc(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  return s.replace(
+    /[&<>"]/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string,
+  );
 }
 
 function renderCronHtml(records: CronRunRecord[]): string {
   const color: Record<string, string> = {
-    success: '#1a7f37',
-    failed: '#cf222e',
-    running: '#9a6700',
-    idle: '#57606a',
+    success: "#1a7f37",
+    failed: "#cf222e",
+    running: "#9a6700",
+    idle: "#57606a",
   };
   const rows = records
     .map((r) => {
-      const c = color[r.status] ?? '#57606a';
+      const c = color[r.status] ?? "#57606a";
       return `<tr>
         <td><code>${esc(r.job)}</code></td>
         <td><code>${esc(r.schedule)}</code></td>
         <td><b style="color:${c}">${esc(r.status.toUpperCase())}</b></td>
-        <td>${r.lastStartedAt ? esc(r.lastStartedAt.replace('T', ' ').slice(0, 19)) : '—'}</td>
-        <td>${r.lastDurationMs != null ? r.lastDurationMs + ' ms' : '—'}</td>
+        <td>${r.lastStartedAt ? esc(r.lastStartedAt.replace("T", " ").slice(0, 19)) : "—"}</td>
+        <td>${r.lastDurationMs != null ? r.lastDurationMs + " ms" : "—"}</td>
         <td>${r.runs}</td>
-        <td style="color:${r.failures ? '#cf222e' : 'inherit'}">${r.failures}</td>
-        <td style="color:#cf222e">${r.lastError ? esc(r.lastError) : ''}</td>
+        <td style="color:${r.failures ? "#cf222e" : "inherit"}">${r.failures}</td>
+        <td style="color:#cf222e">${r.lastError ? esc(r.lastError) : ""}</td>
       </tr>`;
     })
-    .join('');
+    .join("");
   const empty = records.length
-    ? ''
+    ? ""
     : '<tr><td colspan="8" style="color:#57606a">Henüz cron çalışmadı (kayıtlar ilk tetiklenmede görünür).</td></tr>';
   return `<!doctype html><html lang="tr"><head><meta charset="utf-8">
 <meta http-equiv="refresh" content="3">

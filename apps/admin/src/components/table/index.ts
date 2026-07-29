@@ -1,14 +1,14 @@
-import './meta';
+import "./meta";
 
-export { col, type ColOpts } from './columns';
+export { col, type ColOpts } from "./columns";
 export {
   RowActionMenu,
   activeToggleAction,
   editDeleteActions,
   type RowAction,
   type RowActionItem,
-} from './RowActionMenu';
-export { TruncatedText } from './TruncatedText';
+} from "./RowActionMenu";
+export { TruncatedText } from "./TruncatedText";
 export {
   Empty,
   CellText,
@@ -17,9 +17,18 @@ export {
   CellNumber,
   CellDate,
   CellCode,
+  CellId,
   CellLink,
   CellUser,
   CellBadge,
   CellActions,
-} from './cells';
-export type { CellAlign, CellColumnMeta } from './meta';
+} from "./cells";
+export { SortableHeader } from "./SortableHeader";
+export type {
+  CellAlign,
+  CellColumnMeta,
+  SortType,
+  SortOrder,
+  SortState,
+  SetSort,
+} from "./meta";

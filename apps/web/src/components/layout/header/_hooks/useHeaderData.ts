@@ -1,27 +1,68 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '@/stores/authStore';
-import { useCartStore } from '@/stores/cartStore';
-import { messagesApi, api, wishlistApi } from '@/lib/api';
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthStore } from "@/stores/authStore";
+import { hasAuthMarker } from "@/lib/authMarker";
+import { useCart } from "@/hooks/useCart";
+import { wishlistApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
+import { useHeaderBadgeCounts } from "@/hooks/useHeaderBadgeCounts";
 
 /**
  * The shared header data hook: auth (from the auth store, gated behind hydration
  * so SSR and first client render match) plus every badge count the header and
  * its children render — unread messages, unread notifications, pending
- * offers/trades (polled every 30s while authenticated), the cart count (from
- * the cart store) and the wishlist count (query gated on `showAuthUI`).
+ * offers/trades (socket-refreshed TanStack queries with a slow polling
+ * fallback), the cart count (from the cart store) and the wishlist count.
  *
  * Called once in `Header` and passed down as props, replacing the old
  * NavbarContext + useNavbarCounts split (no context layer).
  */
 export function useHeaderData() {
-  const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const pathname = usePathname();
 
+  // Initial auth check + self-heal. `checkAuth` runs once on mount, then again
+  // whenever the session marker says "logged in" but the client store has
+  // fallen out of sync to guest — on tab focus/visibility, bfcache restore
+  // (pageshow) and SPA route changes. Without this, a single transient guest
+  // resolution (e.g. the `tarodan_authed` marker briefly unreadable while the
+  // BFF proxy refreshes the session) would stick for the whole SPA session,
+  // showing "Giriş Yap" until a hard reload.
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    const reconcile = () => {
+      const s = useAuthStore.getState();
+      if (!s.isAuthenticated && hasAuthMarker()) s.checkAuth();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") reconcile();
+    };
+
+    useAuthStore.getState().checkAuth();
+
+    window.addEventListener("focus", reconcile);
+    window.addEventListener("pageshow", reconcile);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", reconcile);
+      window.removeEventListener("pageshow", reconcile);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  // Re-check on client-side navigation: the header never remounts across SPA
+  // route changes, so a stale guest store would otherwise never recover.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const s = useAuthStore.getState();
+    if (!s.isAuthenticated && hasAuthMarker()) s.checkAuth();
+  }, [pathname]);
 
   // Defer auth-dependent UI until after hydration so server and first client
   // render always match (avoids hydration error).
@@ -33,82 +74,36 @@ export function useHeaderData() {
 
   const showAuthUI = mounted && isAuthenticated;
 
-  const { itemCount: cartCount, fetchCart } = useCartStore();
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-  const [pendingOffersCount, setPendingOffersCount] = useState(0);
-  const [pendingTradesCount, setPendingTradesCount] = useState(0);
+  const { itemCount: cartCount, refetch: fetchCart } = useCart();
+  const badgeCounts = useHeaderBadgeCounts(showAuthUI);
 
   const wishlistQuery = useQuery({
-    queryKey: ['wishlist'],
+    queryKey: queryKeys.wishlist.all(),
     queryFn: async () => {
       const res = await wishlistApi.get();
       const data = res.data;
-      const items = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
+      const items =
+        data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
       return Array.isArray(items) ? items : [];
     },
     enabled: showAuthUI,
-    meta: { page: 'navbar-wishlist-count' },
+    meta: { page: "navbar-wishlist-count" },
   });
   const wishlistCount = wishlistQuery.data?.length ?? 0;
-
-  const fetchUnreadMessageCount = async () => {
-    try {
-      const response = await messagesApi.getThreads();
-      const threads = response.data.data || response.data.threads || [];
-      const totalUnread = threads.reduce((sum: number, thread: any) => {
-        return sum + (thread.unreadCount || 0);
-      }, 0);
-      setUnreadMessageCount(totalUnread);
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch unread message count:', error);
-    }
-  };
-
-  const fetchPendingCounts = async () => {
-    try {
-      const [offersRes, tradesRes, notificationsRes] = await Promise.all([
-        api.get('/offers/pending-count').catch(() => null),
-        api.get('/trades/pending-count').catch(() => null),
-        api.get('/notifications/unread-count').catch(() => null),
-      ]);
-      setPendingOffersCount(offersRes?.data?.received || 0);
-      setPendingTradesCount(tradesRes?.data?.received || 0);
-      setUnreadNotificationsCount(notificationsRes?.data?.count ?? notificationsRes?.data?.unreadCount ?? 0);
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch pending counts:', error);
-    }
-  };
 
   useEffect(() => {
     if (isAuthenticated) {
       // Sepeti uygulama açılışında yükle ki navbar rozeti ürün sayısını
       // göstersin ve ürün detayında "Sepetten Çıkar" doğru görünsün.
       fetchCart();
-      fetchUnreadMessageCount();
-      fetchPendingCounts();
-      // Poll for new messages and pending counts every 30 seconds
-      const interval = setInterval(() => {
-        fetchUnreadMessageCount();
-        fetchPendingCounts();
-      }, 30000);
-      return () => clearInterval(interval);
-    } else {
-      setUnreadMessageCount(0);
-      setPendingOffersCount(0);
-      setPendingTradesCount(0);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchCart]);
 
   return {
     isAuthenticated,
     user,
-    logout,
     showAuthUI,
-    unreadMessageCount,
-    unreadNotificationsCount,
-    pendingOffersCount,
-    pendingTradesCount,
+    ...badgeCounts,
     cartCount,
     wishlistCount,
   };

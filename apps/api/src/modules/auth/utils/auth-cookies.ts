@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Request, Response } from "express";
+import { randomBytes } from "crypto";
 
 /**
  * httpOnly cookie tabanlı auth.
@@ -14,12 +15,17 @@ import { Request, Response } from 'express';
  */
 
 export const COOKIE_NAMES = {
-  user: { access: 'access_token', refresh: 'refresh_token' },
-  admin: { access: 'admin_token', refresh: 'admin_refresh_token' },
+  user: { access: "access_token", refresh: "refresh_token" },
+  admin: { access: "admin_token", refresh: "admin_refresh_token" },
 } as const;
 
+export const CSRF_COOKIE_NAME = "csrf_token";
+
 /** "30m" | "7d" | "15m" | "1h" | "900s" gibi süreyi ms'e çevirir. */
-export function parseDurationMs(value: string | undefined, fallbackMs: number): number {
+export function parseDurationMs(
+  value: string | undefined,
+  fallbackMs: number,
+): number {
   if (!value) return fallbackMs;
   const m = /^(\d+)\s*([smhd])$/.exec(value.trim());
   if (!m) {
@@ -28,7 +34,14 @@ export function parseDurationMs(value: string | undefined, fallbackMs: number): 
   }
   const n = Number(m[1]);
   const unit = m[2];
-  const mult = unit === 's' ? 1000 : unit === 'm' ? 60_000 : unit === 'h' ? 3_600_000 : 86_400_000;
+  const mult =
+    unit === "s"
+      ? 1000
+      : unit === "m"
+        ? 60_000
+        : unit === "h"
+          ? 3_600_000
+          : 86_400_000;
   return n * mult;
 }
 
@@ -36,23 +49,34 @@ function ttls(admin: boolean) {
   if (admin) {
     return {
       access: parseDurationMs(process.env.ADMIN_JWT_EXPIRES_IN, 30 * 60_000),
-      refresh: parseDurationMs(process.env.ADMIN_JWT_REFRESH_EXPIRES_IN, 7 * 86_400_000),
+      refresh: parseDurationMs(
+        process.env.ADMIN_JWT_REFRESH_EXPIRES_IN,
+        7 * 86_400_000,
+      ),
     };
   }
   return {
     access: parseDurationMs(process.env.JWT_EXPIRES_IN, 15 * 60_000),
-    refresh: parseDurationMs(process.env.JWT_REFRESH_EXPIRES_IN, 7 * 86_400_000),
+    refresh: parseDurationMs(
+      process.env.JWT_REFRESH_EXPIRES_IN,
+      7 * 86_400_000,
+    ),
   };
 }
 
 function baseCookieOptions() {
-  const isProduction = process.env.NODE_ENV === 'production';
+  // Honor an explicit COOKIE_SECURE=true independent of NODE_ENV, so a prod
+  // deploy that forgets NODE_ENV=production still ships Secure session cookies
+  // instead of transmitting tokens over plaintext HTTP.
+  const secure =
+    process.env.NODE_ENV === "production" ||
+    process.env.COOKIE_SECURE === "true";
   const domain = process.env.COOKIE_DOMAIN || undefined;
   return {
     httpOnly: true as const,
-    sameSite: 'lax' as const,
-    secure: isProduction,
-    path: '/',
+    sameSite: "lax" as const,
+    secure,
+    path: "/",
     ...(domain ? { domain } : {}),
   };
 }
@@ -66,10 +90,24 @@ export function setAuthCookies(
   const t = ttls(opts.admin);
   const base = baseCookieOptions();
   res.cookie(names.access, tokens.accessToken, { ...base, maxAge: t.access });
-  res.cookie(names.refresh, tokens.refreshToken, { ...base, maxAge: t.refresh });
+  res.cookie(names.refresh, tokens.refreshToken, {
+    ...base,
+    maxAge: t.refresh,
+  });
+  // Double-submit token: readable by browser JavaScript, unlike auth cookies.
+  // It contains no session data and is validated only when an API auth cookie
+  // is used for a state-changing request.
+  res.cookie(CSRF_COOKIE_NAME, randomBytes(32).toString("base64url"), {
+    ...base,
+    httpOnly: false,
+    maxAge: t.refresh,
+  });
 }
 
-export function clearAuthCookies(res: Response, opts: { admin: boolean }): void {
+export function clearAuthCookies(
+  res: Response,
+  opts: { admin: boolean },
+): void {
   const names = opts.admin ? COOKIE_NAMES.admin : COOKIE_NAMES.user;
   const base = baseCookieOptions();
   // clearCookie, maxAge dışındaki attribute'lar (path/domain/sameSite) eşleşmeli.
@@ -81,8 +119,8 @@ export function clearAuthCookies(res: Response, opts: { admin: boolean }): void 
 function parseCookieHeader(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (!header) return out;
-  for (const part of header.split(';')) {
-    const idx = part.indexOf('=');
+  for (const part of header.split(";")) {
+    const idx = part.indexOf("=");
     if (idx === -1) continue;
     const k = part.slice(0, idx).trim();
     const v = part.slice(idx + 1).trim();
@@ -94,10 +132,12 @@ function parseCookieHeader(header: string | undefined): Record<string, string> {
 /** İstekten verilen cookie isimlerinden ilk bulunanı döndürür (passport extractor için). */
 export function readCookie(req: Request, names: string[]): string | null {
   // cookie-parser kuruluysa req.cookies dolu olur; değilse header'dan ayrıştır.
-  const fromParser = (req as Request & { cookies?: Record<string, string> }).cookies;
-  const jar = fromParser && Object.keys(fromParser).length > 0
-    ? fromParser
-    : parseCookieHeader(req.headers?.cookie);
+  const fromParser = (req as Request & { cookies?: Record<string, string> })
+    .cookies;
+  const jar =
+    fromParser && Object.keys(fromParser).length > 0
+      ? fromParser
+      : parseCookieHeader(req.headers?.cookie);
   for (const name of names) {
     if (jar[name]) return jar[name];
   }

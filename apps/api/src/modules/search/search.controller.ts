@@ -4,11 +4,16 @@ import {
   Post,
   Query,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SearchService, SearchOptions, SearchResponse, RichAutocompleteResult } from './search.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminRole } from '@prisma/client';
 
 @Controller('search')
@@ -90,14 +95,20 @@ export class SearchController {
   }
 
   @Post('admin/reindex')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
+  @RequirePermission('products')
   async reindexAll(): Promise<{ indexed: number }> {
     const indexed = await this.searchService.reindexAll();
     return { indexed };
   }
 
   @Post('admin/index/:productId')
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
+  @RequirePermission('products')
   async indexProduct(
     @Param('productId') productId: string,
   ): Promise<{ success: boolean }> {

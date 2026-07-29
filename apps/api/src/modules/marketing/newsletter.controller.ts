@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { NewsletterService } from './newsletter.service';
 import { NewsletterSubscribeDto } from './dto/newsletter-subscribe.dto';
@@ -11,6 +12,7 @@ export class NewsletterController {
 
   @Post('subscribe')
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Bültene abone ol (misafir)' })
   @ApiResponse({ status: 200, description: 'Abonelik başarılı' })
@@ -32,6 +34,7 @@ export class NewsletterController {
 
   @Post('unsubscribe')
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'E-posta ile abonelikten çık' })
   @ApiResponse({ status: 200, description: 'Abonelik iptal edildi' })

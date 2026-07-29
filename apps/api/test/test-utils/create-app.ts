@@ -1,13 +1,19 @@
-import { ValidationPipe } from '@nestjs/common';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { Test, TestingModule } from '@nestjs/testing';
-import { json, urlencoded } from 'express';
-import { AppModule } from '../../src/app.module';
-import { PayTRService } from '../../src/modules/payment-providers/paytr.service';
-import { StorageService } from '../../src/modules/storage/storage.service';
-import { MockPayTRService } from '../mocks/paytr.mock';
-import { SURAT_SOAP_CLIENT } from '../../src/modules/surat-cargo/surat-cargo.service';
-import { StubSuratSoapClient } from '../../src/modules/surat-cargo/surat-soap.client';
+import { ValidationPipe } from "@nestjs/common";
+import { NestExpressApplication } from "@nestjs/platform-express";
+import { Test, TestingModule } from "@nestjs/testing";
+import { json, urlencoded } from "express";
+import { AppModule } from "../../src/app.module";
+import { PayTRService } from "../../src/modules/payment-providers/paytr.service";
+import { StorageService } from "../../src/modules/storage/storage.service";
+import { MockPayTRService } from "../mocks/paytr.mock";
+import { SURAT_CARRIER_CLIENT } from "../../src/modules/surat-cargo/surat-cargo.service";
+import { StubSuratSoapClient } from "../../src/modules/surat-cargo/surat-soap.client";
+import { TradeShipmentService } from "../../src/modules/trade/trade-shipment.service";
+import { FulfillmentFinalizer } from "../../src/modules/payment/fulfillment-finalizer.service";
+import {
+  drainE2EBackgroundTasks,
+  trackE2EBackgroundTask,
+} from "./background-tasks";
 
 /**
  * Bootstrap a real NestJS app for E2E tests.
@@ -31,10 +37,46 @@ export interface E2ETestApp {
   module: TestingModule;
   paytr: MockPayTRService;
   surat: StubSuratSoapClient;
+  waitForBackgroundTasks: () => Promise<void>;
   close: () => Promise<void>;
 }
 
+/**
+ * Deterministic Elasticsearch readiness barrier (#119). Search scenarios
+ * (06-src) and other ES-backed suites (e.g. 13-trd) intermittently returned
+ * "empty wholesale" because the app connected and the first reindex ran before
+ * the ES cluster was actually ready — the docker container health-check can go
+ * green while the cluster is still initialising. Block until ES reports at
+ * least 'yellow' BEFORE the app boots, so index creation / reindex never races
+ * a not-ready cluster.
+ */
+async function waitForElasticsearch(): Promise<void> {
+  const node = (
+    process.env.ELASTICSEARCH_NODE || "http://localhost:9200"
+  ).replace(/\/$/, "");
+  const url = `${node}/_cluster/health?wait_for_status=yellow&timeout=30s`;
+  const attempts = 30;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const body = (await res.json()) as { status?: string };
+        if (body.status === "yellow" || body.status === "green") return;
+      }
+    } catch {
+      // ES not accepting connections yet — retry below.
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error(
+    `Elasticsearch not ready (status != yellow/green) after ${attempts}s at ${node}`,
+  );
+}
+
 export async function createE2ETestApp(): Promise<E2ETestApp> {
+  // ES must be ready before the app's SearchModule connects/indexes (#119).
+  await waitForElasticsearch();
+
   const paytr = new MockPayTRService();
   const storageStub = createStorageStub();
 
@@ -53,8 +95,8 @@ export async function createE2ETestApp(): Promise<E2ETestApp> {
   });
 
   // Body parsers (mirrors main.ts — needed for PayTR callback urlencoded body).
-  app.use(json({ limit: '50mb' }));
-  app.use(urlencoded({ extended: true, limit: '50mb' }));
+  app.use(json({ limit: "50mb" }));
+  app.use(urlencoded({ extended: true, limit: "50mb" }));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -67,20 +109,41 @@ export async function createE2ETestApp(): Promise<E2ETestApp> {
     }),
   );
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix("api");
+
+  const fulfillmentFinalizer = module.get(FulfillmentFinalizer);
+  const finalizePaidOrder =
+    fulfillmentFinalizer.finalizePaidOrder.bind(fulfillmentFinalizer);
+  fulfillmentFinalizer.finalizePaidOrder = ((...args) =>
+    trackE2EBackgroundTask(
+      finalizePaidOrder(...args),
+    )) as FulfillmentFinalizer["finalizePaidOrder"];
 
   await app.init();
 
+  // Trade acceptance deliberately dispatches Sürat shipment creation in the
+  // background. Track those promises so truncateAll()/app.close() cannot delete
+  // their rows while a carrier result is still being persisted.
+  const tradeShipmentService = module.get(TradeShipmentService);
+  const createInboundTradeShipments =
+    tradeShipmentService.createInboundTradeShipments.bind(tradeShipmentService);
+  tradeShipmentService.createInboundTradeShipments = ((tradeId: string) =>
+    trackE2EBackgroundTask(
+      createInboundTradeShipments(tradeId),
+    )) as TradeShipmentService["createInboundTradeShipments"];
+
   // Sürat SOAP stub is auto-instantiated by SuratCargoModule when SURAT_SOAP_MODE!=live.
   // We resolve it from the DI container so tests can inspect/clear call history.
-  const surat = module.get<StubSuratSoapClient>(SURAT_SOAP_CLIENT);
+  const surat = module.get<StubSuratSoapClient>(SURAT_CARRIER_CLIENT);
 
   return {
     app,
     module,
     paytr,
     surat,
+    waitForBackgroundTasks: drainE2EBackgroundTasks,
     close: async () => {
+      await drainE2EBackgroundTasks();
       await app.close();
     },
   };
@@ -91,11 +154,11 @@ function createStorageStub(): Partial<StorageService> {
     isStorageAvailable: () => true,
     async uploadFile() {
       return {
-        key: 'test/file.bin',
-        url: 'test/file.bin',
+        key: "test/file.bin",
+        url: "test/file.bin",
         size: 0,
-        mimeType: 'application/octet-stream',
-        bucket: 'test-bucket',
+        mimeType: "application/octet-stream",
+        bucket: "test-bucket",
       } as any;
     },
     async uploadFiles() {
@@ -111,10 +174,13 @@ function createStorageStub(): Partial<StorageService> {
       return `https://test-cdn.invalid/${key}`;
     },
     async getPresignedUploadUrl(_args: any) {
-      return { uploadUrl: 'https://test-presigned.invalid', key: 'test/file.bin' } as any;
+      return {
+        uploadUrl: "https://test-presigned.invalid",
+        key: "test/file.bin",
+      } as any;
     },
     async getPresignedDownloadUrl() {
-      return 'https://test-presigned.invalid';
+      return "https://test-presigned.invalid";
     },
     async getFilesByEntity() {
       return [] as any;

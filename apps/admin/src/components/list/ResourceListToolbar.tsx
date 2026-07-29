@@ -1,14 +1,47 @@
-'use client';
+"use client";
 
-import { type ReactNode } from 'react';
+import { type ReactNode } from "react";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
+import { Button } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { useResourceList } from "@/context/ResourceListContext";
+import { columnsToCsv, hasExportableColumns } from "@/lib/csv";
+import { downloadBlob } from "@/lib/download";
 
 /**
- * Layout for the search box + page-specific filters. Stacks on mobile; on wider
- * screens the filters sit next to the search and wrap gracefully when they don't
- * fit (the search keeps a min width).
+ * Layout for the search box + page-specific filters, plus a CSV export button
+ * pinned to the right of the same row. The table registers its columns on the
+ * context (via DataTable), so the export works on every list without per-page
+ * wiring; it downloads the currently loaded rows.
  */
 export function ResourceListToolbar({ children }: { children: ReactNode }) {
+  const t = useTranslations();
+  const { rows, exportRef, exportName } = useResourceList();
+
+  const onExport = () => {
+    const columns = exportRef.current;
+    if (!hasExportableColumns(columns)) return;
+    const date = new Date().toISOString().slice(0, 10);
+    downloadBlob(
+      `${exportName}_${date}.csv`,
+      columnsToCsv(columns, rows),
+      "text/csv;charset=utf-8;",
+    );
+  };
+
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">{children}</div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      {children}
+      <Button
+        variant="secondary"
+        size="sm"
+        leftIcon={<ArrowDownTrayIcon className="h-4 w-4" />}
+        onClick={onExport}
+        disabled={rows.length === 0}
+        className="sm:ml-auto"
+      >
+        {t("admin.shared.table.exportCsv")}
+      </Button>
+    </div>
   );
 }

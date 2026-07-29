@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma';
 import { NotificationService } from '../notification/notification.service';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
+import { SecurityService } from '../security/security.service';
 
 describe('AuthService.loginWithApple', () => {
   let service: AuthService;
@@ -21,6 +22,7 @@ describe('AuthService.loginWithApple', () => {
   const prisma: any = {
     oAuthAccount: { findUnique: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'oa1' }) },
     user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn().mockResolvedValue({}) },
+    refreshToken: { create: jest.fn().mockResolvedValue({ id: 'rt1' }) },
   };
 
   beforeEach(async () => {
@@ -29,13 +31,20 @@ describe('AuthService.loginWithApple', () => {
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
-        { provide: JwtService, useValue: { signAsync: jest.fn().mockResolvedValue('tok') } },
+        {
+          provide: JwtService,
+          useValue: {
+            signAsync: jest.fn().mockResolvedValue('tok'),
+            decode: jest.fn().mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+          },
+        },
         { provide: ConfigService, useValue: { get: (k: string) => (k.includes('SECRET') ? 'secret' : '15m') } },
         { provide: NotificationService, useValue: {} },
         { provide: CacheService, useValue: { del: jest.fn(), set: jest.fn(), get: jest.fn() } },
         { provide: StorageService, useValue: { getPublicAssetUrl: jest.fn().mockReturnValue(null) } },
         { provide: GoogleAuthService, useValue: { verifyIdToken: jest.fn() } },
         { provide: AppleAuthService, useValue: apple },
+        { provide: SecurityService, useValue: { validateTOTP: jest.fn() } },
       ],
     }).compile();
     service = moduleRef.get(AuthService);

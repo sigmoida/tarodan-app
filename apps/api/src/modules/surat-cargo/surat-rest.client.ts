@@ -1,7 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { SuratGonderiPayload } from './surat-cargo.types';
-import { SuratSoapClient, type SuratSoapCallOptions } from './surat-soap.client';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type { SuratGonderiPayload, SuratBarcodeRaw } from "./surat-cargo.types";
+import {
+  SuratCarrierClient,
+  type SuratSoapCallOptions,
+} from "./surat-soap.client";
 
 /**
  * Sürat Kargo REST client — "GonderiyiKargoyaGonder" entegrasyon API'si.
@@ -20,14 +23,22 @@ import { SuratSoapClient, type SuratSoapCallOptions } from './surat-soap.client'
  * (SOAP istemcisinin boş alanları atlamasının tam TERSİ.)
  */
 
-const SURAT_REST_LIVE = 'https://api01.suratkargo.com.tr/api/GonderiyiKargoyaGonder';
-const SURAT_REST_TEST = 'https://api02.suratkargo.com.tr/api/GonderiyiKargoyaGonder';
+const SURAT_REST_LIVE =
+  "https://api01.suratkargo.com.tr/api/GonderiyiKargoyaGonder";
+const SURAT_REST_TEST =
+  "https://api02.suratkargo.com.tr/api/GonderiyiKargoyaGonder";
 
 // GonderiGeriCek = gönderiyi geri çek (iptal). Sürat'ın sağlanan REST dokümanlarında
 // YOK ama api01/api02'de mevcut. Gövde create ile aynı desende:
 // { KullaniciAdi, Sifre, OzelKargoTakipNo }. (Format 2026-07-02 deneyerek doğrulandı.)
-const SURAT_GERICEK_LIVE = 'https://api01.suratkargo.com.tr/api/GonderiGeriCek';
-const SURAT_GERICEK_TEST = 'https://api02.suratkargo.com.tr/api/GonderiGeriCek';
+const SURAT_GERICEK_LIVE = "https://api01.suratkargo.com.tr/api/GonderiGeriCek";
+const SURAT_GERICEK_TEST = "https://api02.suratkargo.com.tr/api/GonderiGeriCek";
+
+// OrtakBarkodOlustur = gönderi oluştur + gerçek KargoTakipNo + ZPL etiket döner.
+const SURAT_BARKOD_LIVE =
+  "https://api01.suratkargo.com.tr/api/OrtakBarkodOlustur";
+const SURAT_BARKOD_TEST =
+  "https://api02.suratkargo.com.tr/api/OrtakBarkodOlustur";
 
 interface SuratRestResult {
   Message?: string | null;
@@ -40,46 +51,57 @@ interface SuratRestResult {
  * WSDL/JSON `Gonderi` modelini eksiksiz kurar — her string alan mevcut ve non-null.
  * Enum/numerik alanlar dokümandaki tiplere göre gönderilir; `Iademi` byte (1/0).
  */
-export function buildRestGonderi(p: SuratGonderiPayload): Record<string, unknown> {
+// L3: Sürat alan sınırı — aşırı uzun serbest-metin değeri (adres, ad) Sürat
+// tarafında sessiz truncate/reject yerine bizde kırpılır. Resmi dokümanda kesin
+// limit yok; makul üst sınırlar. Tek merkez: tüm create/barkod çağrıları buradan
+// geçer.
+const cap = (v: string | undefined | null, max: number): string =>
+  String(v ?? "")
+    .trim()
+    .slice(0, max);
+
+export function buildRestGonderi(
+  p: SuratGonderiPayload,
+): Record<string, unknown> {
   return {
-    KisiKurum: p.KisiKurum ?? '',
-    SahisBirim: p.SahisBirim ?? '',
-    AliciAdresi: p.AliciAdresi ?? '',
-    Il: p.Il ?? '',
-    Ilce: p.Ilce ?? '',
-    TelefonEv: p.TelefonEv ?? '',
-    TelefonIs: p.TelefonIs ?? '',
-    TelefonCep: p.TelefonCep ?? '',
-    Email: p.Email ?? '',
-    AliciKodu: p.AliciKodu ?? '',
+    KisiKurum: cap(p.KisiKurum, 100),
+    SahisBirim: cap(p.SahisBirim, 100),
+    AliciAdresi: cap(p.AliciAdresi, 250),
+    Il: cap(p.Il, 50),
+    Ilce: cap(p.Ilce, 50),
+    TelefonEv: cap(p.TelefonEv, 20),
+    TelefonIs: cap(p.TelefonIs, 20),
+    TelefonCep: cap(p.TelefonCep, 20),
+    Email: cap(p.Email, 100),
+    AliciKodu: p.AliciKodu ?? "",
     KargoTuru: p.KargoTuru,
     OdemeTipi: p.OdemeTipi,
-    IrsaliyeSeriNo: p.IrsaliyeSeriNo ?? '',
-    IrsaliyeSiraNo: p.IrsaliyeSiraNo ?? '',
-    ReferansNo: p.ReferansNo ?? '',
+    IrsaliyeSeriNo: p.IrsaliyeSeriNo ?? "",
+    IrsaliyeSiraNo: p.IrsaliyeSiraNo ?? "",
+    ReferansNo: p.ReferansNo ?? "",
     OzelKargoTakipNo: p.OzelKargoTakipNo,
     Adet: p.Adet,
     // Doküman örneği desi/kg'yi string gönderiyor ("1"); doğrulanmış davranışla aynı.
     BirimDesi: String(p.BirimDesi ?? 0),
     BirimKg: String(p.BirimKg ?? 0),
-    KargoIcerigi: p.KargoIcerigi ?? '',
+    KargoIcerigi: cap(p.KargoIcerigi, 100),
     KapidanOdemeTahsilatTipi: p.KapidanOdemeTahsilatTipi ?? 0,
     KapidanOdemeTutari: p.KapidanOdemeTutari ?? 0,
-    EkHizmetler: p.EkHizmetler ?? '',
-    SevkAdresi: p.SevkAdresi ?? '',
-    TeslimSubeKodu: p.TeslimSubeKodu ?? '',
+    EkHizmetler: p.EkHizmetler ?? "",
+    SevkAdresi: p.SevkAdresi ?? "",
+    TeslimSubeKodu: p.TeslimSubeKodu ?? "",
     TasimaSekli: p.TasimaSekli,
     TeslimSekli: p.TeslimSekli,
     GonderiSekli: p.GonderiSekli,
     Pazaryerimi: p.Pazaryerimi,
-    EntegrasyonFirmasi: p.EntegrasyonFirmasi ?? '',
+    EntegrasyonFirmasi: p.EntegrasyonFirmasi ?? "",
     // Doküman: byte Iademi (1: İade / 0: Standart)
     Iademi: p.Iademi ? 1 : 0,
   };
 }
 
 @Injectable()
-export class RestSuratClient extends SuratSoapClient {
+export class RestSuratClient extends SuratCarrierClient {
   private readonly logger = new Logger(RestSuratClient.name);
 
   constructor(private readonly configService: ConfigService) {
@@ -87,18 +109,27 @@ export class RestSuratClient extends SuratSoapClient {
   }
 
   private isTestMode(): boolean {
-    return this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() !== 'false';
+    return (
+      this.configService
+        .get<string>("SURAT_KARGO_TEST_MODE", "true")
+        ?.trim() !== "false"
+    );
   }
 
   async callGonderiyiKargoyaGonderYeni(
     payload: SuratGonderiPayload,
     options: SuratSoapCallOptions,
   ): Promise<string> {
-    const kullaniciAdi = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
-    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    const kullaniciAdi = this.configService.get<string>(
+      "SURAT_KARGO_CARI_KODU",
+      "",
+    );
+    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
 
     if (!kullaniciAdi || !sifre) {
-      throw new Error('SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured');
+      throw new Error(
+        "SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured",
+      );
     }
 
     const url = this.isTestMode() ? SURAT_REST_TEST : SURAT_REST_LIVE;
@@ -117,39 +148,48 @@ export class RestSuratClient extends SuratSoapClient {
 
     try {
       const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body,
         signal: controller.signal,
       });
 
-      // 5xx → teknik hata (retry edilir)
-      if (response.status >= 500) {
+      // Non-2xx → ASLA başarı sayma. 5xx VE 4xx teknik hata olarak fırlatılır
+      // (retry; kalıcı 4xx — 400/401/404 — retry'lar tükenince 'failed' işaretlenir).
+      // Eski kod yalnız 5xx'i yakalıyordu: bir 4xx yanıtın gövdesi IsError içermezse
+      // aşağıdaki `data.IsError !== true` dalı yanlışlıkla "Tamam" (false success)
+      // dönebiliyordu → gönderi Sürat'ta oluşmadığı halde başarı sanılırdı.
+      if (response.status >= 400) {
         const err = new Error(`HTTP ${response.status}`);
         (err as any).statusCode = response.status;
         throw err;
       }
 
       const text = await response.text();
-      if (!text || text.trim() === '') {
-        return '';
+      if (!text || text.trim() === "") {
+        return "";
       }
 
       let data: SuratRestResult;
       try {
         data = JSON.parse(text) as SuratRestResult;
       } catch {
-        throw new Error(`Unexpected non-JSON Surat response: ${text.slice(0, 200)}`);
+        throw new Error(
+          `Unexpected non-JSON Surat response: ${text.slice(0, 200)}`,
+        );
       }
 
-      const message = String(data.Message ?? '').trim();
+      const message = String(data.Message ?? "").trim();
 
       // Başarı: IsError=false (ör. "<ref> nolu kayıt başarıyla oluşturuldu")
       if (data.IsError !== true) {
         this.logger.log(
           `Surat REST response ref=${payload.OzelKargoTakipNo} ok message="${message}"`,
         );
-        return 'Tamam';
+        return "Tamam";
       }
 
       // Idempotent: "Bu Siparişe Ait Gönderi Oluşmuştur" / "daha önce oluşturuldu"
@@ -158,17 +198,17 @@ export class RestSuratClient extends SuratSoapClient {
         this.logger.warn(
           `Surat REST shipment already exists (idempotent success) ref=${payload.OzelKargoTakipNo} message="${message}"`,
         );
-        return 'Tamam';
+        return "Tamam";
       }
 
       this.logger.warn(
         `Surat REST business failure ref=${payload.OzelKargoTakipNo} status=${data.StatusCode} message="${message}"`,
       );
-      return message || 'Bilinmeyen Sürat hatası';
+      return message || "Bilinmeyen Sürat hatası";
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        const err = new Error('ETIMEDOUT');
-        (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+      if (error.name === "AbortError") {
+        const err = new Error("ETIMEDOUT");
+        (err as NodeJS.ErrnoException).code = "ETIMEDOUT";
         throw err;
       }
       throw error;
@@ -193,10 +233,15 @@ export class RestSuratClient extends SuratSoapClient {
     ozelKargoTakipNo: string,
     options: SuratSoapCallOptions,
   ): Promise<string> {
-    const kullaniciAdi = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
-    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    const kullaniciAdi = this.configService.get<string>(
+      "SURAT_KARGO_CARI_KODU",
+      "",
+    );
+    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
     if (!kullaniciAdi || !sifre) {
-      throw new Error('SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured');
+      throw new Error(
+        "SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured",
+      );
     }
 
     const url = this.isTestMode() ? SURAT_GERICEK_TEST : SURAT_GERICEK_LIVE;
@@ -214,35 +259,40 @@ export class RestSuratClient extends SuratSoapClient {
     const timer = setTimeout(() => controller.abort(), options.timeoutMs);
     try {
       const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body,
         signal: controller.signal,
       });
 
-      if (response.status >= 500) {
+      if (response.status >= 400) {
         const err = new Error(`HTTP ${response.status}`);
         (err as any).statusCode = response.status;
         throw err;
       }
 
       const text = await response.text();
-      if (!text || text.trim() === '') return '';
+      if (!text || text.trim() === "") return "";
 
       let data: SuratRestResult;
       try {
         data = JSON.parse(text) as SuratRestResult;
       } catch {
-        throw new Error(`Unexpected non-JSON Surat response: ${text.slice(0, 200)}`);
+        throw new Error(
+          `Unexpected non-JSON Surat response: ${text.slice(0, 200)}`,
+        );
       }
 
-      const message = String(data.Message ?? '').trim();
+      const message = String(data.Message ?? "").trim();
 
       if (data.IsError !== true) {
         this.logger.log(
           `Surat REST GonderiGeriCek ok ref=${ozelKargoTakipNo} message="${message}"`,
         );
-        return 'Tamam';
+        return "Tamam";
       }
 
       // Geri çekilecek gönderi bulunamadı → zaten yok/pasif → idempotent başarı.
@@ -250,17 +300,111 @@ export class RestSuratClient extends SuratSoapClient {
         this.logger.warn(
           `Surat REST GonderiGeriCek kayıt bulunamadı (idempotent) ref=${ozelKargoTakipNo} message="${message}"`,
         );
-        return 'Pasif Edilecek Gonderi Bulunamadi!';
+        return "Pasif Edilecek Gonderi Bulunamadi!";
       }
 
       this.logger.warn(
         `Surat REST GonderiGeriCek business failure ref=${ozelKargoTakipNo} message="${message}"`,
       );
-      return message || 'Bilinmeyen Sürat hatası';
+      return message || "Bilinmeyen Sürat hatası";
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        const err = new Error('ETIMEDOUT');
-        (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+      if (error.name === "AbortError") {
+        const err = new Error("ETIMEDOUT");
+        (err as NodeJS.ErrnoException).code = "ETIMEDOUT";
+        throw err;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * OrtakBarkodOlustur — gönderiyi oluştur + gerçek KargoTakipNo + ZPL etiketi
+   * anında döndür. Gövde create ile aynı desende: { KullaniciAdi, Sifre, Gonderi }.
+   * Teknik hatada (timeout/5xx/network/parse) throw eder; iş hatasında isError=true.
+   */
+  async callOrtakBarkodOlustur(
+    payload: SuratGonderiPayload,
+    options: SuratSoapCallOptions,
+  ): Promise<SuratBarcodeRaw> {
+    const kullaniciAdi = this.configService.get<string>(
+      "SURAT_KARGO_CARI_KODU",
+      "",
+    );
+    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
+    if (!kullaniciAdi || !sifre) {
+      throw new Error(
+        "SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured",
+      );
+    }
+
+    const url = this.isTestMode() ? SURAT_BARKOD_TEST : SURAT_BARKOD_LIVE;
+    const body = JSON.stringify({
+      KullaniciAdi: kullaniciAdi,
+      Sifre: sifre,
+      Gonderi: buildRestGonderi(payload),
+    });
+
+    this.logger.debug(
+      `Surat OrtakBarkodOlustur ref=${payload.OzelKargoTakipNo} test=${this.isTestMode()} timeout=${options.timeoutMs}ms`,
+    );
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body,
+        signal: controller.signal,
+      });
+
+      if (response.status >= 400) {
+        const err = new Error(`HTTP ${response.status}`);
+        (err as any).statusCode = response.status;
+        throw err;
+      }
+
+      const text = await response.text();
+      if (!text || text.trim() === "") {
+        throw new Error("EMPTY_RESPONSE");
+      }
+
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(
+          `Unexpected non-JSON Surat response: ${text.slice(0, 200)}`,
+        );
+      }
+
+      const isError = (data?.isError ?? data?.IsError ?? false) === true;
+      const message = String(data?.Message ?? "").trim();
+      const barcode: unknown[] = Array.isArray(data?.Barcode)
+        ? data.Barcode
+        : [];
+      const kargoTakipNo =
+        data?.KargoTakipNo != null ? String(data.KargoTakipNo).trim() : null;
+
+      this.logger.log(
+        `Surat OrtakBarkodOlustur ref=${payload.OzelKargoTakipNo} isError=${isError} kod=${kargoTakipNo ?? "-"} message="${message}"`,
+      );
+
+      return {
+        isError,
+        message,
+        kargoTakipNo,
+        labelZpl: barcode.length ? String(barcode[0]) : null,
+      };
+    } catch (error: any) {
+      if (error.name === "AbortError") {
+        const err = new Error("ETIMEDOUT");
+        (err as NodeJS.ErrnoException).code = "ETIMEDOUT";
         throw err;
       }
       throw error;

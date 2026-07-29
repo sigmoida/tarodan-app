@@ -1,13 +1,16 @@
 import {
   Injectable,
   NotFoundException,
+  BadRequestException,
   Optional,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { AdminAuditService } from './admin-audit.service';
-import { AdminOrderQueryDto, ResolveDisputeDto } from './dto';
-import { OrderStatus, Prisma } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { AdminAuditService } from "./admin-audit.service";
+import { PaymentService } from "../payment/payment.service";
+import { AdminOrderQueryDto, ResolveDisputeDto } from "./dto";
+import { OrderStatus, Prisma } from "@prisma/client";
+import { paginate } from "../../common/list";
 
 /**
  * Sipariş yönetimi (liste, ihtilaflar, ihtilaf çözümü) — AdminService'in
@@ -21,23 +24,36 @@ export class AdminOrderService {
     private readonly audit: AdminAuditService,
     @Optional()
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly paymentService?: PaymentService,
   ) {}
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
     // Strip expired presigned S3 query params to get the clean public URL
-    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+    if (
+      (imageKeyOrUrl.startsWith("http://") ||
+        imageKeyOrUrl.startsWith("https://")) &&
+      imageKeyOrUrl.includes("X-Amz-Signature")
+    ) {
       try {
         const parsed = new URL(imageKeyOrUrl);
-        parsed.search = '';
+        parsed.search = "";
         return parsed.toString();
       } catch {
         // fall through
       }
     }
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
       return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
@@ -51,17 +67,26 @@ export class AdminOrderService {
    * Get orders with filters
    */
   async getOrders(query: AdminOrderQueryDto) {
-    const { search, status, fromDate, toDate, userId, userRole, productId, page = 1, limit = 20 } = query;
+    const { search, status, fromDate, toDate, userId, userRole, productId } =
+      query;
 
     const where: Prisma.OrderWhereInput = {};
 
     if (search) {
+      const normalized = search.trim().toLowerCase();
+      const numeric = Number(search.replace(",", "."));
       where.OR = [
-        { orderNumber: { contains: search, mode: 'insensitive' } },
-        { buyer: { displayName: { contains: search, mode: 'insensitive' } } },
-        { seller: { displayName: { contains: search, mode: 'insensitive' } } },
-        { product: { title: { contains: search, mode: 'insensitive' } } },
+        { orderNumber: { contains: search, mode: "insensitive" } },
+        { buyer: { displayName: { contains: search, mode: "insensitive" } } },
+        { buyer: { email: { contains: search, mode: "insensitive" } } },
+        { seller: { displayName: { contains: search, mode: "insensitive" } } },
+        { seller: { email: { contains: search, mode: "insensitive" } } },
+        { product: { title: { contains: search, mode: "insensitive" } } },
       ];
+      if (Object.values(OrderStatus).includes(normalized as OrderStatus))
+        where.OR.push({ status: normalized as OrderStatus });
+      if (Number.isFinite(numeric))
+        where.OR.push({ totalAmount: numeric }, { commissionAmount: numeric });
     }
 
     if (status) {
@@ -69,15 +94,12 @@ export class AdminOrderService {
     }
 
     if (userId) {
-      if (userRole === 'buyer') {
+      if (userRole === "buyer") {
         where.buyerId = userId;
-      } else if (userRole === 'seller') {
+      } else if (userRole === "seller") {
         where.sellerId = userId;
       } else {
-        where.OR = [
-          { buyerId: userId },
-          { sellerId: userId },
-        ];
+        where.OR = [{ buyerId: userId }, { sellerId: userId }];
       }
     }
 
@@ -95,60 +117,81 @@ export class AdminOrderService {
       }
     }
 
-    const [total, orders] = await Promise.all([
-      this.prisma.order.count({ where }),
-      this.prisma.order.findMany({
-        where,
-        include: {
-          buyer: { select: { id: true, displayName: true, email: true } },
-          seller: { select: { id: true, displayName: true, email: true } },
-          product: {
-            select: {
-              id: true,
-              title: true,
-              images: {
-                take: 1,
-                orderBy: { sortOrder: 'asc' },
-                select: { cardKey: true },
+    // Grup (CheckoutGroup) bazında sayfala: bir sepet asla sayfa sınırına
+    // bölünmez. `orders.some` order-seviye filtreyle eşleşen EN AZ bir siparişi
+    // olan grupları getirir; sonra o grupların TÜM siparişlerini (eksiksiz sepet)
+    // çekeriz. Sıralama: grup createdAt (en yeni). Her order backfill ile bir
+    // CheckoutGroup'a bağlıdır (grupsuz order admin listesinde görünmez).
+    const groupPage = await paginate(
+      this.prisma.checkoutGroup,
+      {
+        where: { orders: { some: where } },
+        orderBy: { createdAt: "desc" as const },
+        select: { id: true },
+      },
+      query,
+    );
+    const groupIds = groupPage.data.map((g) => g.id);
+
+    const orders = groupIds.length
+      ? await this.prisma.order.findMany({
+          where: { checkoutGroupId: { in: groupIds } },
+          include: {
+            buyer: { select: { id: true, displayName: true, email: true } },
+            seller: { select: { id: true, displayName: true, email: true } },
+            product: {
+              select: {
+                id: true,
+                title: true,
+                images: {
+                  take: 1,
+                  orderBy: { sortOrder: "asc" },
+                  select: { cardKey: true },
+                },
               },
             },
-          },
-          checkoutGroup: { select: { groupNumber: true } },
-          // Açık (aktif) iade talebi — admin listede "İade Sürecinde" rozeti için.
-          refundRequests: {
-            where: {
-              status: { notIn: ['refunded', 'rejected', 'cancelled'] as any },
+            checkoutGroup: { select: { groupNumber: true } },
+            // Kargo durumu + takip no — liste kolonu + expanded detayda paket kargosu.
+            shipment: {
+              select: {
+                id: true,
+                status: true,
+                trackingNumber: true,
+                providerTrackingId: true,
+              },
             },
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            select: { id: true, status: true, refundNumber: true },
+            // Açık (aktif) iade talebi — "İade Sürecinde" rozeti için.
+            refundRequests: {
+              where: {
+                status: {
+                  notIn: ["refunded", "rejected", "cancelled"] as any,
+                },
+              },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { id: true, status: true, refundNumber: true },
+            },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    // Çoklu-ürün sepetlerini admin listede gruplu gösterebilmek için her siparişin
-    // ait olduğu CheckoutGroup'taki TOPLAM sipariş adedini ekle (grubun gerçek
-    // boyutu). groupItemCount>1 → "çoklu sipariş" rozeti + görsel gruplama.
-    const groupIds = [
-      ...new Set(orders.map((o) => o.checkoutGroupId).filter((x): x is string => !!x)),
-    ];
-    const groupCounts = groupIds.length
-      ? await this.prisma.order.groupBy({
-          by: ['checkoutGroupId'],
-          where: { checkoutGroupId: { in: groupIds } },
-          _count: { _all: true },
+          orderBy: { createdAt: "asc" },
         })
       : [];
-    const groupCountMap = new Map(
-      groupCounts.map((g) => [g.checkoutGroupId, g._count._all]),
+
+    // Grup üyelerini sayfadaki grup sırasına (grup createdAt desc) göre bitişik
+    // diz ki client-side gruplama sırayı korusun; her grubun gerçek boyutunu tut.
+    const byGroup = new Map<string, typeof orders>();
+    for (const o of orders) {
+      const k = o.checkoutGroupId as string;
+      const bucket = byGroup.get(k);
+      if (bucket) bucket.push(o);
+      else byGroup.set(k, [o]);
+    }
+    const ordered = groupIds.flatMap((id) => byGroup.get(id) ?? []);
+    const groupSize = new Map(
+      groupIds.map((id) => [id, byGroup.get(id)?.length ?? 0]),
     );
 
     return {
-      data: orders.map((o) => ({
+      data: ordered.map((o) => ({
         ...o,
         // Misafir siparişlerinde alıcı, ortak sistem kullanıcısı (GUEST_SYSTEM /
         // guest@tarodan.system). Admin listede placeholder yerine gerçek misafir
@@ -156,10 +199,19 @@ export class AdminOrderService {
         buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
+        shipmentStatus: (o as any).shipment?.status ?? null,
+        shipmentId: (o as any).shipment?.id ?? null,
+        shipmentTrackingNumber:
+          (o as any).shipment?.providerTrackingId ??
+          (o as any).shipment?.trackingNumber ??
+          null,
+        internalTrackingNumber: (o as any).shipment?.trackingNumber ?? null,
+        // Satıcı-paketi (OrderPackage) referansı — admin listede sepeti satıcı
+        // bazında gruplayabilmek için (checkoutGroupId zaten ...o ile geliyor).
+        packageId: o.packageId ?? null,
         groupNumber: o.checkoutGroup?.groupNumber ?? null,
-        groupItemCount: o.checkoutGroupId
-          ? groupCountMap.get(o.checkoutGroupId) ?? 1
-          : 1,
+        // Grup artık eksiksiz döndüğü için gerçek üye sayısı = grubun boyutu.
+        groupItemCount: groupSize.get(o.checkoutGroupId as string) ?? 1,
         productImageUrl: this.resolveProductImageUrl(
           (o.product as any)?.images?.[0]?.cardKey,
         ),
@@ -171,7 +223,7 @@ export class AdminOrderService {
             }
           : null,
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      meta: groupPage.meta,
     };
   }
 
@@ -181,21 +233,25 @@ export class AdminOrderService {
    * misafir ad/e-postasını shippingAddress'ten al. Değilse alıcıyı aynen döndür.
    */
   private resolveGuestBuyerForAdmin(
-    buyer: { id: string; displayName: string | null; email: string | null } | null,
+    buyer: {
+      id: string;
+      displayName: string | null;
+      email: string | null;
+    } | null,
     shippingAddress: unknown,
   ): { id: string; displayName: string | null; email: string | null } | null {
     if (!buyer) return buyer;
     const sa = (shippingAddress as any) || {};
     const isGuest =
-      buyer.email === 'guest@tarodan.system' ||
-      buyer.displayName === 'GUEST_SYSTEM' ||
+      buyer.email === "guest@tarodan.system" ||
+      buyer.displayName === "GUEST_SYSTEM" ||
       sa?.isGuestOrder === true;
     if (!isGuest) return buyer;
     const guestEmail = sa?.guestEmail || sa?.email || null;
     const guestName = sa?.guestName || sa?.fullName || null;
     return {
       id: buyer.id,
-      displayName: guestName || guestEmail || 'Misafir',
+      displayName: guestName || guestEmail || "Misafir",
       email: guestEmail || buyer.email,
     };
   }
@@ -231,7 +287,7 @@ export class AdminOrderService {
           product: { select: { id: true, title: true } },
           payment: { select: { id: true, status: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -251,44 +307,80 @@ export class AdminOrderService {
   /**
    * Resolve order dispute
    */
-  async resolveDispute(adminId: string, orderId: string, dto: ResolveDisputeDto) {
+  async resolveDispute(
+    adminId: string,
+    orderId: string,
+    dto: ResolveDisputeDto,
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException("Sipariş bulunamadı");
     }
 
-    // Handle resolution based on type
-    let newStatus: OrderStatus;
+    // Refund resolutions MUST go through the canonical refund orchestrator (F3.2):
+    // PayTR refund + payout void + hold release + stock restore + ledger. A bare
+    // status write would leave money/hold/stock/ledger inconsistent. Money moves
+    // FIRST — if the refund fails (e.g. payout already started) the dispute is NOT
+    // marked resolved (fail-closed).
+    let newStatus: OrderStatus = order.status;
     switch (dto.resolution) {
-      case 'buyer_refund':
+      case "buyer_refund":
+        if (!this.paymentService) {
+          throw new Error("PaymentService kullanılamıyor: iade işlenemedi");
+        }
+        await this.paymentService.processRefund(orderId, undefined, {
+          idempotencyKey: `admin-dispute:${orderId}`,
+        });
         newStatus = OrderStatus.refunded;
         break;
-      case 'seller_favor':
+      case "partial_refund":
+        if (dto.refundAmount == null || dto.refundAmount <= 0) {
+          throw new BadRequestException(
+            "Kısmi iade için geçerli bir iade tutarı gerekir",
+          );
+        }
+        if (!this.paymentService) {
+          throw new Error("PaymentService kullanılamıyor: iade işlenemedi");
+        }
+        await this.paymentService.processRefund(orderId, dto.refundAmount, {
+          idempotencyKey: `admin-dispute:${orderId}`,
+        });
+        // Kısmi iade siparişi tamamen 'refunded' yapmaz — durum korunur; iade
+        // ödeme/ledger'a kaydedilir.
+        newStatus = order.status;
+        break;
+      case "seller_favor":
         newStatus = OrderStatus.completed;
         break;
-      case 'partial_refund':
-        newStatus = OrderStatus.refunded;
-        break;
-      case 'dismissed':
+      case "dismissed":
+      default:
         newStatus = order.status; // Keep current status
         break;
-      default:
-        newStatus = order.status;
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: newStatus },
-    });
+    const updated =
+      newStatus === order.status
+        ? order
+        : await this.prisma.order.update({
+            where: { id: orderId },
+            data: { status: newStatus },
+          });
 
-    await this.audit.createAuditLog(adminId, 'dispute_resolve', 'Order', orderId, order, {
-      ...updated,
-      resolution: dto.resolution,
-      note: dto.note,
-    });
+    await this.audit.createAuditLog(
+      adminId,
+      "dispute_resolve",
+      "Order",
+      orderId,
+      order,
+      {
+        ...updated,
+        resolution: dto.resolution,
+        note: dto.note,
+      },
+    );
 
     return { success: true, orderId, resolution: dto.resolution, newStatus };
   }

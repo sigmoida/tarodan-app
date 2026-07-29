@@ -1,29 +1,35 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Badge, Button } from '@tarodan/ui';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Badge, Button } from "@tarodan/ui";
 import {
   PencilIcon,
   GlobeAltIcon,
   ExclamationTriangleIcon,
-} from '@heroicons/react/24/outline';
-import { adminApi } from '@/lib/api';
-import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/AdminList';
-import { SectionCard } from '@/components/detail/SectionCard';
+} from "@heroicons/react/24/outline";
+import { adminApi } from "@/lib/api";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/AdminList";
+import { SectionCard } from "@/components/detail/SectionCard";
 import {
-  PREDEFINED_PAGES,
+  predefinedPages,
+  PAGES_QUERY_KEY,
   type PredefinedSlug,
   type StaticPage,
-} from './_lib/content';
-import { PageEditorModal } from './_modals/PageEditorModal';
+} from "./_lib/content";
+import { PageEditorModal } from "./_modals/PageEditorModal";
+import { useTranslations } from "next-intl";
 
 export default function PagesPage() {
+  const t = useTranslations();
+  const pages = predefinedPages(t);
   const [editSlug, setEditSlug] = useState<PredefinedSlug | null>(null);
 
-  const { data: pageMap = {}, isLoading } = useQuery<Record<string, StaticPage>>({
-    queryKey: ['admin', 'pages'],
+  const { data: pageMap = {}, isLoading } = useQuery<
+    Record<string, StaticPage>
+  >({
+    queryKey: PAGES_QUERY_KEY,
     queryFn: async () => {
       const res = await adminApi.getPages();
       const pages: StaticPage[] = res.data?.data ?? [];
@@ -34,31 +40,37 @@ export default function PagesPage() {
   return (
     <AdminPage>
       <PageHeader
-        title="Sayfa Yönetimi"
-        description="Web sitesinin sabit sayfalarının içeriğini düzenleyin."
+        title={t("admin.marketing.pages.title")}
+        description={t("admin.marketing.pages.subtitle")}
       />
 
       {isLoading ? (
         <SectionCard>
-          <p className="text-center text-muted">Yükleniyor…</p>
+          <p className="text-center text-muted">{t("common.loading")}</p>
         </SectionCard>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {PREDEFINED_PAGES.map((page) => {
+          {pages.map((page) => {
             const existing = pageMap[page.slug];
             const badge = existing ? (
               <Badge
-                variant={existing.isPublished ? 'success' : 'secondary'}
+                variant={existing.isPublished ? "success" : "secondary"}
                 size="sm"
                 className="inline-flex items-center gap-1"
               >
                 <GlobeAltIcon className="h-3 w-3" />
-                {existing.isPublished ? 'Yayında' : 'Taslak'}
+                {existing.isPublished
+                  ? t("admin.marketing.pages.published")
+                  : t("admin.marketing.pages.draft")}
               </Badge>
             ) : (
-              <Badge variant="warning" size="sm" className="inline-flex items-center gap-1">
+              <Badge
+                variant="warning"
+                size="sm"
+                className="inline-flex items-center gap-1"
+              >
                 <ExclamationTriangleIcon className="h-3 w-3" />
-                İçerik yok
+                {t("admin.marketing.pages.noContent")}
               </Badge>
             );
             return (
@@ -76,7 +88,9 @@ export default function PagesPage() {
                     leftIcon={<PencilIcon className="h-4 w-4" />}
                     onClick={() => setEditSlug(page.slug)}
                   >
-                    {existing ? 'Düzenle' : 'İçerik Oluştur'}
+                    {existing
+                      ? t("common.edit")
+                      : t("admin.marketing.pages.createContent")}
                   </Button>
                 }
               >

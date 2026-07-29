@@ -10,7 +10,12 @@
 
 export type { AuthConfig, AuthEndpoints } from './config';
 export { createSession, type SessionToolkit, type ApiFetchResult } from './session';
-export { createAuthLogic, type LoginInput, type AuthLoginResult } from './actions';
+export {
+	createAuthLogic,
+	type LoginInput,
+	type AuthErrorReason,
+	type AuthLoginResult,
+} from './actions';
 export { createBffProxy } from './proxy';
 export { isExpired } from './jwt';
 export { cookieOptions, type SessionCookieOptions } from './cookies';

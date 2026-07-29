@@ -1,6 +1,7 @@
 "use client";
 
 import { LockClosedIcon } from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import {
   computeEstimatedReleaseAt,
@@ -33,9 +34,15 @@ export interface EscrowStatusCardProps {
 
 const toneStyles: Record<string, { wrap: string; label: string }> = {
   danger: { wrap: "bg-danger-50 border-danger-200", label: "text-danger-700" },
-  warning: { wrap: "bg-warning-50 border-warning-200", label: "text-warning-700" },
+  warning: {
+    wrap: "bg-warning-50 border-warning-200",
+    label: "text-warning-700",
+  },
   info: { wrap: "bg-info-50 border-info-200", label: "text-info-700" },
-  success: { wrap: "bg-success-50 border-success-200", label: "text-success-700" },
+  success: {
+    wrap: "bg-success-50 border-success-200",
+    label: "text-success-700",
+  },
 };
 
 function fmtDate(d: Date | null): string {
@@ -49,6 +56,7 @@ export function EscrowStatusCard({
   cancellationType,
   hasOpenRefund,
 }: EscrowStatusCardProps) {
+  const t = useTranslations();
   // No escrow on a cancelled order; just show the cancel/refund type.
   const isCancelled = status === "cancelled";
   const isRefunded = status === "refunded";
@@ -56,16 +64,19 @@ export function EscrowStatusCard({
 
   const releaseAt = computeEstimatedReleaseAt(deliveredAt);
   const windowEnd = computeRefundWindowEnd(deliveredAt);
-  const cancelType = cancellationTypeLabel(cancellationType);
+  const cancelType = cancellationTypeLabel(cancellationType, t);
 
-  const reason = describeHoldReason({
-    hasOpenRefund: openRefund,
-    deliveredAt: deliveredAt ?? null,
-  });
+  const reason = describeHoldReason(
+    {
+      hasOpenRefund: openRefund,
+      deliveredAt: deliveredAt ?? null,
+    },
+    t,
+  );
   const tone = toneStyles[reason.tone] ?? toneStyles.info;
 
   return (
-    <SectionCard title="Satıcı Ödemesi (Escrow)">
+    <SectionCard title={t("admin.operations.orders.escrow.title")}>
       {/* Cancel/refund type badge */}
       {cancelType && (
         <div className="mb-4 flex items-start gap-2">
@@ -86,11 +97,11 @@ export function EscrowStatusCard({
 
       {isCancelled ? (
         <p className="text-sm text-muted">
-          Sipariş iptal edildi — satıcıya ödeme (payout) oluşmaz.
+          {t("admin.operations.orders.escrow.cancelledNote")}
         </p>
       ) : isRefunded ? (
         <p className="text-sm text-muted">
-          Sipariş iade edildi — ödeme alıcıya geri döndü, satıcıya payout yapılmadı.
+          {t("admin.operations.orders.escrow.refundedNote")}
         </p>
       ) : (
         <div className="space-y-4">
@@ -100,10 +111,10 @@ export function EscrowStatusCard({
               <LockClosedIcon className="w-5 h-5 text-danger-600 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-danger-700">
-                  Açık iade nedeniyle bekletiliyor (frozen)
+                  {t("admin.operations.orders.escrow.frozenTitle")}
                 </p>
                 <p className="text-xs text-danger-600 mt-0.5">
-                  Hold, açık iade talebi sonuçlanana kadar kilitli — serbest bırakılamaz.
+                  {t("admin.operations.orders.escrow.frozenDetail")}
                 </p>
               </div>
             </div>
@@ -112,7 +123,9 @@ export function EscrowStatusCard({
           {/* Hold status summary */}
           {!openRefund && (
             <div className={`rounded-lg border px-3 py-2 ${tone.wrap}`}>
-              <p className={`text-sm font-medium ${tone.label}`}>{reason.label}</p>
+              <p className={`text-sm font-medium ${tone.label}`}>
+                {reason.label}
+              </p>
               <p className="text-xs text-muted mt-0.5">{reason.detail}</p>
             </div>
           )}
@@ -120,28 +133,36 @@ export function EscrowStatusCard({
           {/* Date breakdown */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <div>
-              <span className="text-muted">Teslim tarihi</span>
+              <span className="text-muted">
+                {t("admin.operations.orders.escrow.deliveryDate")}
+              </span>
               <p className="font-medium text-heading">
                 {deliveredAt
                   ? new Date(deliveredAt).toLocaleString("tr-TR")
-                  : "Henüz teslim edilmedi"}
+                  : t("admin.operations.orders.escrow.notDelivered")}
               </p>
             </div>
             <div>
               <span className="text-muted">
-                İade penceresi bitişi (teslim + {REFUND_WINDOW_DAYS} gün)
+                {t("admin.operations.orders.escrow.refundWindowEnd", {
+                  days: REFUND_WINDOW_DAYS,
+                })}
               </span>
               <p className="font-medium text-heading">{fmtDate(windowEnd)}</p>
             </div>
             <div>
               <span className="text-muted">
-                Tahmini serbest bırakma (+{PAYOUT_GRACE_DAYS} gün grace)
+                {t("admin.operations.orders.escrow.estimatedRelease", {
+                  days: PAYOUT_GRACE_DAYS,
+                })}
               </span>
               <p className="font-medium text-heading">{fmtDate(releaseAt)}</p>
             </div>
             {completedAt && (
               <div>
-                <span className="text-muted">Tamamlanma</span>
+                <span className="text-muted">
+                  {t("admin.operations.orders.escrow.completed")}
+                </span>
                 <p className="font-medium text-heading">
                   {new Date(completedAt).toLocaleString("tr-TR")}
                 </p>
@@ -150,9 +171,9 @@ export function EscrowStatusCard({
           </div>
 
           <p className="text-xs text-muted">
-            Ödeme satıcıya teslimden {REFUND_WINDOW_DAYS} gün sonra (iade penceresi)
-            otomatik aktarılır; alıcı onayı ödemeyi erkene almaz. Tarihler tahminidir —
-            kesin tarih ve aksiyon için Satıcı Ödemeleri sayfasına bakın.
+            {t("admin.operations.orders.escrow.footerNote", {
+              days: REFUND_WINDOW_DAYS,
+            })}
           </p>
         </div>
       )}

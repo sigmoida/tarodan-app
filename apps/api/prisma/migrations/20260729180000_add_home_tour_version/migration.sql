@@ -1,0 +1,2 @@
+ALTER TABLE "users"
+ADD COLUMN "home_tour_version" INTEGER NOT NULL DEFAULT 0;

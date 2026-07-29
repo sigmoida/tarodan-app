@@ -1,0 +1,70 @@
+"use server";
+
+import { type AuthErrorReason } from "@tarodan/auth";
+import { type WebUser } from "@/lib/auth.config";
+import { authLogic, getSession } from "./session";
+
+export type WebLoginResult =
+  | { status: "ok"; user: WebUser | null }
+  | { status: "2fa" }
+  | { status: "error"; reason: AuthErrorReason; message: string };
+
+function reasonMessage(
+  reason: AuthErrorReason,
+  serverMessage: string | undefined,
+): string {
+  if (reason === "connection") return "Sunucuya bağlanılamadı.";
+  if (reason === "unverified")
+    return serverMessage || "Email verification required";
+  if (reason === "invalid") return "E-posta veya şifre hatalı";
+  return serverMessage || "Giriş başarısız";
+}
+
+/**
+ * BFF Server Actions for the web app (email/password login, Google login,
+ * logout, forgot-password). On success the tokens are written to the app's
+ * httpOnly cookies inside `@tarodan/auth`; the resolved user is returned so the
+ * client store can hydrate. These back the live login UI and authStore.
+ */
+export async function loginAction(input: {
+  email: string;
+  password: string;
+  twoFactorCode?: string;
+}): Promise<WebLoginResult> {
+  const result = await authLogic.login(input);
+  if (result.status === "error") {
+    return {
+      status: "error",
+      reason: result.reason,
+      message: reasonMessage(result.reason, result.serverMessage),
+    };
+  }
+  if (result.status === "2fa") return { status: "2fa" };
+  const user = await getSession();
+  return { status: "ok", user };
+}
+
+export async function googleLoginAction(code: string): Promise<WebLoginResult> {
+  const result = await authLogic.googleLogin({ code });
+  if (result.status === "error") {
+    return {
+      status: "error",
+      reason: result.reason,
+      message: reasonMessage(result.reason, result.serverMessage),
+    };
+  }
+  if (result.status === "2fa") return { status: "2fa" };
+  const user = await getSession();
+  return { status: "ok", user };
+}
+
+export async function logoutAction(): Promise<void> {
+  await authLogic.logout();
+}
+
+export async function forgotPasswordAction(
+  email: string,
+): Promise<{ ok: true }> {
+  await authLogic.forgotPassword(email);
+  return { ok: true };
+}

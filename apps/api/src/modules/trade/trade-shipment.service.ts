@@ -3,19 +3,16 @@ import {
   BadRequestException,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { ShipmentStatus } from '@prisma/client';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-  SuratGonderiPayload,
-} from '../surat-cargo/surat-cargo.types';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { ShipmentStatus } from "@prisma/client";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { SuratGonderiPayload } from "../surat-cargo/surat-cargo.types";
+import { i18nMessage } from "../i18n";
+import { CacheService } from "../cache/cache.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 
 /**
  * Takas Sürat Kargo orkestrasyonu — TradeService'ten birebir taşındı
@@ -29,6 +26,8 @@ export class TradeShipmentService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+    private readonly notificationService: NotificationService,
     @Optional()
     private readonly suratCargoService?: SuratCargoService,
   ) {}
@@ -39,27 +38,36 @@ export class TradeShipmentService {
    * are from_warehouse shipments already submitted to Sürat).
    */
   async cancelSuratShipmentsForTrade(tradeId: string): Promise<void> {
-    if (!this.suratCargoService || !this.suratCargoService.isIntegrationEnabled()) {
+    if (
+      !this.suratCargoService ||
+      !this.suratCargoService.isIntegrationEnabled()
+    ) {
       return;
     }
     try {
       const shipments = await this.prisma.tradeShipment.findMany({
         where: {
           tradeId,
-          carrier: 'surat',
-          status: { notIn: ['delivered', 'returned', 'cancelled', 'failed'] as any },
+          carrier: "surat",
+          status: {
+            notIn: ["delivered", "returned", "cancelled", "failed"] as any,
+          },
           trackingNumber: { not: null },
         },
       });
       for (const shipment of shipments) {
         if (!shipment.trackingNumber) continue;
         try {
-          await this.suratCargoService.cancelShipmentByOrderNumber(shipment.trackingNumber);
+          await this.suratCargoService.cancelShipmentByOrderNumber(
+            shipment.trackingNumber,
+          );
           await this.prisma.tradeShipment.update({
             where: { id: shipment.id },
-            data: { status: 'cancelled' as any },
+            data: { status: "cancelled" as any },
           });
-          this.logger.log(`Surat trade shipment cancelled: ${shipment.trackingNumber}`);
+          this.logger.log(
+            `Surat trade shipment cancelled: ${shipment.trackingNumber}`,
+          );
         } catch (err: any) {
           this.logger.error(
             `Failed to cancel Surat trade shipment ${shipment.trackingNumber}: ${err.message}`,
@@ -67,7 +75,9 @@ export class TradeShipmentService {
         }
       }
     } catch (error: any) {
-      this.logger.error(`cancelSuratShipmentsForTrade failed for ${tradeId}: ${error.message}`);
+      this.logger.error(
+        `cancelSuratShipmentsForTrade failed for ${tradeId}: ${error.message}`,
+      );
     }
   }
 
@@ -111,20 +121,20 @@ export class TradeShipmentService {
       });
       if (!addr) {
         throw new BadRequestException(
-          'Seçilen teslimat adresi bulunamadı veya size ait değil.',
+          i18nMessage("server.trade.selectedAddressNotFound"),
         );
       }
       return addr.id;
     }
     const fallback = await db.address.findFirst({
       where: { userId },
-      orderBy: { isDefault: 'desc' },
+      orderBy: { isDefault: "desc" },
       select: { id: true },
     });
     if (!fallback) {
       if (required) {
         throw new BadRequestException(
-          'Takas için bir teslimat adresi ekleyin. Profil → Adreslerim üzerinden adres ekleyebilirsiniz.',
+          i18nMessage("server.trade.noShippingAddress"),
         );
       }
       return null;
@@ -181,7 +191,7 @@ export class TradeShipmentService {
           defaultAddr ??
           (await this.prisma.address.findFirst({
             where: { userId },
-            orderBy: { createdAt: 'asc' },
+            orderBy: { createdAt: "asc" },
           }))
         );
       };
@@ -196,7 +206,7 @@ export class TradeShipmentService {
         trade.receiver.addresses[0],
       );
 
-      type SideKey = 'INI' | 'REC';
+      type SideKey = "INI" | "REC";
       type Side = {
         suffix: SideKey;
         shipperId: string;
@@ -205,13 +215,13 @@ export class TradeShipmentService {
       };
       const sides: Side[] = [
         {
-          suffix: 'INI',
+          suffix: "INI",
           shipperId: trade.initiatorId,
           user: trade.initiator,
           address: initiatorAddress,
         },
         {
-          suffix: 'REC',
+          suffix: "REC",
           shipperId: trade.receiverId,
           user: trade.receiver,
           address: receiverAddress,
@@ -245,8 +255,9 @@ export class TradeShipmentService {
 
         for (const side of sides) {
           if (!side.address) {
+            // M5: bildirim tx DIŞINDA atılır (aşağıda) — burada yalnız logla+atla.
             this.logger.warn(
-              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — admin must intervene`,
+              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — user notified to add one`,
             );
             continue;
           }
@@ -258,7 +269,7 @@ export class TradeShipmentService {
             where: {
               tradeId: trade.id,
               shipperId: side.shipperId,
-              leg: 'to_warehouse',
+              leg: "to_warehouse",
             },
           });
 
@@ -274,18 +285,18 @@ export class TradeShipmentService {
             // tradeNumber zaten "TRD-..." formatında geliyor; çift "TRD-" önekini
             // önlemek için doğrudan tradeNumber'ı kullan.
             const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
-              .replace(/[^a-zA-Z0-9-]/g, '')
+              .replace(/[^a-zA-Z0-9-]/g, "")
               .slice(0, 50);
             row = await tx.tradeShipment.create({
               data: {
                 tradeId: trade.id,
                 shipperId: side.shipperId,
                 fromAddressId: side.address.id,
-                carrier: 'surat',
+                carrier: "surat",
                 trackingNumber: ozelKargoTakipNo,
                 status: ShipmentStatus.label_created,
-                leg: 'to_warehouse',
-                recipientType: 'warehouse',
+                leg: "to_warehouse",
+                recipientType: "warehouse",
                 recipientUserId: null,
               },
             });
@@ -306,6 +317,29 @@ export class TradeShipmentService {
         }
       });
 
+      // M5: adressiz taraf sessizce atlanıyordu — takas deadline'a kadar askıda
+      // kalıyor, kimseye haber gitmiyordu. Kullanıcıya "adres ekle" bildirimi at
+      // (in_app + push, şablon TRADE_ADDRESS_REQUIRED). Reconciliation cron bu
+      // fonksiyonu periyodik yeniden çağırdığından cache ile günde bire dedupe
+      // edilir; adres eklenince kargo otomatik oluşur ve bildirim kesilir.
+      for (const side of sides) {
+        if (side.address) continue;
+        const dedupeKey = `trade:addr-missing-notified:${trade.id}:${side.shipperId}`;
+        try {
+          if (await this.cache.get(dedupeKey)) continue;
+          await this.cache.set(dedupeKey, 1, { ttl: 24 * 3600 });
+          await this.notificationService.createInAppNotification(
+            side.shipperId,
+            NotificationType.TRADE_ADDRESS_REQUIRED,
+            { tradeId: trade.id, tradeNumber: trade.tradeNumber },
+          );
+        } catch (err: any) {
+          this.logger.warn(
+            `TRADE_ADDRESS_REQUIRED notify failed trade=${trade.id} user=${side.shipperId}: ${err?.message}`,
+          );
+        }
+      }
+
       // Now, OUTSIDE the tx, fire the Sürat SOAP calls. Each is wrapped in
       // try/catch so one failure doesn't block the other side.
       if (
@@ -321,17 +355,33 @@ export class TradeShipmentService {
       for (const item of dispatched) {
         if (!item.payload) continue;
         try {
-          const result = await this.suratCargoService.submitShipmentWithRetry({
-            idempotencyKey: `surat:trade-inbound:${item.ozelKargoTakipNo}`,
-            correlationId: `trade-inbound-${tradeId}`,
-            payload: item.payload,
-          });
+          const result = await this.suratCargoService.createShipmentWithBarcode(
+            {
+              idempotencyKey: `surat:trade-inbound:${item.ozelKargoTakipNo}`,
+              correlationId: `trade-inbound-${tradeId}`,
+              payload: item.payload,
+            },
+          );
+          if (result.ok) {
+            // Persist the REAL Sürat cargo code + label (KargoTakipNo).
+            await this.prisma.tradeShipment
+              .update({
+                where: { id: item.shipmentId },
+                data: {
+                  providerTrackingId: result.kargoTakipNo,
+                  labelZpl: result.labelZpl,
+                },
+              })
+              .catch((e) =>
+                this.logger.error(
+                  `Failed to persist barcode for trade shipment ${item.shipmentId}: ${e.message}`,
+                ),
+              );
+          }
           if (!result.ok) {
             const r = result as any;
             const errMsg =
-              r.kind === 'business'
-                ? r.suratMessage
-                : `technical:${r.code}`;
+              r.kind === "business" ? r.suratMessage : `technical:${r.code}`;
             this.logger.warn(
               `Sürat inbound submit non-ok for trade ${tradeId} oid=${item.ozelKargoTakipNo}: ${errMsg}; leaving shipment at label_created for admin review`,
             );
@@ -401,39 +451,127 @@ export class TradeShipmentService {
     // info from env so non-cash trades & cash trades alike share the same
     // source. Defaults match Tarodan HQ (override via env).
     const warehouseName =
-      process.env.TARODAN_WAREHOUSE_NAME?.trim() || 'Tarodan Depo';
+      process.env.TARODAN_WAREHOUSE_NAME?.trim() || "Tarodan Depo";
     const warehouseAddress =
       process.env.TARODAN_WAREHOUSE_ADDRESS?.trim() ||
-      'Tarodan Merkez Depo Adresi';
+      "Tarodan Merkez Depo Adresi";
     const warehouseCity =
-      process.env.TARODAN_WAREHOUSE_CITY?.trim() || 'Istanbul';
+      process.env.TARODAN_WAREHOUSE_CITY?.trim() || "Istanbul";
     const warehouseDistrict =
-      process.env.TARODAN_WAREHOUSE_DISTRICT?.trim() || 'Maltepe';
+      process.env.TARODAN_WAREHOUSE_DISTRICT?.trim() || "Maltepe";
     const warehousePhone =
-      process.env.TARODAN_WAREHOUSE_PHONE?.trim() || '05000000000';
+      process.env.TARODAN_WAREHOUSE_PHONE?.trim() || "05000000000";
 
     const senderLabel =
-      fromAddress.fullName || user?.displayName || user?.email || 'Takas Gönderici';
+      fromAddress.fullName ||
+      user?.displayName ||
+      user?.email ||
+      "Takas Gönderici";
 
-    return {
-      KisiKurum: warehouseName,
-      SahisBirim: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
-      AliciAdresi: warehouseAddress,
-      Il: normalizeSuratLocation(warehouseCity),
-      Ilce: normalizeSuratLocation(warehouseDistrict),
-      TelefonCep: normalizeSuratPhone(warehousePhone),
-      KargoTuru: SuratKargoTuru.Koli,
-      OdemeTipi: SuratOdemeTipi.Pesin,
-      OzelKargoTakipNo: ozelKargoTakipNo,
-      Adet: 1,
-      BirimDesi: 1,
-      BirimKg: 1,
-      KapidanOdemeTahsilatTipi: 1 as any,
-      TasimaSekli: SuratTasimaSekli.KaraYolu,
-      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-      GonderiSekli: SuratGonderiSekli.Standart,
-      Pazaryerimi: 0,
-      Iademi: false,
-    };
+    // warehouseName zaten `?.trim() || "Tarodan Depo"` → daima boş olmayan trimli
+    // değer; builder'ın `KisiKurum.trim() || "Alıcı"` mantığı burada no-op olur.
+    return buildStandardGonderiPayload({
+      recipientName: warehouseName,
+      address: warehouseAddress,
+      city: warehouseCity,
+      district: warehouseDistrict,
+      phone: warehousePhone,
+      ref: ozelKargoTakipNo,
+      content: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
+    });
+  }
+
+  /**
+   * Kargo kodu retry job: kodsuz (providerTrackingId NULL) kalmış tek bir
+   * depoya-giriş (to_warehouse) takas gönderisi için OrtakBarkodOlustur'u yeniden
+   * dener. İlk oluşturmadaki payload builder'ı + idempotency anahtarını AYNEN
+   * kullanır → Sürat'ta mükerrer gönderi oluşmaz. Başarılıysa kodu+etiketi yazar
+   * ve gönderiyi (pending'e düşmüşse) label_created'a çeker. SuratTrackingService
+   * orchestrator'ı çağırır; hiçbir zaman throw etmez, boolean döner.
+   */
+  async retryInboundBarcode(tradeShipmentId: string): Promise<boolean> {
+    if (!this.suratCargoService?.isIntegrationEnabled()) return false;
+
+    const ship = await this.prisma.tradeShipment.findUnique({
+      where: { id: tradeShipmentId },
+      include: {
+        trade: { select: { tradeNumber: true } },
+        fromAddress: true,
+      },
+    });
+    // Guard: yalnız kodsuz, adresli, Sürat'lı depoya-giriş bacağı.
+    if (
+      !ship ||
+      ship.carrier !== "surat" ||
+      ship.providerTrackingId ||
+      ship.leg !== "to_warehouse" ||
+      !ship.trackingNumber ||
+      !ship.fromAddress
+    ) {
+      return false;
+    }
+
+    // shipper bir relation değil (yalnız shipperId scalar) → kullanıcıyı ayrı yükle.
+    const shipper = await this.prisma.user.findUnique({
+      where: { id: ship.shipperId },
+      select: { displayName: true, email: true },
+    });
+
+    const payload = this.buildSuratPayloadForInboundLeg(
+      shipper ?? { displayName: null, email: "" },
+      ship.fromAddress,
+      ship.trackingNumber,
+      ship.trade.tradeNumber,
+    );
+    if (!payload) return false;
+
+    try {
+      const result = await this.suratCargoService.createShipmentWithBarcode({
+        idempotencyKey: `surat:trade-inbound:${ship.trackingNumber}`,
+        correlationId: `trade-inbound-retry-${ship.tradeId}`,
+        payload,
+      });
+      if (!result.ok) {
+        const r = result as any;
+        this.logger.warn(
+          `Retry inbound barcode non-ok trade-shipment=${tradeShipmentId} oid=${ship.trackingNumber}: ${r.kind === "business" ? r.suratMessage : `technical:${r.code}`}`,
+        );
+        return false;
+      }
+      await this.prisma.tradeShipment.update({
+        where: { id: tradeShipmentId },
+        data: {
+          providerTrackingId: result.kargoTakipNo,
+          labelZpl: result.labelZpl,
+          status: ShipmentStatus.label_created,
+        },
+      });
+      this.logger.log(
+        `Retry OK: trade inbound barcode filled ${tradeShipmentId} oid=${ship.trackingNumber} code=${result.kargoTakipNo}`,
+      );
+      // A2/C24: kod gecikmeli oluştu — gönderen "hazırlanıyor" görüp bekliyordu;
+      // artık şubeye gidebilir, haber ver.
+      try {
+        await this.notificationService.createInAppNotification(
+          ship.shipperId,
+          NotificationType.CARGO_CODE_READY,
+          {
+            reference: ship.trade.tradeNumber,
+            tradeId: ship.tradeId,
+            link: `/trades/${ship.tradeId}`,
+          },
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `CARGO_CODE_READY notify failed trade-shipment=${tradeShipmentId}: ${err?.message}`,
+        );
+      }
+      return true;
+    } catch (e: any) {
+      this.logger.error(
+        `Retry inbound barcode threw ${tradeShipmentId}: ${e?.message}`,
+      );
+      return false;
+    }
   }
 }

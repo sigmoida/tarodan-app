@@ -9,8 +9,14 @@
       "Resource": [
         "arn:aws:s3:::amzn-tarodan/dev/products/*",
         "arn:aws:s3:::amzn-tarodan/dev/collections/*",
+        "arn:aws:s3:::amzn-tarodan/dev/avatars/*",
+        "arn:aws:s3:::amzn-tarodan/staging/products/*",
+        "arn:aws:s3:::amzn-tarodan/staging/collections/*",
+        "arn:aws:s3:::amzn-tarodan/staging/avatars/*",
         "arn:aws:s3:::amzn-tarodan/prod/products/*",
-        "arn:aws:s3:::amzn-tarodan/prod/collections/*"
+        "arn:aws:s3:::amzn-tarodan/prod/collections/*",
+        "arn:aws:s3:::amzn-tarodan/prod/avatars/*",
+        "arn:aws:s3:::amzn-tarodan/seed-assets/hero/*"
       ]
     }
   ]

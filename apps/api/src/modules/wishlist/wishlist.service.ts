@@ -4,19 +4,19 @@ import {
   NotFoundException,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { ProductStatus } from '@prisma/client';
-import { DiscountService } from '../discount/discount.service';
-import { StorageService } from '../storage/storage.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { ProductStatus } from "@prisma/client";
+import { DiscountService } from "../discount/discount.service";
+import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import {
   AddToWishlistDto,
   WishlistResponseDto,
   WishlistItemResponseDto,
-} from './dto';
+} from "./dto";
 
 @Injectable()
 export class WishlistService {
@@ -29,7 +29,7 @@ export class WishlistService {
     private readonly discountService: DiscountService,
     @Optional()
     private readonly storageService: StorageService,
-  ) { }
+  ) {}
 
   // ==========================================================================
   // GET OR CREATE WISHLIST
@@ -64,7 +64,7 @@ export class WishlistService {
           },
         },
       },
-      orderBy: { addedAt: 'desc' },
+      orderBy: { addedAt: "desc" },
     });
 
     // Map items with campaign discount prices (skip deleted products)
@@ -75,7 +75,9 @@ export class WishlistService {
         const dto = await this.mapItemToDto(item);
         mappedItems.push(dto);
       } catch (err) {
-        this.logger.warn(`mapItemToDto failed for item ${item.id}: ${err?.message || err}`);
+        this.logger.warn(
+          `mapItemToDto failed for item ${item.id}: ${err?.message || err}`,
+        );
       }
     }
 
@@ -105,12 +107,14 @@ export class WishlistService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException("Ürün bulunamadı");
     }
 
     // Cannot add own product to wishlist
     if (product.sellerId === userId) {
-      throw new BadRequestException('Kendi ürününüzü istek listesine ekleyemezsiniz');
+      throw new BadRequestException(
+        "Kendi ürününüzü istek listesine ekleyemezsiniz",
+      );
     }
 
     const wishlist = await this.getOrCreateWishlist(userId);
@@ -177,11 +181,11 @@ export class WishlistService {
         {
           productId: product.id,
           productTitle: product.title,
-          userName: user?.displayName || 'Bir kullanıcı',
+          userName: user?.displayName || "Bir kullanıcı",
         },
       );
     } catch (error) {
-      this.logger.error('Failed to send product liked notification:', error);
+      this.logger.error("Failed to send product liked notification:", error);
     }
 
     return this.mapItemToDto(item);
@@ -196,7 +200,7 @@ export class WishlistService {
     });
 
     if (!wishlist) {
-      throw new NotFoundException('İstek listesi bulunamadı');
+      throw new NotFoundException("İstek listesi bulunamadı");
     }
 
     const item = await this.prisma.wishlistItem.findUnique({
@@ -209,7 +213,7 @@ export class WishlistService {
     });
 
     if (!item) {
-      throw new NotFoundException('Ürün istek listenizde değil');
+      throw new NotFoundException("Ürün istek listenizde değil");
     }
 
     // Use transaction to delete wishlist item and decrement like count
@@ -268,10 +272,17 @@ export class WishlistService {
   // ==========================================================================
   // HELPER - Resolve product image URL (S3 key -> presigned URL)
   // ==========================================================================
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
+    if (isPublicStorageKey(imageKeyOrUrl)) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
@@ -296,7 +307,9 @@ export class WishlistService {
     const originalPrice = basePrice;
 
     // Resolve product image URL (S3 key -> presigned URL)
-    const resolvedImage = this.resolveProductImageUrl(product.images?.[0]?.cardKey);
+    const resolvedImage = this.resolveProductImageUrl(
+      product.images?.[0]?.cardKey,
+    );
 
     return {
       id: item.id,
@@ -304,7 +317,8 @@ export class WishlistService {
       productTitle: product.title,
       productImage: resolvedImage,
       productPrice: effectivePrice,
-      productOriginalPrice: effectivePrice < originalPrice ? originalPrice : undefined,
+      productOriginalPrice:
+        effectivePrice < originalPrice ? originalPrice : undefined,
       productCondition: product.condition,
       productStatus: product.status,
       sellerId: product.seller.id,

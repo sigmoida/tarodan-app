@@ -1,23 +1,27 @@
-'use client';
+"use client";
 
-import { adminApi } from '@/lib/api';
-import { ResourceList } from '@/components/list';
-import { clientListFetcher } from '@/lib/query/client-list';
-import { scheduleColumns } from '../_lib/columns';
-import { type ScheduleItem } from '../_lib/types';
+import { adminApi } from "@/lib/api";
+import { ResourceList } from "@/components/list";
+import { scheduleColumns } from "../_lib/columns";
+import { type ScheduleItem } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function ScheduleTab() {
+  const t = useTranslations();
   return (
     <ResourceList<ScheduleItem>
       resource="payouts-schedule"
-      fetcher={clientListFetcher<ScheduleItem>(
-        () => adminApi.getPayoutsSchedule({ limit: 50 }),
-        (raw) => (Array.isArray(raw) ? raw : (raw?.data ?? [])),
-      )}
+      fetcher={(params) => adminApi.getPayoutsSchedule(params)}
       getRowId={(s) => s.id}
-      errorMessage="Takvim yüklenemedi"
+      syncUrl
     >
-      <ResourceList.Table columns={scheduleColumns} emptyText="Yaklaşan ödeme yok" />
+      <ResourceList.Toolbar>
+        <ResourceList.Search />
+      </ResourceList.Toolbar>
+      <ResourceList.Table
+        columns={scheduleColumns(t)}
+        emptyText={t("admin.finance.payouts.noUpcomingPayments")}
+      />
       <ResourceList.Pagination />
     </ResourceList>
   );

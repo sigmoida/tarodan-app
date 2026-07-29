@@ -1,40 +1,43 @@
-import {
-  Injectable,
-  Optional,
-  Logger,
-} from '@nestjs/common';
-import { AdminAuditService } from './admin-audit.service';
-import { AdminCommissionService } from './admin-commission.service';
-import { AdminSettingsService } from './admin-settings.service';
-import { AdminUserService } from './admin-user.service';
-import { AdminStaffService } from './admin-staff.service';
-import { AdminProductService } from './admin-product.service';
-import { AdminOrderService } from './admin-order.service';
-import { AdminAnalyticsService } from './admin-analytics.service';
-import { AdminModerationService } from './admin-moderation.service';
-import { AdminPaymentService } from './admin-payment.service';
-import { AdminPayoutService } from './admin-payout.service';
-import { AdminTradeService } from './admin-trade.service';
-import { AdminRefundService } from './admin-refund.service';
-import { AdminMessagingService } from './admin-messaging.service';
-import { AdminSupportService } from './admin-support.service';
-import { AdminContentService } from './admin-content.service';
-import { AdminTaxService } from './admin-tax.service';
-import { AdminMembershipService } from './admin-membership.service';
-import { AdminCatalogService } from './admin-catalog.service';
-import { AdminCollectionService } from './admin-collection.service';
-import { AdminNotificationService } from './admin-notification.service';
-import { AdminLogsService } from './admin-logs.service';
-import { AdminShippingService } from './admin-shipping.service';
-import { AdminReviewService } from './admin-review.service';
-import { AdminSellerApplicationService } from './admin-seller-application.service';
+import { Injectable, Optional, Logger } from "@nestjs/common";
+import { AdminAuditService } from "./admin-audit.service";
+import { AdminCommissionService } from "./admin-commission.service";
+import { AdminSettingsService } from "./admin-settings.service";
+import { AdminUserService } from "./admin-user.service";
+import { AdminStaffService } from "./admin-staff.service";
+import { AdminProductService } from "./admin-product.service";
+import { AdminOrderService } from "./admin-order.service";
+import { AdminAnalyticsService } from "./admin-analytics.service";
+import { AdminModerationService } from "./admin-moderation.service";
+import { AdminPaymentService } from "./admin-payment.service";
+import { AdminPayoutService } from "./admin-payout.service";
+import { AdminTradeService } from "./admin-trade.service";
+import { AdminRefundService } from "./admin-refund.service";
+import { AdminMessagingService } from "./admin-messaging.service";
+import { AdminSupportService } from "./admin-support.service";
+import { AdminContentService } from "./admin-content.service";
+import { AdminTaxService } from "./admin-tax.service";
+import { AdminMembershipService } from "./admin-membership.service";
+import { AdminCatalogService } from "./admin-catalog.service";
+import { AdminCollectionService } from "./admin-collection.service";
+import { AdminNotificationService } from "./admin-notification.service";
+import { AdminLogsService } from "./admin-logs.service";
+import { AdminShippingService } from "./admin-shipping.service";
+import { AdminReviewService } from "./admin-review.service";
+import { AdminSellerApplicationService } from "./admin-seller-application.service";
 import {
   CreateCommissionRuleDto,
+  PreviewCommissionDto,
   UpdateCommissionRuleDto,
   UpdatePlatformSettingDto,
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
+  AdminTradeQueryDto,
+  AdminMessageQueryDto,
+  AdminShipmentQueryDto,
+  AdminRefundHistoryQueryDto,
+  TradeShipmentQueryDto,
+  RefundRequestQueryDto,
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
@@ -46,8 +49,11 @@ import {
   ResolveDisputeDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
+  AddOrderTrackingDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
+  ElogoInvoiceQueryDto,
+  SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
   PayoutExportQueryDto,
@@ -57,13 +63,34 @@ import {
   UpdateProductDto,
   RatingQueryDto,
   RatingStatus,
+  AdminUserRatingQueryDto,
+  AdminCategoryQueryDto,
+  AdminBrandQueryDto,
+  AdminManufacturerQueryDto,
+  AdminCarModelQueryDto,
+  AdminAttributeGroupQueryDto,
+  AdminAttributeQueryDto,
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
-} from './dto';
-import { TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, MembershipTierType } from '@prisma/client';
-import { RefundService } from '../refund/refund.service';
-import { OrderService } from '../order/order.service';
-import { SuratTrackingService } from '../surat-cargo/surat-tracking.service';
+  SellerApplicationQueryDto,
+  RefundAttemptQueryDto,
+  ResolveRefundAttemptDto,
+  NotificationHistoryQueryDto,
+  ScheduledNotificationQueryDto,
+  ErrorLogQueryDto,
+  SecurityLogQueryDto,
+  EmailLogQueryDto,
+} from "./dto";
+import {
+  TicketStatus,
+  TicketPriority,
+  TicketCategory,
+  MembershipTierType,
+  OrderStatus,
+} from "@prisma/client";
+import { RefundService } from "../refund/refund.service";
+import { OrderService } from "../order/order.service";
+import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 
 @Injectable()
 export class AdminService {
@@ -100,19 +127,34 @@ export class AdminService {
     private readonly orderService?: OrderService,
     @Optional()
     private readonly suratTrackingService?: SuratTrackingService,
-  ) { }
+  ) {}
 
   // ---------- Order 48h pencere admin müdahaleleri (Faz 3B.4) ----------
 
   async forceCompleteOrder(
     orderId: string,
     adminId: string,
-    reason?: string,
+    reason: string,
   ): Promise<{ completed: boolean }> {
     if (!this.orderService) {
-      throw new Error('OrderService not available');
+      throw new Error("OrderService not available");
     }
-    return this.orderService.forceComplete(orderId, adminId, reason);
+    const result = await this.orderService.forceComplete(
+      orderId,
+      adminId,
+      reason,
+    );
+    if (result.completed) {
+      await this.auditService.createAuditLog(
+        adminId,
+        "order_force_completed",
+        "Order",
+        orderId,
+        { status: OrderStatus.awaiting_buyer_confirmation },
+        { status: OrderStatus.completed, reason },
+      );
+    }
+    return result;
   }
 
   async extendOrderConfirmation(
@@ -122,9 +164,14 @@ export class AdminService {
     reason?: string,
   ): Promise<{ newDeadline: Date }> {
     if (!this.orderService) {
-      throw new Error('OrderService not available');
+      throw new Error("OrderService not available");
     }
-    return this.orderService.extendConfirmation(orderId, adminId, hours, reason);
+    return this.orderService.extendConfirmation(
+      orderId,
+      adminId,
+      hours,
+      reason,
+    );
   }
 
   // ---------- RefundRequest policy override (Faz 4B.1) ----------
@@ -139,15 +186,47 @@ export class AdminService {
       refundSellerCommission?: boolean;
     },
   ) {
-    return this.refundService.overrideRefundPolicy(refundRequestId, adminId, payload);
+    return this.refundService.overrideRefundPolicy(
+      refundRequestId,
+      adminId,
+      payload,
+    );
   }
 
   async setReturnShippingPayer(
     refundRequestId: string,
     adminId: string,
-    payer: 'buyer' | 'seller' | 'platform',
+    payer: "buyer" | "seller" | "platform",
   ) {
-    return this.refundService.setReturnShippingPayer(refundRequestId, adminId, payer);
+    return this.refundService.setReturnShippingPayer(
+      refundRequestId,
+      adminId,
+      payer,
+    );
+  }
+
+  async approveRefundRequest(
+    adminId: string,
+    refundRequestId: string,
+    note?: string,
+  ) {
+    return this.adminRefundService.approveRefundRequest(
+      adminId,
+      refundRequestId,
+      note,
+    );
+  }
+
+  async rejectRefundRequest(
+    adminId: string,
+    refundRequestId: string,
+    reason: string,
+  ) {
+    return this.adminRefundService.rejectRefundRequest(
+      adminId,
+      refundRequestId,
+      reason,
+    );
   }
 
   // ==================== COMMISSION RULES ====================
@@ -157,11 +236,19 @@ export class AdminService {
     return this.commissionService.getCommissionRules();
   }
 
+  async previewCommission(dto: PreviewCommissionDto) {
+    return this.commissionService.previewCommission(dto);
+  }
+
   async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {
     return this.commissionService.createCommissionRule(adminId, dto);
   }
 
-  async updateCommissionRule(adminId: string, ruleId: string, dto: UpdateCommissionRuleDto) {
+  async updateCommissionRule(
+    adminId: string,
+    ruleId: string,
+    dto: UpdateCommissionRuleDto,
+  ) {
     return this.commissionService.updateCommissionRule(adminId, ruleId, dto);
   }
 
@@ -217,9 +304,14 @@ export class AdminService {
     adminId: string,
     userId: string,
     tierType: MembershipTierType,
-    billingPeriod: 'monthly' | 'yearly' = 'monthly',
+    billingPeriod: "monthly" | "yearly" = "monthly",
   ) {
-    return this.userService.adminChangeUserMembership(adminId, userId, tierType, billingPeriod);
+    return this.userService.adminChangeUserMembership(
+      adminId,
+      userId,
+      tierType,
+      billingPeriod,
+    );
   }
 
   // ==================== ADMIN STAFF (admin rol yönetimi) ====================
@@ -253,7 +345,11 @@ export class AdminService {
     return this.staffService.assignAdminStaff(actingUserId, dto);
   }
 
-  async updateAdminStaff(actingUserId: string, id: string, dto: UpdateAdminStaffDto) {
+  async updateAdminStaff(
+    actingUserId: string,
+    id: string,
+    dto: UpdateAdminStaffDto,
+  ) {
     return this.staffService.updateAdminStaff(actingUserId, id, dto);
   }
 
@@ -272,7 +368,11 @@ export class AdminService {
     return this.productService.getProducts(query);
   }
 
-  async exportProducts(query: { status?: string; categoryId?: string; sellerId?: string }) {
+  async exportProducts(query: {
+    status?: string;
+    categoryId?: string;
+    sellerId?: string;
+  }) {
     return this.productService.exportProducts(query);
   }
 
@@ -280,15 +380,27 @@ export class AdminService {
     return this.productService.getProduct(productId);
   }
 
-  async updateProduct(adminId: string, productId: string, dto: UpdateProductDto) {
+  async updateProduct(
+    adminId: string,
+    productId: string,
+    dto: UpdateProductDto,
+  ) {
     return this.productService.updateProduct(adminId, productId, dto);
   }
 
-  async approveProduct(adminId: string, productId: string, dto: ApproveProductDto) {
+  async approveProduct(
+    adminId: string,
+    productId: string,
+    dto: ApproveProductDto,
+  ) {
     return this.productService.approveProduct(adminId, productId, dto);
   }
 
-  async rejectProduct(adminId: string, productId: string, dto: RejectProductDto) {
+  async rejectProduct(
+    adminId: string,
+    productId: string,
+    dto: RejectProductDto,
+  ) {
     return this.productService.rejectProduct(adminId, productId, dto);
   }
 
@@ -313,7 +425,11 @@ export class AdminService {
     return this.adminOrderService.getDisputedOrders(query);
   }
 
-  async resolveDispute(adminId: string, orderId: string, dto: ResolveDisputeDto) {
+  async resolveDispute(
+    adminId: string,
+    orderId: string,
+    dto: ResolveDisputeDto,
+  ) {
     return this.adminOrderService.resolveDispute(adminId, orderId, dto);
   }
 
@@ -348,14 +464,18 @@ export class AdminService {
     return this.analyticsService.getOrderById(orderId);
   }
 
-  async updateOrderStatus(adminId: string, orderId: string, dto: UpdateOrderStatusDto) {
+  async updateOrderStatus(
+    adminId: string,
+    orderId: string,
+    dto: UpdateOrderStatusDto,
+  ) {
     return this.analyticsService.updateOrderStatus(adminId, orderId, dto);
   }
 
   async addOrderTracking(
     adminId: string,
     orderId: string,
-    dto: { trackingNumber: string; carrier: string; trackingUrl?: string },
+    dto: AddOrderTrackingDto,
   ) {
     return this.analyticsService.addOrderTracking(adminId, orderId, dto);
   }
@@ -363,7 +483,10 @@ export class AdminService {
   async sendOrderNotification(
     adminId: string,
     orderId: string,
-    dto: { type: 'status_update' | 'shipped' | 'delivered' | 'custom'; message?: string },
+    dto: {
+      type: "status_update" | "shipped" | "delivered" | "custom";
+      message?: string;
+    },
   ) {
     return this.analyticsService.sendOrderNotification(adminId, orderId, dto);
   }
@@ -378,6 +501,14 @@ export class AdminService {
 
   async getRecentOrders(limit: number = 10) {
     return this.analyticsService.getRecentOrders(limit);
+  }
+
+  async getTopProducts(limit: number = 10) {
+    return this.analyticsService.getTopProducts(limit);
+  }
+
+  async getTopSellers(limit: number = 10) {
+    return this.analyticsService.getTopSellers(limit);
   }
 
   async getPendingActions() {
@@ -450,6 +581,11 @@ export class AdminService {
     kind?: string;
     page?: number;
     pageSize?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
   }) {
     return this.moderationService.getModerationEvents(options);
   }
@@ -463,7 +599,10 @@ export class AdminService {
   }
 
   async setAiConfig(relevanceThreshold?: number, nsfwThreshold?: number) {
-    return this.moderationService.setAiConfig(relevanceThreshold, nsfwThreshold);
+    return this.moderationService.setAiConfig(
+      relevanceThreshold,
+      nsfwThreshold,
+    );
   }
 
   async approveModerationItem(
@@ -472,7 +611,12 @@ export class AdminService {
     itemId: string,
     notes?: string,
   ) {
-    return this.moderationService.approveModerationItem(adminId, type, itemId, notes);
+    return this.moderationService.approveModerationItem(
+      adminId,
+      type,
+      itemId,
+      notes,
+    );
   }
 
   async rejectModerationItem(
@@ -482,7 +626,13 @@ export class AdminService {
     reason: string,
     notes?: string,
   ) {
-    return this.moderationService.rejectModerationItem(adminId, type, itemId, reason, notes);
+    return this.moderationService.rejectModerationItem(
+      adminId,
+      type,
+      itemId,
+      reason,
+      notes,
+    );
   }
 
   async flagModerationItem(
@@ -492,7 +642,13 @@ export class AdminService {
     reason: string,
     priority?: string,
   ) {
-    return this.moderationService.flagModerationItem(adminId, type, itemId, reason, priority);
+    return this.moderationService.flagModerationItem(
+      adminId,
+      type,
+      itemId,
+      reason,
+      priority,
+    );
   }
 
   // ==================== PAYMENT MANAGEMENT ====================
@@ -519,22 +675,43 @@ export class AdminService {
     paymentId: string,
     amount?: number,
     reason?: string,
+    idempotencyKey?: string,
   ) {
-    return this.adminPaymentService.manualRefund(adminId, paymentId, amount, reason);
+    return this.adminPaymentService.manualRefund(
+      adminId,
+      paymentId,
+      amount,
+      reason,
+      idempotencyKey,
+    );
   }
 
-  async getRefundHistory(query: {
-    search?: string;
-    startDate?: Date;
-    endDate?: Date;
-    page?: number;
-    limit?: number;
-  }) {
+  async getRefundAttempts(query: RefundAttemptQueryDto) {
+    return this.adminPaymentService.getRefundAttempts(query);
+  }
+
+  async resolveRefundAttempt(
+    adminId: string,
+    attemptId: string,
+    dto: ResolveRefundAttemptDto,
+  ) {
+    return this.adminPaymentService.resolveRefundAttempt(
+      adminId,
+      attemptId,
+      dto,
+    );
+  }
+
+  async getRefundHistory(query: AdminRefundHistoryQueryDto) {
     return this.adminPaymentService.getRefundHistory(query);
   }
 
   async forceCancelPayment(adminId: string, paymentId: string, reason: string) {
-    return this.adminPaymentService.forceCancelPayment(adminId, paymentId, reason);
+    return this.adminPaymentService.forceCancelPayment(
+      adminId,
+      paymentId,
+      reason,
+    );
   }
 
   // ==================== SELLER PAYOUTS ====================
@@ -548,7 +725,15 @@ export class AdminService {
     return this.payoutService.getPayoutsTransactions(query);
   }
 
-  async getPayoutsSchedule(query: { sellerId?: string; limit?: number }) {
+  async getPayoutsSchedule(query: {
+    sellerId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
+  }) {
     return this.payoutService.getPayoutsSchedule(query);
   }
 
@@ -575,27 +760,11 @@ export class AdminService {
   // ==================== TRADE MANAGEMENT ====================
   // Taşındı: admin-trade.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getTrades(query: {
-    status?: TradeStatus;
-    initiatorId?: string;
-    receiverId?: string;
-    userId?: string;
-    fromDate?: string;
-    toDate?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getTrades(query: AdminTradeQueryDto) {
     return this.tradeService.getTrades(query);
   }
 
-  async findTradeShipments(query: {
-    status?: ShipmentStatus;
-    leg?: 'to_warehouse' | 'from_warehouse' | 'return';
-    tradeNumber?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async findTradeShipments(query: TradeShipmentQueryDto) {
     return this.tradeService.findTradeShipments(query);
   }
 
@@ -603,7 +772,11 @@ export class AdminService {
     return this.tradeService.getTradeById(tradeId);
   }
 
-  async resolveTrade(adminId: string, tradeId: string, dto: { resolution: string; note?: string }) {
+  async resolveTrade(
+    adminId: string,
+    tradeId: string,
+    dto: { resolution: string; note?: string },
+  ) {
     return this.tradeService.resolveTrade(adminId, tradeId, dto);
   }
 
@@ -612,7 +785,11 @@ export class AdminService {
     tradeId: string,
     shipmentId: string,
   ) {
-    return this.tradeService.markWarehouseReceived(adminId, tradeId, shipmentId);
+    return this.tradeService.markWarehouseReceived(
+      adminId,
+      tradeId,
+      shipmentId,
+    );
   }
 
   async approveWarehouseTrade(
@@ -644,7 +821,11 @@ export class AdminService {
     tradeId: string,
     dto: { reason: string; sendArrivedItemBack?: boolean },
   ) {
-    return this.tradeService.forceCancelStuckWarehouseTrade(adminId, tradeId, dto);
+    return this.tradeService.forceCancelStuckWarehouseTrade(
+      adminId,
+      tradeId,
+      dto,
+    );
   }
 
   async markReturnShipmentLost(
@@ -658,14 +839,7 @@ export class AdminService {
   // ==================== REFUND REQUEST ADMIN ====================
   // Taşındı: admin-refund.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async listRefundRequests(query: {
-    status?: import('@prisma/client').RefundRequestStatus[];
-    userSearch?: string;
-    from?: string;
-    to?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async listRefundRequests(query: RefundRequestQueryDto) {
     return this.adminRefundService.listRefundRequests(query);
   }
 
@@ -674,11 +848,34 @@ export class AdminService {
   }
 
   async forceFinalizeRefund(adminId: string, refundRequestId: string) {
-    return this.adminRefundService.forceFinalizeRefund(adminId, refundRequestId);
+    return this.adminRefundService.forceFinalizeRefund(
+      adminId,
+      refundRequestId,
+    );
   }
 
-  async resolveTradeCompensation(adminId: string, tradeId: string, note?: string) {
-    return this.adminRefundService.resolveTradeCompensation(adminId, tradeId, note);
+  async closeStuckRefund(
+    adminId: string,
+    refundRequestId: string,
+    reason?: string,
+  ) {
+    return this.adminRefundService.closeStuckRefund(
+      adminId,
+      refundRequestId,
+      reason,
+    );
+  }
+
+  async resolveTradeCompensation(
+    adminId: string,
+    tradeId: string,
+    note?: string,
+  ) {
+    return this.adminRefundService.resolveTradeCompensation(
+      adminId,
+      tradeId,
+      note,
+    );
   }
 
   async retryTradeRefund(adminId: string, tradeId: string) {
@@ -688,14 +885,7 @@ export class AdminService {
   // ==================== MESSAGE MANAGEMENT ====================
   // Taşındı: admin-messaging.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getMessages(query: {
-    status?: MessageStatus;
-    fromDate?: string;
-    toDate?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getMessages(query: AdminMessageQueryDto) {
     return this.adminMessagingService.getMessages(query);
   }
 
@@ -736,43 +926,62 @@ export class AdminService {
     return this.adminSupportService.getSupportTicketById(ticketId);
   }
 
-  async updateSupportTicket(adminId: string, ticketId: string, dto: {
-    status?: TicketStatus;
-    priority?: TicketPriority;
-    assigneeId?: string;
-    note?: string;
-  }) {
+  async updateSupportTicket(
+    adminId: string,
+    ticketId: string,
+    dto: {
+      status?: TicketStatus;
+      priority?: TicketPriority;
+      assigneeId?: string;
+      note?: string;
+    },
+  ) {
     return this.adminSupportService.updateSupportTicket(adminId, ticketId, dto);
   }
 
-  async replyToSupportTicket(adminId: string, ticketId: string, message: string) {
-    return this.adminSupportService.replyToSupportTicket(adminId, ticketId, message);
+  async replyToSupportTicket(
+    adminId: string,
+    ticketId: string,
+    message: string,
+  ) {
+    return this.adminSupportService.replyToSupportTicket(
+      adminId,
+      ticketId,
+      message,
+    );
   }
 
   // ==================== CATEGORY MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getCategories() {
-    return this.catalogService.getCategories();
+  async getCategories(query: AdminCategoryQueryDto) {
+    return this.catalogService.getCategories(query);
   }
 
-  async createCategory(adminId: string, dto: {
-    name: string;
-    description?: string;
-    parentId?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async createCategory(
+    adminId: string,
+    dto: {
+      name: string;
+      description?: string;
+      parentId?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.catalogService.createCategory(adminId, dto);
   }
 
-  async updateCategory(adminId: string, categoryId: string, dto: {
-    name?: string;
-    description?: string;
-    parentId?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async updateCategory(
+    adminId: string,
+    categoryId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      parentId?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.catalogService.updateCategory(adminId, categoryId, dto);
   }
 
@@ -822,7 +1031,11 @@ export class AdminService {
     return this.contentService.getEmailTemplate(key);
   }
 
-  async updateEmailTemplate(adminId: string, key: string, dto: UpdateEmailTemplateDto) {
+  async updateEmailTemplate(
+    adminId: string,
+    key: string,
+    dto: UpdateEmailTemplateDto,
+  ) {
     return this.contentService.updateEmailTemplate(adminId, key, dto);
   }
 
@@ -836,10 +1049,18 @@ export class AdminService {
     overrideHtml?: string,
     overrideSubject?: string,
   ) {
-    return this.contentService.previewEmailTemplate(key, templateData, overrideHtml, overrideSubject);
+    return this.contentService.previewEmailTemplate(
+      key,
+      templateData,
+      overrideHtml,
+      overrideSubject,
+    );
   }
 
-  async sendTestEmail(key: string, dto: { to: string; templateData?: Record<string, any> }) {
+  async sendTestEmail(
+    key: string,
+    dto: { to: string; templateData?: Record<string, any> },
+  ) {
     return this.contentService.sendTestEmail(key, dto);
   }
 
@@ -850,25 +1071,32 @@ export class AdminService {
     return this.taxService.getTaxRegions();
   }
 
-  async createTaxRegion(adminId: string, dto: {
-    name: string;
-    countryCode: string;
-    regionCode?: string;
-    isDefault?: boolean;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async createTaxRegion(
+    adminId: string,
+    dto: {
+      name: string;
+      countryCode: string;
+      regionCode?: string;
+      isDefault?: boolean;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.taxService.createTaxRegion(adminId, dto);
   }
 
-  async updateTaxRegion(adminId: string, id: string, dto: {
-    name?: string;
-    countryCode?: string;
-    regionCode?: string;
-    isDefault?: boolean;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async updateTaxRegion(
+    adminId: string,
+    id: string,
+    dto: {
+      name?: string;
+      countryCode?: string;
+      regionCode?: string;
+      isDefault?: boolean;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.taxService.updateTaxRegion(adminId, id, dto);
   }
 
@@ -880,28 +1108,35 @@ export class AdminService {
     return this.taxService.getTaxRates(regionId);
   }
 
-  async createTaxRate(adminId: string, dto: {
-    taxRegionId?: string;
-    name: string;
-    rate: number;
-    isDefault?: boolean;
-    effectiveFrom?: string;
-    effectiveTo?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async createTaxRate(
+    adminId: string,
+    dto: {
+      taxRegionId?: string;
+      name: string;
+      rate: number;
+      isDefault?: boolean;
+      effectiveFrom?: string;
+      effectiveTo?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.taxService.createTaxRate(adminId, dto);
   }
 
-  async updateTaxRate(adminId: string, id: string, dto: {
-    name?: string;
-    rate?: number;
-    isDefault?: boolean;
-    effectiveFrom?: string;
-    effectiveTo?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async updateTaxRate(
+    adminId: string,
+    id: string,
+    dto: {
+      name?: string;
+      rate?: number;
+      isDefault?: boolean;
+      effectiveFrom?: string;
+      effectiveTo?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.taxService.updateTaxRate(adminId, id, dto);
   }
 
@@ -913,24 +1148,31 @@ export class AdminService {
     return this.taxService.getTaxRules(regionId);
   }
 
-  async createTaxRule(adminId: string, dto: {
-    taxRegionId?: string;
-    taxRateId: string;
-    scope: string;
-    categoryId?: string;
-    priority?: number;
-    isActive?: boolean;
-  }) {
+  async createTaxRule(
+    adminId: string,
+    dto: {
+      taxRegionId?: string;
+      taxRateId: string;
+      scope: string;
+      categoryId?: string;
+      priority?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.taxService.createTaxRule(adminId, dto);
   }
 
-  async updateTaxRule(adminId: string, id: string, dto: {
-    taxRateId?: string;
-    scope?: string;
-    categoryId?: string;
-    priority?: number;
-    isActive?: boolean;
-  }) {
+  async updateTaxRule(
+    adminId: string,
+    id: string,
+    dto: {
+      taxRateId?: string;
+      scope?: string;
+      categoryId?: string;
+      priority?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.taxService.updateTaxRule(adminId, id, dto);
   }
 
@@ -941,7 +1183,7 @@ export class AdminService {
   async getTaxReport(query: {
     fromDate?: string;
     toDate?: string;
-    groupBy?: 'day' | 'month' | 'year' | 'region';
+    groupBy?: "day" | "month" | "year" | "region";
     regionId?: string;
   }) {
     return this.taxService.getTaxReport(query);
@@ -958,7 +1200,11 @@ export class AdminService {
     return this.taxService.setDefaultVat(adminId, ratePercent);
   }
 
-  async setVatOverride(adminId: string, categoryId: string, ratePercent: number) {
+  async setVatOverride(
+    adminId: string,
+    categoryId: string,
+    ratePercent: number,
+  ) {
     return this.taxService.setVatOverride(adminId, categoryId, ratePercent);
   }
 
@@ -984,26 +1230,11 @@ export class AdminService {
   // ==================== ELOGO FATURA (e-Arşiv/e-Fatura) ====================
   // Taşındı: admin-tax.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getElogoInvoices(query: {
-    type?: string;
-    status?: string;
-    documentType?: string;
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getElogoInvoices(query: ElogoInvoiceQueryDto) {
     return this.taxService.getElogoInvoices(query);
   }
 
-  async getSellerUploadedInvoices(query: {
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getSellerUploadedInvoices(query: SellerUploadedInvoiceQueryDto) {
     return this.taxService.getSellerUploadedInvoices(query);
   }
 
@@ -1018,29 +1249,35 @@ export class AdminService {
     return this.membershipService.getMembershipTiers();
   }
 
-  async updateMembershipTier(adminId: string, tierId: string, dto: {
-    name?: string;
-    description?: string;
-    monthlyPrice?: number;
-    yearlyPrice?: number;
-    maxFreeListings?: number;
-    maxTotalListings?: number;
-    maxImagesPerListing?: number;
-    canCreateCollections?: boolean;
-    canTrade?: boolean;
-    isAdFree?: boolean;
-    featuredListingSlots?: number;
-    commissionDiscount?: number;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
+  async updateMembershipTier(
+    adminId: string,
+    tierId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      monthlyPrice?: number;
+      yearlyPrice?: number;
+      maxFreeListings?: number;
+      maxTotalListings?: number;
+      maxImagesPerListing?: number;
+      canCreateCollections?: boolean;
+      canTrade?: boolean;
+      isAdFree?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
     return this.membershipService.updateMembershipTier(adminId, tierId, dto);
   }
 
   // ==================== PRODUCT DELETION (ADMIN) ====================
   // Taşındı: admin-product.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async deleteProduct(adminId: string, productId: string, hardDelete: boolean = false) {
+  async deleteProduct(
+    adminId: string,
+    productId: string,
+    hardDelete: boolean = false,
+  ) {
     return this.productService.deleteProduct(adminId, productId, hardDelete);
   }
 
@@ -1051,8 +1288,8 @@ export class AdminService {
   // ==================== BRAND MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getBrands() {
-    return this.catalogService.getBrands();
+  async getBrands(query: AdminBrandQueryDto) {
+    return this.catalogService.getBrands(query);
   }
 
   async createBrand(
@@ -1095,13 +1332,22 @@ export class AdminService {
   // ==================== MANUFACTURER MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getManufacturers() {
-    return this.catalogService.getManufacturers();
+  async getManufacturers(query: AdminManufacturerQueryDto) {
+    return this.catalogService.getManufacturers(query);
   }
 
   async createManufacturer(
     adminId: string,
-    dto: { name: string; logo?: string; description?: string; website?: string; country?: string; foundedYear?: number; sortOrder?: number; isActive?: boolean },
+    dto: {
+      name: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      country?: string;
+      foundedYear?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.catalogService.createManufacturer(adminId, dto);
   }
@@ -1109,7 +1355,16 @@ export class AdminService {
   async updateManufacturer(
     adminId: string,
     id: string,
-    dto: { name?: string; logo?: string; description?: string; website?: string; country?: string; foundedYear?: number | null; sortOrder?: number; isActive?: boolean },
+    dto: {
+      name?: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      country?: string;
+      foundedYear?: number | null;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.catalogService.updateManufacturer(adminId, id, dto);
   }
@@ -1121,13 +1376,21 @@ export class AdminService {
   // ==================== CAR MODEL MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getCarModels(brandId?: string) {
-    return this.catalogService.getCarModels(brandId);
+  async getCarModels(query: AdminCarModelQueryDto) {
+    return this.catalogService.getCarModels(query);
   }
 
   async createCarModel(
     adminId: string,
-    dto: { brandId: string; name: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+    dto: {
+      brandId: string;
+      name: string;
+      slug?: string;
+      yearStart?: number;
+      yearEnd?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.catalogService.createCarModel(adminId, dto);
   }
@@ -1135,7 +1398,14 @@ export class AdminService {
   async updateCarModel(
     adminId: string,
     id: string,
-    dto: { name?: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+    dto: {
+      name?: string;
+      slug?: string;
+      yearStart?: number;
+      yearEnd?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.catalogService.updateCarModel(adminId, id, dto);
   }
@@ -1147,12 +1417,7 @@ export class AdminService {
   // ==================== SHIPPING (view-only) ====================
   // Taşındı: admin-shipping.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getShipments(query: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    carrierId?: string;
-  }) {
+  async getShipments(query: AdminShipmentQueryDto) {
     return this.shippingService.getShipments(query);
   }
 
@@ -1183,83 +1448,62 @@ export class AdminService {
   // ==================== NOTIFICATION MANAGEMENT ====================
   // Taşındı: admin-notification.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getNotificationHistory(query: {
-    page?: number;
-    limit?: number;
-    channel?: string;
-    status?: string;
-    userId?: string;
-    type?: string;
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-  }) {
+  async getNotificationHistory(query: NotificationHistoryQueryDto) {
     return this.adminNotificationService.getNotificationHistory(query);
   }
 
-  async sendNotification(adminId: string, dto: {
-    title: string;
-    body: string;
-    channels: string[];
-    targetType: 'all' | 'segment' | 'user_ids';
-    userIds?: string[];
-    segmentCriteria?: Record<string, any>;
-    data?: Record<string, any>;
-  }) {
+  async sendNotification(
+    adminId: string,
+    dto: {
+      title: string;
+      body: string;
+      channels: string[];
+      targetType: "all" | "segment" | "user_ids";
+      userIds?: string[];
+      segmentCriteria?: Record<string, any>;
+      data?: Record<string, any>;
+    },
+  ) {
     return this.adminNotificationService.sendNotification(adminId, dto);
   }
 
-  async scheduleNotification(adminId: string, dto: {
-    title: string;
-    body: string;
-    channels: string[];
-    targetType: 'all' | 'segment' | 'user_ids';
-    userIds?: string[];
-    segmentCriteria?: Record<string, any>;
-    scheduledFor: string;
-  }) {
+  async scheduleNotification(
+    adminId: string,
+    dto: {
+      title: string;
+      body: string;
+      channels: string[];
+      targetType: "all" | "segment" | "user_ids";
+      userIds?: string[];
+      segmentCriteria?: Record<string, any>;
+      scheduledFor: string;
+    },
+  ) {
     return this.adminNotificationService.scheduleNotification(adminId, dto);
   }
 
-  async getScheduledNotifications(query?: { page?: number; limit?: number; status?: string }) {
+  async getScheduledNotifications(query?: ScheduledNotificationQueryDto) {
     return this.adminNotificationService.getScheduledNotifications(query);
   }
 
   async cancelScheduledNotification(adminId: string, notificationId: string) {
-    return this.adminNotificationService.cancelScheduledNotification(adminId, notificationId);
+    return this.adminNotificationService.cancelScheduledNotification(
+      adminId,
+      notificationId,
+    );
   }
 
   // ==================== ERROR LOGS ====================
   // Taşındı: admin-logs.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getErrorLogs(query: {
-    page?: number;
-    limit?: number;
-    severity?: string;
-    source?: string;
-    userId?: string;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-  }) {
+  async getErrorLogs(query: ErrorLogQueryDto) {
     return this.logsService.getErrorLogs(query);
   }
 
   // ==================== SECURITY LOGS ====================
   // Taşındı: admin-logs.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getSecurityLogs(query: {
-    page?: number;
-    limit?: number;
-    eventType?: string;
-    severity?: string;
-    ipAddress?: string;
-    userId?: string;
-    resolved?: boolean;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-  }) {
+  async getSecurityLogs(query: SecurityLogQueryDto) {
     return this.logsService.getSecurityLogs(query);
   }
 
@@ -1274,17 +1518,7 @@ export class AdminService {
   // ==================== EMAIL LOGS ====================
   // Taşındı: admin-logs.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getEmailLogs(query: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    template?: string;
-    to?: string;
-    userId?: string;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-  }) {
+  async getEmailLogs(query: EmailLogQueryDto) {
     return this.logsService.getEmailLogs(query);
   }
 
@@ -1298,8 +1532,9 @@ export class AdminService {
     isFeatured?: boolean;
     page?: number;
     limit?: number;
-    sortBy?: 'createdAt' | 'name' | 'likeCount' | 'viewCount';
-    sortOrder?: 'asc' | 'desc';
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
   }) {
     return this.collectionService.getCollections(query);
   }
@@ -1308,56 +1543,94 @@ export class AdminService {
     return this.collectionService.getCollectionById(collectionId);
   }
 
-  async createAdminCollection(adminId: string, dto: {
-    name: string;
-    description?: string;
-    isPublic?: boolean;
-    isFeatured?: boolean;
-    coverImageKey?: string;
-    userId?: string;
-  }) {
+  async createAdminCollection(
+    adminId: string,
+    dto: {
+      name: string;
+      description?: string;
+      isPublic?: boolean;
+      isFeatured?: boolean;
+      coverImageKey?: string;
+      userId?: string;
+    },
+  ) {
     return this.collectionService.createAdminCollection(adminId, dto);
   }
 
-  async updateAdminCollection(adminId: string, collectionId: string, dto: {
-    name?: string;
-    description?: string;
-    isPublic?: boolean;
-    isFeatured?: boolean;
-    coverImageKey?: string;
-  }) {
-    return this.collectionService.updateAdminCollection(adminId, collectionId, dto);
+  async updateAdminCollection(
+    adminId: string,
+    collectionId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      isPublic?: boolean;
+      isFeatured?: boolean;
+      coverImageKey?: string;
+    },
+  ) {
+    return this.collectionService.updateAdminCollection(
+      adminId,
+      collectionId,
+      dto,
+    );
   }
 
   async deleteAdminCollection(adminId: string, collectionId: string) {
     return this.collectionService.deleteAdminCollection(adminId, collectionId);
   }
 
-  async addItemsToCollection(adminId: string, collectionId: string, productIds: string[]) {
-    return this.collectionService.addItemsToCollection(adminId, collectionId, productIds);
+  async addItemsToCollection(
+    adminId: string,
+    collectionId: string,
+    productIds: string[],
+  ) {
+    return this.collectionService.addItemsToCollection(
+      adminId,
+      collectionId,
+      productIds,
+    );
   }
 
-  async removeItemFromAdminCollection(adminId: string, collectionId: string, itemId: string) {
-    return this.collectionService.removeItemFromAdminCollection(adminId, collectionId, itemId);
+  async removeItemFromAdminCollection(
+    adminId: string,
+    collectionId: string,
+    itemId: string,
+  ) {
+    return this.collectionService.removeItemFromAdminCollection(
+      adminId,
+      collectionId,
+      itemId,
+    );
   }
 
-  async setCollectionVisibility(adminId: string, collectionId: string, isPublic: boolean) {
-    return this.collectionService.setCollectionVisibility(adminId, collectionId, isPublic);
+  async setCollectionVisibility(
+    adminId: string,
+    collectionId: string,
+    isPublic: boolean,
+  ) {
+    return this.collectionService.setCollectionVisibility(
+      adminId,
+      collectionId,
+      isPublic,
+    );
   }
 
-  async setCollectionFeatured(adminId: string, collectionId: string, isFeatured: boolean) {
-    return this.collectionService.setCollectionFeatured(adminId, collectionId, isFeatured);
+  async setCollectionFeatured(
+    adminId: string,
+    collectionId: string,
+    isFeatured: boolean,
+  ) {
+    return this.collectionService.setCollectionFeatured(
+      adminId,
+      collectionId,
+      isFeatured,
+    );
   }
 
   // ==================== ATTRIBUTE GROUP MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getAttributeGroups(query: {
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-  }) {
+  async getAttributeGroups(query: AdminAttributeGroupQueryDto) {
     return this.catalogService.getAttributeGroups(query);
   }
 
@@ -1365,23 +1638,30 @@ export class AdminService {
     return this.catalogService.getAttributeGroupById(groupId);
   }
 
-  async createAttributeGroup(adminId: string, dto: {
-    name: string;
-    description?: string;
-    isRequired?: boolean;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
+  async createAttributeGroup(
+    adminId: string,
+    dto: {
+      name: string;
+      description?: string;
+      isRequired?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
     return this.catalogService.createAttributeGroup(adminId, dto);
   }
 
-  async updateAttributeGroup(adminId: string, groupId: string, dto: {
-    name?: string;
-    description?: string;
-    isRequired?: boolean;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
+  async updateAttributeGroup(
+    adminId: string,
+    groupId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      isRequired?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
     return this.catalogService.updateAttributeGroup(adminId, groupId, dto);
   }
 
@@ -1392,34 +1672,35 @@ export class AdminService {
   // ==================== ATTRIBUTE VALUE MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getAttributes(query: {
-    groupId?: string;
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-  }) {
+  async getAttributes(query: AdminAttributeQueryDto) {
     return this.catalogService.getAttributes(query);
   }
 
-  async createAttribute(adminId: string, dto: {
-    groupId: string;
-    value: string;
-    displayValue?: string;
-    color?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async createAttribute(
+    adminId: string,
+    dto: {
+      groupId: string;
+      value: string;
+      displayValue?: string;
+      color?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.catalogService.createAttribute(adminId, dto);
   }
 
-  async updateAttribute(adminId: string, attributeId: string, dto: {
-    value?: string;
-    displayValue?: string;
-    color?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async updateAttribute(
+    adminId: string,
+    attributeId: string,
+    dto: {
+      value?: string;
+      displayValue?: string;
+      color?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.catalogService.updateAttribute(adminId, attributeId, dto);
   }
 
@@ -1434,11 +1715,15 @@ export class AdminService {
     return this.reviewService.getReviews(query);
   }
 
-  async updateReviewStatus(adminId: string, reviewId: string, status: RatingStatus) {
+  async updateReviewStatus(
+    adminId: string,
+    reviewId: string,
+    status: RatingStatus,
+  ) {
     return this.reviewService.updateReviewStatus(adminId, reviewId, status);
   }
 
-  async getUserRatings(query: { page?: number; limit?: number; search?: string; status?: string }) {
+  async getUserRatings(query: AdminUserRatingQueryDto) {
     return this.reviewService.getUserRatings(query);
   }
 
@@ -1447,25 +1732,54 @@ export class AdminService {
   // Not: updateUserRatingStatus ve applyOrderCoupon da bu banner aralığında
   // olduğu için bölümle birlikte taşındı.
 
-  async getSellerApplications(query: { page?: number; limit?: number; search?: string; status?: string }) {
+  async getSellerApplications(query: SellerApplicationQueryDto) {
     return this.sellerApplicationService.getSellerApplications(query);
   }
 
+  async getSellerApplicationDetail(userId: string) {
+    return this.sellerApplicationService.getSellerApplicationDetail(userId);
+  }
+
   async approveSellerApplication(adminId: string, userId: string) {
-    return this.sellerApplicationService.approveSellerApplication(adminId, userId);
+    return this.sellerApplicationService.approveSellerApplication(
+      adminId,
+      userId,
+    );
   }
 
-  async rejectSellerApplication(adminId: string, userId: string, reason: string) {
-    return this.sellerApplicationService.rejectSellerApplication(adminId, userId, reason);
+  async rejectSellerApplication(
+    adminId: string,
+    userId: string,
+    reason: string,
+  ) {
+    return this.sellerApplicationService.rejectSellerApplication(
+      adminId,
+      userId,
+      reason,
+    );
   }
 
-  async updateUserRatingStatus(adminId: string, ratingId: string, status: RatingStatus) {
-    return this.sellerApplicationService.updateUserRatingStatus(adminId, ratingId, status);
+  async updateUserRatingStatus(
+    adminId: string,
+    ratingId: string,
+    status: RatingStatus,
+  ) {
+    return this.sellerApplicationService.updateUserRatingStatus(
+      adminId,
+      ratingId,
+      status,
+    );
   }
 
-  async applyOrderCoupon(orderId: string, adminId: string, code: string | null) {
-    return this.sellerApplicationService.applyOrderCoupon(orderId, adminId, code);
+  async applyOrderCoupon(
+    orderId: string,
+    adminId: string,
+    code: string | null,
+  ) {
+    return this.sellerApplicationService.applyOrderCoupon(
+      orderId,
+      adminId,
+      code,
+    );
   }
-
 }
-

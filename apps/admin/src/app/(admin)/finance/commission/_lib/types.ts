@@ -1,12 +1,16 @@
-import { z } from 'zod';
+import { z } from "zod";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Category {
   id: string;
   name: string;
 }
 
-export type SellerType = 'FREE' | 'PREMIUM' | 'BUSINESS' | 'ALL';
-export type AppliesTo = 'SELLER' | 'BUYER' | 'BOTH';
+export type SellerType = "FREE" | "PREMIUM" | "BUSINESS" | "ALL";
+export type AppliesTo = "SELLER" | "BUYER" | "BOTH";
+export type TaxpayerType = "individual" | "corporate" | "all";
 
 export interface CommissionRule {
   id: string;
@@ -15,12 +19,30 @@ export interface CommissionRule {
   categoryName: string | null;
   sellerType: SellerType | null;
   appliesTo: AppliesTo;
+  taxpayerType?: TaxpayerType;
+  minAmount?: number | null;
+  maxAmount?: number | null;
+  // legacy single rates
   sellerRate: number | null;
   buyerRate: number | null;
   sellerMin: number | null;
   sellerMax: number | null;
   buyerMin: number | null;
   buyerMax: number | null;
+  // v2 four rates
+  buyerCommissionRate?: number | null;
+  buyerCommissionMin?: number | null;
+  buyerCommissionMax?: number | null;
+  buyerServiceFeeRate?: number | null;
+  buyerServiceFeeMin?: number | null;
+  buyerServiceFeeMax?: number | null;
+  sellerCommissionRate?: number | null;
+  sellerCommissionMin?: number | null;
+  sellerCommissionMax?: number | null;
+  sellerPlatformFeeRate?: number | null;
+  sellerPlatformFeeMin?: number | null;
+  sellerPlatformFeeMax?: number | null;
+  shippingBuyerShare?: number | null;
   priority?: number;
   isActive: boolean;
   createdAt: string;
@@ -34,93 +56,186 @@ export interface CommissionRevenue {
   byMonth: Array<{ period: string; commission: number; orderCount: number }>;
 }
 
-export const SELLER_TYPES: { value: SellerType; label: string }[] = [
-  { value: 'FREE', label: 'Ücretsiz' },
-  { value: 'PREMIUM', label: 'Premium' },
-  { value: 'BUSINESS', label: 'İşletme' },
-  { value: 'ALL', label: 'Tümü' },
+export const sellerTypes = (t: T): { value: SellerType; label: string }[] => [
+  { value: "FREE", label: t("admin.finance.commission.sellerTypes.free") },
+  {
+    value: "PREMIUM",
+    label: t("admin.finance.commission.sellerTypes.premium"),
+  },
+  {
+    value: "BUSINESS",
+    label: t("admin.finance.commission.sellerTypes.business"),
+  },
+  { value: "ALL", label: t("common.all") },
 ];
 
-export const APPLIES_TO_OPTIONS: { value: AppliesTo; label: string }[] = [
-  { value: 'SELLER', label: 'Satıcı' },
-  { value: 'BUYER', label: 'Alıcı' },
-  { value: 'BOTH', label: 'Her İkisi' },
+export const taxpayerTypes = (
+  t: T,
+): { value: TaxpayerType; label: string }[] => [
+  { value: "all", label: t("common.all") },
+  {
+    value: "individual",
+    label: t("admin.finance.commission.taxpayer.individual"),
+  },
+  {
+    value: "corporate",
+    label: t("admin.finance.commission.taxpayer.corporate"),
+  },
 ];
 
-export const sellerTypeLabel = (v: SellerType | null) =>
-  SELLER_TYPES.find((t) => t.value === v)?.label ?? 'Tümü';
+export const appliesToOptions = (
+  t: T,
+): { value: AppliesTo; label: string }[] => [
+  { value: "BOTH", label: t("admin.finance.commission.both") },
+  { value: "SELLER", label: t("admin.finance.common.seller") },
+  { value: "BUYER", label: t("admin.finance.common.buyer") },
+];
 
-export const appliesToLabel = (v: AppliesTo) =>
-  APPLIES_TO_OPTIONS.find((t) => t.value === v)?.label ?? v;
+export const sellerTypeLabel = (v: SellerType | null, t: T) =>
+  sellerTypes(t).find((item) => item.value === v)?.label ?? t("common.all");
+
+export const taxpayerTypeLabel = (v: TaxpayerType | null | undefined, t: T) =>
+  taxpayerTypes(t).find((item) => item.value === (v ?? "all"))?.label ??
+  t("common.all");
+
+export const appliesToLabel = (v: AppliesTo, t: T) =>
+  appliesToOptions(t).find((item) => item.value === v)?.label ?? v;
 
 /** A rule counts as the default when it matches every order (no category, any seller). */
 export const isDefaultRule = (r: CommissionRule) =>
-  !r.categoryId && r.sellerType === 'ALL' && r.isActive;
+  !r.categoryId &&
+  r.sellerType === "ALL" &&
+  (r.taxpayerType ?? "all") === "all" &&
+  r.isActive;
+
+const rateField = z.string().optional().default("");
 
 /** Form schema — validation-only; strings are shaped to numbers/nulls in the mutationFn. */
-export const commissionSchema = z
-  .object({
-    name: z.string().min(1, 'Kural adı gerekli'),
-    categoryId: z.string().optional().default(''),
-    sellerType: z.enum(['FREE', 'PREMIUM', 'BUSINESS', 'ALL']).default('ALL'),
-    appliesTo: z.enum(['SELLER', 'BUYER', 'BOTH']).default('SELLER'),
-    sellerRate: z.string().optional().default(''),
-    buyerRate: z.string().optional().default(''),
-    sellerMin: z.string().optional().default(''),
-    sellerMax: z.string().optional().default(''),
-    buyerMin: z.string().optional().default(''),
-    buyerMax: z.string().optional().default(''),
-    priority: z.number().default(0),
-    isActive: z.boolean().default(true),
-  })
-  .superRefine((v, ctx) => {
-    const needsSeller = v.appliesTo === 'SELLER' || v.appliesTo === 'BOTH';
-    const needsBuyer = v.appliesTo === 'BUYER' || v.appliesTo === 'BOTH';
-    if (needsSeller && !v.sellerRate)
-      ctx.addIssue({ code: 'custom', path: ['sellerRate'], message: 'Satıcı oranı gerekli' });
-    if (needsBuyer && !v.buyerRate)
-      ctx.addIssue({ code: 'custom', path: ['buyerRate'], message: 'Alıcı oranı gerekli' });
-    if (v.sellerMin && v.sellerMax && parseFloat(v.sellerMin) > parseFloat(v.sellerMax))
-      ctx.addIssue({ code: 'custom', path: ['sellerMax'], message: 'Maksimum, minimumdan küçük olamaz' });
-    if (v.buyerMin && v.buyerMax && parseFloat(v.buyerMin) > parseFloat(v.buyerMax))
-      ctx.addIssue({ code: 'custom', path: ['buyerMax'], message: 'Maksimum, minimumdan küçük olamaz' });
-  });
+export const commissionSchema = (t: T) =>
+  z
+    .object({
+      name: z
+        .string()
+        .min(1, t("admin.finance.commission.validation.nameRequired")),
+      categoryId: z.string().optional().default(""),
+      sellerType: z.enum(["FREE", "PREMIUM", "BUSINESS", "ALL"]).default("ALL"),
+      taxpayerType: z.enum(["individual", "corporate", "all"]).default("all"),
+      appliesTo: z.enum(["SELLER", "BUYER", "BOTH"]).default("BOTH"),
+      minAmount: rateField,
+      maxAmount: rateField,
+      // 4 rate blocks
+      buyerCommissionRate: rateField,
+      buyerCommissionMin: rateField,
+      buyerCommissionMax: rateField,
+      buyerServiceFeeRate: rateField,
+      buyerServiceFeeMin: rateField,
+      buyerServiceFeeMax: rateField,
+      sellerCommissionRate: rateField,
+      sellerCommissionMin: rateField,
+      sellerCommissionMax: rateField,
+      sellerPlatformFeeRate: rateField,
+      sellerPlatformFeeMin: rateField,
+      sellerPlatformFeeMax: rateField,
+      shippingBuyerShare: z.string().optional().default("100"),
+      priority: z.number().default(0),
+      isActive: z.boolean().default(true),
+    })
+    .superRefine((v, ctx) => {
+      // at least one rate
+      const anyRate = [
+        v.buyerCommissionRate,
+        v.buyerServiceFeeRate,
+        v.sellerCommissionRate,
+        v.sellerPlatformFeeRate,
+      ].some((r) => r && parseFloat(r) > 0);
+      if (!anyRate)
+        ctx.addIssue({
+          code: "custom",
+          path: ["sellerCommissionRate"],
+          message: t("admin.finance.commission.validation.atLeastOneRate"),
+        });
+      // min <= max for each block + amount range
+      const pairs: Array<[string, string, string]> = [
+        ["buyerCommissionMin", "buyerCommissionMax", "buyerCommissionMax"],
+        ["buyerServiceFeeMin", "buyerServiceFeeMax", "buyerServiceFeeMax"],
+        ["sellerCommissionMin", "sellerCommissionMax", "sellerCommissionMax"],
+        [
+          "sellerPlatformFeeMin",
+          "sellerPlatformFeeMax",
+          "sellerPlatformFeeMax",
+        ],
+        ["minAmount", "maxAmount", "maxAmount"],
+      ];
+      for (const [minKey, maxKey, path] of pairs) {
+        const min = (v as any)[minKey];
+        const max = (v as any)[maxKey];
+        if (min && max && parseFloat(min) > parseFloat(max))
+          ctx.addIssue({
+            code: "custom",
+            path: [path],
+            message: t("admin.finance.commission.validation.maxBelowMin"),
+          });
+      }
+    });
 
-export type CommissionFormValues = z.infer<typeof commissionSchema>;
+export type CommissionFormValues = z.infer<ReturnType<typeof commissionSchema>>;
 
 export const emptyCommissionForm: CommissionFormValues = {
-  name: '',
-  categoryId: '',
-  sellerType: 'ALL',
-  appliesTo: 'SELLER',
-  sellerRate: '5',
-  buyerRate: '0',
-  sellerMin: '',
-  sellerMax: '',
-  buyerMin: '',
-  buyerMax: '',
+  name: "",
+  categoryId: "",
+  sellerType: "ALL",
+  taxpayerType: "all",
+  appliesTo: "BOTH",
+  minAmount: "",
+  maxAmount: "",
+  buyerCommissionRate: "",
+  buyerCommissionMin: "",
+  buyerCommissionMax: "",
+  buyerServiceFeeRate: "",
+  buyerServiceFeeMin: "",
+  buyerServiceFeeMax: "",
+  sellerCommissionRate: "8",
+  sellerCommissionMin: "",
+  sellerCommissionMax: "",
+  sellerPlatformFeeRate: "",
+  sellerPlatformFeeMin: "",
+  sellerPlatformFeeMax: "",
+  shippingBuyerShare: "100",
   priority: 0,
   isActive: true,
 };
 
+const s = (v: number | null | undefined) => (v != null ? String(v) : "");
+
 export function ruleToForm(rule: CommissionRule): CommissionFormValues {
+  // v2 rates fall back to legacy so editing an old rule pre-fills sensibly.
   return {
     name: rule.name,
-    categoryId: rule.categoryId ?? '',
-    sellerType: rule.sellerType ?? 'ALL',
-    appliesTo: rule.appliesTo ?? 'SELLER',
-    sellerRate: rule.sellerRate?.toString() ?? '0',
-    buyerRate: rule.buyerRate?.toString() ?? '0',
-    sellerMin: rule.sellerMin?.toString() ?? '',
-    sellerMax: rule.sellerMax?.toString() ?? '',
-    buyerMin: rule.buyerMin?.toString() ?? '',
-    buyerMax: rule.buyerMax?.toString() ?? '',
+    categoryId: rule.categoryId ?? "",
+    sellerType: rule.sellerType ?? "ALL",
+    taxpayerType: rule.taxpayerType ?? "all",
+    appliesTo: rule.appliesTo ?? "BOTH",
+    minAmount: s(rule.minAmount),
+    maxAmount: s(rule.maxAmount),
+    buyerCommissionRate: s(rule.buyerCommissionRate),
+    buyerCommissionMin: s(rule.buyerCommissionMin),
+    buyerCommissionMax: s(rule.buyerCommissionMax),
+    buyerServiceFeeRate: s(rule.buyerServiceFeeRate ?? rule.buyerRate),
+    buyerServiceFeeMin: s(rule.buyerServiceFeeMin ?? rule.buyerMin),
+    buyerServiceFeeMax: s(rule.buyerServiceFeeMax ?? rule.buyerMax),
+    sellerCommissionRate: s(rule.sellerCommissionRate ?? rule.sellerRate),
+    sellerCommissionMin: s(rule.sellerCommissionMin ?? rule.sellerMin),
+    sellerCommissionMax: s(rule.sellerCommissionMax ?? rule.sellerMax),
+    sellerPlatformFeeRate: s(rule.sellerPlatformFeeRate),
+    sellerPlatformFeeMin: s(rule.sellerPlatformFeeMin),
+    sellerPlatformFeeMax: s(rule.sellerPlatformFeeMax),
+    shippingBuyerShare: s(rule.shippingBuyerShare ?? 100),
     priority: rule.priority ?? 0,
     isActive: rule.isActive,
   };
 }
 
-const num = (s: string) => (s ? parseFloat(s) : null);
+const num = (v: string) => (v ? parseFloat(v) : null);
 
 /** Shape form values into the create/update API payload. */
 export function commissionFormToPayload(v: CommissionFormValues) {
@@ -128,13 +243,23 @@ export function commissionFormToPayload(v: CommissionFormValues) {
     name: v.name.trim(),
     categoryId: v.categoryId || null,
     sellerType: v.sellerType,
+    taxpayerType: v.taxpayerType,
     appliesTo: v.appliesTo,
-    sellerRate: num(v.sellerRate),
-    buyerRate: num(v.buyerRate),
-    sellerMin: num(v.sellerMin),
-    sellerMax: num(v.sellerMax),
-    buyerMin: num(v.buyerMin),
-    buyerMax: num(v.buyerMax),
+    minAmount: num(v.minAmount),
+    maxAmount: num(v.maxAmount),
+    buyerCommissionRate: num(v.buyerCommissionRate),
+    buyerCommissionMin: num(v.buyerCommissionMin),
+    buyerCommissionMax: num(v.buyerCommissionMax),
+    buyerServiceFeeRate: num(v.buyerServiceFeeRate),
+    buyerServiceFeeMin: num(v.buyerServiceFeeMin),
+    buyerServiceFeeMax: num(v.buyerServiceFeeMax),
+    sellerCommissionRate: num(v.sellerCommissionRate),
+    sellerCommissionMin: num(v.sellerCommissionMin),
+    sellerCommissionMax: num(v.sellerCommissionMax),
+    sellerPlatformFeeRate: num(v.sellerPlatformFeeRate),
+    sellerPlatformFeeMin: num(v.sellerPlatformFeeMin),
+    sellerPlatformFeeMax: num(v.sellerPlatformFeeMax),
+    shippingBuyerShare: num(v.shippingBuyerShare),
     priority: v.priority,
     isActive: v.isActive,
   };

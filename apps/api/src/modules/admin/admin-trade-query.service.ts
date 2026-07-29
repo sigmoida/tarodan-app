@@ -1,11 +1,9 @@
-import {
-  Injectable,
-  NotFoundException,
-  Optional,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { Prisma, TradeStatus, ShipmentStatus } from '@prisma/client';
+import { Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { Prisma } from "@prisma/client";
+import { AdminTradeQueryDto, TradeShipmentQueryDto } from "./dto";
+import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Takas yönetimi salt-okunur sorguları (admin liste/detay) — AdminTradeService'ten
@@ -23,19 +21,30 @@ export class AdminTradeQueryService {
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
     // Strip expired presigned S3 query params to get the clean public URL
-    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+    if (
+      (imageKeyOrUrl.startsWith("http://") ||
+        imageKeyOrUrl.startsWith("https://")) &&
+      imageKeyOrUrl.includes("X-Amz-Signature")
+    ) {
       try {
         const parsed = new URL(imageKeyOrUrl);
-        parsed.search = '';
+        parsed.search = "";
         return parsed.toString();
       } catch {
         // fall through
       }
     }
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
       return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
@@ -48,18 +57,16 @@ export class AdminTradeQueryService {
   /**
    * Get trades with filters for admin
    */
-  async getTrades(query: {
-    status?: TradeStatus;
-    initiatorId?: string;
-    receiverId?: string;
-    userId?: string;
-    fromDate?: string;
-    toDate?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const { status, initiatorId, receiverId, userId, fromDate, toDate, search, page = 1, limit = 20 } = query;
+  async getTrades(query: AdminTradeQueryDto) {
+    const {
+      status,
+      initiatorId,
+      receiverId,
+      userId,
+      fromDate,
+      toDate,
+      search,
+    } = query;
 
     const where: Prisma.TradeWhereInput = {};
 
@@ -83,11 +90,19 @@ export class AdminTradeQueryService {
       // Takas no, başlatan displayName/email veya alıcı displayName/email araması
       and.push({
         OR: [
-          { tradeNumber: { contains: search, mode: 'insensitive' } },
-          { initiator: { displayName: { contains: search, mode: 'insensitive' } } },
-          { receiver:  { displayName: { contains: search, mode: 'insensitive' } } },
-          { initiator: { email: { contains: search, mode: 'insensitive' } } },
-          { receiver:  { email: { contains: search, mode: 'insensitive' } } },
+          { tradeNumber: { contains: search, mode: "insensitive" } },
+          {
+            initiator: {
+              displayName: { contains: search, mode: "insensitive" },
+            },
+          },
+          {
+            receiver: {
+              displayName: { contains: search, mode: "insensitive" },
+            },
+          },
+          { initiator: { email: { contains: search, mode: "insensitive" } } },
+          { receiver: { email: { contains: search, mode: "insensitive" } } },
         ],
       });
     }
@@ -106,9 +121,15 @@ export class AdminTradeQueryService {
       }
     }
 
-    const [total, trades] = await Promise.all([
-      this.prisma.trade.count({ where }),
-      this.prisma.trade.findMany({
+    const orderBy = resolveOrderBy<Prisma.TradeOrderByWithRelationInput>(
+      "Trade",
+      query,
+      { defaultSort: { createdAt: "desc" } },
+    );
+
+    return paginate(
+      this.prisma.trade,
+      {
         where,
         include: {
           initiator: { select: { id: true, displayName: true, email: true } },
@@ -120,7 +141,7 @@ export class AdminTradeQueryService {
                   id: true,
                   title: true,
                   price: true,
-                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                  images: { take: 1, orderBy: { sortOrder: "asc" } },
                 },
               },
             },
@@ -129,16 +150,10 @@ export class AdminTradeQueryService {
           cashPayment: true,
           dispute: true,
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: trades,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+        orderBy,
+      },
+      query,
+    );
   }
 
   /**
@@ -146,39 +161,80 @@ export class AdminTradeQueryService {
    * Joins shipper and (when present) recipient users by user id since
    * TradeShipment does not have direct relations to User.
    */
-  async findTradeShipments(query: {
-    status?: ShipmentStatus;
-    leg?: 'to_warehouse' | 'from_warehouse' | 'return';
-    tradeNumber?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const { status, leg, tradeNumber, page = 1, limit = 20 } = query;
+  async findTradeShipments(query: TradeShipmentQueryDto) {
+    const { status, leg, tradeNumber, search } = query;
+
+    const matchingUsers = search?.trim()
+      ? await this.prisma.user.findMany({
+          where: {
+            OR: [
+              {
+                displayName: {
+                  contains: search.trim(),
+                  mode: "insensitive",
+                },
+              },
+              { email: { contains: search.trim(), mode: "insensitive" } },
+            ],
+          },
+          select: { id: true },
+        })
+      : [];
+    const textSearch = buildSearchWhere(search, [
+      "trade.tradeNumber",
+      "carrier",
+      "trackingNumber",
+      "lostReason",
+      "recipientType",
+    ]);
 
     const where: Prisma.TradeShipmentWhereInput = {
       ...(status && { status }),
       ...(leg && { leg }),
       ...(tradeNumber && {
         trade: {
-          tradeNumber: { contains: tradeNumber, mode: 'insensitive' },
+          tradeNumber: { contains: tradeNumber, mode: "insensitive" },
         },
       }),
+      ...(search?.trim()
+        ? {
+            OR: [
+              ...((textSearch?.OR ?? []) as Prisma.TradeShipmentWhereInput[]),
+              ...(matchingUsers.length
+                ? [
+                    { shipperId: { in: matchingUsers.map(({ id }) => id) } },
+                    {
+                      recipientUserId: {
+                        in: matchingUsers.map(({ id }) => id),
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          }
+        : {}),
     };
 
-    const [total, shipments] = await Promise.all([
-      this.prisma.tradeShipment.count({ where }),
-      this.prisma.tradeShipment.findMany({
+    const orderBy =
+      resolveOrderBy<Prisma.TradeShipmentOrderByWithRelationInput>(
+        "TradeShipment",
+        query,
+        { defaultSort: { updatedAt: "desc" } },
+      );
+    const result = await paginate(
+      this.prisma.tradeShipment,
+      {
         where,
         include: {
           trade: {
             select: { id: true, tradeNumber: true, status: true },
           },
         },
-        orderBy: { updatedAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+        orderBy,
+      },
+      query,
+    );
+    const shipments = result.data;
 
     // Resolve shipper / recipient users in a single batched query
     const userIds = Array.from(
@@ -201,13 +257,13 @@ export class AdminTradeQueryService {
       ...s,
       shipper: userMap.get(s.shipperId) ?? null,
       recipientUser: s.recipientUserId
-        ? userMap.get(s.recipientUserId) ?? null
+        ? (userMap.get(s.recipientUserId) ?? null)
         : null,
     }));
 
     return {
+      ...result,
       data,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -240,7 +296,7 @@ export class AdminTradeQueryService {
           include: {
             product: {
               include: {
-                images: { orderBy: { sortOrder: 'asc' } },
+                images: { orderBy: { sortOrder: "asc" } },
                 category: true,
                 seller: { select: { id: true, displayName: true } },
               },
@@ -249,7 +305,7 @@ export class AdminTradeQueryService {
         },
         shipments: {
           include: {
-            events: { orderBy: { eventTime: 'asc' } },
+            events: { orderBy: { eventTime: "asc" } },
           },
         },
         cashPayment: true,
@@ -258,7 +314,7 @@ export class AdminTradeQueryService {
     });
 
     if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
+      throw new NotFoundException("Takas bulunamadı");
     }
 
     // Resolve product image S3 keys (cardKey) into usable URLs. The frontend
@@ -268,7 +324,9 @@ export class AdminTradeQueryService {
       const product = item?.product;
       if (product) {
         product.images = (product.images ?? [])
-          .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
+          .map((img: any) => ({
+            url: this.resolveProductImageUrl(img?.cardKey),
+          }))
           .filter((img: any) => img.url);
       }
     }

@@ -1,10 +1,24 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, type ReactNode } from 'react';
-import type { FieldValues, SubmitHandler, UseFormReturn } from 'react-hook-form';
-import { Modal, type ModalProps } from '../Modal';
-import { ModalFooter } from '../Dialog';
-import { Form } from './Form';
+import { useEffect, useRef, type ReactNode } from "react";
+import type {
+  FieldValues,
+  SubmitHandler,
+  UseFormReturn,
+} from "react-hook-form";
+import { Modal, type ModalProps } from "../Modal";
+import { ModalFooter } from "../Dialog";
+import { useConfirm, type ConfirmOptions } from "../ConfirmProvider";
+import { Form } from "./Form";
+
+const defaultDiscardConfirmation: ConfirmOptions = {
+  title: "Kaydedilmemiş değişiklikler",
+  description:
+    "Yaptığınız değişiklikler kaybolacak. Formu kapatmak istiyor musunuz?",
+  confirmLabel: "Değişiklikleri Sil",
+  cancelLabel: "Düzenlemeye Devam Et",
+  destructive: true,
+};
 
 export interface FormModalProps<T extends FieldValues> {
   open: boolean;
@@ -19,7 +33,13 @@ export interface FormModalProps<T extends FieldValues> {
   resetValues?: T;
   submitLabel?: string;
   cancelLabel?: string;
-  maxWidth?: ModalProps['maxWidth'];
+  maxWidth?: ModalProps["maxWidth"];
+  /** Optional width/layout override for editor-style split panes. */
+  modalClassName?: string;
+  /** Keep complex editors open when their backdrop is clicked. */
+  closeOnBackdrop?: boolean;
+  /** Customize the dirty-form warning, or set false to disable it. */
+  discardConfirmation?: ConfirmOptions | false;
   children: ReactNode;
 }
 
@@ -40,12 +60,16 @@ export function FormModal<T extends FieldValues>({
   onSubmit,
   isSubmitting,
   resetValues,
-  submitLabel = 'Kaydet',
-  cancelLabel = 'İptal',
-  maxWidth = 'max-w-lg',
+  submitLabel = "Kaydet",
+  cancelLabel = "İptal",
+  maxWidth = "max-w-lg",
+  modalClassName,
+  closeOnBackdrop,
+  discardConfirmation = defaultDiscardConfirmation,
   children,
 }: FormModalProps<T>) {
   const pending = isSubmitting ?? form.formState.isSubmitting;
+  const confirm = useConfirm();
 
   // Reset only on the false→true edge (avoids clobbering keystrokes each render).
   const wasOpen = useRef(false);
@@ -54,12 +78,27 @@ export function FormModal<T extends FieldValues>({
     wasOpen.current = open;
   }, [open, resetValues, form]);
 
-  const close = () => {
-    if (!pending) onClose();
+  const close = async () => {
+    if (pending) return;
+    if (
+      form.formState.isDirty &&
+      discardConfirmation !== false &&
+      !(await confirm(discardConfirmation))
+    ) {
+      return;
+    }
+    onClose();
   };
 
   return (
-    <Modal isOpen={open} onClose={close} title={title} maxWidth={maxWidth}>
+    <Modal
+      isOpen={open}
+      onClose={close}
+      title={title}
+      maxWidth={maxWidth}
+      className={modalClassName}
+      closeOnBackdrop={closeOnBackdrop}
+    >
       <Form form={form} onSubmit={onSubmit} className="space-y-4">
         {children}
         <ModalFooter

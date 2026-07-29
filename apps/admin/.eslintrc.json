@@ -1,4 +1,14 @@
 {
   "root": true,
-  "extends": ["@tarodan/eslint-config/next.json"]
+  "extends": ["@tarodan/eslint-config/next.json"],
+  "plugins": ["@tarodan"],
+  "rules": {
+    "@tarodan/no-hardcoded-turkish": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.spec.*", "**/*.test.*"],
+      "rules": { "@tarodan/no-hardcoded-turkish": "off" }
+    }
+  ]
 }

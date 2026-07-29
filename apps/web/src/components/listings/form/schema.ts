@@ -1,6 +1,8 @@
 /** @format */
 
-import { z } from 'zod';
+import { z } from "zod";
+import { createTranslator } from "next-intl";
+import { getMessages, resolveLocale } from "@tarodan/i18n";
 
 /**
  * Shared building blocks for the new/edit listing form schemas. Numeric fields
@@ -9,80 +11,110 @@ import { z } from 'zod';
  */
 
 export const listingFieldMessages = (locale: string) => {
-	const tr = locale !== 'en';
-	return {
-		required: tr
-			? 'Lütfen tüm zorunlu alanları doldurun'
-			: 'Please fill in all required fields',
-		validPrice: tr ? 'Geçerli bir fiyat giriniz' : 'Please enter a valid price',
-		setSize: tr ? 'Set için en az 2 parça girin' : 'A set needs at least 2 pieces',
-		photo: tr ? 'En az bir fotoğraf ekleyin' : 'Please add at least one photo',
-	};
+  const t = createTranslator({
+    locale,
+    messages: getMessages(resolveLocale(locale)),
+  });
+  return {
+    required: t("auth.fillRequiredFields"),
+    validPrice: t("common.invalidPrice"),
+    setSize: t("product.setMinPieces"),
+    photo: t("product.addThreePhotos"),
+    descriptionLength: t("product.descriptionLength"),
+  };
 };
 
 export type ListingFieldMessages = ReturnType<typeof listingFieldMessages>;
 
 /** One uploaded image = its card + detail storage keys. */
 export const listingImageSchema = z.object({
-	cardKey: z.string(),
-	detailKey: z.string(),
+  cardKey: z.string(),
+  detailKey: z.string(),
 });
 
 /** Fields common to both forms. Spread into each form's `z.object({...})`. */
 export function baseListingFields(msg: ListingFieldMessages) {
-	return {
-		title: z.string().trim().min(1, msg.required).max(200),
-		description: z.string().max(5000),
-		categoryId: z.string().min(1, msg.required),
-		condition: z.string().min(1, msg.required),
-		brandId: z.string(),
-		carModelId: z.string(),
-		scale: z.string(),
-		material: z.string(),
-		manufacturerId: z.string(),
-		year: z.string(),
-		isTradeEnabled: z.boolean(),
-		isSet: z.boolean(),
-		bundleSize: z.string(),
-		quantity: z.string(),
-		price: z
-			.string()
-			.min(1, msg.required)
-			.refine((v) => !isNaN(Number(v)) && Number(v) >= 1, msg.validPrice),
-	};
+  return {
+    title: z.string().trim().min(1, msg.required).max(200),
+    description: z
+      .string()
+      .trim()
+      .min(30, msg.descriptionLength)
+      .max(330, msg.descriptionLength),
+    categoryId: z.string().min(1, msg.required),
+    condition: z.string().min(1, msg.required),
+    brandId: z.string().min(1, msg.required),
+    carModelId: z.string().min(1, msg.required),
+    modelCode: z.string().trim().min(1, msg.required).max(100),
+    color: z.string().trim().min(1, msg.required).max(80),
+    scale: z.string().min(1, msg.required),
+    material: z.string().min(1, msg.required),
+    manufacturerId: z.string().min(1, msg.required),
+    isBoxed: z.enum(["boxed", "unboxed"], {
+      required_error: msg.required,
+      invalid_type_error: msg.required,
+    }),
+    year: z.string(),
+    isTradeEnabled: z.boolean(),
+    isSet: z.boolean(),
+    bundleSize: z.string(),
+    quantity: z.string(),
+    shippingDesi: z
+      .string()
+      .min(1, msg.required)
+      .refine(
+        (value) =>
+          Number.isInteger(Number(value)) &&
+          Number(value) >= 1 &&
+          Number(value) <= 1000,
+        msg.required,
+      ),
+    price: z
+      .string()
+      .min(1, msg.required)
+      .refine((v) => !isNaN(Number(v)) && Number(v) >= 1, msg.validPrice),
+  };
 }
 
 /** superRefine: when it's a set, require bundleSize >= 2. */
 export function bundleSizeRefine(setSizeMsg: string) {
-	return (val: { isSet: boolean; bundleSize: string }, ctx: z.RefinementCtx) => {
-		if (val.isSet) {
-			const n = Number(val.bundleSize);
-			if (!val.bundleSize || Number.isNaN(n) || n < 2) {
-				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
-					path: ['bundleSize'],
-					message: setSizeMsg,
-				});
-			}
-		}
-	};
+  return (
+    val: { isSet: boolean; bundleSize: string },
+    ctx: z.RefinementCtx,
+  ) => {
+    if (val.isSet) {
+      const n = Number(val.bundleSize);
+      if (!val.bundleSize || Number.isNaN(n) || n < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["bundleSize"],
+          message: setSizeMsg,
+        });
+      }
+    }
+  };
 }
 
 /** Default values for the shared base fields (each form adds its own extras). */
 export const emptyBaseListingValues = {
-	title: '',
-	description: '',
-	categoryId: '',
-	condition: 'very_good',
-	brandId: '',
-	carModelId: '',
-	scale: '1:64',
-	material: '',
-	manufacturerId: '',
-	year: '',
-	isTradeEnabled: false,
-	isSet: false,
-	bundleSize: '',
-	quantity: '',
-	price: '',
+  title: "",
+  description: "",
+  categoryId: "",
+  condition: "",
+  brandId: "",
+  carModelId: "",
+  modelCode: "",
+  color: "",
+  scale: "",
+  material: "",
+  manufacturerId: "",
+  // Runtime starts empty so the seller must make an explicit boxed/unboxed choice.
+  isBoxed: "" as "boxed",
+  year: "",
+  isTradeEnabled: false,
+  isSet: false,
+  bundleSize: "",
+  quantity: "",
+  shippingDesi: "1",
+  price: "",
 };

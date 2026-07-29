@@ -1,14 +1,24 @@
-import { Injectable, NotFoundException, BadRequestException, Optional, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { AdminAuditService } from './admin-audit.service';
-import { ProductStatus, PaymentStatus, TradeStatus, ShipmentStatus } from '@prisma/client';
-import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
-import { PaymentService } from '../payment/payment.service';
-import { EventService } from '../events/event.service';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
-import { SuratKargoTuru, SuratOdemeTipi, SuratTasimaSekli, SuratTeslimSekli, SuratGonderiSekli } from '../surat-cargo/surat-cargo.types';
-import { AdminTradeCommonService } from './admin-trade-common.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Optional,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { AdminAuditService } from "./admin-audit.service";
+import {
+  ProductStatus,
+  PaymentStatus,
+  TradeStatus,
+  ShipmentStatus,
+} from "@prisma/client";
+import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
+import { PaymentService } from "../payment/payment.service";
+import { EventService } from "../events/event.service";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { AdminTradeCommonService } from "./admin-trade-common.service";
 
 /**
  * Takas çözüm & iade/iptal yaşam döngüsü (resolveTrade, markReturnDelivered,
@@ -32,7 +42,11 @@ export class AdminTradeResolutionService {
   /**
    * Resolve trade dispute or cancel trade
    */
-  async resolveTrade(adminId: string, tradeId: string, dto: { resolution: string; note?: string }) {
+  async resolveTrade(
+    adminId: string,
+    tradeId: string,
+    dto: { resolution: string; note?: string },
+  ) {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
@@ -42,7 +56,7 @@ export class AdminTradeResolutionService {
     });
 
     if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
+      throw new NotFoundException("Takas bulunamadı");
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -56,7 +70,7 @@ export class AdminTradeResolutionService {
       let updatedTrade;
       let newStatus: TradeStatus;
 
-      if (dto.resolution === 'cancel') {
+      if (dto.resolution === "cancel") {
         // Cancel trade - make products active again
         newStatus = TradeStatus.cancelled;
 
@@ -70,10 +84,13 @@ export class AdminTradeResolutionService {
           data: {
             status: newStatus,
             cancelledAt: new Date(),
-            cancelReason: dto.note || 'Admin tarafından iptal edildi',
+            cancelReason: dto.note || "Admin tarafından iptal edildi",
           },
         });
-      } else if (dto.resolution === 'favor_initiator' || dto.resolution === 'complete_trade') {
+      } else if (
+        dto.resolution === "favor_initiator" ||
+        dto.resolution === "complete_trade"
+      ) {
         // Complete trade
         newStatus = TradeStatus.completed;
 
@@ -104,7 +121,7 @@ export class AdminTradeResolutionService {
             },
           });
         }
-      } else if (dto.resolution === 'favor_receiver') {
+      } else if (dto.resolution === "favor_receiver") {
         // Cancel and return products
         newStatus = TradeStatus.cancelled;
 
@@ -118,7 +135,7 @@ export class AdminTradeResolutionService {
           data: {
             status: newStatus,
             cancelledAt: new Date(),
-            cancelReason: dto.note || 'Alıcı lehine iptal edildi',
+            cancelReason: dto.note || "Alıcı lehine iptal edildi",
           },
         });
 
@@ -135,17 +152,31 @@ export class AdminTradeResolutionService {
           });
         }
       } else {
-        throw new BadRequestException('Geçersiz çözüm tipi. Geçerli değerler: cancel, favor_initiator, favor_receiver, complete_trade');
+        throw new BadRequestException(
+          "Geçersiz çözüm tipi. Geçerli değerler: cancel, favor_initiator, favor_receiver, complete_trade",
+        );
       }
 
       // Create audit log
-      await this.audit.createAuditLog(adminId, 'trade_resolve', 'Trade', tradeId, trade, {
-        ...updatedTrade,
-        resolution: dto.resolution,
-        note: dto.note,
-      });
+      await this.audit.createAuditLog(
+        adminId,
+        "trade_resolve",
+        "Trade",
+        tradeId,
+        trade,
+        {
+          ...updatedTrade,
+          resolution: dto.resolution,
+          note: dto.note,
+        },
+      );
 
-      return { success: true, tradeId, resolution: dto.resolution, status: newStatus };
+      return {
+        success: true,
+        tradeId,
+        resolution: dto.resolution,
+        status: newStatus,
+      };
     });
   }
 
@@ -159,149 +190,153 @@ export class AdminTradeResolutionService {
     tradeId: string,
     shipmentId: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+    return this.prisma
+      .$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
 
-      const trade = await tx.trade.findUnique({
-        where: { id: tradeId },
-        select: { id: true, status: true },
-      });
-      if (!trade) {
-        throw new NotFoundException('Takas bulunamadı');
-      }
-
-      const shipment = await tx.tradeShipment.findUnique({
-        where: { id: shipmentId },
-      });
-      if (!shipment || shipment.tradeId !== tradeId) {
-        throw new NotFoundException('Gönderim bulunamadı');
-      }
-      if (shipment.leg !== 'return') {
-        throw new BadRequestException('Bu gönderim bir iade gönderimi değil');
-      }
-      if (shipment.deliveredAt) {
-        throw new BadRequestException(
-          'Bu iade gönderimi zaten teslim edildi olarak işaretlenmiş',
-        );
-      }
-
-      const now = new Date();
-      const updatedShipment = await tx.tradeShipment.update({
-        where: { id: shipmentId },
-        data: {
-          status: ShipmentStatus.delivered,
-          deliveredAt: now,
-          confirmedAt: now,
-        },
-      });
-
-      // Check if all return shipments are delivered
-      const returnShipments = await tx.tradeShipment.findMany({
-        where: { tradeId, leg: 'return' },
-        select: { id: true, deliveredAt: true },
-      });
-      const allDelivered =
-        returnShipments.length >= 2 &&
-        returnShipments.every((s) => s.deliveredAt !== null);
-
-      let finalStatus: TradeStatus = trade.status;
-      if (allDelivered && trade.status !== TradeStatus.cancelled) {
-        // Release reservations and reactivate products
-        const items = await tx.tradeItem.findMany({
-          where: { tradeId },
-          select: { productId: true, quantity: true },
+        const trade = await tx.trade.findUnique({
+          where: { id: tradeId },
+          select: { id: true, status: true },
         });
+        if (!trade) {
+          throw new NotFoundException("Takas bulunamadı");
+        }
 
-        const byProduct = new Map<string, number>();
-        for (const item of items) {
-          byProduct.set(
-            item.productId,
-            (byProduct.get(item.productId) ?? 0) + item.quantity,
+        const shipment = await tx.tradeShipment.findUnique({
+          where: { id: shipmentId },
+        });
+        if (!shipment || shipment.tradeId !== tradeId) {
+          throw new NotFoundException("Gönderim bulunamadı");
+        }
+        if (shipment.leg !== "return") {
+          throw new BadRequestException("Bu gönderim bir iade gönderimi değil");
+        }
+        if (shipment.deliveredAt) {
+          throw new BadRequestException(
+            "Bu iade gönderimi zaten teslim edildi olarak işaretlenmiş",
           );
         }
 
-        for (const [productId, qty] of byProduct) {
-          await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
-          const prod = await tx.product.findUnique({
-            where: { id: productId },
-            select: { reservedQuantity: true },
-          });
-          if (prod) {
-            const newReserved = safeDecrementReserved(
-              prod.reservedQuantity,
-              qty,
-            );
-            await tx.product.update({
-              where: { id: productId },
-              data: {
-                reservedQuantity: newReserved,
-                status:
-                  newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
-              },
-            });
-          }
-        }
-
-        await tx.trade.update({
-          where: { id: tradeId },
+        const now = new Date();
+        const updatedShipment = await tx.tradeShipment.update({
+          where: { id: shipmentId },
           data: {
-            status: TradeStatus.cancelled,
-            cancelledAt: now,
-            updatedAt: now,
+            status: ShipmentStatus.delivered,
+            deliveredAt: now,
+            confirmedAt: now,
           },
         });
-        finalStatus = TradeStatus.cancelled;
-      }
 
-      await this.audit.createAuditLog(
-        adminId,
-        'trade_return_delivered',
-        'TradeShipment',
-        shipmentId,
-        shipment,
-        {
-          ...updatedShipment,
-          allDelivered,
-          tradeStatus: finalStatus,
-        },
-      );
+        // Check if all return shipments are delivered
+        const returnShipments = await tx.tradeShipment.findMany({
+          where: { tradeId, leg: "return" },
+          select: { id: true, deliveredAt: true },
+        });
+        const allDelivered =
+          returnShipments.length >= 2 &&
+          returnShipments.every((s) => s.deliveredAt !== null);
 
-      const parties = await tx.trade.findUnique({
-        where: { id: tradeId },
-        select: { initiatorId: true, receiverId: true },
-      });
-
-      return {
-        success: true,
-        tradeId,
-        shipmentId,
-        status: finalStatus,
-        allDelivered,
-        initiatorId: parties!.initiatorId,
-        receiverId: parties!.receiverId,
-      };
-    }).then(async (res) => {
-      if (res.allDelivered && res.status === TradeStatus.cancelled) {
-        try {
-          await this.eventService.emitTradeReturnCompleted({
-            tradeId: res.tradeId,
-            initiatorId: res.initiatorId,
-            receiverId: res.receiverId,
+        let finalStatus: TradeStatus = trade.status;
+        if (allDelivered && trade.status !== TradeStatus.cancelled) {
+          // Release reservations and reactivate products
+          const items = await tx.tradeItem.findMany({
+            where: { tradeId },
+            select: { productId: true, quantity: true },
           });
-        } catch (err) {
-          this.logger.error(
-            `Failed to emit trade.return-completed for trade ${res.tradeId}: ${err}`,
-          );
+
+          const byProduct = new Map<string, number>();
+          for (const item of items) {
+            byProduct.set(
+              item.productId,
+              (byProduct.get(item.productId) ?? 0) + item.quantity,
+            );
+          }
+
+          for (const [productId, qty] of byProduct) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+            const prod = await tx.product.findUnique({
+              where: { id: productId },
+              select: { reservedQuantity: true },
+            });
+            if (prod) {
+              const newReserved = safeDecrementReserved(
+                prod.reservedQuantity,
+                qty,
+              );
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  reservedQuantity: newReserved,
+                  status:
+                    newReserved > 0
+                      ? ProductStatus.reserved
+                      : ProductStatus.active,
+                },
+              });
+            }
+          }
+
+          await tx.trade.update({
+            where: { id: tradeId },
+            data: {
+              status: TradeStatus.cancelled,
+              cancelledAt: now,
+              updatedAt: now,
+            },
+          });
+          finalStatus = TradeStatus.cancelled;
         }
-      }
-      return {
-        success: res.success,
-        tradeId: res.tradeId,
-        shipmentId: res.shipmentId,
-        status: res.status,
-        allDelivered: res.allDelivered,
-      };
-    });
+
+        await this.audit.createAuditLog(
+          adminId,
+          "trade_return_delivered",
+          "TradeShipment",
+          shipmentId,
+          shipment,
+          {
+            ...updatedShipment,
+            allDelivered,
+            tradeStatus: finalStatus,
+          },
+        );
+
+        const parties = await tx.trade.findUnique({
+          where: { id: tradeId },
+          select: { initiatorId: true, receiverId: true },
+        });
+
+        return {
+          success: true,
+          tradeId,
+          shipmentId,
+          status: finalStatus,
+          allDelivered,
+          initiatorId: parties!.initiatorId,
+          receiverId: parties!.receiverId,
+        };
+      })
+      .then(async (res) => {
+        if (res.allDelivered && res.status === TradeStatus.cancelled) {
+          try {
+            await this.eventService.emitTradeReturnCompleted({
+              tradeId: res.tradeId,
+              initiatorId: res.initiatorId,
+              receiverId: res.receiverId,
+            });
+          } catch (err) {
+            this.logger.error(
+              `Failed to emit trade.return-completed for trade ${res.tradeId}: ${err}`,
+            );
+          }
+        }
+        return {
+          success: res.success,
+          tradeId: res.tradeId,
+          shipmentId: res.shipmentId,
+          status: res.status,
+          allDelivered: res.allDelivered,
+        };
+      });
   }
 
   /**
@@ -320,7 +355,7 @@ export class AdminTradeResolutionService {
     const reason = dto?.reason?.trim();
     if (!reason || reason.length < 10) {
       throw new BadRequestException(
-        'İptal gerekçesi en az 10 karakter olmalıdır',
+        "İptal gerekçesi en az 10 karakter olmalıdır",
       );
     }
     const sendArrivedItemBack = dto.sendArrivedItemBack !== false;
@@ -333,7 +368,7 @@ export class AdminTradeResolutionService {
         include: { cashPayment: true },
       });
       if (!trade) {
-        throw new NotFoundException('Takas bulunamadı');
+        throw new NotFoundException("Takas bulunamadı");
       }
       if (trade.status !== TradeStatus.shipping_to_warehouse) {
         throw new BadRequestException(
@@ -342,53 +377,64 @@ export class AdminTradeResolutionService {
       }
       if (!trade.firstWarehouseArrivalAt) {
         throw new BadRequestException(
-          'Hiçbir ürün depoya ulaşmamış; bu endpoint sadece kısmen ulaşmış takaslar için.',
+          "Hiçbir ürün depoya ulaşmamış; bu endpoint sadece kısmen ulaşmış takaslar için.",
         );
       }
 
       const toWarehouseShipments = await tx.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
+        where: { tradeId, leg: "to_warehouse" },
       });
       const arrived = toWarehouseShipments.find((s) => s.deliveredAt !== null);
       const stuck = toWarehouseShipments.find((s) => s.deliveredAt === null);
       if (!arrived || !stuck) {
         throw new BadRequestException(
-          'Hem ulaşmış hem de yolda olan bir kargo bulunamadı; force-cancel için durum uygun değil.',
+          "Hem ulaşmış hem de yolda olan bir kargo bulunamadı; force-cancel için durum uygun değil.",
         );
       }
 
       const now = new Date();
-      let returnShipmentDraft: { id: string; recipientUserId: string; oid: string } | null = null;
+      let returnShipmentDraft: {
+        id: string;
+        recipientUserId: string;
+        oid: string;
+      } | null = null;
 
       if (sendArrivedItemBack && arrived.recipientUserId === null) {
         // recipientUserId on arrived to_warehouse is the shipper (the original owner).
       }
       if (sendArrivedItemBack) {
         const arrivedOwnerId = arrived.shipperId;
-        const warehouseAddressId = await this.common.resolveWarehouseAddressId(tx);
+        const warehouseAddressId =
+          await this.common.resolveWarehouseAddressId(tx);
         const oid = `TRD-${trade.tradeNumber}-RET-STK`
-          .replace(/[^a-zA-Z0-9-]/g, '')
+          .replace(/[^a-zA-Z0-9-]/g, "")
           .slice(0, 50);
         const draft = await tx.tradeShipment.create({
           data: {
             tradeId,
             shipperId: adminId,
             fromAddressId: warehouseAddressId,
-            carrier: 'pending',
+            carrier: "pending",
             trackingNumber: null,
             status: ShipmentStatus.pending,
-            leg: 'return',
-            recipientType: 'user',
+            leg: "return",
+            recipientType: "user",
             recipientUserId: arrivedOwnerId,
           },
         });
-        returnShipmentDraft = { id: draft.id, recipientUserId: arrivedOwnerId, oid };
+        returnShipmentDraft = {
+          id: draft.id,
+          recipientUserId: arrivedOwnerId,
+          oid,
+        };
       }
 
       await tx.trade.update({
         where: { id: tradeId },
         data: {
-          status: returnShipmentDraft ? TradeStatus.returning : TradeStatus.cancelled,
+          status: returnShipmentDraft
+            ? TradeStatus.returning
+            : TradeStatus.cancelled,
           cancelReason: `Admin force-cancel (stuck): ${reason}`,
           ...(returnShipmentDraft ? {} : { cancelledAt: now }),
           updatedAt: now,
@@ -404,7 +450,10 @@ export class AdminTradeResolutionService {
         });
         const byProduct = new Map<string, number>();
         for (const item of items) {
-          byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+          byProduct.set(
+            item.productId,
+            (byProduct.get(item.productId) ?? 0) + item.quantity,
+          );
         }
         for (const [productId, qty] of byProduct) {
           await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
@@ -413,13 +462,18 @@ export class AdminTradeResolutionService {
             select: { reservedQuantity: true },
           });
           if (prod) {
-            const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+            const newReserved = safeDecrementReserved(
+              prod.reservedQuantity,
+              qty,
+            );
             await tx.product.update({
               where: { id: productId },
               data: {
                 reservedQuantity: newReserved,
                 status:
-                  newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+                  newReserved > 0
+                    ? ProductStatus.reserved
+                    : ProductStatus.active,
               },
             });
           }
@@ -428,8 +482,8 @@ export class AdminTradeResolutionService {
 
       await this.audit.createAuditLog(
         adminId,
-        'trade_force_cancel_stuck',
-        'Trade',
+        "trade_force_cancel_stuck",
+        "Trade",
         tradeId,
         trade,
         {
@@ -437,7 +491,7 @@ export class AdminTradeResolutionService {
           stuckShipmentId: stuck.id,
           arrivedShipmentId: arrived.id,
           returnShipmentId: returnShipmentDraft?.id ?? null,
-          newStatus: returnShipmentDraft ? 'returning' : 'cancelled',
+          newStatus: returnShipmentDraft ? "returning" : "cancelled",
         },
       );
 
@@ -450,7 +504,8 @@ export class AdminTradeResolutionService {
         },
         returnShipmentDraft,
         shouldRefund:
-          !!trade.cashPayment && trade.cashPayment.status === PaymentStatus.completed,
+          !!trade.cashPayment &&
+          trade.cashPayment.status === PaymentStatus.completed,
         warehouseAddressId: returnShipmentDraft
           ? await this.common.resolveWarehouseAddressId(tx)
           : null,
@@ -471,44 +526,48 @@ export class AdminTradeResolutionService {
         });
         const arrivedAddress = await this.prisma.address.findFirst({
           where: { userId: txResult.arrivedOwnerId },
-          orderBy: { isDefault: 'desc' },
+          orderBy: { isDefault: "desc" },
         });
         if (
           arrivedAddress &&
           this.suratCargoService &&
           this.suratCargoService.isIntegrationEnabled()
         ) {
-          const result = await this.suratCargoService.submitShipmentWithRetry({
-            idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
-            correlationId: `trade-force-cancel-${tradeId}`,
-            payload: {
-              KisiKurum:
-                arrivedAddress.fullName || arrivedUser?.displayName || 'Takas İade',
-              SahisBirim: 'Takas Kayıp İade',
-              AliciAdresi: arrivedAddress.address,
-              Il: normalizeSuratLocation(arrivedAddress.city),
-              Ilce: normalizeSuratLocation(arrivedAddress.district),
-              TelefonCep: normalizeSuratPhone(arrivedAddress.phone),
-              KargoTuru: SuratKargoTuru.Koli,
-              OdemeTipi: SuratOdemeTipi.Pesin,
-              OzelKargoTakipNo: txResult.returnShipmentDraft.oid,
-              Adet: 1,
-              BirimDesi: 1,
-              BirimKg: 1,
-              KapidanOdemeTahsilatTipi: 1,
-              TasimaSekli: SuratTasimaSekli.KaraYolu,
-              TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-              GonderiSekli: SuratGonderiSekli.Standart,
-              Pazaryerimi: 0,
-              Iademi: true,
+          const result = await this.suratCargoService.createShipmentWithBarcode(
+            {
+              idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
+              correlationId: `trade-force-cancel-${tradeId}`,
+              payload: buildStandardGonderiPayload({
+                recipientName:
+                  arrivedAddress.fullName ||
+                  arrivedUser?.displayName ||
+                  "Takas İade",
+                address: arrivedAddress.address,
+                city: arrivedAddress.city,
+                district: arrivedAddress.district,
+                phone: arrivedAddress.phone,
+                ref: txResult.returnShipmentDraft.oid,
+                content: "Takas Kayıp İade",
+                isReturn: true,
+                // KisiKurum fallback zinciri "Takas İade" (builder'ın "Alıcı"sı
+                // değil) ve trim yok → birebir korumak için override.
+                overrides: {
+                  KisiKurum:
+                    arrivedAddress.fullName ||
+                    arrivedUser?.displayName ||
+                    "Takas İade",
+                },
+              }),
             },
-          });
+          );
           if (result.ok) {
             await this.prisma.tradeShipment.update({
               where: { id: txResult.returnShipmentDraft.id },
               data: {
-                carrier: 'surat',
+                carrier: "surat",
                 trackingNumber: txResult.returnShipmentDraft.oid,
+                providerTrackingId: result.kargoTakipNo,
+                labelZpl: result.labelZpl,
                 status: ShipmentStatus.label_created,
                 shippedAt: new Date(),
               },
@@ -516,7 +575,7 @@ export class AdminTradeResolutionService {
           } else {
             const r = result as any;
             const errMsg =
-              r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+              r.kind === "business" ? r.suratMessage : `technical: ${r.code}`;
             this.logger.error(
               `Force-cancel return shipment submit failed for trade ${tradeId}: ${errMsg}`,
             );
@@ -525,7 +584,7 @@ export class AdminTradeResolutionService {
           await this.prisma.tradeShipment.update({
             where: { id: txResult.returnShipmentDraft.id },
             data: {
-              carrier: 'Tarodan Warehouse',
+              carrier: "Tarodan Warehouse",
               trackingNumber: `TRK${Date.now()
                 .toString(36)
                 .toUpperCase()}${Math.random()
@@ -546,7 +605,7 @@ export class AdminTradeResolutionService {
 
     // Cancel the stuck counterpart shipment in Sürat (best-effort).
     if (
-      txResult.stuckShipment.carrier === 'surat' &&
+      txResult.stuckShipment.carrier === "surat" &&
       txResult.stuckShipment.trackingNumber &&
       this.suratCargoService &&
       this.suratCargoService.isIntegrationEnabled()
@@ -557,7 +616,7 @@ export class AdminTradeResolutionService {
         );
         await this.prisma.tradeShipment.update({
           where: { id: txResult.stuckShipment.id },
-          data: { status: 'cancelled' as any },
+          data: { status: "cancelled" as any },
         });
       } catch (err: any) {
         this.logger.error(
@@ -575,7 +634,7 @@ export class AdminTradeResolutionService {
         });
       } catch (err: any) {
         const message =
-          err?.message ?? 'Bilinmeyen hata (PayTR iade başarısız)';
+          err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
         this.logger.error(
           `forceCancelStuckWarehouseTrade refund failed for ${tradeId}: ${message}`,
         );
@@ -620,180 +679,189 @@ export class AdminTradeResolutionService {
     const reason = dto?.reason?.trim();
     if (!reason || reason.length < 10) {
       throw new BadRequestException(
-        'Kayıp gerekçesi en az 10 karakter olmalıdır',
+        "Kayıp gerekçesi en az 10 karakter olmalıdır",
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+    return this.prisma
+      .$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
 
-      const trade = await tx.trade.findUnique({
-        where: { id: tradeId },
-        select: {
-          id: true,
-          status: true,
-          initiatorId: true,
-          receiverId: true,
-          compensationPendingUserId: true,
-        },
-      });
-      if (!trade) {
-        throw new NotFoundException('Takas bulunamadı');
-      }
-
-      const shipment = await tx.tradeShipment.findUnique({
-        where: { id: dto.shipmentId },
-      });
-      if (!shipment || shipment.tradeId !== tradeId) {
-        throw new NotFoundException('Gönderim bulunamadı');
-      }
-      if (shipment.leg !== 'return') {
-        throw new BadRequestException(
-          'Sadece iade gönderileri kayıp olarak işaretlenebilir',
-        );
-      }
-      if (shipment.deliveredAt) {
-        throw new BadRequestException(
-          'Bu gönderim zaten teslim edildi; kayıp işaretlenemez',
-        );
-      }
-      if (shipment.lostAt) {
-        throw new BadRequestException('Bu gönderim zaten kayıp işaretli');
-      }
-
-      const compensationUserId =
-        dto.compensateUserId ?? shipment.recipientUserId ?? null;
-      if (
-        compensationUserId &&
-        compensationUserId !== trade.initiatorId &&
-        compensationUserId !== trade.receiverId
-      ) {
-        throw new BadRequestException(
-          'Tazminat kullanıcısı bu takasın taraflarından biri olmalı',
-        );
-      }
-
-      const now = new Date();
-      const updatedShipment = await tx.tradeShipment.update({
-        where: { id: dto.shipmentId },
-        data: {
-          status: ShipmentStatus.failed,
-          lostAt: now,
-          lostReason: reason,
-        },
-      });
-
-      // If every return shipment has been resolved (delivered or lost),
-      // finalize the trade the same way markReturnDelivered would: release
-      // reservations, reactivate products, and cancel the trade.
-      const returnShipments = await tx.tradeShipment.findMany({
-        where: { tradeId, leg: 'return' },
-        select: { id: true, deliveredAt: true, lostAt: true },
-      });
-      const allResolved =
-        returnShipments.length >= 2 &&
-        returnShipments.every((s) => s.deliveredAt !== null || s.lostAt !== null);
-
-      let finalStatus: TradeStatus = trade.status;
-      if (allResolved && trade.status !== TradeStatus.cancelled) {
-        const items = await tx.tradeItem.findMany({
-          where: { tradeId },
-          select: { productId: true, quantity: true },
+        const trade = await tx.trade.findUnique({
+          where: { id: tradeId },
+          select: {
+            id: true,
+            status: true,
+            initiatorId: true,
+            receiverId: true,
+            compensationPendingUserId: true,
+          },
         });
-        const byProduct = new Map<string, number>();
-        for (const item of items) {
-          byProduct.set(
-            item.productId,
-            (byProduct.get(item.productId) ?? 0) + item.quantity,
+        if (!trade) {
+          throw new NotFoundException("Takas bulunamadı");
+        }
+
+        const shipment = await tx.tradeShipment.findUnique({
+          where: { id: dto.shipmentId },
+        });
+        if (!shipment || shipment.tradeId !== tradeId) {
+          throw new NotFoundException("Gönderim bulunamadı");
+        }
+        if (shipment.leg !== "return") {
+          throw new BadRequestException(
+            "Sadece iade gönderileri kayıp olarak işaretlenebilir",
           );
         }
-        for (const [productId, qty] of byProduct) {
-          await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
-          const prod = await tx.product.findUnique({
-            where: { id: productId },
-            select: { reservedQuantity: true },
-          });
-          if (prod) {
-            const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
-            await tx.product.update({
-              where: { id: productId },
-              data: {
-                reservedQuantity: newReserved,
-                status:
-                  newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
-              },
-            });
-          }
+        if (shipment.deliveredAt) {
+          throw new BadRequestException(
+            "Bu gönderim zaten teslim edildi; kayıp işaretlenemez",
+          );
+        }
+        if (shipment.lostAt) {
+          throw new BadRequestException("Bu gönderim zaten kayıp işaretli");
         }
 
-        await tx.trade.update({
-          where: { id: tradeId },
-          data: {
-            status: TradeStatus.cancelled,
-            cancelledAt: now,
-            updatedAt: now,
-            ...(compensationUserId
-              ? {
-                  compensationPendingUserId: compensationUserId,
-                  compensationResolvedAt: null,
-                }
-              : {}),
-          },
-        });
-        finalStatus = TradeStatus.cancelled;
-      } else if (compensationUserId) {
-        await tx.trade.update({
-          where: { id: tradeId },
-          data: {
-            compensationPendingUserId: compensationUserId,
-            compensationResolvedAt: null,
-            updatedAt: now,
-          },
-        });
-      }
+        const compensationUserId =
+          dto.compensateUserId ?? shipment.recipientUserId ?? null;
+        if (
+          compensationUserId &&
+          compensationUserId !== trade.initiatorId &&
+          compensationUserId !== trade.receiverId
+        ) {
+          throw new BadRequestException(
+            "Tazminat kullanıcısı bu takasın taraflarından biri olmalı",
+          );
+        }
 
-      await this.audit.createAuditLog(
-        adminId,
-        'trade_return_shipment_lost',
-        'TradeShipment',
-        dto.shipmentId,
-        shipment,
-        {
-          ...updatedShipment,
-          allResolved,
-          tradeStatus: finalStatus,
+        const now = new Date();
+        const updatedShipment = await tx.tradeShipment.update({
+          where: { id: dto.shipmentId },
+          data: {
+            status: ShipmentStatus.failed,
+            lostAt: now,
+            lostReason: reason,
+          },
+        });
+
+        // If every return shipment has been resolved (delivered or lost),
+        // finalize the trade the same way markReturnDelivered would: release
+        // reservations, reactivate products, and cancel the trade.
+        const returnShipments = await tx.tradeShipment.findMany({
+          where: { tradeId, leg: "return" },
+          select: { id: true, deliveredAt: true, lostAt: true },
+        });
+        const allResolved =
+          returnShipments.length >= 2 &&
+          returnShipments.every(
+            (s) => s.deliveredAt !== null || s.lostAt !== null,
+          );
+
+        let finalStatus: TradeStatus = trade.status;
+        if (allResolved && trade.status !== TradeStatus.cancelled) {
+          const items = await tx.tradeItem.findMany({
+            where: { tradeId },
+            select: { productId: true, quantity: true },
+          });
+          const byProduct = new Map<string, number>();
+          for (const item of items) {
+            byProduct.set(
+              item.productId,
+              (byProduct.get(item.productId) ?? 0) + item.quantity,
+            );
+          }
+          for (const [productId, qty] of byProduct) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+            const prod = await tx.product.findUnique({
+              where: { id: productId },
+              select: { reservedQuantity: true },
+            });
+            if (prod) {
+              const newReserved = safeDecrementReserved(
+                prod.reservedQuantity,
+                qty,
+              );
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  reservedQuantity: newReserved,
+                  status:
+                    newReserved > 0
+                      ? ProductStatus.reserved
+                      : ProductStatus.active,
+                },
+              });
+            }
+          }
+
+          await tx.trade.update({
+            where: { id: tradeId },
+            data: {
+              status: TradeStatus.cancelled,
+              cancelledAt: now,
+              updatedAt: now,
+              ...(compensationUserId
+                ? {
+                    compensationPendingUserId: compensationUserId,
+                    compensationResolvedAt: null,
+                  }
+                : {}),
+            },
+          });
+          finalStatus = TradeStatus.cancelled;
+        } else if (compensationUserId) {
+          await tx.trade.update({
+            where: { id: tradeId },
+            data: {
+              compensationPendingUserId: compensationUserId,
+              compensationResolvedAt: null,
+              updatedAt: now,
+            },
+          });
+        }
+
+        await this.audit.createAuditLog(
+          adminId,
+          "trade_return_shipment_lost",
+          "TradeShipment",
+          dto.shipmentId,
+          shipment,
+          {
+            ...updatedShipment,
+            allResolved,
+            tradeStatus: finalStatus,
+            compensationUserId,
+            reason,
+          },
+        );
+
+        return {
+          success: true,
+          tradeId,
+          shipmentId: dto.shipmentId,
+          status: finalStatus,
           compensationUserId,
           reason,
-        },
-      );
-
-      return {
-        success: true,
-        tradeId,
-        shipmentId: dto.shipmentId,
-        status: finalStatus,
-        compensationUserId,
-        reason,
-      };
-    }).then(async (res) => {
-      try {
-        await this.eventService.emitTradeReturnLost({
+        };
+      })
+      .then(async (res) => {
+        try {
+          await this.eventService.emitTradeReturnLost({
+            tradeId: res.tradeId,
+            compensationUserId: res.compensationUserId,
+            reason: res.reason,
+          });
+        } catch (err) {
+          this.logger.error(
+            `Failed to emit trade.return-lost for trade ${res.tradeId}: ${err}`,
+          );
+        }
+        return {
+          success: res.success,
           tradeId: res.tradeId,
+          shipmentId: res.shipmentId,
+          status: res.status,
           compensationUserId: res.compensationUserId,
-          reason: res.reason,
-        });
-      } catch (err) {
-        this.logger.error(
-          `Failed to emit trade.return-lost for trade ${res.tradeId}: ${err}`,
-        );
-      }
-      return {
-        success: res.success,
-        tradeId: res.tradeId,
-        shipmentId: res.shipmentId,
-        status: res.status,
-        compensationUserId: res.compensationUserId,
-      };
-    });
+        };
+      });
   }
 }

@@ -195,7 +195,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      # Bound Prisma's pool per process so 2 API replicas + worker stay well
+      # under Postgres max_connections (#71). Raise these (or front with
+      # PgBouncer) if max_connections / replica count is tuned up.
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?connection_limit=20&pool_timeout=20
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -214,6 +217,8 @@ services:
       GOOGLE_CLIENT_ID_WEB: ${GOOGLE_CLIENT_ID_WEB:-243308404313-kdc77bd36flfhv6ujlb5tfd4qjteh94c.apps.googleusercontent.com}
       GOOGLE_CLIENT_ID_IOS: ${GOOGLE_CLIENT_ID_IOS}
       GOOGLE_CLIENT_ID_ANDROID: ${GOOGLE_CLIENT_ID_ANDROID}
+      # Web auth-code flow secret'ı — Coolify env'inden gelir (commit edilmez).
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       # Sürat Kargo (değerler Coolify env'inden gelir; güvenli varsayılanlar).
       # Test için Coolify'da: SURAT_CARGO_ENABLED=true, SURAT_SOAP_MODE=rest,
       # SURAT_KARGO_TEST_MODE=true, SURAT_KARGO_CARI_KODU=..., SURAT_KARGO_SIFRE=...
@@ -238,7 +243,7 @@ services:
       - "traefik.http.routers.api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.api.middlewares=rate-limit,security-headers,compress"
       - "traefik.http.services.api.loadbalancer.server.port=3001"
-      - "traefik.http.services.api.loadbalancer.healthCheck.path=/health"
+      - "traefik.http.services.api.loadbalancer.healthCheck.path=/api/health/ready"
       - "traefik.http.services.api.loadbalancer.healthCheck.interval=10s"
     deploy:
       resources:
@@ -255,7 +260,10 @@ services:
     command: node dist/worker.js
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      # Bound Prisma's pool per process so 2 API replicas + worker stay well
+      # under Postgres max_connections (#71). Raise these (or front with
+      # PgBouncer) if max_connections / replica count is tuned up.
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?connection_limit=20&pool_timeout=20
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}

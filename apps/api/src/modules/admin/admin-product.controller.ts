@@ -15,9 +15,9 @@ import {
   UploadedFile,
   BadRequestException,
   Res,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
@@ -25,24 +25,35 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
-} from '@nestjs/swagger';
-import { AdminService } from './admin.service';
-import { AdvertisementService } from '../advertisement/advertisement.service';
-import { MediaService } from '../media/media.service';
-import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
-import { DiscountService } from '../discount/discount.service';
-import { CreateDiscountDto, UpdateDiscountDto, DiscountQueryDto } from '../discount/dto';
-import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import { BypassPermissionMatrix } from '../auth/decorators/bypass-permission-matrix.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AdminRoute } from '../auth/decorators/admin-route.decorator';
-import { Public } from '../auth/decorators/public.decorator';
-import { AdminRole } from '@prisma/client';
-import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
-import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
+} from "@nestjs/swagger";
+import { AdminService } from "./admin.service";
+import { AdvertisementService } from "../advertisement/advertisement.service";
+import { MediaService } from "../media/media.service";
+import {
+  CreateAdvertisementDto,
+  UpdateAdvertisementDto,
+  ReorderAdsDto,
+} from "../advertisement/dto";
+import { DiscountService } from "../discount/discount.service";
+import {
+  CreateDiscountDto,
+  UpdateDiscountDto,
+  DiscountQueryDto,
+} from "../discount/dto";
+import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
+import { BypassPermissionMatrix } from "../auth/decorators/bypass-permission-matrix.decorator";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { Public } from "../auth/decorators/public.decorator";
+import { AdminRole } from "@prisma/client";
+import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
+import {
+  OverrideRefundPolicyDto,
+  SetReturnShippingPayerDto,
+} from "../refund/dto";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -52,6 +63,7 @@ import {
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
+  AdminRefundHistoryQueryDto,
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
@@ -90,10 +102,10 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
-} from './dto';
+} from "./dto";
 
-@ApiTags('admin')
-@Controller('admin')
+@ApiTags("admin")
+@Controller("admin")
 @AdminRoute() // Mark as admin route to skip global JwtAuthGuard
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
@@ -101,175 +113,222 @@ export class AdminProductController {
   constructor(
     private readonly adminService: AdminService,
     private readonly discountService: DiscountService,
-  ) { }
+  ) {}
 
   // ==================== PRODUCT MANAGEMENT ====================
 
-  @Get('products')
+  @Get("products")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get products with filters' })
+  @ApiOperation({ summary: "Get products with filters" })
   async getProducts(@Query() query: AdminProductQueryDto) {
     return this.adminService.getProducts(query);
   }
 
-  @Get('products/:id')
+  @Get("products/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get single product' })
-  @ApiParam({ name: 'id', description: 'Product ID' })
-  async getProduct(@Param('id') id: string) {
+  @ApiOperation({ summary: "Get single product" })
+  @ApiParam({ name: "id", description: "Product ID" })
+  async getProduct(@Param("id") id: string) {
     return this.adminService.getProduct(id);
   }
 
-  @Patch('products/:id')
+  @Patch("products/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update product details' })
-  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiOperation({ summary: "Update product details" })
+  @ApiParam({ name: "id", description: "Product ID" })
   async updateProduct(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() dto: UpdateProductDto,
   ) {
     return this.adminService.updateProduct(adminId, id, dto);
   }
 
-  @Get('products-export')
+  @Get("products-export")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Export products to CSV' })
+  @ApiOperation({ summary: "Export products to CSV" })
   async exportProducts(
-    @Query('status') status?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('sellerId') sellerId?: string,
+    @Query("status") status?: string,
+    @Query("categoryId") categoryId?: string,
+    @Query("sellerId") sellerId?: string,
     @Res() res?: any,
   ) {
-    const result = await this.adminService.exportProducts({ status, categoryId, sellerId });
-    res.setHeader('Content-Type', result.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    const result = await this.adminService.exportProducts({
+      status,
+      categoryId,
+      sellerId,
+    });
+    res.setHeader("Content-Type", result.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${result.filename}"`,
+    );
     res.send(result.content);
   }
 
-  @Get('payments/refunds')
+  @Get("payments/refunds")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get refund history' })
-  async getRefundHistory(
-    @Query('search') search?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.adminService.getRefundHistory({
-      search,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 20,
-    });
+  @ApiOperation({ summary: "Get refund history" })
+  async getRefundHistory(@Query() query: AdminRefundHistoryQueryDto) {
+    return this.adminService.getRefundHistory(query);
   }
 
   // ==================== DISCOUNT MANAGEMENT (admin token) ====================
 
-
-  @Get('discounts')
+  @Get("discounts")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'List discounts (admin)' })
+  @ApiOperation({ summary: "List discounts (admin)" })
   async getDiscounts(
-    @CurrentUser('id') adminId: string,
+    @CurrentUser("id") adminId: string,
     @Query() query: DiscountQueryDto,
   ) {
     return this.discountService.findAll(query, adminId, true);
   }
 
-  @Post('discounts')
+  @Post("discounts")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Create discount (admin)' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Discount created' })
+  @ApiOperation({ summary: "Create discount (admin)" })
+  @ApiResponse({ status: HttpStatus.CREATED, description: "Discount created" })
   async createDiscount(
-    @CurrentUser('id') adminId: string,
+    @CurrentUser("id") adminId: string,
     @Body() dto: CreateDiscountDto,
   ) {
     return this.discountService.create(dto, adminId, true);
   }
 
-  @Get('discounts/:id')
+  @Get("discounts/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get discount by ID (admin)' })
-  @ApiParam({ name: 'id', description: 'Discount ID' })
+  @ApiOperation({ summary: "Get discount by ID (admin)" })
+  @ApiParam({ name: "id", description: "Discount ID" })
   async getDiscount(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.discountService.findOne(id, adminId, true);
   }
 
-  @Patch('discounts/:id')
+  @Patch("discounts/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update discount (admin)' })
-  @ApiParam({ name: 'id', description: 'Discount ID' })
+  @ApiOperation({ summary: "Update discount (admin)" })
+  @ApiParam({ name: "id", description: "Discount ID" })
   async updateDiscount(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() dto: UpdateDiscountDto,
   ) {
     return this.discountService.update(id, dto, adminId, true);
   }
 
-  @Delete('discounts/:id')
+  @Delete("discounts/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete discount (admin)' })
-  @ApiParam({ name: 'id', description: 'Discount ID' })
+  @ApiOperation({ summary: "Delete discount (admin)" })
+  @ApiParam({ name: "id", description: "Discount ID" })
   async deleteDiscount(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.discountService.delete(id, adminId, true);
   }
 
-  @Post('products/:id/approve')
+  // ==================== VOUCHER CODES (bulk single-use) ====================
+
+  @Post("discounts/:id/codes")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Generate bulk single-use voucher codes (admin)" })
+  @ApiParam({ name: "id", description: "Discount (template) ID" })
+  async generateVoucherCodes(
+    @Param("id") id: string,
+    @Body() body: { count: number; prefix?: string },
+  ) {
+    return this.discountService.generateCodes(
+      id,
+      Number(body?.count) || 0,
+      body?.prefix,
+    );
+  }
+
+  @Get("discounts/:id/codes")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "List a discount's voucher codes (admin)" })
+  @ApiParam({ name: "id", description: "Discount (template) ID" })
+  async getVoucherCodes(@Param("id") id: string) {
+    return this.discountService.listCodes(id);
+  }
+
+  @Get("discounts/:id/codes/export")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Export a discount's voucher codes as CSV (admin)" })
+  @ApiParam({ name: "id", description: "Discount (template) ID" })
+  async exportVoucherCodes(
+    @Param("id") id: string,
+    @Res() res: import("express").Response,
+  ) {
+    const { data } = await this.discountService.listCodes(id);
+    const rows = [
+      "code,isRedeemed,redeemedAt,orderId",
+      ...data.map((c) =>
+        [
+          c.code,
+          c.isRedeemed ? "1" : "0",
+          c.redeemedAt ? new Date(c.redeemedAt).toISOString() : "",
+          c.orderId ?? "",
+        ].join(","),
+      ),
+    ].join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="voucher-codes-${id}.csv"`,
+    );
+    res.send(rows);
+  }
+
+  @Post("products/:id/approve")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Approve a pending product' })
-  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiOperation({ summary: "Approve a pending product" })
+  @ApiParam({ name: "id", description: "Product ID" })
   async approveProduct(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() dto: ApproveProductDto,
   ) {
     return this.adminService.approveProduct(adminId, id, dto);
   }
 
-  @Post('products/:id/reject')
+  @Post("products/:id/reject")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reject a product' })
-  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiOperation({ summary: "Reject a product" })
+  @ApiParam({ name: "id", description: "Product ID" })
   async rejectProduct(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() dto: RejectProductDto,
   ) {
     return this.adminService.rejectProduct(adminId, id, dto);
   }
 
-  @Post('products/bulk-approve')
+  @Post("products/bulk-approve")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bulk approve multiple products' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Products approved' })
+  @ApiOperation({ summary: "Bulk approve multiple products" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Products approved" })
   async bulkApproveProducts(
-    @CurrentUser('id') adminId: string,
+    @CurrentUser("id") adminId: string,
     @Body() body: { ids: string[]; note?: string },
   ) {
     return this.adminService.bulkApproveProducts(adminId, body.ids, body.note);
   }
 
-  @Post('products/bulk-reject')
+  @Post("products/bulk-reject")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bulk reject multiple products' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Products rejected' })
+  @ApiOperation({ summary: "Bulk reject multiple products" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Products rejected" })
   async bulkRejectProducts(
-    @CurrentUser('id') adminId: string,
+    @CurrentUser("id") adminId: string,
     @Body() body: { ids: string[]; reason: string },
   ) {
     return this.adminService.bulkRejectProducts(adminId, body.ids, body.reason);
@@ -277,31 +336,30 @@ export class AdminProductController {
 
   // ==================== PRODUCT DELETION (ADMIN) ====================
 
-  @Delete('products/:id')
+  @Delete("products/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete product (admin only)' })
-  @ApiParam({ name: 'id', description: 'Product ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Product deleted' })
+  @ApiOperation({ summary: "Delete product (admin only)" })
+  @ApiParam({ name: "id", description: "Product ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Product deleted" })
   async deleteProduct(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Query('hardDelete') hardDelete?: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Query("hardDelete") hardDelete?: string,
   ) {
-    return this.adminService.deleteProduct(adminId, id, hardDelete === 'true');
+    return this.adminService.deleteProduct(adminId, id, hardDelete === "true");
   }
 
-  @Post('products/:id/restore')
+  @Post("products/:id/restore")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Restore a soft-deleted product (admin only)' })
-  @ApiParam({ name: 'id', description: 'Product ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Product restored' })
+  @ApiOperation({ summary: "Restore a soft-deleted product (admin only)" })
+  @ApiParam({ name: "id", description: "Product ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Product restored" })
   async restoreProduct(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.adminService.restoreProduct(adminId, id);
   }
-
 }

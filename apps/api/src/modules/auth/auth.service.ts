@@ -5,22 +5,32 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { ModuleRef } from '@nestjs/core';
-import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto';
-import { PrismaService } from '../../prisma';
-import { RegisterDto, BusinessRegisterDto, LoginDto, AuthResponseDto, TokensDto } from './dto';
-import { JwtPayload } from './interfaces';
-import { SellerType, OrderStatus, PaymentStatus } from '@prisma/client';
-import { NotificationService } from '../notification/notification.service';
-import { CacheService } from '../cache/cache.service';
-import { StorageService } from '../storage/storage.service';
-import { GoogleAuthService } from './google-auth.service';
-import { AppleAuthService } from './apple-auth.service';
-import { PaymentService } from '../payment/payment.service';
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import { ModuleRef } from "@nestjs/core";
+import * as bcrypt from "bcrypt";
+import * as crypto from "crypto";
+import { PrismaService } from "../../prisma";
+import {
+  RegisterDto,
+  BusinessRegisterDto,
+  LoginDto,
+  AuthResponseDto,
+  TwoFactorChallengeDto,
+  TokensDto,
+} from "./dto";
+import { JwtPayload } from "./interfaces";
+import { SellerType, OrderStatus, PaymentStatus } from "@prisma/client";
+import { NotificationService } from "../notification/notification.service";
+import { CacheService } from "../cache/cache.service";
+import { StorageService } from "../storage/storage.service";
+import { GoogleAuthService } from "./google-auth.service";
+import { AppleAuthService } from "./apple-auth.service";
+import { PaymentService } from "../payment/payment.service";
+import { i18nMessage } from "../i18n";
+import { SecurityService } from "../security/security.service";
 
 @Injectable()
 export class AuthService {
@@ -35,15 +45,23 @@ export class AuthService {
     private readonly storageService: StorageService,
     private readonly googleAuthService: GoogleAuthService,
     private readonly appleAuthService: AppleAuthService,
+    private readonly securityService: SecurityService,
     private readonly moduleRef: ModuleRef,
-  ) { }
+  ) {}
 
-  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+  private async resolveAvatarUrl(
+    avatarUrl: string | null | undefined,
+  ): Promise<string | null> {
     if (!avatarUrl) return null;
-    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://"))
+      return avatarUrl;
     if (this.storageService) {
       try {
-        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+        return await this.storageService.getPresignedDownloadUrl(
+          "avatars",
+          avatarUrl,
+          86400,
+        );
       } catch {
         return null;
       }
@@ -62,7 +80,9 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('Bu email adresi zaten kayıtlı');
+      throw new ConflictException(
+        i18nMessage("server.auth.emailAlreadyRegistered"),
+      );
     }
 
     // Check if phone already exists (if provided)
@@ -72,7 +92,9 @@ export class AuthService {
       });
 
       if (existingPhone) {
-        throw new ConflictException('Bu telefon numarası zaten kayıtlı');
+        throw new ConflictException(
+          i18nMessage("server.auth.phoneAlreadyRegistered"),
+        );
       }
     }
 
@@ -83,15 +105,20 @@ export class AuthService {
       let age = today.getFullYear() - birth.getFullYear();
       const monthDiff = today.getMonth() - birth.getMonth();
 
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < birth.getDate())
+      ) {
         age--;
       }
 
       if (age < 18) {
-        throw new BadRequestException('Kayıt olmak için en az 18 yaşında olmanız gerekmektedir');
+        throw new BadRequestException(i18nMessage("server.auth.minAge18"));
       }
     } else {
-      throw new BadRequestException('Doğum tarihi zorunludur');
+      throw new BadRequestException(
+        i18nMessage("server.auth.birthDateRequired"),
+      );
     }
 
     // Hash password
@@ -122,7 +149,9 @@ export class AuthService {
         });
       } catch (error) {
         // Ignore if field doesn't exist yet
-        this.logger.warn('acceptsMarketingEmails field not available yet, migration needed');
+        this.logger.warn(
+          "acceptsMarketingEmails field not available yet, migration needed",
+        );
       }
     }
 
@@ -130,7 +159,7 @@ export class AuthService {
     try {
       // Get system guest user
       const systemGuestUser = await this.prisma.user.findUnique({
-        where: { email: 'guest@tarodan.system' },
+        where: { email: "guest@tarodan.system" },
       });
 
       if (systemGuestUser) {
@@ -145,7 +174,9 @@ export class AuthService {
         const matchingOrders = guestOrders.filter((order: any) => {
           try {
             const shippingAddress = order.shippingAddress as any;
-            const guestEmail = shippingAddress?.guestEmail?.toLowerCase()?.trim();
+            const guestEmail = shippingAddress?.guestEmail
+              ?.toLowerCase()
+              ?.trim();
             const userEmail = dto.email.toLowerCase().trim();
             return guestEmail === userEmail;
           } catch {
@@ -164,7 +195,9 @@ export class AuthService {
             },
           });
 
-          this.logger.log(`Linked ${matchingOrders.length} guest order(s) to new user ${user.id} (${user.email})`);
+          this.logger.log(
+            `Linked ${matchingOrders.length} guest order(s) to new user ${user.id} (${user.email})`,
+          );
 
           // Misafir, ödeme sonrası success sayfasına ulaşamadıysa (eski guest
           // redirect bug'ı) ödeme yakalanmamış olabilir → sahiplenilen pending
@@ -174,13 +207,17 @@ export class AuthService {
             (o: any) => o.status === OrderStatus.pending_payment,
           );
           if (pendingOrders.length > 0) {
-            void this.verifyClaimedGuestPayments(pendingOrders).catch(() => undefined);
+            void this.verifyClaimedGuestPayments(pendingOrders).catch(
+              () => undefined,
+            );
           }
         }
       }
     } catch (error) {
       // Don't fail registration if linking guest orders fails
-      this.logger.error(`Failed to link guest orders for ${user.email}: ${error.message}`);
+      this.logger.error(
+        `Failed to link guest orders for ${user.email}: ${error.message}`,
+      );
     }
 
     // Send email verification
@@ -191,12 +228,18 @@ export class AuthService {
       try {
         await this.notificationService.sendWelcomeEmail(user.id);
       } catch (error) {
-        this.logger.error(`Failed to send welcome email to ${user.email}: ${error.message}`);
+        this.logger.error(
+          `Failed to send welcome email to ${user.email}: ${error.message}`,
+        );
       }
     }
 
     // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.isSeller,
+    );
 
     return {
       user: {
@@ -210,7 +253,8 @@ export class AuthService {
         createdAt: user.createdAt,
       },
       tokens,
-      message: 'Kayıt başarılı! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.',
+      // #224: mesaj artık AuthController.register() tarafından locale'e göre kuruluyor
+      // (server.auth.registerSuccess) — servis burada sabit metin döndürmüyor.
     };
   }
 
@@ -242,11 +286,13 @@ export class AuthService {
                 : []),
             ],
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           select: { id: true },
         });
         if (!payment) continue;
-        const res = await paymentService.verifyPaymentFromClient(payment.id);
+        const res = await paymentService.verifyPaymentFromClient(payment.id, {
+          internal: true,
+        });
         if (res.completed) {
           this.logger.log(
             `Recovered guest payment ${payment.id} for claimed order ${order.id}`,
@@ -265,8 +311,11 @@ export class AuthService {
    */
   async sendEmailVerification(userId: string, email: string): Promise<void> {
     // Generate verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(verificationToken)
+      .digest("hex");
     const expiresAt = new Date(Date.now() + 24 * 3600000); // 24 hours
 
     // Delete existing tokens for this user
@@ -285,23 +334,29 @@ export class AuthService {
     });
 
     // Send verification email
-    await this.notificationService.sendEmailVerification(userId, verificationToken);
+    await this.notificationService.sendEmailVerification(
+      userId,
+      verificationToken,
+    );
   }
 
   /**
    * Verify email with token
    * POST /auth/verify-email
    */
-  async verifyEmail(token: string): Promise<{ message: string }> {
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  async verifyEmail(token: string): Promise<{ alreadyVerified: boolean }> {
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-    const verificationToken = await this.prisma.emailVerificationToken.findUnique({
-      where: { token: hashedToken },
-      include: { user: true },
-    });
+    const verificationToken =
+      await this.prisma.emailVerificationToken.findUnique({
+        where: { token: hashedToken },
+        include: { user: true },
+      });
 
     if (!verificationToken) {
-      throw new BadRequestException('Geçersiz veya süresi dolmuş doğrulama linki');
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailVerificationLinkInvalid"),
+      );
     }
 
     if (verificationToken.usedAt) {
@@ -310,13 +365,19 @@ export class AuthService {
       // başarı dön. Aksi halde ilk çağrı doğrularken ikinci çağrı kullanıcıya
       // yanlışlıkla "Doğrulama Başarısız" gösteriyordu.
       if (verificationToken.user?.isEmailVerified) {
-        return { message: 'Email adresiniz zaten doğrulanmış.' };
+        // #224: başarı mesajı AuthController.verifyEmail() tarafından locale'e göre
+        // kuruluyor (server.auth.emailVerificationAlreadyDone).
+        return { alreadyVerified: true };
       }
-      throw new BadRequestException('Bu doğrulama linki daha önce kullanılmış');
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailVerificationLinkUsed"),
+      );
     }
 
     if (verificationToken.expiresAt < new Date()) {
-      throw new BadRequestException('Doğrulama linkinin süresi dolmuş');
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailVerificationLinkExpired"),
+      );
     }
 
     // Mark email as verified
@@ -331,7 +392,9 @@ export class AuthService {
       data: { usedAt: new Date() },
     });
 
-    return { message: 'Email adresiniz başarıyla doğrulandı!' };
+    // #224: başarı mesajı AuthController.verifyEmail() tarafından locale'e göre
+    // kuruluyor (server.auth.emailVerificationSuccess).
+    return { alreadyVerified: false };
   }
 
   /**
@@ -345,7 +408,9 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('Bu email adresi zaten kayıtlı');
+      throw new ConflictException(
+        i18nMessage("server.auth.emailAlreadyRegistered"),
+      );
     }
 
     // Check if phone already exists
@@ -354,7 +419,9 @@ export class AuthService {
     });
 
     if (existingPhone) {
-      throw new ConflictException('Bu telefon numarası zaten kayıtlı');
+      throw new ConflictException(
+        i18nMessage("server.auth.phoneAlreadyRegistered"),
+      );
     }
 
     // Check if company name already exists (must be unique for business accounts)
@@ -365,7 +432,9 @@ export class AuthService {
     });
 
     if (existingCompanyName) {
-      throw new ConflictException('Bu şirket adı zaten kayıtlı');
+      throw new ConflictException(
+        i18nMessage("server.auth.companyNameAlreadyRegistered"),
+      );
     }
 
     // Check if tax ID already exists
@@ -375,7 +444,9 @@ export class AuthService {
       });
 
       if (existingTaxId) {
-        throw new ConflictException('Bu vergi kimlik numarası zaten kayıtlı');
+        throw new ConflictException(
+          i18nMessage("server.auth.taxIdAlreadyRegistered"),
+        );
       }
     }
 
@@ -391,8 +462,12 @@ export class AuthService {
         displayName: dto.companyName,
         companyName: dto.companyName,
         taxId: dto.taxId,
+        // Kurumsal başvuru detayları (admin incelemesi için saklanır).
+        companyType: dto.companyType ?? null,
+        companyCity: dto.city ?? null,
+        companyDistrict: dto.district ?? null,
         isSeller: false,
-        businessStatus: 'pending',
+        businessStatus: "pending",
         isVerified: false, // Email verification required
         isEmailVerified: false,
         acceptsMarketingEmails: dto.acceptsMarketingEmails ?? false,
@@ -403,7 +478,11 @@ export class AuthService {
     await this.sendEmailVerification(user.id, user.email);
 
     // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.isSeller,
+    );
 
     return {
       user: {
@@ -417,7 +496,8 @@ export class AuthService {
         createdAt: user.createdAt,
       },
       tokens,
-      message: 'Şirket hesabı başarıyla oluşturuldu! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.',
+      // #224: mesaj artık AuthController.registerBusiness() tarafından locale'e göre
+      // kuruluyor (server.auth.businessRegisterSuccess).
     };
   }
 
@@ -425,29 +505,29 @@ export class AuthService {
    * Resend email verification
    * POST /auth/resend-verification
    */
-  async resendEmailVerification(userId: string): Promise<{ message: string }> {
+  async resendEmailVerification(userId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
     if (user.isEmailVerified) {
-      throw new BadRequestException('Email adresi zaten doğrulanmış');
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailAlreadyVerified"),
+      );
     }
 
     await this.sendEmailVerification(userId, user.email);
-
-    return { message: 'Doğrulama emaili tekrar gönderildi' };
   }
 
   /**
    * Login user
    * POST /auth/login
    */
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async login(dto: LoginDto): Promise<AuthResponseDto | TwoFactorChallengeDto> {
     try {
       // Find user by email with membership info
       const user = await this.prisma.user.findUnique({
@@ -458,58 +538,90 @@ export class AuthService {
               tier: true,
             },
           },
+          twoFactorSecret: {
+            select: { isEnabled: true },
+          },
         },
       });
 
       if (!user) {
         // Log failed login attempt - user not found
-        await this.logSecurityEvent('failed_login', 'medium', {
+        await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
-          reason: 'user_not_found',
+          reason: "user_not_found",
         });
-        throw new UnauthorizedException('Email veya şifre hatalı');
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidCredentials"),
+        );
       }
 
       // Silinmiş (anonimleştirilmiş) hesap: kaynakta reddet, token üretme.
       if (user.deletedAt) {
-        await this.logSecurityEvent('failed_login', 'medium', {
+        await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
           userId: user.id,
-          reason: 'deleted_account',
+          reason: "deleted_account",
         });
-        throw new UnauthorizedException('Email veya şifre hatalı');
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidCredentials"),
+        );
       }
 
       // Guard: OAuth-only accounts have no passwordHash — avoid bcrypt throwing on null
       if (!user.passwordHash) {
-        await this.logSecurityEvent('failed_login', 'medium', {
+        await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
           userId: user.id,
-          reason: 'oauth_only_account',
+          reason: "oauth_only_account",
         });
-        throw new UnauthorizedException('Email veya şifre hatalı');
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidCredentials"),
+        );
       }
 
       // Verify password
-      const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+      const isPasswordValid = await bcrypt.compare(
+        dto.password,
+        user.passwordHash,
+      );
 
       if (!isPasswordValid) {
         // Log failed login attempt - wrong password
-        await this.logSecurityEvent('failed_login', 'medium', {
+        await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
           userId: user.id,
-          reason: 'invalid_password',
+          reason: "invalid_password",
         });
-        throw new UnauthorizedException('Email veya şifre hatalı');
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidCredentials"),
+        );
+      }
+
+      if (user.isBanned) {
+        await this.logSecurityEvent("failed_login", "high", {
+          email: dto.email,
+          userId: user.id,
+          reason: "banned_account",
+        });
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.accountSuspended"),
+        );
       }
 
       // Check if email is verified - require email verification before login
       if (!user.isEmailVerified) {
-        throw new UnauthorizedException(
-          'Email adresiniz henüz doğrulanmamış. Lütfen email adresinize gönderilen doğrulama linkine tıklayın. ' +
-          'Doğrulama emaili gelmediyse, tekrar gönderebilirsiniz.'
-        );
+        throw new UnauthorizedException({
+          ...i18nMessage("server.auth.emailNotVerifiedLogin"),
+          errorCode: "EMAIL_NOT_VERIFIED",
+        });
       }
+
+      const twoFactorChallenge = await this.verifyLoginSecondFactor(
+        user.id,
+        user.twoFactorSecret?.isEnabled === true,
+        dto.twoFactorCode,
+      );
+      if (twoFactorChallenge) return twoFactorChallenge;
 
       // Update lastLoginAt immediately so it's persisted before any other async work
       const now = new Date();
@@ -519,11 +631,17 @@ export class AuthService {
           data: { lastLoginAt: now, lastActivityAt: now },
         });
       } catch (err) {
-        this.logger.warn(`Failed to update lastLoginAt for user ${user.id}: ${err}`);
+        this.logger.warn(
+          `Failed to update lastLoginAt for user ${user.id}: ${err}`,
+        );
       }
 
       // Generate tokens
-      const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
+      const tokens = await this.generateTokens(
+        user.id,
+        user.email,
+        user.isSeller,
+      );
 
       // Cache invalidation: Clear any guest session cache and set up user cache
       await this.invalidateGuestCacheOnLogin(user.id);
@@ -546,7 +664,9 @@ export class AuthService {
             };
           }
         } catch (membershipError) {
-          this.logger.warn('Error formatting membership data for login response');
+          this.logger.warn(
+            "Error formatting membership data for login response",
+          );
           // Continue without membership data if there's an error
         }
       }
@@ -570,13 +690,17 @@ export class AuthService {
       };
     } catch (error) {
       // Re-throw known exceptions
-      if (error instanceof UnauthorizedException) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ServiceUnavailableException
+      ) {
         throw error;
       }
-      this.logger.error('Login failed');
-      throw new BadRequestException(
-        `Giriş işlemi sırasında bir hata oluştu: ${error instanceof Error ? error.message : String(error)}`
+      this.logger.error(
+        "Login failed",
+        error instanceof Error ? error.stack : String(error),
       );
+      throw new BadRequestException(i18nMessage("server.auth.loginFailed"));
     }
   }
 
@@ -584,7 +708,10 @@ export class AuthService {
    * Admin login (separate authentication)
    * POST /auth/admin/login
    */
-  async adminLogin(dto: LoginDto) {
+  async adminLogin(
+    dto: LoginDto,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
+  ) {
     // Find user by email – select only columns that exist in DB (avoids schema/DB drift)
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -595,32 +722,62 @@ export class AuthService {
         displayName: true,
         isVerified: true,
         isSeller: true,
+        isBanned: true,
+        deletedAt: true,
         createdAt: true,
         adminUser: true,
+        twoFactorSecret: {
+          select: { isEnabled: true },
+        },
       },
     });
 
     if (!user || !user.adminUser) {
-      this.logger.warn('Admin login failed: user not found or no admin user');
-      throw new UnauthorizedException('Email veya şifre hatalı');
+      this.logger.warn("Admin login failed: user not found or no admin user");
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidCredentials"),
+      );
+    }
+
+    const isPasswordValid =
+      !!user.passwordHash &&
+      (await bcrypt.compare(dto.password, user.passwordHash));
+    if (!isPasswordValid) {
+      this.logger.warn("Admin login failed: invalid password");
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidCredentials"),
+      );
+    }
+
+    if (user.deletedAt || user.isBanned) {
+      this.logger.warn("Admin login failed: user account inactive");
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.adminAccountNotFoundOrInactive"),
+      );
     }
 
     if (!user.adminUser.isActive) {
-      this.logger.warn('Admin login failed: admin account inactive');
-      throw new UnauthorizedException('Admin hesabı deaktif edilmiş');
+      this.logger.warn("Admin login failed: admin account inactive");
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.adminAccountDeactivated"),
+      );
     }
 
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!isPasswordValid) {
-      this.logger.warn('Admin login failed: invalid password');
-      throw new UnauthorizedException('Email veya şifre hatalı');
-    }
+    const twoFactorChallenge = await this.verifyLoginSecondFactor(
+      user.id,
+      user.twoFactorSecret?.isEnabled === true,
+      dto.twoFactorCode,
+    );
+    if (twoFactorChallenge) return twoFactorChallenge;
 
     // Generate admin tokens (using separate secret)
     const tokens = await this.generateAdminTokens(
       user.id,
       user.email,
       user.adminUser.role,
+      user.adminUser.id,
+      undefined,
+      sessionContext,
     );
 
     await Promise.all([
@@ -634,7 +791,7 @@ export class AuthService {
       }),
     ]);
 
-    this.logger.log('Admin login success');
+    this.logger.log("Admin login success");
 
     return {
       user: {
@@ -661,7 +818,7 @@ export class AuthService {
   async refreshTokens(
     userId: string,
     refreshToken: string,
-    opts?: { isAdmin?: boolean },
+    opts?: { isAdmin?: boolean; adminSessionToken?: string },
   ): Promise<TokensDto> {
     // Find user (admin için adminUser ilişkisiyle güncel rol/aktiflik)
     const user = await this.prisma.user.findUnique({
@@ -670,7 +827,12 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Kullanıcı bulunamadı');
+      throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
+    }
+    if (user.deletedAt || user.isBanned) {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.accountSuspended"),
+      );
     }
 
     // Sunulan refresh token'ı persist edilmiş duruma karşı doğrula + rotasyon için
@@ -681,9 +843,17 @@ export class AuthService {
     // Admin refresh: hesabın hâlâ aktif admin olduğunu doğrula, admin token üret.
     if (opts?.isAdmin) {
       if (!user.adminUser?.isActive) {
-        throw new UnauthorizedException('Admin hesabı bulunamadı veya deaktif');
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.adminAccountNotFoundOrInactive"),
+        );
       }
-      return this.generateAdminTokens(user.id, user.email, user.adminUser.role);
+      return this.generateAdminTokens(
+        user.id,
+        user.email,
+        user.adminUser.role,
+        user.adminUser.id,
+        opts.adminSessionToken,
+      );
     }
 
     // Generate new tokens (token rotation)
@@ -693,15 +863,37 @@ export class AuthService {
   /**
    * Logout (client-side token removal)
    * POST /auth/logout
-   * 
+   *
    * Note: With JWT, logout is typically handled client-side by removing the token.
    * For enhanced security, we could implement a token blacklist using Redis.
    */
-  async logout(refreshToken?: string): Promise<{ message: string }> {
+  async logout(
+    refreshToken?: string,
+    opts?: { admin?: boolean },
+  ): Promise<void> {
     // Refresh token'ı DB'de iptal et → çalınan/logout sonrası token bir daha
     // /auth/refresh'te kullanılamaz. (Eskiden no-op'tu; token, JWT süresi dolana
     // dek — varsayılan 7 gün — geçerli kalıyordu.)
     if (refreshToken) {
+      if (opts?.admin) {
+        try {
+          const payload = await this.jwtService.verifyAsync<JwtPayload>(
+            refreshToken,
+            {
+              secret:
+                this.configService.getOrThrow<string>("JWT_REFRESH_SECRET"),
+              ignoreExpiration: true,
+            },
+          );
+          if (payload.isAdmin && payload.sessionToken) {
+            await this.securityService.terminateAdminSessionByToken(
+              payload.sessionToken,
+            );
+          }
+        } catch {
+          // Cookie yine temizlenir; doğrulanamayan token DB oturumunu silemez.
+        }
+      }
       await this.prisma.refreshToken
         .updateMany({
           where: { tokenHash: this.hashToken(refreshToken) },
@@ -711,7 +903,8 @@ export class AuthService {
           /* iptal best-effort; cookie zaten temizleniyor */
         });
     }
-    return { message: 'Çıkış yapıldı' };
+    // #224: "Çıkış yapıldı" mesajı artık AuthController/AdminAuthController'da
+    // locale'e göre kuruluyor (server.auth.loggedOut).
   }
 
   /**
@@ -734,7 +927,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException('Kullanıcı bulunamadı');
+      throw new BadRequestException(i18nMessage("server.auth.userNotFound"));
     }
 
     return {
@@ -749,6 +942,8 @@ export class AuthService {
       isAdmin: !!user.adminUser?.isActive,
       role: user.adminUser?.role,
       createdAt: user.createdAt,
+      preferredLanguage: user.preferredLanguage,
+      homeTourVersion: user.homeTourVersion,
     };
   }
 
@@ -760,48 +955,60 @@ export class AuthService {
     email: string,
     isSeller: boolean,
   ): Promise<TokensDto> {
-    const jwtSecret = this.configService.get<string>('JWT_SECRET');
-    const jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+    const jwtSecret = this.configService.get<string>("JWT_SECRET");
+    const jwtRefreshSecret =
+      this.configService.get<string>("JWT_REFRESH_SECRET");
 
     if (!jwtSecret) {
-      throw new Error('JWT_SECRET is not configured in environment variables');
+      throw new Error("JWT_SECRET is not configured in environment variables");
     }
 
     if (!jwtRefreshSecret) {
-      throw new Error('JWT_REFRESH_SECRET is not configured in environment variables');
+      throw new Error(
+        "JWT_REFRESH_SECRET is not configured in environment variables",
+      );
     }
 
     const accessPayload: JwtPayload = {
       sub: userId,
       email,
       isSeller,
-      type: 'access',
+      type: "access",
     };
 
     const refreshPayload: JwtPayload = {
       sub: userId,
       email,
       isSeller,
-      type: 'refresh',
+      type: "refresh",
+      // Aynı saniyedeki rotasyonda iat çakışsa bile token tekil kalsın (rotasyon/geçersizleştirme
+      // tokenHash üzerinden çalışır; iki özdeş token hash'i çakışıp rotasyonu bozardı).
+      jti: crypto.randomUUID(),
     };
 
     try {
       const [accessToken, refreshToken] = await Promise.all([
         this.jwtService.signAsync(accessPayload, {
           secret: jwtSecret,
-          expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '15m',
+          expiresIn: this.configService.get<string>("JWT_EXPIRES_IN") || "15m",
         }),
         this.jwtService.signAsync(refreshPayload, {
           secret: jwtRefreshSecret,
-          expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d',
+          expiresIn:
+            this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "7d",
         }),
       ]);
 
       await this.persistRefreshToken(userId, refreshToken);
       return { accessToken, refreshToken };
     } catch (error) {
-      this.logger.error('Token generation failed');
-      throw new Error(`Failed to generate tokens: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error("Token generation failed");
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+      throw new Error(
+        `Failed to generate tokens: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -812,14 +1019,25 @@ export class AuthService {
     userId: string,
     email: string,
     role: string,
+    adminUserId: string,
+    existingSessionToken?: string,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
   ): Promise<TokensDto> {
+    const sessionToken =
+      existingSessionToken ||
+      (await this.securityService.createAdminSession(
+        adminUserId,
+        sessionContext?.ipAddress,
+        sessionContext?.userAgent,
+      ));
     const accessPayload: JwtPayload = {
       sub: userId,
       email,
       isSeller: false,
       isAdmin: true,
       role,
-      type: 'access',
+      sessionToken,
+      type: "access",
     };
 
     const refreshPayload: JwtPayload = {
@@ -828,19 +1046,24 @@ export class AuthService {
       isSeller: false,
       isAdmin: true,
       role,
-      type: 'refresh',
+      sessionToken,
+      type: "refresh",
+      // Aynı saniyedeki rotasyonda bile tekil token (bkz. generateTokens).
+      jti: crypto.randomUUID(),
     };
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(accessPayload, {
-        secret: this.configService.get<string>('ADMIN_JWT_SECRET') || this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('ADMIN_JWT_EXPIRES_IN') || '15m',
+        secret: this.configService.getOrThrow<string>("ADMIN_JWT_SECRET"),
+        expiresIn:
+          this.configService.get<string>("ADMIN_JWT_EXPIRES_IN") || "15m",
       }),
 
       this.jwtService.signAsync(refreshPayload, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: this.configService.get<string>("JWT_REFRESH_SECRET"),
         expiresIn:
-          this.configService.get<string>('ADMIN_JWT_REFRESH_EXPIRES_IN') || '7d',
+          this.configService.get<string>("ADMIN_JWT_REFRESH_EXPIRES_IN") ||
+          "7d",
       }),
     ]);
 
@@ -857,15 +1080,19 @@ export class AuthService {
 
   /** Refresh token'ın deterministik SHA-256 özeti (tabloda @unique tokenHash). */
   private hashToken(token: string): string {
-    return crypto.createHash('sha256').update(token).digest('hex');
+    return crypto.createHash("sha256").update(token).digest("hex");
   }
 
-  /** Üretilen refresh token'ı hash'leyip DB'ye yazar. Tracking tablosu auth akışını
-   *  bloke etmemeli → hata yutulur (token yine de geçerli; en kötü ihtimalle bir
-   *  sonraki refresh'te "legacy" muamelesi görür). */
-  private async persistRefreshToken(userId: string, refreshToken: string): Promise<void> {
+  /** Üretilen refresh token'ı hash'leyip DB'ye yazar. Persist edilemeyen token
+   *  iptal/rotasyon garantisinin dışında kalacağı için istemciye dağıtılmaz. */
+  private async persistRefreshToken(
+    userId: string,
+    refreshToken: string,
+  ): Promise<void> {
     try {
-      const decoded = this.jwtService.decode(refreshToken) as { exp?: number } | null;
+      const decoded = this.jwtService.decode(refreshToken) as {
+        exp?: number;
+      } | null;
       const expiresAt = decoded?.exp
         ? new Date(decoded.exp * 1000)
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -873,10 +1100,11 @@ export class AuthService {
         data: { userId, tokenHash: this.hashToken(refreshToken), expiresAt },
       });
     } catch (error) {
-      // Aynı saniyede aynı payload → birebir aynı JWT → tokenHash unique ihlali
-      // olabilir; ya da geçici DB hatası. Auth'u düşürmeyelim, sadece logla.
-      this.logger.warn(
+      this.logger.error(
         `Refresh token persist edilemedi: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new ServiceUnavailableException(
+        "Oturum güvenli şekilde oluşturulamadı",
       );
     }
   }
@@ -886,43 +1114,75 @@ export class AuthService {
    *  reddeder. Kaydı olmayan "legacy" token (persistans öncesi üretilmiş) tek seferlik
    *  kabul edilir; tekrar kullanımı engellensin diye anında revoked işaretlenir
    *  (adopt-and-retire). Geçersizse UnauthorizedException fırlatır. */
-  private async assertAndRotateRefreshToken(userId: string, refreshToken: string): Promise<void> {
+  private async assertAndRotateRefreshToken(
+    userId: string,
+    refreshToken: string,
+  ): Promise<void> {
     if (!refreshToken) {
-      throw new UnauthorizedException('Geçersiz refresh token');
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidRefreshToken"),
+      );
     }
     const tokenHash = this.hashToken(refreshToken);
-    const existing = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+    const existing = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+    });
 
     if (existing) {
       if (existing.revokedAt) {
-        throw new UnauthorizedException('Refresh token iptal edilmiş');
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.refreshTokenRevoked"),
+        );
       }
       if (existing.expiresAt < new Date()) {
-        throw new UnauthorizedException('Refresh token süresi dolmuş');
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.refreshTokenExpired"),
+        );
       }
       if (existing.userId !== userId) {
-        throw new UnauthorizedException('Geçersiz refresh token');
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidRefreshToken"),
+        );
       }
-      // Geçerli → rotasyon: eskiyi iptal et (tekrar kullanılırsa yukarıda reddedilir).
-      await this.prisma.refreshToken.update({
-        where: { tokenHash },
+      // Atomik tüketim: iki eşzamanlı refresh isteğinden yalnız biri revokedAt:null
+      // koşulunu sağlayabilir.
+      const revoked = await this.prisma.refreshToken.updateMany({
+        where: {
+          tokenHash,
+          userId,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
         data: { revokedAt: new Date() },
       });
+      if (revoked.count !== 1) {
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.refreshTokenRevoked"),
+        );
+      }
       return;
     }
 
     // Kaydı yok → persistans öncesi üretilmiş legacy token (deploy geçiş penceresi).
     // Mevcut tüm oturumları topluca düşürmemek için tek seferlik kabul et; ama hemen
     // "revoked" satır oluştur ki aynı legacy token ikinci kez kullanılamasın.
-    const decoded = this.jwtService.decode(refreshToken) as { exp?: number } | null;
+    const decoded = this.jwtService.decode(refreshToken) as {
+      exp?: number;
+    } | null;
     const expiresAt = decoded?.exp
       ? new Date(decoded.exp * 1000)
       : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await this.prisma.refreshToken
-      .create({ data: { userId, tokenHash, expiresAt, revokedAt: new Date() } })
-      .catch(() => {
-        /* yarış/duplicate → yok say; rotasyon yine de bir kez ilerler */
+    try {
+      await this.prisma.refreshToken.create({
+        data: { userId, tokenHash, expiresAt, revokedAt: new Date() },
       });
+    } catch {
+      // Aynı legacy tokenı eşzamanlı kullanan ikinci istek unique constraint'te
+      // kaybeder ve token üretemez.
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.refreshTokenRevoked"),
+      );
+    }
   }
 
   /**
@@ -956,19 +1216,27 @@ export class AuthService {
    * Request password reset
    * POST /auth/forgot-password
    */
-  async requestPasswordReset(email: string): Promise<{ message: string }> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
+  async requestPasswordReset(email: string): Promise<void> {
+    // Silinmiş (anonimleştirilmiş) ya da banlı hesaba reset linki gönderme:
+    // findUnique yerine deletedAt:null + banlı filtresi. Yanıt her durumda aynı
+    // (enumeration'a karşı) — sadece link üretimini/gönderimini atlarız.
+    const user = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null, isBanned: false },
     });
 
     // Don't reveal if user exists for security
+    // #224: yanıt mesajı AuthController.forgotPassword() tarafından locale'e göre
+    // kuruluyor (server.auth.passwordResetLinkSent) — kullanıcı bulunsun bulunmasın aynı.
     if (!user) {
-      return { message: 'Eğer bu email kayıtlıysa, şifre sıfırlama linki gönderildi' };
+      return;
     }
 
     // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
     const expiresAt = new Date(Date.now() + 3600000); // 1 hour
 
     // Delete existing tokens for this user
@@ -987,17 +1255,15 @@ export class AuthService {
 
     // Send email with reset link using NotificationService
     await this.notificationService.sendPasswordResetEmail(user.id, resetToken);
-
-    return { message: 'Eğer bu email kayıtlıysa, şifre sıfırlama linki gönderildi' };
   }
 
   /**
    * Reset password with token
    * POST /auth/reset-password
    */
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(token: string, newPassword: string): Promise<void> {
     // Hash the token to compare
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
     // Find token
     const resetToken = await this.prisma.passwordResetToken.findUnique({
@@ -1006,15 +1272,28 @@ export class AuthService {
     });
 
     if (!resetToken) {
-      throw new BadRequestException('Geçersiz veya süresi dolmuş token');
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
+      );
     }
 
     if (resetToken.usedAt) {
-      throw new BadRequestException('Bu token daha önce kullanılmış');
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenAlreadyUsed"),
+      );
     }
 
     if (resetToken.expiresAt < new Date()) {
-      throw new BadRequestException('Token süresi dolmuş');
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenExpired"),
+      );
+    }
+
+    // Silinmiş/banlı hesap için token geçerli olsa bile parola set etme.
+    if (resetToken.user.deletedAt || resetToken.user.isBanned) {
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
+      );
     }
 
     // Hash new password
@@ -1032,30 +1311,59 @@ export class AuthService {
       data: { usedAt: new Date() },
     });
 
-    return { message: 'Şifre başarıyla sıfırlandı' };
+    // Parola değişti → mevcut tüm refresh token'ları (session'ları) iptal et.
+    // Bir hesap kurtarma/ele geçirme savunmasının parçasıysa, eski oturumlar
+    // (ör. saldırgan) anında düşer; kullanıcı yeniden giriş yapar.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: resetToken.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    // #224: başarı mesajı AuthController.resetPassword() tarafından locale'e göre
+    // kuruluyor (server.auth.passwordResetSuccess).
   }
 
   /**
    * Verilen userId için AuthResponseDto üretir (login response ile aynı şekil).
    */
-  private async buildUserAuthResponse(userId: string): Promise<AuthResponseDto> {
+  private async buildUserAuthResponse(
+    userId: string,
+  ): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { membership: { include: { tier: true } } },
+      include: {
+        membership: { include: { tier: true } },
+        twoFactorSecret: { select: { isEnabled: true } },
+      },
     });
     if (!user) {
-      throw new UnauthorizedException('Kullanıcı bulunamadı');
+      throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
     }
     // Silinmiş/banlı satıra token verme: aksi halde login "başarılı" olur ama
     // ilk korumalı istekte guard reddeder → kafa karıştırıcı "askıya alındı" ekranı.
     if (user.deletedAt) {
-      throw new UnauthorizedException('Hesap silinmiş');
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.accountDeleted"),
+      );
     }
     if (user.isBanned) {
-      throw new UnauthorizedException('Hesabınız askıya alınmış');
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.accountSuspended"),
+      );
+    }
+    if (user.twoFactorSecret?.isEnabled) {
+      throw new UnauthorizedException({
+        message:
+          "İki faktörlü doğrulama etkin hesaplar sağlayıcı girişi yerine şifre ile giriş yapmalıdır",
+        errorCode: "TWO_FACTOR_PASSWORD_REQUIRED",
+      });
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.isSeller,
+    );
 
     let membershipData = undefined;
     if (user.membership && user.membership.tier) {
@@ -1090,16 +1398,75 @@ export class AuthService {
     };
   }
 
+  private async verifyLoginSecondFactor(
+    userId: string,
+    enabled: boolean,
+    code?: string,
+  ): Promise<TwoFactorChallengeDto | null> {
+    if (!enabled) return null;
+    if (!code) return { requires2FA: true };
+
+    const valid = await this.securityService.validateTOTP(userId, code);
+    if (!valid) {
+      await this.logSecurityEvent("failed_login", "high", {
+        userId,
+        reason: "invalid_two_factor_code",
+      });
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidCredentials"),
+      );
+    }
+
+    return null;
+  }
+
+  /**
+   * Identifier-first login: bir e-postanın aktif bir hesaba ait olup olmadığını
+   * ve o hesabın parolası olup olmadığını (OAuth-only mu) döndürür.
+   *   - exists=false            → kayıtlı değil (UI: "kayıt olun")
+   *   - exists, hasPassword     → normal parola girişi (UI: parola iste)
+   *   - exists, !hasPassword    → Google-only hesap (UI: Google / şifre belirle)
+   * Not: identifier-first akışı doğası gereği hesap varlığını ifşa eder
+   * (user enumeration). Uç @Throttle ile sınırlıdır; bilinçli bir tercihtir.
+   */
+  async checkEmail(
+    email: string,
+  ): Promise<{ exists: boolean; hasPassword: boolean }> {
+    const user = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      select: { passwordHash: true },
+    });
+    return { exists: !!user, hasPassword: !!user?.passwordHash };
+  }
+
   /**
    * Google id_token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
    * → yoksa yeni kullanıcı. Mevcut JWT akışını kullanır.
    */
-  async loginWithGoogle(idToken: string): Promise<AuthResponseDto> {
+  async loginWithGoogle(
+    input: string | { idToken?: string; code?: string },
+  ): Promise<AuthResponseDto> {
+    // Geriye uyumlu: mobil/native doğrudan id_token string'i gönderir; web
+    // { code } gönderir (backend Google ile takas eder → id_token).
+    const opts = typeof input === "string" ? { idToken: input } : input;
+    const idToken = opts.code
+      ? await this.googleAuthService.exchangeCodeForIdToken(opts.code)
+      : opts.idToken;
+    if (!idToken) {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.googleSessionInvalid"),
+      );
+    }
     const profile = await this.googleAuthService.verifyIdToken(idToken);
 
     // 1) Mevcut OAuthAccount?
     const existing = await this.prisma.oAuthAccount.findUnique({
-      where: { provider_providerUserId: { provider: 'google', providerUserId: profile.sub } },
+      where: {
+        provider_providerUserId: {
+          provider: "google",
+          providerUserId: profile.sub,
+        },
+      },
     });
     if (existing) {
       return this.buildUserAuthResponse(existing.userId);
@@ -1114,13 +1481,28 @@ export class AuthService {
     });
     if (byEmail) {
       await this.prisma.oAuthAccount.create({
-        data: { provider: 'google', providerUserId: profile.sub, email: profile.email, userId: byEmail.id },
+        data: {
+          provider: "google",
+          providerUserId: profile.sub,
+          email: profile.email,
+          userId: byEmail.id,
+        },
       });
+      // Google e-postayı zaten doğruladı (email_verified === true zorunlu). Hesap
+      // henüz doğrulanmamışsa artık doğrulanmış say — böylece normal parola girişi
+      // de açılır ve Google-login'in bypass ettiği e-posta doğrulama kapısıyla
+      // tutarlı hale gelir.
+      if (!byEmail.isEmailVerified) {
+        await this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { isEmailVerified: true },
+        });
+      }
       return this.buildUserAuthResponse(byEmail.id);
     }
 
     // 3) Yeni kullanıcı
-    const displayName = profile.name?.trim() || profile.email.split('@')[0];
+    const displayName = profile.name?.trim() || profile.email.split("@")[0];
     const created = await this.prisma.user.create({
       data: {
         email: profile.email,
@@ -1132,7 +1514,12 @@ export class AuthService {
       },
     });
     await this.prisma.oAuthAccount.create({
-      data: { provider: 'google', providerUserId: profile.sub, email: profile.email, userId: created.id },
+      data: {
+        provider: "google",
+        providerUserId: profile.sub,
+        email: profile.email,
+        userId: created.id,
+      },
     });
     return this.buildUserAuthResponse(created.id);
   }
@@ -1142,12 +1529,21 @@ export class AuthService {
    * → yoksa yeni kullanıcı. Relay email olduğu gibi kaydedilir; kimlik anahtarı sub.
    * fullName yalnız ilk yetkilendirmede (yeni kullanıcı) gelir.
    */
-  async loginWithApple(identityToken: string, fullName?: string): Promise<AuthResponseDto> {
-    const profile = await this.appleAuthService.verifyIdentityToken(identityToken);
+  async loginWithApple(
+    identityToken: string,
+    fullName?: string,
+  ): Promise<AuthResponseDto> {
+    const profile =
+      await this.appleAuthService.verifyIdentityToken(identityToken);
 
     // 1) Mevcut OAuthAccount?
     const existing = await this.prisma.oAuthAccount.findUnique({
-      where: { provider_providerUserId: { provider: 'apple', providerUserId: profile.sub } },
+      where: {
+        provider_providerUserId: {
+          provider: "apple",
+          providerUserId: profile.sub,
+        },
+      },
     });
     if (existing) {
       return this.buildUserAuthResponse(existing.userId);
@@ -1159,13 +1555,18 @@ export class AuthService {
     });
     if (byEmail) {
       await this.prisma.oAuthAccount.create({
-        data: { provider: 'apple', providerUserId: profile.sub, email: profile.email, userId: byEmail.id },
+        data: {
+          provider: "apple",
+          providerUserId: profile.sub,
+          email: profile.email,
+          userId: byEmail.id,
+        },
       });
       return this.buildUserAuthResponse(byEmail.id);
     }
 
     // 3) Yeni kullanıcı
-    const displayName = fullName?.trim() || profile.email.split('@')[0];
+    const displayName = fullName?.trim() || profile.email.split("@")[0];
     const created = await this.prisma.user.create({
       data: {
         email: profile.email,
@@ -1176,7 +1577,12 @@ export class AuthService {
       },
     });
     await this.prisma.oAuthAccount.create({
-      data: { provider: 'apple', providerUserId: profile.sub, email: profile.email, userId: created.id },
+      data: {
+        provider: "apple",
+        providerUserId: profile.sub,
+        email: profile.email,
+        userId: created.id,
+      },
     });
     return this.buildUserAuthResponse(created.id);
   }
@@ -1186,7 +1592,7 @@ export class AuthService {
    */
   private async logSecurityEvent(
     eventType: string,
-    severity: 'low' | 'medium' | 'high' | 'critical',
+    severity: "low" | "medium" | "high" | "critical",
     details: Record<string, any>,
   ): Promise<void> {
     try {

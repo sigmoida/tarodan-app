@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { pageMetadataFor } from '@/lib/navigation';
 
 /**
@@ -12,9 +13,10 @@ import { pageMetadataFor } from '@/lib/navigation';
  */
 export function RouteMetadata() {
   const pathname = usePathname();
+  const t = useTranslations();
 
   useEffect(() => {
-    const { title, description } = pageMetadataFor(pathname);
+    const { title, description } = pageMetadataFor(pathname, t);
     document.title = title;
 
     let tag = document.head.querySelector<HTMLMetaElement>('meta[name="description"]');
@@ -24,7 +26,7 @@ export function RouteMetadata() {
       document.head.appendChild(tag);
     }
     tag.content = description;
-  }, [pathname]);
+  }, [pathname, t]);
 
   return null;
 }

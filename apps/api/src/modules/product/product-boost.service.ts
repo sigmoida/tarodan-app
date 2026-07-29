@@ -4,14 +4,15 @@ import {
   ForbiddenException,
   NotFoundException,
   Logger,
-} from '@nestjs/common';
-import { Request } from 'express';
-import { PrismaService } from '../../prisma';
-import { ProductStatus, OrderStatus } from '@prisma/client';
-import { isPremiumEntitled } from '../membership/membership.util';
-import { PaymentService } from '../payment/payment.service';
-import { PaymentProvider } from '../payment/dto';
-import { BOOST_DURATIONS, BoostPricingOption } from './dto/boost.dto';
+} from "@nestjs/common";
+import { Request } from "express";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
+import { ProductStatus, OrderStatus } from "@prisma/client";
+import { isPremiumEntitled } from "../membership/membership.util";
+import { PaymentService } from "../payment/payment.service";
+import { PaymentProvider } from "../payment/dto";
+import { BOOST_DURATIONS, BoostPricingOption } from "./dto/boost.dto";
 
 /**
  * Boost (öne çıkarma) satın alma akışı.
@@ -44,10 +45,10 @@ export class ProductBoostService {
   /** Boost özelliği admin tarafından kapatılmış mı? */
   async isBoostEnabled(): Promise<boolean> {
     const setting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'boost_enabled' },
+      where: { settingKey: "boost_enabled" },
     });
     if (!setting) return true; // varsayılan: açık
-    return setting.settingValue !== 'false';
+    return setting.settingValue !== "false";
   }
 
   /** Belirli bir süre için fiyatı döndürür (PlatformSetting → varsayılan). */
@@ -55,13 +56,18 @@ export class ProductBoostService {
     const setting = await this.prisma.platformSetting.findUnique({
       where: { settingKey: this.settingKeyFor(durationDays) },
     });
-    const parsed = setting?.settingValue ? parseFloat(setting.settingValue) : NaN;
+    const parsed = setting?.settingValue
+      ? parseFloat(setting.settingValue)
+      : NaN;
     if (!isNaN(parsed) && parsed >= 0) return parsed;
     return this.DEFAULT_PRICES[durationDays] ?? 0;
   }
 
   /** Tüm boost süreleri + fiyatları (admin'den ayarlanabilir). */
-  async getPricing(): Promise<{ enabled: boolean; options: BoostPricingOption[] }> {
+  async getPricing(): Promise<{
+    enabled: boolean;
+    options: BoostPricingOption[];
+  }> {
     const enabled = await this.isBoostEnabled();
     const options: BoostPricingOption[] = [];
     for (const durationDays of BOOST_DURATIONS) {
@@ -71,9 +77,115 @@ export class ProductBoostService {
     return { enabled, options };
   }
 
+  /** Kampanya fiyatı geçerli mi (opsiyonel tarih penceresi açık)? → efektif fiyat. */
+  private effectiveTierPrice(tier: {
+    price: unknown;
+    campaignPrice: unknown;
+    campaignStartsAt: Date | null;
+    campaignEndsAt: Date | null;
+  }): number {
+    const base = Number(tier.price);
+    if (tier.campaignPrice == null) return base;
+    const now = new Date();
+    if (tier.campaignStartsAt && now < tier.campaignStartsAt) return base;
+    if (tier.campaignEndsAt && now > tier.campaignEndsAt) return base;
+    return Number(tier.campaignPrice);
+  }
+
+  /** Ürün fiyatına göre (paket, süre) için aktif kademeyi çöz → efektif fiyat. */
+  private async resolvePackagePrice(
+    packageId: string,
+    durationDays: number,
+    productPrice: number,
+  ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }> {
+    const pkg = await this.prisma.adPackage.findFirst({
+      where: { id: packageId, isActive: true },
+      select: { id: true, name: true, showcaseOnHome: true },
+    });
+    if (!pkg) {
+      throw new BadRequestException(
+        i18nMessage("server.product.boostPackageNotFound"),
+      );
+    }
+    const tier = await this.prisma.adPackageTier.findFirst({
+      where: {
+        packageId,
+        durationDays,
+        isActive: true,
+        minAmount: { lte: productPrice },
+        OR: [{ maxAmount: null }, { maxAmount: { gte: productPrice } }],
+      },
+    });
+    if (!tier) {
+      throw new BadRequestException(
+        i18nMessage("server.product.boostPriceUndefined"),
+      );
+    }
+    return {
+      price: this.effectiveTierPrice(tier),
+      packageName: pkg.name,
+      showcaseOnHome: pkg.showcaseOnHome,
+    };
+  }
+
+  /**
+   * Bir ürün için satın alınabilir paket seçenekleri: ürünün fiyatına uyan
+   * kademeleri paket + süre bazında döndürür (modal bunu render eder).
+   */
+  async getBoostOptions(productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, price: true },
+    });
+    if (!product) {
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
+    }
+    const productPrice = Number(product.price);
+    const enabled = await this.isBoostEnabled();
+
+    const packages = await this.prisma.adPackage.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+      include: {
+        tiers: {
+          where: {
+            isActive: true,
+            minAmount: { lte: productPrice },
+            OR: [{ maxAmount: null }, { maxAmount: { gte: productPrice } }],
+          },
+          orderBy: { durationDays: "asc" },
+        },
+      },
+    });
+
+    return {
+      enabled,
+      productPrice,
+      packages: packages
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          showcaseOnHome: p.showcaseOnHome,
+          options: p.tiers.map((t) => ({
+            durationDays: t.durationDays,
+            price: this.effectiveTierPrice(t),
+            listPrice: Number(t.price),
+            campaign: this.effectiveTierPrice(t) < Number(t.price),
+            label: `${t.durationDays} gün`,
+          })),
+        }))
+        // paketin bu fiyat için hiç kademesi yoksa listeleme
+        .filter((p) => p.options.length > 0),
+    };
+  }
+
   /**
    * Boost satın almayı başlatır: doğrula → ProductBoost(pending) + sanal ürün + Order →
    * ödeme başlat. Ödeme URL'sini döndürür.
+   *
+   * `packageId` verilirse yeni paket/kademe fiyatlandırması (ürün fiyatına göre);
+   * verilmezse eski düz `boost_price_*` fiyatı (geçiş dönemi geriye-dönük uyumu).
    */
   async initiateBoost(
     userId: string,
@@ -82,47 +194,82 @@ export class ProductBoostService {
     provider: PaymentProvider = PaymentProvider.paytr,
     autoRenew = false,
     req?: Request,
+    packageId?: string,
   ) {
-    if (!BOOST_DURATIONS.includes(durationDays as any)) {
-      throw new BadRequestException('Geçerli bir boost süresi seçiniz (3, 7 veya 30 gün)');
+    if (!packageId && !BOOST_DURATIONS.includes(durationDays as any)) {
+      throw new BadRequestException(
+        i18nMessage("server.product.invalidBoostDuration"),
+      );
     }
 
     if (!(await this.isBoostEnabled())) {
-      throw new BadRequestException('Öne çıkarma şu anda kullanılamıyor');
+      throw new BadRequestException(
+        i18nMessage("server.product.boostUnavailable"),
+      );
     }
 
     // Ürün + sahiplik + durum doğrula
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
-      select: { id: true, sellerId: true, status: true, title: true, categoryId: true },
+      select: {
+        id: true,
+        sellerId: true,
+        status: true,
+        title: true,
+        categoryId: true,
+        price: true,
+      },
     });
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
     if (product.sellerId !== userId) {
-      throw new ForbiddenException('Sadece kendi ilanınızı öne çıkarabilirsiniz');
+      throw new ForbiddenException(i18nMessage("server.product.boostOwnOnly"));
     }
     if (product.status !== ProductStatus.active) {
-      throw new BadRequestException('Sadece aktif (yayında) ilanlar öne çıkarılabilir');
+      throw new BadRequestException(
+        i18nMessage("server.product.boostActiveOnly"),
+      );
     }
 
-    const price = await this.getPriceForDuration(durationDays);
+    // Fiyat + paket bilgisi HER ZAMAN serverda çözülür (istemciye güvenilmez).
+    let price: number;
+    let packageName: string | null = null;
+    let showcaseOnHome = false;
+    if (packageId) {
+      const resolved = await this.resolvePackagePrice(
+        packageId,
+        durationDays,
+        Number(product.price),
+      );
+      price = resolved.price;
+      packageName = resolved.packageName;
+      showcaseOnHome = resolved.showcaseOnHome;
+    } else {
+      price = await this.getPriceForDuration(durationDays);
+    }
     if (price <= 0) {
-      throw new BadRequestException('Bu süre için geçerli bir fiyat tanımlı değil');
+      throw new BadRequestException(
+        i18nMessage("server.product.boostPriceUndefined"),
+      );
     }
 
     // Platform satıcısı + varsayılan kategori (sanal ürün için)
     const platformSeller = await this.prisma.user.findFirst({
-      where: { email: 'platform@tarodan.com', sellerType: 'platform' },
+      where: { email: "platform@tarodan.com", sellerType: "platform" },
     });
     if (!platformSeller) {
-      throw new NotFoundException('Platform seller bulunamadı');
+      throw new NotFoundException(
+        i18nMessage("server.product.platformSellerNotFound"),
+      );
     }
     const defaultCategory = await this.prisma.category.findFirst({
       where: { isActive: true },
     });
     if (!defaultCategory) {
-      throw new NotFoundException('Kategori bulunamadı');
+      throw new NotFoundException(
+        i18nMessage("server.product.categoryNotFound"),
+      );
     }
 
     // Otomatik yenileme yalnızca premium (ücretli, aktif) üyelere
@@ -130,9 +277,20 @@ export class ProductBoostService {
     if (autoRenew) {
       const membership = await this.prisma.userMembership.findUnique({
         where: { userId },
-        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
+        select: {
+          status: true,
+          currentPeriodEnd: true,
+          tier: { select: { type: true, isActive: true } },
+          user: {
+            select: {
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+            },
+          },
+        },
       });
-      effectiveAutoRenew = isPremiumEntitled(membership);
+      effectiveAutoRenew = isPremiumEntitled(membership, membership?.user);
     }
 
     // ProductBoost kaydı (pending)
@@ -140,9 +298,12 @@ export class ProductBoostService {
       data: {
         productId: product.id,
         userId,
+        packageId: packageId ?? null,
+        packageName,
+        showcaseOnHome,
         durationDays,
         price,
-        status: 'pending',
+        status: "pending",
         autoRenew: effectiveAutoRenew,
       },
     });
@@ -155,10 +316,14 @@ export class ProductBoostService {
           id: virtualProductId,
           sellerId: platformSeller.id,
           categoryId: defaultCategory.id,
-          title: `İlan Öne Çıkarma (${durationDays} gün)`,
-          description: `"${product.title}" ilanı için ${durationDays} günlük öne çıkarma`,
+          title: packageName
+            ? `${packageName} — İlan Öne Çıkarma (${durationDays} gün)`
+            : `İlan Öne Çıkarma (${durationDays} gün)`,
+          description: `"${product.title}" ilanı için ${
+            packageName ? `${packageName} ` : ""
+          }${durationDays} günlük öne çıkarma`,
           price,
-          condition: 'new',
+          condition: "new",
           status: ProductStatus.active,
         },
       });
@@ -179,7 +344,7 @@ export class ProductBoostService {
           shippingCost: 0,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          shippingAddress: { type: 'boost', boostId: boost.id } as any,
+          shippingAddress: { type: "boost", boostId: boost.id } as any,
         },
       });
 
@@ -195,7 +360,7 @@ export class ProductBoostService {
         req,
       );
 
-      // Ödeme niyeti (intent): kart bilgisi /payments/process-direct ile alınır (iframe yok).
+      // Ödeme niyeti (intent): kart bilgisi /payments/direct-form ile alınır (iframe yok).
       return {
         boostId: boost.id,
         productId: product.id,
@@ -204,12 +369,13 @@ export class ProductBoostService {
         paymentId: paymentResult.paymentId,
         provider: paymentResult.provider,
         expiresIn: paymentResult.expiresIn || 300,
-        useBypass: (paymentResult as { useBypass?: boolean }).useBypass === true,
+        useBypass:
+          (paymentResult as { useBypass?: boolean }).useBypass === true,
       };
     } catch (error) {
       // Ödeme başlatılamazsa pending boost'u temizle
       await this.prisma.productBoost
-        .update({ where: { id: boost.id }, data: { status: 'failed' } })
+        .update({ where: { id: boost.id }, data: { status: "failed" } })
         .catch(() => {});
       throw error;
     }
@@ -219,14 +385,14 @@ export class ProductBoostService {
   async getMyBoosts(userId: string) {
     const boosts = await this.prisma.productBoost.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         product: {
           select: {
             id: true,
             title: true,
             status: true,
-            images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+            images: { orderBy: { sortOrder: "asc" }, take: 1 },
           },
         },
       },
@@ -250,9 +416,9 @@ export class ProductBoostService {
       autoRenew: b.autoRenew,
       startsAt: b.startsAt?.toISOString() ?? null,
       endsAt: b.endsAt?.toISOString() ?? null,
-      isActive: b.status === 'active' && b.endsAt != null && b.endsAt > now,
+      isActive: b.status === "active" && b.endsAt != null && b.endsAt > now,
       remainingMs:
-        b.status === 'active' && b.endsAt != null && b.endsAt > now
+        b.status === "active" && b.endsAt != null && b.endsAt > now
           ? b.endsAt.getTime() - now.getTime()
           : 0,
       createdAt: b.createdAt.toISOString(),

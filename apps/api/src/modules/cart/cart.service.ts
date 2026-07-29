@@ -2,12 +2,13 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { DiscountService } from '../discount/discount.service';
-import { StorageService } from '../storage/storage.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { DiscountService } from "../discount/discount.service";
+import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import {
   AddToCartDto,
   UpdateCartItemDto,
@@ -16,22 +17,21 @@ import {
   CartCalculationResponseDto,
   CartItemResponseDto,
   AppliedDiscountDto,
-} from './dto';
-import { ProductStatus, DiscountScope, Prisma } from '@prisma/client';
+} from "./dto";
+import { ProductStatus, DiscountScope, Prisma } from "@prisma/client";
 import {
   getAvailableQuantity,
   canAddRequestedQuantityToCart,
-} from '../product/helpers/product-availability.helper';
+} from "../product/helpers/product-availability.helper";
+import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import {
+  calculatePackageDesi,
+  outboundPackageShipping,
+  ShippingDesiRateNotFoundError,
+} from "../shipping/shipping-tariff.helper";
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
-
-// Shipping configuration
-const FREE_SHIPPING_THRESHOLD = 500;
-const BASE_SHIPPING_COST = 29.99;
-
-// Max discount percentage
-const MAX_DISCOUNT_PERCENT = 0.5; // 50%
 
 @Injectable()
 export class CartService {
@@ -40,9 +40,10 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly discountService: DiscountService,
+    private readonly shippingTariffs: ShippingTariffService,
     @Optional()
     private readonly storageService: StorageService,
-  ) { }
+  ) {}
 
   /**
    * Get or create a cart for user
@@ -55,7 +56,7 @@ export class CartService {
           include: {
             product: {
               include: {
-                images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                images: { take: 1, orderBy: { sortOrder: "asc" } },
                 seller: { select: { id: true, displayName: true } },
               },
             },
@@ -76,7 +77,7 @@ export class CartService {
             include: {
               product: {
                 include: {
-                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                  images: { take: 1, orderBy: { sortOrder: "asc" } },
                   seller: { select: { id: true, displayName: true } },
                 },
               },
@@ -98,7 +99,7 @@ export class CartService {
             include: {
               product: {
                 include: {
-                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                  images: { take: 1, orderBy: { sortOrder: "asc" } },
                   seller: { select: { id: true, displayName: true } },
                 },
               },
@@ -121,31 +122,29 @@ export class CartService {
     const product = await this.prisma.product.findUnique({
       where: { id: dto.productId },
       include: {
-        images: { take: 1, orderBy: { sortOrder: 'asc' } },
+        images: { take: 1, orderBy: { sortOrder: "asc" } },
         seller: { select: { id: true, displayName: true } },
       },
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException("Ürün bulunamadı");
     }
 
     if (product.status !== ProductStatus.active) {
-      throw new BadRequestException('Bu ürün şu an satışa uygun değil');
+      throw new BadRequestException("Bu ürün şu an satışa uygun değil");
     }
 
     // Check if user is trying to buy their own product
     if (product.sellerId === userId) {
-      throw new BadRequestException('Kendi ürününüzü satın alamazsınız');
+      throw new BadRequestException("Kendi ürününüzü satın alamazsınız");
     }
 
     // Sepet: fiziksel stok üst sınırı kontrolü
-    if (
-      !canAddRequestedQuantityToCart(product, dto.quantity || 1)
-    ) {
+    if (!canAddRequestedQuantityToCart(product, dto.quantity || 1)) {
       throw new BadRequestException(
         product.quantity === 0
-          ? 'Ürün stokta yok'
+          ? "Ürün stokta yok"
           : `Bu üründen en fazla ${product.quantity} adet sipariş verilebilir`,
       );
     }
@@ -184,7 +183,10 @@ export class CartService {
       }
     } else {
       // Check max quantity per order
-      if (product.maxQuantityPerOrder && (dto.quantity || 1) > product.maxQuantityPerOrder) {
+      if (
+        product.maxQuantityPerOrder &&
+        (dto.quantity || 1) > product.maxQuantityPerOrder
+      ) {
         throw new BadRequestException(
           `Bu üründen maksimum ${product.maxQuantityPerOrder} adet alabilirsiniz`,
         );
@@ -227,7 +229,7 @@ export class CartService {
     });
 
     if (!item) {
-      throw new NotFoundException('Ürün sepette bulunamadı');
+      throw new NotFoundException("Ürün sepette bulunamadı");
     }
 
     if (dto.quantity === 0) {
@@ -235,7 +237,10 @@ export class CartService {
       await this.prisma.cartItem.delete({ where: { id: item.id } });
     } else {
       // Check stock
-      if (item.product.quantity !== null && dto.quantity > item.product.quantity) {
+      if (
+        item.product.quantity !== null &&
+        dto.quantity > item.product.quantity
+      ) {
         throw new BadRequestException(
           `Stokta sadece ${item.product.quantity} adet var`,
         );
@@ -265,7 +270,10 @@ export class CartService {
   /**
    * Remove item from cart
    */
-  async removeItem(userId: string, productId: string): Promise<CartResponseDto> {
+  async removeItem(
+    userId: string,
+    productId: string,
+  ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
     const item = await this.prisma.cartItem.findUnique({
@@ -278,7 +286,7 @@ export class CartService {
     });
 
     if (!item) {
-      throw new NotFoundException('Ürün sepette bulunamadı');
+      throw new NotFoundException("Ürün sepette bulunamadı");
     }
 
     await this.prisma.cartItem.delete({ where: { id: item.id } });
@@ -289,7 +297,10 @@ export class CartService {
   /**
    * Apply coupon code to cart
    */
-  async applyCoupon(userId: string, dto: ApplyCouponDto): Promise<CartResponseDto> {
+  async applyCoupon(
+    userId: string,
+    dto: ApplyCouponDto,
+  ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
     // Get cart items for validation
@@ -305,7 +316,7 @@ export class CartService {
     });
 
     if (!cartWithItems?.items.length) {
-      throw new BadRequestException('Sepetiniz boş');
+      throw new BadRequestException("Sepetiniz boş");
     }
 
     // Validate coupon
@@ -369,7 +380,9 @@ export class CartService {
   /**
    * Get cart with full calculations (used by checkout)
    */
-  async getCartWithCalculations(userId: string): Promise<CartCalculationResponseDto> {
+  async getCartWithCalculations(
+    userId: string,
+  ): Promise<CartCalculationResponseDto> {
     const cart = await this.getOrCreate(userId);
     return cart.calculation;
   }
@@ -454,10 +467,9 @@ export class CartService {
       const hasDiscount = effectivePrice < originalPrice;
 
       const lineTotal = effectivePrice * item.quantity;
-      const productDiscount = hasDiscount ? (originalPrice - effectivePrice) * item.quantity : 0;
-
-      subtotal += lineTotal;
-      productDiscountTotal += productDiscount;
+      const productDiscount = hasDiscount
+        ? (originalPrice - effectivePrice) * item.quantity
+        : 0;
 
       const available = getAvailableQuantity(product);
       let isAvailable = product.status === ProductStatus.active;
@@ -466,20 +478,25 @@ export class CartService {
       if (available !== null) {
         if (available === 0) {
           isAvailable = false;
-          stockWarning = 'Stokta yok';
+          stockWarning = "Stokta yok";
         } else if (available < item.quantity) {
           stockWarning = `Stokta sadece ${available} adet var`;
         } else if (available <= 5) {
-          stockWarning = 'Son birkaç ürün!';
+          stockWarning = "Son birkaç ürün!";
         }
       }
 
       if (!isAvailable) {
         warnings.push(`"${product.title}" artık satışta değil`);
+      } else {
+        subtotal += lineTotal;
+        productDiscountTotal += productDiscount;
       }
 
       // Resolve product image URL (S3 key -> presigned URL)
-      const resolvedImage = this.resolveProductImageUrl(product.images?.[0]?.cardKey);
+      const resolvedImage = this.resolveProductImageUrl(
+        product.images?.[0]?.cardKey,
+      );
 
       // Bu satırda sipariş edilebilecek üst sınır = fiziksel stok ∧ sipariş-başına-maks.
       // updateItem/addItem backend doğrulamasıyla BİREBİR aynı sınır (product.quantity +
@@ -498,7 +515,7 @@ export class CartService {
         productTitle: product.title,
         productImage: resolvedImage,
         sellerId: product.sellerId,
-        sellerName: product.seller?.displayName || 'Satıcı',
+        sellerName: product.seller?.displayName || "Satıcı",
         quantity: item.quantity,
         originalPrice,
         salePrice: hasDiscount ? effectivePrice : undefined,
@@ -508,8 +525,11 @@ export class CartService {
         isAvailable,
         stockWarning,
         maxQuantity,
+        shippingDesi: product.shippingDesi,
       });
     }
+
+    const availableItems = items.filter((item) => item.isAvailable);
 
     // Apply coupon discount
     let couponDiscountTotal = 0;
@@ -517,7 +537,7 @@ export class CartService {
     if (cart.couponCode) {
       const couponResult = await this.applyCouponDiscount(
         cart.couponCode,
-        items,
+        availableItems,
         userId,
       );
       couponDiscountTotal = couponResult.discountAmount;
@@ -538,32 +558,96 @@ export class CartService {
     // The subtotal already uses discounted prices (effectivePrice), so we only subtract:
     // - couponDiscountTotal: additional coupon discount on top of current prices
     // - campaignDiscountTotal: (currently 0, campaigns reflected in effectivePrice)
-    let totalDiscount = couponDiscountTotal + campaignDiscountTotal;
+    const totalDiscount = couponDiscountTotal + campaignDiscountTotal;
+    // İndirim tavanı YOK: checkout (tahsil edilen) hiçbir tavan uygulamıyor, bu
+    // yüzden sepet önizlemesi de uygulamaz → önizleme = tahsilat. Toplam yalnızca
+    // grandTotal'da 0'a taban yapılır (Math.max(0, ...)).
 
-    // Apply max discount cap (50% of original subtotal)
-    const originalSubtotal = items.reduce(
-      (sum, i) => sum + i.originalPrice * i.quantity,
+    // Checkout ile aynı paket kuralı: aynı satıcının ürünleri tek paket, paket desisi
+    // ürün desisi × adet toplamıdır. Böylece sepet özeti ile sipariş oluşturma aynı
+    // aktif tarifeyi ve aynı satıcı-paketi sınırını kullanır.
+    const hasAvailableItems = availableItems.length > 0;
+    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
+    const sellerPackages = new Map<
+      string,
+      {
+        subtotal: number;
+        lines: Array<{ shippingDesi: number; quantity: number }>;
+      }
+    >();
+    for (const item of availableItems) {
+      const current = sellerPackages.get(item.sellerId) ?? {
+        subtotal: 0,
+        lines: [],
+      };
+      current.subtotal += item.lineTotal;
+      current.lines.push({
+        shippingDesi: item.shippingDesi,
+        quantity: item.quantity,
+      });
+      sellerPackages.set(item.sellerId, current);
+    }
+    const affectedProductIds = new Set(
+      appliedDiscounts.flatMap((discount) => discount.affectedProductIds ?? []),
+    );
+    const eligibleLines = availableItems.filter((item) =>
+      affectedProductIds.has(item.productId),
+    );
+    const eligibleTotal = eligibleLines.reduce(
+      (sum, item) => sum + item.lineTotal,
       0,
     );
-    const maxDiscount = originalSubtotal * MAX_DISCOUNT_PERCENT;
-    if (totalDiscount > maxDiscount) {
-      totalDiscount = maxDiscount;
-      warnings.push('Maksimum indirim limitine ulaşıldı (%50)');
-    }
+    let allocatedCoupon = 0;
+    eligibleLines.forEach((item, index) => {
+      const packageEntry = sellerPackages.get(item.sellerId);
+      if (!packageEntry || eligibleTotal <= 0) return;
+      const lineCoupon =
+        index === eligibleLines.length - 1
+          ? Math.round((couponDiscountTotal - allocatedCoupon) * 100) / 100
+          : Math.round(
+              ((couponDiscountTotal * item.lineTotal) / eligibleTotal) * 100,
+            ) / 100;
+      allocatedCoupon += lineCoupon;
+      packageEntry.subtotal = Math.max(0, packageEntry.subtotal - lineCoupon);
+    });
 
-    // Calculate shipping
-    const shippingCost = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : BASE_SHIPPING_COST;
-    const amountToFreeShipping =
-      subtotal >= FREE_SHIPPING_THRESHOLD
-        ? 0
-        : FREE_SHIPPING_THRESHOLD - subtotal;
+    let shippingCost = 0;
+    let amountToFreeShipping = 0;
+    try {
+      for (const sellerPackage of sellerPackages.values()) {
+        const packageShipping = outboundPackageShipping(
+          tariff,
+          sellerPackage.subtotal,
+          calculatePackageDesi(sellerPackage.lines),
+        ).toNumber();
+        shippingCost += packageShipping;
+        if (packageShipping > 0 && tariff.freeShippingEnabled) {
+          amountToFreeShipping += Math.max(
+            0,
+            Number(tariff.freeShippingThreshold) - sellerPackage.subtotal,
+          );
+        }
+      }
+    } catch (error) {
+      if (error instanceof ShippingDesiRateNotFoundError) {
+        throw new ServiceUnavailableException({
+          code: "SHIPPING_DESI_RATE_NOT_CONFIGURED",
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+    if (!hasAvailableItems) {
+      shippingCost = 0;
+      amountToFreeShipping = 0;
+    }
 
     // Grand total
     const grandTotal = subtotal - totalDiscount + shippingCost;
 
     return {
       items,
-      itemCount: items.reduce((sum, i) => sum + i.quantity, 0),
+      itemCount: availableItems.reduce((sum, i) => sum + i.quantity, 0),
       subtotal,
       productDiscountTotal,
       couponDiscountTotal,
@@ -601,18 +685,34 @@ export class CartService {
       });
 
       if (!discount || !discount.isActive) {
-        return { discountAmount: 0, warning: 'Kupon artık geçerli değil' };
+        return { discountAmount: 0, warning: "Kupon artık geçerli değil" };
       }
 
       const now = new Date();
       if (now < discount.startDate || now > discount.endDate) {
-        return { discountAmount: 0, warning: 'Kuponun süresi doldu' };
+        return { discountAmount: 0, warning: "Kuponun süresi doldu" };
       }
 
       // Check usage limits
-      const canUse = await this.discountService.checkUsageLimit(discount.id, userId);
+      const canUse = await this.discountService.checkUsageLimit(
+        discount.id,
+        userId,
+      );
       if (!canUse) {
-        return { discountAmount: 0, warning: 'Bu kuponu zaten kullandınız' };
+        return { discountAmount: 0, warning: "Bu kuponu zaten kullandınız" };
+      }
+
+      // Category scope needs each product's categoryId — fetch it once so the
+      // eligibility check below matches the authoritative checkout path
+      // (DiscountService.isProductEligibleForDiscount). Previously the category
+      // branch ignored the product's category entirely and behaved like global.
+      const categoryByProduct = new Map<string, string | null>();
+      if (discount.scope === DiscountScope.category) {
+        const prods = await this.prisma.product.findMany({
+          where: { id: { in: items.map((i) => i.productId) } },
+          select: { id: true, categoryId: true },
+        });
+        for (const p of prods) categoryByProduct.set(p.id, p.categoryId);
       }
 
       // Calculate discount based on scope
@@ -626,7 +726,8 @@ export class CartService {
 
         switch (discount.scope) {
           case DiscountScope.global:
-            isEligible = discount.sellerId === null || discount.sellerId === item.sellerId;
+            isEligible =
+              discount.sellerId === null || discount.sellerId === item.sellerId;
             break;
           case DiscountScope.seller:
             isEligible = discount.sellerId === item.sellerId;
@@ -635,23 +736,32 @@ export class CartService {
             isEligible = discount.targetProductIds.includes(item.productId);
             break;
           case DiscountScope.category:
-            // Would need to check product's category
-            isEligible = discount.sellerId === null;
+            isEligible =
+              discount.categoryId != null &&
+              categoryByProduct.get(item.productId) === discount.categoryId;
             break;
         }
 
         if (isEligible) {
-          eligibleAmount += item.lineTotal;
+          // Kupon BAZ fiyat üzerinden hesaplanır (kampanyalı/efektif fiyat değil)
+          // → checkout'taki validateCoupon ile aynı taban (product.price * adet).
+          eligibleAmount += item.originalPrice * item.quantity;
           affectedProductIds.push(item.productId);
         }
       }
 
       if (eligibleAmount === 0) {
-        return { discountAmount: 0, warning: 'Bu kupon sepetinizdeki ürünlere uygulanamaz' };
+        return {
+          discountAmount: 0,
+          warning: "Bu kupon sepetinizdeki ürünlere uygulanamaz",
+        };
       }
 
       // Check minimum cart value
-      if (discount.minCartValue && eligibleAmount < Number(discount.minCartValue)) {
+      if (
+        discount.minCartValue &&
+        eligibleAmount < Number(discount.minCartValue)
+      ) {
         return {
           discountAmount: 0,
           warning: `Minimum sepet tutarı: ${Number(discount.minCartValue).toFixed(2)} TL`,
@@ -660,14 +770,17 @@ export class CartService {
 
       // Calculate discount amount
       let discountAmount = 0;
-      if (discount.type === 'percentage') {
+      if (discount.type === "percentage") {
         discountAmount = eligibleAmount * (Number(discount.value) / 100);
       } else {
         discountAmount = Number(discount.value);
       }
 
       // Apply max discount cap
-      if (discount.maxDiscountAmount && discountAmount > Number(discount.maxDiscountAmount)) {
+      if (
+        discount.maxDiscountAmount &&
+        discountAmount > Number(discount.maxDiscountAmount)
+      ) {
         discountAmount = Number(discount.maxDiscountAmount);
       }
 
@@ -690,7 +803,7 @@ export class CartService {
       };
     } catch (error) {
       this.logger.error(`Error applying coupon: ${error}`);
-      return { discountAmount: 0, warning: 'Kupon uygulanırken hata oluştu' };
+      return { discountAmount: 0, warning: "Kupon uygulanırken hata oluştu" };
     }
   }
 
@@ -727,18 +840,25 @@ export class CartService {
           startDate: { lte: now },
           endDate: { gte: now },
         },
-        orderBy: { priority: 'asc' },
+        orderBy: { priority: "asc" },
       });
 
       for (const campaign of campaigns) {
-        if (campaign.minCartValue && sellerSubtotal < Number(campaign.minCartValue)) continue;
+        if (
+          campaign.minCartValue &&
+          sellerSubtotal < Number(campaign.minCartValue)
+        )
+          continue;
         let discountAmount = 0;
-        if (campaign.type === 'percentage') {
+        if (campaign.type === "percentage") {
           discountAmount = sellerSubtotal * (Number(campaign.value) / 100);
         } else {
           discountAmount = Math.min(Number(campaign.value), sellerSubtotal);
         }
-        if (campaign.maxDiscountAmount && discountAmount > Number(campaign.maxDiscountAmount)) {
+        if (
+          campaign.maxDiscountAmount &&
+          discountAmount > Number(campaign.maxDiscountAmount)
+        ) {
           discountAmount = Number(campaign.maxDiscountAmount);
         }
         if (discountAmount > 0) {
@@ -780,7 +900,7 @@ export class CartService {
         endDate: { gte: now },
         scope: { in: [DiscountScope.global, DiscountScope.category] },
       },
-      orderBy: { priority: 'asc' },
+      orderBy: { priority: "asc" },
     });
 
     for (const campaign of campaigns) {
@@ -791,14 +911,17 @@ export class CartService {
 
       // Calculate discount
       let discountAmount = 0;
-      if (campaign.type === 'percentage') {
+      if (campaign.type === "percentage") {
         discountAmount = subtotal * (Number(campaign.value) / 100);
       } else {
         discountAmount = Number(campaign.value);
       }
 
       // Apply max cap
-      if (campaign.maxDiscountAmount && discountAmount > Number(campaign.maxDiscountAmount)) {
+      if (
+        campaign.maxDiscountAmount &&
+        discountAmount > Number(campaign.maxDiscountAmount)
+      ) {
         discountAmount = Number(campaign.maxDiscountAmount);
       }
 
@@ -829,10 +952,17 @@ export class CartService {
   /**
    * Resolve product image URL (S3 key -> presigned URL)
    */
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
+    if (isPublicStorageKey(imageKeyOrUrl)) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;

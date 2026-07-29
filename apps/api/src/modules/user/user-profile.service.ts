@@ -1,15 +1,33 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { User, Prisma, ProductStatus, TradeStatus, OrderStatus } from '@prisma/client';
-import { ModerationAiClient } from '../moderation/moderation-ai.client';
-import { computeTrustScore } from './helpers/trust-score';
-import { isPremiumEntitled } from '../membership/membership.util';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import {
+  User,
+  Prisma,
+  ProductStatus,
+  TradeStatus,
+  OrderStatus,
+  RefundRequestStatus,
+  PayoutStatus,
+  PaymentHoldStatus,
+} from "@prisma/client";
+import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { computeTrustScore } from "./helpers/trust-score";
+import {
+  effectiveMembershipTierType,
+  isPremiumEntitled,
+} from "../membership/membership.util";
+import { i18nMessage } from "../i18n";
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationSettings,
   UpdateNotificationSettingsDto,
-} from './dto';
-import { UserCommonService } from './user-common.service';
+} from "./dto";
+import { UserCommonService } from "./user-common.service";
 
 /**
  * UserProfileService — profil/lookup/hesap grubu: avatar redirect, find*,
@@ -74,7 +92,7 @@ export class UserProfileService {
       where: { id },
       include: {
         addresses: {
-          orderBy: { isDefault: 'desc' },
+          orderBy: { isDefault: "desc" },
         },
         membership: {
           include: {
@@ -85,7 +103,7 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
     // Count only active listings (exclude inactive and deleted)
@@ -99,16 +117,31 @@ export class UserProfileService {
     // Güven Skoru için ek istatistikler (puan, satış, takas)
     const [ratingAgg, salesCount, tradesCount] = await Promise.all([
       this.prisma.rating.aggregate({
-        where: { receiverId: id, status: 'approved' },
+        where: { receiverId: id, status: "approved" },
         _avg: { score: true },
         _count: true,
       }),
-      this.prisma.order.count({ where: { sellerId: id, status: 'completed' } }),
+      this.prisma.order.count({ where: { sellerId: id, status: "completed" } }),
       this.prisma.trade.count({
-        where: { OR: [{ initiatorId: id }, { receiverId: id }], status: 'completed' },
+        where: {
+          OR: [{ initiatorId: id }, { receiverId: id }],
+          status: "completed",
+        },
       }),
     ]);
-    const isPremium = isPremiumEntitled(user.membership);
+    const isPremium = isPremiumEntitled(user.membership, user);
+    const freeTier = await this.prisma.membershipTier.findUnique({
+      where: { type: "free" },
+    });
+    if (!freeTier) {
+      throw new NotFoundException(
+        i18nMessage("server.membership.freeTierNotFound"),
+      );
+    }
+    const effectiveTier =
+      user.membership && (user.membership.tier.type === "free" || isPremium)
+        ? user.membership.tier
+        : freeTier;
     const trust = computeTrustScore({
       averageRating: ratingAgg._avg?.score || 0,
       totalRatings: ratingAgg._count,
@@ -117,44 +150,43 @@ export class UserProfileService {
       isVerified: user.isVerified,
     });
 
-    // Format membership info for frontend
-    const membershipInfo = user.membership ? {
-      id: user.membership.id,
-      status: user.membership.status,
-      currentPeriodStart: user.membership.currentPeriodStart,
-      currentPeriodEnd: user.membership.currentPeriodEnd,
-      tier: {
-        id: user.membership.tier.id,
-        type: user.membership.tier.type,
-        name: user.membership.tier.name,
-        maxFreeListings: user.membership.tier.maxFreeListings,
-        maxTotalListings: user.membership.tier.maxTotalListings,
-        maxImagesPerListing: user.membership.tier.maxImagesPerListing,
-        canCreateCollections: user.membership.tier.canCreateCollections,
-        canTrade: user.membership.tier.canTrade,
-        isAdFree: user.membership.tier.isAdFree,
-        featuredListingSlots: user.membership.tier.featuredListingSlots,
-        commissionDiscount: user.membership.tier.commissionDiscount,
-      },
-    } : {
-      tier: {
-        type: 'free',
-        name: 'Ücretsiz',
-        maxFreeListings: 5,
-        maxTotalListings: 10,
-        maxImagesPerListing: 3,
-        canTrade: false,
-        canCreateCollections: false,
-        featuredListingSlots: 0,
-        commissionDiscount: 0,
-        isAdFree: false,
-      },
-      status: 'active',
-      expiresAt: null,
+    // Format membership info for frontend — EFFECTIVE view. The web gates its UI
+    // (Takas / Koleksiyon / limits) off this payload, so it must match the backend's
+    // own gates: an unpaid (past_due) or expired membership grants NO premium
+    // capability. `isPremium` (isPremiumEntitled) is the single source of truth —
+    // when it's false the tier is presented as free, while the real status/period is
+    // still returned for display. Detailed plan/pending info lives in /membership/me.
+    const effectiveTierView = {
+      id: effectiveTier.id,
+      type: effectiveTier.type,
+      name: effectiveTier.name,
+      maxFreeListings: effectiveTier.maxFreeListings,
+      maxTotalListings: effectiveTier.maxTotalListings,
+      maxImagesPerListing: effectiveTier.maxImagesPerListing,
+      canCreateCollections: effectiveTier.canCreateCollections,
+      canTrade: effectiveTier.canTrade,
+      isAdFree: effectiveTier.isAdFree,
+      featuredListingSlots: effectiveTier.featuredListingSlots,
+      commissionDiscount: effectiveTier.commissionDiscount,
     };
+    const membershipInfo = user.membership
+      ? {
+          id: user.membership.id,
+          status: user.membership.status,
+          currentPeriodStart: user.membership.currentPeriodStart,
+          currentPeriodEnd: user.membership.currentPeriodEnd,
+          tier: effectiveTierView,
+        }
+      : {
+          tier: effectiveTierView,
+          status: "active",
+          expiresAt: null,
+        };
 
     // Resolve avatar URL (S3 key → presigned URL)
-    const resolvedAvatarUrl = await this.common.resolveAvatarUrl(user.avatarUrl);
+    const resolvedAvatarUrl = await this.common.resolveAvatarUrl(
+      user.avatarUrl,
+    );
 
     // Remove raw membership and hassas alanları yanıttan çıkar (passwordHash,
     // fcmToken, ban metadata'sı asla client'a dönmemeli).
@@ -200,22 +232,23 @@ export class UserProfileService {
       isCorporateSeller?: boolean;
       avatarUrl?: string;
       showTrustScore?: boolean;
+      preferredLanguage?: string;
     },
   ) {
     // Profil serbest metinlerini AI moderasyonundan geçir (uygunsuz → engelle)
     await this.moderationAi.assertTextClean(data.displayName, {
-      entityType: 'user',
+      entityType: "user",
       entityId: userId,
       userId,
-      field: 'display_name',
-      label: 'görünen ad',
+      field: "display_name",
+      label: "görünen ad",
     });
     await this.moderationAi.assertTextClean(data.bio, {
-      entityType: 'user',
+      entityType: "user",
       entityId: userId,
       userId,
-      field: 'bio',
-      label: 'biyografi',
+      field: "bio",
+      label: "biyografi",
     });
 
     // Check if user is business tier - only business tier users should have business info
@@ -229,10 +262,10 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
-    const isBusinessTier = user.membership?.tier?.type === 'business';
+    const isBusinessTier = user.membership?.tier?.type === "business";
     const isCorporateSeller = data.isCorporateSeller === true;
 
     // Check phone uniqueness if being updated
@@ -245,21 +278,27 @@ export class UserProfileService {
       });
 
       if (existingPhone) {
-        throw new BadRequestException('Bu telefon numarası zaten kullanılıyor');
+        throw new BadRequestException(
+          i18nMessage("server.user.phoneAlreadyInUse"),
+        );
       }
     }
 
     // Prepare update data
     const updateData: Prisma.UserUpdateInput = {};
 
-    if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.displayName !== undefined)
+      updateData.displayName = data.displayName;
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.bio !== undefined) updateData.bio = data.bio;
-    if (data.showTrustScore !== undefined) updateData.showTrustScore = data.showTrustScore;
+    if (data.showTrustScore !== undefined)
+      updateData.showTrustScore = data.showTrustScore;
+    if (data.preferredLanguage !== undefined)
+      updateData.preferredLanguage = data.preferredLanguage;
     if (data.birthDate !== undefined) {
       updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     }
-    
+
     // Only process business information if user is business tier or isCorporateSeller is true
     if (isBusinessTier || isCorporateSeller) {
       if (data.companyName !== undefined) {
@@ -285,7 +324,9 @@ export class UserProfileService {
 
     // Check if there's any data to update
     if (Object.keys(updateData).length === 0) {
-      throw new BadRequestException('Güncellenecek alan bulunamadı');
+      throw new BadRequestException(
+        i18nMessage("server.user.noFieldsToUpdate"),
+      );
     }
 
     // Update user
@@ -296,6 +337,26 @@ export class UserProfileService {
 
     // Return updated user in the same format as findByIdWithAddresses
     return this.findByIdWithAddresses(userId);
+  }
+
+  async completeHomeTour(userId: string, version: number) {
+    await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        homeTourVersion: { lt: version },
+      },
+      data: { homeTourVersion: version },
+    });
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { homeTourVersion: true },
+    });
+    if (!user) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+
+    return user;
   }
 
   /**
@@ -309,10 +370,11 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
-    const stored = (user.notificationSettings as Partial<NotificationSettings> | null) ?? {};
+    const stored =
+      (user.notificationSettings as Partial<NotificationSettings> | null) ?? {};
     return { ...DEFAULT_NOTIFICATION_SETTINGS, ...stored };
   }
 
@@ -336,7 +398,9 @@ export class UserProfileService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { notificationSettings: merged as unknown as Prisma.InputJsonValue },
+      data: {
+        notificationSettings: merged as unknown as Prisma.InputJsonValue,
+      },
     });
 
     return merged;
@@ -355,7 +419,7 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
     // Check 1: Active products (active, pending, reserved)
@@ -363,19 +427,20 @@ export class UserProfileService {
       where: {
         sellerId: userId,
         status: {
-          in: [ProductStatus.active, ProductStatus.pending, ProductStatus.reserved],
+          in: [
+            ProductStatus.active,
+            ProductStatus.pending,
+            ProductStatus.reserved,
+          ],
         },
       },
       select: { id: true, title: true, status: true },
     });
 
-    // Check 2: Active trades (pending, accepted, shipped, received - not completed/cancelled/rejected/disputed)
+    // Check 2: every non-terminal legacy and escrow trade state.
     const activeTrades = await this.prisma.trade.findMany({
       where: {
-        OR: [
-          { initiatorId: userId },
-          { receiverId: userId },
-        ],
+        OR: [{ initiatorId: userId }, { receiverId: userId }],
         status: {
           in: [
             TradeStatus.pending,
@@ -385,19 +450,23 @@ export class UserProfileService {
             TradeStatus.both_shipped,
             TradeStatus.initiator_received,
             TradeStatus.receiver_received,
+            TradeStatus.awaiting_payment,
+            TradeStatus.shipping_to_warehouse,
+            TradeStatus.at_warehouse,
+            TradeStatus.admin_reviewing,
+            TradeStatus.shipping_to_recipients,
+            TradeStatus.returning,
+            TradeStatus.disputed,
           ],
         },
       },
       select: { id: true, tradeNumber: true, status: true },
     });
 
-    // Check 3: Pending orders (as buyer or seller)
+    // Check 3: every order state with an unfinished fulfilment/refund obligation.
     const pendingOrders = await this.prisma.order.findMany({
       where: {
-        OR: [
-          { buyerId: userId },
-          { sellerId: userId },
-        ],
+        OR: [{ buyerId: userId }, { sellerId: userId }],
         status: {
           in: [
             OrderStatus.pending_payment,
@@ -405,41 +474,124 @@ export class UserProfileService {
             OrderStatus.preparing,
             OrderStatus.shipped,
             OrderStatus.delivered,
+            OrderStatus.awaiting_buyer_confirmation,
+            OrderStatus.refund_requested,
           ],
         },
       },
       select: { id: true, orderNumber: true, status: true },
     });
 
-    // Build error messages
-    const errors: string[] = [];
+    const openRefunds = await this.prisma.refundRequest.findMany({
+      where: {
+        OR: [
+          { requesterId: userId },
+          { order: { OR: [{ buyerId: userId }, { sellerId: userId }] } },
+        ],
+        status: {
+          in: [
+            RefundRequestStatus.pending_review,
+            RefundRequestStatus.approved,
+            RefundRequestStatus.wait_for_delivery,
+            RefundRequestStatus.return_shipment_open,
+            RefundRequestStatus.return_in_transit,
+            RefundRequestStatus.return_delivered,
+            RefundRequestStatus.disputed,
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    const pendingPayouts = await this.prisma.payoutTransfer.findMany({
+      where: {
+        sellerId: userId,
+        status: {
+          in: [
+            PayoutStatus.pending,
+            PayoutStatus.processing,
+            PayoutStatus.retry_pending,
+            PayoutStatus.returned,
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    const openPaymentHolds = await this.prisma.paymentHold.findMany({
+      where: {
+        sellerId: userId,
+        status: {
+          in: [PaymentHoldStatus.held, PaymentHoldStatus.released],
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    // Build blocking reasons as catalog payloads; AllExceptionsFilter renders
+    // both the top-level message and each errors[] entry in the request locale
+    // while preserving the {errors, details} contract the client relies on (#224).
+    const errors: ReturnType<typeof i18nMessage>[] = [];
 
     if (activeProducts.length > 0) {
       errors.push(
-        `${activeProducts.length} aktif ilanınız bulunmaktadır. Lütfen önce tüm ilanlarınızı kaldırın.`,
+        i18nMessage("server.user.deleteBlockedActiveListings", {
+          count: activeProducts.length,
+        }),
       );
     }
 
     if (activeTrades.length > 0) {
       errors.push(
-        `${activeTrades.length} aktif takas teklifiniz bulunmaktadır. Lütfen takas işlemlerinizi tamamlayın veya iptal edin.`,
+        i18nMessage("server.user.deleteBlockedActiveTrades", {
+          count: activeTrades.length,
+        }),
       );
     }
 
     if (pendingOrders.length > 0) {
       errors.push(
-        `${pendingOrders.length} bekleyen satın alım/satış işleminiz bulunmaktadır. Lütfen siparişlerinizi tamamlayın veya iptal edin.`,
+        i18nMessage("server.user.deleteBlockedPendingOrders", {
+          count: pendingOrders.length,
+        }),
+      );
+    }
+
+    if (openRefunds.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedOpenRefunds", {
+          count: openRefunds.length,
+        }),
+      );
+    }
+
+    if (pendingPayouts.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedPendingPayouts", {
+          count: pendingPayouts.length,
+        }),
+      );
+    }
+
+    if (openPaymentHolds.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedPaymentHolds", {
+          count: openPaymentHolds.length,
+        }),
       );
     }
 
     if (errors.length > 0) {
       throw new BadRequestException({
-        message: 'Hesabınızı silmek için aşağıdaki işlemleri tamamlamanız gerekmektedir:',
+        ...i18nMessage("server.user.deleteAccountBlocked"),
         errors,
         details: {
           activeProducts: activeProducts.length,
           activeTrades: activeTrades.length,
           pendingOrders: pendingOrders.length,
+          openRefunds: openRefunds.length,
+          pendingPayouts: pendingPayouts.length,
+          openPaymentHolds: openPaymentHolds.length,
         },
       });
     }
@@ -451,50 +603,58 @@ export class UserProfileService {
     // Korunan: pazaryeri/sosyal içerik (ilan, yorum, mesaj, takas) "Silinmiş Kullanıcı"ya
     // bağlı kalır. deletedAt işaretlenir → auth artık bu hesabı reddeder.
     try {
-      await this.prisma.$transaction(async (tx) => {
-        // 1) Kimlik-doğrulama / oturum verileri (login imkânsız hale gelir)
-        await tx.refreshToken.deleteMany({ where: { userId } });
-        await tx.passwordResetToken.deleteMany({ where: { userId } });
-        await tx.emailVerificationToken.deleteMany({ where: { userId } });
-        await tx.pushToken.deleteMany({ where: { userId } });
-        await tx.oAuthAccount.deleteMany({ where: { userId } });
-        await tx.twoFactorSecret.deleteMany({ where: { userId } });
+      await this.prisma.$transaction(
+        async (tx) => {
+          // 1) Kimlik-doğrulama / oturum verileri (login imkânsız hale gelir)
+          await tx.refreshToken.deleteMany({ where: { userId } });
+          await tx.passwordResetToken.deleteMany({ where: { userId } });
+          await tx.emailVerificationToken.deleteMany({ where: { userId } });
+          await tx.pushToken.deleteMany({ where: { userId } });
+          await tx.oAuthAccount.deleteMany({ where: { userId } });
+          await tx.twoFactorSecret.deleteMany({ where: { userId } });
 
-        // 2) Ödeme kimlik bilgileri (kayıtlı kartlar)
-        await tx.savedCard.deleteMany({ where: { userId } });
+          // 2) Ödeme kimlik bilgileri (kayıtlı kartlar)
+          await tx.savedCard.deleteMany({ where: { userId } });
 
-        // 3) Doğrudan PII / kişisel veriler
-        await tx.address.deleteMany({ where: { userId } });
-        await tx.notificationLog.deleteMany({ where: { userId } });
+          // 3) Doğrudan PII / kişisel veriler
+          await tx.address.deleteMany({ where: { userId } });
+          await tx.notificationLog.deleteMany({ where: { userId } });
 
-        // 4) PII'yi anonimleştir + login engelle. Unique alanları (email/phone/companyName)
-        //    serbest bırak ki kullanıcı aynı bilgiyle yeniden kayıt olabilsin.
-        await tx.user.update({
-          where: { id: userId },
-          data: {
-            email: `deleted_${userId}@deleted.local`,
-            phone: null,
-            passwordHash: '',
-            displayName: 'Silinmiş Kullanıcı',
-            avatarUrl: null,
-            bio: null,
-            fcmToken: null,
-            companyName: null,
-            taxId: null,
-            acceptsMarketingEmails: false,
-            isSeller: false,
-            deletedAt: new Date(),
-          },
-        });
-      }, {
-        timeout: 60000,
-      });
+          // 4) PII'yi anonimleştir + login engelle. Unique alanları (email/phone/companyName)
+          //    serbest bırak ki kullanıcı aynı bilgiyle yeniden kayıt olabilsin.
+          await tx.user.update({
+            where: { id: userId },
+            data: {
+              email: `deleted_${userId}@deleted.local`,
+              phone: null,
+              passwordHash: "",
+              displayName: "Silinmiş Kullanıcı",
+              avatarUrl: null,
+              bio: null,
+              fcmToken: null,
+              companyName: null,
+              taxId: null,
+              acceptsMarketingEmails: false,
+              isSeller: false,
+              deletedAt: new Date(),
+            },
+          });
+        },
+        {
+          timeout: 60000,
+        },
+      );
 
       this.logger.log(`User account anonymized (soft-deleted): ${userId}`);
-      return { message: 'Hesabınız başarıyla silindi' };
+      // #224: mesaj artık UserController.deleteAccount() tarafından locale'e göre
+      // kuruluyor (server.user.accountDeleted) — servis burada sabit metin döndürmüyor.
     } catch (error: any) {
-      this.logger.error(`Delete account (anonymize) failed for ${userId}: ${error?.message}`);
-      throw new BadRequestException('Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.');
+      this.logger.error(
+        `Delete account (anonymize) failed for ${userId}: ${error?.message}`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.user.deleteAccountFailed"),
+      );
     }
   }
 
@@ -516,7 +676,7 @@ export class UserProfileService {
       where: { id: userId },
       data: {
         isSeller: true,
-        sellerType: 'individual',
+        sellerType: "individual",
       },
     });
   }
@@ -545,43 +705,63 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
     // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).
     const listingWhere = isOwner
-      ? { sellerId: userId, status: { notIn: ['deleted'] } as any }
-      : { sellerId: userId, status: 'active' };
-    const collectionWhere = isOwner
-      ? { userId }
-      : { userId, isPublic: true };
+      ? { sellerId: userId, status: { notIn: ["deleted"] } as any }
+      : { sellerId: userId, status: "active" };
+    const collectionWhere = isOwner ? { userId } : { userId, isPublic: true };
 
     // Get seller stats + followers count + membership
     // completedTrades: güven skoru için sabit metrik (viewer'dan bağımsız).
     // allTrades: sahip görünümünde gösterilen "tüm takaslar" sayısı.
-    const [totalListings, totalSales, completedTrades, allTrades, ratings, followersCount, membership, totalCollections] = await Promise.all([
+    const [
+      totalListings,
+      totalSales,
+      completedTrades,
+      allTrades,
+      ratings,
+      followersCount,
+      membership,
+      totalCollections,
+    ] = await Promise.all([
       this.prisma.product.count({ where: listingWhere }),
-      this.prisma.order.count({ where: { sellerId: userId, status: 'completed' } }),
-      this.prisma.trade.count({
-        where: {
-          OR: [{ initiatorId: userId }, { receiverId: userId }],
-          status: 'completed',
-        }
+      this.prisma.order.count({
+        where: { sellerId: userId, status: "completed" },
       }),
       this.prisma.trade.count({
         where: {
           OR: [{ initiatorId: userId }, { receiverId: userId }],
-        }
+          status: "completed",
+        },
+      }),
+      this.prisma.trade.count({
+        where: {
+          OR: [{ initiatorId: userId }, { receiverId: userId }],
+        },
       }),
       this.prisma.rating.aggregate({
-        where: { receiverId: userId, status: 'approved' },
+        where: { receiverId: userId, status: "approved" },
         _avg: { score: true },
         _count: true,
       }),
       this.prisma.userFollow.count({ where: { followingId: userId } }),
       this.prisma.userMembership.findUnique({
         where: { userId },
-        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
+        select: {
+          status: true,
+          currentPeriodEnd: true,
+          tier: { select: { type: true, isActive: true } },
+          user: {
+            select: {
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+            },
+          },
+        },
       }),
       this.prisma.collection.count({ where: collectionWhere }),
     ]);
@@ -590,11 +770,16 @@ export class UserProfileService {
     const totalTrades = isOwner ? allTrades : completedTrades;
 
     // Resolve avatar URL (S3 key → presigned URL)
-    const resolvedAvatarUrl = await this.common.resolveAvatarUrl(user.avatarUrl);
+    const resolvedAvatarUrl = await this.common.resolveAvatarUrl(
+      user.avatarUrl,
+    );
 
     // Premium (ücretli, aktif) üyelik mi?
-    const membershipTier = membership?.tier.type ?? 'free';
-    const isPremium = isPremiumEntitled(membership);
+    const isPremium = isPremiumEntitled(membership, membership?.user);
+    const membershipTier = effectiveMembershipTierType(
+      membership,
+      membership?.user,
+    );
 
     // Güven Skoru (0..100) — premium avantajı
     const trust = computeTrustScore({

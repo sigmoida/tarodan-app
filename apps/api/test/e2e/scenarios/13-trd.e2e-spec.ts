@@ -2201,14 +2201,13 @@ describe('13 — Takas (TRD)', () => {
       .expect(400);
     expect(self.body.message).toBe('Kendinizle takas yapamazsınız');
 
-    // TRD-006 türevi (adres yok) — Accept-Language EN gönderilse bile TR sabit.
+    // TRD-006 türevi (adres yok) — varsayılan locale Türkçe.
     const f = await setupBilateral();
     const prisma = getPrisma();
     await prisma.address.deleteMany({ where: { userId: f.initiator.id } });
     const noAddr = await request(server())
       .post('/api/trades')
       .set(authHeader(f.initiator))
-      .set('Accept-Language', 'en-US')
       .send(createTradeBody(f))
       .expect(400);
     expect(noAddr.body.message).toContain('Takas için bir teslimat adresi ekleyin');
@@ -2409,7 +2408,11 @@ describe('13 — Takas (TRD)', () => {
       .expect(201);
     const prisma = getPrisma();
     const dispute = await prisma.tradeDispute.findUnique({ where: { tradeId } });
-    expect(dispute?.resolvedById).toBe(admin.id);
+    const adminRecord = await prisma.adminUser.findUnique({
+      where: { userId: admin.id },
+      select: { id: true },
+    });
+    expect(dispute?.resolvedById).toBe(adminRecord?.id);
   });
 
   scenario('TRD-097', async () => {

@@ -3,6 +3,7 @@
 'use client';
 
 import { Suspense, type ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { Spinner, Alert, Button } from '@tarodan/ui';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -14,6 +15,7 @@ import { ErrorBoundary } from './ErrorBoundary';
  * inside a React transition so they DON'T re-trigger this fallback.
  */
 export function SuspenseBoundary({ children }: { children: ReactNode }) {
+	const t = useTranslations();
 	return (
 		<QueryErrorResetBoundary>
 			{({ reset }) => (
@@ -21,9 +23,9 @@ export function SuspenseBoundary({ children }: { children: ReactNode }) {
 					fallback={(clear) => (
 						<Alert
 							variant='danger'
-							title='Bir hata oluştu'>
+							title={t('admin.shared.suspense.errorTitle')}>
 							<div className='flex flex-col items-start gap-3'>
-								<span>Veriler yüklenemedi. Lütfen tekrar deneyin.</span>
+								<span>{t('admin.shared.suspense.errorDescription')}</span>
 								<Button
 									variant='outline'
 									size='sm'
@@ -31,7 +33,7 @@ export function SuspenseBoundary({ children }: { children: ReactNode }) {
 										reset();
 										clear();
 									}}>
-									Tekrar dene
+									{t('admin.shared.suspense.retry')}
 								</Button>
 							</div>
 						</Alert>

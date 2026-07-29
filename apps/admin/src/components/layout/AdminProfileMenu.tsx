@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import {
   IconButton,
   DropdownMenu,
@@ -20,12 +21,13 @@ const PROFILE_MENU_ITEMS: Array<{ label: string; href: string }> = [];
  * IconButton; reads the current admin straight from the session context.
  */
 export function AdminProfileMenu() {
+  const t = useTranslations();
   const { user, logout } = useSession();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton aria-label="Hesap menüsü" className="text-inverted hover:bg-inverted/10">
+        <IconButton aria-label={t('admin.shared.profileMenu.ariaLabel')} className="text-inverted hover:bg-inverted/10">
           <UserCircleIcon className="h-6 w-6" />
         </IconButton>
       </DropdownMenuTrigger>
@@ -33,7 +35,7 @@ export function AdminProfileMenu() {
       <DropdownMenuContent align="end" className="w-60">
         <div className="px-2 py-1.5">
           <p className="truncate text-sm font-medium text-heading">
-            {user.displayName || 'Yönetici'}
+            {user.displayName || t('admin.shared.profileMenu.defaultName')}
           </p>
           <p className="truncate text-xs text-muted">{user.email}</p>
         </div>
@@ -51,7 +53,7 @@ export function AdminProfileMenu() {
 
         <DropdownMenuItem danger onSelect={() => logout()}>
           <ArrowRightStartOnRectangleIcon className="h-4 w-4 shrink-0" />
-          Çıkış Yap
+          {t('common.logout')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

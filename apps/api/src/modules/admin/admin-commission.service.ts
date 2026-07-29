@@ -1,7 +1,25 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { AdminAuditService } from './admin-audit.service';
-import { CreateCommissionRuleDto, UpdateCommissionRuleDto } from './dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import {
+  CommissionRuleType,
+  CommissionSellerType,
+  CommissionAppliesTo,
+  CommissionTaxpayerType,
+} from "@prisma/client";
+import { PrismaService } from "../../prisma";
+import {
+  calculateCommissionFromRules,
+  CommissionRuleForCalculation,
+} from "../order/order-commission.helper";
+import { AdminAuditService } from "./admin-audit.service";
+import {
+  CreateCommissionRuleDto,
+  PreviewCommissionDto,
+  UpdateCommissionRuleDto,
+} from "./dto";
 
 /**
  * Komisyon kuralları yönetimi — AdminService'in COMMISSION RULES bölümünden
@@ -20,105 +38,142 @@ export class AdminCommissionService {
   async getCommissionRules() {
     const rules = await this.prisma.commissionRule.findMany({
       include: { category: { select: { id: true, name: true } } },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
     });
 
-    return rules.map((r) => ({
-      id: r.id,
-      name: r.name,
-      categoryId: r.categoryId,
-      categoryName: r.category?.name || null,
-      sellerType: r.sellerType,
-      appliesTo: r.appliesTo || 'SELLER',
-      sellerRate: r.sellerRate ? Number(r.sellerRate) : null,
-      buyerRate: r.buyerRate ? Number(r.buyerRate) : null,
-      sellerMin: r.sellerMin ? Number(r.sellerMin) : null,
-      sellerMax: r.sellerMax ? Number(r.sellerMax) : null,
-      buyerMin: r.buyerMin ? Number(r.buyerMin) : null,
-      buyerMax: r.buyerMax ? Number(r.buyerMax) : null,
-      isActive: r.isActive,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-      // Legacy fields for backward compatibility
-      percentage: Number(r.percentage),
-      type: r.ruleType,
-      minAmount: r.minAmount ? Number(r.minAmount) : null,
-    }));
+    return rules.map((r) => this.serializeRule(r));
+  }
+
+  /**
+   * @deprecated Legacy single-rate preview — NOT wired to any UI (the admin rule
+   * form uses the client-side `BreakdownPreview`, which reflects the full v2
+   * rates/taxpayer/amount/shipping). This builds the draft from only the old
+   * `sellerRate/buyerRate` fields and calls the engine via the legacy positional
+   * overload, so it would reproduce the old preview != checkout drift. Do not
+   * re-wire it; either delete it or upgrade it to the v2 draft before reuse.
+   */
+  async previewCommission(dto: PreviewCommissionDto) {
+    const activeRules = await this.prisma.commissionRule.findMany({
+      where: { isActive: true },
+    });
+    const rules: CommissionRuleForCalculation[] = activeRules.filter(
+      (rule) => rule.id !== dto.ruleId,
+    );
+
+    if (dto.isActive !== false) {
+      rules.unshift({
+        id: dto.ruleId ?? "commission-preview-draft",
+        name: "Taslak komisyon kuralı",
+        ruleType: CommissionRuleType.default,
+        categoryId: dto.categoryId?.trim() || null,
+        sellerType: dto.sellerType,
+        appliesTo: dto.appliesTo,
+        sellerRate: dto.sellerRate,
+        buyerRate: dto.buyerRate,
+        sellerMin: dto.sellerMin,
+        sellerMax: dto.sellerMax,
+        buyerMin: dto.buyerMin,
+        buyerMax: dto.buyerMax,
+      });
+    }
+
+    return calculateCommissionFromRules(
+      dto.amount,
+      rules,
+      dto.previewCategoryId?.trim() || null,
+      dto.previewSellerType,
+    );
   }
 
   /**
    * Create commission rule
    * Requirement: Commission configuration via admin (project.md)
    */
-  async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {
-    // Validate appliesTo requirements
-    if (dto.appliesTo === 'SELLER' && !dto.sellerRate) {
-      throw new BadRequestException('sellerRate is required when appliesTo is SELLER');
-    }
-    if (dto.appliesTo === 'BUYER' && !dto.buyerRate) {
-      throw new BadRequestException('buyerRate is required when appliesTo is BUYER');
-    }
-    if (dto.appliesTo === 'BOTH' && (!dto.sellerRate || !dto.buyerRate)) {
-      throw new BadRequestException('Both sellerRate and buyerRate are required when appliesTo is BOTH');
-    }
+  /** Ranges overlap if aLo <= bHi && bLo <= aHi (null bounds = ±infinity). */
+  private rangesOverlap(
+    aMin: number | null,
+    aMax: number | null,
+    bMin: number | null,
+    bMax: number | null,
+  ): boolean {
+    const aLo = aMin ?? -Infinity;
+    const aHi = aMax ?? Infinity;
+    const bLo = bMin ?? -Infinity;
+    const bHi = bMax ?? Infinity;
+    return aLo <= bHi && bLo <= aHi;
+  }
 
-    // Validate min <= max
-    if (dto.sellerMin != null && dto.sellerMax != null && dto.sellerMin > dto.sellerMax) {
-      throw new BadRequestException('sellerMin cannot be greater than sellerMax');
-    }
-    if (dto.buyerMin != null && dto.buyerMax != null && dto.buyerMin > dto.buyerMax) {
-      throw new BadRequestException('buyerMin cannot be greater than buyerMax');
-    }
-
-    // If categoryId is empty string, set to null
-    const categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
-
-    // Check if a rule with the same combination already exists.
-    // appliesTo da eşleşmeli: alıcı ve satıcı kuralı aynı kategori+tip için ayrı taraflara uygulanır.
-    const existingRule = await this.prisma.commissionRule.findFirst({
+  /**
+   * v2 çoklu-kural: aynı (kategori × satıcı tipi × vergi tipi × appliesTo)
+   * ekseninde tutar aralıkları çakışmamalı. Böylece bir kategoriye birden çok
+   * kural (farklı kademe/aralık) eklenebilir ama eşleşme belirsizleşmez.
+   */
+  private async assertNoRangeOverlap(params: {
+    categoryId: string | null;
+    sellerType: CommissionSellerType;
+    taxpayerType: CommissionTaxpayerType;
+    appliesTo: CommissionAppliesTo;
+    minAmount: number | null;
+    maxAmount: number | null;
+    excludeId?: string;
+  }) {
+    const siblings = await this.prisma.commissionRule.findMany({
       where: {
-        categoryId: categoryId,
-        sellerType: dto.sellerType,
-        appliesTo: dto.appliesTo as any,
+        categoryId: params.categoryId,
+        sellerType: params.sellerType,
+        taxpayerType: params.taxpayerType,
+        appliesTo: params.appliesTo,
         isActive: true,
+        ...(params.excludeId ? { id: { not: params.excludeId } } : {}),
       },
+      select: { id: true, minAmount: true, maxAmount: true },
     });
-
-    if (existingRule) {
-      const categoryName = categoryId
-        ? (await this.prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } }))?.name || 'Kategori'
-        : 'Tüm Kategoriler';
-      const sellerTypeName = dto.sellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : dto.sellerType;
+    const clash = siblings.find((s) =>
+      this.rangesOverlap(
+        params.minAmount,
+        params.maxAmount,
+        s.minAmount != null ? Number(s.minAmount) : null,
+        s.maxAmount != null ? Number(s.maxAmount) : null,
+      ),
+    );
+    if (clash) {
       throw new BadRequestException(
-        `Bu kombinasyon için zaten bir kural mevcut: ${categoryName} + ${sellerTypeName}. Aynı seviyede sadece bir kural olabilir.`
+        "Aynı kategori / satıcı tipi / vergi tipi için tutar aralığı çakışan aktif bir kural zaten var.",
       );
     }
+  }
 
-    const rule = await this.prisma.commissionRule.create({
-      data: {
-        name: dto.name,
-        categoryId,
-        sellerType: dto.sellerType,
-        appliesTo: dto.appliesTo,
-        sellerRate: dto.sellerRate != null ? dto.sellerRate : null,
-        buyerRate: dto.buyerRate != null ? dto.buyerRate : null,
-        sellerMin: dto.sellerMin != null ? dto.sellerMin : null,
-        sellerMax: dto.sellerMax != null ? dto.sellerMax : null,
-        buyerMin: dto.buyerMin != null ? dto.buyerMin : null,
-        buyerMax: dto.buyerMax != null ? dto.buyerMax : null,
-        priority: 0, // Priority removed - each combination can only have one rule
-        isActive: dto.isActive ?? true,
-        // Legacy fields (for backward compatibility)
-        percentage: dto.percentage ?? (dto.sellerRate || 0),
-        ruleType: dto.type || 'default',
-        minAmount: dto.minAmount,
-      },
-      include: { category: { select: { id: true, name: true } } },
-    });
+  /** v2 kesinti oranları/limitleri — create ve update ortak eşlemesi. */
+  private v2RuleData(
+    dto: CreateCommissionRuleDto | UpdateCommissionRuleDto,
+  ): Record<string, unknown> {
+    const keys = [
+      "buyerCommissionRate",
+      "buyerCommissionMin",
+      "buyerCommissionMax",
+      "buyerServiceFeeRate",
+      "buyerServiceFeeMin",
+      "buyerServiceFeeMax",
+      "sellerCommissionRate",
+      "sellerCommissionMin",
+      "sellerCommissionMax",
+      "sellerPlatformFeeRate",
+      "sellerPlatformFeeMin",
+      "sellerPlatformFeeMax",
+    ] as const;
+    const data: Record<string, unknown> = {};
+    for (const k of keys) {
+      if ((dto as any)[k] !== undefined) data[k] = (dto as any)[k];
+    }
+    if (dto.taxpayerType !== undefined) data.taxpayerType = dto.taxpayerType;
+    if (dto.maxAmount !== undefined) data.maxAmount = dto.maxAmount;
+    if (dto.shippingBuyerShare !== undefined)
+      data.shippingBuyerShare = dto.shippingBuyerShare;
+    return data;
+  }
 
-    // Log action
-    await this.audit.createAuditLog(adminId, 'commission_rule_create', 'CommissionRule', rule.id, null, rule);
-
+  private serializeRule(rule: any) {
+    const num = (v: any) => (v != null ? Number(v) : null);
     return {
       id: rule.id,
       name: rule.name,
@@ -126,102 +181,196 @@ export class AdminCommissionService {
       categoryName: rule.category?.name || null,
       sellerType: rule.sellerType,
       appliesTo: rule.appliesTo,
-      sellerRate: rule.sellerRate ? Number(rule.sellerRate) : null,
-      buyerRate: rule.buyerRate ? Number(rule.buyerRate) : null,
-      sellerMin: rule.sellerMin ? Number(rule.sellerMin) : null,
-      sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
-      buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
-      buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
+      taxpayerType: rule.taxpayerType,
+      minAmount: num(rule.minAmount),
+      maxAmount: num(rule.maxAmount),
+      sellerRate: num(rule.sellerRate),
+      buyerRate: num(rule.buyerRate),
+      sellerMin: num(rule.sellerMin),
+      sellerMax: num(rule.sellerMax),
+      buyerMin: num(rule.buyerMin),
+      buyerMax: num(rule.buyerMax),
+      buyerCommissionRate: num(rule.buyerCommissionRate),
+      buyerCommissionMin: num(rule.buyerCommissionMin),
+      buyerCommissionMax: num(rule.buyerCommissionMax),
+      buyerServiceFeeRate: num(rule.buyerServiceFeeRate),
+      buyerServiceFeeMin: num(rule.buyerServiceFeeMin),
+      buyerServiceFeeMax: num(rule.buyerServiceFeeMax),
+      sellerCommissionRate: num(rule.sellerCommissionRate),
+      sellerCommissionMin: num(rule.sellerCommissionMin),
+      sellerCommissionMax: num(rule.sellerCommissionMax),
+      sellerPlatformFeeRate: num(rule.sellerPlatformFeeRate),
+      sellerPlatformFeeMin: num(rule.sellerPlatformFeeMin),
+      sellerPlatformFeeMax: num(rule.sellerPlatformFeeMax),
+      shippingBuyerShare: num(rule.shippingBuyerShare),
+      priority: rule.priority,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
-      // Legacy fields
-      percentage: Number(rule.percentage),
+      // Legacy
+      percentage: num(rule.percentage),
       type: rule.ruleType,
-      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
     };
+  }
+
+  async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {
+    // En az bir kesinti oranı verilmeli (legacy veya v2).
+    const anyRate = [
+      dto.sellerRate,
+      dto.buyerRate,
+      dto.buyerCommissionRate,
+      dto.buyerServiceFeeRate,
+      dto.sellerCommissionRate,
+      dto.sellerPlatformFeeRate,
+    ].some((r) => r != null);
+    if (!anyRate) {
+      throw new BadRequestException("En az bir kesinti oranı girmelisiniz.");
+    }
+
+    // min <= max sanity (legacy floors/caps + amount range)
+    const pairs: Array<[number | undefined, number | undefined, string]> = [
+      [dto.sellerMin, dto.sellerMax, "sellerMin/sellerMax"],
+      [dto.buyerMin, dto.buyerMax, "buyerMin/buyerMax"],
+      [dto.minAmount, dto.maxAmount, "minAmount/maxAmount"],
+    ];
+    for (const [min, max, label] of pairs) {
+      if (min != null && max != null && min > max) {
+        throw new BadRequestException(
+          `${label}: alt sınır üst sınırdan büyük olamaz`,
+        );
+      }
+    }
+
+    const categoryId =
+      dto.categoryId && dto.categoryId.trim() !== "" ? dto.categoryId : null;
+    const taxpayerType = dto.taxpayerType ?? CommissionTaxpayerType.all;
+
+    await this.assertNoRangeOverlap({
+      categoryId,
+      sellerType: dto.sellerType,
+      taxpayerType,
+      appliesTo: dto.appliesTo,
+      minAmount: dto.minAmount ?? null,
+      maxAmount: dto.maxAmount ?? null,
+    });
+
+    const rule = await this.prisma.commissionRule.create({
+      data: {
+        name: dto.name,
+        categoryId,
+        sellerType: dto.sellerType,
+        appliesTo: dto.appliesTo,
+        taxpayerType,
+        sellerRate: dto.sellerRate ?? null,
+        buyerRate: dto.buyerRate ?? null,
+        sellerMin: dto.sellerMin ?? null,
+        sellerMax: dto.sellerMax ?? null,
+        buyerMin: dto.buyerMin ?? null,
+        buyerMax: dto.buyerMax ?? null,
+        priority: dto.priority ?? 0,
+        isActive: dto.isActive ?? true,
+        ...this.v2RuleData(dto),
+        // Legacy (backward compatibility)
+        percentage: dto.percentage ?? (dto.sellerRate || 0),
+        ruleType: dto.type || "default",
+        minAmount: dto.minAmount,
+      },
+      include: { category: { select: { id: true, name: true } } },
+    });
+
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "commission_rule_create",
+      "CommissionRule",
+      rule.id,
+      null,
+      rule,
+    );
+
+    return this.serializeRule(rule);
   }
 
   /**
    * Update commission rule
    */
-  async updateCommissionRule(adminId: string, ruleId: string, dto: UpdateCommissionRuleDto) {
+  async updateCommissionRule(
+    adminId: string,
+    ruleId: string,
+    dto: UpdateCommissionRuleDto,
+  ) {
     const existing = await this.prisma.commissionRule.findUnique({
       where: { id: ruleId },
     });
 
     if (!existing) {
-      throw new NotFoundException('Komisyon kuralı bulunamadı');
+      throw new NotFoundException("Komisyon kuralı bulunamadı");
     }
 
-    // Determine final appliesTo value
-    const appliesTo = dto.appliesTo ?? existing.appliesTo ?? 'SELLER';
-
-    // Validate appliesTo requirements
-    if (appliesTo === 'SELLER' && dto.sellerRate === undefined && !existing.sellerRate) {
-      throw new BadRequestException('sellerRate is required when appliesTo is SELLER');
-    }
-    if (appliesTo === 'BUYER' && dto.buyerRate === undefined && !existing.buyerRate) {
-      throw new BadRequestException('buyerRate is required when appliesTo is BUYER');
-    }
-    if (appliesTo === 'BOTH') {
-      const finalSellerRate = dto.sellerRate !== undefined ? dto.sellerRate : existing.sellerRate;
-      const finalBuyerRate = dto.buyerRate !== undefined ? dto.buyerRate : existing.buyerRate;
-      if (!finalSellerRate || !finalBuyerRate) {
-        throw new BadRequestException('Both sellerRate and buyerRate are required when appliesTo is BOTH');
-      }
-    }
+    // Determine final appliesTo value (v2: rate requirements are lenient — a rule
+    // may carry legacy OR v2 rates; the engine falls back appropriately).
+    const appliesTo = dto.appliesTo ?? existing.appliesTo ?? "SELLER";
 
     // Validate min <= max
-    const sellerMin = dto.sellerMin !== undefined ? dto.sellerMin : existing.sellerMin;
-    const sellerMax = dto.sellerMax !== undefined ? dto.sellerMax : existing.sellerMax;
+    const sellerMin =
+      dto.sellerMin !== undefined ? dto.sellerMin : existing.sellerMin;
+    const sellerMax =
+      dto.sellerMax !== undefined ? dto.sellerMax : existing.sellerMax;
     if (sellerMin != null && sellerMax != null && sellerMin > sellerMax) {
-      throw new BadRequestException('sellerMin cannot be greater than sellerMax');
+      throw new BadRequestException(
+        "sellerMin cannot be greater than sellerMax",
+      );
     }
 
-    const buyerMin = dto.buyerMin !== undefined ? dto.buyerMin : existing.buyerMin;
-    const buyerMax = dto.buyerMax !== undefined ? dto.buyerMax : existing.buyerMax;
+    const buyerMin =
+      dto.buyerMin !== undefined ? dto.buyerMin : existing.buyerMin;
+    const buyerMax =
+      dto.buyerMax !== undefined ? dto.buyerMax : existing.buyerMax;
     if (buyerMin != null && buyerMax != null && buyerMin > buyerMax) {
-      throw new BadRequestException('buyerMin cannot be greater than buyerMax');
+      throw new BadRequestException("buyerMin cannot be greater than buyerMax");
     }
 
     // Determine final categoryId and sellerType
-    const finalCategoryId = dto.categoryId !== undefined
-      ? (dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null)
-      : existing.categoryId;
-    const finalSellerType = dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
+    const finalCategoryId =
+      dto.categoryId !== undefined
+        ? dto.categoryId && dto.categoryId.trim() !== ""
+          ? dto.categoryId
+          : null
+        : existing.categoryId;
+    const finalSellerType =
+      dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
+    const finalTaxpayerType =
+      dto.taxpayerType !== undefined ? dto.taxpayerType : existing.taxpayerType;
+    const finalMinAmount =
+      dto.minAmount !== undefined
+        ? dto.minAmount
+        : existing.minAmount != null
+          ? Number(existing.minAmount)
+          : null;
+    const finalMaxAmount =
+      dto.maxAmount !== undefined
+        ? dto.maxAmount
+        : existing.maxAmount != null
+          ? Number(existing.maxAmount)
+          : null;
 
-    // Check if changing categoryId or sellerType would conflict with another rule.
-    // NOT: appliesTo (SELLER/BUYER/BOTH) da eşleşmeli — alıcı hizmet bedeli kuralı ile
-    // satıcı komisyon kuralı aynı kategori+satıcı tipinde ayrı taraflara uygulanır, ÇAKIŞMAZ.
-    if ((dto.categoryId !== undefined || dto.sellerType !== undefined || dto.appliesTo !== undefined) &&
-      (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType || appliesTo !== existing.appliesTo)) {
-      const conflictingRule = await this.prisma.commissionRule.findFirst({
-        where: {
-          categoryId: finalCategoryId,
-          sellerType: finalSellerType,
-          appliesTo: appliesTo as any,
-          isActive: true,
-          id: { not: existing.id }, // Exclude current rule
-        },
-      });
-
-      if (conflictingRule) {
-        const categoryName = finalCategoryId
-          ? (await this.prisma.category.findUnique({ where: { id: finalCategoryId }, select: { name: true } }))?.name || 'Kategori'
-          : 'Tüm Kategoriler';
-        const sellerTypeName = finalSellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : finalSellerType;
-        throw new BadRequestException(
-          `Bu kombinasyon başka bir kural tarafından kullanılıyor: ${categoryName} + ${sellerTypeName}. Aynı seviyede sadece bir kural olabilir.`
-        );
-      }
-    }
+    // v2: aynı (kategori × satıcı tipi × vergi tipi × appliesTo) ekseninde tutar
+    // aralıkları çakışmamalı (çoklu kural serbest ama belirsizlik yasak).
+    await this.assertNoRangeOverlap({
+      categoryId: finalCategoryId,
+      sellerType: finalSellerType as CommissionSellerType,
+      taxpayerType: finalTaxpayerType,
+      appliesTo: appliesTo as CommissionAppliesTo,
+      minAmount: finalMinAmount ?? null,
+      maxAmount: finalMaxAmount ?? null,
+      excludeId: existing.id,
+    });
 
     // Prepare update data
     const updateData: any = {};
     if (dto.name !== undefined) updateData.name = dto.name;
     if (dto.categoryId !== undefined) {
-      updateData.categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
+      updateData.categoryId =
+        dto.categoryId && dto.categoryId.trim() !== "" ? dto.categoryId : null;
     }
     if (dto.sellerType !== undefined) updateData.sellerType = dto.sellerType;
     if (dto.appliesTo !== undefined) updateData.appliesTo = dto.appliesTo;
@@ -231,8 +380,10 @@ export class AdminCommissionService {
     if (dto.sellerMax !== undefined) updateData.sellerMax = dto.sellerMax;
     if (dto.buyerMin !== undefined) updateData.buyerMin = dto.buyerMin;
     if (dto.buyerMax !== undefined) updateData.buyerMax = dto.buyerMax;
-    // Priority removed - not used anymore
+    if (dto.priority !== undefined) updateData.priority = dto.priority;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+    // v2 fields (taxpayerType, maxAmount, 4 rate sets, shippingBuyerShare)
+    Object.assign(updateData, this.v2RuleData(dto));
     // Legacy fields
     if (dto.percentage !== undefined) updateData.percentage = dto.percentage;
     if (dto.type !== undefined) updateData.ruleType = dto.type;
@@ -244,29 +395,16 @@ export class AdminCommissionService {
       include: { category: { select: { id: true, name: true } } },
     });
 
-    await this.audit.createAuditLog(adminId, 'commission_rule_update', 'CommissionRule', rule.id, existing, rule);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "commission_rule_update",
+      "CommissionRule",
+      rule.id,
+      existing,
+      rule,
+    );
 
-    return {
-      id: rule.id,
-      name: rule.name,
-      categoryId: rule.categoryId,
-      categoryName: rule.category?.name || null,
-      sellerType: rule.sellerType,
-      appliesTo: rule.appliesTo,
-      sellerRate: rule.sellerRate ? Number(rule.sellerRate) : null,
-      buyerRate: rule.buyerRate ? Number(rule.buyerRate) : null,
-      sellerMin: rule.sellerMin ? Number(rule.sellerMin) : null,
-      sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
-      buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
-      buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
-      isActive: rule.isActive,
-      createdAt: rule.createdAt,
-      updatedAt: rule.updatedAt,
-      // Legacy fields
-      percentage: Number(rule.percentage),
-      type: rule.ruleType,
-      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
-    };
+    return this.serializeRule(rule);
   }
 
   /**
@@ -278,14 +416,21 @@ export class AdminCommissionService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Komisyon kuralı bulunamadı');
+      throw new NotFoundException("Komisyon kuralı bulunamadı");
     }
 
     await this.prisma.commissionRule.delete({
       where: { id: ruleId },
     });
 
-    await this.audit.createAuditLog(adminId, 'commission_rule_delete', 'CommissionRule', ruleId, existing, null);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "commission_rule_delete",
+      "CommissionRule",
+      ruleId,
+      existing,
+      null,
+    );
 
     return { success: true };
   }
@@ -294,26 +439,38 @@ export class AdminCommissionService {
 
   /** Takas nakit farkı komisyon oranı (%). PlatformSetting 'trade_commission_rate', varsayılan %5. */
   async getTradeCommissionRate(): Promise<{ rate: number }> {
-    const row = await this.prisma.platformSetting.findUnique({ where: { settingKey: 'trade_commission_rate' } });
-    return { rate: Number(row?.settingValue ?? '5') || 5 };
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: "trade_commission_rate" },
+    });
+    return { rate: Number(row?.settingValue ?? "5") || 5 };
   }
 
-  async setTradeCommissionRate(adminId: string, rate: number): Promise<{ rate: number }> {
+  async setTradeCommissionRate(
+    adminId: string,
+    rate: number,
+  ): Promise<{ rate: number }> {
     if (!(rate >= 0 && rate <= 100)) {
-      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+      throw new BadRequestException("Oran 0 ile 100 arasında olmalı");
     }
     await this.prisma.platformSetting.upsert({
-      where: { settingKey: 'trade_commission_rate' },
+      where: { settingKey: "trade_commission_rate" },
       create: {
-        settingKey: 'trade_commission_rate',
+        settingKey: "trade_commission_rate",
         settingValue: String(rate),
-        settingType: 'number',
-        description: 'Takas nakit farkı komisyon oranı (%)',
+        settingType: "number",
+        description: "Takas nakit farkı komisyon oranı (%)",
         updatedBy: adminId,
       },
       update: { settingValue: String(rate), updatedBy: adminId },
     });
-    await this.audit.createAuditLog(adminId, 'trade_commission_rate_update', 'PlatformSetting', 'trade_commission_rate', null, { rate });
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "trade_commission_rate_update",
+      "PlatformSetting",
+      "trade_commission_rate",
+      null,
+      { rate },
+    );
     return { rate };
   }
 }

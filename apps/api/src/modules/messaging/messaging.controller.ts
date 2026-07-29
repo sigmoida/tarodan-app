@@ -28,11 +28,13 @@ import {
 } from './dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { AdminRole } from '@prisma/client';
 import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('messages')
+@RequirePermission('messages')
 export class MessagingController {
   private readonly logger = new Logger(MessagingController.name);
 

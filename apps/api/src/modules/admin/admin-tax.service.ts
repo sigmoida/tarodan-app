@@ -2,11 +2,17 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma';
-import { AdminAuditService } from './admin-audit.service';
-import { StorageService } from '../storage/storage.service';
+} from "@nestjs/common";
+import { ElogoInvoiceStatus, ElogoInvoiceType, Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma";
+import { AdminAuditService } from "./admin-audit.service";
+import { StorageService } from "../storage/storage.service";
+import { ElogoInvoiceQueryDto, SellerUploadedInvoiceQueryDto } from "./dto";
+import {
+  paginate,
+  paginateComputedRows,
+  resolveOrderBy,
+} from "../../common/list";
 
 /**
  * Vergi ayarları admin operasyonları (bölgeler, oranlar, kurallar, raporlama) —
@@ -22,13 +28,13 @@ export class AdminTaxService {
   ) {}
 
   private static readonly ELOGO_TYPE_LABELS: Record<string, string> = {
-    commission: 'Komisyon',
-    service_fee: 'Hizmet Bedeli',
-    membership: 'Üyelik',
-    boost: 'Öne Çıkarma',
-    trade_commission: 'Takas Komisyonu',
-    platform_sale: 'Platform Satışı',
-    return_invoice: 'İade Faturası',
+    commission: "Komisyon",
+    service_fee: "Hizmet Bedeli",
+    membership: "Üyelik",
+    boost: "Öne Çıkarma",
+    trade_commission: "Takas Komisyonu",
+    platform_sale: "Platform Satışı",
+    return_invoice: "İade Faturası",
   };
 
   // ==================== TAX SETTINGS (Regions, Rates, Rules, Reporting) ====================
@@ -38,7 +44,11 @@ export class AdminTaxService {
   }
 
   private get hasTaxModels(): boolean {
-    return !!(this.taxPrisma.taxRegion && this.taxPrisma.taxRate && this.taxPrisma.taxRule);
+    return !!(
+      this.taxPrisma.taxRegion &&
+      this.taxPrisma.taxRate &&
+      this.taxPrisma.taxRule
+    );
   }
 
   async getTaxRegions() {
@@ -47,7 +57,7 @@ export class AdminTaxService {
       include: {
         _count: { select: { taxRates: true, taxRules: true } },
       },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
     return {
       data: regions.map((r: any) => ({
@@ -66,15 +76,21 @@ export class AdminTaxService {
     };
   }
 
-  async createTaxRegion(adminId: string, dto: {
-    name: string;
-    countryCode: string;
-    regionCode?: string;
-    isDefault?: boolean;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+  async createTaxRegion(
+    adminId: string,
+    dto: {
+      name: string;
+      countryCode: string;
+      regionCode?: string;
+      isDefault?: boolean;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     if (dto.isDefault) {
       await this.taxPrisma.taxRegion.updateMany({ data: { isDefault: false } });
     }
@@ -88,21 +104,37 @@ export class AdminTaxService {
         isActive: dto.isActive ?? true,
       },
     });
-    await this.audit.createAuditLog(adminId, 'tax_region_create', 'TaxRegion', region.id, null, region);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_region_create",
+      "TaxRegion",
+      region.id,
+      null,
+      region,
+    );
     return region;
   }
 
-  async updateTaxRegion(adminId: string, id: string, dto: {
-    name?: string;
-    countryCode?: string;
-    regionCode?: string;
-    isDefault?: boolean;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const existing = await this.taxPrisma.taxRegion.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Vergi bölgesi bulunamadı');
+  async updateTaxRegion(
+    adminId: string,
+    id: string,
+    dto: {
+      name?: string;
+      countryCode?: string;
+      regionCode?: string;
+      isDefault?: boolean;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
+    const existing = await this.taxPrisma.taxRegion.findUnique({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException("Vergi bölgesi bulunamadı");
     if (dto.isDefault) {
       await this.taxPrisma.taxRegion.updateMany({ data: { isDefault: false } });
     }
@@ -110,30 +142,53 @@ export class AdminTaxService {
       where: { id },
       data: {
         ...(dto.name != null && { name: dto.name }),
-        ...(dto.countryCode != null && { countryCode: dto.countryCode.toUpperCase() }),
-        ...(dto.regionCode !== undefined && { regionCode: dto.regionCode || null }),
+        ...(dto.countryCode != null && {
+          countryCode: dto.countryCode.toUpperCase(),
+        }),
+        ...(dto.regionCode !== undefined && {
+          regionCode: dto.regionCode || null,
+        }),
         ...(dto.isDefault != null && { isDefault: dto.isDefault }),
         ...(dto.sortOrder != null && { sortOrder: dto.sortOrder }),
         ...(dto.isActive != null && { isActive: dto.isActive }),
       },
     });
-    await this.audit.createAuditLog(adminId, 'tax_region_update', 'TaxRegion', id, existing, region);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_region_update",
+      "TaxRegion",
+      id,
+      existing,
+      region,
+    );
     return region;
   }
 
   async deleteTaxRegion(adminId: string, id: string) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     const region = await this.taxPrisma.taxRegion.findUnique({
       where: { id },
       include: { _count: { select: { taxRates: true } } },
     });
-    if (!region) throw new NotFoundException('Vergi bölgesi bulunamadı');
+    if (!region) throw new NotFoundException("Vergi bölgesi bulunamadı");
     if (region._count.taxRates > 0) {
-      throw new BadRequestException('Bu bölgede vergi oranları tanımlı. Önce oranları silin.');
+      throw new BadRequestException(
+        "Bu bölgede vergi oranları tanımlı. Önce oranları silin.",
+      );
     }
     await this.taxPrisma.taxRule.deleteMany({ where: { taxRegionId: id } });
     await this.taxPrisma.taxRegion.delete({ where: { id } });
-    await this.audit.createAuditLog(adminId, 'tax_region_delete', 'TaxRegion', id, region, null);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_region_delete",
+      "TaxRegion",
+      id,
+      region,
+      null,
+    );
     return { success: true };
   }
 
@@ -145,7 +200,7 @@ export class AdminTaxService {
       include: {
         taxRegion: { select: { id: true, name: true, countryCode: true } },
       },
-      orderBy: [{ taxRegionId: 'asc' }, { sortOrder: 'asc' }, { rate: 'asc' }],
+      orderBy: [{ taxRegionId: "asc" }, { sortOrder: "asc" }, { rate: "asc" }],
     });
     return {
       data: rates.map((r: any) => ({
@@ -173,30 +228,48 @@ export class AdminTaxService {
    */
   private async resolveDefaultTaxRegionId(): Promise<string> {
     const region =
-      (await this.taxPrisma.taxRegion.findFirst({ where: { isActive: true, isDefault: true } })) ??
-      (await this.taxPrisma.taxRegion.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
+      (await this.taxPrisma.taxRegion.findFirst({
+        where: { isActive: true, isDefault: true },
+      })) ??
+      (await this.taxPrisma.taxRegion.findFirst({
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
+      }));
     if (region) return region.id;
     const created = await this.taxPrisma.taxRegion.create({
-      data: { name: 'Türkiye', countryCode: 'TR', isDefault: true, isActive: true },
+      data: {
+        name: "Türkiye",
+        countryCode: "TR",
+        isDefault: true,
+        isActive: true,
+      },
     });
     return created.id;
   }
 
-  async createTaxRate(adminId: string, dto: {
-    taxRegionId?: string;
-    name: string;
-    rate: number;
-    isDefault?: boolean;
-    effectiveFrom?: string;
-    effectiveTo?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+  async createTaxRate(
+    adminId: string,
+    dto: {
+      taxRegionId?: string;
+      name: string;
+      rate: number;
+      isDefault?: boolean;
+      effectiveFrom?: string;
+      effectiveTo?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     let taxRegionId = dto.taxRegionId;
     if (taxRegionId) {
-      const region = await this.taxPrisma.taxRegion.findUnique({ where: { id: taxRegionId } });
-      if (!region) throw new NotFoundException('Vergi bölgesi bulunamadı');
+      const region = await this.taxPrisma.taxRegion.findUnique({
+        where: { id: taxRegionId },
+      });
+      if (!region) throw new NotFoundException("Vergi bölgesi bulunamadı");
     } else {
       taxRegionId = await this.resolveDefaultTaxRegionId();
     }
@@ -218,22 +291,36 @@ export class AdminTaxService {
         isActive: dto.isActive ?? true,
       },
     });
-    await this.audit.createAuditLog(adminId, 'tax_rate_create', 'TaxRate', rate.id, null, rate);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_rate_create",
+      "TaxRate",
+      rate.id,
+      null,
+      rate,
+    );
     return rate;
   }
 
-  async updateTaxRate(adminId: string, id: string, dto: {
-    name?: string;
-    rate?: number;
-    isDefault?: boolean;
-    effectiveFrom?: string;
-    effectiveTo?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+  async updateTaxRate(
+    adminId: string,
+    id: string,
+    dto: {
+      name?: string;
+      rate?: number;
+      isDefault?: boolean;
+      effectiveFrom?: string;
+      effectiveTo?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     const existing = await this.taxPrisma.taxRate.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Vergi oranı bulunamadı');
+    if (!existing) throw new NotFoundException("Vergi oranı bulunamadı");
     if (dto.isDefault != null && dto.isDefault) {
       await this.taxPrisma.taxRate.updateMany({
         where: { taxRegionId: existing.taxRegionId },
@@ -246,28 +333,51 @@ export class AdminTaxService {
         ...(dto.name != null && { name: dto.name }),
         ...(dto.rate != null && { rate: dto.rate }),
         ...(dto.isDefault != null && { isDefault: dto.isDefault }),
-        ...(dto.effectiveFrom !== undefined && { effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null }),
-        ...(dto.effectiveTo !== undefined && { effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null }),
+        ...(dto.effectiveFrom !== undefined && {
+          effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null,
+        }),
+        ...(dto.effectiveTo !== undefined && {
+          effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
+        }),
         ...(dto.sortOrder != null && { sortOrder: dto.sortOrder }),
         ...(dto.isActive != null && { isActive: dto.isActive }),
       },
     });
-    await this.audit.createAuditLog(adminId, 'tax_rate_update', 'TaxRate', id, existing, rate);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_rate_update",
+      "TaxRate",
+      id,
+      existing,
+      rate,
+    );
     return rate;
   }
 
   async deleteTaxRate(adminId: string, id: string) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     const rate = await this.taxPrisma.taxRate.findUnique({
       where: { id },
       include: { _count: { select: { taxRules: true } } },
     });
-    if (!rate) throw new NotFoundException('Vergi oranı bulunamadı');
+    if (!rate) throw new NotFoundException("Vergi oranı bulunamadı");
     if (rate._count.taxRules > 0) {
-      throw new BadRequestException('Bu orana bağlı vergi kuralları var. Önce kuralları silin veya güncelleyin.');
+      throw new BadRequestException(
+        "Bu orana bağlı vergi kuralları var. Önce kuralları silin veya güncelleyin.",
+      );
     }
     await this.taxPrisma.taxRate.delete({ where: { id } });
-    await this.audit.createAuditLog(adminId, 'tax_rate_delete', 'TaxRate', id, rate, null);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_rate_delete",
+      "TaxRate",
+      id,
+      rate,
+      null,
+    );
     return { success: true };
   }
 
@@ -281,7 +391,11 @@ export class AdminTaxService {
         taxRate: { select: { id: true, name: true, rate: true } },
         category: { select: { id: true, name: true } },
       },
-      orderBy: [{ taxRegionId: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
+      orderBy: [
+        { taxRegionId: "asc" },
+        { priority: "desc" },
+        { createdAt: "asc" },
+      ],
     });
     return {
       data: rules.map((r: any) => ({
@@ -302,69 +416,112 @@ export class AdminTaxService {
     };
   }
 
-  async createTaxRule(adminId: string, dto: {
-    taxRegionId?: string;
-    taxRateId: string;
-    scope: string;
-    categoryId?: string;
-    priority?: number;
-    isActive?: boolean;
-  }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const rate = await this.taxPrisma.taxRate.findUnique({ where: { id: dto.taxRateId } });
-    if (!rate) throw new NotFoundException('Vergi oranı bulunamadı');
+  async createTaxRule(
+    adminId: string,
+    dto: {
+      taxRegionId?: string;
+      taxRateId: string;
+      scope: string;
+      categoryId?: string;
+      priority?: number;
+      isActive?: boolean;
+    },
+  ) {
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
+    const rate = await this.taxPrisma.taxRate.findUnique({
+      where: { id: dto.taxRateId },
+    });
+    if (!rate) throw new NotFoundException("Vergi oranı bulunamadı");
     // Bölge verilmezse kuralın bölgesi = oranın bölgesi (TR-only sadeleştirme).
     const taxRegionId = dto.taxRegionId ?? rate.taxRegionId;
     if (rate.taxRegionId !== taxRegionId) {
-      throw new BadRequestException('Vergi oranı bu bölgeye ait değil.');
+      throw new BadRequestException("Vergi oranı bu bölgeye ait değil.");
     }
-    if (dto.scope === 'category' && !dto.categoryId) {
-      throw new BadRequestException('Kategori kuralı için categoryId gerekli.');
+    if (dto.scope === "category" && !dto.categoryId) {
+      throw new BadRequestException("Kategori kuralı için categoryId gerekli.");
     }
     const rule = await this.taxPrisma.taxRule.create({
       data: {
         taxRegionId,
         taxRateId: dto.taxRateId,
-        scope: dto.scope as 'default_rate' | 'category' | 'product',
+        scope: dto.scope as "default_rate" | "category" | "product",
         categoryId: dto.categoryId ?? null,
         priority: dto.priority ?? 0,
         isActive: dto.isActive ?? true,
       },
     });
-    await this.audit.createAuditLog(adminId, 'tax_rule_create', 'TaxRule', rule.id, null, rule);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_rule_create",
+      "TaxRule",
+      rule.id,
+      null,
+      rule,
+    );
     return rule;
   }
 
-  async updateTaxRule(adminId: string, id: string, dto: {
-    taxRateId?: string;
-    scope?: string;
-    categoryId?: string;
-    priority?: number;
-    isActive?: boolean;
-  }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+  async updateTaxRule(
+    adminId: string,
+    id: string,
+    dto: {
+      taxRateId?: string;
+      scope?: string;
+      categoryId?: string;
+      priority?: number;
+      isActive?: boolean;
+    },
+  ) {
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     const existing = await this.taxPrisma.taxRule.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Vergi kuralı bulunamadı');
+    if (!existing) throw new NotFoundException("Vergi kuralı bulunamadı");
     const rate = await this.taxPrisma.taxRule.update({
       where: { id },
       data: {
         ...(dto.taxRateId != null && { taxRateId: dto.taxRateId }),
-        ...(dto.scope != null && { scope: dto.scope as 'default_rate' | 'category' | 'product' }),
-        ...(dto.categoryId !== undefined && { categoryId: dto.categoryId || null }),
+        ...(dto.scope != null && {
+          scope: dto.scope as "default_rate" | "category" | "product",
+        }),
+        ...(dto.categoryId !== undefined && {
+          categoryId: dto.categoryId || null,
+        }),
         ...(dto.priority != null && { priority: dto.priority }),
         ...(dto.isActive != null && { isActive: dto.isActive }),
       },
     });
-    await this.audit.createAuditLog(adminId, 'tax_rule_update', 'TaxRule', id, existing, rate);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_rule_update",
+      "TaxRule",
+      id,
+      existing,
+      rate,
+    );
     return rate;
   }
 
   async deleteTaxRule(adminId: string, id: string) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     const rule = await this.taxPrisma.taxRule.findUnique({ where: { id } });
-    if (!rule) throw new NotFoundException('Vergi kuralı bulunamadı');
+    if (!rule) throw new NotFoundException("Vergi kuralı bulunamadı");
     await this.taxPrisma.taxRule.delete({ where: { id } });
-    await this.audit.createAuditLog(adminId, 'tax_rule_delete', 'TaxRule', id, rule, null);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "tax_rule_delete",
+      "TaxRule",
+      id,
+      rule,
+      null,
+    );
     return { success: true };
   }
 
@@ -374,17 +531,20 @@ export class AdminTaxService {
   async getTaxReport(query: {
     fromDate?: string;
     toDate?: string;
-    groupBy?: 'day' | 'month' | 'year' | 'region';
+    groupBy?: "day" | "month" | "year" | "region";
     regionId?: string;
   }) {
-    const from = query.fromDate ? new Date(query.fromDate) : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const from = query.fromDate
+      ? new Date(query.fromDate)
+      : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
     const to = query.toDate ? new Date(query.toDate) : new Date();
-    if (from > to) throw new BadRequestException('fromDate must be before toDate');
+    if (from > to)
+      throw new BadRequestException("fromDate must be before toDate");
 
     const invoices = await this.prisma.invoice.findMany({
       where: {
         issuedAt: { gte: from, lte: to },
-        status: { not: 'cancelled' },
+        status: { not: "cancelled" },
       },
       select: {
         id: true,
@@ -394,11 +554,17 @@ export class AdminTaxService {
         issuedAt: true,
         orderId: true,
       },
-      orderBy: { issuedAt: 'asc' },
+      orderBy: { issuedAt: "asc" },
     });
 
-    const totalTaxCollected = invoices.reduce((sum, inv) => sum + Number(inv.taxAmount), 0);
-    const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.total), 0);
+    const totalTaxCollected = invoices.reduce(
+      (sum, inv) => sum + Number(inv.taxAmount),
+      0,
+    );
+    const totalRevenue = invoices.reduce(
+      (sum, inv) => sum + Number(inv.total),
+      0,
+    );
     const invoiceCount = invoices.length;
 
     const summary = {
@@ -409,11 +575,19 @@ export class AdminTaxService {
       invoiceCount,
     };
 
-    let breakdown: Array<{ period: string; taxCollected: number; revenue: number; count: number }> = [];
-    const groupBy = query.groupBy || 'month';
+    let breakdown: Array<{
+      period: string;
+      taxCollected: number;
+      revenue: number;
+      count: number;
+    }> = [];
+    const groupBy = query.groupBy || "month";
 
-    if (groupBy === 'day') {
-      const byDay = new Map<string, { tax: number; revenue: number; count: number }>();
+    if (groupBy === "day") {
+      const byDay = new Map<
+        string,
+        { tax: number; revenue: number; count: number }
+      >();
       for (const inv of invoices) {
         const key = inv.issuedAt.toISOString().slice(0, 10);
         const cur = byDay.get(key) || { tax: 0, revenue: 0, count: 0 };
@@ -430,8 +604,11 @@ export class AdminTaxService {
           revenue: Math.round(v.revenue * 100) / 100,
           count: v.count,
         }));
-    } else if (groupBy === 'month') {
-      const byMonth = new Map<string, { tax: number; revenue: number; count: number }>();
+    } else if (groupBy === "month") {
+      const byMonth = new Map<
+        string,
+        { tax: number; revenue: number; count: number }
+      >();
       for (const inv of invoices) {
         const key = inv.issuedAt.toISOString().slice(0, 7);
         const cur = byMonth.get(key) || { tax: 0, revenue: 0, count: 0 };
@@ -448,8 +625,11 @@ export class AdminTaxService {
           revenue: Math.round(v.revenue * 100) / 100,
           count: v.count,
         }));
-    } else if (groupBy === 'year') {
-      const byYear = new Map<string, { tax: number; revenue: number; count: number }>();
+    } else if (groupBy === "year") {
+      const byYear = new Map<
+        string,
+        { tax: number; revenue: number; count: number }
+      >();
       for (const inv of invoices) {
         const key = inv.issuedAt.getFullYear().toString();
         const cur = byYear.get(key) || { tax: 0, revenue: 0, count: 0 };
@@ -495,15 +675,15 @@ export class AdminTaxService {
         taxRate: true,
         category: { select: { id: true, name: true } },
       },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     });
-    const def = rules.find((r: any) => r.scope === 'default_rate');
+    const def = rules.find((r: any) => r.scope === "default_rate");
     const overrides = rules
-      .filter((r: any) => r.scope === 'category' && r.categoryId)
+      .filter((r: any) => r.scope === "category" && r.categoryId)
       .map((r: any) => ({
         ruleId: r.id,
         categoryId: r.categoryId,
-        categoryName: r.category?.name ?? '—',
+        categoryName: r.category?.name ?? "—",
         rate: Number(r.taxRate.rate),
       }));
     return { defaultRate: def ? Number(def.taxRate.rate) : null, overrides };
@@ -526,9 +706,12 @@ export class AdminTaxService {
   }
 
   async setDefaultVat(adminId: string, ratePercent: number) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     if (!(ratePercent >= 0 && ratePercent <= 100)) {
-      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+      throw new BadRequestException("Oran 0 ile 100 arasında olmalı");
     }
     const regionId = await this.resolveDefaultTaxRegionId();
     const rate = await this.findOrCreateVatRate(regionId, ratePercent);
@@ -536,9 +719,12 @@ export class AdminTaxService {
       where: { taxRegionId: regionId },
       data: { isDefault: false },
     });
-    await this.taxPrisma.taxRate.update({ where: { id: rate.id }, data: { isDefault: true } });
+    await this.taxPrisma.taxRate.update({
+      where: { id: rate.id },
+      data: { isDefault: true },
+    });
     const rule = await this.taxPrisma.taxRule.findFirst({
-      where: { taxRegionId: regionId, scope: 'default_rate' },
+      where: { taxRegionId: regionId, scope: "default_rate" },
     });
     if (rule) {
       await this.taxPrisma.taxRule.update({
@@ -547,25 +733,45 @@ export class AdminTaxService {
       });
     } else {
       await this.taxPrisma.taxRule.create({
-        data: { taxRegionId: regionId, taxRateId: rate.id, scope: 'default_rate' },
+        data: {
+          taxRegionId: regionId,
+          taxRateId: rate.id,
+          scope: "default_rate",
+        },
       });
     }
-    await this.audit.createAuditLog(adminId, 'vat_default_update', 'TaxRule', regionId, null, { rate: ratePercent });
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "vat_default_update",
+      "TaxRule",
+      regionId,
+      null,
+      { rate: ratePercent },
+    );
     return { defaultRate: ratePercent };
   }
 
   /** Kategori istisnası ekle/güncelle: kategori → KDV %. Kategori başına tek kural (upsert). */
-  async setVatOverride(adminId: string, categoryId: string, ratePercent: number) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+  async setVatOverride(
+    adminId: string,
+    categoryId: string,
+    ratePercent: number,
+  ) {
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
     if (!(ratePercent >= 0 && ratePercent <= 100)) {
-      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+      throw new BadRequestException("Oran 0 ile 100 arasında olmalı");
     }
-    const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
-    if (!category) throw new NotFoundException('Kategori bulunamadı');
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+    });
+    if (!category) throw new NotFoundException("Kategori bulunamadı");
     const regionId = await this.resolveDefaultTaxRegionId();
     const rate = await this.findOrCreateVatRate(regionId, ratePercent);
     const existing = await this.taxPrisma.taxRule.findFirst({
-      where: { taxRegionId: regionId, scope: 'category', categoryId },
+      where: { taxRegionId: regionId, scope: "category", categoryId },
     });
     const rule = existing
       ? await this.taxPrisma.taxRule.update({
@@ -573,18 +779,49 @@ export class AdminTaxService {
           data: { taxRateId: rate.id, isActive: true },
         })
       : await this.taxPrisma.taxRule.create({
-          data: { taxRegionId: regionId, taxRateId: rate.id, scope: 'category', categoryId, priority: 10 },
+          data: {
+            taxRegionId: regionId,
+            taxRateId: rate.id,
+            scope: "category",
+            categoryId,
+            priority: 10,
+          },
         });
-    await this.audit.createAuditLog(adminId, 'vat_override_upsert', 'TaxRule', rule.id, existing, { categoryId, rate: ratePercent });
-    return { ruleId: rule.id, categoryId, categoryName: category.name, rate: ratePercent };
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "vat_override_upsert",
+      "TaxRule",
+      rule.id,
+      existing,
+      { categoryId, rate: ratePercent },
+    );
+    return {
+      ruleId: rule.id,
+      categoryId,
+      categoryName: category.name,
+      rate: ratePercent,
+    };
   }
 
   async deleteVatOverride(adminId: string, ruleId: string) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const rule = await this.taxPrisma.taxRule.findUnique({ where: { id: ruleId } });
-    if (!rule || rule.scope !== 'category') throw new NotFoundException('KDV istisnası bulunamadı');
+    if (!this.hasTaxModels)
+      throw new BadRequestException(
+        "Tax models not available. Run: npx prisma generate (in apps/api)",
+      );
+    const rule = await this.taxPrisma.taxRule.findUnique({
+      where: { id: ruleId },
+    });
+    if (!rule || rule.scope !== "category")
+      throw new NotFoundException("KDV istisnası bulunamadı");
     await this.taxPrisma.taxRule.delete({ where: { id: ruleId } });
-    await this.audit.createAuditLog(adminId, 'vat_override_delete', 'TaxRule', ruleId, rule, null);
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "vat_override_delete",
+      "TaxRule",
+      ruleId,
+      rule,
+      null,
+    );
     return { success: true };
   }
 
@@ -593,28 +830,39 @@ export class AdminTaxService {
   /** E-ticaret stopaj oranı (%). PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
   async getWithholdingRate(): Promise<{ rate: number }> {
     const row = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'withholding_tax_rate' },
+      where: { settingKey: "withholding_tax_rate" },
     });
-    const rate = Number(row?.settingValue ?? '1');
+    const rate = Number(row?.settingValue ?? "1");
     return { rate: Number.isFinite(rate) && rate >= 0 ? rate : 1 };
   }
 
-  async setWithholdingRate(adminId: string, rate: number): Promise<{ rate: number }> {
+  async setWithholdingRate(
+    adminId: string,
+    rate: number,
+  ): Promise<{ rate: number }> {
     if (!(rate >= 0 && rate <= 100)) {
-      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+      throw new BadRequestException("Oran 0 ile 100 arasında olmalı");
     }
     await this.prisma.platformSetting.upsert({
-      where: { settingKey: 'withholding_tax_rate' },
+      where: { settingKey: "withholding_tax_rate" },
       create: {
-        settingKey: 'withholding_tax_rate',
+        settingKey: "withholding_tax_rate",
         settingValue: String(rate),
-        settingType: 'number',
-        description: 'E-ticaret stopaj (tevkifat) oranı (%) — GVK 94/19, kurumsal satıcı payout kesintisi',
+        settingType: "number",
+        description:
+          "E-ticaret stopaj (tevkifat) oranı (%) — GVK 94/19, kurumsal satıcı payout kesintisi",
         updatedBy: adminId,
       },
       update: { settingValue: String(rate), updatedBy: adminId },
     });
-    await this.audit.createAuditLog(adminId, 'withholding_tax_rate_update', 'PlatformSetting', 'withholding_tax_rate', null, { rate });
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "withholding_tax_rate_update",
+      "PlatformSetting",
+      "withholding_tax_rate",
+      null,
+      { rate },
+    );
     return { rate };
   }
 
@@ -630,16 +878,22 @@ export class AdminTaxService {
 
     const transfers = await this.prisma.payoutTransfer.findMany({
       where: {
-        status: 'completed',
+        status: "completed",
         processedAt: { gte: from, lt: to },
         withholdingTax: { gt: 0 },
       },
       include: {
         seller: {
-          select: { id: true, displayName: true, companyName: true, taxId: true, email: true },
+          select: {
+            id: true,
+            displayName: true,
+            companyName: true,
+            taxId: true,
+            email: true,
+          },
         },
       },
-      orderBy: { processedAt: 'asc' },
+      orderBy: { processedAt: "asc" },
     });
 
     const bySeller = new Map<
@@ -657,7 +911,7 @@ export class AdminTaxService {
     for (const t of transfers) {
       const cur = bySeller.get(t.sellerId) || {
         sellerId: t.sellerId,
-        sellerName: t.seller?.companyName || t.seller?.displayName || '—',
+        sellerName: t.seller?.companyName || t.seller?.displayName || "—",
         taxId: t.seller?.taxId || null,
         email: t.seller?.email || null,
         transferCount: 0,
@@ -679,7 +933,7 @@ export class AdminTaxService {
 
     const pendingAgg = await this.prisma.payoutTransfer.aggregate({
       where: {
-        status: { in: ['pending', 'processing', 'retry_pending'] },
+        status: { in: ["pending", "processing", "retry_pending"] },
         withholdingTax: { gt: 0 },
       },
       _sum: { withholdingTax: true },
@@ -687,10 +941,11 @@ export class AdminTaxService {
     });
 
     return {
-      period: `${query.year}-${String(query.month).padStart(2, '0')}`,
+      period: `${query.year}-${String(query.month).padStart(2, "0")}`,
       summary: {
         totalWithholding:
-          Math.round(rows.reduce((s, r) => s + r.withholdingTax, 0) * 100) / 100,
+          Math.round(rows.reduce((s, r) => s + r.withholdingTax, 0) * 100) /
+          100,
         sellerCount: rows.length,
         transferCount: transfers.length,
         pendingWithholding:
@@ -707,20 +962,7 @@ export class AdminTaxService {
    * Tarodan'ın kestiği e-Arşiv/e-Fatura gelir belgeleri (komisyon/hizmet/üyelik/boost/takas/
    * platform satışı) + iade faturaları. Sayfalı + tür/durum/belge/tarih filtreli + arama.
    */
-  async getElogoInvoices(query: {
-    type?: string;
-    status?: string;
-    documentType?: string;
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 20;
-    const skip = (page - 1) * limit;
-
+  async getElogoInvoices(query: ElogoInvoiceQueryDto) {
     const where: Prisma.ElogoInvoiceWhereInput = {};
     if (query.type) where.type = query.type as any;
     if (query.status) where.status = query.status as any;
@@ -732,57 +974,95 @@ export class AdminTaxService {
     }
     if (query.search?.trim()) {
       const q = query.search.trim();
+      const normalized = q.toLowerCase();
+      const numeric = Number(q.replace(",", "."));
       where.OR = [
-        { invoiceNumber: { contains: q, mode: 'insensitive' } },
-        { recipientName: { contains: q, mode: 'insensitive' } },
-        { recipientVknTckn: { contains: q, mode: 'insensitive' } },
-        { ettn: { contains: q, mode: 'insensitive' } },
-        { billingReference: { contains: q, mode: 'insensitive' } },
+        { invoiceNumber: { contains: q, mode: "insensitive" } },
+        { recipientName: { contains: q, mode: "insensitive" } },
+        { recipientVknTckn: { contains: q, mode: "insensitive" } },
+        { ettn: { contains: q, mode: "insensitive" } },
+        { billingReference: { contains: q, mode: "insensitive" } },
       ];
+      if (
+        Object.values(ElogoInvoiceType).includes(normalized as ElogoInvoiceType)
+      )
+        where.OR.push({ type: normalized as ElogoInvoiceType });
+      if (
+        Object.values(ElogoInvoiceStatus).includes(
+          normalized as ElogoInvoiceStatus,
+        )
+      )
+        where.OR.push({ status: normalized as ElogoInvoiceStatus });
+      if (Number.isFinite(numeric))
+        where.OR.push(
+          { netAmount: numeric },
+          { taxAmount: numeric },
+          { total: numeric },
+        );
     }
 
-    const [rows, total] = await Promise.all([
-      this.prisma.elogoInvoice.findMany({
+    const select = {
+      id: true,
+      type: true,
+      status: true,
+      documentType: true,
+      invoiceNumber: true,
+      ettn: true,
+      recipientName: true,
+      recipientVknTckn: true,
+      recipientUserId: true,
+      netAmount: true,
+      taxAmount: true,
+      total: true,
+      vatRate: true,
+      billingReference: true,
+      pdfUrl: true,
+      emailSentAt: true,
+      elogoResultMsg: true,
+      issuedAt: true,
+      cancelledAt: true,
+      cancelReason: true,
+      createdAt: true,
+    } satisfies Prisma.ElogoInvoiceSelect;
+    let result;
+    if (query.sortBy === "hasPdf") {
+      const invoices = await this.prisma.elogoInvoice.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          type: true,
-          status: true,
-          documentType: true,
-          invoiceNumber: true,
-          ettn: true,
-          recipientName: true,
-          recipientVknTckn: true,
-          recipientUserId: true,
-          netAmount: true,
-          taxAmount: true,
-          total: true,
-          vatRate: true,
-          billingReference: true,
-          pdfUrl: true,
-          emailSentAt: true,
-          elogoResultMsg: true,
-          issuedAt: true,
-          cancelledAt: true,
-          cancelReason: true,
-          createdAt: true,
-        },
-      }),
-      this.prisma.elogoInvoice.count({ where }),
-    ]);
+        select,
+      });
+      result = paginateComputedRows(
+        invoices,
+        (invoice) => (invoice.pdfUrl ? 1 : 0),
+        { ...query, sortType: "number" },
+      );
+    } else {
+      const orderBy =
+        resolveOrderBy<Prisma.ElogoInvoiceOrderByWithRelationInput>(
+          "ElogoInvoice",
+          query,
+          { defaultSort: { createdAt: "desc" } },
+        );
+      result = await paginate(
+        this.prisma.elogoInvoice,
+        { where, orderBy, select },
+        query,
+      );
+    }
+    const rows = result.data as Prisma.ElogoInvoiceGetPayload<{
+      select: typeof select;
+    }>[];
 
     return {
+      ...result,
       data: rows.map((r) => ({
         id: r.id,
         type: r.type,
-        typeLabel: AdminTaxService.ELOGO_TYPE_LABELS[r.type] || 'Fatura',
-        isReturn: r.type === 'return_invoice',
+        typeLabel: AdminTaxService.ELOGO_TYPE_LABELS[r.type] || "Fatura",
+        isReturn: r.type === "return_invoice",
         status: r.status,
         documentType: r.documentType,
-        documentTypeLabel: r.documentType === 'EINVOICE' ? 'e-Fatura' : 'e-Arşiv',
+        documentTypeLabel:
+          r.documentType === "EINVOICE" ? "e-Fatura" : "e-Arşiv",
         invoiceNumber: r.invoiceNumber,
         ettn: r.ettn,
         recipientName: r.recipientName,
@@ -801,7 +1081,6 @@ export class AdminTaxService {
         cancelReason: r.cancelReason,
         createdAt: r.createdAt,
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -809,17 +1088,7 @@ export class AdminTaxService {
    * Kurumsal satıcıların siparişe ELLE yüklediği ürün faturaları (eLogo gelir faturasından ayrı).
    * Admin Faturalar sayfasında "Satıcı Faturaları" sekmesi.
    */
-  async getSellerUploadedInvoices(query: {
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 20;
-    const skip = (page - 1) * limit;
-
+  async getSellerUploadedInvoices(query: SellerUploadedInvoiceQueryDto) {
     const where: Prisma.SellerUploadedInvoiceWhereInput = {};
     if (query.startDate || query.endDate) {
       where.uploadedAt = {};
@@ -829,20 +1098,71 @@ export class AdminTaxService {
     if (query.search?.trim()) {
       const q = query.search.trim();
       where.OR = [
-        { fileName: { contains: q, mode: 'insensitive' } },
-        { order: { is: { orderNumber: { contains: q, mode: 'insensitive' } } } },
-        { order: { is: { seller: { is: { companyName: { contains: q, mode: 'insensitive' } } } } } },
-        { order: { is: { seller: { is: { displayName: { contains: q, mode: 'insensitive' } } } } } },
-        { order: { is: { buyer: { is: { displayName: { contains: q, mode: 'insensitive' } } } } } },
+        { fileName: { contains: q, mode: "insensitive" } },
+        {
+          order: { is: { orderNumber: { contains: q, mode: "insensitive" } } },
+        },
+        {
+          order: {
+            is: {
+              seller: {
+                is: { companyName: { contains: q, mode: "insensitive" } },
+              },
+            },
+          },
+        },
+        {
+          order: {
+            is: {
+              seller: {
+                is: { displayName: { contains: q, mode: "insensitive" } },
+              },
+            },
+          },
+        },
+        {
+          order: {
+            is: {
+              buyer: {
+                is: { displayName: { contains: q, mode: "insensitive" } },
+              },
+            },
+          },
+        },
       ];
     }
 
-    const [rows, total] = await Promise.all([
-      this.prisma.sellerUploadedInvoice.findMany({
+    const orderBy = resolveOrderBy<
+      | Prisma.SellerUploadedInvoiceOrderByWithRelationInput
+      | Prisma.SellerUploadedInvoiceOrderByWithRelationInput[]
+    >("SellerUploadedInvoice", query, {
+      defaultSort: { uploadedAt: "desc" },
+      // The list shows order + party columns pulled from the linked order.
+      sortMap: {
+        orderNumber: (direction) => ({ order: { orderNumber: direction } }),
+        orderTotal: (direction) => ({ order: { totalAmount: direction } }),
+        // The cell displays companyName first and falls back to displayName.
+        // Keep null companies last, then use displayName as a stable fallback.
+        sellerName: (direction) => [
+          {
+            order: {
+              seller: {
+                companyName: { sort: direction, nulls: "last" },
+              },
+            },
+          },
+          { order: { seller: { displayName: direction } } },
+        ],
+        buyerName: (direction) => ({
+          order: { buyer: { displayName: direction } },
+        }),
+      },
+    });
+    const result = await paginate(
+      this.prisma.sellerUploadedInvoice,
+      {
         where,
-        orderBy: { uploadedAt: 'desc' },
-        skip,
-        take: limit,
+        orderBy,
         select: {
           id: true,
           fileName: true,
@@ -860,12 +1180,13 @@ export class AdminTaxService {
             },
           },
         },
-      }),
-      this.prisma.sellerUploadedInvoice.count({ where }),
-    ]);
+      },
+      query,
+    );
 
     return {
-      data: rows.map((r) => ({
+      ...result,
+      data: result.data.map((r) => ({
         id: r.id,
         fileName: r.fileName,
         fileSize: r.fileSize,
@@ -875,23 +1196,28 @@ export class AdminTaxService {
         orderId: r.order?.id ?? null,
         orderNumber: r.order?.orderNumber ?? null,
         orderTotal: r.order ? Number(r.order.totalAmount) : null,
-        sellerName: r.order?.seller?.companyName || r.order?.seller?.displayName || '—',
-        buyerName: r.order?.buyer?.displayName || '—',
+        sellerName:
+          r.order?.seller?.companyName || r.order?.seller?.displayName || "—",
+        buyerName: r.order?.buyer?.displayName || "—",
         buyerEmail: r.order?.buyer?.email ?? null,
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
   /** Satıcı faturası PDF — admin için presigned indirme URL'i. */
-  async getSellerUploadedInvoicePdf(id: string): Promise<{ url: string; fileName: string }> {
+  async getSellerUploadedInvoicePdf(
+    id: string,
+  ): Promise<{ url: string; fileName: string }> {
     const inv = await this.prisma.sellerUploadedInvoice.findUnique({
       where: { id },
       select: { pdfKey: true, fileName: true },
     });
-    if (!inv) throw new NotFoundException('Fatura bulunamadı');
-    const url = await this.storageService.getPresignedDownloadUrl('documents', inv.pdfKey, 3600);
+    if (!inv) throw new NotFoundException("Fatura bulunamadı");
+    const url = await this.storageService.getPresignedDownloadUrl(
+      "documents",
+      inv.pdfKey,
+      3600,
+    );
     return { url, fileName: inv.fileName };
   }
-
 }

@@ -1,8 +1,27 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { PrismaService } from '../../prisma';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { PrismaService } from "../../prisma";
+
+/** In-process (EventEmitter2) event adları — modüller-arası döngüsüz decoupling. */
+export const PAYMENT_TRADE_CASH_CLEARED = "payment.trade-cash-cleared";
+/** Faz 8.1 — fiziksel siparişin ödemesi commit oldu; fulfillment sonlandırması istenir. */
+export const ORDER_FULFILLMENT_REQUESTED = "order.fulfillment-requested";
+
+/**
+ * Faz 8.1 — Ödeme atomik tx'i (claim + preparing + stok + escrow hold) commit olduktan
+ * SONRA fiziksel siparişin POST-COMMIT sonlandırması (ledger capture + order.paid + Sürat)
+ * bu event ile İSTENİR; `OrderFulfillmentListener` tüketir. order/payment nesneleri tx'te
+ * yüklenmiş hâlleriyle taşınır (birebir aynı argümanlar → davranış değişmez, ekstra sorgu yok).
+ */
+export interface OrderFulfillmentRequestedPayload {
+  order: any; // buyer/seller/product include'lı Prisma order (finalizer'a aynen geçer)
+  payment: any; // Prisma payment
+  skipBuyer?: boolean;
+  transactionId?: string;
+}
 
 /**
  * Event Payload Types
@@ -29,6 +48,10 @@ export interface OrderPaidPayload {
   productId: string;
   productTitle: string;
   totalAmount: number;
+  /** Sipariş adedi (çoklu-adet sepet). Varsayılan 1; e-postada adet gösterimi için. */
+  quantity?: number;
+  /** Birim fiyat (opsiyonel; adet>1'de satır kırılımı için). */
+  unitPrice?: number;
   commissionAmount: number;
   buyerEmail: string;
   buyerName: string;
@@ -70,7 +93,21 @@ export interface GroupBuyerOrderPaidPayload {
   groupTotal: number;
   paymentMethod: string;
   transactionId: string;
-  items: Array<{ productTitle: string; totalAmount: number }>;
+  items: Array<{
+    productTitle: string;
+    totalAmount: number;
+    /** Sipariş adedi (çoklu-adet). Varsayılan 1. */
+    quantity?: number;
+    /** Bu order satırına yüklü kargo (satıcı paketinin TEK kargosu; kardeşlerde 0). */
+    shippingCost?: number;
+  }>;
+  /**
+   * Satıcı-bazlı kargo dökümü — her satıcı = bir OrderPackage = TEK kargo ücreti.
+   * Konsolide kardeş order'ların shippingCost'u 0 ("pakete dahil"). Opsiyonel (geriye dönük).
+   */
+  sellerShipments?: Array<{ sellerName: string; shippingCost: number }>;
+  /** Tüm satıcı paketlerinin toplam kargosu. Opsiyonel. */
+  shippingTotal?: number;
   shippingAddress: {
     fullName: string;
     phone: string;
@@ -189,10 +226,35 @@ export class EventService {
   constructor(
     @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
     @InjectQueue(QUEUE_NAMES.PUSH) private readonly pushQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.SHIPPING) private readonly shippingQueue: Queue,
     @InjectQueue(QUEUE_NAMES.ANALYTICS) private readonly analyticsQueue: Queue,
     private readonly prisma: PrismaService,
-  ) { }
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * Faz 8.4: Nakit-farklı takas ödemesi temizlendi → inbound (depoya) Sürat
+   * gönderileri oluşturulmalı. TradeService'i Payment içinden ModuleRef + runtime
+   * require() ile çözmek (Trade↔Payment döngüsü) yerine in-process event yayınlanır;
+   * Trade tarafındaki dinleyici (TradeCashClearedListener) createInboundTradeShipments'ı çağırır.
+   */
+  emitTradeCashCleared(payload: { tradeId: string }): void {
+    this.logger.log(
+      `Emitting ${PAYMENT_TRADE_CASH_CLEARED} for trade ${payload.tradeId}`,
+    );
+    this.eventEmitter.emit(PAYMENT_TRADE_CASH_CLEARED, payload);
+  }
+
+  /**
+   * Faz 8.1 — Ödeme servisi FulfillmentFinalizer'a DOĞRUDAN bağlı olmadan (DIP) sipariş
+   * sonlandırmasını ister. `emitAsync` + await: mevcut zamanlama korunur (sonlandırma
+   * dönmeden önce tamamlanır) → tek değişiklik dispatch mekanizması, davranış aynı.
+   * Listener best-effort (kendi içinde try/catch) → fulfillment hatası ödemeyi BOZMAZ.
+   */
+  async emitOrderFulfillmentRequested(
+    payload: OrderFulfillmentRequestedPayload,
+  ): Promise<void> {
+    await this.eventEmitter.emitAsync(ORDER_FULFILLMENT_REQUESTED, payload);
+  }
 
   /**
    * Emit order.created event
@@ -201,7 +263,9 @@ export class EventService {
    * - Queues analytics event for the checkout-initiated funnel
    */
   async emitOrderCreated(payload: OrderCreatedPayload): Promise<void> {
-    this.logger.log(`Emitting order.created event for order ${payload.orderNumber}`);
+    this.logger.log(
+      `Emitting order.created event for order ${payload.orderNumber}`,
+    );
 
     // No buyer/seller notification on order.created: payment is not yet confirmed and the order
     // may be abandoned. Both sides are notified only after payment succeeds (order.paid):
@@ -226,7 +290,9 @@ export class EventService {
     });
     */
 
-    this.logger.log(`order.created event emitted for order ${payload.orderNumber}`);
+    this.logger.log(
+      `order.created event emitted for order ${payload.orderNumber}`,
+    );
   }
 
   /**
@@ -237,88 +303,109 @@ export class EventService {
    * - Queues analytics event
    */
   async emitOrderPaid(payload: OrderPaidPayload): Promise<void> {
-    this.logger.log(`Emitting order.paid event for order ${payload.orderNumber}`);
+    this.logger.log(
+      `Emitting order.paid event for order ${payload.orderNumber}`,
+    );
 
     // Çoklu-ürün (sepet) akışında alıcıya ürün başına onay maili/push GÖNDERME.
     // Alıcı tarafı grup başına TEK kez emitGroupBuyerOrderPaid ile üst seviyeden
     // gönderilir; burada yalnız satıcı maili/push'u + analytics çalışır.
     if (!payload.skipBuyer) {
       // Queue email to buyer - Payment confirmation
-      await this.emailQueue.add('send-template', {
-        to: payload.buyerEmail,
-        template: 'order-paid',
-        subject: `Ödeme alındı - ${payload.orderNumber}`,
-        templateData: {
-          orderNumber: payload.orderNumber,
-          buyerName: payload.buyerName,
-          buyerEmail: payload.buyerEmail,
-          productTitle: payload.productTitle,
-          totalAmount: payload.totalAmount,
-          paymentMethod: payload.paymentMethod,
-          transactionId: payload.transactionId,
-          orderId: payload.orderId,
-          shippingAddress: payload.shippingAddress,
-          isGuestOrder: payload.isGuestOrder ?? false,
-          buyerSystemEmail: payload.buyerSystemEmail ?? '',
+      await this.emailQueue.add(
+        "send-template",
+        {
+          to: payload.buyerEmail,
+          template: "order-paid",
+          subject: `Ödeme alındı - ${payload.orderNumber}`,
+          templateData: {
+            orderNumber: payload.orderNumber,
+            buyerName: payload.buyerName,
+            buyerEmail: payload.buyerEmail,
+            productTitle: payload.productTitle,
+            quantity: payload.quantity ?? 1,
+            unitPrice: payload.unitPrice,
+            totalAmount: payload.totalAmount,
+            paymentMethod: payload.paymentMethod,
+            transactionId: payload.transactionId,
+            orderId: payload.orderId,
+            shippingAddress: payload.shippingAddress,
+            isGuestOrder: payload.isGuestOrder ?? false,
+            buyerSystemEmail: payload.buyerSystemEmail ?? "",
+          },
         },
-      }, {
-        priority: 1,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
-      });
+        {
+          priority: 1,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 2000 },
+        },
+      );
     }
 
     // Queue email to seller - Payment received, prepare shipment
-    await this.emailQueue.add('send-template', {
-      to: payload.sellerEmail,
-      template: 'order-paid-seller',
-      subject: `Yeni sipariş - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        sellerName: payload.sellerName,
-        productTitle: payload.productTitle,
-        totalAmount: payload.totalAmount,
-        commissionAmount: payload.commissionAmount,
-        netAmount: payload.totalAmount - payload.commissionAmount,
-        orderId: payload.orderId,
-        shippingAddress: payload.shippingAddress,
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.sellerEmail,
+        template: "order-paid-seller",
+        subject: `Yeni sipariş - ${payload.orderNumber}`,
+        templateData: {
+          orderNumber: payload.orderNumber,
+          sellerName: payload.sellerName,
+          productTitle: payload.productTitle,
+          quantity: payload.quantity ?? 1,
+          totalAmount: payload.totalAmount,
+          commissionAmount: payload.commissionAmount,
+          netAmount: payload.totalAmount - payload.commissionAmount,
+          orderId: payload.orderId,
+          shippingAddress: payload.shippingAddress,
+        },
       },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
     // Queue push notification to buyer (sepet akışında atlanır — grup başına tek push)
     if (!payload.skipBuyer) {
-      await this.pushQueue.add('send-notification', {
-        userId: payload.buyerId,
-        title: 'Ödeme Onaylandı',
-        body: `${payload.productTitle} siparişiniz için ödeme alındı`,
-        data: {
-          type: 'payment_confirmed',
-          orderId: payload.orderId,
-          orderNumber: payload.orderNumber,
+      await this.pushQueue.add(
+        "send-notification",
+        {
+          userId: payload.buyerId,
+          title: "Ödeme Onaylandı",
+          body: `${payload.productTitle} siparişiniz için ödeme alındı`,
+          data: {
+            type: "payment_confirmed",
+            orderId: payload.orderId,
+            orderNumber: payload.orderNumber,
+          },
         },
-      }, {
-        priority: 1,
-      });
+        {
+          priority: 1,
+        },
+      );
     }
 
     // Queue push notification to seller — this is the seller's first ("new order") alert,
     // fired only after payment is confirmed.
-    await this.pushQueue.add('send-notification', {
-      userId: payload.sellerId,
-      title: 'Yeni Sipariş',
-      body: `${payload.productTitle} ürününüz satıldı! Kargoya hazırlayın.`,
-      data: {
-        type: 'payment_received',
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.sellerId,
+        title: "Yeni Sipariş",
+        body: `${payload.productTitle} ürününüz satıldı! Kargoya hazırlayın.`,
+        data: {
+          type: "payment_received",
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber,
+        },
       },
-    }, {
-      priority: 1,
-    });
+      {
+        priority: 1,
+      },
+    );
 
     // Do NOT auto-create shipment here – order stays "Hazırlanıyor" until seller enters tracking / marks shipped
 
@@ -341,7 +428,9 @@ export class EventService {
     });
     */
 
-    this.logger.log(`order.paid event emitted for order ${payload.orderNumber}`);
+    this.logger.log(
+      `order.paid event emitted for order ${payload.orderNumber}`,
+    );
   }
 
   /**
@@ -351,49 +440,66 @@ export class EventService {
    * bu üst-seviye çağrıyla bir kez kapsanır. Ürünler satır satır 'order-paid-group'
    * template'inde listelenir.
    */
-  async emitGroupBuyerOrderPaid(payload: GroupBuyerOrderPaidPayload): Promise<void> {
-    this.logger.log(`Emitting group buyer order.paid for group ${payload.groupNumber}`);
+  async emitGroupBuyerOrderPaid(
+    payload: GroupBuyerOrderPaidPayload,
+  ): Promise<void> {
+    this.logger.log(
+      `Emitting group buyer order.paid for group ${payload.groupNumber}`,
+    );
 
     // Queue tek onay maili — alıcı
-    await this.emailQueue.add('send-template', {
-      to: payload.buyerEmail,
-      template: 'order-paid-group',
-      subject: `Siparişiniz alındı - ${payload.groupNumber}`,
-      templateData: {
-        groupNumber: payload.groupNumber,
-        buyerName: payload.buyerName,
-        buyerEmail: payload.buyerEmail,
-        items: payload.items,
-        groupTotal: payload.groupTotal,
-        paymentMethod: payload.paymentMethod,
-        transactionId: payload.transactionId,
-        shippingAddress: payload.shippingAddress,
-        isGuestOrder: payload.isGuestOrder ?? false,
-        buyerSystemEmail: payload.buyerSystemEmail ?? '',
-        // Misafir takip linki temsilci sipariş no üzerinden çözülür
-        orderNumber: payload.representativeOrderNumber ?? '',
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.buyerEmail,
+        template: "order-paid-group",
+        subject: `Siparişiniz alındı - ${payload.groupNumber}`,
+        templateData: {
+          groupNumber: payload.groupNumber,
+          buyerName: payload.buyerName,
+          buyerEmail: payload.buyerEmail,
+          items: payload.items,
+          // Satıcı-bazlı kargo dökümü + toplam (satıcı = paket = tek kargo).
+          sellerShipments: payload.sellerShipments ?? [],
+          shippingTotal: payload.shippingTotal ?? 0,
+          groupTotal: payload.groupTotal,
+          paymentMethod: payload.paymentMethod,
+          transactionId: payload.transactionId,
+          shippingAddress: payload.shippingAddress,
+          isGuestOrder: payload.isGuestOrder ?? false,
+          buyerSystemEmail: payload.buyerSystemEmail ?? "",
+          // Misafir takip linki temsilci sipariş no üzerinden çözülür
+          orderNumber: payload.representativeOrderNumber ?? "",
+        },
       },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
     // Queue tek push — alıcı
-    await this.pushQueue.add('send-notification', {
-      userId: payload.buyerId,
-      title: 'Ödeme Onaylandı',
-      body: `${payload.items.length} ürünlük siparişiniz için ödeme alındı`,
-      data: {
-        type: 'payment_confirmed',
-        checkoutGroupId: payload.checkoutGroupId,
-        groupNumber: payload.groupNumber,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.buyerId,
+        title: "Ödeme Onaylandı",
+        body: `${payload.items.length} ürünlük siparişiniz için ödeme alındı`,
+        data: {
+          type: "payment_confirmed",
+          checkoutGroupId: payload.checkoutGroupId,
+          groupNumber: payload.groupNumber,
+        },
       },
-    }, {
-      priority: 1,
-    });
+      {
+        priority: 1,
+      },
+    );
 
-    this.logger.log(`group buyer order.paid emitted for group ${payload.groupNumber}`);
+    this.logger.log(
+      `group buyer order.paid emitted for group ${payload.groupNumber}`,
+    );
   }
 
   /**
@@ -402,28 +508,36 @@ export class EventService {
    * - Queues push notification with tracking info
    */
   async emitOrderShipped(payload: OrderShippedPayload): Promise<void> {
-    this.logger.log(`Emitting order.shipped event for order ${payload.orderNumber}`);
+    this.logger.log(
+      `Emitting order.shipped event for order ${payload.orderNumber}`,
+    );
 
     // Queue email to buyer - Shipment notification
-    await this.emailQueue.add('send-template', {
-      to: payload.buyerEmail,
-      template: 'order-shipped',
-      subject: `Siparişiniz kargoya verildi - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        buyerName: payload.buyerName,
-        trackingNumber: payload.trackingNumber,
-        trackingUrl: payload.trackingUrl,
-        provider: payload.provider,
-        estimatedDelivery: payload.estimatedDelivery,
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.buyerEmail,
+        template: "order-shipped",
+        subject: `Siparişiniz kargoya verildi - ${payload.orderNumber}`,
+        templateData: {
+          orderNumber: payload.orderNumber,
+          buyerName: payload.buyerName,
+          trackingNumber: payload.trackingNumber,
+          trackingUrl: payload.trackingUrl,
+          provider: payload.provider,
+          estimatedDelivery: payload.estimatedDelivery,
+        },
       },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
-    this.logger.log(`order.shipped event emitted for order ${payload.orderNumber}`);
+    this.logger.log(
+      `order.shipped event emitted for order ${payload.orderNumber}`,
+    );
   }
 
   /**
@@ -432,25 +546,33 @@ export class EventService {
    * - Prompts buyer to confirm receipt
    */
   async emitOrderDelivered(payload: OrderDeliveredPayload): Promise<void> {
-    this.logger.log(`Emitting order.delivered event for order ${payload.orderNumber}`);
+    this.logger.log(
+      `Emitting order.delivered event for order ${payload.orderNumber}`,
+    );
 
     // Queue email to buyer - Delivery confirmation
-    await this.emailQueue.add('send-template', {
-      to: payload.buyerEmail,
-      template: 'order-delivered',
-      subject: `Siparişiniz teslim edildi - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        buyerName: payload.buyerName,
-        orderId: payload.orderId,
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.buyerEmail,
+        template: "order-delivered",
+        subject: `Siparişiniz teslim edildi - ${payload.orderNumber}`,
+        templateData: {
+          orderNumber: payload.orderNumber,
+          buyerName: payload.buyerName,
+          orderId: payload.orderId,
+        },
       },
-    }, {
-      priority: 2,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 2,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
-    this.logger.log(`order.delivered event emitted for order ${payload.orderNumber}`);
+    this.logger.log(
+      `order.delivered event emitted for order ${payload.orderNumber}`,
+    );
   }
 
   /**
@@ -460,42 +582,52 @@ export class EventService {
    * - Queues analytics event
    */
   async emitOfferCreated(payload: OfferCreatedPayload): Promise<void> {
-    this.logger.log(`Emitting offer.created event for offer ${payload.offerId}`);
+    this.logger.log(
+      `Emitting offer.created event for offer ${payload.offerId}`,
+    );
 
     // Queue email to seller - New offer received
-    await this.emailQueue.add('send-template', {
-      to: payload.sellerEmail,
-      template: 'offer-received',
-      subject: `Yeni teklif aldınız - ${payload.productTitle}`,
-      templateData: {
-        sellerName: payload.sellerName,
-        productTitle: payload.productTitle,
-        productPrice: payload.productPrice,
-        offerAmount: payload.offerAmount,
-        buyerName: payload.buyerName,
-        offerId: payload.offerId,
-        productId: payload.productId,
-        expiresAt: payload.expiresAt,
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.sellerEmail,
+        template: "offer-received",
+        subject: `Yeni teklif aldınız - ${payload.productTitle}`,
+        templateData: {
+          sellerName: payload.sellerName,
+          productTitle: payload.productTitle,
+          productPrice: payload.productPrice,
+          offerAmount: payload.offerAmount,
+          buyerName: payload.buyerName,
+          offerId: payload.offerId,
+          productId: payload.productId,
+          expiresAt: payload.expiresAt,
+        },
       },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
     // Queue push notification to seller
-    await this.pushQueue.add('send-notification', {
-      userId: payload.sellerId,
-      title: 'Yeni Teklif',
-      body: `${payload.productTitle} için ${payload.offerAmount.toFixed(2)} TL teklif aldınız`,
-      data: {
-        type: 'offer_received',
-        offerId: payload.offerId,
-        productId: payload.productId,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.sellerId,
+        title: "Yeni Teklif",
+        body: `${payload.productTitle} için ${payload.offerAmount.toFixed(2)} TL teklif aldınız`,
+        data: {
+          type: "offer_received",
+          offerId: payload.offerId,
+          productId: payload.productId,
+        },
       },
-    }, {
-      priority: 1,
-    });
+      {
+        priority: 1,
+      },
+    );
 
     // Queue analytics event
     // DISABLED — analytics 'track-event' (handler/tablo yok, boşa fail ediyordu).
@@ -524,42 +656,52 @@ export class EventService {
    * - Queues analytics event
    */
   async emitOfferAccepted(payload: OfferAcceptedPayload): Promise<void> {
-    this.logger.log(`Emitting offer.accepted event for offer ${payload.offerId}`);
+    this.logger.log(
+      `Emitting offer.accepted event for offer ${payload.offerId}`,
+    );
 
     // Queue email to buyer - Offer accepted, payment required
-    await this.emailQueue.add('send-template', {
-      to: payload.buyerEmail,
-      template: 'offer-accepted',
-      subject: `Teklifiniz kabul edildi - ${payload.productTitle}`,
-      templateData: {
-        buyerName: payload.buyerName,
-        productTitle: payload.productTitle,
-        offerAmount: payload.offerAmount,
-        sellerName: payload.sellerName,
-        offerId: payload.offerId,
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.buyerEmail,
+        template: "offer-accepted",
+        subject: `Teklifiniz kabul edildi - ${payload.productTitle}`,
+        templateData: {
+          buyerName: payload.buyerName,
+          productTitle: payload.productTitle,
+          offerAmount: payload.offerAmount,
+          sellerName: payload.sellerName,
+          offerId: payload.offerId,
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber,
+        },
       },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
     // Queue push notification to buyer - Offer accepted, proceed to payment
-    await this.pushQueue.add('send-notification', {
-      userId: payload.buyerId,
-      title: 'Teklif Kabul Edildi!',
-      body: `${payload.productTitle} için teklifiniz kabul edildi. Ödeme yaparak siparişinizi tamamlayın.`,
-      data: {
-        type: 'offer_accepted',
-        offerId: payload.offerId,
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.buyerId,
+        title: "Teklif Kabul Edildi!",
+        body: `${payload.productTitle} için teklifiniz kabul edildi. Ödeme yaparak siparişinizi tamamlayın.`,
+        data: {
+          type: "offer_accepted",
+          offerId: payload.offerId,
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber,
+        },
       },
-    }, {
-      priority: 1,
-    });
+      {
+        priority: 1,
+      },
+    );
 
     // Queue analytics event
     // DISABLED — analytics 'track-event' (handler/tablo yok, boşa fail ediyordu).
@@ -579,7 +721,9 @@ export class EventService {
     });
     */
 
-    this.logger.log(`offer.accepted event emitted for offer ${payload.offerId}`);
+    this.logger.log(
+      `offer.accepted event emitted for offer ${payload.offerId}`,
+    );
   }
 
   /**
@@ -588,42 +732,54 @@ export class EventService {
    * - Sends push notification to buyer
    */
   async emitPaymentFailed(payload: PaymentFailedPayload): Promise<void> {
-    this.logger.log(`Emitting payment.failed event for order ${payload.orderNumber}`);
+    this.logger.log(
+      `Emitting payment.failed event for order ${payload.orderNumber}`,
+    );
 
     // Queue email to buyer - Payment failed
-    await this.emailQueue.add('send-template', {
-      to: payload.buyerEmail,
-      template: 'payment-failed',
-      subject: `Ödeme Başarısız - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        buyerName: payload.buyerName,
-        amount: payload.amount,
-        provider: payload.provider,
-        failureReason: payload.failureReason,
-        orderId: payload.orderId,
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.buyerEmail,
+        template: "payment-failed",
+        subject: `Ödeme Başarısız - ${payload.orderNumber}`,
+        templateData: {
+          orderNumber: payload.orderNumber,
+          buyerName: payload.buyerName,
+          amount: payload.amount,
+          provider: payload.provider,
+          failureReason: payload.failureReason,
+          orderId: payload.orderId,
+        },
       },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
     // Queue push notification to buyer
-    await this.pushQueue.add('send-notification', {
-      userId: payload.buyerId,
-      title: 'Ödeme Başarısız',
-      body: `Sipariş ${payload.orderNumber} için ödeme başarısız oldu.`,
-      data: {
-        type: 'payment_failed',
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.buyerId,
+        title: "Ödeme Başarısız",
+        body: `Sipariş ${payload.orderNumber} için ödeme başarısız oldu.`,
+        data: {
+          type: "payment_failed",
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber,
+        },
       },
-    }, {
-      priority: 1,
-    });
+      {
+        priority: 1,
+      },
+    );
 
-    this.logger.log(`payment.failed event emitted for order ${payload.orderNumber}`);
+    this.logger.log(
+      `payment.failed event emitted for order ${payload.orderNumber}`,
+    );
   }
 
   /**
@@ -632,74 +788,94 @@ export class EventService {
    * - Sends push notifications
    */
   async emitPaymentRefunded(payload: PaymentRefundedPayload): Promise<void> {
-    this.logger.log(`Emitting payment.refunded event for order ${payload.orderNumber}`);
+    this.logger.log(
+      `Emitting payment.refunded event for order ${payload.orderNumber}`,
+    );
 
     // Queue email to buyer - Refund processed
-    await this.emailQueue.add('send-template', {
-      to: payload.buyerEmail,
-      template: 'payment-refunded',
-      subject: `İade İşlemi Tamamlandı - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        buyerName: payload.buyerName,
-        refundAmount: payload.refundAmount,
-        totalAmount: payload.totalAmount,
-        provider: payload.provider,
-        orderId: payload.orderId,
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.buyerEmail,
+        template: "payment-refunded",
+        subject: `İade İşlemi Tamamlandı - ${payload.orderNumber}`,
+        templateData: {
+          orderNumber: payload.orderNumber,
+          buyerName: payload.buyerName,
+          refundAmount: payload.refundAmount,
+          totalAmount: payload.totalAmount,
+          provider: payload.provider,
+          orderId: payload.orderId,
+        },
       },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
     // Queue email to seller - Refund notification
-    await this.emailQueue.add('send-template', {
-      to: payload.sellerEmail,
-      template: 'payment-refunded-seller',
-      subject: `İade İşlemi - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        sellerName: payload.sellerName,
-        refundAmount: payload.refundAmount,
-        totalAmount: payload.totalAmount,
-        orderId: payload.orderId,
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: payload.sellerEmail,
+        template: "payment-refunded-seller",
+        subject: `İade İşlemi - ${payload.orderNumber}`,
+        templateData: {
+          orderNumber: payload.orderNumber,
+          sellerName: payload.sellerName,
+          refundAmount: payload.refundAmount,
+          totalAmount: payload.totalAmount,
+          orderId: payload.orderId,
+        },
       },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+      {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
 
     // Queue push notification to buyer
-    await this.pushQueue.add('send-notification', {
-      userId: payload.buyerId,
-      title: 'İade İşlemi Tamamlandı',
-      body: `Sipariş ${payload.orderNumber} için ${payload.refundAmount.toFixed(2)} TL iade edildi.`,
-      data: {
-        type: 'payment_refunded',
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.buyerId,
+        title: "İade İşlemi Tamamlandı",
+        body: `Sipariş ${payload.orderNumber} için ${payload.refundAmount.toFixed(2)} TL iade edildi.`,
+        data: {
+          type: "payment_refunded",
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber,
+        },
       },
-    }, {
-      priority: 1,
-    });
+      {
+        priority: 1,
+      },
+    );
 
     // Queue push notification to seller
-    await this.pushQueue.add('send-notification', {
-      userId: payload.sellerId,
-      title: 'İade İşlemi',
-      body: `Sipariş ${payload.orderNumber} için iade işlemi gerçekleştirildi.`,
-      data: {
-        type: 'payment_refunded',
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.sellerId,
+        title: "İade İşlemi",
+        body: `Sipariş ${payload.orderNumber} için iade işlemi gerçekleştirildi.`,
+        data: {
+          type: "payment_refunded",
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber,
+        },
       },
-    }, {
-      priority: 1,
-    });
+      {
+        priority: 1,
+      },
+    );
 
-    this.logger.log(`payment.refunded event emitted for order ${payload.orderNumber}`);
+    this.logger.log(
+      `payment.refunded event emitted for order ${payload.orderNumber}`,
+    );
   }
 
   /**
@@ -713,18 +889,24 @@ export class EventService {
     productTitle: string;
     reason: string;
   }): Promise<void> {
-    this.logger.log(`Emitting offer.auto-rejected for offer ${payload.offerId}`);
+    this.logger.log(
+      `Emitting offer.auto-rejected for offer ${payload.offerId}`,
+    );
 
-    await this.pushQueue.add('send-notification', {
-      userId: payload.buyerId,
-      title: 'Teklifiniz Kapatıldı',
-      body: `${payload.productTitle}: ${payload.reason}`,
-      data: {
-        type: 'offer_auto_rejected',
-        offerId: payload.offerId,
-        productId: payload.productId,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.buyerId,
+        title: "Teklifiniz Kapatıldı",
+        body: `${payload.productTitle}: ${payload.reason}`,
+        data: {
+          type: "offer_auto_rejected",
+          offerId: payload.offerId,
+          productId: payload.productId,
+        },
       },
-    }, { priority: 3 });
+      { priority: 3 },
+    );
   }
 
   /**
@@ -737,18 +919,24 @@ export class EventService {
     receiverId: string;
     reason: string;
   }): Promise<void> {
-    this.logger.log(`Emitting trade.auto-cancelled for trade ${payload.tradeId}`);
+    this.logger.log(
+      `Emitting trade.auto-cancelled for trade ${payload.tradeId}`,
+    );
 
     for (const userId of [payload.initiatorId, payload.receiverId]) {
-      await this.pushQueue.add('send-notification', {
-        userId,
-        title: 'Takas İptal Edildi',
-        body: `Takasınız otomatik olarak iptal edildi: ${payload.reason}`,
-        data: {
-          type: 'trade_auto_cancelled',
-          tradeId: payload.tradeId,
+      await this.pushQueue.add(
+        "send-notification",
+        {
+          userId,
+          title: "Takas İptal Edildi",
+          body: `Takasınız otomatik olarak iptal edildi: ${payload.reason}`,
+          data: {
+            type: "trade_auto_cancelled",
+            tradeId: payload.tradeId,
+          },
         },
-      }, { priority: 3 });
+        { priority: 3 },
+      );
     }
   }
 
@@ -763,19 +951,25 @@ export class EventService {
     receiverId: string;
     shippingDeadline: Date;
   }): Promise<void> {
-    this.logger.log(`Emitting trade.ready-for-shipping for trade ${payload.tradeId}`);
+    this.logger.log(
+      `Emitting trade.ready-for-shipping for trade ${payload.tradeId}`,
+    );
 
     for (const userId of [payload.initiatorId, payload.receiverId]) {
-      await this.pushQueue.add('send-notification', {
-        userId,
-        title: 'Takas Kargoya Hazır',
-        body: 'Ödeme tamamlandı. Ürününüzü Tarodan deposuna göndermeniz gerekiyor.',
-        data: {
-          type: 'trade_ready_for_shipping',
-          tradeId: payload.tradeId,
-          shippingDeadline: payload.shippingDeadline.toISOString(),
+      await this.pushQueue.add(
+        "send-notification",
+        {
+          userId,
+          title: "Takas Kargoya Hazır",
+          body: "Ödeme tamamlandı. Ürününüzü Tarodan deposuna göndermeniz gerekiyor.",
+          data: {
+            type: "trade_ready_for_shipping",
+            tradeId: payload.tradeId,
+            shippingDeadline: payload.shippingDeadline.toISOString(),
+          },
         },
-      }, { priority: 3 });
+        { priority: 3 },
+      );
     }
   }
 
@@ -795,13 +989,13 @@ export class EventService {
 
     for (const userId of [payload.initiatorId, payload.receiverId]) {
       await this.pushQueue.add(
-        'send-notification',
+        "send-notification",
         {
           userId,
-          title: 'Takas Onaylandı',
-          body: 'Takas onaylandı, ürünler yolda.',
+          title: "Takas Onaylandı",
+          body: "Takas onaylandı, ürünler yolda.",
           data: {
-            type: 'trade_warehouse_approved',
+            type: "trade_warehouse_approved",
             tradeId: payload.tradeId,
             notes: payload.notes ?? null,
           },
@@ -827,13 +1021,13 @@ export class EventService {
 
     for (const userId of [payload.initiatorId, payload.receiverId]) {
       await this.pushQueue.add(
-        'send-notification',
+        "send-notification",
         {
           userId,
-          title: 'Takas Reddedildi',
+          title: "Takas Reddedildi",
           body: `Takas reddedildi: ${payload.reason}`,
           data: {
-            type: 'trade_warehouse_rejected',
+            type: "trade_warehouse_rejected",
             tradeId: payload.tradeId,
             reason: payload.reason,
           },
@@ -853,17 +1047,19 @@ export class EventService {
     initiatorId: string;
     receiverId: string;
   }): Promise<void> {
-    this.logger.log(`Emitting trade.cancel-locked for trade ${payload.tradeId}`);
+    this.logger.log(
+      `Emitting trade.cancel-locked for trade ${payload.tradeId}`,
+    );
 
     for (const userId of [payload.initiatorId, payload.receiverId]) {
       await this.pushQueue.add(
-        'send-notification',
+        "send-notification",
         {
           userId,
-          title: 'Takas Depoda',
-          body: 'Ürünlerden biri Tarodan deposuna ulaştı. Bu noktadan sonra iptal yapılamaz; sorun varsa itiraz açın.',
+          title: "Takas Depoda",
+          body: "Ürünlerden biri Tarodan deposuna ulaştı. Bu noktadan sonra iptal yapılamaz; sorun varsa itiraz açın.",
           data: {
-            type: 'trade_cancel_locked',
+            type: "trade_cancel_locked",
             tradeId: payload.tradeId,
           },
         },
@@ -881,17 +1077,19 @@ export class EventService {
     initiatorId: string;
     receiverId: string;
   }): Promise<void> {
-    this.logger.log(`Emitting trade.return-completed for trade ${payload.tradeId}`);
+    this.logger.log(
+      `Emitting trade.return-completed for trade ${payload.tradeId}`,
+    );
 
     for (const userId of [payload.initiatorId, payload.receiverId]) {
       await this.pushQueue.add(
-        'send-notification',
+        "send-notification",
         {
           userId,
-          title: 'İade Tamamlandı',
-          body: 'Ürününüz size geri ulaştı; takas iptal edildi.',
+          title: "İade Tamamlandı",
+          body: "Ürününüz size geri ulaştı; takas iptal edildi.",
           data: {
-            type: 'trade_return_completed',
+            type: "trade_return_completed",
             tradeId: payload.tradeId,
           },
         },
@@ -913,13 +1111,13 @@ export class EventService {
 
     if (!payload.compensationUserId) return;
     await this.pushQueue.add(
-      'send-notification',
+      "send-notification",
       {
         userId: payload.compensationUserId,
-        title: 'İade Kargosu Kayıp',
+        title: "İade Kargosu Kayıp",
         body: `İade gönderiniz kayıp olarak işaretlendi. Tarodan ekibi sizinle iletişime geçecek.`,
         data: {
-          type: 'trade_return_lost',
+          type: "trade_return_lost",
           tradeId: payload.tradeId,
           reason: payload.reason,
         },
@@ -937,17 +1135,19 @@ export class EventService {
     cashPayerId: string | null;
     reason: string;
   }): Promise<void> {
-    this.logger.log(`Emitting trade.refund-failed for trade ${payload.tradeId}`);
+    this.logger.log(
+      `Emitting trade.refund-failed for trade ${payload.tradeId}`,
+    );
 
     if (payload.cashPayerId) {
       await this.pushQueue.add(
-        'send-notification',
+        "send-notification",
         {
           userId: payload.cashPayerId,
-          title: 'İade Gecikti',
-          body: 'Otomatik iadeniz tamamlanamadı. Tarodan ekibi durumu inceliyor; en kısa sürede çözeceğiz.',
+          title: "İade Gecikti",
+          body: "Otomatik iadeniz tamamlanamadı. Tarodan ekibi durumu inceliyor; en kısa sürede çözeceğiz.",
           data: {
-            type: 'trade_refund_failed',
+            type: "trade_refund_failed",
             tradeId: payload.tradeId,
             reason: payload.reason,
           },
@@ -964,17 +1164,19 @@ export class EventService {
     tradeId: string;
     cashPayerId: string | null;
   }): Promise<void> {
-    this.logger.log(`Emitting trade.refund-completed for trade ${payload.tradeId}`);
+    this.logger.log(
+      `Emitting trade.refund-completed for trade ${payload.tradeId}`,
+    );
 
     if (payload.cashPayerId) {
       await this.pushQueue.add(
-        'send-notification',
+        "send-notification",
         {
           userId: payload.cashPayerId,
-          title: 'İade Tamamlandı',
-          body: 'Nakit fark ödemeniz PayTR üzerinden iade edildi.',
+          title: "İade Tamamlandı",
+          body: "Nakit fark ödemeniz PayTR üzerinden iade edildi.",
           data: {
-            type: 'trade_refund_completed',
+            type: "trade_refund_completed",
             tradeId: payload.tradeId,
           },
         },
@@ -992,18 +1194,24 @@ export class EventService {
     buyerId: string;
     productTitle: string;
   }): Promise<void> {
-    this.logger.log(`Emitting reservation.expired for order ${payload.orderNumber}`);
+    this.logger.log(
+      `Emitting reservation.expired for order ${payload.orderNumber}`,
+    );
 
-    await this.pushQueue.add('send-notification', {
-      userId: payload.buyerId,
-      title: 'Sipariş Süresi Doldu',
-      body: `${payload.productTitle} siparişinizin ödeme süresi doldu ve iptal edildi.`,
-      data: {
-        type: 'reservation_expired',
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
+    await this.pushQueue.add(
+      "send-notification",
+      {
+        userId: payload.buyerId,
+        title: "Sipariş Süresi Doldu",
+        body: `${payload.productTitle} siparişinizin ödeme süresi doldu ve iptal edildi.`,
+        data: {
+          type: "reservation_expired",
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber,
+        },
       },
-    }, { priority: 3 });
+      { priority: 3 },
+    );
   }
 
   /**
@@ -1015,23 +1223,29 @@ export class EventService {
     subject: string;
     templateData?: Record<string, any>;
   }): Promise<void> {
-    await this.emailQueue.add('send-template', {
-      to: data.to,
-      template: data.template,
-      subject: data.subject,
-      templateData: data.templateData || {},
-    }, {
-      priority: 2,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+    await this.emailQueue.add(
+      "send-template",
+      {
+        to: data.to,
+        template: data.template,
+        subject: data.subject,
+        templateData: data.templateData || {},
+      },
+      {
+        priority: 2,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    );
   }
 
   /**
    * Emit admin broadcast notification
    */
   async emitAdminBroadcast(payload: AdminBroadcastPayload): Promise<void> {
-    this.logger.log(`Emitting admin broadcast to ${payload.userIds.length} users`);
+    this.logger.log(
+      `Emitting admin broadcast to ${payload.userIds.length} users`,
+    );
 
     // Fetch user details in chunks
     const chunkSize = 100;
@@ -1045,14 +1259,18 @@ export class EventService {
           email: true,
           // Only need to know whether the user has at least one active device
           // token (push_tokens table) to decide whether to queue a push job.
-          pushTokens: { where: { isActive: true }, select: { id: true }, take: 1 },
+          pushTokens: {
+            where: { isActive: true },
+            select: { id: true },
+            take: 1,
+          },
         },
       });
 
       for (const user of users) {
         // Send email if requested
-        if (payload.channels.includes('email')) {
-          await this.emailQueue.add('send', {
+        if (payload.channels.includes("email")) {
+          await this.emailQueue.add("send", {
             to: user.email,
             subject: payload.title,
             html: `
@@ -1067,18 +1285,17 @@ export class EventService {
         }
 
         // Send push if requested and the user has at least one active device token
-        if (payload.channels.includes('push') && user.pushTokens.length > 0) {
-          await this.pushQueue.add('send-notification', {
+        if (payload.channels.includes("push") && user.pushTokens.length > 0) {
+          await this.pushQueue.add("send-notification", {
             userId: user.id,
             title: payload.title,
             body: payload.body,
             data: {
               ...payload.data,
-              type: 'admin_broadcast',
+              type: "admin_broadcast",
             },
           });
         }
-
       }
     }
   }

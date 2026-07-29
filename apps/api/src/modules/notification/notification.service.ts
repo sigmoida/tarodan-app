@@ -10,15 +10,15 @@
  * (NotificationCommerceService / NotificationAccountService). No behavior
  * change — external callers see the same surface.
  */
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   SendNotificationDto,
   NotificationType,
   RegisterPushTokenDto,
-} from './dto';
-import { NotificationDispatchService } from './notification-dispatch.service';
-import { NotificationCommerceService } from './notification-commerce.service';
-import { NotificationAccountService } from './notification-account.service';
+} from "./dto";
+import { NotificationDispatchService } from "./notification-dispatch.service";
+import { NotificationCommerceService } from "./notification-commerce.service";
+import { NotificationAccountService } from "./notification-account.service";
 
 @Injectable()
 export class NotificationService {
@@ -46,7 +46,11 @@ export class NotificationService {
     return this.dispatch.registerPushToken(userId, dto);
   }
 
-  async getInAppNotifications(userId: string, page: number = 1, limit: number = 20) {
+  async getInAppNotifications(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
     return this.dispatch.getInAppNotifications(userId, page, limit);
   }
 
@@ -62,8 +66,16 @@ export class NotificationService {
     return this.dispatch.getUnreadCount(userId);
   }
 
-  async sendTemplateEmailToUser(userId: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
-    return this.dispatch.sendTemplateEmailToUser(userId, templateKey, templateData);
+  async sendTemplateEmailToUser(
+    userId: string,
+    templateKey: string,
+    templateData: Record<string, any>,
+  ): Promise<void> {
+    return this.dispatch.sendTemplateEmailToUser(
+      userId,
+      templateKey,
+      templateData,
+    );
   }
 
   getProviderStatus() {
@@ -80,7 +92,11 @@ export class NotificationService {
     return this.commerce.notifyOrderPaid(sellerId, orderId, amount);
   }
 
-  async notifyOrderShipped(buyerId: string, orderId: string, trackingNumber: string) {
+  async notifyOrderShipped(
+    buyerId: string,
+    orderId: string,
+    trackingNumber: string,
+  ) {
     return this.commerce.notifyOrderShipped(buyerId, orderId, trackingNumber);
   }
 
@@ -89,7 +105,11 @@ export class NotificationService {
     orderId: string,
     confirmationDeadline: Date,
   ) {
-    return this.commerce.notifyOrderDeliveredConfirm(buyerId, orderId, confirmationDeadline);
+    return this.commerce.notifyOrderDeliveredConfirm(
+      buyerId,
+      orderId,
+      confirmationDeadline,
+    );
   }
 
   async notifyOrderAutoCompleted(userId: string, orderId: string) {
@@ -105,54 +125,101 @@ export class NotificationService {
     orderId: string,
     reason?: string,
   ) {
-    return this.commerce.notifyOrderForceCompletedByAdmin(userId, orderId, reason);
+    return this.commerce.notifyOrderForceCompletedByAdmin(
+      userId,
+      orderId,
+      reason,
+    );
   }
 
   async notifySellerDidNotShipRefunded(buyerId: string, orderId: string) {
     return this.commerce.notifySellerDidNotShipRefunded(buyerId, orderId);
   }
 
-  async notifyOfferReceived(sellerId: string, productId: string, amount: number) {
+  async notifyOfferReceived(
+    sellerId: string,
+    productId: string,
+    amount: number,
+  ) {
     return this.commerce.notifyOfferReceived(sellerId, productId, amount);
   }
 
-  async notifyOfferAccepted(buyerId: string, productId: string, amount: number) {
+  async notifyOfferAccepted(
+    buyerId: string,
+    productId: string,
+    amount: number,
+  ) {
     return this.commerce.notifyOfferAccepted(buyerId, productId, amount);
   }
 
   async notifyOrderCancelledOutOfStock(
-    buyerId: string, productId: string, _productTitle: string, _categoryId: string | null,
+    buyerId: string,
+    productId: string,
+    _productTitle: string,
+    _categoryId: string | null,
   ) {
-    return this.commerce.notifyOrderCancelledOutOfStock(buyerId, productId, _productTitle, _categoryId);
+    return this.commerce.notifyOrderCancelledOutOfStock(
+      buyerId,
+      productId,
+      _productTitle,
+      _categoryId,
+    );
   }
 
   async notifyOfferCancelledOutOfStock(
-    buyerId: string, productId: string, _productTitle: string, _categoryId: string | null,
+    buyerId: string,
+    productId: string,
+    _productTitle: string,
+    _categoryId: string | null,
   ) {
-    return this.commerce.notifyOfferCancelledOutOfStock(buyerId, productId, _productTitle, _categoryId);
+    return this.commerce.notifyOfferCancelledOutOfStock(
+      buyerId,
+      productId,
+      _productTitle,
+      _categoryId,
+    );
   }
 
   async notifyReservationReleased(
-    buyerId: string, orderId: string, productTitle: string,
+    buyerId: string,
+    orderId: string,
+    productTitle: string,
   ) {
-    return this.commerce.notifyReservationReleased(buyerId, orderId, productTitle);
+    return this.commerce.notifyReservationReleased(
+      buyerId,
+      orderId,
+      productTitle,
+    );
   }
 
   async notifyOrderPaymentExpired(
-    buyerId: string, orderId: string, productTitle: string,
+    buyerId: string,
+    orderId: string,
+    productTitle: string,
   ) {
-    return this.commerce.notifyOrderPaymentExpired(buyerId, orderId, productTitle);
+    return this.commerce.notifyOrderPaymentExpired(
+      buyerId,
+      orderId,
+      productTitle,
+    );
   }
 
   async sendOrderCancelledEmails(orderId: string): Promise<void> {
     return this.commerce.sendOrderCancelledEmails(orderId);
   }
 
-  async broadcastBackInStock(productId: string, productTitle: string): Promise<void> {
+  async broadcastBackInStock(
+    productId: string,
+    productTitle: string,
+  ): Promise<void> {
     return this.commerce.broadcastBackInStock(productId, productTitle);
   }
 
-  async notifyBackInStock(userId: string, productId: string, _productTitle: string) {
+  async notifyBackInStock(
+    userId: string,
+    productId: string,
+    _productTitle: string,
+  ) {
     return this.commerce.notifyBackInStock(userId, productId, _productTitle);
   }
 
@@ -164,8 +231,16 @@ export class NotificationService {
     return this.commerce.notifyTradeAccepted(initiatorId, tradeId);
   }
 
-  async notifyTradeShipped(receiverId: string, tradeId: string, trackingNumber: string) {
-    return this.commerce.notifyTradeShipped(receiverId, tradeId, trackingNumber);
+  async notifyTradeShipped(
+    receiverId: string,
+    tradeId: string,
+    trackingNumber: string,
+  ) {
+    return this.commerce.notifyTradeShipped(
+      receiverId,
+      tradeId,
+      trackingNumber,
+    );
   }
 
   async notifyTradeCompleted(userId: string, tradeId: string) {
@@ -196,7 +271,19 @@ export class NotificationService {
     return this.account.sendEmailVerification(userId, verificationToken);
   }
 
-  async sendGuestCheckoutVerificationCode(email: string, code: string, ttlSeconds: number) {
-    return this.account.sendGuestCheckoutVerificationCode(email, code, ttlSeconds);
+  async sendEmailChangeCode(email: string, code: string, ttlSeconds: number) {
+    return this.account.sendEmailChangeCode(email, code, ttlSeconds);
+  }
+
+  async sendGuestCheckoutVerificationCode(
+    email: string,
+    code: string,
+    ttlSeconds: number,
+  ) {
+    return this.account.sendGuestCheckoutVerificationCode(
+      email,
+      code,
+      ttlSeconds,
+    );
   }
 }

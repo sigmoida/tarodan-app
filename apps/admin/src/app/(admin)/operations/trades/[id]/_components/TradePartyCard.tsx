@@ -1,7 +1,8 @@
-import Link from 'next/link';
-import { getProductEffectivePrice } from '@/lib/product-price';
-import { SectionCard } from '@/components/detail/SectionCard';
-import type { TradeItem } from '../types';
+import Link from "next/link";
+import { getProductEffectivePrice } from "@/lib/product-price";
+import { fmtTry } from "@/lib/format";
+import { SectionCard } from "@/components/detail/SectionCard";
+import type { TradeItem } from "../types";
 
 /** A trade party (initiator/receiver) with their offered items. */
 export function TradePartyCard({
@@ -48,10 +49,7 @@ export function TradePartyCard({
                 {item.product.title}
               </Link>
               <p className="text-xs text-muted">
-                ₺
-                {getProductEffectivePrice(item.product).toLocaleString('tr-TR', {
-                  minimumFractionDigits: 2,
-                })}
+                {fmtTry(getProductEffectivePrice(item.product))}
               </p>
             </div>
           </div>

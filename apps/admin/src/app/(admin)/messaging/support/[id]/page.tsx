@@ -1,28 +1,26 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useState } from "react";
+import { useParams } from "next/navigation";
 import {
-  ChatBubbleLeftRightIcon,
   ArrowUturnLeftIcon,
   PencilSquareIcon,
-} from '@heroicons/react/24/outline';
+} from "@heroicons/react/24/outline";
+import { Button, StatusBadge, enumLabel } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { DetailPage } from "@/components/detail/DetailPage";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { PartyCard } from "@/components/detail/PartyCard";
+import { Timeline } from "@/components/detail/Timeline";
+import { DataList, Field } from "@/components/detail/DataList";
+import { TicketReplyModal } from "./_modals/TicketReplyModal";
+import { TicketStatusModal } from "./_modals/TicketStatusModal";
 import {
-  Button,
-  StatusBadge,
-  enumLabel,
-  ticketStatusConfig,
-  ticketPriorityConfig,
-  ticketCategoryConfig,
-} from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { DetailPage } from '@/components/detail/DetailPage';
-import { SectionCard } from '@/components/detail/SectionCard';
-import { PartyCard } from '@/components/detail/PartyCard';
-import { Timeline } from '@/components/detail/Timeline';
-import { DataList, Field } from '@/components/detail/DataList';
-import { TicketReplyModal } from './_modals/TicketReplyModal';
-import { TicketStatusModal } from './_modals/TicketStatusModal';
+  supportTicketStatusConfig,
+  supportTicketPriorityConfig,
+  supportTicketCategoryConfig,
+} from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 interface SupportTicketDetail {
   id: string;
@@ -31,11 +29,14 @@ interface SupportTicketDetail {
   category: string;
   priority: string;
   status: string;
-  creator: { id: string; displayName: string; email: string };
-  assignee?: { id: string; displayName: string };
+  creatorId: string;
+  creatorName: string;
+  assigneeId?: string;
+  assigneeName?: string;
   messages: Array<{
     id: string;
-    sender: { id: string; displayName: string };
+    senderId: string;
+    senderName: string;
     content: string;
     isInternal: boolean;
     createdAt: string;
@@ -46,6 +47,7 @@ interface SupportTicketDetail {
 }
 
 export default function SupportTicketDetailPage() {
+  const translate = useTranslations();
   const { id } = useParams<{ id: string }>();
   const [replyOpen, setReplyOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -56,13 +58,19 @@ export default function SupportTicketDetailPage() {
       id={id}
       fetcher={(tid) => adminApi.getTicket(tid).then((r) => r.data)}
       backHref="/messaging/support"
-      emptyTitle="Destek talebi bulunamadı"
-      title={(t) => t.subject}
-      subtitle={(t) => `#${t.ticketNumber}`}
-      badge={(t) => (
+      emptyTitle={translate("admin.messaging.support.notFound")}
+      title={(ticket) => ticket.subject}
+      subtitle={(ticket) => `#${ticket.ticketNumber}`}
+      badge={(ticket) => (
         <span className="flex items-center gap-2">
-          <StatusBadge status={t.priority} config={ticketPriorityConfig} />
-          <StatusBadge status={t.status} config={ticketStatusConfig} />
+          <StatusBadge
+            status={ticket.priority}
+            config={supportTicketPriorityConfig(translate)}
+          />
+          <StatusBadge
+            status={ticket.status}
+            config={supportTicketStatusConfig(translate)}
+          />
         </span>
       )}
       actions={() => (
@@ -72,98 +80,139 @@ export default function SupportTicketDetailPage() {
             leftIcon={<ArrowUturnLeftIcon className="h-5 w-5" />}
             onClick={() => setReplyOpen(true)}
           >
-            Yanıtla
+            {translate("admin.messaging.support.reply")}
           </Button>
           <Button
             variant="secondary"
             leftIcon={<PencilSquareIcon className="h-5 w-5" />}
             onClick={() => setStatusOpen(true)}
           >
-            Durum Güncelle
+            {translate("admin.messaging.support.updateStatus")}
           </Button>
         </>
       )}
     >
-      {(t) => (
+      {(ticket) => (
         <>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
-              <SectionCard title="Mesajlar" icon={ChatBubbleLeftRightIcon}>
+              <SectionCard
+                title={translate("admin.messaging.support.messages")}
+              >
                 <div className="space-y-4">
-                  {t.messages.map((message) => (
+                  {ticket.messages.map((message) => (
                     <div
                       key={message.id}
                       className={`rounded-lg p-4 ${
                         message.isInternal
-                          ? 'border border-warning-200 bg-warning-50'
-                          : 'bg-surface-alt'
+                          ? "border border-warning-200 bg-warning-50"
+                          : "bg-surface-alt"
                       }`}
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-heading">
-                            {message.sender.displayName}
+                            {message.senderName}
                           </span>
                           {message.isInternal && (
                             <span className="rounded bg-warning-200 px-2 py-0.5 text-xs text-warning-800">
-                              İç Not
+                              {translate(
+                                "admin.messaging.support.internalNote",
+                              )}
                             </span>
                           )}
                         </div>
                         <span className="text-xs text-muted">
-                          {new Date(message.createdAt).toLocaleString('tr-TR')}
+                          {new Date(message.createdAt).toLocaleString(
+                            translate("common.dateLocale"),
+                          )}
                         </span>
                       </div>
-                      <p className="whitespace-pre-wrap text-body">{message.content}</p>
+                      <p className="whitespace-pre-wrap text-body">
+                        {message.content}
+                      </p>
                     </div>
                   ))}
-                  {t.messages.length === 0 && (
-                    <p className="text-sm text-muted">Henüz mesaj yok.</p>
+                  {ticket.messages.length === 0 && (
+                    <p className="text-sm text-muted">
+                      {translate("admin.messaging.support.noMessages")}
+                    </p>
                   )}
                 </div>
               </SectionCard>
             </div>
 
             <div className="space-y-6">
-              <SectionCard title="Talep Bilgileri">
+              <SectionCard
+                title={translate("admin.messaging.support.ticketInfo")}
+              >
                 <DataList columns={1}>
-                  <Field label="Kategori">
-                    {enumLabel(ticketCategoryConfig, t.category, t.category)}
+                  <Field label={translate("common.category")}>
+                    {enumLabel(
+                      supportTicketCategoryConfig(translate),
+                      ticket.category,
+                      ticket.category,
+                    )}
                   </Field>
-                  <Field label="Öncelik">
-                    <StatusBadge status={t.priority} config={ticketPriorityConfig} />
+                  <Field
+                    label={translate("admin.messaging.support.priorityLabel")}
+                  >
+                    <StatusBadge
+                      status={ticket.priority}
+                      config={supportTicketPriorityConfig(translate)}
+                    />
                   </Field>
-                  <Field label="Durum">
-                    <StatusBadge status={t.status} config={ticketStatusConfig} />
+                  <Field label={translate("common.status")}>
+                    <StatusBadge
+                      status={ticket.status}
+                      config={supportTicketStatusConfig(translate)}
+                    />
                   </Field>
-                  {t.assignee && <Field label="Atanan">{t.assignee.displayName}</Field>}
+                  {ticket.assigneeName && (
+                    <Field
+                      label={translate("admin.messaging.support.assignee")}
+                    >
+                      {ticket.assigneeName}
+                    </Field>
+                  )}
                 </DataList>
               </SectionCard>
 
               <PartyCard
-                title="Oluşturan"
-                name={t.creator.displayName}
-                userHref={`/accounts/users/${t.creator.id}`}
-                email={t.creator.email}
+                title={translate("admin.messaging.support.creator")}
+                name={ticket.creatorName}
+                userHref={`/accounts/users/${ticket.creatorId}`}
               />
 
               <Timeline
                 items={[
-                  { label: 'Oluşturulma', at: t.createdAt },
-                  { label: 'Son Güncelleme', at: t.updatedAt },
-                  { label: 'Çözülme', at: t.resolvedAt },
+                  {
+                    label: translate("admin.messaging.support.createdAt"),
+                    at: ticket.createdAt,
+                  },
+                  {
+                    label: translate("admin.messaging.support.lastUpdated"),
+                    at: ticket.updatedAt,
+                  },
+                  {
+                    label: translate("admin.messaging.support.resolvedAt"),
+                    at: ticket.resolvedAt,
+                  },
                 ]}
               />
             </div>
           </div>
 
           {replyOpen && (
-            <TicketReplyModal ticketId={t.id} onClose={() => setReplyOpen(false)} />
+            <TicketReplyModal
+              ticketId={ticket.id}
+              onClose={() => setReplyOpen(false)}
+            />
           )}
           {statusOpen && (
             <TicketStatusModal
-              ticketId={t.id}
-              currentStatus={t.status}
+              ticketId={ticket.id}
+              currentStatus={ticket.status}
               onClose={() => setStatusOpen(false)}
             />
           )}

@@ -1,50 +1,57 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { DataTable } from '@/components/DataTable';
-import { useResourceList } from '@/components/list';
-import { StatusUpdateModal } from '../[id]/_modals/StatusUpdateModal';
-import { orderColumns } from '../_lib/columns';
-import { orderRowMenu } from '../_lib/rowActions';
-import { type Order, mapOrders, useOrderGroups } from '../_lib/orders';
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { DataTable } from "@/components/DataTable";
+import { useResourceList } from "@/components/list";
+import { StatusUpdateModal } from "../[id]/_modals/StatusUpdateModal";
+import { orderColumns } from "../_lib/columns";
+import { orderRowMenu } from "../_lib/rowActions";
+import { type OrderGroupRow, mapOrders, useOrderGroups } from "../_lib/orders";
+import { OrderGroupDetail } from "./OrderGroupDetail";
+import { useSession } from "@/context/SessionContext";
 
 /**
- * The orders table — the page's unique logic (checkout-group accordion) lives
- * here, reading rows from the ResourceList context. Status editing goes through
- * the shared StatusUpdateModal (same as the detail page).
+ * The orders table. Each placed order / checkout group is ONE row; the row
+ * expands into a detail row listing its product line-items (grouped by seller
+ * when the cart has multiple satıcı-paketleri). Reads rows from the ResourceList
+ * context; status editing goes through the shared StatusUpdateModal.
  */
 export function OrdersTable() {
+  const t = useTranslations();
   const router = useRouter();
-  const { rows, isLoading, search, filters } = useResourceList<any>();
+  const { user } = useSession();
+  const { rows, isLoading, search, filters, sort, setSort } =
+    useResourceList<any>();
 
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [statusOrder, setStatusOrder] = useState<Order | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusOrder, setStatusOrder] = useState<OrderGroupRow | null>(null);
 
-  const toggleGroup = (gid: string) =>
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(gid)) next.delete(gid);
-      else next.add(gid);
-      return next;
-    });
+  const toggleRow = (id: string) =>
+    setExpandedId((prev) => (prev === id ? null : id));
 
-  const orders = useMemo(() => mapOrders(rows), [rows]);
-  const { displayRows, rowClassById } = useOrderGroups(orders, expandedGroups);
+  const orders = useMemo(() => mapOrders(rows, t), [rows, t]);
+  const displayRows = useOrderGroups(orders);
 
   const columns = orderColumns({
-    expandedGroups,
-    toggleGroup,
-    rowMenu: orderRowMenu({
-      onView: (o) => router.push(`/operations/orders/${o.id}`),
-      onEditStatus: (o) => setStatusOrder(o),
-    }),
+    t,
+    expandedId,
+    toggleRow,
+    rowMenu: orderRowMenu(
+      t,
+      {
+        onView: (o) => router.push(`/operations/orders/${o.orderId}`),
+        onEditStatus: (o) => setStatusOrder(o),
+      },
+      user.role === "super_admin" || user.role === "admin",
+    ),
   });
 
   const emptyText =
-    search || filters.status !== 'all' || filters.userId
-      ? 'Filtreye uygun sipariş bulunamadı'
-      : 'Henüz sipariş yok';
+    search || filters.status !== "all" || filters.userId
+      ? t("admin.operations.orders.emptyFiltered")
+      : t("admin.operations.orders.empty");
 
   return (
     <>
@@ -52,14 +59,17 @@ export function OrdersTable() {
         columns={columns}
         data={displayRows}
         loading={isLoading}
-        rowClassName={(o) => rowClassById.get(o.id)}
         emptyText={emptyText}
         getRowId={(o) => o.id}
+        expandedId={expandedId}
+        renderExpanded={(row) => <OrderGroupDetail row={row} />}
+        sort={sort}
+        onSort={setSort}
       />
       {statusOrder && (
         <StatusUpdateModal
           open
-          orderId={statusOrder.id}
+          orderId={statusOrder.orderId}
           currentStatus={statusOrder.status}
           onClose={() => setStatusOrder(null)}
         />

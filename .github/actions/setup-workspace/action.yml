@@ -1,27 +1,27 @@
 name: 'Setup Workspace'
 description: >-
-  Ortak CI bootstrap: pnpm + node (tek kaynaktan), opsiyonel Turbo cache,
-  bağımlılık kurulumu ve opsiyonel prisma generate. Tekrarı sıfırlar.
-  Not: checkout bu action'dan ÖNCE job içinde yapılmalı (local action ancak
-  repo checkout edilince çözülür).
+  Shared CI bootstrap: pnpm + node (single source of truth), optional Turbo
+  cache, dependency install and optional prisma generate. Removes duplication.
+  Note: checkout must run BEFORE this action in the job (a local action only
+  resolves once the repo is checked out).
 
 inputs:
   prisma:
-    description: 'prisma generate çalıştırılsın mı (retry ile)'
+    description: 'Whether to run prisma generate (with retry)'
     required: false
     default: 'true'
   turbo-cache:
-    description: '.turbo cache restore/save edilsin mi'
+    description: 'Whether to restore/save the .turbo cache'
     required: false
     default: 'true'
 
 runs:
   using: 'composite'
   steps:
-    # pnpm sürümü pinlenmez → package.json "packageManager" alanından okunur (tek kaynak).
+    # pnpm version is not pinned -> read from the "packageManager" field in package.json (single source).
     - uses: pnpm/action-setup@v4
 
-    # Node sürümü .nvmrc'den okunur (tek kaynak).
+    # Node version is read from .nvmrc (single source).
     - uses: actions/setup-node@v4
       with:
         node-version-file: .nvmrc

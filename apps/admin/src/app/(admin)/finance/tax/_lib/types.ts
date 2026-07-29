@@ -1,4 +1,11 @@
-import { CalculatorIcon, ReceiptPercentIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import {
+  CalculatorIcon,
+  ReceiptPercentIcon,
+  ChartBarIcon,
+} from "@heroicons/react/24/outline";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface VatOverride {
   ruleId: string;
@@ -53,19 +60,23 @@ export interface TaxReport {
   }>;
 }
 
-export const TAX_TABS = [
-  { key: 'kdv', label: 'KDV', icon: CalculatorIcon },
-  { key: 'withholding', label: 'Stopaj', icon: ReceiptPercentIcon },
-  { key: 'report', label: 'Vergi Raporu', icon: ChartBarIcon },
+export const taxTabs = (t: T) => [
+  { key: "kdv", label: t("admin.finance.common.vat"), icon: CalculatorIcon },
+  {
+    key: "withholding",
+    label: t("admin.finance.tax.withholding"),
+    icon: ReceiptPercentIcon,
+  },
+  { key: "report", label: t("admin.finance.tax.report"), icon: ChartBarIcon },
 ];
 
-export const MONTHS = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
-];
+export const months = (locale: string) =>
+  Array.from({ length: 12 }, (_, index) =>
+    new Date(2024, index, 1).toLocaleDateString(locale, { month: "long" }),
+  );
 
-export const groupByOptions = [
-  { value: 'day', label: 'Günlük' },
-  { value: 'month', label: 'Aylık' },
-  { value: 'year', label: 'Yıllık' },
+export const groupByOptions = (t: T) => [
+  { value: "day", label: t("admin.finance.tax.groupBy.day") },
+  { value: "month", label: t("admin.finance.tax.groupBy.month") },
+  { value: "year", label: t("admin.finance.tax.groupBy.year") },
 ];

@@ -1,0 +1,116 @@
+/** @format */
+
+"use client";
+
+import toast from "react-hot-toast";
+import { discountsApi, userApi } from "@/lib/api";
+import { useWebList } from "@/hooks/useWebResource";
+import { useWebMutation } from "@/hooks/useWebMutation";
+import type { Discount, DiscountFormData, SellerProduct } from "../_lib/types";
+
+const RESOURCE = "profile-discounts";
+const PRODUCTS_RESOURCE = "profile-discounts-products";
+
+/**
+ * All of the seller's discounts (unfiltered). Metrics AND the filtered list both
+ * derive from this single dataset, so switching tabs never refetches or moves
+ * the metric cards.
+ */
+export function useDiscounts(enabled: boolean) {
+  const query = useWebList<Discount[]>({
+    resource: RESOURCE,
+    fetcher: async () => {
+      const res = await discountsApi.getAll({ limit: 100 });
+      const data = res.data;
+      return data.items || data || [];
+    },
+    enabled,
+    query: { meta: { page: "profile-discounts" } },
+  });
+  return { discounts: query.data ?? [], isLoading: query.isLoading };
+}
+
+/** Active products for the discount form's product picker. */
+export function useSellerProducts(enabled: boolean) {
+  const query = useWebList<SellerProduct[]>({
+    resource: PRODUCTS_RESOURCE,
+    fetcher: async () => {
+      const res = await userApi.getMyProducts({ limit: 100, status: "active" });
+      const data = res.data;
+      const items: SellerProduct[] = data.data || data.products || data || [];
+      return items.filter((p) => p.status === "active");
+    },
+    enabled,
+    query: { meta: { page: "profile-discounts-products" } },
+  });
+  return query.data ?? [];
+}
+
+function buildPayload(form: DiscountFormData) {
+  return {
+    code: form.code.trim() || undefined,
+    name: form.name,
+    description: form.description || undefined,
+    type: form.type,
+    value: form.value,
+    scope: form.scope,
+    targetProductIds: form.scope === "product" ? form.targetProductIds : [],
+    minCartValue: form.minCartValue ? parseFloat(form.minCartValue) : undefined,
+    maxDiscountAmount: form.maxDiscountAmount
+      ? parseFloat(form.maxDiscountAmount)
+      : undefined,
+    usageLimitTotal: form.usageLimitTotal
+      ? parseInt(form.usageLimitTotal)
+      : undefined,
+    usageLimitPerUser: parseInt(form.usageLimitPerUser) || 1,
+    isStackable: form.isStackable,
+    isActive: form.isActive,
+    startDate: new Date(form.startDate).toISOString(),
+    endDate: new Date(form.endDate + "T23:59:59").toISOString(),
+  };
+}
+
+/** Create or update a discount (update when `id` is passed). */
+export function useSaveDiscount() {
+  return useWebMutation(
+    async ({ id, form }: { id: string | null; form: DiscountFormData }) => {
+      const payload = buildPayload(form);
+      if (id) await discountsApi.update(id, payload);
+      else await discountsApi.create(payload as any);
+      return !!id;
+    },
+    {
+      invalidates: [RESOURCE],
+      errorMessage: "İndirim kaydedilirken hata oluştu",
+      onSuccess: (wasUpdate) =>
+        toast.success(
+          wasUpdate ? "İndirim güncellendi" : "İndirim oluşturuldu",
+        ),
+    },
+  );
+}
+
+export function useDeleteDiscount() {
+  return useWebMutation((id: string) => discountsApi.delete(id), {
+    invalidates: [RESOURCE],
+    successMessage: "İndirim silindi",
+    errorMessage: "İndirim silinirken hata oluştu",
+  });
+}
+
+export function useToggleDiscount() {
+  return useWebMutation(
+    (discount: Discount) =>
+      discountsApi.update(discount.id, { isActive: !discount.isActive }),
+    {
+      invalidates: [RESOURCE],
+      errorMessage: "Durum güncellenirken hata oluştu",
+      onSuccess: (_res, discount) =>
+        toast.success(
+          discount.isActive
+            ? "İndirim devre dışı bırakıldı"
+            : "İndirim aktif edildi",
+        ),
+    },
+  );
+}

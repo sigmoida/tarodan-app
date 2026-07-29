@@ -1,16 +1,11 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { Prisma } from '@prisma/client';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { SuratTrackingService } from '../surat-cargo/surat-tracking.service';
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratKapidanOdemeTahsilatTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-} from '../surat-cargo/surat-cargo.types';
+import { Injectable, Optional } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { Prisma } from "@prisma/client";
+import { AdminShipmentQueryDto } from "./dto";
+import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
+import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 
 /**
  * Kargo görünümü admin operasyonları (salt-okunur) — AdminService'in
@@ -32,45 +27,57 @@ export class AdminShippingService {
   /**
    * Get list of shipments
    */
-  async getShipments(query: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    carrierId?: string;
-  }) {
-    const { page = 1, limit = 10, status, carrierId } = query;
-    const where: Prisma.ShipmentWhereInput = {};
+  async getShipments(query: AdminShipmentQueryDto) {
+    const { status, carrierId, search } = query;
+    const where: Prisma.ShipmentWhereInput = {
+      ...(buildSearchWhere(search, [
+        "order.orderNumber",
+        "order.buyer.displayName",
+        "order.buyer.email",
+        "order.seller.displayName",
+        "order.seller.email",
+        "provider",
+        "trackingNumber",
+        "providerTrackingId",
+        "providerRawStatus",
+        "receivedBy",
+        "returnReason",
+      ]) as Prisma.ShipmentWhereInput | undefined),
+    };
+    const pagination = { ...query, limit: query.limit ?? 20 };
 
     if (status) where.status = status as any;
     if (carrierId) where.provider = carrierId;
 
-    const [total, shipments] = await Promise.all([
-      this.prisma.shipment.count({ where }),
-      this.prisma.shipment.findMany({
+    const orderBy = resolveOrderBy<Prisma.ShipmentOrderByWithRelationInput>(
+      "Shipment",
+      query,
+      { defaultSort: { createdAt: "desc" } },
+    );
+
+    return paginate(
+      this.prisma.shipment,
+      {
         where,
         include: {
           order: {
+            // `include` returns every Order scalar, so `packageId` (the per-seller
+            // OrderPackage) and `quantity` come along for free. Same-seller orders
+            // in a checkout group share ONE physical Sürat gönderi but keep a
+            // Shipment row each; the admin list groups siblings that share a
+            // `packageId` into a single physical-parcel row and shows the package's
+            // order line-items (product below), so a 2-seller cart = 2 rows, not 3.
             include: {
               buyer: { select: { id: true, displayName: true, email: true } },
               seller: { select: { id: true, displayName: true, email: true } },
+              product: { select: { id: true, title: true } },
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: shipments,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        orderBy,
       },
-    };
+      pagination,
+    );
   }
 
   /**
@@ -85,16 +92,17 @@ export class AdminShippingService {
       where: { id: shipmentId },
     });
     if (!shipment) {
-      return { ok: false, message: 'Gönderi bulunamadı' };
+      return { ok: false, message: "Gönderi bulunamadı" };
     }
-    if (shipment.provider !== 'surat') {
-      return { ok: false, message: 'Bu gönderi Sürat kargo değil' };
+    if (shipment.provider !== "surat") {
+      return { ok: false, message: "Bu gönderi Sürat kargo değil" };
     }
     if (!this.suratTrackingService) {
-      return { ok: false, message: 'Takip servisi kullanılamıyor' };
+      return { ok: false, message: "Takip servisi kullanılamıyor" };
     }
 
-    const updated = await this.suratTrackingService.syncShipmentTracking(shipmentId);
+    const updated =
+      await this.suratTrackingService.syncShipmentTracking(shipmentId);
     const fresh = await this.prisma.shipment.findUnique({
       where: { id: shipmentId },
     });
@@ -102,8 +110,8 @@ export class AdminShippingService {
     return {
       ok: updated,
       message: updated
-        ? 'Takip bilgisi güncellendi'
-        : 'Sürat’tan güncelleme alınamadı (kargo henüz hareket görmemiş ya da takip numarası yok olabilir)',
+        ? "Takip bilgisi güncellendi"
+        : "Sürat’tan güncelleme alınamadı (kargo henüz hareket görmemiş ya da takip numarası yok olabilir)",
       shipment: fresh,
     };
   }
@@ -126,7 +134,7 @@ export class AdminShippingService {
       return {
         ref,
         enabled: false,
-        create: { ok: false, message: 'Sürat servisi kullanılamıyor' },
+        create: { ok: false, message: "Sürat servisi kullanılamıyor" },
         track: null,
       };
     }
@@ -134,7 +142,10 @@ export class AdminShippingService {
       return {
         ref,
         enabled: false,
-        create: { ok: false, message: 'SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)' },
+        create: {
+          ok: false,
+          message: "SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)",
+        },
         track: null,
       };
     }
@@ -143,41 +154,33 @@ export class AdminShippingService {
     const createResult = await this.suratCargoService.submitShipmentWithRetry({
       idempotencyKey: ref,
       correlationId: ref,
-      payload: {
-        KisiKurum: 'ADMIN TEST ALICI',
-        SahisBirim: 'Endpoint testi',
-        AliciAdresi: 'Caferağa Mah. Moda Cad. No:14',
-        Il: 'İstanbul',
-        Ilce: 'Kadıköy',
-        TelefonCep: '5321112233',
-        KargoTuru: SuratKargoTuru.Koli,
-        OdemeTipi: SuratOdemeTipi.Pesin,
-        OzelKargoTakipNo: ref,
-        Adet: 1,
-        BirimDesi: 1,
-        BirimKg: 1,
-        KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
-        TasimaSekli: SuratTasimaSekli.KaraYolu,
-        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-        GonderiSekli: SuratGonderiSekli.Standart,
-        Pazaryerimi: 0,
-        Iademi: false,
-      },
+      payload: buildStandardGonderiPayload({
+        recipientName: "ADMIN TEST ALICI",
+        address: "Caferağa Mah. Moda Cad. No:14",
+        city: "İstanbul",
+        district: "Kadıköy",
+        phone: "5321112233",
+        ref,
+        content: "Endpoint testi",
+        // Test payload'u telefonu HAM (05xx normalizasyonu olmadan) gönderir;
+        // builder normalize eder → birebir korumak için override.
+        overrides: { TelefonCep: "5321112233" },
+      }),
     });
 
     const create = createResult.ok
-      ? { ok: true, message: 'Sürat gönderi oluşturuldu (başarılı)' }
+      ? { ok: true, message: "Sürat gönderi oluşturuldu (başarılı)" }
       : {
           ok: false,
           message:
             (createResult as any).suratMessage ||
-            `teknik hata: ${(createResult as any).code ?? 'bilinmiyor'}`,
+            `teknik hata: ${(createResult as any).code ?? "bilinmiyor"}`,
         };
 
     // 2) Aynı referansla takibi sorgula — Sürat'tan durum oku (REST tracking)
     const track = this.suratTrackingService
       ? await this.suratTrackingService.probeTracking(ref)
-      : { ok: false, error: 'Takip servisi kullanılamıyor' };
+      : { ok: false, error: "Takip servisi kullanılamıyor" };
 
     return { ref, enabled: true, create, track };
   }
@@ -187,8 +190,10 @@ export class AdminShippingService {
    * ham olarak sorgular. DB'ye dokunmaz.
    */
   async suratTestTrack(ref: string): Promise<any> {
-    if (!ref?.trim()) return { ok: false, error: 'Referans (OzelKargoTakipNo) gerekli' };
-    if (!this.suratTrackingService) return { ok: false, error: 'Takip servisi kullanılamıyor' };
+    if (!ref?.trim())
+      return { ok: false, error: "Referans (OzelKargoTakipNo) gerekli" };
+    if (!this.suratTrackingService)
+      return { ok: false, error: "Takip servisi kullanılamıyor" };
     return this.suratTrackingService.probeTracking(ref.trim());
   }
 
@@ -196,11 +201,18 @@ export class AdminShippingService {
    * Test konsolu: verilen referansla Sürat iptal/geri-çek endpoint'ini (GonderiGeriCek)
    * çağırır. Uzak çağrı yapar, DB'ye dokunmaz.
    */
-  async suratTestCancel(ref: string): Promise<{ ok: boolean; suratMessage?: string; error?: string }> {
-    if (!ref?.trim()) return { ok: false, error: 'Referans (OzelKargoTakipNo) gerekli' };
-    if (!this.suratCargoService) return { ok: false, error: 'Sürat servisi kullanılamıyor' };
+  async suratTestCancel(
+    ref: string,
+  ): Promise<{ ok: boolean; suratMessage?: string; error?: string }> {
+    if (!ref?.trim())
+      return { ok: false, error: "Referans (OzelKargoTakipNo) gerekli" };
+    if (!this.suratCargoService)
+      return { ok: false, error: "Sürat servisi kullanılamıyor" };
     if (!this.suratCargoService.isIntegrationEnabled()) {
-      return { ok: false, error: 'SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)' };
+      return {
+        ok: false,
+        error: "SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)",
+      };
     }
     return this.suratCargoService.cancelShipmentByOrderNumber(ref.trim());
   }
@@ -210,31 +222,28 @@ export class AdminShippingService {
    * Gerçek KargoTakipNo + ZPL etiket döner (düz create bunları vermez). DB'ye dokunmaz.
    */
   async suratTestBarcode(): Promise<any> {
-    if (!this.suratTrackingService) return { ok: false, error: 'Takip servisi kullanılamıyor' };
+    if (!this.suratTrackingService)
+      return { ok: false, error: "Takip servisi kullanılamıyor" };
     if (!this.suratCargoService?.isIntegrationEnabled()) {
-      return { ok: false, error: 'SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)' };
+      return {
+        ok: false,
+        error: "SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)",
+      };
     }
     const ref = `ADMIN-BARKOD-${Date.now()}`;
-    const result = await this.suratTrackingService.probeBarcode({
-      KisiKurum: 'ADMIN BARKOD TEST',
-      SahisBirim: 'Endpoint testi',
-      AliciAdresi: 'Caferağa Mah. Moda Cad. No:14',
-      Il: 'İstanbul',
-      Ilce: 'Kadıköy',
-      TelefonCep: '5321112233',
-      KargoTuru: SuratKargoTuru.Koli,
-      OdemeTipi: SuratOdemeTipi.Pesin,
-      OzelKargoTakipNo: ref,
-      Adet: 1,
-      BirimDesi: 1,
-      BirimKg: 1,
-      KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
-      TasimaSekli: SuratTasimaSekli.KaraYolu,
-      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-      GonderiSekli: SuratGonderiSekli.Standart,
-      Pazaryerimi: 0,
-      Iademi: false,
-    });
+    const result = await this.suratTrackingService.probeBarcode(
+      buildStandardGonderiPayload({
+        recipientName: "ADMIN BARKOD TEST",
+        address: "Caferağa Mah. Moda Cad. No:14",
+        city: "İstanbul",
+        district: "Kadıköy",
+        phone: "5321112233",
+        ref,
+        content: "Endpoint testi",
+        // Test payload'u telefonu HAM gönderir; builder normalize eder → koru.
+        overrides: { TelefonCep: "5321112233" },
+      }),
+    );
     return { ref, ...result };
   }
 
@@ -242,9 +251,81 @@ export class AdminShippingService {
    * Test konsolu: GonderiSil ile gönderiyi sil/pasif et (referansla). DB'ye dokunmaz.
    */
   async suratTestSil(ref: string): Promise<any> {
-    if (!ref?.trim()) return { ok: false, error: 'Referans (WebSiparisKodu) gerekli' };
-    if (!this.suratTrackingService) return { ok: false, error: 'Takip servisi kullanılamıyor' };
+    if (!ref?.trim())
+      return { ok: false, error: "Referans (WebSiparisKodu) gerekli" };
+    if (!this.suratTrackingService)
+      return { ok: false, error: "Takip servisi kullanılamıyor" };
     return this.suratTrackingService.probeGonderiSil(ref.trim());
   }
 
+  /**
+   * Kargo mutabakatı: müşteriden alınan kargo (alıcı payı) ile Sürat'ın gerçek
+   * faturaladığı tutarı karşılaştırır. delta > 0 platform kârı, < 0 zarar. Yalnız
+   * taşıyıcı maliyeti senkronlanmış (carrierActualCost dolu) gönderiler.
+   */
+  async getShippingReconciliation(limit = 100) {
+    const take = Math.min(Math.max(limit, 1), 500);
+    const shipments = await this.prisma.shipment.findMany({
+      where: { carrierActualCost: { not: null } },
+      orderBy: { carrierCostSyncedAt: "desc" },
+      take,
+      select: {
+        id: true,
+        provider: true,
+        carrierActualCost: true,
+        carrierNetCost: true,
+        carrierTaxAmount: true,
+        carrierDesi: true,
+        carrierCostSyncedAt: true,
+        order: {
+          select: {
+            orderNumber: true,
+            shippingCost: true,
+            buyerShippingAmount: true,
+          },
+        },
+      },
+    });
+
+    const round = (n: number) => Math.round(n * 100) / 100;
+    const rows = shipments.map((s) => {
+      const charged = Number(
+        s.order?.buyerShippingAmount ?? s.order?.shippingCost ?? 0,
+      );
+      const carrier = Number(s.carrierActualCost ?? 0);
+      return {
+        shipmentId: s.id,
+        orderNumber: s.order?.orderNumber ?? null,
+        provider: s.provider,
+        chargedShipping: charged,
+        carrierActualCost: carrier,
+        carrierNetCost:
+          s.carrierNetCost != null ? Number(s.carrierNetCost) : null,
+        carrierTaxAmount:
+          s.carrierTaxAmount != null ? Number(s.carrierTaxAmount) : null,
+        carrierDesi: s.carrierDesi != null ? Number(s.carrierDesi) : null,
+        delta: round(charged - carrier),
+        syncedAt: s.carrierCostSyncedAt,
+      };
+    });
+
+    const totals = rows.reduce(
+      (acc, r) => ({
+        chargedTotal: acc.chargedTotal + r.chargedShipping,
+        carrierTotal: acc.carrierTotal + r.carrierActualCost,
+        deltaTotal: acc.deltaTotal + r.delta,
+      }),
+      { chargedTotal: 0, carrierTotal: 0, deltaTotal: 0 },
+    );
+
+    return {
+      rows,
+      totals: {
+        chargedTotal: round(totals.chargedTotal),
+        carrierTotal: round(totals.carrierTotal),
+        deltaTotal: round(totals.deltaTotal),
+        count: rows.length,
+      },
+    };
+  }
 }

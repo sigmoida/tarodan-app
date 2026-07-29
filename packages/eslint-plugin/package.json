@@ -1,0 +1,7 @@
+{
+  "name": "@tarodan/eslint-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tarodan-internal ESLint rules (i18n guardrails, #225)",
+  "main": "index.js"
+}

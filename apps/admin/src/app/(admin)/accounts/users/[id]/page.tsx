@@ -1,41 +1,46 @@
-'use client';
+"use client";
 
-import { useParams } from 'next/navigation';
-import { StarIcon } from '@heroicons/react/24/outline';
-import { Button } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { DetailPage } from '@/components/detail/DetailPage';
-import { useConfirm } from '@/provider/ConfirmProvider';
-import { usePrompt } from '@/provider/PromptProvider';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { type UserDetail } from './types';
-import { UserStats } from './_sections/UserStats';
-import { UserInfoSection } from './_sections/UserInfoSection';
-import { MembershipSection } from './_sections/MembershipSection';
-import { UserActivityTabs } from './_sections/UserActivityTabs';
-import { UserSidebar } from './_sections/UserSidebar';
+import { useParams } from "next/navigation";
+import { StarIcon } from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
+import { Badge, Button } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { DetailPage } from "@/components/detail/DetailPage";
+import { useConfirm } from "@/provider/ConfirmProvider";
+import { usePrompt } from "@/provider/PromptProvider";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { type UserDetail } from "./types";
+import { UserStats } from "./_sections/UserStats";
+import { UserInfoSection } from "./_sections/UserInfoSection";
+import { MembershipSection } from "./_sections/MembershipSection";
+import { UserActivityTabs } from "./_sections/UserActivityTabs";
+import { UserSidebar } from "./_sections/UserSidebar";
 
 export default function UserDetailPage() {
+  const t = useTranslations();
   const { id } = useParams<{ id: string }>();
   const confirm = useConfirm();
   const prompt = usePrompt();
 
-  const ban = useAdminMutation((reason: string) => adminApi.banUser(id, reason), {
-    invalidates: ['users'],
-    successMessage: 'Kullanıcı banlandı',
-  });
+  const ban = useAdminMutation(
+    (reason: string) => adminApi.banUser(id, reason),
+    {
+      invalidates: ["users"],
+      successMessage: t("admin.users.detail.banned"),
+    },
+  );
   const unban = useAdminMutation(() => adminApi.unbanUser(id), {
-    invalidates: ['users'],
-    successMessage: 'Kullanıcı banı kaldırıldı',
+    invalidates: ["users"],
+    successMessage: t("admin.users.detail.unbanned"),
   });
 
   const onBan = async () => {
     const reason = await prompt({
-      title: 'Kullanıcıyı Banla',
-      label: 'Ban Nedeni',
-      placeholder: 'Ban nedenini açıklayın...',
-      confirmLabel: 'Banla',
-      requiredMessage: 'Ban nedeni gereklidir',
+      title: t("admin.users.detail.banTitle"),
+      label: t("admin.users.detail.banReasonLabel"),
+      placeholder: t("admin.users.detail.banReasonPlaceholder"),
+      confirmLabel: t("admin.users.detail.banConfirm"),
+      requiredMessage: t("admin.users.detail.banReasonRequired"),
       destructive: true,
     });
     if (!reason) return;
@@ -43,12 +48,12 @@ export default function UserDetailPage() {
   };
 
   const onUnban = async () => {
-    const ok = await confirm({
-      title: 'Banı Kaldır',
-      description: 'Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?',
-      confirmLabel: 'Banı Kaldır',
+    await confirm({
+      title: t("admin.users.detail.unbanTitle"),
+      description: t("admin.users.detail.unbanConfirmDesc"),
+      confirmLabel: t("admin.users.detail.unbanTitle"),
+      onConfirm: () => unban.mutateAsync(),
     });
-    if (ok) unban.mutate();
   };
 
   return (
@@ -57,7 +62,7 @@ export default function UserDetailPage() {
       id={id}
       fetcher={(uid) => adminApi.getUser(uid).then((r) => r.data)}
       backHref="/accounts/users"
-      emptyTitle="Kullanıcı bulunamadı"
+      emptyTitle={t("admin.users.empty")}
       title={(u) => u.displayName}
       subtitle={(u) => (
         <span className="flex flex-wrap items-center gap-2">
@@ -67,7 +72,9 @@ export default function UserDetailPage() {
               <StarIcon className="h-4 w-4 fill-warning-500" />
               {u.averageRating}
               <span className="text-muted">
-                ({u.stats?.receivedRatingsCount || 0} değerlendirme)
+                {t("admin.users.detail.ratingsCount", {
+                  count: u.stats?.receivedRatingsCount || 0,
+                })}
               </span>
             </span>
           )}
@@ -75,23 +82,23 @@ export default function UserDetailPage() {
       )}
       badge={(u) =>
         u.isBanned ? (
-          <span className="rounded-full bg-danger-500/20 px-3 py-1 text-sm font-medium text-danger-600">
-            Banlı
-          </span>
+          <Badge variant="danger">{t("admin.users.detail.bannedBadge")}</Badge>
         ) : (
-          <span className="rounded-full bg-success-500/20 px-3 py-1 text-sm font-medium text-success-700">
-            Aktif
-          </span>
+          <Badge variant="success">{t("common.active")}</Badge>
         )
       }
       actions={(u) =>
         u.isBanned ? (
-          <Button variant="success" onClick={onUnban} isLoading={unban.isPending}>
-            Banı Kaldır
+          <Button
+            variant="success"
+            onClick={onUnban}
+            isLoading={unban.isPending}
+          >
+            {t("admin.users.detail.unbanTitle")}
           </Button>
         ) : (
           <Button variant="danger" onClick={onBan} isLoading={ban.isPending}>
-            Banla
+            {t("admin.users.detail.banConfirm")}
           </Button>
         )
       }

@@ -1,6 +1,12 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { OrderStatus, TradeStatus, TicketStatus, ProductStatus } from '@prisma/client';
+import { Injectable, BadRequestException } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import {
+  OrderStatus,
+  TradeStatus,
+  TicketStatus,
+  ProductStatus,
+} from "@prisma/client";
+import { TarodanWebSocketGateway } from "../websocket/websocket.gateway";
 
 export interface ReportFilter {
   startDate?: Date;
@@ -54,13 +60,20 @@ export interface ProductReport {
   pendingProducts: number;
   soldProducts: number;
   averagePrice: number;
-  categoryDistribution: Array<{ name: string; count: number; percentage: number }>;
+  categoryDistribution: Array<{
+    name: string;
+    count: number;
+    percentage: number;
+  }>;
   productsByCondition: Record<string, number>;
 }
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly websocketGateway: TarodanWebSocketGateway,
+  ) {}
 
   // ==========================================================================
   // SALES REPORT
@@ -76,7 +89,7 @@ export class ReportsService {
           lte: endDate,
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     const totalOrders = orders.length;
@@ -134,7 +147,7 @@ export class ReportsService {
       include: {
         items: true,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     const totalTrades = trades.length;
@@ -147,14 +160,20 @@ export class ReportsService {
 
     // Calculate average trade value
     const tradeValues = trades.map((t) => {
-      const initiatorItems = (t.items || []).filter((i: { side: string }) => i.side === 'initiator');
-      const receiverItems = (t.items || []).filter((i: { side: string }) => i.side === 'receiver');
+      const initiatorItems = (t.items || []).filter(
+        (i: { side: string }) => i.side === "initiator",
+      );
+      const receiverItems = (t.items || []).filter(
+        (i: { side: string }) => i.side === "receiver",
+      );
       const initiatorValue = initiatorItems.reduce(
-        (sum: number, item: { valueAtTrade: { toString: () => string } }) => sum + parseFloat(item.valueAtTrade.toString()),
+        (sum: number, item: { valueAtTrade: { toString: () => string } }) =>
+          sum + parseFloat(item.valueAtTrade.toString()),
         0,
       );
       const receiverValue = receiverItems.reduce(
-        (sum: number, item: { valueAtTrade: { toString: () => string } }) => sum + parseFloat(item.valueAtTrade.toString()),
+        (sum: number, item: { valueAtTrade: { toString: () => string } }) =>
+          sum + parseFloat(item.valueAtTrade.toString()),
         0,
       );
       return (initiatorValue + receiverValue) / 2;
@@ -198,23 +217,24 @@ export class ReportsService {
   async generateUserReport(filter: ReportFilter): Promise<UserReport> {
     const { startDate, endDate } = this.getDateRange(filter);
 
-    const [totalUsers, newUsers, verifiedSellers, memberships] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({
-        where: {
-          createdAt: {
-            gte: startDate,
-            lte: endDate,
+    const [totalUsers, newUsers, verifiedSellers, memberships] =
+      await Promise.all([
+        this.prisma.user.count(),
+        this.prisma.user.count({
+          where: {
+            createdAt: {
+              gte: startDate,
+              lte: endDate,
+            },
           },
-        },
-      }),
-      this.prisma.user.count({
-        where: { sellerType: 'verified' },
-      }),
-      this.prisma.userMembership.findMany({
-        include: { tier: true },
-      }),
-    ]);
+        }),
+        this.prisma.user.count({
+          where: { sellerType: "verified" },
+        }),
+        this.prisma.userMembership.findMany({
+          include: { tier: true },
+        }),
+      ]);
 
     // Users by membership tier
     const usersByMembership: Record<string, number> = {};
@@ -232,7 +252,7 @@ export class ReportsService {
         },
       },
       select: { createdAt: true },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     const dailyRegistrations = this.aggregateByDate(registrations, () => ({}));
@@ -329,12 +349,12 @@ export class ReportsService {
   async exportSalesReportCSV(filter: ReportFilter): Promise<string> {
     const report = await this.generateSalesReport(filter);
 
-    let csv = 'Tarih,Sipariş Sayısı,Gelir (TRY),Komisyon (TRY)\n';
+    let csv = "Tarih,Sipariş Sayısı,Gelir (TRY),Komisyon (TRY)\n";
     for (const day of report.dailySales) {
       csv += `${day.date},${day.orders},${day.revenue},${day.commission}\n`;
     }
 
-    csv += '\nÖzet\n';
+    csv += "\nÖzet\n";
     csv += `Toplam Sipariş,${report.totalOrders}\n`;
     csv += `Toplam Gelir,${report.totalRevenue}\n`;
     csv += `Toplam Komisyon,${report.totalCommission}\n`;
@@ -346,12 +366,12 @@ export class ReportsService {
   async exportTradeReportCSV(filter: ReportFilter): Promise<string> {
     const report = await this.generateTradeReport(filter);
 
-    let csv = 'Tarih,Toplam Takas,Tamamlanan,İptal Edilen\n';
+    let csv = "Tarih,Toplam Takas,Tamamlanan,İptal Edilen\n";
     for (const day of report.dailyTrades) {
       csv += `${day.date},${day.total},${day.completed},${day.cancelled}\n`;
     }
 
-    csv += '\nÖzet\n';
+    csv += "\nÖzet\n";
     csv += `Toplam Takas,${report.totalTrades}\n`;
     csv += `Tamamlanan,${report.completedTrades}\n`;
     csv += `İptal Edilen,${report.cancelledTrades}\n`;
@@ -363,12 +383,12 @@ export class ReportsService {
   async exportUserReportCSV(filter: ReportFilter): Promise<string> {
     const report = await this.generateUserReport(filter);
 
-    let csv = 'Tarih,Yeni Kayıt\n';
+    let csv = "Tarih,Yeni Kayıt\n";
     for (const day of report.dailyRegistrations) {
       csv += `${day.date},${day.count}\n`;
     }
 
-    csv += '\nÖzet\n';
+    csv += "\nÖzet\n";
     csv += `Toplam Kullanıcı,${report.totalUsers}\n`;
     csv += `Yeni Kullanıcı,${report.newUsers}\n`;
     csv += `Onaylı Satıcı,${report.verifiedSellers}\n`;
@@ -384,7 +404,7 @@ export class ReportsService {
   async exportSalesReportJSON(filter: ReportFilter): Promise<object> {
     const report = await this.generateSalesReport(filter);
     return {
-      title: 'Satış Raporu',
+      title: "Satış Raporu",
       generatedAt: new Date().toISOString(),
       filter,
       data: report,
@@ -395,11 +415,18 @@ export class ReportsService {
   // HELPER METHODS
   // ==========================================================================
 
-  private getDateRange(filter: ReportFilter): { startDate: Date; endDate: Date } {
+  private getDateRange(filter: ReportFilter): {
+    startDate: Date;
+    endDate: Date;
+  } {
     const endDate = filter.endDate || new Date();
     const startDate =
       filter.startDate ||
-      new Date(endDate.getFullYear(), endDate.getMonth() - 1, endDate.getDate());
+      new Date(
+        endDate.getFullYear(),
+        endDate.getMonth() - 1,
+        endDate.getDate(),
+      );
 
     return { startDate, endDate };
   }
@@ -408,13 +435,11 @@ export class ReportsService {
     items: T[],
     extractor: (item: T) => Record<string, number>,
   ): Array<{ date: string; count: number; [key: string]: string | number }> {
-    const grouped: Record<
-      string,
-      { count: number; [key: string]: number }
-    > = {};
+    const grouped: Record<string, { count: number; [key: string]: number }> =
+      {};
 
     for (const item of items) {
-      const date = item.createdAt.toISOString().split('T')[0];
+      const date = item.createdAt.toISOString().split("T")[0];
       if (!grouped[date]) {
         grouped[date] = { count: 0 };
       }
@@ -442,71 +467,36 @@ export class ReportsService {
   async generateAccessReport(filter: ReportFilter) {
     const { startDate, endDate } = this.getDateRange(filter);
 
-    // For now, generate simulated analytics data
-    // In production, this would pull from a dedicated analytics table or external service
-    
-    // Get user activity data as a proxy for site access
-    const users = await this.prisma.user.findMany({
+    // NOTE: There is no anonymous-visitor analytics pipeline yet, so access
+    // reporting reflects AUTHENTICATED users only. Real metrics are derived
+    // from `lastActivityAt` (activity) and `createdAt` (new registrations).
+    // Page views, device / traffic / geographic breakdowns are intentionally
+    // omitted rather than fabricated.
+    const activeUsers = await this.prisma.user.findMany({
       where: {
-        updatedAt: {
+        lastActivityAt: {
           gte: startDate,
           lte: endDate,
         },
       },
-      select: { id: true, createdAt: true, updatedAt: true },
+      select: { id: true, lastActivityAt: true },
     });
 
-    // Get product data (using product updates as proxy for activity)
-    const products = await this.prisma.product.findMany({
+    const newVisitors = await this.prisma.user.count({
       where: {
-        updatedAt: {
+        createdAt: {
           gte: startDate,
           lte: endDate,
         },
       },
-      select: { id: true, createdAt: true, updatedAt: true },
     });
 
-    // Estimate page views based on activity
-    const totalPageViews = products.length * 10 + users.length * 5; // Estimated
-    const uniqueVisitors = users.length;
-
-    // Calculate daily visits
-    const dailyVisits = this.generateDailyAccessData(startDate, endDate);
-
-    // Top pages (simulated based on recent products)
-    const topPages = products
-      .slice(0, 10)
-      .map((p, index) => ({
-        page: `/products/${p.id}`,
-        views: Math.floor(Math.random() * 100) + 10, // Simulated views
-      }));
-
-    // Device breakdown (simulated)
-    const deviceBreakdown = {
-      desktop: Math.floor(uniqueVisitors * 0.45),
-      mobile: Math.floor(uniqueVisitors * 0.48),
-      tablet: Math.floor(uniqueVisitors * 0.07),
-    };
-
-    // Traffic sources (simulated)
-    const trafficSources = {
-      direct: Math.floor(uniqueVisitors * 0.35),
-      organic: Math.floor(uniqueVisitors * 0.30),
-      social: Math.floor(uniqueVisitors * 0.20),
-      referral: Math.floor(uniqueVisitors * 0.10),
-      email: Math.floor(uniqueVisitors * 0.05),
-    };
-
-    // Geographic breakdown (simulated for Turkey)
-    const geographicBreakdown = {
-      'İstanbul': Math.floor(uniqueVisitors * 0.35),
-      'Ankara': Math.floor(uniqueVisitors * 0.15),
-      'İzmir': Math.floor(uniqueVisitors * 0.12),
-      'Antalya': Math.floor(uniqueVisitors * 0.08),
-      'Bursa': Math.floor(uniqueVisitors * 0.06),
-      'Diğer': Math.floor(uniqueVisitors * 0.24),
-    };
+    const uniqueVisitors = activeUsers.length;
+    const dailyVisits = this.buildDailyAccessData(
+      startDate,
+      endDate,
+      activeUsers,
+    );
 
     return {
       period: {
@@ -514,50 +504,41 @@ export class ReportsService {
         end: endDate,
       },
       summary: {
-        totalPageViews,
         uniqueVisitors,
-        averageSessionDuration: '3:24', // minutes:seconds
-        bounceRate: 42.5, // percentage
-        pagesPerSession: 3.2,
+        newVisitors,
       },
       dailyVisits,
-      topPages,
-      deviceBreakdown,
-      trafficSources,
-      geographicBreakdown,
+      scope: "authenticated",
     };
   }
 
   /**
-   * Get real-time visitor statistics
+   * Get real-time visitor statistics.
+   *
+   * Counts AUTHENTICATED users only:
+   * - `liveVisitors`: users currently connected via websocket presence.
+   * - `dailyActiveVisitors`: users with recorded activity since midnight
+   *   (based on `lastActivityAt`).
+   *
+   * Anonymous visitors are out of scope until a real analytics pipeline exists.
    */
   async getRealtimeVisitorStats() {
-    // Get users active in the last 5 minutes
-    const fiveMinutesAgo = new Date();
-    fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
-    const activeUsers = await this.prisma.user.count({
+    const dailyActiveVisitors = await this.prisma.user.count({
       where: {
-        updatedAt: {
-          gte: fiveMinutesAgo,
+        lastActivityAt: {
+          gte: startOfToday,
         },
       },
     });
 
-    // Simulated real-time data
     return {
-      activeVisitors: activeUsers + Math.floor(Math.random() * 50),
-      currentPageViews: Math.floor(Math.random() * 100) + 20,
-      topCurrentPages: [
-        { page: '/', visitors: Math.floor(Math.random() * 20) + 5 },
-        { page: '/products', visitors: Math.floor(Math.random() * 15) + 3 },
-        { page: '/categories/diecast', visitors: Math.floor(Math.random() * 10) + 2 },
-      ],
-      recentActivity: [
-        { type: 'page_view', page: '/products/123', timestamp: new Date() },
-        { type: 'add_to_cart', product: 'Hot Wheels 1969 Mustang', timestamp: new Date(Date.now() - 30000) },
-        { type: 'purchase', orderId: 'ORD-123', timestamp: new Date(Date.now() - 60000) },
-      ],
+      liveVisitors: this.websocketGateway.getOnlineUsersCount(),
+      dailyActiveVisitors,
+      scope: "authenticated",
+      generatedAt: new Date(),
     };
   }
 
@@ -567,64 +548,43 @@ export class ReportsService {
   async exportAccessReportCSV(filter: ReportFilter): Promise<string> {
     const report = await this.generateAccessReport(filter);
 
-    let csv = 'Date,Page Views,Visitors,Sessions\n';
+    let csv = "Date,Active Visitors\n";
 
     for (const day of report.dailyVisits) {
-      csv += `${day.date},${day.pageViews},${day.visitors},${day.sessions}\n`;
+      csv += `${day.date},${day.activeVisitors}\n`;
     }
 
-    csv += '\n\nTop Pages\n';
-    csv += 'Page,Views\n';
-    for (const page of report.topPages) {
-      csv += `${page.page},${page.views}\n`;
-    }
-
-    csv += '\n\nDevice Breakdown\n';
-    csv += 'Device,Visitors\n';
-    for (const [device, count] of Object.entries(report.deviceBreakdown)) {
-      csv += `${device},${count}\n`;
-    }
-
-    csv += '\n\nTraffic Sources\n';
-    csv += 'Source,Visitors\n';
-    for (const [source, count] of Object.entries(report.trafficSources)) {
-      csv += `${source},${count}\n`;
-    }
+    csv += "\n\nSummary\n";
+    csv += "Metric,Value\n";
+    csv += `Unique Visitors,${report.summary.uniqueVisitors}\n`;
+    csv += `New Visitors,${report.summary.newVisitors}\n`;
 
     return csv;
   }
 
   /**
-   * Generate daily access data
+   * Build daily active-visitor counts from authenticated user activity.
+   *
+   * Each user is bucketed on the day of their most recent activity
+   * (`lastActivityAt`); days with no activity report zero.
    */
-  private generateDailyAccessData(startDate: Date, endDate: Date) {
-    const days: Array<{
-      date: string;
-      pageViews: number;
-      visitors: number;
-      sessions: number;
-    }> = [];
+  private buildDailyAccessData(
+    startDate: Date,
+    endDate: Date,
+    users: Array<{ lastActivityAt: Date | null }>,
+  ) {
+    const buckets = new Map<string, number>();
+    for (const user of users) {
+      if (!user.lastActivityAt) continue;
+      const key = user.lastActivityAt.toISOString().split("T")[0];
+      buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    }
 
+    const days: Array<{ date: string; activeVisitors: number }> = [];
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
-      // Generate realistic-looking random data
-      const baseVisitors = 100 + Math.floor(Math.random() * 200);
-      const dayOfWeek = currentDate.getDay();
-      
-      // Weekend adjustment (less traffic)
-      const weekendMultiplier = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.7 : 1;
-      
-      const visitors = Math.floor(baseVisitors * weekendMultiplier);
-      const sessions = Math.floor(visitors * (1 + Math.random() * 0.3));
-      const pageViews = Math.floor(sessions * (2 + Math.random() * 2));
-
-      days.push({
-        date: currentDate.toISOString().split('T')[0],
-        pageViews,
-        visitors,
-        sessions,
-      });
-
+      const key = currentDate.toISOString().split("T")[0];
+      days.push({ date: key, activeVisitors: buckets.get(key) ?? 0 });
       currentDate.setDate(currentDate.getDate() + 1);
     }
 

@@ -24,21 +24,11 @@ async function buyAndInitiate(
     .send({ productId, shippingAddressId })
     .expect(201);
 
-  // İframe kaldırıldı: tek ödeme yolu process-direct. Kart gönderimi merchant_oid'i
-  // (providerConversationId) atar → callback eşleşebilir. (Mock PayTR; gerçek çağrı yok.)
+  // Direct API form hazırlığı merchant_oid'i atar; kart alanları API'ye gelmez.
   const payRes = await request(ctx.app.getHttpServer())
-    .post('/api/payments/process-direct')
+    .post('/api/payments/direct-form')
     .set(authHeader(buyer))
-    .send({
-      orderId: buyRes.body.orderId,
-      card: {
-        cardHolderName: 'TEST KART',
-        cardNumber: '4355084355084358',
-        expireMonth: '12',
-        expireYear: '30',
-        cvc: '000',
-      },
-    })
+    .send({ orderId: buyRes.body.orderId })
     .expect(201);
 
   return { orderId: buyRes.body.orderId, paymentId: payRes.body.paymentId };

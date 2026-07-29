@@ -1,14 +1,25 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import {
   OfferStatus,
   OrderStatus,
   ProductStatus,
   TradeStatus,
   Prisma,
-} from '@prisma/client';
-import { PrismaService } from '../../prisma';
-import { getAvailableQuantity, safeDecrementReserved } from './helpers/product-availability.helper';
-import { NotificationService } from '../notification/notification.service';
+} from "@prisma/client";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
+import {
+  getAvailableQuantity,
+  safeDecrementReserved,
+} from "./helpers/product-availability.helper";
+import { getReservedAwareStatus } from "./helpers/product-status.helper";
+import { NotificationService } from "../notification/notification.service";
+import { DiscountService } from "../discount/discount.service";
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -75,6 +86,7 @@ export class ProductLockService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    @Optional() private readonly discountService?: DiscountService,
   ) {}
 
   /**
@@ -110,19 +122,29 @@ export class ProductLockService {
     const product = await this.lockProductForUpdate(tx, productId);
 
     if (!product) {
-      throw new BadRequestException(`Ürün bulunamadı: ${productId}`);
+      throw new BadRequestException(
+        i18nMessage("server.product.notFoundWithId", { productId }),
+      );
     }
 
-    if (product.status !== ProductStatus.active && product.status !== ProductStatus.reserved) {
+    if (
+      product.status !== ProductStatus.active &&
+      product.status !== ProductStatus.reserved
+    ) {
       throw new BadRequestException(
-        `Ürün satışta değil (status=${product.status})`,
+        i18nMessage("server.product.notForSaleStatus", {
+          status: product.status,
+        }),
       );
     }
 
     const available = getAvailableQuantity(product);
     if (available !== null && available < requiredQty) {
       throw new BadRequestException(
-        `Bu ürün stokta bulunmamaktadır (müsait=${available}, istenen=${requiredQty})`,
+        i18nMessage("server.product.insufficientStock", {
+          available,
+          requested: requiredQty,
+        }),
       );
     }
 
@@ -136,6 +158,31 @@ export class ProductLockService {
     );
 
     return product;
+  }
+
+  /**
+   * checkAndReserve'in TERSİ — bir rezervasyonu güvenle serbest bırakır. Ürünü ÖNCE
+   * FOR UPDATE ile kilitler, reservedQuantity'yi clamp'li düşürür ve rezerv-duyarlı
+   * status yazar. Kilit ŞART: eskiden takas iptal/red/dispute yolları ürünü kilitlemeden
+   * oku-hesapla-mutlak-yaz yapıyordu (#4 lost-update) → araya giren bir checkout
+   * rezervasyonu siliniyordu. Çağıran, DEADLOCK'a karşı ürün id'lerini SIRALI iterlemeli
+   * (checkAndReserve/completion yollarıyla aynı kilit sırası).
+   */
+  async releaseReservation(
+    tx: PrismaTx,
+    productId: string,
+    qty: number,
+  ): Promise<void> {
+    const product = await this.lockProductForUpdate(tx, productId);
+    if (!product) return;
+    const newReserved = safeDecrementReserved(product.reservedQuantity, qty);
+    await tx.product.update({
+      where: { id: productId },
+      data: {
+        reservedQuantity: newReserved,
+        status: getReservedAwareStatus(product.quantity, newReserved),
+      },
+    });
   }
 
   /**
@@ -159,7 +206,13 @@ export class ProductLockService {
       // "İptal Edildi" alongside the genuinely unpaid ones.
       OR: [
         { order: { is: null } },
-        { order: { status: { in: [OrderStatus.pending_payment, OrderStatus.cancelled] } } },
+        {
+          order: {
+            status: {
+              in: [OrderStatus.pending_payment, OrderStatus.cancelled],
+            },
+          },
+        },
       ],
     };
     if (excludeOfferId) {
@@ -184,7 +237,7 @@ export class ProductLockService {
       where: { id: { in: offersToReject.map((o) => o.id) } },
       data: {
         status: OfferStatus.cancelled,
-        cancelReason: 'Stok tükendiği için otomatik iptal edildi',
+        cancelReason: "Stok tükendiği için otomatik iptal edildi",
       },
     });
 
@@ -241,7 +294,7 @@ export class ProductLockService {
       where: { id: { in: tradeIds } },
       data: {
         status: TradeStatus.cancelled,
-        cancelReason: 'Stok tükendiği için otomatik iptal edildi',
+        cancelReason: "Stok tükendiği için otomatik iptal edildi",
         cancelledAt: new Date(),
       },
     });
@@ -271,7 +324,7 @@ export class ProductLockService {
   async invalidatePendingOrdersForProduct(
     tx: PrismaTx,
     productId: string,
-    cancelReason: string = 'Stok takas icin ayrildi',
+    cancelReason: string = "Stok takas icin ayrildi",
   ): Promise<InvalidateOrdersResult> {
     // Fetch each pending_payment order with the signals we need to tell
     // whether it currently holds a stock reservation:
@@ -299,6 +352,7 @@ export class ProductLockService {
         buyerId: true,
         productId: true,
         offerId: true,
+        checkoutGroupId: true,
         product: { select: { title: true } },
         payment: { select: { id: true } },
       },
@@ -316,6 +370,32 @@ export class ProductLockService {
         cancelReason,
       },
     });
+
+    if (this.discountService) {
+      const groupIds = [
+        ...new Set(
+          orders
+            .map((order) => order.checkoutGroupId)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+      const groupOrders =
+        groupIds.length > 0
+          ? await tx.order.findMany({
+              where: { checkoutGroupId: { in: groupIds } },
+              select: { id: true },
+            })
+          : [];
+      await this.discountService.releaseReservedUsageForOrders(
+        [
+          ...new Set([
+            ...orders.map((order) => order.id),
+            ...groupOrders.map((order) => order.id),
+          ]),
+        ],
+        tx,
+      );
+    }
 
     // Release reservations only for orders that actually held one. Clamp with
     // GREATEST(..., 0) as defensive guard against pre-existing drift or the
@@ -408,9 +488,16 @@ export class ProductLockService {
         // Dispatch notifications AFTER tx commit so a rollback can't emit phantom messages.
         for (const o of productRejectedOffers) {
           await this.notificationService
-            .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, null)
+            .notifyOfferCancelledOutOfStock(
+              o.buyerId,
+              o.productId,
+              o.productTitle,
+              null,
+            )
             .catch((err) =>
-              this.logger.warn(`sweep-notify failed for ${o.buyerId}: ${err.message}`),
+              this.logger.warn(
+                `sweep-notify failed for ${o.buyerId}: ${err.message}`,
+              ),
             );
         }
       } catch (e: any) {

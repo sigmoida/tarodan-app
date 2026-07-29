@@ -4,9 +4,9 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { MembershipTierType } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { MembershipTierType } from "@prisma/client";
 import {
   SubscribeDto,
   CreateMembershipTierDto,
@@ -14,13 +14,13 @@ import {
   MembershipTierResponseDto,
   UserMembershipResponseDto,
   MembershipLimitsDto,
-} from './dto';
-import { PaymentProvider } from '../payment/dto';
-import { Request } from 'express';
-import { MembershipPaymentInitResponseDto } from './dto/membership-payment.dto';
-import { isPremiumEntitled } from './membership.util';
-import { MembershipCommonService } from './membership-common.service';
-import { MembershipSubscriptionService } from './membership-subscription.service';
+} from "./dto";
+import { PaymentProvider } from "../payment/dto";
+import { Request } from "express";
+import { MembershipPaymentInitResponseDto } from "./dto/membership-payment.dto";
+import { MembershipCommonService } from "./membership-common.service";
+import { MembershipSubscriptionService } from "./membership-subscription.service";
+import { i18nMessage } from "../i18n";
 
 /**
  * MembershipService (facade) — her public imza aynen korunur. Tier/sorgu/limit/
@@ -43,10 +43,12 @@ export class MembershipService {
   // ==========================================================================
   // GET ALL TIERS
   // ==========================================================================
-  async getAllTiers(includeInactive = false): Promise<MembershipTierResponseDto[]> {
+  async getAllTiers(
+    includeInactive = false,
+  ): Promise<MembershipTierResponseDto[]> {
     const tiers = await this.prisma.membershipTier.findMany({
       where: includeInactive ? {} : { isActive: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sortOrder: "asc" },
     });
 
     return tiers.map((tier) => this.common.mapTierToDto(tier));
@@ -55,13 +57,17 @@ export class MembershipService {
   // ==========================================================================
   // GET TIER BY TYPE
   // ==========================================================================
-  async getTierByType(type: MembershipTierType): Promise<MembershipTierResponseDto> {
+  async getTierByType(
+    type: MembershipTierType,
+  ): Promise<MembershipTierResponseDto> {
     const tier = await this.prisma.membershipTier.findUnique({
       where: { type },
     });
 
     if (!tier) {
-      throw new NotFoundException(`Üyelik tipi bulunamadı: ${type}`);
+      throw new NotFoundException(
+        i18nMessage("server.membership.tierNotFound", { type }),
+      );
     }
 
     return this.common.mapTierToDto(tier);
@@ -80,37 +86,49 @@ export class MembershipService {
   async getUserLimits(userId: string): Promise<MembershipLimitsDto> {
     try {
       if (!userId) {
-        throw new BadRequestException('Kullanıcı kimliği bulunamadı');
+        throw new BadRequestException(
+          i18nMessage("server.membership.userIdNotFound"),
+        );
       }
 
       const membership = await this.getUserMembership(userId);
 
       if (!membership || !membership.tier) {
-        throw new NotFoundException('Üyelik bilgisi bulunamadı');
+        throw new NotFoundException(
+          i18nMessage("server.membership.infoNotFound"),
+        );
       }
 
       // getUserUsageStats already handles platform setting override for all tiers
       // We just need to ensure maxFreeListings and maxTotalListings reflect the platform setting override
       let maxFreeListings = membership.tier.maxFreeListings;
       let maxTotalListings = membership.tier.maxTotalListings;
-      
+
       if (membership.tier.type === MembershipTierType.free) {
-        const freeListingLimitSetting = await this.prisma.platformSetting.findUnique({
-          where: { settingKey: 'free_listing_limit' },
-        });
+        const freeListingLimitSetting =
+          await this.prisma.platformSetting.findUnique({
+            where: { settingKey: "free_listing_limit" },
+          });
         if (freeListingLimitSetting?.settingValue) {
-          const platformLimit = parseInt(freeListingLimitSetting.settingValue, 10);
+          const platformLimit = parseInt(
+            freeListingLimitSetting.settingValue,
+            10,
+          );
           if (!isNaN(platformLimit) && platformLimit > 0) {
             maxFreeListings = platformLimit;
             maxTotalListings = platformLimit; // For free tier, total = free
           }
         }
       } else if (membership.tier.type === MembershipTierType.premium) {
-        const premiumListingLimitSetting = await this.prisma.platformSetting.findUnique({
-          where: { settingKey: 'premium_listing_limit' },
-        });
+        const premiumListingLimitSetting =
+          await this.prisma.platformSetting.findUnique({
+            where: { settingKey: "premium_listing_limit" },
+          });
         if (premiumListingLimitSetting?.settingValue) {
-          const platformLimit = parseInt(premiumListingLimitSetting.settingValue, 10);
+          const platformLimit = parseInt(
+            premiumListingLimitSetting.settingValue,
+            10,
+          );
           if (!isNaN(platformLimit)) {
             if (platformLimit === -1) {
               maxTotalListings = -1; // Unlimited
@@ -120,11 +138,15 @@ export class MembershipService {
           }
         }
       } else if (membership.tier.type === MembershipTierType.business) {
-        const businessListingLimitSetting = await this.prisma.platformSetting.findUnique({
-          where: { settingKey: 'business_listing_limit' },
-        });
+        const businessListingLimitSetting =
+          await this.prisma.platformSetting.findUnique({
+            where: { settingKey: "business_listing_limit" },
+          });
         if (businessListingLimitSetting?.settingValue) {
-          const platformLimit = parseInt(businessListingLimitSetting.settingValue, 10);
+          const platformLimit = parseInt(
+            businessListingLimitSetting.settingValue,
+            10,
+          );
           if (!isNaN(platformLimit)) {
             if (platformLimit === -1) {
               maxTotalListings = -1; // Unlimited
@@ -136,7 +158,9 @@ export class MembershipService {
       }
 
       return {
-        canCreateListing: membership.remainingTotalListings === -1 || membership.remainingTotalListings > 0, // -1 means unlimited
+        canCreateListing:
+          membership.remainingTotalListings === -1 ||
+          membership.remainingTotalListings > 0, // -1 means unlimited
         canUseFreeSlot: membership.remainingFreeListings > 0,
         canTrade: membership.tier.canTrade,
         canCreateCollection: membership.tier.canCreateCollections,
@@ -152,20 +176,29 @@ export class MembershipService {
         tierType: membership.tier.type,
       };
     } catch (error) {
-      this.logger.warn('getUserLimits failed');
+      this.logger.warn("getUserLimits failed");
       // Re-throw known exceptions
-      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      // Wrap unknown errors
-      throw new BadRequestException(`Üyelik limitleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+      // Wrap unknown errors — do not leak internal detail to the client.
+      throw new BadRequestException(
+        i18nMessage("server.membership.limitsFetchFailed"),
+      );
     }
   }
 
   // ==========================================================================
   // SUBSCRIBE TO TIER (delegate → MembershipSubscriptionService)
   // ==========================================================================
-  async subscribe(userId: string, dto: SubscribeDto): Promise<UserMembershipResponseDto> {
+  async subscribe(
+    userId: string,
+    dto: SubscribeDto,
+  ): Promise<UserMembershipResponseDto> {
     return this.subscription.subscribe(userId, dto);
   }
 
@@ -190,7 +223,9 @@ export class MembershipService {
   // ==========================================================================
   // CANCEL SCHEDULED CHANGE (delegate → MembershipSubscriptionService)
   // ==========================================================================
-  async cancelScheduledChange(userId: string): Promise<UserMembershipResponseDto> {
+  async cancelScheduledChange(
+    userId: string,
+  ): Promise<UserMembershipResponseDto> {
     return this.subscription.cancelScheduledChange(userId);
   }
 
@@ -207,13 +242,17 @@ export class MembershipService {
   // ==========================================================================
   // ADMIN: CREATE TIER
   // ==========================================================================
-  async createTier(dto: CreateMembershipTierDto): Promise<MembershipTierResponseDto> {
+  async createTier(
+    dto: CreateMembershipTierDto,
+  ): Promise<MembershipTierResponseDto> {
     const existingTier = await this.prisma.membershipTier.findUnique({
       where: { type: dto.type },
     });
 
     if (existingTier) {
-      throw new BadRequestException(`Üyelik tipi zaten mevcut: ${dto.type}`);
+      throw new BadRequestException(
+        i18nMessage("server.membership.tierAlreadyExists", { type: dto.type }),
+      );
     }
 
     const tier = await this.prisma.membershipTier.create({
@@ -250,12 +289,82 @@ export class MembershipService {
     });
 
     if (!tier) {
-      throw new NotFoundException(`Üyelik tipi bulunamadı: ${tierType}`);
+      throw new NotFoundException(
+        i18nMessage("server.membership.tierNotFound", { type: tierType }),
+      );
     }
 
-    const updatedTier = await this.prisma.membershipTier.update({
-      where: { type: tierType },
-      data: dto,
+    if (!Object.values(dto).some((value) => value !== undefined)) {
+      throw new BadRequestException("En az bir alan güncellenmelidir");
+    }
+    if (
+      dto.maxTotalListings !== undefined &&
+      dto.maxTotalListings !== -1 &&
+      dto.maxTotalListings < 1
+    ) {
+      throw new BadRequestException(
+        "Toplam ilan limiti -1 veya en az 1 olmalıdır",
+      );
+    }
+    if (tier.type === MembershipTierType.free) {
+      if (dto.isActive === false) {
+        throw new BadRequestException(
+          "Ücretsiz üyelik seviyesi pasif yapılamaz",
+        );
+      }
+      if (
+        (dto.monthlyPrice !== undefined && dto.monthlyPrice !== 0) ||
+        (dto.yearlyPrice !== undefined && dto.yearlyPrice !== 0)
+      ) {
+        throw new BadRequestException(
+          "Ücretsiz üyelik fiyatları sıfır olmalıdır",
+        );
+      }
+    } else if (
+      (dto.monthlyPrice !== undefined && dto.monthlyPrice <= 0) ||
+      (dto.yearlyPrice !== undefined && dto.yearlyPrice <= 0)
+    ) {
+      throw new BadRequestException(
+        "Ücretli üyelik fiyatları sıfırdan büyük olmalıdır",
+      );
+    }
+
+    const updatedTier = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.membershipTier.update({
+        where: { type: tierType },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          monthlyPrice: dto.monthlyPrice,
+          yearlyPrice: dto.yearlyPrice,
+          maxFreeListings: dto.maxFreeListings,
+          maxTotalListings: dto.maxTotalListings,
+          maxImagesPerListing: dto.maxImagesPerListing,
+          canCreateCollections: dto.canCreateCollections,
+          canTrade: dto.canTrade,
+          isAdFree: dto.isAdFree,
+          isActive: dto.isActive,
+          sortOrder: dto.sortOrder,
+        },
+      });
+
+      if (
+        tier.type !== MembershipTierType.free &&
+        dto.monthlyPrice !== undefined
+      ) {
+        await tx.platformSetting.upsert({
+          where: { settingKey: `${tier.type}_monthly_price` },
+          update: { settingValue: String(dto.monthlyPrice) },
+          create: {
+            settingKey: `${tier.type}_monthly_price`,
+            settingValue: String(dto.monthlyPrice),
+            settingType: "number",
+            description: `${tier.name} monthly membership price`,
+          },
+        });
+      }
+
+      return updated;
     });
 
     return this.common.mapTierToDto(updatedTier);
@@ -264,7 +373,11 @@ export class MembershipService {
   // ==========================================================================
   // OTO-YENİLEME (MIT recurring) (delegate → MembershipSubscriptionService)
   // ==========================================================================
-  async runAutoRenewals(): Promise<{ renewed: number; failed: number; attempted: number }> {
+  async runAutoRenewals(): Promise<{
+    renewed: number;
+    failed: number;
+    attempted: number;
+  }> {
     return this.subscription.runAutoRenewals();
   }
 
@@ -276,6 +389,10 @@ export class MembershipService {
       id: string;
       last4: string;
       brand: string | null;
+      bank: string | null;
+      cardType: string | null;
+      cardScheme: string | null;
+      businessCard: boolean | null;
       expMonth: string | null;
       expYear: string | null;
       requireCvv: boolean;
@@ -290,7 +407,10 @@ export class MembershipService {
   // ==========================================================================
   // SAVED CARDS (CAPI) — sil (delegate → MembershipSubscriptionService)
   // ==========================================================================
-  async deleteSavedCard(userId: string, cardId: string): Promise<{ deleted: boolean }> {
+  async deleteSavedCard(
+    userId: string,
+    cardId: string,
+  ): Promise<{ deleted: boolean }> {
     return this.subscription.deleteSavedCard(userId, cardId);
   }
 
@@ -304,13 +424,23 @@ export class MembershipService {
   // ==========================================================================
   // VALIDATE LISTING CREATION
   // ==========================================================================
-  async canCreateListing(userId: string): Promise<{ allowed: boolean; reason?: string }> {
+  // #224: bu üç canCreate*() metodunun `reason` alanı i18nMessage()'a taşınmadı —
+  // (a) trade/product/collection modüllerinde doğrudan `throw new
+  // BadRequestException(result.reason)` ile veya `||` fallback'iyle string olarak
+  // tüketiliyor (örn. trade-lifecycle.service.ts, collection-crud.service.ts —
+  // kapsam dışı), (b) /membership/check/* endpoint'leri `reason`'ı olduğu gibi
+  // JSON response'ta client'a dönüyor (AllExceptionsFilter'ın locale-render'ı yalnız
+  // exception'larda çalışır, düz 200 body'de değil). Tipi payload'a çevirmek bu
+  // modüllerde de değişiklik ister — kapsam dışı, invasive, rapora bkz.
+  async canCreateListing(
+    userId: string,
+  ): Promise<{ allowed: boolean; reason?: string }> {
     const limits = await this.getUserLimits(userId);
 
     if (!limits.canCreateListing) {
       return {
         allowed: false,
-        reason: 'İlan limitinize ulaştınız. Üyeliğinizi yükseltin.',
+        reason: "İlan limitinize ulaştınız. Üyeliğinizi yükseltin.",
       };
     }
 
@@ -320,34 +450,15 @@ export class MembershipService {
   // ==========================================================================
   // VALIDATE TRADE CREATION
   // ==========================================================================
-  async canCreateTrade(userId: string): Promise<{ allowed: boolean; reason?: string }> {
-    // Takas kapısı GERÇEK (satın alınan) tier'a bakar. getUserLimits, ödeme bekleyen (past_due)
-    // paralı üyeliği "free"ye düşürdüğü için premium üye takası yanlışlıkla engelleniyordu (BUG A).
-    // Bu yüzden ham üyeliği okuyup tier.canTrade'i kontrol ediyoruz; past_due (ödeme bekleyen)
-    // paralı üye de takas yapabilir. Sadece free / iptal / süresi dolmuş engellenir.
-    let membership = await this.prisma.userMembership.findUnique({
-      where: { userId },
-      include: { tier: true },
-    });
-    // Kayıt (register) userMembership satırı oluşturmaz; satır yalnızca
-    // getUserMembership ilk çağrıldığında lazy oluşturulur. canCreateTrade ham satırı
-    // okuduğu için, üyelik sayfasını hiç açmamış yeni free kullanıcı yanlışlıkla
-    // engelleniyordu. Satırı (free tier) garanti edip ÖYLE kontrol et — past_due
-    // premium hâlâ takas edebilsin diye sonra yine HAM tier/status okunur (BUG A).
-    if (!membership) {
-      await this.getUserMembership(userId); // free tier satırını lazy oluşturur
-      membership = await this.prisma.userMembership.findUnique({
-        where: { userId },
-        include: { tier: true },
-      });
-    }
-    // Premium hakkı tek doğruluk kaynağı isPremiumEntitled: ücretli tier + dönem
-    // bitmemiş + durum∈{active,cancelled}. past_due (ödeme onaylanmamış) takas yapamaz;
-    // ödeme onaylanınca status=active olur. tier.canTrade ayrıca tier yeteneğini doğrular.
-    if (!membership || !isPremiumEntitled(membership) || !membership.tier?.canTrade) {
+  async canCreateTrade(
+    userId: string,
+  ): Promise<{ allowed: boolean; reason?: string }> {
+    const limits = await this.getUserLimits(userId);
+    if (!limits.canTrade) {
       return {
         allowed: false,
-        reason: 'Takas özelliği üyeliğinizde mevcut değil. Üyeliğinizi yükseltin.',
+        reason:
+          "Takas özelliği üyeliğinizde mevcut değil. Üyeliğinizi yükseltin.",
       };
     }
 
@@ -357,13 +468,16 @@ export class MembershipService {
   // ==========================================================================
   // VALIDATE COLLECTION CREATION
   // ==========================================================================
-  async canCreateCollection(userId: string): Promise<{ allowed: boolean; reason?: string }> {
+  async canCreateCollection(
+    userId: string,
+  ): Promise<{ allowed: boolean; reason?: string }> {
     const limits = await this.getUserLimits(userId);
 
     if (!limits.canCreateCollection) {
       return {
         allowed: false,
-        reason: 'Koleksiyon özelliği üyeliğinizde mevcut değil. Üyeliğinizi yükseltin.',
+        reason:
+          "Koleksiyon özelliği üyeliğinizde mevcut değil. Üyeliğinizi yükseltin.",
       };
     }
 

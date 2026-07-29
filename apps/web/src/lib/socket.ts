@@ -1,13 +1,19 @@
-import { io, Socket } from 'socket.io-client';
-import type { ServerToClientEvents, ClientToServerEvents } from '@tarodan/types';
+import { io, Socket } from "socket.io-client";
+import type {
+  ServerToClientEvents,
+  ClientToServerEvents,
+} from "@tarodan/types";
+import { getPublicApiOrigin } from "@/lib/api/origin";
 
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
 function socketBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  return getPublicApiOrigin();
 }
 
-export function getSocket(token: string): Socket<ServerToClientEvents, ClientToServerEvents> {
+export function getSocket(
+  token: string,
+): Socket<ServerToClientEvents, ClientToServerEvents> {
   if (socket && socket.connected) return socket;
   if (socket) {
     socket.auth = { token };
@@ -16,7 +22,7 @@ export function getSocket(token: string): Socket<ServerToClientEvents, ClientToS
   }
   socket = io(socketBaseUrl(), {
     auth: { token },
-    transports: ['websocket', 'polling'],
+    transports: ["websocket", "polling"],
     autoConnect: true,
   });
   return socket;

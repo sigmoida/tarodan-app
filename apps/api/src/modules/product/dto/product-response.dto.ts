@@ -1,10 +1,10 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ProductImageDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   id: string;
 
-  @ApiProperty({ example: 'https://storage.example.com/image.jpg' })
+  @ApiProperty({ example: "https://storage.example.com/image.jpg" })
   url: string;
 
   @ApiProperty({ example: 0 })
@@ -12,59 +12,69 @@ export class ProductImageDto {
 }
 
 export class ProductSellerDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   id: string;
 
-  @ApiProperty({ example: 'John Doe' })
+  @ApiProperty({ example: "John Doe" })
   displayName: string;
 
   @ApiProperty({ example: true })
   isVerified: boolean;
 
-  @ApiPropertyOptional({ example: 'verified' })
+  @ApiPropertyOptional({ example: "verified" })
   sellerType?: string;
 }
 
 export class ProductCategoryDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   id: string;
 
-  @ApiProperty({ example: 'Action Figures' })
+  @ApiProperty({ example: "Action Figures" })
   name: string;
 
-  @ApiProperty({ example: 'action-figures' })
+  @ApiProperty({ example: "action-figures" })
   slug: string;
 }
 
 export class ProductResponseDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   id: string;
 
-  @ApiProperty({ example: 'Vintage Star Wars Action Figure' })
+  @ApiProperty({ example: "Vintage Star Wars Action Figure" })
   title: string;
 
-  @ApiPropertyOptional({ example: 'Original 1977 figure...' })
+  @ApiPropertyOptional({ example: "Original 1977 figure..." })
   description?: string;
 
   @ApiProperty({ example: 299.99 })
   price: number;
 
-  @ApiProperty({ example: 'very_good' })
+  @ApiProperty({ example: "very_good" })
   condition: string;
 
-  @ApiProperty({ example: 'active' })
+  @ApiPropertyOptional({ example: "HKG72" })
+  modelCode?: string;
+
+  @ApiPropertyOptional({ example: "Kırmızı" })
+  color?: string;
+
+  @ApiPropertyOptional({ example: true })
+  isBoxed?: boolean;
+
+  @ApiProperty({ example: "active" })
   status: string;
 
   @ApiPropertyOptional({
     example: 5,
-    description: 'Stock quantity (null for unlimited stock)',
+    description: "Stock quantity (null for unlimited stock)",
     nullable: true,
   })
   quantity?: number | null;
 
   @ApiPropertyOptional({
     example: 4,
-    description: 'Available quantity (quantity - reserved); undefined when unlimited',
+    description:
+      "Available quantity (quantity - reserved); undefined when unlimited",
     nullable: true,
   })
   availableQuantity?: number | null;
@@ -84,13 +94,13 @@ export class ProductResponseDto {
   @ApiProperty({ example: false })
   isPreorder: boolean;
 
-  @ApiPropertyOptional({ example: '2024-06-01T00:00:00.000Z' })
+  @ApiPropertyOptional({ example: "2024-06-01T00:00:00.000Z" })
   releaseDate?: Date;
 
   @ApiProperty({ example: false })
   isLimited: boolean;
 
-  @ApiPropertyOptional({ example: '1/500' })
+  @ApiPropertyOptional({ example: "1/500" })
   editionNumber?: string;
 
   @ApiPropertyOptional({ example: 500 })
@@ -102,10 +112,10 @@ export class ProductResponseDto {
   @ApiPropertyOptional({ example: 2 })
   bundleSize?: number;
 
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   createdAt: Date;
 
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   updatedAt: Date;
 }
 

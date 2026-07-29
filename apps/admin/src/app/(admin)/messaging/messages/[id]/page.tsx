@@ -1,21 +1,20 @@
-'use client';
+"use client";
 
-import { useParams } from 'next/navigation';
+import { useParams } from "next/navigation";
 import {
-  ChatBubbleLeftRightIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XCircleIcon,
-  UserIcon,
-} from '@heroicons/react/24/outline';
-import { Button, StatusBadge } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { DetailPage } from '@/components/detail/DetailPage';
-import { SectionCard } from '@/components/detail/SectionCard';
-import { PartyCard } from '@/components/detail/PartyCard';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { usePrompt } from '@/provider/PromptProvider';
-import { messageStatusConfig } from '../_lib/types';
+} from "@heroicons/react/24/outline";
+import { Button, StatusBadge } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { DetailPage } from "@/components/detail/DetailPage";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { PartyCard } from "@/components/detail/PartyCard";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { usePrompt } from "@/provider/PromptProvider";
+import { messageStatusConfig } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 interface MessageDetail {
   id: string;
@@ -44,29 +43,33 @@ interface MessageDetail {
 }
 
 const isPending = (status: string) =>
-  status === 'pending' || status === 'pending_approval';
+  status === "pending" || status === "pending_approval";
 
 export default function MessageDetailPage() {
+  const t = useTranslations();
   const { id } = useParams<{ id: string }>();
   const prompt = usePrompt();
 
   const approve = useAdminMutation(() => adminApi.approveMessage(id), {
-    invalidates: ['messages'],
-    successMessage: 'Mesaj onaylandı',
+    invalidates: ["messages"],
+    successMessage: t("admin.messaging.messages.approved"),
   });
   const reject = useAdminMutation(
     (reason: string) => adminApi.rejectMessage(id, reason),
-    { invalidates: ['messages'], successMessage: 'Mesaj reddedildi' },
+    {
+      invalidates: ["messages"],
+      successMessage: t("admin.messaging.messages.rejected"),
+    },
   );
 
   const onReject = async () => {
     const reason = await prompt({
-      title: 'Mesajı Reddet',
-      label: 'Red nedeni',
-      placeholder: 'Mesajın neden reddedildiğini yaz...',
-      confirmLabel: 'Reddet',
+      title: t("admin.messaging.messages.rejectTitle"),
+      label: t("admin.messaging.messages.rejectionReason"),
+      placeholder: t("admin.messaging.messages.rejectionPlaceholder"),
+      confirmLabel: t("admin.messaging.messages.reject"),
       destructive: true,
-      requiredMessage: 'Red nedeni gereklidir',
+      requiredMessage: t("admin.messaging.messages.rejectionRequired"),
     });
     if (reason === null) return;
     reject.mutate(reason);
@@ -78,20 +81,26 @@ export default function MessageDetailPage() {
       id={id}
       fetcher={(mid) => adminApi.getMessage(mid).then((r) => r.data)}
       backHref="/messaging/messages"
-      emptyTitle="Mesaj bulunamadı"
-      title={() => 'Mesaj Detayı'}
-      subtitle={(m) => new Date(m.createdAt).toLocaleString('tr-TR')}
-      badge={(m) => <StatusBadge status={m.status} config={messageStatusConfig} />}
+      emptyTitle={t("admin.messaging.messages.notFound")}
+      title={() => t("admin.messaging.messages.detailTitle")}
+      subtitle={(m) =>
+        new Date(m.createdAt).toLocaleString(t("common.dateLocale"))
+      }
+      badge={(m) => (
+        <StatusBadge status={m.status} config={messageStatusConfig(t)} />
+      )}
       actions={(m) =>
         isPending(m.status) && (
           <>
             <Button
               variant="secondary"
-              leftIcon={<CheckCircleIcon className="h-5 w-5 text-success-500" />}
+              leftIcon={
+                <CheckCircleIcon className="h-5 w-5 text-success-500" />
+              }
               onClick={() => approve.mutate()}
               isLoading={approve.isPending}
             >
-              Onayla
+              {t("common.confirm")}
             </Button>
             <Button
               variant="secondary"
@@ -99,7 +108,7 @@ export default function MessageDetailPage() {
               onClick={onReject}
               isLoading={reject.isPending}
             >
-              Reddet
+              {t("admin.messaging.messages.reject")}
             </Button>
           </>
         )
@@ -109,17 +118,21 @@ export default function MessageDetailPage() {
         const threadMessages = m.thread?.messages ?? [];
         return (
           <>
-            <SectionCard title="Mesaj" icon={ChatBubbleLeftRightIcon}>
+            <SectionCard title={t("common.message")}>
               {m.originalContent && m.originalContent !== m.content && (
                 <div className="mb-3">
-                  <p className="mb-1 text-xs text-muted">Orijinal içerik</p>
+                  <p className="mb-1 text-xs text-muted">
+                    {t("admin.messaging.messages.originalContent")}
+                  </p>
                   <p className="rounded border border-border bg-surface-alt p-3 text-sm text-heading">
                     {m.originalContent}
                   </p>
                 </div>
               )}
               <div>
-                <p className="mb-1 text-xs text-muted">İçerik</p>
+                <p className="mb-1 text-xs text-muted">
+                  {t("admin.messaging.messages.content")}
+                </p>
                 <p className="rounded border border-border bg-surface-alt p-3 text-sm text-heading">
                   {m.content}
                 </p>
@@ -130,30 +143,31 @@ export default function MessageDetailPage() {
                   <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-500" />
                   <div>
                     <p className="text-xs font-medium text-warning-700">
-                      İşaretlenme Nedeni
+                      {t("admin.messaging.messages.flaggedReason")}
                     </p>
-                    <p className="text-sm text-warning-800">{m.flaggedReason}</p>
+                    <p className="text-sm text-warning-800">
+                      {m.flaggedReason}
+                    </p>
                   </div>
                 </div>
               )}
 
               <p className="mt-4 text-xs text-muted">
-                Konu ID: <span className="font-mono">{m.threadId}</span>
+                {t("admin.messaging.messages.threadId")}:{" "}
+                <span className="font-mono">{m.threadId}</span>
               </p>
             </SectionCard>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <PartyCard
-                title="Gönderen"
-                icon={UserIcon}
+                title={t("admin.messaging.messages.sender")}
                 name={m.sender.displayName}
                 userHref={`/accounts/users/${m.sender.id}`}
                 email={m.sender.email}
                 phone={m.sender.phone}
               />
               <PartyCard
-                title="Alıcı"
-                icon={UserIcon}
+                title={t("admin.messaging.messages.receiver")}
                 name={m.receiver.displayName}
                 userHref={`/accounts/users/${m.receiver.id}`}
                 email={m.receiver.email}
@@ -163,8 +177,9 @@ export default function MessageDetailPage() {
 
             {threadMessages.length > 0 && (
               <SectionCard
-                title={`Konuşma Geçmişi (${threadMessages.length} mesaj)`}
-                icon={ChatBubbleLeftRightIcon}
+                title={t("admin.messaging.messages.conversationHistory", {
+                  count: threadMessages.length,
+                })}
               >
                 <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
                   {threadMessages.map((msg) => {
@@ -173,29 +188,32 @@ export default function MessageDetailPage() {
                     return (
                       <div
                         key={msg.id}
-                        className={`flex ${isSender ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${isSender ? "justify-end" : "justify-start"}`}
                       >
                         <div
                           className={`max-w-xs rounded-xl px-3 py-2 text-sm md:max-w-md ${
-                            isCurrent ? 'ring-2 ring-primary-400' : ''
+                            isCurrent ? "ring-2 ring-primary-400" : ""
                           } ${
                             isSender
-                              ? 'bg-primary-500 text-inverted'
-                              : 'border border-border bg-surface-alt text-heading'
+                              ? "bg-primary-500 text-inverted"
+                              : "border border-border bg-surface-alt text-heading"
                           }`}
                         >
                           <p>{msg.content}</p>
                           <p
                             className={`mt-1 text-xs ${
-                              isSender ? 'text-inverted/80' : 'text-muted'
+                              isSender ? "text-inverted/80" : "text-muted"
                             }`}
                           >
-                            {new Date(msg.createdAt).toLocaleString('tr-TR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                            {new Date(msg.createdAt).toLocaleString(
+                              t("common.dateLocale"),
+                              {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )}
                           </p>
                         </div>
                       </div>

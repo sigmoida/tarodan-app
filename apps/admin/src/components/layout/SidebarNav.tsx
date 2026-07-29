@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import type { NavGroup as NavGroupType, NavItem } from '@/lib/navigation';
 import { NavLink } from './NavLink';
 import { NavGroup } from './NavGroup';
@@ -25,11 +26,12 @@ export function SidebarNav({
   onToggleGroup: (id: string) => void;
   onNavigate?: () => void;
 }) {
+  const t = useTranslations();
   return (
     <nav className="flex-1 p-3 pt-2 space-y-1 overflow-y-auto min-h-0">
       {isSearching ? (
         searchResults.length === 0 ? (
-          <p className="px-3 py-4 text-sm text-muted text-center">Eşleşen menü öğesi yok</p>
+          <p className="px-3 py-4 text-sm text-muted text-center">{t('admin.shared.sidebarNav.noResults')}</p>
         ) : (
           searchResults.map((item) => (
             <NavLink key={item.href} item={item} onNavigate={onNavigate} />

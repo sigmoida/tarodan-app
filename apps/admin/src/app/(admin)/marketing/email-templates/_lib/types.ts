@@ -17,6 +17,29 @@ export interface TemplateDetail {
   isCustom: boolean;
 }
 
+import { z } from "zod";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
+
+export const emailTemplateEditorSchema = (t: T) =>
+  z.object({
+    name: z
+      .string()
+      .trim()
+      .min(1, t("admin.marketing.emailTemplates.validation.nameRequired")),
+    subject: z.string(),
+    bodyHtml: z.string(),
+    testEmail: z
+      .string()
+      .email(t("admin.marketing.emailTemplates.validation.validEmail"))
+      .or(z.literal("")),
+  });
+
+export type EmailTemplateEditorValues = z.infer<
+  ReturnType<typeof emailTemplateEditorSchema>
+>;
+
 /** Convert sample data into source data with `{{variable}}` placeholders for the editor. */
 export function makeSourceData(
   sample: Record<string, unknown>,
@@ -25,17 +48,17 @@ export function makeSourceData(
   for (const [key, value] of Object.entries(sample)) {
     if (Array.isArray(value)) {
       result[key] = value.map((item) => {
-        if (item !== null && typeof item === 'object') {
+        if (item !== null && typeof item === "object") {
           const o: Record<string, unknown> = {};
           for (const k of Object.keys(item as object)) {
             const v = (item as Record<string, unknown>)[k];
-            o[k] = typeof v === 'number' ? v : `{{${k}}}`;
+            o[k] = typeof v === "number" ? v : `{{${k}}}`;
           }
           return o;
         }
         return `{{${key}}}`;
       });
-    } else if (typeof value === 'number') {
+    } else if (typeof value === "number") {
       result[key] = value;
     } else {
       result[key] = `{{${key}}}`;

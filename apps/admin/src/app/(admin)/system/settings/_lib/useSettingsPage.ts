@@ -1,0 +1,69 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
+import { useZodForm } from "@tarodan/ui/form";
+import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { useTabParam } from "@/hooks/useTabParam";
+import {
+  type SettingsFormValues,
+  type SettingsTab,
+  parseSettings,
+  settingsSchema,
+  settingsTabs,
+  tabFields,
+  tabTitle,
+  toFormValues,
+} from "./settings";
+
+export function useSettingsPage() {
+  const t = useTranslations();
+  const [tab, setTab] = useTabParam("listing");
+  const activeTab = tab as SettingsTab;
+  const fieldsByTab = tabFields(t);
+
+  const query = useQuery({
+    queryKey: adminKeys.all("platform-settings"),
+    queryFn: async () => {
+      const response = await adminApi.getSettings();
+      return parseSettings(response.data?.data ?? response.data ?? []);
+    },
+  });
+
+  // Reactively reseed from the query (including after invalidation) without an
+  // effect-backed state mirror. All tabs remain valid on whole-form submit.
+  const form = useZodForm(settingsSchema(t), {
+    values: query.data ? toFormValues(query.data) : undefined,
+  });
+
+  const save = useAdminMutation(
+    (payload: { tab: SettingsTab; values: SettingsFormValues }) =>
+      Promise.all(
+        fieldsByTab[payload.tab].map((field) =>
+          adminApi.updateSetting(
+            field.backendKey,
+            String(Number(payload.values[field.key])),
+          ),
+        ),
+      ),
+    {
+      invalidates: ["platform-settings"],
+      successMessage: t("admin.settings.saved"),
+    },
+  );
+
+  return {
+    t,
+    tab,
+    setTab,
+    activeTab,
+    tabs: settingsTabs(t),
+    title: tabTitle(t)[activeTab],
+    fields: fieldsByTab[activeTab],
+    query,
+    form,
+    save,
+  };
+}

@@ -1,5 +1,6 @@
-import { QueryCache, QueryClient } from '@tanstack/react-query';
-import * as Sentry from '@sentry/nextjs';
+import { QueryCache } from "@tanstack/react-query";
+import { createPlatformQueryClient } from "@tarodan/api-client/query";
+import { logger } from "@/lib/logger";
 
 /**
  * Shared QueryClient config — used by BOTH the browser client (lib/queryClient)
@@ -9,22 +10,29 @@ import * as Sentry from '@sentry/nextjs';
  */
 
 /** Global query error handler: log to Sentry + (dev) console. */
-export function onQueryError(error: unknown, query: { queryKey?: unknown; meta?: unknown }) {
-  if (process.env.NODE_ENV === 'development') {
+export function onQueryError(
+  error: unknown,
+  query: { queryKey?: unknown; meta?: unknown },
+) {
+  if (process.env.NODE_ENV === "development") {
     // eslint-disable-next-line no-console
-    console.error('React Query error:', query?.queryKey, error);
+    console.error("React Query error:", query?.queryKey, error);
   }
-  Sentry.captureException(error, {
-    tags: { layer: 'ReactQuery', type: 'query' },
-    extra: { queryKey: query?.queryKey, meta: query?.meta },
+  logger.captureException(error, {
+    source: "react-query",
+    queryKey: query?.queryKey,
+    meta: query?.meta,
   });
 }
 
 export function makeQueryClient() {
-  return new QueryClient({
+  return createPlatformQueryClient({
     queryCache: new QueryCache({
       onError: (error, query) =>
-        onQueryError(error, { queryKey: (query as { queryKey?: unknown })?.queryKey, meta: (query as { meta?: unknown })?.meta }),
+        onQueryError(error, {
+          queryKey: (query as { queryKey?: unknown })?.queryKey,
+          meta: (query as { meta?: unknown })?.meta,
+        }),
     }),
     defaultOptions: {
       queries: {
@@ -34,10 +42,11 @@ export function makeQueryClient() {
         retry: (failureCount, error: unknown) => {
           const err = error as { code?: string; message?: string };
           const isNetworkError =
-            err?.code === 'ECONNREFUSED' ||
-            err?.code === 'ERR_NETWORK' ||
-            (typeof err?.message === 'string' &&
-              (err.message.includes('ECONNREFUSED') || err.message.includes('Network Error')));
+            err?.code === "ECONNREFUSED" ||
+            err?.code === "ERR_NETWORK" ||
+            (typeof err?.message === "string" &&
+              (err.message.includes("ECONNREFUSED") ||
+                err.message.includes("Network Error")));
           if (isNetworkError) return failureCount < 5;
           return failureCount < 1;
         },
@@ -45,9 +54,10 @@ export function makeQueryClient() {
       },
       mutations: {
         onError: (error: unknown, _variables: unknown, context: unknown) => {
-          Sentry.captureException(error, {
-            tags: { layer: 'ReactQuery', type: 'mutation' },
-            extra: { context },
+          logger.captureException(error, {
+            source: "react-query",
+            type: "mutation",
+            context,
           });
         },
       },

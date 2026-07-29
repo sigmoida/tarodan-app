@@ -1,6 +1,9 @@
-import type { StatusConfig } from '@tarodan/ui';
+import type { StatusConfig } from "@tarodan/ui";
+import type { useTranslations } from "next-intl";
 
-export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+type T = ReturnType<typeof useTranslations<never>>;
+
+export type ReviewStatus = "pending" | "approved" | "rejected";
 
 export interface Review {
   id: string;
@@ -28,49 +31,56 @@ export interface UserRating {
   receiver: { id: string; displayName: string; email: string };
 }
 
-export const reviewStatusConfig: Record<string, StatusConfig> = {
-  approved: { label: 'Onaylı', variant: 'success' },
-  pending: { label: 'Bekliyor', variant: 'warning' },
-  rejected: { label: 'Reddedildi', variant: 'danger' },
-};
+export const reviewStatusConfig = (t: T): Record<string, StatusConfig> => ({
+  approved: { label: t("common.approved"), variant: "success" },
+  pending: { label: t("common.pending"), variant: "warning" },
+  rejected: { label: t("common.rejected"), variant: "danger" },
+});
 
-export const REVIEW_TABS = [
-  { key: 'product', label: 'Ürün Yorumları' },
-  { key: 'seller', label: 'Satıcı Yorumları' },
+export const reviewTabs = (t: T) => [
+  { key: "product", label: t("admin.accounts.reviews.tabs.product") },
+  { key: "seller", label: t("admin.accounts.reviews.tabs.seller") },
 ];
 
-export const reviewStatusOptions = [
-  { value: 'all', label: 'Tüm Durumlar' },
-  { value: 'pending', label: 'Bekleyenler' },
-  { value: 'approved', label: 'Onaylananlar' },
-  { value: 'rejected', label: 'Reddedilenler' },
+export const reviewStatusOptions = (t: T) => [
+  { value: "all", label: t("admin.accounts.reviews.allStatuses") },
+  { value: "pending", label: t("admin.accounts.reviews.filters.pending") },
+  { value: "approved", label: t("admin.accounts.reviews.filters.approved") },
+  { value: "rejected", label: t("admin.accounts.reviews.filters.rejected") },
 ];
 
-export const statusLabels: Record<ReviewStatus, string> = {
-  approved: 'onaylandı',
-  pending: 'beklemeye alındı',
-  rejected: 'reddedildi',
-};
+export const statusLabels = (t: T): Record<ReviewStatus, string> => ({
+  approved: t("admin.accounts.reviews.actionResult.approved"),
+  pending: t("admin.accounts.reviews.actionResult.pending"),
+  rejected: t("admin.accounts.reviews.actionResult.rejected"),
+});
 
 /** Confirm-dialog copy per target status. */
-export const REVIEW_ACTION_CONFIRM: Record<
+export const reviewActionConfirm = (
+  t: T,
+): Record<
   ReviewStatus,
-  { title: string; description: string; confirmLabel: string; destructive?: boolean }
-> = {
+  {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    destructive?: boolean;
+  }
+> => ({
   approved: {
-    title: 'Yorumu onayla',
-    description: 'Bu yorum onaylanacak ve yayında görünecek.',
-    confirmLabel: 'Onayla',
+    title: t("admin.accounts.reviews.confirm.approveTitle"),
+    description: t("admin.accounts.reviews.confirm.approveDescription"),
+    confirmLabel: t("common.confirm"),
   },
   rejected: {
-    title: 'Yorumu reddet',
-    description: 'Bu yorum reddedilecek ve yayından kaldırılacak.',
-    confirmLabel: 'Reddet',
+    title: t("admin.accounts.reviews.confirm.rejectTitle"),
+    description: t("admin.accounts.reviews.confirm.rejectDescription"),
+    confirmLabel: t("admin.accounts.reviews.reject"),
     destructive: true,
   },
   pending: {
-    title: 'Yorumu geri al',
-    description: 'Yorum yeniden "Bekliyor" durumuna alınacak.',
-    confirmLabel: 'Geri Al',
+    title: t("admin.accounts.reviews.confirm.revertTitle"),
+    description: t("admin.accounts.reviews.confirm.revertDescription"),
+    confirmLabel: t("admin.accounts.reviews.revert"),
   },
-};
+});

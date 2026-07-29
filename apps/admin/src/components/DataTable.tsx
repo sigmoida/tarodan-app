@@ -1,15 +1,23 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useContext, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { AnimatePresence, motion } from "framer-motion";
+
+// framer-motion is code-split (#102): it only loads on the few list pages that
+// pass `renderExpanded`, staying out of every other list bundle.
+const DataTableExpandRow = dynamic(() => import("./DataTableExpandRow"), {
+  ssr: false,
+});
 import {
   Spinner,
+  EmptyState,
   Checkbox,
   Table,
   TableHeader,
@@ -18,7 +26,13 @@ import {
   TableHead,
   TableCell,
 } from "@tarodan/ui";
-import { type CellAlign } from "@/components/table/meta";
+import {
+  type CellAlign,
+  type SetSort,
+  type SortState,
+} from "@/components/table/meta";
+import { SortableHeader } from "@/components/table/SortableHeader";
+import { ResourceListContext } from "@/context/ResourceListContext";
 
 export type { ColumnDef };
 
@@ -52,6 +66,14 @@ export interface DataTableProps<T> {
   renderExpanded?: (row: T) => ReactNode;
   /** Id of the currently open row (matches getRowId). When set, it opens/closes smoothly. */
   expandedId?: string | null;
+  // ── Sorting (optional) ──
+  /** The active sort; drives header highlight + arrow direction. */
+  sort?: SortState;
+  /**
+   * Toggle handler. Sort controls render ONLY when this is provided AND a column
+   * carries `meta.sortable` — legacy tables (no handler / no meta) are untouched.
+   */
+  onSort?: SetSort;
 }
 
 /**
@@ -64,7 +86,7 @@ export function DataTable<T>({
   columns,
   data,
   loading,
-  emptyText = "Kayıt bulunamadı",
+  emptyText,
   emptyAction,
   onRowClick,
   rowClassName,
@@ -75,7 +97,16 @@ export function DataTable<T>({
   onToggleAll,
   renderExpanded,
   expandedId,
+  sort,
+  onSort,
 }: DataTableProps<T>) {
+  const t = useTranslations();
+  const resolvedEmptyText = emptyText ?? t("admin.shared.table.noRecords");
+
+  // Register columns with the enclosing ResourceList (if any) so its toolbar can
+  // offer a CSV export. Safe when standalone — the context is simply absent.
+  const resourceList = useContext(ResourceListContext);
+  if (resourceList) resourceList.exportRef.current = columns;
   const table = useReactTable({
     data,
     columns,
@@ -85,14 +116,18 @@ export function DataTable<T>({
 
   const rowIds = getRowId ? data.map((d) => getRowId(d)) : [];
   const allSelected =
-    selectable && rowIds.length > 0 && rowIds.every((id) => selectedIds.includes(id));
+    selectable &&
+    rowIds.length > 0 &&
+    rowIds.every((id) => selectedIds.includes(id));
   const colSpan = columns.length + (selectable ? 1 : 0);
 
   // Sizing system is opt-in: when columns come from the `col.*` factory (carry
   // meta), fixed-layout + colgroup + alignment kick in. Without meta (legacy raw
   // ColumnDef consumers) the table keeps its old behavior unchanged.
   const hasSizing = columns.some(
-    (c) => c.meta && (c.meta.minWidth != null || c.meta.grow != null || c.meta.align != null),
+    (c) =>
+      c.meta &&
+      (c.meta.minWidth != null || c.meta.grow != null || c.meta.align != null),
   );
   // Width basis: each column gets minWidth px; the table's min-width is their
   // sum. Above that threshold columns grow proportionally; below it the table
@@ -102,7 +137,8 @@ export function DataTable<T>({
   const tableMinWidth = hasSizing
     ? (selectable ? 44 : 0) + columns.reduce((sum, c) => sum + colMin(c), 0)
     : 0;
-  const alignOf = (align?: CellAlign) => (align ? ALIGN_CLASS[align] : undefined);
+  const alignOf = (align?: CellAlign) =>
+    align ? ALIGN_CLASS[align] : undefined;
 
   // Initial load (no data yet) shows a full spinner; on search/filter refetch the
   // existing rows are kept and slightly dimmed (keepPreviousData behavior).
@@ -133,17 +169,41 @@ export function DataTable<T>({
                     <Checkbox
                       checked={!!allSelected}
                       onChange={() => onToggleAll?.(rowIds)}
-                      aria-label="Tümünü seç"
+                      aria-label={t("admin.shared.table.selectAll")}
                     />
                   </TableHead>
                 )}
-                {hg.headers.map((h) => (
-                  <TableHead key={h.id} className={alignOf(h.column.columnDef.meta?.align)}>
-                    {h.isPlaceholder
-                      ? null
-                      : flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
+                {hg.headers.map((h) => {
+                  const meta = h.column.columnDef.meta;
+                  const canSort = !!onSort && meta?.sortable && !!meta.sortKey;
+                  const isActive = canSort && sort?.sortBy === meta.sortKey;
+                  return (
+                    <TableHead
+                      key={h.id}
+                      className={["whitespace-nowrap", alignOf(meta?.align)]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {h.isPlaceholder ? null : canSort ? (
+                        <SortableHeader
+                          sortKey={meta.sortKey!}
+                          sortType={meta.sortType}
+                          active={!!isActive}
+                          order={sort?.sortOrder}
+                          align={meta?.align}
+                          onSort={onSort!}
+                        >
+                          {flexRender(
+                            h.column.columnDef.header,
+                            h.getContext(),
+                          )}
+                        </SortableHeader>
+                      ) : (
+                        flexRender(h.column.columnDef.header, h.getContext())
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>
@@ -156,17 +216,21 @@ export function DataTable<T>({
           >
             {isInitialLoad ? (
               <TableRow>
-                <TableCell colSpan={colSpan} className="p-8 text-center text-muted">
+                <TableCell
+                  colSpan={colSpan}
+                  className="p-8 text-center text-muted"
+                >
                   <Spinner size="md" className="mx-auto" />
                 </TableCell>
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={colSpan} className="p-8 text-center text-muted">
-                  <div className="flex flex-col items-center gap-3">
-                    <span>{emptyText}</span>
-                    {emptyAction}
-                  </div>
+                <TableCell colSpan={colSpan} className="p-0">
+                  <EmptyState
+                    size="compact"
+                    title={resolvedEmptyText}
+                    action={emptyAction}
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -193,7 +257,9 @@ export function DataTable<T>({
                       }
                       className={[
                         onRowClick ? "cursor-pointer" : "",
-                        selectable && selectedIds.includes(id) ? "bg-primary-500/5" : "",
+                        selectable && selectedIds.includes(id)
+                          ? "bg-primary-500/5"
+                          : "",
                         rowClassName?.(row.original) ?? "",
                       ]
                         .filter(Boolean)
@@ -204,7 +270,7 @@ export function DataTable<T>({
                           <Checkbox
                             checked={selectedIds.includes(id)}
                             onChange={() => onToggleRow?.(id)}
-                            aria-label="Satırı seç"
+                            aria-label={t("admin.shared.table.selectRow")}
                           />
                         </TableCell>
                       )}
@@ -213,27 +279,19 @@ export function DataTable<T>({
                           key={cell.id}
                           className={alignOf(cell.column.columnDef.meta?.align)}
                         >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
                         </TableCell>
                       ))}
                     </TableRow>
                     {renderExpanded && (
                       <TableRow className="!border-t-0 hover:bg-transparent">
                         <TableCell colSpan={colSpan} className="!p-0">
-                          <AnimatePresence initial={false}>
-                            {isExpanded && (
-                              <motion.div
-                                key="expanded"
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.25, ease: "easeInOut" }}
-                                className="overflow-hidden"
-                              >
-                                {renderExpanded(row.original)}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                          <DataTableExpandRow isExpanded={isExpanded}>
+                            {renderExpanded(row.original)}
+                          </DataTableExpandRow>
                         </TableCell>
                       </TableRow>
                     )}

@@ -1,8 +1,8 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as Sentry from '@sentry/node';
-import { setCronTracker } from './cron-tracker.holder';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import * as Sentry from "@sentry/node";
+import { setCronTracker } from "./cron-tracker.holder";
 
-export type CronStatus = 'idle' | 'running' | 'success' | 'failed';
+export type CronStatus = "idle" | "running" | "success" | "failed";
 
 export interface CronRunRecord {
   job: string;
@@ -17,7 +17,7 @@ export interface CronRunRecord {
 }
 
 /**
- * Cron izleme — her @TrackedCron çalıştığında başlangıç/bitiş/durum/süre kaydı.
+ * Cron izleme — izlenen her cron çalıştığında başlangıç/bitiş/durum/süre kaydı.
  *
  * - In-memory (restart'ta sıfırlanır); kalıcı geçmiş için Sentry Crons devreye
  *   girer (DSN tanımlıysa). DB persistleme ileride eklenebilir (şema değişikliği
@@ -27,7 +27,7 @@ export interface CronRunRecord {
  */
 @Injectable()
 export class CronTrackerService implements OnModuleInit {
-  private readonly logger = new Logger('CronTracker');
+  private readonly logger = new Logger("CronTracker");
   private readonly records = new Map<string, CronRunRecord>();
 
   constructor() {
@@ -40,7 +40,9 @@ export class CronTrackerService implements OnModuleInit {
   }
 
   list(): CronRunRecord[] {
-    return [...this.records.values()].sort((a, b) => a.job.localeCompare(b.job));
+    return [...this.records.values()].sort((a, b) =>
+      a.job.localeCompare(b.job),
+    );
   }
 
   private ensure(job: string, schedule: string): CronRunRecord {
@@ -49,7 +51,7 @@ export class CronTrackerService implements OnModuleInit {
       rec = {
         job,
         schedule,
-        status: 'idle',
+        status: "idle",
         lastStartedAt: null,
         lastFinishedAt: null,
         lastDurationMs: null,
@@ -63,33 +65,40 @@ export class CronTrackerService implements OnModuleInit {
   }
 
   private slug(job: string): string {
-    return job.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+    return job.replace(/[^a-zA-Z0-9-_]/g, "-").toLowerCase();
   }
 
   /**
    * Orijinal cron işini SARMALAR: davranışı birebir korur (sonucu döndürür,
    * hatayı aynen rethrow eder), sadece etrafına ölçüm + check-in ekler.
    */
-  async track<T>(job: string, schedule: string, fn: () => Promise<T> | T): Promise<T> {
+  async track<T>(
+    job: string,
+    schedule: string,
+    fn: () => Promise<T> | T,
+  ): Promise<T> {
     const rec = this.ensure(job, schedule);
     rec.schedule = schedule;
-    rec.status = 'running';
+    rec.status = "running";
     rec.lastStartedAt = new Date().toISOString();
     rec.runs += 1;
     const start = Date.now();
 
     let checkInId: string | undefined;
     try {
-      checkInId = Sentry.captureCheckIn({ monitorSlug: this.slug(job), status: 'in_progress' });
+      checkInId = Sentry.captureCheckIn({
+        monitorSlug: this.slug(job),
+        status: "in_progress",
+      });
     } catch {
       /* Sentry yoksa sessiz geç */
     }
 
-    const finalize = (status: 'success' | 'failed', error?: unknown) => {
+    const finalize = (status: "success" | "failed", error?: unknown) => {
       rec.status = status;
       rec.lastFinishedAt = new Date().toISOString();
       rec.lastDurationMs = Date.now() - start;
-      if (status === 'failed') {
+      if (status === "failed") {
         rec.failures += 1;
         rec.lastError = error instanceof Error ? error.message : String(error);
       } else {
@@ -100,7 +109,7 @@ export class CronTrackerService implements OnModuleInit {
           Sentry.captureCheckIn({
             checkInId,
             monitorSlug: this.slug(job),
-            status: status === 'success' ? 'ok' : 'error',
+            status: status === "success" ? "ok" : "error",
           });
         }
       } catch {
@@ -110,11 +119,13 @@ export class CronTrackerService implements OnModuleInit {
 
     try {
       const result = await fn();
-      finalize('success');
+      finalize("success");
       return result;
     } catch (e) {
-      finalize('failed', e);
-      this.logger.error(`Cron '${job}' FAILED (${rec.lastDurationMs}ms): ${rec.lastError}`);
+      finalize("failed", e);
+      this.logger.error(
+        `Cron '${job}' FAILED (${rec.lastDurationMs}ms): ${rec.lastError}`,
+      );
       throw e; // davranış korunur — hata yukarı aynen gider
     }
   }
