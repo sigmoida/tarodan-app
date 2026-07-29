@@ -27,8 +27,10 @@ export type SetSort = (sortKey: string, sortType?: SortType) => void;
 export interface CellColumnMeta {
   /** Header + cell alignment (always the same). */
   align?: CellAlign;
-  /** The column's base px width: its share of the horizontal-scroll threshold + proportional growth weight. */
+  /** The column's base px width. Flexible columns also use it as their growth weight. */
   minWidth?: number;
+  /** Keep the column at `minWidth` when the table has extra horizontal space. */
+  fixed?: boolean;
   /** @deprecated No longer affects width; column width is managed by `minWidth`. */
   grow?: number;
   /** Field key sent to the backend (`sortBy`) / read by the client comparator. */

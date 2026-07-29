@@ -5,6 +5,7 @@
 import { Select } from "@tarodan/ui";
 import { type LogTab } from "../_lib/types";
 import { useTranslations } from "next-intl";
+import { cn } from "@/lib/utils";
 
 const buildOptions = (t: ReturnType<typeof useTranslations<never>>) => ({
   errorSeverity: [
@@ -108,7 +109,11 @@ export function LogsFilters({
       value={filters[name] ?? fallback}
       onChange={(e) => setFilter(name, e.target.value)}
       options={options}
-      className={className}
+      className={cn(
+        "min-w-32 max-w-56 shrink overflow-hidden whitespace-nowrap",
+        "[&>span:first-child]:min-w-0 [&>span:first-child]:truncate",
+        className,
+      )}
     />
   );
 

@@ -1,7 +1,7 @@
 /** @format */
 
-import { type ReactNode } from 'react';
-import { cn } from '@tarodan/ui';
+import { type ReactNode } from "react";
+import { cn } from "@tarodan/ui";
 
 /**
  * The single admin page wrapper — one source of truth for vertical page rhythm.
@@ -9,11 +9,11 @@ import { cn } from '@tarodan/ui';
  * the spacing here changes it everywhere. Never hardcode `space-y-6` on a page.
  */
 export function AdminPage({
-	children,
-	className,
+  children,
+  className,
 }: {
-	children: ReactNode;
-	className?: string;
+  children: ReactNode;
+  className?: string;
 }) {
-	return <div className={cn('space-y-4', className)}>{children}</div>;
+  return <div className={cn("min-w-0 space-y-4", className)}>{children}</div>;
 }

@@ -34,9 +34,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar open={open} onClose={closeSidebar} />
 
       {/* pt-16 clears the fixed h-16 Topbar (which is out of flow). */}
-      <div className="pt-16 lg:pl-64">
+      <div className="min-w-0 pt-16 lg:pl-64">
         <Topbar onOpenSidebar={openSidebar} />
-        <main className="p-6">
+        <main className="min-w-0 p-6">
           {isRouteAllowed ? children : <ForbiddenScreen />}
         </main>
       </div>

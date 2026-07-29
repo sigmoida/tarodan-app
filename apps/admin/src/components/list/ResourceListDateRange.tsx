@@ -16,17 +16,17 @@ export function ResourceListDateRange({
   const [from, setFrom] = useFilter(fromName);
   const [to, setTo] = useFilter(toName);
   return (
-    <div className="flex gap-3">
+    <div className="flex shrink-0 gap-3">
       <DatePicker
         value={from}
         onChange={(v) => setFrom(v)}
-        className="flex-1 sm:w-40 sm:flex-none"
+        className="w-40"
         aria-label={t("admin.shared.dateRange.startDate")}
       />
       <DatePicker
         value={to}
         onChange={(v) => setTo(v)}
-        className="flex-1 sm:w-40 sm:flex-none"
+        className="w-40"
         aria-label={t("admin.shared.dateRange.endDate")}
       />
     </div>

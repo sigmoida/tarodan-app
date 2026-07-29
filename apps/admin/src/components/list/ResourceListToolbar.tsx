@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useResourceList } from "@/context/ResourceListContext";
 import { columnsToCsv, hasExportableColumns } from "@/lib/csv";
 import { downloadBlob } from "@/lib/download";
+import { cn } from "@/lib/utils";
 
 /**
  * Layout for the search box + page-specific filters, plus a CSV export button
@@ -14,7 +15,13 @@ import { downloadBlob } from "@/lib/download";
  * context (via DataTable), so the export works on every list without per-page
  * wiring; it downloads the currently loaded rows.
  */
-export function ResourceListToolbar({ children }: { children: ReactNode }) {
+export function ResourceListToolbar({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   const t = useTranslations();
   const { rows, exportRef, exportName } = useResourceList();
 
@@ -30,15 +37,19 @@ export function ResourceListToolbar({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+    <div
+      className={cn(
+        "flex min-w-0 flex-nowrap items-start gap-3 overflow-x-auto pb-1",
+        className,
+      )}
+    >
       {children}
       <Button
-        variant="secondary"
-        size="sm"
+        variant="outline"
         leftIcon={<ArrowDownTrayIcon className="h-4 w-4" />}
         onClick={onExport}
         disabled={rows.length === 0}
-        className="sm:ml-auto"
+        className="ml-auto shrink-0"
       >
         {t("admin.shared.table.exportCsv")}
       </Button>

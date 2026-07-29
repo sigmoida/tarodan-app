@@ -87,7 +87,7 @@ function WithholdingControls() {
 
   return (
     <SectionCard>
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="flex min-w-0 flex-nowrap items-end gap-4 overflow-x-auto pb-1">
         <Select
           label={t("admin.finance.tax.year")}
           value={filters.year ?? INITIAL_FILTERS.year}
@@ -107,7 +107,8 @@ function WithholdingControls() {
           }))}
         />
         <Button
-          variant="secondary"
+          variant="outline"
+          className="shrink-0"
           leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
           onClick={exportCsv}
           disabled={(report?.allRows?.length ?? 0) === 0}
