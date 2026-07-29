@@ -40,6 +40,7 @@ model User {
   isBanned                Boolean                  @default(false) @map("is_banned")
   acceptsMarketingEmails  Boolean                  @default(false) @map("accepts_marketing_emails")
   preferredLanguage       String?                  @map("preferred_language")
+  homeTourVersion         Int                      @default(0) @map("home_tour_version")
   notificationSettings    Json?                    @map("notification_settings")
   lastActivityAt          DateTime?                @map("last_activity_at")
   lastLoginAt             DateTime?                @map("last_login_at")

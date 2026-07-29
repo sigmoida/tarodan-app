@@ -109,6 +109,10 @@ export class UserService {
     return this.profile.updateProfile(userId, data);
   }
 
+  async completeHomeTour(userId: string, version: number) {
+    return this.profile.completeHomeTour(userId, version);
+  }
+
   /**
    * Bildirim tercihlerini getir. Kayıt yoksa varsayılanlar döner; kısmi
    * kayıtlar varsayılanların üzerine birleştirilir.

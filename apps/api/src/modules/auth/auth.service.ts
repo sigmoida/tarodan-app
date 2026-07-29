@@ -942,6 +942,8 @@ export class AuthService {
       isAdmin: !!user.adminUser?.isActive,
       role: user.adminUser?.role,
       createdAt: user.createdAt,
+      preferredLanguage: user.preferredLanguage,
+      homeTourVersion: user.homeTourVersion,
     };
   }
 

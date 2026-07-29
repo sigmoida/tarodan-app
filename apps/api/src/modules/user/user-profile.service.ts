@@ -339,6 +339,26 @@ export class UserProfileService {
     return this.findByIdWithAddresses(userId);
   }
 
+  async completeHomeTour(userId: string, version: number) {
+    await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        homeTourVersion: { lt: version },
+      },
+      data: { homeTourVersion: version },
+    });
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { homeTourVersion: true },
+    });
+    if (!user) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+
+    return user;
+  }
+
   /**
    * Bildirim tercihlerini getir. Kayıt yoksa varsayılanlar döner; kısmi
    * kayıtlar varsayılanların üzerine birleştirilir.
