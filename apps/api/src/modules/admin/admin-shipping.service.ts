@@ -6,6 +6,7 @@ import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { StorageService } from "../storage/storage.service";
 
 /**
  * Kargo görünümü admin operasyonları (salt-okunur) — AdminService'in
@@ -17,10 +18,32 @@ export class AdminShippingService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional()
+    private readonly storageService?: StorageService,
+    @Optional()
     private readonly suratCargoService?: SuratCargoService,
     @Optional()
     private readonly suratTrackingService?: SuratTrackingService,
   ) {}
+
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
+    if (!imageKeyOrUrl) return null;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    ) {
+      try {
+        const parsed = new URL(imageKeyOrUrl);
+        if (parsed.searchParams.has("X-Amz-Signature")) parsed.search = "";
+        return parsed.toString();
+      } catch {
+        return imageKeyOrUrl;
+      }
+    }
+    return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
+  }
 
   // ==================== SHIPPING (view-only) ====================
 
@@ -55,7 +78,7 @@ export class AdminShippingService {
       { defaultSort: { createdAt: "desc" } },
     );
 
-    return paginate(
+    const result = await paginate(
       this.prisma.shipment,
       {
         where,
@@ -70,7 +93,17 @@ export class AdminShippingService {
             include: {
               buyer: { select: { id: true, displayName: true, email: true } },
               seller: { select: { id: true, displayName: true, email: true } },
-              product: { select: { id: true, title: true } },
+              product: {
+                select: {
+                  id: true,
+                  title: true,
+                  images: {
+                    take: 1,
+                    orderBy: { sortOrder: "asc" },
+                    select: { cardKey: true },
+                  },
+                },
+              },
             },
           },
         },
@@ -78,6 +111,27 @@ export class AdminShippingService {
       },
       pagination,
     );
+
+    return {
+      ...result,
+      data: result.data.map((shipment: any) => ({
+        ...shipment,
+        order: shipment.order
+          ? {
+              ...shipment.order,
+              product: shipment.order.product
+                ? {
+                    id: shipment.order.product.id,
+                    title: shipment.order.product.title,
+                    imageUrl: this.resolveProductImageUrl(
+                      shipment.order.product.images?.[0]?.cardKey,
+                    ),
+                  }
+                : null,
+            }
+          : null,
+      })),
+    };
   }
 
   /**

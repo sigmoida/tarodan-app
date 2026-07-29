@@ -48,7 +48,7 @@ export function tradeColumns(t: T) {
               )}
           </div>
         ),
-      { grow: 2, minWidth: 150, sortKey: "status", sortType: "text" },
+      { grow: 2, minWidth: 200, sortKey: "status", sortType: "text" },
     ),
     col.user<Trade>(t("admin.operations.trades.initiator"), (r) => ({
       name: r.initiator.displayName,

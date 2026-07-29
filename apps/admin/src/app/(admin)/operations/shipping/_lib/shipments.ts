@@ -39,12 +39,22 @@ export function toPhysicalShipments(
         providerTrackingId: r.providerTrackingId,
         trackingUrl: r.trackingUrl,
         status: r.status,
+        updatedAt: r.updatedAt,
         buyer: r.order?.buyer ?? null,
         seller: r.order?.seller ?? null,
         items: [],
       };
       byKey.set(key, parcel);
       order.push(key);
+    } else if (
+      new Date(r.updatedAt).getTime() > new Date(parcel.updatedAt).getTime()
+    ) {
+      parcel.provider = r.provider;
+      parcel.trackingNumber = r.trackingNumber;
+      parcel.providerTrackingId = r.providerTrackingId;
+      parcel.trackingUrl = r.trackingUrl;
+      parcel.status = r.status;
+      parcel.updatedAt = r.updatedAt;
     }
     if (r.order) {
       parcel.items.push({
@@ -52,6 +62,7 @@ export function toPhysicalShipments(
         orderNumber: r.order.orderNumber,
         productId: r.order.product?.id ?? null,
         productTitle: r.order.product?.title ?? null,
+        productImageUrl: r.order.product?.imageUrl ?? null,
         quantity: r.order.quantity ?? 1,
       });
     }

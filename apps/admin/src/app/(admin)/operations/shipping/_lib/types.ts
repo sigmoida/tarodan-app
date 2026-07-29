@@ -7,6 +7,7 @@ export interface OrderShipmentRow {
   providerTrackingId: string | null;
   trackingUrl: string | null;
   status: string;
+  updatedAt: string;
   order?: {
     id: string;
     orderNumber: string;
@@ -15,7 +16,7 @@ export interface OrderShipmentRow {
     quantity: number;
     buyer?: { id: string; displayName: string; email?: string } | null;
     seller?: { id: string; displayName: string; email?: string } | null;
-    product?: { id: string; title: string } | null;
+    product?: { id: string; title: string; imageUrl?: string | null } | null;
   } | null;
 }
 
@@ -25,6 +26,7 @@ export interface ParcelLineItem {
   orderNumber: string;
   productId: string | null;
   productTitle: string | null;
+  productImageUrl: string | null;
   quantity: number;
 }
 
@@ -42,6 +44,7 @@ export interface PhysicalShipmentRow {
   providerTrackingId: string | null;
   trackingUrl: string | null;
   status: string;
+  updatedAt: string;
   buyer?: { id: string; displayName: string; email?: string } | null;
   seller?: { id: string; displayName: string; email?: string } | null;
   items: ParcelLineItem[];
