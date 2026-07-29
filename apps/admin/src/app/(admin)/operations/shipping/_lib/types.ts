@@ -13,8 +13,8 @@ export interface OrderShipmentRow {
     /** Per-seller OrderPackage — siblings sharing it share one physical parcel. */
     packageId: string | null;
     quantity: number;
-    buyer?: { id: string; displayName: string } | null;
-    seller?: { id: string; displayName: string } | null;
+    buyer?: { id: string; displayName: string; email?: string } | null;
+    seller?: { id: string; displayName: string; email?: string } | null;
     product?: { id: string; title: string } | null;
   } | null;
 }
@@ -23,6 +23,7 @@ export interface OrderShipmentRow {
 export interface ParcelLineItem {
   orderId: string;
   orderNumber: string;
+  productId: string | null;
   productTitle: string | null;
   quantity: number;
 }
@@ -41,8 +42,8 @@ export interface PhysicalShipmentRow {
   providerTrackingId: string | null;
   trackingUrl: string | null;
   status: string;
-  buyer?: { id: string; displayName: string } | null;
-  seller?: { id: string; displayName: string } | null;
+  buyer?: { id: string; displayName: string; email?: string } | null;
+  seller?: { id: string; displayName: string; email?: string } | null;
   items: ParcelLineItem[];
 }
 
@@ -90,7 +91,7 @@ export interface SuratShipmentRow {
   order?: {
     id: string;
     orderNumber: string;
-    buyer?: { id: string; displayName: string } | null;
-    seller?: { id: string; displayName: string } | null;
+    buyer?: { id: string; displayName: string; email?: string } | null;
+    seller?: { id: string; displayName: string; email?: string } | null;
   } | null;
 }

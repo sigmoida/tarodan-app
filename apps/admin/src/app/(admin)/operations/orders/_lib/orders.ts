@@ -17,8 +17,8 @@ export interface Order {
   shipmentId?: string | null;
   shipmentTrackingNumber?: string | null;
   internalTrackingNumber?: string | null;
-  buyer: { id: string; displayName: string };
-  seller: { id: string; displayName: string };
+  buyer: { id: string; displayName: string; email?: string };
+  seller: { id: string; displayName: string; email?: string };
   product?: { id: string; title: string };
   createdAt: string;
   itemCount: number;
@@ -49,7 +49,7 @@ export interface OrderLineItem {
   internalTrackingNumber?: string | null;
   product?: { id: string; title: string };
   productImageUrl?: string | null;
-  seller: { id: string; displayName: string };
+  seller: { id: string; displayName: string; email?: string };
   packageId?: string | null;
   activeRefundRequest?: Order["activeRefundRequest"];
   cancellationType?: string | null;
@@ -58,7 +58,7 @@ export interface OrderLineItem {
 /** A satıcı-paketi (çatı): the line items of one seller within a checkout group. */
 export interface SellerPackage {
   key: string;
-  seller: { id: string; displayName: string };
+  seller: { id: string; displayName: string; email?: string };
   items: OrderLineItem[];
 }
 
@@ -76,13 +76,13 @@ export interface OrderGroupRow {
   checkoutGroupId: string | null;
   /** groupNumber for a group, orderNumber for a standalone order */
   displayNumber: string;
-  buyer: { id: string; displayName: string };
+  buyer: { id: string; displayName: string; email?: string };
   createdAt: string;
   itemCount: number;
   totalAmount: number;
   commission: number;
   subtotal: number;
-  sellers: { id: string; displayName: string }[];
+  sellers: { id: string; displayName: string; email?: string }[];
   thumbs: string[];
   items: OrderLineItem[];
   packages: SellerPackage[];
@@ -199,7 +199,10 @@ export function useOrderGroups(orders: Order[]): OrderGroupRow[] {
       const head = members[0];
       const items = members.map(toLineItem);
       const packages = buildPackages(items);
-      const sellersMap = new Map<string, { id: string; displayName: string }>();
+      const sellersMap = new Map<
+        string,
+        { id: string; displayName: string; email?: string }
+      >();
       for (const m of members)
         if (m.seller?.id) sellersMap.set(m.seller.id, m.seller);
       const sellers = Array.from(sellersMap.values());

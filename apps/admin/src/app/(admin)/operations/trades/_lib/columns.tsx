@@ -1,14 +1,33 @@
+import Link from "next/link";
 import { Badge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel } from "@/lib/utils";
-import { col, type RowActionItem } from "@/components/table";
-import { type Trade, disputeConfig, cashPayerName } from "./trades";
+import { col, TruncatedText } from "@/components/table";
+import { type Trade, disputeConfig, cashPayer } from "./trades";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-export function tradeColumns(t: T, rowMenu: (t: Trade) => RowActionItem[]) {
+export function tradeColumns(t: T) {
   return [
-    col.code<Trade>(t("admin.operations.trades.tradeNumber"), "tradeNumber"),
+    col.custom<Trade>(
+      t("admin.operations.trades.tradeNumber"),
+      (trade) => (
+        <Link
+          href={`/operations/trades/${trade.id}`}
+          className="block text-primary-600 hover:underline"
+        >
+          <TruncatedText className="font-mono">
+            {trade.tradeNumber}
+          </TruncatedText>
+        </Link>
+      ),
+      {
+        minWidth: 240,
+        sortKey: "tradeNumber",
+        sortType: "text",
+        exportValue: (trade) => trade.tradeNumber,
+      },
+    ),
     col.custom<Trade>(
       t("common.status"),
       (r) =>
@@ -33,10 +52,12 @@ export function tradeColumns(t: T, rowMenu: (t: Trade) => RowActionItem[]) {
     ),
     col.user<Trade>(t("admin.operations.trades.initiator"), (r) => ({
       name: r.initiator.displayName,
+      secondary: r.initiator.email,
       href: `/accounts/users/${r.initiator.id}`,
     })),
     col.user<Trade>(t("admin.operations.trades.receiver"), (r) => ({
       name: r.receiver.displayName,
+      secondary: r.receiver.email,
       href: `/accounts/users/${r.receiver.id}`,
     })),
     col.money<Trade>(
@@ -48,20 +69,20 @@ export function tradeColumns(t: T, rowMenu: (t: Trade) => RowActionItem[]) {
         sortType: "number",
       },
     ),
-    // Farkı kim öder — nakit farkı olan takaslarda ödeyen taraf, yoksa "—".
-    col.custom<Trade>(
+    col.user<Trade>(
       t("admin.operations.trades.paidBy"),
       (r) => {
-        const name = cashPayerName(r);
-        return name ? (
-          <span className="text-sm text-body">{name}</span>
-        ) : (
-          <span className="text-muted">—</span>
-        );
+        const payer = cashPayer(r);
+        return payer
+          ? {
+              name: payer.displayName,
+              secondary: payer.email,
+              href: `/accounts/users/${payer.id}`,
+            }
+          : null;
       },
-      { minWidth: 120 },
+      { minWidth: 300 },
     ),
     col.date<Trade>(t("common.date"), "createdAt"),
-    col.rowMenu<Trade>(rowMenu),
   ];
 }

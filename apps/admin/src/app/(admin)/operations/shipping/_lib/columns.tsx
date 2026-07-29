@@ -39,29 +39,52 @@ export const physicalShipmentColumns = (t: T) => [
                 {`#${it.orderNumber}${it.quantity > 1 ? ` ×${it.quantity}` : ""}`}
               </TruncatedText>
             </Link>
-            {it.productTitle ? (
-              <TruncatedText className="text-xs text-muted">
-                {it.productTitle}
-              </TruncatedText>
-            ) : null}
           </div>
         ))}
       </div>
     ),
     { grow: 3, minWidth: 220, sortKey: "order.orderNumber", sortType: "text" },
   ),
-  col.text<PhysicalShipmentRow>(
+  col.product<PhysicalShipmentRow>(
+    t("admin.catalog.common.product"),
+    (r) => {
+      const first = r.items[0];
+      return first?.productTitle
+        ? {
+            title: first.productTitle,
+            secondary:
+              r.items.length > 1 ? `+${r.items.length - 1}` : undefined,
+            href: first.productId
+              ? `/catalog/products/${first.productId}`
+              : undefined,
+          }
+        : null;
+    },
+    { sortKey: "order.product.title" },
+  ),
+  col.user<PhysicalShipmentRow>(
     t("admin.operations.common.buyer"),
-    (r) => r.buyer?.displayName,
+    (r) =>
+      r.buyer
+        ? {
+            name: r.buyer.displayName,
+            secondary: r.buyer.email,
+            href: `/accounts/users/${r.buyer.id}`,
+          }
+        : null,
     { sortKey: "order.buyer.displayName" },
   ),
-  col.id<PhysicalShipmentRow>(
-    t("admin.operations.common.buyerId"),
-    (r) => r.buyer?.id,
-  ),
-  col.id<PhysicalShipmentRow>(
-    t("admin.operations.common.sellerId"),
-    (r) => r.seller?.id,
+  col.user<PhysicalShipmentRow>(
+    t("admin.operations.common.seller"),
+    (r) =>
+      r.seller
+        ? {
+            name: r.seller.displayName,
+            secondary: r.seller.email,
+            href: `/accounts/users/${r.seller.id}`,
+          }
+        : null,
+    { sortKey: "order.seller.displayName" },
   ),
   col.muted<PhysicalShipmentRow>(
     t("admin.operations.shipping.carrier"),
@@ -187,14 +210,23 @@ export const tradeShipmentColumns = (t: T) => [
       r.shipper
         ? {
             name: r.shipper.displayName,
+            secondary: r.shipper.email,
             href: `/accounts/users/${r.shipper.id}`,
           }
         : null,
     { sortKey: "shipper.displayName" },
   ),
-  col.id<TradeShipmentRow>(
-    t("admin.operations.common.buyerId"),
-    (r) => r.recipientUser?.id,
+  col.user<TradeShipmentRow>(
+    t("admin.messaging.messages.receiver"),
+    (r) =>
+      r.recipientUser
+        ? {
+            name: r.recipientUser.displayName,
+            secondary: r.recipientUser.email,
+            href: `/accounts/users/${r.recipientUser.id}`,
+          }
+        : null,
+    { sortKey: "recipientUser.displayName" },
   ),
   col.muted<TradeShipmentRow>(
     t("admin.operations.shipping.updated"),
@@ -224,14 +256,29 @@ export function suratShipmentColumns(
           : null,
       { sortKey: "order.orderNumber" },
     ),
-    col.text<SuratShipmentRow>(
+    col.user<SuratShipmentRow>(
       t("admin.operations.common.buyer"),
-      (r) => r.order?.buyer?.displayName,
+      (r) =>
+        r.order?.buyer
+          ? {
+              name: r.order.buyer.displayName,
+              secondary: r.order.buyer.email,
+              href: `/accounts/users/${r.order.buyer.id}`,
+            }
+          : null,
       { sortKey: "order.buyer.displayName" },
     ),
-    col.id<SuratShipmentRow>(
-      t("admin.operations.common.buyerId"),
-      (r) => r.order?.buyer?.id,
+    col.user<SuratShipmentRow>(
+      t("admin.operations.common.seller"),
+      (r) =>
+        r.order?.seller
+          ? {
+              name: r.order.seller.displayName,
+              secondary: r.order.seller.email,
+              href: `/accounts/users/${r.order.seller.id}`,
+            }
+          : null,
+      { sortKey: "order.seller.displayName" },
     ),
     col.custom<SuratShipmentRow>(
       t("admin.operations.common.trackingNumber"),

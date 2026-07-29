@@ -50,6 +50,7 @@ export function toPhysicalShipments(
       parcel.items.push({
         orderId: r.order.id,
         orderNumber: r.order.orderNumber,
+        productId: r.order.product?.id ?? null,
         productTitle: r.order.product?.title ?? null,
         quantity: r.order.quantity ?? 1,
       });

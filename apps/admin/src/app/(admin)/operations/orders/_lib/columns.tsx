@@ -1,20 +1,15 @@
+import Link from "next/link";
 import {
-  Button,
   Badge,
+  IconButton,
   orderStatusConfig,
   shipmentStatusConfig,
 } from "@tarodan/ui";
-import { ShoppingBagIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
 import { fmtTry } from "@/lib/format";
-import {
-  col,
-  CellText,
-  CellUser,
-  TruncatedText,
-  type RowActionItem,
-} from "@/components/table";
+import { col, TruncatedText } from "@/components/table";
 import { type OrderGroupRow } from "./orders";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -23,24 +18,19 @@ export interface OrderColumnProps {
   t: T;
   expandedId: string | null;
   toggleRow: (id: string) => void;
-  rowMenu: (o: OrderGroupRow) => RowActionItem[];
 }
 
-export function orderColumns({
-  t,
-  expandedId,
-  toggleRow,
-  rowMenu,
-}: OrderColumnProps) {
+export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
   return [
     col.custom<OrderGroupRow>(
-      t("admin.operations.orders.groupNumber"),
+      "",
       (o) => {
         const open = expandedId === o.id;
         return (
-          <Button
+          <IconButton
             type="button"
             variant="ghost"
+            size="sm"
             onClick={(e) => {
               e.stopPropagation();
               toggleRow(o.id);
@@ -51,28 +41,44 @@ export function orderColumns({
                 ? t("admin.operations.orders.hideItems")
                 : t("admin.operations.orders.showItems")
             }
-            className="-mx-1 flex h-auto w-fit max-w-full items-center gap-1.5 rounded px-1 py-0.5 hover:bg-primary-100"
+            aria-label={
+              open
+                ? t("admin.operations.orders.hideItems")
+                : t("admin.operations.orders.showItems")
+            }
+            className="text-muted hover:text-primary-600"
           >
             <ChevronRightIcon
-              className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${
-                open ? "rotate-90" : ""
+              className={`h-4 w-4 transition-transform ${
+                open ? "rotate-90 text-primary-600" : ""
               }`}
             />
-            <TruncatedText className="font-mono text-sm text-primary-600">
-              {o.displayNumber}
-            </TruncatedText>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-surface-alt px-1.5 py-0.5 text-[11px] font-medium text-muted">
-              <ShoppingBagIcon className="h-3 w-3" />
-              {t("admin.operations.orders.cartItems", { count: o.itemCount })}
-            </span>
-          </Button>
+          </IconButton>
         );
       },
       {
-        grow: 2,
-        minWidth: 150,
+        id: "expand",
+        minWidth: 52,
+        fixed: true,
+        align: "center",
+        sortable: false,
+      },
+    ),
+    col.custom<OrderGroupRow>(
+      t("admin.operations.orders.groupNumber"),
+      (o) => (
+        <Link
+          href={`/operations/orders/${o.orderId}`}
+          className="block text-primary-600 hover:underline"
+        >
+          <TruncatedText className="font-mono">{o.displayNumber}</TruncatedText>
+        </Link>
+      ),
+      {
+        minWidth: 200,
         sortKey: "orderNumber",
         sortType: "text",
+        exportValue: (o) => o.displayNumber,
       },
     ),
     col.custom<OrderGroupRow>(
@@ -115,80 +121,50 @@ export function orderColumns({
               )}
           </div>
         ),
-      { grow: 2, minWidth: 170, sortKey: "status", sortType: "text" },
+      { minWidth: 220, sortKey: "status", sortType: "text" },
     ),
     col.user<OrderGroupRow>(
       t("admin.operations.orders.buyer"),
       (o) => ({
         name: o.buyer.displayName,
+        secondary: o.buyer.email,
         href: `/accounts/users/${o.buyer.id}`,
       }),
-      { sortKey: "buyer.displayName", sortType: "text" },
-    ),
-    col.custom<OrderGroupRow>(
-      t("admin.operations.orders.seller"),
-      (o) => {
-        if (o.isMultiSeller) {
-          const first = o.sellers[0];
-          const extra = Math.max(0, o.sellers.length - 1);
-          return (
-            <span className="flex items-center gap-1 text-sm text-body">
-              <CellText value={first?.displayName} />
-              {extra > 0 && (
-                <span className="rounded bg-surface-alt px-1 text-xs text-muted">
-                  +{extra}
-                </span>
-              )}
-            </span>
-          );
-        }
-        const seller = o.sellers[0];
-        return (
-          <CellUser
-            name={seller?.displayName}
-            href={seller ? `/accounts/users/${seller.id}` : undefined}
-          />
-        );
+      {
+        minWidth: 280,
+        sortKey: "buyer.displayName",
+        sortType: "text",
       },
-      { sortKey: "seller.displayName", sortType: "text" },
     ),
-    col.id<OrderGroupRow>(t("admin.operations.orders.sellerId"), (o) =>
-      o.isMultiSeller ? undefined : o.sellers[0]?.id,
-    ),
-    col.custom<OrderGroupRow>(
+    col.product<OrderGroupRow>(
       t("admin.catalog.common.product"),
       (o) => {
-        const thumbs = o.thumbs;
-        const extra = o.itemCount - thumbs.length;
-        return (
-          <div className="flex items-center gap-1">
-            {thumbs.length > 0 ? (
-              thumbs.map((src, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={i}
-                  src={src}
-                  alt=""
-                  className="h-8 w-8 rounded border border-border-subtle bg-surface-alt object-cover"
-                />
-              ))
-            ) : (
-              <span className="flex h-8 w-8 items-center justify-center rounded border border-border-subtle bg-surface-alt text-muted">
-                <ShoppingBagIcon className="h-4 w-4" />
-              </span>
-            )}
-            {extra > 0 && (
-              <span className="flex h-8 min-w-8 items-center justify-center rounded border border-border-subtle bg-surface-alt px-1 text-[11px] font-medium text-muted">
-                +{extra}
-              </span>
-            )}
-          </div>
-        );
+        const product = o.items[0]?.product;
+        return product
+          ? {
+              title: product.title,
+              image: o.items[0]?.productImageUrl,
+              href: `/catalog/products/${product.id}`,
+            }
+          : null;
       },
-      { grow: 2, sortKey: "product.title", sortType: "text" },
+      {
+        minWidth: 300,
+        sortKey: "product.title",
+        sortType: "text",
+      },
+    ),
+    col.number<OrderGroupRow>(
+      t("admin.operations.orders.productCount"),
+      (o) => o.itemCount,
+      {
+        minWidth: 128,
+        sortable: false,
+      },
     ),
     col.money<OrderGroupRow>(t("common.amount"), (o) => o.totalAmount, {
       tone: "primary",
+      minWidth: 110,
       sortKey: "totalAmount",
       sortType: "number",
     }),
@@ -208,16 +184,22 @@ export function orderColumns({
           </span>
         );
       },
-      { sortKey: "commissionAmount", sortType: "number" },
+      {
+        minWidth: 140,
+        sortKey: "commissionAmount",
+        sortType: "number",
+      },
     ),
-    col.badge<OrderGroupRow>(t("admin.operations.orders.cargoStatus"), (o) =>
-      o.itemCount > 1 || !o.shipmentStatus ? (
-        <span className="text-subtle">—</span>
-      ) : (
-        <Badge status={o.shipmentStatus} config={shipmentStatusConfig} />
-      ),
+    col.badge<OrderGroupRow>(
+      t("admin.operations.orders.cargoStatus"),
+      (o) =>
+        o.itemCount > 1 || !o.shipmentStatus ? (
+          <span className="text-subtle">—</span>
+        ) : (
+          <Badge status={o.shipmentStatus} config={shipmentStatusConfig} />
+        ),
+      { minWidth: 140 },
     ),
-    col.date<OrderGroupRow>(t("common.date"), "createdAt"),
-    col.rowMenu<OrderGroupRow>(rowMenu),
+    col.date<OrderGroupRow>(t("common.date"), "createdAt", { minWidth: 120 }),
   ];
 }
