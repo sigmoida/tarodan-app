@@ -5,6 +5,7 @@ import { defaultLocale, locales } from "@tarodan/i18n";
 import { webAuthConfig } from "@/lib/auth.config";
 import { routing } from "@/i18n/routing";
 import { SITE_UNLOCK_COOKIE, safeEqual, siteUnlockToken } from "@/lib/siteLock";
+import { internalComingSoonPath, isSiteLocked } from "@/lib/siteLockPolicy.mjs";
 
 /**
  * Web middleware = i18n routing (#214) composed with the edge auth gate.
@@ -107,7 +108,7 @@ export async function middleware(request: NextRequest) {
   // matchers already filter out `/api/unlock` and asset paths, so we only need
   // to allowlist `/coming-soon` here to avoid a rewrite loop.
   if (
-    process.env.SITE_LOCKED === "true" &&
+    isSiteLocked(process.env.SITE_LOCKED) &&
     rest !== "/coming-soon" &&
     !rest.startsWith("/coming-soon/")
   ) {
@@ -119,8 +120,12 @@ export async function middleware(request: NextRequest) {
     }
     if (!unlocked) {
       const destination = request.nextUrl.clone();
-      destination.pathname = `${prefix}/coming-soon`;
-      const response = NextResponse.rewrite(destination);
+      destination.pathname = internalComingSoonPath(locale);
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("X-NEXT-INTL-LOCALE", locale);
+      const response = NextResponse.rewrite(destination, {
+        request: { headers: requestHeaders },
+      });
       response.headers.set("X-Robots-Tag", "noindex");
       return response;
     }

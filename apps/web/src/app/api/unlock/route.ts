@@ -1,5 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SITE_UNLOCK_COOKIE, siteUnlockToken } from "@/lib/siteLock";
+import { SITE_UNLOCK_COOKIE, safeEqual, siteUnlockToken } from "@/lib/siteLock";
+import {
+  UnlockRateLimiter,
+  resolvePublicOrigin,
+} from "@/lib/siteLockPolicy.mjs";
+
+const unlockLimiter = new UnlockRateLimiter({
+  maxAttempts: 5,
+  windowMs: 15 * 60 * 1000,
+});
 
 /**
  * PIN-unlock endpoint for the pre-launch storefront gate (#398).
@@ -15,6 +24,15 @@ export async function POST(request: NextRequest) {
   if (!expected) {
     return unlockErrorRedirect(request, "error");
   }
+  const clientKey = unlockClientKey(request);
+  const currentLimit = unlockLimiter.status(clientKey);
+  if (currentLimit.blocked) {
+    return unlockErrorRedirect(
+      request,
+      "rate-limited",
+      currentLimit.retryAfterSeconds,
+    );
+  }
 
   const contentType = request.headers.get("content-type") ?? "";
   let pin: string | undefined;
@@ -29,11 +47,21 @@ export async function POST(request: NextRequest) {
     if (typeof value === "string") pin = value;
   }
 
-  if (!pin || pin !== expected) {
+  if (!pin || !safeEqual(pin, expected)) {
+    unlockLimiter.recordFailure(clientKey);
+    const failedLimit = unlockLimiter.status(clientKey);
+    if (failedLimit.blocked) {
+      return unlockErrorRedirect(
+        request,
+        "rate-limited",
+        failedLimit.retryAfterSeconds,
+      );
+    }
     return unlockErrorRedirect(request, "invalid");
   }
 
-  const response = NextResponse.redirect(new URL("/", request.url), 303);
+  unlockLimiter.clear(clientKey);
+  const response = NextResponse.redirect(publicUrl(request, "/"), 303);
   response.cookies.set({
     name: SITE_UNLOCK_COOKIE,
     value: await siteUnlockToken(expected),
@@ -41,14 +69,47 @@ export async function POST(request: NextRequest) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: 60 * 60 * 24 * 7,
+    priority: "high",
   });
   return response;
 }
 
 /** Return a visible form error without exposing the submitted PIN or secret. */
-function unlockErrorRedirect(request: NextRequest, error: "invalid" | "error") {
-  const destination = new URL("/coming-soon", request.url);
+function unlockErrorRedirect(
+  request: NextRequest,
+  error: "invalid" | "error" | "rate-limited",
+  retryAfterSeconds = 0,
+) {
+  const destination = publicUrl(request, "/coming-soon");
   destination.searchParams.set("unlock", error);
-  return NextResponse.redirect(destination, 303);
+  const response = NextResponse.redirect(destination, 303);
+  if (retryAfterSeconds > 0) {
+    response.headers.set("Retry-After", String(retryAfterSeconds));
+  }
+  return response;
+}
+
+function publicUrl(request: NextRequest, pathname: string): URL {
+  return new URL(
+    pathname,
+    resolvePublicOrigin(
+      process.env.NEXT_PUBLIC_APP_URL,
+      request.nextUrl.origin,
+    ),
+  );
+}
+
+function unlockClientKey(request: NextRequest): string {
+  const forwardedFor = request.headers
+    .get("x-forwarded-for")
+    ?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return (
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-real-ip") ||
+    forwardedFor?.at(-1) ||
+    "unknown"
+  );
 }

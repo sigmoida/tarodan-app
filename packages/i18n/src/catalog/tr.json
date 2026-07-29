@@ -2208,19 +2208,17 @@
       "socialTitle": "Bizi takip edin"
     },
     "comingSoon": {
-      "title": "Çok Yakında",
-      "subtitle": "Model araba tutkunları için pazar yerimiz açılıyor.",
-      "emailPlaceholder": "E-posta adresiniz",
-      "notifyMe": "Haberdar Et",
-      "countdownLabel": "Açılışa kalan süre",
-      "launching": "Açılıyor…",
+      "title": "Yakında Başlıyoruz",
+      "subtitle": "Model araba tutkunlarını güvenli ve özel bir pazaryerinde buluşturmak için son hazırlıklarımızı yapıyoruz.",
+      "launchNote": "Çok yakında tarodan.com.tr'deyiz.",
       "socialTitle": "Bizi takip edin",
       "pin": {
         "label": "Erişim kodunuz varsa girin",
         "placeholder": "Erişim kodu",
         "submit": "Devam Et",
         "invalid": "Geçersiz kod. Lütfen tekrar deneyin.",
-        "error": "Bir sorun oluştu. Lütfen tekrar deneyin."
+        "error": "Bir sorun oluştu. Lütfen tekrar deneyin.",
+        "rateLimited": "Çok fazla hatalı deneme yapıldı. Lütfen 15 dakika sonra tekrar deneyin."
       }
     }
   },

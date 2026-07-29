@@ -23,7 +23,9 @@ export default function PinForm() {
         ? t("utility.comingSoon.pin.invalid")
         : unlockStatus === "error"
           ? t("utility.comingSoon.pin.error")
-          : null,
+          : unlockStatus === "rate-limited"
+            ? t("utility.comingSoon.pin.rateLimited")
+            : null,
     );
   }, [t]);
 
@@ -44,6 +46,7 @@ export default function PinForm() {
           type="password"
           inputMode="numeric"
           autoComplete="off"
+          maxLength={128}
           placeholder={t("utility.comingSoon.pin.placeholder")}
           className="flex-1"
           required
@@ -53,7 +56,7 @@ export default function PinForm() {
         </Button>
       </div>
       {error && (
-        <p className="text-sm text-danger-600" role="alert">
+        <p className="text-sm text-danger-600" role="alert" aria-live="polite">
           {error}
         </p>
       )}

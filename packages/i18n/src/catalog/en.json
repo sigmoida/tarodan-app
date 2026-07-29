@@ -2208,19 +2208,17 @@
       "socialTitle": "Follow us"
     },
     "comingSoon": {
-      "title": "Coming Soon",
-      "subtitle": "Our marketplace for model car enthusiasts is launching soon.",
-      "emailPlaceholder": "Your email",
-      "notifyMe": "Notify Me",
-      "countdownLabel": "Time until launch",
-      "launching": "Launching…",
+      "title": "Launching Soon",
+      "subtitle": "We are making the final preparations to bring model car enthusiasts together in a secure, dedicated marketplace.",
+      "launchNote": "We will be at tarodan.com.tr very soon.",
       "socialTitle": "Follow us",
       "pin": {
         "label": "Have an access code? Enter it below",
         "placeholder": "Access code",
         "submit": "Continue",
         "invalid": "Invalid code. Please try again.",
-        "error": "Something went wrong. Please try again."
+        "error": "Something went wrong. Please try again.",
+        "rateLimited": "Too many invalid attempts. Please try again in 15 minutes."
       }
     }
   },

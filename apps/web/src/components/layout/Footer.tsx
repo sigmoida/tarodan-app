@@ -15,10 +15,9 @@ const LOCALE_NAMES: Record<Locale, string> = { tr: "Türkçe", en: "English" };
 const LOCALE_FLAGS: Record<Locale, string> = { tr: "🇹🇷", en: "🇬🇧" };
 
 const SOCIAL_LINKS = [
-  { label: "X", href: "https://x.com" },
   { label: "Instagram", href: "https://www.instagram.com/tarodan.com.tr/" },
-  { label: "Facebook", href: "https://facebook.com" },
-  { label: "TikTok", href: "https://www.tiktok.com" },
+  { label: "Facebook", href: "https://www.facebook.com/tarodan.com.tr/" },
+  { label: "TikTok", href: "https://www.tiktok.com/@tarodan.com.tr" },
 ];
 
 export default function Footer() {
