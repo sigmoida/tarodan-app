@@ -11,8 +11,9 @@ import type { MessageKey } from "@tarodan/i18n";
  * the centered form (`AuthCard`, rendered as `children`) + copyright. The other
  * column = a per-route marketplace hero image with a punchy, top-left headline
  * (and stats on the entry screens), shown on `lg+`. The frame + form are
- * identical everywhere; per page, the hero image/copy AND which side it sits on
- * change — all from the one config below.
+ * identical everywhere; each auth flow chooses its hero from the config below.
+ * Registration routes intentionally share one hero so switching account type
+ * only changes the form.
  */
 
 interface Hero {
@@ -24,17 +25,7 @@ interface Hero {
   stats?: boolean;
 }
 
-/** First matching prefix wins — keep `/register/business` before `/register`. */
 const HERO_BY_PATH: Array<{ prefix: string; hero: Hero }> = [
-  {
-    prefix: "/register/business",
-    hero: {
-      image: heroImageUrl("hero-trading.png"),
-      side: "right",
-      titleKey: "auth.heroBusinessTitle",
-      subtitleKey: "auth.heroBusinessSubtitle",
-    },
-  },
   {
     prefix: "/register",
     hero: {
@@ -109,7 +100,7 @@ export default function AuthHeroLayout({
         </footer>
       </div>
 
-      {/* Per-route hero panel (lg+), side driven by config */}
+      {/* Auth-flow hero panel (lg+), side driven by config */}
       <div
         className={`relative hidden flex-1 overflow-hidden lg:flex ${
           heroLeft ? "lg:order-1" : "lg:order-2"

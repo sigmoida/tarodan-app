@@ -3,6 +3,7 @@
 import { BuildingOffice2Icon, UserIcon } from "@heroicons/react/24/outline";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
+import { Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 
 export function RegisterAccountTabs({
   active,
@@ -26,25 +27,25 @@ export function RegisterAccountTabs({
   ];
 
   return (
-    <div className="grid grid-cols-2 border border-border bg-surface p-1">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const selected = item.id === active;
-        return (
-          <Link
-            key={item.id}
-            href={item.href}
-            className={`flex min-h-11 items-center justify-center gap-2 px-3 text-sm font-semibold transition-colors ${
-              selected
-                ? "bg-primary-600 text-inverted"
-                : "text-muted hover:bg-surface-elevated hover:text-heading"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-            {item.label}
-          </Link>
-        );
-      })}
-    </div>
+    <Tabs value={active}>
+      <TabsList className="grid w-full grid-cols-2 gap-0 rounded-none bg-surface p-1">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <TabsTrigger
+              key={item.id}
+              value={item.id}
+              asChild
+              className="min-h-11 rounded-none bg-transparent px-3 font-semibold text-muted shadow-none hover:bg-surface-elevated hover:text-heading data-[state=active]:!bg-primary-600 data-[state=active]:!text-inverted data-[state=active]:shadow-none"
+            >
+              <Link href={item.href} className="flex items-center gap-2">
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }
