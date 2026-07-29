@@ -1,4 +1,4 @@
-import { Logo } from "@tarodan/ui/logo";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import StatusScreen from "../_components/StatusScreen";
 import SocialLinks from "../_components/SocialLinks";
@@ -9,7 +9,16 @@ export default function ComingSoonPage() {
 
   return (
     <StatusScreen
-      logo={<Logo className="mx-auto h-16 w-auto" />}
+      logo={
+        <Image
+          src="/tarodan-logo.jpg"
+          alt="Tarodan"
+          width={162}
+          height={40}
+          className="rounded-lg object-contain"
+          priority
+        />
+      }
       title={t("utility.comingSoon.title")}
       description={t("utility.comingSoon.subtitle")}
     >
