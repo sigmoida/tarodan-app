@@ -4,13 +4,13 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import { PrismaService } from '../../prisma';
-import { AdminAuditService } from './admin-audit.service';
-import { PaymentService } from '../payment/payment.service';
-import { SearchService } from '../search/search.service';
-import { CacheService } from '../cache/cache.service';
+} from "@nestjs/common";
+import * as bcrypt from "bcrypt";
+import { PrismaService } from "../../prisma";
+import { AdminAuditService } from "./admin-audit.service";
+import { PaymentService } from "../payment/payment.service";
+import { SearchService } from "../search/search.service";
+import { CacheService } from "../cache/cache.service";
 import {
   BanUserDto,
   AssignAdminStaffDto,
@@ -20,9 +20,14 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   ADMIN_PERMISSION_KEYS,
   migrateLegacyPermissions,
-} from './dto';
-import { ProductStatus, OfferStatus, TradeStatus, AdminRole } from '@prisma/client';
-import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
+} from "./dto";
+import {
+  ProductStatus,
+  OfferStatus,
+  TradeStatus,
+  AdminRole,
+} from "@prisma/client";
+import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 
 /**
  * Admin personel/rol yönetimi (+ banner aralığındaki banUser) — AdminService'in
@@ -42,7 +47,9 @@ export class AdminStaffService {
   ) {}
 
   /** Acting kullanıcının (User.id) AdminUser.id'sini çöz (audit/createdBy için). */
-  private async resolveAdminUserId(userId: string): Promise<string | undefined> {
+  private async resolveAdminUserId(
+    userId: string,
+  ): Promise<string | undefined> {
     const a = await this.prisma.adminUser.findFirst({
       where: { userId },
       select: { id: true },
@@ -51,14 +58,26 @@ export class AdminStaffService {
   }
 
   private shapeStaff(
-    s: { id: string; userId: string; role: AdminRole; isActive: boolean; lastLoginAt: Date | null; createdAt: Date },
-    user: { email: string; displayName: string | null },
+    s: {
+      id: string;
+      userId: string;
+      role: AdminRole;
+      isActive: boolean;
+      lastLoginAt: Date | null;
+      createdAt: Date;
+    },
+    user: {
+      email: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+    },
   ) {
     return {
       id: s.id,
       userId: s.userId,
       email: user.email,
       name: user.displayName ?? user.email,
+      avatarUrl: user.avatarUrl ?? undefined,
       role: s.role,
       isActive: s.isActive,
       lastLoginAt: s.lastLoginAt ?? null,
@@ -67,18 +86,31 @@ export class AdminStaffService {
   }
 
   /** Best-effort audit kaydı (admin rol işlemleri akışı bloke etmesin). */
-  private async auditStaff(actingUserId: string, action: string, id: string, oldV: any, newV: any) {
+  private async auditStaff(
+    actingUserId: string,
+    action: string,
+    id: string,
+    oldV: any,
+    newV: any,
+  ) {
     try {
       const adminUserId = await this.resolveAdminUserId(actingUserId);
       if (adminUserId) {
-        await this.audit.createAuditLog(adminUserId, action, 'AdminUser', id, oldV, newV);
+        await this.audit.createAuditLog(
+          adminUserId,
+          action,
+          "AdminUser",
+          id,
+          oldV,
+          newV,
+        );
       }
     } catch {
       /* audit hatası işlemi bloke etmesin */
     }
   }
 
-  private readonly STAFF_ASSIGN_SETTING_KEY = 'allow_admin_assign_roles';
+  private readonly STAFF_ASSIGN_SETTING_KEY = "allow_admin_assign_roles";
 
   /** İşlemi yapan kullanıcının (User.id) AdminUser kaydı (id + rol). */
   private async resolveActingAdmin(
@@ -96,20 +128,21 @@ export class AdminStaffService {
     const s = await this.prisma.platformSetting.findUnique({
       where: { settingKey: this.STAFF_ASSIGN_SETTING_KEY },
     });
-    return { allowAdminAssign: s?.settingValue === 'true' };
+    return { allowAdminAssign: s?.settingValue === "true" };
   }
 
   /** Ayarı güncelle (yalnız super_admin controller'da kilitli). */
   async setStaffSettings(actingUserId: string, dto: UpdateStaffSettingsDto) {
     const updatedBy = await this.resolveAdminUserId(actingUserId);
-    const value = dto.allowAdminAssign ? 'true' : 'false';
+    const value = dto.allowAdminAssign ? "true" : "false";
     await this.prisma.platformSetting.upsert({
       where: { settingKey: this.STAFF_ASSIGN_SETTING_KEY },
       create: {
         settingKey: this.STAFF_ASSIGN_SETTING_KEY,
         settingValue: value,
-        settingType: 'boolean',
-        description: 'Yöneticiler (admin) de admin rolü atayabilsin mi (süper_admin hariç)',
+        settingType: "boolean",
+        description:
+          "Yöneticiler (admin) de admin rolü atayabilsin mi (süper_admin hariç)",
         updatedBy,
       },
       update: { settingValue: value, updatedBy },
@@ -117,7 +150,7 @@ export class AdminStaffService {
     return { allowAdminAssign: dto.allowAdminAssign };
   }
 
-  private readonly ROLE_PERMISSIONS_SETTING_KEY = 'admin_role_permissions';
+  private readonly ROLE_PERMISSIONS_SETTING_KEY = "admin_role_permissions";
 
   /** Rol → izin eşleşmesini döner (platform_settings'ten; yoksa varsayılanı kullan). */
   async getRolePermissions(): Promise<Record<string, string[]>> {
@@ -139,15 +172,19 @@ export class AdminStaffService {
     dto: SetRolePermissionsDto,
   ): Promise<Record<string, string[]>> {
     const updatedBy = await this.resolveAdminUserId(actingUserId);
-    const merged = { ...dto.permissions, super_admin: [...ADMIN_PERMISSION_KEYS] };
+    const merged = {
+      ...dto.permissions,
+      super_admin: [...ADMIN_PERMISSION_KEYS],
+    };
     const value = JSON.stringify(merged);
     await this.prisma.platformSetting.upsert({
       where: { settingKey: this.ROLE_PERMISSIONS_SETTING_KEY },
       create: {
         settingKey: this.ROLE_PERMISSIONS_SETTING_KEY,
         settingValue: value,
-        settingType: 'json',
-        description: 'Admin rolleri için izin matrisi (super_admin her zaman tam yetkili)',
+        settingType: "json",
+        description:
+          "Admin rolleri için izin matrisi (super_admin her zaman tam yetkili)",
         updatedBy,
       },
       update: { settingValue: value, updatedBy },
@@ -161,40 +198,44 @@ export class AdminStaffService {
     ...involvedRoles: (AdminRole | undefined)[]
   ) {
     const acting = await this.resolveActingAdmin(actingUserId);
-    if (!acting) throw new ForbiddenException('Bu işlem için yetkiniz yok');
+    if (!acting) throw new ForbiddenException("Bu işlem için yetkiniz yok");
     if (acting.role === AdminRole.super_admin) return; // süper admin her şeyi yapar
     if (acting.role === AdminRole.admin) {
       const { allowAdminAssign } = await this.getStaffSettings();
       if (!allowAdminAssign) {
         throw new ForbiddenException(
-          'Rol atama yetkisi yalnızca süper adminde (yönetici izni kapalı)',
+          "Rol atama yetkisi yalnızca süper adminde (yönetici izni kapalı)",
         );
       }
       if (involvedRoles.includes(AdminRole.super_admin)) {
         throw new ForbiddenException(
-          'Süper admin rolüyle ilgili işlemi yalnızca süper admin yapabilir',
+          "Süper admin rolüyle ilgili işlemi yalnızca süper admin yapabilir",
         );
       }
       return;
     }
-    throw new ForbiddenException('Bu işlem için yetkiniz yok');
+    throw new ForbiddenException("Bu işlem için yetkiniz yok");
   }
 
   /** Yeni admin hesabı için okunabilir geçici şifre üret. */
   private generateTempPassword(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-    let p = '';
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    let p = "";
     for (let i = 0; i < 10; i++) {
       p += chars[Math.floor(Math.random() * chars.length)];
     }
-    return p + '!9';
+    return p + "!9";
   }
 
   /** Tüm admin personeli + rol başına (aktif) sayıları döndür. */
   async listAdminStaff() {
     const staff = await this.prisma.adminUser.findMany({
-      include: { user: { select: { email: true, displayName: true } } },
-      orderBy: { createdAt: 'asc' },
+      include: {
+        user: {
+          select: { email: true, displayName: true, avatarUrl: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
     });
     const roleCounts: Record<string, number> = {
       super_admin: 0,
@@ -214,7 +255,7 @@ export class AdminStaffService {
     const email = dto.email.toLowerCase().trim();
     let user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, displayName: true },
+      select: { id: true, email: true, displayName: true, avatarUrl: true },
     });
 
     // Kayıt yoksa hesabı oluştur. Şifre verilmediyse geçici üret + yanıtta döndür (süper admin paylaşsın).
@@ -223,7 +264,7 @@ export class AdminStaffService {
       const rawPassword = dto.password || this.generateTempPassword();
       if (!dto.password) tempPassword = rawPassword;
       const passwordHash = await bcrypt.hash(rawPassword, 12);
-      const displayName = dto.displayName?.trim() || email.split('@')[0];
+      const displayName = dto.displayName?.trim() || email.split("@")[0];
       user = await this.prisma.user.create({
         data: {
           email,
@@ -232,7 +273,7 @@ export class AdminStaffService {
           isEmailVerified: true,
           isVerified: true,
         },
-        select: { id: true, email: true, displayName: true },
+        select: { id: true, email: true, displayName: true, avatarUrl: true },
       });
     }
 
@@ -245,7 +286,13 @@ export class AdminStaffService {
         where: { id: existing.id },
         data: { role: dto.role, isActive: true },
       });
-      await this.auditStaff(actingUserId, 'admin_staff_update', updated.id, existing, updated);
+      await this.auditStaff(
+        actingUserId,
+        "admin_staff_update",
+        updated.id,
+        existing,
+        updated,
+      );
       return { ...this.shapeStaff(updated, user), tempPassword };
     }
 
@@ -253,29 +300,46 @@ export class AdminStaffService {
     const created = await this.prisma.adminUser.create({
       data: { userId: user.id, role: dto.role, isActive: true, createdBy },
     });
-    await this.auditStaff(actingUserId, 'admin_staff_create', created.id, null, created);
+    await this.auditStaff(
+      actingUserId,
+      "admin_staff_create",
+      created.id,
+      null,
+      created,
+    );
     return { ...this.shapeStaff(created, user), tempPassword };
   }
 
   /** Admin personelin rolünü/aktifliğini güncelle. */
-  async updateAdminStaff(actingUserId: string, id: string, dto: UpdateAdminStaffDto) {
+  async updateAdminStaff(
+    actingUserId: string,
+    id: string,
+    dto: UpdateAdminStaffDto,
+  ) {
     const existing = await this.prisma.adminUser.findUnique({
       where: { id },
-      include: { user: { select: { email: true, displayName: true } } },
+      include: {
+        user: {
+          select: { email: true, displayName: true, avatarUrl: true },
+        },
+      },
     });
-    if (!existing) throw new NotFoundException('Admin kaydı bulunamadı');
+    if (!existing) throw new NotFoundException("Admin kaydı bulunamadı");
     await this.assertCanManage(actingUserId, existing.role, dto.role);
 
     // Son aktif süper admin'i düşürme/pasifleştirme engeli (sistemi yetkisiz bırakmamak için).
     const downgradingLastSuper =
       existing.role === AdminRole.super_admin &&
-      (dto.isActive === false || (dto.role != null && dto.role !== AdminRole.super_admin));
+      (dto.isActive === false ||
+        (dto.role != null && dto.role !== AdminRole.super_admin));
     if (downgradingLastSuper) {
       const activeSupers = await this.prisma.adminUser.count({
         where: { role: AdminRole.super_admin, isActive: true },
       });
       if (activeSupers <= 1) {
-        throw new BadRequestException('Sistemdeki son süper admin değiştirilemez');
+        throw new BadRequestException(
+          "Sistemdeki son süper admin değiştirilemez",
+        );
       }
     }
 
@@ -286,14 +350,20 @@ export class AdminStaffService {
         ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
       },
     });
-    await this.auditStaff(actingUserId, 'admin_staff_update', id, existing, updated);
+    await this.auditStaff(
+      actingUserId,
+      "admin_staff_update",
+      id,
+      existing,
+      updated,
+    );
     return this.shapeStaff(updated, existing.user);
   }
 
   /** Admin yetkisini tamamen kaldır (AdminUser sil). */
   async removeAdminStaff(actingUserId: string, id: string) {
     const existing = await this.prisma.adminUser.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Admin kaydı bulunamadı');
+    if (!existing) throw new NotFoundException("Admin kaydı bulunamadı");
     await this.assertCanManage(actingUserId, existing.role);
 
     const acting = await this.prisma.adminUser.findFirst({
@@ -301,19 +371,27 @@ export class AdminStaffService {
       select: { id: true },
     });
     if (acting?.id === id) {
-      throw new BadRequestException('Kendi admin yetkinizi kaldıramazsınız');
+      throw new BadRequestException("Kendi admin yetkinizi kaldıramazsınız");
     }
     if (existing.role === AdminRole.super_admin) {
       const activeSupers = await this.prisma.adminUser.count({
         where: { role: AdminRole.super_admin, isActive: true },
       });
       if (activeSupers <= 1) {
-        throw new BadRequestException('Sistemdeki son süper admin kaldırılamaz');
+        throw new BadRequestException(
+          "Sistemdeki son süper admin kaldırılamaz",
+        );
       }
     }
 
     await this.prisma.adminUser.delete({ where: { id } });
-    await this.auditStaff(actingUserId, 'admin_staff_delete', id, existing, null);
+    await this.auditStaff(
+      actingUserId,
+      "admin_staff_delete",
+      id,
+      existing,
+      null,
+    );
     return { success: true };
   }
 
@@ -332,11 +410,11 @@ export class AdminStaffService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException("Kullanıcı bulunamadı");
     }
 
     if ((user as any).isBanned) {
-      throw new BadRequestException('Kullanıcı zaten banlı');
+      throw new BadRequestException("Kullanıcı zaten banlı");
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -381,7 +459,10 @@ export class AdminStaffService {
           });
           const byProduct = new Map<string, number>();
           for (const item of items) {
-            byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+            byProduct.set(
+              item.productId,
+              (byProduct.get(item.productId) ?? 0) + item.quantity,
+            );
           }
           for (const [productId, qty] of byProduct) {
             await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
@@ -390,12 +471,18 @@ export class AdminStaffService {
               select: { reservedQuantity: true },
             });
             if (prod) {
-              const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+              const newReserved = safeDecrementReserved(
+                prod.reservedQuantity,
+                qty,
+              );
               await tx.product.update({
                 where: { id: productId },
                 data: {
                   reservedQuantity: newReserved,
-                  status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+                  status:
+                    newReserved > 0
+                      ? ProductStatus.reserved
+                      : ProductStatus.active,
                 },
               });
               releasedProductIds.add(productId);
@@ -406,7 +493,7 @@ export class AdminStaffService {
           where: { id: trade.id, version: trade.version },
           data: {
             status: TradeStatus.cancelled,
-            cancelReason: 'Kullanıcı banlandığı için takas iptal edildi',
+            cancelReason: "Kullanıcı banlandığı için takas iptal edildi",
             cancelledAt: new Date(),
             version: { increment: 1 },
           },
@@ -455,9 +542,18 @@ export class AdminStaffService {
       });
 
       // 6. Audit log oluştur
-      await this.audit.createAuditLog(adminId, 'user_ban', 'User', userId, user, updatedUser);
+      await this.audit.createAuditLog(
+        adminId,
+        "user_ban",
+        "User",
+        userId,
+        user,
+        updatedUser,
+      );
 
-      this.logger.warn(`User ${userId} banned by admin ${adminId}: ${dto.reason}`);
+      this.logger.warn(
+        `User ${userId} banned by admin ${adminId}: ${dto.reason}`,
+      );
 
       return {
         success: true,
@@ -467,7 +563,9 @@ export class AdminStaffService {
         cancelledTradeIds,
         // Suspended + iptal edilen takaslardan serbest kalan (karşı tarafın da)
         // ürünleri ES'te güncellemek için birleşik küme.
-        affectedProductIds: Array.from(new Set([...toSuspend.map((p) => p.id), ...releasedProductIds])),
+        affectedProductIds: Array.from(
+          new Set([...toSuspend.map((p) => p.id), ...releasedProductIds]),
+        ),
       };
     });
 
@@ -476,14 +574,16 @@ export class AdminStaffService {
       await this.paymentService
         .refundTradeCashPaymentIfCompleted(tradeId)
         .catch((err) =>
-          this.logger.warn(`Ban: trade refund failed for ${tradeId}: ${err?.message}`),
+          this.logger.warn(
+            `Ban: trade refund failed for ${tradeId}: ${err?.message}`,
+          ),
         );
     }
 
     // Etkilenen ilanları arama/listeden senkronla (suspended → düşer, serbest
     // kalan karşı taraf ürünü → yeniden indekslenir).
     if (result.affectedProductIds.length > 0) {
-      await this.cache.delPattern('products:list:*');
+      await this.cache.delPattern("products:list:*");
       await Promise.all(
         result.affectedProductIds.map((id) =>
           this.cache.del(`product:${id}`).catch(() => {}),
@@ -492,7 +592,9 @@ export class AdminStaffService {
       for (const id of result.affectedProductIds) {
         this.searchService
           .syncProduct(id)
-          .catch((err) => this.logger.warn(`ES sync (ban) failed for ${id}: ${err?.message}`));
+          .catch((err) =>
+            this.logger.warn(`ES sync (ban) failed for ${id}: ${err?.message}`),
+          );
       }
     }
 

@@ -145,6 +145,7 @@ export class TicketResponseDto {
   ticketNumber: string;
   creatorId: string;
   creatorName: string;
+  creatorEmail?: string;
   assigneeId?: string;
   assigneeName?: string;
   category: TicketCategory;

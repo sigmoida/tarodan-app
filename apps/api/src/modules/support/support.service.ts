@@ -355,7 +355,7 @@ export class SupportService {
       this.prisma.supportTicket.findMany({
         where,
         include: {
-          creator: { select: { id: true, displayName: true } },
+          creator: { select: { id: true, displayName: true, email: true } },
           assignee: { select: { id: true, displayName: true } },
           _count: { select: { messages: true } },
         },
@@ -647,6 +647,7 @@ export class SupportService {
       ticketNumber: ticket.ticketNumber,
       creatorId: ticket.creatorId,
       creatorName: ticket.creator?.displayName || "",
+      creatorEmail: ticket.creator?.email || undefined,
       assigneeId: ticket.assigneeId || undefined,
       assigneeName: ticket.assignee?.displayName || undefined,
       category: ticket.category,

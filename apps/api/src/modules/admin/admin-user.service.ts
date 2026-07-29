@@ -136,6 +136,7 @@ export class AdminUserService {
       username: true,
       email: true,
       displayName: true,
+      avatarUrl: true,
       phone: true,
       isSeller: true,
       sellerType: true,

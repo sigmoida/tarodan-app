@@ -132,7 +132,14 @@ export class AdminProductService {
       {
         where,
         include: {
-          seller: { select: { id: true, displayName: true, email: true } },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
           category: { select: { id: true, name: true } },
           brand: { select: { name: true } },
           images: { take: 1, orderBy: { sortOrder: "asc" } },

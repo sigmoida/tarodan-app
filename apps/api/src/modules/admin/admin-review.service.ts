@@ -254,8 +254,22 @@ export class AdminReviewService {
         where,
         orderBy,
         include: {
-          giver: { select: { id: true, displayName: true, email: true } },
-          receiver: { select: { id: true, displayName: true, email: true } },
+          giver: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+          receiver: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
         },
       },
       query,

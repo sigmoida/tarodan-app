@@ -229,6 +229,7 @@ export class AdminPayoutService {
         orderNumber: h.payment.order?.orderNumber ?? "-",
         sellerId: h.sellerId,
         sellerName: h.seller.displayName ?? h.seller.email,
+        sellerEmail: h.seller.email,
         amount: Number(h.amount),
         releaseAt: h.releaseAt,
         createdAt: h.createdAt,

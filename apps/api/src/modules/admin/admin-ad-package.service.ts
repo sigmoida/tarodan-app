@@ -173,6 +173,7 @@ export class AdminAdPackageService {
             username: boost.user.username,
             name: boost.user.displayName,
             email: boost.user.email,
+            avatarUrl: boost.user.avatarUrl,
           }
         : null,
       product: boost.product
@@ -393,6 +394,7 @@ export class AdminAdPackageService {
               username: true,
               displayName: true,
               email: true,
+              avatarUrl: true,
             },
           },
           package: { select: { id: true, name: true } },
@@ -432,6 +434,7 @@ export class AdminAdPackageService {
             username: true,
             displayName: true,
             email: true,
+            avatarUrl: true,
           },
         },
         package: { select: { id: true, name: true } },
