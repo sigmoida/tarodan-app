@@ -75,17 +75,17 @@ export default function UsersPage() {
             <ResourceList.FilterSelect
               name="filter"
               options={getUserFilterOptions(t)}
-              className="sm:w-48"
+              className="min-w-0 overflow-hidden whitespace-nowrap sm:w-48 [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
             />
             <ResourceList.FilterSelect
               name="membershipTier"
               options={getMembershipTierFilterOptions(t)}
-              className="sm:w-44"
+              className="min-w-0 overflow-hidden whitespace-nowrap sm:w-44 [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
             />
             <ResourceList.FilterSelect
               name="lifecycle"
               options={getMembershipLifecycleOptions(t)}
-              className="sm:w-52"
+              className="min-w-0 overflow-hidden whitespace-nowrap sm:w-52 [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
             />
             <ResourceList.DateRange />
           </ResourceList.Toolbar>

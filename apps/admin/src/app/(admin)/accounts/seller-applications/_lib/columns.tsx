@@ -12,7 +12,11 @@ export function applicationColumns(
   return [
     col.user<Application>(
       t("admin.accounts.sellerApplications.company"),
-      (a) => ({ name: a.companyTitle, secondary: a.companyEmail }),
+      (a) => ({
+        name: a.companyTitle,
+        secondary: a.companyEmail,
+        href: a.userId ? `/accounts/users/${a.userId}` : undefined,
+      }),
       {
         sortKey: "companyTitle",
         sortType: "text",

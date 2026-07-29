@@ -1,5 +1,3 @@
-import Image from "next/image";
-import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { Badge } from "@tarodan/ui";
 import { col } from "@/components/table";
 import {
@@ -18,54 +16,29 @@ type Act = (id: string, s: ReviewStatus) => void;
 
 export function productReviewColumns(act: Act, t: T, busyId?: string) {
   return [
-    col.id<Review>(t("admin.accounts.reviews.reviewId"), (r) => r.id),
-    col.custom<Review>(
+    col.product<Review>(
       t("admin.accounts.reviews.product"),
-      (r) => (
-        <div className="flex items-center gap-3">
-          {r.product.images?.[0] ? (
-            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded">
-              <Image
-                src={r.product.images[0].url}
-                alt={r.product.title}
-                fill
-                className="object-cover"
-              />
-            </div>
-          ) : (
-            <div className="h-10 w-10 shrink-0 rounded bg-surface-alt" />
-          )}
-          <span
-            className="min-w-0 truncate text-sm font-medium text-heading"
-            title={r.product.title}
-          >
-            {r.product.title}
-          </span>
-        </div>
-      ),
-      { grow: 3, minWidth: 220, sortKey: "product.title", sortType: "text" },
+      (r) => ({
+        title: r.product.title,
+        image: r.product.images?.[0]?.url,
+        href: `/catalog/products/${r.product.id}`,
+      }),
+      { grow: 5, minWidth: 400, sortKey: "product.title", sortType: "text" },
     ),
-    col.custom<Review>(
+    col.user<Review>(
       t("common.user"),
-      (r) => (
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-600">
-            {r.user.displayName.charAt(0)}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm text-heading">
-              {r.user.displayName}
-            </p>
-            {r.isVerifiedPurchase && (
-              <span className="flex items-center gap-1 text-[10px] text-success-700">
-                <CheckCircleIcon className="h-3 w-3" />
-                {t("admin.accounts.reviews.verifiedBuyer")}
-              </span>
-            )}
-          </div>
-        </div>
-      ),
-      { grow: 2, minWidth: 170, sortKey: "user.displayName", sortType: "text" },
+      (r) => ({
+        name: r.user.displayName,
+        secondary: r.user.email,
+        avatar: r.user.avatarUrl,
+        href: `/accounts/users/${r.user.id}`,
+      }),
+      {
+        grow: 4,
+        minWidth: 380,
+        sortKey: "user.displayName",
+        sortType: "text",
+      },
     ),
     col.custom<Review>(
       t("admin.accounts.reviews.review"),
@@ -96,26 +69,25 @@ export function productReviewColumns(act: Act, t: T, busyId?: string) {
 
 export function sellerReviewColumns(act: Act, t: T, busyId?: string) {
   return [
-    col.id<UserRating>(t("admin.accounts.reviews.reviewId"), (r) => r.id),
     col.user<UserRating>(
       t("admin.accounts.reviews.sender"),
       (r) => ({
         name: r.giver?.displayName ?? "—",
         secondary: r.giver?.email,
+        avatar: r.giver?.avatarUrl,
+        href: r.giver?.id ? `/accounts/users/${r.giver.id}` : undefined,
       }),
-      { sortKey: "giver.displayName" },
+      { minWidth: 240, sortKey: "giver.displayName" },
     ),
     col.user<UserRating>(
       t("admin.accounts.reviews.receiverSeller"),
       (r) => ({
         name: r.receiver?.displayName ?? "—",
         secondary: r.receiver?.email,
+        avatar: r.receiver?.avatarUrl,
+        href: r.receiver?.id ? `/accounts/users/${r.receiver.id}` : undefined,
       }),
-      { sortKey: "receiver.displayName" },
-    ),
-    col.id<UserRating>(
-      t("admin.operations.common.sellerId"),
-      (r) => r.receiver?.id,
+      { minWidth: 260, sortKey: "receiver.displayName" },
     ),
     col.custom<UserRating>(
       t("admin.accounts.reviews.score"),

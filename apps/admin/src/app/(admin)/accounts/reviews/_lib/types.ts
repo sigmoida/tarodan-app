@@ -15,7 +15,12 @@ export interface Review {
   adminReplyAt?: string;
   createdAt: string;
   isVerifiedPurchase: boolean;
-  user: { id: string; displayName: string; email: string; avatar?: string };
+  user: {
+    id: string;
+    displayName: string;
+    email: string;
+    avatarUrl?: string;
+  };
   product: { id: string; title: string; images: { url: string }[] };
 }
 
@@ -27,8 +32,18 @@ export interface UserRating {
   createdAt: string;
   orderId?: string;
   tradeId?: string;
-  giver: { id: string; displayName: string; email: string };
-  receiver: { id: string; displayName: string; email: string };
+  giver: {
+    id: string;
+    displayName: string;
+    email: string;
+    avatarUrl?: string;
+  };
+  receiver: {
+    id: string;
+    displayName: string;
+    email: string;
+    avatarUrl?: string;
+  };
 }
 
 export const reviewStatusConfig = (t: T): Record<string, StatusConfig> => ({

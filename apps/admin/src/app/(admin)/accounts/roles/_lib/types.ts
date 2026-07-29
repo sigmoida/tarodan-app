@@ -5,6 +5,7 @@ export interface StaffItem {
   userId: string;
   email: string;
   name: string;
+  avatarUrl?: string;
   role: string;
   isActive: boolean;
   lastLoginAt: string | null;
