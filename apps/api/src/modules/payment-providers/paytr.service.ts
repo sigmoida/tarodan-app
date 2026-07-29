@@ -714,6 +714,8 @@ export class PayTRService implements IPaymentProvider {
       ]),
     );
 
+    // request_exp_date bilinçli gönderilmiyor: PayTR Direct API, Unix epoch
+    // değerini geçersiz token olarak reddediyor; alan yoksa 30 dakika kullanıyor.
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
       user_ip: buyer.ip,
@@ -734,8 +736,6 @@ export class PayTRService implements IPaymentProvider {
       user_basket: userBasket,
       debug_on: this.testMode ? "1" : "0",
       client_lang: "tr",
-      // Hazırlanan formun fiyat/oid bilgisi uzun süre sonra kullanılamasın.
-      request_exp_date: String(Math.floor(Date.now() / 1000) + 30 * 60),
     });
 
     if (options?.savedCard) {

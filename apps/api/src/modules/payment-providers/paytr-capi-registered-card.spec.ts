@@ -87,6 +87,9 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       expect(fields).not.toHaveProperty("expiry_month");
       expect(fields).not.toHaveProperty("expiry_year");
       expect(fields).not.toHaveProperty("cvv");
+      // PayTR, Unix epoch request_exp_date değerini genel "paytr_token
+      // geçersiz" hatasıyla reddediyor; alan yoksa 30 dakikalık varsayılanı kullanır.
+      expect(fields).not.toHaveProperty("request_exp_date");
 
       const hashStr =
         MID +
