@@ -25,7 +25,10 @@ export interface AuthMiddlewareOptions {
    * server-side route authorization without trusting a browser-supplied value.
    */
   requestPathHeader?: string;
-  /** Optional `expired` query value used when the refresh token is rejected. */
+  /**
+   * Optional `expired` query value used when the refresh token or downstream
+   * session is rejected. Landing on login with this value clears auth cookies.
+   */
   expiredSessionReason?: string;
 }
 
@@ -47,6 +50,17 @@ export function createAuthMiddleware(
   const isProd = config.isProd ?? process.env.NODE_ENV === "production";
   const skew = config.jwtSkewMs ?? 30_000;
   const loginPath = options.loginPath ?? "/login";
+  const clearAuthCookies = (response: NextResponse): NextResponse => {
+    response.cookies.set(config.cookies.access, "", { path: "/", maxAge: 0 });
+    response.cookies.set(config.cookies.refresh, "", { path: "/", maxAge: 0 });
+    if (config.indicatorCookie) {
+      response.cookies.set(config.indicatorCookie, "", {
+        path: "/",
+        maxAge: 0,
+      });
+    }
+    return response;
+  };
 
   return async function middleware(
     request: NextRequest,
@@ -65,6 +79,7 @@ export function createAuthMiddleware(
     }
 
     const refresh = request.cookies.get(config.cookies.refresh)?.value;
+    const access = request.cookies.get(config.cookies.access)?.value;
 
     // Guest-only pages: bounce an authed user to home, let guests through. Only
     // on real navigations — an RSC prefetch or the Server Action revalidation
@@ -75,10 +90,23 @@ export function createAuthMiddleware(
       (p) => pathname === p || pathname.startsWith(p + "/"),
     );
     if (isGuestOnly) {
+      // A protected layout sends invalid upstream sessions here with an
+      // explicit reason. Clear both httpOnly tokens before rendering login so
+      // the guest-only redirect cannot bounce the same dead session back.
+      if (
+        options.expiredSessionReason &&
+        request.nextUrl.searchParams.get("expired") ===
+          options.expiredSessionReason
+      ) {
+        return clearAuthCookies(next());
+      }
       const isRscRequest =
         request.headers.has("rsc") ||
         request.headers.has("next-router-prefetch");
-      if (refresh && !isRscRequest) {
+      // A refresh cookie alone does not prove there is a usable session. It can
+      // outlive an upstream rejection or a signing-key rotation and previously
+      // caused /login <-> protected-page redirect loops.
+      if (refresh && !isExpired(access, skew) && !isRscRequest) {
         return NextResponse.redirect(
           new URL(options.authedHome ?? "/", request.url),
         );
@@ -92,15 +120,10 @@ export function createAuthMiddleware(
         "redirect",
         `${pathname}${request.nextUrl.search}`,
       );
-      const res = NextResponse.redirect(loginUrl);
-      // No session → clear any stale JS-readable indicator so the client can't
-      // mistakenly render as authed on the next page.
-      if (config.indicatorCookie)
-        res.cookies.set(config.indicatorCookie, "", { path: "/", maxAge: 0 });
-      return res;
+      // No refresh token means the access token cannot form a usable session.
+      return clearAuthCookies(NextResponse.redirect(loginUrl));
     }
 
-    const access = request.cookies.get(config.cookies.access)?.value;
     if (!isExpired(access, skew)) {
       // Valid session — make sure the JS-readable indicator reflects it. This
       // self-heals sessions created before the indicator existed and keeps it
@@ -151,13 +174,7 @@ export function createAuthMiddleware(
       if (options.expiredSessionReason) {
         loginUrl.searchParams.set("expired", options.expiredSessionReason);
       }
-      const redirect = NextResponse.redirect(loginUrl);
-      if (config.indicatorCookie)
-        redirect.cookies.set(config.indicatorCookie, "", {
-          path: "/",
-          maxAge: 0,
-        });
-      return redirect;
+      return clearAuthCookies(NextResponse.redirect(loginUrl));
     }
 
     const newRefresh = tokens.refreshToken ?? refresh;
