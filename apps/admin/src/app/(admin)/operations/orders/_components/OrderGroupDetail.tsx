@@ -36,6 +36,20 @@ function LineItem({ item }: { item: OrderLineItem }) {
             t("admin.operations.orders.itemCountUnit", { count: 1 })}
         </TruncatedText>
         <span className="font-mono text-xs text-muted">{item.orderNumber}</span>
+        <dl className="mt-1 grid gap-x-3 text-[11px] text-muted sm:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="inline">{t("admin.operations.orders.orderId")}: </dt>
+            <dd className="inline break-all font-mono">{item.id}</dd>
+          </div>
+          {item.product?.id && (
+            <div className="min-w-0">
+              <dt className="inline">
+                {t("admin.operations.orders.productId")}:{" "}
+              </dt>
+              <dd className="inline break-all font-mono">{item.product.id}</dd>
+            </div>
+          )}
+        </dl>
       </div>
       {item.cancellationType === "iptal" ? (
         <Badge
@@ -56,15 +70,43 @@ function LineItem({ item }: { item: OrderLineItem }) {
 /** Same seller = one parcel = ONE tracking number → shown once per package. */
 function PackageTracking({ items }: { items: OrderLineItem[] }) {
   const t = useTranslations();
-  const tracking = items.find((i) => i.trackingNumber)?.trackingNumber;
-  if (!tracking) return null;
+  const shipment = items.find(
+    (i) => i.trackingNumber || i.internalTrackingNumber || i.shipmentId,
+  );
+  if (!shipment) return null;
   return (
-    <div className="border-t border-border-subtle px-3 py-1.5 text-xs">
-      <span className="text-muted">
-        {t("admin.operations.common.trackingNumber")}:
-      </span>{" "}
-      <span className="font-mono text-body">{tracking}</span>
-    </div>
+    <dl className="grid gap-1 border-t border-border-subtle px-3 py-2 text-xs sm:grid-cols-3">
+      {shipment.trackingNumber && (
+        <div>
+          <dt className="text-muted">
+            {t("admin.operations.common.trackingNumber")}
+          </dt>
+          <dd className="break-all font-mono text-body">
+            {shipment.trackingNumber}
+          </dd>
+        </div>
+      )}
+      {shipment.internalTrackingNumber && (
+        <div>
+          <dt className="text-muted">
+            {t("admin.operations.orders.internalTrackingNumber")}
+          </dt>
+          <dd className="break-all font-mono text-body">
+            {shipment.internalTrackingNumber}
+          </dd>
+        </div>
+      )}
+      {shipment.shipmentId && (
+        <div>
+          <dt className="text-muted">
+            {t("admin.operations.orders.shipmentId")}
+          </dt>
+          <dd className="break-all font-mono text-body">
+            {shipment.shipmentId}
+          </dd>
+        </div>
+      )}
+    </dl>
   );
 }
 
@@ -73,13 +115,21 @@ function PackageBlock({ pkg }: { pkg: SellerPackage }) {
   const t = useTranslations();
   return (
     <div className="rounded-lg border border-border-subtle bg-surface">
-      <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-3 py-1.5">
-        <Link
-          href={`/accounts/users/${pkg.seller.id}`}
-          className="truncate text-sm font-medium text-primary-600 hover:underline"
-        >
-          {pkg.seller.displayName}
-        </Link>
+      <div className="flex items-start justify-between gap-2 border-b border-border-subtle px-3 py-2">
+        <div className="min-w-0">
+          <Link
+            href={`/accounts/users/${pkg.seller.id}`}
+            className="block truncate text-sm font-medium text-primary-600 hover:underline"
+          >
+            {pkg.seller.displayName}
+          </Link>
+          <p className="break-all font-mono text-[11px] text-muted">
+            {t("admin.operations.orders.sellerId")}: {pkg.seller.id}
+          </p>
+          <p className="break-all font-mono text-[11px] text-muted">
+            {t("admin.operations.orders.packageId")}: {pkg.key}
+          </p>
+        </div>
         <span className="shrink-0 rounded bg-surface-alt px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted">
           {t("admin.operations.orders.sellerPackage")} ·{" "}
           {t("admin.operations.orders.itemCountUnit", {
@@ -103,9 +153,30 @@ function PackageBlock({ pkg }: { pkg: SellerPackage }) {
  * seller (satıcı paketi) with a per-seller subheader.
  */
 export function OrderGroupDetail({ row }: { row: OrderGroupRow }) {
+  const t = useTranslations();
+  const header = (
+    <dl className="grid gap-1 rounded border border-border-subtle bg-surface px-3 py-2 text-xs sm:grid-cols-2">
+      <div>
+        <dt className="text-muted">
+          {t("admin.operations.orders.groupNumber")}
+        </dt>
+        <dd className="break-all font-mono text-body">{row.displayNumber}</dd>
+      </div>
+      {row.checkoutGroupId && (
+        <div>
+          <dt className="text-muted">{t("admin.operations.orders.groupId")}</dt>
+          <dd className="break-all font-mono text-body">
+            {row.checkoutGroupId}
+          </dd>
+        </div>
+      )}
+    </dl>
+  );
+
   if (row.isMultiSeller) {
     return (
       <div className="space-y-2 bg-surface-alt/40 px-4 py-3">
+        {header}
         {row.packages.map((pkg) => (
           <PackageBlock key={pkg.key} pkg={pkg} />
         ))}
@@ -113,7 +184,8 @@ export function OrderGroupDetail({ row }: { row: OrderGroupRow }) {
     );
   }
   return (
-    <div className="bg-surface-alt/40 px-4 py-2">
+    <div className="space-y-2 bg-surface-alt/40 px-4 py-2">
+      {header}
       <div className="rounded-lg border border-border-subtle bg-surface">
         <div className="divide-y divide-border-subtle">
           {row.items.map((item) => (

@@ -152,7 +152,14 @@ export class AdminOrderService {
             },
             checkoutGroup: { select: { groupNumber: true } },
             // Kargo durumu + takip no — liste kolonu + expanded detayda paket kargosu.
-            shipment: { select: { status: true, trackingNumber: true } },
+            shipment: {
+              select: {
+                id: true,
+                status: true,
+                trackingNumber: true,
+                providerTrackingId: true,
+              },
+            },
             // Açık (aktif) iade talebi — "İade Sürecinde" rozeti için.
             refundRequests: {
               where: {
@@ -193,7 +200,12 @@ export class AdminOrderService {
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
         shipmentStatus: (o as any).shipment?.status ?? null,
-        shipmentTrackingNumber: (o as any).shipment?.trackingNumber ?? null,
+        shipmentId: (o as any).shipment?.id ?? null,
+        shipmentTrackingNumber:
+          (o as any).shipment?.providerTrackingId ??
+          (o as any).shipment?.trackingNumber ??
+          null,
+        internalTrackingNumber: (o as any).shipment?.trackingNumber ?? null,
         // Satıcı-paketi (OrderPackage) referansı — admin listede sepeti satıcı
         // bazında gruplayabilmek için (checkoutGroupId zaten ...o ile geliyor).
         packageId: o.packageId ?? null,

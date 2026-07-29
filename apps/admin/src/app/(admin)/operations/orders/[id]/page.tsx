@@ -43,7 +43,9 @@ export default function OrderDetailPage() {
       backHref="/operations/orders"
       emptyTitle={t("admin.operations.orders.notFound")}
       title={(order) =>
-        t("admin.operations.orders.detailTitle", { number: order.orderNumber })
+        t("admin.operations.orders.detailTitle", {
+          number: order.group?.groupNumber ?? order.orderNumber,
+        })
       }
       subtitle={(order) => new Date(order.createdAt).toLocaleString("tr-TR")}
       badge={(order) => {
@@ -101,7 +103,7 @@ export default function OrderDetailPage() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="space-y-6 lg:col-span-2">
                 <OrderInfoSection order={order} status={status} />
-                {order.group && order.group.isMultiItem ? (
+                {order.group ? (
                   <PackagesSection group={order.group} />
                 ) : (
                   <ProductSection order={order} />

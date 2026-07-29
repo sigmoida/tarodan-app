@@ -8,6 +8,7 @@
   },
   "include": [
     "prisma/seed.ts",
+    "prisma/seed-commerce.ts",
     "prisma/seed-media.ts",
     "prisma/seed-production.ts"
   ]

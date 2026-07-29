@@ -120,6 +120,7 @@ export const hasVisibleShipment = (order: Order): boolean =>
 
 export interface OrderGroup {
   key: string;
+  groupNumber: string;
   orders: Order[];
 }
 
@@ -174,9 +175,17 @@ export function groupOrders(orders: Order[]): OrderGroup[] {
         continue;
       }
       indexByGroup.set(groupKey, entries.length);
-      entries.push({ key: groupKey, orders: [order] });
+      entries.push({
+        key: groupKey,
+        groupNumber: order.groupNumber ?? groupKey,
+        orders: [order],
+      });
     } else {
-      entries.push({ key: order.id, orders: [order] });
+      entries.push({
+        key: order.id,
+        groupNumber: order.groupNumber ?? order.orderNumber,
+        orders: [order],
+      });
     }
   }
   return entries;

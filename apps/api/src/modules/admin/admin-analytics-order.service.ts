@@ -216,7 +216,15 @@ export class AdminAnalyticsOrderService {
           },
         },
         package: { select: { id: true, shippingCost: true } },
-        shipment: { select: { status: true } },
+        shipment: {
+          select: {
+            id: true,
+            provider: true,
+            status: true,
+            trackingNumber: true,
+            providerTrackingId: true,
+          },
+        },
       },
       orderBy: { createdAt: "asc" },
     });
@@ -229,6 +237,13 @@ export class AdminAnalyticsOrderService {
         sellerType: string | null;
       };
       shippingCost: number;
+      shipment: {
+        id: string;
+        provider: string;
+        status: ShipmentStatus;
+        trackingNumber: string | null;
+        providerTrackingId: string | null;
+      } | null;
       items: Array<{
         orderId: string;
         orderNumber: string;
@@ -257,9 +272,31 @@ export class AdminAnalyticsOrderService {
             sellerType: (o.seller as any).sellerType ?? null,
           },
           shippingCost: Number(o.package?.shippingCost ?? 0),
+          shipment: o.shipment
+            ? {
+                id: o.shipment.id,
+                provider: o.shipment.provider,
+                status: o.shipment.status,
+                trackingNumber: o.shipment.trackingNumber,
+                providerTrackingId: o.shipment.providerTrackingId,
+              }
+            : null,
           items: [],
         };
         pkgMap.set(key, pkg);
+      }
+      if (
+        o.shipment &&
+        (!pkg.shipment ||
+          (!pkg.shipment.providerTrackingId && !!o.shipment.providerTrackingId))
+      ) {
+        pkg.shipment = {
+          id: o.shipment.id,
+          provider: o.shipment.provider,
+          status: o.shipment.status,
+          trackingNumber: o.shipment.trackingNumber,
+          providerTrackingId: o.shipment.providerTrackingId,
+        };
       }
       const img = o.product?.images?.[0];
       pkg.items.push({

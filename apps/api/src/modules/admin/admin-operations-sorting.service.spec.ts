@@ -38,6 +38,79 @@ describe("admin operations list sorting", () => {
     );
   });
 
+  it("returns every checkout group as one complete admin row source", async () => {
+    const checkoutGroup = {
+      count: jest.fn().mockResolvedValue(1),
+      findMany: jest.fn().mockResolvedValue([{ id: "group-1" }]),
+    };
+    const order = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: "order-1",
+          orderNumber: "ORD-1",
+          checkoutGroupId: "group-1",
+          packageId: "package-1",
+          buyerId: "buyer-1",
+          sellerId: "seller-1",
+          productId: "product-1",
+          totalAmount: 130,
+          subtotal: 100,
+          commissionAmount: 10,
+          shippingAddress: {},
+          checkoutGroup: { groupNumber: "GRP-1" },
+          buyer: {
+            id: "buyer-1",
+            displayName: "Buyer",
+            email: "buyer@example.com",
+          },
+          seller: {
+            id: "seller-1",
+            displayName: "Seller",
+            email: "seller@example.com",
+          },
+          product: {
+            id: "product-1",
+            title: "Product",
+            images: [],
+          },
+          shipment: {
+            id: "shipment-1",
+            status: "shipped",
+            trackingNumber: "INTERNAL-1",
+            providerTrackingId: "SURAT-1",
+          },
+          refundRequests: [],
+          createdAt: new Date("2026-07-29T08:00:00.000Z"),
+        },
+      ]),
+    };
+    const service = new AdminOrderService(
+      { checkoutGroup, order } as any,
+      {} as any,
+      undefined as any,
+    );
+
+    const result = await service.getOrders({ page: 1, limit: 20 });
+
+    expect(result.data).toEqual([
+      expect.objectContaining({
+        id: "order-1",
+        checkoutGroupId: "group-1",
+        groupNumber: "GRP-1",
+        groupItemCount: 1,
+        packageId: "package-1",
+        shipmentId: "shipment-1",
+        shipmentTrackingNumber: "SURAT-1",
+        internalTrackingNumber: "INTERNAL-1",
+      }),
+    ]);
+    expect(order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { checkoutGroupId: { in: ["group-1"] } },
+      }),
+    );
+  });
+
   it("sorts trades by a scalar field", async () => {
     const trade = createDelegate();
     const service = new AdminTradeQueryService(

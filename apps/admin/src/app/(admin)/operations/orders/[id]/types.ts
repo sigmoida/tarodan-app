@@ -22,6 +22,13 @@ export interface OrderPackageView {
     sellerType?: string | null;
   };
   shippingCost: number;
+  shipment: {
+    id: string;
+    provider: string;
+    status: string;
+    trackingNumber: string | null;
+    providerTrackingId: string | null;
+  } | null;
   items: OrderPackageItem[];
 }
 

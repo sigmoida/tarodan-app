@@ -29,7 +29,11 @@ export function orderRowMenu(
         onClick: () => onView(o),
       },
     ];
-    if (canEditStatus && !o.isGroup && canManuallyUpdateOrderStatus(o.status)) {
+    if (
+      canEditStatus &&
+      o.itemCount === 1 &&
+      canManuallyUpdateOrderStatus(o.status)
+    ) {
       items.push({
         label: t("admin.operations.orders.updateStatus"),
         icon: PencilSquareIcon,

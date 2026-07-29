@@ -14,7 +14,9 @@ export interface Order {
   subtotal: number;
   commission: number;
   shipmentStatus?: string | null;
+  shipmentId?: string | null;
   shipmentTrackingNumber?: string | null;
+  internalTrackingNumber?: string | null;
   buyer: { id: string; displayName: string };
   seller: { id: string; displayName: string };
   product?: { id: string; title: string };
@@ -42,7 +44,9 @@ export interface OrderLineItem {
   status: string;
   totalAmount: number;
   shipmentStatus?: string | null;
+  shipmentId?: string | null;
   trackingNumber?: string | null;
+  internalTrackingNumber?: string | null;
   product?: { id: string; title: string };
   productImageUrl?: string | null;
   seller: { id: string; displayName: string };
@@ -104,7 +108,9 @@ export function mapOrders(raw: any[], t: T): Order[] {
     subtotal: Number(o.subtotal ?? 0),
     commission: Number(o.commissionAmount || 0),
     shipmentStatus: o.shipmentStatus ?? null,
+    shipmentId: o.shipmentId ?? null,
     shipmentTrackingNumber: o.shipmentTrackingNumber ?? null,
+    internalTrackingNumber: o.internalTrackingNumber ?? null,
     buyer: o.buyer || {
       id: "",
       displayName: t("admin.operations.orders.buyer"),
@@ -137,7 +143,9 @@ function toLineItem(o: Order): OrderLineItem {
     status: o.status,
     totalAmount: o.totalAmount,
     shipmentStatus: o.shipmentStatus,
+    shipmentId: o.shipmentId ?? null,
     trackingNumber: o.shipmentTrackingNumber ?? null,
+    internalTrackingNumber: o.internalTrackingNumber ?? null,
     product: o.product,
     productImageUrl: o.productImageUrl,
     seller: o.seller,
@@ -202,7 +210,7 @@ export function useOrderGroups(orders: Order[]): OrderGroupRow[] {
       // True group size from the backend (may exceed members present on this page
       // when a group straddles a page boundary); standalone orders → 1.
       const itemCount = head.checkoutGroupId ? head.groupItemCount : 1;
-      const isGroup = itemCount > 1;
+      const isGroup = !!head.checkoutGroupId;
 
       return {
         id: isGroup ? `grp:${head.checkoutGroupId}` : head.id,
@@ -212,7 +220,8 @@ export function useOrderGroups(orders: Order[]): OrderGroupRow[] {
         checkoutGroupId: head.checkoutGroupId ?? null,
         // Cati (checkout group) numarasi her satirda gorunur (tekli de dahil);
         // grup numarasi yoksa (eski veri) order numarasina duser.
-        displayNumber: head.groupNumber ?? head.orderNumber,
+        displayNumber:
+          head.groupNumber ?? head.checkoutGroupId ?? head.orderNumber,
         buyer: head.buyer,
         createdAt: head.createdAt,
         itemCount,

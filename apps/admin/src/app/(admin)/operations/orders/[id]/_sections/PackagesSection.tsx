@@ -46,6 +46,18 @@ function PackageItem({ item }: { item: OrderPackageItem }) {
             </span>
           )}
         </div>
+        <dl className="mt-1 grid gap-x-3 text-[11px] text-muted sm:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="inline">{t("admin.operations.orders.orderId")}: </dt>
+            <dd className="inline break-all font-mono">{item.orderId}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="inline">
+              {t("admin.operations.orders.productId")}:{" "}
+            </dt>
+            <dd className="inline break-all font-mono">{item.productId}</dd>
+          </div>
+        </dl>
       </div>
       <Badge status={item.status} config={orderStatusConfig} />
       <span className="w-24 shrink-0 text-right text-sm font-medium tabular-nums text-body">
@@ -65,32 +77,79 @@ function PackageBlock({
   const t = useTranslations();
   return (
     <div className="rounded-lg border border-border-subtle">
-      {showHeader && (
-        <div className="flex items-center justify-between gap-2 border-b border-border-subtle bg-surface-alt/50 px-4 py-2">
+      <div className="flex items-start justify-between gap-3 border-b border-border-subtle bg-surface-alt/50 px-4 py-2">
+        <div className="min-w-0">
           <Link
             href={`/accounts/users/${pkg.seller.id}`}
-            className="truncate font-medium text-primary-600 hover:underline"
+            className="block truncate font-medium text-primary-600 hover:underline"
           >
             {pkg.seller.displayName}
           </Link>
-          <span className="shrink-0 text-xs text-muted">
-            {t("admin.operations.orders.sellerPackage")}
-            {pkg.shippingCost > 0 && (
-              <>
-                {" · "}
-                {t("admin.operations.orders.packageShipping", {
-                  amount: fmtTry(pkg.shippingCost),
-                })}
-              </>
+          <dl className="mt-1 space-y-0.5 text-[11px] text-muted">
+            <div>
+              <dt className="inline">
+                {t("admin.operations.orders.sellerId")}:{" "}
+              </dt>
+              <dd className="inline break-all font-mono">{pkg.seller.id}</dd>
+            </div>
+            {pkg.packageId && (
+              <div>
+                <dt className="inline">
+                  {t("admin.operations.orders.packageId")}:{" "}
+                </dt>
+                <dd className="inline break-all font-mono">{pkg.packageId}</dd>
+              </div>
             )}
-          </span>
+          </dl>
         </div>
-      )}
+        <span className="shrink-0 text-right text-xs text-muted">
+          {showHeader && (
+            <>
+              {t("admin.operations.orders.sellerPackage")}
+              <br />
+            </>
+          )}
+          {pkg.shippingCost > 0 &&
+            t("admin.operations.orders.packageShipping", {
+              amount: fmtTry(pkg.shippingCost),
+            })}
+        </span>
+      </div>
       <div className="divide-y divide-border-subtle px-4">
         {pkg.items.map((item) => (
           <PackageItem key={item.orderId} item={item} />
         ))}
       </div>
+      {pkg.shipment && (
+        <dl className="grid gap-2 border-t border-border-subtle px-4 py-2 text-xs sm:grid-cols-3">
+          <div>
+            <dt className="text-muted">
+              {t("admin.operations.common.trackingNumber")}
+            </dt>
+            <dd className="break-all font-mono text-body">
+              {pkg.shipment.providerTrackingId ??
+                pkg.shipment.trackingNumber ??
+                "-"}
+            </dd>
+          </div>
+          {pkg.shipment.trackingNumber && (
+            <div>
+              <dt className="text-muted">
+                {t("admin.operations.orders.internalTrackingNumber")}
+              </dt>
+              <dd className="break-all font-mono text-body">
+                {pkg.shipment.trackingNumber}
+              </dd>
+            </div>
+          )}
+          <div>
+            <dt className="text-muted">
+              {t("admin.operations.orders.shipmentId")}
+            </dt>
+            <dd className="break-all font-mono text-body">{pkg.shipment.id}</dd>
+          </div>
+        </dl>
+      )}
     </div>
   );
 }
@@ -105,6 +164,22 @@ export function PackagesSection({ group }: { group: OrderGroup }) {
   return (
     <SectionCard title={t("admin.operations.orders.packagesTitle")}>
       <div className="space-y-3">
+        <dl className="grid gap-2 rounded border border-border-subtle bg-surface-alt/50 px-4 py-2 text-xs sm:grid-cols-2">
+          <div>
+            <dt className="text-muted">
+              {t("admin.operations.orders.groupNumber")}
+            </dt>
+            <dd className="break-all font-mono text-body">
+              {group.groupNumber ?? group.id}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted">
+              {t("admin.operations.orders.groupId")}
+            </dt>
+            <dd className="break-all font-mono text-body">{group.id}</dd>
+          </div>
+        </dl>
         {group.packages.map((pkg) => (
           <PackageBlock
             key={pkg.packageId ?? pkg.seller.id}

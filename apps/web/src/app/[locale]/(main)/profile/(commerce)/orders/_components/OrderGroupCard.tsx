@@ -129,7 +129,6 @@ export default function OrderGroupCard({
   const isMulti = group.orders.length > 1;
   const total = group.orders.reduce((sum, o) => sum + orderAmount(o), 0);
   const date = group.orders[0]?.createdAt;
-  const groupNumber = group.orders[0]?.groupNumber;
   const packages = groupByPackage(group.orders);
   const multiPackage = packages.length > 1;
 
@@ -141,9 +140,9 @@ export default function OrderGroupCard({
           <>
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                {groupNumber && (
-                  <p className="text-sm text-muted">#{groupNumber}</p>
-                )}
+                <p className="font-mono text-sm text-muted">
+                  {group.groupNumber}
+                </p>
                 <p className="text-sm text-subtle">{formatDate(date)}</p>
               </div>
               <Badge variant="outline" size="sm">
@@ -188,9 +187,7 @@ export default function OrderGroupCard({
           </>
         ) : (
           <div>
-            {groupNumber && (
-              <p className="text-sm text-muted">#{groupNumber}</p>
-            )}
+            <p className="font-mono text-sm text-muted">{group.groupNumber}</p>
             <p className="text-sm text-subtle">{formatDate(date)}</p>
           </div>
         )}

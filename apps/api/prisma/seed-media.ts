@@ -124,14 +124,24 @@ async function main(): Promise<void> {
     throw new Error("S3 storage is not available for seed media sync.");
   }
 
-  let productCount = 0;
+  let productImageCount = 0;
   const products = await prisma.product.findMany({
-    where: { images: { none: {} } },
-    select: { id: true, slug: true },
+    select: {
+      id: true,
+      slug: true,
+      images: { select: { id: true }, orderBy: { sortOrder: "asc" } },
+    },
   });
   const productTasks = products.flatMap((product) => {
     const base = resolveSeedProductAssetBase(product.slug, productBases);
-    return base ? [{ ...product, base }] : [];
+    const missingCount = Math.max(0, 3 - product.images.length);
+    return base
+      ? Array.from({ length: missingCount }, (_, offset) => ({
+          id: product.id,
+          base,
+          sortOrder: product.images.length + offset,
+        }))
+      : [];
   });
 
   await mapWithConcurrency(productTasks, 6, async (product) => {
@@ -158,10 +168,10 @@ async function main(): Promise<void> {
         productId: product.id,
         cardKey: card.key,
         detailKey: detail.key,
-        sortOrder: 0,
+        sortOrder: product.sortOrder,
       },
     });
-    productCount += 1;
+    productImageCount += 1;
   });
 
   let collectionCount = 0;
@@ -215,7 +225,7 @@ async function main(): Promise<void> {
   });
 
   console.log(
-    `Seed media sync complete: ${productCount} products, ${collectionCount} collections, ${avatarCount} avatars added.`,
+    `Seed media sync complete: ${productImageCount} product images, ${collectionCount} collections, ${avatarCount} avatars added.`,
   );
 }
 

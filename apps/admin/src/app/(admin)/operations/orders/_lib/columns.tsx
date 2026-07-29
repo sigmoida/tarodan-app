@@ -34,7 +34,7 @@ export function orderColumns({
 }: OrderColumnProps) {
   return [
     col.custom<OrderGroupRow>(
-      t("admin.operations.orders.orderNumber"),
+      t("admin.operations.orders.groupNumber"),
       (o) => {
         const open = expandedId === o.id;
         return (
@@ -78,7 +78,7 @@ export function orderColumns({
     col.custom<OrderGroupRow>(
       t("common.status"),
       (o) =>
-        o.isGroup ? (
+        o.itemCount > 1 ? (
           <Badge
             variant={o.groupStatus === "done" ? "success" : "default"}
             size="sm"
@@ -211,7 +211,7 @@ export function orderColumns({
       { sortKey: "commissionAmount", sortType: "number" },
     ),
     col.badge<OrderGroupRow>(t("admin.operations.orders.cargoStatus"), (o) =>
-      o.isGroup || !o.shipmentStatus ? (
+      o.itemCount > 1 || !o.shipmentStatus ? (
         <span className="text-subtle">—</span>
       ) : (
         <Badge status={o.shipmentStatus} config={shipmentStatusConfig} />

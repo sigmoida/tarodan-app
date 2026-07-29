@@ -18,6 +18,7 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
   const makeService = (over: {
     orderUnique?: any;
     packageOrders?: any[];
+    orderPackage?: any;
     existingShipment?: any;
   }) => {
     const captured: any = {
@@ -35,6 +36,11 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
           .mockImplementation(({ where }: any) =>
             Promise.resolve(where?.packageId ? (over.packageOrders ?? []) : []),
           ),
+      },
+      orderPackage: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(over.orderPackage ?? { billableDesi: 3 }),
       },
       shipment: {
         findFirst: jest.fn().mockResolvedValue(over.existingShipment ?? null),
@@ -106,6 +112,7 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     expect(captured.barcodeCall.payload.OzelKargoTakipNo).toBe("ORD-1");
     // toplam adet (2+1) + birleşik içerik
     expect(captured.barcodeCall.payload.Adet).toBe(3);
+    expect(captured.barcodeCall.payload.BirimDesi).toBe(3);
     expect(captured.barcodeCall.payload.SahisBirim).toContain("A");
     expect(captured.barcodeCall.payload.SahisBirim).toContain("B");
   });
