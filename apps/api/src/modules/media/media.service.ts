@@ -1,8 +1,15 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { v4 as uuidv4 } from 'uuid';
-import { MembershipService } from '../membership/membership.service';
-import { StorageService, UploadOptions as StorageUploadOptions } from '../storage/storage.service';
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { v4 as uuidv4 } from "uuid";
+import { MembershipService } from "../membership/membership.service";
+import {
+  StorageService,
+  UploadOptions as StorageUploadOptions,
+} from "../storage/storage.service";
+import {
+  configureSharpSafety,
+  isBlockedSharpMimeType,
+} from "../../common/image/sharp-safety";
 
 // Sharp is optional - image resizing will be skipped if not available.
 // Yükleme hatası SESSİZCE yutulmasın: staging'de imaj sharp'sız çıktığında tek
@@ -10,7 +17,7 @@ import { StorageService, UploadOptions as StorageUploadOptions } from '../storag
 let sharp: any;
 let sharpLoadError: string | null = null;
 try {
-  sharp = require('sharp');
+  sharp = configureSharpSafety(require("sharp"));
 } catch (e: any) {
   sharp = null;
   sharpLoadError = e?.message ?? String(e);
@@ -20,14 +27,14 @@ try {
 }
 
 export interface UploadOptions {
-  bucket?: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets';
+  bucket?: "products" | "avatars" | "documents" | "collections" | "tickets";
   folder?: string;
   maxSize?: number;
   allowedTypes?: string[];
   resize?: {
     width?: number;
     height?: number;
-    fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+    fit?: "cover" | "contain" | "fill" | "inside" | "outside";
   };
   generateThumbnail?: boolean;
   entityType?: string;
@@ -46,7 +53,9 @@ export interface UploadResult {
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
-  private readonly defaultBucket: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets' = 'products';
+  private readonly defaultBucket:
+    "products" | "avatars" | "documents" | "collections" | "tickets" =
+    "products";
 
   constructor(
     private configService: ConfigService,
@@ -61,9 +70,9 @@ export class MediaService {
   ): Promise<UploadResult> {
     const {
       bucket = this.defaultBucket,
-      folder = 'uploads',
+      folder = "uploads",
       maxSize = 10 * 1024 * 1024, // 10MB default
-      allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+      allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"],
       resize,
       generateThumbnail = false,
       entityType,
@@ -73,28 +82,28 @@ export class MediaService {
     // Validate file size
     if (file.size > maxSize) {
       throw new BadRequestException(
-        `File size exceeds maximum allowed (${maxSize / 1024 / 1024}MB)`
+        `File size exceeds maximum allowed (${maxSize / 1024 / 1024}MB)`,
       );
     }
 
     // Validate file type
     if (!allowedTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        `File type '${file.mimetype}' is not allowed`
+        `File type '${file.mimetype}' is not allowed`,
       );
     }
 
     // Generate unique filename
-    const ext = file.originalname.split('.').pop();
+    const ext = file.originalname.split(".").pop();
     const filename = `${uuidv4()}.${ext}`;
 
     try {
       let buffer = file.buffer;
 
       // Process image if resize options provided and sharp is available
-      if (resize && file.mimetype.startsWith('image/') && sharp) {
+      if (resize && file.mimetype.startsWith("image/") && sharp) {
         buffer = await sharp(buffer)
-          .resize(resize.width, resize.height, { fit: resize.fit || 'cover' })
+          .resize(resize.width, resize.height, { fit: resize.fit || "cover" })
           .toBuffer();
       }
 
@@ -127,14 +136,16 @@ export class MediaService {
           3600, // 1 hour
         );
       } catch (err: any) {
-        this.logger.warn(`Presigned URL generation failed for ${uploadResult.key}: ${err.message}`);
+        this.logger.warn(
+          `Presigned URL generation failed for ${uploadResult.key}: ${err.message}`,
+        );
         // Fallback: keep url undefined — frontend should handle this gracefully
       }
 
       // Generate thumbnail if requested and sharp is available
-      if (generateThumbnail && file.mimetype.startsWith('image/') && sharp) {
+      if (generateThumbnail && file.mimetype.startsWith("image/") && sharp) {
         const thumbBuffer = await sharp(file.buffer)
-          .resize(200, 200, { fit: 'cover' })
+          .resize(200, 200, { fit: "cover" })
           .toBuffer();
 
         const thumbFilename = `thumb_${filename}`;
@@ -158,7 +169,7 @@ export class MediaService {
       return result;
     } catch (error: any) {
       this.logger.error(`Upload failed: ${error.message}`);
-      throw new BadRequestException('File upload failed');
+      throw new BadRequestException("File upload failed");
     }
   }
 
@@ -167,34 +178,42 @@ export class MediaService {
     options: UploadOptions = {},
     uploaderId?: string,
   ): Promise<UploadResult[]> {
-    return Promise.all(files.map((file) => this.upload(file, options, uploaderId)));
+    return Promise.all(
+      files.map((file) => this.upload(file, options, uploaderId)),
+    );
   }
 
-  async delete(key: string, bucket: string = this.defaultBucket): Promise<void> {
+  async delete(
+    key: string,
+    bucket: string = this.defaultBucket,
+  ): Promise<void> {
     try {
       await this.storageService.deleteFile(bucket, key);
       this.logger.log(`File deleted: ${key}`);
     } catch (error: any) {
       this.logger.error(`Delete failed: ${error.message}`);
-      throw new BadRequestException('File deletion failed');
+      throw new BadRequestException("File deletion failed");
     }
   }
 
-  async deleteMultiple(keys: string[], bucket: string = this.defaultBucket): Promise<void> {
+  async deleteMultiple(
+    keys: string[],
+    bucket: string = this.defaultBucket,
+  ): Promise<void> {
     try {
-      const files = keys.map(key => ({ bucket, key }));
+      const files = keys.map((key) => ({ bucket, key }));
       await this.storageService.deleteFiles(files);
       this.logger.log(`Files deleted: ${keys.length} items`);
     } catch (error: any) {
       this.logger.error(`Bulk delete failed: ${error.message}`);
-      throw new BadRequestException('Bulk file deletion failed');
+      throw new BadRequestException("Bulk file deletion failed");
     }
   }
 
   async getPresignedUrl(
     key: string,
     bucket: string = this.defaultBucket,
-    expiry: number = 3600
+    expiry: number = 3600,
   ): Promise<string> {
     return this.storageService.getPresignedDownloadUrl(bucket, key, expiry);
   }
@@ -202,7 +221,7 @@ export class MediaService {
   async getPresignedUploadUrl(
     key: string,
     bucket: string = this.defaultBucket,
-    expiry: number = 3600
+    expiry: number = 3600,
   ): Promise<string> {
     return this.storageService.getPresignedUploadUrl(bucket, key, expiry);
   }
@@ -213,16 +232,16 @@ export class MediaService {
       folder?: string;
       filename?: string;
       mimeType?: string;
-      bucket?: 'products' | 'avatars' | 'documents' | 'collections' | 'tickets';
+      bucket?: "products" | "avatars" | "documents" | "collections" | "tickets";
       entityType?: string;
       entityId?: string;
     } = {},
     uploaderId?: string,
   ): Promise<UploadResult> {
     const bucket = options.bucket || this.defaultBucket;
-    const folder = options.folder || 'uploads';
+    const folder = options.folder || "uploads";
     const filename = options.filename || `${uuidv4()}.jpg`;
-    const mimeType = options.mimeType || 'image/jpeg';
+    const mimeType = options.mimeType || "image/jpeg";
 
     try {
       const uploadResult = await this.storageService.uploadFile(
@@ -246,7 +265,7 @@ export class MediaService {
       };
     } catch (error: any) {
       this.logger.error(`Buffer upload failed: ${error.message}`);
-      throw new BadRequestException('Buffer upload failed');
+      throw new BadRequestException("Buffer upload failed");
     }
   }
 
@@ -254,39 +273,38 @@ export class MediaService {
     sourceKey: string,
     destKey: string,
     sourceBucket: string = this.defaultBucket,
-    destBucket: string = this.defaultBucket
+    destBucket: string = this.defaultBucket,
   ): Promise<void> {
     try {
       // S3'te copy işlemi için önce source'u indir, sonra yeni yere yükle
-      const sourcePresignedUrl = await this.storageService.getPresignedDownloadUrl(
-        sourceBucket,
-        sourceKey,
-        3600
-      );
-      
+      const sourcePresignedUrl =
+        await this.storageService.getPresignedDownloadUrl(
+          sourceBucket,
+          sourceKey,
+          3600,
+        );
+
       // Fetch source file
       const response = await fetch(sourcePresignedUrl);
       const buffer = Buffer.from(await response.arrayBuffer());
-      
+
       // Get file info from database to get mimeType
       // For now, we'll try to infer from key or use default
-      const mimeType = 'application/octet-stream'; // Default
-      
+      const mimeType = "application/octet-stream"; // Default
+
       // Upload to destination
-      await this.storageService.uploadFile(
-        buffer,
-        {
-          bucket: destBucket as 'products' | 'avatars' | 'documents' | 'collections' | 'tickets',
-          folder: destKey.substring(0, destKey.lastIndexOf('/')),
-          filename: destKey.substring(destKey.lastIndexOf('/') + 1),
-          mimeType,
-        }
-      );
-      
+      await this.storageService.uploadFile(buffer, {
+        bucket: destBucket as
+          "products" | "avatars" | "documents" | "collections" | "tickets",
+        folder: destKey.substring(0, destKey.lastIndexOf("/")),
+        filename: destKey.substring(destKey.lastIndexOf("/") + 1),
+        mimeType,
+      });
+
       this.logger.log(`File copied from ${sourceKey} to ${destKey}`);
     } catch (error: any) {
       this.logger.error(`Copy failed: ${error.message}`);
-      throw new BadRequestException('File copy failed');
+      throw new BadRequestException("File copy failed");
     }
   }
 
@@ -300,49 +318,62 @@ export class MediaService {
   ): Promise<{ cardKey: string; detailKey: string }> {
     if (!sharp) {
       this.logger.error(
-        `sharp unavailable (load error: ${sharpLoadError ?? 'unknown'}) — image upload rejected`,
+        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image upload rejected`,
       );
-      throw new BadRequestException('Image processing (sharp) is not available');
+      throw new BadRequestException(
+        "Image processing (sharp) is not available",
+      );
     }
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.');
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
+    if (
+      !allowedTypes.includes(file.mimetype) ||
+      isBlockedSharpMimeType(file.mimetype)
+    ) {
+      throw new BadRequestException(
+        "Geçersiz dosya tipi. Sadece JPEG, PNG ve WebP desteklenir.",
+      );
     }
     if (file.size > 10 * 1024 * 1024) {
-      throw new BadRequestException('Dosya boyutu çok büyük (max 10MB)');
+      throw new BadRequestException("Dosya boyutu çok büyük (max 10MB)");
     }
 
     const baseId = uuidv4();
-    const folder = `product-images/${productId || 'temp'}`;
+    const folder = `product-images/${productId || "temp"}`;
     const cacheOpts = {
-      contentType: 'image/webp' as const,
-      cacheControl: 'public, max-age=31536000, immutable',
+      contentType: "image/webp" as const,
+      cacheControl: "public, max-age=31536000, immutable",
       skipMediaFile: true,
     };
 
     const cardBuffer = await sharp(file.buffer)
-      .resize(500, 500, { fit: 'cover' })
+      .resize(500, 500, { fit: "cover" })
       .webp({ quality: 85 })
       .toBuffer();
 
     const detailBuffer = await sharp(file.buffer)
-      .resize(1200, 1200, { fit: 'inside' })
+      .resize(1200, 1200, { fit: "inside" })
       .webp({ quality: 90 })
       .toBuffer();
 
     const cardResult = await this.storageService.uploadFile(cardBuffer, {
-      bucket: 'products',
+      bucket: "products",
       folder,
       filename: `${baseId}-card.webp`,
-      mimeType: 'image/webp',
+      mimeType: "image/webp",
       ...cacheOpts,
     });
 
     const detailResult = await this.storageService.uploadFile(detailBuffer, {
-      bucket: 'products',
+      bucket: "products",
       folder,
       filename: `${baseId}-detail.webp`,
-      mimeType: 'image/webp',
+      mimeType: "image/webp",
       ...cacheOpts,
     });
 
@@ -352,55 +383,80 @@ export class MediaService {
   /**
    * Upload collection cover image (1200x600 WebP). Returns S3 key. Skips MediaFile.
    */
-  async uploadCollectionCover(file: Express.Multer.File): Promise<{ key: string }> {
+  async uploadCollectionCover(
+    file: Express.Multer.File,
+  ): Promise<{ key: string }> {
     if (!sharp) {
       this.logger.error(
-        `sharp unavailable (load error: ${sharpLoadError ?? 'unknown'}) — image upload rejected`,
+        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image upload rejected`,
       );
-      throw new BadRequestException('Image processing (sharp) is not available');
+      throw new BadRequestException(
+        "Image processing (sharp) is not available",
+      );
     }
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.');
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
+    if (
+      !allowedTypes.includes(file.mimetype) ||
+      isBlockedSharpMimeType(file.mimetype)
+    ) {
+      throw new BadRequestException(
+        "Geçersiz dosya tipi. Sadece JPEG, PNG ve WebP desteklenir.",
+      );
     }
     if (file.size > 10 * 1024 * 1024) {
-      throw new BadRequestException('Dosya boyutu çok büyük (max 10MB)');
+      throw new BadRequestException("Dosya boyutu çok büyük (max 10MB)");
     }
 
     const buffer = await sharp(file.buffer)
-      .resize(1200, 600, { fit: 'cover' })
+      .resize(1200, 600, { fit: "cover" })
       .webp({ quality: 85 })
       .toBuffer();
 
     const result = await this.storageService.uploadFile(buffer, {
-      bucket: 'collections',
-      folder: 'covers',
+      bucket: "collections",
+      folder: "covers",
       filename: `${uuidv4()}.webp`,
-      mimeType: 'image/webp',
-      contentType: 'image/webp',
-      cacheControl: 'public, max-age=31536000, immutable',
+      mimeType: "image/webp",
+      contentType: "image/webp",
+      cacheControl: "public, max-age=31536000, immutable",
       skipMediaFile: true,
     });
 
     return { key: result.key };
   }
 
-  async getFileInfo(key: string, bucket: string = this.defaultBucket): Promise<{ size: number; lastModified: Date; contentType: string }> {
+  async getFileInfo(
+    key: string,
+    bucket: string = this.defaultBucket,
+  ): Promise<{ size: number; lastModified: Date; contentType: string }> {
     // S3'te file info için presigned URL ile HEAD request yapabiliriz
     // Veya database'den bilgi alabiliriz
     // Şimdilik basit bir implementasyon
     try {
-      const presignedUrl = await this.storageService.getPresignedDownloadUrl(bucket, key, 60);
-      const response = await fetch(presignedUrl, { method: 'HEAD' });
-      
+      const presignedUrl = await this.storageService.getPresignedDownloadUrl(
+        bucket,
+        key,
+        60,
+      );
+      const response = await fetch(presignedUrl, { method: "HEAD" });
+
       return {
-        size: parseInt(response.headers.get('content-length') || '0', 10),
-        lastModified: new Date(response.headers.get('last-modified') || Date.now()),
-        contentType: response.headers.get('content-type') || 'application/octet-stream',
+        size: parseInt(response.headers.get("content-length") || "0", 10),
+        lastModified: new Date(
+          response.headers.get("last-modified") || Date.now(),
+        ),
+        contentType:
+          response.headers.get("content-type") || "application/octet-stream",
       };
     } catch (error: any) {
       this.logger.error(`Get file info failed: ${error.message}`);
-      throw new BadRequestException('Get file info failed');
+      throw new BadRequestException("Get file info failed");
     }
   }
 }

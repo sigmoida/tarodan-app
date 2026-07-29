@@ -105,8 +105,8 @@ export class SearchCommonService implements OnModuleInit {
   private readonly logger = new Logger(SearchCommonService.name);
   // Public: alt servisler this.common.client ile paylaşılan ES bağlantısına erişir.
   client: Client;
-  private readonly PRODUCTS_INDEX = "products";
-  private readonly COLLECTIONS_INDEX = "collections";
+  private readonly PRODUCTS_INDEX: string;
+  private readonly COLLECTIONS_INDEX: string;
   private esAvailable = false;
   // Re-entrancy guard for collections reindex — TEK örnek Common'da tutulur ki
   // eşzamanlı reindex koruması alt servisler arasında paylaşılsın.
@@ -116,7 +116,21 @@ export class SearchCommonService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
-  ) {}
+  ) {
+    const configuredPrefix = this.configService
+      .get<string>("ELASTICSEARCH_INDEX_PREFIX")
+      ?.trim();
+    const deploymentPrefix = this.configService.get<string>("APP_ENV")?.trim();
+    const prefix = (configuredPrefix || deploymentPrefix || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    // Local/test keeps the legacy names. Staging and production are isolated by
+    // APP_ENV even when both deployments point at the same Elasticsearch cluster.
+    this.PRODUCTS_INDEX = prefix ? `${prefix}-products` : "products";
+    this.COLLECTIONS_INDEX = prefix ? `${prefix}-collections` : "collections";
+  }
 
   get productsIndex(): string {
     return this.PRODUCTS_INDEX;

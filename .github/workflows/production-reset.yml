@@ -1,0 +1,226 @@
+name: Production Database Reset
+
+# This workflow is intentionally separate from Release Production. A merge or
+# deploy must never erase production data. Run it only during the pre-launch
+# maintenance window, while the storefront lock is enabled.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type RESET_PRODUCTION exactly"
+        required: true
+        type: string
+      dry_run:
+        description: "Validate containers, environment and backup access only"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    name: Backup, reset and verify empty production
+    if: ${{ inputs.confirm == 'RESET_PRODUCTION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - name: Resolve production application UUIDs
+        id: uuid
+        env:
+          UUIDS: ${{ secrets.COOLIFY_PROD_UUIDS }}
+        run: |
+          set -euo pipefail
+          api="$(printf '%s' "$UUIDS" | cut -d, -f1 | xargs)"
+          web="$(printf '%s' "$UUIDS" | cut -d, -f2 | xargs)"
+          [ -n "$api" ] && [ -n "$web" ]
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+
+      - name: Guard, backup, reset and smoke test
+        uses: appleboy/ssh-action@v1
+        env:
+          RESET_CONFIRM: ${{ inputs.confirm }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+          API_UUID: ${{ steps.uuid.outputs.api }}
+          WEB_UUID: ${{ steps.uuid.outputs.web }}
+          BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.PRODUCTION_BOOTSTRAP_ADMIN_EMAIL }}
+          BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_BOOTSTRAP_ADMIN_PASSWORD }}
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USERNAME }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          command_timeout: 40m
+          envs: RESET_CONFIRM,DRY_RUN,API_UUID,WEB_UUID,BOOTSTRAP_ADMIN_EMAIL,BOOTSTRAP_ADMIN_PASSWORD
+          script: |
+            set -euo pipefail
+            log() { echo "[production-reset] $*"; }
+            die() { echo "[production-reset] REFUSED: $*" >&2; exit 1; }
+
+            [ "${RESET_CONFIRM:-}" = "RESET_PRODUCTION" ] || die "Exact confirmation is missing."
+            [ -n "${API_UUID:-}" ] || die "API UUID is missing."
+            [ -n "${WEB_UUID:-}" ] || die "Web UUID is missing."
+            [ -n "${BOOTSTRAP_ADMIN_EMAIL:-}" ] || die "PRODUCTION_BOOTSTRAP_ADMIN_EMAIL is missing."
+            [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ] || die "PRODUCTION_BOOTSTRAP_ADMIN_PASSWORD is missing."
+
+            find_app_container() {
+              uuid="$1"
+              cid="$(docker ps --filter "label=coolify.applicationId=$uuid" --format '{{.ID}}' | head -1)"
+              if [ -z "$cid" ]; then
+                cid="$(docker ps --filter "name=$uuid" --format '{{.ID}}' | head -1)"
+              fi
+              printf '%s' "$cid"
+            }
+
+            API_CID="$(find_app_container "$API_UUID")"
+            WEB_CID="$(find_app_container "$WEB_UUID")"
+            [ -n "$API_CID" ] || die "Production API container was not found."
+            [ -n "$WEB_CID" ] || die "Production web container was not found."
+            log "api container: $API_CID | web container: $WEB_CID"
+
+            env_from() {
+              docker exec "$1" printenv "$2" 2>/dev/null || true
+            }
+
+            NODE_ENV_VALUE="$(env_from "$API_CID" NODE_ENV)"
+            APP_ENV_VALUE="$(env_from "$API_CID" APP_ENV)"
+            PROCESS_ROLE_VALUE="$(env_from "$API_CID" PROCESS_ROLE)"
+            FRONTEND_URL_VALUE="$(env_from "$API_CID" FRONTEND_URL)"
+            API_URL_VALUE="$(env_from "$API_CID" API_URL)"
+            S3_PREFIX_VALUE="$(env_from "$API_CID" S3_ENV_PREFIX)"
+            ES_PREFIX_VALUE="$(env_from "$API_CID" ELASTICSEARCH_INDEX_PREFIX)"
+            PAYMENT_BYPASS_VALUE="$(env_from "$API_CID" PAYMENT_BYPASS)"
+            PAYTR_TEST_VALUE="$(env_from "$API_CID" PAYTR_TEST_MODE)"
+            PAYOUTS_DISABLED_VALUE="$(env_from "$API_CID" PAYOUTS_DISABLED)"
+            SITE_LOCKED_VALUE="$(env_from "$WEB_CID" SITE_LOCKED)"
+
+            [ "$NODE_ENV_VALUE" = "production" ] || die "NODE_ENV is not production."
+            [ "$APP_ENV_VALUE" = "production" ] || die "APP_ENV is not production."
+            case "$PROCESS_ROLE_VALUE" in all|web) : ;; *) die "API PROCESS_ROLE must be all or web." ;; esac
+            case "$FRONTEND_URL_VALUE" in
+              https://tarodan.shop|https://www.tarodan.shop) : ;;
+              *) die "FRONTEND_URL is not an exact production storefront URL." ;;
+            esac
+            case "$API_URL_VALUE" in
+              https://tarodan.shop/api|https://www.tarodan.shop/api|https://api.tarodan.shop/api) : ;;
+              *) die "API_URL is not an approved production API URL." ;;
+            esac
+            case "$FRONTEND_URL_VALUE $API_URL_VALUE" in
+              *staging*) die "A staging URL was found in the production container." ;;
+            esac
+            [ "$S3_PREFIX_VALUE" = "prod" ] || die "S3_ENV_PREFIX must be prod."
+            [ -z "$ES_PREFIX_VALUE" ] || [ "$ES_PREFIX_VALUE" = "production" ] || die "ELASTICSEARCH_INDEX_PREFIX must be production when set."
+            [ "$PAYMENT_BYPASS_VALUE" = "false" ] || die "PAYMENT_BYPASS must be false."
+            case "$PAYTR_TEST_VALUE" in false|0) : ;; *) die "PAYTR_TEST_MODE must be false." ;; esac
+            [ "$PAYOUTS_DISABLED_VALUE" = "false" ] || die "PAYOUTS_DISABLED must be false."
+            [ "$SITE_LOCKED_VALUE" = "true" ] || die "SITE_LOCKED=true is required during a production reset."
+
+            DB_URL="$(env_from "$API_CID" DATABASE_URL)"
+            [ -n "$DB_URL" ] || die "DATABASE_URL is missing."
+
+            DB_PARTS="$(docker exec "$API_CID" node -e '
+              const url = new URL(process.env.DATABASE_URL);
+              const values = [
+                url.hostname,
+                decodeURIComponent(url.username),
+                decodeURIComponent(url.password),
+                decodeURIComponent(url.pathname.replace(/^\\//, "")),
+              ];
+              for (const value of values) {
+                process.stdout.write(Buffer.from(value).toString("base64") + "\n");
+              }
+            ')"
+            PG_HOST="$(printf '%s\n' "$DB_PARTS" | sed -n '1p' | base64 -d)"
+            PG_USER="$(printf '%s\n' "$DB_PARTS" | sed -n '2p' | base64 -d)"
+            PG_PASS="$(printf '%s\n' "$DB_PARTS" | sed -n '3p' | base64 -d)"
+            PG_DB="$(printf '%s\n' "$DB_PARTS" | sed -n '4p' | base64 -d)"
+            [ -n "$PG_HOST" ] && [ -n "$PG_USER" ] && [ -n "$PG_DB" ] || die "DATABASE_URL could not be parsed."
+
+            PG_CID="$(docker ps --format '{{.ID}}\t{{.Names}}' | awk -v host="$PG_HOST" '$2 == host { print $1; exit }')"
+            if [ -z "$PG_CID" ]; then
+              PG_CID="$(docker ps --filter "name=$PG_HOST" --format '{{.ID}}' | head -1)"
+            fi
+            [ -n "$PG_CID" ] || die "PostgreSQL container '$PG_HOST' was not found; backup cannot be guaranteed."
+
+            log "All production guards passed."
+            if [ "${DRY_RUN:-1}" = "1" ]; then
+              log "DRY_RUN=1. No data or runtime state was changed."
+              exit 0
+            fi
+
+            TS="$(date -u +%Y%m%d-%H%M%S)"
+            BACKUP_DIR="$HOME/tarodan-production-backups"
+            BACKUP_FILE="$BACKUP_DIR/production-pre-reset-$TS.dump"
+            mkdir -p "$BACKUP_DIR"
+            chmod 700 "$BACKUP_DIR"
+            log "Creating mandatory PostgreSQL backup: $BACKUP_FILE"
+            docker exec -e PGPASSWORD="$PG_PASS" "$PG_CID" \
+              pg_dump -Fc --no-owner --no-acl -U "$PG_USER" "$PG_DB" > "$BACKUP_FILE"
+            chmod 600 "$BACKUP_FILE"
+            [ -s "$BACKUP_FILE" ] || die "Backup file is empty."
+            docker exec -i "$PG_CID" pg_restore -l < "$BACKUP_FILE" >/dev/null
+            sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
+            log "Backup verified: $BACKUP_FILE"
+
+            log "Resetting schema and applying migrations without demo seed..."
+            docker exec "$API_CID" sh -c \
+              'cd /app && npx prisma migrate reset --force --skip-seed --schema=prisma/schema.prisma'
+
+            log "Bootstrapping mandatory business references (no demo catalog/users/orders)..."
+            docker exec "$API_CID" sh -c \
+              'cd /app && node dist-seed/prisma/seed-production.js'
+
+            log "Creating the one operational super-admin account..."
+            docker exec \
+              -e BOOTSTRAP_ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" \
+              -e BOOTSTRAP_ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" \
+              "$API_CID" sh -c \
+              'cd /app && node dist-seed/prisma/bootstrap-production-admin.js'
+
+            log "Clearing the selected Redis DB and production-only search indices..."
+            docker exec "$API_CID" sh -c \
+              'cd /app && node dist-seed/maintenance/reset-production-runtime.js'
+
+            # Next's fetch cache can still contain pre-reset product/category
+            # responses. Remove it before restarting the storefront.
+            docker exec "$WEB_CID" sh -c \
+              'rm -rf /app/apps/web/.next/cache/* /app/.next/cache/*' || die "Web cache could not be cleared."
+
+            log "Restarting API and locked storefront..."
+            docker restart "$API_CID" "$WEB_CID" >/dev/null
+
+            ready=0
+            for attempt in $(seq 1 60); do
+              if docker exec "$API_CID" node -e \
+                'fetch(`http://127.0.0.1:${process.env.PORT || 3001}/api/health/ready`).then(r => { if (!r.ok) process.exit(1) })' \
+                >/dev/null 2>&1; then
+                ready=1
+                break
+              fi
+              sleep 2
+            done
+            [ "$ready" = "1" ] || die "API did not become ready after reset. Restore from $BACKUP_FILE."
+
+            log "Verifying ready API and an empty public catalog..."
+            docker exec "$API_CID" sh -c \
+              'cd /app && node dist-seed/maintenance/verify-production-empty.js'
+
+            web_ready=0
+            for attempt in $(seq 1 30); do
+              if docker exec "$WEB_CID" node -e \
+                'fetch(`http://127.0.0.1:${process.env.PORT || 3000}/coming-soon`).then(r => { if (!r.ok) process.exit(1) })' \
+                >/dev/null 2>&1; then
+                web_ready=1
+                break
+              fi
+              sleep 2
+            done
+            [ "$web_ready" = "1" ] || die "Locked storefront did not become healthy."
+
+            log "Reset complete. Production remains locked. Backup: $BACKUP_FILE"

@@ -11,12 +11,13 @@ import { CollectionResponseDto } from "./dto";
 import { CollectionCommonService } from "./collection-common.service";
 import * as https from "https";
 import * as http from "http";
+import { configureSharpSafety } from "../../common/image/sharp-safety";
 
 // Sharp is optional. Yükleme hatası sessizce yutulmasın (bkz. media.service —
 // staging'de sharp'sız imaj tek 400 ile teşhis edilemiyordu).
 let sharp: any;
 try {
-  sharp = require("sharp");
+  sharp = configureSharpSafety(require("sharp"));
 } catch (e: any) {
   sharp = null;
   // eslint-disable-next-line no-console

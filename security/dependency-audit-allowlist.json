@@ -12,6 +12,12 @@
       "package": "brace-expansion",
       "expires": "2026-10-31",
       "reason": "Build-time-only dependency of Sentry's webpack tooling; no attacker-controlled glob patterns are evaluated and forcing a transitive major would cross package compatibility boundaries."
+    },
+    {
+      "ghsa": "GHSA-f88m-g3jw-g9cj",
+      "package": "sharp",
+      "expires": "2026-08-31",
+      "reason": "Sharp 0.35 prebuilt binaries require x86-64-v2 but the current Coolify host is v1. The upstream workaround is active: GIF, TIFF and VIPS loaders are blocked globally, and transformed uploads reject blocked MIME types while the host upgrade or source build is prepared."
     }
   ]
 }
