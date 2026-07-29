@@ -38,6 +38,7 @@ export interface ScheduleItem {
   orderNumber: string;
   sellerId: string;
   sellerName: string;
+  sellerEmail: string;
   amount: number;
   releaseAt: string | null;
   createdAt: string;

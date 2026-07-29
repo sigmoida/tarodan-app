@@ -17,6 +17,7 @@ export const historyColumns = (t: T) => [
     (n) => ({
       name: n.user?.displayName || n.userId,
       secondary: n.user?.email,
+      href: n.userId ? `/accounts/users/${n.userId}` : undefined,
     }),
     { sortKey: "user.displayName", sortType: "text" },
   ),

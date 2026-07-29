@@ -37,7 +37,10 @@ export interface SellerInvoice {
   orderId: string | null;
   orderNumber: string | null;
   orderTotal: number | null;
+  sellerId: string | null;
   sellerName: string;
+  sellerEmail: string | null;
+  buyerId: string | null;
   buyerName: string;
   buyerEmail: string | null;
 }
@@ -141,7 +144,10 @@ export function mapSellerInvoices(raw: any[]): SellerInvoice[] {
     orderId: r.orderId,
     orderNumber: r.orderNumber,
     orderTotal: r.orderTotal != null ? Number(r.orderTotal) : null,
+    sellerId: r.sellerId,
     sellerName: r.sellerName,
+    sellerEmail: r.sellerEmail,
+    buyerId: r.buyerId,
     buyerName: r.buyerName,
     buyerEmail: r.buyerEmail,
   }));

@@ -11,6 +11,7 @@ export interface BoostPurchase {
     username: string;
     name: string;
     email: string;
+    avatarUrl?: string;
   } | null;
   product: { id: string; title: string; status: string } | null;
   packageName: string | null;

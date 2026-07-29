@@ -22,13 +22,15 @@ export function discountColumns(
       t("admin.marketing.discounts.discount"),
       (d) => (
         <div className="min-w-0">
-          <p className="truncate font-medium text-heading">{d.name}</p>
+          <p className="font-medium text-heading">{d.name}</p>
           {d.description && (
-            <p className="truncate text-xs text-muted">{d.description}</p>
+            <p className="mt-1 whitespace-normal break-words text-xs leading-5 text-muted">
+              {d.description}
+            </p>
           )}
         </div>
       ),
-      { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
+      { grow: 3, minWidth: 340, sortKey: "name", sortType: "text" },
     ),
     col.custom<Discount>(
       t("admin.marketing.discounts.code"),
@@ -83,10 +85,14 @@ export function discountColumns(
           : `${d.usedCount}`,
       { sortKey: "usedCount", sortType: "number" },
     ),
-    col.muted<Discount>(
+    col.custom<Discount>(
       t("common.date"),
-      (d) => `${fmtDate(d.startDate)} – ${fmtDate(d.endDate)}`,
-      { sortKey: "startDate", sortType: "date" },
+      (d) => (
+        <span className="whitespace-nowrap text-sm text-muted">
+          {fmtDate(d.startDate)} – {fmtDate(d.endDate)}
+        </span>
+      ),
+      { minWidth: 220, sortKey: "startDate", sortType: "date" },
     ),
     col.badge<Discount>(
       t("common.status"),

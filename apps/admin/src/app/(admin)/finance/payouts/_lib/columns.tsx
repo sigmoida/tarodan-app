@@ -8,8 +8,19 @@ import type { useTranslations } from "next-intl";
 type T = ReturnType<typeof useTranslations<never>>;
 
 export const scheduleColumns = (t: T) => [
-  col.text<ScheduleItem>(t("admin.finance.common.order"), "orderNumber"),
-  col.text<ScheduleItem>(t("admin.finance.common.seller"), "sellerName"),
+  col.text<ScheduleItem>(t("admin.finance.common.order"), "orderNumber", {
+    grow: 3,
+    minWidth: 260,
+  }),
+  col.user<ScheduleItem>(
+    t("admin.finance.common.seller"),
+    (row) => ({
+      name: row.sellerName,
+      secondary: row.sellerEmail,
+      href: `/accounts/users/${row.sellerId}`,
+    }),
+    { grow: 5, minWidth: 360, sortKey: "sellerName" },
+  ),
   col.money<ScheduleItem>(t("common.amount"), "amount"),
   col.date<ScheduleItem>(t("admin.finance.payouts.releaseDate"), "releaseAt"),
   col.badge<ScheduleItem>(
@@ -31,15 +42,16 @@ export function transactionColumns(
     col.text<PayoutTransaction>(
       t("admin.finance.common.order"),
       (row) => row.orderNumber,
-      { sortKey: "orderNumber" },
+      { grow: 3, minWidth: 260, sortKey: "orderNumber" },
     ),
     col.user<PayoutTransaction>(
       t("admin.finance.common.seller"),
       (row) => ({
         name: row.sellerName,
         secondary: row.sellerEmail,
+        href: `/accounts/users/${row.sellerId}`,
       }),
-      { sortKey: "sellerName" },
+      { grow: 5, minWidth: 360, sortKey: "sellerName" },
     ),
     col.money<PayoutTransaction>(t("common.amount"), "amount"),
     col.badge<PayoutTransaction>(

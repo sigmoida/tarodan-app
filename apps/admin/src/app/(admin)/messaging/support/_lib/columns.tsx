@@ -16,7 +16,7 @@ export const ticketColumns = (t: T) => [
   col.link<SupportTicket>(
     t("admin.messaging.support.ticketNumber"),
     (t) => ({ href: `/messaging/support/${t.id}`, label: t.ticketNumber }),
-    { sortKey: "ticketNumber", sortType: "text" },
+    { minWidth: 190, sortKey: "ticketNumber", sortType: "text" },
   ),
   col.text<SupportTicket>(t("admin.messaging.support.subject"), "subject", {
     grow: 3,
@@ -24,10 +24,15 @@ export const ticketColumns = (t: T) => [
   }),
   col.user<SupportTicket>(
     t("admin.messaging.support.creator"),
-    (t) => ({ name: t.creatorName || "—" }),
-    { sortKey: "creatorName" },
+    (ticket) => ({
+      name: ticket.creatorName || "—",
+      secondary: ticket.creatorEmail,
+      href: ticket.creatorId
+        ? `/accounts/users/${ticket.creatorId}`
+        : undefined,
+    }),
+    { minWidth: 240, sortKey: "creatorName" },
   ),
-  col.id<SupportTicket>(t("admin.users.userId"), (ticket) => ticket.creatorId),
   col.muted<SupportTicket>(
     t("common.category"),
     (ticket) =>

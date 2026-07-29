@@ -16,18 +16,19 @@ export function purchaseColumns(t: T) {
           ? {
               name: p.buyer.name,
               secondary: p.buyer.email,
-              href: `/users/${p.buyer.id}`,
+              avatar: p.buyer.avatarUrl,
+              href: `/accounts/users/${p.buyer.id}`,
             }
           : null,
-      { sortable: false },
+      { minWidth: 280, sortable: false },
     ),
-    col.link<BoostPurchase>(
+    col.product<BoostPurchase>(
       t("admin.marketing.boostPurchases.product"),
       (p) =>
         p.product
           ? {
+              title: p.product.title,
               href: `/catalog/products/${p.product.id}`,
-              label: p.product.title,
             }
           : null,
       { sortable: false },
@@ -71,7 +72,7 @@ export function purchaseColumns(t: T) {
     col.custom<BoostPurchase>(
       t("admin.marketing.boostPurchases.period"),
       (p) => <PeriodCell startsAt={p.startsAt} endsAt={p.endsAt} />,
-      { grow: 2, minWidth: 150 },
+      { grow: 2, minWidth: 220 },
     ),
     col.custom<BoostPurchase>(
       t("admin.marketing.boostPurchases.performance"),
@@ -84,7 +85,7 @@ export function purchaseColumns(t: T) {
         ) : (
           <span className="text-subtle">—</span>
         ),
-      { minWidth: 130 },
+      { minWidth: 220 },
     ),
   ];
 }

@@ -15,21 +15,31 @@ export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
       }),
       { grow: 1, minWidth: 120, sortKey: "orderNumber" },
     ),
-    col.custom<Payment>(
-      t("admin.finance.payments.buyerSeller"),
-      (p) => (
-        <div className="text-sm">
-          <p className="font-medium text-heading">
-            {t("admin.finance.common.buyer")}: {p.buyer.displayName}
-          </p>
-          <p className="text-xs text-muted">{p.buyer.email}</p>
-          <p className="mt-1 font-medium text-heading">
-            {t("admin.finance.common.seller")}: {p.seller.displayName}
-          </p>
-          <p className="text-xs text-muted">{p.seller.email}</p>
-        </div>
-      ),
-      { grow: 3, minWidth: 200, sortKey: "buyer.displayName" },
+    col.user<Payment>(
+      t("admin.finance.common.buyer"),
+      (p) => ({
+        name: p.buyer.displayName,
+        secondary: p.buyer.email,
+        href: `/accounts/users/${p.buyer.id}`,
+      }),
+      { sortKey: "buyer.displayName" },
+    ),
+    col.user<Payment>(
+      t("admin.finance.common.seller"),
+      (p) => ({
+        name: p.seller.displayName,
+        secondary: p.seller.email,
+        href: `/accounts/users/${p.seller.id}`,
+      }),
+      { sortKey: "seller.displayName" },
+    ),
+    col.product<Payment>(
+      t("admin.catalog.common.product"),
+      (p) => ({
+        title: p.product.title,
+        href: `/catalog/products/${p.product.id}`,
+      }),
+      { sortKey: "product.title" },
     ),
     col.money<Payment>(t("common.amount"), "amount"),
     col.muted<Payment>(

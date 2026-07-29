@@ -127,9 +127,13 @@ export const sellerColumns = (t: T) => [
     ),
     { grow: 2, minWidth: 180, sortKey: "orderNumber" },
   ),
-  col.text<SellerInvoice>(
+  col.user<SellerInvoice>(
     t("admin.finance.common.seller"),
-    (s) => s.sellerName,
+    (s) => ({
+      name: s.sellerName,
+      secondary: s.sellerEmail,
+      href: s.sellerId ? `/accounts/users/${s.sellerId}` : undefined,
+    }),
     {
       sortKey: "sellerName",
     },
@@ -139,6 +143,7 @@ export const sellerColumns = (t: T) => [
     (s) => ({
       name: s.buyerName,
       secondary: s.buyerEmail,
+      href: s.buyerId ? `/accounts/users/${s.buyerId}` : undefined,
     }),
     { sortKey: "buyerName" },
   ),
