@@ -8,6 +8,7 @@ import BankAccountSection from "./_sections/BankAccountSection";
 import SecuritySection from "./_sections/SecuritySection";
 import NotificationsSection from "./_sections/NotificationsSection";
 import DangerZoneSection from "./_sections/DangerZoneSection";
+import LanguagePreferenceSection from "./_sections/LanguagePreferenceSection";
 
 export const metadata: Metadata = {
   title: "Profilim | Tarodan",
@@ -26,6 +27,7 @@ export default function ProfilePage() {
     <div className="space-y-6 pb-16">
       <MembershipSummary />
       <ProfileInfoSection />
+      <LanguagePreferenceSection />
       <AddressesSection />
       <BankAccountSection />
       <SecuritySection />

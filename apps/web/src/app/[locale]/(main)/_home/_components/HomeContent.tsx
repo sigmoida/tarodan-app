@@ -9,6 +9,7 @@ import Spotlights from "../sections/Spotlights";
 import TopCollections from "../sections/TopCollections";
 import TradeRail from "../sections/TradeRail";
 import TrustBadges from "../sections/TrustBadges";
+import HomeOnboardingTour from "./HomeOnboardingTour";
 
 export default function HomeContent({
   data,
@@ -19,9 +20,16 @@ export default function HomeContent({
 }) {
   const featuredCollector =
     data.featuredCollector ?? data.topCollections[0] ?? null;
+  const hasProducts =
+    data.featured.length +
+      data.discounted.length +
+      data.trade.length +
+      data.popular.length >
+    0;
 
   return (
     <PageShell>
+      <HomeOnboardingTour hasProducts={hasProducts} />
       <HeroSlider />
       <BrandsMarquee items={data.marqueeItems} />
       <FeaturedRail items={data.featured} />

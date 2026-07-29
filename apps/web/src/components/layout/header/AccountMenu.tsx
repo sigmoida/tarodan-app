@@ -119,6 +119,7 @@ export default function AccountMenu({
       <Button
         variant="nav"
         size="sm"
+        data-tour="account"
         onClick={() => setShowAccountDropdown(!showAccountDropdown)}
         aria-expanded={showAccountDropdown}
       >

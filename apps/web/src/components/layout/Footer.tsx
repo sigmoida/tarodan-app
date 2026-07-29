@@ -2,12 +2,12 @@
 
 "use client";
 
-import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { useSearchParams } from "next/navigation";
+import { Link } from "@/i18n/navigation";
 import Image from "next/image";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { locales, type Locale } from "@tarodan/i18n";
 import { Button, Select } from "@tarodan/ui";
+import { useLanguagePreference } from "@/hooks/useLanguagePreference";
 import { Container } from "./Container";
 
 const LOCALES: readonly Locale[] = locales;
@@ -22,20 +22,7 @@ const SOCIAL_LINKS = [
 
 export default function Footer() {
   const t = useTranslations();
-  const locale = useLocale();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  // URL-based locale (#214): navigate to the SAME page under the chosen locale's
-  // prefix (`/products` ⇄ `/en/products`), preserving the query string.
-  // `usePathname`/`router` come from `@/i18n/navigation`, so the pathname is
-  // locale-stripped and `replace` re-adds the target prefix (and syncs the
-  // NEXT_LOCALE cookie) — a real navigation, not just a cookie write + refresh.
-  const changeLocale = (next: Locale) => {
-    const query = Object.fromEntries(searchParams.entries());
-    router.replace({ pathname, query }, { locale: next });
-  };
+  const { currentLocale: locale, changeLanguage } = useLanguagePreference();
 
   const clearCookieConsent = () => {
     localStorage.removeItem("cookie_consent");
@@ -217,7 +204,9 @@ export default function Footer() {
           <div className="flex items-center gap-3">
             <Select
               value={locale}
-              onChange={(e) => changeLocale(e.target.value as Locale)}
+              onChange={(e) => {
+                void changeLanguage(e.target.value as Locale);
+              }}
               selectSize="sm"
               aria-label={t("language.language")}
               className="w-auto"

@@ -1445,6 +1445,7 @@
     "phoneVerified": "Telefon doğrulandı",
     "cannotDeleteAccount": "Hesap silinemez",
     "deleteAccountFailed": "Hesap silinemedi",
+    "preferencesTitle": "Tercihler",
     "boost": {
       "title": "İlanı Öne Çıkar",
       "intro": "Bu ilanı seçtiğiniz paket ve süre boyunca arama, kategori ve ana sayfa vitrininde üst sıralarda gösterin.",
@@ -1696,7 +1697,27 @@
     "turkish": "Türkçe",
     "english": "English",
     "selectLanguage": "Dil Seçin",
-    "languageInfo": "Uygulama dilini değiştirdiğinizde tüm menü ve bildirimler seçtiğiniz dile geçer."
+    "languageInfo": "Uygulama dilini değiştirdiğinizde tüm menü ve bildirimler seçtiğiniz dile geçer.",
+    "saved": "Dil tercihi kaydedildi",
+    "saveFailed": "Dil tercihi kaydedilemedi"
+  },
+  "onboarding": {
+    "welcomeTitle": "Tarodan'a hoş geldiniz",
+    "welcomeContent": "Alışveriş, satış ve takas işlemlerine hızlıca göz atalım.",
+    "searchTitle": "Aradığınızı bulun",
+    "searchContent": "Ürün, marka veya model aramak için bu alanı kullanın.",
+    "productTitle": "Ürünleri inceleyin",
+    "productContent": "Ürün detaylarını görmek ve satın alma seçeneklerine ulaşmak için ürün kartına tıklayın.",
+    "cartTitle": "Sepetinizi yönetin",
+    "cartContent": "Eklediğiniz ürünleri, kuponunuzu ve ödeme adımını burada yönetebilirsiniz.",
+    "sellTitle": "İlan verin",
+    "sellContent": "Koleksiyonunuzdaki ürünleri satışa veya takasa açmak için buradan başlayın.",
+    "accountTitle": "Hesabınızı takip edin",
+    "accountContent": "Sipariş, ilan, mesaj, üyelik ve profil ayarlarınıza buradan ulaşın.",
+    "back": "Geri",
+    "next": "İleri ({current}/{total})",
+    "finish": "Tamamla",
+    "skip": "Atla"
   },
   "address": {
     "myAddresses": "Adreslerim",

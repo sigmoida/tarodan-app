@@ -38,7 +38,10 @@ export default function HomeProductCard({
   const isTrade = Boolean(product.trade_available || product.isTradeEnabled);
 
   return (
-    <div className="group relative flex h-full flex-col">
+    <div
+      data-tour={index === 0 ? "home-product" : undefined}
+      className="group relative flex h-full flex-col"
+    >
       <Link href={`/listings/${product.id}`} className="flex-1">
         <div className="flex h-full flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
           <div className="relative aspect-square bg-surface-alt">

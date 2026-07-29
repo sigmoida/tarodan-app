@@ -1445,6 +1445,7 @@
     "phoneVerified": "Phone verified",
     "cannotDeleteAccount": "Cannot delete account",
     "deleteAccountFailed": "Failed to delete account",
+    "preferencesTitle": "Preferences",
     "boost": {
       "title": "Feature Listing",
       "intro": "Show this listing at the top of search, category and the home showcase for the package and duration you choose.",
@@ -1696,7 +1697,27 @@
     "turkish": "Türkçe",
     "english": "English",
     "selectLanguage": "Select Language",
-    "languageInfo": "When you change the app language, all menus and notifications switch to your selected language."
+    "languageInfo": "When you change the app language, all menus and notifications switch to your selected language.",
+    "saved": "Language preference saved",
+    "saveFailed": "Failed to save language preference"
+  },
+  "onboarding": {
+    "welcomeTitle": "Welcome to Tarodan",
+    "welcomeContent": "Let's take a quick look at buying, selling, and trading.",
+    "searchTitle": "Find what you need",
+    "searchContent": "Use this field to search for a product, brand, or model.",
+    "productTitle": "Explore products",
+    "productContent": "Select a product card to view its details and purchase options.",
+    "cartTitle": "Manage your cart",
+    "cartContent": "Manage your products, coupon, and payment step here.",
+    "sellTitle": "Create a listing",
+    "sellContent": "Start here to offer an item from your collection for sale or trade.",
+    "accountTitle": "Manage your account",
+    "accountContent": "Access your orders, listings, messages, membership, and profile settings here.",
+    "back": "Back",
+    "next": "Next ({current}/{total})",
+    "finish": "Finish",
+    "skip": "Skip"
   },
   "address": {
     "myAddresses": "My Addresses",

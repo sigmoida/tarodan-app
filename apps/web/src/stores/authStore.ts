@@ -57,6 +57,8 @@ interface User {
   avatarUrl?: string;
   bio?: string;
   birthDate?: string;
+  preferredLanguage?: "tr" | "en";
+  homeTourVersion?: number;
 }
 
 // Membership limits per tier
@@ -168,6 +170,10 @@ const mapApiUser = (apiUser: any): User => ({
   avatarUrl: apiUser.avatarUrl || apiUser.avatar_url,
   bio: apiUser.bio,
   birthDate: apiUser.birthDate || apiUser.birth_date || null,
+  preferredLanguage:
+    apiUser.preferredLanguage || apiUser.preferred_language || undefined,
+  homeTourVersion:
+    apiUser.homeTourVersion ?? apiUser.home_tour_version ?? undefined,
 });
 
 /**

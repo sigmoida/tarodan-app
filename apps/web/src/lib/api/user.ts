@@ -7,7 +7,10 @@ export const userApi = {
     displayName?: string;
     phone?: string;
     bio?: string;
+    preferredLanguage?: "tr" | "en";
   }) => api.patch("/users/me", data),
+  completeHomeTour: (version: number) =>
+    api.patch("/users/me/onboarding/home-tour", { version }),
   getMyProducts: (params?: Record<string, any>) =>
     api.get("/products/my", { params }),
   getMyProductById: (id: string) => api.get(`/products/my/${id}`),

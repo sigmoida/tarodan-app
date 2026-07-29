@@ -8,6 +8,7 @@ import BusinessMembershipGuard from "@/components/BusinessMembershipGuard";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Container } from "@/components/layout/Container";
+import PreferredLanguageSync from "@/components/PreferredLanguageSync";
 
 /**
  * Layout for the public marketplace. Owns the storefront chrome (Navbar +
@@ -23,6 +24,7 @@ export default function MainLayout({
 }) {
   return (
     <QueryProvider>
+      <PreferredLanguageSync />
       <RealtimeProvider />
       <PlatformFeeAnnouncementBanner />
       <ConfirmProvider>

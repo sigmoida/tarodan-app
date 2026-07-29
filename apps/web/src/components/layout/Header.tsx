@@ -94,7 +94,7 @@ export default function Header() {
                   <>
                     {/* İlan Ver */}
                     <Button variant="nav" asChild className="gap-1.5">
-                      <Link href="/listings/new">
+                      <Link href="/listings/new" data-tour="new-listing">
                         <PlusIcon className="w-4 h-4" />
                         <span className="hidden sm:inline">
                           {t("nav.newListing")}
@@ -137,7 +137,7 @@ export default function Header() {
                   title={t("nav.cart")}
                   className="relative h-9 w-9 rounded-md"
                 >
-                  <Link href="/cart">
+                  <Link href="/cart" data-tour="cart">
                     <ShoppingCartIcon className="w-5 h-5" />
                     {cartCount > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-surface-elevated text-primary-500 text-xs rounded-full flex items-center justify-center font-semibold">

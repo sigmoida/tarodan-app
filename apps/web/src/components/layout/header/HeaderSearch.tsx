@@ -438,6 +438,7 @@ export default function HeaderSearch() {
   return (
     <div
       ref={searchContainerRef}
+      data-tour="search"
       className="hidden md:flex flex-1 justify-center min-w-0 min-h-0 px-4"
     >
       <div className="w-full max-w-xl relative flex-shrink-0">
