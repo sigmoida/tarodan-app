@@ -25,7 +25,11 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
 import { AdminRole } from "@prisma/client";
-import { CreateAdPackageDto, UpdateAdPackageDto } from "./dto/ad-package.dto";
+import {
+  CreateAdPackageDto,
+  ExtendBoostDto,
+  UpdateAdPackageDto,
+} from "./dto/ad-package.dto";
 
 @ApiTags("admin")
 @Controller("admin/ad-packages")
@@ -61,6 +65,34 @@ export class AdminAdPackageController {
       status,
       search,
     });
+  }
+
+  @Get("purchases/:id")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Get boost purchase details and performance" })
+  async getPurchase(@Param("id") id: string) {
+    return this.service.getPurchase(id);
+  }
+
+  @Post("purchases/:id/pause")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Pause an active boost purchase" })
+  async pausePurchase(@Param("id") id: string) {
+    return this.service.pausePurchase(id);
+  }
+
+  @Post("purchases/:id/resume")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Resume a paused boost purchase" })
+  async resumePurchase(@Param("id") id: string) {
+    return this.service.resumePurchase(id);
+  }
+
+  @Post("purchases/:id/extend")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Extend an active or paused boost purchase" })
+  async extendPurchase(@Param("id") id: string, @Body() dto: ExtendBoostDto) {
+    return this.service.extendPurchase(id, dto.days);
   }
 
   // ==================== PACKAGE MANAGEMENT ====================

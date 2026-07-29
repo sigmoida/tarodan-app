@@ -19,6 +19,9 @@ export function buildOverviewSeed(user: WebUser): ProfileOverviewSeed {
   return {
     profile: {
       id: user.id,
+      adminCode: user.adminCode || "",
+      username: user.username || "",
+      usernameClaimedAt: user.usernameClaimed ? new Date().toISOString() : null,
       email: user.email,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,

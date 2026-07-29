@@ -7,6 +7,10 @@ import {
 import { SellerDocumentType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
+import {
+  CreateCorporateStakeholderDto,
+  UpdateCorporateApplicationDto,
+} from "./dto";
 
 /** All corporate-seller document slots, in display order. */
 export const SELLER_DOCUMENT_TYPES: SellerDocumentType[] = [
@@ -14,7 +18,13 @@ export const SELLER_DOCUMENT_TYPES: SellerDocumentType[] = [
   SellerDocumentType.contract,
   SellerDocumentType.signature_circular,
   SellerDocumentType.activity_certificate,
-  SellerDocumentType.identity,
+  SellerDocumentType.identity_front,
+  SellerDocumentType.identity_back,
+  SellerDocumentType.passport_front,
+  SellerDocumentType.passport_back,
+  SellerDocumentType.residence_or_invoice,
+  SellerDocumentType.trade_registry_gazette,
+  SellerDocumentType.bank_account_info,
 ];
 
 const ALLOWED_MIME = [
@@ -28,7 +38,7 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB (documents bucket cap)
 /**
  * Kurumsal satıcı başvuru belgeleri: private `documents` bucket'a yükleme +
  * kullanıcının kendi belgelerini presigned URL ile listelemesi. Her belge tipi
- * için tek kayıt; yeniden yükleme eskisini değiştirir ve durumu `pending`'e alır.
+ * için tek güncel kayıt; yeniden yükleme eski sürümü denetim geçmişinde tutar.
  */
 @Injectable()
 export class SellerDocumentService {
@@ -39,22 +49,27 @@ export class SellerDocumentService {
     private readonly storage: StorageService,
   ) {}
 
-  private async assertBusinessApplicant(userId: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { companyName: true },
+  private async assertBusinessApplicant(userId: string) {
+    const application = await this.prisma.corporateApplication.findUnique({
+      where: { userId },
     });
-    // Belge yükleme yalnız kurumsal başvuru yapmış (firma adı olan) kullanıcıya.
-    if (!user?.companyName) {
+    if (!application) {
       throw new ForbiddenException(
         "Yalnızca kurumsal satıcı başvurusu yapan kullanıcılar belge yükleyebilir",
       );
     }
+    if (!["completing", "under_review"].includes(application.status)) {
+      throw new ForbiddenException(
+        "Başvuru bu aşamada belge değişikliğine açık değil",
+      );
+    }
+    return application;
   }
 
   async uploadDocument(
     userId: string,
     documentType: SellerDocumentType,
+    stakeholderId: string | undefined,
     file: Express.Multer.File | undefined,
   ) {
     if (!SELLER_DOCUMENT_TYPES.includes(documentType)) {
@@ -67,7 +82,38 @@ export class SellerDocumentService {
     if (file.size > MAX_SIZE) {
       throw new BadRequestException("Dosya en fazla 10MB olabilir");
     }
-    await this.assertBusinessApplicant(userId);
+    const application = await this.assertBusinessApplicant(userId);
+    const identityTypes: SellerDocumentType[] = [
+      SellerDocumentType.identity_front,
+      SellerDocumentType.identity_back,
+      SellerDocumentType.passport_front,
+      SellerDocumentType.passport_back,
+    ];
+    const isIdentityDocument = identityTypes.includes(documentType);
+    let stakeholder: { id: string; identityType: "tckn" | "passport" } | null =
+      null;
+
+    if (isIdentityDocument) {
+      if (!stakeholderId) {
+        throw new BadRequestException(
+          "Kimlik veya pasaport belgesi için şirket sahibi/ortağı seçilmelidir",
+        );
+      }
+      stakeholder = await this.prisma.corporateStakeholder.findFirst({
+        where: { id: stakeholderId, applicationId: application.id },
+        select: { id: true, identityType: true },
+      });
+      if (!stakeholder) {
+        throw new BadRequestException("Şirket sahibi/ortağı bulunamadı");
+      }
+      const expectedPrefix =
+        stakeholder.identityType === "tckn" ? "identity_" : "passport_";
+      if (!documentType.startsWith(expectedPrefix)) {
+        throw new BadRequestException(
+          "Belge tipi, seçilen kişinin kimlik türüyle eşleşmiyor",
+        );
+      }
+    }
 
     const ext = file.mimetype === "application/pdf" ? "pdf" : "img";
     const up = await this.storage.uploadFile(
@@ -84,26 +130,37 @@ export class SellerDocumentService {
       userId,
     );
 
-    const rec = await this.prisma.sellerDocument.upsert({
-      where: { userId_documentType: { userId, documentType } },
-      create: {
+    const previous = await this.prisma.sellerDocument.findFirst({
+      where: {
         userId,
         documentType,
-        s3Key: up.key,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        size: file.size,
+        stakeholderId: stakeholder?.id ?? null,
+        isCurrent: true,
       },
-      update: {
-        s3Key: up.key,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        size: file.size,
-        status: "pending",
-        reviewNote: null,
-        reviewedAt: null,
-        uploadedAt: new Date(),
-      },
+      orderBy: { version: "desc" },
+    });
+
+    const rec = await this.prisma.$transaction(async (tx) => {
+      if (previous) {
+        await tx.sellerDocument.update({
+          where: { id: previous.id },
+          data: { isCurrent: false },
+        });
+      }
+      return tx.sellerDocument.create({
+        data: {
+          userId,
+          applicationId: application.id,
+          stakeholderId: stakeholder?.id,
+          documentType,
+          s3Key: up.key,
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          version: (previous?.version ?? 0) + 1,
+          supersedesId: previous?.id,
+        },
+      });
     });
     this.logger.log(`Seller document uploaded: ${userId}/${documentType}`);
     return { documentType: rec.documentType, status: rec.status };
@@ -112,7 +169,7 @@ export class SellerDocumentService {
   /** All slots for the current user with upload state + a short-lived preview URL. */
   async listMyDocuments(userId: string) {
     const docs = await this.prisma.sellerDocument.findMany({
-      where: { userId },
+      where: { userId, isCurrent: true },
     });
     const byType = new Map(docs.map((d) => [d.documentType, d]));
     const slots = await Promise.all(
@@ -126,6 +183,8 @@ export class SellerDocumentService {
           mimeType: d.mimeType,
           status: d.status,
           reviewNote: d.reviewNote,
+          appealNote: d.appealNote,
+          version: d.version,
           uploadedAt: d.uploadedAt,
           url: await this.storage.getPresignedDownloadUrl(
             "documents",
@@ -136,5 +195,168 @@ export class SellerDocumentService {
       }),
     );
     return { documents: slots };
+  }
+
+  async getMyApplication(userId: string) {
+    const application = await this.prisma.corporateApplication.findUnique({
+      where: { userId },
+      include: {
+        stakeholders: {
+          include: {
+            documents: {
+              where: { isCurrent: true },
+            },
+          },
+        },
+        documents: {
+          where: { isCurrent: true },
+          orderBy: { uploadedAt: "desc" },
+        },
+        events: {
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
+      },
+    });
+    if (!application) {
+      throw new BadRequestException("Kurumsal başvuru bulunamadı");
+    }
+    return application;
+  }
+
+  async updateMyApplication(
+    userId: string,
+    dto: UpdateCorporateApplicationDto,
+  ) {
+    const application = await this.assertBusinessApplicant(userId);
+    return this.prisma.corporateApplication.update({
+      where: { id: application.id },
+      data: {
+        ...dto,
+        iban: dto.iban?.replace(/\s/g, "").toUpperCase(),
+        events: {
+          create: {
+            action: "company_details_updated",
+            actorUserId: userId,
+          },
+        },
+      },
+    });
+  }
+
+  async addStakeholder(userId: string, dto: CreateCorporateStakeholderDto) {
+    const application = await this.assertBusinessApplicant(userId);
+    return this.prisma.corporateStakeholder.create({
+      data: {
+        applicationId: application.id,
+        fullName: dto.fullName.trim(),
+        identityType: dto.identityType,
+        identityNumber: dto.identityNumber?.trim(),
+      },
+    });
+  }
+
+  async appealDocument(userId: string, documentId: string, note: string) {
+    const document = await this.prisma.sellerDocument.findFirst({
+      where: { id: documentId, userId, isCurrent: true },
+    });
+    if (!document) throw new BadRequestException("Belge bulunamadı");
+    if (!["rejected", "revision_requested"].includes(document.status)) {
+      throw new BadRequestException(
+        "Yalnız reddedilen veya revizyon istenen belgeye itiraz edilebilir",
+      );
+    }
+    await this.prisma.$transaction([
+      this.prisma.sellerDocument.update({
+        where: { id: document.id },
+        data: { status: "appealed", appealNote: note.trim() },
+      }),
+      this.prisma.corporateApplicationEvent.create({
+        data: {
+          applicationId: document.applicationId!,
+          action: "document_appealed",
+          note: note.trim(),
+          actorUserId: userId,
+          metadata: {
+            documentId,
+            documentType: document.documentType,
+          },
+        },
+      }),
+    ]);
+    return { success: true };
+  }
+
+  async submitForFinalReview(userId: string) {
+    const application = await this.getMyApplication(userId);
+    const missingFields = [
+      "taxId",
+      "companyType",
+      "taxOffice",
+      "companyCity",
+      "companyDistrict",
+      "bankAccountHolder",
+      "iban",
+    ].filter((field) => !application[field as keyof typeof application]);
+    if (missingFields.length) {
+      throw new BadRequestException(
+        `Eksik şirket bilgileri: ${missingFields.join(", ")}`,
+      );
+    }
+
+    const currentCompanyTypes = new Set(
+      application.documents
+        .filter((document) => !document.stakeholderId)
+        .map((document) => document.documentType),
+    );
+    const required = [
+      SellerDocumentType.tax_plate,
+      SellerDocumentType.contract,
+      SellerDocumentType.signature_circular,
+      SellerDocumentType.activity_certificate,
+      SellerDocumentType.residence_or_invoice,
+      SellerDocumentType.trade_registry_gazette,
+      SellerDocumentType.bank_account_info,
+    ];
+    const missingDocuments = required.filter(
+      (type) => !currentCompanyTypes.has(type),
+    );
+    const stakeholdersWithoutIdentity = application.stakeholders.filter(
+      (stakeholder) => {
+        const currentTypes = new Set(
+          stakeholder.documents.map((document) => document.documentType),
+        );
+        const prefix =
+          stakeholder.identityType === "tckn" ? "identity" : "passport";
+        return (
+          !currentTypes.has(`${prefix}_front` as SellerDocumentType) ||
+          !currentTypes.has(`${prefix}_back` as SellerDocumentType)
+        );
+      },
+    );
+    if (
+      missingDocuments.length ||
+      !application.stakeholders.length ||
+      stakeholdersWithoutIdentity.length
+    ) {
+      throw new BadRequestException(
+        "Zorunlu belgeler ile her şirket sahibi/ortağının kimlik veya pasaport ön-arka yüzleri tamamlanmalıdır",
+      );
+    }
+
+    await this.prisma.corporateApplication.update({
+      where: { id: application.id },
+      data: {
+        status: "under_review",
+        submittedForReviewAt: new Date(),
+        events: {
+          create: {
+            action: "submitted_for_final_review",
+            actorUserId: userId,
+          },
+        },
+      },
+    });
+    return { success: true, status: "under_review" };
   }
 }

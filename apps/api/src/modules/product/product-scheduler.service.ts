@@ -303,7 +303,15 @@ export class ProductSchedulerService implements OnModuleInit {
           id: true,
           userId: true,
           autoRenew: true,
-          product: { select: { title: true, sellerId: true } },
+          product: {
+            select: {
+              title: true,
+              sellerId: true,
+              viewCount: true,
+              likeCount: true,
+              clickCount: true,
+            },
+          },
         },
       });
 
@@ -372,6 +380,16 @@ export class ProductSchedulerService implements OnModuleInit {
       // Otomatik yenileme açık + premium satıcı → yenileme hatırlatma bildirimi
       // (Gerçek recurring çekim yok; üyelik auto-renew gibi hatırlatma gönderilir.)
       for (const b of expiringBoosts) {
+        if (b.product) {
+          await this.prisma.productBoost.update({
+            where: { id: b.id },
+            data: {
+              finalViewCount: b.product.viewCount,
+              finalLikeCount: b.product.likeCount,
+              finalClickCount: b.product.clickCount,
+            },
+          });
+        }
         if (b.autoRenew && b.product && premiumSet.has(b.product.sellerId)) {
           await this.notificationService
             .createInAppNotification(b.userId, NotificationType.BOOST_EXPIRED, {

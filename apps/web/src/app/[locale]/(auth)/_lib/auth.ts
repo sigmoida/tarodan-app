@@ -126,6 +126,13 @@ export const registerSchema = (locale: Locale) => {
   return z
     .object({
       displayName: z.string().trim().min(1, t("common.fillAllFields")),
+      username: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .min(3, t("auth.usernameRules"))
+        .max(30, t("auth.usernameRules"))
+        .regex(/^[a-z0-9](?:[a-z0-9._]*[a-z0-9])?$/, t("auth.usernameRules")),
       email: z
         .string()
         .trim()
@@ -160,27 +167,27 @@ export const businessRegisterSchema = (locale: Locale) => {
   const t = translator(locale);
   return z
     .object({
-      companyName: z.string().trim().min(1, t("auth.fillRequiredFields")),
-      email: z
+      authorizedFullName: z
+        .string()
+        .trim()
+        .min(2, t("auth.fillRequiredFields")),
+      companyLegalName: z.string().trim().min(2, t("auth.fillRequiredFields")),
+      companyTitle: z.string().trim().min(2, t("auth.fillRequiredFields")),
+      companyAddress: z.string().trim().min(10, t("auth.fillRequiredFields")),
+      companyEmail: z
         .string()
         .trim()
         .min(1, t("auth.fillRequiredFields"))
         .email(t("validation.invalidEmail")),
-      phone: z.string().trim().min(1, t("auth.fillRequiredFields")),
-      companyType: z.string().optional(),
-      taxId: z.string().trim().min(1, t("auth.fillRequiredFields")),
-      city: z.string().trim().min(1, t("auth.fillRequiredFields")),
-      district: z.string().optional(),
-      password: z
+      kepAddress: z
         .string()
-        .min(8, t("validation.passwordMin8"))
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, t("auth.passwordComplexity")),
-      confirmPassword: z.string(),
+        .trim()
+        .email(t("validation.invalidEmail"))
+        .optional()
+        .or(z.literal("")),
+      phone: z.string().trim().min(1, t("auth.fillRequiredFields")),
+      contactPhone: z.string().optional(),
       agreeTerms: z.boolean(),
-    })
-    .refine((d) => d.password === d.confirmPassword, {
-      message: t("validation.passwordMatch"),
-      path: ["confirmPassword"],
     })
     .refine((d) => d.agreeTerms === true, {
       message: t("auth.mustAcceptTerms"),

@@ -16,13 +16,14 @@ import { PrismaService } from "../../prisma";
 import {
   RegisterDto,
   BusinessRegisterDto,
+  CorporateInvitationDto,
   LoginDto,
   AuthResponseDto,
   TwoFactorChallengeDto,
   TokensDto,
 } from "./dto";
 import { JwtPayload } from "./interfaces";
-import { SellerType, OrderStatus, PaymentStatus } from "@prisma/client";
+import { SellerType, OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
@@ -31,6 +32,7 @@ import { AppleAuthService } from "./apple-auth.service";
 import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
 import { SecurityService } from "../security/security.service";
+import { isUsernameAllowed, normalizeUsername } from "./username.util";
 
 @Injectable()
 export class AuthService {
@@ -69,11 +71,65 @@ export class AuthService {
     return null;
   }
 
+  private async nextAdminCode(prefix: "B" | "S" | "K"): Promise<string> {
+    const [row] = await this.prisma.$queryRaw<Array<{ code: string }>>`
+      SELECT generate_user_admin_code(${prefix}) AS code
+    `;
+    return row.code;
+  }
+
+  private rethrowUserUniqueConstraint(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const rawTarget = error.meta?.target;
+      const target = (
+        Array.isArray(rawTarget) ? rawTarget.join(",") : String(rawTarget ?? "")
+      ).toLowerCase();
+      if (target.includes("username")) {
+        throw new ConflictException("Bu kullanıcı adı kullanılıyor");
+      }
+      if (target.includes("phone")) {
+        throw new ConflictException(
+          i18nMessage("server.auth.phoneAlreadyRegistered"),
+        );
+      }
+      if (target.includes("email")) {
+        throw new ConflictException(
+          i18nMessage("server.auth.emailAlreadyRegistered"),
+        );
+      }
+      throw new ConflictException("Bu hesap bilgileri daha önce kullanılmış");
+    }
+    throw error;
+  }
+
+  async isUsernameAvailable(value: string): Promise<boolean> {
+    const username = normalizeUsername(value);
+    if (!isUsernameAllowed(username)) return false;
+    const existing = await this.prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    });
+    return !existing;
+  }
+
   /**
    * Register a new user
    * POST /auth/register
    */
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
+    const username = normalizeUsername(dto.username);
+    if (!isUsernameAllowed(username)) {
+      throw new BadRequestException(
+        "Kullanıcı adı 3-30 karakter olmalı; küçük harf, rakam, nokta veya alt çizgi içermelidir",
+      );
+    }
+    if (!(await this.isUsernameAvailable(username))) {
+      throw new ConflictException("Bu kullanıcı adı kullanılıyor");
+    }
+
     // Check if email already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -123,22 +179,31 @@ export class AuthService {
 
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 12);
+    const adminCode = await this.nextAdminCode(dto.isSeller ? "S" : "B");
 
     // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        phone: dto.phone,
-        passwordHash,
-        displayName: dto.displayName,
-        birthDate: new Date(dto.birthDate),
-        isSeller: dto.isSeller ?? false,
-        sellerType: dto.isSeller ? SellerType.individual : null,
-        isVerified: false, // Email verification required
-        isEmailVerified: false, // Will be true after email verification
-        // acceptsMarketingEmails: dto.marketingConsent ?? dto.acceptsMarketingEmails ?? false, // Will be available after migration
-      },
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          adminCode,
+          username,
+          usernameClaimedAt: new Date(),
+          email: dto.email,
+          phone: dto.phone,
+          passwordHash,
+          displayName: dto.displayName,
+          birthDate: new Date(dto.birthDate),
+          isSeller: dto.isSeller ?? false,
+          sellerType: dto.isSeller ? SellerType.individual : null,
+          isVerified: false, // Email verification required
+          isEmailVerified: false, // Will be true after email verification
+          // acceptsMarketingEmails: dto.marketingConsent ?? dto.acceptsMarketingEmails ?? false, // Will be available after migration
+        },
+      });
+    } catch (error) {
+      this.rethrowUserUniqueConstraint(error);
+    }
 
     // Update acceptsMarketingEmails after user creation (until migration is done)
     if (dto.marketingConsent || dto.acceptsMarketingEmails) {
@@ -244,6 +309,9 @@ export class AuthService {
     return {
       user: {
         id: user.id,
+        adminCode: user.adminCode,
+        username: user.username,
+        usernameClaimed: user.usernameClaimedAt != null,
         email: user.email,
         phone: user.phone ?? undefined,
         displayName: user.displayName,
@@ -401,103 +469,179 @@ export class AuthService {
    * Register a new business account
    * POST /auth/register/business
    */
-  async registerBusiness(dto: BusinessRegisterDto): Promise<AuthResponseDto> {
-    // Check if email already exists
+  async registerBusiness(dto: BusinessRegisterDto) {
+    const companyEmail = dto.companyEmail.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email: companyEmail },
     });
-
     if (existingUser) {
       throw new ConflictException(
         i18nMessage("server.auth.emailAlreadyRegistered"),
       );
     }
-
-    // Check if phone already exists
-    const existingPhone = await this.prisma.user.findUnique({
-      where: { phone: dto.phone },
+    const existingPhone = await this.prisma.user.findFirst({
+      where: { OR: [{ phone: dto.phone }, { email: companyEmail }] },
     });
-
     if (existingPhone) {
       throw new ConflictException(
         i18nMessage("server.auth.phoneAlreadyRegistered"),
       );
     }
-
-    // Check if company name already exists (must be unique for business accounts)
-    const existingCompanyName = await this.prisma.user.findFirst({
+    const openApplication = await this.prisma.corporateApplication.findFirst({
       where: {
-        companyName: dto.companyName,
+        OR: [{ companyEmail }, { phone: dto.phone }],
+        status: { not: "rejected" },
       },
     });
-
-    if (existingCompanyName) {
+    if (openApplication) {
       throw new ConflictException(
-        i18nMessage("server.auth.companyNameAlreadyRegistered"),
+        "Bu e-posta veya telefonla açık bir başvuru var.",
       );
     }
 
-    // Check if tax ID already exists
-    if (dto.taxId) {
-      const existingTaxId = await this.prisma.user.findFirst({
-        where: { taxId: dto.taxId },
-      });
-
-      if (existingTaxId) {
-        throw new ConflictException(
-          i18nMessage("server.auth.taxIdAlreadyRegistered"),
-        );
-      }
-    }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(dto.password, 12);
-
-    // Create business user
-    const user = await this.prisma.user.create({
+    const application = await this.prisma.corporateApplication.create({
       data: {
-        email: dto.email,
+        authorizedFullName: dto.authorizedFullName.trim(),
+        companyLegalName: dto.companyLegalName.trim(),
+        companyTitle: dto.companyTitle.trim(),
+        companyAddress: dto.companyAddress.trim(),
+        companyEmail,
+        kepAddress: dto.kepAddress?.trim().toLowerCase() || null,
         phone: dto.phone,
-        passwordHash,
-        displayName: dto.companyName,
-        companyName: dto.companyName,
-        taxId: dto.taxId,
-        // Kurumsal başvuru detayları (admin incelemesi için saklanır).
-        companyType: dto.companyType ?? null,
-        companyCity: dto.city ?? null,
-        companyDistrict: dto.district ?? null,
-        isSeller: false,
-        businessStatus: "pending",
-        isVerified: false, // Email verification required
-        isEmailVerified: false,
-        acceptsMarketingEmails: dto.acceptsMarketingEmails ?? false,
+        contactPhone: dto.contactPhone || null,
+        events: {
+          create: {
+            action: "application_submitted",
+            metadata: { source: "web" },
+          },
+        },
       },
+      select: { id: true, status: true, companyEmail: true },
     });
 
-    // Send email verification
-    await this.sendEmailVerification(user.id, user.email);
+    return {
+      applicationId: application.id,
+      status: application.status,
+      email: application.companyEmail,
+    };
+  }
 
-    // Generate tokens
-    const tokens = await this.generateTokens(
-      user.id,
-      user.email,
-      user.isSeller,
-    );
+  async getCorporateInvitation(token: string) {
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const application = await this.prisma.corporateApplication.findUnique({
+      where: { invitationTokenHash: tokenHash },
+      select: {
+        id: true,
+        companyTitle: true,
+        companyEmail: true,
+        status: true,
+        invitationExpiresAt: true,
+      },
+    });
+    if (
+      !application ||
+      application.status !== "invited" ||
+      !application.invitationExpiresAt ||
+      application.invitationExpiresAt <= new Date()
+    ) {
+      throw new BadRequestException(
+        "Davet bağlantısı geçersiz veya süresi dolmuş.",
+      );
+    }
+    return {
+      companyTitle: application.companyTitle,
+      companyEmail: application.companyEmail,
+      expiresAt: application.invitationExpiresAt,
+    };
+  }
+
+  async activateCorporateInvitation(dto: CorporateInvitationDto) {
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(dto.token)
+      .digest("hex");
+    const username = normalizeUsername(dto.username);
+    if (!isUsernameAllowed(username)) {
+      throw new BadRequestException("Geçersiz kullanıcı adı.");
+    }
+
+    const application = await this.prisma.corporateApplication.findUnique({
+      where: { invitationTokenHash: tokenHash },
+    });
+    if (
+      !application ||
+      application.status !== "invited" ||
+      !application.invitationExpiresAt ||
+      application.invitationExpiresAt <= new Date()
+    ) {
+      throw new BadRequestException(
+        "Davet bağlantısı geçersiz veya süresi dolmuş.",
+      );
+    }
+    const usernameExists = await this.prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    });
+    if (usernameExists) {
+      throw new ConflictException("Bu kullanıcı adı daha önce alınmış.");
+    }
+
+    const [passwordHash, adminCode] = await Promise.all([
+      bcrypt.hash(dto.password, 12),
+      this.nextAdminCode("K"),
+    ]);
+    const now = new Date();
+    let user;
+    try {
+      user = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            adminCode,
+            username,
+            usernameClaimedAt: now,
+            email: application.companyEmail,
+            phone: application.phone,
+            passwordHash,
+            displayName: application.companyTitle,
+            companyName: application.companyLegalName,
+            companyType: application.companyType,
+            companyCity: application.companyCity,
+            companyDistrict: application.companyDistrict,
+            taxId: application.taxId,
+            isEmailVerified: true,
+            isVerified: false,
+            isSeller: false,
+            sellerType: "verified",
+            businessStatus: "pending",
+          },
+        });
+        await tx.corporateApplication.update({
+          where: { id: application.id },
+          data: {
+            userId: created.id,
+            status: "completing",
+            activatedAt: now,
+            invitationTokenHash: null,
+            invitationExpiresAt: null,
+            events: {
+              create: {
+                action: "invitation_activated",
+                actorUserId: created.id,
+              },
+            },
+          },
+        });
+        return created;
+      });
+    } catch (error) {
+      this.rethrowUserUniqueConstraint(error);
+    }
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone ?? undefined,
-        displayName: user.displayName,
-        isVerified: user.isVerified,
-        isSeller: user.isSeller,
-        sellerType: user.sellerType ?? undefined,
-        createdAt: user.createdAt,
-      },
-      tokens,
-      // #224: mesaj artık AuthController.registerBusiness() tarafından locale'e göre
-      // kuruluyor (server.auth.businessRegisterSuccess).
+      userId: user.id,
+      adminCode: user.adminCode,
+      username: user.username,
+      status: "completing",
     };
   }
 
@@ -676,6 +820,9 @@ export class AuthService {
       return {
         user: {
           id: user.id,
+          adminCode: user.adminCode,
+          username: user.username,
+          usernameClaimed: user.usernameClaimedAt != null,
           email: user.email,
           phone: user.phone ?? undefined,
           displayName: user.displayName,
@@ -717,6 +864,9 @@ export class AuthService {
       where: { email: dto.email },
       select: {
         id: true,
+        adminCode: true,
+        username: true,
+        usernameClaimedAt: true,
         email: true,
         passwordHash: true,
         displayName: true,
@@ -796,6 +946,9 @@ export class AuthService {
     return {
       user: {
         id: user.id,
+        adminCode: user.adminCode,
+        username: user.username,
+        usernameClaimed: user.usernameClaimedAt != null,
         email: user.email,
         displayName: user.displayName,
         isVerified: user.isVerified,
@@ -1383,6 +1536,9 @@ export class AuthService {
     return {
       user: {
         id: user.id,
+        adminCode: user.adminCode,
+        username: user.username,
+        usernameClaimed: user.usernameClaimedAt != null,
         email: user.email,
         phone: user.phone ?? undefined,
         displayName: user.displayName,

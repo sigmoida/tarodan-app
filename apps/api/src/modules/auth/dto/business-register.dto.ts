@@ -5,88 +5,69 @@ import {
   MaxLength,
   IsOptional,
   Matches,
-  IsBoolean,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class BusinessRegisterDto {
-  @ApiProperty({
-    example: 'ABC Ltd. Şti.',
-    description: 'Company name',
-  })
+  @ApiProperty({ example: "Ayşe Yılmaz" })
   @IsString()
-  @MinLength(2, { message: 'Şirket adı en az 2 karakter olmalıdır' })
-  @MaxLength(200, { message: 'Şirket adı en fazla 200 karakter olabilir' })
-  companyName: string;
+  @MinLength(2)
+  @MaxLength(120)
+  authorizedFullName: string;
 
-  @ApiProperty({
-    example: 'user@example.com',
-    description: 'User email address',
-  })
-  @IsEmail({}, { message: 'Geçerli bir email adresi giriniz' })
-  email: string;
-
-  @ApiProperty({
-    example: '+905551234567',
-    description: 'User phone number (Turkish format)',
-  })
+  @ApiProperty({ example: "Tarodan Otomotiv Ticaret Limited Şirketi" })
   @IsString()
-  @Matches(/^\+90[0-9]{10}$/, {
-    message: 'Geçerli bir Türkiye telefon numarası giriniz (+905XXXXXXXXX)',
-  })
+  @MinLength(2)
+  @MaxLength(240)
+  companyLegalName: string;
+
+  @ApiProperty({ example: "Tarodan Otomotiv" })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(200)
+  companyTitle: string;
+
+  @ApiProperty({ example: "Maslak Mah. Büyükdere Cad. No:1 Sarıyer/İstanbul" })
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  companyAddress: string;
+
+  @ApiProperty({ example: "kurumsal@firma.com" })
+  @IsEmail()
+  companyEmail: string;
+
+  @ApiPropertyOptional({ example: "firma@hs01.kep.tr" })
+  @IsOptional()
+  @IsEmail()
+  kepAddress?: string;
+
+  @ApiProperty({ example: "+905551234567" })
+  @Matches(/^\+90[0-9]{10}$/)
   phone: string;
 
-  @ApiProperty({
-    example: 'SecurePass123!',
-    description: 'Password (min 8 chars, 1 uppercase, 1 lowercase, 1 number)',
-  })
+  @ApiPropertyOptional({ example: "+905559876543" })
+  @IsOptional()
+  @Matches(/^\+90[0-9]{10}$/)
+  contactPhone?: string;
+}
+
+export class CorporateInvitationDto {
+  @ApiProperty()
   @IsString()
-  @MinLength(8, { message: 'Şifre en az 8 karakter olmalıdır' })
-  @MaxLength(50, { message: 'Şifre en fazla 50 karakter olabilir' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message: 'Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir',
-  })
+  token: string;
+
+  @ApiProperty({ example: "tarodan.kurumsal" })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(30)
+  @Matches(/^[a-z0-9](?:[a-z0-9._]*[a-z0-9])?$/)
+  username: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
   password: string;
-
-  @ApiPropertyOptional({
-    example: 'Limited Şirket',
-    description: 'Company type',
-  })
-  @IsOptional()
-  @IsString()
-  companyType?: string;
-
-  @ApiProperty({
-    example: '1234567890',
-    description: 'Tax ID number (10-11 digits)',
-  })
-  @IsString()
-  @Matches(/^[0-9]{10,11}$/, {
-    message: 'Vergi kimlik numarası 10-11 haneli olmalıdır',
-  })
-  taxId: string;
-
-  @ApiProperty({
-    example: 'İstanbul',
-    description: 'City',
-  })
-  @IsString()
-  @MinLength(2, { message: 'İl adı en az 2 karakter olmalıdır' })
-  city: string;
-
-  @ApiPropertyOptional({
-    example: 'Kadıköy',
-    description: 'District',
-  })
-  @IsOptional()
-  @IsString()
-  district?: string;
-
-  @ApiPropertyOptional({
-    example: true,
-    description: 'Consent for marketing emails',
-  })
-  @IsOptional()
-  @IsBoolean()
-  acceptsMarketingEmails?: boolean;
 }

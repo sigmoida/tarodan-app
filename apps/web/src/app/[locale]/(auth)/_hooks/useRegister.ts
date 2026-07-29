@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 
 interface RegisterInput {
   displayName: string;
+  username: string;
   email: string;
   phone: string;
   birthDate: string;
@@ -34,6 +35,7 @@ export function useRegister() {
       const formattedPhone = input.phone || undefined;
       return api.post("/auth/register", {
         displayName: input.displayName,
+        username: input.username.trim().toLowerCase(),
         email: input.email,
         password: input.password,
         phone: formattedPhone,

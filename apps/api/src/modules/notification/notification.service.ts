@@ -78,6 +78,18 @@ export class NotificationService {
     );
   }
 
+  async sendTemplateEmailToAddress(
+    email: string,
+    templateKey: string,
+    templateData: Record<string, any>,
+  ) {
+    return this.dispatch.sendTemplateEmailToAddress(
+      email,
+      templateKey,
+      templateData,
+    );
+  }
+
   getProviderStatus() {
     return this.dispatch.getProviderStatus();
   }

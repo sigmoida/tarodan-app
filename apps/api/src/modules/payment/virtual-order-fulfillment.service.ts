@@ -279,7 +279,14 @@ export class VirtualOrderFulfillmentService {
     // Stacking: aktif boost varsa yeni süre kalanın ÜSTÜNE eklenir.
     const boostedProduct = await tx.product.findUnique({
       where: { id: boost.productId },
-      select: { boostedUntil: true, qualityScore: true, popularityScore: true },
+      select: {
+        boostedUntil: true,
+        qualityScore: true,
+        popularityScore: true,
+        viewCount: true,
+        likeCount: true,
+        clickCount: true,
+      },
     });
     const base =
       boostedProduct?.boostedUntil && boostedProduct.boostedUntil > nowTs
@@ -290,7 +297,15 @@ export class VirtualOrderFulfillmentService {
     );
     await tx.productBoost.update({
       where: { id: boost.id },
-      data: { status: "active", startsAt: nowTs, endsAt, purchasedAt: nowTs },
+      data: {
+        status: "active",
+        startsAt: nowTs,
+        endsAt,
+        purchasedAt: nowTs,
+        baselineViewCount: boostedProduct?.viewCount ?? 0,
+        baselineLikeCount: boostedProduct?.likeCount ?? 0,
+        baselineClickCount: boostedProduct?.clickCount ?? 0,
+      },
     });
     await tx.product.update({
       where: { id: boost.productId },

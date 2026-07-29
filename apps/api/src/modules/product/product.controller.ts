@@ -158,11 +158,13 @@ export class ProductController {
    * İlanın fiyatına göre satın alınabilir paket/süre/fiyat seçenekleri (yeni model).
    */
   @Get(":id/boost/options")
-  @Public()
   @ApiOperation({ summary: "İlan için boost paket seçenekleri" })
   @ApiResponse({ status: 200, description: "Paket + süre + fiyat listesi" })
-  async getBoostOptions(@Param("id") id: string) {
-    return this.productBoostService.getBoostOptions(id);
+  async getBoostOptions(
+    @Param("id") id: string,
+    @CurrentUser("id") userId: string,
+  ) {
+    return this.productBoostService.getBoostOptions(id, userId);
   }
 
   /**
@@ -630,6 +632,44 @@ export class ProductController {
       ip ||
       "unknown";
     return this.productService.incrementViewCount(
+      id,
+      userId,
+      clientIp,
+      userAgent,
+    );
+  }
+
+  /**
+   * POST /products/:id/click
+   * Count a marketplace listing-card click separately from detail views.
+   */
+  @Post(":id/click")
+  @Public()
+  @ApiOperation({ summary: "İlan kartı tıklama sayısını artır" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  async incrementClickCount(
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") userId?: string,
+    @Ip() ip?: string,
+    @Headers("user-agent") userAgent?: string,
+    @Req() req?: any,
+  ) {
+    const clientIp =
+      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req?.headers?.["x-real-ip"] ||
+      ip ||
+      "unknown";
+    return this.productService.incrementClickCount(
       id,
       userId,
       clientIp,

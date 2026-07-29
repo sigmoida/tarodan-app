@@ -8,9 +8,12 @@ import {
   ValidateNested,
   Min,
   IsDateString,
+  IsEnum,
+  IsUUID,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { AdPackageAudienceMode, MembershipTierType } from "@prisma/client";
 
 export class AdPackageTierDto {
   @ApiProperty({ example: 7 })
@@ -86,6 +89,26 @@ export class CreateAdPackageDto {
   @IsInt()
   sortOrder?: number;
 
+  @ApiPropertyOptional({
+    enum: AdPackageAudienceMode,
+    default: AdPackageAudienceMode.everyone,
+  })
+  @IsOptional()
+  @IsEnum(AdPackageAudienceMode)
+  audienceMode?: AdPackageAudienceMode;
+
+  @ApiPropertyOptional({ enum: MembershipTierType, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(MembershipTierType, { each: true })
+  targetTierTypes?: MembershipTierType[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID("4", { each: true })
+  targetUserIds?: string[];
+
   @ApiPropertyOptional({ type: [AdPackageTierDto] })
   @IsOptional()
   @IsArray()
@@ -121,6 +144,23 @@ export class UpdateAdPackageDto {
   @IsInt()
   sortOrder?: number;
 
+  @ApiPropertyOptional({ enum: AdPackageAudienceMode })
+  @IsOptional()
+  @IsEnum(AdPackageAudienceMode)
+  audienceMode?: AdPackageAudienceMode;
+
+  @ApiPropertyOptional({ enum: MembershipTierType, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(MembershipTierType, { each: true })
+  targetTierTypes?: MembershipTierType[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID("4", { each: true })
+  targetUserIds?: string[];
+
   @ApiPropertyOptional({
     type: [AdPackageTierDto],
     description: "When provided, replaces the package's tier rows wholesale.",
@@ -130,4 +170,12 @@ export class UpdateAdPackageDto {
   @ValidateNested({ each: true })
   @Type(() => AdPackageTierDto)
   tiers?: AdPackageTierDto[];
+}
+
+export class ExtendBoostDto {
+  @ApiProperty({ example: 7, minimum: 1, maximum: 365 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  days: number;
 }

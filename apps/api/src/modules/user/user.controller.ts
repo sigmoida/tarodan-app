@@ -33,6 +33,7 @@ import {
   UpsertBankAccountDto,
   UpdateNotificationSettingsDto,
   CompleteHomeTourDto,
+  ClaimUsernameDto,
 } from "./dto";
 
 @ApiTags("users")
@@ -72,6 +73,18 @@ export class UserController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.userService.updateProfile(userId, dto);
+  }
+
+  @Patch("me/username")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Değiştirilemez kullanıcı adını bir kez belirle" })
+  @ApiResponse({ status: 200, description: "Kullanıcı adı belirlendi" })
+  async claimUsername(
+    @CurrentUser("id") userId: string,
+    @Body() dto: ClaimUsernameDto,
+  ) {
+    return this.userService.claimUsername(userId, dto.username);
   }
 
   @Patch("me/onboarding/home-tour")

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
@@ -28,6 +29,7 @@ import {
   UpdateNotificationSettingsDto,
 } from "./dto";
 import { UserCommonService } from "./user-common.service";
+import { isUsernameAllowed, normalizeUsername } from "../auth/username.util";
 
 /**
  * UserProfileService — profil/lookup/hesap grubu: avatar redirect, find*,
@@ -337,6 +339,46 @@ export class UserProfileService {
 
     // Return updated user in the same format as findByIdWithAddresses
     return this.findByIdWithAddresses(userId);
+  }
+
+  async claimUsername(userId: string, requestedUsername: string) {
+    const username = normalizeUsername(requestedUsername);
+    if (!isUsernameAllowed(username)) {
+      throw new BadRequestException(
+        "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { usernameClaimedAt: true },
+    });
+    if (!user) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+    if (user.usernameClaimedAt) {
+      throw new ConflictException("Kullanıcı adı daha önce belirlenmiş.");
+    }
+
+    try {
+      const result = await this.prisma.user.updateMany({
+        where: { id: userId, usernameClaimedAt: null },
+        data: { username, usernameClaimedAt: new Date() },
+      });
+      if (result.count !== 1) {
+        throw new ConflictException("Kullanıcı adı daha önce belirlenmiş.");
+      }
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("Bu kullanıcı adı daha önce alınmış.");
+      }
+      throw error;
+    }
+
+    return { username, usernameClaimed: true };
   }
 
   async completeHomeTour(userId: string, version: number) {
@@ -684,7 +726,20 @@ export class UserProfileService {
   /**
    * Get public user profile
    */
-  async getPublicProfile(userId: string, viewerId?: string) {
+  async getPublicProfile(identifier: string, viewerId?: string) {
+    const normalizedIdentifier = normalizeUsername(identifier);
+    const identity = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ id: identifier }, { username: normalizedIdentifier }],
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!identity) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+    const userId = identity.id;
+
     // Sahibin kendi profili mi? Sahip ise sayaçlar "tümünü" gösterir
     // (ilan: draft hariç tüm durumlar, takas: tüm statüler, koleksiyon: özel dahil);
     // başkası bakarken yalnızca herkese görünür/biten kayıtlar sayılır.
@@ -694,6 +749,8 @@ export class UserProfileService {
       where: { id: userId },
       select: {
         id: true,
+        adminCode: true,
+        username: true,
         displayName: true,
         avatarUrl: true,
         bio: true,

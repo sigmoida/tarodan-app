@@ -1759,6 +1759,29 @@ export class AdminService {
     );
   }
 
+  async reviewSellerDocument(
+    adminId: string,
+    applicationId: string,
+    documentId: string,
+    status: import("@prisma/client").SellerDocumentStatus,
+    note?: string,
+  ) {
+    return this.sellerApplicationService.reviewSellerDocument(
+      adminId,
+      applicationId,
+      documentId,
+      status,
+      note,
+    );
+  }
+
+  async finalApproveSellerApplication(adminId: string, applicationId: string) {
+    return this.sellerApplicationService.finalApproveSellerApplication(
+      adminId,
+      applicationId,
+    );
+  }
+
   async updateUserRatingStatus(
     adminId: string,
     ratingId: string,

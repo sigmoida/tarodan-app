@@ -8,7 +8,7 @@ import {
 import { Request } from "express";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
-import { ProductStatus, OrderStatus } from "@prisma/client";
+import { ProductStatus, OrderStatus, Prisma } from "@prisma/client";
 import { isPremiumEntitled } from "../membership/membership.util";
 import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
@@ -92,14 +92,50 @@ export class ProductBoostService {
     return Number(tier.campaignPrice);
   }
 
+  private eligibleAudienceWhere(
+    userId: string,
+    tierType: "free" | "basic" | "premium" | "business",
+  ): Prisma.AdPackageWhereInput {
+    return {
+      OR: [
+        { audienceMode: "everyone" },
+        {
+          audienceMode: "membership_tiers",
+          targetTiers: { some: { tierType } },
+        },
+        {
+          audienceMode: "specific_users",
+          targetUsers: { some: { userId } },
+        },
+        {
+          audienceMode: "tiers_or_users",
+          OR: [
+            { targetTiers: { some: { tierType } } },
+            { targetUsers: { some: { userId } } },
+          ],
+        },
+      ],
+    };
+  }
+
   /** Ürün fiyatına göre (paket, süre) için aktif kademeyi çöz → efektif fiyat. */
   private async resolvePackagePrice(
     packageId: string,
     durationDays: number,
     productPrice: number,
+    userId: string,
   ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }> {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      select: { tier: { select: { type: true } } },
+    });
+    const tierType = membership?.tier.type ?? "free";
     const pkg = await this.prisma.adPackage.findFirst({
-      where: { id: packageId, isActive: true },
+      where: {
+        id: packageId,
+        isActive: true,
+        ...this.eligibleAudienceWhere(userId, tierType),
+      },
       select: { id: true, name: true, showcaseOnHome: true },
     });
     if (!pkg) {
@@ -132,7 +168,7 @@ export class ProductBoostService {
    * Bir ürün için satın alınabilir paket seçenekleri: ürünün fiyatına uyan
    * kademeleri paket + süre bazında döndürür (modal bunu render eder).
    */
-  async getBoostOptions(productId: string) {
+  async getBoostOptions(productId: string, userId: string) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
       select: { id: true, price: true },
@@ -142,9 +178,17 @@ export class ProductBoostService {
     }
     const productPrice = Number(product.price);
     const enabled = await this.isBoostEnabled();
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      select: { tier: { select: { type: true } } },
+    });
+    const tierType = membership?.tier.type ?? "free";
 
     const packages = await this.prisma.adPackage.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...this.eligibleAudienceWhere(userId, tierType),
+      },
       orderBy: { sortOrder: "asc" },
       include: {
         tiers: {
@@ -241,6 +285,7 @@ export class ProductBoostService {
         packageId,
         durationDays,
         Number(product.price),
+        userId,
       );
       price = resolved.price;
       packageName = resolved.packageName;
@@ -392,6 +437,9 @@ export class ProductBoostService {
             id: true,
             title: true,
             status: true,
+            viewCount: true,
+            likeCount: true,
+            clickCount: true,
             images: { orderBy: { sortOrder: "asc" }, take: 1 },
           },
         },
@@ -399,29 +447,72 @@ export class ProductBoostService {
     });
 
     const now = new Date();
-    return boosts.map((b) => ({
-      id: b.id,
-      productId: b.productId,
-      product: b.product
+    const rows = boosts.map((b) => {
+      const current = {
+        views: b.finalViewCount ?? b.product?.viewCount ?? 0,
+        likes: b.finalLikeCount ?? b.product?.likeCount ?? 0,
+        clicks: b.finalClickCount ?? b.product?.clickCount ?? 0,
+      };
+      const before =
+        b.baselineViewCount == null
+          ? null
+          : {
+              views: b.baselineViewCount,
+              likes: b.baselineLikeCount ?? 0,
+              clicks: b.baselineClickCount ?? 0,
+            };
+      const gain = before
         ? {
-            id: b.product.id,
-            title: b.product.title,
-            status: b.product.status,
-            image: b.product.images[0]?.cardKey ?? null,
+            views: current.views - before.views,
+            likes: current.likes - before.likes,
+            clicks: current.clicks - before.clicks,
           }
-        : null,
-      durationDays: b.durationDays,
-      price: Number(b.price),
-      status: b.status,
-      autoRenew: b.autoRenew,
-      startsAt: b.startsAt?.toISOString() ?? null,
-      endsAt: b.endsAt?.toISOString() ?? null,
-      isActive: b.status === "active" && b.endsAt != null && b.endsAt > now,
-      remainingMs:
-        b.status === "active" && b.endsAt != null && b.endsAt > now
-          ? b.endsAt.getTime() - now.getTime()
-          : 0,
-      createdAt: b.createdAt.toISOString(),
+        : null;
+      const performanceScore = gain
+        ? Math.max(0, gain.views) +
+          Math.max(0, gain.likes) * 5 +
+          Math.max(0, gain.clicks) * 3
+        : null;
+
+      return {
+        id: b.id,
+        productId: b.productId,
+        product: b.product
+          ? {
+              id: b.product.id,
+              title: b.product.title,
+              status: b.product.status,
+              image: b.product.images[0]?.cardKey ?? null,
+            }
+          : null,
+        packageName: b.packageName,
+        durationDays: b.durationDays,
+        extendedDays: b.extendedDays,
+        price: Number(b.price),
+        status: b.status,
+        autoRenew: b.autoRenew,
+        startsAt: b.startsAt?.toISOString() ?? null,
+        endsAt: b.endsAt?.toISOString() ?? null,
+        isActive: b.status === "active" && b.endsAt != null && b.endsAt > now,
+        remainingMs:
+          b.status === "active" && b.endsAt != null && b.endsAt > now
+            ? b.endsAt.getTime() - now.getTime()
+            : b.status === "paused"
+              ? (b.pausedRemainingSeconds ?? 0) * 1000
+              : 0,
+        metrics: { before, current, gain, performanceScore },
+        createdAt: b.createdAt.toISOString(),
+      };
+    });
+    const bestScore = rows.reduce(
+      (best, row) => Math.max(best, row.metrics.performanceScore ?? -1),
+      -1,
+    );
+    return rows.map((row) => ({
+      ...row,
+      isBest:
+        row.metrics.performanceScore != null &&
+        row.metrics.performanceScore === bestScore,
     }));
   }
 }

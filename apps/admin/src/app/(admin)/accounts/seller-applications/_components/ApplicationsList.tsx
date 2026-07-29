@@ -44,7 +44,7 @@ export function ApplicationsList({ status }: { status: string }) {
   const onApprove = async (app: Application) => {
     await confirm({
       description: t("admin.accounts.sellerApplications.approveConfirm", {
-        company: app.companyName,
+        company: app.companyTitle,
       }),
       confirmLabel: t("common.confirm"),
       onConfirm: () => approve.mutateAsync(app.id),

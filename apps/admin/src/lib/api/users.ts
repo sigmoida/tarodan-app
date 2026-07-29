@@ -53,4 +53,16 @@ export const usersApi = {
     api.post(`/admin/seller-applications/${id}/approve`),
   rejectSellerApplication: (id: string, reason: string) =>
     api.post(`/admin/seller-applications/${id}/reject`, { reason }),
+  reviewSellerDocument: (
+    applicationId: string,
+    documentId: string,
+    status: "approved" | "rejected" | "revision_requested",
+    note?: string,
+  ) =>
+    api.patch(
+      `/admin/seller-applications/${applicationId}/documents/${documentId}`,
+      { status, note },
+    ),
+  finalApproveSellerApplication: (id: string) =>
+    api.post(`/admin/seller-applications/${id}/final-approve`),
 };

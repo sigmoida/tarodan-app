@@ -127,10 +127,10 @@ describe("admin system and user list sorting", () => {
     );
   });
 
-  it("sorts seller applications by a user scalar", async () => {
-    const user = createDelegate();
+  it("sorts corporate applications by a scalar", async () => {
+    const corporateApplication = createDelegate();
     const service = new AdminSellerApplicationService(
-      { user } as any,
+      { corporateApplication } as any,
       {} as any,
       {} as any,
       {} as any,
@@ -140,13 +140,13 @@ describe("admin system and user list sorting", () => {
     await service.getSellerApplications({
       page: 3,
       limit: 10,
-      sortBy: "companyName",
+      sortBy: "companyTitle",
       sortOrder: "asc",
     });
 
-    expect(user.findMany).toHaveBeenCalledWith(
+    expect(corporateApplication.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: { companyName: "asc" },
+        orderBy: { companyTitle: "asc" },
         skip: 20,
         take: 10,
       }),

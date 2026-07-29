@@ -119,7 +119,7 @@ export default function MembershipSummary() {
         </div>
 
         <ButtonLink
-          href="/membership"
+          href="/profile/membership"
           variant="outline"
           size="sm"
           className="shrink-0"

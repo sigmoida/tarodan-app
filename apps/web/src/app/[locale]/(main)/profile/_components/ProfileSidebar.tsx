@@ -25,6 +25,7 @@ import {
   BuildingStorefrontIcon,
   ShieldCheckIcon,
   ArrowRightOnRectangleIcon,
+  AtSymbolIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
@@ -72,6 +73,20 @@ export default function ProfileSidebar() {
           label: t("profile.myProfile"),
           href: "/profile",
         },
+        {
+          icon: CreditCardIcon,
+          label: "Üyeliğim",
+          href: "/profile/membership",
+        },
+        ...(!profile?.usernameClaimedAt
+          ? [
+              {
+                icon: AtSymbolIcon,
+                label: t("profile.chooseUsername"),
+                href: "/profile/username",
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -204,6 +219,11 @@ export default function ProfileSidebar() {
             {profile?.displayName || t("nav.account")}
           </p>
           <p className="text-xs text-muted truncate">{profile?.email}</p>
+          {profile?.adminCode && (
+            <p className="mt-0.5 text-2xs font-medium text-subtle">
+              {profile.adminCode}
+            </p>
+          )}
         </div>
       </div>
 

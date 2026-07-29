@@ -9,6 +9,9 @@ datasource db {
 
 model User {
   id                      String                   @id @default(uuid())
+  adminCode               String                   @unique @default(dbgenerated("generate_user_admin_code('B'::text)")) @map("admin_code")
+  username                String                   @unique @default(dbgenerated("generate_legacy_username()"))
+  usernameClaimedAt       DateTime?                @map("username_claimed_at")
   email                   String                   @unique
   phone                   String?                  @unique
   passwordHash            String?                  @map("password_hash")
@@ -88,6 +91,8 @@ model User {
   wishlist                Wishlist?
   bankAccount             SellerBankAccount?
   sellerDocuments         SellerDocument[]
+  corporateApplication    CorporateApplication?
+  targetedAdPackages      AdPackageUserTarget[]
   payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
   savedCards              SavedCard[]
@@ -96,8 +101,84 @@ model User {
   productBoosts           ProductBoost[]
 
   @@index([email])
+  @@index([adminCode])
+  @@index([username])
   @@index([isSeller])
   @@map("users")
+}
+
+/// Kurumsal hesap, ön başvuru onaylanmadan User oluşturmaz. Başvuru onaylanınca
+/// tek kullanımlık davet ile parola/kullanıcı adı belirlenir; kalan bilgiler ve
+/// belgeler tamamlandıktan sonra kurumsal satıcı nihai olarak aktive edilir.
+model CorporateApplication {
+  id                    String                      @id @default(uuid())
+  userId                String?                     @unique @map("user_id")
+  status                CorporateApplicationStatus  @default(submitted)
+  authorizedFullName    String                      @map("authorized_full_name")
+  companyLegalName      String                      @map("company_legal_name")
+  companyTitle          String                      @map("company_title")
+  companyAddress        String                      @map("company_address")
+  companyEmail          String                      @map("company_email")
+  kepAddress            String?                     @map("kep_address")
+  phone                 String
+  contactPhone          String?                     @map("contact_phone")
+  taxId                 String?                     @map("tax_id")
+  companyType           String?                     @map("company_type")
+  taxOffice             String?                     @map("tax_office")
+  companyCity           String?                     @map("company_city")
+  companyDistrict       String?                     @map("company_district")
+  bankAccountHolder     String?                     @map("bank_account_holder")
+  iban                  String?
+  reviewNote            String?                     @map("review_note")
+  invitationTokenHash   String?                     @unique @map("invitation_token_hash")
+  invitationExpiresAt   DateTime?                   @map("invitation_expires_at")
+  preliminaryApprovedAt DateTime?                   @map("preliminary_approved_at")
+  activatedAt           DateTime?                   @map("activated_at")
+  submittedForReviewAt  DateTime?                   @map("submitted_for_review_at")
+  finalApprovedAt       DateTime?                   @map("final_approved_at")
+  rejectedAt            DateTime?                   @map("rejected_at")
+  createdAt             DateTime                    @default(now()) @map("created_at")
+  updatedAt             DateTime                    @updatedAt @map("updated_at")
+  user                  User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  documents             SellerDocument[]
+  stakeholders          CorporateStakeholder[]
+  events                CorporateApplicationEvent[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([companyEmail])
+  @@index([phone])
+  @@index([taxId])
+  @@map("corporate_applications")
+}
+
+model CorporateStakeholder {
+  id             String                @id @default(uuid())
+  applicationId  String                @map("application_id")
+  fullName       String                @map("full_name")
+  identityType   CorporateIdentityType @map("identity_type")
+  identityNumber String?               @map("identity_number")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  application    CorporateApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  documents      SellerDocument[]
+
+  @@index([applicationId])
+  @@map("corporate_stakeholders")
+}
+
+model CorporateApplicationEvent {
+  id            String               @id @default(uuid())
+  applicationId String               @map("application_id")
+  action        String
+  note          String?
+  actorAdminId  String?              @map("actor_admin_id")
+  actorUserId   String?              @map("actor_user_id")
+  metadata      Json?
+  createdAt     DateTime             @default(now()) @map("created_at")
+  application   CorporateApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt(sort: Desc)])
+  @@map("corporate_application_events")
 }
 
 /// Kullanıcıların gönderdiği içerik şikayetleri (ürün/kullanıcı/koleksiyon/mesaj).
@@ -487,6 +568,7 @@ model Product {
   status              ProductStatus      @default(pending)
   isTradeEnabled      Boolean            @default(false) @map("is_trade_enabled")
   viewCount           Int                @default(0) @map("view_count")
+  clickCount          Int                @default(0) @map("click_count")
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
   version             Int                @default(1)
@@ -577,30 +659,39 @@ model Product {
 }
 
 model ProductBoost {
-  id             String      @id @default(uuid())
-  productId      String      @map("product_id")
-  userId         String      @map("user_id")
+  id                     String      @id @default(uuid())
+  productId              String      @map("product_id")
+  userId                 String      @map("user_id")
   /// Purchased ad package. Nullable for legacy boosts predating the package model.
-  packageId      String?     @map("package_id")
+  packageId              String?     @map("package_id")
   /// Snapshot of the package name at purchase time (survives later package edits).
-  packageName    String?     @map("package_name")
+  packageName            String?     @map("package_name")
   /// Snapshot of the package's `showcaseOnHome` flag — the home-showcase query
   /// keys on the product column set from this, so a later package flip is inert.
-  showcaseOnHome Boolean     @default(false) @map("showcase_on_home")
-  durationDays   Int         @map("duration_days")
-  price          Decimal     @db.Decimal(10, 2)
-  status         BoostStatus @default(pending)
-  autoRenew      Boolean     @default(false) @map("auto_renew")
-  startsAt       DateTime?   @map("starts_at")
-  endsAt         DateTime?   @map("ends_at")
+  showcaseOnHome         Boolean     @default(false) @map("showcase_on_home")
+  durationDays           Int         @map("duration_days")
+  price                  Decimal     @db.Decimal(10, 2)
+  status                 BoostStatus @default(pending)
+  autoRenew              Boolean     @default(false) @map("auto_renew")
+  startsAt               DateTime?   @map("starts_at")
+  endsAt                 DateTime?   @map("ends_at")
   /// Set on activation — the LIFO ordering key for search + home showcase.
-  purchasedAt    DateTime?   @map("purchased_at")
-  orderId        String?     @unique @map("order_id")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
-  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  package        AdPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  purchasedAt            DateTime?   @map("purchased_at")
+  pausedAt               DateTime?   @map("paused_at")
+  pausedRemainingSeconds Int?        @map("paused_remaining_seconds")
+  extendedDays           Int         @default(0) @map("extended_days")
+  baselineViewCount      Int?        @map("baseline_view_count")
+  baselineLikeCount      Int?        @map("baseline_like_count")
+  baselineClickCount     Int?        @map("baseline_click_count")
+  finalViewCount         Int?        @map("final_view_count")
+  finalLikeCount         Int?        @map("final_like_count")
+  finalClickCount        Int?        @map("final_click_count")
+  orderId                String?     @unique @map("order_id")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
+  product                Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package                AdPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
 
   @@index([productId])
   @@index([userId])
@@ -614,18 +705,43 @@ model ProductBoost {
 /// that also appear in the homepage showcase area (Vitrin), on top of the search
 /// priority every active package grants.
 model AdPackage {
-  id             String          @id @default(uuid())
+  id             String                    @id @default(uuid())
   name           String
-  slug           String          @unique
-  showcaseOnHome Boolean         @default(false) @map("showcase_on_home")
-  isActive       Boolean         @default(true) @map("is_active")
-  sortOrder      Int             @default(0) @map("sort_order")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  slug           String                    @unique
+  showcaseOnHome Boolean                   @default(false) @map("showcase_on_home")
+  isActive       Boolean                   @default(true) @map("is_active")
+  sortOrder      Int                       @default(0) @map("sort_order")
+  audienceMode   AdPackageAudienceMode     @default(everyone) @map("audience_mode")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
   tiers          AdPackageTier[]
   boosts         ProductBoost[]
+  targetTiers    AdPackageMembershipTier[]
+  targetUsers    AdPackageUserTarget[]
 
   @@map("ad_packages")
+}
+
+model AdPackageMembershipTier {
+  packageId String             @map("package_id")
+  tierType  MembershipTierType @map("tier_type")
+  package   AdPackage          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, tierType])
+  @@index([tierType])
+  @@map("ad_package_membership_tiers")
+}
+
+model AdPackageUserTarget {
+  packageId String    @map("package_id")
+  userId    String    @map("user_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  package   AdPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, userId])
+  @@index([userId])
+  @@map("ad_package_user_targets")
 }
 
 /// One priced cell of a package's matrix: a duration + a product-price range →
@@ -1461,21 +1577,31 @@ model SellerBankAccount {
 /// admin presigned URL ile görüntüler. (userId, documentType) tekil → yeniden
 /// yükleme eskisini değiştirir.
 model SellerDocument {
-  id           String               @id @default(uuid())
-  userId       String               @map("user_id")
-  documentType SellerDocumentType   @map("document_type")
-  s3Key        String               @map("s3_key")
-  fileName     String               @map("file_name")
-  mimeType     String               @map("mime_type")
-  size         Int                  @default(0)
-  status       SellerDocumentStatus @default(pending)
-  reviewNote   String?              @map("review_note")
-  uploadedAt   DateTime             @default(now()) @map("uploaded_at")
-  reviewedAt   DateTime?            @map("reviewed_at")
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String                @id @default(uuid())
+  userId        String                @map("user_id")
+  applicationId String?               @map("application_id")
+  stakeholderId String?               @map("stakeholder_id")
+  documentType  SellerDocumentType    @map("document_type")
+  s3Key         String                @map("s3_key")
+  fileName      String                @map("file_name")
+  mimeType      String                @map("mime_type")
+  size          Int                   @default(0)
+  status        SellerDocumentStatus  @default(pending)
+  reviewNote    String?               @map("review_note")
+  uploadedAt    DateTime              @default(now()) @map("uploaded_at")
+  reviewedAt    DateTime?             @map("reviewed_at")
+  reviewedBy    String?               @map("reviewed_by")
+  appealNote    String?               @map("appeal_note")
+  version       Int                   @default(1)
+  isCurrent     Boolean               @default(true) @map("is_current")
+  supersedesId  String?               @map("supersedes_id")
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application   CorporateApplication? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  stakeholder   CorporateStakeholder? @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, documentType])
   @@index([userId])
+  @@index([applicationId, documentType, isCurrent])
+  @@index([stakeholderId])
   @@map("seller_documents")
 }
 
@@ -1484,13 +1610,22 @@ enum SellerDocumentType {
   contract // sözleşme
   signature_circular // imza sirküleri
   activity_certificate // faaliyet belgesi
-  identity // kimlik
+  identity // eski birleşik kimlik belgesi
+  identity_front
+  identity_back
+  passport_front
+  passport_back
+  residence_or_invoice
+  trade_registry_gazette
+  bank_account_info
 }
 
 enum SellerDocumentStatus {
   pending
   approved
   rejected
+  revision_requested
+  appealed
 }
 
 // PayTR CAPI kayıtlı kart (recurring/oto-yenileme için). PAN/CVV ASLA saklanmaz —
@@ -2551,6 +2686,7 @@ enum ProductCondition {
 enum BoostStatus {
   pending
   active
+  paused
   expired
   cancelled
   failed
@@ -2705,6 +2841,29 @@ enum BusinessStatus {
   pending
   approved
   rejected
+}
+
+enum CorporateApplicationStatus {
+  submitted
+  preliminary_approved
+  invited
+  activated
+  completing
+  under_review
+  approved
+  rejected
+}
+
+enum CorporateIdentityType {
+  tckn
+  passport
+}
+
+enum AdPackageAudienceMode {
+  everyone
+  membership_tiers
+  specific_users
+  tiers_or_users
 }
 
 enum SellerType {

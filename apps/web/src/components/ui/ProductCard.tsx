@@ -95,15 +95,17 @@ export interface ProductCardProps {
 function CardLink({
   href,
   className,
+  onClick,
   children,
 }: {
   href: string | null;
   className?: string;
+  onClick?: () => void;
   children: React.ReactNode;
 }) {
   if (!href) return <div className={className}>{children}</div>;
   return (
-    <Link href={href} className={className}>
+    <Link href={href} className={className} onClick={onClick}>
       {children}
     </Link>
   );
@@ -123,6 +125,15 @@ export default function ProductCard({
   const t = useTranslations();
 
   const linkHref = href === undefined ? `/listings/${product.id}` : href;
+  const trackClick =
+    href === undefined
+      ? () => {
+          void fetch(`/gateway/products/${product.id}/click`, {
+            method: "POST",
+            keepalive: true,
+          }).catch(() => undefined);
+        }
+      : undefined;
 
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
@@ -153,7 +164,7 @@ export default function ProductCard({
   if (layout === "list") {
     return (
       <div className="relative">
-        <CardLink href={linkHref}>
+        <CardLink href={linkHref} onClick={trackClick}>
           <div className="bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex items-center gap-4 p-3">
             <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
               <OptimizedImage
@@ -226,7 +237,11 @@ export default function ProductCard({
 
   return (
     <div className="relative group h-full flex flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
-      <CardLink href={linkHref} className="flex flex-1 flex-col">
+      <CardLink
+        href={linkHref}
+        className="flex flex-1 flex-col"
+        onClick={trackClick}
+      >
         <div className="relative aspect-square bg-surface-alt">
           <OptimizedImage
             src={imageUrl}

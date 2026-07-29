@@ -132,6 +132,8 @@ export class AdminUserService {
 
     const select = {
       id: true,
+      adminCode: true,
+      username: true,
       email: true,
       displayName: true,
       phone: true,

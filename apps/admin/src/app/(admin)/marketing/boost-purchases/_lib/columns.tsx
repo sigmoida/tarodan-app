@@ -2,6 +2,7 @@ import { Badge } from "@tarodan/ui";
 import { col } from "@/components/table";
 import { type BoostPurchase, purchaseStatusConfig } from "./types";
 import type { useTranslations } from "next-intl";
+import Link from "next/link";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -35,7 +36,12 @@ export function purchaseColumns(t: T) {
       t("admin.marketing.boostPurchases.package"),
       (p) => (
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-body">{p.packageName ?? "—"}</span>
+          <Link
+            href={`/marketing/boost-purchases/${p.id}`}
+            className="truncate font-medium text-primary hover:underline"
+          >
+            {p.packageName ?? "—"}
+          </Link>
           {p.showcaseOnHome && (
             <Badge variant="primary" size="sm">
               {t("admin.marketing.boostPurchases.showcaseBadge")}
@@ -66,6 +72,19 @@ export function purchaseColumns(t: T) {
       t("admin.marketing.boostPurchases.period"),
       (p) => <PeriodCell startsAt={p.startsAt} endsAt={p.endsAt} />,
       { grow: 2, minWidth: 150 },
+    ),
+    col.custom<BoostPurchase>(
+      t("admin.marketing.boostPurchases.performance"),
+      (p) =>
+        p.metrics.gain ? (
+          <span className="whitespace-nowrap text-sm font-medium text-success">
+            +{p.metrics.gain.views} / +{p.metrics.gain.likes} / +
+            {p.metrics.gain.clicks}
+          </span>
+        ) : (
+          <span className="text-subtle">—</span>
+        ),
+      { minWidth: 130 },
     ),
   ];
 }

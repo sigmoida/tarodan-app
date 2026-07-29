@@ -36,6 +36,9 @@ function mapAuthUserToProfile(user: any): UserProfile {
   const tierType = user.membershipTier || "free";
   return {
     id: user.id,
+    adminCode: user.adminCode,
+    username: user.username,
+    usernameClaimedAt: user.usernameClaimed ? new Date().toISOString() : null,
     email: user.email,
     displayName: user.displayName,
     phone: user.phone,

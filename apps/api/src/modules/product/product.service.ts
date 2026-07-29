@@ -124,6 +124,20 @@ export class ProductService implements OnModuleInit {
     );
   }
 
+  async incrementClickCount(
+    productId: string,
+    userId?: string,
+    clientIp?: string,
+    userAgent?: string,
+  ): Promise<{ clickCount: number }> {
+    return this.engagementService.incrementClickCount(
+      productId,
+      userId,
+      clientIp,
+      userAgent,
+    );
+  }
+
   async getProductStats(productId: string, sellerId: string) {
     return this.statsService.getProductStats(productId, sellerId);
   }

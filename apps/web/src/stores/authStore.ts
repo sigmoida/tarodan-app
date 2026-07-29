@@ -13,6 +13,9 @@ export type MembershipTier = "free" | "basic" | "premium" | "business";
 
 interface User {
   id: string;
+  adminCode: string;
+  username: string;
+  usernameClaimed: boolean;
   email: string;
   phone?: string;
   displayName: string;
@@ -140,6 +143,12 @@ const extractMembershipTier = (user: any): MembershipTier => {
 // Map API user to store user
 const mapApiUser = (apiUser: any): User => ({
   id: apiUser.id,
+  adminCode: apiUser.adminCode || apiUser.admin_code || "",
+  username: apiUser.username || "",
+  usernameClaimed:
+    apiUser.usernameClaimed ??
+    apiUser.username_claimed ??
+    Boolean(apiUser.usernameClaimedAt || apiUser.username_claimed_at),
   email: apiUser.email,
   phone: apiUser.phone,
   displayName: apiUser.displayName || apiUser.display_name || "",
@@ -222,6 +231,7 @@ interface AuthState {
   loginWithGoogle: (code: string) => Promise<void>;
   loginWithApple: (idToken: string, fullName?: string) => Promise<void>;
   register: (
+    displayName: string,
     username: string,
     email: string,
     password: string,
@@ -334,6 +344,7 @@ export const useAuthStore = create<AuthState>()(
 
         register: async (
           displayName: string,
+          username: string,
           email: string,
           password: string,
           phone?: string,
@@ -342,6 +353,7 @@ export const useAuthStore = create<AuthState>()(
         ) => {
           await authApi.register({
             displayName,
+            username,
             email,
             password,
             phone,

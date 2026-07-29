@@ -51,6 +51,7 @@ export function getEmailTemplateSubject(
     "membership-expiring": `${data?.tierName || "Üyeliğiniz"} Sona Eriyor`,
     "membership-expiring-urgent": `${data?.tierName || "Üyeliğiniz"} Yarın Sona Eriyor!`,
     "product-approved": "Ürününüz Onaylandı",
+    "seller-document-revision": "Kurumsal Başvurunuzda Belge Güncellemesi",
     "wishlist-price-change": data?.isPriceDrop
       ? `🎉 Fiyat Düştü: ${data?.productTitle || ""}`
       : `📈 Fiyat Değişti: ${data?.productTitle || ""}`,
@@ -684,15 +685,19 @@ export function renderEmailTemplate(
       ${titleBlock("Kurumsal Başvurunuz Onaylandı!", "🎉")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
-        Tarodan'a kurumsal hesap başvurunuzu inceledik ve onayladık. Artık ürün listeleyebilir, satış yapabilir ve tüm satıcı özelliklerine erişebilirsiniz.
+        ${
+          data?.invitationUrl
+            ? "Kurumsal hesap ön başvurunuz onaylandı. Hesabınızı oluşturmak için aşağıdaki tek kullanımlık bağlantıdan kullanıcı adınızı ve ilk şifrenizi belirleyin."
+            : "Tarodan'a kurumsal hesap başvurunuzu inceledik ve onayladık. Artık ürün listeleyebilir, satış yapabilir ve tüm satıcı özelliklerine erişebilirsiniz."
+        }
       </p>
       ${successBox(`
-        <p style="margin: 0 0 6px 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Kurumsal Hesap Aktif</p>
+        <p style="margin: 0 0 6px 0; font-size: 16px; color: #166534; font-weight: 600;">✓ ${data?.invitationUrl ? "Ön Başvuru Onaylandı" : "Kurumsal Hesap Aktif"}</p>
         ${data?.companyName ? `<p style="margin: 0; font-size: 14px; color: #166534;">${data.companyName}</p>` : ""}
       `)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 20px 0;">Başlamak için satıcı panelinizi ziyaret edebilirsiniz:</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 20px 0;">${data?.invitationUrl ? `Bağlantı ${data?.invitationExpiresHours || 72} saat geçerlidir.` : "Başlamak için satıcı panelinizi ziyaret edebilirsiniz:"}</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Satıcı Paneline Git", `${frontendUrl}/seller`)}
+        ${primaryButton(data?.invitationUrl ? "Kurumsal Hesabı Oluştur" : "Satıcı Paneline Git", data?.invitationUrl || `${frontendUrl}/seller`)}
       </div>
       <p style="font-size: 14px; color: #6b7280; margin: 0;">İyi satışlar dileriz!<br/><strong style="color: #f97316;">Tarodan Ekibi</strong></p>
     `,
@@ -728,6 +733,23 @@ export function renderEmailTemplate(
       </p>
     `,
       "Kurumsal Başvurunuz Hakkında",
+    ),
+
+    "seller-document-revision": wrapEmail(
+      `
+      ${titleBlock("Belge Güncellemesi Gerekiyor", "📄")}
+      ${greeting(data?.name)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        Kurumsal başvurunuzdaki <strong>${data?.documentType || "belge"}</strong> için güncelleme istendi.
+      </p>
+      ${warningBox(`
+        <p style="margin: 0; font-size: 14px; color: #92400e;">${data?.reason || "Lütfen belgeyi kontrol ederek yeniden yükleyin."}</p>
+      `)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Belgelerimi Yönet", `${frontendUrl}/profile/business`)}
+      </div>
+    `,
+      "Belge Güncellemesi Gerekiyor",
     ),
 
     "seller-did-not-ship-refunded": wrapEmail(

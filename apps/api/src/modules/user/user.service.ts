@@ -109,6 +109,10 @@ export class UserService {
     return this.profile.updateProfile(userId, data);
   }
 
+  async claimUsername(userId: string, username: string) {
+    return this.profile.claimUsername(userId, username);
+  }
+
   async completeHomeTour(userId: string, version: number) {
     return this.profile.completeHomeTour(userId, version);
   }
