@@ -383,7 +383,7 @@ export function CommissionRuleFormModal({
       onSubmit={submit}
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
-      maxWidth="max-w-2xl"
+      size="2xl"
     >
       <FormError />
       <FormInput name="name" label={t("admin.finance.commission.ruleName")} />

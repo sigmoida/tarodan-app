@@ -75,7 +75,7 @@ export function TariffFormModal({
           ? t("admin.shippingTariffs.update")
           : t("admin.shippingTariffs.create")
       }
-      maxWidth="max-w-2xl"
+      size="2xl"
     >
       <FormInput name="name" label={t("admin.shippingTariffs.nameLabel")} />
       <ShippingRateRows />

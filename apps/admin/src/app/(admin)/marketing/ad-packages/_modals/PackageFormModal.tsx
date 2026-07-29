@@ -134,7 +134,7 @@ export function PackageFormModal({
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
-      maxWidth="max-w-2xl"
+      size="2xl"
       closeOnBackdrop={false}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

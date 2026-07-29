@@ -36,6 +36,15 @@ export function ApproveTradeModal({
       isOpen={open}
       onClose={() => !approve.isPending && onClose()}
       title={t("admin.operations.trades.approveTitle")}
+      closeButtonDisabled={approve.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => approve.mutate()}
+          confirmLabel={t("common.confirm")}
+          isLoading={approve.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <p className="text-sm text-body">
@@ -53,13 +62,6 @@ export function ApproveTradeModal({
             disabled={approve.isPending}
           />
         </div>
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => approve.mutate()}
-          confirmLabel={t("common.confirm")}
-          confirmVariant="success"
-          isLoading={approve.isPending}
-        />
       </div>
     </Modal>
   );

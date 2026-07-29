@@ -64,7 +64,7 @@ export function TierFormModal({
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
       submitLabel={t("common.update")}
-      maxWidth="max-w-2xl"
+      size="2xl"
     >
       <div className="grid grid-cols-2 gap-4">
         <FormInput name="name" label={t("admin.tiers.field.name")} />

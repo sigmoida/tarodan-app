@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useCallback } from 'react';
-import { Modal, type ModalProps } from './Modal';
-import { Button } from './Button';
+import React, { useCallback } from "react";
+import { Modal, type ModalProps } from "./Modal";
+import { Button } from "./Button";
 
 /** Dialog is an alias for Modal — same API, clearer name when used as a task dialog. */
 export const Dialog = Modal;
@@ -20,8 +20,6 @@ export interface ModalFooterProps {
   confirmLabel?: string;
   /** Danger styling for the primary action (destructive confirmations). */
   destructive?: boolean;
-  /** Explicit primary-action variant (overrides `destructive`); e.g. "success" for approve. */
-  confirmVariant?: 'primary' | 'danger' | 'success';
   /** Primary action shows a spinner and both buttons disable. */
   isLoading?: boolean;
   /** Disable the primary action (e.g. empty required field). */
@@ -36,23 +34,29 @@ export interface ModalFooterProps {
 export const ModalFooter: React.FC<ModalFooterProps> = ({
   onCancel,
   onConfirm,
-  cancelLabel = 'İptal',
-  confirmLabel = 'Kaydet',
+  cancelLabel = "İptal",
+  confirmLabel = "Kaydet",
   destructive = false,
-  confirmVariant,
   isLoading = false,
   disabled = false,
 }) => (
-  <div className="flex items-center justify-end gap-3 pt-2">
-    <Button type="button" variant="secondary" onClick={onCancel} disabled={isLoading}>
+  <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+    <Button
+      type="button"
+      variant="outline"
+      onClick={onCancel}
+      disabled={isLoading}
+      className="w-full sm:w-auto"
+    >
       {cancelLabel}
     </Button>
     <Button
-      type={onConfirm ? 'button' : 'submit'}
-      variant={confirmVariant ?? (destructive ? 'danger' : 'primary')}
+      type={onConfirm ? "button" : "submit"}
+      variant={destructive ? "danger" : undefined}
       onClick={onConfirm}
       isLoading={isLoading}
       disabled={disabled}
+      className="w-full sm:w-auto"
     >
       {confirmLabel}
     </Button>
@@ -81,10 +85,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  title = 'Emin misiniz?',
+  title = "Emin misiniz?",
   description,
-  confirmLabel = 'Onayla',
-  cancelLabel = 'Vazgeç',
+  confirmLabel = "Onayla",
+  cancelLabel = "Vazgeç",
   destructive,
   isLoading,
 }) => {
@@ -93,16 +97,24 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   }, [onConfirm]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="max-w-md">
-      {description && <p className="mb-5 text-sm text-body">{description}</p>}
-      <ModalFooter
-        onCancel={onClose}
-        onConfirm={handleConfirm}
-        cancelLabel={cancelLabel}
-        confirmLabel={confirmLabel}
-        destructive={destructive}
-        isLoading={isLoading}
-      />
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      size="md"
+      closeButtonDisabled={isLoading}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={handleConfirm}
+          cancelLabel={cancelLabel}
+          confirmLabel={confirmLabel}
+          destructive={destructive}
+          isLoading={isLoading}
+        />
+      }
+    >
+      {description && <p className="text-sm text-body">{description}</p>}
     </Modal>
   );
 };

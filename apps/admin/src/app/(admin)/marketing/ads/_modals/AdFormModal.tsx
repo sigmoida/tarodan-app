@@ -272,7 +272,7 @@ export function AdFormModal({
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
-      maxWidth="max-w-2xl"
+      size="2xl"
     >
       <FormInput name="title" label={t("common.title")} />
       <AdImageField />

@@ -14,7 +14,7 @@ export function GuestContactModal({
 }) {
   const t = useTranslations();
   return (
-    <Modal isOpen onClose={onClose} title={contact.subject} maxWidth="max-w-lg">
+    <Modal isOpen onClose={onClose} title={contact.subject} size="lg">
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="min-w-0">

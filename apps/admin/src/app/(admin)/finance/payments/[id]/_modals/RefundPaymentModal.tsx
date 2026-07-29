@@ -40,7 +40,17 @@ export function RefundPaymentModal({
       isOpen
       onClose={onClose}
       title={t("admin.finance.payments.manualRefund")}
-      maxWidth="max-w-md"
+      size="md"
+      closeButtonDisabled={refund.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => refund.mutate()}
+          confirmLabel={t("admin.finance.payments.refundConfirm")}
+          destructive
+          isLoading={refund.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <p className="text-muted">
@@ -62,13 +72,6 @@ export function RefundPaymentModal({
           onChange={(e) => setReason(e.target.value)}
           rows={3}
           placeholder={t("admin.finance.payments.refundReasonPlaceholder")}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => refund.mutate()}
-          confirmLabel={t("admin.finance.payments.refundConfirm")}
-          destructive
-          isLoading={refund.isPending}
         />
       </div>
     </Modal>

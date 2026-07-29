@@ -94,7 +94,7 @@ export {
 } from "./components/ProductBadge";
 export { Avatar, type AvatarProps } from "./components/Avatar";
 export { Alert, type AlertProps } from "./components/Alert";
-export { Modal, type ModalProps } from "./components/Modal";
+export { Modal, type ModalProps, type ModalSize } from "./components/Modal";
 export {
   Dialog,
   ConfirmDialog,

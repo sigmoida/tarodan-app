@@ -215,7 +215,19 @@ function ResolveRefundAttemptModal({
       isOpen
       onClose={onClose}
       title={t("admin.finance.payments.refundReconciliation.resolveTitle")}
-      maxWidth="max-w-lg"
+      size="lg"
+      closeButtonDisabled={resolve.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => resolve.mutate()}
+          confirmLabel={t(
+            "admin.finance.payments.refundReconciliation.confirm",
+          )}
+          disabled={!note.trim()}
+          isLoading={resolve.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <Select
@@ -253,15 +265,6 @@ function ResolveRefundAttemptModal({
           maxLength={1000}
           rows={4}
           disabled={resolve.isPending}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => resolve.mutate()}
-          confirmLabel={t(
-            "admin.finance.payments.refundReconciliation.confirm",
-          )}
-          disabled={!note.trim()}
-          isLoading={resolve.isPending}
         />
       </div>
     </Modal>

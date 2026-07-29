@@ -49,6 +49,15 @@ export function ResolveDisputeModal({
       isOpen={open}
       onClose={() => !resolve.isPending && onClose()}
       title={t("admin.operations.trades.resolveTitle")}
+      closeButtonDisabled={resolve.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          confirmLabel={t("admin.operations.trades.resolve")}
+          isLoading={resolve.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <div>
@@ -86,12 +95,6 @@ export function ResolveDisputeModal({
             disabled={resolve.isPending}
           />
         </div>
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={submit}
-          confirmLabel={t("admin.operations.trades.resolve")}
-          isLoading={resolve.isPending}
-        />
       </div>
     </Modal>
   );

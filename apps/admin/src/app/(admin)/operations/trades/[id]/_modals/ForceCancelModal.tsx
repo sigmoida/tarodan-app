@@ -52,6 +52,16 @@ export function ForceCancelModal({
       isOpen={open}
       onClose={() => !forceCancel.isPending && onClose()}
       title={t("admin.operations.trades.forceCancelTitle")}
+      closeButtonDisabled={forceCancel.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          confirmLabel={t("admin.operations.trades.forceCancelTitle")}
+          destructive
+          isLoading={forceCancel.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <p className="text-sm text-body">
@@ -74,13 +84,6 @@ export function ForceCancelModal({
           onChange={(e) => setSendBack(e.target.checked)}
           disabled={forceCancel.isPending}
           label={t("admin.operations.trades.sendBackLabel")}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={submit}
-          confirmLabel={t("admin.operations.trades.forceCancelTitle")}
-          destructive
-          isLoading={forceCancel.isPending}
         />
       </div>
     </Modal>

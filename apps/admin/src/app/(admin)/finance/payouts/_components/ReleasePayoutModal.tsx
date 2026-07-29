@@ -29,7 +29,17 @@ export function ReleasePayoutModal({
       isOpen
       onClose={onClose}
       title={t("admin.finance.payouts.release")}
-      maxWidth="max-w-md"
+      size="md"
+      closeButtonDisabled={release.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => release.mutate()}
+          confirmLabel={t("admin.finance.payouts.release")}
+          isLoading={release.isPending}
+          disabled={!reason.trim()}
+        />
+      }
     >
       <div className="space-y-4">
         <p className="text-muted">
@@ -42,13 +52,6 @@ export function ReleasePayoutModal({
           rows={3}
           maxLength={500}
           placeholder={t("admin.finance.payouts.releaseReasonPlaceholder")}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => release.mutate()}
-          confirmLabel={t("admin.finance.payouts.release")}
-          isLoading={release.isPending}
-          disabled={!reason.trim()}
         />
       </div>
     </Modal>

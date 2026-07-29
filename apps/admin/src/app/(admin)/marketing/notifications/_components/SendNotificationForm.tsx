@@ -165,8 +165,7 @@ export function SendNotificationForm({
         onSubmit={(formValues) => send.mutate(formValues)}
         isSubmitting={send.isPending}
         submitLabel={t("admin.marketing.notifications.sendNow")}
-        maxWidth="max-w-2xl"
-        modalClassName="max-w-6xl"
+        size="wide"
         closeOnBackdrop={false}
       >
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
