@@ -177,6 +177,7 @@ export function LoginForm() {
               name="password"
               type="password"
               label={t("auth.password")}
+              placeholder="••••••••"
               autoComplete="current-password"
               autoFocus
             />

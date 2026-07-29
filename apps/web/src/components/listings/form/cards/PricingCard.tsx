@@ -58,6 +58,7 @@ export default function PricingCard({
           name="shippingDesi"
           type="number"
           label={t("product.shippingDesi")}
+          placeholder="1"
           min={1}
           max={1000}
           step={1}

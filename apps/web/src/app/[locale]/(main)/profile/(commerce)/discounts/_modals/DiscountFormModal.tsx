@@ -124,6 +124,7 @@ export default function DiscountFormModal({
           min="0"
           max={type === "percentage" ? 100 : 10000}
           step={type === "percentage" ? 1 : 0.01}
+          placeholder={type === "percentage" ? "10" : "100"}
           value={value}
           onChange={(e) =>
             setValue("value", parseFloat(e.target.value) || 0, {
@@ -249,6 +250,7 @@ export default function DiscountFormModal({
           label="Kullanıcı Başı Limit"
           type="number"
           min="1"
+          placeholder="1"
         />
       </div>
 

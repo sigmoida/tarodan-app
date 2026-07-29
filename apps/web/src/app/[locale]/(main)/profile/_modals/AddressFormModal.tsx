@@ -69,7 +69,11 @@ export default function AddressFormModal({
       <FormInput name="title" label="Adres Başlığı" placeholder="Ev, İş, vb." />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <FormInput name="fullName" label="Ad Soyad" />
+        <FormInput
+          name="fullName"
+          label="Ad Soyad"
+          placeholder="Adınız Soyadınız"
+        />
         <FormPhone name="phone" label="Telefon" />
       </div>
 
@@ -100,8 +104,17 @@ export default function AddressFormModal({
         )}
       </div>
 
-      <FormTextarea name="address" label="Adres" rows={3} />
-      <FormInput name="zipCode" label="Posta Kodu (opsiyonel)" />
+      <FormTextarea
+        name="address"
+        label="Adres"
+        placeholder="Mahalle, sokak, bina ve daire bilgileri"
+        rows={3}
+      />
+      <FormInput
+        name="zipCode"
+        label="Posta Kodu (opsiyonel)"
+        placeholder="Örn: 34000"
+      />
       <FormCheckbox name="isDefault" label="Varsayılan adres olarak ayarla" />
     </FormModal>
   );

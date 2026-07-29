@@ -63,10 +63,15 @@ export function CategoryFormModal({
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
     >
-      <FormInput name="name" label={t("admin.catalog.categories.nameLabel")} />
+      <FormInput
+        name="name"
+        label={t("admin.catalog.categories.nameLabel")}
+        placeholder={t("admin.catalog.categories.namePlaceholder")}
+      />
       <FormTextarea
         name="description"
         label={t("common.description")}
+        placeholder={t("admin.catalog.categories.descriptionPlaceholder")}
         rows={3}
       />
       <FormCheckbox name="isActive" label={t("common.active")} />

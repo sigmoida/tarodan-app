@@ -200,7 +200,9 @@ export function DiscountFormModal({
           placeholder={
             type === "bogo"
               ? t("admin.marketing.discounts.freePlaceholder")
-              : ""
+              : type === "percentage"
+                ? "10"
+                : "100"
           }
           helperText={
             type === "bogo"
@@ -294,6 +296,7 @@ export function DiscountFormModal({
           type="number"
           min="1"
           label={t("admin.marketing.discounts.perUserLimit")}
+          placeholder="1"
         />
       </div>
 

@@ -92,6 +92,7 @@ export default function CorporateInvitationPage() {
       >
         <Input
           label={t("auth.username")}
+          placeholder={t("auth.usernamePlaceholder")}
           value={username}
           onChange={(event) =>
             setUsername(event.target.value.toLowerCase().replace(/\s/g, ""))
@@ -106,6 +107,7 @@ export default function CorporateInvitationPage() {
         <Input
           label={t("auth.password")}
           type="password"
+          placeholder="••••••••"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           autoComplete="new-password"
@@ -114,6 +116,7 @@ export default function CorporateInvitationPage() {
         <Input
           label={t("auth.confirmPassword")}
           type="password"
+          placeholder="••••••••"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
           autoComplete="new-password"

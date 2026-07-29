@@ -103,6 +103,7 @@ export default function CustomItemForm({
       <FormTextarea
         name="description"
         label={t("product.description")}
+        placeholder={t("product.descriptionPlaceholder")}
         rows={2}
       />
       <div className="grid grid-cols-2 gap-3">
@@ -144,6 +145,7 @@ export default function CustomItemForm({
           name="year"
           type="number"
           label={t("product.releaseYear")}
+          placeholder="2026"
           min={1900}
           max={2100}
         />

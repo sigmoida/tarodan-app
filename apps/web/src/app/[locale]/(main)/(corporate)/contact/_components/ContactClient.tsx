@@ -48,12 +48,26 @@ export default function ContactClient() {
         {/* Form */}
         <SectionCard className="lg:col-span-2">
           <Form form={form} onSubmit={onSubmit} className="space-y-5">
-            <FormInput name="name" label={t("contact.name")} />
-            <FormInput name="email" type="email" label={t("contact.email")} />
-            <FormInput name="subject" label={t("contact.subject")} />
+            <FormInput
+              name="name"
+              label={t("contact.name")}
+              placeholder={t("contact.namePlaceholder")}
+            />
+            <FormInput
+              name="email"
+              type="email"
+              label={t("contact.email")}
+              placeholder={t("contact.emailPlaceholder")}
+            />
+            <FormInput
+              name="subject"
+              label={t("contact.subject")}
+              placeholder={t("contact.subjectPlaceholder")}
+            />
             <FormTextarea
               name="message"
               label={t("contact.message")}
+              placeholder={t("contact.messagePlaceholder")}
               rows={6}
             />
             <Button

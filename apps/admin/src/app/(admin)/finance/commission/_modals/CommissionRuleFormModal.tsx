@@ -82,6 +82,7 @@ function RateBlock({
           type="number"
           step="0.01"
           min="0"
+          placeholder="0"
         />
         <FormInput
           name={minName}
@@ -215,6 +216,7 @@ function BreakdownPreview() {
           step="0.01"
           label={t("admin.finance.commission.examplePrice")}
           value={price}
+          placeholder="1000"
           onChange={(e) => setPrice(e.target.value)}
         />
         <Select
@@ -237,6 +239,7 @@ function BreakdownPreview() {
           step="0.01"
           label={t("admin.finance.commission.exampleVat")}
           value={vat}
+          placeholder="20"
           onChange={(e) => setVat(e.target.value)}
         />
         <Input
@@ -245,6 +248,7 @@ function BreakdownPreview() {
           step="0.01"
           label={t("admin.finance.commission.exampleWithholding")}
           value={withholding}
+          placeholder="1"
           onChange={(e) => setWithholding(e.target.value)}
         />
       </div>
@@ -386,7 +390,11 @@ export function CommissionRuleFormModal({
       size="2xl"
     >
       <FormError />
-      <FormInput name="name" label={t("admin.finance.commission.ruleName")} />
+      <FormInput
+        name="name"
+        label={t("admin.finance.commission.ruleName")}
+        placeholder={t("admin.finance.commission.ruleNamePlaceholder")}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <FormSelect
@@ -466,6 +474,7 @@ export function CommissionRuleFormModal({
           step="1"
           min="0"
           max="100"
+          placeholder="50"
           helperText={t("admin.finance.commission.shippingShareHelper")}
         />
       </div>

@@ -81,16 +81,22 @@ export function AttributeGroupFormModal({
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
     >
-      <FormInput name="name" label={t("admin.catalog.attributes.nameField")} />
+      <FormInput
+        name="name"
+        label={t("admin.catalog.attributes.nameField")}
+        placeholder={t("admin.catalog.attributes.groupNamePlaceholder")}
+      />
       <FormTextarea
         name="description"
         label={t("common.description")}
+        placeholder={t("admin.catalog.attributes.descriptionPlaceholder")}
         rows={2}
       />
       <FormInput
         name="sortOrder"
         label={t("admin.catalog.common.sortOrder")}
         type="number"
+        placeholder="0"
       />
       <div className="flex gap-6 pt-1">
         <FormCheckbox

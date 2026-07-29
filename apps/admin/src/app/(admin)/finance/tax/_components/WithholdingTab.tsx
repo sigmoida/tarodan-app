@@ -206,6 +206,7 @@ export function WithholdingTab() {
             step={0.01}
             label={t("admin.finance.tax.withholdingRatePercent")}
             value={whRate}
+            placeholder="1"
             onChange={(event) => setWhRate(event.target.value)}
             className="w-32"
           />

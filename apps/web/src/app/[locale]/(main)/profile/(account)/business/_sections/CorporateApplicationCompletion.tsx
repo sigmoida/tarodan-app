@@ -161,18 +161,27 @@ export default function CorporateApplicationCompletion({
         >
           {(
             [
-              ["companyType", "fields.companyType"],
-              ["taxId", "fields.taxId"],
-              ["taxOffice", "fields.taxOffice"],
-              ["companyCity", "fields.companyCity"],
-              ["companyDistrict", "fields.companyDistrict"],
-              ["bankAccountHolder", "fields.bankAccountHolder"],
-              ["iban", "fields.iban"],
+              ["companyType", "fields.companyType", "placeholders.companyType"],
+              ["taxId", "fields.taxId", "placeholders.taxId"],
+              ["taxOffice", "fields.taxOffice", "placeholders.taxOffice"],
+              ["companyCity", "fields.companyCity", "placeholders.companyCity"],
+              [
+                "companyDistrict",
+                "fields.companyDistrict",
+                "placeholders.companyDistrict",
+              ],
+              [
+                "bankAccountHolder",
+                "fields.bankAccountHolder",
+                "placeholders.bankAccountHolder",
+              ],
+              ["iban", "fields.iban", "placeholders.iban"],
             ] as const
-          ).map(([key, label]) => (
+          ).map(([key, label, placeholder]) => (
             <Input
               key={key}
               label={t(label)}
+              placeholder={t(placeholder)}
               value={details[key]}
               onChange={(event) =>
                 setDetails((current) => ({
@@ -297,6 +306,7 @@ export default function CorporateApplicationCompletion({
           >
             <Input
               label={t("fields.fullName")}
+              placeholder={t("placeholders.fullName")}
               value={stakeholder.fullName}
               onChange={(event) =>
                 setStakeholder((current) => ({
@@ -326,6 +336,7 @@ export default function CorporateApplicationCompletion({
             </label>
             <Input
               label={t("fields.identityNumber")}
+              placeholder={t("placeholders.identityNumber")}
               value={stakeholder.identityNumber}
               onChange={(event) =>
                 setStakeholder((current) => ({

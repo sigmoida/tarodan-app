@@ -154,6 +154,7 @@ export function PackageFormModal({
           type="number"
           min="0"
           label={t("admin.marketing.adPackages.sortOrder")}
+          placeholder="0"
         />
       </div>
 

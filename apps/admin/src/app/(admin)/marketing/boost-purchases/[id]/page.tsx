@@ -208,6 +208,7 @@ export default function BoostPurchaseDetailPage() {
                     min={1}
                     max={365}
                     value={extensionDays}
+                    placeholder="7"
                     onChange={(event) =>
                       setExtensionDays(
                         Math.min(365, Math.max(1, Number(event.target.value))),

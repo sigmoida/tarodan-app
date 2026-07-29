@@ -70,6 +70,7 @@ export function GenerateCodesModal({
         min="1"
         max="10000"
         label={t("admin.marketing.discounts.codes.count")}
+        placeholder="100"
       />
       <FormInput
         name="prefix"

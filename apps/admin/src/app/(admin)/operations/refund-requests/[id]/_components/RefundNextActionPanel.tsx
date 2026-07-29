@@ -92,6 +92,9 @@ export function RefundNextActionPanel({
               </label>
               <Textarea
                 value={reviewNote}
+                placeholder={t(
+                  "admin.operations.refundRequests.reviewNotePlaceholder",
+                )}
                 onChange={(event) =>
                   setReviewNote(event.target.value.slice(0, 1000))
                 }

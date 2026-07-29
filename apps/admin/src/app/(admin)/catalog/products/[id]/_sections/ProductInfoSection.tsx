@@ -141,6 +141,7 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
             max={1000}
             step={1}
             value={shippingDesi}
+            placeholder="1"
             onChange={(event) =>
               setShippingDesi(Math.max(1, Number(event.target.value) || 1))
             }

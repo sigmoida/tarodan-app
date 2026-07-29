@@ -88,19 +88,26 @@ export function RegisterBusinessForm() {
         <FormInput
           name="authorizedFullName"
           label={`${t("auth.authorizedFullName")} *`}
+          placeholder={t("auth.authorizedFullNamePlaceholder")}
           autoComplete="name"
         />
 
         <FormInput
           name="companyLegalName"
           label={`${t("auth.companyLegalName")} *`}
+          placeholder={t("auth.companyLegalNamePlaceholder")}
         />
 
-        <FormInput name="companyTitle" label={`${t("auth.companyTitle")} *`} />
+        <FormInput
+          name="companyTitle"
+          label={`${t("auth.companyTitle")} *`}
+          placeholder={t("auth.companyTitlePlaceholder")}
+        />
 
         <FormTextarea
           name="companyAddress"
           label={`${t("auth.companyAddress")} *`}
+          placeholder={t("auth.companyAddressPlaceholder")}
           rows={3}
         />
 
@@ -109,12 +116,14 @@ export function RegisterBusinessForm() {
             name="companyEmail"
             type="email"
             label={`${t("auth.companyEmail")} *`}
+            placeholder={t("auth.companyEmailPlaceholder")}
             autoComplete="email"
           />
           <FormInput
             name="kepAddress"
             type="email"
             label={t("auth.kepAddress")}
+            placeholder={t("auth.kepAddressPlaceholder")}
           />
         </div>
 

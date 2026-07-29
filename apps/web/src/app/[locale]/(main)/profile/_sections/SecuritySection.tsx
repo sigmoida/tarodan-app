@@ -151,12 +151,14 @@ export default function SecuritySection() {
           name="currentPassword"
           type="password"
           label="Mevcut Şifre"
+          placeholder="••••••••"
           autoComplete="current-password"
         />
         <FormInput
           name="newPassword"
           type="password"
           label="Yeni Şifre"
+          placeholder="••••••••"
           autoComplete="new-password"
         />
         <div className="flex flex-wrap gap-2">
@@ -180,6 +182,7 @@ export default function SecuritySection() {
           name="confirmPassword"
           type="password"
           label="Yeni Şifre (Tekrar)"
+          placeholder="••••••••"
           autoComplete="new-password"
         />
       </Form>

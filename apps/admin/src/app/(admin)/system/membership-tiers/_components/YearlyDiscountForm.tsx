@@ -69,6 +69,7 @@ export function YearlyDiscountForm({
           min="0"
           max="100"
           label={t("admin.tiers.yearlyDiscount.label")}
+          placeholder="10"
           className="w-48"
         />
         <Button type="submit" isLoading={save.isPending}>

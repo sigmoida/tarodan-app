@@ -274,10 +274,22 @@ export function AdFormModal({
       submitLabel={isEdit ? t("common.update") : t("common.create")}
       size="2xl"
     >
-      <FormInput name="title" label={t("common.title")} />
+      <FormInput
+        name="title"
+        label={t("common.title")}
+        placeholder={t("admin.marketing.ads.titlePlaceholder")}
+      />
       <AdImageField />
-      <FormInput name="altText" label={t("admin.marketing.ads.altText")} />
-      <FormInput name="linkUrl" label="Link URL" />
+      <FormInput
+        name="altText"
+        label={t("admin.marketing.ads.altText")}
+        placeholder={t("admin.marketing.ads.altTextPlaceholder")}
+      />
+      <FormInput
+        name="linkUrl"
+        label="Link URL"
+        placeholder={t("admin.marketing.ads.linkUrlPlaceholder")}
+      />
       <div className="grid grid-cols-2 gap-4">
         <FormSelect
           name="position"
@@ -294,6 +306,7 @@ export function AdFormModal({
         name="displayOrder"
         label={t("admin.marketing.ads.displayOrder")}
         type="number"
+        placeholder="0"
       />
       <div className="grid grid-cols-2 gap-4">
         <FormDatePicker

@@ -253,6 +253,9 @@ function ResolveRefundAttemptModal({
               "admin.finance.payments.refundReconciliation.providerRefundId",
             )}
             value={providerRefundId}
+            placeholder={t(
+              "admin.finance.payments.refundReconciliation.providerRefundIdPlaceholder",
+            )}
             onChange={(event) => setProviderRefundId(event.target.value)}
             maxLength={200}
             disabled={resolve.isPending}
@@ -261,6 +264,9 @@ function ResolveRefundAttemptModal({
         <Textarea
           label={t("admin.finance.payments.refundReconciliation.note")}
           value={note}
+          placeholder={t(
+            "admin.finance.payments.refundReconciliation.notePlaceholder",
+          )}
           onChange={(event) => setNote(event.target.value)}
           maxLength={1000}
           rows={4}

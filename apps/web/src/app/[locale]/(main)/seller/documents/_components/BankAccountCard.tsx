@@ -83,9 +83,14 @@ export function BankAccountCard() {
         <FormInput
           name="accountHolder"
           label={t("seller.documents.accountHolder")}
+          placeholder={t("seller.documents.accountHolderPlaceholder")}
         />
         <FormIban name="iban" label={t("seller.documents.iban")} />
-        <FormInput name="taxId" label={t("seller.documents.taxIdOptional")} />
+        <FormInput
+          name="taxId"
+          label={t("seller.documents.taxIdOptional")}
+          placeholder={t("seller.documents.taxIdPlaceholder")}
+        />
         <Button type="submit" isLoading={save.isPending} className="w-full">
           {t("seller.documents.saveIban")}
         </Button>

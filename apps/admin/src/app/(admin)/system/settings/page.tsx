@@ -53,6 +53,7 @@ export default function SettingsPage() {
                 helperText={f.helper}
                 min={f.min}
                 step={f.step}
+                placeholder="0"
               />
             ))}
           </div>

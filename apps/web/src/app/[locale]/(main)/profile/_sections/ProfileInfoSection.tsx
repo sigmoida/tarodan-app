@@ -201,7 +201,13 @@ export default function ProfileInfoSection() {
             <FormPhone name="phone" label="Telefon" />
             <FormDatePicker name="birthDate" label="Doğum Tarihi" />
           </div>
-          <FormTextarea name="bio" label="Hakkımda" rows={4} maxLength={500} />
+          <FormTextarea
+            name="bio"
+            label="Hakkımda"
+            placeholder="Kendiniz hakkında birkaç şey yazın..."
+            rows={4}
+            maxLength={500}
+          />
 
           {isBusiness && (
             <div className="space-y-4 rounded-lg border border-border-subtle bg-surface p-4">

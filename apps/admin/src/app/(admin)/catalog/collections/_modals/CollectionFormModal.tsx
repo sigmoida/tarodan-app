@@ -76,10 +76,15 @@ export function CollectionFormModal({
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
     >
-      <FormInput name="name" label={t("admin.catalog.collections.nameLabel")} />
+      <FormInput
+        name="name"
+        label={t("admin.catalog.collections.nameLabel")}
+        placeholder={t("admin.catalog.collections.namePlaceholder")}
+      />
       <FormTextarea
         name="description"
         label={t("common.description")}
+        placeholder={t("admin.catalog.collections.descriptionPlaceholder")}
         rows={3}
       />
       <FormInput

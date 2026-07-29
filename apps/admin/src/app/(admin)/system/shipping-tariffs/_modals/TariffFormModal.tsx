@@ -77,7 +77,11 @@ export function TariffFormModal({
       }
       size="2xl"
     >
-      <FormInput name="name" label={t("admin.shippingTariffs.nameLabel")} />
+      <FormInput
+        name="name"
+        label={t("admin.shippingTariffs.nameLabel")}
+        placeholder={t("admin.shippingTariffs.namePlaceholder")}
+      />
       <ShippingRateRows />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormInput
@@ -86,6 +90,7 @@ export function TariffFormModal({
           type="number"
           step="0.01"
           min="0"
+          placeholder="1000"
         />
       </div>
       <FormCheckbox
@@ -99,6 +104,7 @@ export function TariffFormModal({
           type="number"
           step="0.01"
           min="0"
+          placeholder="100"
         />
         <FormInput
           name="tradeLegFee"
@@ -106,6 +112,7 @@ export function TariffFormModal({
           type="number"
           step="0.01"
           min="0"
+          placeholder="100"
         />
       </div>
     </FormModal>
@@ -154,6 +161,7 @@ function ShippingRateRows() {
               min="1"
               max="20000"
               step="1"
+              placeholder="1"
             />
             <FormInput
               name={`rates.${index}.amount`}
@@ -161,6 +169,7 @@ function ShippingRateRows() {
               type="number"
               min="0"
               step="0.01"
+              placeholder="100"
             />
             <Button
               type="button"

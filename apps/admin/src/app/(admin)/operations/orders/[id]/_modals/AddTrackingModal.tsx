@@ -63,6 +63,7 @@ export function AddTrackingModal({
         <Input
           label={t("admin.operations.common.trackingNumber")}
           value={trackingNumber}
+          placeholder={t("admin.operations.orders.trackingNumberPlaceholder")}
           onChange={(event) => setTrackingNumber(event.target.value)}
           maxLength={100}
           disabled={submit.isPending}
