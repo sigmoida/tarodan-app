@@ -9,6 +9,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import { useVisibleNav } from "@/hooks/useVisibleNav";
 import { useNavSearch } from "@/hooks/useNavSearch";
 import { useNavGroups } from "@/hooks/useNavGroups";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { NavSearch } from "./NavSearch";
 import { SidebarNav } from "./SidebarNav";
 
@@ -72,6 +73,10 @@ export function Sidebar({
         onToggleGroup={toggleGroup}
         onNavigate={onClose}
       />
+
+      <div className="shrink-0 border-t border-border p-3">
+        <LocaleSwitcher />
+      </div>
     </aside>
   );
 }

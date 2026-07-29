@@ -32,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * cookie) and the shared message catalog, then hand both to
  * `NextIntlClientProvider` so every client component can call `useTranslations`.
  * `<html lang>` reflects the active locale. Locale switching is a cookie write +
- * refresh (the admin has no URL routing) — see `LocaleSwitcher` in the topbar.
+ * refresh (the admin has no URL routing) — see `LocaleSwitcher` in the sidebar.
  */
 export default async function RootLayout({
   children,
