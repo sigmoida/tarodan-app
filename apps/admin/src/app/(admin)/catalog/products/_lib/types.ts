@@ -31,12 +31,18 @@ export interface Product {
     | "reserved"
     | "deleted";
   condition: string;
-  seller: { id: string; displayName: string };
+  seller: {
+    id: string;
+    displayName: string;
+    email?: string;
+    avatarUrl?: string;
+  };
   category: { name: string };
   brand?: { name: string } | null;
   description?: string | null;
   relevanceScore?: number | null;
   isTradeEnabled?: boolean;
+  quantity?: number | null;
   imageCount?: number;
   imageUrl?: string;
   createdAt: string;
@@ -66,6 +72,7 @@ export function mapProducts(raw: any[], t: T): Product[] {
     description: p.description ?? null,
     relevanceScore: p.relevanceScore ?? null,
     isTradeEnabled: !!p.isTradeEnabled,
+    quantity: p.quantity != null ? Number(p.quantity) : null,
     imageCount: p._count?.images ?? (p.images?.length || undefined),
     imageUrl: (() => {
       let url = p.imageUrl || p.images?.[0]?.url || p.images?.[0] || "";

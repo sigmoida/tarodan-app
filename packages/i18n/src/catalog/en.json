@@ -4064,6 +4064,7 @@
         "sellerId": "Seller ID",
         "cargoStatus": "Shipping Status",
         "commission": "Commission",
+        "productCount": "Product Count",
         "itemCountUnit": "{count} items",
         "cartItems": "{count}-item cart",
         "expandCart": "Expand cart",

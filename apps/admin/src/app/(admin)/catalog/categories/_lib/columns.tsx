@@ -8,11 +8,27 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export function categoryColumns(t: T, actions: CategoryRowActions) {
   return [
-    col.text<Category>(t("common.category"), "name", { minWidth: 200 }),
-    col.muted<Category>(t("common.description"), (c) => c.description, {
-      minWidth: 220,
-      sortKey: "description",
+    col.text<Category>(t("common.category"), "name", {
+      grow: 3,
+      minWidth: 300,
     }),
+    col.custom<Category>(
+      t("common.description"),
+      (c) =>
+        c.description ? (
+          <p className="whitespace-normal break-words text-sm text-muted">
+            {c.description}
+          </p>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+      {
+        grow: 4,
+        minWidth: 320,
+        sortKey: "description",
+        sortType: "text",
+      },
+    ),
     col.number<Category>(
       t("admin.catalog.common.product"),
       (c) => c.productCount,

@@ -9,7 +9,13 @@ export interface Collection {
   viewCount: number;
   likeCount: number;
   itemCount: number;
-  owner: { id: string; displayName: string; avatarUrl?: string; membershipTier?: string | null };
+  owner: {
+    id: string;
+    displayName: string;
+    email: string;
+    avatarUrl?: string;
+    membershipTier?: string | null;
+  };
   createdAt: string;
   updatedAt: string;
 }

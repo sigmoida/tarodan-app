@@ -1,6 +1,6 @@
 /** @format */
 
-import Image from "next/image";
+import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
   Badge,
   productStatusConfig,
@@ -15,7 +15,6 @@ import {
   getProductOriginalPriceForDisplay,
 } from "@/lib/product-price";
 import { fmtTry } from "@/lib/format";
-import { productRowMenu, type ProductRowActions } from "./rowActions";
 import { aiCheckConfig, aiCheckKey, type Product } from "./types";
 
 // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- URL query payload, not display copy
@@ -23,33 +22,34 @@ const PLACEHOLDER = "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-export type { ProductRowActions };
-
-export function productColumns(t: T, actions: ProductRowActions) {
+export function productColumns(t: T) {
   return [
-    col.custom<Product>(
+    col.product<Product>(
       t("admin.catalog.common.product"),
-      (p) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="relative flex-shrink-0">
-            <Image
-              src={p.imageUrl || PLACEHOLDER}
-              alt=""
-              width={40}
-              height={40}
-              unoptimized
-              className="h-10 w-10 rounded-lg bg-surface-alt object-cover"
-            />
-            {p.imageCount != null && p.imageCount > 1 && (
-              <span className="absolute -bottom-1 -right-1 rounded bg-heading/80 px-1 text-[10px] font-medium text-inverted">
-                {p.imageCount}
-              </span>
-            )}
-          </div>
-          <span className="truncate font-medium text-heading">{p.title}</span>
-        </div>
-      ),
-      { grow: 3, minWidth: 220, sortKey: "title", sortType: "text" },
+      (p) => ({
+        title: p.title,
+        secondary: `${t("admin.catalog.products.stock")}: ${
+          p.quantity ?? t("admin.catalog.products.notSpecified")
+        }`,
+        image: p.imageUrl || PLACEHOLDER,
+        href: `/catalog/products/${p.id}`,
+      }),
+      { minWidth: 560, sortKey: "title", sortType: "text" },
+    ),
+    col.user<Product>(
+      t("admin.catalog.products.seller"),
+      (p) => ({
+        name: p.seller.displayName,
+        secondary: p.seller.email,
+        avatar: p.seller.avatarUrl,
+        href: `/accounts/users/${p.seller.id}`,
+      }),
+      {
+        grow: 6,
+        minWidth: 420,
+        sortKey: "seller.displayName",
+        sortType: "text",
+      },
     ),
     col.custom<Product>(
       t("common.price"),
@@ -77,14 +77,21 @@ export function productColumns(t: T, actions: ProductRowActions) {
       t("admin.catalog.products.listingScore"),
       (p) => p.relevanceScore,
     ),
-    col.custom<Product>(t("admin.catalog.products.tradeable"), (p) =>
-      p.isTradeEnabled ? (
-        <Badge variant="success" size="sm">
-          ✓
-        </Badge>
-      ) : (
-        <Empty />
-      ),
+    col.custom<Product>(
+      t("admin.catalog.products.tradeable"),
+      (p) =>
+        p.isTradeEnabled ? (
+          <CheckIcon
+            className="h-5 w-5 text-success-600"
+            aria-label={t("common.yes")}
+          />
+        ) : (
+          <XMarkIcon
+            className="h-5 w-5 text-danger-600"
+            aria-label={t("common.no")}
+          />
+        ),
+      { minWidth: 120 },
     ),
     col.badge<Product>(
       t("common.status"),
@@ -109,20 +116,10 @@ export function productColumns(t: T, actions: ProductRowActions) {
       (p) => enumLabel(productConditionConfig, p.condition),
       { sortKey: "condition", sortType: "text" },
     ),
-    col.user<Product>(
-      t("admin.catalog.products.seller"),
-      (p) => ({
-        name: p.seller.displayName,
-        href: `/accounts/users/${p.seller.id}`,
-      }),
-      { sortKey: "seller.displayName", sortType: "text" },
-    ),
-    col.id<Product>(t("admin.catalog.products.sellerId"), (p) => p.seller.id),
     col.text<Product>(t("common.category"), (p) => p.category.name, {
       sortKey: "category.name",
       sortType: "text",
     }),
     col.date<Product>(t("common.date"), "createdAt"),
-    col.rowMenu<Product>(productRowMenu(t, actions)),
   ];
 }

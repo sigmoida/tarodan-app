@@ -4064,6 +4064,7 @@
         "sellerId": "Satıcı ID",
         "cargoStatus": "Kargo Durumu",
         "commission": "Komisyon",
+        "productCount": "Ürün Sayısı",
         "itemCountUnit": "{count} adet",
         "cartItems": "{count} ürünlük sepet",
         "expandCart": "Sepeti aç",
