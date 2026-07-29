@@ -13,11 +13,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { SmtpProvider } from "../notification/providers/smtp.provider";
 import { StorageService } from "../storage/storage.service";
-import {
-  renderEmailTemplate,
-  getEmailTemplateSubject,
-  substituteEmailVariables,
-} from "../../common/helpers/email-template-renderer";
+import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 
 @Injectable()
 export class MarketingSchedulerService implements OnModuleInit {
@@ -105,7 +101,7 @@ export class MarketingSchedulerService implements OnModuleInit {
         },
       });
 
-      const baseUrl = process.env.FRONTEND_URL || "https://tarodan.com";
+      const baseUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
       const mappedTrending = trendingProducts.map((p) => ({
         ...p,
         imageUrl: p.images?.[0]?.cardKey
@@ -124,24 +120,18 @@ export class MarketingSchedulerService implements OnModuleInit {
             userName: user.displayName,
             trendingProducts: mappedTrending,
           };
-          const html = newsletterDbTemplate?.bodyHtml
-            ? substituteEmailVariables(
-                newsletterDbTemplate.bodyHtml,
-                templateData,
-              )
-            : renderEmailTemplate(
-                "marketing-newsletter",
-                templateData,
-                baseUrl,
-              );
-          const subject = newsletterDbTemplate?.subject
-            ? substituteEmailVariables(
-                newsletterDbTemplate.subject,
-                templateData,
-              )
-            : getEmailTemplateSubject("marketing-newsletter", templateData);
+          const email = renderManagedEmailTemplate(
+            "marketing-newsletter",
+            { ...templateData, to: user.email },
+            newsletterDbTemplate,
+            baseUrl,
+          );
 
-          await this.smtpProvider.sendEmail({ to: user.email, subject, html });
+          await this.smtpProvider.sendEmail({
+            to: user.email,
+            subject: email.subject,
+            html: email.html,
+          });
         } catch (error: any) {
           this.logger.error(
             `Failed to send newsletter email for user ${user.id}: ${error.message}`,
@@ -228,7 +218,7 @@ export class MarketingSchedulerService implements OnModuleInit {
         },
       });
 
-      const baseUrl = process.env.FRONTEND_URL || "https://tarodan.com";
+      const baseUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
       const mappedFeatured = featuredProducts.map((p) => ({
         ...p,
         imageUrl: p.images?.[0]?.cardKey
@@ -247,14 +237,18 @@ export class MarketingSchedulerService implements OnModuleInit {
             userName: user.displayName,
             featuredProducts: mappedFeatured,
           };
-          const html = monthlyDbTemplate?.bodyHtml
-            ? substituteEmailVariables(monthlyDbTemplate.bodyHtml, templateData)
-            : renderEmailTemplate("marketing-monthly", templateData, baseUrl);
-          const subject = monthlyDbTemplate?.subject
-            ? substituteEmailVariables(monthlyDbTemplate.subject, templateData)
-            : getEmailTemplateSubject("marketing-monthly", templateData);
+          const email = renderManagedEmailTemplate(
+            "marketing-monthly",
+            { ...templateData, to: user.email },
+            monthlyDbTemplate,
+            baseUrl,
+          );
 
-          await this.smtpProvider.sendEmail({ to: user.email, subject, html });
+          await this.smtpProvider.sendEmail({
+            to: user.email,
+            subject: email.subject,
+            html: email.html,
+          });
         } catch (error: any) {
           this.logger.error(
             `Failed to send monthly promotion email for user ${user.id}: ${error.message}`,
@@ -279,179 +273,5 @@ export class MarketingSchedulerService implements OnModuleInit {
         stats: { sent: 0, errors: 1 },
       };
     }
-  }
-
-  /**
-   * Generate HTML content for weekly newsletter
-   */
-  private generateNewsletterHtml(userName: string, products: any[]): string {
-    const baseStyle = `
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      max-width: 600px;
-      margin: 0 auto;
-      background: #ffffff;
-      padding: 32px;
-    `;
-    const headerStyle = `color: #1a1a2e; margin-bottom: 24px;`;
-    const buttonStyle = `
-      display: inline-block;
-      padding: 14px 28px;
-      background-color: #4f46e5;
-      color: white;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-    `;
-    const boxStyle = `
-      background: #f8fafc;
-      padding: 20px;
-      border-radius: 12px;
-      margin: 20px 0;
-      border: 1px solid #e2e8f0;
-    `;
-
-    const productsHtml =
-      products.length > 0
-        ? `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 24px 0;">
-          ${products
-            .map(
-              (p) => `
-            <div style="${boxStyle}">
-              ${p.imageUrl ? `<img src="${p.imageUrl}" alt="${p.title}" style="width: 100%; border-radius: 8px; margin-bottom: 12px;" />` : ""}
-              <p style="font-weight: 600; margin: 8px 0;">${p.title}</p>
-              <p style="color: #4f46e5; font-size: 18px; font-weight: 600; margin: 8px 0;">${p.price} TL</p>
-              <a href="${p.productUrl}" style="${buttonStyle}">İncele</a>
-            </div>
-          `,
-            )
-            .join("")}
-        </div>
-      `
-        : "<p>Bu hafta öne çıkan ürün bulunmamaktadır.</p>";
-
-    return `
-      <div style="${baseStyle}">
-        <h1 style="${headerStyle}">📰 Tarodan Haftalık Bülteni</h1>
-        <p>Merhaba ${userName},</p>
-        <p>Bu hafta en çok ilgi gören ürünler:</p>
-        ${productsHtml}
-        <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-          <a href="${process.env.FRONTEND_URL || "https://tarodan.com"}/profile/settings" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
-        </p>
-      </div>
-    `;
-  }
-
-  /**
-   * Generate text content for weekly newsletter
-   */
-  private generateNewsletterText(userName: string, products: any[]): string {
-    const productsText =
-      products.length > 0
-        ? products.map((p) => `- ${p.title}: ${p.price} TL`).join("\n")
-        : "Bu hafta öne çıkan ürün bulunmamaktadır.";
-
-    return `
-Tarodan Haftalık Bülteni
-
-Merhaba ${userName},
-
-Bu hafta en çok ilgi gören ürünler:
-
-${productsText}
-
-Bildirim tercihlerinizi değiştirmek için: ${process.env.FRONTEND_URL || "https://tarodan.com"}/profile/settings
-    `.trim();
-  }
-
-  /**
-   * Generate HTML content for monthly promotions
-   */
-  private generateMonthlyPromotionHtml(
-    userName: string,
-    products: any[],
-  ): string {
-    const baseStyle = `
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      max-width: 600px;
-      margin: 0 auto;
-      background: #ffffff;
-      padding: 32px;
-    `;
-    const headerStyle = `color: #1a1a2e; margin-bottom: 24px;`;
-    const buttonStyle = `
-      display: inline-block;
-      padding: 14px 28px;
-      background-color: #4f46e5;
-      color: white;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-    `;
-    const boxStyle = `
-      background: #f8fafc;
-      padding: 20px;
-      border-radius: 12px;
-      margin: 20px 0;
-      border: 1px solid #e2e8f0;
-    `;
-
-    const productsHtml =
-      products.length > 0
-        ? `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 24px 0;">
-          ${products
-            .map(
-              (p) => `
-            <div style="${boxStyle}">
-              ${p.imageUrl ? `<img src="${p.imageUrl}" alt="${p.title}" style="width: 100%; border-radius: 8px; margin-bottom: 12px;" />` : ""}
-              <p style="font-weight: 600; margin: 8px 0;">${p.title}</p>
-              <p style="color: #4f46e5; font-size: 18px; font-weight: 600; margin: 8px 0;">${p.price} TL</p>
-              <a href="${p.productUrl}" style="${buttonStyle}">İncele</a>
-            </div>
-          `,
-            )
-            .join("")}
-        </div>
-      `
-        : "<p>Bu ay öne çıkan ürün bulunmamaktadır.</p>";
-
-    return `
-      <div style="${baseStyle}">
-        <h1 style="${headerStyle}">🎁 Tarodan Aylık Özel Fırsatlar</h1>
-        <p>Merhaba ${userName},</p>
-        <p>Bu ay sizin için özel olarak seçtiğimiz ürünler:</p>
-        ${productsHtml}
-        <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
-          <a href="${process.env.FRONTEND_URL || "https://tarodan.com"}/profile/settings" style="color: #64748b;">Bildirim tercihlerinizi değiştirmek için tıklayın</a>
-        </p>
-      </div>
-    `;
-  }
-
-  /**
-   * Generate text content for monthly promotions
-   */
-  private generateMonthlyPromotionText(
-    userName: string,
-    products: any[],
-  ): string {
-    const productsText =
-      products.length > 0
-        ? products.map((p) => `- ${p.title}: ${p.price} TL`).join("\n")
-        : "Bu ay öne çıkan ürün bulunmamaktadır.";
-
-    return `
-Tarodan Aylık Özel Fırsatlar
-
-Merhaba ${userName},
-
-Bu ay sizin için özel olarak seçtiğimiz ürünler:
-
-${productsText}
-
-Bildirim tercihlerinizi değiştirmek için: ${process.env.FRONTEND_URL || "https://tarodan.com"}/profile/settings
-    `.trim();
   }
 }

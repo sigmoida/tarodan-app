@@ -2,9 +2,9 @@
  * SMTP Email Provider using Nodemailer
  * Sends emails via configured SMTP server
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as nodemailer from "nodemailer";
 
 export interface SmtpEmailOptions {
   to: string;
@@ -34,13 +34,17 @@ export class SmtpProvider {
   private readonly enabled: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    const host = this.configService.get<string>('SMTP_HOST', '');
-    const port = this.configService.get<number>('SMTP_PORT', 587);
-    const user = this.configService.get<string>('SMTP_USER', '');
-    const pass = this.configService.get<string>('SMTP_PASS', '');
-    const secure = this.configService.get<string>('SMTP_SECURE', 'false') === 'true';
-    
-    this.fromEmail = this.configService.get<string>('MAIL_FROM', 'noreply@tarodan.com');
+    const host = this.configService.get<string>("SMTP_HOST", "");
+    const port = this.configService.get<number>("SMTP_PORT", 587);
+    const user = this.configService.get<string>("SMTP_USER", "");
+    const pass = this.configService.get<string>("SMTP_PASS", "");
+    const secure =
+      this.configService.get<string>("SMTP_SECURE", "false") === "true";
+
+    this.fromEmail = this.configService.get<string>(
+      "MAIL_FROM",
+      "noreply@tarodan.com.tr",
+    );
     // Host yeterli (Mailhog/dev auth istemez); user+pass varsa auth uygulanır (prod).
     this.enabled = !!host;
 
@@ -65,7 +69,9 @@ export class SmtpProvider {
         }
       });
     } else {
-      this.logger.warn('SMTP is not configured. Email notifications will be logged only.');
+      this.logger.warn(
+        "SMTP is not configured. Email notifications will be logged only.",
+      );
     }
   }
 
@@ -74,9 +80,13 @@ export class SmtpProvider {
    */
   async sendEmail(options: SmtpEmailOptions): Promise<SmtpResponse> {
     if (!this.enabled || !this.transporter) {
-      this.logger.log(`[EMAIL-MOCK] To: ${options.to}, Subject: ${options.subject}`);
+      this.logger.log(
+        `[EMAIL-MOCK] To: ${options.to}, Subject: ${options.subject}`,
+      );
       if (options.html) {
-        this.logger.debug(`[EMAIL-MOCK] HTML content length: ${options.html.length}`);
+        this.logger.debug(
+          `[EMAIL-MOCK] HTML content length: ${options.html.length}`,
+        );
       }
       return { success: true, messageId: `mock-${Date.now()}` };
     }
@@ -98,11 +108,14 @@ export class SmtpProvider {
 
       const info = await this.transporter.sendMail(mailOptions);
 
-      this.logger.log(`Email sent via SMTP to ${options.to}, ID: ${info.messageId}`);
+      this.logger.log(
+        `Email sent via SMTP to ${options.to}, ID: ${info.messageId}`,
+      );
 
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       this.logger.error(`Failed to send email via SMTP: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }

@@ -4,6 +4,10 @@ import { Queue } from "bull";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
+import {
+  escapeEmailHtml,
+  wrapEmailTemplateLayout,
+} from "../../common/helpers/email-template-renderer";
 
 /** In-process (EventEmitter2) event adları — modüller-arası döngüsüz decoupling. */
 export const PAYMENT_TRADE_CASH_CLEARED = "payment.trade-cash-cleared";
@@ -1222,6 +1226,8 @@ export class EventService {
     template: string;
     subject: string;
     templateData?: Record<string, any>;
+    overrideHtml?: string;
+    overrideSubject?: string;
   }): Promise<void> {
     await this.emailQueue.add(
       "send-template",
@@ -1230,6 +1236,8 @@ export class EventService {
         template: data.template,
         subject: data.subject,
         templateData: data.templateData || {},
+        overrideHtml: data.overrideHtml,
+        overrideSubject: data.overrideSubject,
       },
       {
         priority: 2,
@@ -1270,17 +1278,19 @@ export class EventService {
       for (const user of users) {
         // Send email if requested
         if (payload.channels.includes("email")) {
+          const title = escapeEmailHtml(payload.title);
+          const body = escapeEmailHtml(payload.body).replace(/\n/g, "<br>");
           await this.emailQueue.add("send", {
             to: user.email,
             subject: payload.title,
-            html: `
-              <div style="font-family: sans-serif; padding: 20px;">
-                <h2 style="color: #ea580c;">${payload.title}</h2>
-                <div style="line-height: 1.6; color: #374151;">${payload.body}</div>
-                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;"/>
-                <p style="font-size: 12px; color: #6b7280;">Bu e-posta Tarodan tarafından otomatik olarak gönderilmiştir.</p>
-              </div>
-            `,
+            html: wrapEmailTemplateLayout(
+              `
+                <h2 style="font-size: 24px; line-height: 1.3; color: #27272a; margin: 0 0 18px;">${title}</h2>
+                <p style="font-size: 15px; line-height: 1.7; color: #52525b; margin: 0;">${body}</p>
+              `,
+              payload.title,
+              { to: user.email },
+            ),
           });
         }
 

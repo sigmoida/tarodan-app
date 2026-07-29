@@ -22,8 +22,10 @@ import { SmsProvider } from "./providers/sms.provider";
 import { SmtpProvider } from "./providers/smtp.provider";
 import { RealtimeService } from "../websocket/realtime.service";
 import {
-  renderEmailTemplate,
-  getEmailTemplateSubject,
+  escapeEmailHtml,
+  renderManagedEmailTemplate,
+  substituteEmailVariables,
+  wrapEmailTemplateLayout,
 } from "../../common/helpers/email-template-renderer";
 import {
   resolveSettings,
@@ -90,14 +92,7 @@ export class NotificationDispatchService {
   }
 
   substituteTemplateVariables(text: string, data: Record<string, any>): string {
-    return text.replace(/\{\{([\w.]+)\}\}/g, (_, key) => {
-      const val = key.includes(".")
-        ? key
-            .split(".")
-            .reduce((o: any, k: string) => (o != null ? o[k] : undefined), data)
-        : data[key];
-      return val != null ? String(val) : `{{${key}}}`;
-    });
+    return substituteEmailVariables(text, data);
   }
 
   /**
@@ -234,19 +229,25 @@ export class NotificationDispatchService {
     data?: Record<string, any>,
   ): Promise<boolean> {
     try {
+      const frontendUrl =
+        this.configService.get<string>("FRONTEND_URL") ||
+        (this.configService.get<string>("NODE_ENV") === "production"
+          ? "https://tarodan.com.tr"
+          : "http://localhost:3000");
+      const safeSubject = escapeEmailHtml(subject);
+      const safeBody = escapeEmailHtml(body).replace(/\n/g, "<br>");
       const result = await this.sendGridProvider.sendEmail({
         to,
         subject,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">${subject}</h2>
-            <p>${body}</p>
-            <hr style="border: 1px solid #eee; margin: 20px 0;">
-            <p style="color: #666; font-size: 12px;">
-              © ${new Date().getFullYear()} Tarodan. Tüm hakları saklıdır.
-            </p>
-          </div>
-        `,
+        html: wrapEmailTemplateLayout(
+          `
+            <h2 style="font-size: 24px; line-height: 1.3; color: #27272a; margin: 0 0 18px;">${safeSubject}</h2>
+            <p style="font-size: 15px; line-height: 1.7; color: #52525b; margin: 0;">${safeBody}</p>
+          `,
+          subject,
+          { ...data, to },
+          frontendUrl,
+        ),
       });
 
       return result.success;
@@ -678,7 +679,7 @@ export class NotificationDispatchService {
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       const frontendUrl =
-        this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+        this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
       // Placeholder takma adları: göndericiler farklı anahtar adları geçebiliyor
       // (ör. welcome 'name'/'verifyUrl' geçer ama DB şablonu {{displayName}}/{{frontendUrl}}
       // bekler). Eşdeğer anahtarları doldur ki ham {{...}} kalmasın. Mevcut değerler
@@ -695,25 +696,25 @@ export class NotificationDispatchService {
       const dbTemplate = await this.prisma.emailTemplate.findUnique({
         where: { key: templateKey },
       });
-      let html: string;
-      let subject: string;
-      if (dbTemplate?.bodyHtml) {
-        html = this.substituteTemplateVariables(
-          dbTemplate.bodyHtml,
-          templateData,
-        );
-        subject = dbTemplate.subject
-          ? this.substituteTemplateVariables(dbTemplate.subject, templateData)
-          : getEmailTemplateSubject(templateKey, templateData);
-      } else {
-        html = renderEmailTemplate(templateKey, templateData, frontendUrl);
-        subject = getEmailTemplateSubject(templateKey, templateData);
-      }
+      const rendered = renderManagedEmailTemplate(
+        templateKey,
+        { ...templateData, to: email },
+        dbTemplate,
+        frontendUrl,
+      );
       if (this.sendGridProvider.isConfigured()) {
-        return this.sendGridProvider.sendEmail({ to: email, subject, html });
+        return this.sendGridProvider.sendEmail({
+          to: email,
+          subject: rendered.subject,
+          html: rendered.html,
+        });
       }
       if (this.smtpProvider.isConfigured()) {
-        return this.smtpProvider.sendEmail({ to: email, subject, html });
+        return this.smtpProvider.sendEmail({
+          to: email,
+          subject: rendered.subject,
+          html: rendered.html,
+        });
       }
       return { success: false, error: "No email provider configured" };
     } catch (err) {

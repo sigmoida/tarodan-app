@@ -35,6 +35,7 @@ import { randomUUID } from "crypto";
 import { StorageService } from "../src/modules/storage/storage.service";
 import { PrismaService } from "../src/prisma";
 import { SEED_AVATAR_BY_EMAIL } from "../src/common/seed-media-mapping";
+import { EMAIL_TEMPLATE_DEFINITIONS } from "../src/common/email/email-template-registry";
 import { normalizeSeedCommerce } from "./seed-commerce";
 const prisma = new PrismaClient();
 
@@ -5034,130 +5035,35 @@ async function main() {
   // 24. Email Templates
   // ==========================================================================
   console.log("Creating email templates...");
-  const emailTemplates = [
-    {
-      key: "welcome",
-      name: "Hoş Geldiniz",
-      subject: "Tarodan'a Hoş Geldiniz, {{displayName}}!",
-      bodyHtml: `<h1>Merhaba {{displayName}},</h1>
-<p>Tarodan ailesine hoş geldiniz! Artık diecast model araba koleksiyonunuzu büyütmeye hazırsınız.</p>
-<p>Başlamak için: <a href="{{frontendUrl}}/listings">İlanları Keşfet</a></p>
-<p>İyi koleksiyonlar,<br>Tarodan Ekibi</p>`,
-      variablesJson: JSON.stringify(["displayName", "frontendUrl"]),
-    },
-    {
-      key: "email_verification",
-      name: "E-posta Doğrulama",
-      subject: "E-posta Adresinizi Doğrulayın",
-      bodyHtml: `<h1>E-posta Doğrulama</h1>
-<p>Merhaba {{displayName}},</p>
-<p>Hesabınızı doğrulamak için aşağıdaki bağlantıya tıklayın:</p>
-<p><a href="{{verificationUrl}}">E-postamı Doğrula</a></p>
-<p>Bu bağlantı 24 saat geçerlidir. Talebi siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>`,
-      variablesJson: JSON.stringify(["displayName", "verificationUrl"]),
-    },
-    {
-      key: "password_reset",
-      name: "Şifre Sıfırlama",
-      subject: "Şifre Sıfırlama Talebi",
-      bodyHtml: `<h1>Şifre Sıfırlama</h1>
-<p>Merhaba {{displayName}},</p>
-<p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:</p>
-<p><a href="{{resetUrl}}">Şifremi Sıfırla</a></p>
-<p>Bu bağlantı 1 saat geçerlidir. Talebi siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>`,
-      variablesJson: JSON.stringify(["displayName", "resetUrl"]),
-    },
-    {
-      key: "order_placed",
-      name: "Sipariş Oluşturuldu",
-      subject: "Siparişiniz Alındı — #{{orderNumber}}",
-      bodyHtml: `<h1>Siparişiniz Alındı!</h1>
-<p>Merhaba {{buyerName}},</p>
-<p><strong>#{{orderNumber}}</strong> numaralı siparişiniz başarıyla oluşturuldu.</p>
-<p>Ürün: {{productTitle}}</p>
-<p>Tutar: {{amount}} TL</p>
-<p>Sipariş durumunuzu takip etmek için: <a href="{{orderUrl}}">Siparişimi Görüntüle</a></p>`,
-      variablesJson: JSON.stringify([
-        "buyerName",
-        "orderNumber",
-        "productTitle",
-        "amount",
-        "orderUrl",
-      ]),
-    },
-    {
-      key: "order_shipped",
-      name: "Sipariş Kargoya Verildi",
-      subject: "Siparişiniz Kargoya Verildi — #{{orderNumber}}",
-      bodyHtml: `<h1>Siparişiniz Yola Çıktı!</h1>
-<p>Merhaba {{buyerName}},</p>
-<p><strong>#{{orderNumber}}</strong> numaralı siparişiniz kargoya verildi.</p>
-<p>Kargo Firması: Sürat Kargo</p>
-<p>Takip No: <strong>{{trackingNumber}}</strong></p>
-<p><a href="{{trackingUrl}}">Kargomu Takip Et</a></p>`,
-      variablesJson: JSON.stringify([
-        "buyerName",
-        "orderNumber",
-        "trackingNumber",
-        "trackingUrl",
-      ]),
-    },
-    {
-      key: "offer_received",
-      name: "Yeni Teklif Alındı",
-      subject: "{{productTitle}} için yeni bir teklif aldınız",
-      bodyHtml: `<h1>Yeni Teklif!</h1>
-<p>Merhaba {{sellerName}},</p>
-<p><strong>{{buyerName}}</strong> adlı kullanıcı <strong>{{productTitle}}</strong> ilanınıza <strong>{{offerAmount}} TL</strong> teklif verdi.</p>
-<p><a href="{{offerUrl}}">Teklifi İncele</a></p>`,
-      variablesJson: JSON.stringify([
-        "sellerName",
-        "buyerName",
-        "productTitle",
-        "offerAmount",
-        "offerUrl",
-      ]),
-    },
-    {
-      key: "trade_request",
-      name: "Takas Talebi",
-      subject: "Yeni Takas Talebi — {{productTitle}}",
-      bodyHtml: `<h1>Takas Talebi</h1>
-<p>Merhaba {{sellerName}},</p>
-<p><strong>{{requesterName}}</strong> adlı kullanıcı <strong>{{productTitle}}</strong> ilanınız için takas teklif etti.</p>
-<p><a href="{{tradeUrl}}">Takası İncele</a></p>`,
-      variablesJson: JSON.stringify([
-        "sellerName",
-        "requesterName",
-        "productTitle",
-        "tradeUrl",
-      ]),
-    },
-    {
-      key: "payout_sent",
-      name: "Ödeme Gönderildi",
-      subject: "Satış geliriniz IBAN'ınıza aktarıldı",
-      bodyHtml: `<h1>Ödemeniz Gönderildi</h1>
-<p>Merhaba {{sellerName}},</p>
-<p><strong>{{amount}} TL</strong> tutarındaki satış geliriniz IBAN\'ınıza aktarıldı.</p>
-<p>İşlem Tarihi: {{date}}</p>`,
-      variablesJson: JSON.stringify(["sellerName", "amount", "date"]),
-    },
+  const obsoleteEmailTemplateKeys = [
+    "email_verification",
+    "password_reset",
+    "order_placed",
+    "order_shipped",
+    "offer_received",
+    "trade_request",
+    "payout_sent",
   ];
+  await prisma.emailTemplate.deleteMany({
+    where: { key: { in: obsoleteEmailTemplateKeys } },
+  });
 
-  for (const t of emailTemplates) {
+  for (const definition of EMAIL_TEMPLATE_DEFINITIONS) {
     await prisma.emailTemplate.upsert({
-      where: { key: t.key },
-      update: {
-        name: t.name,
-        subject: t.subject,
-        bodyHtml: t.bodyHtml,
-        variablesJson: t.variablesJson,
+      where: { key: definition.key },
+      update: {},
+      create: {
+        key: definition.key,
+        name: definition.name,
+        subject: "",
+        bodyHtml: "",
+        variablesJson: "[]",
       },
-      create: t,
     });
   }
-  console.log(`✅ Created/updated ${emailTemplates.length} email templates`);
+  console.log(
+    `✅ Ensured ${EMAIL_TEMPLATE_DEFINITIONS.length} canonical email templates`,
+  );
 
   // ==========================================================================
   // 25. Discounts

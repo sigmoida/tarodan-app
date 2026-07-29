@@ -440,7 +440,7 @@ export class NotificationCommerceService {
     });
     // "Stoğa geri geldi" e-postası — in-app/push'un yanında markalı mail.
     const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
     await this.dispatch.sendTemplateEmailToUser(userId, "back-in-stock", {
       productTitle: data.productTitle,
       productUrl: `${frontendUrl}/products/${productId}`,
@@ -459,7 +459,7 @@ export class NotificationCommerceService {
       data: { tradeId },
     });
     const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
     const user = await this.prisma.user.findUnique({
       where: { id: receiverId },
       select: { displayName: true },
@@ -483,7 +483,7 @@ export class NotificationCommerceService {
       data: { tradeId },
     });
     const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
     const user = await this.prisma.user.findUnique({
       where: { id: initiatorId },
       select: { displayName: true },
@@ -507,7 +507,7 @@ export class NotificationCommerceService {
       data: { tradeId, trackingNumber },
     });
     const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
     const user = await this.prisma.user.findUnique({
       where: { id: receiverId },
       select: { displayName: true },
@@ -528,7 +528,7 @@ export class NotificationCommerceService {
       data: { tradeId },
     });
     const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { displayName: true },

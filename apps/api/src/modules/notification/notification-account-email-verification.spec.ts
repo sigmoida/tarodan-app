@@ -1,7 +1,7 @@
 import { NotificationAccountService } from "./notification-account.service";
 
 describe("NotificationAccountService.sendEmailVerification", () => {
-  it("uses the legacy DB template key and sends a tokenized verification link", async () => {
+  it("uses the canonical DB template and the shared branded layout", async () => {
     const prisma = {
       user: {
         findUnique: jest.fn().mockResolvedValue({
@@ -10,7 +10,7 @@ describe("NotificationAccountService.sendEmailVerification", () => {
         }),
       },
       emailTemplate: {
-        findFirst: jest.fn().mockResolvedValue({
+        findUnique: jest.fn().mockResolvedValue({
           subject: "E-posta Adresinizi Doğrulayın",
           bodyHtml:
             '<p>{{displayName}}</p><a href="{{verificationUrl}}">Doğrula</a>',
@@ -36,7 +36,7 @@ describe("NotificationAccountService.sendEmailVerification", () => {
       sendEmail: jest.fn(),
     };
     const configService = {
-      get: jest.fn().mockReturnValue("https://tarodan.com"),
+      get: jest.fn().mockReturnValue("https://tarodan.com.tr"),
     };
 
     const service = new NotificationAccountService(
@@ -53,17 +53,22 @@ describe("NotificationAccountService.sendEmailVerification", () => {
       expect.objectContaining({ success: true, messageId: "message-1" }),
     );
 
-    expect(prisma.emailTemplate.findFirst).toHaveBeenCalledWith({
-      where: {
-        key: { in: ["email-verification", "email_verification"] },
-      },
+    expect(prisma.emailTemplate.findUnique).toHaveBeenCalledWith({
+      where: { key: "email-verification" },
     });
     expect(sendGridProvider.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "new-user@example.com",
         subject: "E-posta Adresinizi Doğrulayın",
         html: expect.stringContaining(
-          "https://tarodan.com/verify-email?token=raw-verification-token",
+          "https://tarodan.com.tr/verify-email?token=raw-verification-token",
+        ),
+      }),
+    );
+    expect(sendGridProvider.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining(
+          "https://tarodan.com.tr/tarodan-logo.jpg",
         ),
       }),
     );

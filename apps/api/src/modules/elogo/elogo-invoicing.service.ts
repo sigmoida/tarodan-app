@@ -15,11 +15,7 @@ import { buildInvoiceXml, type UblParty } from "./ubl/ubl-invoice.builder";
 import type { ElogoDocumentType } from "./elogo.types";
 import { Prisma, type ElogoInvoice } from "@prisma/client";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
-import {
-  renderEmailTemplate,
-  substituteEmailVariables,
-  getEmailTemplateSubject,
-} from "../../common/helpers/email-template-renderer";
+import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 
 /**
  * Tarodan'ın KENDİ gelir e-belgelerini (komisyon, hizmet bedeli, üyelik, boost, iade)
@@ -1418,21 +1414,21 @@ export class ElogoInvoicingService {
         };
         const frontendUrl = this.config.get<string>(
           "FRONTEND_URL",
-          "https://tarodan.com",
+          "https://tarodan.com.tr",
         );
         const dbTpl = await this.prisma.emailTemplate
           .findUnique({ where: { key: tplKey } })
           .catch(() => null);
-        const html = dbTpl?.bodyHtml
-          ? substituteEmailVariables(dbTpl.bodyHtml, tplData)
-          : renderEmailTemplate(tplKey, tplData, frontendUrl);
-        const subject = dbTpl?.subject
-          ? substituteEmailVariables(dbTpl.subject, tplData)
-          : getEmailTemplateSubject(tplKey, tplData);
+        const email = renderManagedEmailTemplate(
+          tplKey,
+          { ...tplData, to: recipientEmail },
+          dbTpl,
+          frontendUrl,
+        );
         await this.smtp.sendEmail({
           to: recipientEmail,
-          subject,
-          html,
+          subject: email.subject,
+          html: email.html,
           attachments: [{ filename: `${inv.invoiceNumber}.pdf`, content: pdf }],
         } as any);
         emailedAt = new Date();

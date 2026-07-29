@@ -480,7 +480,7 @@ export class ProductSchedulerService implements OnModuleInit {
 
       // "İlanınız sona erdi" e-postaları (ilan başına, satıcıya). İlan 60 günü
       // doldurduğu ilk gün expire olup active'den çıktığı için mükerrer gitmez.
-      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com";
+      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
       for (const listing of toExpire) {
         try {
           await this.notificationService.sendTemplateEmailToUser(
@@ -603,7 +603,7 @@ export class ProductSchedulerService implements OnModuleInit {
       log(`${expiringListings.length} ilan 7 gün içinde sona eriyor`);
 
       // "İlanınızın süresi doluyor" e-postası (ilan başına, satıcıya).
-      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com";
+      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
       for (const listing of expiringListings) {
         const expirationDate = new Date(listing.createdAt);
         expirationDate.setDate(

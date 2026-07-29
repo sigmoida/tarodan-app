@@ -17,6 +17,13 @@ export interface TemplateDetail {
   isCustom: boolean;
 }
 
+export interface TemplatePreview {
+  subject: string;
+  html: string;
+  bodyHtml: string;
+  unresolvedVariables: string[];
+}
+
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 

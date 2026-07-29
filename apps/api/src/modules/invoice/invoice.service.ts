@@ -4,9 +4,9 @@
  *
  * Requirement: "After payment, invoices will be sent to users automatically" (requirements.txt)
  *
- * İnce facade: her public imza aynen korunur. PDF/HTML render işleri
- * InvoicePdfService'e (this.pdf.*) delege edilir; e-posta gövdesi saf
- * renderer'lardan gelir (invoice-email.renderer). Dış çağıranlar
+ * İnce facade: her public imza aynen korunur. PDF işleri
+ * InvoicePdfService'e (this.pdf.*) delege edilir; e-posta gövdesi ortak
+ * e-posta şablonu renderer'ından gelir. Dış çağıranlar
  * (payment.service, payment-reconciliation.service) etkilenmez.
  */
 import {
@@ -24,11 +24,7 @@ import { NotificationService } from "../notification/notification.service";
 import { SmtpProvider } from "../notification/providers/smtp.provider";
 import { NotificationType, NotificationChannel } from "../notification/dto";
 import { TaxService } from "../tax";
-import {
-  renderEmailTemplate,
-  getEmailTemplateSubject,
-  substituteEmailVariables,
-} from "../../common/helpers/email-template-renderer";
+import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { InvoicePdfService, InvoiceData } from "./invoice-pdf.service";
 
 @Injectable()
@@ -353,7 +349,7 @@ export class InvoiceService {
       const frontendUrl =
         this.configService.get("FRONTEND_URL") ||
         (this.configService.get("NODE_ENV") === "production"
-          ? "https://tarodan.com"
+          ? "https://tarodan.com.tr"
           : "http://localhost:3000");
       // Guest: track-order (no login). Member: orders/[id] (login → redirect back to order)
       const buyerOrderUrl =
@@ -375,17 +371,17 @@ export class InvoiceService {
       const buyerDbTemplate = await this.prisma.emailTemplate.findUnique({
         where: { key: "invoice-buyer" },
       });
-      const buyerHtml = buyerDbTemplate?.bodyHtml
-        ? substituteEmailVariables(buyerDbTemplate.bodyHtml, buyerTemplateData)
-        : renderEmailTemplate("invoice-buyer", buyerTemplateData, frontendUrl);
-      const buyerSubject = buyerDbTemplate?.subject
-        ? substituteEmailVariables(buyerDbTemplate.subject, buyerTemplateData)
-        : getEmailTemplateSubject("invoice-buyer", buyerTemplateData);
+      const buyerEmailContent = renderManagedEmailTemplate(
+        "invoice-buyer",
+        { ...buyerTemplateData, to: buyerEmail },
+        buyerDbTemplate,
+        frontendUrl,
+      );
 
       const buyerResult = await this.smtpProvider.sendEmail({
         to: buyerEmail,
-        subject: buyerSubject,
-        html: buyerHtml,
+        subject: buyerEmailContent.subject,
+        html: buyerEmailContent.html,
       });
 
       if (buyerResult.success) {
@@ -412,24 +408,17 @@ export class InvoiceService {
       const sellerDbTemplate = await this.prisma.emailTemplate.findUnique({
         where: { key: "invoice-seller" },
       });
-      const sellerHtml = sellerDbTemplate?.bodyHtml
-        ? substituteEmailVariables(
-            sellerDbTemplate.bodyHtml,
-            sellerTemplateData,
-          )
-        : renderEmailTemplate(
-            "invoice-seller",
-            sellerTemplateData,
-            frontendUrl,
-          );
-      const sellerSubject = sellerDbTemplate?.subject
-        ? substituteEmailVariables(sellerDbTemplate.subject, sellerTemplateData)
-        : getEmailTemplateSubject("invoice-seller", sellerTemplateData);
+      const sellerEmailContent = renderManagedEmailTemplate(
+        "invoice-seller",
+        { ...sellerTemplateData, to: order.seller.email },
+        sellerDbTemplate,
+        frontendUrl,
+      );
 
       const sellerResult = await this.smtpProvider.sendEmail({
         to: order.seller.email,
-        subject: sellerSubject,
-        html: sellerHtml,
+        subject: sellerEmailContent.subject,
+        html: sellerEmailContent.html,
       });
 
       if (sellerResult.success) {

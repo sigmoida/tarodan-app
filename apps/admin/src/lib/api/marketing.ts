@@ -30,7 +30,12 @@ export const marketingApi = {
     api.delete(`/admin/email-templates/${encodeURIComponent(key)}`),
   sendTestEmail: (
     key: string,
-    data: { to: string; templateData?: Record<string, any> },
+    data: {
+      to: string;
+      templateData?: Record<string, any>;
+      overrideHtml?: string;
+      overrideSubject?: string;
+    },
   ) =>
     api.post(
       `/admin/email-templates/${encodeURIComponent(key)}/send-test`,

@@ -3,6 +3,67 @@
  * Used by EmailWorker (queue processor) and AdminService (preview).
  */
 
+export interface EmailBrandOptions {
+  frontendUrl?: string;
+  logoUrl?: string;
+  supportEmail?: string;
+  preferencesUrl?: string;
+}
+
+export const EMAIL_CONTENT_START = "<!-- TARODAN_CONTENT_START -->";
+export const EMAIL_CONTENT_END = "<!-- TARODAN_CONTENT_END -->";
+
+export function escapeEmailHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeEmailTemplateData(value: any): any {
+  if (typeof value === "string") return escapeEmailHtml(value);
+  if (Array.isArray(value)) return value.map(escapeEmailTemplateData);
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [
+        key,
+        escapeEmailTemplateData(nested),
+      ]),
+    );
+  }
+  return value;
+}
+
+function normalizeEmailBrandOptions(
+  input?: string | EmailBrandOptions,
+): Required<EmailBrandOptions> {
+  const options = typeof input === "string" ? { frontendUrl: input } : input;
+  const frontendUrl = (
+    options?.frontendUrl || "https://tarodan.com.tr"
+  ).replace(/\/+$/, "");
+  return {
+    frontendUrl,
+    logoUrl: options?.logoUrl || `${frontendUrl}/tarodan-logo.jpg`,
+    supportEmail: options?.supportEmail || "destek@tarodan.com.tr",
+    preferencesUrl:
+      options?.preferencesUrl || `${frontendUrl}/profile/settings`,
+  };
+}
+
+function safeEmailUrl(url: string, fallback: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return escapeEmailHtml(parsed.toString());
+    }
+  } catch {
+    // Fall through to the configured safe URL.
+  }
+  return escapeEmailHtml(fallback);
+}
+
 export function substituteEmailVariables(
   text: string,
   data: Record<string, any>,
@@ -13,8 +74,141 @@ export function substituteEmailVariables(
           .split(".")
           .reduce((o: any, k: string) => (o != null ? o[k] : undefined), data)
       : data[key];
-    return val != null ? String(val) : `{{${key}}}`;
+    return val != null ? escapeEmailHtml(val) : `{{${key}}}`;
   });
+}
+
+export function extractEmailTemplateVariables(text: string): string[] {
+  return Array.from(
+    new Set(
+      Array.from(text.matchAll(/\{\{([\w.]+)\}\}/g), (match) => match[1]),
+    ),
+  ).sort();
+}
+
+export function extractEmailTemplateContent(html: string): string {
+  const start = html.indexOf(EMAIL_CONTENT_START);
+  const end = html.indexOf(EMAIL_CONTENT_END);
+  if (start >= 0 && end > start) {
+    return html.slice(start + EMAIL_CONTENT_START.length, end).trim();
+  }
+
+  if (!/<(?:!doctype|html|body)\b/i.test(html)) return html.trim();
+
+  const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1];
+  return (body || html).trim();
+}
+
+export function wrapEmailTemplateLayout(
+  content: string,
+  title: string,
+  data: Record<string, any> = {},
+  brandInput?: string | EmailBrandOptions,
+): string {
+  const brand = normalizeEmailBrandOptions(brandInput);
+  const frontendUrl = safeEmailUrl(brand.frontendUrl, "https://tarodan.com.tr");
+  const logoUrl = safeEmailUrl(
+    brand.logoUrl,
+    `${frontendUrl}/tarodan-logo.jpg`,
+  );
+  const preferencesUrl = safeEmailUrl(
+    brand.preferencesUrl,
+    `${frontendUrl}/profile/settings`,
+  );
+  const supportEmail = escapeEmailHtml(brand.supportEmail);
+
+  return `
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light only">
+  <title>${escapeEmailHtml(title)}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f7f7f8; font-family: Arial, Helvetica, sans-serif; color: #27272a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width: 100%; background-color: #f7f7f8;">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 600px; background-color: #ffffff; border: 1px solid #e7e7e9; border-radius: 8px;">
+          <tr>
+            <td style="padding: 28px 36px 24px; text-align: left; border-bottom: 3px solid #ff6b00;">
+              <a href="${frontendUrl}" style="display: inline-block; text-decoration: none;">
+                <img src="${logoUrl}" width="176" alt="Tarodan" style="display: block; width: 176px; max-width: 100%; height: auto; border: 0;" />
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 36px;">
+              ${EMAIL_CONTENT_START}
+              ${content}
+              ${EMAIL_CONTENT_END}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 36px 28px; background-color: #fafafa; border-top: 1px solid #ededee; color: #71717a;">
+              <p style="margin: 0 0 12px; font-size: 13px; line-height: 1.6;">
+                Yardım için <a href="mailto:${supportEmail}" style="color: #d95700; text-decoration: none;">${supportEmail}</a> adresinden bize ulaşabilirsiniz.
+              </p>
+              <p style="margin: 0 0 12px; font-size: 12px; line-height: 1.6;">
+                <a href="${frontendUrl}" style="color: #52525b; text-decoration: none; margin-right: 14px;">Tarodan</a>
+                <a href="${preferencesUrl}" style="color: #52525b; text-decoration: none;">Bildirim tercihleri</a>
+              </p>
+              <p style="margin: 0; font-size: 11px; line-height: 1.6; color: #a1a1aa;">
+                © ${new Date().getFullYear()} Tarodan. Bu e-posta ${escapeEmailHtml(data?.to || "size")} gönderilmiştir.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function renderStoredEmailTemplate(
+  bodyHtml: string,
+  subject: string,
+  data: Record<string, any>,
+  brandInput?: string | EmailBrandOptions,
+): { subject: string; html: string; bodyHtml: string } {
+  const body = extractEmailTemplateContent(bodyHtml);
+  const renderedBody = substituteEmailVariables(body, data);
+  const renderedSubject = substituteEmailVariables(subject, data);
+  return {
+    subject: renderedSubject,
+    bodyHtml: body,
+    html: wrapEmailTemplateLayout(
+      renderedBody,
+      renderedSubject || "Tarodan Bildirim",
+      data,
+      brandInput,
+    ),
+  };
+}
+
+export function renderManagedEmailTemplate(
+  template: string,
+  data: Record<string, any>,
+  storedTemplate?: { bodyHtml?: string | null; subject?: string | null } | null,
+  brandInput?: string | EmailBrandOptions,
+): { subject: string; html: string } {
+  const defaultSubject = getEmailTemplateSubject(template, data);
+  if (storedTemplate?.bodyHtml?.trim()) {
+    const rendered = renderStoredEmailTemplate(
+      storedTemplate.bodyHtml,
+      storedTemplate.subject?.trim() || defaultSubject,
+      data,
+      brandInput,
+    );
+    return { subject: rendered.subject, html: rendered.html };
+  }
+
+  return {
+    subject: defaultSubject,
+    html: renderEmailTemplate(template, data, brandInput),
+  };
 }
 
 export function formatEmailPrice(amount: number | string): string {
@@ -47,16 +241,16 @@ export function getEmailTemplateSubject(
     "payment-failed": `Ödeme Tamamlanamadı - ${data?.orderNumber || ""}`,
     "payment-refunded": `İade İşleminiz Tamamlandı - ${data?.orderNumber || ""}`,
     "payment-refunded-seller": `İade İşlemi Bildirimi - ${data?.orderNumber || ""}`,
-    "premium-offer": "🌟 Premium Üyelik ile Daha Fazla Fırsat!",
+    "premium-offer": "Premium Üyelik ile Daha Fazla Fırsat",
     "membership-expiring": `${data?.tierName || "Üyeliğiniz"} Sona Eriyor`,
     "membership-expiring-urgent": `${data?.tierName || "Üyeliğiniz"} Yarın Sona Eriyor!`,
     "product-approved": "Ürününüz Onaylandı",
     "seller-document-revision": "Kurumsal Başvurunuzda Belge Güncellemesi",
     "wishlist-price-change": data?.isPriceDrop
-      ? `🎉 Fiyat Düştü: ${data?.productTitle || ""}`
-      : `📈 Fiyat Değişti: ${data?.productTitle || ""}`,
-    "marketing-newsletter": "📰 Tarodan Haftalık Bülteni",
-    "marketing-monthly": "🎁 Tarodan Aylık Özel Fırsatlar",
+      ? `Fiyat Düştü: ${data?.productTitle || ""}`
+      : `Fiyat Değişti: ${data?.productTitle || ""}`,
+    "marketing-newsletter": "Tarodan Haftalık Bülteni",
+    "marketing-monthly": "Tarodan Aylık Özel Fırsatlar",
     "seller-did-not-ship-refunded": "Satıcı Kargoya Vermedi — İadeniz Yapıldı",
     "trade-received": "Yeni Takas Teklifi Aldınız",
     "trade-accepted": "Takas Teklifiniz Kabul Edildi",
@@ -92,86 +286,44 @@ export function getEmailTemplateSubject(
 export function renderEmailTemplate(
   template: string,
   data: Record<string, any>,
-  frontendUrl: string = "https://tarodan.com",
+  brandInput: string | EmailBrandOptions = "https://tarodan.com.tr",
 ): string {
+  const rawData = data;
+  const brand = normalizeEmailBrandOptions(brandInput);
+  const frontendUrl = brand.frontendUrl;
   const isGuest =
-    data?.isGuestOrder === true ||
-    data?.buyerSystemEmail === "guest@tarodan.system";
-  const guestEmail = (data?.buyerEmail || "").trim().toLowerCase();
+    rawData?.isGuestOrder === true ||
+    rawData?.buyerSystemEmail === "guest@tarodan.system";
+  const guestEmail = (rawData?.buyerEmail || "").trim().toLowerCase();
   const orderPaidTrackUrl =
-    isGuest && data?.orderNumber
-      ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(data.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ""}`
-      : `${frontendUrl}/orders/${data?.orderId || ""}`;
+    isGuest && rawData?.orderNumber
+      ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(rawData.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ""}`
+      : `${frontendUrl}/orders/${rawData?.orderId || ""}`;
   // Grup (sepet) ödemesinde tek takip linki: üye → sipariş listesi, misafir →
   // temsilci siparişin track-order sayfası (grup için tekil sipariş sayfası yok).
   const orderPaidGroupTrackUrl =
-    isGuest && data?.orderNumber
-      ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(data.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ""}`
+    isGuest && rawData?.orderNumber
+      ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(rawData.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ""}`
       : `${frontendUrl}/orders`;
 
-  const wrapEmail = (content: string, title: string) => `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f3f4f6;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%;">
-          <tr>
-            <td style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 30px 40px; border-radius: 16px 16px 0 0; text-align: center;">
-              <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">🚗 TARODAN</h1>
-              <p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.85);">Türkiye'nin En Büyük Diecast Pazaryeri</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #ffffff; padding: 40px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
-              ${content}
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #1f2937; padding: 30px 40px; border-radius: 0 0 16px 16px; text-align: center;">
-              <p style="margin: 0 0 16px 0; font-size: 14px; color: #9ca3af;">
-                Sorularınız mı var? <a href="mailto:destek@tarodan.com" style="color: #f97316; text-decoration: none;">destek@tarodan.com</a>
-              </p>
-              <div style="margin-bottom: 16px;">
-                <a href="${frontendUrl}" style="display: inline-block; margin: 0 8px; color: #9ca3af; text-decoration: none; font-size: 13px;">Ana Sayfa</a>
-                <a href="${frontendUrl}/listings" style="display: inline-block; margin: 0 8px; color: #9ca3af; text-decoration: none; font-size: 13px;">İlanlar</a>
-                <a href="${frontendUrl}/help" style="display: inline-block; margin: 0 8px; color: #9ca3af; text-decoration: none; font-size: 13px;">Yardım</a>
-                <a href="${frontendUrl}/legal/privacy" style="display: inline-block; margin: 0 8px; color: #9ca3af; text-decoration: none; font-size: 13px;">Gizlilik</a>
-              </div>
-              <p style="margin: 0; font-size: 12px; color: #6b7280;">© ${new Date().getFullYear()} Tarodan. Tüm hakları saklıdır.</p>
-              <p style="margin: 8px 0 0 0; font-size: 11px; color: #4b5563;">
-                Bu e-posta ${data?.to || "size"} gönderilmiştir.
-                <a href="${frontendUrl}/profile/settings" style="color: #f97316; text-decoration: none;">Bildirim tercihlerini yönet</a>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  data = escapeEmailTemplateData(rawData);
+  const wrapEmail = (content: string, title: string) =>
+    wrapEmailTemplateLayout(content, title, data, brand);
 
   const primaryButton = (text: string, href: string) => `
-    <a href="${href}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px; text-align: center; box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);">${text}</a>`;
+    <a href="${safeEmailUrl(href, frontendUrl)}" style="display: inline-block; padding: 13px 28px; background-color: #ff6b00; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 15px; text-align: center;">${text}</a>`;
 
   const infoBox = (content: string) => `
-    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%); padding: 20px 24px; border-radius: 12px; margin: 24px 0; border-left: 4px solid #f59e0b;">${content}</div>`;
+    <div style="background-color: #fffaf5; padding: 18px 20px; border-radius: 6px; margin: 24px 0; border: 1px solid #ffe2cc;">${content}</div>`;
 
   const detailsBox = (content: string) => `
-    <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; margin: 24px 0; border: 1px solid #e2e8f0;">${content}</div>`;
+    <div style="background-color: #fafafa; padding: 22px; border-radius: 6px; margin: 24px 0; border: 1px solid #ededee;">${content}</div>`;
 
   const successBox = (content: string) => `
-    <div style="background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%); padding: 20px 24px; border-radius: 12px; margin: 24px 0; border-left: 4px solid #22c55e;">${content}</div>`;
+    <div style="background-color: #f4fbf6; padding: 18px 20px; border-radius: 6px; margin: 24px 0; border: 1px solid #d8efde;">${content}</div>`;
 
   const warningBox = (content: string) => `
-    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%); padding: 20px 24px; border-radius: 12px; margin: 24px 0; border-left: 4px solid #f59e0b;">${content}</div>`;
+    <div style="background-color: #fffaf0; padding: 18px 20px; border-radius: 6px; margin: 24px 0; border: 1px solid #f5e4bd;">${content}</div>`;
 
   const detailRow = (label: string, value: string, highlight?: boolean) => `
     <tr>
@@ -182,8 +334,8 @@ export function renderEmailTemplate(
   const greeting = (name: string) => `
     <p style="font-size: 16px; color: #374151; margin: 0 0 20px 0;">Merhaba <strong style="color: #111827;">${name || "Değerli Üyemiz"}</strong>,</p>`;
 
-  const titleBlock = (text: string, emoji?: string) => `
-    <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin: 0 0 16px 0; line-height: 1.3;">${emoji ? `${emoji} ` : ""}${text}</h2>`;
+  const titleBlock = (text: string, _decoration?: string) => `
+    <h2 style="font-size: 24px; font-weight: 700; color: #27272a; margin: 0 0 16px 0; line-height: 1.3;">${text}</h2>`;
 
   // Ürün adına adet ekle ("Ürün adı × 3"); adet 1/boş ise gürültü yapma.
   const qtyLabel = (productTitle: string, qty?: number) =>
@@ -200,7 +352,7 @@ export function renderEmailTemplate(
       ${titleBlock("Tarodan'a Hoş Geldiniz!", "🎉")}
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Türkiye'nin en büyük diecast pazaryerine katıldığınız için teşekkür ederiz!</p>
-      ${successBox(`<p style="margin: 0; font-size: 14px; color: #166534;">✓ Hesabınız başarıyla oluşturuldu<br/>✓ E-postanızı doğrulayarak tüm özelliklere erişebilirsiniz</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 14px; color: #166534;">Hesabınız başarıyla oluşturuldu.<br/>E-postanızı doğrulayarak tüm özelliklere erişebilirsiniz.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("E-postamı Doğrula", data?.verifyUrl || frontendUrl)}
       </div>
@@ -242,7 +394,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">📦 Siparişiniz hazırlandığında size bilgi vereceğiz.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Siparişiniz hazırlandığında size bilgi vereceğiz.</p>`)}
     `,
       "Siparişiniz Alındı",
     ),
@@ -252,7 +404,7 @@ export function renderEmailTemplate(
       ${titleBlock("Yeni Sipariş!", "🎉")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz için yeni bir sipariş aldınız.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">💰 Yeni satış bildirimi</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Yeni satış bildirimi</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -272,7 +424,7 @@ export function renderEmailTemplate(
       ${titleBlock("Ödeme Alındı", "✅")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz için ödeme başarıyla alındı.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ödeme başarıyla tamamlandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme başarıyla tamamlandı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -297,7 +449,7 @@ export function renderEmailTemplate(
       ${titleBlock("Siparişiniz Alındı", "✅")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz için ödeme başarıyla alındı. Ürünleriniz satıcı bazında paketler halinde (her satıcı için ayrı kargo) gönderilecektir.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ödeme başarıyla tamamlandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme başarıyla tamamlandı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${data?.groupNumber ? detailRow("Sipariş No", "#" + data.groupNumber) : ""}
@@ -337,7 +489,7 @@ export function renderEmailTemplate(
       ${titleBlock("Yeni Sipariş!", "🎉")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ödeme hesabınıza yansıyacak</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme hesabınıza yansıyacak</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -350,7 +502,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Kargo Bilgisi Gir", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">ℹ️ Not: Ödemeniz, alıcı ürünü teslim aldıktan 14 gün sonra hesabınıza aktarılacaktır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: Ödemeniz, alıcı ürünü teslim aldıktan 14 gün sonra hesabınıza aktarılacaktır.</p>`)}
     `,
       "Yeni Sipariş!",
     ),
@@ -378,7 +530,7 @@ export function renderEmailTemplate(
       ${titleBlock("Siparişiniz Teslim Edildi", "🎁")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz başarıyla teslim edildi!</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Teslimat tamamlandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Teslimat tamamlandı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -388,7 +540,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">ℹ️ Not: 14 günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: 14 günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
     `,
       "Siparişiniz Teslim Edildi",
     ),
@@ -401,7 +553,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Şifremi Sıfırla", data?.resetUrl || "")}
       </div>
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⚠️ Bu bağlantı 1 saat geçerlidir. Eğer bu talebi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu bağlantı 1 saat geçerlidir. Eğer bu talebi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>`)}
     `,
       "Şifre Sıfırlama",
     ),
@@ -419,7 +571,7 @@ export function renderEmailTemplate(
           ${detailRow("Teklif Veren", data?.buyerName || "")}
         </table>
       `)}
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⏰ Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : "24 saat içinde"} dolacak.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : "24 saat içinde"} dolacak.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Teklifi İncele", `${frontendUrl}/seller/offers/${data?.offerId || ""}`)}
       </div>
@@ -432,7 +584,7 @@ export function renderEmailTemplate(
       ${titleBlock("Teklifiniz Kabul Edildi!", "🎉")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! <strong>${data?.productTitle || ""}</strong> ürünü için verdiğiniz teklif kabul edildi.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Teklifiniz onaylandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Teklifiniz onaylandı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Ürün", data?.productTitle || "")}
@@ -441,7 +593,7 @@ export function renderEmailTemplate(
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
         </table>
       `)}
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⚠️ Siparişinizi tamamlamak için ödeme yapmanız gerekmektedir.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Siparişinizi tamamlamak için ödeme yapmanız gerekmektedir.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Ödeme Yap", `${frontendUrl}/orders/${data?.orderId || ""}/payment`)}
       </div>
@@ -467,7 +619,7 @@ export function renderEmailTemplate(
           </tr>
         </table>
       `)}
-      ${data?.isPriceDrop ? successBox(`<p style="margin: 0; font-size: 14px; color: #166534;">🎉 Bu ürünün fiyatı düştü! Hemen almak için aşağıdaki butona tıklayın.</p>`) : ""}
+      ${data?.isPriceDrop ? successBox(`<p style="margin: 0; font-size: 14px; color: #166534;">Bu ürünün fiyatı düştü. Hemen almak için aşağıdaki butona tıklayın.</p>`) : ""}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Ürünü Görüntüle", data?.productUrl || frontendUrl)}
       </div>
@@ -489,7 +641,7 @@ export function renderEmailTemplate(
           <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0;">
             <p style="font-weight: 600; margin: 0 0 8px 0; color: #111827;">${p.title}</p>
             <p style="color: #f97316; font-size: 18px; font-weight: 700; margin: 0 0 12px 0;">${formatEmailPrice(p.price)} TL</p>
-            <a href="${p.productUrl}" style="color: #f97316; text-decoration: none; font-weight: 500; font-size: 14px;">İncele →</a>
+            <a href="${p.productUrl}" style="color: #f97316; text-decoration: none; font-weight: 500; font-size: 14px;">İncele</a>
           </div>`,
               )
               .join("")}</div>`
@@ -513,7 +665,7 @@ export function renderEmailTemplate(
           <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0;">
             <p style="font-weight: 600; margin: 0 0 8px 0; color: #111827;">${p.title}</p>
             <p style="color: #f97316; font-size: 18px; font-weight: 700; margin: 0 0 12px 0;">${formatEmailPrice(p.price)} TL</p>
-            <a href="${p.productUrl}" style="color: #f97316; text-decoration: none; font-weight: 500; font-size: 14px;">İncele →</a>
+            <a href="${p.productUrl}" style="color: #f97316; text-decoration: none; font-weight: 500; font-size: 14px;">İncele</a>
           </div>`,
               )
               .join("")}</div>`
@@ -547,7 +699,7 @@ export function renderEmailTemplate(
       ${titleBlock("İade İşleminiz Tamamlandı", "💰")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişiniz için iade işlemi başarıyla gerçekleştirildi.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ İade işlemi onaylandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">İade işlemi onaylandı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -572,7 +724,7 @@ export function renderEmailTemplate(
           ${detailRow("İade Tutarı", formatEmailPrice(data?.refundAmount || 0) + " TL", true)}
         </table>
       `)}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">ℹ️ İade tutarı alıcıya aktarılmıştır. Herhangi bir işlem yapmanıza gerek yoktur.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İade tutarı alıcıya aktarılmıştır. Herhangi bir işlem yapmanıza gerek yoktur.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
       </div>
@@ -623,7 +775,7 @@ export function renderEmailTemplate(
       ${titleBlock("Üyeliğiniz Yarın Sona Eriyor!", "🚨")}
       ${greeting(data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.tierName || "Üyeliğiniz"}</strong> üyeliğinizin süresi <strong style="color: #dc2626;">yarın (${data?.expirationDate || ""})</strong> sona eriyor.</p>
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⚠️ Üyeliğiniz sona erdiğinde Premium özelliklere erişiminiz kısıtlanacaktır.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Üyeliğiniz sona erdiğinde Premium özelliklere erişiminiz kısıtlanacaktır.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Hemen Yenile", data?.renewUrl || `${frontendUrl}/membership`)}
       </div>
@@ -639,7 +791,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("E-postamı Doğrula", data?.verificationUrl || data?.verifyUrl || `${frontendUrl}/verify`)}
       </div>
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⏱️ Bu link ${data?.expiresIn || "24 saat"} içinde geçerliliğini yitirecektir.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu link ${data?.expiresIn || "24 saat"} içinde geçerliliğini yitirecektir.</p>`)}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0;">Bu hesabı siz oluşturmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>
     `,
       "E-posta Doğrulama",
@@ -650,7 +802,7 @@ export function renderEmailTemplate(
       ${titleBlock("Ödeme Alındı", "✅")}
       ${greeting(data?.buyerName || data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ödemeniz başarıyla alındı.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ödeme onaylandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme onaylandı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -670,7 +822,7 @@ export function renderEmailTemplate(
       ${greeting(data?.sellerName || data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ürününüz incelendi ve yayına alındı. Alıcılar artık ürününüzü görebilir!</p>
       ${successBox(`
-        <p style="margin: 0 0 8px 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ürün Yayında</p>
+          <p style="margin: 0 0 8px 0; font-size: 16px; color: #166534; font-weight: 600;">Ürün yayında</p>
         <p style="margin: 0; font-size: 14px; color: #166534;">${data?.productTitle || ""}</p>
       `)}
       <div style="text-align: center; margin: 32px 0;">
@@ -692,7 +844,7 @@ export function renderEmailTemplate(
         }
       </p>
       ${successBox(`
-        <p style="margin: 0 0 6px 0; font-size: 16px; color: #166534; font-weight: 600;">✓ ${data?.invitationUrl ? "Ön Başvuru Onaylandı" : "Kurumsal Hesap Aktif"}</p>
+        <p style="margin: 0 0 6px 0; font-size: 16px; color: #166534; font-weight: 600;">${data?.invitationUrl ? "Ön başvuru onaylandı" : "Kurumsal hesap aktif"}</p>
         ${data?.companyName ? `<p style="margin: 0; font-size: 14px; color: #166534;">${data.companyName}</p>` : ""}
       `)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 20px 0;">${data?.invitationUrl ? `Bağlantı ${data?.invitationExpiresHours || 72} saat geçerlidir.` : "Başlamak için satıcı panelinizi ziyaret edebilirsiniz:"}</p>
@@ -729,7 +881,7 @@ export function renderEmailTemplate(
         ${primaryButton("Profilimi Güncelle", `${frontendUrl}/profile`)}
       </div>
       <p style="font-size: 14px; color: #6b7280; margin: 0;">
-        Sorularınız için: <a href="mailto:destek@tarodan.com" style="color: #f97316;">destek@tarodan.com</a>
+        Sorularınız için: <a href="mailto:destek@tarodan.com.tr" style="color: #d95700;">destek@tarodan.com.tr</a>
       </p>
     `,
       "Kurumsal Başvurunuz Hakkında",
@@ -759,7 +911,7 @@ export function renderEmailTemplate(
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Satıcının belirlenen süre içinde kargoya vermemesi nedeniyle siparişiniz iptal edildi ve ödemeniz iade edildi.
       </p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ İade işleminiz başlatıldı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">İade işleminiz başlatıldı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || data?.orderId || ""))}
@@ -781,7 +933,7 @@ export function renderEmailTemplate(
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Bir kullanıcı size takas teklifi gönderdi. Teklifi inceleyip kabul veya reddedebilirsiniz.
       </p>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⏰ Takas teklifleri sınırlı süre geçerlidir. Hızlı yanıt verin!</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Takas teklifleri sınırlı süre geçerlidir. Hızlı yanıt verin.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Teklifi İncele", data?.tradeUrl || `${frontendUrl}/trades`)}
       </div>
@@ -796,8 +948,8 @@ export function renderEmailTemplate(
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Harika haber! Takas teklifiniz karşı taraf tarafından kabul edildi.
       </p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Takas onaylandı — Şimdi ürününüzü kargolayın</p>`)}
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">📦 Ürününüzü en kısa sürede kargoya vermeyi unutmayın.</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Takas onaylandı. Şimdi ürününüzü kargolayın.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Ürününüzü en kısa sürede kargoya vermeyi unutmayın.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Takası Görüntüle", data?.tradeUrl || `${frontendUrl}/trades`)}
       </div>
@@ -831,7 +983,7 @@ export function renderEmailTemplate(
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
         Takas işleminiz başarıyla tamamlandı. Umarız her iki taraf için de keyifli bir deneyim olmuştur!
       </p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Takas başarıyla tamamlandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Takas başarıyla tamamlandı</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Takası Görüntüle", data?.tradeUrl || `${frontendUrl}/trades`)}
       </div>
@@ -849,7 +1001,7 @@ export function renderEmailTemplate(
           <p style="font-size: 40px; font-weight: 700; letter-spacing: 12px; color: #111827; margin: 0; font-family: monospace;">${data?.code || ""}</p>
         </div>
       </div>
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⏱️ Bu kod <strong>${data?.expiresInMinutes || 10} dakika</strong> geçerlidir. Başkasıyla paylaşmayın.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu kod <strong>${data?.expiresInMinutes || 10} dakika</strong> geçerlidir. Başkasıyla paylaşmayın.</p>`)}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Bu kodu siz talep etmediyseniz bu e-postayı görmezden gelebilirsiniz.</p>
     `,
       "Misafir Sipariş Doğrulama Kodu",
@@ -864,7 +1016,7 @@ export function renderEmailTemplate(
           <p style="font-size: 40px; font-weight: 700; letter-spacing: 12px; color: #111827; margin: 0; font-family: monospace;">${data?.code || ""}</p>
         </div>
       </div>
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⏱️ Bu kod <strong>${data?.expiresInMinutes || 15} dakika</strong> geçerlidir. Başkasıyla paylaşmayın.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu kod <strong>${data?.expiresInMinutes || 15} dakika</strong> geçerlidir. Başkasıyla paylaşmayın.</p>`)}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Bu değişikliği siz talep etmediyseniz bu e-postayı görmezden gelebilirsiniz; hesabınız etkilenmez.</p>
     `,
       "E-posta Değişikliği Doğrulama Kodu",
@@ -933,7 +1085,7 @@ export function renderEmailTemplate(
           ${detailRow("Tutar (KDV dahil)", formatEmailPrice(data?.total || 0) + " TL", true)}
         </table>
       `)}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">📎 Faturanız ektedir. e-Arşiv faturalarınızı <a href="https://ebelgesorgulama.elogo.com.tr/" style="color: #b45309; font-weight: 600;">ebelgesorgulama.elogo.com.tr</a> üzerinden de görüntüleyebilirsiniz.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Faturanız ektedir. e-Arşiv faturalarınızı <a href="https://ebelgesorgulama.elogo.com.tr/" style="color: #b45309; font-weight: 600;">ebelgesorgulama.elogo.com.tr</a> üzerinden de görüntüleyebilirsiniz.</p>`)}
       <p style="font-size: 13px; color: #9ca3af; margin: 16px 0 0 0;">Fatura bilgileriniz yasal yükümlülükler gereği saklanmaktadır.</p>
     `,
       "e-Arşiv Faturanız Hazır",
@@ -954,7 +1106,7 @@ export function renderEmailTemplate(
           ${detailRow("Satıcı", data?.sellerName || "")}
         </table>
       `)}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">📎 Faturanız ektedir. Siparişlerim sayfasından da görüntüleyebilirsiniz.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Faturanız ektedir. Siparişlerim sayfasından da görüntüleyebilirsiniz.</p>`)}
     `,
       "Satıcı Faturanız Hazır",
     ),
@@ -972,7 +1124,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İptal nedeni:</strong> ${data.reason}</p>`) : ""}
-      ${data?.refundAmount ? infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">💳 İade tutarı ödeme yönteminize 3–5 iş günü içinde yansıyacaktır.</p>`) : ""}
+      ${data?.refundAmount ? infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İade tutarı ödeme yönteminize 3–5 iş günü içinde yansıyacaktır.</p>`) : ""}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Alışverişe Devam Et", `${frontendUrl}/listings`)}
       </div>
@@ -1013,7 +1165,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       ${data?.refundReason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İade nedeni:</strong> ${data.refundReason}</p>`) : ""}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⏰ Belirlenen süre içinde yanıt vermezseniz talep otomatik olarak işleme alınabilir.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Belirlenen süre içinde yanıt vermezseniz talep otomatik olarak işleme alınabilir.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("İade Talebini İncele", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
       </div>
@@ -1026,7 +1178,7 @@ export function renderEmailTemplate(
       ${titleBlock("İade Talebiniz Onaylandı", "✅")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz onaylandı.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ İadeniz işleme alındı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">İadeniz işleme alındı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -1034,7 +1186,7 @@ export function renderEmailTemplate(
           ${detailRow("İade Tutarı", formatEmailPrice(data?.refundAmount || 0) + " TL", true)}
         </table>
       `)}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">💳 İade tutarı ödeme yönteminize 3–5 iş günü içinde yansıyacaktır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İade tutarı ödeme yönteminize 3–5 iş günü içinde yansıyacaktır.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
       </div>
@@ -1058,7 +1210,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
       </div>
-      <p style="font-size: 14px; color: #6b7280; margin: 0;">Sorularınız için: <a href="mailto:destek@tarodan.com" style="color: #f97316;">destek@tarodan.com</a></p>
+      <p style="font-size: 14px; color: #6b7280; margin: 0;">Sorularınız için: <a href="mailto:destek@tarodan.com.tr" style="color: #d95700;">destek@tarodan.com.tr</a></p>
     `,
       "İade Talebiniz Hakkında",
     ),
@@ -1076,7 +1228,7 @@ export function renderEmailTemplate(
           ${data?.cargoCompany ? detailRow("Kargo Firması", data.cargoCompany) : ""}
         </table>
       `)}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">ℹ️ Ürünü orijinal ambalajında, eksiksiz şekilde gönderdiğinizden emin olun. İadeniz, ürün satıcıya ulaştıktan sonra tamamlanacaktır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Ürünü orijinal ambalajında, eksiksiz şekilde gönderdiğinizden emin olun. İadeniz, ürün satıcıya ulaştıktan sonra tamamlanacaktır.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton(data?.returnUrl ? "İade Etiketini Görüntüle" : "Siparişi Görüntüle", data?.returnUrl || `${frontendUrl}/orders/${data?.orderId || ""}`)}
       </div>
@@ -1089,7 +1241,7 @@ export function renderEmailTemplate(
       ${titleBlock("İadeniz Tamamlandı", "💰")}
       ${greeting(data?.buyerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade tutarınız ödeme yönteminize iade edildi. İşlem tamamlandı.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ İadeniz tamamlandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">İadeniz tamamlandı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -1097,7 +1249,7 @@ export function renderEmailTemplate(
           ${detailRow("İade Tutarı", formatEmailPrice(data?.refundAmount || 0) + " TL", true)}
         </table>
       `)}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">💳 İade tutarı ödeme yönteminize 3–5 iş günü içinde yansır. Bankanıza bağlı olarak süre değişebilir.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İade tutarı ödeme yönteminize 3–5 iş günü içinde yansır. Bankanıza bağlı olarak süre değişebilir.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
       </div>
@@ -1188,7 +1340,7 @@ export function renderEmailTemplate(
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.reviewerName || "Bir alıcı"}</strong> sizi değerlendirdi.</p>
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
-          ${data?.rating != null ? detailRow("Puan", "★".repeat(Math.max(0, Math.min(5, Math.round(Number(data.rating))))) + "☆".repeat(Math.max(0, 5 - Math.min(5, Math.round(Number(data.rating))))) + `  (${data.rating}/5)`, true) : ""}
+          ${data?.rating != null ? detailRow("Puan", `${data.rating}/5`, true) : ""}
           ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
         </table>
         ${data?.comment ? `<p style="margin: 16px 0 0 0; font-size: 15px; color: #374151; font-style: italic;">"${data.comment}"</p>` : ""}
@@ -1223,7 +1375,7 @@ export function renderEmailTemplate(
       ${titleBlock("İlanınızın Süresi Doldu", "📭")}
       ${greeting(data?.sellerName || data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi doldu ve yayından kaldırıldı. Tekrar yayınlayarak alıcılarla buluşmaya devam edebilirsiniz.</p>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">🔄 İlanınızı birkaç tıklamayla yeniden yayınlayabilirsiniz.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanınızı birkaç tıklamayla yeniden yayınlayabilirsiniz.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("İlanı Yeniden Yayınla", data?.listingUrl || `${frontendUrl}/seller/listings`)}
       </div>
@@ -1248,7 +1400,7 @@ export function renderEmailTemplate(
       ${titleBlock("Stoğa Geri Geldi!", "🔔")}
       ${greeting(data?.userName || data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Takip ettiğiniz <strong style="color: #111827;">${data?.productTitle || "ürün"}</strong> yeniden stokta! Tükenmeden hemen inceleyin.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ürün tekrar satışta</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ürün tekrar satışta</p>`)}
       ${
         data?.price
           ? detailsBox(`
@@ -1271,7 +1423,7 @@ export function renderEmailTemplate(
       ${titleBlock("Ödemeniz Aktarıldı", "💸")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Bir satışınıza ait ödeme banka hesabınıza aktarıldı.</p>
-      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ödeme aktarımı tamamlandı</p>`)}
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme aktarımı tamamlandı</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${data?.orderNumber ? detailRow("Sipariş No", "#" + data.orderNumber) : ""}
@@ -1280,7 +1432,7 @@ export function renderEmailTemplate(
           ${data?.payoutDate ? detailRow("Aktarım Tarihi", String(data.payoutDate)) : ""}
         </table>
       `)}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">ℹ️ Tutarın hesabınıza geçmesi bankanıza bağlı olarak 1–2 iş günü sürebilir.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Tutarın hesabınıza geçmesi bankanıza bağlı olarak 1–2 iş günü sürebilir.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Kazançlarımı Görüntüle", `${frontendUrl}/seller/earnings`)}
       </div>
