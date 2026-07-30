@@ -30,6 +30,7 @@ import {
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
+  RegisterResponseDto,
   TwoFactorChallengeDto,
   TokensDto,
   ForgotPasswordDto,
@@ -72,15 +73,16 @@ export class AuthController {
   @ApiOperation({ summary: "Yeni kullanıcı kaydı" })
   @ApiResponse({
     status: 201,
-    description: "Kayıt başarılı",
-    type: AuthResponseDto,
+    description:
+      "Kayıt başarılı (oturum açılmaz — e-posta doğrulaması beklenir)",
+    type: RegisterResponseDto,
   })
   @ApiResponse({ status: 400, description: "Geçersiz veri" })
   @ApiResponse({ status: 409, description: "Email zaten kayıtlı" })
   async register(
     @Body() dto: RegisterDto,
     @ReqLocale() locale: Locale,
-  ): Promise<AuthResponseDto> {
+  ): Promise<RegisterResponseDto> {
     const result = await this.authService.register(dto);
     return {
       ...result,

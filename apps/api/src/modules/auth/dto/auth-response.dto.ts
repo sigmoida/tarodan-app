@@ -80,6 +80,19 @@ export class AuthResponseDto {
   message?: string;
 }
 
+/**
+ * Kayıt yanıtı: token İÇERMEZ. Doğrulanmamış hesaba çalışan oturum vermek,
+ * "girişte e-posta doğrulaması şart" kuralını refresh ömrü boyunca bypass
+ * edilebilir kılıyordu.
+ */
+export class RegisterResponseDto {
+  @ApiProperty({ type: UserResponseDto })
+  user: UserResponseDto;
+
+  @ApiProperty({ required: false })
+  message?: string;
+}
+
 export class TwoFactorChallengeDto {
   @ApiProperty({ example: true })
   requires2FA: true;

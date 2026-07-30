@@ -19,6 +19,7 @@ import {
   CorporateInvitationDto,
   LoginDto,
   AuthResponseDto,
+  RegisterResponseDto,
   TwoFactorChallengeDto,
   TokensDto,
 } from "./dto";
@@ -119,7 +120,7 @@ export class AuthService {
    * Register a new user
    * POST /auth/register
    */
-  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+  async register(dto: RegisterDto): Promise<RegisterResponseDto> {
     const username = normalizeUsername(dto.username);
     if (!isUsernameAllowed(username)) {
       throw new BadRequestException(
@@ -299,12 +300,11 @@ export class AuthService {
       }
     }
 
-    // Generate tokens
-    const tokens = await this.generateTokens(
-      user.id,
-      user.email,
-      user.isSeller,
-    );
+    // Kayıt oturum AÇMAZ: doğrulanmamış hesaba çalışan access/refresh token vermek,
+    // "girişte doğrulama şart" kuralını refresh ömrü boyunca bypass edilebilir
+    // kılıyordu (sahibi olmadığı e-postayla kayıt olan biri ilan açıp ödeme
+    // başlatabiliyordu). İstemciler zaten kayıt sonrası doğrulama ekranını gösterip
+    // token kullanmıyor.
 
     return {
       user: {
@@ -320,7 +320,6 @@ export class AuthService {
         sellerType: user.sellerType ?? undefined,
         createdAt: user.createdAt,
       },
-      tokens,
       // #224: mesaj artık AuthController.register() tarafından locale'e göre kuruluyor
       // (server.auth.registerSuccess) — servis burada sabit metin döndürmüyor.
     };
@@ -986,6 +985,17 @@ export class AuthService {
       throw new UnauthorizedException(
         i18nMessage("server.auth.accountSuspended"),
       );
+    }
+
+    // E-posta doğrulaması oturumun ÖNKOŞULUDUR: `login` bunu zorunlu tutuyordu ama
+    // refresh etmiyordu, dolayısıyla doğrulanmamış bir hesap refresh ömrü boyunca
+    // (~7 gün) tam yetkiyle çalışmaya devam edebiliyordu. Admin oturumları hariç —
+    // onlar ayrı davet/aktivasyon akışıyla yönetilir.
+    if (!opts?.isAdmin && !user.isEmailVerified) {
+      throw new UnauthorizedException({
+        ...i18nMessage("server.auth.emailNotVerifiedLogin"),
+        errorCode: "EMAIL_NOT_VERIFIED",
+      });
     }
 
     // Sunulan refresh token'ı persist edilmiş duruma karşı doğrula + rotasyon için
