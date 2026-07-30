@@ -7,6 +7,10 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "crypto";
 import { PrismaService } from "../../prisma";
+import {
+  ELOGO_MAX_SEND_ATTEMPTS,
+  isTransientElogoFailure,
+} from "./elogo-retry-policy";
 import { ElogoService } from "./elogo.service";
 import { TaxService } from "../tax/tax.service";
 import { StorageService } from "../storage/storage.service";
@@ -40,7 +44,7 @@ type ResolvedRefundAdjustment = InvoiceRefundReversePayload & {
   finalizedAt: Date;
 };
 
-const MAX_SEND_ATTEMPTS = 8;
+const MAX_SEND_ATTEMPTS = ELOGO_MAX_SEND_ATTEMPTS;
 const SEND_LEASE_MS = 10 * 60 * 1000;
 
 const LINE_DESCRIPTION: Record<string, string> = {
@@ -783,6 +787,47 @@ export class ElogoInvoicingService {
     }
   }
 
+  /**
+   * Deneme bütçesi tükenmiş (`failed` + attemptCount >= üst sınır) faturaları
+   * greplenebilir ALARM olarak raporlar. Bunlar otomatik kurtarılmaz: yasal süre
+   * işlerken kimse fark etmezse fatura hiç kesilmez.
+   */
+  async reportExhaustedInvoices(): Promise<number> {
+    const exhausted = await this.prisma.elogoInvoice.findMany({
+      where: {
+        status: "failed",
+        attemptCount: { gte: ELOGO_MAX_SEND_ATTEMPTS },
+      },
+      select: {
+        id: true,
+        type: true,
+        sourceId: true,
+        invoiceNumber: true,
+        elogoResultMsg: true,
+      },
+      take: 100,
+    });
+    for (const inv of exhausted) {
+      this.logger.error(
+        `ELOGO_INVOICE_EXHAUSTED id=${inv.id} type=${inv.type} source=${inv.sourceId} no=${inv.invoiceNumber}: ${inv.elogoResultMsg ?? "-"}`,
+      );
+    }
+    return exhausted.length;
+  }
+
+  /**
+   * Admin müdahalesi: deneme sayacını sıfırlar ve gönderimi yeniden başlatır.
+   * Sağlayıcı arızası giderildikten sonra DB'ye elle dokunmadan kurtarma yolu.
+   * Numara/ETTN korunur (aynı belge yeniden gönderilir) → çift fatura oluşmaz.
+   */
+  async resetInvoiceAttempts(invoiceId: string): Promise<void> {
+    await this.prisma.elogoInvoice.update({
+      where: { id: invoiceId },
+      data: { attemptCount: 0, status: "pending" },
+    });
+    await this.sendRecord(invoiceId);
+  }
+
   // ───────────────────────── app: görüntüleme/indirme ─────────────────────────
 
   /** Kullanıcının kendi e-Arşiv faturaları (uygulamada listelemek için). */
@@ -1349,18 +1394,24 @@ export class ElogoInvoicingService {
         return;
       }
     } catch (err: any) {
+      // GEÇİCİ arıza (ağ/zaman aşımı/sağlayıcı 5xx) deneme bütçesini TÜKETMEMELİ:
+      // 8 deneme × 30 dk cron ≈ 4 saat; sağlayıcı bir gün kapalı kalırsa fatura
+      // kalıcı `failed`'e düşüp 7 günlük e-Arşiv süresini sessizce kaçırıyordu.
+      // Sayaç geri alınır ve kayıt `pending`'de bırakılır → cron denemeye devam eder.
+      const transient = isTransientElogoFailure(err);
       await this.prisma.elogoInvoice
         .update({
           where: { id: inv.id },
           data: {
             invoiceNumber: currentNumber,
-            status: "failed",
+            status: transient ? "pending" : "failed",
+            ...(transient ? { attemptCount: { decrement: 1 } } : {}),
             elogoResultMsg: String(err?.message || err).slice(0, 500),
           },
         })
         .catch(() => undefined);
-      this.logger.error(
-        `eLogo ${inv.type} faturası gönderim hatası (${currentNumber}): ${err?.message}`,
+      this.logger[transient ? "warn" : "error"](
+        `eLogo ${inv.type} faturası gönderim hatası (${currentNumber}, ${transient ? "geçici" : "kalıcı"}): ${err?.message}`,
       );
     }
   }
