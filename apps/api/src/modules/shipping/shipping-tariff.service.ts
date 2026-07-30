@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import {
   Prisma,
+  ShippingPackageTier,
   ShippingTariff,
   ShippingTariffRate,
   ShippingTariffStatus,
@@ -19,8 +20,18 @@ import {
 } from "./shipping-tariff.helper";
 
 const DEFAULT_PROVIDER = "surat";
+/**
+ * Tarife her okunduğunda kademeler de gelmeli: fiyat artık kademelerden çözülür
+ * (shippingAmountForDesi). Tek yerde tanımlı olması, bir okuma yolunun kademesiz
+ * tarife döndürüp checkout'u fail-closed'a düşürmesini engeller.
+ */
+const TARIFF_INCLUDE = {
+  rates: { orderBy: { desi: "asc" } },
+  packageTiers: { orderBy: { sortOrder: "asc" } },
+} satisfies Prisma.ShippingTariffInclude;
 export type ShippingTariffWithRates = ShippingTariff & {
   rates: ShippingTariffRate[];
+  packageTiers: ShippingPackageTier[];
 };
 
 export interface ShippingTariffInput {
@@ -57,7 +68,7 @@ export class ShippingTariffService {
   ): Promise<ShippingTariffWithRates> {
     const tariff = await this.prisma.shippingTariff.findFirst({
       where: { provider, status: ShippingTariffStatus.active },
-      include: { rates: { orderBy: { desi: "asc" } } },
+      include: TARIFF_INCLUDE,
     });
     if (!tariff) {
       throw new NotFoundException(
@@ -130,14 +141,14 @@ export class ShippingTariffService {
     return this.prisma.shippingTariff.findMany({
       where: provider ? { provider } : undefined,
       orderBy: [{ provider: "asc" }, { version: "desc" }],
-      include: { rates: { orderBy: { desi: "asc" } } },
+      include: TARIFF_INCLUDE,
     });
   }
 
   async getById(id: string): Promise<ShippingTariffWithRates> {
     const tariff = await this.prisma.shippingTariff.findUnique({
       where: { id },
-      include: { rates: { orderBy: { desi: "asc" } } },
+      include: TARIFF_INCLUDE,
     });
     if (!tariff) {
       throw new NotFoundException(
@@ -186,7 +197,7 @@ export class ShippingTariffService {
             }
           : undefined,
       },
-      include: { rates: { orderBy: { desi: "asc" } } },
+      include: TARIFF_INCLUDE,
     });
   }
 
@@ -234,7 +245,7 @@ export class ShippingTariffService {
       }
       return tx.shippingTariff.findUniqueOrThrow({
         where: { id },
-        include: { rates: { orderBy: { desi: "asc" } } },
+        include: TARIFF_INCLUDE,
       });
     });
   }
@@ -286,7 +297,7 @@ export class ShippingTariffService {
           effectiveFrom: new Date(),
           updatedBy: adminId,
         },
-        include: { rates: { orderBy: { desi: "asc" } } },
+        include: TARIFF_INCLUDE,
       });
     });
     this.logger.log(

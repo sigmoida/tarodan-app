@@ -27,7 +27,7 @@ import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import {
   calculatePackageDesi,
   outboundPackageShipping,
-  ShippingDesiRateNotFoundError,
+  ShippingPackageTiersNotConfiguredError,
 } from "../shipping/shipping-tariff.helper";
 
 // Cart expiry time: 24 hours
@@ -629,9 +629,9 @@ export class CartService {
         }
       }
     } catch (error) {
-      if (error instanceof ShippingDesiRateNotFoundError) {
+      if (error instanceof ShippingPackageTiersNotConfiguredError) {
         throw new ServiceUnavailableException({
-          code: "SHIPPING_DESI_RATE_NOT_CONFIGURED",
+          code: "SHIPPING_PACKAGE_TIERS_NOT_CONFIGURED",
           message: error.message,
         });
       }

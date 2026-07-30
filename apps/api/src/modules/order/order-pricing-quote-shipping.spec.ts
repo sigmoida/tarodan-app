@@ -1,5 +1,6 @@
 import { OrderPricingService } from "./order-pricing.service";
 import { ProductStatus } from "@prisma/client";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
 /**
  * Checkout quote kargosu artık SATICI-BAŞINA (create ile ortak calculateShippingBySeller).
@@ -57,10 +58,7 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         outboundPackageFee: BASE,
         freeShippingEnabled: true,
         freeShippingThreshold: THRESHOLD,
-        rates: [
-          { desi: 1, amount: BASE },
-          { desi: 2, amount: BASE },
-        ],
+        packageTiers: flatPackageTiers(BASE),
       }),
       getActiveTariffSnapshot: async () => ({
         tariffId: "tariff-1",
@@ -69,10 +67,7 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
           outboundPackageFee: BASE,
           freeShippingEnabled: true,
           freeShippingThreshold: THRESHOLD,
-          rates: [
-            { desi: 1, amount: BASE },
-            { desi: 2, amount: BASE },
-          ],
+          packageTiers: flatPackageTiers(BASE),
         },
       }),
     } as any;

@@ -24,7 +24,7 @@ import {
   outboundPackageShipping,
   resolvePackageShippingBuyerShare,
   splitShippingByBuyerShare,
-  ShippingDesiRateNotFoundError,
+  ShippingPackageTiersNotConfiguredError,
   type OutboundTariffLike,
 } from "../shipping/shipping-tariff.helper";
 import { DiscountService } from "../discount/discount.service";
@@ -107,9 +107,9 @@ export class OrderPricingService {
     try {
       return outboundPackageShipping(tariff, subtotal, billableDesi).toNumber();
     } catch (error) {
-      if (error instanceof ShippingDesiRateNotFoundError) {
+      if (error instanceof ShippingPackageTiersNotConfiguredError) {
         throw new ServiceUnavailableException({
-          code: "SHIPPING_DESI_RATE_NOT_CONFIGURED",
+          code: "SHIPPING_PACKAGE_TIERS_NOT_CONFIGURED",
           message: `Kargo tarifesinde ${billableDesi} desi için fiyat tanımlı değil.`,
         });
       }

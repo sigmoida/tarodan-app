@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, ShippingPackageTierCode } from "@prisma/client";
 
 /**
  * Pure shipping-tariff math — the SINGLE source both the checkout pricing path and
@@ -9,66 +9,63 @@ import { Prisma } from "@prisma/client";
 const D = Prisma.Decimal;
 type DecimalLike = Prisma.Decimal | number | string;
 
+export interface PackageTierLike {
+  code: ShippingPackageTierCode;
+  minDesi: number;
+  /** null = üst sınırsız (son kademe). */
+  maxDesi: number | null;
+  amount: DecimalLike;
+}
+
 export interface OutboundTariffLike {
   provider?: string;
   outboundPackageFee: DecimalLike;
   freeShippingEnabled: boolean;
   freeShippingThreshold: DecimalLike;
-  rates?: Array<{
-    desi: number;
-    amount: DecimalLike;
-  }>;
+  packageTiers?: PackageTierLike[];
 }
 
-export class ShippingDesiRateNotFoundError extends Error {
-  constructor(desi: number) {
-    super(`Active shipping tariff has no rate for ${desi} desi.`);
-    this.name = "ShippingDesiRateNotFoundError";
+export class ShippingPackageTiersNotConfiguredError extends Error {
+  constructor() {
+    super("Active shipping tariff has no package tiers configured.");
+    this.name = "ShippingPackageTiersNotConfiguredError";
   }
 }
 
 /**
- * Amount for a package's billable desi.
+ * Bir paketin faturalanabilir desisinin düştüğü kademe.
  *
- * An exact admin-defined row always wins. A missing row must NOT block checkout:
- * package desi is the sum of `shippingDesi × quantity` over the package's lines
- * and products allow a desi up to 1000, so the reachable desi set easily exceeds
- * the configured rows (4 items of desi 3 → 12). Requiring an exact match made the
- * whole cart unpurchasable with a 503. Resolution order, never undercharging:
+ * Satıcı ilanda yalnız paket boyutu seçer; desi arka planda kalır çünkü kargo
+ * satıcı paketi başına BİR kez alınır ve paketin desisi satırların toplamıdır
+ * (Σ desi × adet). Toplam hangi aralığa düşerse o kademe uygulanır → 2 küçük ürün
+ * (4 desi) Orta kademeye çıkar, eksik tahsil olmaz.
  *
- *  1. exact row
- *  2. gap inside the table → the next HIGHER row (standard carrier bracketing)
- *  3. below the smallest row → the smallest row
- *  4. above the largest row → largest row + the tariff's own marginal step per
- *     extra desi (derived from the two largest rows; a single-row tariff uses its
- *     amount-per-desi)
- *
- * An empty rate table is still a hard configuration error and fails closed.
+ * Aralıklar yarı-açıktır: (minDesi, maxDesi]. Son kademenin `maxDesi`'si null
+ * olduğundan HER desi bir kademeye düşer — eski desi tablosunun "satır yok" 503'ü
+ * ortadan kalkar. Kademe tanımı hiç yoksa bu bir yapılandırma hatasıdır.
  */
+export function resolvePackageTier(
+  tariff: OutboundTariffLike,
+  billableDesi: number,
+): PackageTierLike {
+  const tiers = [...(tariff.packageTiers ?? [])].sort(
+    (a, b) => a.minDesi - b.minDesi,
+  );
+  if (tiers.length === 0) throw new ShippingPackageTiersNotConfiguredError();
+
+  const match = tiers.find(
+    (tier) => tier.maxDesi == null || billableDesi <= tier.maxDesi,
+  );
+  // En küçük kademenin altındaki desi ilk kademeyle ücretlenir; üstü son kademeyle.
+  return match ?? tiers[tiers.length - 1];
+}
+
+/** Bir paketin faturalanabilir desisi için kademe tutarı. */
 export function shippingAmountForDesi(
   tariff: OutboundTariffLike,
   billableDesi: number,
 ): Prisma.Decimal {
-  const rates = [...(tariff.rates ?? [])].sort((a, b) => a.desi - b.desi);
-  if (rates.length === 0) throw new ShippingDesiRateNotFoundError(billableDesi);
-
-  const exact = rates.find((row) => row.desi === billableDesi);
-  if (exact) return new D(exact.amount);
-
-  const nextHigher = rates.find((row) => row.desi > billableDesi);
-  if (nextHigher) return new D(nextHigher.amount);
-
-  const highest = rates[rates.length - 1];
-  const extraDesi = billableDesi - highest.desi;
-  const marginalStep =
-    rates.length >= 2
-      ? new D(highest.amount)
-          .sub(new D(rates[rates.length - 2].amount))
-          .div(highest.desi - rates[rates.length - 2].desi)
-      : new D(highest.amount).div(highest.desi);
-  return new D(highest.amount)
-    .add(marginalStep.mul(extraDesi))
-    .toDecimalPlaces(2);
+  return new D(resolvePackageTier(tariff, billableDesi).amount);
 }
 
 export function calculatePackageDesi(

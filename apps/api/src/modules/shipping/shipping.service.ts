@@ -21,7 +21,7 @@ import { canTransitionShipmentStatus } from "./shipment-state-machine";
 import { ShippingTariffService } from "./shipping-tariff.service";
 import {
   shippingAmountForDesi,
-  ShippingDesiRateNotFoundError,
+  ShippingPackageTiersNotConfiguredError,
 } from "./shipping-tariff.helper";
 import { ShipmentStatus, OrderStatus } from "@prisma/client";
 
@@ -163,9 +163,9 @@ export class ShippingService {
     try {
       cost = shippingAmountForDesi(tariff, billableDesi).toNumber();
     } catch (error) {
-      if (error instanceof ShippingDesiRateNotFoundError) {
+      if (error instanceof ShippingPackageTiersNotConfiguredError) {
         throw new ServiceUnavailableException({
-          code: "SHIPPING_DESI_RATE_NOT_CONFIGURED",
+          code: "SHIPPING_PACKAGE_TIERS_NOT_CONFIGURED",
           message: error.message,
         });
       }

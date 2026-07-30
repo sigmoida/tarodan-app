@@ -4,6 +4,7 @@ import {
   resolvePackageShippingBuyerShare,
   splitShippingByBuyerShare,
 } from "../shipping/shipping-tariff.helper";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
 /**
  * BLOCKER: `shippingBuyerShare` önizleme ile tahsilat arasında ayrışıyordu.
@@ -101,10 +102,7 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
           outboundPackageFee: BASE,
           freeShippingEnabled: false,
           freeShippingThreshold: null,
-          rates: [
-            { desi: 1, amount: BASE },
-            { desi: 2, amount: BASE },
-          ],
+          packageTiers: flatPackageTiers(BASE),
         },
       }),
     } as any;

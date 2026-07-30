@@ -5,6 +5,7 @@ import { DiscountService } from "../discount/discount.service";
 import { StorageService } from "../storage/storage.service";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import { ProductStatus } from "@prisma/client";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
 /**
  * addItem — "sepette zaten olan ürüne tekrar ekleme" davranışı.
@@ -59,7 +60,7 @@ describe("CartService.addItem — idempotent re-add", () => {
               outboundPackageFee: 29.99,
               freeShippingEnabled: true,
               freeShippingThreshold: 500,
-              rates: [{ desi: 1, amount: 29.99 }],
+              packageTiers: flatPackageTiers(29.99),
             }),
           },
         },
@@ -192,7 +193,7 @@ describe("CartService.calculateCart — unavailable items", () => {
           outboundPackageFee: 29.99,
           freeShippingEnabled: true,
           freeShippingThreshold: 500,
-          rates: [{ desi: 1, amount: 29.99 }],
+          packageTiers: flatPackageTiers(29.99),
         }),
       } as any,
       {} as StorageService,

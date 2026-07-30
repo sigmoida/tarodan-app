@@ -1,4 +1,5 @@
 import { OrderPricingService } from "./order-pricing.service";
+import { packageTiers } from "../shipping/testing/tariff-fixture";
 
 describe("OrderPricingService listing commission preview", () => {
   const prisma = {
@@ -16,10 +17,7 @@ describe("OrderPricingService listing commission preview", () => {
       outboundPackageFee: 100,
       freeShippingEnabled: false,
       freeShippingThreshold: null,
-      rates: [
-        { desi: 1, amount: 100 },
-        { desi: 2, amount: 180 },
-      ],
+      packageTiers: packageTiers(100, 180, 260),
     }),
   };
   const service = new OrderPricingService(
@@ -43,7 +41,8 @@ describe("OrderPricingService listing commission preview", () => {
     } as any);
   });
 
-  it("deducts the seller share of the exact desi tariff from seller net", async () => {
+  it("deducts the seller share of the resolved package tier from seller net", async () => {
+    // Küçük paket (desi 2) → 100 TL; pay %40 alıcı / %60 satıcı.
     const preview = await (service.getCommissionPreview as any)(
       1000,
       "seller-1",
@@ -52,12 +51,29 @@ describe("OrderPricingService listing commission preview", () => {
     );
 
     expect(preview).toMatchObject({
+      fullShippingAmount: 100,
+      buyerShippingAmount: 40,
+      sellerShippingAmount: 60,
+      shippingAmount: 60,
+      sellerNetAmount: 840, // 1000 − 100 komisyon − 60 kargo payı
+      shippingDesi: 2,
+    });
+  });
+
+  it("büyük paket kademesinde satıcı payı kademe fiyatından hesaplanır", async () => {
+    // Orta paket (desi 5) → 180 TL; satıcı payı %60 → 108.
+    const preview = await (service.getCommissionPreview as any)(
+      1000,
+      "seller-1",
+      "category-1",
+      5,
+    );
+
+    expect(preview).toMatchObject({
       fullShippingAmount: 180,
       buyerShippingAmount: 72,
       sellerShippingAmount: 108,
-      shippingAmount: 108,
       sellerNetAmount: 792,
-      shippingDesi: 2,
     });
   });
 

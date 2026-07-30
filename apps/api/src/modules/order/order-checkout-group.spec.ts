@@ -26,6 +26,7 @@ import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
 import { RefundService } from "../refund/refund.service";
 import { OrderStatus, ProductStatus } from "@prisma/client";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
 // resolves without a DB.
@@ -34,10 +35,7 @@ const SHIPPING_TARIFF_MOCK = {
     outboundPackageFee: 29.99,
     freeShippingEnabled: true,
     freeShippingThreshold: 500,
-    rates: Array.from({ length: 20 }, (_, index) => ({
-      desi: index + 1,
-      amount: 29.99,
-    })),
+    packageTiers: flatPackageTiers(29.99),
   }),
   getActiveTariffSnapshot: async () => ({
     tariffId: "tariff-1",
@@ -46,10 +44,7 @@ const SHIPPING_TARIFF_MOCK = {
       outboundPackageFee: 29.99,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      rates: Array.from({ length: 20 }, (_, index) => ({
-        desi: index + 1,
-        amount: 29.99,
-      })),
+      packageTiers: flatPackageTiers(29.99),
     },
   }),
 };
