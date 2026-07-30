@@ -106,6 +106,9 @@ export function outboundPackageShipping(
 const DEFAULT_SHIPPING_BUYER_SHARE = 100;
 const clampShare = (share: number) => Math.min(100, Math.max(0, share));
 
+/** Paket boyutu başına alıcı kargo payı (%). */
+export type ShippingBuyerShareByTier = Record<ShippingPackageTierCode, number>;
+
 /**
  * Bir satıcı paketindeki satırların kargo paylarını TEK pakete indirger.
  *
@@ -143,4 +146,44 @@ export function splitShippingByBuyerShare(
   const buyer = Math.round(fullShipping * (share / 100) * 100) / 100;
   const seller = Math.round((fullShipping - buyer) * 100) / 100;
   return { buyer, seller };
+}
+
+/**
+ * Bir satıcı paketinin TÜM kargo kararı — dört checkout yolunun ve önizlemenin
+ * TEK kaynağı.
+ *
+ * Sıra kritiktir ve bu fonksiyonun var olma sebebi budur: kargo payı artık paketin
+ * KADEMESİNE bağlı, kademe ise toplam desiden çıkıyor. Dolayısıyla önce kademe
+ * çözülmeli, pay ancak sonra o kademeden okunmalı. Yolların biri satırın payını,
+ * diğeri kademenin payını kullanırsa önizleme ile tahsilat yeniden ayrışır — daha
+ * önce sepette gösterilenden farklı tutar tahsil edilmesine yol açan hata buydu.
+ *
+ * `lineShares` paketteki her satırın kademe-payı haritasıdır; seçilen kademede en
+ * DÜŞÜK pay uygulanır (alıcı, sepette gördüğü sübvansiyondan fazlasını ödemez ve
+ * sonuç satır sırasından bağımsız kalır).
+ */
+export function resolvePackageShippingDecision(params: {
+  tariff: OutboundTariffLike;
+  subtotal: number;
+  billableDesi: number;
+  lineShares: Array<ShippingBuyerShareByTier | null | undefined>;
+}): {
+  tierCode: ShippingPackageTierCode;
+  fullShipping: number;
+  buyerShare: number;
+  buyer: number;
+  seller: number;
+} {
+  const { tariff, subtotal, billableDesi, lineShares } = params;
+  const tier = resolvePackageTier(tariff, billableDesi);
+  const fullShipping = outboundPackageShipping(
+    tariff,
+    subtotal,
+    billableDesi,
+  ).toNumber();
+  const buyerShare = resolvePackageShippingBuyerShare(
+    lineShares.map((shares) => shares?.[tier.code]),
+  );
+  const { buyer, seller } = splitShippingByBuyerShare(fullShipping, buyerShare);
+  return { tierCode: tier.code, fullShipping, buyerShare, buyer, seller };
 }

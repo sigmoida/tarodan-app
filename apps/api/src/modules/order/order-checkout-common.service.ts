@@ -66,16 +66,19 @@ export class OrderCheckoutCommonService {
       sellerId,
       categoryId,
     );
-    const fullShippingAmount = await this.orderPricing.calculateShippingCost(
-      amount,
-      shippingTariff,
-      shippingDesi,
-    );
-    const { buyer: buyerShippingAmount, seller: sellerShippingAmount } =
-      splitShippingByBuyerShare(
-        fullShippingAmount,
-        commission.shippingBuyerShare,
-      );
+    // Kargo kararı (quote/checkout ile ORTAK): kademe → o kademenin payı → bölüşüm.
+    const {
+      fullShipping: fullShippingAmount,
+      buyer: buyerShippingAmount,
+      seller: sellerShippingAmount,
+    } = this.orderPricing.resolveShippingDecision({
+      tariff:
+        shippingTariff ??
+        (await this.orderPricing.resolveShippingTariffSnapshot()).tariff,
+      subtotal: amount,
+      billableDesi: shippingDesi,
+      lineShares: [commission.shippingBuyerShares],
+    });
     const { taxAmount, withholdingTaxAmount } = await this.resolveSellerTaxes(
       sellerId,
       categoryId,

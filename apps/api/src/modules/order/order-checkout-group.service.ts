@@ -23,8 +23,7 @@ import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import {
   calculatePackageDesi,
-  resolvePackageShippingBuyerShare,
-  splitShippingByBuyerShare,
+  type ShippingBuyerShareByTier,
 } from "../shipping/shipping-tariff.helper";
 
 /**
@@ -554,26 +553,21 @@ export class OrderCheckoutGroupService {
               calculatePackageDesi(packageLines),
             ]),
           );
-          // Satıcı-başına kargo: quote ile ORTAK yardımcı (DRY) → önizleme ve tahsilat
-          // aynı; ikisi ayrı hesaplayınca oluşan az-göster/fazla-tahsil bug'ı kapandı.
-          const sellerShipping =
-            await this.orderPricing.calculateShippingBySeller(
-              sellerLineSubtotals,
-              shippingTariff.tariff,
-              sellerDesi,
-            );
-          // Kargo payı satıcı PAKETİ düzeyinde belirlenir: paketin satırları farklı
-          // kategorilere (dolayısıyla farklı `shippingBuyerShare` kurallarına) düşebilir.
-          // Bu yüzden komisyonlar kargo bölüşümünden ÖNCE hesaplanır; aksi halde
-          // yalnız kargonun yüklendiği İLK satırın payı uygulanır ve önizlemeyle
-          // ayrışır. İndirgeme ortak yardımcıda (quote ile birebir).
+          // Kargo kararı satıcı PAKETİ düzeyinde verilir ve SIRA kritiktir: paketin
+          // desisi kademeyi, kademe de payı belirler. Bu yüzden komisyonlar kargo
+          // bölüşümünden ÖNCE hesaplanır — aksi halde yalnız kargonun yüklendiği İLK
+          // satırın payı uygulanır ve önizlemeyle ayrışır. Karar, quote ile ORTAK
+          // yardımcıdan gelir (DRY): az-göster/fazla-tahsil bug'ı bu yüzden kapandı.
           const lineCommissions: Array<{
             discountedPrice: number;
             commission: Awaited<
               ReturnType<typeof this.orderPricing.calculateCommission>
             >;
           }> = [];
-          const sellerShareLines = new Map<string, number[]>();
+          const sellerShareLines = new Map<
+            string,
+            ShippingBuyerShareByTier[]
+          >();
           for (const entry of pricing) {
             // Negatif-koruma: kupon satır başına eligible-subtotal ile capli olsa da
             // yuvarlama artığına karşı floor (order.totalAmount asla negatif olamaz).
@@ -589,13 +583,18 @@ export class OrderCheckoutGroupService {
             lineCommissions.push({ discountedPrice, commission });
             sellerShareLines.set(entry.product.sellerId, [
               ...(sellerShareLines.get(entry.product.sellerId) ?? []),
-              commission.shippingBuyerShare,
+              commission.shippingBuyerShares,
             ]);
           }
-          const sellerShippingShare = new Map(
-            [...sellerShareLines.entries()].map(([sellerId, shares]) => [
+          const sellerShippingDecision = new Map(
+            [...sellerLineSubtotals.entries()].map(([sellerId, subtotal]) => [
               sellerId,
-              resolvePackageShippingBuyerShare(shares),
+              this.orderPricing.resolveShippingDecision({
+                tariff: shippingTariff.tariff,
+                subtotal,
+                billableDesi: sellerDesi.get(sellerId) ?? 1,
+                lineShares: sellerShareLines.get(sellerId) ?? [],
+              }),
             ]),
           );
 
@@ -616,19 +615,19 @@ export class OrderCheckoutGroupService {
               lineCommissions[entryIndex];
             // Satıcı-bazlı kargo ücreti: yalnız satıcının İLK satırına yükle, kardeşlere 0.
             const entrySellerId = entry.product.sellerId;
+            const decision = sellerShippingDecision.get(entrySellerId);
             let fullShipping = 0;
+            let buyerShippingAmount = 0;
+            let sellerShippingAmount = 0;
             let chargedThisLine = false;
             if (!sellerShippingCharged.has(entrySellerId)) {
-              fullShipping = sellerShipping.get(entrySellerId) ?? 0;
+              // Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
+              fullShipping = decision?.fullShipping ?? 0;
+              buyerShippingAmount = decision?.buyer ?? 0;
+              sellerShippingAmount = decision?.seller ?? 0;
               sellerShippingCharged.add(entrySellerId);
               chargedThisLine = true;
             }
-            // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
-            const { buyer: buyerShippingAmount, seller: sellerShippingAmount } =
-              splitShippingByBuyerShare(
-                fullShipping,
-                sellerShippingShare.get(entrySellerId),
-              );
             const shippingCost = buyerShippingAmount; // buyer-charged shipping
             if (chargedThisLine) {
               sellerShippingBreakdown.set(entrySellerId, {
@@ -689,11 +688,11 @@ export class OrderCheckoutGroupService {
           // shippingCost KANONİK olarak alıcı payıdır (direct/guest ile aynı) + tarife
           // snapshot'ı. Faz 2'de fiziksel Sürat gönderisi de bu paket başına konsolide olacak.
           const packageBySeller = new Map<string, string>();
-          for (const [sellerId, shipping] of sellerShipping) {
+          for (const [sellerId, decision] of sellerShippingDecision) {
             const bd = sellerShippingBreakdown.get(sellerId) ?? {
-              full: shipping,
-              buyer: shipping,
-              seller: 0,
+              full: decision.fullShipping,
+              buyer: decision.buyer,
+              seller: decision.seller,
             };
             const pkg = await tx.orderPackage.create({
               data: {

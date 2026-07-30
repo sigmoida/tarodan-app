@@ -1,10 +1,14 @@
-import { ProductStatus } from "@prisma/client";
+import { ProductStatus, ShippingPackageTierCode } from "@prisma/client";
 import { OrderPricingService } from "./order-pricing.service";
 import {
   resolvePackageShippingBuyerShare,
+  resolvePackageShippingDecision,
   splitShippingByBuyerShare,
 } from "../shipping/shipping-tariff.helper";
-import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import {
+  flatPackageTiers,
+  packageTiers,
+} from "../shipping/testing/tariff-fixture";
 
 /**
  * BLOCKER: `shippingBuyerShare` önizleme ile tahsilat arasında ayrışıyordu.
@@ -34,6 +38,106 @@ describe("resolvePackageShippingBuyerShare", () => {
   it("aralık dışı değerler 0–100'e sıkıştırılır", () => {
     expect(resolvePackageShippingBuyerShare([150])).toBe(100);
     expect(resolvePackageShippingBuyerShare([-20])).toBe(0);
+  });
+});
+
+/**
+ * Kademe bazlı paya geçişte SIRA kritik hale geldi: pay artık paketin kademesine
+ * bağlı, kademe ise toplam desiden çıkıyor. Dört checkout yolu ve önizleme bu tek
+ * kararı çağırmalı — aksi halde biri "satırın payı", diğeri "kademenin payı"
+ * kullanır ve önizleme ile tahsilat yeniden ayrışır (eski bug'ın kök nedeni).
+ */
+describe("resolvePackageShippingDecision", () => {
+  const tariff = {
+    outboundPackageFee: 0,
+    freeShippingEnabled: false,
+    freeShippingThreshold: 0,
+    packageTiers: packageTiers(100, 130, 160),
+  };
+  const shares = (small: number, medium: number, large: number) => ({
+    small,
+    medium,
+    large,
+  });
+
+  it("kademeyi ÖNCE çözer, payı o kademeden okur", () => {
+    // 4 desi → Orta kademe (130 TL) → orta payı %70 uygulanır (küçüğün %100'ü değil).
+    const decision = resolvePackageShippingDecision({
+      tariff,
+      subtotal: 1000,
+      billableDesi: 4,
+      lineShares: [shares(100, 70, 50)],
+    });
+
+    expect(decision.tierCode).toBe(ShippingPackageTierCode.medium);
+    expect(decision.fullShipping).toBe(130);
+    expect(decision.buyerShare).toBe(70);
+    expect(decision.buyer).toBe(91);
+    expect(decision.seller).toBe(39);
+  });
+
+  it("aynı paketteki farklı kategoriler → o kademenin EN DÜŞÜK payı", () => {
+    const decision = resolvePackageShippingDecision({
+      tariff,
+      subtotal: 1000,
+      billableDesi: 10,
+      lineShares: [shares(100, 70, 50), shares(100, 100, 80)],
+    });
+
+    expect(decision.tierCode).toBe(ShippingPackageTierCode.large);
+    expect(decision.buyerShare).toBe(50);
+    // Satır sırası sonucu değiştirmez.
+    expect(
+      resolvePackageShippingDecision({
+        tariff,
+        subtotal: 1000,
+        billableDesi: 10,
+        lineShares: [shares(100, 100, 80), shares(100, 70, 50)],
+      }).buyerShare,
+    ).toBe(50);
+  });
+
+  it("ücretsiz kargo eşiği kademenin üstündedir: iki taraf da ödemez", () => {
+    const decision = resolvePackageShippingDecision({
+      tariff: {
+        ...tariff,
+        freeShippingEnabled: true,
+        freeShippingThreshold: 500,
+      },
+      subtotal: 500,
+      billableDesi: 10,
+      lineShares: [shares(100, 70, 50)],
+    });
+
+    expect(decision.fullShipping).toBe(0);
+    expect(decision.buyer).toBe(0);
+    expect(decision.seller).toBe(0);
+  });
+
+  it("pay bilgisi yoksa varsayılan 100 (alıcı tüm kargoyu öder)", () => {
+    const decision = resolvePackageShippingDecision({
+      tariff,
+      subtotal: 1000,
+      billableDesi: 2,
+      lineShares: [],
+    });
+
+    expect(decision.buyerShare).toBe(100);
+    expect(decision.buyer).toBe(100);
+    expect(decision.seller).toBe(0);
+  });
+
+  it("buyer + seller her zaman tam kargoya eşittir", () => {
+    const decision = resolvePackageShippingDecision({
+      tariff: { ...tariff, packageTiers: packageTiers(33.33, 33.33, 33.33) },
+      subtotal: 1000,
+      billableDesi: 2,
+      lineShares: [shares(33, 33, 33)],
+    });
+
+    expect(Math.round((decision.buyer + decision.seller) * 100) / 100).toBe(
+      33.33,
+    );
   });
 });
 
@@ -122,6 +226,11 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
           buyerFeeAmount: 0,
           sellerFeeAmount: 0,
           shippingBuyerShare: categoryId === "cat-sub" ? 40 : 100,
+          shippingBuyerShares: {
+            small: categoryId === "cat-sub" ? 40 : 100,
+            medium: categoryId === "cat-sub" ? 40 : 100,
+            large: categoryId === "cat-sub" ? 40 : 100,
+          },
           sellerRuleId: "r1",
         }) as any,
     );

@@ -9,7 +9,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { CheckoutQuoteDto } from "./dto";
-import { ProductStatus } from "@prisma/client";
+import { ProductStatus, ShippingPackageTierCode } from "@prisma/client";
 import {
   calculateCommissionFromRules,
   CommissionCalculationResult,
@@ -22,10 +22,11 @@ import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import {
   calculatePackageDesi,
   outboundPackageShipping,
-  resolvePackageShippingBuyerShare,
+  resolvePackageShippingDecision,
   splitShippingByBuyerShare,
   ShippingPackageTiersNotConfiguredError,
   type OutboundTariffLike,
+  type ShippingBuyerShareByTier,
 } from "../shipping/shipping-tariff.helper";
 import { DiscountService } from "../discount/discount.service";
 import { createHash } from "crypto";
@@ -104,13 +105,35 @@ export class OrderPricingService {
     subtotal: number,
     billableDesi: number,
   ): number {
+    return this.guardTierConfig(() =>
+      outboundPackageShipping(tariff, subtotal, billableDesi).toNumber(),
+    );
+  }
+
+  /**
+   * Bir satıcı paketinin kargo kararı (kademe → pay → bölüşüm) — ortak yardımcıyı
+   * çağırır, yapılandırma hatasını HTTP'ye çevirir. Quote ve create yolları aynı
+   * kararı bu tek noktadan alır.
+   */
+  resolveShippingDecision(params: {
+    tariff: OutboundTariffLike;
+    subtotal: number;
+    billableDesi: number;
+    lineShares: Array<ShippingBuyerShareByTier | null | undefined>;
+  }): ReturnType<typeof resolvePackageShippingDecision> {
+    return this.guardTierConfig(() => resolvePackageShippingDecision(params));
+  }
+
+  /** Kademesiz tarife yapılandırma hatasıdır: fail-closed 503. */
+  private guardTierConfig<T>(compute: () => T): T {
     try {
-      return outboundPackageShipping(tariff, subtotal, billableDesi).toNumber();
+      return compute();
     } catch (error) {
       if (error instanceof ShippingPackageTiersNotConfiguredError) {
         throw new ServiceUnavailableException({
           code: "SHIPPING_PACKAGE_TIERS_NOT_CONFIGURED",
-          message: `Kargo tarifesinde ${billableDesi} desi için fiyat tanımlı değil.`,
+          message:
+            "Aktif kargo tarifesinde paket boyutu fiyatları tanımlı değil.",
         });
       }
       throw error;
@@ -197,6 +220,8 @@ export class OrderPricingService {
       sellerId: string;
       shippingCost: number;
       billableDesi: number;
+      /** Paketin çözülmüş boyutu — UI "Orta Paket" gibi gösterebilir. */
+      packageTier: ShippingPackageTierCode;
     }>;
     // Aktif tarife sürümü — istemci order-create'e geri gönderir; sürüm değiştiyse
     // create 409 PRICING_CHANGED döner. Aktif tarife yoksa quote fail-closed davranır.
@@ -246,7 +271,10 @@ export class OrderPricingService {
     >();
     // Kargo payı: satıcının kuralındaki alıcı payı (%). Create yolu ile aynı
     // bölüşüm; önizleme toplamı oluşan siparişle birebir eşleşsin.
-    const sellerShippingShareLines = new Map<string, number[]>();
+    const sellerShippingShareLines = new Map<
+      string,
+      ShippingBuyerShareByTier[]
+    >();
 
     // Pass 1: ürünleri çöz + EFEKTİF (kampanya) birim fiyat + satır toplamı (F1.4).
     const lines: Array<{
@@ -373,11 +401,12 @@ export class OrderPricingService {
         product.categoryId,
       );
 
-      // Paket payı satır sırasından bağımsız olmalı: satırın payını topla,
-      // indirgemeyi ortak yardımcı yapsın (`map.set` ile son satır kazanmasın).
+      // Paket payı satır sırasından BAĞIMSIZ olmalı ve paketin KADEMESİNE göre
+      // seçilmeli: satırın üç kademelik pay haritasını topla, kademe çözüldükten
+      // sonra ortak karar (resolvePackageShippingDecision) indirgemeyi yapsın.
       sellerShippingShareLines.set(product.sellerId, [
         ...(sellerShippingShareLines.get(product.sellerId) ?? []),
-        commissionResult.shippingBuyerShare,
+        commissionResult.shippingBuyerShares,
       ]);
       const lineBuyerFee = commissionResult.buyerFeeAmount;
       const lineSellerFee = commissionResult.sellerFeeAmount;
@@ -433,33 +462,30 @@ export class OrderPricingService {
       });
     }
 
-    // Satıcı-BAŞINA kargo (create ile ortak yardımcı) → çoklu-satıcı sepette doğru toplam.
+    // Satıcı-BAŞINA kargo: paket desisi → kademe → o kademenin payı → bölüşüm.
+    // Create yolları ile ORTAK karar (resolvePackageShippingDecision) kullanılır ki
+    // önizleme ile tahsilat birebir kalsın.
     const sellerDesi = new Map(
       [...sellerDesiLines.entries()].map(([sellerId, packageLines]) => [
         sellerId,
         calculatePackageDesi(packageLines),
       ]),
     );
-    const shippingMap = await this.calculateShippingBySeller(
-      sellerSubtotals,
-      shippingTariff.tariff,
-      sellerDesi,
-    );
-    // Alıcı yalnız kendi kargo payını öder (create yolundaki yuvarlamayla birebir).
-    // buyerShare=100 → tam kargo (mevcut davranış korunur).
-    const shippingBySeller = [...shippingMap.entries()].map(
-      ([sellerId, fullShipping]) => {
-        const share = resolvePackageShippingBuyerShare(
-          sellerShippingShareLines.get(sellerId) ?? [],
-        );
-        const { buyer: buyerShipping } = splitShippingByBuyerShare(
-          fullShipping,
-          share,
-        );
+    const shippingBySeller = [...sellerSubtotals.entries()].map(
+      ([sellerId, subtotal]) => {
+        const billableDesi = sellerDesi.get(sellerId) ?? 1;
+        const decision = this.resolveShippingDecision({
+          tariff: shippingTariff.tariff,
+          subtotal,
+          billableDesi,
+          lineShares: sellerShippingShareLines.get(sellerId) ?? [],
+        });
         return {
           sellerId,
-          shippingCost: buyerShipping,
-          billableDesi: sellerDesi.get(sellerId) ?? 1,
+          // Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
+          shippingCost: decision.buyer,
+          billableDesi,
+          packageTier: decision.tierCode,
         };
       },
     );

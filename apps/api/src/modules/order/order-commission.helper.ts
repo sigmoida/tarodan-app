@@ -8,6 +8,7 @@ import {
   SellerType,
   ShippingPackageTierCode,
 } from "@prisma/client";
+import type { ShippingBuyerShareByTier } from "../shipping/shipping-tariff.helper";
 
 type CommissionNumericValue = number | string | { toString(): string };
 
@@ -55,8 +56,8 @@ export interface CommissionRuleForCalculation {
   }> | null;
 }
 
-/** Her paket boyutu için alıcı payı (%). */
-export type ShippingBuyerShareByTier = Record<ShippingPackageTierCode, number>;
+// Kademe-payı haritası kargo alanına ait; tek kaynak shipping helper'dadır.
+export type { ShippingBuyerShareByTier };
 
 export interface CommissionCalculationResult {
   /** buyerCommission + buyerServiceFee (what the buyer pays on top). */

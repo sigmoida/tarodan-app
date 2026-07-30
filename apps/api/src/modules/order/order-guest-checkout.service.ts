@@ -329,18 +329,18 @@ export class OrderGuestCheckoutService {
         product.categoryId, // Pass categoryId for priority-based matching
       );
 
-      // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const fullShipping = await this.orderPricing.calculateShippingCost(
-        finalPrice,
-        shippingTariff.tariff,
-        product.shippingDesi,
-      );
-      // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
-      const { buyer: buyerShippingAmount, seller: sellerShippingAmount } =
-        splitShippingByBuyerShare(
-          fullShipping,
-          commissionResult.shippingBuyerShare,
-        );
+      // Kargo kararı (quote ile ORTAK): paket desisi → kademe → o kademenin payı →
+      // bölüşüm. Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
+      const {
+        fullShipping,
+        buyer: buyerShippingAmount,
+        seller: sellerShippingAmount,
+      } = this.orderPricing.resolveShippingDecision({
+        tariff: shippingTariff.tariff,
+        subtotal: finalPrice,
+        billableDesi: product.shippingDesi,
+        lineShares: [commissionResult.shippingBuyerShares],
+      });
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const {

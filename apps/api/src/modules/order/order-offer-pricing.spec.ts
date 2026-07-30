@@ -1,4 +1,6 @@
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { resolvePackageShippingDecision } from "../shipping/shipping-tariff.helper";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
 /**
  * BLOCKER: teklif kabul edildiğinde sipariş `offer.service` içinde
@@ -16,7 +18,7 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
     outboundPackageFee: 50,
     freeShippingEnabled: false,
     freeShippingThreshold: 0,
-    rates: [{ desi: 1, amount: 50 }],
+    packageTiers: flatPackageTiers(50),
   } as any;
 
   const makeService = (opts: {
@@ -62,9 +64,20 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
         sellerCommissionAmount: 15,
         sellerPlatformFeeAmount: 5,
         shippingBuyerShare: opts.buyerShare ?? 100,
+        shippingBuyerShares: {
+          small: opts.buyerShare ?? 100,
+          medium: opts.buyerShare ?? 100,
+          large: opts.buyerShare ?? 100,
+        },
         sellerRuleId: "r1",
       }),
-      calculateShippingCost: jest.fn().mockResolvedValue(50),
+      // Kargo kararı OrderPricingService'te tek noktadan verilir; burada gerçek
+      // yardımcıya delege ederek kademe→pay→bölüşüm zincirini olduğu gibi ölçüyoruz.
+      resolveShippingDecision: jest
+        .fn()
+        .mockImplementation((args: any) =>
+          resolvePackageShippingDecision(args),
+        ),
     };
     const service = new OrderCheckoutCommonService(
       prisma as any,
@@ -135,10 +148,8 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
       "s1",
       "c1",
     );
-    expect(orderPricing.calculateShippingCost).toHaveBeenCalledWith(
-      1000,
-      tariff,
-      1,
+    expect(orderPricing.resolveShippingDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ tariff, subtotal: 1000, billableDesi: 1 }),
     );
   });
 });
