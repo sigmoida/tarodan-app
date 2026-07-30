@@ -16,6 +16,9 @@ COPY turbo.json ./
 # Copy packages (monorepo dependencies)
 COPY packages ./packages
 
+# Repo-root build scripts — the app's `build` runs sync-brand-assets.mjs first
+COPY scripts ./scripts
+
 # Copy app package files
 COPY apps/web/package.json ./apps/web/
 
