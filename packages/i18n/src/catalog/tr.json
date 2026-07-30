@@ -563,6 +563,8 @@
     "listPriceLine": "Liste fiyatı",
     "commissionLine": "Komisyon",
     "shippingLine": "Kargo bedeli",
+    "sellerShippingShare": "Kargodan payınız (kesinti)",
+    "shippingPaidByBuyer": "Kargo ödemesi yapmazsınız — kargo alıcıya ait",
     "productDetails": "Ürün Detayları",
     "categoryRequired": "Kategori *",
     "selectCategory": "Kategori Seçin",

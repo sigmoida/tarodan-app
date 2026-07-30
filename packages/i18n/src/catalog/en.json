@@ -563,6 +563,8 @@
     "listPriceLine": "List price",
     "commissionLine": "Commission",
     "shippingLine": "Shipping fee",
+    "sellerShippingShare": "Your shipping share (deducted)",
+    "shippingPaidByBuyer": "You won't pay shipping — the buyer covers it",
     "productDetails": "Product Details",
     "categoryRequired": "Category *",
     "selectCategory": "Select category",

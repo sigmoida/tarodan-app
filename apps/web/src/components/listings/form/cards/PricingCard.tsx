@@ -154,7 +154,11 @@ function PackageSizePicker() {
 
 /** Per-sale summary shown to the seller: only the net take-home ("elde kalan"),
  *  with all commission/withholding deductions already folded in, plus the
- *  seller-paid shipping deduction. No itemised commission/list-price rows. */
+ *  seller-paid shipping deduction. No itemised commission/list-price rows.
+ *
+ *  Kargo satırı SORUYU açıkça yanıtlar: satıcı kargo ödeyecek mi? Pay 0 ise
+ *  "ödemezsiniz" cümlesi görünür; pay > 0 ise kesinti tonuyla tutar gösterilir.
+ *  Çıplak "₺0,00" satırı bu ayrımı vermiyordu. */
 function PricingBreakdown({
   preview,
 }: {
@@ -170,7 +174,15 @@ function PricingBreakdown({
         value={fmt(sellerNetAmount)}
         tone="net"
       />
-      <Row label={t("product.shippingLine")} value={fmt(shippingAmount)} />
+      {shippingAmount > 0 ? (
+        <Row
+          label={t("product.sellerShippingShare")}
+          value={fmt(shippingAmount)}
+          tone="deduction"
+        />
+      ) : (
+        <p className="text-xs text-muted">{t("product.shippingPaidByBuyer")}</p>
+      )}
     </div>
   );
 }
