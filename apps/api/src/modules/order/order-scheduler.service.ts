@@ -128,6 +128,63 @@ export class OrderSchedulerService implements OnModuleInit {
    * Tüm teslim yollarını (webhook + worker) yakalar; idempotent.
    * Gerçek iş — Bull processor 'process-delivered-orders' buradan çağırır.
    */
+  /**
+   * Faturalama sağlığı alarmları.
+   *
+   * 1) Uzun süre `shipped`'te takılı siparişler: kargo poll'u teslimatı hiç
+   *    raporlamazsa sipariş asla `delivered` olmaz ve faturalama filtresine hiç
+   *    girmez → gerçekten teslim edilmiş sipariş faturasız kalır (eskiden bunu
+   *    gösteren hiçbir sinyal yoktu; tek kurtarma admin'in elle işaretlemesiydi).
+   * 2) Teslim edilmiş olup yasal süre (e-Arşiv 7 gün) içinde faturalanamayanlar.
+   */
+  async reportInvoiceStaleness(): Promise<{
+    stuckShipped: number;
+    uninvoicedDelivered: number;
+  }> {
+    const stuckDays =
+      Number(
+        this.configService.get<string>("SHIPPED_STALE_ALERT_DAYS") ?? "10",
+      ) || 10;
+    const invoiceDeadlineDays =
+      Number(this.configService.get<string>("INVOICE_DEADLINE_DAYS") ?? "5") ||
+      5;
+
+    const [stuckShipped, uninvoicedDelivered] = await Promise.all([
+      this.prisma.order.count({
+        where: {
+          status: OrderStatus.shipped,
+          updatedAt: {
+            lt: new Date(Date.now() - stuckDays * 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          status: { in: [OrderStatus.delivered, OrderStatus.completed] },
+          commissionLedger: { isNot: null },
+          revenueInvoicedAt: null,
+          deliveredAt: {
+            lt: new Date(
+              Date.now() - invoiceDeadlineDays * 24 * 60 * 60 * 1000,
+            ),
+          },
+        },
+      }),
+    ]);
+
+    if (stuckShipped > 0) {
+      this.logger.error(
+        `ORDERS_STUCK_SHIPPED count=${stuckShipped} — ${stuckDays} günden uzun süre kargoda; teslimat poll'lanmadıysa fatura hiç kesilmez`,
+      );
+    }
+    if (uninvoicedDelivered > 0) {
+      this.logger.error(
+        `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadlineDays} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`,
+      );
+    }
+    return { stuckShipped, uninvoicedDelivered };
+  }
+
   async runProcessDeliveredOrders(log: (msg: string) => void = () => {}) {
     // 1) Faturası kesilmemiş teslim EDİLMİŞ veya TAMAMLANMIŞ siparişler → teslim faturalarını kes.
     // NOT: deliveredAt bazı teslim yollarında NULL kalabiliyor + sipariş hızla `completed`'e
@@ -275,8 +332,11 @@ export class OrderSchedulerService implements OnModuleInit {
       }
     }
 
+    // Faturalama sağlığı: takılı kargo + süresi geçmiş faturasız teslimat alarmları.
+    const staleness = await this.reportInvoiceStaleness();
+
     this.logger.log(
-      `processDeliveredOrders: teslim=${delivered.length} yeniFatura=${invoiced} tamamlanan=${completed} takasFatura=${tradeInvoiced} (returnWindow=${returnWindowDays}g)`,
+      `processDeliveredOrders: teslim=${delivered.length} yeniFatura=${invoiced} tamamlanan=${completed} takasFatura=${tradeInvoiced} takılıKargo=${staleness.stuckShipped} faturasız=${staleness.uninvoicedDelivered} (returnWindow=${returnWindowDays}g)`,
     );
     log(
       `${delivered.length} teslim · ${invoiced} yeni fatura · ${completed} tamamlandı · ${tradeInvoiced} takas faturası`,
