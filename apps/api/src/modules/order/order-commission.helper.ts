@@ -6,6 +6,7 @@ import {
   CommissionTaxpayerType,
   MembershipTierType,
   SellerType,
+  ShippingPackageTierCode,
 } from "@prisma/client";
 
 type CommissionNumericValue = number | string | { toString(): string };
@@ -44,7 +45,18 @@ export interface CommissionRuleForCalculation {
   sellerPlatformFeeMax?: CommissionNumericValue | null;
   /** Buyer share (%) of the single shipping cost; seller share = 100 - this. */
   shippingBuyerShare?: CommissionNumericValue | null;
+  /**
+   * Paket boyutu başına kargo bölüşümü. Satır bulunmayan kademe, tek
+   * `shippingBuyerShare` değerine geri düşer (kolaylık fallback'i).
+   */
+  shippingShares?: Array<{
+    tierCode: ShippingPackageTierCode;
+    buyerShare: CommissionNumericValue;
+  }> | null;
 }
+
+/** Her paket boyutu için alıcı payı (%). */
+export type ShippingBuyerShareByTier = Record<ShippingPackageTierCode, number>;
 
 export interface CommissionCalculationResult {
   /** buyerCommission + buyerServiceFee (what the buyer pays on top). */
@@ -58,8 +70,14 @@ export interface CommissionCalculationResult {
   buyerServiceFeeAmount: number;
   sellerCommissionAmount: number;
   sellerPlatformFeeAmount: number;
-  /** 0–100; buyer's share of the shipping cost (default 100 = buyer pays all). */
+  /**
+   * 0–100; buyer's share of the shipping cost (default 100 = buyer pays all).
+   * Paketin kademesi bilinmediğinde kullanılan geriye-uyum değeri: ilk kademenin
+   * payı. Kademe çözüldükten sonra `shippingBuyerShares` okunmalıdır.
+   */
   shippingBuyerShare: number;
+  /** Paket boyutu başına alıcı payı — çağıran, paketin kademesine göre seçer. */
+  shippingBuyerShares: ShippingBuyerShareByTier;
   ruleId: string | null;
   ruleName: string | null;
   /**
@@ -90,6 +108,34 @@ export interface CommissionMatchContext {
 
 const numericValue = (value: CommissionNumericValue | null | undefined) =>
   value == null ? null : Number(value);
+
+const DEFAULT_SHIPPING_BUYER_SHARE = 100;
+const SHIPPING_TIER_CODES = Object.values(ShippingPackageTierCode);
+const clampShare = (share: number) => Math.min(100, Math.max(0, share));
+
+/**
+ * Bir kuralın paket boyutu başına alıcı kargo payları. Kademe satırı bulunmayan
+ * boyut kuralın tek `shippingBuyerShare` değerini kullanır; o da yoksa 100
+ * (alıcı tüm kargoyu öder — mevcut davranış korunur).
+ */
+function resolveShippingBuyerShares(
+  rule: CommissionRuleForCalculation | null | undefined,
+): ShippingBuyerShareByTier {
+  const fallbackRaw = numericValue(rule?.shippingBuyerShare);
+  const fallback =
+    fallbackRaw == null
+      ? DEFAULT_SHIPPING_BUYER_SHARE
+      : clampShare(fallbackRaw);
+  const byTier = new Map(
+    (rule?.shippingShares ?? []).map((share) => [
+      share.tierCode,
+      clampShare(Number(share.buyerShare)),
+    ]),
+  );
+  return Object.fromEntries(
+    SHIPPING_TIER_CODES.map((code) => [code, byTier.get(code) ?? fallback]),
+  ) as ShippingBuyerShareByTier;
+}
 
 /**
  * "Catch-all" kural: her eksende wildcard, tutar aralığı sınırsız ve HER İKİ
@@ -316,11 +362,16 @@ export function calculateCommissionFromRules(
   const sellerFeeAmount =
     Math.round((sellerCommissionAmount + sellerPlatformFeeAmount) * 100) / 100;
   const primary = sellerMatch ?? buyerMatch;
-  const shareRaw = numericValue(
-    sellerMatch?.shippingBuyerShare ?? buyerMatch?.shippingBuyerShare,
-  );
+  // Kargo payı satıcı tarafı kuralından gelir (kargoyu o sübvanse eder); yoksa
+  // alıcı tarafı kuralından. Kademe satırı olmayan boyut, kuralın tek payına düşer.
+  const shareSource =
+    sellerMatch?.shippingBuyerShare != null ||
+    sellerMatch?.shippingShares?.length
+      ? sellerMatch
+      : (buyerMatch ?? sellerMatch);
+  const shippingBuyerShares = resolveShippingBuyerShares(shareSource);
   const shippingBuyerShare =
-    shareRaw == null ? 100 : Math.min(100, Math.max(0, shareRaw));
+    shippingBuyerShares[SHIPPING_TIER_CODES[0]] ?? DEFAULT_SHIPPING_BUYER_SHARE;
 
   return {
     buyerFeeAmount,
@@ -332,6 +383,7 @@ export function calculateCommissionFromRules(
     sellerCommissionAmount,
     sellerPlatformFeeAmount,
     shippingBuyerShare,
+    shippingBuyerShares,
     ruleId: primary?.id ?? null,
     ruleName: primary?.name ?? null,
     sellerRuleId: sellerMatch?.id ?? null,

@@ -725,7 +725,9 @@ export class OrderPricingService {
     // Tüm aktif kuralları çek (Faz 5.1)
     const allActive = await this.prisma.commissionRule.findMany({
       where: { isActive: true },
-      include: { category: true },
+      // shippingShares: paket boyutu başına kargo bölüşümü — kademe çözüldükten
+      // sonra okunur. Include eksik kalırsa tüm kademeler sessizce tek paya düşer.
+      include: { category: true, shippingShares: true },
     });
 
     this.logger.debug(`Found ${allActive.length} active commission rules`);
