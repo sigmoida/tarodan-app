@@ -19,7 +19,7 @@ import { ProductStatus, Prisma } from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
-import { isPremiumEntitled } from "../membership/membership.util";
+import { MembershipService } from "../membership/membership.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
 
 /**
@@ -41,7 +41,24 @@ export class ProductUpdateService {
     private readonly smtpProvider: SmtpProvider,
     private readonly common: ProductCommonService,
     private readonly ranking: ProductRankingService,
+    private readonly membershipService: MembershipService,
   ) {}
+
+  /**
+   * İlanı takasa açma hakkı — takas TEKLİF/KABUL kapılarıyla AYNI kaynak
+   * (canCreateTrade → efektif tier'ın canTrade bayrağı). Eski kapı burada
+   * `tier.canTrade && isPremiumEntitled` istiyordu; free tier'da entitled hep
+   * false olduğundan admin free tier'a takası açsa bile ilan takasa
+   * işaretlenemiyordu — teklif verme ve downgrade cron'u ise bayrağı tanıyordu.
+   */
+  private async assertTradeEnableAllowed(sellerId: string): Promise<void> {
+    const canTrade = await this.membershipService.canCreateTrade(sellerId);
+    if (!canTrade.allowed) {
+      throw new BadRequestException(
+        i18nMessage("server.product.tradeRequiresPremium"),
+      );
+    }
+  }
 
   /**
    * Update product
@@ -190,19 +207,7 @@ export class ProductUpdateService {
     // Check membership for trade feature
     let canEnableTrade = false;
     if (dto.isTradeEnabled === true) {
-      const seller = await this.prisma.user.findUnique({
-        where: { id: sellerId },
-        include: { membership: { include: { tier: true } } },
-      });
-
-      if (
-        !seller?.membership?.tier?.canTrade ||
-        !isPremiumEntitled(seller.membership, seller)
-      ) {
-        throw new BadRequestException(
-          i18nMessage("server.product.tradeRequiresPremium"),
-        );
-      }
+      await this.assertTradeEnableAllowed(sellerId);
       canEnableTrade = true;
     }
 

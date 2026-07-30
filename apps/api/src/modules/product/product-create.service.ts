@@ -104,6 +104,16 @@ export class ProductCreateService {
       );
     }
 
+    // Takasa açma, güncellemedeki kapıyla AYNI kaynaktan (efektif tier'ın
+    // canTrade bayrağı) denetlenir. Önyüz kutuyu gizlese de DTO alanı istemci
+    // elindedir — kapısız bırakmak takas hakkı olmayan kullanıcıya API'den
+    // takaslı ilan açtırıyordu.
+    if (dto.isTradeEnabled === true && !limits.canTrade) {
+      throw new BadRequestException(
+        i18nMessage("server.product.tradeRequiresPremium"),
+      );
+    }
+
     // AI görsel moderasyonu (senkron): uygunsuz/NSFW görselde ilanı ENGELLE + net mesaj.
     // Düşük ilgililik admin incelemesine kalabilir; burada sadece uygunsuzu durdururuz.
     if (dto.images?.length && this.moderationAi.isEnabled) {
