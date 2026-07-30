@@ -45,6 +45,16 @@ export class PayoutSchedulerService implements OnModuleInit {
         );
       }
 
+      // 1b) Kısmi iade nedeniyle void edilmiş payout'ları, iade sonuçlandıysa
+      // geri kuyruğa al — aksi halde satıcı iade dışında kalan hakkını hiç almaz.
+      const requeued = await this.payoutService.requeueRefundVoidedPayouts();
+      if (requeued > 0) {
+        log(`${requeued} iade-void payout yeniden kuyruğa alındı`);
+        this.logger.log(
+          `Requeued ${requeued} refund-voided payout(s) for remaining seller balance`,
+        );
+      }
+
       // 2) Process all pending payouts
       const result = await this.payoutService.processPendingPayouts();
       log(

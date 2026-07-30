@@ -45,6 +45,30 @@ const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
 
 const IBAN_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
 
+/** Tutar eşiği: bu değerin altındaki net ödeme "sıfır" kabul edilir (kuruş artıkları). */
+const PAYOUT_MIN_NET = 0.01;
+
+/** Henüz sonuçlanmamış (parayı bağlayan) iade denemesi durumları. */
+const UNRESOLVED_REFUND_ATTEMPT_STATUSES: RefundAttemptStatus[] = [
+  RefundAttemptStatus.prepared,
+  RefundAttemptStatus.submitting,
+  RefundAttemptStatus.succeeded,
+  RefundAttemptStatus.manual_review,
+];
+
+/**
+ * Satıcının bir hold üzerinden hak ettiği GÜNCEL net tutar: escrow'a giren
+ * tutar eksi o hold'dan iade edilmiş kısım. Payout oluşturma ve transfer
+ * öncesi yeniden doğrulama AYNI bu formülü kullanır (tek kaynak) — aksi halde
+ * kısmi iade sonrası satırda kalan bayat `netAmount` transfer edilebilir.
+ */
+function entitledNetFromHold(hold: {
+  amount: unknown;
+  refundedAmount?: unknown;
+}): number {
+  return Number(hold.amount) - Number(hold.refundedAmount ?? 0);
+}
+
 @Injectable()
 export class PayoutService {
   private readonly logger = new Logger(PayoutService.name);
@@ -110,6 +134,40 @@ export class PayoutService {
   }
 
   /**
+   * Bu ödeme/sipariş için parayı bağlayan bir iade var mı? Payout OLUŞTURMA,
+   * transfer ETME ve iade-void'lu payout'u yeniden kuyruğa alma yollarının
+   * tamamı aynı guard'ı kullanır (tek kaynak).
+   *
+   * @returns engel nedeni (`refund_pending`) veya engel yoksa `null`
+   */
+  private async findBlockingRefund(target: {
+    orderId: string | null;
+    paymentId: string;
+    tradeId?: string | null;
+  }): Promise<"refund_pending" | null> {
+    if (target.orderId) {
+      const openRefund = await this.prisma.refundRequest.findFirst({
+        where: {
+          orderId: target.orderId,
+          status: { in: OPEN_REFUND_STATUSES },
+        },
+        select: { id: true },
+      });
+      if (openRefund) return "refund_pending";
+    }
+    const activeAttempt = await this.prisma.refundAttempt.findFirst({
+      where: {
+        paymentId: target.paymentId,
+        orderId: target.orderId,
+        tradeId: target.tradeId ?? null,
+        status: { in: UNRESOLVED_REFUND_ATTEMPT_STATUSES },
+      },
+      select: { id: true },
+    });
+    return activeAttempt ? "refund_pending" : null;
+  }
+
+  /**
    * Create PayoutTransfer records for all newly released holds.
    * Called after releaseHoldsDue() marks holds as released.
    */
@@ -158,44 +216,20 @@ export class PayoutService {
       // freeze `held` hedeflediğinden `released` hold'u kaçırır → payout cron satıcıya
       // öder + alıcıya iade edilir → ÇİFT KAYIP. Açık iade varken bekle (iade terminal
       // olunca hold ya cancelled olur ya da unfreeze ile normal akışa döner).
-      const openRefund = await this.prisma.refundRequest.findFirst({
-        where: {
-          orderId: hold.orderId,
-          status: { in: OPEN_REFUND_STATUSES },
-        },
-        select: { id: true },
+      const blockingRefund = await this.findBlockingRefund({
+        orderId: hold.orderId,
+        paymentId: hold.paymentId,
       });
-      if (openRefund) {
+      if (blockingRefund) {
         this.logger.warn(
-          `Payout skipped: order ${hold.orderId} has an open refund (released hold not frozen in time). Waiting for refund to terminalize.`,
-        );
-        continue;
-      }
-      const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
-        where: {
-          paymentId: hold.paymentId,
-          orderId: hold.orderId,
-          status: {
-            in: [
-              RefundAttemptStatus.prepared,
-              RefundAttemptStatus.submitting,
-              RefundAttemptStatus.succeeded,
-              RefundAttemptStatus.manual_review,
-            ],
-          },
-        },
-        select: { id: true },
-      });
-      if (activeRefundAttempt) {
-        this.logger.warn(
-          `Payout skipped: order ${hold.orderId} has unresolved refund attempt ${activeRefundAttempt.id}`,
+          `Payout skipped: order ${hold.orderId} has an unsettled refund (open request or unresolved attempt). Waiting for refund to terminalize.`,
         );
         continue;
       }
 
       // Adet bazlı kısmi iade: satıcıya yalnız iade EDİLMEYEN kısım ödenir.
-      const netPayout = Number(hold.amount) - Number(hold.refundedAmount ?? 0);
-      if (netPayout <= 0.01) {
+      const netPayout = entitledNetFromHold(hold);
+      if (netPayout <= PAYOUT_MIN_NET) {
         // Tamamı iade edilmiş → ödeme yapma (hold zaten cancelled olmalı; emniyet).
         continue;
       }
@@ -450,7 +484,15 @@ export class PayoutService {
     const pending = await this.prisma.payoutTransfer.findMany({
       where: { status: PayoutStatus.pending },
       include: {
-        paymentHold: { select: { paymentId: true, orderId: true } },
+        paymentHold: {
+          select: {
+            paymentId: true,
+            orderId: true,
+            // Transfer öncesi bayat-net doğrulaması için gerekli (aşağıya bkz).
+            amount: true,
+            refundedAmount: true,
+          },
+        },
         tradeCashPayment: {
           select: {
             tradeId: true,
@@ -480,61 +522,69 @@ export class PayoutService {
           : null;
       if (refundTarget) {
         if (refundTarget.orderId) {
-          const [order, openRefund] = await Promise.all([
-            this.prisma.order.findUnique({
-              where: { id: refundTarget.orderId },
-              select: { status: true },
-            }),
-            this.prisma.refundRequest.findFirst({
-              where: {
-                orderId: refundTarget.orderId,
-                status: { in: OPEN_REFUND_STATUSES },
-              },
-              select: { id: true },
-            }),
-          ]);
+          const order = await this.prisma.order.findUnique({
+            where: { id: refundTarget.orderId },
+            select: { status: true },
+          });
           if (
             !order ||
-            !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
-            openRefund
+            !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status)
           ) {
             await this.prisma.payoutTransfer.updateMany({
               where: { id: payout.id, status: PayoutStatus.pending },
               data: {
                 status: PayoutStatus.failed,
-                failureReason: openRefund
-                  ? "refund_pending"
-                  : "order_not_payout_eligible",
+                failureReason: "order_not_payout_eligible",
               },
             });
             continue;
           }
         }
-        const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
-          where: {
-            paymentId: refundTarget.paymentId,
-            orderId: refundTarget.orderId,
-            tradeId: refundTarget.tradeId,
-            status: {
-              in: [
-                RefundAttemptStatus.prepared,
-                RefundAttemptStatus.submitting,
-                RefundAttemptStatus.succeeded,
-                RefundAttemptStatus.manual_review,
-              ],
-            },
-          },
-          select: { id: true },
-        });
-        if (activeRefundAttempt) {
+        const blockingRefund = await this.findBlockingRefund(refundTarget);
+        if (blockingRefund) {
           await this.prisma.payoutTransfer.updateMany({
             where: { id: payout.id, status: PayoutStatus.pending },
             data: {
               status: PayoutStatus.failed,
-              failureReason: "refund_pending",
+              failureReason: blockingRefund,
             },
           });
           continue;
+        }
+      }
+
+      // Bayat-net koruması: kısmi iade `pending` payout'u void ederken satırdaki
+      // `netAmount`'u güncellemez ve `paymentHoldId` unique olduğundan düzeltilmiş
+      // yeni bir payout oluşamaz. Admin satırı retry ile tekrar `pending` yaparsa
+      // iade ÖNCESİ tutar transfer edilirdi (satıcıya fazla ödeme). Transferden
+      // hemen önce hold'dan hak edilen net'i yeniden oku ve YALNIZ AŞAĞI yönlü
+      // düzelt — satıcı kesintisi (adjustment) ile düşürülmüş net yükseltilmemeli.
+      let netToTransfer = Number(payout.netAmount);
+      if (payout.paymentHold) {
+        const entitledNet = entitledNetFromHold(payout.paymentHold);
+        if (entitledNet <= PAYOUT_MIN_NET) {
+          const failedClaim = await this.prisma.payoutTransfer.updateMany({
+            where: { id: payout.id, status: PayoutStatus.pending },
+            data: {
+              status: PayoutStatus.failed,
+              failureReason: "fully_refunded",
+            },
+          });
+          this.logger.warn(
+            `Payout ${payout.id} iptal: hold tamamen iade edilmiş (net=${entitledNet}) — transfer yapılmadı`,
+          );
+          if (failedClaim.count > 0) failed++;
+          continue;
+        }
+        if (entitledNet < netToTransfer) {
+          this.logger.warn(
+            `Payout ${payout.id} net tutarı düzeltildi: ${netToTransfer} → ${entitledNet} (kısmi iade sonrası bayat değer)`,
+          );
+          netToTransfer = entitledNet;
+          await this.prisma.payoutTransfer.update({
+            where: { id: payout.id },
+            data: { netAmount: netToTransfer },
+          });
         }
       }
       // Y5: İşleme anında satıcının GÜNCEL banka hesabını oku. Payout oluşturulurken
@@ -645,7 +695,7 @@ export class PayoutService {
           .createPlatformTransfer({
             merchantOid: payout.merchantOid,
             transId: payout.transId,
-            submerchantAmount: Number(payout.netAmount),
+            submerchantAmount: netToTransfer,
             totalAmount: Number(payout.amount),
             transferName,
             transferIban,
@@ -668,19 +718,19 @@ export class PayoutService {
           );
           await this.sendPayoutReleasedEmail(
             payout.sellerId,
-            Number(payout.netAmount),
+            netToTransfer,
             transferIban,
           );
           processed++;
           // 11.1c (G4/KVKK): tam IBAN loglanmaz — yalnız son 4 hane (email'le simetrik).
           this.logger.log(
-            `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${maskIban(transferIban)}`,
+            `Payout ${payout.transId} completed: ${netToTransfer} TL → ${maskIban(transferIban)}`,
           );
           // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
           // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
           // → sipariş bazında escrow net 0'a iner. Best-effort (payout'u bozmaz).
           try {
-            const net = Number(payout.netAmount);
+            const net = netToTransfer;
             if (net > 0)
               await this.ledger?.record(this.prisma, {
                 eventType: LedgerEventType.payout_completed,
@@ -726,6 +776,79 @@ export class PayoutService {
       );
     }
     return { processed, failed };
+  }
+
+  /**
+   * Kısmi iade nedeniyle void edilmiş (`failed/order_refunded`) payout'ları,
+   * iade tamamen sonuçlandıktan sonra yeniden kuyruğa alır.
+   *
+   * Neden gerekli: `PayoutTransfer.paymentHoldId` UNIQUE olduğundan
+   * `createPayoutsForReleasedHolds` aynı hold için ikinci bir payout üretemez;
+   * void edilen satır elle retry edilmezse satıcı iade DIŞINDA kalan hakkını
+   * hiç alamaz. Tutar burada düzeltilmez — `processPendingPayouts` transferden
+   * önce hak edilen net'i yeniden hesaplar (tek kaynak).
+   */
+  async requeueRefundVoidedPayouts(): Promise<number> {
+    const voided = await this.prisma.payoutTransfer.findMany({
+      where: {
+        status: PayoutStatus.failed,
+        failureReason: "order_refunded",
+        paymentHoldId: { not: null },
+      },
+      include: {
+        paymentHold: {
+          select: {
+            paymentId: true,
+            orderId: true,
+            amount: true,
+            refundedAmount: true,
+          },
+        },
+      },
+      take: 50,
+    });
+
+    let requeued = 0;
+    for (const payout of voided) {
+      const hold = payout.paymentHold;
+      if (!hold) continue;
+
+      // Satıcıya ödenecek bakiye kalmadıysa (tam iade) dokunma.
+      if (entitledNetFromHold(hold) <= PAYOUT_MIN_NET) continue;
+
+      const order = await this.prisma.order.findUnique({
+        where: { id: hold.orderId },
+        select: { status: true },
+      });
+      if (!order || !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status)) {
+        continue;
+      }
+
+      // İade hâlâ sürüyorsa bekle — aksi halde iade ile payout yarışır.
+      const blockingRefund = await this.findBlockingRefund({
+        orderId: hold.orderId,
+        paymentId: hold.paymentId,
+      });
+      if (blockingRefund) continue;
+
+      // CAS: yalnız hâlâ bu iade-void durumundaysa promote et.
+      const claim = await this.prisma.payoutTransfer.updateMany({
+        where: {
+          id: payout.id,
+          status: PayoutStatus.failed,
+          failureReason: "order_refunded",
+        },
+        data: { status: PayoutStatus.pending, failureReason: null },
+      });
+      if (claim.count === 0) continue;
+
+      requeued++;
+      this.logger.log(
+        `Payout ${payout.id} yeniden kuyruğa alındı: kısmi iade sonrası satıcının kalan hakkı ödenecek`,
+      );
+    }
+
+    return requeued;
   }
 
   /**
