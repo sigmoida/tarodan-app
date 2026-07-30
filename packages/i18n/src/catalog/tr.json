@@ -755,7 +755,7 @@
     "enterShippingAddress": "Lütfen teslimat adresini girin",
     "payWithPaytr": "PayTR ile Öde",
     "discountLabel": "İndirim",
-    "platformServiceFeeWithRate": "Platform Hizmet Bedeli (%3)",
+    "platformServiceFeeWithRate": "Platform Hizmet Bedeli (%{rate})",
     "securePaymentCreditCard": "Kredi kartı ile güvenli ödeme",
     "paytrRedirectNotice": "“Devam Et” butonuna bastığınızda, kart bilgilerinizi güvenli PayTR ödeme sayfasında gireceksiniz.",
     "addressTitlePlaceholder": "Adres Başlığı (örn: Ev, İş)",
@@ -774,7 +774,8 @@
     "completeDeliveryAddress": "Lütfen teslimat adresini eksiksiz doldurun",
     "shippingCalculatedAtCheckout": "Ödeme adımında hesaplanır",
     "loginFasterCheckout": "Hızlı ödeme için giriş yapın",
-    "cartSavedAfterLogin": "Sepetiniz giriş yaptıktan sonra korunacak."
+    "cartSavedAfterLogin": "Sepetiniz giriş yaptıktan sonra korunacak.",
+    "platformServiceFee": "Platform Hizmet Bedeli"
   },
   "order": {
     "myOrders": "Siparişlerim",

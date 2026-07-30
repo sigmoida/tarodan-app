@@ -14,6 +14,10 @@ const fmtTL = (n: number) =>
     maximumFractionDigits: 2,
   });
 
+/** Oranı gereksiz kuruş göstermeden yazar: %3, %4,5 gibi. */
+const fmtRate = (n: number) =>
+  n.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+
 export default function OrderSummarySidebar() {
   const {
     t,
@@ -116,7 +120,13 @@ export default function OrderSummarySidebar() {
         {(quote?.pricing?.buyerFeeAmount ?? 0) > 0 && (
           <div className="flex justify-between items-center">
             <span className="text-muted flex items-center gap-1">
-              {t("checkout.platformServiceFeeWithRate")}
+              {/* Oran kural setinden gelir; çeviri metnine gömülü sabit "%3"
+                  gerçek orandan bağımsızdı ve yanlış oran gösterebiliyordu. */}
+              {(quote?.pricing?.buyerFeeRate ?? 0) > 0
+                ? t("checkout.platformServiceFeeWithRate", {
+                    rate: fmtRate(Number(quote!.pricing.buyerFeeRate)),
+                  })
+                : t("checkout.platformServiceFee")}
               <a
                 href="/platform-service-fee"
                 target="_blank"

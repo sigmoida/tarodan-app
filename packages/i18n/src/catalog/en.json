@@ -755,7 +755,7 @@
     "enterShippingAddress": "Please enter your delivery address",
     "payWithPaytr": "Pay with PayTR",
     "discountLabel": "Discount",
-    "platformServiceFeeWithRate": "Platform Service Fee (3%)",
+    "platformServiceFeeWithRate": "Platform Service Fee ({rate}%)",
     "securePaymentCreditCard": "Secure payment with credit card",
     "paytrRedirectNotice": "Click 'Continue' to proceed. Your card details will be entered securely on the PayTR payment page.",
     "addressTitlePlaceholder": "Address Title (e.g. Home, Work)",
@@ -774,7 +774,8 @@
     "completeDeliveryAddress": "Please complete the delivery address",
     "shippingCalculatedAtCheckout": "Calculated at checkout",
     "loginFasterCheckout": "Sign in for faster checkout",
-    "cartSavedAfterLogin": "Your cart will be saved after login."
+    "cartSavedAfterLogin": "Your cart will be saved after login.",
+    "platformServiceFee": "Platform Service Fee"
   },
   "order": {
     "myOrders": "My Orders",

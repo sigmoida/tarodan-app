@@ -44,6 +44,25 @@ export interface ShippingTariffSnapshot {
 }
 
 /**
+ * Checkout'ta gösterilecek ETKİN alıcı ücreti oranı (%).
+ *
+ * Oran sabit yazılamaz: kural setine göre değişir ve sepette farklı kategoriler
+ * (dolayısıyla farklı oranlar) bulunabilir. Tek bir kuralın oranını göstermek
+ * yanıltıcı olacağından tahsil edilen ücretin alt-toplama bölümü kullanılır —
+ * gösterilen oran her zaman gösterilen tutarla tutarlı olur.
+ *
+ * Fee'nin hesaplandığı bazla aynı baz verilmelidir (kupon uygulanmışsa indirimli
+ * alt-toplam), aksi halde alıcıya olduğundan küçük bir oran görünür.
+ */
+export function effectiveBuyerFeeRate(
+  buyerFeeAmount: number,
+  feeBasisSubtotal: number,
+): number {
+  if (!(feeBasisSubtotal > 0) || !(buyerFeeAmount > 0)) return 0;
+  return Math.round((buyerFeeAmount / feeBasisSubtotal) * 100 * 100) / 100;
+}
+
+/**
  * Fiyatlandırma hesapları (kargo ücreti, komisyon, checkout quote) —
  * OrderService'ten birebir taşındı. OrderService aynı imzalarla buraya delege eder.
  */
@@ -233,6 +252,8 @@ export class OrderPricingService {
       subtotal: number;
       shippingAmount: number;
       buyerFeeAmount: number;
+      /** Etkin alıcı ücreti oranı (%) — checkout etiketinde gösterilir. */
+      buyerFeeRate: number;
       sellerFeeAmount: number;
       commissionAmount: number;
       taxAmount: number;
@@ -519,6 +540,11 @@ export class OrderPricingService {
       subtotal: itemsSubtotal,
       shippingAmount,
       buyerFeeAmount: totalBuyerFee,
+      // Fee, kupon sonrası indirimli baz üzerinden hesaplandı → oran da o bazla.
+      buyerFeeRate: effectiveBuyerFeeRate(
+        totalBuyerFee,
+        itemsSubtotal - couponDiscountTotal,
+      ),
       sellerFeeAmount: totalSellerFee,
       commissionAmount,
       taxAmount: totalTax,

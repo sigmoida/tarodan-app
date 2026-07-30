@@ -37,6 +37,8 @@ export interface CheckoutQuote {
     subtotal: number;
     shippingAmount: number;
     buyerFeeAmount: number;
+    /** Etkin oran (%) — etikette gösterilir; sabit değil, kural setinden gelir. */
+    buyerFeeRate: number;
     sellerFeeAmount: number;
     commissionAmount: number;
     taxAmount: number;
