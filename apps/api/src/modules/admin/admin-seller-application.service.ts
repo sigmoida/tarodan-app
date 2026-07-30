@@ -232,23 +232,37 @@ export class AdminSellerApplicationService {
     if (application.status === "rejected")
       throw new BadRequestException("Bu başvuru zaten reddedilmiş");
 
-    await this.prisma.corporateApplication.update({
-      where: { id: applicationId },
-      data: {
-        status: "rejected",
-        reviewNote: reason.trim(),
-        rejectedAt: new Date(),
-        invitationTokenHash: null,
-        invitationExpiresAt: null,
-        events: {
-          create: {
-            action: "application_rejected",
-            note: reason.trim(),
-            actorAdminId: adminId,
+    await this.prisma.$transaction([
+      this.prisma.corporateApplication.update({
+        where: { id: applicationId },
+        data: {
+          status: "rejected",
+          reviewNote: reason.trim(),
+          rejectedAt: new Date(),
+          invitationTokenHash: null,
+          invitationExpiresAt: null,
+          events: {
+            create: {
+              action: "application_rejected",
+              note: reason.trim(),
+              actorAdminId: adminId,
+            },
           },
         },
-      },
-    });
+      }),
+      // Aktivasyon SONRASI red: kullanıcı satırı da "rejected" olmalı. Eskiden
+      // yalnız başvuru işaretleniyordu; user.businessStatus "pending"de kalıyor,
+      // web guard'ı kullanıcıyı sonsuza dek /business-pending'e ("başvurunuz
+      // inceleniyor") kilitliyor ve /business-rejected ekranı hiç görünmüyordu.
+      ...(application.userId
+        ? [
+            this.prisma.user.update({
+              where: { id: application.userId },
+              data: { businessStatus: "rejected" as const },
+            }),
+          ]
+        : []),
+    ]);
     await this.audit.createAuditLog(
       adminId,
       "seller_application_reject",
