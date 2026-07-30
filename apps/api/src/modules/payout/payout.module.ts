@@ -7,6 +7,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { PaymentProvidersModule } from "../payment-providers";
 import { NotificationModule } from "../notification/notification.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -15,7 +16,11 @@ import { NotificationModule } from "../notification/notification.module";
     NotificationModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
-  providers: [PayoutService, PayoutSchedulerService, PayoutScheduledProcessor],
+  providers: [
+    PayoutService,
+    PayoutSchedulerService,
+    ...scheduledProcessors(PayoutScheduledProcessor),
+  ],
   exports: [PayoutService],
 })
 export class PayoutModule {}

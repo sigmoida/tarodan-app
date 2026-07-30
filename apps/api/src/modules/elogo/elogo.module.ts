@@ -15,6 +15,7 @@ import {
   LiveElogoSoapClient,
   StubElogoSoapClient,
 } from "./elogo-soap.client";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 /**
  * eLogo e-Belge entegrasyon modülü.
@@ -46,7 +47,7 @@ import {
     ElogoService,
     ElogoInvoicingService,
     ElogoSchedulerService,
-    ElogoScheduledProcessor,
+    ...scheduledProcessors(ElogoScheduledProcessor),
   ],
   controllers: [ElogoInvoiceController],
   exports: [ElogoService, ElogoInvoicingService],

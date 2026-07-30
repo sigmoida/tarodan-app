@@ -20,6 +20,7 @@ import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
 import { RatingModule } from "../rating/rating.module";
 import { ModerationModule } from "../moderation/moderation.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -43,7 +44,7 @@ import { ModerationModule } from "../moderation/moderation.module";
     UserBankService,
     UserEngagementService,
     FeaturedSchedulerService,
-    FeaturedScheduledProcessor,
+    ...scheduledProcessors(FeaturedScheduledProcessor),
   ],
   exports: [UserService],
 })

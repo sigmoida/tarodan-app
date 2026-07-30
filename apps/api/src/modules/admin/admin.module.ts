@@ -81,6 +81,7 @@ import { NotificationModule } from "../notification/notification.module";
 import { OrderModule } from "../order/order.module";
 import { ElogoModule } from "../elogo/elogo.module";
 import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -168,7 +169,7 @@ import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
     AdminSellerApplicationService,
     AdminAdPackageService,
     ScheduledNotificationScheduler,
-    ScheduledNotificationProcessor,
+    ...scheduledProcessors(ScheduledNotificationProcessor),
   ],
   exports: [AdminService],
 })

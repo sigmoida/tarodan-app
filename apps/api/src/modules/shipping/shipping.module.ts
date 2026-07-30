@@ -11,6 +11,7 @@ import { PaymentModule } from "../payment/payment.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { NotificationModule } from "../notification/notification.module";
 import { ShippingTariffModule } from "./shipping-tariff.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { ShippingTariffModule } from "./shipping-tariff.module";
   providers: [
     ShippingService,
     ShippingSchedulerService,
-    ShippingScheduledProcessor,
+    ...scheduledProcessors(ShippingScheduledProcessor),
   ],
   exports: [ShippingService],
 })

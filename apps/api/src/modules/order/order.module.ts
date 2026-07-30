@@ -29,6 +29,7 @@ import { TaxModule } from "../tax/tax.module";
 import { ElogoModule } from "../elogo";
 import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 import { RefundModule } from "../refund/refund.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -59,7 +60,7 @@ import { RefundModule } from "../refund/refund.module";
     OrderQueryService,
     OrderLifecycleService,
     OrderSchedulerService,
-    OrderScheduledProcessor,
+    ...scheduledProcessors(OrderScheduledProcessor),
     SellerInvoiceService,
     SmtpProvider,
   ],

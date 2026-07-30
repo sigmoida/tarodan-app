@@ -20,6 +20,7 @@ import { PaymentModule } from "../payment/payment.module";
 import { ProductModule } from "../product/product.module";
 import { EventModule } from "../events";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -43,7 +44,7 @@ import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
     TradeLifecycleService,
     TradeReconciliationService,
     TradeSchedulerService,
-    TradeScheduledProcessor,
+    ...scheduledProcessors(TradeScheduledProcessor),
     TradeCashClearedListener,
   ],
   exports: [TradeService],

@@ -14,6 +14,7 @@ import { RefundController } from "./refund.controller";
 import { RefundService } from "./refund.service";
 import { RefundSchedulerService } from "./refund-scheduler.service";
 import { RefundScheduledProcessor } from "./refund-scheduled.processor";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -35,7 +36,11 @@ import { RefundScheduledProcessor } from "./refund-scheduled.processor";
     }),
   ],
   controllers: [RefundController],
-  providers: [RefundService, RefundSchedulerService, RefundScheduledProcessor],
+  providers: [
+    RefundService,
+    RefundSchedulerService,
+    ...scheduledProcessors(RefundScheduledProcessor),
+  ],
   exports: [RefundService, RefundSchedulerService],
 })
 export class RefundModule {}

@@ -43,6 +43,7 @@ import { CommissionModule } from "../commission/commission.module";
 import { StorageModule } from "../storage/storage.module";
 import { ElogoModule } from "../elogo";
 import { DiscountModule } from "../discount";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -94,7 +95,7 @@ import { DiscountModule } from "../discount";
     PaymentProviderEventService,
     PaymentLifecycleService,
     PaymentSchedulerService,
-    PaymentScheduledProcessor,
+    ...scheduledProcessors(PaymentScheduledProcessor),
     PaymentOutboxHandlers,
     RawBodyMiddleware,
   ],

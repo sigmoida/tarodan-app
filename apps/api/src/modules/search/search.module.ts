@@ -14,6 +14,7 @@ import { SearchScheduledProcessor } from "./search-scheduled.processor";
 import { PrismaModule } from "../../prisma";
 import { StorageModule } from "../storage/storage.module";
 import { QUEUE_NAMES } from "../../workers/constants";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
     SearchSyncService,
     SearchIndexingService,
     SearchSyncListener,
-    SearchScheduledProcessor,
+    ...scheduledProcessors(SearchScheduledProcessor),
   ],
   exports: [SearchService, SearchIndexingService],
 })

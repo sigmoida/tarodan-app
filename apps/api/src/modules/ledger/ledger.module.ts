@@ -5,6 +5,7 @@ import { LedgerService } from "./ledger.service";
 import { LedgerBalanceService } from "./ledger-balance.service";
 import { LedgerReconciliationService } from "./ledger-reconciliation.service";
 import { LedgerScheduledProcessor } from "./ledger-scheduled.processor";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 /**
  * LedgerModule (Faz 6) — değişmez çift-taraflı defter + günlük drift reconciliation.
@@ -18,7 +19,7 @@ import { LedgerScheduledProcessor } from "./ledger-scheduled.processor";
     LedgerService,
     LedgerBalanceService,
     LedgerReconciliationService,
-    LedgerScheduledProcessor,
+    ...scheduledProcessors(LedgerScheduledProcessor),
   ],
   exports: [LedgerService, LedgerBalanceService, LedgerReconciliationService],
 })
