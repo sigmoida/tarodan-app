@@ -15,9 +15,12 @@ import {
   CurrencyDollarIcon,
   ChevronDownIcon,
   BellIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
+import MembershipBadge from "@/components/membership/MembershipBadge";
 import UserAvatar from "@/components/UserAvatar";
+import { membershipNavLabel } from "@/lib/membership";
 import { useLocale, useTranslations } from "next-intl";
 import type { HeaderData } from "./_hooks/useHeaderData";
 
@@ -156,10 +159,10 @@ export default function AccountMenu({
                       {user?.displayName}
                     </p>
                     <p className="text-xs text-muted truncate">{user?.email}</p>
+                    {/* Profil kartındakiyle AYNI rozet — eskiden burada ham
+                        kademe kodunu büyük harfle basan ayrı bir etiket vardı. */}
                     {membershipTier !== "free" && (
-                      <span className="inline-block mt-1 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide bg-warning-100 text-warning-700 rounded">
-                        {membershipTier}
-                      </span>
+                      <MembershipBadge tier={membershipTier} className="mt-1" />
                     )}
                   </div>
                 </div>
@@ -171,6 +174,16 @@ export default function AccountMenu({
               <Link href="/profile" onClick={close} className={MENU_LINK_CLASS}>
                 <UserCircleIcon className="w-5 h-5" />
                 {t("profile.myProfile")}
+              </Link>
+              {/* Üyelik — profil navigasyonundaki sırayla aynı: profilin hemen
+                  altında. Üyeliği olmayan "Üye Ol" görür. */}
+              <Link
+                href="/profile/membership"
+                onClick={close}
+                className={MENU_LINK_CLASS}
+              >
+                <SparklesIcon className="w-5 h-5" />
+                {membershipNavLabel(membershipTier)}
               </Link>
               <Link
                 href="/profile/listings"
