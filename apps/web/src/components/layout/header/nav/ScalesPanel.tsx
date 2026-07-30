@@ -4,6 +4,7 @@
 
 import { Link } from "@/i18n/navigation";
 import { NavigationMenuLink } from "@tarodan/ui";
+import { navHref } from "./config";
 import NavPanel from "./NavPanel";
 
 export default function ScalesPanel({
@@ -22,7 +23,7 @@ export default function ScalesPanel({
         {scales.map((scale) => (
           <NavigationMenuLink asChild key={scale}>
             <Link
-              href={`/listings?scale=${encodeURIComponent(scale)}`}
+              href={navHref.scale(scale)}
               className="rounded-full border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:border-primary-200 hover:bg-surface-alt hover:text-primary-600"
             >
               {scale}

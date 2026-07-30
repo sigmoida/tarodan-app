@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
+import { PROFILE_PANE_HEIGHT } from "../../_lib/layout";
 import { useMessaging } from "./_hooks/useMessaging";
 import ThreadList from "./_components/ThreadList";
 import ChatHeader from "./_components/ChatHeader";
@@ -31,7 +32,9 @@ export default function MessagesPage() {
   const { selectedThread } = vm;
 
   return (
-    <div className="h-[calc(100vh-8rem)] bg-surface text-heading flex flex-col">
+    <div
+      className={`${PROFILE_PANE_HEIGHT} bg-surface text-heading flex flex-col`}
+    >
       <div className="flex-1 flex min-h-0 mx-auto w-full max-w-full overflow-hidden bg-surface-elevated rounded-lg border border-border sm:shadow-sm">
         <ThreadList
           className={`${selectedThread ? "hidden sm:flex" : "flex"} w-full sm:w-80`}

@@ -409,8 +409,13 @@ function useNavSearch() {
 }
 
 /**
- * Desktop search form + the full autocomplete dropdown (recent + popular +
- * rich categorized results). All state/logic lives in `useNavSearch`.
+ * Search form + the full autocomplete dropdown (recent + popular + rich
+ * categorized results). All state/logic lives in `useNavSearch`.
+ *
+ * Yerleşim: `lg` altında başlığın İKİNCİ satırında tam genişlik (`order-last
+ * basis-full`), `lg` ve üstünde eski yerinde — logo ile eylem kümesi arasında.
+ * Eskiden `hidden md:flex` ile küçük ekranda tamamen kayboluyordu; arama pazar
+ * yerinin ana eylemi, gizlenecek şey değil.
  */
 export default function HeaderSearch() {
   const t = useTranslations();
@@ -439,9 +444,11 @@ export default function HeaderSearch() {
     <div
       ref={searchContainerRef}
       data-tour="search"
-      className="hidden md:flex flex-1 justify-center min-w-0 min-h-0 px-4"
+      className="order-last flex w-full min-w-0 basis-full justify-center lg:order-none lg:w-auto lg:flex-1 lg:basis-auto lg:px-4"
     >
-      <div className="w-full max-w-xl relative flex-shrink-0">
+      {/* Genişlik sınırı yalnız masaüstünde: `lg` altında arama kendi satırında
+          durduğu için daraltmanın bir gerekçesi yok, kenarlarda boşluk bırakıyordu. */}
+      <div className="relative w-full flex-shrink-0 lg:max-w-xl">
         <form onSubmit={handleSearchSubmit} className="relative h-10 block">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-primary-400">
             <MagnifyingGlassIcon className="w-4 h-4 shrink-0" aria-hidden />
