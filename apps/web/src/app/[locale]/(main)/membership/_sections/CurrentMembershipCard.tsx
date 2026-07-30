@@ -2,8 +2,8 @@
 
 "use client";
 
-import { CalendarIcon } from "@heroicons/react/24/outline";
 import { Button, Toggle } from "@tarodan/ui";
+import Notice from "../_components/Notice";
 import type { MembershipDetails } from "../_lib/types";
 
 function fmtDate(iso?: string) {
@@ -24,7 +24,13 @@ interface Props {
   onCancel: () => void;
 }
 
-/** Logged-in, paid-tier management: dates + auto-renew + cancel. */
+/**
+ * Logged-in, paid-tier management: dates + auto-renew + cancel.
+ *
+ * Sadeleştirildi: tarihler renkli ikon kutucukları yerine düz bir künye satırı.
+ * Kutucuklar (mavi/yeşil daire + takvim ikonu) iki basit tarihe sayfadaki en
+ * ağır görsel vurguyu veriyordu; taşıdıkları ek bir bilgi yoktu.
+ */
 export default function CurrentMembershipCard({
   membership,
   autoRenewSaving,
@@ -35,72 +41,62 @@ export default function CurrentMembershipCard({
   const isCancelled = membership.status === "cancelled";
 
   return (
-    <div className="mx-auto max-w-4xl rounded-lg border border-border bg-surface-elevated p-6">
-      <h2 className="text-lg font-bold text-heading">
-        Mevcut Üyelik Bilgileri
-      </h2>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-info-50 p-2.5">
-            <CalendarIcon className="h-5 w-5 text-info-600" />
-          </div>
-          <div>
-            <p className="text-sm text-muted">Üyelik Başlangıç Tarihi</p>
-            <p className="font-semibold text-heading">
-              {fmtDate(membership.currentPeriodStart)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-success-50 p-2.5">
-            <CalendarIcon className="h-5 w-5 text-success-600" />
-          </div>
-          <div>
-            <p className="text-sm text-muted">
-              {isCancelled ? "Geçerlilik Bitiş Tarihi" : "Yenilenme Tarihi"}
-            </p>
-            <p className="font-semibold text-heading">
-              {fmtDate(membership.currentPeriodEnd)}
-            </p>
-          </div>
-        </div>
+    <div className="rounded-lg border border-border bg-surface-elevated">
+      <div className="border-b border-border-subtle px-6 py-4">
+        <h2 className="font-semibold text-heading">Mevcut Üyelik Bilgileri</h2>
       </div>
 
-      {/* Otomatik yenileme — hatırlatma tabanlı (sessiz çekim yok) */}
-      <div className="mt-6 border-t border-border pt-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="font-semibold text-heading">Otomatik Yenileme</h3>
-            <p className="mt-1 text-sm text-muted">
-              Etkinleştirildiğinde üyeliğiniz dönem sonunda seçtiğiniz plana
-              göre kayıtlı kartınızdan otomatik yenilenir. Devre dışı
-              bırakırsanız ücret tahsil edilmez.
-            </p>
-          </div>
-          <Toggle
-            checked={!!membership.autoRenew}
-            onChange={onToggleAutoRenew}
-            disabled={autoRenewSaving}
-            label="Otomatik yenileme"
-          />
+      <dl className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2">
+        <div>
+          <dt className="text-sm text-muted">Üyelik Başlangıç Tarihi</dt>
+          <dd className="mt-0.5 font-medium text-heading">
+            {fmtDate(membership.currentPeriodStart)}
+          </dd>
         </div>
+        <div>
+          <dt className="text-sm text-muted">
+            {isCancelled ? "Geçerlilik Bitiş Tarihi" : "Yenilenme Tarihi"}
+          </dt>
+          <dd className="mt-0.5 font-medium text-heading">
+            {fmtDate(membership.currentPeriodEnd)}
+          </dd>
+        </div>
+      </dl>
+
+      {/* Otomatik yenileme — hatırlatma tabanlı (sessiz çekim yok) */}
+      <div className="flex items-start justify-between gap-4 border-t border-border-subtle px-6 py-5">
+        <div>
+          <h3 className="text-sm font-semibold text-heading">
+            Otomatik Yenileme
+          </h3>
+          <p className="mt-1 text-sm text-muted">
+            Etkinleştirildiğinde üyeliğiniz dönem sonunda seçtiğiniz plana göre
+            kayıtlı kartınızdan otomatik yenilenir. Devre dışı bırakırsanız
+            ücret tahsil edilmez.
+          </p>
+        </div>
+        <Toggle
+          checked={!!membership.autoRenew}
+          onChange={onToggleAutoRenew}
+          disabled={autoRenewSaving}
+          label="Otomatik yenileme"
+        />
       </div>
 
       {/* Üyelik iptali */}
-      <div className="mt-6 border-t border-border pt-6">
+      <div className="border-t border-border-subtle px-6 py-5">
         {isCancelled ? (
-          <div className="rounded-lg border border-warning-200 bg-warning-50 p-4">
-            <p className="text-sm font-medium text-warning-800">
-              Üyeliğiniz iptal edildi — {fmtDate(membership.currentPeriodEnd)}{" "}
-              tarihine kadar tüm özellikleriniz aktif kalır. Sonrasında otomatik
-              olarak ücretsiz plana geçilir.
-            </p>
-          </div>
+          <Notice>
+            Üyeliğiniz iptal edildi — {fmtDate(membership.currentPeriodEnd)}{" "}
+            tarihine kadar tüm özellikleriniz aktif kalır. Sonrasında otomatik
+            olarak ücretsiz plana geçilir.
+          </Notice>
         ) : (
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="font-semibold text-heading">Üyeliği İptal Et</h3>
+              <h3 className="text-sm font-semibold text-heading">
+                Üyeliği İptal Et
+              </h3>
               <p className="mt-1 text-sm text-muted">
                 İptal ettiğinizde mevcut dönem sonuna kadar özelliklerinizi
                 kullanmaya devam edersiniz; sonra ücretsiz plana geçilir. Ücret

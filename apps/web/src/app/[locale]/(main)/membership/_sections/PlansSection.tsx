@@ -7,10 +7,10 @@ import TierCard from "../_components/TierCard";
 import type { Period, Tier, TierPrices } from "../_lib/types";
 
 const GRID_BY_COUNT: Record<number, string> = {
-  1: "grid-cols-1 max-w-lg",
-  2: "grid-cols-1 md:grid-cols-2 max-w-4xl",
-  3: "grid-cols-1 md:grid-cols-3 max-w-6xl",
-  4: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-7xl",
+  1: "grid-cols-1 max-w-md",
+  2: "grid-cols-1 md:grid-cols-2 max-w-3xl",
+  3: "grid-cols-1 md:grid-cols-3 max-w-5xl",
+  4: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl",
 };
 
 interface Props {
@@ -37,7 +37,7 @@ export default function PlansSection({
   onSelect,
 }: Props) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PeriodToggle
         value={period}
         onChange={onPeriodChange}
@@ -46,7 +46,7 @@ export default function PlansSection({
 
       <div className="flex justify-center">
         <div
-          className={`grid w-full gap-8 ${GRID_BY_COUNT[tiers.length] ?? GRID_BY_COUNT[4]}`}
+          className={`grid w-full gap-4 ${GRID_BY_COUNT[tiers.length] ?? GRID_BY_COUNT[4]}`}
         >
           {tiers.map((tier) => (
             <TierCard

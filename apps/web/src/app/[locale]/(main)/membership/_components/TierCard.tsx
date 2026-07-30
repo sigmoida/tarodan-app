@@ -2,13 +2,19 @@
 
 "use client";
 
-import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
+import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { formatTL } from "@/lib/format";
 import { displayPrice } from "../_lib/tiers";
 import type { Period, Tier, TierPrices } from "../_lib/types";
 
+/**
+ * Tek plan kartı. Sadeleştirilmiş sürüm: tek vurgu rengi (seçili kenarlık),
+ * geri kalan her şey nötr. Eskiden kart aynı anda halka + renkli rozet + yeşil
+ * tikler + mavi "mevcut plan" etiketi taşıyordu; dört farklı renk hangi bilginin
+ * önemli olduğunu belirsizleştiriyordu.
+ */
 export default function TierCard({
   tier,
   period,
@@ -30,7 +36,6 @@ export default function TierCard({
 }) {
   const t = useTranslations();
   const price = displayPrice(tier, period, prices);
-  const discount = prices.yearly_discount_percentage ?? 20;
 
   const ctaLabel = isExactCurrent
     ? t("membership.currentPlan")
@@ -38,72 +43,55 @@ export default function TierCard({
       ? t("membership.free")
       : t("common.continue");
 
+  // Tek rozet yuvası, öncelik sırası: seçili > mevcut > popüler.
+  const badge = isSelected
+    ? t("common.selected")
+    : isCurrent
+      ? t("membership.currentPlan")
+      : tier.popular
+        ? t("membership.mostPopular")
+        : null;
+
   return (
     <div
       id={`tier-${tier.id}`}
       onClick={disabled ? undefined : onSelect}
-      className={`relative flex flex-col rounded-xl border bg-surface-elevated p-8 transition-all ${
+      className={`flex flex-col rounded-lg border bg-surface-elevated p-6 transition-colors ${
         disabled
           ? "cursor-not-allowed opacity-60"
-          : "cursor-pointer hover:border-primary-300"
-      } ${
-        isSelected
-          ? "border-primary-500 ring-2 ring-primary-500"
-          : tier.popular
-            ? "border-primary-300"
-            : "border-border"
-      }`}
+          : "cursor-pointer hover:border-border-strong"
+      } ${isSelected ? "border-primary-500" : "border-border"}`}
     >
-      {/* Corner badge */}
-      <div className="absolute right-4 top-4">
-        {isSelected ? (
-          <Badge
-            variant="success"
-            size="sm"
-            icon={<CheckIcon className="h-3.5 w-3.5" />}
-          >
-            {t("common.selected")}
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-lg font-semibold text-heading">{tier.name}</h3>
+        {badge && (
+          <Badge variant="default" size="sm" className="flex-shrink-0">
+            {badge}
           </Badge>
-        ) : isCurrent ? (
-          <Badge variant="info" size="sm">
-            {t("membership.currentPlan")}
-          </Badge>
-        ) : tier.popular ? (
-          <Badge variant="primary" size="sm">
-            {t("membership.mostPopular")}
-          </Badge>
-        ) : null}
+        )}
       </div>
+      <p className="mt-1 text-sm text-muted">{tier.description}</p>
 
-      <h3 className="text-2xl font-bold text-heading">{tier.name}</h3>
-      <p className="mt-1.5 text-sm text-muted">{tier.description}</p>
-
-      <div className="mt-6">
+      <div className="mt-5">
         <div className="flex items-baseline gap-1">
-          <span className="text-4xl font-bold text-heading">
+          <span className="text-3xl font-semibold text-heading">
             {tier.price === 0 ? "Ücretsiz" : formatTL(price)}
           </span>
           {tier.price > 0 && (
-            <span className="text-base text-muted">
+            <span className="text-sm text-muted">
               /{period === "yearly" ? "yıl" : "ay"}
             </span>
           )}
         </div>
-        {period === "yearly" && tier.price > 0 && (
-          <p className="mt-1.5 text-sm text-muted">
-            Ayda {formatTL(Math.round(price / 12))}
-            <span className="ml-1 text-success-600">· %{discount} indirim</span>
-          </p>
-        )}
       </div>
 
-      <ul className="mt-6 flex-1 space-y-3">
+      <ul className="mt-5 flex-1 space-y-2.5 border-t border-border-subtle pt-5">
         {tier.features.map((feature, i) => (
           <li key={i} className="flex items-start gap-2.5">
             {feature.included ? (
-              <CheckIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-success-500" />
+              <CheckIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-heading" />
             ) : (
-              <XMarkIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-subtle" />
+              <XMarkIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-subtle" />
             )}
             <span
               className={`text-sm ${feature.included ? "text-body" : "text-subtle"}`}
@@ -115,14 +103,7 @@ export default function TierCard({
       </ul>
 
       <Button
-        variant={
-          isExactCurrent
-            ? "secondary"
-            : tier.price === 0
-              ? "outline"
-              : "primary"
-        }
-        size="lg"
+        variant={isExactCurrent || tier.price === 0 ? "outline" : "primary"}
         disabled={disabled}
         onClick={
           disabled
@@ -132,7 +113,7 @@ export default function TierCard({
                 onSelect();
               }
         }
-        className="mt-8 w-full"
+        className="mt-6 w-full"
       >
         {ctaLabel}
       </Button>

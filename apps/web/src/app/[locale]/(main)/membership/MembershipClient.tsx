@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { buildTiers, visibleTiers } from "./_lib/tiers";
@@ -53,10 +53,6 @@ export default function MembershipClient() {
     () => visibleTiers(allTiers, { isBusinessAccount, currentTier }),
     [allTiers, isBusinessAccount, currentTier],
   );
-  const currentTierName = allTiers.find(
-    (tier) => tier.id === currentTier,
-  )?.name;
-
   const showRequiredBanner =
     isRequired && isBusinessAccount && currentTier !== "business";
   const showCurrentCard =
@@ -75,7 +71,6 @@ export default function MembershipClient() {
         <MembershipStatusBanners
           membership={membership}
           currentTier={currentTier}
-          currentTierName={currentTierName}
           onCancelScheduledChange={actions.cancelScheduledChange}
         />
       )}
