@@ -200,6 +200,59 @@ describe("ShippingTariffService active tariff", () => {
       });
     });
 
+    it("temsilci desi kendi kademesinin dışında kalıyorsa reddeder", async () => {
+      // Kapsama sözleşmesi sağlam (0-1 / 1-5 / 5-∞) ama küçük paketin kodda
+      // sabit temsilci desisi (2) artık ORTA kademeye düşer: satıcının "Küçük"
+      // seçtiği ürün checkout'ta orta kademe fiyatı ve payıyla ücretlenirdi.
+      const shifted = [
+        { ...validTiers[0], maxDesi: 1 },
+        { ...validTiers[1], minDesi: 1, maxDesi: 5 },
+        validTiers[2],
+      ];
+      const service = new ShippingTariffService(
+        activationPrisma(draft({ packageTiers: shifted })),
+      );
+
+      await expect(
+        service.activate("tariff-3", "admin-1"),
+      ).rejects.toMatchObject({
+        response: { code: "SHIPPING_PACKAGE_TIER_REPRESENTATIVE_DESI_INVALID" },
+      });
+    });
+
+    it("temsilci desiyi kapsayan farklı aralıklarla aktifleşebilir", async () => {
+      // Aralıklar varsayılandan farklı ama her kademenin temsilcisi (2/5/10)
+      // hâlâ kendi aralığında: (0-2] / (2-7] / (7-∞).
+      const widened = [
+        validTiers[0],
+        { ...validTiers[1], maxDesi: 7 },
+        { ...validTiers[2], minDesi: 7 },
+      ];
+      const tx = {
+        shippingTariff: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          update: jest
+            .fn()
+            .mockResolvedValue(
+              tariff(3, { status: ShippingTariffStatus.active }),
+            ),
+        },
+      };
+      const prisma = {
+        shippingTariff: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue(draft({ packageTiers: widened })),
+        },
+        $transaction: jest.fn(async (fn: any) => fn(tx)),
+      } as any;
+      const service = new ShippingTariffService(prisma);
+
+      const activated = await service.activate("tariff-3", "admin-1");
+
+      expect(activated.status).toBe(ShippingTariffStatus.active);
+    });
+
     it("geçerli kademelerle aktifleştirir ve mevcut aktifi arşivler", async () => {
       const tx = {
         shippingTariff: {

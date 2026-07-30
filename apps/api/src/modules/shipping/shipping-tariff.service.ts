@@ -14,7 +14,10 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
-import { SHIPPING_PACKAGE_TIER_ORDER } from "./shipping-package-tier";
+import {
+  SHIPPING_PACKAGE_TIER_ORDER,
+  billableDesiForTier,
+} from "./shipping-package-tier";
 import {
   outboundPackageShipping,
   shippingAmountForDesi,
@@ -462,6 +465,28 @@ export class ShippingTariffService {
         code: "SHIPPING_PACKAGE_TIER_RANGES_INVALID",
         message:
           "Paket boyutu aralıkları 0'dan başlamalı, boşluksuz ve çakışmasız ilerlemeli, son boyut üst sınırsız olmalıdır.",
+      });
+    }
+
+    // Ürünün `shippingDesi` alanı satıcının seçtiği boyutun SABİT temsilci
+    // desisinden türetilir (billableDesiForTier) ve checkout kademeyi bu
+    // desiden yeniden çözer. Temsilci kendi aralığının dışında kalan bir
+    // tarife aktifleşirse, satıcının seçtiği boyut ile ücretlenen boyut
+    // sessizce ayrışır (örn. "Küçük" seçilen ürün orta kademe fiyatı öder).
+    const representativeOutside = ordered.find((tier) => {
+      const representative = billableDesiForTier(tier.code);
+      return (
+        representative <= tier.minDesi ||
+        (tier.maxDesi != null && representative > tier.maxDesi)
+      );
+    });
+    if (representativeOutside) {
+      throw new BadRequestException({
+        code: "SHIPPING_PACKAGE_TIER_REPRESENTATIVE_DESI_INVALID",
+        message:
+          `"${representativeOutside.code}" boyutunun aralığı, ürünlere yazılan temsilci desiyi ` +
+          `(${billableDesiForTier(representativeOutside.code)}) kapsamıyor — satıcının seçtiği boyut ` +
+          "ile ödeme adımında ücretlenen boyut ayrışır. Aralıkları temsilci desiyi kapsayacak şekilde düzenleyin.",
       });
     }
   }
