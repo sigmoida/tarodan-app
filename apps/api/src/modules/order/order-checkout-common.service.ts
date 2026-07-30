@@ -9,7 +9,11 @@ import { generateUniqueReference } from "../../common/helpers/generate-reference
 import { Prisma } from "@prisma/client";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { TaxService } from "../tax/tax.service";
-import { CommissionResult } from "./order-pricing.service";
+import { CommissionResult, OrderPricingService } from "./order-pricing.service";
+import {
+  splitShippingByBuyerShare,
+  type OutboundTariffLike,
+} from "../shipping/shipping-tariff.helper";
 
 /**
  * Sipariş oluşturma primitifleri (Sürat gönderi fail-fast, kurumsal-satıcı KDV,
@@ -26,7 +30,76 @@ export class OrderCheckoutCommonService {
     private readonly prisma: PrismaService,
     private readonly suratCargoService: SuratCargoService,
     private readonly taxService: TaxService,
+    private readonly orderPricing: OrderPricingService,
   ) {}
+
+  /**
+   * Teklif bazlı bir siparişin TÜM bedelleri: komisyon, kargo (alıcı/satıcı payı),
+   * KDV, stopaj ve tahsil edilecek toplam.
+   *
+   * Tek kaynak olması kritik: teklif kabul edilirken sipariş `OfferService` içinde
+   * oluşturuluyor ve orada yalnız komisyon hesaplanıyordu — KDV, stopaj ve kargo
+   * sıfır kalıyordu (kurumsal satıcıda KDV tahsil edilmemesi + kargonun bedava
+   * verilmesi). Klasik `POST /orders` teklif yolu ise aynı hesabı kendi içinde
+   * tekrar yazıyordu. İkisi de artık burayı çağırır.
+   */
+  async resolveOfferOrderPricing(params: {
+    amount: number;
+    sellerId: string;
+    categoryId: string | null;
+    shippingDesi: number;
+    shippingTariff?: OutboundTariffLike;
+  }): Promise<{
+    commission: CommissionResult;
+    fullShippingAmount: number;
+    buyerShippingAmount: number;
+    sellerShippingAmount: number;
+    taxAmount: number;
+    withholdingTaxAmount: number;
+    totalAmount: number;
+  }> {
+    const { amount, sellerId, categoryId, shippingDesi, shippingTariff } =
+      params;
+
+    const commission = await this.orderPricing.calculateCommission(
+      amount,
+      sellerId,
+      categoryId,
+    );
+    const fullShippingAmount = await this.orderPricing.calculateShippingCost(
+      amount,
+      shippingTariff,
+      shippingDesi,
+    );
+    const { buyer: buyerShippingAmount, seller: sellerShippingAmount } =
+      splitShippingByBuyerShare(
+        fullShippingAmount,
+        commission.shippingBuyerShare,
+      );
+    const { taxAmount, withholdingTaxAmount } = await this.resolveSellerTaxes(
+      sellerId,
+      categoryId,
+      amount,
+    );
+
+    // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + KDV.
+    // (Stopaj satıcı payout'undan kesilir, alıcıya yansıtılmaz.)
+    const totalAmount =
+      Math.round(
+        (amount + buyerShippingAmount + commission.buyerFeeAmount + taxAmount) *
+          100,
+      ) / 100;
+
+    return {
+      commission,
+      fullShippingAmount,
+      buyerShippingAmount,
+      sellerShippingAmount,
+      taxAmount,
+      withholdingTaxAmount,
+      totalAmount,
+    };
+  }
 
   buildSuratIdempotencyKey(parts: string[]): string {
     return createHash("sha256")

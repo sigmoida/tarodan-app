@@ -23,6 +23,7 @@ describe("OrderCheckoutCommonService corporate seller tax policy", () => {
       prisma as any,
       {} as any,
       taxService as any,
+      {} as any,
     );
 
     await expect(

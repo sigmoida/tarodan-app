@@ -22,6 +22,7 @@ import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { OrderService } from "../order/order.service";
+import { OrderCheckoutCommonService } from "../order/order-checkout-common.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
@@ -43,6 +44,9 @@ export class OfferService {
     private readonly productLockService: ProductLockService,
     @Optional()
     private readonly storageService: StorageService,
+    // Teklif siparişinin bedelleri (kargo + KDV + stopaj + toplam) normal satışla
+    // AYNI primitiften gelir; burada ayrı hesap yapılmaz.
+    private readonly checkoutCommon: OrderCheckoutCommonService,
   ) {
     this.offerExpiryHours = parseInt(
       this.configService.get("OFFER_EXPIRY_HOURS") || "24",
@@ -354,15 +358,18 @@ export class OfferService {
       // Teklif kabul = sadece anlaşma. Stok değişmez, invalidation yok.
       // Reserve, ödeme başlatıldığında (payment initiate) yapılacak.
 
-      // Calculate commission using the same logic as direct buy
-      const commissionResult = await this.orderService.calculateCommission(
-        Number(offerData.amount),
-        offerData.sellerId,
-        productData.categoryId,
-      );
-
-      const totalAmount =
-        Number(offerData.amount) + commissionResult.buyerFeeAmount;
+      // Bedeller: komisyon + kargo payı + KDV + stopaj + tahsil edilecek toplam.
+      // Eskiden yalnız komisyon hesaplanıyor, KDV/stopaj/kargo @default(0) kalıyordu →
+      // kurumsal satıcının teklif satışında KDV tahsil edilmiyor, stopaj kesilmiyor
+      // ve kargo bedava veriliyordu.
+      const offerPricing = await this.checkoutCommon.resolveOfferOrderPricing({
+        amount: Number(offerData.amount),
+        sellerId: offerData.sellerId,
+        categoryId: productData.categoryId,
+        shippingDesi: productData.shippingDesi,
+      });
+      const commissionResult = offerPricing.commission;
+      const totalAmount = offerPricing.totalAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
@@ -376,6 +383,13 @@ export class OfferService {
           sellerId: offerData.sellerId,
           offerId: offerId,
           totalAmount,
+          subtotal: Number(offerData.amount),
+          unitPrice: Number(offerData.amount),
+          shippingCost: offerPricing.buyerShippingAmount,
+          buyerShippingAmount: offerPricing.buyerShippingAmount,
+          sellerShippingAmount: offerPricing.sellerShippingAmount,
+          taxAmount: offerPricing.taxAmount,
+          withholdingTaxAmount: offerPricing.withholdingTaxAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -392,7 +406,7 @@ export class OfferService {
       });
 
       this.logger.log(
-        `Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount})`,
+        `Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount}, shipping=${offerPricing.buyerShippingAmount}, tax=${offerPricing.taxAmount})`,
       );
 
       // Re-fetch offer with order relation so response includes orderId

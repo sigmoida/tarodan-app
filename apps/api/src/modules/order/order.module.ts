@@ -63,6 +63,8 @@ import { RefundModule } from "../refund/refund.module";
     SellerInvoiceService,
     SmtpProvider,
   ],
-  exports: [OrderService],
+  // OrderCheckoutCommonService: teklif/sipariş bedel primitifleri (OfferService
+  // teklif kabulünde aynı hesabı kullanır — tek kaynak).
+  exports: [OrderService, OrderCheckoutCommonService],
 })
 export class OrderModule {}

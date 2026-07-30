@@ -742,24 +742,19 @@ export class OrderCheckoutDirectService {
         }
       }
 
-      // Calculate commission with category-based matching (3.3)
-      const commissionResult = await this.orderPricing.calculateCommission(
-        Number(offer.amount),
-        offer.sellerId,
-        offer.product.categoryId, // Pass categoryId for priority-based matching
-      );
-      const offerFullShipping = await this.orderPricing.calculateShippingCost(
-        Number(offer.amount),
-        shippingTariff.tariff,
-        offer.product.shippingDesi,
-      );
-      const {
-        buyer: offerBuyerShippingAmount,
-        seller: offerSellerShippingAmount,
-      } = splitShippingByBuyerShare(
-        offerFullShipping,
-        commissionResult.shippingBuyerShare,
-      );
+      // Bedeller teklif kabul yoluyla AYNI primitiften gelir (tek kaynak): komisyon,
+      // kargo payı, KDV, stopaj ve tahsil edilecek toplam.
+      const offerPricing = await this.checkoutCommon.resolveOfferOrderPricing({
+        amount: Number(offer.amount),
+        sellerId: offer.sellerId,
+        categoryId: offer.product.categoryId,
+        shippingDesi: offer.product.shippingDesi,
+        shippingTariff: shippingTariff.tariff,
+      });
+      const commissionResult = offerPricing.commission;
+      const offerFullShipping = offerPricing.fullShippingAmount;
+      const offerBuyerShippingAmount = offerPricing.buyerShippingAmount;
+      const offerSellerShippingAmount = offerPricing.sellerShippingAmount;
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -772,21 +767,9 @@ export class OrderCheckoutDirectService {
           dto.shippingAddressId,
         ]);
 
-      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
-      const {
-        taxAmount: offerTaxAmount,
-        withholdingTaxAmount: offerWithholdingAmount,
-      } = await this.checkoutCommon.resolveSellerTaxes(
-        offer.sellerId,
-        offer.product.categoryId,
-        Number(offer.amount),
-      );
-      // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
-      const totalAmount =
-        Number(offer.amount) +
-        offerBuyerShippingAmount +
-        commissionResult.buyerFeeAmount +
-        offerTaxAmount;
+      const offerTaxAmount = offerPricing.taxAmount;
+      const offerWithholdingAmount = offerPricing.withholdingTaxAmount;
+      const totalAmount = offerPricing.totalAmount;
       const offerPricingHash = this.orderPricing.computePricingHash([
         {
           productId: offer.productId,
