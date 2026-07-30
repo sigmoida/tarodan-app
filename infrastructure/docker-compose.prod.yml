@@ -128,7 +128,9 @@ services:
         reservations:
           memory: 64M
 
-  # Redis Cache & Queue
+  # Redis — CACHE only (disposable). LRU eviction is correct here: entries are
+  # regenerable, so shedding them under memory pressure is harmless.
+  # Consumed via REDIS_URL (CacheService).
   redis:
     image: redis:7-alpine
     container_name: tarodan-redis
@@ -155,6 +157,39 @@ services:
           memory: 2G
         reservations:
           memory: 512M
+
+  # Redis — QUEUES (Bull). Separate instance with noeviction, as BullRootModule
+  # already assumes (it connects via REDIS_HOST/PORT/PASSWORD while the cache uses
+  # REDIS_URL). Sharing one LRU instance meant Redis could silently evict ANY key
+  # under memory pressure — including delayed jobs, repeatable-job configs and
+  # locks — so a queued payout tick or order e-mail would just disappear with no
+  # error anywhere. Bull requires noeviction.
+  redis-queue:
+    image: redis:7-alpine
+    container_name: tarodan-redis-queue
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy noeviction
+    volumes:
+      - redis_queue_data:/data
+    networks:
+      - tarodan-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
 
   # Elasticsearch
   elasticsearch:
@@ -199,9 +234,17 @@ services:
       # under Postgres max_connections (#71). Raise these (or front with
       # PgBouncer) if max_connections / replica count is tuned up.
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?connection_limit=20&pool_timeout=20
-      REDIS_HOST: redis
+      # Bull (kuyruk) — noeviction instance. Cache AYRI (REDIS_URL) çünkü cache
+      # LRU ile atılabilir, kuyruk işleri atılamaz.
+      REDIS_HOST: redis-queue
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # CacheService yalnız REDIS_URL okur; tanımsızken localhost'a düşüyordu →
+      # cache + worker heartbeat (dolayısıyla web readiness) kırılıyordu.
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Rol: `web` API'yi cron tüketiminden ayırır (işler worker'a kalır). Varsayılan
+      # `all` mevcut tek-process davranışını korur.
+      PROCESS_ROLE: ${API_PROCESS_ROLE:-all}
       JWT_SECRET: ${JWT_SECRET}
       ELASTICSEARCH_URL: http://elasticsearch:9200
       SENDGRID_API_KEY: ${SENDGRID_API_KEY}
@@ -231,6 +274,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-queue:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
@@ -264,10 +309,35 @@ services:
       # under Postgres max_connections (#71). Raise these (or front with
       # PgBouncer) if max_connections / replica count is tuned up.
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?connection_limit=20&pool_timeout=20
-      REDIS_HOST: redis
+      REDIS_HOST: redis-queue
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      PROCESS_ROLE: worker
+      # worker.ts Sentry'yi DSN yoksa hiç başlatmıyor → tüm arka-plan katmanı hata
+      # takibi olmadan koşuyordu.
+      SENTRY_DSN: ${SENTRY_DSN}
       SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      # Payout transferleri, iadeler ve durum sorguları worker'da koşar; PayTR
+      # anahtarları olmadan para işleri hiç yapılamaz.
+      PAYTR_MERCHANT_ID: ${PAYTR_MERCHANT_ID}
+      PAYTR_MERCHANT_KEY: ${PAYTR_MERCHANT_KEY}
+      PAYTR_MERCHANT_SALT: ${PAYTR_MERCHANT_SALT}
+      PAYTR_TEST_MODE: ${PAYTR_TEST_MODE:-false}
+      # Sürat takip senkronu worker'da koşar (teslimat → escrow saati → fatura).
+      SURAT_CARGO_ENABLED: ${SURAT_CARGO_ENABLED:-false}
+      SURAT_SOAP_MODE: ${SURAT_SOAP_MODE:-stub}
+      SURAT_KARGO_TEST_MODE: ${SURAT_KARGO_TEST_MODE:-true}
+      SURAT_KARGO_CARI_KODU: ${SURAT_KARGO_CARI_KODU}
+      SURAT_KARGO_SIFRE: ${SURAT_KARGO_SIFRE}
+      # e-Logo fatura kesimi/retry cron'u worker'da koşar.
+      ELOGO_ENABLED: ${ELOGO_ENABLED:-false}
+      ELOGO_SOAP_MODE: ${ELOGO_SOAP_MODE:-stub}
+      ELOGO_WS_USERNAME: ${ELOGO_WS_USERNAME}
+      ELOGO_WS_PASSWORD: ${ELOGO_WS_PASSWORD}
+      ELOGO_COMPANY_VKN: ${ELOGO_COMPANY_VKN}
+      ELOGO_COMPANY_TITLE: ${ELOGO_COMPANY_TITLE}
+      FRONTEND_URL: ${FRONTEND_URL:-https://${DOMAIN}}
       ELASTICSEARCH_URL: http://elasticsearch:9200
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
@@ -278,6 +348,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-queue:
         condition: service_healthy
     networks:
       - tarodan-network
@@ -431,6 +503,7 @@ volumes:
   traefik_logs:
   postgres_data:
   redis_data:
+  redis_queue_data:
   elasticsearch_data:
   prometheus_data:
   grafana_data:

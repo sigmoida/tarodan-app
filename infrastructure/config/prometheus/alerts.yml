@@ -82,6 +82,10 @@ groups:
           description: "Container {{ $labels.name }} has restarted {{ humanize $value }} times in last 10 minutes"
 
       # Queue Backlog
+      # NOT: `bull_queue_waiting` metriğini üreten bir exporter YOK (ne api ne de
+      # compose'da bull exporter/prom-client var) → bu alarm hiçbir zaman
+      # tetiklenmez. Bir exporter eklenene kadar kuyruk derinliği izlemesi için
+      # /admin/queues (Bull Board) ve Sentry Cron check-in'lerine bakın.
       - alert: QueueBacklog
         expr: bull_queue_waiting > 1000
         for: 5m
