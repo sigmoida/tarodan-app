@@ -17,6 +17,8 @@ describe("OrderSchedulerService.runProcessDeliveredOrders — invoice candidate 
     const prisma = {
       order: {
         findMany: jest.fn().mockResolvedValue([]),
+        // Faturalama sağlığı alarmları (reportInvoiceStaleness) sayaç sorgular.
+        count: jest.fn().mockResolvedValue(0),
       },
       elogoInvoice: { findMany: jest.fn().mockResolvedValue([]) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
