@@ -12,6 +12,13 @@ import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
+/**
+ * Rozetler bu tabloda SABİT genişlikte: içerik uzunluğu satırdan satıra değişse
+ * de ("Tüm Site" / "Ürün" / "Süresi Doldu") kolon içinde hizalı bir sütun
+ * oluşsun. İçerik kadar genişleyen rozetler sıralamayı tırtıklı gösteriyordu.
+ */
+const BADGE_SIZE = "w-28 justify-center";
+
 export function discountColumns(
   rowMenu: (d: Discount) => RowActionItem[],
   t: T,
@@ -46,13 +53,13 @@ export function discountColumns(
             </span>
           )}
           {d.isFlashSale && (
-            <Badge variant="primary" size="sm">
+            <Badge variant="primary" size="sm" className={BADGE_SIZE}>
               ⚡ Flash
             </Badge>
           )}
         </div>
       ),
-      { grow: 1, minWidth: 130, sortKey: "code", sortType: "text" },
+      { grow: 1, minWidth: 230, sortKey: "code", sortType: "text" },
     ),
     col.custom<Discount>(
       t("admin.marketing.discounts.value"),
@@ -67,7 +74,7 @@ export function discountColumns(
       t("admin.marketing.discounts.scopeLabel"),
       (d) => (
         <div className="min-w-0">
-          <Badge variant="info" size="sm">
+          <Badge variant="info" size="sm" className={BADGE_SIZE}>
             {scopes[d.scope] ?? d.scope}
           </Badge>
           {d.categoryName && (
@@ -75,7 +82,7 @@ export function discountColumns(
           )}
         </div>
       ),
-      { grow: 1, minWidth: 110, sortKey: "scope", sortType: "text" },
+      { grow: 1, minWidth: 150, sortKey: "scope", sortType: "text" },
     ),
     col.muted<Discount>(
       t("admin.marketing.discounts.usage"),
@@ -97,7 +104,11 @@ export function discountColumns(
     col.badge<Discount>(
       t("common.status"),
       (d) => (
-        <Badge status={getDiscountStatus(d)} config={discountStatusConfig(t)} />
+        <Badge
+          status={getDiscountStatus(d)}
+          config={discountStatusConfig(t)}
+          className={BADGE_SIZE}
+        />
       ),
       { sortKey: "isActive", sortType: "number" },
     ),

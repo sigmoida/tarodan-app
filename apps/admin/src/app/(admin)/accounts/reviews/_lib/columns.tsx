@@ -23,7 +23,7 @@ export function productReviewColumns(act: Act, t: T, busyId?: string) {
         image: r.product.images?.[0]?.url,
         href: `/catalog/products/${r.product.id}`,
       }),
-      { grow: 5, minWidth: 400, sortKey: "product.title", sortType: "text" },
+      { grow: 5, minWidth: 480, sortKey: "product.title", sortType: "text" },
     ),
     col.user<Review>(
       t("common.user"),

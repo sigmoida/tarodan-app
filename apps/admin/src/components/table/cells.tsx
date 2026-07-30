@@ -25,15 +25,35 @@ export function Empty() {
   return <span className="text-subtle">—</span>;
 }
 
-/** Free text — single line, clipped, full text on hover when clipped. */
+/**
+ * Free text — single line, clipped, full text on hover when clipped.
+ *
+ * `wrap` bunun TEK istisnası: kırpmak yerine satır kaydırır. Uzun ve tam
+ * okunması gereken alanlar için (ör. iade sebebi) açık tercih olarak verilir;
+ * varsayılan kırpma, satır yüksekliklerinin tabloda sabit kalmasını sağlar.
+ */
 export function CellText({
   value,
   className,
+  wrap,
 }: {
   value?: ReactNode;
   className?: string;
+  wrap?: boolean;
 }) {
   if (value == null || value === "") return <Empty />;
+  if (wrap) {
+    return (
+      <span
+        className={cn(
+          "block whitespace-normal break-words text-body",
+          className,
+        )}
+      >
+        {value}
+      </span>
+    );
+  }
   return (
     <TruncatedText className={cn("text-body", className)}>
       {value}

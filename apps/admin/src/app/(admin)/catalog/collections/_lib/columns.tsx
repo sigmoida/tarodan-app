@@ -39,7 +39,7 @@ export function collectionColumns(t: T, actions: CollectionRowActions) {
         </div>
       ),
       {
-        minWidth: 360,
+        minWidth: 440,
         sortKey: "name",
         sortType: "text",
       },

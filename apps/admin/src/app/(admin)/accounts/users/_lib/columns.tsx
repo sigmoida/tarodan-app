@@ -26,7 +26,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
         avatar: u.avatarUrl,
         href: `/accounts/users/${u.id}`,
       }),
-      { minWidth: 460, sortKey: "displayName", sortType: "text" },
+      { minWidth: 520, sortKey: "displayName", sortType: "text" },
     ),
     col.custom<User>(
       t("common.status"),

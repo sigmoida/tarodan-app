@@ -81,7 +81,9 @@ export const refundRequestColumns = (t: T) => [
     t("admin.operations.refundRequests.reason"),
     (r) => enumLabel(refundReasonConfig, r.reason, r.reason),
     {
-      grow: 2,
+      // Sebep etiketleri uzun ("Açıklamaya Uygun Değil") ve tam okunmalı.
+      minWidth: 260,
+      wrap: true,
       sortKey: "reason",
       sortType: "text",
     },

@@ -161,10 +161,22 @@ function base<T>(
 }
 
 export const col = {
-  /** Free text (truncate + hover). Pass a field key to make it sortable. */
-  text<T>(header: ReactNode, get: Accessor<T, ReactNode>, opts?: ColOpts) {
+  /**
+   * Free text (truncate + hover). Pass a field key to make it sortable.
+   * `wrap: true` kırpma yerine satır kaydırır — uzun etiketler için.
+   */
+  text<T>(
+    header: ReactNode,
+    get: Accessor<T, ReactNode>,
+    opts?: ColOpts & { wrap?: boolean },
+  ) {
     const [g, o] = field(get, opts);
-    return base<T>("text", header, (r) => <CellText value={g(r)} />, o);
+    return base<T>(
+      "text",
+      header,
+      (r) => <CellText value={g(r)} wrap={opts?.wrap} />,
+      o,
+    );
   },
   /** Secondary/muted text. Pass a field key to make it sortable. */
   muted<T>(header: ReactNode, get: Accessor<T, ReactNode>, opts?: ColOpts) {

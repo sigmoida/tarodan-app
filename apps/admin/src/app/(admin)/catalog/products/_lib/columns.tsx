@@ -69,9 +69,6 @@ export function productColumns(t: T) {
         sortType: "number",
       },
     ),
-    col.muted<Product>(t("common.description"), (p) => p.description, {
-      grow: 2,
-    }),
     col.text<Product>(t("admin.catalog.common.brand"), (p) => p.brand?.name),
     col.number<Product>(
       t("admin.catalog.products.listingScore"),

@@ -75,7 +75,7 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
         </Link>
       ),
       {
-        minWidth: 200,
+        minWidth: 180,
         sortKey: "orderNumber",
         sortType: "text",
         exportValue: (o) => o.displayNumber,
@@ -118,7 +118,7 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
               )}
           </div>
         ),
-      { minWidth: 220, sortKey: "status", sortType: "text" },
+      { minWidth: 190, sortKey: "status", sortType: "text" },
     ),
     col.user<OrderGroupRow>(
       t("admin.operations.orders.buyer"),
@@ -128,7 +128,7 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
         href: `/accounts/users/${o.buyer.id}`,
       }),
       {
-        minWidth: 340,
+        minWidth: 480,
         sortKey: "buyer.displayName",
         sortType: "text",
       },
@@ -146,7 +146,7 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
           : null;
       },
       {
-        minWidth: 300,
+        minWidth: 480,
         sortKey: "product.title",
         sortType: "text",
       },
@@ -155,7 +155,8 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
       t("admin.operations.orders.productCount"),
       (o) => o.itemCount,
       {
-        minWidth: 128,
+        // Tek haneli sayı; kazanılan yer Alıcı ve Ürün kolonlarına gitsin.
+        minWidth: 96,
         sortable: false,
       },
     ),
@@ -182,7 +183,7 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
         );
       },
       {
-        minWidth: 140,
+        minWidth: 130,
         sortKey: "commissionAmount",
         sortType: "number",
       },
@@ -195,8 +196,8 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
         ) : (
           <Badge status={o.shipmentStatus} config={shipmentStatusConfig} />
         ),
-      { minWidth: 140 },
+      { minWidth: 130 },
     ),
-    col.date<OrderGroupRow>(t("common.date"), "createdAt", { minWidth: 120 }),
+    col.date<OrderGroupRow>(t("common.date"), "createdAt", { minWidth: 110 }),
   ];
 }
