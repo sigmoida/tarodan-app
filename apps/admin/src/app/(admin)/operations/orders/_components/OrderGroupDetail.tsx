@@ -4,11 +4,7 @@ import { ShoppingBagIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { fmtTry } from "@/lib/format";
 import { CellUser, TruncatedText } from "@/components/table";
-import type {
-  OrderGroupRow,
-  OrderLineItem,
-  SellerPackage,
-} from "../_lib/orders";
+import type { OrderGroupRow, OrderLineItem } from "../_lib/orders";
 
 /** One product line inside the expanded detail row. */
 function LineItem({ item }: { item: OrderLineItem }) {
@@ -78,35 +74,12 @@ function LineItem({ item }: { item: OrderLineItem }) {
   );
 }
 
-/** One satıcı-paketi block: seller subheader + that seller's line items. */
-function PackageBlock({ pkg }: { pkg: SellerPackage }) {
-  const t = useTranslations();
+/** A bordered box of line items (one satıcı paketi, or the whole group). */
+function ItemsBox({ items }: { items: OrderLineItem[] }) {
   return (
     <div className="rounded-lg border border-border-subtle bg-surface">
-      <div className="flex items-start justify-between gap-2 border-b border-border-subtle px-3 py-2">
-        <div className="min-w-0">
-          <Link
-            href={`/accounts/users/${pkg.seller.id}`}
-            className="block truncate text-sm font-medium text-primary-600 hover:underline"
-          >
-            {pkg.seller.displayName}
-          </Link>
-          <p className="break-all font-mono text-[11px] text-muted">
-            {t("admin.operations.orders.sellerId")}: {pkg.seller.id}
-          </p>
-          <p className="break-all font-mono text-[11px] text-muted">
-            {t("admin.operations.orders.packageId")}: {pkg.key}
-          </p>
-        </div>
-        <span className="shrink-0 rounded bg-surface-alt px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-          {t("admin.operations.orders.sellerPackage")} ·{" "}
-          {t("admin.operations.orders.itemCountUnit", {
-            count: pkg.items.length,
-          })}
-        </span>
-      </div>
-      <div className="divide-y divide-border-subtle p-1">
-        {pkg.items.map((item) => (
+      <div className="divide-y divide-border-subtle">
+        {items.map((item) => (
           <LineItem key={item.id} item={item} />
         ))}
       </div>
@@ -116,28 +89,22 @@ function PackageBlock({ pkg }: { pkg: SellerPackage }) {
 
 /**
  * The expanded detail row for an order/checkout group. Lists the product line
- * items; when the cart spans multiple sellers/packages the items are grouped by
- * seller (satıcı paketi) with a per-seller subheader.
+ * items; when the cart spans multiple sellers/packages the items are grouped
+ * into one box per satıcı paketi (the seller is shown on each line item).
  */
 export function OrderGroupDetail({ row }: { row: OrderGroupRow }) {
   if (row.isMultiSeller) {
     return (
       <div className="space-y-2 bg-surface-alt/40 px-4 py-3">
         {row.packages.map((pkg) => (
-          <PackageBlock key={pkg.key} pkg={pkg} />
+          <ItemsBox key={pkg.key} items={pkg.items} />
         ))}
       </div>
     );
   }
   return (
     <div className="bg-surface-alt/40 px-4 py-2">
-      <div className="rounded-lg border border-border-subtle bg-surface">
-        <div className="divide-y divide-border-subtle">
-          {row.items.map((item) => (
-            <LineItem key={item.id} item={item} />
-          ))}
-        </div>
-      </div>
+      <ItemsBox items={row.items} />
     </div>
   );
 }

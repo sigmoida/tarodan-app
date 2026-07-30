@@ -85,10 +85,7 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
       t("common.status"),
       (o) =>
         o.itemCount > 1 ? (
-          <Badge
-            variant={o.groupStatus === "done" ? "success" : "default"}
-            size="sm"
-          >
+          <Badge variant={o.groupStatus === "done" ? "success" : "default"}>
             {o.groupStatus === "done"
               ? t("admin.operations.orders.groupDone")
               : t("admin.operations.orders.groupOngoing")}
@@ -131,7 +128,7 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
         href: `/accounts/users/${o.buyer.id}`,
       }),
       {
-        minWidth: 280,
+        minWidth: 340,
         sortKey: "buyer.displayName",
         sortType: "text",
       },

@@ -124,12 +124,6 @@ export default function OrderDetailPage() {
                   email={order.buyer.email}
                   phone={order.buyer.phone}
                 />
-                <PartyCard
-                  title={t("admin.operations.orders.seller")}
-                  name={order.seller.displayName}
-                  userHref={`/accounts/users/${order.seller.id}`}
-                  email={order.seller.email}
-                />
                 <Timeline
                   items={[
                     {
