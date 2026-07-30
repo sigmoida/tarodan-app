@@ -81,7 +81,7 @@ export default function Product360Modal() {
                 view360Index > 0 ? view360Index - 1 : images.length - 1,
               )
             }
-            className="absolute left-4 top-1/2 h-12 w-12 -translate-y-1/2 bg-surface-elevated/10 text-inverted hover:bg-surface-elevated/20"
+            className="absolute left-4 top-1/2 h-12 w-12 -translate-y-1/2 bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
           >
             <ChevronLeftIcon className="h-6 w-6" />
           </IconButton>
@@ -93,7 +93,7 @@ export default function Product360Modal() {
                 view360Index < images.length - 1 ? view360Index + 1 : 0,
               )
             }
-            className="absolute right-4 top-1/2 h-12 w-12 -translate-y-1/2 bg-surface-elevated/10 text-inverted hover:bg-surface-elevated/20"
+            className="absolute right-4 top-1/2 h-12 w-12 -translate-y-1/2 bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
           >
             <ChevronRightIcon className="h-6 w-6" />
           </IconButton>
@@ -112,7 +112,7 @@ export default function Product360Modal() {
                   className={`h-1.5 flex-1 rounded-sm p-0 transition-all ${
                     index === view360Index
                       ? "bg-primary-500"
-                      : "bg-surface-elevated/30 hover:bg-surface-elevated/50"
+                      : "bg-border-strong hover:bg-subtle"
                   }`}
                 />
               ))}

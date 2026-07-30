@@ -100,7 +100,7 @@ export default function ProductLightbox() {
             variant="ghost"
             aria-label={t("common.zoomIn")}
             onClick={handleZoomIn}
-            className="h-10 w-10 bg-surface-elevated/10 text-inverted hover:bg-surface-elevated/20"
+            className="h-10 w-10 bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
             disabled={zoomLevel >= 3}
           >
             <MagnifyingGlassPlusIcon className="h-5 w-5" />
@@ -109,7 +109,7 @@ export default function ProductLightbox() {
             variant="ghost"
             aria-label={t("common.zoomOut")}
             onClick={handleZoomOut}
-            className="h-10 w-10 bg-surface-elevated/10 text-inverted hover:bg-surface-elevated/20"
+            className="h-10 w-10 bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
             disabled={zoomLevel <= 1}
           >
             <MagnifyingGlassMinusIcon className="h-5 w-5" />
@@ -151,7 +151,7 @@ export default function ProductLightbox() {
                 setZoomLevel(1);
                 setPanPosition({ x: 0, y: 0 });
               }}
-              className="absolute left-4 top-1/2 z-10 h-12 w-12 -translate-y-1/2 bg-surface-elevated/10 text-inverted hover:bg-surface-elevated/20"
+              className="absolute left-4 top-1/2 z-10 h-12 w-12 -translate-y-1/2 bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
             >
               <ChevronLeftIcon className="h-6 w-6" />
             </IconButton>
@@ -167,7 +167,7 @@ export default function ProductLightbox() {
                 setZoomLevel(1);
                 setPanPosition({ x: 0, y: 0 });
               }}
-              className="absolute right-4 top-1/2 z-10 h-12 w-12 -translate-y-1/2 bg-surface-elevated/10 text-inverted hover:bg-surface-elevated/20"
+              className="absolute right-4 top-1/2 z-10 h-12 w-12 -translate-y-1/2 bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
             >
               <ChevronRightIcon className="h-6 w-6" />
             </IconButton>
