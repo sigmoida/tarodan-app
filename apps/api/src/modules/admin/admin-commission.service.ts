@@ -108,41 +108,73 @@ export class AdminCommissionService {
   }
 
   /**
-   * v2 çoklu-kural: aynı (kategori × satıcı tipi × vergi tipi × appliesTo)
-   * ekseninde tutar aralıkları çakışmamalı. Böylece bir kategoriye birden çok
-   * kural (farklı kademe/aralık) eklenebilir ama eşleşme belirsizleşmez.
+   * v2 çoklu-kural: MOTORUN belirsizlik tanımıyla aynı denetim. Motor iki tarafı
+   * ayrı eşleştirir (satıcı tarafı SELLER∪BOTH, alıcı tarafı BUYER∪BOTH) ve
+   * null/ALL/all değerlerini joker sayar. Dolayısıyla iki kural ancak şu dördü
+   * birden sağlanırsa belirsizlik üretir ve reddedilmelidir:
+   *   1. normalize eksenleri AYNI (kategori değeri; satıcı tipi joker≡joker ya
+   *      da aynı özel değer; vergi tipi için aynısı),
+   *   2. appliesTo tarafları KESİŞİYOR (SELLER↔BOTH, BUYER↔BOTH, BOTH↔hepsi),
+   *   3. tutar aralıkları çakışıyor,
+   *   4. ikisi de aktif.
+   * Farklı özgüllükteki kurallar (örn. kategorili × kategori jokeri) motor
+   * tarafından skorla ayrıştığı için serbesttir. Eksen filtreleri BİLEREK
+   * JS'te: Prisma `where` eşitliği null≡ALL eş anlamlılığını göremez.
    */
   private async assertNoRangeOverlap(params: {
     categoryId: string | null;
-    sellerType: CommissionSellerType;
-    taxpayerType: CommissionTaxpayerType;
+    sellerType: CommissionSellerType | null;
+    taxpayerType: CommissionTaxpayerType | null;
     appliesTo: CommissionAppliesTo;
     minAmount: number | null;
     maxAmount: number | null;
     excludeId?: string;
   }) {
+    const normalizeSeller = (v: CommissionSellerType | null) =>
+      v == null || v === CommissionSellerType.ALL ? null : v;
+    const normalizeTaxpayer = (v: CommissionTaxpayerType | null) =>
+      v == null || v === CommissionTaxpayerType.all ? null : v;
+    const sides = (v: CommissionAppliesTo): CommissionAppliesTo[] =>
+      v === CommissionAppliesTo.BOTH
+        ? [CommissionAppliesTo.SELLER, CommissionAppliesTo.BUYER]
+        : [v];
+    const sidesIntersect = (a: CommissionAppliesTo, b: CommissionAppliesTo) =>
+      sides(a).some((side) => sides(b).includes(side));
+
     const siblings = await this.prisma.commissionRule.findMany({
       where: {
-        categoryId: params.categoryId,
-        sellerType: params.sellerType,
-        taxpayerType: params.taxpayerType,
-        appliesTo: params.appliesTo,
         isActive: true,
         ...(params.excludeId ? { id: { not: params.excludeId } } : {}),
       },
-      select: { id: true, minAmount: true, maxAmount: true },
+      select: {
+        id: true,
+        categoryId: true,
+        sellerType: true,
+        taxpayerType: true,
+        appliesTo: true,
+        minAmount: true,
+        maxAmount: true,
+      },
     });
-    const clash = siblings.find((s) =>
-      this.rangesOverlap(
-        params.minAmount,
-        params.maxAmount,
-        s.minAmount != null ? Number(s.minAmount) : null,
-        s.maxAmount != null ? Number(s.maxAmount) : null,
-      ),
+
+    const clash = siblings.find(
+      (s) =>
+        s.categoryId === params.categoryId &&
+        normalizeSeller(s.sellerType) === normalizeSeller(params.sellerType) &&
+        normalizeTaxpayer(s.taxpayerType) ===
+          normalizeTaxpayer(params.taxpayerType) &&
+        sidesIntersect(s.appliesTo, params.appliesTo) &&
+        this.rangesOverlap(
+          params.minAmount,
+          params.maxAmount,
+          s.minAmount != null ? Number(s.minAmount) : null,
+          s.maxAmount != null ? Number(s.maxAmount) : null,
+        ),
     );
     if (clash) {
       throw new BadRequestException(
-        "Aynı kategori / satıcı tipi / vergi tipi için tutar aralığı çakışan aktif bir kural zaten var.",
+        "Aynı kategori / satıcı tipi / vergi tipi ekseninde, uygulanan tarafı ve tutar aralığı çakışan aktif bir kural zaten var. " +
+          "Hangi kuralın uygulanacağı belirsizleşeceği için önce mevcut kuralı düzenleyin veya aralıkları ayırın.",
       );
     }
   }
