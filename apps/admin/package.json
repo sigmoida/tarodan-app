@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
-    "build": "next build",
+    "dev": "node ../../scripts/sync-brand-assets.mjs public && next dev -p 3002",
+    "build": "node ../../scripts/sync-brand-assets.mjs public && next build",
     "start": "next start -p 3002",
     "lint": "next lint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test:api": "node scripts/check-api-collisions.mjs"
+    "test:api": "node scripts/check-api-collisions.mjs",
+    "sync:brand": "node ../../scripts/sync-brand-assets.mjs public"
   },
   "dependencies": {
     "@heroicons/react": "^2.1.1",
@@ -20,6 +21,7 @@
     "@tanstack/react-table": "^8.11.2",
     "@tarodan/api-client": "workspace:*",
     "@tarodan/auth": "workspace:*",
+    "@tarodan/brand": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/i18n": "workspace:*",
     "@tarodan/logger": "workspace:*",
