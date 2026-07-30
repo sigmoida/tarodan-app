@@ -19,28 +19,33 @@ export default function AuthMinimalLayout({
   const t = useTranslations();
 
   return (
+    /*
+      Logo, form ve telif satırı `(centered)` çerçevesiyle AYNI sütunda ve sola
+      dayalı. Eskiden logo ve telif ortalanmıştı, form ise `max-w-md` içinde
+      soldan başlıyordu — aynı ürünün iki auth çerçevesi farklı hizalanıyordu.
+    */
     <div className="flex min-h-screen flex-col bg-surface-elevated">
-      <header className="flex justify-center p-6">
-        <Link href="/" className="inline-flex items-center">
-          <Image
-            src="/tarodan-logo.jpg"
-            alt="Tarodan"
-            width={162}
-            height={40}
-            className="rounded-lg object-contain"
-          />
-        </Link>
-      </header>
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6">
+        <header className="py-6">
+          <Link href="/" className="inline-flex items-center">
+            <Image
+              src="/tarodan-logo.jpg"
+              alt="Tarodan"
+              width={162}
+              height={40}
+              className="rounded-lg object-contain"
+            />
+          </Link>
+        </header>
 
-      <main className="flex flex-1 items-center justify-center px-6 py-8">
-        {children}
-      </main>
+        <main className="flex flex-1 items-center py-8">{children}</main>
 
-      <footer className="p-6 text-center">
-        <p className="text-sm text-subtle">
-          © {new Date().getFullYear()} Tarodan. {t("footer.copyright")}
-        </p>
-      </footer>
+        <footer className="py-6">
+          <p className="text-sm text-subtle">
+            © {new Date().getFullYear()} Tarodan. {t("footer.copyright")}
+          </p>
+        </footer>
+      </div>
     </div>
   );
 }

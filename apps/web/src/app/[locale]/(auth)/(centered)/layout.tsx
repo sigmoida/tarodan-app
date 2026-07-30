@@ -77,32 +77,46 @@ export default function AuthHeroLayout({
           heroLeft ? "lg:order-2" : "lg:order-1"
         }`}
       >
-        <header className="p-6">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <Image
-              src="/tarodan-logo.jpg"
-              alt="Tarodan"
-              width={162}
-              height={40}
-              className="rounded-lg object-contain"
-            />
-          </Link>
-        </header>
+        {/*
+          Logo, form ve alt bilgi AYNI sütunda: genişlik `AuthCard`'ın
+          `max-w-md`'siyle birebir, hepsi sola dayalı. Eskiden logo sütunun en
+          solunda (p-6), form ortada, telif metni ortalanmış duruyordu — üç
+          eleman üç farklı hizada başlıyordu.
+        */}
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6">
+          <header className="py-6">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <Image
+                src="/tarodan-logo.jpg"
+                alt="Tarodan"
+                width={162}
+                height={40}
+                className="rounded-lg object-contain"
+              />
+            </Link>
+          </header>
 
-        <main className="flex flex-1 items-center justify-center px-6 py-8">
-          {children}
-        </main>
+          <main className="flex flex-1 items-center py-8">{children}</main>
 
-        <footer className="p-6 text-center">
-          <p className="text-sm text-subtle">
-            © {new Date().getFullYear()} Tarodan. {t("footer.copyright")}
-          </p>
-        </footer>
+          <footer className="py-6">
+            <p className="text-sm text-subtle">
+              © {new Date().getFullYear()} Tarodan. {t("footer.copyright")}
+            </p>
+          </footer>
+        </div>
       </div>
 
-      {/* Auth-flow hero panel (lg+), side driven by config */}
+      {/*
+        Auth-flow hero panel (lg+), side driven by config.
+
+        `lg:h-screen` + yapışkan konum: panel esnek satırın yüksekliğini takip
+        ETMEZ. Aksi halde uzun formlar (kurumsal başvuru) satırı büyütüyor ve
+        görsel bireysel sekmede bir boyda, kurumsal sekmede bambaşka bir boyda
+        görünüyordu. `self-start` şart — esnek öğe varsayılan olarak gerilir ve
+        gerilmiş bir öğede `sticky` çalışmaz.
+      */}
       <div
-        className={`relative hidden flex-1 overflow-hidden lg:flex ${
+        className={`relative hidden flex-1 overflow-hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start ${
           heroLeft ? "lg:order-1" : "lg:order-2"
         }`}
       >
