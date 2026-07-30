@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDaysIcon,
   ChevronLeftIcon,
@@ -79,8 +79,22 @@ export function DatePicker({
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
   }, []);
+  // Without a value, open on the closest selectable month instead of today —
+  // e.g. a birth-date field with `max` 18 years back would otherwise open on a
+  // fully disabled month.
+  const clampToBounds = (y: number, m: number) => {
+    const mx = parseISO(max);
+    const mn = parseISO(min);
+    if (mx && (y > mx.y || (y === mx.y && m > mx.m)))
+      return { y: mx.y, m: mx.m };
+    if (mn && (y < mn.y || (y === mn.y && m < mn.m)))
+      return { y: mn.y, m: mn.m };
+    return { y, m };
+  };
   const [view, setView] = useState(() =>
-    selected ? { y: selected.y, m: selected.m } : { y: today.y, m: today.m },
+    selected
+      ? { y: selected.y, m: selected.m }
+      : clampToBounds(today.y, today.m),
   );
 
   // Follow the selected value when it changes from the outside.
@@ -153,10 +167,22 @@ export function DatePicker({
       ),
     [locale],
   );
-  const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString(locale, {
-    month: "long",
-    year: "numeric",
-  });
+  const monthNames = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, m) =>
+        new Date(2024, m, 1).toLocaleDateString(locale, { month: "long" }),
+      ),
+    [locale],
+  );
+  // Year dropdown range: bounded by min/max when given, otherwise a wide
+  // window around today (newest first, so birth-date pickers read naturally).
+  const yearOptions = useMemo(() => {
+    const maxY = parseISO(max)?.y ?? today.y + 10;
+    const minY = parseISO(min)?.y ?? Math.min(today.y, maxY) - 100;
+    const years: number[] = [];
+    for (let y = Math.max(maxY, minY); y >= minY; y--) years.push(y);
+    return years;
+  }, [min, max, today.y]);
   const displayValue = selected
     ? new Date(selected.y, selected.m, selected.d).toLocaleDateString(locale, {
         day: "2-digit",
@@ -218,10 +244,40 @@ export function DatePicker({
 
         {open && (
           <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border border-border bg-surface-elevated p-3 shadow-lg">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-semibold capitalize text-heading">
-                {monthLabel}
-              </span>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1">
+                <select
+                  value={view.m}
+                  onChange={(e) =>
+                    setView((v) => ({ ...v, m: +e.target.value }))
+                  }
+                  aria-label="Month"
+                  className="min-w-0 cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold capitalize text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
+                >
+                  {monthNames.map((mLabel, m) => (
+                    <option key={m} value={m}>
+                      {mLabel}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={view.y}
+                  onChange={(e) =>
+                    setView((v) => ({ ...v, y: +e.target.value }))
+                  }
+                  aria-label="Year"
+                  className="cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
+                >
+                  {(yearOptions.includes(view.y)
+                    ? yearOptions
+                    : [view.y, ...yearOptions]
+                  ).map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -311,13 +367,18 @@ export function DatePicker({
               >
                 {clearLabel}
               </button>
-              <button
-                type="button"
-                onClick={() => pick(today.y, today.m, today.d)}
-                className="font-medium text-primary-600 hover:text-primary-700"
-              >
-                {todayLabel}
-              </button>
+              {!isDisabledDay(today.y, today.m, today.d) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView({ y: today.y, m: today.m });
+                    pick(today.y, today.m, today.d);
+                  }}
+                  className="font-medium text-primary-600 hover:text-primary-700"
+                >
+                  {todayLabel}
+                </button>
+              )}
             </div>
           </div>
         )}
