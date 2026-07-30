@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { ProductCondition } from "@prisma/client";
 import { ProductCreateService } from "./product-create.service";
 import type { CreateProductDto } from "./dto";
+import { ShippingPackageTierCode } from "@prisma/client";
 
 describe("ProductCreateService required listing details", () => {
   const sellerId = "seller-1";
@@ -19,7 +20,7 @@ describe("ProductCreateService required listing details", () => {
     isBoxed: true,
     scale: "1:64",
     material: "diecast",
-    shippingDesi: 2,
+    shippingPackageTier: ShippingPackageTierCode.medium,
     images: [
       { cardKey: "card-1.webp", detailKey: "detail-1.webp" },
       { cardKey: "card-2.webp", detailKey: "detail-2.webp" },
@@ -124,7 +125,9 @@ describe("ProductCreateService required listing details", () => {
           modelCode: "HKG72",
           color: "Kırmızı",
           isBoxed: true,
-          shippingDesi: 2,
+          // Boyut seçimi ürüne yazılır ve desi ondan TÜRETİLİR (orta → 5).
+          shippingPackageTier: ShippingPackageTierCode.medium,
+          shippingDesi: 5,
         }),
       }),
     );

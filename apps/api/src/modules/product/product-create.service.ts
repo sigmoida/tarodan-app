@@ -21,6 +21,7 @@ import { computeRelevanceScore } from "./helpers/relevance-score";
 import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
 import { ProductStatsService } from "./product-stats.service";
+import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
 
 /**
  * ProductCreateService — ilan oluşturma. Üyelik ilan/görsel limiti, AI görsel+metin
@@ -251,7 +252,7 @@ export class ProductCreateService {
           condition: dto.condition,
           status: ProductStatus.pending, // Needs admin approval
           quantity: dto.quantity !== undefined ? dto.quantity : 1, // default 1 adet; sınırsız (null) yalnızca açıkça istenince
-          shippingDesi: dto.shippingDesi ?? 1,
+          ...productShippingTierData(dto.shippingPackageTier),
           isTradeEnabled: dto.isTradeEnabled || false,
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,

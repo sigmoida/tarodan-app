@@ -17,7 +17,7 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
-import { ProductCondition } from "@prisma/client";
+import { ProductCondition, ShippingPackageTierCode } from "@prisma/client";
 
 export class ImageVariantDto {
   @IsString()
@@ -180,17 +180,16 @@ export class CreateProductDto {
   quantity?: number | null;
 
   @ApiPropertyOptional({
-    example: 2,
+    enum: ShippingPackageTierCode,
+    example: ShippingPackageTierCode.small,
     description:
-      "Packaged shipping desi selected by the seller; admin may override it.",
-    default: 1,
+      "Paket boyutu (satıcı seçer). Desi bundan türetilir; satıcı desi girmez. " +
+      "Admin moderasyonla düzeltebilir.",
+    default: ShippingPackageTierCode.small,
   })
   @IsOptional()
-  @IsInt({ message: "Kargo desisi tam sayı olmalıdır" })
-  @Type(() => Number)
-  @Min(1, { message: "Kargo desisi en az 1 olmalıdır" })
-  @Max(1000, { message: "Kargo desisi en fazla 1000 olabilir" })
-  shippingDesi?: number;
+  @IsEnum(ShippingPackageTierCode, { message: "Geçersiz kargo paket boyutu" })
+  shippingPackageTier?: ShippingPackageTierCode;
 
   @ApiProperty({
     example: "1:64",

@@ -20,6 +20,7 @@ import { renderManagedEmailTemplate } from "../../common/helpers/email-template-
 import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
 import { isPremiumEntitled } from "../membership/membership.util";
+import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -307,8 +308,8 @@ export class ProductUpdateService {
             ? null
             : Number(dto.quantity)
           : undefined,
-      shippingDesi:
-        dto.shippingDesi !== undefined ? Number(dto.shippingDesi) : undefined,
+      // Boyut gönderilmediyse kargo alanlarına DOKUNULMAZ (kısmi güncelleme).
+      ...productShippingTierData(dto.shippingPackageTier, { partial: true }),
       category: dto.categoryId
         ? { connect: { id: dto.categoryId } }
         : undefined,
