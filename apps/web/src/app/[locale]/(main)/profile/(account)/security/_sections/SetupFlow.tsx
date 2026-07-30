@@ -47,9 +47,12 @@ export default function SetupFlow({
         </p>
         <div className="mb-4 flex justify-center">
           <div className="rounded-lg border-2 border-border bg-surface-elevated p-4">
-            {setupData.qrCodeUrl ? (
+            {/* `qrCodeUrl` bir `otpauth://` bağlantısıdır, görsel adresi değil —
+                doğrudan `src` verilince tarayıcı yükleyemez ve kırık görsel çıkar.
+                Taranabilir PNG'yi sunucu üretir. */}
+            {setupData.qrCodeImage ? (
               <Image
-                src={setupData.qrCodeUrl}
+                src={setupData.qrCodeImage}
                 alt="2FA QR Code"
                 width={200}
                 height={200}

@@ -8,7 +8,10 @@ export interface TwoFactorStatus {
 
 /** Payload returned when starting 2FA setup (`POST /security/2fa/enable`). */
 export interface SetupResponse {
+  /** `otpauth://...` sağlama URI'si — GÖRSEL DEĞİL, kimlik doğrulayıcı bağlantısı. */
   qrCodeUrl: string;
+  /** Taranabilir QR görseli (`data:image/png;base64,...`). */
+  qrCodeImage?: string;
   secret: string;
   backupCodes: string[];
 }
