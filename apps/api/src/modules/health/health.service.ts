@@ -13,7 +13,8 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
-import { MembershipTierType } from "@prisma/client";
+import { CommissionAppliesTo, MembershipTierType } from "@prisma/client";
+import { isCatchAllCommissionRule } from "../order/order-commission.helper";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
 
@@ -179,7 +180,7 @@ export class HealthService {
     try {
       const [
         membershipTierCount,
-        commissionRuleCount,
+        wildcardCommissionRules,
         taxRuleCount,
         shippingTariff,
         platformSeller,
@@ -197,7 +198,18 @@ export class HealthService {
             isActive: true,
           },
         }),
-        this.prisma.commissionRule.count({ where: { isActive: true } }),
+        // Yalnız SAYI yetmez: kategoriye özel kurallardan oluşan bir konfigürasyon
+        // "hazır" görünürken kapsam dışı her kategori checkout'ta fail-closed 503
+        // verir. Wildcard adaylarını çekip catch-all testini uygula (tek kaynak).
+        this.prisma.commissionRule.findMany({
+          where: {
+            isActive: true,
+            categoryId: null,
+            minAmount: null,
+            maxAmount: null,
+            appliesTo: CommissionAppliesTo.BOTH,
+          },
+        }),
         this.prisma.taxRule.count({ where: { isActive: true } }),
         this.prisma.shippingTariff.findFirst({
           where: { provider: "surat", status: "active" },
@@ -209,9 +221,19 @@ export class HealthService {
         }),
       ]);
 
+      const hasCatchAllCommissionRule = wildcardCommissionRules.some((rule) =>
+        isCatchAllCommissionRule(rule),
+      );
+      if (!hasCatchAllCommissionRule) {
+        this.logger.error(
+          "BUSINESS_CONFIG_MISSING: no active catch-all commission rule (appliesTo=BOTH, all axes wildcard). " +
+            "Orders whose category/amount matches no rule will fail checkout with 503.",
+        );
+      }
+
       return (
         membershipTierCount === 4 &&
-        commissionRuleCount > 0 &&
+        hasCatchAllCommissionRule &&
         taxRuleCount > 0 &&
         !!shippingTariff &&
         !!platformSeller

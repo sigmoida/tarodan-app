@@ -13,6 +13,7 @@ import { PrismaService } from "../../prisma";
 import {
   calculateCommissionFromRules,
   CommissionRuleForCalculation,
+  isCatchAllCommissionRule,
 } from "../order/order-commission.helper";
 import { AdminAuditService } from "./admin-audit.service";
 import {
@@ -365,6 +366,22 @@ export class AdminCommissionService {
       excludeId: existing.id,
     });
 
+    // Son aktif catch-all kural pasife alınamaz veya catch-all kapsamından
+    // çıkarılamaz (kategori/tutar/appliesTo daraltarak da olsa).
+    const staysCatchAll =
+      (dto.isActive === undefined ? existing.isActive : dto.isActive) &&
+      isCatchAllCommissionRule({
+        categoryId: finalCategoryId,
+        sellerType: finalSellerType as CommissionSellerType,
+        taxpayerType: finalTaxpayerType,
+        minAmount: finalMinAmount ?? null,
+        maxAmount: finalMaxAmount ?? null,
+        appliesTo: appliesTo as CommissionAppliesTo,
+      });
+    if (existing.isActive && !staysCatchAll) {
+      await this.assertCatchAllRuleSurvives(existing);
+    }
+
     // Prepare update data
     const updateData: any = {};
     if (dto.name !== undefined) updateData.name = dto.name;
@@ -408,6 +425,39 @@ export class AdminCommissionService {
   }
 
   /**
+   * En az bir AKTİF catch-all kuralın kalmasını garanti eder. Catch-all yoksa
+   * eşleşmeyen her kategori/tutar kombinasyonu checkout'ta fail-closed 503
+   * verir — yani sepet ödenemez hale gelir. Bu yüzden son catch-all kuralın
+   * silinmesi/pasife alınması engellenir.
+   */
+  private async assertCatchAllRuleSurvives(
+    rule: Parameters<typeof isCatchAllCommissionRule>[0] & { id: string },
+  ): Promise<void> {
+    if (!isCatchAllCommissionRule(rule)) return;
+
+    const otherActiveCatchAll = (
+      await this.prisma.commissionRule.findMany({
+        where: {
+          isActive: true,
+          id: { not: rule.id },
+          categoryId: null,
+          minAmount: null,
+          maxAmount: null,
+          appliesTo: CommissionAppliesTo.BOTH,
+        },
+      })
+    ).some((candidate) => isCatchAllCommissionRule(candidate));
+
+    if (!otherActiveCatchAll) {
+      throw new BadRequestException(
+        "Son aktif genel (catch-all) komisyon kuralı kaldırılamaz veya pasife alınamaz — " +
+          "aksi halde eşleşen kuralı olmayan siparişler ödeme adımında hata verir. " +
+          "Önce yerine geçecek yeni bir genel kural tanımlayın.",
+      );
+    }
+  }
+
+  /**
    * Delete commission rule
    */
   async deleteCommissionRule(adminId: string, ruleId: string) {
@@ -417,6 +467,10 @@ export class AdminCommissionService {
 
     if (!existing) {
       throw new NotFoundException("Komisyon kuralı bulunamadı");
+    }
+
+    if (existing.isActive) {
+      await this.assertCatchAllRuleSurvives(existing);
     }
 
     await this.prisma.commissionRule.delete({

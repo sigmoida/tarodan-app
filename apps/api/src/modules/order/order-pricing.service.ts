@@ -733,14 +733,21 @@ export class OrderPricingService {
       this.logger,
     );
 
-    if (!result.ruleId) {
-      // Fail closed: a missing commission rule is a configuration error, not a
-      // reason to silently apply 0 commission — that would zero platform revenue
-      // AND undercharge the buyer fee. Abort so no order is ever created at the
-      // wrong price; ops is alerted by the error log. In normal operation a
-      // catch-all default rule always matches, so this never fires.
+    // Fail closed: a missing commission rule is a configuration error, not a
+    // reason to silently apply 0 commission — that would zero platform revenue
+    // AND undercharge the buyer fee. Abort so no order is ever created at the
+    // wrong price; ops is alerted by the error log. In normal operation a
+    // catch-all default rule always matches, so this never fires.
+    //
+    // The SELLER side must match specifically: `ruleId` is `sellerMatch ??
+    // buyerMatch`, so a gap in seller-side rules that leaves only a global buyer
+    // fee rule matching would otherwise pass this guard and silently book
+    // `sellerFeeAmount = 0`. A genuinely commission-free category must be
+    // configured as an explicit SELLER/BOTH rule with rate 0, never as a missing
+    // rule.
+    if (!result.sellerRuleId) {
       this.logger.error(
-        `No matching commission rule (amount=${amount} category=${categoryId} sellerType=${commissionSellerType} taxpayer=${taxpayerType}). Configure a default commission rule. Failing closed.`,
+        `No matching seller-side commission rule (amount=${amount} category=${categoryId} sellerType=${commissionSellerType} taxpayer=${taxpayerType} buyerRule=${result.buyerRuleId ?? "none"}). Configure a catch-all commission rule with appliesTo=BOTH. Failing closed.`,
       );
       throw new ServiceUnavailableException(
         i18nMessage("server.commission.noRuleConfigured"),

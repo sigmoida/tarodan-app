@@ -62,6 +62,13 @@ export interface CommissionCalculationResult {
   shippingBuyerShare: number;
   ruleId: string | null;
   ruleName: string | null;
+  /**
+   * Hangi tarafın kuralı eşleşti? `ruleId` bunların birleşimidir (seller ?? buyer),
+   * bu yüzden tek başına "satıcı komisyonu yapılandırılmış mı" sorusunu YANITLAMAZ.
+   * Fail-closed guard'lar bu alanlara bakmalıdır.
+   */
+  sellerRuleId: string | null;
+  buyerRuleId: string | null;
   ruleType?: CommissionRuleType;
   appliedRate?: number;
   wasMinApplied?: boolean;
@@ -83,6 +90,40 @@ export interface CommissionMatchContext {
 
 const numericValue = (value: CommissionNumericValue | null | undefined) =>
   value == null ? null : Number(value);
+
+/**
+ * "Catch-all" kural: her eksende wildcard, tutar aralığı sınırsız ve HER İKİ
+ * tarafa (BOTH) uygulanan kural. En az bir aktif catch-all kuralın varlığı
+ * dağıtım önkoşuludur: aksi halde eşleşmeyen her kategori/tutar checkout'ta
+ * fail-closed 503 verir (veya yalnız alıcı tarafı eşleşir ve satıcı komisyonu
+ * sessizce 0 olur). Tanım tek kaynaktan gelir — health check ve silme guard'ı
+ * bu fonksiyonu kullanır.
+ */
+export function isCatchAllCommissionRule(
+  rule: Pick<
+    CommissionRuleForCalculation,
+    | "categoryId"
+    | "sellerType"
+    | "taxpayerType"
+    | "minAmount"
+    | "maxAmount"
+    | "appliesTo"
+  >,
+): boolean {
+  const wildcardSeller =
+    rule.sellerType == null || rule.sellerType === CommissionSellerType.ALL;
+  const wildcardTaxpayer =
+    rule.taxpayerType == null ||
+    rule.taxpayerType === CommissionTaxpayerType.all;
+  return (
+    rule.categoryId == null &&
+    wildcardSeller &&
+    wildcardTaxpayer &&
+    rule.minAmount == null &&
+    rule.maxAmount == null &&
+    rule.appliesTo === CommissionAppliesTo.BOTH
+  );
+}
 
 /** Whether `amount` falls in the rule's [minAmount, maxAmount] range (null = unbounded). */
 function amountInRange(
@@ -293,6 +334,8 @@ export function calculateCommissionFromRules(
     shippingBuyerShare,
     ruleId: primary?.id ?? null,
     ruleName: primary?.name ?? null,
+    sellerRuleId: sellerMatch?.id ?? null,
+    buyerRuleId: buyerMatch?.id ?? null,
     ruleType: primary?.ruleType,
     appliedRate:
       numericValue(
