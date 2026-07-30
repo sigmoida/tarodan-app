@@ -171,7 +171,11 @@ export const ordersApi = {
   }) => api.get("/orders/commission-preview", { params }),
   /** Batch commission preview for multiple items (e.g. ilanlarım list). */
   getCommissionPreviewBatch: (
-    items: Array<{ amount: number; categoryId?: string | null }>,
+    items: Array<{
+      amount: number;
+      categoryId?: string | null;
+      packageTier?: string | null;
+    }>,
   ) => api.post("/orders/commission-preview-batch", { items }),
 };
 

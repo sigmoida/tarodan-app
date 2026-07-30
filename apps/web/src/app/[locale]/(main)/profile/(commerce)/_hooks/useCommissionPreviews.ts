@@ -14,6 +14,12 @@ export interface CommissionItem {
   id: string;
   amount: number;
   categoryId?: string | null;
+  /**
+   * İlanın paket boyutu (small/medium/large). Satıcı kargo payı kademe bazlı
+   * olabildiğinden net tahmin, ilanın KENDİ kademesiyle hesaplanmalı —
+   * gönderilmezse API küçük paket varsayar.
+   */
+  packageTier?: string | null;
 }
 
 /**
@@ -25,7 +31,9 @@ export function useCommissionPreviews(
   items: CommissionItem[],
 ): Record<string, EstimatedNet> {
   const signature = items
-    .map((i) => `${i.id}-${i.amount}-${i.categoryId ?? ""}`)
+    .map(
+      (i) => `${i.id}-${i.amount}-${i.categoryId ?? ""}-${i.packageTier ?? ""}`,
+    )
     .join(",");
 
   const query = useWebList<Record<string, EstimatedNet>>({
@@ -37,6 +45,7 @@ export function useCommissionPreviews(
         items.map((i) => ({
           amount: Number(i.amount),
           categoryId: i.categoryId ?? null,
+          packageTier: i.packageTier ?? null,
         })),
       );
       const map: Record<string, EstimatedNet> = {};

@@ -47,6 +47,7 @@ export default function ProfileListingsPage() {
       id: l.id,
       amount: Number(l.price) || 0,
       categoryId: l.category?.id,
+      packageTier: l.shippingPackageTier,
     })),
   );
   const deleteMutation = useDeleteListing();

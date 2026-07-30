@@ -65,6 +65,7 @@ function OffersPageContent() {
       id: o.id,
       amount: Number(o.amount),
       categoryId: o.product?.categoryId,
+      packageTier: o.product?.shippingPackageTier,
     })),
   );
 

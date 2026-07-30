@@ -29,6 +29,8 @@ export interface Offer {
     imageUrl?: string;
     images?: { cardUrl?: string; detailUrl?: string; url?: string }[];
     categoryId?: string | null;
+    /** Paket boyutu — net tahmin ürünün kendi kargo kademesiyle yapılır. */
+    shippingPackageTier?: string | null;
   };
   buyer?: { id: string; displayName: string; avatarUrl?: string };
   seller?: { id: string; displayName: string; avatarUrl?: string };
