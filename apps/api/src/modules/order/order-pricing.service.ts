@@ -14,7 +14,9 @@ import {
   calculateCommissionFromRules,
   CommissionCalculationResult,
   mapSellerTypeForCommission,
+  resolvePackageShippingBuyerShare,
   resolveTaxpayerType,
+  splitShippingByBuyerShare,
 } from "./order-commission.helper";
 import { TaxService } from "../tax/tax.service";
 import { isPremiumEntitled } from "../membership/membership.util";
@@ -244,7 +246,7 @@ export class OrderPricingService {
     >();
     // Kargo payı: satıcının kuralındaki alıcı payı (%). Create yolu ile aynı
     // bölüşüm; önizleme toplamı oluşan siparişle birebir eşleşsin.
-    const sellerShippingShare = new Map<string, number>();
+    const sellerShippingShareLines = new Map<string, number[]>();
 
     // Pass 1: ürünleri çöz + EFEKTİF (kampanya) birim fiyat + satır toplamı (F1.4).
     const lines: Array<{
@@ -371,10 +373,12 @@ export class OrderPricingService {
         product.categoryId,
       );
 
-      sellerShippingShare.set(
-        product.sellerId,
+      // Paket payı satır sırasından bağımsız olmalı: satırın payını topla,
+      // indirgemeyi ortak yardımcı yapsın (`map.set` ile son satır kazanmasın).
+      sellerShippingShareLines.set(product.sellerId, [
+        ...(sellerShippingShareLines.get(product.sellerId) ?? []),
         commissionResult.shippingBuyerShare,
-      );
+      ]);
       const lineBuyerFee = commissionResult.buyerFeeAmount;
       const lineSellerFee = commissionResult.sellerFeeAmount;
       const lineSellerNet = discountedLine - lineSellerFee;
@@ -445,9 +449,13 @@ export class OrderPricingService {
     // buyerShare=100 → tam kargo (mevcut davranış korunur).
     const shippingBySeller = [...shippingMap.entries()].map(
       ([sellerId, fullShipping]) => {
-        const share = sellerShippingShare.get(sellerId) ?? 100;
-        const buyerShipping =
-          Math.round(fullShipping * (share / 100) * 100) / 100;
+        const share = resolvePackageShippingBuyerShare(
+          sellerShippingShareLines.get(sellerId) ?? [],
+        );
+        const { buyer: buyerShipping } = splitShippingByBuyerShare(
+          fullShipping,
+          share,
+        );
         return {
           sellerId,
           shippingCost: buyerShipping,
@@ -597,11 +605,8 @@ export class OrderPricingService {
       }),
       this.calculateShippingCost(amount, undefined, shippingDesi),
     ]);
-    const buyerShippingAmount =
-      Math.round(fullShippingAmount * (result.shippingBuyerShare / 100) * 100) /
-      100;
-    const sellerShippingAmount =
-      Math.round((fullShippingAmount - buyerShippingAmount) * 100) / 100;
+    const { buyer: buyerShippingAmount, seller: sellerShippingAmount } =
+      splitShippingByBuyerShare(fullShippingAmount, result.shippingBuyerShare);
     // Kurumsal satıcıda stopaj da kesileceğinden önizleme neti gerçek payout ile eşleşsin.
     let withholdingTaxAmount = 0;
     if (seller?.businessStatus === "approved" && seller?.taxId) {

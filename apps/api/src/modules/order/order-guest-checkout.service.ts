@@ -27,6 +27,7 @@ import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { splitShippingByBuyerShare } from "./order-commission.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 
 /**
@@ -335,12 +336,11 @@ export class OrderGuestCheckoutService {
         product.shippingDesi,
       );
       // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
-      const buyerShippingAmount =
-        Math.round(
-          fullShipping * (commissionResult.shippingBuyerShare / 100) * 100,
-        ) / 100;
-      const sellerShippingAmount =
-        Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
+      const { buyer: buyerShippingAmount, seller: sellerShippingAmount } =
+        splitShippingByBuyerShare(
+          fullShipping,
+          commissionResult.shippingBuyerShare,
+        );
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
       const {

@@ -22,6 +22,10 @@ import {
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { calculatePackageDesi } from "../shipping/shipping-tariff.helper";
+import {
+  resolvePackageShippingBuyerShare,
+  splitShippingByBuyerShare,
+} from "./order-commission.helper";
 
 /**
  * Toplu checkout (CheckoutGroup) akışı: sepetteki tüm ürünler tek grup + ürün
@@ -558,6 +562,43 @@ export class OrderCheckoutGroupService {
               shippingTariff.tariff,
               sellerDesi,
             );
+          // Kargo payı satıcı PAKETİ düzeyinde belirlenir: paketin satırları farklı
+          // kategorilere (dolayısıyla farklı `shippingBuyerShare` kurallarına) düşebilir.
+          // Bu yüzden komisyonlar kargo bölüşümünden ÖNCE hesaplanır; aksi halde
+          // yalnız kargonun yüklendiği İLK satırın payı uygulanır ve önizlemeyle
+          // ayrışır. İndirgeme ortak yardımcıda (quote ile birebir).
+          const lineCommissions: Array<{
+            discountedPrice: number;
+            commission: Awaited<
+              ReturnType<typeof this.orderPricing.calculateCommission>
+            >;
+          }> = [];
+          const sellerShareLines = new Map<string, number[]>();
+          for (const entry of pricing) {
+            // Negatif-koruma: kupon satır başına eligible-subtotal ile capli olsa da
+            // yuvarlama artığına karşı floor (order.totalAmount asla negatif olamaz).
+            const discountedPrice = Math.max(
+              0,
+              entry.productPrice * entry.quantity - entry.couponDiscount,
+            );
+            const commission = await this.orderPricing.calculateCommission(
+              discountedPrice,
+              entry.product.sellerId,
+              entry.product.categoryId,
+            );
+            lineCommissions.push({ discountedPrice, commission });
+            sellerShareLines.set(entry.product.sellerId, [
+              ...(sellerShareLines.get(entry.product.sellerId) ?? []),
+              commission.shippingBuyerShare,
+            ]);
+          }
+          const sellerShippingShare = new Map(
+            [...sellerShareLines.entries()].map(([sellerId, shares]) => [
+              sellerId,
+              resolvePackageShippingBuyerShare(shares),
+            ]),
+          );
+
           const sellerShippingCharged = new Set<string>();
           // Per-seller shipping breakdown captured on the charged line, used to write
           // the OrderPackage with the SAME buyer-share semantics as direct/guest
@@ -567,22 +608,12 @@ export class OrderCheckoutGroupService {
             { full: number; buyer: number; seller: number }
           >();
 
-          for (const entry of pricing) {
+          for (const [entryIndex, entry] of pricing.entries()) {
             // Satır toplamı = birim fiyat * adet - (satıra düşen kupon). Komisyon,
             // kargo ve vergi satır toplamı üzerinden hesaplanır (adet>1 ölçeklenir).
             const lineSubtotal = entry.productPrice * entry.quantity;
-            // Negatif-koruma: kupon satır başına eligible-subtotal ile capli olsa da
-            // yuvarlama artığına karşı floor (order.totalAmount asla negatif olamaz).
-            const discountedPrice = Math.max(
-              0,
-              lineSubtotal - entry.couponDiscount,
-            );
-            const commissionResult =
-              await this.orderPricing.calculateCommission(
-                discountedPrice,
-                entry.product.sellerId,
-                entry.product.categoryId,
-              );
+            const { discountedPrice, commission: commissionResult } =
+              lineCommissions[entryIndex];
             // Satıcı-bazlı kargo ücreti: yalnız satıcının İLK satırına yükle, kardeşlere 0.
             const entrySellerId = entry.product.sellerId;
             let fullShipping = 0;
@@ -593,14 +624,11 @@ export class OrderCheckoutGroupService {
               chargedThisLine = true;
             }
             // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
-            const buyerShippingAmount =
-              Math.round(
-                fullShipping *
-                  (commissionResult.shippingBuyerShare / 100) *
-                  100,
-              ) / 100;
-            const sellerShippingAmount =
-              Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
+            const { buyer: buyerShippingAmount, seller: sellerShippingAmount } =
+              splitShippingByBuyerShare(
+                fullShipping,
+                sellerShippingShare.get(entrySellerId),
+              );
             const shippingCost = buyerShippingAmount; // buyer-charged shipping
             if (chargedThisLine) {
               sellerShippingBreakdown.set(entrySellerId, {
