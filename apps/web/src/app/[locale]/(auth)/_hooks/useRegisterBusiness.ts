@@ -12,9 +12,8 @@ interface RegisterBusinessInput {
   companyTitle: string;
   companyAddress: string;
   companyEmail: string;
-  kepAddress?: string;
+  kepAddress: string;
   phone: string;
-  contactPhone?: string;
   agreeTerms: boolean;
 }
 
@@ -31,9 +30,8 @@ export function useRegisterBusiness() {
         companyTitle: input.companyTitle.trim(),
         companyAddress: input.companyAddress.trim(),
         companyEmail: input.companyEmail.trim().toLowerCase(),
-        kepAddress: input.kepAddress?.trim().toLowerCase() || undefined,
+        kepAddress: input.kepAddress.trim().toLowerCase(),
         phone: input.phone,
-        contactPhone: input.contactPhone || undefined,
       }),
     onSuccess: (_response, input) => {
       setRegisteredEmail(input.companyEmail);

@@ -36,7 +36,6 @@ export function RegisterBusinessForm() {
       companyEmail: "",
       kepAddress: "",
       phone: "",
-      contactPhone: "",
       agreeTerms: false,
     },
   });
@@ -122,19 +121,16 @@ export function RegisterBusinessForm() {
           <FormInput
             name="kepAddress"
             type="email"
-            label={t("auth.kepAddress")}
+            label={`${t("auth.kepAddress")} *`}
             placeholder={t("auth.kepAddressPlaceholder")}
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormPhone
-            name="phone"
-            label={`${t("auth.companyPhone")} *`}
-            required
-          />
-          <FormPhone name="contactPhone" label={t("auth.contactPhone")} />
-        </div>
+        <FormPhone
+          name="phone"
+          label={`${t("auth.companyPhone")} *`}
+          required
+        />
 
         <FormCheckbox
           name="agreeTerms"

@@ -179,14 +179,15 @@ export const businessRegisterSchema = (locale: Locale) => {
         .trim()
         .min(1, t("auth.fillRequiredFields"))
         .email(t("validation.invalidEmail")),
+      // KEP kurumsal tebligat adresi: başvurunun yasal iletişim kanalı, bu
+      // yüzden zorunlu. İrtibat telefonu alanı kaldırıldı — şirket telefonu
+      // zaten zorunlu ve ikincisi hiçbir akışta kullanılmıyordu.
       kepAddress: z
         .string()
         .trim()
-        .email(t("validation.invalidEmail"))
-        .optional()
-        .or(z.literal("")),
+        .min(1, t("auth.fillRequiredFields"))
+        .email(t("validation.invalidEmail")),
       phone: z.string().trim().min(1, t("auth.fillRequiredFields")),
-      contactPhone: z.string().optional(),
       agreeTerms: z.boolean(),
     })
     .refine((d) => d.agreeTerms === true, {
