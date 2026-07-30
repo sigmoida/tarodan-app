@@ -3,8 +3,15 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useFormContext } from "react-hook-form";
+import { Radio } from "@tarodan/ui";
 import { FormInput } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/ui";
+import {
+  usePackageTiers,
+  sampleDimensionsLabel,
+  type PackageTierCode,
+} from "../usePackageTiers";
 
 interface PricingCardProps {
   locale: string;
@@ -54,17 +61,9 @@ export default function PricingCard({
           min={1}
           helperText={quantityHelper}
         />
-        <FormInput
-          name="shippingDesi"
-          type="number"
-          label={t("product.shippingDesi")}
-          placeholder="1"
-          min={1}
-          max={1000}
-          step={1}
-          helperText={t("product.shippingDesiHelper")}
-        />
       </div>
+
+      <PackageSizePicker />
 
       {(commissionPreviewLoading || commissionPreview) && (
         <div className="mt-4 p-4 bg-surface rounded-xl border border-border-subtle text-sm">
@@ -79,6 +78,77 @@ export default function PricingCard({
         </div>
       )}
     </SectionCard>
+  );
+}
+
+/**
+ * Kargo girdisi: satıcı desi yazmaz, üç paket boyutundan birini seçer. Kartlar
+ * aktif tarifeden gelir (etiket + tam kargo bedeli + örnek ölçü); desi arayüzde
+ * hiç görünmez. Seçim, altındaki "size kalan" önizlemesini canlı günceller.
+ */
+function PackageSizePicker() {
+  const t = useTranslations();
+  const { setValue, watch } = useFormContext();
+  const { tiers, tiersLoading } = usePackageTiers();
+  const selected = watch("shippingPackageTier") as PackageTierCode;
+
+  return (
+    <div className="mt-4">
+      <p className="mb-1 text-sm font-medium text-heading">
+        {t("product.packageSize")}
+      </p>
+      <p className="mb-3 text-xs text-muted">
+        {t("product.packageSizeHelper")}
+      </p>
+
+      {tiersLoading ? (
+        <p className="text-sm text-subtle">{t("product.calculating")}</p>
+      ) : tiers.length === 0 ? (
+        <p className="text-sm text-danger-700">
+          {t("product.packageSizeUnavailable")}
+        </p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {tiers.map((tier) => {
+            const dimensions = sampleDimensionsLabel(tier);
+            const isSelected = selected === tier.code;
+            return (
+              <label
+                key={tier.code}
+                className={`flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition ${
+                  isSelected
+                    ? "border-primary-500 bg-primary-50"
+                    : "border-border hover:border-border-strong"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Radio
+                    name="shippingPackageTier"
+                    value={tier.code}
+                    checked={isSelected}
+                    onChange={() =>
+                      setValue("shippingPackageTier", tier.code, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                  <span className="font-medium text-heading">{tier.label}</span>
+                </span>
+                <span className="text-sm font-semibold text-primary-600">
+                  {fmt(tier.amount)}
+                </span>
+                {dimensions && (
+                  <span className="text-xs text-muted">
+                    {t("product.sampleDimensions", { dimensions })}
+                  </span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

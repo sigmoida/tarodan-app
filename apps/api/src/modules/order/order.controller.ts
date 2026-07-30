@@ -24,6 +24,8 @@ import { i18nMessage } from "../i18n";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { ShippingPackageTierCode } from "@prisma/client";
+import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import {
   CreateOrderDto,
   OrderQueryDto,
@@ -79,26 +81,23 @@ export class OrderController {
   async getCommissionPreview(
     @Query("amount") amountStr: string,
     @Query("categoryId") categoryId: string | undefined,
-    @Query("shippingDesi") shippingDesiStr: string | undefined,
+    @Query("packageTier") packageTierCode: string | undefined,
     @CurrentUser("id") userId: string,
   ) {
     const amount = parseFloat(amountStr);
     if (Number.isNaN(amount) || amount < 0) {
       throw new BadRequestException(i18nMessage("server.order.invalidAmount"));
     }
-    const shippingDesi =
-      shippingDesiStr == null || shippingDesiStr === ""
-        ? 1
-        : Number(shippingDesiStr);
-    if (
-      !Number.isInteger(shippingDesi) ||
-      shippingDesi < 1 ||
-      shippingDesi > 1000
-    ) {
-      throw new BadRequestException(
-        "Kargo desisi 1 ile 1000 arasında tam sayı olmalıdır",
-      );
+    // Satıcı desi göndermez; paket boyutu gönderir ve desi ondan TÜRETİLİR —
+    // böylece önizleme, checkout'un uyguladığı kademeyle birebir aynı olur.
+    const tierCode =
+      packageTierCode == null || packageTierCode === ""
+        ? ShippingPackageTierCode.small
+        : (packageTierCode as ShippingPackageTierCode);
+    if (!Object.values(ShippingPackageTierCode).includes(tierCode)) {
+      throw new BadRequestException("Geçersiz kargo paket boyutu");
     }
+    const shippingDesi = billableDesiForTier(tierCode);
     return this.orderService.getCommissionPreview(
       amount,
       userId,

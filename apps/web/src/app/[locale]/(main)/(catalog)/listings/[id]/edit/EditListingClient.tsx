@@ -58,7 +58,7 @@ export default function EditListingClient() {
   const brandId = form.watch("brandId");
   const price = form.watch("price");
   const categoryId = form.watch("categoryId");
-  const shippingDesi = form.watch("shippingDesi");
+  const shippingPackageTier = form.watch("shippingPackageTier");
 
   const catalogEnabled = !authLoading && isAuthenticated;
   const { flatCategories } = useListingCategories(catalogEnabled);
@@ -74,7 +74,7 @@ export default function EditListingClient() {
   const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
     price,
     categoryId,
-    shippingDesi,
+    shippingPackageTier,
   );
   const { productDiscounts } = useProductDiscounts({
     id,

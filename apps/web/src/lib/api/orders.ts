@@ -167,7 +167,7 @@ export const ordersApi = {
   getCommissionPreview: (params: {
     amount: number;
     categoryId?: string;
-    shippingDesi?: number;
+    packageTier?: string;
   }) => api.get("/orders/commission-preview", { params }),
   /** Batch commission preview for multiple items (e.g. ilanlarım list). */
   getCommissionPreviewBatch: (

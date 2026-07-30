@@ -556,8 +556,6 @@
     "pricing": "Pricing",
     "priceLabel": "Price (₺) *",
     "stockQuantity": "Stock quantity",
-    "shippingDesi": "Package desi",
-    "shippingDesiHelper": "Enter the desi of the product when packaged for shipment.",
     "estimatedPerSale": "Estimated (per sale)",
     "calculating": "Calculating...",
     "platformDeduction": "Platform deduction",
@@ -630,7 +628,11 @@
     "soldOn": "Sold: {date}",
     "buyerHandle": "Buyer: @{name}",
     "orderDetail": "Order Details",
-    "relist": "Relist"
+    "relist": "Relist",
+    "packageSize": "Shipping package size",
+    "packageSizeHelper": "Pick the smallest package your item fits in. Shipping is priced from this choice.",
+    "packageSizeUnavailable": "Package sizes could not be loaded right now. Please try again later.",
+    "sampleDimensions": "Sample size: {dimensions}"
   },
   "cart": {
     "myCart": "My Cart",

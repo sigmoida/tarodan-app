@@ -556,8 +556,6 @@
     "pricing": "Fiyatlandırma",
     "priceLabel": "Fiyat (₺) *",
     "stockQuantity": "Stok Miktarı",
-    "shippingDesi": "Paket desisi",
-    "shippingDesiHelper": "Ürünün kargoya hazır paketinin desisini girin.",
     "estimatedPerSale": "Tahmini (satış başına)",
     "calculating": "Hesaplanıyor...",
     "platformDeduction": "Platform kesintisi",
@@ -630,7 +628,11 @@
     "soldOn": "Satış: {date}",
     "buyerHandle": "Alıcı: @{name}",
     "orderDetail": "Sipariş Detayı",
-    "relist": "Yeniden Satışa Aç"
+    "relist": "Yeniden Satışa Aç",
+    "packageSize": "Kargo paket boyutu",
+    "packageSizeHelper": "Ürününüzün sığacağı en küçük paketi seçin. Kargo bedeli bu seçime göre hesaplanır.",
+    "packageSizeUnavailable": "Paket boyutları şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin.",
+    "sampleDimensions": "Örnek ölçü: {dimensions}"
   },
   "cart": {
     "myCart": "Sepetim",
