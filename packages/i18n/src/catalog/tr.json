@@ -4585,7 +4585,14 @@
         "requestId": "Talep ID",
         "returnProviderRaw": "İade kargo sağlayıcı (ham)",
         "providerRefundId": "Provider Refund ID",
-        "rawHistory": "Ham işlem geçmişi"
+        "rawHistory": "Ham işlem geçmişi",
+        "returnChargeBuyer": "Dönüş kargosu (alıcıdan kesilir)",
+        "buyerRefundTotal": "Alıcıya iade toplamı",
+        "sellerImpactTitle": "Satıcı yansımaları",
+        "sellerImpactHint": "Bu kalemler alıcı iadesine girmez; satıcının payout mahsubuna / escrow'una işlenir.",
+        "chargeReturnToSeller": "Dönüş kargosu borcu (satıcıya)",
+        "chargeOutboundToSeller": "Gidiş kargosu borcu (satıcıya)",
+        "sellerShippingCompensation": "Kargo payı tazmini (satıcıya iade)"
       },
       "refunds": {
         "title": "İade Geçmişi",

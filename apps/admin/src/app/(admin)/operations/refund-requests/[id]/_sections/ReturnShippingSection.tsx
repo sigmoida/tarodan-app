@@ -53,32 +53,103 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
       </div>
 
       {rr.policyCode && rr.policyCode !== "legacy" && (
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
-          <Field label={t("admin.operations.refundRequests.policyCode")}>
-            <span className="font-mono">{rr.policyCode}</span>
-          </Field>
-          <Field label={t("admin.operations.refundRequests.returnDesi")}>
-            {rr.returnBillableDesi ?? 1}
-          </Field>
-          <Field label={t("admin.operations.refundRequests.returnFee")}>
-            {fmtTry(rr.returnShippingAmount ?? 0)}
-          </Field>
-          <Field label={t("admin.operations.refundRequests.productRefund")}>
-            {fmtTry(rr.refundedProductAmount ?? 0)}
-          </Field>
-          <Field label={t("admin.operations.refundRequests.outboundRefund")}>
-            {fmtTry(rr.refundedOutboundShippingAmount ?? 0)}
-          </Field>
-          <Field label={t("admin.operations.refundRequests.protectionRefund")}>
-            {fmtTry(rr.refundedBuyerProtectionAmount ?? 0)}
-          </Field>
-          <Field label={t("admin.operations.refundRequests.sellerFeeRefund")}>
-            {fmtTry(rr.refundedSellerFeeAmount ?? 0)}
-          </Field>
-          <Field label={t("admin.operations.refundRequests.sellerFeeRetained")}>
-            {fmtTry(rr.retainedSellerPlatformFeeAmount ?? 0)}
-          </Field>
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
+            <Field label={t("admin.operations.refundRequests.policyCode")}>
+              <span className="font-mono">{rr.policyCode}</span>
+            </Field>
+            <Field label={t("admin.operations.refundRequests.returnDesi")}>
+              {rr.returnBillableDesi ?? 1}
+            </Field>
+            <Field label={t("admin.operations.refundRequests.returnFee")}>
+              {fmtTry(rr.returnShippingAmount ?? 0)}
+            </Field>
+            <Field label={t("admin.operations.refundRequests.productRefund")}>
+              {fmtTry(rr.refundedProductAmount ?? 0)}
+            </Field>
+            <Field label={t("admin.operations.refundRequests.outboundRefund")}>
+              {fmtTry(rr.refundedOutboundShippingAmount ?? 0)}
+            </Field>
+            <Field
+              label={t("admin.operations.refundRequests.protectionRefund")}
+            >
+              {fmtTry(rr.refundedBuyerProtectionAmount ?? 0)}
+            </Field>
+            {/* Kesinti satırı OLMADAN kalemler başlıktaki tutara toplanmıyordu:
+                cayma iadesinde ürün 800 görünüp toplam 680 yazıyor, aradaki
+                −120 (alıcıdan kesilen dönüş kargosu) ekranda yoktu. */}
+            {Number(rr.returnShippingChargeToBuyer ?? 0) > 0 && (
+              <Field
+                label={t("admin.operations.refundRequests.returnChargeBuyer")}
+              >
+                <span className="text-danger-700">
+                  −{fmtTry(rr.returnShippingChargeToBuyer ?? 0)}
+                </span>
+              </Field>
+            )}
+            <Field
+              label={t("admin.operations.refundRequests.buyerRefundTotal")}
+            >
+              <span className="font-semibold text-heading">
+                {fmtTry(rr.amount)}
+              </span>
+            </Field>
+          </div>
+
+          {/* Satıcı bacağı: alıcı iadesine girmeyen ama satıcının payout/escrow'una
+              işlenen kalemler — komisyon iadesi/tutulan bedel + kargo borç/tazminleri. */}
+          <div className="rounded-lg bg-surface-alt p-3">
+            <p className="mb-2 text-xs font-medium text-muted">
+              {t("admin.operations.refundRequests.sellerImpactTitle")} —{" "}
+              {t("admin.operations.refundRequests.sellerImpactHint")}
+            </p>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
+              <Field
+                label={t("admin.operations.refundRequests.sellerFeeRefund")}
+              >
+                {fmtTry(rr.refundedSellerFeeAmount ?? 0)}
+              </Field>
+              <Field
+                label={t("admin.operations.refundRequests.sellerFeeRetained")}
+              >
+                {fmtTry(rr.retainedSellerPlatformFeeAmount ?? 0)}
+              </Field>
+              {Number(rr.returnShippingChargeToSeller ?? 0) > 0 && (
+                <Field
+                  label={t(
+                    "admin.operations.refundRequests.chargeReturnToSeller",
+                  )}
+                >
+                  <span className="text-danger-700">
+                    −{fmtTry(rr.returnShippingChargeToSeller ?? 0)}
+                  </span>
+                </Field>
+              )}
+              {Number(rr.outboundShippingChargeToSeller ?? 0) > 0 && (
+                <Field
+                  label={t(
+                    "admin.operations.refundRequests.chargeOutboundToSeller",
+                  )}
+                >
+                  <span className="text-danger-700">
+                    −{fmtTry(rr.outboundShippingChargeToSeller ?? 0)}
+                  </span>
+                </Field>
+              )}
+              {Number(rr.sellerShippingCompensationAmount ?? 0) > 0 && (
+                <Field
+                  label={t(
+                    "admin.operations.refundRequests.sellerShippingCompensation",
+                  )}
+                >
+                  <span className="text-success-700">
+                    +{fmtTry(rr.sellerShippingCompensationAmount ?? 0)}
+                  </span>
+                </Field>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {rr.returnTrackingNumber ? (

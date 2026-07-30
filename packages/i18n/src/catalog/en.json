@@ -4585,7 +4585,14 @@
         "requestId": "Request ID",
         "returnProviderRaw": "Return shipping provider (raw)",
         "providerRefundId": "Provider Refund ID",
-        "rawHistory": "Raw activity history"
+        "rawHistory": "Raw activity history",
+        "returnChargeBuyer": "Return shipping (deducted from buyer)",
+        "buyerRefundTotal": "Total refunded to buyer",
+        "sellerImpactTitle": "Seller impact",
+        "sellerImpactHint": "These lines are not part of the buyer refund; they hit the seller's payout deductions / escrow.",
+        "chargeReturnToSeller": "Return shipping debt (to seller)",
+        "chargeOutboundToSeller": "Outbound shipping debt (to seller)",
+        "sellerShippingCompensation": "Shipping share compensation (back to seller)"
       },
       "refunds": {
         "title": "Refund History",

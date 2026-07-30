@@ -190,10 +190,7 @@ export default function RefundRequestDetailPage() {
                   returnShippingPayer: rr.returnShippingPayer ?? null,
                 }}
                 order={{
-                  subtotal:
-                    rr.order.subtotal != null
-                      ? Number(rr.order.subtotal)
-                      : null,
+                  totalAmount: Number(rr.order.totalAmount ?? 0),
                   shippingCost: Number(rr.order.shippingCost ?? 0),
                   buyerFeeAmount: Number(rr.order.buyerFeeAmount ?? 0),
                   commissionAmount: Number(rr.order.commissionAmount ?? 0),
