@@ -14,8 +14,9 @@ export const userApi = {
       "/users/me/username",
       { username },
     ),
-  completeHomeTour: (version: number) =>
-    api.patch("/users/me/onboarding/home-tour", { version }),
+  /** Bir tanıtım turunu tamamlandı olarak işaretler (tur anahtarı ile). */
+  completeTour: (tour: "home" | "listing", version: number) =>
+    api.patch("/users/me/onboarding/tour", { tour, version }),
   getMyProducts: (params?: Record<string, any>) =>
     api.get("/products/my", { params }),
   getMyProductById: (id: string) => api.get(`/products/my/${id}`),

@@ -1833,7 +1833,21 @@
     "back": "Geri",
     "next": "İleri ({current}/{total})",
     "finish": "Tamamla",
-    "skip": "Atla"
+    "skip": "Atla",
+    "listing": {
+      "welcomeTitle": "İlan vermeye başlayalım",
+      "welcomeContent": "Formu beş adımda tamamlayacağız; her adımda ne isteneceğini kısaca göstereceğim.",
+      "basicsTitle": "Başlık ve açıklama",
+      "basicsContent": "Ürünün adını ve durumunu net yazın. Alıcılar aramada önce bu başlığı görür.",
+      "detailsTitle": "Ürün özellikleri",
+      "detailsContent": "Kategori, marka, model ve ölçek gibi bilgiler ürününüzün doğru aramalarda çıkmasını sağlar.",
+      "pricingTitle": "Fiyat ve kargo paketi",
+      "pricingContent": "Fiyatı girin ve ürününüzün sığacağı en küçük paketi seçin. Hemen altında elinize geçecek tutarı görürsünüz.",
+      "imagesTitle": "Fotoğraflar",
+      "imagesContent": "İlk fotoğraf vitrin görseli olur. Farklı açılardan, bol ışıklı kareler satışı hızlandırır.",
+      "submitTitle": "İlanı yayınlayın",
+      "submitContent": "Her şey hazırsa ilanı yayınlayın. Yayından sonra ilanınızı düzenlemeye devam edebilirsiniz."
+    }
   },
   "address": {
     "myAddresses": "Adreslerim",
@@ -6476,7 +6490,8 @@
       "phoneAlreadyInUse": "Bu telefon numarası zaten kullanılıyor",
       "unfollowed": "Takip bırakıldı",
       "userBlocked": "{displayName} engellendi",
-      "userUnblocked": "Engel kaldırıldı"
+      "userUnblocked": "Engel kaldırıldı",
+      "unknownOnboardingTour": "Bilinmeyen tanıtım turu"
     },
     "membership": {
       "alreadyCancelled": "Üyelik zaten iptal edilmiş",

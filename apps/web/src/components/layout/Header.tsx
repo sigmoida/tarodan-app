@@ -64,8 +64,14 @@ export default function Header() {
       {/* Slim Top Bar - Image Marquee (50px / 40px mobile) */}
       <TopAdsBar />
 
-      {/* Sticky header block: main bar + category bar together, always visible */}
-      <div className="sticky top-0 z-50">
+      {/*
+        Sticky header block: main bar + category bar together, always visible.
+        `data-sticky-header` is the measurement hook the onboarding tour uses to
+        compute its scroll offset — without it the spotlight scrolled a target to
+        y=0 and this block covered it (the category bar makes the height variable,
+        so a constant would drift).
+      */}
+      <div className="sticky top-0 z-50" data-sticky-header>
         {/* Main bar */}
         <div className="bg-primary-500 border-b border-primary-600 shadow-sm">
           <Container>

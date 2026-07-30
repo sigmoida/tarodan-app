@@ -32,7 +32,7 @@ import {
   UpdateAddressDto,
   UpsertBankAccountDto,
   UpdateNotificationSettingsDto,
-  CompleteHomeTourDto,
+  CompleteTourDto,
   ClaimUsernameDto,
 } from "./dto";
 
@@ -87,16 +87,16 @@ export class UserController {
     return this.userService.claimUsername(userId, dto.username);
   }
 
-  @Patch("me/onboarding/home-tour")
+  @Patch("me/onboarding/tour")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Ana sayfa tanıtım turunu tamamla" })
+  @ApiOperation({ summary: "Bir tanıtım turunu tamamlandı olarak işaretle" })
   @ApiResponse({ status: 200, description: "Tanıtım turu tamamlandı" })
-  async completeHomeTour(
+  async completeTour(
     @CurrentUser("id") userId: string,
-    @Body() dto: CompleteHomeTourDto,
+    @Body() dto: CompleteTourDto,
   ) {
-    return this.userService.completeHomeTour(userId, dto.version);
+    return this.userService.completeTour(userId, dto.tour, dto.version);
   }
 
   /**

@@ -24,6 +24,10 @@ import {
 } from "../membership/membership.util";
 import { i18nMessage } from "../i18n";
 import {
+  ONBOARDING_TOURS,
+  type OnboardingTourKey,
+} from "./user-preferences.constants";
+import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationSettings,
   UpdateNotificationSettingsDto,
@@ -381,18 +385,34 @@ export class UserProfileService {
     return { username, usernameClaimed: true };
   }
 
-  async completeHomeTour(userId: string, version: number) {
+  /**
+   * Bir tanıtım turunu tamamlandı olarak işaretler.
+   *
+   * Sürüm alanı tur anahtarından çözülür (ONBOARDING_TOURS tek kaynak), böylece
+   * her yeni tur için ayrı uç/servis yazmak gerekmez. Güncelleme `lt` ile
+   * MONOTON: aynı çağrı iki kez gelse de tek etki eder ve sürüm asla geri gitmez
+   * (aksi halde tur kullanıcıya tekrar tekrar gösterilirdi).
+   */
+  async completeTour(userId: string, tour: OnboardingTourKey, version: number) {
+    const config = ONBOARDING_TOURS[tour];
+    if (!config) {
+      throw new BadRequestException(
+        i18nMessage("server.user.unknownOnboardingTour"),
+      );
+    }
+    // Sürüm turun kendi güncel sürümüyle sınırlı: istemci ileri bir sürüm
+    // gönderip turu kalıcı olarak susturamaz.
+    const target = Math.min(version, config.version);
+    const field = config.field;
+
     await this.prisma.user.updateMany({
-      where: {
-        id: userId,
-        homeTourVersion: { lt: version },
-      },
-      data: { homeTourVersion: version },
+      where: { id: userId, [field]: { lt: target } },
+      data: { [field]: target },
     });
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { homeTourVersion: true },
+      select: { [field]: true },
     });
     if (!user) {
       throw new NotFoundException(i18nMessage("server.user.notFound"));

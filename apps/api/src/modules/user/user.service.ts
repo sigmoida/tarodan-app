@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { User } from "@prisma/client";
 import { NotificationSettings, UpdateNotificationSettingsDto } from "./dto";
 import { UserProfileService } from "./user-profile.service";
+import type { OnboardingTourKey } from "./user-preferences.constants";
 import { UserAddressService } from "./user-address.service";
 import { UserSocialService } from "./user-social.service";
 import { UserStatsService } from "./user-stats.service";
@@ -113,8 +114,8 @@ export class UserService {
     return this.profile.claimUsername(userId, username);
   }
 
-  async completeHomeTour(userId: string, version: number) {
-    return this.profile.completeHomeTour(userId, version);
+  async completeTour(userId: string, tour: OnboardingTourKey, version: number) {
+    return this.profile.completeTour(userId, tour, version);
   }
 
   /**

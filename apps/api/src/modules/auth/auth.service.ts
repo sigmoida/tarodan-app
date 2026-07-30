@@ -1107,6 +1107,7 @@ export class AuthService {
       createdAt: user.createdAt,
       preferredLanguage: user.preferredLanguage,
       homeTourVersion: user.homeTourVersion,
+      listingTourVersion: user.listingTourVersion,
     };
   }
 

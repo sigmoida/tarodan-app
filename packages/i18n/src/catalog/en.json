@@ -1833,7 +1833,21 @@
     "back": "Back",
     "next": "Next ({current}/{total})",
     "finish": "Finish",
-    "skip": "Skip"
+    "skip": "Skip",
+    "listing": {
+      "welcomeTitle": "Let's create your listing",
+      "welcomeContent": "We'll go through the form in five steps, with a quick note on what each one needs.",
+      "basicsTitle": "Title and description",
+      "basicsContent": "Name the item and state its condition clearly. The title is what buyers see first in search.",
+      "detailsTitle": "Product details",
+      "detailsContent": "Category, brand, model and scale are what make your item show up in the right searches.",
+      "pricingTitle": "Price and package size",
+      "pricingContent": "Set your price and pick the smallest package your item fits in. Your take-home appears right below.",
+      "imagesTitle": "Photos",
+      "imagesContent": "The first photo becomes the cover. Well-lit shots from several angles sell faster.",
+      "submitTitle": "Publish the listing",
+      "submitContent": "Publish when everything looks right. You can keep editing the listing afterwards."
+    }
   },
   "address": {
     "myAddresses": "My Addresses",
@@ -6476,7 +6490,8 @@
       "phoneAlreadyInUse": "This phone number is already in use",
       "unfollowed": "Unfollowed",
       "userBlocked": "{displayName} has been blocked",
-      "userUnblocked": "Block removed"
+      "userUnblocked": "Block removed",
+      "unknownOnboardingTour": "Unknown onboarding tour"
     },
     "membership": {
       "alreadyCancelled": "Membership has already been cancelled",

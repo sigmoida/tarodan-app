@@ -5,8 +5,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   HOME_TOUR_VERSION,
+  ONBOARDING_TOURS,
   resolvePreferredLocale,
   shouldStartHomeTour,
+  shouldStartTour,
 } from "../src/lib/userExperiencePolicy.mjs";
 
 const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -94,5 +96,85 @@ test("exposes the saved language preference from the profile settings page", () 
 
   assert.match(profilePage, /LanguagePreferenceSection/);
   assert.match(userApi, /preferredLanguage\?: "tr" \| "en"/);
-  assert.match(userApi, /me\/onboarding\/home-tour/);
+  // Tur tamamlama artık tek uç üzerinden tur anahtarıyla gidiyor.
+  assert.match(userApi, /me\/onboarding\/tour/);
+});
+
+test("her tanımlı tur kendi sürüm alanıyla bağımsız ilerler", () => {
+  for (const [tour, config] of Object.entries(ONBOARDING_TOURS)) {
+    assert.equal(
+      shouldStartTour({
+        isAuthenticated: true,
+        isLoading: false,
+        completedVersion: 0,
+        tour,
+      }),
+      true,
+      `${tour} turu hiç görülmemişse açılmalı`,
+    );
+    assert.equal(
+      shouldStartTour({
+        isAuthenticated: true,
+        isLoading: false,
+        completedVersion: config.version,
+        tour,
+      }),
+      false,
+      `${tour} turu tamamlanmışsa tekrar açılmamalı`,
+    );
+  }
+});
+
+test("bilinmeyen tur anahtarı turu açmaz", () => {
+  assert.equal(
+    shouldStartTour({
+      isAuthenticated: true,
+      isLoading: false,
+      completedVersion: 0,
+      tour: "nope",
+    }),
+    false,
+  );
+});
+
+test("tur alanları API ile aynı adları taşır", () => {
+  // Alan adı ayrışırsa tur ya hiç açılmaz ya her girişte tekrar açılır.
+  assert.equal(ONBOARDING_TOURS.home.field, "homeTourVersion");
+  assert.equal(ONBOARDING_TOURS.listing.field, "listingTourVersion");
+});
+
+test("ilan verme turunun hedefleri formda duruyor", () => {
+  const newListing = readFileSync(
+    join(
+      webRoot,
+      "src/app/[locale]/(main)/(catalog)/listings/new/NewListingClient.tsx",
+    ),
+    "utf8",
+  );
+
+  for (const anchor of [
+    "listing-basics",
+    "listing-details",
+    "listing-pricing",
+    "listing-images",
+    "listing-submit",
+  ]) {
+    assert.match(newListing, new RegExp(`data-tour="${anchor}"`));
+  }
+});
+
+test("tur kaydırma ofseti sticky başlığı ölçüyor", () => {
+  // Ofset sabitlenirse kategori barı göründüğünde spotlight yine başlığın
+  // altında kalır; ölçüm tutamağının kaybolmaması kritik.
+  const header = readFileSync(
+    join(webRoot, "src/components/layout/Header.tsx"),
+    "utf8",
+  );
+  const theme = readFileSync(
+    join(webRoot, "src/components/onboarding/tourTheme.ts"),
+    "utf8",
+  );
+
+  assert.match(header, /data-sticky-header/);
+  assert.match(theme, /\[data-sticky-header\]/);
 });
