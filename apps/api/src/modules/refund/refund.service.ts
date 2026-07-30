@@ -17,6 +17,7 @@ import {
   ShipmentStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { PaymentService } from "../payment/payment.service";
 import { RefundPendingReconciliationException } from "../payment-providers/refund-errors";
@@ -261,17 +262,8 @@ export class RefundService {
       );
     }
 
-    const activeStatuses: RefundRequestStatus[] = [
-      RefundRequestStatus.pending_review,
-      RefundRequestStatus.approved,
-      RefundRequestStatus.wait_for_delivery,
-      RefundRequestStatus.return_shipment_open,
-      RefundRequestStatus.return_in_transit,
-      RefundRequestStatus.return_delivered,
-      RefundRequestStatus.disputed,
-    ];
     const hasActive = order.refundRequests.some((r) =>
-      activeStatuses.includes(r.status),
+      ACTIVE_REFUND_REQUEST_STATUSES.includes(r.status),
     );
     if (hasActive) {
       throw new BadRequestException(i18nMessage("server.refund.alreadyActive"));
@@ -387,17 +379,8 @@ export class RefundService {
         i18nMessage("server.refund.completedPaymentNotFound"),
       );
     }
-    const activeStatuses: RefundRequestStatus[] = [
-      RefundRequestStatus.pending_review,
-      RefundRequestStatus.approved,
-      RefundRequestStatus.wait_for_delivery,
-      RefundRequestStatus.return_shipment_open,
-      RefundRequestStatus.return_in_transit,
-      RefundRequestStatus.return_delivered,
-      RefundRequestStatus.disputed,
-    ];
     const hasActive = order.refundRequests.some((request) =>
-      activeStatuses.includes(request.status),
+      ACTIVE_REFUND_REQUEST_STATUSES.includes(request.status),
     );
     if (hasActive) {
       throw new BadRequestException(i18nMessage("server.refund.alreadyActive"));
@@ -412,24 +395,34 @@ export class RefundService {
       false,
     );
     const refundNumber = await this.generateRefundNumber();
-    const created = await this.prisma.refundRequest.create({
-      data: {
-        refundNumber,
-        orderId: order.id,
-        requesterId,
-        reason:
-          reasonCode === OrderCancellationReason.delivery_delayed
-            ? RefundReason.other
-            : RefundReason.changed_mind,
-        description: description?.trim() || null,
-        amount: financial.financials.buyerRefundAmount,
-        refundQuantity: order.quantity ?? 1,
-        status: policy.requiresAdminReview
-          ? RefundRequestStatus.pending_review
-          : RefundRequestStatus.approved,
-        ...this.refundFinancialData(policy, financial),
-      },
-    });
+    let created;
+    try {
+      created = await this.prisma.refundRequest.create({
+        data: {
+          refundNumber,
+          orderId: order.id,
+          requesterId,
+          reason:
+            reasonCode === OrderCancellationReason.delivery_delayed
+              ? RefundReason.other
+              : RefundReason.changed_mind,
+          description: description?.trim() || null,
+          amount: financial.financials.buyerRefundAmount,
+          refundQuantity: order.quantity ?? 1,
+          status: policy.requiresAdminReview
+            ? RefundRequestStatus.pending_review
+            : RefundRequestStatus.approved,
+          ...this.refundFinancialData(policy, financial),
+        },
+      });
+    } catch (error) {
+      if (this.isDuplicateActiveRefund(error)) {
+        throw new BadRequestException(
+          i18nMessage("server.refund.alreadyActive"),
+        );
+      }
+      throw error;
+    }
     await this.freezeHoldForRefund(order.id, created.id);
     await this.prisma.order.update({
       where: { id: order.id },
@@ -1383,6 +1376,19 @@ export class RefundService {
    * Random by design so it leaks no sequence/count information. The
    * `refund_number` column's @unique constraint is the final collision guard.
    */
+  /**
+   * Kısmi tekil indeks (`refund_requests_order_id_active_key`) ihlalini, uygulama
+   * guard'ının verdiği AYNI anlamlı hataya çevirir. Guard read-then-create olduğu
+   * için eşzamanlı iki gönderimde ikinci istek buraya düşer; indeks olmasaydı iki
+   * aktif talep + iki Sürat iade kargosu oluşurdu.
+   */
+  private isDuplicateActiveRefund(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    );
+  }
+
   private async generateRefundNumber(): Promise<string> {
     return generateUniqueReference(
       "RFD",
@@ -1621,22 +1627,32 @@ export class RefundService {
     );
     const amount = financial.financials.buyerRefundAmount;
 
-    const created = await this.prisma.refundRequest.create({
-      data: {
-        refundNumber,
-        orderId: order.id,
-        requesterId,
-        reason: dto.reason,
-        description: dto.description ?? null,
-        evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
-        amount,
-        refundQuantity,
-        status: policy.requiresAdminReview
-          ? RefundRequestStatus.pending_review
-          : RefundRequestStatus.approved,
-        ...this.refundFinancialData(policy, financial),
-      },
-    });
+    let created;
+    try {
+      created = await this.prisma.refundRequest.create({
+        data: {
+          refundNumber,
+          orderId: order.id,
+          requesterId,
+          reason: dto.reason,
+          description: dto.description ?? null,
+          evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
+          amount,
+          refundQuantity,
+          status: policy.requiresAdminReview
+            ? RefundRequestStatus.pending_review
+            : RefundRequestStatus.approved,
+          ...this.refundFinancialData(policy, financial),
+        },
+      });
+    } catch (error) {
+      if (this.isDuplicateActiveRefund(error)) {
+        throw new BadRequestException(
+          i18nMessage("server.refund.alreadyActive"),
+        );
+      }
+      throw error;
+    }
 
     if (policy.requiresAdminReview) {
       await this.freezeHoldForRefund(order.id, created.id);
@@ -1767,24 +1783,34 @@ export class RefundService {
     const amount = financial.financials.buyerRefundAmount;
     const requiresReview = policy.requiresAdminReview;
 
-    const created = await this.prisma.refundRequest.create({
-      data: {
-        refundNumber,
-        orderId: order.id,
-        requesterId,
-        reason: dto.reason,
-        description: dto.description ?? null,
-        evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
-        amount,
-        refundQuantity,
-        status: requiresReview
-          ? RefundRequestStatus.pending_review
-          : RefundRequestStatus.wait_for_delivery,
-        decidedBy: requiresReview ? null : "system",
-        decidedAt: requiresReview ? null : new Date(),
-        ...this.refundFinancialData(policy, financial),
-      },
-    });
+    let created;
+    try {
+      created = await this.prisma.refundRequest.create({
+        data: {
+          refundNumber,
+          orderId: order.id,
+          requesterId,
+          reason: dto.reason,
+          description: dto.description ?? null,
+          evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
+          amount,
+          refundQuantity,
+          status: requiresReview
+            ? RefundRequestStatus.pending_review
+            : RefundRequestStatus.wait_for_delivery,
+          decidedBy: requiresReview ? null : "system",
+          decidedAt: requiresReview ? null : new Date(),
+          ...this.refundFinancialData(policy, financial),
+        },
+      });
+    } catch (error) {
+      if (this.isDuplicateActiveRefund(error)) {
+        throw new BadRequestException(
+          i18nMessage("server.refund.alreadyActive"),
+        );
+      }
+      throw error;
+    }
 
     // İade açıldı → satıcı hold'unu kilitle (payout bu iade kapanana kadar bloke).
     await this.freezeHoldForRefund(order.id, created.id);
