@@ -270,8 +270,13 @@ export class UserProfileService {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
-    const isBusinessTier = user.membership?.tier?.type === "business";
-    const isCorporateSeller = data.isCorporateSeller === true;
+    // Şirket kimliği (companyName + taxId) SELF-SERVICE yazılamaz: bu alanlar
+    // yalnız kurumsal onay boru hattı (finalApprove) tarafından damgalanır ve
+    // web guard'ı / vergilendirme yüzeyleri bunlara güvenir. Profilden yalnız
+    // ONAYLI kurumsal hesap güncelleyebilir. Eski `isCorporateSeller` bayrağı
+    // istemcinin gönderdiği çıplak bir alandı — herhangi bir bireysel kullanıcı
+    // kendini "şirket" ilan edip guard'ın üyelik döngüsüne kilitlenebiliyordu.
+    const canEditCompanyFields = user.businessStatus === "approved";
 
     // Check phone uniqueness if being updated
     if (data.phone) {
@@ -304,20 +309,19 @@ export class UserProfileService {
       updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     }
 
-    // Only process business information if user is business tier or isCorporateSeller is true
-    if (isBusinessTier || isCorporateSeller) {
+    // Only approved corporate accounts may touch company identity fields.
+    if (canEditCompanyFields) {
       if (data.companyName !== undefined) {
         updateData.companyName = data.companyName || null;
       }
       if (data.taxId !== undefined) {
         updateData.taxId = data.taxId || null;
       }
-    } else {
-      // For non-business users without corporate seller flag, clear business info if it exists
-      if (data.companyName !== undefined || data.taxId !== undefined) {
-        updateData.companyName = null;
-        updateData.taxId = null;
-      }
+    } else if (data.companyName !== undefined || data.taxId !== undefined) {
+      // Onaysız hesapta gönderilen şirket alanları YOK SAYILIR ve varsa eski
+      // self-declare kalıntısı temizlenir.
+      updateData.companyName = null;
+      updateData.taxId = null;
     }
     // Handle avatar URL (S3 key)
     if (data.avatarUrl !== undefined) {
