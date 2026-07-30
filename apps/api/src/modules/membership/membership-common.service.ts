@@ -428,7 +428,6 @@ export class MembershipCommonService {
       canTrade: tier.canTrade,
       isAdFree: tier.isAdFree,
       featuredListingSlots: tier.featuredListingSlots,
-      commissionDiscount: parseFloat(tier.commissionDiscount),
       isActive: tier.isActive,
     };
   }

@@ -146,12 +146,6 @@ export class CreateMembershipTierDto {
   @IsNumber()
   @Min(0)
   featuredListingSlots: number;
-
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  commissionDiscount: number;
 }
 
 export class MembershipTierResponseDto {
@@ -168,7 +162,6 @@ export class MembershipTierResponseDto {
   canTrade: boolean;
   isAdFree: boolean;
   featuredListingSlots: number;
-  commissionDiscount: number;
   isActive: boolean;
 }
 
@@ -217,7 +210,6 @@ export class MembershipLimitsDto {
   remainingFreeListings: number;
   remainingTotalListings: number;
   remainingFeaturedSlots: number;
-  commissionDiscount: number;
   tierName: string;
   tierType: MembershipTierType;
 }

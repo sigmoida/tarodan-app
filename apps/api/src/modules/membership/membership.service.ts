@@ -171,7 +171,6 @@ export class MembershipService {
         remainingFreeListings: membership.remainingFreeListings, // Already calculated correctly by getUserUsageStats
         remainingTotalListings: membership.remainingTotalListings, // Already calculated correctly by getUserUsageStats
         remainingFeaturedSlots: membership.remainingFeaturedSlots,
-        commissionDiscount: membership.tier.commissionDiscount,
         tierName: membership.tier.name,
         tierType: membership.tier.type,
       };
@@ -269,7 +268,9 @@ export class MembershipService {
         canTrade: dto.canTrade,
         isAdFree: dto.isAdFree,
         featuredListingSlots: dto.featuredListingSlots,
-        commissionDiscount: dto.commissionDiscount,
+        // commissionDiscount BİLEREK yazılmıyor: komisyon avantajı yalnız
+        // komisyon kurallarının üyelik ekseninden (PREMIUM/BUSINESS) gelir;
+        // bu kolon motor tarafından hiç okunmaz (DB varsayılanı 0 kalır).
         isActive: true,
       },
     });

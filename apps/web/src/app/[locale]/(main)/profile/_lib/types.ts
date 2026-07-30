@@ -9,7 +9,6 @@ export interface MembershipTier {
   canTrade: boolean;
   canCreateCollections: boolean;
   featuredListingSlots: number;
-  commissionDiscount: number;
   isAdFree: boolean;
 }
 

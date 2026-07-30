@@ -173,7 +173,6 @@ export class UserProfileService {
       canTrade: effectiveTier.canTrade,
       isAdFree: effectiveTier.isAdFree,
       featuredListingSlots: effectiveTier.featuredListingSlots,
-      commissionDiscount: effectiveTier.commissionDiscount,
     };
     const membershipInfo = user.membership
       ? {
