@@ -212,9 +212,15 @@ export function calculateRefundFinancials(
     0,
     1,
   );
+  // Alıcı koruma bedeli = alıcıdan ürün fiyatının ÜSTÜNE tahsil edilen ücretin
+  // TAMAMI (v2: buyerCommission + buyerServiceFee = buyerFeeAmount). Yalnız
+  // hizmet bedelini iade edip komisyon bileşenini tutmak, satıcı kusurlu tam
+  // iadede bile alıcıyı zarara sokuyordu; `productPaid` her iki bileşeni de
+  // düştüğü için politika "koruma bedeli iade edilsin" dediğinde ikisi birden
+  // geri verilmelidir. (Legacy sipariş: buyerFeeAmount zaten toplamın kendisi.)
   const buyerProtectionFee = Math.max(
     0,
-    input.buyerServiceFeeAmount || input.buyerFeeAmount,
+    input.buyerFeeAmount || input.buyerServiceFeeAmount,
   );
   const productPaid = Math.max(
     0,

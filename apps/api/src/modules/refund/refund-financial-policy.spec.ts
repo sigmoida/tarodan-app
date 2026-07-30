@@ -231,6 +231,72 @@ describe("refund financial policy", () => {
     });
   });
 
+  describe("v2 buyer fee = buyerCommission + buyerServiceFee", () => {
+    // Alıcı ücreti İKİ bileşenli: komisyon 30 + hizmet bedeli 50 = 80.
+    // totalAmount = 1000 ürün + 130 kargo + 80 alıcı ücreti = 1210.
+    const v2Amounts = {
+      ...orderAmounts,
+      totalAmount: 1210,
+      buyerFeeAmount: 80,
+      buyerServiceFeeAmount: 50,
+    };
+
+    it("seller-fault full return refunds the ENTIRE buyer fee — buyer is made whole", () => {
+      const result = calculateRefundFinancials(
+        resolveReturnPolicy("damaged"),
+        v2Amounts,
+      );
+
+      // Ürün 1000 + kargo 130 + alıcı ücretinin TAMAMI 80 (komisyon dahil).
+      expect(result.buyerProtectionRefundAmount).toBe(80);
+      expect(result.buyerRefundAmount).toBe(1210);
+    });
+
+    it("seller-fault cancellation refunds the entire buyer fee too", () => {
+      const result = calculateRefundFinancials(
+        resolveCancellationPolicy("delivery_delayed"),
+        v2Amounts,
+      );
+
+      expect(result.buyerProtectionRefundAmount).toBe(80);
+      expect(result.buyerRefundAmount).toBe(1210);
+    });
+
+    it("prorates the full buyer fee on a partial seller-fault return", () => {
+      const result = calculateRefundFinancials(resolveReturnPolicy("damaged"), {
+        ...v2Amounts,
+        orderQuantity: 2,
+        refundQuantity: 1,
+      });
+
+      expect(result.buyerProtectionRefundAmount).toBe(40);
+    });
+
+    it("a rule with ONLY buyerCommissionRate (no service fee) still refunds it", () => {
+      // buyerFee = 30 komisyon, hizmet bedeli 0 → totalAmount 1160.
+      const result = calculateRefundFinancials(resolveReturnPolicy("damaged"), {
+        ...v2Amounts,
+        totalAmount: 1160,
+        buyerFeeAmount: 30,
+        buyerServiceFeeAmount: 0,
+      });
+
+      expect(result.buyerProtectionRefundAmount).toBe(30);
+      expect(result.buyerRefundAmount).toBe(1160);
+    });
+
+    it("buyer-remorse keeps the whole buyer fee (no partial component refund)", () => {
+      const result = calculateRefundFinancials(
+        resolveReturnPolicy("changed_mind"),
+        v2Amounts,
+      );
+
+      expect(result.buyerProtectionRefundAmount).toBe(0);
+      // Ürün 1000 − dönüş kargosu 180.
+      expect(result.buyerRefundAmount).toBe(820);
+    });
+  });
+
   it("never allows buyer-paid return shipping to make the refund negative", () => {
     const result = calculateRefundFinancials(
       resolveReturnPolicy("changed_mind"),
