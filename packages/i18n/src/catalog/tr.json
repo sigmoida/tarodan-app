@@ -3925,7 +3925,14 @@
         "documentTypes": {
           "archive": "e-Arşiv",
           "invoice": "e-Fatura"
-        }
+        },
+        "monthIssued": "Bu Ay Kesilen",
+        "pendingShort": "Bekleyen",
+        "failedShort": "Başarısız",
+        "exhaustedShort": "Deneme Tükendi",
+        "retry": "Yeniden Dene",
+        "retried": "Fatura yeniden kuyruğa alındı",
+        "documentCount": "{count} belge"
       },
       "payments": {
         "title": "Ödeme Yönetimi",
@@ -3944,7 +3951,7 @@
           "weekly": "Haftalık",
           "monthly": "Aylık"
         },
-        "totalRevenue": "Toplam Gelir",
+        "totalRevenue": "Tahsilat (Ciro)",
         "totalPayments": "Toplam Ödeme",
         "successRate": "Başarı Oranı",
         "averageAmount": "Ortalama Tutar",
@@ -4009,6 +4016,11 @@
           "completed": "Tamamlandı",
           "failed": "Başarısız",
           "refunded": "İade Edildi"
+        },
+        "tabs": {
+          "list": "Ödemeler",
+          "statistics": "İstatistik",
+          "reconciliation": "İade Mutabakatı"
         }
       },
       "payouts": {
@@ -4040,6 +4052,27 @@
           "held": "Tutuluyor",
           "released": "Serbest Bırakıldı",
           "cancelled": "İptal Edildi"
+        },
+        "escrowTab": "Escrow (Hold'lar)",
+        "transfersTab": "Transferler",
+        "adjustmentsTab": "Borç Mahsupları",
+        "releasedAwaiting": "Serbest — Transfer Bekliyor",
+        "transferredTotal": "Transfer Edilen (Net)",
+        "failedTransfers": "Başarısız Transfer",
+        "retryTransfer": "Yeniden Dene",
+        "transferRetried": "Transfer yeniden kuyruğa alındı",
+        "ibanLast4": "IBAN (son 4)",
+        "netAmount": "Net Tutar",
+        "deduction": "Mahsup",
+        "remaining": "Kalan",
+        "adjustmentType": {
+          "return_shipping": "Dönüş kargosu",
+          "shipping_deficit": "Kargo açığı",
+          "outbound_shipping": "Gidiş kargosu"
+        },
+        "adjustmentStatus": {
+          "open": "Açık",
+          "settled": "Kapandı"
         }
       },
       "tax": {
@@ -4093,6 +4126,29 @@
         "validation": {
           "rateRange": "Oran 0 ile 100 arasında olmalı",
           "selectCategory": "Kategori seçin"
+        }
+      },
+      "overview": {
+        "title": "Finans Özeti",
+        "subtitle": "Para akışının tek bakışta durumu (bu ay)",
+        "funnel": {
+          "collected": "Tahsilat (Ciro)",
+          "collectedHint": "{count} tamamlanan ödeme",
+          "escrowHeld": "Escrow'da Bekleyen",
+          "escrowHeldHint": "{count} aktif hold",
+          "transferred": "Satıcıya Ödenen (Net)",
+          "transferredHint": "{count} tamamlanan transfer",
+          "platformRevenue": "Platform Geliri (Net)",
+          "platformRevenueHint": "Komisyon + hizmet bedeli − iadeler"
+        },
+        "health": {
+          "title": "Dikkat Gerektirenler",
+          "failedTransfers": "Başarısız / dönen transfer",
+          "overdueHolds": "Süresi geçmiş hold",
+          "uninvoicedDelivered": "Faturasız teslimat",
+          "exhaustedInvoices": "Deneme bütçesi tükenen fatura",
+          "openAdjustments": "Açık satıcı borcu",
+          "allClear": "Her şey yolunda — müdahale gerektiren kayıt yok"
         }
       }
     },
@@ -5542,6 +5598,10 @@
         "pages": {
           "name": "Sayfalar",
           "description": "İçerik sayfalarını oluşturun ve düzenleyin"
+        },
+        "financeOverview": {
+          "name": "Finans Özeti",
+          "description": "Para akışı hunisi ve dikkat gerektiren finansal kayıtlar."
         },
         "payments": {
           "name": "Ödemeler",

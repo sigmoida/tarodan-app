@@ -1,7 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { BanknotesIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import {
+  BanknotesIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
@@ -42,23 +47,39 @@ export function PayoutsSummary() {
           </span>
         }
       />
+      {/* Escrow gerçeği: "released" para bankaya GİTMİŞ demek değil. Kartlar
+          released-bekleyen / gerçekten transfer edilen / başarısız diye ayrışır. */}
+      <MetricCard
+        icon={ClockIcon}
+        tone="info"
+        label={t("admin.finance.payouts.releasedAwaiting")}
+        value={data ? fmtTry(data.releasedAwaitingTransfer) : "—"}
+        loading={isLoading}
+      />
       <MetricCard
         icon={CheckCircleIcon}
         tone="success"
-        label={t("admin.finance.payouts.paidTotal")}
-        value={data ? fmtTry(data.totalReleased) : "—"}
+        label={t("admin.finance.payouts.transferredTotal")}
+        value={data ? fmtTry(data.transferredTotal) : "—"}
         loading={isLoading}
         footer={
           <span className="text-muted">
             {t("admin.finance.payouts.transactionCount", {
-              count: data?.countReleased ?? 0,
+              count: data?.transferredCount ?? 0,
             })}
           </span>
         }
       />
+      <MetricCard
+        icon={ExclamationTriangleIcon}
+        tone={data?.failedTransferCount ? "danger" : "success"}
+        label={t("admin.finance.payouts.failedTransfers")}
+        value={data ? String(data.failedTransferCount) : "—"}
+        loading={isLoading}
+      />
       <SectionCard
         title={t("admin.finance.payouts.upcomingReleases")}
-        className="md:col-span-2"
+        className="md:col-span-2 lg:col-span-4"
       >
         <div className="min-h-[4.75rem]" aria-busy={isLoading || undefined}>
           {isLoading ? (

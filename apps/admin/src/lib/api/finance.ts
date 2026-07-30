@@ -113,8 +113,33 @@ export const financeApi = {
   forceCancelPayment: (id: string, reason: string) =>
     api.post(`/admin/payments/${id}/force-cancel`, { reason }),
 
+  // Finance overview (money-flow funnel + health counters)
+  getFinanceOverview: () => api.get("/admin/finance/overview"),
+  // eLogo invoice summary strip + exhausted-retry recovery
+  getInvoicesSummary: () => api.get("/admin/invoices/summary"),
+  retryElogoInvoice: (id: string) => api.post(`/admin/invoices/${id}/retry`),
+
   // Seller Payouts
   getPayoutsSummary: () => api.get("/admin/payouts/summary"),
+  // Real bank transfers (PayoutTransfer rows) — separate from escrow holds
+  getPayoutTransfers: (params?: {
+    status?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get("/admin/payouts/transfers", { params }),
+  retryPayoutTransfer: (transferId: string) =>
+    api.post(`/admin/payouts/${transferId}/retry`),
+  // Seller debt deductions (return shipping, outbound charge, shipping deficit)
+  getPayoutAdjustments: (params?: {
+    status?: string;
+    type?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get("/admin/payouts/adjustments", { params }),
   getPayoutsTransactions: (params?: {
     search?: string;
     sellerId?: string;

@@ -3925,7 +3925,14 @@
         "documentTypes": {
           "archive": "e-Archive",
           "invoice": "e-Invoice"
-        }
+        },
+        "monthIssued": "Issued This Month",
+        "pendingShort": "Pending",
+        "failedShort": "Failed",
+        "exhaustedShort": "Retry Exhausted",
+        "retry": "Retry",
+        "retried": "Invoice re-queued",
+        "documentCount": "{count} documents"
       },
       "payments": {
         "title": "Payment Management",
@@ -3944,7 +3951,7 @@
           "weekly": "Weekly",
           "monthly": "Monthly"
         },
-        "totalRevenue": "Total Revenue",
+        "totalRevenue": "Collected (GMV)",
         "totalPayments": "Total Payments",
         "successRate": "Success Rate",
         "averageAmount": "Average Amount",
@@ -4009,6 +4016,11 @@
           "completed": "Completed",
           "failed": "Failed",
           "refunded": "Refunded"
+        },
+        "tabs": {
+          "list": "Payments",
+          "statistics": "Statistics",
+          "reconciliation": "Refund Reconciliation"
         }
       },
       "payouts": {
@@ -4040,6 +4052,27 @@
           "held": "Held",
           "released": "Released",
           "cancelled": "Cancelled"
+        },
+        "escrowTab": "Escrow (Holds)",
+        "transfersTab": "Transfers",
+        "adjustmentsTab": "Debt Deductions",
+        "releasedAwaiting": "Released — Awaiting Transfer",
+        "transferredTotal": "Transferred (Net)",
+        "failedTransfers": "Failed Transfers",
+        "retryTransfer": "Retry",
+        "transferRetried": "Transfer re-queued",
+        "ibanLast4": "IBAN (last 4)",
+        "netAmount": "Net Amount",
+        "deduction": "Deduction",
+        "remaining": "Remaining",
+        "adjustmentType": {
+          "return_shipping": "Return shipping",
+          "shipping_deficit": "Shipping deficit",
+          "outbound_shipping": "Outbound shipping"
+        },
+        "adjustmentStatus": {
+          "open": "Open",
+          "settled": "Settled"
         }
       },
       "tax": {
@@ -4093,6 +4126,29 @@
         "validation": {
           "rateRange": "Rate must be between 0 and 100",
           "selectCategory": "Select a category"
+        }
+      },
+      "overview": {
+        "title": "Finance Overview",
+        "subtitle": "The money flow at a glance (this month)",
+        "funnel": {
+          "collected": "Collected (GMV)",
+          "collectedHint": "{count} completed payments",
+          "escrowHeld": "Held in Escrow",
+          "escrowHeldHint": "{count} active holds",
+          "transferred": "Paid to Sellers (Net)",
+          "transferredHint": "{count} completed transfers",
+          "platformRevenue": "Platform Revenue (Net)",
+          "platformRevenueHint": "Commission + service fees − refunds"
+        },
+        "health": {
+          "title": "Needs Attention",
+          "failedTransfers": "Failed / returned transfers",
+          "overdueHolds": "Overdue holds",
+          "uninvoicedDelivered": "Uninvoiced deliveries",
+          "exhaustedInvoices": "Invoices out of retry budget",
+          "openAdjustments": "Open seller debts",
+          "allClear": "All clear — nothing needs intervention"
         }
       }
     },
@@ -5542,6 +5598,10 @@
         "pages": {
           "name": "Pages",
           "description": "Create and edit content pages"
+        },
+        "financeOverview": {
+          "name": "Finance Overview",
+          "description": "Money-flow funnel and financial records needing attention."
         },
         "payments": {
           "name": "Payments",

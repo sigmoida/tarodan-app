@@ -381,6 +381,13 @@ export function getNavGroups(t: T): NavGroup[] {
       href: "/finance",
       items: [
         {
+          name: t("admin.nav.items.financeOverview.name"),
+          href: "/finance/overview",
+          icon: CurrencyDollarIcon,
+          description: t("admin.nav.items.financeOverview.description"),
+          permission: "payments",
+        },
+        {
           name: t("admin.nav.items.payments.name"),
           href: "/finance/payments",
           icon: CreditCardIcon,
