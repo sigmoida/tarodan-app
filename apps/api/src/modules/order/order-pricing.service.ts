@@ -23,11 +23,11 @@ import {
   calculatePackageDesi,
   outboundPackageShipping,
   resolvePackageShippingDecision,
-  splitShippingByBuyerShare,
   ShippingPackageTiersNotConfiguredError,
   type OutboundTariffLike,
   type ShippingBuyerShareByTier,
 } from "../shipping/shipping-tariff.helper";
+import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import { DiscountService } from "../discount/discount.service";
 import { createHash } from "crypto";
 
@@ -648,17 +648,32 @@ export class OrderPricingService {
     shippingAmount: number;
     sellerNetAmount: number;
     shippingDesi: number;
+    /** Desiden çözülen paket boyutu — UI "Orta Paket" gibi gösterebilir. */
+    packageTier: ShippingPackageTierCode;
   }> {
-    const [result, seller, fullShippingAmount] = await Promise.all([
+    const [result, seller, tariff] = await Promise.all([
       this.calculateCommission(amount, sellerId, categoryId),
       this.prisma.user.findUnique({
         where: { id: sellerId },
         select: { businessStatus: true, taxId: true },
       }),
-      this.calculateShippingCost(amount, undefined, shippingDesi),
+      this.shippingTariffs.getActiveOutboundTariff(),
     ]);
-    const { buyer: buyerShippingAmount, seller: sellerShippingAmount } =
-      splitShippingByBuyerShare(fullShippingAmount, result.shippingBuyerShare);
+    // Kargo kararı checkout yollarıyla ORTAK: kademe desiden çözülür, pay O
+    // kademenin payıdır. Eskiden burada kuralın tek `shippingBuyerShare` değeri
+    // (ilk kademenin payı) kullanılıyordu — kademe bazlı pay yapılandırıldığında
+    // orta/büyük paketli ilanın önizlemesi tahsilattan sapıyordu.
+    const decision = this.resolveShippingDecision({
+      tariff,
+      subtotal: amount,
+      billableDesi: shippingDesi,
+      lineShares: [result.shippingBuyerShares],
+    });
+    const {
+      fullShipping: fullShippingAmount,
+      buyer: buyerShippingAmount,
+      seller: sellerShippingAmount,
+    } = decision;
     // Kurumsal satıcıda stopaj da kesileceğinden önizleme neti gerçek payout ile eşleşsin.
     let withholdingTaxAmount = 0;
     if (seller?.businessStatus === "approved" && seller?.taxId) {
@@ -684,15 +699,23 @@ export class OrderPricingService {
       shippingAmount: sellerShippingAmount,
       sellerNetAmount,
       shippingDesi,
+      packageTier: decision.tierCode,
     };
   }
 
   /**
-   * Batch commission preview for multiple (amount, categoryId) pairs. Same order as input.
+   * Batch commission preview for multiple (amount, categoryId, packageTier)
+   * tuples. Same order as input. Paket boyutu verilmeyen kalem küçük paket
+   * sayılır — desi tek preview ucundakiyle AYNI haritadan türetilir ki liste
+   * görünümü ile ilan formu aynı sonucu göstersin.
    */
   async getCommissionPreviewBatch(
     sellerId: string,
-    items: Array<{ amount: number; categoryId?: string | null }>,
+    items: Array<{
+      amount: number;
+      categoryId?: string | null;
+      packageTier?: ShippingPackageTierCode | null;
+    }>,
   ): Promise<{
     results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }>;
   }> {
@@ -706,6 +729,9 @@ export class OrderPricingService {
           amount,
           sellerId,
           item.categoryId ?? null,
+          billableDesiForTier(
+            item.packageTier ?? ShippingPackageTierCode.small,
+          ),
         );
         return {
           sellerFeeAmount: preview.sellerFeeAmount,

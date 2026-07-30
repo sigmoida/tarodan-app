@@ -116,13 +116,33 @@ export class OrderController {
   @ApiOperation({ summary: "Batch commission preview for multiple items" })
   async getCommissionPreviewBatch(
     @Body()
-    body: { items: Array<{ amount: number; categoryId?: string | null }> },
+    body: {
+      items: Array<{
+        amount: number;
+        categoryId?: string | null;
+        /** İlanın paket boyutu — verilmezse küçük paket varsayılır. */
+        packageTier?: string | null;
+      }>;
+    },
     @CurrentUser("id") userId: string,
   ) {
     if (!body?.items || !Array.isArray(body.items) || body.items.length > 50) {
       throw new BadRequestException("items array required (max 50)");
     }
-    return this.orderService.getCommissionPreviewBatch(userId, body.items);
+    const tierValues = Object.values(ShippingPackageTierCode) as string[];
+    return this.orderService.getCommissionPreviewBatch(
+      userId,
+      body.items.map((item) => ({
+        amount: item.amount,
+        categoryId: item.categoryId ?? null,
+        // Geçersiz/eksik boyut sessizce yanlış kademeye düşmesin: bilinmeyen
+        // değer küçük pakete indirgenir (tek preview ucuyla aynı varsayılan).
+        packageTier:
+          item.packageTier && tierValues.includes(item.packageTier)
+            ? (item.packageTier as ShippingPackageTierCode)
+            : null,
+      })),
+    );
   }
 
   /**

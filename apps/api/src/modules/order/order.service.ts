@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { ShippingPackageTierCode } from "@prisma/client";
 import {
   CreateOrderDto,
   OrderQueryDto,
@@ -114,7 +115,11 @@ export class OrderService {
 
   async getCommissionPreviewBatch(
     sellerId: string,
-    items: Array<{ amount: number; categoryId?: string | null }>,
+    items: Array<{
+      amount: number;
+      categoryId?: string | null;
+      packageTier?: ShippingPackageTierCode | null;
+    }>,
   ): Promise<{
     results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }>;
   }> {
