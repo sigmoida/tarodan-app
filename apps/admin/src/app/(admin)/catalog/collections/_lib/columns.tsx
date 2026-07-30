@@ -51,22 +51,6 @@ export function collectionColumns(t: T, actions: CollectionRowActions) {
         secondary: c.owner.email,
         avatar: c.owner.avatarUrl,
         href: `/accounts/users/${c.owner.id}`,
-        tertiary:
-          c.owner.membershipTier === "premium" ||
-          c.owner.membershipTier === "business" ? (
-            <div className="mt-1">
-              <Badge
-                size="sm"
-                variant={
-                  c.owner.membershipTier === "business" ? "info" : "warning"
-                }
-              >
-                {c.owner.membershipTier === "business"
-                  ? t("admin.catalog.collections.tierBusiness")
-                  : t("admin.catalog.collections.tierPremium")}
-              </Badge>
-            </div>
-          ) : undefined,
       }),
       { minWidth: 360, sortKey: "owner.displayName", sortType: "text" },
     ),

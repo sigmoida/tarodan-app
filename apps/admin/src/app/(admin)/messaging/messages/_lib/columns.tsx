@@ -1,5 +1,5 @@
 import { Badge } from "@tarodan/ui";
-import { col, type RowActionItem } from "@/components/table";
+import { col, TruncatedText, type RowActionItem } from "@/components/table";
 import { type Message, messageStatusConfig } from "./types";
 import type { useTranslations } from "next-intl";
 
@@ -39,11 +39,13 @@ export function messageColumns(rowMenu: (m: Message) => RowActionItem[], t: T) {
       t("admin.messaging.messages.warning"),
       (m) =>
         m.flaggedReason ? (
-          <Badge variant="warning">{m.flaggedReason}</Badge>
+          <Badge variant="warning" className="min-w-0 max-w-full">
+            <TruncatedText className="min-w-0">{m.flaggedReason}</TruncatedText>
+          </Badge>
         ) : (
           <span className="text-muted">—</span>
         ),
-      { sortKey: "flaggedReason", sortType: "text" },
+      { minWidth: 220, sortKey: "flaggedReason", sortType: "text" },
     ),
     col.badge<Message>(
       t("common.status"),

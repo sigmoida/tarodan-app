@@ -22,9 +22,6 @@ export interface Refund {
 
 export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
   return [
-    col.id<Refund>(t("admin.operations.refunds.colId"), "id", {
-      grow: 1,
-    }),
     col.link<Refund>(
       t("admin.operations.common.order"),
       (r) =>
@@ -81,7 +78,7 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
               href: `/catalog/products/${r.order.product.id}`,
             }
           : null,
-      { sortKey: "order.product.title" },
+      { minWidth: 380, sortKey: "order.product.title" },
     ),
     col.date<Refund>(
       t("admin.operations.refunds.refundedAt"),
