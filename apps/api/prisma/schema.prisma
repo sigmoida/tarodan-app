@@ -1832,6 +1832,13 @@ model ElogoInvoice {
   recipientUserId           String?            @map("recipient_user_id")
   recipientVknTckn          String?            @map("recipient_vkn_tckn")
   recipientName             String?            @map("recipient_name")
+  // Misafir siparişleri tek sistem kullanıcısını paylaşır; gönderim anında alıcıyı
+  // kullanıcı kaydından çözmek faturayı sistem e-postasına/boş adrese yazıyordu.
+  // Kesim anındaki GERÇEK iletişim bilgisi burada snapshot'lanır.
+  recipientEmail            String?            @map("recipient_email")
+  recipientCity             String?            @map("recipient_city")
+  recipientDistrict         String?            @map("recipient_district")
+  recipientStreet           String?            @map("recipient_street")
   documentType              String             @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
   sendType                  String             @default("ELEKTRONIK") @map("send_type")
   invoiceNumber             String?            @unique @map("invoice_number")

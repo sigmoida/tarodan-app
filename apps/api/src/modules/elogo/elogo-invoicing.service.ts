@@ -11,6 +11,10 @@ import {
   ELOGO_MAX_SEND_ATTEMPTS,
   isTransientElogoFailure,
 } from "./elogo-retry-policy";
+import {
+  resolveGuestInvoiceRecipient,
+  type GuestInvoiceRecipient,
+} from "./elogo-guest-recipient";
 import { ElogoService } from "./elogo.service";
 import { TaxService } from "../tax/tax.service";
 import { StorageService } from "../storage/storage.service";
@@ -163,9 +167,20 @@ export class ElogoInvoicingService {
   }
 
   /** Alıcı (User) → UBL party + belge tipi (e-Fatura mükellefse EINVOICE). */
-  private async resolveRecipient(userId: string): Promise<{
+  private async resolveRecipient(
+    userId: string,
+    /**
+     * Misafir siparişinin gerçek alıcı bilgisi. Tüm misafir checkout'ları tek
+     * sistem kullanıcısını paylaştığı için kullanıcı kaydından okumak faturayı
+     * "GUEST_SYSTEM" adına ve sistem e-postasına kesiyordu — nihai tüketici yolu
+     * bile gerçek adı gerektirir ve müşteri zorunlu e-Arşiv kopyasını almıyordu.
+     */
+    guestOverride?: GuestInvoiceRecipient | null,
+  ): Promise<{
     vknTckn: string;
     name: string;
+    email?: string | null;
+    address?: GuestInvoiceRecipient["address"];
     party: UblParty;
     documentType: ElogoDocumentType;
     alias?: string;
@@ -182,7 +197,12 @@ export class ElogoInvoicingService {
     const digits = (user?.taxId || "").replace(/\D/g, "");
     const hasRealTaxId = digits.length === 10 || digits.length === 11;
     const vknTckn = hasRealTaxId ? digits : "11111111111"; // bilinmeyen nihai tüketici (GİB)
-    const name = user?.companyName || user?.displayName || "Müşteri";
+    const name =
+      guestOverride?.name ||
+      user?.companyName ||
+      user?.displayName ||
+      "Müşteri";
+    const email = guestOverride?.email ?? user?.email;
 
     let documentType: ElogoDocumentType = "EARCHIVE";
     let alias: string | undefined;
@@ -196,7 +216,20 @@ export class ElogoInvoicingService {
     return {
       vknTckn,
       name,
-      party: this.buildParty(vknTckn, name, user?.email),
+      email,
+      address: guestOverride?.address,
+      party: this.buildParty(
+        vknTckn,
+        name,
+        email,
+        guestOverride?.address
+          ? {
+              city: guestOverride.address.city,
+              district: guestOverride.address.district,
+              address: guestOverride.address.street,
+            }
+          : null,
+      ),
       documentType,
       alias,
     };
@@ -342,6 +375,7 @@ export class ElogoInvoicingService {
         buyerId: true,
         totalAmount: true,
         checkoutGroupId: true,
+        shippingAddress: true,
       },
     });
     if (!order) return;
@@ -365,7 +399,14 @@ export class ElogoInvoicingService {
       0,
       Number(order.totalAmount) - Number(refundedOrders[orderId] ?? 0),
     );
-    await this.cut("platform_sale", orderId, order.buyerId, netSaleAmount);
+    await this.cut(
+      "platform_sale",
+      orderId,
+      order.buyerId,
+      netSaleAmount,
+      undefined,
+      resolveGuestInvoiceRecipient(order.shippingAddress),
+    );
   }
 
   private async isPlatformSeller(sellerId: string): Promise<boolean> {
@@ -385,6 +426,7 @@ export class ElogoInvoicingService {
           sellerId: true,
           buyerServiceFeeAmount: true,
           buyerCommissionAmount: true,
+          shippingAddress: true,
         },
       }),
       this.prisma.commissionLedger.findUnique({
@@ -409,7 +451,14 @@ export class ElogoInvoicingService {
         : hasBuyerCommission
           ? "Alıcı komisyonu"
           : undefined; // service-only → varsayılan LINE_DESCRIPTION.service_fee
-    await this.cut("service_fee", orderId, order.buyerId, netBuyerFee, desc);
+    await this.cut(
+      "service_fee",
+      orderId,
+      order.buyerId,
+      netBuyerFee,
+      desc,
+      resolveGuestInvoiceRecipient(order.shippingAddress),
+    );
   }
 
   /** Üyelik faturası → ÜYEYE (membershipPayment.amount). */
@@ -990,6 +1039,8 @@ export class ElogoInvoicingService {
     grossAmount: number,
     /** Kesim anında snapshot'lanan kalem açıklaması; boşsa LINE_DESCRIPTION[type]. */
     lineDescription?: string,
+    /** Misafir siparişinin gerçek alıcı kimliği (paylaşılan sistem kullanıcısı yerine). */
+    guestRecipient?: GuestInvoiceRecipient | null,
   ): Promise<void> {
     try {
       const providerEnabled = this.elogo.isEnabled();
@@ -1015,7 +1066,10 @@ export class ElogoInvoicingService {
         return;
       }
 
-      const recipient = await this.resolveRecipient(recipientUserId);
+      const recipient = await this.resolveRecipient(
+        recipientUserId,
+        guestRecipient,
+      );
       const now = new Date();
       const vatRate = await this.resolveVatRate();
       const amounts = this.invoiceAmounts(grossAmount, vatRate);
@@ -1039,6 +1093,12 @@ export class ElogoInvoicingService {
               recipientUserId,
               recipientVknTckn: recipient.vknTckn,
               recipientName: recipient.name,
+              // Kesim anındaki iletişim bilgisi: misafir siparişlerinde gönderim
+              // anında kullanıcı kaydına dönmek sistem e-postasına/boş adrese düşer.
+              recipientEmail: recipient.email ?? null,
+              recipientCity: recipient.address?.city ?? null,
+              recipientDistrict: recipient.address?.district ?? null,
+              recipientStreet: recipient.address?.street ?? null,
               documentType: recipient.documentType,
               sendType: "ELEKTRONIK",
               invoiceNumber,
@@ -1217,11 +1277,21 @@ export class ElogoInvoicingService {
         : Promise.resolve(null),
       this.fetchAddress(inv.recipientUserId),
     ]);
+    const snapshotAddress =
+      inv.recipientCity || inv.recipientDistrict || inv.recipientStreet
+        ? {
+            city: inv.recipientCity,
+            district: inv.recipientDistrict,
+            address: inv.recipientStreet,
+          }
+        : null;
     const party = this.buildParty(
       inv.recipientVknTckn,
       inv.recipientName || "Müşteri",
-      recipientUser?.email,
-      addr,
+      // Snapshot önce: misafir siparişlerinde kullanıcı kaydı paylaşılan sistem
+      // hesabıdır (sistem e-postası + adres yok).
+      inv.recipientEmail ?? recipientUser?.email,
+      snapshotAddress ?? addr,
     );
     const desc =
       inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
@@ -1264,7 +1334,7 @@ export class ElogoInvoicingService {
           recipientName: inv.recipientName,
           lineDescription: inv.lineDescription,
         },
-        recipientUser?.email ?? null,
+        inv.recipientEmail ?? recipientUser?.email ?? null,
       ).catch((e) =>
         this.logger.warn(
           `eLogo PDF teslim hatası (${invoiceNumber}): ${e?.message}`,
