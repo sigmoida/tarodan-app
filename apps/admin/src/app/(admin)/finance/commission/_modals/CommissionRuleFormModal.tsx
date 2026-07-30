@@ -89,7 +89,7 @@ function RateBlock({
           type="number"
           step="0.01"
           min="0"
-          placeholder="0"
+          placeholder={t("admin.finance.commission.ratePlaceholder")}
         />
         <FormInput
           name={minName}
@@ -97,7 +97,7 @@ function RateBlock({
           type="number"
           step="0.01"
           min="0"
-          placeholder={t("common.optional")}
+          placeholder={t("admin.finance.commission.noFloor")}
         />
         <FormInput
           name={maxName}
@@ -105,8 +105,154 @@ function RateBlock({
           type="number"
           step="0.01"
           min="0"
-          placeholder={t("common.optional")}
+          placeholder={t("admin.finance.commission.noCap")}
         />
+      </div>
+    </div>
+  );
+}
+
+const clampSharePct = (v: number) => Math.min(100, Math.max(0, v));
+
+/** Alıcı/satıcı bölüşümünü tek bakışta gösteren mini bar. */
+function ShareBar({ buyer, dimmed }: { buyer: number; dimmed?: boolean }) {
+  return (
+    <div
+      className={`h-1.5 w-full overflow-hidden rounded-full bg-surface-alt ${
+        dimmed ? "opacity-50" : ""
+      }`}
+    >
+      <div
+        className="h-full rounded-full bg-primary-500"
+        style={{ width: `${buyer}%` }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Tek satırlık pay girişi: etiket + alıcı % input'u + CANLI "Alıcı %X · Satıcı %Y"
+ * bölüşümü. Bir tarafı girince diğeri ekranda görünür — "kalan kim ödüyor"
+ * sorusu kafada hesaplanmaz.
+ */
+function ShareRow({
+  label,
+  name,
+  buyer,
+  usesDefault,
+  placeholder,
+}: {
+  label: string;
+  name: string;
+  buyer: number;
+  usesDefault?: boolean;
+  placeholder: string;
+}) {
+  const t = useTranslations();
+  const pct = (n: number) => Math.round(n * 100) / 100;
+  return (
+    <div className="grid grid-cols-[minmax(8rem,11rem)_5.5rem_1fr] items-center gap-3">
+      <span className="truncate text-sm text-body">{label}</span>
+      <FormInput
+        name={name}
+        type="number"
+        step="1"
+        min="0"
+        max="100"
+        placeholder={placeholder}
+        aria-label={label}
+      />
+      <div className="min-w-0">
+        <div className="mb-1 flex justify-between gap-2 text-xs">
+          <span className={usesDefault ? "text-subtle" : "text-body"}>
+            {t("admin.finance.common.buyer")} %{pct(buyer)}
+            {usesDefault && (
+              <span className="text-subtle">
+                {" "}
+                ({t("admin.finance.commission.usesDefaultShare")})
+              </span>
+            )}
+          </span>
+          <span className={usesDefault ? "text-subtle" : "text-body"}>
+            {t("admin.finance.common.seller")} %{pct(100 - buyer)}
+          </span>
+        </div>
+        <ShareBar buyer={buyer} dimmed={usesDefault} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Kargo bölüşümü: önce VARSAYILAN pay (tüm boyutlar), altında boyut bazlı
+ * İSTİSNALAR. Her satırda alıcı VE satıcı yüzdesi canlı görünür.
+ */
+function ShippingSplitSection() {
+  const t = useTranslations();
+  const { watch } = useFormContext<CommissionFormValues>();
+  const v = watch();
+  const defaultShare = clampSharePct(parseFloat(v.shippingBuyerShare) || 0);
+  const hasDefault = v.shippingBuyerShare.trim() !== "";
+  const effectiveDefault = hasDefault ? defaultShare : 100;
+
+  const tiers: Array<{ name: keyof CommissionFormValues; label: string }> = [
+    {
+      name: "shippingShareSmall",
+      label: t("admin.finance.commission.tierSmall"),
+    },
+    {
+      name: "shippingShareMedium",
+      label: t("admin.finance.commission.tierMedium"),
+    },
+    {
+      name: "shippingShareLarge",
+      label: t("admin.finance.commission.tierLarge"),
+    },
+  ];
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <div>
+        <h3 className="text-sm font-medium text-heading">
+          {t("admin.finance.commission.shippingSharesTitle")}
+        </h3>
+        <p className="text-xs text-muted">
+          {t("admin.finance.commission.shippingSharesHelper")}
+        </p>
+      </div>
+
+      <ShareRow
+        label={t("admin.finance.commission.defaultShareLabel")}
+        name="shippingBuyerShare"
+        buyer={effectiveDefault}
+        usesDefault={!hasDefault}
+        placeholder="100"
+      />
+
+      <div className="border-t border-border pt-3">
+        <p className="mb-2 text-xs font-medium text-muted">
+          {t("admin.finance.commission.tierOverridesTitle")} —{" "}
+          {t("admin.finance.commission.tierOverridesHint")}
+        </p>
+        <div className="space-y-2">
+          {tiers.map((tier) => {
+            const raw = String(v[tier.name] ?? "");
+            const overridden = raw.trim() !== "";
+            const buyer = overridden
+              ? clampSharePct(parseFloat(raw) || 0)
+              : effectiveDefault;
+            return (
+              <ShareRow
+                key={tier.name}
+                label={tier.label}
+                name={tier.name}
+                buyer={buyer}
+                usesDefault={!overridden}
+                placeholder={String(effectiveDefault)}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -222,7 +368,7 @@ function BreakdownPreview() {
       <h3 className="text-sm font-medium text-muted">
         {t("admin.finance.commission.previewCalculator")}
       </h3>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Input
           type="number"
           min="0"
@@ -434,7 +580,7 @@ export function CommissionRuleFormModal({
           type="number"
           step="0.01"
           min="0"
-          placeholder={t("common.optional")}
+          placeholder={t("admin.finance.commission.noLowerBound")}
         />
         <FormInput
           name="maxAmount"
@@ -442,7 +588,7 @@ export function CommissionRuleFormModal({
           type="number"
           step="0.01"
           min="0"
-          placeholder={t("common.optional")}
+          placeholder={t("admin.finance.commission.noUpperBound")}
         />
         <FormSelect
           name="appliesTo"
@@ -478,55 +624,7 @@ export function CommissionRuleFormModal({
         />
       </div>
 
-      <div className="space-y-3 rounded-lg border border-border p-4">
-        <div>
-          <h3 className="text-sm font-medium text-heading">
-            {t("admin.finance.commission.shippingSharesTitle")}
-          </h3>
-          <p className="text-xs text-muted">
-            {t("admin.finance.commission.shippingSharesHelper")}
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <FormInput
-            name="shippingShareSmall"
-            label={t("admin.finance.commission.tierSmall")}
-            type="number"
-            step="1"
-            min="0"
-            max="100"
-            placeholder={t("admin.finance.commission.useSingleShare")}
-          />
-          <FormInput
-            name="shippingShareMedium"
-            label={t("admin.finance.commission.tierMedium")}
-            type="number"
-            step="1"
-            min="0"
-            max="100"
-            placeholder={t("admin.finance.commission.useSingleShare")}
-          />
-          <FormInput
-            name="shippingShareLarge"
-            label={t("admin.finance.commission.tierLarge")}
-            type="number"
-            step="1"
-            min="0"
-            max="100"
-            placeholder={t("admin.finance.commission.useSingleShare")}
-          />
-        </div>
-        <FormInput
-          name="shippingBuyerShare"
-          label={t("admin.finance.commission.shippingBuyerShareLabel")}
-          type="number"
-          step="1"
-          min="0"
-          max="100"
-          placeholder="50"
-          helperText={t("admin.finance.commission.shippingShareHelper")}
-        />
-      </div>
+      <ShippingSplitSection />
 
       <BreakdownPreview />
       <FormCheckbox
