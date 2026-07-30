@@ -29,6 +29,7 @@ Sıra tesadüfi değil: para akışı ve yasal zorunluluk taşıyan alanlar önc
 | 11  | `11-api-contract.md`            | İstemci sözleşmesi, hata kodları, endpoint kataloğu (üretilen)  |
 | 12  | `12-mobile-platform.md`         | Token saklama, deep link, force-update, i18n, izinler           |
 | 13  | `13-parity-matrix.md`           | Web işlevi → mobildeki durum → öncelik (boşluk tablosu)         |
+| 14  | `14-shipping-package-tiers.md`  | **Kargo paket boyutları** — desi kaldırıldı; 03 ve 04'ü ezer    |
 
 **Önce `11` ve `12` okunmalı.** Oradaki istemci sözleşmesi (bearer token, hata kodları,
 sayfalama) her domain dosyasında varsayılır ve tekrar edilmez.
@@ -63,6 +64,9 @@ Mobil, web'in `/gateway` BFF proxy'sini **taklit etmez**; NestJS API'ye doğruda
 | Checkout `expectedPricingHash` + `expectedShippingTariffVersion` **zorunlu** | Quote'tan gelen değerleri aynen geri gönder; 409'da quote'u yenile |
 | Komisyon kuralı yoksa checkout **503**                                       | Kullanıcıya "şu an satın alınamıyor" de, tekrar denenebilir yap    |
 | PayTR prod'da `test_mode` başarı callback'i reddediliyor                     | Mobil ödemeyi test etmek için staging kullan                       |
+| İlan `shippingDesi` **kaldırıldı** → `shippingPackageTier` (paket boyutu)    | Desi input'unu üç kartla değiştir (bkz. doküman 14)                |
+| `commission-preview` `shippingDesi` yerine **`packageTier`** alıyor          | Query parametresini değiştir; yoksa `small` varsayılır             |
+| Checkout hizmet bedeli oranı artık `pricing.buyerFeeRate`                    | Etikete sabit "%3" yazma, bu alandan oku                           |
 
 ### Yanıt gövdesi tutarsızlığı
 

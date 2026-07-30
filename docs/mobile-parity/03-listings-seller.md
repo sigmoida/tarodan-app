@@ -1,5 +1,9 @@
 # 03 — Satıcı: İlan Yönetimi, İndirimler, Öne Çıkarma
 
+> ⚠️ **Kargo/desi bölümleri geçersiz.** Satıcı artık desi girmiyor, üç paket
+> boyutundan birini seçiyor. Bu dosyadaki `shippingDesi` alanı ve doğrulamaları
+> yerine **[14-shipping-package-tiers.md](14-shipping-package-tiers.md)** geçerlidir.
+
 > Önce `00-README.md` okunmalı. Mobilde bu alan **büyük ölçüde hazır**; eksikler
 > §5 (vitrin/boost fiyat ucu) ve `13-parity-matrix.md` #8, #9, #10.
 
@@ -28,21 +32,21 @@ Kota aşıldıysa formu **gönderim öncesi** engelle ve `used/max` bilgisini g�
 
 ## 2. Form için referans verileri
 
-| Method | Path                                                           | Amaç                                             |
-| ------ | -------------------------------------------------------------- | ------------------------------------------------ |
-| `GET`  | `/categories`                                                  | Kategori seçimi (düzleştirilmiş ağaç)            |
-| `GET`  | `/products/filters`                                            | `scales`, `materials`, `brands`, `manufacturers` |
-| `GET`  | `/brands`                                                      | `filters.brands` boşsa yedek                     |
-| `GET`  | `/car-models?brand=:slug`                                      | Seçilen markanın modelleri                       |
-| `GET`  | `/products/attribute-groups?manufacturer=:slug`                | Üreticiye özel dinamik alanlar                   |
-| `GET`  | `/orders/commission-preview?amount=&categoryId=&shippingDesi=` | "Elinize geçecek" önizlemesi                     |
+| Method | Path                                                          | Amaç                                             |
+| ------ | ------------------------------------------------------------- | ------------------------------------------------ |
+| `GET`  | `/categories`                                                 | Kategori seçimi (düzleştirilmiş ağaç)            |
+| `GET`  | `/products/filters`                                           | `scales`, `materials`, `brands`, `manufacturers` |
+| `GET`  | `/brands`                                                     | `filters.brands` boşsa yedek                     |
+| `GET`  | `/car-models?brand=:slug`                                     | Seçilen markanın modelleri                       |
+| `GET`  | `/products/attribute-groups?manufacturer=:slug`               | Üreticiye özel dinamik alanlar                   |
+| `GET`  | `/orders/commission-preview?amount=&categoryId=&packageTier=` | "Elinize geçecek" önizlemesi                     |
 
 **Kategori seçiminde marka ve ölçek kategorilerini gizle** — bunların ayrı alanları var.
 Marka değişince model temizlenir; üretici değişince özel özellikler temizlenir.
 
 `commission-preview` yanıtı `{ sellerFeeAmount, withholdingTaxAmount, shippingAmount, sellerNetAmount }`;
 web yalnızca **`sellerNetAmount`** ve **`shippingAmount`** gösteriyor. Yalnız `price > 0` ve
-`shippingDesi` tam sayı ≥1 iken çağır.
+`packageTier` = `small` \| `medium` \| `large` (bkz. doküman 14).
 
 ---
 
@@ -55,31 +59,31 @@ web yalnızca **`sellerNetAmount`** ve **`shippingAmount`** gösteriyor. Yalnız
 
 ### Alanlar ve doğrulama
 
-| Alan               | Kural                                                             |
-| ------------------ | ----------------------------------------------------------------- |
-| `title`            | trim, 1–200                                                       |
-| `description`      | trim, **30–330 (zorunlu)**                                        |
-| `categoryId`       | zorunlu                                                           |
-| `condition`        | zorunlu — `new \| like_new \| very_good \| good \| fair`          |
-| `brandId`          | zorunlu                                                           |
-| `carModelId`       | zorunlu (marka seçilene kadar kapalı)                             |
-| `modelCode`        | trim, 1–100 (zorunlu)                                             |
-| `color`            | trim, 1–80 (zorunlu)                                              |
-| `scale`            | zorunlu                                                           |
-| `material`         | zorunlu (slug)                                                    |
-| `manufacturerId`   | zorunlu                                                           |
-| `isBoxed`          | zorunlu — `boxed \| unboxed` (boş başlar, seçim zorunlu)          |
-| `year`             | opsiyonel (1950–bu yıl)                                           |
-| `isTradeEnabled`   | üyelikte `canTrade` yoksa anahtar yerine yükseltme bağlantısı     |
-| `quantity`         | oluşturmada varsayılan 1                                          |
-| `shippingDesi`     | zorunlu, **tam sayı 1–1000**                                      |
-| `price`            | zorunlu, ≥ 1                                                      |
-| `images`           | **oluşturmada en az 3**; üst sınır `maxImagesPerListing` (üyelik) |
-| `customAttributes` | `Record<string, string[]>`                                        |
+| Alan                  | Kural                                                             |
+| --------------------- | ----------------------------------------------------------------- |
+| `title`               | trim, 1–200                                                       |
+| `description`         | trim, **30–330 (zorunlu)**                                        |
+| `categoryId`          | zorunlu                                                           |
+| `condition`           | zorunlu — `new \| like_new \| very_good \| good \| fair`          |
+| `brandId`             | zorunlu                                                           |
+| `carModelId`          | zorunlu (marka seçilene kadar kapalı)                             |
+| `modelCode`           | trim, 1–100 (zorunlu)                                             |
+| `color`               | trim, 1–80 (zorunlu)                                              |
+| `scale`               | zorunlu                                                           |
+| `material`            | zorunlu (slug)                                                    |
+| `manufacturerId`      | zorunlu                                                           |
+| `isBoxed`             | zorunlu — `boxed \| unboxed` (boş başlar, seçim zorunlu)          |
+| `year`                | opsiyonel (1950–bu yıl)                                           |
+| `isTradeEnabled`      | üyelikte `canTrade` yoksa anahtar yerine yükseltme bağlantısı     |
+| `quantity`            | oluşturmada varsayılan 1                                          |
+| `shippingPackageTier` | zorunlu, `small` \| `medium` \| `large` (bkz. doküman 14)         |
+| `price`               | zorunlu, ≥ 1                                                      |
+| `images`              | **oluşturmada en az 3**; üst sınır `maxImagesPerListing` (üyelik) |
+| `customAttributes`    | `Record<string, string[]>`                                        |
 
 **Gövde:** `{ title, description?, price:number, categoryId, condition, brandId?, carModelId?,
 modelCode, color, scale?, material?, manufacturerId?, isBoxed:boolean, year?:number,
-isTradeEnabled, isPreorder:false, isSet, bundleSize?:number, quantity:number, shippingDesi:number,
+isTradeEnabled, isPreorder:false, isSet, bundleSize?:number, quantity:number, shippingPackageTier:"small"|"medium"|"large",
 images?:[{cardKey, detailKey}], attributes?: string[] }`
 
 `attributes` = seçilen tüm özel özellik **slug'larının düz listesi** (gruplar birleştirilir).
@@ -208,7 +212,7 @@ başlangıç ilerideyse `pending` · bitiş geçtiyse `expired`.
 - [ ] IBAN yoksa ilan formu açılmıyor, kullanıcı IBAN ekranına yönlendiriliyor.
 - [ ] Kota aşımı gönderim öncesi engelleniyor ve `used/max` gösteriliyor.
 - [ ] Oluşturmada en az 3 görsel zorunlu; üst sınır üyelikten geliyor (sabit değil).
-- [ ] `shippingDesi` tam sayı 1–1000 olarak doğrulanıyor.
+- [ ] `shippingPackageTier` üç boyuttan biri olarak gönderiliyor (bkz. doküman 14).
 - [ ] "İncelemeye gönder" sonrası durum `pending` gösteriliyor (aktif değil).
 - [ ] Boost fiyatları **ilan başına** `/products/:id/boost/options`'tan alınıyor.
 - [ ] Vitrin paketi (`showcaseOnHome`) ayrı etiketle sunuluyor.

@@ -1,5 +1,9 @@
 # 04 — Sepet, Checkout ve Ödeme (PayTR/3DS)
 
+> ⚠️ **Kargo fiyatlandırması değişti.** `shippingBySeller[]` artık `packageTier`
+> da döndürüyor ve hizmet bedeli oranı `pricing.buyerFeeRate`'ten okunmalıdır
+> (sabit "%3" yazmayın). Bkz. **[14-shipping-package-tiers.md](14-shipping-package-tiers.md)**.
+
 > **Bu dosya en kritik olanı.** Ödeme akışı web'de tarayıcıya özgü bir mekanizmayla
 > çalışıyor ve mobile **birebir taşınamaz**; §5 bunun native karşılığını tanımlar.
 > Önce `00-README.md` ve `11-api-contract.md` okunmalı.
