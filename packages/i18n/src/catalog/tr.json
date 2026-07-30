@@ -5794,9 +5794,6 @@
         "sentMessage": "Eğer <strong>{email}</strong> sistemde kayıtlıysa, şifre sıfırlama bağlantısı e-posta adresine gönderildi. Gelen kutunu (ve spam klasörünü) kontrol et.",
         "pageDescription": "Hesap şifrenizi sıfırlayın"
       },
-      "layout": {
-        "copyright": "© 2026 Tarodan Marketplace. Tüm hakları saklıdır."
-      },
       "validation": {
         "emailRequired": "E-posta gerekli",
         "emailInvalid": "Geçerli bir e-posta girin",

@@ -5794,9 +5794,6 @@
         "sentMessage": "If <strong>{email}</strong> is registered with us, a password reset link has been sent to that address. Check your inbox (and spam folder).",
         "pageDescription": "Reset your account password"
       },
-      "layout": {
-        "copyright": "© 2026 Tarodan Marketplace. All rights reserved."
-      },
       "validation": {
         "emailRequired": "Email is required",
         "emailInvalid": "Enter a valid email",
