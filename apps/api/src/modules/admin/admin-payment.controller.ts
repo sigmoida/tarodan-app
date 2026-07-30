@@ -212,7 +212,77 @@ export class AdminPaymentController {
     return this.adminService.forceCancelPayment(adminId, id, body.reason);
   }
 
+  // ==================== FINANCE OVERVIEW ====================
+
+  @Get("finance/overview")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Finance overview: money-flow funnel (collected → escrow → transferred → platform revenue) + health counters",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Finance overview" })
+  async getFinanceOverview() {
+    return this.adminService.getFinanceOverview();
+  }
+
+  @Get("invoices/summary")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "eLogo invoice summary strip (month issued, pending, failed, exhausted)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Invoice summary" })
+  async getInvoicesSummary() {
+    return this.adminService.getInvoicesSummary();
+  }
+
   // ==================== SELLER PAYOUTS ====================
+
+  @Get("payouts/transfers")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "List real bank payout transfers (PayoutTransfer rows)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Payout transfers" })
+  async getPayoutTransfers(
+    @Query("status") status?: string,
+    @Query("search") search?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.adminService.getPayoutTransfers({
+      status,
+      search,
+      dateFrom,
+      dateTo,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
+
+  @Get("payouts/adjustments")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "List seller account adjustments (debts deducted from payouts)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Seller adjustments" })
+  async getPayoutAdjustments(
+    @Query("status") status?: string,
+    @Query("type") type?: string,
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.adminService.getPayoutAdjustments({
+      status,
+      type,
+      search,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
 
   @Get("payouts/summary")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)

@@ -38,6 +38,7 @@ import { AdminAnalyticsReportService } from "./admin-analytics-report.service";
 import { AdminModerationService } from "./admin-moderation.service";
 import { AdminPaymentService } from "./admin-payment.service";
 import { AdminPayoutService } from "./admin-payout.service";
+import { AdminFinanceService } from "./admin-finance.service";
 import { AdminTradeService } from "./admin-trade.service";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { AdminTradeQueryService } from "./admin-trade-query.service";
@@ -148,6 +149,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminModerationService,
     AdminPaymentService,
     AdminPayoutService,
+    AdminFinanceService,
     AdminTradeService,
     AdminTradeCommonService,
     AdminTradeQueryService,

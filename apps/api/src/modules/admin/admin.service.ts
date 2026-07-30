@@ -10,6 +10,7 @@ import { AdminAnalyticsService } from "./admin-analytics.service";
 import { AdminModerationService } from "./admin-moderation.service";
 import { AdminPaymentService } from "./admin-payment.service";
 import { AdminPayoutService } from "./admin-payout.service";
+import { AdminFinanceService } from "./admin-finance.service";
 import { AdminTradeService } from "./admin-trade.service";
 import { AdminRefundService } from "./admin-refund.service";
 import { AdminMessagingService } from "./admin-messaging.service";
@@ -109,6 +110,7 @@ export class AdminService {
     private readonly moderationService: AdminModerationService,
     private readonly adminPaymentService: AdminPaymentService,
     private readonly payoutService: AdminPayoutService,
+    private readonly financeService: AdminFinanceService,
     private readonly tradeService: AdminTradeService,
     private readonly adminRefundService: AdminRefundService,
     private readonly adminMessagingService: AdminMessagingService,
@@ -719,6 +721,35 @@ export class AdminService {
 
   async getPayoutsSummary() {
     return this.payoutService.getPayoutsSummary();
+  }
+
+  async getFinanceOverview() {
+    return this.financeService.getFinanceOverview();
+  }
+
+  async getInvoicesSummary() {
+    return this.financeService.getInvoicesSummary();
+  }
+
+  async getPayoutTransfers(query: {
+    status?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.payoutService.getPayoutTransfers(query);
+  }
+
+  async getPayoutAdjustments(query: {
+    status?: string;
+    type?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.payoutService.getPayoutAdjustments(query);
   }
 
   async getPayoutsTransactions(query: PayoutTransactionsQueryDto) {

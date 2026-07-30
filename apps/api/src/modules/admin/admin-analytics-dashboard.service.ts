@@ -9,6 +9,7 @@ import {
   RefundRequestStatus,
 } from "@prisma/client";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
+import { ledgerNetRevenue } from "../commission/ledger-net";
 
 export interface MetricPeriods {
   yesterday: number;
@@ -167,15 +168,10 @@ export class AdminAnalyticsDashboardService {
             status: { not: CommissionLedgerStatus.waived },
           },
         });
-        const sums = result._sum;
+        // TEK formül (ledgerNetRevenue) — finans özetiyle aynı kaynak.
         // Withholding tax belongs to the seller's tax/payout flow and is not
         // platform revenue, so it does not reduce net commission here.
-        return (
-          Number(sums.sellerCommission ?? 0) -
-          Number(sums.refundedSellerCommission ?? 0) +
-          Number(sums.buyerFee ?? 0) -
-          Number(sums.refundedBuyerFee ?? 0)
-        );
+        return ledgerNetRevenue(result._sum);
       }),
       this.getMetricPeriods(periods, (createdAt) =>
         this.prisma.order.count({
