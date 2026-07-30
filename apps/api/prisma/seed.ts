@@ -37,6 +37,10 @@ import { PrismaService } from "../src/prisma";
 import { SEED_AVATAR_BY_EMAIL } from "../src/common/seed-media-mapping";
 import { EMAIL_TEMPLATE_DEFINITIONS } from "../src/common/email/email-template-registry";
 import { normalizeSeedCommerce } from "./seed-commerce";
+import {
+  billableDesiForTier,
+  tierCodeForDesi,
+} from "../src/modules/shipping/shipping-package-tier";
 const prisma = new PrismaClient();
 
 // Initialize StorageService for seed script
@@ -6726,7 +6730,11 @@ async function main() {
         isBoxed:
           product.isBoxed ??
           (product.condition === ProductCondition.new || index % 3 !== 0),
-        shippingDesi: Math.max(1, product.shippingDesi),
+        // Kargo girdisi artık paket boyutu; desi kademeden TÜRETİLİR.
+        shippingPackageTier: tierCodeForDesi(Math.max(1, product.shippingDesi)),
+        shippingDesi: billableDesiForTier(
+          tierCodeForDesi(Math.max(1, product.shippingDesi)),
+        ),
       },
     });
 

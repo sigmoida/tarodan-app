@@ -5,10 +5,12 @@ import {
   MembershipTierType,
   PrismaClient,
   SellerType,
+  ShippingPackageTierCode,
   ShippingTariffStatus,
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
+import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/shipping-package-tier";
 
 const prisma = new PrismaClient();
 
@@ -90,6 +92,10 @@ async function seedMembershipTiers(): Promise<void> {
 }
 
 async function seedCommissionRule(): Promise<void> {
+  // appliesTo BOTH olmalı: isCatchAllCommissionRule (ve ona dayanan health check +
+  // checkout fail-closed guard'ı) yalnız her iki tarafa uygulanan jokeri catch-all
+  // sayar. SELLER olarak bırakıldığında checkBusinessConfig "catch-all kural yok"
+  // diyerek uyarıyordu.
   await prisma.commissionRule.upsert({
     where: { id: "production-default-commission" },
     create: {
@@ -97,15 +103,24 @@ async function seedCommissionRule(): Promise<void> {
       name: "Default marketplace commission",
       ruleType: CommissionRuleType.default,
       sellerType: CommissionSellerType.ALL,
-      appliesTo: CommissionAppliesTo.SELLER,
+      appliesTo: CommissionAppliesTo.BOTH,
       sellerRate: 5,
       sellerCommissionRate: 5,
       percentage: 0.05,
       shippingBuyerShare: 100,
       priority: 0,
       isActive: true,
+      // Paket boyutu başına kargo bölüşümü: küçük paketi alıcı öder, paket
+      // büyüdükçe satıcı payı artar. Tutarlar tarifede, paylar burada.
+      shippingShares: {
+        create: [
+          { tierCode: ShippingPackageTierCode.small, buyerShare: 100 },
+          { tierCode: ShippingPackageTierCode.medium, buyerShare: 70 },
+          { tierCode: ShippingPackageTierCode.large, buyerShare: 50 },
+        ],
+      },
     },
-    update: {},
+    update: { appliesTo: CommissionAppliesTo.BOTH },
   });
 }
 
@@ -197,6 +212,22 @@ async function seedShippingTariff(): Promise<void> {
           { desi: 2, amount: 180 },
           { desi: 3, amount: 230 },
         ],
+      },
+      // Satıcıya gösterilen üç paket boyutu; fiyat bu satırlardan çözülür.
+      packageTiers: {
+        create: SHIPPING_PACKAGE_TIER_DEFAULTS.map((tier, index) => ({
+          code: tier.code,
+          label: tier.label,
+          minDesi: tier.minDesi,
+          maxDesi: tier.maxDesi,
+          amount: [100, 130, 160][index],
+          ...[
+            { sampleWidth: 25, sampleHeight: 20, sampleLength: 12 },
+            { sampleWidth: 40, sampleHeight: 30, sampleLength: 12 },
+            { sampleWidth: 50, sampleHeight: 40, sampleLength: 15 },
+          ][index],
+          sortOrder: tier.sortOrder,
+        })),
       },
     },
     update: {},

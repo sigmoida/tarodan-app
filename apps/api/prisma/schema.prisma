@@ -578,6 +578,10 @@ model Product {
   popularityUpdatedAt DateTime?          @map("popularity_updated_at")
   quantity            Int?               @map("quantity")
   reservedQuantity    Int?               @default(0) @map("reserved_quantity")
+  // Satıcının seçtiği paket boyutu — ilan formundaki TEK kargo girdisi.
+  shippingPackageTier ShippingPackageTierCode @default(small) @map("shipping_package_tier")
+  // Kademeden TÜRETİLİR (kademenin üst sınırı): admin görür, paket desisi
+  // toplanırken (Σ desi × adet) bu değer kullanılır. Satıcı doğrudan girmez.
   shippingDesi        Int                @default(1) @map("shipping_desi")
   slug                String?            @unique
   oldPrice            Decimal?           @map("old_price") @db.Decimal(10, 2)
@@ -1999,10 +2003,39 @@ model ShippingTariff {
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime             @updatedAt @map("updated_at")
   rates                 ShippingTariffRate[]
+  // Satıcının ilanda seçtiği paket boyutları. Tarifeye bağlı olduğu için
+  // versiyonlama + aktif-tarife dokunulmazlığı + sipariş snapshot'ı miras alınır.
+  packageTiers          ShippingPackageTier[]
 
   @@unique([provider, version])
   @@index([provider, status])
   @@map("shipping_tariffs")
+}
+
+/// Satıcıya gösterilen paket boyutu (Küçük/Orta/Büyük). Desi yalnız admin
+/// tarafında görünür: satıcı boyut seçer, fiyat aralıktan çözülür.
+model ShippingPackageTier {
+  id       String                  @id @default(uuid())
+  tariffId String                  @map("tariff_id")
+  code     ShippingPackageTierCode
+  /// Satıcıya gösterilen ad ("Küçük Paket") — admin düzenleyebilir.
+  label    String
+  /// Kapsanan desi aralığı; maxDesi null = üst sınırsız (son kademe).
+  minDesi  Int                     @map("min_desi")
+  maxDesi  Int?                    @map("max_desi")
+  amount   Decimal                 @db.Decimal(10, 2)
+  /// Satıcıya ipucu olarak gösterilen örnek ölçü (cm); yalnız metin, görsel yok.
+  sampleWidth  Int? @map("sample_width")
+  sampleHeight Int? @map("sample_height")
+  sampleLength Int? @map("sample_length")
+  sortOrder    Int  @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tariff       ShippingTariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
+
+  @@unique([tariffId, code])
+  @@index([tariffId])
+  @@map("shipping_package_tiers")
 }
 
 model ShippingTariffRate {
@@ -2149,15 +2182,35 @@ model CommissionRule {
   sellerPlatformFeeMin  Decimal?               @map("seller_platform_fee_min") @db.Decimal(10, 2)
   sellerPlatformFeeMax  Decimal?               @map("seller_platform_fee_max") @db.Decimal(10, 2)
   // Tek kargo tutarının alıcı payı (%). Satıcı payı = 100 - buyerShare. Varsayılan 100 = alıcı öder (mevcut davranış).
+  // Kademe bazlı pay (shippingShares) tanımlanmamışsa bu değer TÜM kademelere uygulanır.
   shippingBuyerShare    Decimal                @default(100) @map("shipping_buyer_share") @db.Decimal(5, 2)
 
   category Category? @relation(fields: [categoryId], references: [id])
+  // Paket boyutu başına ayrı alıcı/satıcı bölüşümü (örn. Küçük 100/0, Büyük 50/50).
+  shippingShares CommissionRuleShippingShare[]
 
   @@index([isActive])
   @@index([categoryId, sellerType, isActive])
   @@index([sellerType, isActive])
   @@index([categoryId, taxpayerType, sellerType, isActive])
   @@map("commission_rules")
+}
+
+/// Bir komisyon kuralının paket boyutu başına kargo bölüşümü. Satır yoksa
+/// kuralın tek `shippingBuyerShare` değeri geçerlidir (kolaylık fallback'i).
+model CommissionRuleShippingShare {
+  id         String                  @id @default(uuid())
+  ruleId     String                  @map("rule_id")
+  tierCode   ShippingPackageTierCode @map("tier_code")
+  /// Alıcının payı (%); satıcı payı = 100 - buyerShare.
+  buyerShare Decimal                 @default(100) @map("buyer_share") @db.Decimal(5, 2)
+  createdAt  DateTime                @default(now()) @map("created_at")
+  updatedAt  DateTime                @updatedAt @map("updated_at")
+  rule       CommissionRule          @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, tierCode])
+  @@index([ruleId])
+  @@map("commission_rule_shipping_shares")
 }
 
 model TaxRegion {
@@ -2835,6 +2888,14 @@ enum ShippingTariffStatus {
   draft
   active
   archived
+}
+
+/// Satıcının ilanda seçebildiği paket boyutları. Sabit üç kademe; etiketleri
+/// ve desi aralıkları tarifede admin tarafından yönetilir.
+enum ShippingPackageTierCode {
+  small
+  medium
+  large
 }
 
 enum RefundRequestStatus {

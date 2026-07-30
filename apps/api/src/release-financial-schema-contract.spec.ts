@@ -26,4 +26,27 @@ describe("immutable financial schema contract", () => {
     const invoice = modelBlock(schema, "Invoice");
     expect(invoice).toMatch(/orderId\s+String\s+@unique/);
   });
+
+  it("versions package tiers with the tariff so an order's price stays reconstructable", () => {
+    // Kademe tarifeye bağlıdır: aktif tarife dokunulmaz + sipariş tariffVersion'ı
+    // snapshot'lar → geçmiş siparişin kargo fiyatı sonradan değişemez.
+    const tier = modelBlock(schema, "ShippingPackageTier");
+    expect(tier).toMatch(/tariffId\s+String\s+@map\("tariff_id"\)/);
+    expect(tier).toMatch(/@@unique\(\[tariffId, code\]\)/);
+    // Üst sınırsız son kademe: hiçbir desi fiyatsız kalamaz.
+    expect(tier).toMatch(/maxDesi\s+Int\?/);
+  });
+
+  it("keeps at most one shipping share per commission rule and tier", () => {
+    const share = modelBlock(schema, "CommissionRuleShippingShare");
+    expect(share).toMatch(/@@unique\(\[ruleId, tierCode\]\)/);
+    expect(share).toMatch(/buyerShare\s+Decimal/);
+  });
+
+  it("stores the seller-chosen package tier on the product", () => {
+    const product = modelBlock(schema, "Product");
+    expect(product).toMatch(
+      /shippingPackageTier\s+ShippingPackageTierCode\s+@default\(small\)/,
+    );
+  });
 });
