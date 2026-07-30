@@ -91,49 +91,6 @@ export interface CommissionMatchContext {
 const numericValue = (value: CommissionNumericValue | null | undefined) =>
   value == null ? null : Number(value);
 
-/** Kargo payı her zaman 0–100 aralığında yorumlanır; tanımsız pay = alıcı öder. */
-const DEFAULT_SHIPPING_BUYER_SHARE = 100;
-const clampShare = (share: number) => Math.min(100, Math.max(0, share));
-
-/**
- * Bir satıcı paketindeki satırların kargo paylarını TEK pakete indirger.
- *
- * Kargo, satıcı paketi başına bir kez tahsil edilir; ancak paketin satırları
- * farklı kategorilere (dolayısıyla farklı `shippingBuyerShare` taşıyan komisyon
- * kurallarına) düşebilir. Önizleme "son satır", tahsilat "ilk satır" payını
- * kullandığı için alıcı gösterilenden farklı ödeyebiliyordu. İndirgeme satır
- * sırasından BAĞIMSIZ olmalı: en düşük pay uygulanır — böylece alıcı, sepetinde
- * gördüğü sübvansiyonlu kalemin vaadinden daha fazlasını asla ödemez.
- */
-export function resolvePackageShippingBuyerShare(
-  shares: Array<number | null | undefined>,
-): number {
-  const valid = shares
-    .filter((share): share is number => share != null && Number.isFinite(share))
-    .map(clampShare);
-  return valid.length ? Math.min(...valid) : DEFAULT_SHIPPING_BUYER_SHARE;
-}
-
-/**
- * Kargo tutarını alıcı/satıcı paylarına böler. Kuruş yuvarlaması alıcı tarafında
- * yapılır ve satıcı payı kalandan türetilir; böylece buyer + seller HER ZAMAN
- * tam kargoya eşittir (yuvarlama kaçağı olmaz). Quote, direct, guest ve grup
- * yolları bu tek fonksiyonu kullanır.
- */
-export function splitShippingByBuyerShare(
-  fullShipping: number,
-  buyerShare: number | null | undefined,
-): { buyer: number; seller: number } {
-  const share = clampShare(
-    buyerShare == null || !Number.isFinite(buyerShare)
-      ? DEFAULT_SHIPPING_BUYER_SHARE
-      : buyerShare,
-  );
-  const buyer = Math.round(fullShipping * (share / 100) * 100) / 100;
-  const seller = Math.round((fullShipping - buyer) * 100) / 100;
-  return { buyer, seller };
-}
-
 /**
  * "Catch-all" kural: her eksende wildcard, tutar aralığı sınırsız ve HER İKİ
  * tarafa (BOTH) uygulanan kural. En az bir aktif catch-all kuralın varlığı

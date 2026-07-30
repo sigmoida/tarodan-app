@@ -21,11 +21,11 @@ import {
 } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
-import { calculatePackageDesi } from "../shipping/shipping-tariff.helper";
 import {
+  calculatePackageDesi,
   resolvePackageShippingBuyerShare,
   splitShippingByBuyerShare,
-} from "./order-commission.helper";
+} from "../shipping/shipping-tariff.helper";
 
 /**
  * Toplu checkout (CheckoutGroup) akışı: sepetteki tüm ürünler tek grup + ürün

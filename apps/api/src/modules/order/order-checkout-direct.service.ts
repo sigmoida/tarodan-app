@@ -24,7 +24,7 @@ import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
-import { splitShippingByBuyerShare } from "./order-commission.helper";
+import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 
 /**

@@ -3,7 +3,7 @@ import { OrderPricingService } from "./order-pricing.service";
 import {
   resolvePackageShippingBuyerShare,
   splitShippingByBuyerShare,
-} from "./order-commission.helper";
+} from "../shipping/shipping-tariff.helper";
 
 /**
  * BLOCKER: `shippingBuyerShare` önizleme ile tahsilat arasında ayrışıyordu.
