@@ -310,29 +310,16 @@ export class OrderLifecycleService {
         );
       }
 
-      // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı).
-      // Sipariş tamamlandı = komisyon "earned"; tutarlar CommissionLedger snapshot'ından.
-      // Fire-and-forget: sipariş tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
+      // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı,
+      // platform satışı → alıcı). SARMALAYICI üzerinden: tekil issue* çağrıları
+      // `revenueInvoicedAt` işaretini KOYMUYORDU ve tam faturalı sipariş backfill
+      // aday penceresinde yer tutmaya devam ediyordu. Fire-and-forget: sipariş
+      // tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
       void this.elogoInvoicing
-        .issueCommissionInvoice(orderId)
+        .issueOrderRevenueInvoices(orderId)
         .catch((e) =>
           this.logger.warn(
-            `eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`,
-          ),
-        );
-      void this.elogoInvoicing
-        .issueServiceFeeInvoice(orderId)
-        .catch((e) =>
-          this.logger.warn(
-            `eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`,
-          ),
-        );
-      // Platform kendi ürününü sattıysa → alıcıya ürün e-Arşivi (Tarodan=satıcı).
-      void this.elogoInvoicing
-        .issuePlatformSaleInvoice(orderId)
-        .catch((e) =>
-          this.logger.warn(
-            `eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`,
+            `eLogo gelir faturaları tetik hatası ${orderId}: ${e?.message}`,
           ),
         );
     }
@@ -908,30 +895,18 @@ export class OrderLifecycleService {
     // releaseAt teslimde handleOrderDelivered ile set edilir, alıcı onayıyla değil.
     // Burada yalnız komisyon "earned" + e-Arşiv tetiklenir (muhasebe).
 
-    // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı, platform satışı → alıcı).
+    // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı,
+    // platform satışı → alıcı). SARMALAYICI üzerinden — tekil issue* çağrıları
+    // `revenueInvoicedAt` işaretini koymuyordu (backfill pencere doygunluğu).
     // Fire-and-forget: tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
     this.logger.log(
       `confirmDelivery: ${orderId} tamamlandı → e-Arşiv tetikleniyor (komisyon+hizmet+platform)`,
     );
     void this.elogoInvoicing
-      .issueCommissionInvoice(orderId)
+      .issueOrderRevenueInvoices(orderId)
       .catch((e) =>
         this.logger.warn(
-          `eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
-    void this.elogoInvoicing
-      .issueServiceFeeInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
-    void this.elogoInvoicing
-      .issuePlatformSaleInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`,
+          `eLogo gelir faturaları tetik hatası ${orderId}: ${e?.message}`,
         ),
       );
 

@@ -241,6 +241,19 @@ export class OrderSchedulerService implements OnModuleInit {
         if (
           expectedTypes.every((type) => invoicedKeys.has(`${o.id}:${type}`))
         ) {
+          // Faturaları tam ama işareti eksik (tekil tetiklerle kesilmiş) sipariş:
+          // işaretlemeden atlanırsa aday penceresinde sonsuza dek yer tutar ve
+          // işaretin çözdüğü take:500 doygunluğu geri gelir. İşaretle ve çık.
+          await this.prisma.order
+            .update({
+              where: { id: o.id },
+              data: { revenueInvoicedAt: new Date() },
+            })
+            .catch((e: any) =>
+              this.logger.warn(
+                `revenueInvoicedAt backfill işareti yazılamadı ${o.id}: ${e?.message}`,
+              ),
+            );
           continue;
         }
         try {
