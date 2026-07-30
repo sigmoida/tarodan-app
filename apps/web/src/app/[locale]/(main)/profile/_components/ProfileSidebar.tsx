@@ -25,10 +25,11 @@ import {
   BuildingStorefrontIcon,
   ShieldCheckIcon,
   ArrowRightOnRectangleIcon,
-  AtSymbolIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
+import { membershipNavLabel } from "@/lib/membership";
 import { useLocale, useTranslations } from "next-intl";
 import { useProfile } from "../_context/ProfileContext";
 
@@ -54,7 +55,15 @@ interface NavSection {
  * · account); `Profil` and `Güvenlik` are standalone (uncategorized) rows. Live
  * active-state highlighting + the badges the profile overview already loads.
  */
-export default function ProfileSidebar() {
+export default function ProfileSidebar({
+  /** Çekmecede kart çerçevesi istenmez — panelin kendi kenarı zaten var. */
+  className,
+  /** Bir bağlantıya gidildiğinde çağrılır (çekmeceyi kapatmak için). */
+  onNavigate,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+} = {}) {
   const t = useTranslations();
   const pathname = usePathname();
   const {
@@ -74,19 +83,12 @@ export default function ProfileSidebar() {
           href: "/profile",
         },
         {
-          icon: CreditCardIcon,
-          label: "Üyeliğim",
+          // Ödeme Yöntemleri de kart ikonu kullanıyordu; ayırt edilebilsin diye
+          // üyeliğe kendi ikonu verildi.
+          icon: SparklesIcon,
+          label: membershipNavLabel(profile?.membershipTier),
           href: "/profile/membership",
         },
-        ...(!profile?.usernameClaimedAt
-          ? [
-              {
-                icon: AtSymbolIcon,
-                label: t("profile.chooseUsername"),
-                href: "/profile/username",
-              },
-            ]
-          : []),
       ],
     },
     {
@@ -205,7 +207,11 @@ export default function ProfileSidebar() {
       : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <nav className="flex flex-col rounded-lg border border-border-subtle bg-surface-elevated overflow-hidden">
+    <nav
+      className={`flex flex-col overflow-hidden bg-surface-elevated ${
+        className ?? "rounded-lg border border-border-subtle"
+      }`}
+    >
       {/* Identity header */}
       <div className="flex items-center gap-3 px-4 py-4">
         <UserAvatar
@@ -247,6 +253,7 @@ export default function ProfileSidebar() {
                   <li key={href}>
                     <Link
                       href={href}
+                      onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
                       className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
                         active

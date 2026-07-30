@@ -15,6 +15,7 @@ import {
 } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
 import { useAuthStore } from "@/stores/authStore";
+import UsernameField from "../_components/UsernameField";
 import { profileInfoSchema, type ProfileInfoValues } from "../_lib/schemas";
 import {
   useProfileInfo,
@@ -177,6 +178,8 @@ export default function ProfileInfoSection() {
             label="Görünen İsim"
             placeholder="Adınız"
           />
+
+          <UsernameField />
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-heading">
