@@ -2769,6 +2769,9 @@ enum PayoutStatus {
 
 enum SellerAdjustmentType {
   return_shipping
+  // Escrow hold'u kargo düşümünü karşılayamayan satırın açığı (grup sepetinde
+  // kargo satıcının ilk satırına yüklenir; küçük tutarlı ilk satır negatife düşebilir).
+  shipping_deficit
 }
 
 enum SellerAdjustmentStatus {
