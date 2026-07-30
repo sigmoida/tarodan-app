@@ -31,6 +31,7 @@ import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import { membershipNavLabel } from "@/lib/membership";
 import { useLocale, useTranslations } from "next-intl";
+import { useAuthStore } from "@/stores/authStore";
 import { useProfile } from "../_context/ProfileContext";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -73,6 +74,10 @@ export default function ProfileSidebar({
     unreadMessagesCount,
     handleLogout,
   } = useProfile();
+  // Kurumsal akıştaki hesap: businessStatus atanmış (pending/approved/rejected).
+  const isCorporateAccount = useAuthStore(
+    (s) => s.user?.businessStatus != null,
+  );
 
   const sections: NavSection[] = [
     {
@@ -184,16 +189,23 @@ export default function ProfileSidebar({
         },
       ],
     },
-    {
-      title: "Hesap",
-      links: [
-        {
-          icon: BuildingStorefrontIcon,
-          label: "İşletme",
-          href: "/profile/business",
-        },
-      ],
-    },
+    // İşletme sayfası yalnız kurumsal akıştaki hesaplara ait (başvuru
+    // tamamlama + panel). Bireysel kullanıcı bağlantıyı hiç görmez; adresi
+    // elle yazarsa sayfa profile geri yönlendirir.
+    ...(isCorporateAccount
+      ? [
+          {
+            title: "Hesap",
+            links: [
+              {
+                icon: BuildingStorefrontIcon,
+                label: "İşletme",
+                href: "/profile/business",
+              },
+            ],
+          },
+        ]
+      : []),
     {
       links: [
         { icon: ShieldCheckIcon, label: "Güvenlik", href: "/profile/security" },
