@@ -139,7 +139,9 @@ export class NotificationAccountService {
     const frontendUrl =
       this.configService.get("FRONTEND_URL") || "http://localhost:3000";
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
-    const templateData = { name: user.displayName || "", resetUrl };
+    const displayName = user.displayName || "";
+    // displayName: name'in takma adı — legacy admin şablonları {{displayName}} kullanıyor.
+    const templateData = { name: displayName, displayName, resetUrl };
 
     const dbTemplate = await this.prisma.emailTemplate.findUnique({
       where: { key: "password-reset" },

@@ -45,7 +45,13 @@ function normalizeEmailBrandOptions(
   ).replace(/\/+$/, "");
   return {
     frontendUrl,
-    logoUrl: options?.logoUrl || `${frontendUrl}/tarodan-logo.jpg`,
+    // EMAIL_LOGO_URL: mail istemcileri logoyu kendi sunucularından çeker;
+    // FRONTEND_URL localhost olduğunda (dev) erişemezler — herkese açık bir
+    // URL ile override edilebilsin.
+    logoUrl:
+      options?.logoUrl ||
+      process.env.EMAIL_LOGO_URL ||
+      `${frontendUrl}/tarodan-logo.jpg`,
     supportEmail: options?.supportEmail || "destek@tarodan.com.tr",
     preferencesUrl:
       options?.preferencesUrl || `${frontendUrl}/profile/settings`,
