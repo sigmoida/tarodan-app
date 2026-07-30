@@ -2076,6 +2076,12 @@ model RefundRequest {
   retainedSellerPlatformFeeAmount Decimal @default(0) @map("retained_seller_platform_fee_amount") @db.Decimal(10, 2)
   returnShippingChargeToBuyer     Decimal @default(0) @map("return_shipping_charge_to_buyer") @db.Decimal(10, 2)
   returnShippingChargeToSeller    Decimal @default(0) @map("return_shipping_charge_to_seller") @db.Decimal(10, 2)
+  // Escrow hold'dan TAM kargo düşüldüğü için satıcı kendi payını peşin ödemiş sayılır.
+  // Kusur alıcıdaysa / gönderi hiç taşınmadıysa bu pay hold'da satıcıya BIRAKILIR.
+  sellerShippingCompensationAmount Decimal @default(0) @map("seller_shipping_compensation_amount") @db.Decimal(10, 2)
+  // Alıcıya geri ödenen gidiş kargosu: Sürat faturası platformda olduğundan kusur
+  // satıcıdayken satıcıya borç yazılır (payout mahsubu).
+  outboundShippingChargeToSeller   Decimal @default(0) @map("outbound_shipping_charge_to_seller") @db.Decimal(10, 2)
   requiresAdminReview             Boolean @default(false) @map("requires_admin_review")
   penaltyReviewRequired           Boolean @default(false) @map("penalty_review_required")
 
@@ -2772,6 +2778,9 @@ enum SellerAdjustmentType {
   // Escrow hold'u kargo düşümünü karşılayamayan satırın açığı (grup sepetinde
   // kargo satıcının ilk satırına yüklenir; küçük tutarlı ilk satır negatife düşebilir).
   shipping_deficit
+  // Satıcı kusurlu iadede alıcıya geri ödenen GİDİŞ kargosu: Sürat faturası
+  // platformda olduğundan taşıma maliyeti satıcıya döner.
+  outbound_shipping
 }
 
 enum SellerAdjustmentStatus {

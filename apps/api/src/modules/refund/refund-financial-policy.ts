@@ -13,6 +13,18 @@ export interface RefundPolicyDecision {
   refundOutboundShipping: boolean;
   refundBuyerProtectionFee: boolean;
   refundSellerPlatformFee: boolean;
+  /**
+   * Satıcının escrow'da kesilen KENDİ kargo payı tazmin edilsin mi? Kusur
+   * alıcıdaysa (cayma/alıcı hasarı) ve gönderi hiç taşınmadıysa (iptaller)
+   * satıcı kargo masrafına girmez. Tazmin yalnız TAM iadede uygulanır — kısmi
+   * iadede kargo kalan adetlere de hizmet etmiştir.
+   */
+  compensateSellerShipping: boolean;
+  /**
+   * Alıcıya geri ödenen GİDİŞ kargosu satıcıya borç yazılsın mı? Sürat faturası
+   * platforma gelir; kusur satıcıdaysa taşıma maliyeti platformda kalmamalı.
+   */
+  chargeSellerOutboundShipping: boolean;
   requiresEvidence: boolean;
   requiresAdminReview: boolean;
   penaltyReviewRequired: boolean;
@@ -27,6 +39,8 @@ export interface RefundFinancialInput {
   sellerCommissionAmount: number;
   sellerPlatformFeeAmount: number;
   returnShippingAmount: number;
+  /** Satıcının escrow'da kesilen kendi kargo payı (Order.sellerShippingAmount). */
+  sellerShippingAmount: number;
   orderQuantity: number;
   refundQuantity: number;
 }
@@ -41,6 +55,17 @@ export interface RefundFinancialResult {
   buyerRefundAmount: number;
   sellerFeeRefundAmount: number;
   sellerPlatformFeeRetainedAmount: number;
+  /**
+   * Satıcıya GERİ verilecek kendi kargo payı. Escrow hold'dan tam kargo düşüldüğü
+   * için satıcı bu payı peşin ödemiş sayılır; kusur alıcıdaysa ya da gönderi hiç
+   * taşınmadıysa iade edilir. Yalnız TAM iadede > 0.
+   */
+  sellerShippingCompensationAmount: number;
+  /**
+   * Alıcıya geri ödenen gidiş kargosunun satıcıya yazılacak borcu. Sürat faturası
+   * platforma geldiği için kusur satıcıdayken taşıma maliyeti satıcıya döner.
+   */
+  outboundShippingChargeToSeller: number;
   quantityPortion: number;
 }
 
@@ -69,6 +94,8 @@ const sellerFaultReturnPolicy = (reason: string): RefundPolicyDecision => ({
   refundOutboundShipping: true,
   refundBuyerProtectionFee: true,
   refundSellerPlatformFee: false,
+  compensateSellerShipping: false,
+  chargeSellerOutboundShipping: true,
   requiresEvidence: true,
   requiresAdminReview: true,
   penaltyReviewRequired: PENALTY_REVIEW_REASONS.has(reason),
@@ -80,6 +107,8 @@ const buyerRemorseReturnPolicy = (): RefundPolicyDecision => ({
   refundOutboundShipping: false,
   refundBuyerProtectionFee: false,
   refundSellerPlatformFee: true,
+  compensateSellerShipping: true,
+  chargeSellerOutboundShipping: false,
   requiresEvidence: false,
   requiresAdminReview: false,
   penaltyReviewRequired: false,
@@ -91,6 +120,8 @@ const buyerFaultReturnPolicy = (): RefundPolicyDecision => ({
   refundOutboundShipping: false,
   refundBuyerProtectionFee: false,
   refundSellerPlatformFee: true,
+  compensateSellerShipping: true,
+  chargeSellerOutboundShipping: false,
   requiresEvidence: true,
   requiresAdminReview: true,
   penaltyReviewRequired: false,
@@ -102,6 +133,8 @@ const manualReviewReturnPolicy = (): RefundPolicyDecision => ({
   refundOutboundShipping: false,
   refundBuyerProtectionFee: false,
   refundSellerPlatformFee: false,
+  compensateSellerShipping: false,
+  chargeSellerOutboundShipping: false,
   requiresEvidence: true,
   requiresAdminReview: true,
   penaltyReviewRequired: false,
@@ -133,6 +166,8 @@ export function resolveCancellationPolicy(
       refundOutboundShipping: true,
       refundBuyerProtectionFee: true,
       refundSellerPlatformFee: false,
+      compensateSellerShipping: true,
+      chargeSellerOutboundShipping: false,
       requiresEvidence: false,
       requiresAdminReview: false,
       penaltyReviewRequired: false,
@@ -146,6 +181,8 @@ export function resolveCancellationPolicy(
       refundOutboundShipping: true,
       refundBuyerProtectionFee: false,
       refundSellerPlatformFee: true,
+      compensateSellerShipping: true,
+      chargeSellerOutboundShipping: false,
       requiresEvidence: false,
       requiresAdminReview: false,
       penaltyReviewRequired: false,
@@ -158,6 +195,8 @@ export function resolveCancellationPolicy(
     refundOutboundShipping: false,
     refundBuyerProtectionFee: false,
     refundSellerPlatformFee: false,
+    compensateSellerShipping: false,
+    chargeSellerOutboundShipping: false,
     requiresEvidence: true,
     requiresAdminReview: true,
     penaltyReviewRequired: false,
@@ -205,6 +244,18 @@ export function calculateRefundFinancials(
         ? sellerPlatformFee * quantityPortion
         : 0),
   );
+  // Kargo, satıcı paketi başına BİR kez alınır ve paketteki tüm adetlere hizmet
+  // eder; kısmi iadede oranlanamaz. Bu yüzden pay tazmini yalnız TAM iadede
+  // (quantityPortion === 1) uygulanır.
+  const isFullRefund = quantityPortion >= 1;
+  const sellerShippingCompensationAmount =
+    policy.compensateSellerShipping && isFullRefund
+      ? money(Math.max(0, input.sellerShippingAmount))
+      : 0;
+  // Borç, alıcıya fiilen geri ödenen gidiş kargosu kadardır (kısmi iadede oranlı).
+  const outboundShippingChargeToSeller = policy.chargeSellerOutboundShipping
+    ? outboundShippingRefundAmount
+    : 0;
 
   return {
     productRefundAmount,
@@ -226,6 +277,8 @@ export function calculateRefundFinancials(
     sellerPlatformFeeRetainedAmount: policy.refundSellerPlatformFee
       ? 0
       : money(sellerPlatformFee * quantityPortion),
+    sellerShippingCompensationAmount,
+    outboundShippingChargeToSeller,
     quantityPortion,
   };
 }

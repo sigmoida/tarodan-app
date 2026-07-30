@@ -14,6 +14,7 @@ describe("refund financial policy", () => {
     sellerCommissionAmount: 40,
     sellerPlatformFeeAmount: 60,
     returnShippingAmount: 180,
+    sellerShippingAmount: 40,
     orderQuantity: 1,
     refundQuantity: 1,
   };
@@ -109,8 +110,88 @@ describe("refund financial policy", () => {
       buyerRefundAmount: 1180,
       sellerFeeRefundAmount: 40,
       sellerPlatformFeeRetainedAmount: 60,
+      // Kusur satıcıda: kendi kargo payı iade edilmez, alıcıya geri ödenen
+      // gidiş kargosu da satıcıya borç yazılır (Sürat maliyeti platformda kalmasın).
+      sellerShippingCompensationAmount: 0,
+      outboundShippingChargeToSeller: 130,
       quantityPortion: 1,
     });
+  });
+
+  it("compensates the seller's shipping share on a full buyer-remorse return", () => {
+    const result = calculateRefundFinancials(
+      resolveReturnPolicy("changed_mind"),
+      orderAmounts,
+    );
+
+    // Kusur alıcıda: satıcı ürün bedelini alamaz ama kargo masrafına da girmez —
+    // escrow'da kesilen kendi payı (40) tazmin edilir. Gidiş borcu yazılmaz.
+    expect(result.sellerShippingCompensationAmount).toBe(40);
+    expect(result.outboundShippingChargeToSeller).toBe(0);
+  });
+
+  it("compensates the seller's shipping share on a buyer-fault return", () => {
+    const result = calculateRefundFinancials(
+      resolveReturnPolicy("buyer_damaged"),
+      orderAmounts,
+    );
+
+    expect(result.sellerShippingCompensationAmount).toBe(40);
+    expect(result.outboundShippingChargeToSeller).toBe(0);
+  });
+
+  it("does not compensate seller shipping on a partial return", () => {
+    // Kargo kalan adetlere de hizmet etti; kısmi iadede pay tazmini yok,
+    // adet-oranlı mantık aynen korunur.
+    const result = calculateRefundFinancials(
+      resolveReturnPolicy("changed_mind"),
+      {
+        ...orderAmounts,
+        orderQuantity: 2,
+        refundQuantity: 1,
+      },
+    );
+
+    expect(result.sellerShippingCompensationAmount).toBe(0);
+  });
+
+  it("prorates the outbound charge on a partial seller-fault return", () => {
+    const result = calculateRefundFinancials(resolveReturnPolicy("damaged"), {
+      ...orderAmounts,
+      orderQuantity: 2,
+      refundQuantity: 1,
+    });
+
+    // Alıcıya oranlı iade edilen gidiş kargosu kadar borç.
+    expect(result.outboundShippingRefundAmount).toBe(65);
+    expect(result.outboundShippingChargeToSeller).toBe(65);
+    expect(result.sellerShippingCompensationAmount).toBe(0);
+  });
+
+  it.each(["wrong_product_selected", "delivery_delayed"])(
+    "compensates seller shipping on %s cancellation without an outbound charge",
+    (reason) => {
+      // Gönderi taşıyıcıya hiç verilmedi: Sürat maliyeti yok → kimse kargo
+      // ödemez. Satıcının escrow'da kesilen payı iade edilir, borç yazılmaz.
+      const result = calculateRefundFinancials(
+        resolveCancellationPolicy(reason),
+        orderAmounts,
+      );
+
+      expect(result.sellerShippingCompensationAmount).toBe(40);
+      expect(result.outboundShippingChargeToSeller).toBe(0);
+    },
+  );
+
+  it("keeps manual-review flows fully conservative", () => {
+    for (const policy of [
+      resolveReturnPolicy("unknown_reason"),
+      resolveCancellationPolicy("unknown_reason"),
+    ]) {
+      const result = calculateRefundFinancials(policy, orderAmounts);
+      expect(result.sellerShippingCompensationAmount).toBe(0);
+      expect(result.outboundShippingChargeToSeller).toBe(0);
+    }
   });
 
   it("deducts buyer-paid return shipping from buyer-remorse refund", () => {

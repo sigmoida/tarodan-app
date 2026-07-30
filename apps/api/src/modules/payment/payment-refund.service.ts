@@ -15,6 +15,7 @@ import {
   TradeStatus,
   RefundRequestStatus,
   RefundAttemptStatus,
+  SellerAdjustmentType,
 } from "@prisma/client";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
@@ -70,15 +71,28 @@ export interface RefundSettlementOptions {
   closeOrder?: boolean;
   /** Satıcı hold'unun tüketilecek adet oranı. Nakit iade oranından bağımsızdır. */
   holdPortion?: number;
+  /**
+   * Bu iadeden sonra hold'da satıcıya BIRAKILACAK tutar (kendi kargo payının
+   * tazmini). Escrow hold TAM kargoyu düştüğü için satıcı payını peşin ödemiş
+   * sayılır; kusur alıcıdaysa geri verilir. Tüketimi YALNIZ aşağı çeker.
+   */
+  holdRetainedAmount?: number;
   /** Terslenecek satıcı kesintisinin kesin TL tutarı. */
   sellerFeeRefundAmount?: number;
   /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
   buyerFeeRefundAmount?: number;
-  sellerAdjustment?: {
+  /**
+   * Satıcıya yazılacak borçlar (payout mahsubu). İadenin kargo bacağı iki ayrı
+   * kalem doğurabilir: dönüş kargosu (`return_shipping`) ve satıcı kusurunda
+   * alıcıya geri ödenen gidiş kargosu (`outbound_shipping`). `sourceKey` unique
+   * olduğundan tekrar denemede borç ikilenmez.
+   */
+  sellerAdjustments?: Array<{
     sourceKey: string;
     amount: number;
+    type: SellerAdjustmentType;
     refundRequestId?: string;
-  };
+  }>;
 }
 
 export interface ProcessRefundOptions {
@@ -938,8 +952,16 @@ export class PaymentRefundService {
               ),
               1,
             );
-            const refundedSeller =
-              Math.round(sellerAmount * portion * 100) / 100;
+            let refundedSeller = Math.round(sellerAmount * portion * 100) / 100;
+            // Satıcıya bırakılacak tutar (kargo payı tazmini): tüketimi YALNIZ aşağı
+            // çeker. Oran zaten daha azını tüketiyorsa dokunulmaz; bırakılacak tutar
+            // hold'u aşarsa hiç tüketim olmaz.
+            const retained = opts?.settlement?.holdRetainedAmount;
+            if (retained != null && retained > 0) {
+              const consumable =
+                Math.round(Math.max(0, sellerAmount - retained) * 100) / 100;
+              refundedSeller = Math.min(refundedSeller, consumable);
+            }
             const newRefunded =
               Number(activeHold.refundedAmount ?? 0) + refundedSeller;
             if (newRefunded >= sellerAmount - 0.01) {
@@ -1039,28 +1061,28 @@ export class PaymentRefundService {
                 stockRestoredAt: true,
               },
             });
-            const sellerAdjustment = opts?.settlement?.sellerAdjustment;
-            if (
-              orderRow?.sellerId &&
-              sellerAdjustment &&
-              sellerAdjustment.amount > 0
-            ) {
-              await tx.sellerAccountAdjustment.upsert({
-                where: { sourceKey: sellerAdjustment.sourceKey },
-                create: {
-                  sellerId: orderRow.sellerId,
-                  orderId,
-                  refundRequestId: sellerAdjustment.refundRequestId ?? null,
-                  sourceKey: sellerAdjustment.sourceKey,
-                  type: "return_shipping",
-                  amount: sellerAdjustment.amount,
-                  remainingAmount: sellerAdjustment.amount,
-                  metadata: {
-                    refundAttemptId: freshAttempt.id,
+            const sellerAdjustments = (
+              opts?.settlement?.sellerAdjustments ?? []
+            ).filter((adjustment) => adjustment.amount > 0);
+            if (orderRow?.sellerId) {
+              for (const adjustment of sellerAdjustments) {
+                await tx.sellerAccountAdjustment.upsert({
+                  where: { sourceKey: adjustment.sourceKey },
+                  create: {
+                    sellerId: orderRow.sellerId,
+                    orderId,
+                    refundRequestId: adjustment.refundRequestId ?? null,
+                    sourceKey: adjustment.sourceKey,
+                    type: adjustment.type,
+                    amount: adjustment.amount,
+                    remainingAmount: adjustment.amount,
+                    metadata: {
+                      refundAttemptId: freshAttempt.id,
+                    },
                   },
-                },
-                update: {},
-              });
+                  update: {},
+                });
+              }
             }
             const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
             // MONEY-H4: sipariş cancel + stok geri-yükleme siparişin KÜMÜLATİF iadesine

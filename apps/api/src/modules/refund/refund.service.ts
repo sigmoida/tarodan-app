@@ -14,6 +14,7 @@ import {
   Prisma,
   RefundReason,
   RefundRequestStatus,
+  SellerAdjustmentType,
   ShipmentStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
@@ -55,6 +56,8 @@ type RefundFinancialPersistenceData = Pick<
   | "retainedSellerPlatformFeeAmount"
   | "returnShippingChargeToBuyer"
   | "returnShippingChargeToSeller"
+  | "sellerShippingCompensationAmount"
+  | "outboundShippingChargeToSeller"
   | "requiresAdminReview"
   | "penaltyReviewRequired"
   | "refundProductAmount"
@@ -457,6 +460,7 @@ export class RefundService {
             sellerFeeRefundAmount: financial.financials.sellerFeeRefundAmount,
             buyerFeeRefundAmount:
               financial.financials.buyerProtectionRefundAmount,
+            ...this.shippingSettlement(created.id, financial.financials),
           },
         },
       );
@@ -575,14 +579,17 @@ export class RefundService {
             ),
             sellerFeeRefundAmount: Number(rr.refundedSellerFeeAmount),
             buyerFeeRefundAmount: Number(rr.refundedBuyerProtectionAmount),
-            sellerAdjustment:
-              Number(rr.returnShippingChargeToSeller) > 0
-                ? {
-                    sourceKey: `refund-return-shipping:${rr.id}`,
-                    amount: Number(rr.returnShippingChargeToSeller),
-                    refundRequestId: rr.id,
-                  }
-                : undefined,
+            ...this.shippingSettlement(rr.id, {
+              sellerShippingCompensationAmount: Number(
+                rr.sellerShippingCompensationAmount,
+              ),
+              outboundShippingChargeToSeller: Number(
+                rr.outboundShippingChargeToSeller,
+              ),
+              returnShippingChargeToSeller: Number(
+                rr.returnShippingChargeToSeller,
+              ),
+            }),
           },
         },
       );
@@ -989,6 +996,17 @@ export class RefundService {
             ),
             sellerFeeRefundAmount: Number(rr.refundedSellerFeeAmount),
             buyerFeeRefundAmount: Number(rr.refundedBuyerProtectionAmount),
+            ...this.shippingSettlement(rr.id, {
+              sellerShippingCompensationAmount: Number(
+                rr.sellerShippingCompensationAmount,
+              ),
+              outboundShippingChargeToSeller: Number(
+                rr.outboundShippingChargeToSeller,
+              ),
+              returnShippingChargeToSeller: Number(
+                rr.returnShippingChargeToSeller,
+              ),
+            }),
           },
         }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
       );
@@ -1465,6 +1483,7 @@ export class RefundService {
       sellerFeeAmount?: Prisma.Decimal;
       sellerCommissionAmount?: Prisma.Decimal;
       sellerPlatformFeeAmount?: Prisma.Decimal;
+      sellerShippingAmount?: Prisma.Decimal;
       package?: {
         shippingTariffId: string | null;
         shippingTariffVersion: number | null;
@@ -1517,6 +1536,7 @@ export class RefundService {
       sellerCommissionAmount: Number(order.sellerCommissionAmount ?? 0),
       sellerPlatformFeeAmount: Number(order.sellerPlatformFeeAmount ?? 0),
       returnShippingAmount,
+      sellerShippingAmount: Number(order.sellerShippingAmount ?? 0),
       orderQuantity: order.quantity ?? 1,
       refundQuantity,
     });
@@ -1532,6 +1552,49 @@ export class RefundService {
         returnTariff: tariffSnapshot,
         createdAt: new Date().toISOString(),
       } as unknown as Prisma.InputJsonValue,
+    };
+  }
+
+  /**
+   * İadenin KARGO bacağının settlement karşılığı — üç iade yolunun TEK kaynağı.
+   *
+   * Escrow hold TAM kargoyu düştüğü için satıcı kendi payını peşin ödemiş sayılır:
+   * kusur alıcıdaysa (ya da gönderi hiç taşınmadıysa) bu pay hold'da satıcıya
+   * bırakılır. Ters yönde, satıcı kusurunda alıcıya geri ödenen gidiş kargosu ve
+   * dönüş kargosu satıcıya borç yazılır (Sürat faturası platforma gelir).
+   */
+  private shippingSettlement(
+    refundRequestId: string,
+    financials: {
+      sellerShippingCompensationAmount: number;
+      outboundShippingChargeToSeller: number;
+      returnShippingChargeToSeller: number;
+    },
+  ): {
+    holdRetainedAmount: number;
+    sellerAdjustments: Array<{
+      sourceKey: string;
+      amount: number;
+      type: SellerAdjustmentType;
+      refundRequestId: string;
+    }>;
+  } {
+    return {
+      holdRetainedAmount: financials.sellerShippingCompensationAmount,
+      sellerAdjustments: [
+        {
+          sourceKey: `refund-return-shipping:${refundRequestId}`,
+          amount: financials.returnShippingChargeToSeller,
+          type: SellerAdjustmentType.return_shipping,
+          refundRequestId,
+        },
+        {
+          sourceKey: `refund-outbound-shipping:${refundRequestId}`,
+          amount: financials.outboundShippingChargeToSeller,
+          type: SellerAdjustmentType.outbound_shipping,
+          refundRequestId,
+        },
+      ].filter((adjustment) => adjustment.amount > 0),
     };
   }
 
@@ -1553,6 +1616,9 @@ export class RefundService {
         financials.sellerPlatformFeeRetainedAmount,
       returnShippingChargeToBuyer: financials.returnShippingChargeToBuyer,
       returnShippingChargeToSeller: financials.returnShippingChargeToSeller,
+      sellerShippingCompensationAmount:
+        financials.sellerShippingCompensationAmount,
+      outboundShippingChargeToSeller: financials.outboundShippingChargeToSeller,
       requiresAdminReview: policy.requiresAdminReview,
       penaltyReviewRequired: policy.penaltyReviewRequired,
       refundProductAmount: true,
@@ -1606,6 +1672,7 @@ export class RefundService {
       sellerFeeAmount?: Prisma.Decimal;
       sellerCommissionAmount?: Prisma.Decimal;
       sellerPlatformFeeAmount?: Prisma.Decimal;
+      sellerShippingAmount?: Prisma.Decimal;
       package?: {
         shippingTariffId: string | null;
         shippingTariffVersion: number | null;
@@ -1679,6 +1746,7 @@ export class RefundService {
           sellerFeeRefundAmount: financial.financials.sellerFeeRefundAmount,
           buyerFeeRefundAmount:
             financial.financials.buyerProtectionRefundAmount,
+          ...this.shippingSettlement(created.id, financial.financials),
         },
       });
     } catch (err) {
@@ -1761,6 +1829,7 @@ export class RefundService {
       sellerFeeAmount?: Prisma.Decimal;
       sellerCommissionAmount?: Prisma.Decimal;
       sellerPlatformFeeAmount?: Prisma.Decimal;
+      sellerShippingAmount?: Prisma.Decimal;
       package?: {
         shippingTariffId: string | null;
         shippingTariffVersion: number | null;
