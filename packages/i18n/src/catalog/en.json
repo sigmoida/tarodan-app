@@ -6403,6 +6403,7 @@
       "alreadyLiked": "You have already liked this product",
       "bannedCannotCreate": "Your account is banned. You cannot add new products.",
       "bannedCannotEdit": "Your account is banned. You cannot edit products.",
+      "businessApprovalRequired": "You cannot list products until your business account is approved. You will be notified once your application is reviewed.",
       "boostActiveOnly": "Only active (published) listings can be boosted",
       "boostOwnOnly": "You can only boost your own listing",
       "boostPriceUndefined": "No valid price is defined for this duration",

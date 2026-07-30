@@ -22,6 +22,7 @@ import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
 import { ProductStatsService } from "./product-stats.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
+import { sellerAutoEnableData } from "./helpers/seller-auto-enable.helper";
 
 /**
  * ProductCreateService — ilan oluşturma. Üyelik ilan/görsel limiti, AI görsel+metin
@@ -71,6 +72,19 @@ export class ProductCreateService {
     if (seller.isBanned) {
       throw new ForbiddenException(
         i18nMessage("server.product.bannedCannotCreate"),
+      );
+    }
+
+    // Kurumsal akışta satış NİHAİ onaydan sonra başlar. Web guard'ı yalnız
+    // yönlendirme yapar; kapı olmadan pending/rejected kurumsal hesap API'den
+    // ilan açıp KDV'siz "bireysel" gibi satabiliyordu. Bireysel kullanıcıda
+    // businessStatus null'dur ve etkilenmez.
+    if (
+      seller.businessStatus === "pending" ||
+      seller.businessStatus === "rejected"
+    ) {
+      throw new ForbiddenException(
+        i18nMessage("server.product.businessApprovalRequired"),
       );
     }
 
@@ -147,14 +161,12 @@ export class ProductCreateService {
       });
     }
 
-    // Auto-enable seller mode when user creates their first listing
+    // Auto-enable seller mode when user creates their first listing.
+    // Mevcut sellerType korunur (bkz. sellerAutoEnableData).
     if (!seller.isSeller) {
       await this.prisma.user.update({
         where: { id: sellerId },
-        data: {
-          isSeller: true,
-          sellerType: "individual", // Default to individual seller
-        },
+        data: sellerAutoEnableData(seller),
       });
     }
 

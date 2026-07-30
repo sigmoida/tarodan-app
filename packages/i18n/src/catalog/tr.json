@@ -6403,6 +6403,7 @@
       "alreadyLiked": "Bu ürünü zaten beğendiniz",
       "bannedCannotCreate": "Hesabınız banlanmış. Yeni ürün ekleyemezsiniz.",
       "bannedCannotEdit": "Hesabınız banlanmış. Ürün düzenleyemezsiniz.",
+      "businessApprovalRequired": "Kurumsal hesabınız onaylanmadan ilan veremezsiniz. Başvurunuz sonuçlandığında bilgilendirileceksiniz.",
       "boostActiveOnly": "Sadece aktif (yayında) ilanlar öne çıkarılabilir",
       "boostOwnOnly": "Sadece kendi ilanınızı öne çıkarabilirsiniz",
       "boostPriceUndefined": "Bu süre için geçerli bir fiyat tanımlı değil",
