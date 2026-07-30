@@ -6,11 +6,13 @@ import {
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
   OUTBOX_ORDER_FULFILLMENT,
   OUTBOX_REVENUE_INVOICE_ISSUE,
+  OUTBOX_ORDER_REVENUE_INVOICE,
   ShipmentCancelPayload,
   InvoiceRefundReversePayload,
   InvoiceTradeCashRefundReversePayload,
   OrderFulfillmentOutboxPayload,
   RevenueInvoiceIssuePayload,
+  OrderRevenueInvoicePayload,
 } from "../outbox/outbox.types";
 import { PaymentCommonService } from "./payment-common.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -79,6 +81,16 @@ export class PaymentOutboxHandlers implements OnModuleInit {
       }
       if (!orderId) throw new Error("Revenue invoice source is missing");
       await this.elogoInvoicing.issueVirtualOrderInvoice(orderId, kind);
+    });
+
+    // Teslim edilen fiziksel siparişin gelir faturaları. Teslim tx'iyle atomik
+    // yazıldığı için kargo poll'u teslimatı işaretlediği anda fatura görevi de
+    // kalıcıdır — 2 dakikalık backfill cron'una tek bağımlılık kalkar (e-Arşiv'in
+    // 7 günlük süresi cron gecikmesine emanet edilmez). issue* idempotenttir.
+    this.registry.register(OUTBOX_ORDER_REVENUE_INVOICE, async (payload) => {
+      const { orderId } = payload as OrderRevenueInvoicePayload;
+      if (!orderId) throw new Error("Order revenue invoice source is missing");
+      await this.elogoInvoicing.issueOrderRevenueInvoices(orderId);
     });
 
     // #8: fulfillment DAYANIKLILIK backstop'u. Anlık event yolu (OrderFulfillmentListener)

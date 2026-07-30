@@ -1417,6 +1417,11 @@ model Order {
   buyerConfirmedAt           DateTime?                @map("buyer_confirmed_at")
   buyerConfirmationType      BuyerConfirmationType?   @map("buyer_confirmation_type")
   completedAt                DateTime?                @map("completed_at")
+  // Teslim gelir faturaları (komisyon / hizmet bedeli / platform satışı) kesildi mi?
+  // AÇIK işaret: eskiden backfill cron'u her turda TÜM delivered+completed siparişleri
+  // (take:500, sırasız) tarıyordu; tamamlanan siparişler aday kümesinden hiç çıkmadığı
+  // için 500 sipariş sonrası yeni teslimatlar pencereye giremeyip faturasız kalabiliyordu.
+  revenueInvoicedAt          DateTime?                @map("revenue_invoiced_at")
   invoice                    Invoice?
   buyer                      User                     @relation("BuyerOrders", fields: [buyerId], references: [id])
   offer                      Offer?                   @relation(fields: [offerId], references: [id])
@@ -1437,6 +1442,8 @@ model Order {
   @@index([sellerId])
   @@index([status])
   @@index([status, paymentExpiresAt])
+  // Teslim faturası backfill'inin aday sorgusu (faturasız + en yeni teslimat önce).
+  @@index([status, revenueInvoicedAt, deliveredAt])
   @@index([checkoutGroupId])
   @@index([packageId])
   @@map("orders")

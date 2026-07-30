@@ -140,7 +140,14 @@ export class OrderSchedulerService implements OnModuleInit {
       where: {
         status: { in: [OrderStatus.delivered, OrderStatus.completed] },
         commissionLedger: { isNot: null },
+        // AÇIK işaret: faturası kesilmiş siparişler aday kümesinden ÇIKAR. Eskiden
+        // filtre yoktu; tamamlanan siparişler kümede kaldığı için sırasız take:500
+        // penceresi 500 sipariş sonrası YENİ teslimatları dışarıda bırakabiliyordu
+        // (fatura 14 gün gecikiyor veya hiç kesilmiyor).
+        revenueInvoicedAt: null,
       },
+      // En yeni teslimat önce: 7 günlük e-Arşiv penceresi olan siparişler beklemez.
+      orderBy: [{ deliveredAt: "desc" }, { updatedAt: "desc" }],
       select: {
         id: true,
         commissionLedger: {
@@ -237,6 +244,9 @@ export class OrderSchedulerService implements OnModuleInit {
         },
       },
       select: { id: true },
+      // Sipariş tarafıyla aynı gerekçe: tamamlanan takaslar aday kümesinden hiç
+      // çıkmadığı için sırasız pencere yeni takasları dışarıda bırakabiliyordu.
+      orderBy: { updatedAt: "desc" },
       take: 200,
     });
     let tradeInvoiced = 0;

@@ -950,27 +950,10 @@ export class OrderLifecycleService {
       .catch((e: any) =>
         this.logger.warn(`teslim markEarned hatası ${orderId}: ${e?.message}`),
       );
-    void this.elogoInvoicing
-      .issueCommissionInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo komisyon (teslim) tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
-    void this.elogoInvoicing
-      .issueServiceFeeInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo hizmet bedeli (teslim) tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
-    void this.elogoInvoicing
-      .issuePlatformSaleInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo platform satış (teslim) tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
+    // Faturalama + `revenueInvoicedAt` işareti TEK kaynakta (ElogoInvoicingService):
+    // teslim yaşam-döngüsü, teslim tx'inin outbox görevi ve backfill cron'u aynı
+    // metodu çağırır.
+    await this.elogoInvoicing.issueOrderRevenueInvoices(orderId);
   }
 
   /**

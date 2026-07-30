@@ -31,7 +31,9 @@ import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
+  OUTBOX_ORDER_REVENUE_INVOICE,
   type InvoiceRefundReversePayload,
+  type OrderRevenueInvoicePayload,
 } from "../outbox/outbox.types";
 import { LedgerService } from "../ledger/ledger.service";
 import { MONEY_EPSILON } from "./payment.constants";
@@ -1827,6 +1829,19 @@ export class PaymentRefundService {
 
     // Escrow saatini teslimden başlat — para akışının TEK tetikleyicisi.
     await this.scheduleHoldReleaseOnDelivery(orderId, deliveredAt, tx);
+
+    // Teslim gelir faturalarını AYNI tx'te dayanıklı olarak kuyruğa al. Eskiden
+    // faturalama yalnız 2 dakikalık backfill cron'una bağlıydı; cron'un aday
+    // penceresi doyduğunda veya cron gecikince e-Arşiv'in 7 günlük yasal süresi
+    // kaçırılabiliyordu. Outbox at-least-once + issue* idempotent olduğu için
+    // cron ile birlikte çalışması güvenli.
+    if (this.outbox && tx) {
+      await this.outbox.enqueue(tx, {
+        type: OUTBOX_ORDER_REVENUE_INVOICE,
+        payload: { orderId } satisfies OrderRevenueInvoicePayload,
+        dedupeKey: `${OUTBOX_ORDER_REVENUE_INVOICE}:${orderId}`,
+      });
+    }
 
     const order = await db.order.findUnique({
       where: { id: orderId },

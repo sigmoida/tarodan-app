@@ -251,6 +251,44 @@ export class ElogoInvoicingService {
   // ───────────────────────── public API (tetikleyiciler çağırır) ─────────────────────────
 
   /** Komisyon faturası → SATICIYA (ledger.sellerCommission). Sipariş "earned" olunca. */
+  /**
+   * Teslim edilen siparişin TÜM gelir faturalarını keser (komisyon, hizmet bedeli,
+   * platform satışı) ve hepsi başarılıysa siparişe `revenueInvoicedAt` işaretini koyar.
+   *
+   * TEK KAYNAK: teslim yaşam-döngüsü (OrderLifecycleService), teslim tx'inin outbox
+   * görevi ve backfill cron'u aynı bu metodu çağırır. İşaret olmadan backfill her turda
+   * tüm geçmişi taramak zorunda kalır ve aday penceresi doyduğunda yeni teslimatlar
+   * faturasız kalabilir. Fatura türleri birbirini BLOKLAMAZ; biri patlarsa işaret
+   * konmaz ve sonraki tur yeniden dener (issue* idempotenttir).
+   */
+  async issueOrderRevenueInvoices(orderId: string): Promise<void> {
+    const results = await Promise.allSettled([
+      this.issueCommissionInvoice(orderId),
+      this.issueServiceFeeInvoice(orderId),
+      this.issuePlatformSaleInvoice(orderId),
+    ]);
+    const failures = results.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected",
+    );
+    for (const failure of failures) {
+      this.logger.warn(
+        `eLogo teslim faturası hatası ${orderId}: ${failure.reason?.message ?? failure.reason}`,
+      );
+    }
+    if (failures.length > 0) return;
+
+    await this.prisma.order
+      .update({
+        where: { id: orderId },
+        data: { revenueInvoicedAt: new Date() },
+      })
+      .catch((e: any) =>
+        this.logger.warn(
+          `revenueInvoicedAt işareti yazılamadı ${orderId}: ${e?.message}`,
+        ),
+      );
+  }
+
   async issueCommissionInvoice(orderId: string): Promise<void> {
     const [order, ledger] = await Promise.all([
       this.prisma.order.findUnique({
