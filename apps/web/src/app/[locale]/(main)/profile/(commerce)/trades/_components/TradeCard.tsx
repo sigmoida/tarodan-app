@@ -126,16 +126,19 @@ export default function TradeCard({
         />
       </div>
 
+      {/*
+        Takas rozeti İKİ sütunun ARASINDA, tek kopya. Önceden iki kez
+        basılıyordu: biri ızgaranın orta hücresinde (`hidden md:flex`), biri
+        ızgaradan SONRA (`md:hidden`) — bu yüzden mobilde ikon iki listenin de
+        altına, kartın en sonuna düşüyordu. Tek sütuna inen ızgara çocukları
+        kaynak sırasına göre dizdiği için ayrı bir mobil kopyaya gerek yok.
+      */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <ItemColumn label={t("trade.yourItems")} items={myItems} />
-        <div className="hidden md:flex items-center justify-center">
+        <div className="flex items-center justify-center">
           <TradeSwapBadge />
         </div>
         <ItemColumn label={t("trade.theirItems")} items={theirItems} />
-      </div>
-
-      <div className="md:hidden flex items-center justify-center my-4">
-        <TradeSwapBadge />
       </div>
 
       {hasCash && (
