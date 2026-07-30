@@ -58,6 +58,20 @@ export class AdminShippingTariffService {
     return updated;
   }
 
+  /** Aktif tarifeyi kademeleriyle yeni bir draft'a kopyalar (fiyat güncelleme kısayolu). */
+  async cloneActive(adminId: string, provider?: string) {
+    const created = await this.tariffs.cloneActive(adminId, provider);
+    await this.audit.createAuditLog(
+      adminId,
+      "shipping_tariff_clone",
+      "ShippingTariff",
+      created.id,
+      null,
+      created,
+    );
+    return created;
+  }
+
   async activate(id: string, adminId: string) {
     const before = await this.tariffs.getById(id);
     const activated = await this.tariffs.activate(id, adminId);

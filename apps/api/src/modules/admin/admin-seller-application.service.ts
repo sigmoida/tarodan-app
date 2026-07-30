@@ -587,7 +587,7 @@ export class AdminSellerApplicationService {
     }
     const shippingTariff = await this.prisma.shippingTariff.findUnique({
       where: { id: order.package.shippingTariffId },
-      include: { rates: true },
+      include: { packageTiers: true },
     });
     if (!shippingTariff) {
       throw new BadRequestException(

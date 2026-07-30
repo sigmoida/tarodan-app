@@ -2002,7 +2002,6 @@ model ShippingTariff {
   updatedBy             String?              @map("updated_by")
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime             @updatedAt @map("updated_at")
-  rates                 ShippingTariffRate[]
   // Satıcının ilanda seçtiği paket boyutları. Tarifeye bağlı olduğu için
   // versiyonlama + aktif-tarife dokunulmazlığı + sipariş snapshot'ı miras alınır.
   packageTiers          ShippingPackageTier[]
@@ -2038,19 +2037,6 @@ model ShippingPackageTier {
   @@map("shipping_package_tiers")
 }
 
-model ShippingTariffRate {
-  id        String         @id @default(uuid())
-  tariffId  String         @map("tariff_id")
-  desi      Int
-  amount    Decimal        @db.Decimal(10, 2)
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
-  tariff    ShippingTariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
-
-  @@unique([tariffId, desi])
-  @@index([tariffId])
-  @@map("shipping_tariff_rates")
-}
 
 model ShipmentEvent {
   id          String   @id @default(uuid())

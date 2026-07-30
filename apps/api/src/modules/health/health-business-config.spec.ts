@@ -26,7 +26,14 @@ describe("HealthService — business config requires an active catch-all commiss
     ...over,
   });
 
-  const makeService = (commissionRules: any[]) => {
+  const makeService = (
+    commissionRules: any[],
+    packageTiers: Array<{ code: string }> | null = [
+      { code: "small" },
+      { code: "medium" },
+      { code: "large" },
+    ],
+  ) => {
     const prisma = {
       membershipTier: { count: jest.fn().mockResolvedValue(4) },
       commissionRule: {
@@ -34,7 +41,13 @@ describe("HealthService — business config requires an active catch-all commiss
         findMany: jest.fn().mockResolvedValue(commissionRules),
       },
       taxRule: { count: jest.fn().mockResolvedValue(1) },
-      shippingTariff: { findFirst: jest.fn().mockResolvedValue({ id: "t1" }) },
+      shippingTariff: {
+        // Aktif tarife üç kademesiyle birlikte hazır sayılır; eksik kademe
+        // checkout'un fiyat çözememesi demektir.
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(packageTiers ? { id: "t1", packageTiers } : null),
+      },
       user: { findUnique: jest.fn().mockResolvedValue({ id: "platform" }) },
     };
     const service = new HealthService(
@@ -76,6 +89,18 @@ describe("HealthService — business config requires an active catch-all commiss
 
   it("hiç kural yoksa hazır DEĞİLDİR", async () => {
     const { service } = makeService([]);
+    await expect(callCheck(service)).resolves.toBe(false);
+  });
+
+  it("aktif tarifenin kademeleri eksikse hazır DEĞİLDİR", async () => {
+    // Kademesiz/eksik kademeli tarife "aktif" görünür ama checkout hiçbir desi
+    // için fiyat çözemez → hazır sayılmamalı.
+    const { service } = makeService([catchAll()], [{ code: "small" }]);
+    await expect(callCheck(service)).resolves.toBe(false);
+  });
+
+  it("aktif tarife yoksa hazır DEĞİLDİR", async () => {
+    const { service } = makeService([catchAll()], null);
     await expect(callCheck(service)).resolves.toBe(false);
   });
 

@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -13,18 +14,56 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { ShippingPackageTierCode } from "@prisma/client";
 
-export class ShippingTariffRateDto {
+/**
+ * Satıcıya gösterilen paket boyutu. Desi aralığı yalnız admin tarafındadır:
+ * satıcı boyut seçer, fiyat aralıktan çözülür. Son boyutun `maxDesi`'si null
+ * olmalıdır (üst sınırsız) — aksi halde aktifleştirme guard'ı reddeder.
+ */
+export class ShippingPackageTierDto {
+  @IsEnum(ShippingPackageTierCode)
+  code: ShippingPackageTierCode;
+
+  @IsString()
+  @MaxLength(60)
+  label: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(20000)
+  @Type(() => Number)
+  minDesi: number;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(20000)
   @Type(() => Number)
-  desi: number;
+  maxDesi: number | null;
 
   @IsNumber()
   @Min(0)
   @Type(() => Number)
   amount: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  sampleWidth?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  sampleHeight?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  sampleLength?: number | null;
 }
 
 /**
@@ -71,8 +110,8 @@ export class CreateShippingTariffDto {
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => ShippingTariffRateDto)
-  rates: ShippingTariffRateDto[];
+  @Type(() => ShippingPackageTierDto)
+  packageTiers: ShippingPackageTierDto[];
 }
 
 /** Admin: update a DRAFT tariff (all fields optional). */
@@ -114,8 +153,8 @@ export class UpdateShippingTariffDto {
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => ShippingTariffRateDto)
-  rates?: ShippingTariffRateDto[];
+  @Type(() => ShippingPackageTierDto)
+  packageTiers?: ShippingPackageTierDto[];
 }
 
 /** Admin: preview a tariff's outbound shipping for sample seller-package subtotals. */

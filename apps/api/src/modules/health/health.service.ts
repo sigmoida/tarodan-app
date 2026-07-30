@@ -15,6 +15,7 @@ import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { CommissionAppliesTo, MembershipTierType } from "@prisma/client";
 import { isCatchAllCommissionRule } from "../order/order-commission.helper";
+import { SHIPPING_PACKAGE_TIER_ORDER } from "../shipping/shipping-package-tier";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
 
@@ -240,9 +241,11 @@ export class HealthService {
           },
         }),
         this.prisma.taxRule.count({ where: { isActive: true } }),
+        // Kademesiz aktif tarife "hazır" görünür ama checkout hiçbir desi için
+        // fiyat çözemez (fail-closed 503) → kademeleri de doğrula.
         this.prisma.shippingTariff.findFirst({
           where: { provider: "surat", status: "active" },
-          select: { id: true },
+          select: { id: true, packageTiers: { select: { code: true } } },
         }),
         this.prisma.user.findUnique({
           where: { email: "platform@tarodan.com" },
@@ -253,6 +256,17 @@ export class HealthService {
       const hasCatchAllCommissionRule = wildcardCommissionRules.some((rule) =>
         isCatchAllCommissionRule(rule),
       );
+      const hasCompleteShippingTiers =
+        !!shippingTariff &&
+        SHIPPING_PACKAGE_TIER_ORDER.every((code) =>
+          shippingTariff.packageTiers.some((tier) => tier.code === code),
+        );
+      if (shippingTariff && !hasCompleteShippingTiers) {
+        this.logger.error(
+          "BUSINESS_CONFIG_MISSING: the active shipping tariff has incomplete package tiers. " +
+            "Checkout cannot resolve a shipping price and will fail with 503.",
+        );
+      }
       if (!hasCatchAllCommissionRule) {
         this.logger.error(
           "BUSINESS_CONFIG_MISSING: no active catch-all commission rule (appliesTo=BOTH, all axes wildcard). " +
@@ -264,7 +278,7 @@ export class HealthService {
         membershipTierCount === 4 &&
         hasCatchAllCommissionRule &&
         taxRuleCount > 0 &&
-        !!shippingTariff &&
+        hasCompleteShippingTiers &&
         !!platformSeller
       );
     } catch (error) {

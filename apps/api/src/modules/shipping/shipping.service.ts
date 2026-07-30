@@ -23,7 +23,12 @@ import {
   shippingAmountForDesi,
   ShippingPackageTiersNotConfiguredError,
 } from "./shipping-tariff.helper";
-import { ShipmentStatus, OrderStatus } from "@prisma/client";
+import {
+  ShipmentStatus,
+  OrderStatus,
+  ShippingPackageTierCode,
+} from "@prisma/client";
+import { billableDesiForTier } from "./shipping-package-tier";
 
 @Injectable()
 export class ShippingService {
@@ -47,6 +52,44 @@ export class ShippingService {
     private readonly notificationService: NotificationService,
     private readonly shippingTariffs: ShippingTariffService,
   ) {}
+
+  /**
+   * Aktif tarifenin paket boyutları — ilan formunun radyo kartlarını besler.
+   *
+   * Satıcı desi girmez; boyut seçer. `billableDesi` (kademenin üst sınırı) net
+   * kazanç önizlemesi için döner, arayüzde gösterilmez. Aktif tarife yoksa
+   * fail-closed 503 gelir (ilan formu fiyat gösteremez).
+   */
+  async getPackageTiers(): Promise<{
+    tariffVersion: number;
+    tiers: Array<{
+      code: ShippingPackageTierCode;
+      label: string;
+      amount: number;
+      billableDesi: number;
+      minDesi: number;
+      maxDesi: number | null;
+      sampleWidth: number | null;
+      sampleHeight: number | null;
+      sampleLength: number | null;
+    }>;
+  }> {
+    const tariff = await this.shippingTariffs.getActiveOutboundTariff();
+    return {
+      tariffVersion: tariff.version,
+      tiers: tariff.packageTiers.map((tier) => ({
+        code: tier.code,
+        label: tier.label,
+        amount: Number(tier.amount),
+        billableDesi: billableDesiForTier(tier.code),
+        minDesi: tier.minDesi,
+        maxDesi: tier.maxDesi,
+        sampleWidth: tier.sampleWidth,
+        sampleHeight: tier.sampleHeight,
+        sampleLength: tier.sampleLength,
+      })),
+    };
+  }
 
   /**
    * Get list of available shipping carriers

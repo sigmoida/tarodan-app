@@ -8,12 +8,13 @@ import {
 import {
   Prisma,
   ShippingPackageTier,
+  ShippingPackageTierCode,
   ShippingTariff,
-  ShippingTariffRate,
   ShippingTariffStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
+import { SHIPPING_PACKAGE_TIER_ORDER } from "./shipping-package-tier";
 import {
   outboundPackageShipping,
   shippingAmountForDesi,
@@ -26,13 +27,23 @@ const DEFAULT_PROVIDER = "surat";
  * tarife döndürüp checkout'u fail-closed'a düşürmesini engeller.
  */
 const TARIFF_INCLUDE = {
-  rates: { orderBy: { desi: "asc" } },
   packageTiers: { orderBy: { sortOrder: "asc" } },
 } satisfies Prisma.ShippingTariffInclude;
 export type ShippingTariffWithRates = ShippingTariff & {
-  rates: ShippingTariffRate[];
   packageTiers: ShippingPackageTier[];
 };
+
+export interface ShippingPackageTierInput {
+  code: ShippingPackageTierCode;
+  label: string;
+  minDesi: number;
+  /** null = üst sınırsız; son kademe böyle olmalıdır. */
+  maxDesi: number | null;
+  amount: number;
+  sampleWidth?: number | null;
+  sampleHeight?: number | null;
+  sampleLength?: number | null;
+}
 
 export interface ShippingTariffInput {
   provider?: string;
@@ -43,7 +54,22 @@ export interface ShippingTariffInput {
   returnPackageFee?: number;
   tradeLegFee?: number;
   effectiveFrom?: Date | string;
-  rates?: Array<{ desi: number; amount: number }>;
+  packageTiers?: ShippingPackageTierInput[];
+}
+
+/** Kademe satırının yazılabilir alanları (create/update tek kaynak). */
+function tierCreateData(tier: ShippingPackageTierInput) {
+  return {
+    code: tier.code,
+    label: tier.label.trim(),
+    minDesi: tier.minDesi,
+    maxDesi: tier.maxDesi,
+    amount: tier.amount,
+    sampleWidth: tier.sampleWidth ?? null,
+    sampleHeight: tier.sampleHeight ?? null,
+    sampleLength: tier.sampleLength ?? null,
+    sortOrder: SHIPPING_PACKAGE_TIER_ORDER.indexOf(tier.code),
+  };
 }
 
 /**
@@ -165,7 +191,7 @@ export class ShippingTariffService {
   ): Promise<ShippingTariffWithRates> {
     const provider = input.provider ?? DEFAULT_PROVIDER;
     this.assertAmounts(input);
-    this.assertRates(input.rates);
+    this.assertPackageTiers(input.packageTiers);
     const last = await this.prisma.shippingTariff.findFirst({
       where: { provider },
       orderBy: { version: "desc" },
@@ -188,13 +214,8 @@ export class ShippingTariffService {
           : new Date(),
         createdBy: adminId,
         updatedBy: adminId,
-        rates: input.rates?.length
-          ? {
-              create: input.rates.map((rate) => ({
-                desi: rate.desi,
-                amount: rate.amount,
-              })),
-            }
+        packageTiers: input.packageTiers?.length
+          ? { create: input.packageTiers.map(tierCreateData) }
           : undefined,
       },
       include: TARIFF_INCLUDE,
@@ -214,7 +235,7 @@ export class ShippingTariffService {
       );
     }
     this.assertAmounts(input);
-    this.assertRates(input.rates);
+    this.assertPackageTiers(input.packageTiers);
     return this.prisma.$transaction(async (tx) => {
       await tx.shippingTariff.update({
         where: { id },
@@ -231,14 +252,13 @@ export class ShippingTariffService {
           updatedBy: adminId,
         },
       });
-      if (input.rates !== undefined) {
-        await tx.shippingTariffRate.deleteMany({ where: { tariffId: id } });
-        if (input.rates.length) {
-          await tx.shippingTariffRate.createMany({
-            data: input.rates.map((rate) => ({
+      if (input.packageTiers !== undefined) {
+        await tx.shippingPackageTier.deleteMany({ where: { tariffId: id } });
+        if (input.packageTiers.length) {
+          await tx.shippingPackageTier.createMany({
+            data: input.packageTiers.map((tier) => ({
               tariffId: id,
-              desi: rate.desi,
-              amount: rate.amount,
+              ...tierCreateData(tier),
             })),
           });
         }
@@ -248,6 +268,43 @@ export class ShippingTariffService {
         include: TARIFF_INCLUDE,
       });
     });
+  }
+
+  /**
+   * Aktif tarifeyi kademeleriyle yeni bir DRAFT'a kopyalar.
+   *
+   * Aktif tarife dokunulmazdır (fiyat değişimi yeni sürüm doğurur ve sipariş o
+   * sürümü snapshot'lar), ama bu kural olmadan admin her fiyat güncellemesinde üç
+   * kademeyi, aralıkları ve örnek ölçüleri sıfırdan girmek zorunda kalıyor. Klon
+   * bunu "düzenle" deneyimine çevirir: kopyala → tutarı değiştir → aktifleştir.
+   */
+  async cloneActive(
+    adminId: string,
+    provider = DEFAULT_PROVIDER,
+  ): Promise<ShippingTariffWithRates> {
+    const source = await this.getActiveTariff(provider);
+    return this.create(
+      {
+        provider,
+        name: `${source.name} (kopya)`,
+        outboundPackageFee: Number(source.outboundPackageFee),
+        freeShippingEnabled: source.freeShippingEnabled,
+        freeShippingThreshold: Number(source.freeShippingThreshold),
+        returnPackageFee: Number(source.returnPackageFee),
+        tradeLegFee: Number(source.tradeLegFee),
+        packageTiers: source.packageTiers.map((tier) => ({
+          code: tier.code,
+          label: tier.label,
+          minDesi: tier.minDesi,
+          maxDesi: tier.maxDesi,
+          amount: Number(tier.amount),
+          sampleWidth: tier.sampleWidth,
+          sampleHeight: tier.sampleHeight,
+          sampleLength: tier.sampleLength,
+        })),
+      },
+      adminId,
+    );
   }
 
   /**
@@ -266,20 +323,7 @@ export class ShippingTariffService {
       );
     }
     if (tariff.status === ShippingTariffStatus.active) return tariff;
-    if (!tariff.rates.length) {
-      throw new BadRequestException({
-        code: "SHIPPING_DESI_RATES_REQUIRED",
-        message:
-          "Desi tarifesi aktifleştirilmeden önce en az bir fiyat satırı girilmelidir.",
-      });
-    }
-    if (!tariff.rates.some((rate) => rate.desi === 1)) {
-      throw new BadRequestException({
-        code: "SHIPPING_ONE_DESI_RATE_REQUIRED",
-        message:
-          "Mevcut ürünlerin varsayılan desisi için 1 desi fiyatı tanımlanmalıdır.",
-      });
-    }
+    this.assertActivatableTiers(tariff.packageTiers);
 
     const activated = await this.prisma.$transaction(async (tx) => {
       // Archive current active FIRST so the partial-unique(active) index is satisfied.
@@ -343,26 +387,82 @@ export class ShippingTariffService {
     }
   }
 
-  private assertRates(
-    rates: Array<{ desi: number; amount: number }> | undefined,
+  /** Draft'a yazılabilir kademe şekli (aralık kapsaması aktifleştirmede denetlenir). */
+  private assertPackageTiers(
+    tiers: ShippingPackageTierInput[] | undefined,
   ): void {
-    if (rates === undefined) return;
-    const desiValues = new Set<number>();
-    for (const rate of rates) {
-      if (
-        !Number.isInteger(rate.desi) ||
-        rate.desi < 1 ||
-        !Number.isFinite(rate.amount) ||
-        rate.amount < 0 ||
-        desiValues.has(rate.desi)
-      ) {
+    if (tiers === undefined) return;
+    const codes = new Set<ShippingPackageTierCode>();
+    for (const tier of tiers) {
+      const invalid =
+        !Number.isInteger(tier.minDesi) ||
+        tier.minDesi < 0 ||
+        (tier.maxDesi != null &&
+          (!Number.isInteger(tier.maxDesi) || tier.maxDesi <= tier.minDesi)) ||
+        !Number.isFinite(tier.amount) ||
+        tier.amount < 0 ||
+        !tier.label?.trim() ||
+        codes.has(tier.code);
+      if (invalid) {
         throw new BadRequestException({
-          code: "INVALID_SHIPPING_DESI_RATE",
+          code: "INVALID_SHIPPING_PACKAGE_TIER",
           message:
-            "Desi değerleri pozitif ve benzersiz, tutarlar sıfır veya pozitif olmalıdır.",
+            "Paket boyutu aralıkları artan ve benzersiz, tutarlar sıfır veya pozitif olmalıdır.",
         });
       }
-      desiValues.add(rate.desi);
+      codes.add(tier.code);
+    }
+  }
+
+  /**
+   * Aktifleştirme guard'ı — kademe sözleşmesinin son savunması. Kademesiz, eksik,
+   * boşluklu, çakışan ya da son kademesi ÜST SINIRLI bir tarife aktifleşirse
+   * checkout bazı desiler için fiyat çözemez ve fail-closed 503 verir; yani satış
+   * durur. Bu yüzden aktifleşme anında TAM kapsama zorunludur.
+   */
+  private assertActivatableTiers(
+    tiers: Array<{
+      code: ShippingPackageTierCode;
+      minDesi: number;
+      maxDesi: number | null;
+      amount: Prisma.Decimal | number;
+    }>,
+  ): void {
+    const expected = SHIPPING_PACKAGE_TIER_ORDER;
+    const present = new Set(tiers.map((tier) => tier.code));
+    if (
+      tiers.length !== expected.length ||
+      expected.some((code) => !present.has(code))
+    ) {
+      throw new BadRequestException({
+        code: "SHIPPING_PACKAGE_TIERS_REQUIRED",
+        message:
+          "Tarife aktifleştirilmeden önce üç paket boyutunun (küçük, orta, büyük) tamamı tanımlanmalıdır.",
+      });
+    }
+
+    const ordered = expected.map((code) =>
+      tiers.find((tier) => tier.code === code)!,
+    );
+    // İlk kademe 0'dan başlar, her kademe öncekinin bittiği yerden devam eder
+    // (boşluk/çakışma yok), son kademe üst sınırsızdır → her desi fiyatlanır.
+    const invalidRanges =
+      ordered[0].minDesi !== 0 ||
+      ordered[ordered.length - 1].maxDesi != null ||
+      ordered.some(
+        (tier, index) =>
+          Number(tier.amount) < 0 ||
+          (index < ordered.length - 1 &&
+            (tier.maxDesi == null ||
+              tier.maxDesi <= tier.minDesi ||
+              ordered[index + 1].minDesi !== tier.maxDesi)),
+      );
+    if (invalidRanges) {
+      throw new BadRequestException({
+        code: "SHIPPING_PACKAGE_TIER_RANGES_INVALID",
+        message:
+          "Paket boyutu aralıkları 0'dan başlamalı, boşluksuz ve çakışmasız ilerlemeli, son boyut üst sınırsız olmalıdır.",
+      });
     }
   }
 }

@@ -206,14 +206,7 @@ async function seedShippingTariff(): Promise<void> {
       returnPackageFee: 29.99,
       tradeLegFee: 29.99,
       effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
-      rates: {
-        create: [
-          { desi: 1, amount: 130 },
-          { desi: 2, amount: 180 },
-          { desi: 3, amount: 230 },
-        ],
-      },
-      // Satıcıya gösterilen üç paket boyutu; fiyat bu satırlardan çözülür.
+      // Satıcıya gösterilen üç paket boyutu; kargo fiyatı bu satırlardan çözülür.
       packageTiers: {
         create: SHIPPING_PACKAGE_TIER_DEFAULTS.map((tier, index) => ({
           code: tier.code,
