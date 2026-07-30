@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
+import { isRejectableTestModeSuccess } from "./paytr-test-mode.guard";
+import { shouldDeferSupersededOidFailure } from "./paytr-superseded-oid.guard";
 import { PaymentProvider, PayTRCallbackDto } from "./dto";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
@@ -406,6 +408,22 @@ export class PaymentCallbackService {
       return "OK";
     }
 
+    // Prod'da test-modu BAŞARI bildirimini reddet: hash `test_mode`'u kapsamaz ve
+    // test modunda para hareketi olmaz → gerçek-hash'li bir test bildirimi siparişi
+    // sıfır gelirle tamamlayabilirdi.
+    if (
+      isRejectableTestModeSuccess({
+        nodeEnv: process.env.NODE_ENV,
+        status: dto.status,
+        testMode: parsed.testMode,
+      })
+    ) {
+      this.logger.error(
+        `PAYTR_TEST_MODE_CALLBACK_REJECTED merchant_oid=${dto.merchant_oid} — production ortamında test-modu başarı bildirimi; ödeme TAMAMLANMADI`,
+      );
+      return "OK";
+    }
+
     if (dto.status === "success") {
       // Y16: Hash geçerli (otantik PayTR) olsa bile tutarı doğrula. PayTR beklenenden
       // farklı bir tutar bildirirse (ör. kısmi capture veya gevşek eşleşme), siparişi
@@ -449,6 +467,28 @@ export class PaymentCallbackService {
         }
       }
     } else {
+      // Gecikmiş fail bildirimi ESKİ bir oid'e aitse ve o ödemede canlı bir 3DS
+      // çekimi sürüyorsa ertele: aksi halde attempt-1'in geç failed'i attempt-2
+      // uçarken siparişi iptal eder, attempt-2 başarısı CAS'ta `failed` görüp
+      // fulfillment'ı atlar ve alıcı parası çekilmiş halde manuel iadeye düşer.
+      const failWindowMin = parseInt(
+        this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
+        10,
+      );
+      const deferred = shouldDeferSupersededOidFailure({
+        callbackOid: dto.merchant_oid,
+        currentOid: payment.providerConversationId,
+        chargeLive: this.paymentCommon.isChargeLikelyLive(
+          payment.metadata,
+          failWindowMin,
+        ),
+      });
+      if (deferred) {
+        this.logger.warn(
+          `PayTR failed callback ERTELENDİ (superseded oid=${dto.merchant_oid}, current=${payment.providerConversationId}) — canlı çekim sürüyor`,
+        );
+        return "OK";
+      }
       await this.paymentFulfillment.processFailedPayment(
         payment,
         dto.failed_reason_msg || "PayTR payment failed",
