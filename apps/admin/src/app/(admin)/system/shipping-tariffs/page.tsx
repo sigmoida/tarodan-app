@@ -15,6 +15,7 @@ import {
   type ShippingTariff,
   type ShippingTariffStatus,
   STATUS_VARIANT,
+  tierRangeLabel,
 } from "./_lib/types";
 
 /**
@@ -40,6 +41,14 @@ export default function ShippingTariffsPage() {
     },
   );
 
+  // Aktif tarife dokunulmazdır (fiyat değişimi yeni sürüm doğurur). Klonlama, üç
+  // boyutu ve örnek ölçüleri sıfırdan girme zorunluluğunu kaldırır: kopyala →
+  // tutarı değiştir → aktifleştir.
+  const clone = useAdminMutation(() => adminApi.cloneActiveShippingTariff(), {
+    invalidates: ["shipping-tariffs"],
+    successMessage: t("admin.shippingTariffs.cloned"),
+  });
+
   const tariffs = query.data ?? [];
 
   const statusLabel = (s: ShippingTariffStatus) =>
@@ -60,9 +69,20 @@ export default function ShippingTariffsPage() {
             {t("admin.shippingTariffs.description")}
           </p>
         </div>
-        <Button onClick={() => setModal({})}>
-          {t("admin.shippingTariffs.new")}
-        </Button>
+        <div className="flex gap-2">
+          {tariffs.some((tariff) => tariff.status === "active") && (
+            <Button
+              variant="secondary"
+              isLoading={clone.isPending}
+              onClick={() => clone.mutate(undefined)}
+            >
+              {t("admin.shippingTariffs.cloneActive")}
+            </Button>
+          )}
+          <Button onClick={() => setModal({})}>
+            {t("admin.shippingTariffs.new")}
+          </Button>
+        </div>
       </div>
 
       {query.isLoading ? (
@@ -95,18 +115,16 @@ export default function ShippingTariffsPage() {
                   value={`${tariff.provider} · v${tariff.version}`}
                 />
                 <Row
-                  label={t("admin.shippingTariffs.ratesTitle")}
+                  label={t("admin.shippingTariffs.tiersTitle")}
                   value={
-                    tariff.rates?.length
-                      ? tariff.rates
+                    tariff.packageTiers?.length
+                      ? tariff.packageTiers
                           .map(
-                            (rate) =>
-                              `${rate.desi} desi: ${fmtTry(Number(rate.amount))}`,
+                            (tier) =>
+                              `${tier.label} (${tierRangeLabel(tier)}): ${fmtTry(Number(tier.amount))}`,
                           )
                           .join(" · ")
-                      : t("admin.shippingTariffs.legacyPackageFee", {
-                          amount: fmtTry(Number(tariff.outboundPackageFee)),
-                        })
+                      : "—"
                   }
                 />
                 <Row

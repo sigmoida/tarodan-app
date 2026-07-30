@@ -8,7 +8,11 @@ import {
   MaxLength,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { ProductStatus, ProductCondition } from "@prisma/client";
+import {
+  ProductStatus,
+  ProductCondition,
+  ShippingPackageTierCode,
+} from "@prisma/client";
 import { Type } from "class-transformer";
 import { IsNumber, Min } from "class-validator";
 
@@ -117,15 +121,14 @@ export class UpdateProductDto {
   quantity?: number | null;
 
   @ApiPropertyOptional({
-    example: 2,
-    description: "Kargoya hazır ürün paketinin desisi",
+    enum: ShippingPackageTierCode,
+    description:
+      "Paket boyutu düzeltmesi (moderasyon). Desi bu seçimden türetilir; " +
+      "satıcının yanlış boyut seçmesi kargo farkını platforma yıkar.",
   })
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  @Type(() => Number)
-  shippingDesi?: number;
+  @IsEnum(ShippingPackageTierCode)
+  shippingPackageTier?: ShippingPackageTierCode;
 
   @ApiPropertyOptional({ enum: ProductCondition, example: "new" })
   @IsOptional()

@@ -43,6 +43,11 @@ export interface CommissionRule {
   sellerPlatformFeeMin?: number | null;
   sellerPlatformFeeMax?: number | null;
   shippingBuyerShare?: number | null;
+  /** Paket boyutu başına kargo bölüşümü; satır yoksa shippingBuyerShare geçerlidir. */
+  shippingShares?: Array<{
+    tierCode: PackageTierCode;
+    buyerShare: number | string;
+  }>;
   priority?: number;
   isActive: boolean;
   createdAt: string;
@@ -109,6 +114,18 @@ export const isDefaultRule = (r: CommissionRule) =>
   r.isActive;
 
 const rateField = z.string().optional().default("");
+/** Kargo payı: boş = tek paya düş; dolu = 0–100 arası. */
+const shareField = z.string().optional().default("");
+
+/** Sabit üç paket boyutu — API'deki ShippingPackageTierCode ile aynı. */
+export const PACKAGE_TIER_CODES = ["small", "medium", "large"] as const;
+export type PackageTierCode = (typeof PACKAGE_TIER_CODES)[number];
+
+/** Kuralın bir boyut için kayıtlı payı; yoksa boş (tek paya düşer). */
+function tierShare(rule: CommissionRule, code: PackageTierCode): string {
+  const share = rule.shippingShares?.find((row) => row.tierCode === code);
+  return share ? String(share.buyerShare) : "";
+}
 
 /** Form schema — validation-only; strings are shaped to numbers/nulls in the mutationFn. */
 export const commissionSchema = (t: T) =>
@@ -137,6 +154,10 @@ export const commissionSchema = (t: T) =>
       sellerPlatformFeeMin: rateField,
       sellerPlatformFeeMax: rateField,
       shippingBuyerShare: z.string().optional().default("100"),
+      // Paket boyutu başına alıcı payı (%). Boş bırakılan boyut tek paya düşer.
+      shippingShareSmall: shareField,
+      shippingShareMedium: shareField,
+      shippingShareLarge: shareField,
       priority: z.number().default(0),
       isActive: z.boolean().default(true),
     })
@@ -201,6 +222,9 @@ export const emptyCommissionForm: CommissionFormValues = {
   sellerPlatformFeeMin: "",
   sellerPlatformFeeMax: "",
   shippingBuyerShare: "100",
+  shippingShareSmall: "",
+  shippingShareMedium: "",
+  shippingShareLarge: "",
   priority: 0,
   isActive: true,
 };
@@ -230,6 +254,9 @@ export function ruleToForm(rule: CommissionRule): CommissionFormValues {
     sellerPlatformFeeMin: s(rule.sellerPlatformFeeMin),
     sellerPlatformFeeMax: s(rule.sellerPlatformFeeMax),
     shippingBuyerShare: s(rule.shippingBuyerShare ?? 100),
+    shippingShareSmall: tierShare(rule, "small"),
+    shippingShareMedium: tierShare(rule, "medium"),
+    shippingShareLarge: tierShare(rule, "large"),
     priority: rule.priority ?? 0,
     isActive: rule.isActive,
   };
@@ -260,6 +287,18 @@ export function commissionFormToPayload(v: CommissionFormValues) {
     sellerPlatformFeeMin: num(v.sellerPlatformFeeMin),
     sellerPlatformFeeMax: num(v.sellerPlatformFeeMax),
     shippingBuyerShare: num(v.shippingBuyerShare),
+    // Yalnız DOLDURULAN boyutlar gönderilir; boş kalan boyut tek paya düşer.
+    shippingShares: PACKAGE_TIER_CODES.map((code) => ({
+      tierCode: code,
+      buyerShare: num(
+        v[
+          `shippingShare${code[0].toUpperCase()}${code.slice(1)}` as keyof CommissionFormValues
+        ] as string,
+      ),
+    })).filter(
+      (share): share is { tierCode: PackageTierCode; buyerShare: number } =>
+        share.buyerShare != null,
+    ),
     priority: v.priority,
     isActive: v.isActive,
   };

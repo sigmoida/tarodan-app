@@ -30,6 +30,7 @@ import {
   sellerTypes,
   taxpayerTypes,
   appliesToOptions,
+  type PackageTierCode,
 } from "../_lib/types";
 
 interface ShippingTariffSummary {
@@ -39,7 +40,13 @@ interface ShippingTariffSummary {
   version: number;
   status: "draft" | "active" | "archived";
   outboundPackageFee: number | string;
-  rates?: Array<{ desi: number; amount: number | string }>;
+  packageTiers?: Array<{
+    code: PackageTierCode;
+    label: string;
+    minDesi: number;
+    maxDesi: number | null;
+    amount: number | string;
+  }>;
 }
 
 /** rate% of amount, clamped by optional [min,max] TL. */
@@ -111,7 +118,7 @@ function BreakdownPreview() {
   const { watch } = useFormContext<CommissionFormValues>();
   const v = watch();
   const [price, setPrice] = useState("1000");
-  const [shippingDesi, setShippingDesi] = useState("1");
+  const [tierCode, setTierCode] = useState<PackageTierCode>("small");
   const [vat, setVat] = useState("20");
   const [withholding, setWithholding] = useState("1");
   const tariffsQuery = useQuery({
@@ -124,15 +131,12 @@ function BreakdownPreview() {
   const activeTariff = tariffsQuery.data?.find(
     (tariff) => tariff.status === "active",
   );
-  const rates = [...(activeTariff?.rates ?? [])].sort(
-    (left, right) => left.desi - right.desi,
-  );
-  const selectedRate =
-    rates.find((rate) => rate.desi === Number(shippingDesi)) ?? rates[0];
+  const tiers = activeTariff?.packageTiers ?? [];
+  const selectedTier = tiers.find((tier) => tier.code === tierCode) ?? tiers[0];
 
   const amount = parseFloat(price) || 0;
-  const shipping = selectedRate
-    ? Number(selectedRate.amount)
+  const shipping = selectedTier
+    ? Number(selectedTier.amount)
     : Number(activeTariff?.outboundPackageFee ?? 0);
   const vatRate = parseFloat(vat) || 0;
   const whRate = parseFloat(withholding) || 0;
@@ -161,9 +165,15 @@ function BreakdownPreview() {
     v.sellerPlatformFeeMin,
     v.sellerPlatformFeeMax,
   );
+  // Seçilen boyutun payı; o boyut boş bırakıldıysa kuralın tek payı geçerli.
+  const tierShareValue = {
+    small: v.shippingShareSmall,
+    medium: v.shippingShareMedium,
+    large: v.shippingShareLarge,
+  }[selectedTier?.code ?? "small"];
   const buyerShare = Math.min(
     100,
-    Math.max(0, parseFloat(v.shippingBuyerShare) || 0),
+    Math.max(0, parseFloat(tierShareValue || v.shippingBuyerShare) || 0),
   );
   const buyerShipping = Math.round(shipping * (buyerShare / 100) * 100) / 100;
   const sellerShipping = Math.round((shipping - buyerShipping) * 100) / 100;
@@ -181,6 +191,9 @@ function BreakdownPreview() {
 
   const buyerPays =
     amount + buyerCommission + buyerServiceFee + buyerShipping + saleVat;
+  // Sürat faturası platforma gelir: satıcının escrow'undan TAM kargo düşülür ve
+  // alıcının ödediği pay platformda kalıp taşıyıcı maliyetini karşılar. Satıcının
+  // ekonomik yükü kendi payı kadardır — önizleme bunu gösterir.
   const sellerReceives =
     amount +
     saleVat -
@@ -220,16 +233,15 @@ function BreakdownPreview() {
           onChange={(e) => setPrice(e.target.value)}
         />
         <Select
-          label={t("admin.finance.commission.exampleShippingDesi")}
-          value={selectedRate ? String(selectedRate.desi) : ""}
-          onChange={(event) => setShippingDesi(event.target.value)}
-          disabled={tariffsQuery.isLoading || rates.length === 0}
-          options={rates.map((rate) => ({
-            value: String(rate.desi),
-            label: t("admin.finance.commission.shippingDesiAmount", {
-              desi: rate.desi,
-              amount: fmtTry(Number(rate.amount)),
-            }),
+          label={t("admin.finance.commission.examplePackageTier")}
+          value={selectedTier?.code ?? ""}
+          onChange={(event) =>
+            setTierCode(event.target.value as PackageTierCode)
+          }
+          disabled={tariffsQuery.isLoading || tiers.length === 0}
+          options={tiers.map((tier) => ({
+            value: tier.code,
+            label: `${tier.label} — ${fmtTry(Number(tier.amount))}`,
           }))}
           placeholder={t("admin.finance.commission.noActiveShippingTariff")}
         />
@@ -466,7 +478,44 @@ export function CommissionRuleFormModal({
         />
       </div>
 
-      <div className="rounded-lg border border-border p-4">
+      <div className="space-y-3 rounded-lg border border-border p-4">
+        <div>
+          <h3 className="text-sm font-medium text-heading">
+            {t("admin.finance.commission.shippingSharesTitle")}
+          </h3>
+          <p className="text-xs text-muted">
+            {t("admin.finance.commission.shippingSharesHelper")}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <FormInput
+            name="shippingShareSmall"
+            label={t("admin.finance.commission.tierSmall")}
+            type="number"
+            step="1"
+            min="0"
+            max="100"
+            placeholder={t("admin.finance.commission.useSingleShare")}
+          />
+          <FormInput
+            name="shippingShareMedium"
+            label={t("admin.finance.commission.tierMedium")}
+            type="number"
+            step="1"
+            min="0"
+            max="100"
+            placeholder={t("admin.finance.commission.useSingleShare")}
+          />
+          <FormInput
+            name="shippingShareLarge"
+            label={t("admin.finance.commission.tierLarge")}
+            type="number"
+            step="1"
+            min="0"
+            max="100"
+            placeholder={t("admin.finance.commission.useSingleShare")}
+          />
+        </div>
         <FormInput
           name="shippingBuyerShare"
           label={t("admin.finance.commission.shippingBuyerShareLabel")}

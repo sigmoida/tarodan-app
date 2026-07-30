@@ -38,7 +38,10 @@ export class AdminCommissionService {
    */
   async getCommissionRules() {
     const rules = await this.prisma.commissionRule.findMany({
-      include: { category: { select: { id: true, name: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        shippingShares: true,
+      },
       orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
     });
 
@@ -173,6 +176,24 @@ export class AdminCommissionService {
     return data;
   }
 
+  /**
+   * Kademe paylarının yazılabilir hâli. Alan gönderilmediyse `undefined` döner ve
+   * mevcut satırlara DOKUNULMAZ; gönderildiyse tam liste ile değiştirilir (kısmi
+   * gönderim sessizce yarım yapılandırma bırakmasın).
+   */
+  private shippingSharesData(
+    dto: CreateCommissionRuleDto | UpdateCommissionRuleDto,
+  ) {
+    if (dto.shippingShares === undefined) return undefined;
+    return {
+      deleteMany: {},
+      create: dto.shippingShares.map((share) => ({
+        tierCode: share.tierCode,
+        buyerShare: share.buyerShare,
+      })),
+    };
+  }
+
   private serializeRule(rule: any) {
     const num = (v: any) => (v != null ? Number(v) : null);
     return {
@@ -204,6 +225,13 @@ export class AdminCommissionService {
       sellerPlatformFeeMin: num(rule.sellerPlatformFeeMin),
       sellerPlatformFeeMax: num(rule.sellerPlatformFeeMax),
       shippingBuyerShare: num(rule.shippingBuyerShare),
+      // Paket boyutu başına pay: admin formu bunları okur; satır yoksa tek pay geçerli.
+      shippingShares: (rule.shippingShares ?? []).map(
+        (share: { tierCode: string; buyerShare: unknown }) => ({
+          tierCode: share.tierCode,
+          buyerShare: Number(share.buyerShare),
+        }),
+      ),
       priority: rule.priority,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
@@ -271,12 +299,16 @@ export class AdminCommissionService {
         priority: dto.priority ?? 0,
         isActive: dto.isActive ?? true,
         ...this.v2RuleData(dto),
+        shippingShares: this.shippingSharesData(dto),
         // Legacy (backward compatibility)
         percentage: dto.percentage ?? (dto.sellerRate || 0),
         ruleType: dto.type || "default",
         minAmount: dto.minAmount,
       },
-      include: { category: { select: { id: true, name: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        shippingShares: true,
+      },
     });
 
     await this.audit.createRequiredAuditLog(
@@ -401,6 +433,8 @@ export class AdminCommissionService {
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
     // v2 fields (taxpayerType, maxAmount, 4 rate sets, shippingBuyerShare)
     Object.assign(updateData, this.v2RuleData(dto));
+    const shippingShares = this.shippingSharesData(dto);
+    if (shippingShares) updateData.shippingShares = shippingShares;
     // Legacy fields
     if (dto.percentage !== undefined) updateData.percentage = dto.percentage;
     if (dto.type !== undefined) updateData.ruleType = dto.type;
@@ -409,7 +443,10 @@ export class AdminCommissionService {
     const rule = await this.prisma.commissionRule.update({
       where: { id: ruleId },
       data: updateData,
-      include: { category: { select: { id: true, name: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        shippingShares: true,
+      },
     });
 
     await this.audit.createRequiredAuditLog(

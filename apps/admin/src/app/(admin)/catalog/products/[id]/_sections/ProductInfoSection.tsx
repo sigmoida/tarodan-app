@@ -3,7 +3,7 @@
 import {
   Badge,
   Button,
-  Input,
+  Select,
   productConditionConfig,
   enumLabel,
 } from "@tarodan/ui";
@@ -19,7 +19,11 @@ import {
 } from "@/lib/product-price";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import { aiCheckConfig, aiCheckKey } from "../../_lib/types";
-import type { ProductDetail } from "../_lib/types";
+import {
+  PACKAGE_TIER_OPTIONS,
+  type PackageTierCode,
+  type ProductDetail,
+} from "../_lib/types";
 
 function Row({
   label,
@@ -38,12 +42,20 @@ function Row({
 
 export function ProductInfoSection({ product }: { product: ProductDetail }) {
   const t = useTranslations();
-  const [shippingDesi, setShippingDesi] = useState(product.shippingDesi ?? 1);
-  const saveShippingDesi = useAdminMutation(
-    () => adminApi.updateProduct(product.id, { shippingDesi }),
+  // Moderasyon: satıcı yanlış boyut seçtiğinde (buzdolabına "Küçük Paket") kargo
+  // farkını platform üstlenir, çünkü Sürat faturası platforma gelir. Admin düzeltir;
+  // desi kademeden türetilir ve düzeltme denetim kaydına düşer.
+  const [packageTier, setPackageTier] = useState<PackageTierCode>(
+    product.shippingPackageTier ?? "small",
+  );
+  const savePackageTier = useAdminMutation(
+    () =>
+      adminApi.updateProduct(product.id, {
+        shippingPackageTier: packageTier,
+      }),
     {
       invalidates: ["products"],
-      successMessage: t("admin.catalog.products.shippingDesiUpdated"),
+      successMessage: t("admin.catalog.products.packageTierUpdated"),
     },
   );
 
@@ -128,40 +140,36 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
       </div>
       <div className="border-t border-border pt-3">
         <label
-          htmlFor="admin-product-shipping-desi"
+          htmlFor="admin-product-package-tier"
           className="text-sm text-muted"
         >
-          {t("admin.catalog.products.shippingDesi")}
+          {t("admin.catalog.products.packageTier")}
         </label>
         <div className="mt-1 flex max-w-sm items-center gap-2">
-          <Input
-            id="admin-product-shipping-desi"
-            type="number"
-            min={1}
-            max={1000}
-            step={1}
-            value={shippingDesi}
-            placeholder="1"
+          <Select
+            id="admin-product-package-tier"
+            value={packageTier}
             onChange={(event) =>
-              setShippingDesi(Math.max(1, Number(event.target.value) || 1))
+              setPackageTier(event.target.value as PackageTierCode)
             }
+            options={PACKAGE_TIER_OPTIONS.map((option) => ({
+              value: option.value,
+              label: t(option.labelKey),
+            }))}
           />
           <Button
             size="sm"
-            isLoading={saveShippingDesi.isPending}
-            disabled={
-              !Number.isInteger(shippingDesi) ||
-              shippingDesi < 1 ||
-              shippingDesi > 1000 ||
-              shippingDesi === product.shippingDesi
-            }
-            onClick={() => saveShippingDesi.mutate()}
+            isLoading={savePackageTier.isPending}
+            disabled={packageTier === (product.shippingPackageTier ?? "small")}
+            onClick={() => savePackageTier.mutate()}
           >
             {t("common.save")}
           </Button>
         </div>
         <p className="mt-1 text-xs text-muted">
-          {t("admin.catalog.products.shippingDesiHelper")}
+          {t("admin.catalog.products.packageTierHelper", {
+            desi: product.shippingDesi ?? 1,
+          })}
         </p>
       </div>
       {product.rejectionReason && (

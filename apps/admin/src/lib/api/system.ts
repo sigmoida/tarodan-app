@@ -30,6 +30,11 @@ export const systemApi = {
     api.patch(`/admin/shipping/tariffs/${id}`, data),
   activateShippingTariff: (id: string) =>
     api.post(`/admin/shipping/tariffs/${id}/activate`),
+  /** Aktif tarifeyi paket boyutlarıyla yeni bir taslağa kopyalar. */
+  cloneActiveShippingTariff: (provider?: string) =>
+    api.post("/admin/shipping/tariffs/clone-active", undefined, {
+      params: provider ? { provider } : {},
+    }),
 
   // Audit Logs
   getAuditLogs: (params?: any) => api.get("/admin/audit-logs", { params }),

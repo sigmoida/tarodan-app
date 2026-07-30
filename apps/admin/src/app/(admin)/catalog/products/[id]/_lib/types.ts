@@ -1,3 +1,16 @@
+/** Sabit üç paket boyutu — API'deki ShippingPackageTierCode ile aynı. */
+export type PackageTierCode = "small" | "medium" | "large";
+
+/** Kademe seçicisinin etiketleri (komisyon ekranındaki adlarla aynı anahtarlar). */
+export const PACKAGE_TIER_OPTIONS = [
+  { value: "small", labelKey: "admin.shippingTariffs.tierSmallName" },
+  { value: "medium", labelKey: "admin.shippingTariffs.tierMediumName" },
+  { value: "large", labelKey: "admin.shippingTariffs.tierLargeName" },
+] as const satisfies ReadonlyArray<{
+  value: PackageTierCode;
+  labelKey: string;
+}>;
+
 import { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -11,7 +24,10 @@ export interface ProductDetail {
   salePrice?: number | null;
   isOnSale?: boolean;
   quantity?: number;
+  /** Türetilmiş (kademenin üst sınırı) — yalnız admin görür. */
   shippingDesi: number;
+  /** Satıcının seçtiği paket boyutu; admin moderasyonla düzeltebilir. */
+  shippingPackageTier?: PackageTierCode;
   condition: string;
   modelCode?: string | null;
   color?: string | null;

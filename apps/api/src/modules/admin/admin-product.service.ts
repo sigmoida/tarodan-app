@@ -11,6 +11,7 @@ import { notifyWebRevalidate } from "../../common/revalidate";
 import { AdminAuditService } from "./admin-audit.service";
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
+import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import {
   AdminProductQueryDto,
   UpdateProductDto,
@@ -330,8 +331,12 @@ export class AdminProductService {
     if (dto.quantity !== undefined) {
       data.quantity = dto.quantity;
     }
-    if (dto.shippingDesi !== undefined) {
-      data.shippingDesi = dto.shippingDesi;
+    // Paket boyutu düzeltmesi (moderasyon): satıcı yanlış boyut seçtiğinde farkı
+    // platform üstleniyor, bu yüzden admin düzeltebilir. Desi kademeden TÜRETİLİR —
+    // ikisi ayrışırsa paket desisi toplamı yanlış kademeye düşer.
+    if (dto.shippingPackageTier !== undefined) {
+      data.shippingPackageTier = dto.shippingPackageTier;
+      data.shippingDesi = billableDesiForTier(dto.shippingPackageTier);
     }
     // Açıkça seçilen status admin'in override'ı olarak öncelikli — aksi halde
     // düzenleme formu quantity'yi de gönderdiğinden status her zaman miktardan
