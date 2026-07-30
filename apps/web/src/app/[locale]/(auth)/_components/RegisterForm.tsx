@@ -141,14 +141,6 @@ export function RegisterForm() {
           >
             {t("common.login")}
           </Link>
-          <span className="mt-3 block border-t border-border pt-3">
-            <Link
-              href="/register/business"
-              className="font-medium text-body hover:text-primary-600"
-            >
-              {t("auth.openBusinessAccount")}
-            </Link>
-          </span>
         </>
       }
     >

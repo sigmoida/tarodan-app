@@ -28,7 +28,7 @@ export function RegisterAccountTabs({
 
   return (
     <Tabs value={active}>
-      <TabsList className="grid w-full grid-cols-2 gap-0 rounded-none bg-surface p-1">
+      <TabsList className="grid w-full grid-cols-2 gap-0 rounded-lg bg-surface p-1">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -36,7 +36,7 @@ export function RegisterAccountTabs({
               key={item.id}
               value={item.id}
               asChild
-              className="min-h-11 rounded-none bg-transparent px-3 font-semibold text-muted shadow-none hover:bg-surface-elevated hover:text-heading data-[state=active]:!bg-primary-600 data-[state=active]:!text-inverted data-[state=active]:shadow-none"
+              className="min-h-11 rounded-lg bg-transparent px-3 font-semibold text-muted shadow-none hover:bg-surface-elevated hover:text-heading data-[state=active]:!bg-primary-600 data-[state=active]:!text-inverted data-[state=active]:shadow-none"
             >
               <Link href={item.href} className="flex items-center gap-2">
                 <Icon className="h-4 w-4" />
