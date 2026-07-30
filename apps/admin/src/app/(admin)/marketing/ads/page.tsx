@@ -12,6 +12,7 @@ import { ResourceList } from "@/components/list";
 import { clientListFetcher } from "@/lib/query/client-list";
 import {
   type Ad,
+  FILTER_ALL,
   positionFilterOptions,
   deviceFilterOptions,
 } from "./_lib/types";
@@ -50,16 +51,16 @@ export default function AdsPage() {
           (raw) => (Array.isArray(raw) ? raw : (raw?.data ?? [])),
           {
             // No searchFields → full-content search across all displayed columns (#378).
+            // Boş değer = filtre yok. `=== "all"` kaçışı KALDIRILDI: `all`
+            // gerçek bir cihaz hedefi ve süzülebilmeli (bkz. FILTER_ALL).
             filter: (a, p) =>
-              (!p.position ||
-                p.position === "all" ||
-                a.position === p.position) &&
-              (!p.device || p.device === "all" || a.deviceType === p.device),
+              (!p.position || a.position === p.position) &&
+              (!p.device || a.deviceType === p.device),
           },
         )}
         getRowId={(a) => a.id}
         syncUrl
-        initialFilters={{ position: "all", device: "all" }}
+        initialFilters={{ position: FILTER_ALL, device: FILTER_ALL }}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
