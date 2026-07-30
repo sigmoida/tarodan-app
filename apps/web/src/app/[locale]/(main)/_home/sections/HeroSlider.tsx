@@ -46,7 +46,14 @@ export default function HeroSlider() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-surface">
+    /*
+      Hero, sayfadaki diğer bölümlerle AYNI kabuk: yükseltilmiş yüzey + kenarlık
+      + yuvarlatma, yani `HomeSection`'ın kullandığı `SectionCard` görünümü.
+      Eskiden düz `bg-surface` üzerinde, kenarlıksız ve konteynerin kenarına
+      dayalıydı — kart dizisinin arasındaki tek yassı bölümdü. İç dolgu da
+      metni ve görseli diğer bölümlere göre bir kademe içeri alıyor.
+    */
+    <section className="overflow-hidden rounded-lg border border-border bg-surface-elevated">
       {/* Track: all slides in a row, shifted by translateX (dynamic → inline). */}
       <div
         className="flex touch-pan-y transition-transform duration-500 ease-premium"
@@ -56,17 +63,24 @@ export default function HeroSlider() {
       >
         {slides.map((slide, i) => (
           <div key={i} className="w-full flex-shrink-0">
-            <div className="py-24">
-              <div className="grid md:grid-cols-2 gap-12 items-center">
-                {/* Text */}
-                <div className={slide.imageRight ? "" : "md:order-2"}>
-                  <h1 className="text-3xl md:text-4xl lg:text-[3.25rem] font-bold text-heading font-display leading-[1.1] tracking-tight mb-6 whitespace-pre-line">
+            <div className="px-5 py-8 sm:px-8 md:px-10 md:py-14 lg:px-14 lg:py-16">
+              <div className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
+                {/*
+                  Sıralama: mobilde HER ZAMAN görsel üstte, metin altta — dar
+                  ekranda iki sütunluk "yan yana" kurgusunun bir karşılığı yok
+                  ve görselin altta kalması onu ekran dışına itiyordu.
+                  `md`'den itibaren slaytın kendi tarafı geçerli.
+                */}
+                <div
+                  className={`order-2 ${slide.imageRight ? "md:order-1" : "md:order-2"}`}
+                >
+                  <h1 className="mb-4 whitespace-pre-line font-display text-3xl font-bold leading-[1.1] tracking-tight text-heading md:mb-6 md:text-4xl lg:text-[3.25rem]">
                     {t(slide.titleKey)}
                   </h1>
-                  <p className="text-base md:text-lg text-muted mb-6 max-w-lg leading-relaxed">
+                  <p className="mb-6 max-w-lg text-base leading-relaxed text-muted md:text-lg">
                     {t(slide.subtitleKey)}
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <ButtonLink variant="primary" href={slide.cta1.href}>
                       {t(slide.cta1.labelKey)}
                     </ButtonLink>
@@ -75,18 +89,24 @@ export default function HeroSlider() {
                     </ButtonLink>
                   </div>
                 </div>
-                {/* Image */}
+
+                {/*
+                  Görsel mobilde de görünür. `hidden md:block` idi: dar ekranda
+                  hero yalnız metinden ibaret kalıp boş ve yarım duruyordu.
+                  Oran mobilde daha geniş (16/10) — 4/3 dikey alanın yarısını
+                  yiyip başlığı katlanın altına itiyordu.
+                */}
                 <div
-                  className={`relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden rounded-lg border border-border bg-surface-elevated ${
-                    slide.imageRight ? "" : "md:order-1"
+                  className={`relative order-1 aspect-[16/10] w-full overflow-hidden rounded-lg bg-surface md:aspect-[4/3] ${
+                    slide.imageRight ? "md:order-2" : "md:order-1"
                   }`}
                 >
                   <Image
                     src={slide.image}
                     alt={t("home.slider.imageAlt")}
                     fill
-                    sizes="(max-width: 768px) 0px, (max-width: 1024px) 400px, 512px"
-                    className="object-cover object-center rounded-lg"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 45vw, 560px"
+                    className="object-cover object-center"
                     priority={i === 0}
                     quality={90}
                     unoptimized={slide.image.startsWith("http")}
@@ -98,8 +118,9 @@ export default function HeroSlider() {
         ))}
       </div>
 
-      {/* Slide indicators */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+      {/* Slide indicators — akış içinde, kartın altında. Mutlak konumdayken
+          mobilde kısalan dolgu yüzünden içeriğin üstüne biniyordu. */}
+      <div className="flex justify-center gap-2 pb-6">
         {slides.map((_, index) => (
           <Button
             variant="secondary"
