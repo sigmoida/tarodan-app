@@ -18,6 +18,13 @@ import { isCatchAllCommissionRule } from "../order/order-commission.helper";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
 
+/**
+ * Bu sayıda DLQ (`dead`) outbox satırı biriktiğinde instance hazır-değil sayılır:
+ * otomatik kurtarılamayan para yan-etkileri var ve trafiği kesmek, sessizce
+ * devam etmekten iyidir.
+ */
+const OUTBOX_DEAD_READINESS_THRESHOLD = 20;
+
 export interface ServiceHealth {
   status: "healthy" | "unhealthy" | "degraded";
   latency?: number;
@@ -156,18 +163,40 @@ export class HealthService {
     );
   }
 
+  /**
+   * Outbox sağlığı. Bayat `processing` satırı bir ALARM'dır, trafiği kesme
+   * gerekçesi DEĞİLDİR: drain turu onu zaten `pending`'e geri alır, oysa /ready'yi
+   * düşürmek Traefik'in TÜM replikaları yükten çekmesine yol açıyordu — tek bir
+   * çökme sitewide 503'e dönüşüyor ve yeniden başlatmak bile düzeltmiyordu.
+   * Hazır-DEĞİL yalnızca kurtarılamayan birikme (DLQ eşiği) için verilir.
+   */
   private async checkOutbox(): Promise<boolean> {
     if (process.env.NODE_ENV !== "production") return true;
 
     try {
       const staleProcessingBefore = new Date(Date.now() - 5 * 60_000);
-      const staleProcessingCount = await this.prisma.outboxEvent.count({
-        where: {
-          status: "processing",
-          updatedAt: { lt: staleProcessingBefore },
-        },
-      });
-      return staleProcessingCount === 0;
+      const [staleProcessingCount, deadCount] = await Promise.all([
+        this.prisma.outboxEvent.count({
+          where: {
+            status: "processing",
+            updatedAt: { lt: staleProcessingBefore },
+          },
+        }),
+        this.prisma.outboxEvent.count({ where: { status: "dead" } }),
+      ]);
+
+      if (staleProcessingCount > 0) {
+        this.logger.error(
+          `OUTBOX_STALE_PROCESSING count=${staleProcessingCount} — kesintiye uğramış claim'ler bir sonraki drain turunda kurtarılacak`,
+        );
+      }
+      if (deadCount >= OUTBOX_DEAD_READINESS_THRESHOLD) {
+        this.logger.error(
+          `OUTBOX_DEAD_BACKLOG count=${deadCount} — otomatik kurtarılamayan yan-etkiler; manuel inceleme gerekir`,
+        );
+        return false;
+      }
+      return true;
     } catch (error) {
       this.logger.error("Outbox readiness check failed", error);
       return false;

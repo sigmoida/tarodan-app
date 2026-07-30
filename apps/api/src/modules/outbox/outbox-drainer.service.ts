@@ -51,8 +51,51 @@ export class OutboxDrainerService implements OnModuleInit {
     );
   }
 
+  private get staleProcessingMs(): number {
+    return parseInt(
+      this.config.get("OUTBOX_STALE_PROCESSING_MS") || `${5 * 60 * 1000}`,
+      10,
+    );
+  }
+
+  /**
+   * Bayat `processing` satırlarını `pending`'e geri alır.
+   *
+   * `pending → processing` claim'i DB tarafındadır; süreç işin ortasında çökerse
+   * satır kalıcı olarak `processing`'te kalır. Bull'un stall kurtarması bu claim'i
+   * GÖRMEZ, dolayısıyla para yan-etkisi (fulfillment yedeği, iade faturası ters
+   * kaydı, kargo iptali) bir daha hiç denenmez; ayrıca readiness kontrolü bayat
+   * satır yüzünden TÜM pod'larda /ready'yi düşürür (tek crash → sitewide 503).
+   *
+   * Handler'lar idempotent (at-least-once) olduğundan yeniden deneme güvenlidir.
+   * `attempts` artırılır ki sürekli çöken bir satır sonunda DLQ'ya düşsün.
+   */
+  async reclaimStaleProcessing(): Promise<number> {
+    const staleBefore = new Date(Date.now() - this.staleProcessingMs);
+    const reclaimed = await this.prisma.outboxEvent.updateMany({
+      where: {
+        status: OutboxStatus.processing,
+        updatedAt: { lt: staleBefore },
+      },
+      data: {
+        status: OutboxStatus.pending,
+        attempts: { increment: 1 },
+        nextAttemptAt: new Date(),
+      },
+    });
+    if (reclaimed.count > 0) {
+      this.logger.warn(
+        `OUTBOX_RECLAIMED count=${reclaimed.count} — kesintiye uğramış processing satırları yeniden kuyruğa alındı`,
+      );
+    }
+    return reclaimed.count;
+  }
+
   /** Gerçek iş — Bull processor buradan çağırır (bekleyen outbox olaylarını boşaltır). */
   async runDrain(log: (msg: string) => void = () => {}) {
+    // Önce kesintiye uğramış claim'leri kurtar; aksi halde bu satırlar hiçbir
+    // zaman `due` sorgusuna girmez ve yan-etkileri kalıcı olarak kaybolur.
+    const reclaimed = await this.reclaimStaleProcessing();
     const now = new Date();
     const due = await this.prisma.outboxEvent.findMany({
       where: { status: OutboxStatus.pending, nextAttemptAt: { lte: now } },
@@ -123,15 +166,16 @@ export class OutboxDrainerService implements OnModuleInit {
       }
     }
 
-    if (processed > 0 || retried > 0 || dead > 0) {
+    if (processed > 0 || retried > 0 || dead > 0 || reclaimed > 0) {
       this.logger.log(
-        `Outbox drain: ${processed} işlendi, ${retried} retry, ${dead} DLQ`,
+        `Outbox drain: ${processed} işlendi, ${retried} retry, ${dead} DLQ, ${reclaimed} reclaim`,
       );
     }
-    log(`Outbox: ${processed} işlendi · ${retried} retry · ${dead} DLQ`);
+    const summary = `${processed} işlendi · ${retried} retry · ${dead} DLQ · ${reclaimed} reclaim`;
+    log(`Outbox: ${summary}`);
     return {
-      summary: `${processed} işlendi · ${retried} retry · ${dead} DLQ`,
-      stats: { processed, retried, dead },
+      summary,
+      stats: { processed, retried, dead, reclaimed },
     };
   }
 }

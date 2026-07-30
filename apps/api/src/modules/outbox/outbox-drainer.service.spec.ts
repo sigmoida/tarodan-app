@@ -7,11 +7,18 @@ import { OutboxHandlerRegistry } from "./outbox-handler.registry";
 describe("OutboxDrainerService.runDrain", () => {
   const config = { get: jest.fn(() => undefined) } as any;
 
-  function makePrisma(rows: any[]) {
+  function makePrisma(rows: any[], staleReclaimed = 0) {
     return {
       outboxEvent: {
         findMany: jest.fn().mockResolvedValue(rows),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        // İki farklı updateMany çağrısı var: bayat `processing` satırlarını geri
+        // alan reclaim ve satır başına `pending → processing` CAS claim'i. Ayırt
+        // etmezsek reclaim sayacı yanlış okunur.
+        updateMany: jest.fn().mockImplementation(({ where }: any) =>
+          Promise.resolve({
+            count: where?.status === "processing" ? staleReclaimed : 1,
+          }),
+        ),
         update: jest.fn().mockResolvedValue({}),
       },
     } as any;
@@ -35,7 +42,12 @@ describe("OutboxDrainerService.runDrain", () => {
         data: expect.objectContaining({ status: "completed", lastError: null }),
       }),
     );
-    expect(r.stats).toEqual({ processed: 1, retried: 0, dead: 0 });
+    expect(r.stats).toEqual({
+      processed: 1,
+      retried: 0,
+      dead: 0,
+      reclaimed: 0,
+    });
   });
 
   it("handler hata + attempts<max → pending + backoff (attempts++)", async () => {
@@ -53,7 +65,12 @@ describe("OutboxDrainerService.runDrain", () => {
     expect(call.data.attempts).toBe(1);
     expect(call.data.nextAttemptAt).toBeInstanceOf(Date);
     expect(call.data.lastError).toContain("boom");
-    expect(r.stats).toEqual({ processed: 0, retried: 1, dead: 0 });
+    expect(r.stats).toEqual({
+      processed: 0,
+      retried: 1,
+      dead: 0,
+      reclaimed: 0,
+    });
   });
 
   it("handler hata + attempts son deneme → dead (DLQ)", async () => {
@@ -69,7 +86,12 @@ describe("OutboxDrainerService.runDrain", () => {
     const call = prisma.outboxEvent.update.mock.calls[0][0];
     expect(call.data.status).toBe("dead");
     expect(call.data.attempts).toBe(8);
-    expect(r.stats).toEqual({ processed: 0, retried: 0, dead: 1 });
+    expect(r.stats).toEqual({
+      processed: 0,
+      retried: 0,
+      dead: 1,
+      reclaimed: 0,
+    });
   });
 
   it("CAS claim kaybı (count=0) → handler çağrılmaz, atlanır", async () => {
@@ -86,7 +108,12 @@ describe("OutboxDrainerService.runDrain", () => {
 
     expect(handler).not.toHaveBeenCalled();
     expect(prisma.outboxEvent.update).not.toHaveBeenCalled();
-    expect(r.stats).toEqual({ processed: 0, retried: 0, dead: 0 });
+    expect(r.stats).toEqual({
+      processed: 0,
+      retried: 0,
+      dead: 0,
+      reclaimed: 0,
+    });
   });
 
   it("kayıtlı handler yoksa → hata gibi ele alınır (retry)", async () => {
@@ -101,6 +128,11 @@ describe("OutboxDrainerService.runDrain", () => {
     const call = prisma.outboxEvent.update.mock.calls[0][0];
     expect(call.data.status).toBe("pending");
     expect(call.data.lastError).toContain("handler yok");
-    expect(r.stats).toEqual({ processed: 0, retried: 1, dead: 0 });
+    expect(r.stats).toEqual({
+      processed: 0,
+      retried: 1,
+      dead: 0,
+      reclaimed: 0,
+    });
   });
 });
