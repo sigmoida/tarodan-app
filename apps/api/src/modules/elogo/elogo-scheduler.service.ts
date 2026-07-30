@@ -42,7 +42,10 @@ export class ElogoSchedulerService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`eLogo retry cron hatası: ${err?.message}`);
       log(`HATA: ${err?.message}`);
-      return { summary: `Hata: ${err?.message}`, stats: { errors: 1 } };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw err;
     }
   }
 }

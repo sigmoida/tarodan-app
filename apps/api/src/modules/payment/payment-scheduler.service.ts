@@ -2,6 +2,10 @@ import { Injectable, Logger, Optional, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
+import {
+  createCronStepRunner,
+  type CronStepRunner,
+} from "../../monitoring/cron-step-runner";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PaymentService } from "./payment.service";
 import { ProductLockService } from "../product/product-lock.service";
@@ -59,20 +63,26 @@ export class PaymentSchedulerService implements OnModuleInit {
   // İzleme: runHandleExpiredPayments her adımı bu log'a yazar (Bull "Kayıtlar").
   // Bull processor'ı tek tek (concurrency 1) işlediği için instance alanı güvenli.
   private stepLog: (msg: string) => void = () => {};
+  /**
+   * Aktif turun adım koşucusu. Adım izolasyonu korunur ama tur sonunda başarısız
+   * adım varsa hata fırlatılır — aksi halde her PayTR çağrısının patladığı bir tur
+   * bile "başarılı" görünür ve Bull retry'ı / Sentry Cron alarmı hiç tetiklenmez.
+   */
+  private steps: CronStepRunner = createCronStepRunner({ logger: this.logger });
+
+  private beginRun(log: (msg: string) => void): CronStepRunner {
+    this.stepLog = log;
+    this.steps = createCronStepRunner({ logger: this.logger, log });
+    return this.steps;
+  }
 
   private async runStep(name: string, fn: () => Promise<void>): Promise<void> {
-    try {
-      await fn();
-      this.stepLog(`✓ ${name}`);
-    } catch (error: any) {
-      this.logger.error(`Step "${name}" failed: ${error.message}`, error.stack);
-      this.stepLog(`✗ ${name}: ${error.message}`);
-    }
+    await this.steps.step(name, fn);
   }
 
   /** Gerçek iş — Bull processor 'payment-expired' buradan çağırır. */
   async runHandleExpiredPayments(log: (msg: string) => void = () => {}) {
-    this.stepLog = log;
+    const steps = this.beginRun(log);
     this.logger.log("Checking for expired reservations and payments...");
 
     await this.runStep("reconcilePendingPaytrPayments", async () => {
@@ -206,6 +216,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     });
 
     this.stepLog = () => {};
+    steps.assertAllStepsSucceeded();
     return { summary: "Süre dolumu bakım turu tamamlandı (9 adım)", stats: {} };
   }
 
@@ -214,7 +225,7 @@ export class PaymentSchedulerService implements OnModuleInit {
    */
   /** Gerçek iş — Bull processor 'payment-release-holds' buradan çağırır. */
   async runHandleReleaseHoldsDue(log: (msg: string) => void = () => {}) {
-    this.stepLog = log;
+    const steps = this.beginRun(log);
     this.logger.log("Checking for payment holds due for release...");
 
     let releasedHolds = 0;
@@ -252,6 +263,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     }
 
     this.stepLog = () => {};
+    steps.assertAllStepsSucceeded();
     return {
       summary: `${releasedHolds} hold serbest · ${payoutsCreated} payout oluşturuldu`,
       stats: { releasedHolds, tradeCash, payoutsCreated },
@@ -291,7 +303,8 @@ export class PaymentSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { errors: 1 } };
+      // Yut MA: Bull job'ı "failed" olsun ki retry + Sentry Cron alarmı çalışsın.
+      throw error;
     }
   }
 }

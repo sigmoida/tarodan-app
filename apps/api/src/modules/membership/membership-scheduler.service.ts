@@ -82,10 +82,10 @@ export class MembershipSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return {
-        summary: `Hata: ${error.message}`,
-        stats: { downgraded: 0, errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 
@@ -194,12 +194,10 @@ export class MembershipSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return {
-        sent: 0,
-        error: error.message,
-        summary: `Hata: ${error.message}`,
-        stats: { sent: 0, errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 
@@ -325,13 +323,10 @@ export class MembershipSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return {
-        sevenDayReminders: 0,
-        oneDayReminders: 0,
-        error: error.message,
-        summary: `Hata: ${error.message}`,
-        stats: { errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 
@@ -367,11 +362,10 @@ export class MembershipSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return {
-        renewed: 0,
-        summary: `Hata: ${error.message}`,
-        stats: { errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 
