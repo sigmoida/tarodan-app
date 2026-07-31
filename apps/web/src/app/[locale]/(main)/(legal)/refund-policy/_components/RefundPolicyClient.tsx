@@ -1,6 +1,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useLocale, useTranslations } from "next-intl";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
@@ -106,20 +107,26 @@ export default function RefundPolicyClient() {
       </SectionCard>
 
       <div className="flex flex-wrap gap-4">
-        <Link href="/terms" className="text-primary-500 hover:underline">
-          Kullanım Şartları →
+        <Link
+          href="/terms"
+          className="inline-flex items-center text-primary-500 hover:underline"
+        >
+          Kullanım Şartları
+          <ChevronRightIcon className="ml-1 h-4 w-4" />
         </Link>
         <Link
           href="/returns-exchanges"
-          className="text-primary-500 hover:underline"
+          className="inline-flex items-center text-primary-500 hover:underline"
         >
-          İade ve Değişim (Bilgi) →
+          İade ve Değişim (Bilgi)
+          <ChevronRightIcon className="ml-1 h-4 w-4" />
         </Link>
         <Link
           href="/buyer-protection"
-          className="text-primary-500 hover:underline"
+          className="inline-flex items-center text-primary-500 hover:underline"
         >
-          Alıcı Koruma →
+          Alıcı Koruma
+          <ChevronRightIcon className="ml-1 h-4 w-4" />
         </Link>
       </div>
     </DocPage>

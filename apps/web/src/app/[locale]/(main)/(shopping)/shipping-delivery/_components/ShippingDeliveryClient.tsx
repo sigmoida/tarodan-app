@@ -1,6 +1,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useLocale, useTranslations } from "next-intl";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
@@ -44,7 +45,8 @@ export default function ShippingDeliveryClient() {
               href="/track-order"
               className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700"
             >
-              {t("information.shipping.trackLink")} →
+              {t("information.shipping.trackLink")}
+              <ChevronRightIcon className="h-4 w-4" />
             </Link>
           </section>
         </div>

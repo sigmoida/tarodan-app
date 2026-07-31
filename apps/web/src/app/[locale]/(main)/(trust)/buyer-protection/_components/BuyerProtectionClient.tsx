@@ -1,4 +1,5 @@
 import { Link } from "@/i18n/navigation";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
@@ -38,14 +39,14 @@ export default async function BuyerProtectionClient() {
             Cayma hakkı ve standart iade koşulları için{" "}
             <Link
               href="/refund-policy"
-              className="text-primary-500 hover:underline"
+              className="inline-flex items-center text-primary-500 hover:underline"
             >
               İade Politikası
             </Link>{" "}
             ve{" "}
             <Link
               href="/returns-exchanges"
-              className="text-primary-500 hover:underline"
+              className="inline-flex items-center text-primary-500 hover:underline"
             >
               İade ve Değişim
             </Link>{" "}
@@ -108,18 +109,24 @@ export default async function BuyerProtectionClient() {
         <div className="mt-8 flex flex-wrap gap-4">
           <Link
             href="/refund-policy"
-            className="text-primary-500 hover:underline"
+            className="inline-flex items-center text-primary-500 hover:underline"
           >
-            İade Politikası →
+            İade Politikası
+            <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
           <Link
             href="/returns-exchanges"
-            className="text-primary-500 hover:underline"
+            className="inline-flex items-center text-primary-500 hover:underline"
           >
-            İade ve Değişim →
+            İade ve Değişim
+            <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
-          <Link href="/terms" className="text-primary-500 hover:underline">
-            Kullanım Şartları →
+          <Link
+            href="/terms"
+            className="inline-flex items-center text-primary-500 hover:underline"
+          >
+            Kullanım Şartları
+            <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
         </div>
       </SectionCard>

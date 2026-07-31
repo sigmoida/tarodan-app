@@ -3,6 +3,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner } from "@tarodan/ui";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { PRODUCT_PLACEHOLDER } from "../_lib/add-item";
@@ -30,10 +31,11 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
       </p>
       <Link
         href="/listings/new"
-        className="text-sm font-medium text-primary-500 hover:text-primary-600"
+        className="inline-flex items-center text-sm font-medium text-primary-500 hover:text-primary-600"
         onClick={close}
       >
-        {t("collection.createNewListing")} →
+        {t("collection.createNewListing")}
+        <ChevronRightIcon className="ml-1 h-4 w-4" />
       </Link>
     </div>
   ) : (
