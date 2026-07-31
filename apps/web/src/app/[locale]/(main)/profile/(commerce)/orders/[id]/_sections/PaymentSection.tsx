@@ -28,8 +28,18 @@ import {
 } from "../_hooks/useOrderDetail";
 import { orderAmountOf, type OrderDetail } from "../_lib/types";
 
-/** Ödeme bekleyen alıcı: adres seç/ekle + güvenli ödeme akışı. */
-export default function PaymentSection({ order }: { order: OrderDetail }) {
+/**
+ * Ödeme bekleyen alıcı: adres seç/ekle + güvenli ödeme akışı. Grup üyesi
+ * siparişte tahsilat SEPETİN TAMAMI için yapılır (backend tekil isteği gruba
+ * yönlendirir) — groupTotal verildiğinde buton grup toplamını gösterir.
+ */
+export default function PaymentSection({
+  order,
+  groupTotal,
+}: {
+  order: OrderDetail;
+  groupTotal?: number;
+}) {
   const t = useTranslations();
   const isPendingPaymentBuyer =
     order.isBuyer && order.status === "pending_payment";
@@ -95,7 +105,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
 
   if (!isPendingPaymentBuyer) return null;
 
-  const orderAmount = orderAmountOf(order);
+  const payAmount = groupTotal ?? orderAmountOf(order);
   const busy = setAddressAndPay.isPending;
 
   const handlePay = () =>
@@ -286,9 +296,12 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
 
           <div className="p-4 bg-surface border border-border rounded-lg flex items-start gap-3">
             <ShieldCheckIcon className="w-5 h-5 text-success-500 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-muted">
-              {t("order.securePaymentNotice")}
-            </p>
+            <div className="text-sm text-muted">
+              <p>{t("order.securePaymentNotice")}</p>
+              {groupTotal != null && (
+                <p className="mt-1">{t("order.groupPaymentNotice")}</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -313,7 +326,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
             <ShieldCheckIcon className="w-5 h-5" />
             {busy
               ? t("checkout.processing")
-              : `${t("payment.pay")} – ${formatTL(orderAmount)}`}
+              : `${t("payment.pay")} – ${formatTL(payAmount)}`}
           </Button>
         </div>
       </div>

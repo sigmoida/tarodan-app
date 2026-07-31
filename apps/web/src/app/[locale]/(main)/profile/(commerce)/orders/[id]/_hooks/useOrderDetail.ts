@@ -22,6 +22,45 @@ import type {
   SellerInvoiceStatus,
 } from "../_lib/types";
 
+/**
+ * Grup çatısı görünümü: order id sunucuda grubuna çözülür (grupsuz sipariş =
+ * sentetik tek siparişlik grup). Aynı 'order' resource anahtarı kullanılır ki
+ * mevcut invalidation'lar (iptal/iade/onay) bu sorguyu da tazelesin.
+ */
+export function useOrderGroupQuery(orderId: string, enabled: boolean) {
+  return useWebItem<import("../../_lib/types").ServerOrderGroup>({
+    resource: "order",
+    id: orderId,
+    fetcher: async (id) => {
+      const response = await api.get(`/orders/${id}/group`);
+      const data = response.data?.data ?? response.data;
+      if (!data || typeof data !== "object" || !Array.isArray(data.orders)) {
+        throw new Error("Invalid order group response");
+      }
+      return data;
+    },
+    enabled: !!orderId && enabled,
+    query: { meta: { page: "order-detail" }, retry: false },
+  });
+}
+
+/** Alıcı teslimatı onaylar: delivered → confirm, 48s penceresi → confirm-receipt. */
+export function useConfirmDelivery() {
+  const t = useTranslations();
+  return useWebMutation(
+    async ({ orderId, early }: { orderId: string; early: boolean }) => {
+      await api.post(
+        `/orders/${orderId}/${early ? "confirm-receipt" : "confirm"}`,
+      );
+    },
+    {
+      invalidates: ["order", "orders", "orders-counts"],
+      errorMessage: t("order.confirmDeliveryFailed"),
+      onSuccess: () => toast.success(t("order.deliveryConfirmed")),
+    },
+  );
+}
+
 /** The order itself — resource 'order' → detail key ['order', 'detail', orderId]. */
 export function useOrderQuery(orderId: string, enabled: boolean) {
   return useWebItem<OrderDetail>({

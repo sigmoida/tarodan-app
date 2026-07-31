@@ -23,6 +23,7 @@ export function getDisplayStatus(
     preparing: t("order.statusProcessing"),
     shipped: t("order.statusShipped"),
     delivered: t("order.statusDelivered"),
+    awaiting_buyer_confirmation: t("order.statusAwaitingConfirmation"),
     completed: t("order.statusCompleted"),
     cancelled: t("order.statusCancelled"),
     refund_requested: t("order.refundStarted"),

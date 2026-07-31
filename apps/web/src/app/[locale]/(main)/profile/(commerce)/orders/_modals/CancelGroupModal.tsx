@@ -5,29 +5,36 @@
 import { useEffect, useState } from "react";
 import { Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { useCancelOrder } from "../_hooks/useOrders";
+import { useCancelGroup, useCancelOrder } from "../_hooks/useOrders";
 import type { OrderCancellationReason } from "@/lib/api/orders";
+import type { ServerOrderGroup } from "../_lib/types";
 
-interface CancelOrderModalProps {
-  order: { id: string } | null;
+interface CancelGroupModalProps {
+  group: ServerOrderGroup | null;
   onClose: () => void;
 }
 
-/** Structured pre-shipment cancellation shared by list and detail pages. */
-export default function CancelOrderModal({
-  order,
+/**
+ * GRUP iptali (R4): iptal SEPET bazındadır — modal grubun tamamını iptal eder
+ * (kısmi iptal yok). Sentetik (grupsuz) tek siparişte tekil iptal ucuna düşer.
+ * Liste kartı ve grup detay ekranı aynı modalı paylaşır.
+ */
+export default function CancelGroupModal({
+  group,
   onClose,
-}: CancelOrderModalProps) {
+}: CancelGroupModalProps) {
   const t = useTranslations();
   const [reasonCode, setReasonCode] =
     useState<OrderCancellationReason>("changed_mind");
   const [reason, setReason] = useState("");
-  const cancelMutation = useCancelOrder();
+  const cancelGroup = useCancelGroup();
+  const cancelOrder = useCancelOrder();
+  const isPending = cancelGroup.isPending || cancelOrder.isPending;
 
   useEffect(() => {
     setReason("");
     setReasonCode("changed_mind");
-  }, [order?.id]);
+  }, [group?.id]);
 
   const presets = [
     {
@@ -51,33 +58,53 @@ export default function CancelOrderModal({
   ] satisfies Array<{ value: OrderCancellationReason; label: string }>;
 
   const submit = () => {
-    if (!order) return;
-    cancelMutation.mutate(
-      { orderId: order.id, reasonCode, reason },
-      { onSuccess: onClose },
-    );
+    if (!group) return;
+    if (group.kind === "group") {
+      cancelGroup.mutate(
+        { groupId: group.id, reasonCode, reason },
+        { onSuccess: onClose },
+      );
+    } else {
+      const orderId = group.orders[0]?.id;
+      if (!orderId) return;
+      cancelOrder.mutate(
+        { orderId, reasonCode, reason },
+        { onSuccess: onClose },
+      );
+    }
   };
+
+  const isMulti = (group?.orders.length ?? 0) > 1;
 
   return (
     <Modal
-      isOpen={!!order}
+      isOpen={!!group}
       onClose={onClose}
-      title={t("order.cancelOrder")}
+      title={isMulti ? t("order.cancelGroupTitle") : t("order.cancelOrder")}
       description={t("order.cancelRefundNotice")}
       size="md"
       closeLabel={t("common.close")}
-      dismissDisabled={cancelMutation.isPending}
+      dismissDisabled={isPending}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={submit}
           cancelLabel={t("order.keepOrder")}
-          confirmLabel={t("order.cancelOrder")}
+          confirmLabel={
+            isMulti ? t("order.cancelGroupTitle") : t("order.cancelOrder")
+          }
           destructive
-          isLoading={cancelMutation.isPending}
+          isLoading={isPending}
         />
       }
     >
+      {isMulti && (
+        <p className="mb-3 text-sm font-medium text-danger-600">
+          {t("order.cancelGroupAllNotice", {
+            count: group?.orders.length ?? 0,
+          })}
+        </p>
+      )}
       <Select
         value={reasonCode}
         onChange={(event) =>

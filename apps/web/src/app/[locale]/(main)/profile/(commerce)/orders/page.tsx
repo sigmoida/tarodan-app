@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
+import { Pagination, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { EmptyStateCard } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
@@ -11,22 +11,21 @@ import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useTranslations } from "next-intl";
 import {
-  useOrders,
+  useOrderGroups,
   useOrderCounts,
   useInvoiceDownload,
   useReorder,
 } from "./_hooks/useOrders";
 import {
-  groupOrders,
   type Order,
   type OrderRole,
   type OrderStatusFilter,
+  type ServerOrderGroup,
 } from "./_lib/types";
 import { type OrderActionHandlers } from "./_components/OrderActions";
 import OrderGroupCard from "./_components/OrderGroupCard";
 import ReviewModal from "./_modals/ReviewModal";
-import ShippingModal from "./_modals/ShippingModal";
-import CancelOrderModal from "./_modals/CancelOrderModal";
+import CancelGroupModal from "./_modals/CancelGroupModal";
 
 export default function OrdersPage() {
   const searchParams = useSearchParams();
@@ -35,24 +34,25 @@ export default function OrdersPage() {
   const user = useAuthStore((s) => s.user);
 
   const initialRole = (
-    ["buyer", "seller", "all"].includes(searchParams.get("filter") || "")
-      ? searchParams.get("filter")
-      : "buyer"
+    searchParams.get("filter") === "seller" ? "seller" : "buyer"
   ) as OrderRole;
   const [role, setRole] = useState<OrderRole>(initialRole);
   const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>("active");
+  const [page, setPage] = useState(1);
 
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
-  const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
-  const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
+  const [cancelGroup, setCancelGroup] = useState<ServerOrderGroup | null>(null);
 
   const enabled = ready;
-  const { orders, isLoading } = useOrders(role, statusFilter, enabled);
+  const { groups, meta, isLoading } = useOrderGroups(
+    role,
+    statusFilter,
+    page,
+    enabled,
+  );
   const counts = useOrderCounts(enabled);
   const { downloadingId, download } = useInvoiceDownload();
   const reorder = useReorder();
-
-  const groups = groupOrders(orders);
 
   const roleTabs: { value: OrderRole; label: string }[] = [
     {
@@ -60,10 +60,6 @@ export default function OrdersPage() {
       label: `${t("profile.totalPurchases")} (${counts.buyer})`,
     },
     { value: "seller", label: `${t("profile.totalSales")} (${counts.seller})` },
-    {
-      value: "all",
-      label: `${t("common.all")} (${counts.buyer + counts.seller})`,
-    },
   ];
   const statusTabs: { value: OrderStatusFilter; label: string }[] = [
     { value: "active", label: t("product.statusActive") },
@@ -71,15 +67,21 @@ export default function OrdersPage() {
     { value: "refunds", label: t("order.filterRefunds") },
   ];
 
+  const emptyTitle =
+    statusFilter === "cancelled"
+      ? t("order.emptyCancelled")
+      : statusFilter === "refunds"
+        ? t("order.emptyRefunds")
+        : role === "seller"
+          ? t("order.emptySales")
+          : t("order.noOrders");
+
   const actions: OrderActionHandlers = {
     role,
     userEmail: user?.email,
     downloadingId,
-    cancellingId: null,
     onInvoice: download,
     onReorder: reorder,
-    onCancel: setCancelModalOrder,
-    onShip: (order) => setShippingOrderId(order.id),
     onReview: setReviewingOrder,
   };
 
@@ -99,7 +101,13 @@ export default function OrdersPage() {
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs value={role} onValueChange={(v) => setRole(v as OrderRole)}>
+        <Tabs
+          value={role}
+          onValueChange={(v) => {
+            setRole(v as OrderRole);
+            setPage(1);
+          }}
+        >
           <TabsList className="flex flex-wrap">
             {roleTabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>
@@ -110,7 +118,10 @@ export default function OrdersPage() {
         </Tabs>
         <Tabs
           value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as OrderStatusFilter)}
+          onValueChange={(v) => {
+            setStatusFilter(v as OrderStatusFilter);
+            setPage(1);
+          }}
         >
           <TabsList className="flex flex-wrap">
             {statusTabs.map((tab) => (
@@ -126,32 +137,46 @@ export default function OrdersPage() {
         <div className="flex justify-center py-12">
           <Spinner size="xl" />
         </div>
-      ) : orders.length === 0 ? (
+      ) : groups.length === 0 ? (
         <EmptyStateCard
-          title={t("order.noOrders")}
+          title={emptyTitle}
           action={
-            <ButtonLink href="/listings">{t("cart.browseListings")}</ButtonLink>
+            role === "buyer" && statusFilter === "active" ? (
+              <ButtonLink href="/listings">
+                {t("cart.browseListings")}
+              </ButtonLink>
+            ) : undefined
           }
         />
       ) : (
-        <div className="space-y-4">
-          {groups.map((group) => (
-            <OrderGroupCard key={group.key} group={group} actions={actions} />
-          ))}
-        </div>
+        <>
+          <div className="space-y-4">
+            {groups.map((group) => (
+              <OrderGroupCard
+                key={group.id}
+                group={group}
+                actions={actions}
+                onCancelGroup={setCancelGroup}
+              />
+            ))}
+          </div>
+          <Pagination
+            page={meta.page}
+            pageSize={meta.limit}
+            total={meta.total}
+            onPageChange={setPage}
+            className="mt-6"
+          />
+        </>
       )}
 
       <ReviewModal
         order={reviewingOrder}
         onClose={() => setReviewingOrder(null)}
       />
-      <ShippingModal
-        orderId={shippingOrderId}
-        onClose={() => setShippingOrderId(null)}
-      />
-      <CancelOrderModal
-        order={cancelModalOrder}
-        onClose={() => setCancelModalOrder(null)}
+      <CancelGroupModal
+        group={cancelGroup}
+        onClose={() => setCancelGroup(null)}
       />
     </PageShell>
   );

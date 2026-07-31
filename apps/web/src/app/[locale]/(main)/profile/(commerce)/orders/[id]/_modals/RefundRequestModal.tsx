@@ -1,7 +1,7 @@
 "use client";
 
 import { Input, Modal, Select, Textarea } from "@/components/ui";
-import { ModalFooter } from "@tarodan/ui";
+import { IconButton, ModalFooter } from "@tarodan/ui";
 import { useMutation } from "@tanstack/react-query";
 import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
 import { useTranslations } from "next-intl";
@@ -272,13 +272,16 @@ export default function RefundRequestModal({
                     alt=""
                     className="w-full h-full object-cover"
                   />
-                  <button
+                  <IconButton
                     type="button"
+                    size="xs"
+                    variant="ghost"
+                    aria-label={t("common.delete")}
                     onClick={() => removeEvidence(idx)}
-                    className="absolute top-0 right-0 bg-danger-500 text-inverted rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs"
+                    className="absolute right-0 top-0 h-5 w-5 rounded-bl-lg bg-danger-500 text-inverted"
                   >
                     ×
-                  </button>
+                  </IconButton>
                 </div>
               ))}
               {evidenceFiles.length < 5 && (

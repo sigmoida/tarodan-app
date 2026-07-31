@@ -6,48 +6,63 @@ import { useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { api, ratingsApi, mediaApi } from "@/lib/api";
+import { api, ordersApi, ratingsApi, mediaApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useCart } from "@/hooks/useCart";
 import { useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
-import type { Order, OrderRole, OrderStatusFilter } from "../_lib/types";
+import type {
+  Order,
+  OrderRole,
+  OrderStatusFilter,
+  ServerOrderGroup,
+} from "../_lib/types";
 import { getOrderProductId } from "../_lib/types";
 
-/** Orders for the active role + status filter. */
-export function useOrders(
+/**
+ * Grup çatısı listesi: sayfalama SUNUCUDA grup bazında yapılır — sepet iki
+ * sayfaya bölünmez, toplamlar filtreden değil satın almanın tamamından gelir.
+ */
+export function useOrderGroups(
   role: OrderRole,
   statusFilter: OrderStatusFilter,
+  page: number,
   enabled: boolean,
 ) {
-  const query = useWebList<Order[]>({
+  const query = useWebList<{
+    data: ServerOrderGroup[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }>({
     resource: "orders",
-    params: [role, statusFilter],
+    params: [role, statusFilter, page],
     fetcher: async () => {
-      const response = await api.get("/orders", {
-        params: {
-          role: role === "all" ? undefined : role,
-          status: statusFilter === "cancelled" ? "cancelled" : undefined,
-          refundsOnly: statusFilter === "refunds" ? true : undefined,
-        },
+      const response = await ordersApi.getGroups({
+        role,
+        tab: statusFilter,
+        page,
+        limit: 10,
       });
-      return response.data.orders || response.data.data || [];
+      return response.data;
     },
     enabled,
     query: { meta: { page: "orders" } },
   });
-  return { orders: query.data ?? [], isLoading: query.isLoading };
+  return {
+    groups: query.data?.data ?? [],
+    meta: query.data?.meta ?? { total: 0, page: 1, limit: 10, totalPages: 1 },
+    isLoading: query.isLoading,
+  };
 }
 
-/** Buyer / seller totals (meta.total only) for the role tabs. */
+/** Buyer / seller group totals (meta.total only) for the role tabs. */
 export function useOrderCounts(enabled: boolean) {
   const query = useWebList<{ buyer: number; seller: number }>({
     resource: "orders-counts",
     fetcher: async () => {
       const [buyerRes, sellerRes] = await Promise.all([
-        api.get("/orders", { params: { role: "buyer", limit: 1 } }),
-        api.get("/orders", { params: { role: "seller", limit: 1 } }),
+        ordersApi.getGroups({ role: "buyer", limit: 1 }),
+        ordersApi.getGroups({ role: "seller", limit: 1 }),
       ]);
       return {
         buyer: buyerRes.data?.meta?.total ?? 0,
@@ -57,30 +72,6 @@ export function useOrderCounts(enabled: boolean) {
     enabled,
   });
   return query.data ?? { buyer: 0, seller: 0 };
-}
-
-/** Seller adds tracking info → ships the order. */
-export function useShipOrder() {
-  const t = useTranslations();
-  return useWebMutation(
-    async ({
-      orderId,
-      trackingNumber,
-    }: {
-      orderId: string;
-      trackingNumber: string;
-    }) => {
-      await api.post(`/orders/${orderId}/ship`, {
-        trackingNumber: trackingNumber.trim(),
-        carrier: "Sürat Kargo",
-      });
-    },
-    {
-      invalidates: ["orders"],
-      errorMessage: t("order.shippingSaveFailed"),
-      onSuccess: () => toast.success(t("order.shippingSaved")),
-    },
-  );
 }
 
 /** Buyer cancels a pre-shipment order. */
@@ -102,7 +93,33 @@ export function useCancelOrder() {
       });
     },
     {
-      invalidates: ["orders", "orders-counts"],
+      invalidates: ["orders", "orders-counts", "order"],
+      errorMessage: t("order.cancelFailed"),
+      onSuccess: () => toast.success(t("order.orderCancelled")),
+    },
+  );
+}
+
+/** GRUP iptali: sepetin tamamı tek işlemle iptal edilir (R4). */
+export function useCancelGroup() {
+  const t = useTranslations();
+  return useWebMutation(
+    async ({
+      groupId,
+      reasonCode,
+      reason,
+    }: {
+      groupId: string;
+      reasonCode: string;
+      reason?: string;
+    }) => {
+      await ordersApi.cancelGroup(groupId, {
+        reasonCode: reasonCode as any,
+        reason: reason?.trim() || undefined,
+      });
+    },
+    {
+      invalidates: ["orders", "orders-counts", "order"],
       errorMessage: t("order.cancelFailed"),
       onSuccess: () => toast.success(t("order.orderCancelled")),
     },
