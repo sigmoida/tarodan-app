@@ -634,7 +634,16 @@
     "packageSize": "Kargo paket boyutu",
     "packageSizeHelper": "Ürününüzün sığacağı en küçük paketi seçin. Kargo bedeli bu seçime göre hesaplanır.",
     "packageSizeUnavailable": "Paket boyutları şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin.",
-    "sampleDimensions": "Örnek ölçü: {dimensions}"
+    "sampleDimensions": "Örnek ölçü: {dimensions}",
+    "manageAllDiscounts": "Tüm İndirimlerimi Yönet",
+    "discountSectionTitle": "İndirim & Kampanya",
+    "quickDiscount": "Hızlı İndirim",
+    "quickDiscountHint": "Ürününüz için hızlıca indirimli fiyat belirleyin. Bu, ürün sayfasında üstü çizili fiyat olarak görünecektir.",
+    "discountedPricePlaceholder": "İndirimli fiyat",
+    "discountStart": "Başlangıç",
+    "discountEnd": "Bitiş",
+    "discountComingSoonNote": "* Not: Bu özellik yakında aktif olacaktır. Şimdilik ürün fiyatını doğrudan değiştirebilirsiniz.",
+    "appliedDiscounts": "Bu Ürüne Uygulanan İndirimler"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -934,7 +943,7 @@
     "cargoCodeInstructions": "Bu kargo numarasını Sürat Kargo şubesine teslim ederken veriniz. Gönderiniz Sürat sisteminde bu numarayla kayıtlıdır.",
     "cargoCodeCopied": "Kargo numarası kopyalandı",
     "cargoCodePending": "Kargo numarası oluşturuluyor. Birkaç dakika içinde burada görünecektir. Hazır olduğunda size bildirim göndereceğiz.",
-    "cargoOneParcelPerOrder": "Birden fazla siparişiniz mi var? Her sipariş için AYRI koli hazırlayın ve her koliyi kendi kargo koduyla teslim edin — tek koliye birden çok sipariş koymayın; aksi hâlde diğer siparişleriniz kargolanmamış görünür.",
+    "cargoOneParcelPerOrder": "Bu kargo kodu bir SATICI PAKETİNİ temsil eder: paketteki tüm ürünleri TEK koliye koyup bu kodla teslim edin. Farklı kargo kodu olan siparişleri aynı koliye koymayın.",
     "cargoFeeCoveredNotice": "Kargo ücreti Tarodan tarafından karşılanır; şubede sizden ücret talep edilmez. Şube, paketi teslim alırken ölçüm yapabilir.",
     "refundWindowPassed": "14 günlük iade süresi doldu; bu sipariş için artık iade talebi oluşturulamaz.",
     "cancelOrderConfirm": "Bu siparişi iptal etmek istediğinize emin misiniz? Ödemeniz iade edilecektir.",
@@ -968,7 +977,26 @@
     "refundReasonOther": "Diğer",
     "statusPendingPayment": "Ödeme Bekleniyor",
     "statusRefundRequested": "İade Talep Edildi",
-    "track": "Takip Et"
+    "track": "Takip Et",
+    "orderGroupTitle": "Sipariş #{number}",
+    "groupPaymentTitle": "Ödeme",
+    "groupPaymentCovers": "Bu ödeme sepetteki {count} siparişin tamamını kapsar.",
+    "groupPaymentLink": "Ödeme geçmişinde gör",
+    "paidAtLabel": "Ödeme tarihi",
+    "emptyCancelled": "İptal edilmiş siparişiniz yok.",
+    "emptyRefunds": "İade talebiniz bulunmuyor.",
+    "emptySales": "Henüz bir satışınız yok.",
+    "viewCargoCode": "Kargo Kodunu Gör",
+    "confirmDelivery": "Teslim Aldım",
+    "confirmDeliveryTitle": "Teslimatı Onayla",
+    "confirmDeliveryDescription": "Siparişi teslim aldığınızı onaylıyorsunuz. Onaydan sonra sipariş tamamlanır ve satıcı ödemesi planlanır.",
+    "confirmDeliveryFailed": "Teslim onayı başarısız",
+    "deliveryConfirmed": "Teslimat onaylandı",
+    "groupPaymentNotice": "Sepetteki tüm siparişler tek çekimde ödenir; ürünler ayrı ayrı ödenemez.",
+    "statusAwaitingConfirmation": "Onay Bekleniyor",
+    "cancelGroupTitle": "Sepeti İptal Et",
+    "cancelGroupAllNotice": "Bu işlem sepetteki {count} siparişin tamamını iptal eder; yapılan ödeme tek seferde iade edilir. Kısmi iptal yoktur.",
+    "cartSiblings": "Bu sepette başka siparişler de var:"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -4027,7 +4055,10 @@
           "list": "Ödemeler",
           "statistics": "İstatistik",
           "reconciliation": "İade Mutabakatı"
-        }
+        },
+        "cartInfo": "Sepet Bilgileri",
+        "refundedTotal": "İade edilen",
+        "manualRefundGroupHint": "Sepet ödemesinde iade sipariş bazında yapılır — ilgili siparişin iade talebini kullanın."
       },
       "payouts": {
         "title": "Satıcı Ödemeleri",
@@ -4187,7 +4218,7 @@
         "loadError": "Siparişler yüklenemedi",
         "empty": "Henüz sipariş yok",
         "emptyFiltered": "Filtreye uygun sipariş bulunamadı",
-        "totalCount": "Toplam {count} sipariş",
+        "totalCount": "Toplam {count} sipariş grubu",
         "filteringByProduct": "Ürüne göre filtreleniyor",
         "filteringByProductNamed": "Ürüne göre filtreleniyor: {title}",
         "orderNumber": "Sipariş No",
@@ -4310,7 +4341,41 @@
           "tracking": "Kargo Takip",
           "error": "Fatura oluşturulamadı"
         },
-        "shipmentProduct": "Gönderiye konu ürün"
+        "shipmentProduct": "Gönderiye konu ürün",
+        "file": {
+          "coversGroup": "Bu ödeme sepetteki {count} siparişin tamamını kapsar.",
+          "refundedTotal": "İade edilen",
+          "shippingSplitTitle": "Kargo kırılımı",
+          "shippingFull": "Tam bedel",
+          "shippingBuyer": "Alıcı payı",
+          "shippingSeller": "Satıcı payı",
+          "billableDesi": "Faturalanan desi",
+          "quantity": "Adet",
+          "unitPrice": "Birim fiyat",
+          "vat": "KDV",
+          "withholding": "Stopaj (e-ticaret)",
+          "escrowAmount": "Hold tutarı",
+          "escrowStatus": "Hold durumu",
+          "escrowRelease": "Serbest bırakma",
+          "escrowReleased": "Serbest bırakıldı",
+          "escrowRefunded": "İadeyle düşülen",
+          "escrowFrozen": "Açık iade talebi nedeniyle kilitli",
+          "escrowNone": "Bu sipariş için escrow hold kaydı yok (ödeme tamamlanınca oluşur).",
+          "openPayouts": "Satıcı Ödemelerinde aç",
+          "refundsTitle": "İade Talepleri",
+          "refundQty": "{count} adet",
+          "openRefund": "Talebi aç",
+          "ledgerTitle": "Komisyon defteri",
+          "ledgerStatus": {
+            "pending": "Bekliyor",
+            "earned": "Kazanıldı",
+            "refunded": "İade edildi",
+            "waived": "Feragat edildi"
+          },
+          "deliveredAt": "Teslim",
+          "confirmationDeadline": "Onay penceresi bitişi",
+          "guestBuyer": "Misafir alıcı"
+        }
       },
       "trades": {
         "title": "Takaslar",
@@ -4423,7 +4488,19 @@
         "shippedAt": "Gönderim: {date}",
         "deliveredAt": "Teslim: {date}",
         "lost": "Kayıp",
-        "shipmentProducts": "Gönderiye konu ürün(ler)"
+        "shipmentProducts": "Gönderiye konu ürün(ler)",
+        "balance": {
+          "title": "Fark Dökümü",
+          "offeredTotal": "Teklif edilen ürünler toplamı",
+          "counterTotal": "Karşılık verilen ürünler toplamı",
+          "productDiff": "Ürün değeri farkı",
+          "inFavorOf": "{name} lehine",
+          "cashAgreed": "Anlaşılan nakit fark",
+          "commission": "Takas komisyonu",
+          "chargedTotal": "Tahsil edilen toplam (fark + komisyon)",
+          "paymentStatus": "Ödeme durumu",
+          "equalTrade": "Eşit takas — nakit fark yok."
+        }
       },
       "refundRequests": {
         "title": "İade Takibi",
@@ -4600,7 +4677,9 @@
         "loadError": "İade geçmişi yüklenemedi",
         "empty": "İade bulunamadı",
         "colId": "ID",
-        "refundedAt": "İade Tarihi"
+        "refundedAt": "İade Tarihi",
+        "refundNumber": "İade No",
+        "refundedFee": "İade Edilen Kesinti"
       },
       "shipping": {
         "title": "Kargo İşlemleri",
@@ -6400,7 +6479,9 @@
       "statusChangeSystemOnly": "Bu durum değişikliği sistem tarafından yapılır",
       "statusTransitionNotAllowed": "Sipariş durumu {from}'den {to}'e değiştirilemez",
       "updateForbidden": "Bu siparişi güncelleme yetkiniz yok",
-      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok"
+      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok",
+      "groupAlreadyCancelled": "Bu sepetin tüm siparişleri zaten iptal edilmiş.",
+      "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz."
     },
     "payment": {
       "cancelPaymentForbidden": "Bu ödemeyi iptal etme yetkiniz yok",

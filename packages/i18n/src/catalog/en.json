@@ -634,7 +634,16 @@
     "packageSize": "Shipping package size",
     "packageSizeHelper": "Pick the smallest package your item fits in. Shipping is priced from this choice.",
     "packageSizeUnavailable": "Package sizes could not be loaded right now. Please try again later.",
-    "sampleDimensions": "Sample size: {dimensions}"
+    "sampleDimensions": "Sample size: {dimensions}",
+    "manageAllDiscounts": "Manage All My Discounts",
+    "discountSectionTitle": "Discount & Campaign",
+    "quickDiscount": "Quick Discount",
+    "quickDiscountHint": "Quickly set a discounted price for your product. It will appear as a strikethrough price on the product page.",
+    "discountedPricePlaceholder": "Discounted price",
+    "discountStart": "Start",
+    "discountEnd": "End",
+    "discountComingSoonNote": "* Note: This feature will be enabled soon. For now you can change the product price directly.",
+    "appliedDiscounts": "Discounts Applied to This Product"
   },
   "cart": {
     "myCart": "My Cart",
@@ -934,7 +943,7 @@
     "cargoCodeInstructions": "Hand this cargo number to the Sürat Kargo branch when dropping off your package. Your shipment is registered in Sürat's system under this number.",
     "cargoCodeCopied": "Cargo number copied",
     "cargoCodePending": "Your cargo number is being generated. It will appear here in a few minutes. We will notify you when it is ready.",
-    "cargoOneParcelPerOrder": "Have more than one order? Prepare a SEPARATE parcel for each order and hand each one in with its own cargo code — do not combine multiple orders into one parcel; otherwise your other orders will appear unshipped.",
+    "cargoOneParcelPerOrder": "This cargo code represents one SELLER PACKAGE: put all its items in a SINGLE parcel and hand it over with this code. Do not mix orders that have a different cargo code into the same parcel.",
     "cargoFeeCoveredNotice": "Shipping is paid by Tarodan; the branch will not charge you. The branch may measure the package on drop-off.",
     "refundWindowPassed": "The 14-day refund window has passed; a refund can no longer be requested for this order.",
     "cancelOrderConfirm": "Cancel this order? Your payment will be refunded.",
@@ -968,7 +977,26 @@
     "refundReasonOther": "Other",
     "statusPendingPayment": "Pending Payment",
     "statusRefundRequested": "Refund Requested",
-    "track": "Track"
+    "track": "Track",
+    "orderGroupTitle": "Order #{number}",
+    "groupPaymentTitle": "Payment",
+    "groupPaymentCovers": "This payment covers all {count} orders in the cart.",
+    "groupPaymentLink": "View in payment history",
+    "paidAtLabel": "Paid on",
+    "emptyCancelled": "You have no cancelled orders.",
+    "emptyRefunds": "You have no refund requests.",
+    "emptySales": "You have no sales yet.",
+    "viewCargoCode": "View Cargo Code",
+    "confirmDelivery": "I Received It",
+    "confirmDeliveryTitle": "Confirm Delivery",
+    "confirmDeliveryDescription": "You confirm that you received this order. After confirmation the order is completed and the seller payout is scheduled.",
+    "confirmDeliveryFailed": "Delivery confirmation failed",
+    "deliveryConfirmed": "Delivery confirmed",
+    "groupPaymentNotice": "All orders in this cart are charged in a single payment; items cannot be paid separately.",
+    "statusAwaitingConfirmation": "Awaiting Confirmation",
+    "cancelGroupTitle": "Cancel Cart",
+    "cancelGroupAllNotice": "This cancels all {count} orders in the cart; the payment is refunded in full. Partial cancellation is not available.",
+    "cartSiblings": "This cart has other orders too:"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -4027,7 +4055,10 @@
           "list": "Payments",
           "statistics": "Statistics",
           "reconciliation": "Refund Reconciliation"
-        }
+        },
+        "cartInfo": "Cart Details",
+        "refundedTotal": "Refunded",
+        "manualRefundGroupHint": "Cart payments are refunded per order — use the related order's refund request."
       },
       "payouts": {
         "title": "Seller Payouts",
@@ -4187,7 +4218,7 @@
         "loadError": "Failed to load orders",
         "empty": "No orders yet",
         "emptyFiltered": "No orders match the filter",
-        "totalCount": "{count} orders total",
+        "totalCount": "{count} order groups in total",
         "filteringByProduct": "Filtering by product",
         "filteringByProductNamed": "Filtering by product: {title}",
         "orderNumber": "Order No",
@@ -4310,7 +4341,41 @@
           "tracking": "Shipment Tracking",
           "error": "Failed to generate invoice"
         },
-        "shipmentProduct": "Product in this shipment"
+        "shipmentProduct": "Product in this shipment",
+        "file": {
+          "coversGroup": "This payment covers all {count} orders in the cart.",
+          "refundedTotal": "Refunded",
+          "shippingSplitTitle": "Shipping split",
+          "shippingFull": "Full cost",
+          "shippingBuyer": "Buyer share",
+          "shippingSeller": "Seller share",
+          "billableDesi": "Billable desi",
+          "quantity": "Quantity",
+          "unitPrice": "Unit price",
+          "vat": "VAT",
+          "withholding": "Withholding (e-commerce)",
+          "escrowAmount": "Hold amount",
+          "escrowStatus": "Hold status",
+          "escrowRelease": "Release at",
+          "escrowReleased": "Released at",
+          "escrowRefunded": "Consumed by refunds",
+          "escrowFrozen": "Locked by an open refund request",
+          "escrowNone": "No escrow hold for this order yet (created when payment completes).",
+          "openPayouts": "Open in Seller Payouts",
+          "refundsTitle": "Refund Requests",
+          "refundQty": "{count} pcs",
+          "openRefund": "Open request",
+          "ledgerTitle": "Commission ledger",
+          "ledgerStatus": {
+            "pending": "Pending",
+            "earned": "Earned",
+            "refunded": "Refunded",
+            "waived": "Waived"
+          },
+          "deliveredAt": "Delivered",
+          "confirmationDeadline": "Confirmation window ends",
+          "guestBuyer": "Guest buyer"
+        }
       },
       "trades": {
         "title": "Trades",
@@ -4423,7 +4488,19 @@
         "shippedAt": "Shipped: {date}",
         "deliveredAt": "Delivered: {date}",
         "lost": "Lost",
-        "shipmentProducts": "Products in this shipment"
+        "shipmentProducts": "Products in this shipment",
+        "balance": {
+          "title": "Difference Breakdown",
+          "offeredTotal": "Offered items total",
+          "counterTotal": "Counter items total",
+          "productDiff": "Product value difference",
+          "inFavorOf": "in favor of {name}",
+          "cashAgreed": "Agreed cash difference",
+          "commission": "Trade commission",
+          "chargedTotal": "Total charged (difference + commission)",
+          "paymentStatus": "Payment status",
+          "equalTrade": "Equal trade — no cash difference."
+        }
       },
       "refundRequests": {
         "title": "Refund Tracking",
@@ -4600,7 +4677,9 @@
         "loadError": "Failed to load refund history",
         "empty": "No refunds found",
         "colId": "ID",
-        "refundedAt": "Refund Date"
+        "refundedAt": "Refund Date",
+        "refundNumber": "Refund No",
+        "refundedFee": "Reversed Fee"
       },
       "shipping": {
         "title": "Shipping Operations",
@@ -6400,7 +6479,9 @@
       "statusChangeSystemOnly": "This status change is performed by the system",
       "statusTransitionNotAllowed": "Order status cannot be changed from {from} to {to}",
       "updateForbidden": "You are not authorized to update this order",
-      "viewForbidden": "You are not authorized to view this order"
+      "viewForbidden": "You are not authorized to view this order",
+      "groupAlreadyCancelled": "All orders in this cart are already cancelled.",
+      "groupCancelBlockedShipped": "At least one order in this cart has been handed to the carrier — cart cancellation is closed. You can request a refund after delivery."
     },
     "payment": {
       "cancelPaymentForbidden": "You do not have permission to cancel this payment",
