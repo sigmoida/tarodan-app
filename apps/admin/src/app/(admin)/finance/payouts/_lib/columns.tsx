@@ -5,6 +5,7 @@ import {
   payoutStatusConfig,
 } from "@tarodan/ui";
 import { col } from "@/components/table";
+import { fmtTry } from "@/lib/format";
 import { HoldReasonBadge, holdReasonForRow } from "./holds";
 import {
   type ScheduleItem,
@@ -17,10 +18,15 @@ import type { useTranslations } from "next-intl";
 type T = ReturnType<typeof useTranslations<never>>;
 
 export const scheduleColumns = (t: T) => [
-  col.text<ScheduleItem>(t("admin.finance.common.order"), "orderNumber", {
-    grow: 3,
-    minWidth: 260,
-  }),
+  // Sipariş no artık grup dosyasına link (düz metin kopyala-ara devri bitti).
+  col.link<ScheduleItem>(
+    t("admin.finance.common.order"),
+    (row) => ({
+      href: `/operations/orders/${row.orderId}`,
+      label: row.orderNumber !== "-" ? `#${row.orderNumber}` : "—",
+    }),
+    { grow: 3, minWidth: 260, sortKey: "orderNumber" },
+  ),
   col.user<ScheduleItem>(
     t("admin.finance.common.seller"),
     (row) => ({
@@ -36,7 +42,14 @@ export const scheduleColumns = (t: T) => [
     t("admin.finance.payouts.holdReason"),
     (s) => (
       <HoldReasonBadge
-        reason={holdReasonForRow({ status: "held", releaseAt: s.releaseAt }, t)}
+        reason={holdReasonForRow(
+          {
+            status: "held",
+            releaseAt: s.releaseAt,
+            frozenByRefundId: s.frozenByRefundId,
+          },
+          t,
+        )}
       />
     ),
     { sortKey: "releaseAt", sortType: "date" },
@@ -48,9 +61,12 @@ export function transactionColumns(
   t: T,
 ) {
   return [
-    col.text<PayoutTransaction>(
+    col.link<PayoutTransaction>(
       t("admin.finance.common.order"),
-      (row) => row.orderNumber,
+      (row) => ({
+        href: `/operations/orders/${row.orderId}`,
+        label: row.orderNumber !== "-" ? `#${row.orderNumber}` : "—",
+      }),
       { grow: 3, minWidth: 260, sortKey: "orderNumber" },
     ),
     col.user<PayoutTransaction>(
@@ -62,7 +78,22 @@ export function transactionColumns(
       }),
       { grow: 5, minWidth: 360, sortKey: "sellerName" },
     ),
-    col.money<PayoutTransaction>(t("common.amount"), "amount"),
+    // Kısmi iade sonrası ekranda NET görünür (grup dosyasıyla aynı rakam):
+    // amount brüt, refundedAmount düşülen — satıcıya kalan fark.
+    col.custom<PayoutTransaction>(
+      t("common.amount"),
+      (row) => (
+        <div className="tabular-nums">
+          {fmtTry(row.amount - row.refundedAmount)}
+          {row.refundedAmount > 0 && (
+            <p className="text-xs text-danger-600">
+              −{fmtTry(row.refundedAmount)}
+            </p>
+          )}
+        </div>
+      ),
+      { sortKey: "amount", sortType: "number" },
+    ),
     col.badge<PayoutTransaction>(
       t("common.status"),
       (row) => <Badge status={row.status} config={paymentHoldStatusConfig} />,
@@ -81,6 +112,7 @@ export function transactionColumns(
             {
               status: row.status,
               releaseAt: row.releaseAt,
+              frozenByRefundId: row.frozenByRefundId,
             },
             t,
           )}
@@ -133,7 +165,7 @@ export function transferColumns(
     col.link<PayoutTransferRow>(
       t("admin.finance.common.order"),
       (r) => ({
-        href: r.orderId ? `/operations/orders/${r.orderId}` : "#",
+        href: r.orderId ? `/operations/orders/${r.orderId}` : "",
         label: r.orderNumber ? `#${r.orderNumber}` : "—",
       }),
       { grow: 1, minWidth: 130, sortKey: "orderNumber" },
@@ -214,7 +246,7 @@ export function adjustmentColumns(t: T) {
     col.link<PayoutAdjustmentRow>(
       t("admin.finance.common.order"),
       (r) => ({
-        href: r.orderId ? `/operations/orders/${r.orderId}` : "#",
+        href: r.orderId ? `/operations/orders/${r.orderId}` : "",
         label: r.orderNumber ? `#${r.orderNumber}` : "—",
       }),
       { grow: 1, minWidth: 130 },

@@ -1,6 +1,7 @@
 import { type ComponentType } from "react";
 import Link from "next/link";
 import {
+  ChevronRightIcon,
   ShoppingBagIcon,
   CurrencyDollarIcon,
   ArrowsRightLeftIcon,
@@ -59,8 +60,12 @@ function PendingCard({
       </div>
       <div className="min-w-0">
         <p className={`font-medium ${tone_.text}`}>{message}</p>
-        <Link href={href} className={`text-sm hover:underline ${tone_.link}`}>
-          {reviewLabel} →
+        <Link
+          href={href}
+          className={`inline-flex items-center text-sm hover:underline ${tone_.link}`}
+        >
+          {reviewLabel}
+          <ChevronRightIcon className="ml-1 h-4 w-4" />
         </Link>
       </div>
     </div>
@@ -97,7 +102,7 @@ export function PendingActionsPanel({
           message={t("admin.dashboard.pendingActions.refundRequests", {
             count: pending.refundRequests,
           })}
-          href="/operations/orders?status=refund_requested"
+          href="/operations/refund-requests"
           reviewLabel={reviewLabel}
         />
       )}

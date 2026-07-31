@@ -1,6 +1,7 @@
 /** @format */
 
 import { Badge, Button } from "@tarodan/ui";
+import Link from "next/link";
 import { col } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { InvoicePdfButton } from "../_components/InvoicePdfButton";
@@ -135,9 +136,18 @@ export const sellerColumns = (t: T) => [
     t("admin.finance.common.order"),
     (s) => (
       <div className="text-sm">
-        <p className="whitespace-nowrap font-mono font-medium text-heading">
-          {s.orderNumber || "—"}
-        </p>
+        {s.orderId ? (
+          <Link
+            href={`/operations/orders/${s.orderId}`}
+            className="whitespace-nowrap font-mono font-medium text-primary-600 hover:text-primary-700"
+          >
+            #{s.orderNumber}
+          </Link>
+        ) : (
+          <p className="whitespace-nowrap font-mono font-medium text-heading">
+            {s.orderNumber || "—"}
+          </p>
+        )}
         <p className="max-w-[220px] truncate text-xs text-muted">
           {s.fileName}
         </p>

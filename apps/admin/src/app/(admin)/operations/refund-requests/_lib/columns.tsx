@@ -15,6 +15,8 @@ export interface RefundRequestRow {
   refundNumber: string;
   status: string;
   amount: number | string;
+  /** Adet bazlı kısmi iade: siparişin kaç adedi iade ediliyor. */
+  refundQuantity?: number;
   reason: string;
   createdAt: string;
   returnStatus?: string | null;
@@ -77,6 +79,16 @@ export const refundRequestColumns = (t: T) => [
     { sortKey: "order.seller.displayName" },
   ),
   col.money<RefundRequestRow>(t("common.amount"), "amount"),
+  col.text<RefundRequestRow>(
+    t("admin.operations.orders.file.refundQty"),
+    (r) =>
+      r.refundQuantity != null
+        ? t("admin.operations.orders.itemCountUnit", {
+            count: r.refundQuantity,
+          })
+        : null,
+    { minWidth: 90 },
+  ),
   col.text<RefundRequestRow>(
     t("admin.operations.refundRequests.reason"),
     (r) => enumLabel(refundReasonConfig, r.reason, r.reason),

@@ -106,7 +106,12 @@ export function DataTable<T>({
   // Register columns with the enclosing ResourceList (if any) so its toolbar can
   // offer a CSV export. Safe when standalone — the context is simply absent.
   const resourceList = useContext(ResourceListContext);
-  if (resourceList) resourceList.exportRef.current = columns;
+  if (resourceList) {
+    resourceList.exportRef.current = columns;
+    // Kolonlar bu tabloya basılan satır şekline göre yazılır (örn. grup satırı)
+    // — CSV de aynı veriyi kullanmalı, ham context satırlarını değil.
+    resourceList.exportRowsRef.current = data as any[];
+  }
   const table = useReactTable({
     data,
     columns,

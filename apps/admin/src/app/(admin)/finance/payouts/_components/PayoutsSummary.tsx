@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import {
   BanknotesIcon,
   CheckCircleIcon,
@@ -92,11 +93,16 @@ export function PayoutsSummary() {
                     key={r.id}
                     className="flex min-w-0 justify-between gap-2 text-sm text-muted"
                   >
-                    <span className="truncate">
-                      {t("admin.finance.payouts.orderShort", {
-                        id: r.orderId.slice(0, 8),
-                      })}
-                    </span>
+                    <Link
+                      href={`/operations/orders/${r.orderId}`}
+                      className="truncate text-primary-600 hover:text-primary-700"
+                    >
+                      {r.orderNumber
+                        ? `#${r.orderNumber}`
+                        : t("admin.finance.payouts.orderShort", {
+                            id: r.orderId.slice(0, 8),
+                          })}
+                    </Link>
                     <span className="shrink-0 whitespace-nowrap">
                       {fmtTry(r.amount)} —{" "}
                       {r.releaseAt

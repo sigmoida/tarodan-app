@@ -44,6 +44,9 @@ export interface ResourceListContextValue<T> extends UseAdminResourceResult<T> {
   /** The rendered table registers its columns here so the toolbar can offer a
    * CSV export without every page wiring one. */
   exportRef: MutableRefObject<any[]>;
+  /** CSV, tabloya gerçekten basılan (map'lenmiş) satırları dışa aktarır —
+   * ham API satırları değil (grup satırlı listelerde kolonlar map'li şekli bekler). */
+  exportRowsRef: MutableRefObject<any[]>;
   /** Resource name — used as the CSV filename stem. */
   exportName: string;
 }

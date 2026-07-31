@@ -97,4 +97,7 @@ export interface SuratShipmentRow {
     buyer?: { id: string; displayName: string; email?: string } | null;
     seller?: { id: string; displayName: string; email?: string } | null;
   } | null;
+  /** Aynı barkodu paylaşan (aynı fiziksel koli) diğer siparişler — R6:
+   * paket başına TEK satır; kardeşler etikette gösterilir. */
+  siblingOrderNumbers?: string[];
 }

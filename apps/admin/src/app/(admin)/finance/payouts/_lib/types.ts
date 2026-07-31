@@ -26,6 +26,7 @@ export interface PayoutSummary {
     amount: number;
     releaseAt: string | null;
     sellerId: string;
+    orderNumber: string | null;
   }>;
 }
 
@@ -74,6 +75,8 @@ export interface PayoutTransaction {
   releasedAt: string | null;
   paidAt: string | null;
   createdAt: string;
+  refundedAmount: number;
+  frozenByRefundId: string | null;
 }
 
 export interface ScheduleItem {
@@ -86,6 +89,8 @@ export interface ScheduleItem {
   amount: number;
   releaseAt: string | null;
   createdAt: string;
+  refundedAmount: number;
+  frozenByRefundId: string | null;
 }
 
 export const payoutTabs = (t: T) => [

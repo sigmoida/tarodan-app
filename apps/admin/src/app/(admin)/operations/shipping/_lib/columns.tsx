@@ -101,7 +101,10 @@ export const physicalShipmentColumns = ({
         <TruncatedText className="text-xs text-muted">
           {t("admin.operations.shipping.orders.packageSummary", {
             orders: row.items.length,
-            products: row.items.length,
+            products: row.items.reduce(
+              (sum, item) => sum + (item.quantity ?? 1),
+              0,
+            ),
           })}
         </TruncatedText>
       </div>
@@ -345,13 +348,17 @@ export function suratShipmentColumns(
   rowMenu: (r: SuratShipmentRow) => RowActionItem[],
 ) {
   return [
+    // Paket satırı: aynı barkodun kardeş sipariş numaraları etikete eklenir
+    // (R6 — bir koli tek satır; siparişler ayrı koli değildir).
     col.link<SuratShipmentRow>(
       t("admin.operations.common.order"),
       (r) =>
         r.order
           ? {
               href: `/operations/orders/${r.order.id}`,
-              label: `#${r.order.orderNumber}`,
+              label: r.siblingOrderNumbers?.length
+                ? `#${r.order.orderNumber} +${r.siblingOrderNumbers.length}`
+                : `#${r.order.orderNumber}`,
             }
           : null,
       { sortKey: "order.orderNumber" },

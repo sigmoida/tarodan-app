@@ -23,15 +23,20 @@ export function ResourceListToolbar({
   className?: string;
 }) {
   const t = useTranslations();
-  const { rows, exportRef, exportName } = useResourceList();
+  const { rows, exportRef, exportRowsRef, exportName } = useResourceList();
 
   const onExport = () => {
     const columns = exportRef.current;
     if (!hasExportableColumns(columns)) return;
+    // Tabloya basılan (map'lenmiş) satırlar varsa CSV onları kullanır — grup
+    // satırlı listelerde ham API satırları kolon şekliyle uyuşmaz (boş CSV).
+    const exportRows = exportRowsRef.current.length
+      ? exportRowsRef.current
+      : rows;
     const date = new Date().toISOString().slice(0, 10);
     downloadBlob(
       `${exportName}_${date}.csv`,
-      columnsToCsv(columns, rows),
+      columnsToCsv(columns, exportRows),
       "text/csv;charset=utf-8;",
     );
   };

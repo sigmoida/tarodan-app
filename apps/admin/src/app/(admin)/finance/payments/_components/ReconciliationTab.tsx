@@ -37,6 +37,11 @@ interface RefundAttempt {
   updatedAt: string;
   order: { id: string; orderNumber: string } | null;
   trade: { id: string; tradeNumber: string } | null;
+  payment?: {
+    id: string;
+    amount: number;
+    checkoutGroup?: { groupNumber: string } | null;
+  } | null;
 }
 
 export function ReconciliationTab() {
@@ -117,6 +122,10 @@ export function ReconciliationTab() {
                   attempt.order?.orderNumber ??
                   attempt.trade?.tradeNumber ??
                   attempt.id;
+                // Paylaşılan grup ödemesinin kısmi iadesi: satır hangi sepete
+                // ait olduğunu ve ödemeyi söylemek zorunda (R3).
+                const groupNumber =
+                  attempt.payment?.checkoutGroup?.groupNumber ?? null;
                 return (
                   <tr
                     key={attempt.id}
@@ -132,6 +141,14 @@ export function ReconciliationTab() {
                         </Link>
                       ) : (
                         label
+                      )}
+                      {groupNumber && attempt.payment && (
+                        <Link
+                          href={`/finance/payments/${attempt.payment.id}`}
+                          className="block text-xs text-muted hover:text-primary-600"
+                        >
+                          #{groupNumber}
+                        </Link>
                       )}
                     </td>
                     <td className="px-3 py-3">

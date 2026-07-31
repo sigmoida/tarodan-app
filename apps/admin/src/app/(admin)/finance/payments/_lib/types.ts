@@ -5,17 +5,22 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Payment {
   id: string;
-  orderId: string;
-  orderNumber: string;
+  orderId: string | null;
+  orderNumber: string | null;
+  /** Sepet ödemesi kimliği: grup no + kapsanan sipariş sayısı + grup dosyasına
+   * çözülecek anchor sipariş (order id → group file). */
+  groupNumber: string | null;
+  orderCount: number;
+  anchorOrderId: string | null;
   amount: number;
   currency: string;
   provider: string;
   status: string;
   failureReason?: string;
   providerPaymentId?: string;
-  buyer: { id: string; displayName: string; email: string };
-  seller: { id: string; displayName: string; email: string };
-  product: { id: string; title: string };
+  buyer: { id: string; displayName: string; email: string } | null;
+  seller: { id: string; displayName: string; email: string } | null;
+  product: { id: string; title: string } | null;
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
@@ -60,17 +65,20 @@ export const providerFilterOptions = (t: T) => [
 export function mapPayments(raw: any[]): Payment[] {
   return (raw || []).map((p: any) => ({
     id: p.id,
-    orderId: p.orderId,
-    orderNumber: p.orderNumber,
+    orderId: p.orderId ?? null,
+    orderNumber: p.orderNumber ?? null,
+    groupNumber: p.groupNumber ?? null,
+    orderCount: p.orderCount ?? (p.orderId ? 1 : 0),
+    anchorOrderId: p.anchorOrderId ?? p.orderId ?? null,
     amount: Number(p.amount || 0),
     currency: p.currency,
     provider: p.provider,
     status: p.status,
     failureReason: p.failureReason,
     providerPaymentId: p.providerPaymentId,
-    buyer: p.buyer || { id: "", displayName: "", email: "" },
-    seller: p.seller || { id: "", displayName: "", email: "" },
-    product: p.product || { id: "", title: "" },
+    buyer: p.buyer ?? null,
+    seller: p.seller ?? null,
+    product: p.product ?? null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
     paidAt: p.paidAt,

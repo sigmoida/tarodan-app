@@ -28,9 +28,10 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
       <div className="space-y-3">
         {orders.length > 0 ? (
           orders.map((order) => (
-            <div
+            <Link
               key={order.id}
-              className="flex items-center justify-between border-b border-border py-3 last:border-0"
+              href={`/operations/orders/${order.id}`}
+              className="flex items-center justify-between border-b border-border py-3 transition-colors last:border-0 hover:bg-surface-alt"
             >
               <div className="flex min-w-0 flex-1 items-center">
                 <div className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100">
@@ -59,7 +60,7 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
                   {formatRelativeDate(order.createdAt, t)}
                 </span>
               </div>
-            </div>
+            </Link>
           ))
         ) : (
           <EmptyState
