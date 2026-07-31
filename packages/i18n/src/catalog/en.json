@@ -794,7 +794,8 @@
     "shippingFee": "Shipping fee",
     "platformFee": "Platform fee",
     "buyerPayable": "Amount due",
-    "vatIncluded": "VAT included"
+    "vatIncluded": "VAT included",
+    "serviceFee": "Service fee"
   },
   "order": {
     "myOrders": "My Orders",

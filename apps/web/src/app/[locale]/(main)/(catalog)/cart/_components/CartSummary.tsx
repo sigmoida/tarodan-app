@@ -7,6 +7,8 @@ import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import OrderSummaryLines from "@/components/order/OrderSummaryLines";
+import type { OrderSummaryAmounts } from "@/components/order/OrderSummaryLines";
 import CouponBox from "./CouponBox";
 
 interface AppliedDiscount {
@@ -22,18 +24,22 @@ const fmtTL = (n: number) =>
     maximumFractionDigits: 2,
   });
 
+/**
+ * Sepet özeti — tutarların HİÇBİRİ burada hesaplanmaz. `quote` doğrudan
+ * `POST /orders/quote`'tan gelir; ürünün tabi olduğu komisyon kuralı, hizmet
+ * KDV'si ve kargo hep o tek hesaptan çıkar. `subtotal` yalnız quote henüz
+ * dönmediğinde gösterilecek yedek değerdir.
+ */
 export default function CartSummary({
   subtotal,
   appliedDiscounts,
-  buyerFee,
-  grandTotal,
+  quote,
   isAuthenticated,
   canCheckout,
 }: {
   subtotal: number;
   appliedDiscounts?: AppliedDiscount[];
-  buyerFee: number;
-  grandTotal: number;
+  quote: OrderSummaryAmounts | null;
   isAuthenticated: boolean;
   canCheckout: boolean;
 }) {
@@ -44,15 +50,10 @@ export default function CartSummary({
 
   return (
     <SectionCard title={t("checkout.orderSummary")} className="sticky top-24">
-      <div className="space-y-3 text-sm">
-        <div className="flex justify-between">
-          <span className="text-muted">{t("checkout.subtotal")}</span>
-          <span className="font-medium">{fmtTL(subtotal ?? 0)} TL</span>
-        </div>
-
+      <OrderSummaryLines amounts={quote}>
         {autoDiscounts.map((d) => (
           <div
-            key={d.discountId}
+            key={d.discountId ?? d.discountName}
             className="flex justify-between text-success-600"
           >
             <span>{d.discountName}</span>
@@ -61,30 +62,7 @@ export default function CartSummary({
             </span>
           </div>
         ))}
-
-        {buyerFee > 0 && (
-          <div className="flex justify-between">
-            <span className="text-muted">{t("footer.platformServiceFee")}</span>
-            <span className="font-medium">{fmtTL(buyerFee)} TL</span>
-          </div>
-        )}
-
-        <div className="flex justify-between">
-          <span className="text-muted">{t("checkout.shipping")}</span>
-          <span className="text-subtle">
-            {t("checkout.shippingCalculatedAtCheckout")}
-          </span>
-        </div>
-
-        <hr className="my-1" />
-
-        <div className="flex justify-between text-lg">
-          <span className="font-semibold">{t("checkout.total")}</span>
-          <span className="font-bold text-primary-500">
-            {fmtTL(grandTotal ?? 0)} TL
-          </span>
-        </div>
-      </div>
+      </OrderSummaryLines>
 
       <div className="mt-5 border-t border-border-subtle pt-5">
         <CouponBox />

@@ -46,6 +46,13 @@ export interface CheckoutQuote {
     buyerServiceTaxAmount: number;
     /** Uygulanan hizmet KDV oranı (%) — satır bazında KDV bunun üzerinden türetilir. */
     serviceVatRate: number;
+    /** Ekranın bastığı özet satırları, KDV DAHİL — üçünün toplamı `total`. */
+    summary: {
+      productAmount: number;
+      shippingAmount: number;
+      serviceFeeAmount: number;
+      total: number;
+    };
     totalAmount: number;
     sellerNetAmount: number;
   };

@@ -794,7 +794,8 @@
     "shippingFee": "Kargo ücreti",
     "platformFee": "Platform bedeli",
     "buyerPayable": "Ödenecek tutar",
-    "vatIncluded": "KDV dahil"
+    "vatIncluded": "KDV dahil",
+    "serviceFee": "Hizmet Bedeli"
   },
   "order": {
     "myOrders": "Siparişlerim",
