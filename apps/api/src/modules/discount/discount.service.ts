@@ -660,6 +660,17 @@ export class DiscountService {
       }
     }
 
+    // Kupon AKTİF olabilir ama sepetteki hiçbir ürün kapsamına girmiyorsa
+    // uygulanmamalı: eligibleSubtotal 0 kalır, indirim 0 çıkar ve kupon
+    // "uygulandı" görünüp hiçbir şey indirmezdi. Kullanıcı sebebini göremediği
+    // için kuponu bozuk sanıyordu.
+    if (dto.cartItems?.length && eligibleProductIds.length === 0) {
+      return {
+        isValid: false,
+        error: "Bu kupon sepetinizdeki ürünler için geçerli değil",
+      };
+    }
+
     // Check minimum cart value
     if (discount.minCartValue && cartTotal < Number(discount.minCartValue)) {
       return {

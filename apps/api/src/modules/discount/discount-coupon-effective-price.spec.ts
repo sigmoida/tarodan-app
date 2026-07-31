@@ -93,4 +93,47 @@ describe("DiscountService coupon pricing base", () => {
       error: "Minimum sepet tutarı: 75.00 TL",
     });
   });
+
+  describe("sepete uygunluk", () => {
+    it("sepetteki hiçbir ürün kapsamda değilse kupon REDDEDİLİR", async () => {
+      // Kupon aktif ve süresi geçerli ama yalnız başka bir kategoriye ait.
+      // Eskiden isValid=true, indirim 0 dönüyordu: kupon "uygulandı" görünüp
+      // hiçbir şey indirmiyor, kullanıcı sebebini göremiyordu.
+      const service = makeService({
+        scope: DiscountScope.category,
+        categoryId: "baska-kategori",
+      });
+
+      const result = await service.validateCoupon(
+        {
+          code: coupon.code,
+          cartItems: [{ productId: product.id, quantity: 1 }],
+        },
+        "buyer-1",
+      );
+
+      expect(result).toEqual({
+        isValid: false,
+        error: "Bu kupon sepetinizdeki ürünler için geçerli değil",
+      });
+    });
+
+    it("en az bir ürün kapsamdaysa kupon geçerlidir", async () => {
+      const service = makeService({
+        scope: DiscountScope.category,
+        categoryId: product.categoryId,
+      });
+
+      const result = await service.validateCoupon(
+        {
+          code: coupon.code,
+          cartItems: [{ productId: product.id, quantity: 1 }],
+        },
+        "buyer-1",
+      );
+
+      expect(result.isValid).toBe(true);
+      expect(result.discount?.eligibleProductIds).toEqual([product.id]);
+    });
+  });
 });
