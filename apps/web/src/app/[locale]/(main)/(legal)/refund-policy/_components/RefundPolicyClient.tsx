@@ -97,7 +97,7 @@ export default function RefundPolicyClient() {
           <p>İade talepleriniz ve sorularınız için:</p>
           <ul>
             <li>
-              <strong>E-posta:</strong> destek@tarodan.com
+              <strong>E-posta:</strong> destek@tarodan.com.tr
             </li>
             <li>
               <strong>Konu:</strong> İade Talebi – Sipariş No

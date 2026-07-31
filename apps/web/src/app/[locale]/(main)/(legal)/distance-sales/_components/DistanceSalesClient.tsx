@@ -32,7 +32,7 @@ export default async function DistanceSalesClient() {
               </tr>
               <tr>
                 <td className="border p-2 font-semibold">E-posta</td>
-                <td className="border p-2">info@tarodan.com</td>
+                <td className="border p-2">info@tarodan.com.tr</td>
               </tr>
               <tr>
                 <td className="border p-2 font-semibold">Mersis No</td>

@@ -5160,7 +5160,7 @@ async function main() {
 <p>6698 sayılı Kişisel Verilerin Korunması Kanunu uyarınca verilerinize erişim, düzeltme, silme ve itiraz haklarına sahipsiniz.</p>
 <p>Talepleriniz için: <a href="mailto:kvkk@tarodan.com">kvkk@tarodan.com</a></p>
 <h2>4. İletişim</h2>
-<p><a href="mailto:destek@tarodan.com">destek@tarodan.com</a></p>`,
+<p><a href="mailto:destek@tarodan.com.tr">destek@tarodan.com.tr</a></p>`,
       metaTitle: "Gizlilik Politikası | Tarodan",
       metaDescription: "Tarodan gizlilik politikası ve KVKK aydınlatma metni.",
       sortOrder: 2,
@@ -5193,7 +5193,7 @@ async function main() {
   <li>Teslim alınan ürün açıklamaya uymuyorsa 3 iş günü içinde iade talebi açılabilir.</li>
 </ul>
 <h2>6. İletişim</h2>
-<p><a href="mailto:destek@tarodan.com">destek@tarodan.com</a></p>`,
+<p><a href="mailto:destek@tarodan.com.tr">destek@tarodan.com.tr</a></p>`,
       metaTitle: "Kullanım Koşulları | Tarodan",
       metaDescription:
         "Tarodan platform kullanım koşulları ve üyelik sözleşmesi.",

@@ -74,7 +74,7 @@ export class InvoicePdfService {
     name: "Tarodan Marketplace",
     address: "İstanbul, Türkiye",
     taxId: "0000000000",
-    email: "info@tarodan.com",
+    email: "info@tarodan.com.tr",
     phone: "+90 212 000 0000",
   };
 

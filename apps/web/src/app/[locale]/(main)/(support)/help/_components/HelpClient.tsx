@@ -92,7 +92,7 @@ export default function HelpClient() {
             <div className="space-y-2 text-sm text-body">
               <div className="flex items-center gap-3">
                 <EnvelopeIcon className="w-5 h-5 text-primary-500" />
-                <span>destek@tarodan.com</span>
+                <span>destek@tarodan.com.tr</span>
               </div>
               <div className="flex items-center gap-3">
                 <PhoneIcon className="w-5 h-5 text-primary-500" />

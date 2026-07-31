@@ -70,7 +70,7 @@ export default async function BuyerProtectionClient() {
             </li>
             <li>
               <strong>Destek talebi:</strong> Çözülemezse Hesabım → Siparişlerim
-              → İlgili sipariş → "Sorun bildir" veya destek@tarodan.com.
+              → İlgili sipariş → "Sorun bildir" veya destek@tarodan.com.tr.
             </li>
             <li>
               <strong>İnceleme:</strong> Destek ekibimiz talebi ve (varsa)
@@ -103,7 +103,7 @@ export default async function BuyerProtectionClient() {
           </p>
 
           <h2>7. İletişim</h2>
-          <p>destek@tarodan.com – konu: "Alıcı Koruma – Sipariş No"</p>
+          <p>destek@tarodan.com.tr – konu: "Alıcı Koruma – Sipariş No"</p>
         </div>
 
         <div className="mt-8 flex flex-wrap gap-4">

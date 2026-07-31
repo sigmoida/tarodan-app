@@ -111,10 +111,10 @@ export default function PlatformHizmetBedeliPage() {
             </Link>
             'ni ziyaret edebilir veya{" "}
             <a
-              href="mailto:destek@tarodan.com"
+              href="mailto:destek@tarodan.com.tr"
               className="text-primary-600 underline"
             >
-              destek@tarodan.com
+              destek@tarodan.com.tr
             </a>{" "}
             adresinden bize ulaşabilirsiniz.
           </p>
