@@ -4,6 +4,7 @@ import {
   REFERENCE_PREFIX,
   reprefixReference,
 } from "../src/common/helpers/code-prefixes";
+import { generateReferenceCode } from "../src/common/helpers/generate-reference";
 
 const money = (value: number): number =>
   Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
@@ -297,6 +298,8 @@ export async function normalizeSeedCommerce(
     if (!packageId) {
       const orderPackage = await prisma.orderPackage.create({
         data: {
+          // Koli numarası (PKG-…): Sürat'a iletilen ve müşterinin sorguladığı kod.
+          packageNumber: generateReferenceCode(REFERENCE_PREFIX.orderPackage),
           checkoutGroupId,
           sellerId: head.sellerId,
           buyerId: head.buyerId,

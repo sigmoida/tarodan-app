@@ -90,6 +90,12 @@ const groupNumberFor = (orderNumber: string) =>
 /** Çok satırlı sepetlerde grubun kendi referansı olur. */
 const generateGroupNumber = () =>
   generateReferenceCode(REFERENCE_PREFIX.checkoutGroup);
+/**
+ * Koli numarası: satıcı paketi başına bir tane. Sepet numarasından da sipariş
+ * numarasından da BAĞIMSIZDIR — Sürat'a bu kod gider, müşteri bununla sorgular.
+ */
+const generatePackageNumber = () =>
+  generateReferenceCode(REFERENCE_PREFIX.orderPackage);
 
 // Helper for random date in past
 const randomPastDate = (daysBack: number) => {
@@ -3621,19 +3627,27 @@ async function main() {
 
   // Sepet çeşitleri: tek ürün, aynı satıcıdan çok ürün (tek paket) ve
   // çok satıcılı sepet (satıcı başına ayrı paket).
-  const CART_SHAPES: { sellers: number; linesPerSeller: number }[] = [
-    { sellers: 1, linesPerSeller: 1 },
-    { sellers: 1, linesPerSeller: 2 },
-    { sellers: 2, linesPerSeller: 1 },
-    { sellers: 1, linesPerSeller: 1 },
-    { sellers: 1, linesPerSeller: 3 },
-    { sellers: 2, linesPerSeller: 2 },
-    { sellers: 1, linesPerSeller: 1 },
-    { sellers: 3, linesPerSeller: 1 },
-    { sellers: 1, linesPerSeller: 2 },
-    { sellers: 2, linesPerSeller: 1 },
-    { sellers: 1, linesPerSeller: 1 },
-    { sellers: 1, linesPerSeller: 2 },
+  // Her eleman bir SEPET; dizi, satıcı başına kaç ürün satırı olduğunu söyler.
+  // Doğrudan kod hiyerarşisini örnekler: 1 sepet (GRP) → dizi uzunluğu kadar
+  // koli (PKG) → toplam eleman kadar sipariş (ORD).
+  //   [1]      → 1 GRP + 1 PKG + 1 ORD
+  //   [2]      → 1 GRP + 1 PKG + 2 ORD
+  //   [2, 1]   → 1 GRP + 2 PKG + 3 ORD  (2 satıcı, 3 ürün)
+  const CART_SHAPES: number[][] = [
+    [1],
+    [2],
+    [1, 1],
+    [1],
+    [3],
+    [2, 1], // 3 ürün / 2 satıcı — asimetrik dağılım
+    [2, 2],
+    [1],
+    [1, 1, 1],
+    [1, 2], // yine 3 ürün / 2 satıcı, ters dağılım
+    [2],
+    [1, 1],
+    [1],
+    [2],
   ];
 
   const SHIPPING_PER_PACKAGE = 30;
@@ -3644,16 +3658,17 @@ async function main() {
     const status = orderStatuses[cartIndex % orderStatuses.length];
     const createdAt = randomPastDate(30);
 
-    // Sepetin satıcıları (birbirinden farklı) ve satırları.
+    // Sepetin satıcıları (birbirinden farklı) ve satırları — shape[i] = i.
+    // satıcının kaç ürün satırı taşıdığı.
     const cartSellers: string[] = [];
-    for (let s = 0; s < shape.sellers; s++) {
+    for (let s = 0; s < shape.length; s++) {
       const sellerId = sellersWithStock[sellerCursor % sellersWithStock.length];
       sellerCursor++;
       if (!cartSellers.includes(sellerId)) cartSellers.push(sellerId);
     }
     const lines: { sellerId: string; product: any }[] = [];
-    for (const sellerId of cartSellers) {
-      for (let l = 0; l < shape.linesPerSeller; l++) {
+    for (const [sellerIndex, sellerId] of cartSellers.entries()) {
+      for (let l = 0; l < shape[sellerIndex]; l++) {
         const product = takeProduct(sellerId);
         if (product) lines.push({ sellerId, product });
       }
@@ -3701,6 +3716,7 @@ async function main() {
     for (const sellerId of cartSellers) {
       const pkg = await prisma.orderPackage.create({
         data: {
+          packageNumber: generatePackageNumber(),
           checkoutGroupId: group.id,
           sellerId,
           buyerId: buyer.id,
@@ -3790,8 +3806,9 @@ async function main() {
   console.log("Creating shipments...");
 
   // Bir PAKET tek koli olarak gider: aynı paketteki tüm siparişler aynı takip
-  // numarasını paylaşır (runtime'da da takip no paketteki en küçük sipariş
-  // numarasından türetilir). Böylece çok ürünlü sepette tek kargo görünür.
+  // numarasını paylaşır ve bu numara paketin KENDİ kodudur (PKG-…) — runtime'da
+  // Sürat'a `OzelKargoTakipNo` olarak giden değerin aynısı. Sipariş numarasından
+  // türetme YOK: üç seviye (GRP · PKG · ORD) hiçbir zaman aynı değeri taşımaz.
   const shippedOrders = orders.filter((o) =>
     [
       OrderStatus.shipped,
@@ -3799,17 +3816,13 @@ async function main() {
       OrderStatus.completed,
     ].includes(o.status),
   );
-  const trackingByPackage = new Map<string, string>();
-  for (const order of shippedOrders) {
-    const packageKey = order.packageId ?? order.id;
-    if (!trackingByPackage.has(packageKey)) {
-      const siblings = shippedOrders.filter(
-        (o) => (o.packageId ?? o.id) === packageKey,
-      );
-      const packageRef = siblings.map((o) => o.orderNumber).sort()[0] as string;
-      trackingByPackage.set(packageKey, packageRef);
-    }
-  }
+  const packageNumberById = new Map(
+    (
+      await prisma.orderPackage.findMany({
+        select: { id: true, packageNumber: true },
+      })
+    ).map((p) => [p.id, p.packageNumber] as const),
+  );
 
   for (const order of shippedOrders) {
     const carrier = "surat";
@@ -3817,12 +3830,16 @@ async function main() {
       order.status === OrderStatus.shipped
         ? ShipmentStatus.in_transit
         : ShipmentStatus.delivered;
-    const trackingNumber = trackingByPackage.get(order.packageId ?? order.id)!;
+    // Paketsiz (legacy) sipariş kendi numarasına düşer — runtime ile aynı kural.
+    const trackingNumber = order.packageId
+      ? (packageNumberById.get(order.packageId) ?? order.orderNumber)
+      : order.orderNumber;
 
     try {
       await prisma.shipment.create({
         data: {
           orderId: order.id,
+          packageId: order.packageId ?? null,
           provider: carrier,
           trackingNumber,
           trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${trackingNumber}`,
@@ -4052,12 +4069,37 @@ async function main() {
     const isRefunded = sc.status === RefundRequestStatus.refunded;
 
     try {
+      // İade senaryosu da gerçek checkout şeklindedir: sepet → koli → sipariş.
+      // (Eskiden grupsuz/paketsiz "çıplak" sipariş yaratılıyordu; kargo takip
+      // numarası da sipariş numarasının kendisi oluyordu.)
+      const orderNumber = generateOrderNumber();
+      const group = await prisma.checkoutGroup.create({
+        data: {
+          groupNumber: groupNumberFor(orderNumber),
+          buyerId: buyer.id,
+          idempotencyKey: `seed-refund-${i}-${randomUUID()}`,
+          totalAmount,
+          createdAt,
+        },
+      });
+      const pkg = await prisma.orderPackage.create({
+        data: {
+          packageNumber: generatePackageNumber(),
+          checkoutGroupId: group.id,
+          sellerId: product.sellerId,
+          buyerId: buyer.id,
+          shippingCost,
+          createdAt,
+        },
+      });
       const order = await prisma.order.create({
         data: {
-          orderNumber: generateOrderNumber(),
+          orderNumber,
           buyerId: buyer.id,
           sellerId: product.sellerId,
           productId: product.id,
+          checkoutGroupId: group.id,
+          packageId: pkg.id,
           totalAmount,
           subtotal,
           shippingCost,
@@ -4084,7 +4126,8 @@ async function main() {
       // İade tamamlandıysa Payment.refunded → "İade Geçmişi" sayfasını besler.
       await prisma.payment.create({
         data: {
-          orderId: order.id,
+          // Ödeme SEPETE aittir (payments_exactly_one_source_check).
+          checkoutGroupId: group.id,
           provider: "paytr",
           providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
           amount: totalAmount,
@@ -4103,9 +4146,12 @@ async function main() {
       await prisma.shipment.create({
         data: {
           orderId: order.id,
+          packageId: pkg.id,
           provider: "surat",
-          trackingNumber: order.orderNumber,
-          trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${order.orderNumber}`,
+          // Takip referansı KOLİ numarasıdır (Sürat'a giden kod) — sipariş
+          // numarasının kendisi değil.
+          trackingNumber: pkg.packageNumber,
+          trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${pkg.packageNumber}`,
           status: ShipmentStatus.delivered,
           shippedAt: new Date(createdAt.getTime() + 86400000),
           deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
@@ -5650,12 +5696,35 @@ async function main() {
     const withholding = Math.round(subtotal * 0.01 * 100) / 100;
     const createdAt = daysAgoDate(38 - i * 6);
 
+    // Kurumsal satış da gerçek checkout şeklindedir: sepet → koli → sipariş.
+    const orderNumber = generateOrderNumber();
+    const group = await prisma.checkoutGroup.create({
+      data: {
+        groupNumber: groupNumberFor(orderNumber),
+        buyerId: corpBuyer.id,
+        idempotencyKey: `seed-corp-${i}-${randomUUID()}`,
+        totalAmount,
+        createdAt,
+      },
+    });
+    const pkg = await prisma.orderPackage.create({
+      data: {
+        packageNumber: generatePackageNumber(),
+        checkoutGroupId: group.id,
+        sellerId: corporateSeller.id,
+        buyerId: corpBuyer.id,
+        shippingCost,
+        createdAt,
+      },
+    });
     const order = await prisma.order.create({
       data: {
-        orderNumber: generateOrderNumber(),
+        orderNumber,
         buyerId: corpBuyer.id,
         sellerId: corporateSeller.id,
         productId: p.id,
+        checkoutGroupId: group.id,
+        packageId: pkg.id,
         totalAmount,
         subtotal,
         shippingCost,
@@ -5674,7 +5743,9 @@ async function main() {
 
     const payment = await prisma.payment.create({
       data: {
-        orderId: order.id,
+        // Ödeme SEPETE aittir (payments_exactly_one_source_check: tam olarak bir
+        // kaynak) — gerçek checkout da grup bazlı tek ödeme yazar.
+        checkoutGroupId: group.id,
         provider: "paytr",
         providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
         amount: totalAmount,
@@ -5712,9 +5783,11 @@ async function main() {
     await prisma.shipment.create({
       data: {
         orderId: order.id,
+        packageId: pkg.id,
         provider: "surat",
-        trackingNumber: order.orderNumber,
-        trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${order.orderNumber}`,
+        // Takip referansı KOLİ numarasıdır (Sürat'a giden kod).
+        trackingNumber: pkg.packageNumber,
+        trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${pkg.packageNumber}`,
         status: ShipmentStatus.delivered,
         shippedAt: new Date(createdAt.getTime() + 86400000),
         deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
@@ -6160,6 +6233,7 @@ async function main() {
         // yüklenir. Burada satıcı başına 1 order → 2 ayrı paket (2 kargo, 3 değil).
         const pkg = await prisma.orderPackage.create({
           data: {
+            packageNumber: generatePackageNumber(),
             checkoutGroupId: group.id,
             sellerId: sp.sellerId,
             buyerId: buyerDeniz.id,
@@ -6224,6 +6298,7 @@ async function main() {
       });
       const pkg = await prisma.orderPackage.create({
         data: {
+          packageNumber: generatePackageNumber(),
           checkoutGroupId: group.id,
           sellerId: users[3].id,
           buyerId: buyerDeniz.id,
