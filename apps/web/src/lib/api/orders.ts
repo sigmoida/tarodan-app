@@ -193,6 +193,7 @@ export type RefundReason =
   | "damaged"
   | "wrong_item"
   | "not_as_described"
+  | "delivery_delayed"
   | "missing_parts"
   | "counterfeit"
   | "defective"

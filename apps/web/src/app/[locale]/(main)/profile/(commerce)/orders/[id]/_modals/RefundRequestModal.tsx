@@ -104,6 +104,10 @@ export default function RefundRequestModal({
       label: t("order.refundReasonChangedMind"),
     },
     {
+      value: "delivery_delayed",
+      label: t("order.refundReasonDeliveryDelayed"),
+    },
+    {
       value: "damaged",
       label: t("order.refundReasonDamaged"),
     },

@@ -285,6 +285,9 @@ export class RefundService {
       phase === "preparing" || phase === "paid"
         ? resolveCancellationPolicy(
             dto.reason === RefundReason.changed_mind ? "changed_mind" : "other",
+            // Bu dal yalnız `paid`/`preparing` fazında çalışır: paket henüz
+            // taşıyıcıya verilmemiştir, dolayısıyla taşıma maliyeti doğmamıştır.
+            { hasShipped: false },
           )
         : resolveReturnPolicy(dto.reason);
 
@@ -390,7 +393,9 @@ export class RefundService {
       throw new BadRequestException(i18nMessage("server.refund.alreadyActive"));
     }
 
-    const policy = resolveCancellationPolicy(reasonCode);
+    // Kargoya teslim edilmiş sipariş yukarıda reddedildi (iade talebine
+    // yönlendirilir), bu yüzden burada taşıma maliyeti hiç doğmamıştır.
+    const policy = resolveCancellationPolicy(reasonCode, { hasShipped: false });
     const financial = await this.buildFinancialPolicySnapshot(
       order,
       policy,

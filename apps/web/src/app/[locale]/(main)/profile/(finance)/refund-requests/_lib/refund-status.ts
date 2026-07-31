@@ -53,6 +53,7 @@ export function statusMetaOf(status: string): {
 
 /** RefundReason → catalog label key. */
 export const refundReasonLabelKey: Record<string, MessageKey> = {
+  delivery_delayed: "order.refundReasonDeliveryDelayed",
   changed_mind: "order.refundReasonChangedMind",
   damaged: "order.refundReasonDamaged",
   wrong_item: "order.refundReasonWrongItem",

@@ -70,6 +70,10 @@ export interface RefundFinancialResult {
 }
 
 const SELLER_FAULT_RETURN_REASONS = new Set([
+  // Paket kargoya verildikten sonra iptal edilemez (iade talebine yönlendirilir),
+  // bu yüzden gecikme burada da satıcı kusuru olarak karşılanmalı — aksi halde
+  // alıcı manuel incelemede bekliyordu.
+  "delivery_delayed",
   "not_as_described",
   "wrong_item",
   "damaged",
@@ -156,18 +160,33 @@ export function resolveReturnPolicy(reason: string): RefundPolicyDecision {
   return manualReviewReturnPolicy();
 }
 
+/**
+ * İptal politikası — nedene VE gönderinin yola çıkıp çıkmadığına bağlıdır.
+ *
+ * Kargo bedelini kimin üstlendiği yalnız nedenden çıkarılamaz: alıcı caymasında
+ * paket henüz kargoya verilmediyse taşıma hiç doğmaz (kimse ödemez), verildiyse
+ * maliyet gerçekleşmiştir ve alıcı üstlenir. Bu ayrım eskiden hiç yapılmıyordu;
+ * her iki taraf da tazmin edilip taşıma maliyeti PLATFORMDA kalıyordu.
+ *
+ * @param hasShipped Paket taşıyıcıya teslim edildi mi (gerçek maliyet doğdu mu).
+ */
 export function resolveCancellationPolicy(
   reason: string,
+  opts: { hasShipped?: boolean } = {},
 ): RefundPolicyDecision {
+  const hasShipped = opts.hasShipped === true;
+
   if (reason === "delivery_delayed") {
+    // Kusur satıcıda: alıcı kargoyu geri alır, maliyet satıcıya yazılır.
+    // Satıcının kendi payı da tazmin EDİLMEZ — gecikme onun kusuru.
     return {
       policyCode: "seller_fault_cancellation",
       returnShippingPayer: null,
       refundOutboundShipping: true,
       refundBuyerProtectionFee: true,
       refundSellerPlatformFee: false,
-      compensateSellerShipping: true,
-      chargeSellerOutboundShipping: false,
+      compensateSellerShipping: !hasShipped,
+      chargeSellerOutboundShipping: hasShipped,
       requiresEvidence: false,
       requiresAdminReview: false,
       penaltyReviewRequired: false,
@@ -175,13 +194,16 @@ export function resolveCancellationPolicy(
   }
 
   if (BUYER_REMORSE_CANCELLATION_REASONS.has(reason)) {
+    // Alıcı caydı: koruma hizmet bedeli her hâlükârda kesilir. Kargo ise
+    // yalnız gönderi yola çıktıysa alıcıya kalır (payı geri ödenmez);
+    // çıkmadıysa taşıma hiç doğmadığı için iki taraf da tazmin edilir.
     return {
       policyCode: "buyer_remorse_cancellation",
       returnShippingPayer: null,
-      refundOutboundShipping: true,
+      refundOutboundShipping: !hasShipped,
       refundBuyerProtectionFee: false,
       refundSellerPlatformFee: true,
-      compensateSellerShipping: true,
+      compensateSellerShipping: !hasShipped,
       chargeSellerOutboundShipping: false,
       requiresEvidence: false,
       requiresAdminReview: false,

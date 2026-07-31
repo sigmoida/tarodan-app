@@ -312,4 +312,87 @@ describe("refund financial policy", () => {
 
     expect(result.buyerRefundAmount).toBe(0);
   });
+
+  describe("iptal: kargo bedelini gönderi durumu belirler", () => {
+    // Eskiden iptal politikası yalnız nedene bakıyordu: alıcının kargo payı geri
+    // ödeniyor VE satıcının payı tazmin ediliyordu, yani taşıma maliyeti
+    // PLATFORMDA kalıyordu. Gönderi yola çıktıysa maliyet gerçekleşmiştir ve
+    // kusurlu tarafta kalmalıdır.
+    it("alıcı caymasında paket yola çıkmadıysa iki taraf da tazmin edilir", () => {
+      expect(
+        resolveCancellationPolicy("changed_mind", { hasShipped: false }),
+      ).toMatchObject({
+        policyCode: "buyer_remorse_cancellation",
+        refundOutboundShipping: true,
+        compensateSellerShipping: true,
+        // Koruma hizmet bedeli her hâlükârda kesilir.
+        refundBuyerProtectionFee: false,
+      });
+    });
+
+    it("alıcı caymasında paket yola çıktıysa kargoyu alıcı üstlenir", () => {
+      expect(
+        resolveCancellationPolicy("changed_mind", { hasShipped: true }),
+      ).toMatchObject({
+        policyCode: "buyer_remorse_cancellation",
+        // Alıcının payı geri ÖDENMEZ → maliyeti alıcı üstlenir.
+        refundOutboundShipping: false,
+        compensateSellerShipping: false,
+        refundBuyerProtectionFee: false,
+      });
+    });
+
+    it("teslimat gecikmesinde paket yola çıktıysa kargo satıcıya yazılır", () => {
+      expect(
+        resolveCancellationPolicy("delivery_delayed", { hasShipped: true }),
+      ).toMatchObject({
+        policyCode: "seller_fault_cancellation",
+        // Alıcı kargosunu geri alır; maliyet satıcıya borç yazılır.
+        refundOutboundShipping: true,
+        chargeSellerOutboundShipping: true,
+        compensateSellerShipping: false,
+        // Satıcı platform hizmet bedeli kesilir (iade edilmez).
+        refundSellerPlatformFee: false,
+      });
+    });
+
+    it("teslimat gecikmesinde paket yola çıkmadıysa taşıma maliyeti doğmaz", () => {
+      expect(
+        resolveCancellationPolicy("delivery_delayed", { hasShipped: false }),
+      ).toMatchObject({
+        chargeSellerOutboundShipping: false,
+        compensateSellerShipping: true,
+        refundSellerPlatformFee: false,
+      });
+    });
+
+    it("gönderi durumu verilmezse yola çıkmamış sayılır (geriye-uyum)", () => {
+      expect(resolveCancellationPolicy("changed_mind")).toMatchObject({
+        refundOutboundShipping: true,
+        compensateSellerShipping: true,
+      });
+    });
+  });
+
+  describe("iade: gecikmeli teslimat", () => {
+    it("satıcı kusuru sayılır — manuel incelemeye düşmez", () => {
+      // Kargoya verilmiş sipariş iptal EDİLEMEZ (iade talebine yönlendirilir),
+      // bu yüzden geç teslimatın iade tarafında da karşılığı olmalı.
+      expect(resolveReturnPolicy("delivery_delayed")).toMatchObject({
+        policyCode: "seller_fault_return",
+        returnShippingPayer: "seller",
+        chargeSellerOutboundShipping: true,
+        // Satıcı platform hizmet bedeli kesilir.
+        refundSellerPlatformFee: false,
+        // Alıcı koruma bedeli iade edilir — kusur alıcıda değil.
+        refundBuyerProtectionFee: true,
+      });
+    });
+
+    it("cezai işlem gerektirmez (yanlış ürün/sahte ürün gibi değil)", () => {
+      expect(
+        resolveReturnPolicy("delivery_delayed").penaltyReviewRequired,
+      ).toBe(false);
+    });
+  });
 });
