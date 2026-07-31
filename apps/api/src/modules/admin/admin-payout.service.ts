@@ -14,6 +14,8 @@ import {
 } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
 
 /**
  * Satıcı ödemeleri (escrow özet/işlem/plan/CSV, manuel release, transfer retry) —
@@ -678,8 +680,15 @@ export class AdminPayoutService {
     // çoğunlukla IBAN sorunundandır; satıcı IBAN'ı düzeltince cron işleme anında GÜNCEL
     // IBAN'ı okur (Y5) ve doğru hesaba gönderir.
     const isReturned = transfer.status === "returned";
+    // PayTR iade edilen bir transId'yi tekrar kabul etmez; yeni referans üret.
     const newTransId = isReturned
-      ? `ORD${transfer.id.replace(/-/g, "").slice(0, 16)}R${Date.now()}`
+      ? await generateUniqueReference(
+          REFERENCE_PREFIX.payoutTransfer,
+          async (code) =>
+            (await this.prisma.payoutTransfer.count({
+              where: { transId: code },
+            })) > 0,
+        )
       : undefined;
     await this.prisma.payoutTransfer.update({
       where: { id: transferId },

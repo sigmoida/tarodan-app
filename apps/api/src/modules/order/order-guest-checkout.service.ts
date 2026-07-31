@@ -29,6 +29,10 @@ import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
+import {
+  REFERENCE_PREFIX,
+  reprefixReference,
+} from "../../common/helpers/code-prefixes";
 
 /**
  * Misafir checkout + e-posta OTP alt sistemi: sendGuestCheckoutVerificationCode,
@@ -408,7 +412,10 @@ export class OrderGuestCheckoutService {
       // Tek siparişlik grup (misafir yolu)
       const guestOrderGroup = await tx.checkoutGroup.create({
         data: {
-          groupNumber: `GRP${orderNumber}`,
+          groupNumber: reprefixReference(
+            orderNumber,
+            REFERENCE_PREFIX.checkoutGroup,
+          ),
           buyerId: guestUser.id,
           totalAmount,
           isGuest: true,

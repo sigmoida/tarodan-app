@@ -11,6 +11,7 @@ import { CheckoutDto } from "./dto";
 import { OrderStatus, ProductStatus, Prisma } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { EventService } from "../events";
 import { DiscountService } from "../discount";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
@@ -497,7 +498,7 @@ export class OrderCheckoutGroupService {
 
           // Grup + sipariş numaraları
           const groupNumber = await generateUniqueReference(
-            "GRP",
+            REFERENCE_PREFIX.checkoutGroup,
             async (code) =>
               (await this.prisma.checkoutGroup.count({
                 where: { groupNumber: code },

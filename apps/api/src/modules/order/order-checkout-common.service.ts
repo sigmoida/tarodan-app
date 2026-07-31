@@ -6,6 +6,7 @@ import {
 import { createHash } from "crypto";
 import { PrismaService } from "../../prisma";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { Prisma } from "@prisma/client";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { TaxService } from "../tax/tax.service";
@@ -238,7 +239,7 @@ export class OrderCheckoutCommonService {
    */
   async generateOrderNumber(): Promise<string> {
     return generateUniqueReference(
-      "ORD",
+      REFERENCE_PREFIX.order,
       async (code) =>
         (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
     );

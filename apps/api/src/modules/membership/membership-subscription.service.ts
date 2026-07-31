@@ -32,6 +32,8 @@ import { i18nMessage } from "../i18n";
 import { PaymentProviderEventService } from "../payment/payment-provider-event.service";
 import { createHash } from "node:crypto";
 import { VirtualOrderFulfillmentService } from "../payment/virtual-order-fulfillment.service";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -514,7 +516,11 @@ export class MembershipSubscriptionService {
     ].join(":");
 
     try {
-      const orderNumber = `MEM-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      const orderNumber = await generateUniqueReference(
+        REFERENCE_PREFIX.membershipOrder,
+        async (code) =>
+          (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+      );
       intent = await this.prisma.$transaction(async (tx) => {
         const order = await tx.order.create({
           data: {

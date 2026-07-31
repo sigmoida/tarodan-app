@@ -45,6 +45,11 @@ import {
   TradeResponseDto,
 } from "./dto";
 import { i18nMessage } from "../i18n";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import {
+  generateReferenceCode,
+  generateUniqueReference,
+} from "../../common/helpers/generate-reference";
 
 /**
  * Takas yaşam döngüsü metodları (create/accept/reject/counter/cancel/ship/
@@ -79,10 +84,16 @@ export class TradeLifecycleService {
   // ==========================================================================
   // TRADE NUMBER GENERATION
   // ==========================================================================
-  private generateTradeNumber(): string {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `TRD-${timestamp}-${random}`;
+  /**
+   * Takas referansı: TKS-XXXXXXXXXX. Önek "TRD" değildir — o, e-Arşiv fatura
+   * numarasının GİB'e kayıtlı önekiyle çakışır (bkz. code-prefixes.ts).
+   */
+  private generateTradeNumber(): Promise<string> {
+    return generateUniqueReference(
+      REFERENCE_PREFIX.trade,
+      async (code) =>
+        (await this.prisma.trade.count({ where: { tradeNumber: code } })) > 0,
+    );
   }
 
   // ==========================================================================
@@ -210,6 +221,10 @@ export class TradeLifecycleService {
         { required: true },
       );
 
+    // Referans işlem dışında üretilir: çakışma kontrolü transaction'ı
+    // gereksiz yere uzatmasın.
+    const tradeNumber = await this.generateTradeNumber();
+
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
       // CRITICAL: Don't reserve products when trade is pending
@@ -220,7 +235,7 @@ export class TradeLifecycleService {
       // Create trade
       const newTrade = await tx.trade.create({
         data: {
-          tradeNumber: this.generateTradeNumber(),
+          tradeNumber,
           initiatorId,
           receiverId: dto.receiverId,
           status: TradeStatus.pending,
@@ -1084,7 +1099,9 @@ export class TradeLifecycleService {
         );
       }
 
-      const trackingNumber = `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const trackingNumber = generateReferenceCode(
+        REFERENCE_PREFIX.shipmentFallback,
+      );
 
       let confirmationDeadline: Date | null = null;
       if (newStatus === TradeStatus.both_shipped) {

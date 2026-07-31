@@ -9,6 +9,8 @@ import { Request } from "express";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { ProductStatus, OrderStatus, Prisma } from "@prisma/client";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { isPremiumEntitled } from "../membership/membership.util";
 import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
@@ -373,10 +375,11 @@ export class ProductBoostService {
         },
       });
 
-      const orderNumber = `BOOST-${Date.now()}-${Math.random()
-        .toString(36)
-        .substr(2, 9)
-        .toUpperCase()}`;
+      const orderNumber = await generateUniqueReference(
+        REFERENCE_PREFIX.boostOrder,
+        async (code) =>
+          (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+      );
 
       const order = await this.prisma.order.create({
         data: {

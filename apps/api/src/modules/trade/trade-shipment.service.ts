@@ -88,7 +88,7 @@ export class TradeShipmentService {
    * cash payment).
    *
    * Behaviour:
-   *   - Pre-generates `OzelKargoTakipNo` as `TRD-{tradeNumber}-WH-{INI|REC}`.
+   *   - Pre-generates `OzelKargoTakipNo` as `{tradeNumber}-WH-{INI|REC}`.
    *   - Creates the rows in a single short transaction (no Sürat call inside).
    *   - After the tx commits, calls `submitShipmentWithRetry` per side. On
    *     failure, the row is left at `pending` and a warning is logged so the
@@ -282,8 +282,7 @@ export class TradeShipmentService {
               });
             }
           } else {
-            // tradeNumber zaten "TRD-..." formatında geliyor; çift "TRD-" önekini
-            // önlemek için doğrudan tradeNumber'ı kullan.
+            // tradeNumber zaten "TKS-..." önekini taşır; ikinci bir önek eklenmez.
             const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
               .replace(/[^a-zA-Z0-9-]/g, "")
               .slice(0, 50);

@@ -27,6 +27,11 @@ import {
 import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { paginate, resolveOrderBy } from "../../common/list";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import {
+  generateReferenceCode,
+  generateUniqueReference,
+} from "../../common/helpers/generate-reference";
 
 /**
  * #291: sortable fields for the cache-backed guest-contacts list and their sort
@@ -55,10 +60,22 @@ export class SupportService {
   // ==========================================================================
   // GENERATE TICKET NUMBER
   // ==========================================================================
-  private generateTicketNumber(): string {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 4).toUpperCase();
-    return `TKT-${timestamp}-${random}`;
+  private generateTicketNumber(): Promise<string> {
+    return generateUniqueReference(
+      REFERENCE_PREFIX.supportTicket,
+      async (code) =>
+        (await this.prisma.supportTicket.count({
+          where: { ticketNumber: code },
+        })) > 0,
+    );
+  }
+
+  /**
+   * Misafir (üye olmayan) iletişim formu referansı. Redis'te tutulduğu için
+   * DB'de tekillik kontrolü yapılamaz; 30^10 uzayında çakışma ihmal edilebilir.
+   */
+  private generateGuestContactReference(): string {
+    return generateReferenceCode(REFERENCE_PREFIX.guestContact);
   }
 
   // ==========================================================================
@@ -87,7 +104,7 @@ export class SupportService {
 
     try {
       // Generate a reference number for the guest contact
-      const referenceNumber = this.generateTicketNumber().replace("TKT", "GC");
+      const referenceNumber = this.generateGuestContactReference();
 
       // Store guest contact in Redis with 30 day TTL
       const guestContactData = {
@@ -269,9 +286,10 @@ export class SupportService {
     userId: string,
     dto: CreateTicketDto,
   ): Promise<TicketResponseDto> {
+    const ticketNumber = await this.generateTicketNumber();
     const ticket = await this.prisma.supportTicket.create({
       data: {
-        ticketNumber: this.generateTicketNumber(),
+        ticketNumber,
         creatorId: userId,
         category: dto.category,
         priority: dto.priority ?? TicketPriority.medium,

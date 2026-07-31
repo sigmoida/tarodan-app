@@ -20,6 +20,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { PaymentService } from "../payment/payment.service";
 import { RefundPendingReconciliationException } from "../payment-providers/refund-errors";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
@@ -1409,7 +1410,7 @@ export class RefundService {
 
   private async generateRefundNumber(): Promise<string> {
     return generateUniqueReference(
-      "RFD",
+      REFERENCE_PREFIX.refundRequest,
       async (code) =>
         (await this.prisma.refundRequest.count({
           where: { refundNumber: code },

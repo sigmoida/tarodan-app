@@ -26,6 +26,7 @@ import { OrderCheckoutCommonService } from "../order/order-checkout-common.servi
 import { ProductLockService } from "../product/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
 
 @Injectable()
@@ -64,7 +65,7 @@ export class OfferService {
    */
   private async generateOrderNumber(): Promise<string> {
     return generateUniqueReference(
-      "ORD",
+      REFERENCE_PREFIX.order,
       async (code) =>
         (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
     );

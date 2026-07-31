@@ -20,6 +20,8 @@ import {
 } from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 import { LedgerService } from "../ledger/ledger.service";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
 
 /** IBAN'ı log-güvenli hale getir (KVKK): yalnız son 4 hane. */
 function maskIban(iban: string | null | undefined): string {
@@ -239,7 +241,15 @@ export class PayoutService {
         order.orderNumber.replace(/-/g, "");
 
       const bankAccount = hold.seller.bankAccount;
-      const transId = `ORD${hold.orderId.replace(/-/g, "").slice(0, 20)}${Date.now()}`;
+      // PayTR platform transfer referansı. Tekillik `transId` unique index'i
+      // ile garanti; format diğer işlem referanslarıyla aynı ailede.
+      const transId = await generateUniqueReference(
+        REFERENCE_PREFIX.payoutTransfer,
+        async (code) =>
+          (await this.prisma.payoutTransfer.count({
+            where: { transId: code },
+          })) > 0,
+      );
       const pendingAdjustment = await (
         this.prisma as any
       ).sellerAccountAdjustment?.findFirst({
@@ -329,7 +339,13 @@ export class PayoutService {
         payment?.providerConversationId?.trim() ||
         tcp.tradeId.replace(/-/g, "");
 
-      const transId = `TRD${tcp.tradeId.replace(/-/g, "").slice(0, 20)}${Date.now()}`;
+      const transId = await generateUniqueReference(
+        REFERENCE_PREFIX.payoutTransfer,
+        async (code) =>
+          (await this.prisma.payoutTransfer.count({
+            where: { transId: code },
+          })) > 0,
+      );
       const bankAccount = recipient.bankAccount;
 
       await this.prisma.payoutTransfer.create({

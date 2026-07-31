@@ -11,6 +11,8 @@ import { SearchService } from "../search/search.service";
 import { notifyWebRevalidate } from "../../common/revalidate";
 import { fulltextDiscountSearch } from "../../common/helpers/fulltext-search";
 import { resolveOrderBy } from "../../common/list";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateReferenceCode } from "../../common/helpers/generate-reference";
 import {
   CreateDiscountDto,
   UpdateDiscountDto,
@@ -1076,14 +1078,13 @@ export class DiscountService {
     return { generated, total };
   }
 
-  /** URL/insan dostu benzersiz-olması muhtemel kod (çakışma DB'de yakalanır). */
+  /**
+   * Hediye/kupon kodu. Parasal değer taşıdığı için kriptografik rastgelelik
+   * şart: tahmin edilebilir bir kod doğrudan para kaybıdır. Çakışma ayrıca
+   * `code` üzerindeki unique index ile yakalanır.
+   */
   private randomVoucherCode(prefix: string): string {
-    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 0/O, 1/I çıkarıldı
-    let body = "";
-    for (let i = 0; i < 10; i += 1) {
-      body += alphabet[Math.floor(Math.random() * alphabet.length)];
-    }
-    return prefix ? `${prefix}-${body}` : body;
+    return generateReferenceCode(prefix || REFERENCE_PREFIX.voucher);
   }
 
   /** Bir batch'in kodları (admin listeleme + CSV export). */

@@ -46,6 +46,7 @@ describe("PayoutService.createPayoutsForReleasedHolds — grup ödeme payout (#1
       refundAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
       payoutTransfer: {
+        count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockImplementation((arg: any) => {
           created.push(arg.data);
           return Promise.resolve({});

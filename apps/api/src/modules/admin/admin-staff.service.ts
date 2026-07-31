@@ -28,6 +28,7 @@ import {
   AdminRole,
 } from "@prisma/client";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
+import { randomInt } from "crypto";
 
 /**
  * Admin personel/rol yönetimi (+ banner aralığındaki banUser) — AdminService'in
@@ -217,12 +218,16 @@ export class AdminStaffService {
     throw new ForbiddenException("Bu işlem için yetkiniz yok");
   }
 
-  /** Yeni admin hesabı için okunabilir geçici şifre üret. */
+  /**
+   * Yeni admin hesabı için okunabilir geçici şifre üret.
+   * `randomInt` (CSPRNG) şart: Math.random'ın iç durumu birkaç çıktıdan geri
+   * hesaplanabilir; e-postayla giden bir admin şifresi tahmin edilebilir olamaz.
+   */
   private generateTempPassword(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
     let p = "";
     for (let i = 0; i < 10; i++) {
-      p += chars[Math.floor(Math.random() * chars.length)];
+      p += chars[randomInt(0, chars.length)];
     }
     return p + "!9";
   }

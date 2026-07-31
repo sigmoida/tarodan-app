@@ -26,6 +26,10 @@ import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
+import {
+  REFERENCE_PREFIX,
+  reprefixReference,
+} from "../../common/helpers/code-prefixes";
 
 /**
  * Grup dışı satın alma akışları: Hızlı Al (createDirectOrder), teklif→sipariş (create)
@@ -438,7 +442,10 @@ export class OrderCheckoutDirectService {
       // backfill konvansiyonuyla aynı: 'GRP' + orderNumber → uniqueness garantili)
       const singleOrderGroup = await tx.checkoutGroup.create({
         data: {
-          groupNumber: `GRP${orderNumber}`,
+          groupNumber: reprefixReference(
+            orderNumber,
+            REFERENCE_PREFIX.checkoutGroup,
+          ),
           buyerId,
           totalAmount,
           isGuest: false,
@@ -796,7 +803,10 @@ export class OrderCheckoutDirectService {
       // Tek siparişlik grup (teklif yolu)
       const offerOrderGroup = await tx.checkoutGroup.create({
         data: {
-          groupNumber: `GRP${orderNumber}`,
+          groupNumber: reprefixReference(
+            orderNumber,
+            REFERENCE_PREFIX.checkoutGroup,
+          ),
           buyerId,
           totalAmount,
           isGuest: false,
