@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 
+/** "Tüm kategoriler" seçeneğinin form değeri; kayıtta `categoryId: null` olur. */
+export const ALL_CATEGORIES = "all";
+
 type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Category {
@@ -140,7 +143,10 @@ export const commissionSchema = (t: T) =>
       name: z
         .string()
         .min(1, t("admin.finance.commission.validation.nameRequired")),
-      categoryId: z.string().optional().default(""),
+      // "all" gerçek bir DEĞER: FormSelect boş string'i undefined'a çevirip
+      // placeholder gösteriyor, bu yüzden "" seçili görünmüyordu. Satıcı ve
+      // vergi tipi de aynı kalıbı kullanıyor (ALL / all).
+      categoryId: z.string().optional().default(ALL_CATEGORIES),
       sellerType: z.enum(["FREE", "PREMIUM", "BUSINESS", "ALL"]).default("ALL"),
       taxpayerType: z.enum(["individual", "corporate", "all"]).default("all"),
       appliesTo: z.enum(["SELLER", "BUYER", "BOTH"]).default("BOTH"),
@@ -209,7 +215,7 @@ export type CommissionFormValues = z.infer<ReturnType<typeof commissionSchema>>;
 
 export const emptyCommissionForm: CommissionFormValues = {
   name: "",
-  categoryId: "",
+  categoryId: ALL_CATEGORIES,
   sellerType: "ALL",
   taxpayerType: "all",
   appliesTo: "BOTH",
@@ -241,7 +247,7 @@ export function ruleToForm(rule: CommissionRule): CommissionFormValues {
   // v2 rates fall back to legacy so editing an old rule pre-fills sensibly.
   return {
     name: rule.name,
-    categoryId: rule.categoryId ?? "",
+    categoryId: rule.categoryId ?? ALL_CATEGORIES,
     sellerType: rule.sellerType ?? "ALL",
     taxpayerType: rule.taxpayerType ?? "all",
     appliesTo: rule.appliesTo ?? "BOTH",
@@ -274,7 +280,8 @@ const num = (v: string) => (v ? parseFloat(v) : null);
 export function commissionFormToPayload(v: CommissionFormValues) {
   return {
     name: v.name.trim(),
-    categoryId: v.categoryId || null,
+    categoryId:
+      v.categoryId && v.categoryId !== ALL_CATEGORIES ? v.categoryId : null,
     sellerType: v.sellerType,
     taxpayerType: v.taxpayerType,
     appliesTo: v.appliesTo,

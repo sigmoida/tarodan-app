@@ -26,6 +26,7 @@ import {
   type OrderBreakdownLineKey,
 } from "@tarodan/shared";
 import {
+  ALL_CATEGORIES,
   type CommissionRule,
   type CommissionFormValues,
   commissionSchema,
@@ -634,9 +635,22 @@ export function CommissionRuleFormModal({
     },
   );
 
+  // Kategoriler asenkron yüklenir. Düzenlenen kuralın kategorisi liste gelene
+  // kadar seçenekler arasında bulunmuyor ve seçim BOŞ görünüyordu; yükleme
+  // bitene kadar kuralın kendi kategorisi geçici bir seçenek olarak eklenir.
+  const selectedCategoryId = form.watch("categoryId");
+  const knownCategory =
+    selectedCategoryId === ALL_CATEGORIES ||
+    categories.some((c) => c.id === selectedCategoryId);
   const categoryOptions = [
-    { value: "", label: t("admin.finance.commission.allCategories") },
+    {
+      value: ALL_CATEGORIES,
+      label: t("admin.finance.commission.allCategories"),
+    },
     ...categories.map((c) => ({ value: c.id, label: c.name })),
+    ...(knownCategory
+      ? []
+      : [{ value: selectedCategoryId, label: t("common.loading") }]),
   ];
 
   const submit = (values: CommissionFormValues) => {
