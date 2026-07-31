@@ -323,6 +323,9 @@ export class PaymentCommonService {
       await this.prisma.shipment.create({
         data: {
           orderId,
+          // Koli bağı: aynı packageId'yi paylaşan satırlar TEK fiziksel gönderidir
+          // → Sürat koli başına bir kez sorgulanır, webhook kardeşlere yayılır.
+          packageId: order.packageId ?? null,
           provider: "surat",
           status: "pending",
           // trackingNumber = paket OzelKargoTakipNo — poller bununla sorgular;

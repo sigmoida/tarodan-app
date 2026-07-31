@@ -50,19 +50,20 @@ export class OrderTrackingSyncService {
     if (!shipment.trackingNumber) {
       return false;
     }
-    const data = await this.client.fetchTrackingInfo(shipment.trackingNumber);
-
-    if (!data || data.Gonderiler.length === 0) {
-      return false;
-    }
-
-    const gonderi = data.Gonderiler[0];
+    const gonderi = await this.fetchParcel(shipment.trackingNumber);
+    if (!gonderi) return false;
     return this.applyTrackingUpdate(shipment, gonderi);
   }
 
   /**
    * Sync all active Sürat shipments (not yet delivered/returned/cancelled).
    * Intended to be called by a cron job or Bull queue.
+   *
+   * Sorgu birimi KOLİDİR, sipariş satırı değil: bir OrderPackage = bir fiziksel
+   * gönderi = bir OzelKargoTakipNo (PKG-…). 3 ürünlü tek satıcı paketi eskiden
+   * Sürat'ı aynı gönderi için 3 kez sorguluyordu; artık tek sorgu yapılıp sonuç
+   * paketin tüm satırlarına uygulanır. Statü geçişi (CAS) ve teslim escrow'u
+   * satır bazında kalır — iade/ödeme muhasebesi sipariş bazlı olduğu için.
    */
   async syncAllActiveShipments(): Promise<{ synced: number; failed: number }> {
     // Only sync shipments that have a tracking reference. Auto-created
@@ -84,28 +85,56 @@ export class OrderTrackingSyncService {
           { trackingNumber: { not: null } },
         ],
       },
+      include: { order: true },
     });
+
+    // Koli bazında grupla: anahtar = Sürat sorgu referansı (trackingNumber).
+    // Referansı olmayan satır zaten sorgulanamaz — kendi başına bir grup olur ve
+    // syncShipmentTracking'in erken çıkışına düşer (davranış aynı).
+    const parcels = new Map<string, typeof activeShipments>();
+    for (const shipment of activeShipments) {
+      const key = shipment.trackingNumber ?? `shipment:${shipment.id}`;
+      const siblings = parcels.get(key);
+      if (siblings) siblings.push(shipment);
+      else parcels.set(key, [shipment]);
+    }
 
     let synced = 0;
     let failed = 0;
 
-    for (const shipment of activeShipments) {
+    for (const [ref, siblings] of parcels) {
       try {
-        const success = await this.syncShipmentTracking(shipment.id);
-        if (success) synced++;
-        else failed++;
+        // Tek Sürat çağrısı; sonuç kolinin tüm satırlarına uygulanır.
+        const gonderi = siblings[0].trackingNumber
+          ? await this.fetchParcel(siblings[0].trackingNumber)
+          : null;
+        if (!gonderi) {
+          failed += siblings.length;
+          continue;
+        }
+        for (const shipment of siblings) {
+          const success = await this.applyTrackingUpdate(shipment, gonderi);
+          if (success) synced++;
+          else failed++;
+        }
       } catch (error: any) {
-        this.logger.error(
-          `Failed to sync shipment ${shipment.id}: ${error.message}`,
-        );
-        failed++;
+        this.logger.error(`Failed to sync parcel ${ref}: ${error.message}`);
+        failed += siblings.length;
       }
     }
 
     this.logger.log(
-      `Surat tracking sync: ${synced} synced, ${failed} failed out of ${activeShipments.length}`,
+      `Surat tracking sync: ${synced} synced, ${failed} failed out of ` +
+        `${activeShipments.length} shipments in ${parcels.size} parcels`,
     );
     return { synced, failed };
+  }
+
+  /** Bir koliyi Sürat'tan tek sorguyla çeker (OzelKargoTakipNo = PKG-…). */
+  private async fetchParcel(ref: string): Promise<SuratTakipGonderi | null> {
+    const data = await this.client.fetchTrackingInfo(ref);
+    if (!data || data.Gonderiler.length === 0) return null;
+    return data.Gonderiler[0];
   }
 
   private async applyTrackingUpdate(

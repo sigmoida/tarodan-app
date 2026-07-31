@@ -158,6 +158,8 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     expect(captured.shipmentCreate.trackingNumber).toBe("PKG-COLI0001");
     expect(captured.shipmentCreate.providerTrackingId).toBe("SURAT-123");
     expect(captured.shipmentCreate.orderId).toBe("o2");
+    // Gönderi satırı koliye bağlanır → poller/webhook kardeşleri bulabilir.
+    expect(captured.shipmentCreate.packageId).toBe("pkg-1");
   });
 
   it("cancel: paketin BİR order'ı iptal, kardeş hâlâ canlı → fiziksel gönderi İPTAL EDİLMEZ (yerel cancel)", async () => {

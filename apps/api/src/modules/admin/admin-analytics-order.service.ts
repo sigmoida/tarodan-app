@@ -920,6 +920,8 @@ export class AdminAnalyticsOrderService {
         updatedShipment = await tx.shipment.create({
           data: {
             orderId,
+            // Koli bağı — manuel admin girişi de paketi kaybetmez.
+            packageId: fresh.packageId ?? null,
             trackingNumber: dto.trackingNumber,
             providerTrackingId: dto.trackingNumber,
             provider: dto.carrier,

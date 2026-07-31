@@ -235,6 +235,7 @@ export class ShippingService {
       where: { id: dto.orderId },
       include: {
         seller: { include: { addresses: { where: { isDefault: true } } } },
+        package: { select: { packageNumber: true } },
       },
     });
 
@@ -296,12 +297,17 @@ export class ShippingService {
     // no) olarak set et → retry job'u sonraki tick'te gerçek barkodu (providerTrackingId)
     // idempotent olarak tamamlar. Sürat-dışı sağlayıcılar eskisi gibi lokal kalır.
     const isSurat = dto.provider === "surat";
+    // Sürat referansı = KOLİ numarası (PKG-…), sipariş numarası değil: paketin tüm
+    // satırları tek gönderiyi paylaşır ve müşteri kargosunu bu kodla sorgular.
+    // Paketsiz (legacy) siparişte sipariş numarasına düşülür.
+    const suratRef = order.package?.packageNumber ?? order.orderNumber;
     const shipment = await this.prisma.shipment.create({
       data: {
         orderId: dto.orderId,
+        packageId: order.packageId ?? null,
         provider: dto.provider,
         status: ShipmentStatus.pending,
-        ...(isSurat ? { trackingNumber: order.orderNumber } : {}),
+        ...(isSurat ? { trackingNumber: suratRef } : {}),
         cost: rate.cost,
         estimatedDelivery,
       },
@@ -437,19 +443,20 @@ export class ShippingService {
       `Received webhook from ${provider}: tracking=${payload?.trackingNumber ?? payload?.tracking_no ?? "?"} status=${payload?.status ?? "?"}`,
     );
 
-    // Find shipment by tracking number
-    const shipment = await this.prisma.shipment.findFirst({
+    // Referansla eşleşen TÜM gönderi satırları — bir koli (OrderPackage) birden
+    // çok sipariş satırı içerdiğinde hepsi aynı OzelKargoTakipNo'yu paylaşır.
+    // Eskiden findFirst ile yalnız BİRİ güncelleniyordu: kardeş satırlar kargoda
+    // takılı kalıyor, teslimde escrow'ları hiç açılmıyordu.
+    const reference = payload.trackingNumber || payload.tracking_no;
+    const siblings = await this.prisma.shipment.findMany({
       where: {
         provider,
-        OR: [
-          { trackingNumber: payload.trackingNumber || payload.tracking_no },
-          { providerTrackingId: payload.trackingNumber || payload.tracking_no },
-        ],
+        OR: [{ trackingNumber: reference }, { providerTrackingId: reference }],
       },
       include: { order: true },
     });
 
-    if (!shipment) {
+    if (!siblings.length) {
       this.logger.warn(
         `Shipment not found for tracking: ${payload.trackingNumber}`,
       );
@@ -467,62 +474,68 @@ export class ShippingService {
 
     const newStatus = statusMap[payload.status] || ShipmentStatus.in_transit;
 
-    // #86: ignore out-of-order / illegal provider events (e.g. a late in_transit
-    // after delivered) instead of blind-writing them and regressing the shipment.
-    if (!canTransitionShipmentStatus(shipment.status, newStatus)) {
-      this.logger.warn(
-        `Ignoring illegal shipment transition ${shipment.status} → ${newStatus} ` +
-          `for ${shipment.id} (provider webhook ${provider})`,
-      );
-      return { status: "ignored" };
-    }
-
     // Y11: Teslimat işlemini tüm yollarla TUTARLI yap. 48h dallanması + escrow schedule
     // artık tek kanonik handler'da (paymentService.handleOrderDelivered) — geldiği yola göre
     // farklı sonuç veren eski kopya mantık kaldırıldı.
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Update shipment status — M7 CAS: canTransition yukarıda snapshot'a göre
-      // bakıldı; arada poller/admin statüyü değiştirdiyse yazma, ignore dön.
-      const cas = await tx.shipment.updateMany({
-        where: { id: shipment.id, status: shipment.status },
-        data: { status: newStatus },
-      });
-      if (cas.count === 0) {
+    // Her satır KENDİ geçiş kontrolünü ve CAS'ını yapar: kardeşlerden biri admin
+    // tarafından farklı bir statüye alınmışsa yalnız o atlanır, koli geri kalmaz.
+    let applied = 0;
+    for (const shipment of siblings) {
+      // #86: ignore out-of-order / illegal provider events (e.g. a late in_transit
+      // after delivered) instead of blind-writing them and regressing the shipment.
+      if (!canTransitionShipmentStatus(shipment.status, newStatus)) {
         this.logger.warn(
-          `Ignoring stale provider webhook for ${shipment.id}: status changed concurrently (snapshot=${shipment.status})`,
+          `Ignoring illegal shipment transition ${shipment.status} → ${newStatus} ` +
+            `for ${shipment.id} (provider webhook ${provider})`,
         );
-        return { status: "ignored" };
+        continue;
       }
 
-      // Create event
-      await tx.shipmentEvent.create({
-        data: {
-          shipmentId: shipment.id,
-          status: newStatus,
-          location: payload.location || "Bilinmiyor",
-          description: payload.description,
-          occurredAt: payload.timestamp
-            ? new Date(payload.timestamp)
-            : new Date(),
-        },
+      const ok = await this.prisma.$transaction(async (tx) => {
+        // Update shipment status — M7 CAS: canTransition yukarıda snapshot'a göre
+        // bakıldı; arada poller/admin statüyü değiştirdiyse yazma, ignore dön.
+        const cas = await tx.shipment.updateMany({
+          where: { id: shipment.id, status: shipment.status },
+          data: { status: newStatus },
+        });
+        if (cas.count === 0) {
+          this.logger.warn(
+            `Ignoring stale provider webhook for ${shipment.id}: status changed concurrently (snapshot=${shipment.status})`,
+          );
+          return false;
+        }
+
+        // Create event
+        await tx.shipmentEvent.create({
+          data: {
+            shipmentId: shipment.id,
+            status: newStatus,
+            location: payload.location || "Bilinmiyor",
+            description: payload.description,
+            occurredAt: payload.timestamp
+              ? new Date(payload.timestamp)
+              : new Date(),
+          },
+        });
+
+        // Update order status if delivered. YENİ ESCROW: teslimde ANINDA release YOK
+        // (her iki modda da). deliveredAt set edilir ve hold release = teslim + return
+        // + grace olarak zamanlanır (releaseHoldsDue cron + frozen/açık-iade guard'ları).
+        // Tek kanonik handler: order geçişi + escrow schedule + 48h dallanması burada.
+        if (newStatus === ShipmentStatus.delivered) {
+          await this.paymentService.handleOrderDelivered(
+            shipment.orderId,
+            new Date(),
+            tx,
+          );
+        }
+
+        return true;
       });
+      if (ok) applied++;
+    }
 
-      // Update order status if delivered. YENİ ESCROW: teslimde ANINDA release YOK
-      // (her iki modda da). deliveredAt set edilir ve hold release = teslim + return
-      // + grace olarak zamanlanır (releaseHoldsDue cron + frozen/açık-iade guard'ları).
-      // Tek kanonik handler: order geçişi + escrow schedule + 48h dallanması burada.
-      if (newStatus === ShipmentStatus.delivered) {
-        await this.paymentService.handleOrderDelivered(
-          shipment.orderId,
-          new Date(),
-          tx,
-        );
-      }
-
-      return { status: "ok" };
-    });
-
-    return result;
+    return { status: applied > 0 ? "ok" : "ignored" };
   }
 
   /**

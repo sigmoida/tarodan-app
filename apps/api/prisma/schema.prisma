@@ -1361,6 +1361,7 @@ model OrderPackage {
   updatedAt               DateTime       @updatedAt @map("updated_at")
   checkoutGroup           CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id])
   orders                  Order[]
+  shipments               Shipment[]
 
   @@index([checkoutGroupId])
   @@index([sellerId])
@@ -1969,6 +1970,11 @@ enum ElogoInvoiceStatus {
 model Shipment {
   id                  String          @id @default(uuid())
   orderId             String          @unique @map("order_id")
+  // KOLİ bağı: bir OrderPackage = bir fiziksel gönderi, ama kayıt hâlâ sipariş
+  // başınadır (iade/escrow/muhasebe sipariş bazlı). Aynı packageId'yi paylaşan
+  // satırlar AYNI koliyi temsil eder → Sürat tek kez sorgulanır, webhook tüm
+  // kardeşlere yayılır. Nullable: paketsiz (eski/manuel) kayıtlar için.
+  packageId           String?         @map("package_id")
   provider            String
   trackingNumber      String?         @map("tracking_number")
   trackingUrl         String?         @map("tracking_url")
@@ -1998,7 +2004,9 @@ model Shipment {
   updatedAt           DateTime        @updatedAt @map("updated_at")
   events              ShipmentEvent[]
   order               Order           @relation(fields: [orderId], references: [id])
+  orderPackage        OrderPackage?   @relation(fields: [packageId], references: [id])
 
+  @@index([packageId])
   @@map("shipments")
 }
 
