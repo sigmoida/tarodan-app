@@ -17,6 +17,8 @@ export const categorySchema = (t: T) =>
       .max(500, t("admin.catalog.common.maxChars", { max: 500 }))
       .optional()
       .or(z.literal("")),
+    parentId: z.string().optional().or(z.literal("")),
+    sortOrder: z.string().optional().or(z.literal("")),
     isActive: z.boolean(),
   });
 

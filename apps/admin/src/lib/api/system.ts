@@ -11,6 +11,29 @@ export const systemApi = {
   updateSetting: (key: string, value: string) =>
     api.patch(`/admin/settings/${key}`, { value }),
 
+  // Early-access invite codes (pre-launch site lock)
+  getSiteAccessPins: (params?: any) =>
+    api.get("/admin/site-access-pins", { params }),
+  createSiteAccessPin: (data: any) => api.post("/admin/site-access-pins", data),
+  updateSiteAccessPin: (id: string, data: any) =>
+    api.patch(`/admin/site-access-pins/${id}`, data),
+  deleteSiteAccessPin: (id: string) =>
+    api.delete(`/admin/site-access-pins/${id}`),
+  sendSiteAccessPinInvite: (id: string) =>
+    api.post(`/admin/site-access-pins/${id}/send-invite`),
+
+  // Safe-trade warehouse address (backed by the warehouse_address_id setting)
+  getWarehouseAddress: () => api.get("/admin/settings/warehouse-address"),
+  updateWarehouseAddress: (data: {
+    title?: string;
+    fullName: string;
+    phone: string;
+    city: string;
+    district: string;
+    address: string;
+    zipCode?: string;
+  }) => api.put("/admin/settings/warehouse-address", data),
+
   // Search index (Elasticsearch) — drops + rebuilds the product index.
   reindexSearch: () => api.post("/search/admin/reindex"),
 

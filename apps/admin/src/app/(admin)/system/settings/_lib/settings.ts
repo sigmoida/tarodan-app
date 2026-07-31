@@ -19,6 +19,8 @@ export interface Settings {
 }
 
 export type SettingsTab = "listing" | "trade" | "message";
+/** All page tabs — "warehouse" renders its own card, not the numeric form. */
+export type SettingsPageTab = SettingsTab | "warehouse";
 
 export interface FieldDef {
   key: keyof Settings;
@@ -37,18 +39,41 @@ const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
   listing: [
     { key: "freeListingLimit", backendKey: "free_listing_limit", min: 0 },
     { key: "basicListingLimit", backendKey: "basic_listing_limit", min: -1 },
-    { key: "premiumListingLimit", backendKey: "premium_listing_limit", min: -1 },
-    { key: "businessListingLimit", backendKey: "business_listing_limit", min: -1 },
-    { key: "minProductPrice", backendKey: "min_product_price", min: 0, step: 0.01 },
-    { key: "maxProductPrice", backendKey: "max_product_price", min: 0, step: 0.01 },
+    {
+      key: "premiumListingLimit",
+      backendKey: "premium_listing_limit",
+      min: -1,
+    },
+    {
+      key: "businessListingLimit",
+      backendKey: "business_listing_limit",
+      min: -1,
+    },
+    {
+      key: "minProductPrice",
+      backendKey: "min_product_price",
+      min: 0,
+      step: 0.01,
+    },
+    {
+      key: "maxProductPrice",
+      backendKey: "max_product_price",
+      min: 0,
+      step: 0.01,
+    },
   ],
   trade: [
     { key: "tradeResponseHours", backendKey: "trade_response_deadline_hours" },
     { key: "tradePaymentHours", backendKey: "trade_payment_deadline_hours" },
     { key: "tradeShippingDays", backendKey: "trade_shipping_deadline_days" },
-    { key: "tradeConfirmationDays", backendKey: "trade_confirmation_deadline_days" },
+    {
+      key: "tradeConfirmationDays",
+      backendKey: "trade_confirmation_deadline_days",
+    },
   ],
-  message: [{ key: "maxMessageLength", backendKey: "max_message_length", min: 1 }],
+  message: [
+    { key: "maxMessageLength", backendKey: "max_message_length", min: 1 },
+  ],
 };
 
 /** Per-field translation keys (label/helper) — display-only, kept apart from `FIELD_DEFS`. */
@@ -100,11 +125,12 @@ const FIELD_LABEL_KEYS = {
   },
 } as const satisfies Record<keyof Settings, { label: string; helper: string }>;
 
-export function settingsTabs(t: T): { key: SettingsTab; label: string }[] {
+export function settingsTabs(t: T): { key: SettingsPageTab; label: string }[] {
   return [
     { key: "listing", label: t("admin.settings.tabs.listing") },
     { key: "trade", label: t("admin.settings.tabs.trade") },
     { key: "message", label: t("admin.settings.tabs.message") },
+    { key: "warehouse", label: t("admin.settings.tabs.warehouse") },
   ];
 }
 

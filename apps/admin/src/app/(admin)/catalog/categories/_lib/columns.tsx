@@ -12,6 +12,11 @@ export function categoryColumns(t: T, actions: CategoryRowActions) {
       grow: 3,
       minWidth: 300,
     }),
+    col.muted<Category>(
+      t("admin.catalog.categories.parentLabel"),
+      (c) => c.parent?.name,
+      { grow: 2, minWidth: 160 },
+    ),
     col.custom<Category>(
       t("common.description"),
       (c) =>

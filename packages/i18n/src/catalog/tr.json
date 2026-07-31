@@ -545,6 +545,7 @@
     "sponsoredRegion": "Reklam alanı",
     "model": "Model",
     "modelCode": "Model kodu",
+    "productCode": "İlan No",
     "color": "Renk",
     "boxedCondition": "Kutu durumu",
     "boxed": "Kutulu",
@@ -3104,7 +3105,9 @@
         "nameLabel": "Kategori Adı",
         "namePlaceholder": "Örn. Model Arabalar",
         "descriptionPlaceholder": "Kategori hakkında kısa açıklama...",
-        "nameRequired": "Kategori adı zorunlu"
+        "nameRequired": "Kategori adı zorunlu",
+        "parentLabel": "Üst Kategori",
+        "noParent": "Üst kategori yok (ana kategori)"
       },
       "attributes": {
         "title": "Ürün Özellikleri",
@@ -4973,6 +4976,64 @@
         "resolution": "Dönüş/Çözüm"
       }
     },
+    "earlyAccess": {
+      "title": "Erken Erişim",
+      "description": "Lansman öncesi davet PIN kodlarını oluşturun, dağıtın ve yönetin",
+      "searchPlaceholder": "Etiket, e-posta veya kod ara...",
+      "createButton": "Yeni PIN",
+      "empty": "Henüz erişim kodu yok",
+      "columns": {
+        "label": "Etiket",
+        "email": "E-posta",
+        "code": "Kod",
+        "usage": "Kullanım",
+        "lastUsedAt": "Son Kullanım",
+        "expiresAt": "Son Geçerlilik"
+      },
+      "status": {
+        "active": "Aktif",
+        "revoked": "İptal Edildi",
+        "expired": "Süresi Doldu",
+        "exhausted": "Limit Doldu"
+      },
+      "filters": {
+        "all": "Tüm Durumlar",
+        "active": "Aktif",
+        "revoked": "İptal Edilenler",
+        "expired": "Süresi Dolanlar"
+      },
+      "actions": {
+        "sendInvite": "Davet Maili Gönder",
+        "resendInvite": "Daveti Yeniden Gönder",
+        "copyCode": "Kodu Kopyala",
+        "revoke": "İptal Et",
+        "activate": "Yeniden Aktifleştir"
+      },
+      "modal": {
+        "createTitle": "Yeni Erişim PIN'i",
+        "editTitle": "Erişim PIN'ini Düzenle",
+        "label": "Etiket",
+        "labelPlaceholder": "Örn. Ayşe Yılmaz",
+        "labelRequired": "Etiket zorunlu",
+        "email": "E-posta (opsiyonel)",
+        "emailInvalid": "Geçerli bir e-posta girin",
+        "expiresAt": "Son Geçerlilik (opsiyonel)",
+        "maxUses": "Kullanım Limiti (opsiyonel)",
+        "maxUsesHint": "Boş bırakılırsa sınırsız",
+        "sendEmailNow": "Davet mailini şimdi gönder"
+      },
+      "toasts": {
+        "created": "Erişim kodu oluşturuldu",
+        "updated": "Erişim kodu güncellendi",
+        "deleted": "Erişim kodu silindi",
+        "inviteSent": "Davet maili gönderildi",
+        "codeCopied": "Kod panoya kopyalandı"
+      },
+      "confirm": {
+        "deleteTitle": "Erişim Kodunu Sil",
+        "deleteMessage": "Bu erişim kodu kalıcı olarak silinecek. Bu işlem geri alınamaz. (İptal etmek için silmek yerine 'İptal Et' seçeneğini kullanabilirsiniz.)"
+      }
+    },
     "settings": {
       "page": {
         "title": "Sistem Ayarları",
@@ -4995,12 +5056,27 @@
       "tabs": {
         "listing": "İlan",
         "trade": "Takas",
-        "message": "Mesaj"
+        "message": "Mesaj",
+        "warehouse": "Depo"
       },
       "tabTitle": {
         "listing": "İlan Ayarları",
         "trade": "Takas Ayarları",
         "message": "Mesaj Ayarları"
+      },
+      "warehouse": {
+        "title": "Depo Adresi",
+        "helper": "Güvenli takas kargolarının toplandığı merkez depo adresi. Tanımlanmadan takas depo operasyonları yürütülemez.",
+        "saved": "Depo adresi kaydedildi",
+        "fields": {
+          "title": "Adres Başlığı",
+          "fullName": "Yetkili / Firma Adı",
+          "phone": "Telefon",
+          "city": "İl",
+          "district": "İlçe",
+          "address": "Açık Adres",
+          "zipCode": "Posta Kodu"
+        }
       },
       "fields": {
         "freeListingLimit": {
@@ -5726,6 +5802,11 @@
           "name": "Üyelik Katmanları",
           "description": "Üyelik paketlerini ve avantajlarını yönetin",
           "keywords": "üyelik,membership,tier"
+        },
+        "earlyAccess": {
+          "name": "Erken Erişim",
+          "description": "Lansman öncesi davet PIN kodlarını yönetin",
+          "keywords": "pin,davet,invite,erken erişim,early access,erişim kodu,kilit"
         },
         "settings": {
           "name": "Sistem Ayarları",

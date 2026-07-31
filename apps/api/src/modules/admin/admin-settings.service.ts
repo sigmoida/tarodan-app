@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { MembershipTierType } from "@prisma/client";
+import { MembershipTierType, SellerType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
-import { UpdatePlatformSettingDto } from "./dto";
+import { UpdatePlatformSettingDto, UpdateWarehouseAddressDto } from "./dto";
 
 /**
  * Platform ayarları yönetimi — AdminService'in PLATFORM SETTINGS bölümünden
@@ -177,5 +177,104 @@ export class AdminSettingsService {
     }
 
     return setting;
+  }
+
+  /**
+   * Get the safe-trade warehouse address referenced by the
+   * `warehouse_address_id` platform setting (null when not configured yet).
+   */
+  async getWarehouseAddress() {
+    const setting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: "warehouse_address_id" },
+    });
+    if (!setting?.settingValue) return null;
+    return this.prisma.address.findUnique({
+      where: { id: setting.settingValue },
+    });
+  }
+
+  /**
+   * Create/update the warehouse address and point `warehouse_address_id` at it.
+   * The address is owned by the platform seller account so it survives admin
+   * staff turnover; trade escrow flows resolve it via the platform setting.
+   */
+  async updateWarehouseAddress(
+    adminId: string,
+    dto: UpdateWarehouseAddressDto,
+  ) {
+    const platformUser = await this.prisma.user.findFirst({
+      where: { email: "platform@tarodan.com", sellerType: SellerType.platform },
+      select: { id: true },
+    });
+    if (!platformUser) {
+      throw new BadRequestException(
+        "Platform satıcı hesabı bulunamadı. Önce üretim referans seed'i (seed-production) çalıştırılmalı.",
+      );
+    }
+
+    const existingSetting = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: "warehouse_address_id" },
+    });
+    const existingAddress = existingSetting?.settingValue
+      ? await this.prisma.address.findUnique({
+          where: { id: existingSetting.settingValue },
+        })
+      : null;
+
+    const addressData = {
+      title: dto.title || "Tarodan Deposu",
+      fullName: dto.fullName,
+      phone: dto.phone,
+      city: dto.city,
+      district: dto.district,
+      address: dto.address,
+      zipCode: dto.zipCode || null,
+    };
+
+    const address = await this.prisma.$transaction(async (tx) => {
+      const saved = existingAddress
+        ? await tx.address.update({
+            where: { id: existingAddress.id },
+            data: addressData,
+          })
+        : await tx.address.create({
+            data: {
+              ...addressData,
+              userId: platformUser.id,
+              isDefault: false,
+            },
+          });
+
+      await tx.platformSetting.upsert({
+        where: { settingKey: "warehouse_address_id" },
+        update: { settingValue: saved.id },
+        create: {
+          settingKey: "warehouse_address_id",
+          settingValue: saved.id,
+          settingType: "string",
+          description:
+            "Tarodan central warehouse address ID for safe-trade escrow",
+        },
+      });
+
+      return saved;
+    });
+
+    const adminUser = await this.prisma.adminUser.findFirst({
+      where: { userId: adminId, isActive: true },
+      select: { id: true },
+    });
+    if (adminUser) {
+      await this.audit.createAuditLog(
+        adminUser.id,
+        "warehouse_address_update",
+        "Address",
+        address.id,
+        existingAddress,
+        address,
+      );
+    }
+
+    return address;
   }
 }

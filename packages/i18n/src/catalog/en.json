@@ -545,6 +545,7 @@
     "sponsoredRegion": "Sponsored",
     "model": "Model",
     "modelCode": "Model code",
+    "productCode": "Listing No",
     "color": "Color",
     "boxedCondition": "Box condition",
     "boxed": "Boxed",
@@ -3104,7 +3105,9 @@
         "nameLabel": "Category Name",
         "namePlaceholder": "e.g. Model Cars",
         "descriptionPlaceholder": "Short description of the category...",
-        "nameRequired": "Category name is required"
+        "nameRequired": "Category name is required",
+        "parentLabel": "Parent Category",
+        "noParent": "No parent (root category)"
       },
       "attributes": {
         "title": "Product Attributes",
@@ -4973,6 +4976,64 @@
         "resolution": "Response / Resolution"
       }
     },
+    "earlyAccess": {
+      "title": "Early Access",
+      "description": "Create, distribute and manage pre-launch invite PIN codes",
+      "searchPlaceholder": "Search label, email or code...",
+      "createButton": "New PIN",
+      "empty": "No access codes yet",
+      "columns": {
+        "label": "Label",
+        "email": "Email",
+        "code": "Code",
+        "usage": "Usage",
+        "lastUsedAt": "Last Used",
+        "expiresAt": "Expires"
+      },
+      "status": {
+        "active": "Active",
+        "revoked": "Revoked",
+        "expired": "Expired",
+        "exhausted": "Limit Reached"
+      },
+      "filters": {
+        "all": "All Statuses",
+        "active": "Active",
+        "revoked": "Revoked",
+        "expired": "Expired"
+      },
+      "actions": {
+        "sendInvite": "Send Invite Email",
+        "resendInvite": "Resend Invite",
+        "copyCode": "Copy Code",
+        "revoke": "Revoke",
+        "activate": "Reactivate"
+      },
+      "modal": {
+        "createTitle": "New Access PIN",
+        "editTitle": "Edit Access PIN",
+        "label": "Label",
+        "labelPlaceholder": "e.g. Jane Doe",
+        "labelRequired": "Label is required",
+        "email": "Email (optional)",
+        "emailInvalid": "Enter a valid email",
+        "expiresAt": "Expiry Date (optional)",
+        "maxUses": "Usage Limit (optional)",
+        "maxUsesHint": "Leave empty for unlimited",
+        "sendEmailNow": "Send the invite email now"
+      },
+      "toasts": {
+        "created": "Access code created",
+        "updated": "Access code updated",
+        "deleted": "Access code deleted",
+        "inviteSent": "Invite email sent",
+        "codeCopied": "Code copied to clipboard"
+      },
+      "confirm": {
+        "deleteTitle": "Delete Access Code",
+        "deleteMessage": "This access code will be permanently deleted. This cannot be undone. (Prefer 'Revoke' if you just want to disable it.)"
+      }
+    },
     "settings": {
       "page": {
         "title": "System Settings",
@@ -4995,12 +5056,27 @@
       "tabs": {
         "listing": "Listing",
         "trade": "Trade",
-        "message": "Message"
+        "message": "Message",
+        "warehouse": "Warehouse"
       },
       "tabTitle": {
         "listing": "Listing Settings",
         "trade": "Trade Settings",
         "message": "Message Settings"
+      },
+      "warehouse": {
+        "title": "Warehouse Address",
+        "helper": "Central warehouse address where safe-trade shipments are collected. Trade warehouse operations cannot run until it is configured.",
+        "saved": "Warehouse address saved",
+        "fields": {
+          "title": "Address Title",
+          "fullName": "Contact / Company Name",
+          "phone": "Phone",
+          "city": "City",
+          "district": "District",
+          "address": "Street Address",
+          "zipCode": "Postal Code"
+        }
       },
       "fields": {
         "freeListingLimit": {
@@ -5726,6 +5802,11 @@
           "name": "Membership Tiers",
           "description": "Manage membership plans and benefits",
           "keywords": "membership,tier,plan"
+        },
+        "earlyAccess": {
+          "name": "Early Access",
+          "description": "Manage pre-launch invite PIN codes",
+          "keywords": "pin,invite,early access,access code,lock"
         },
         "settings": {
           "name": "System Settings",

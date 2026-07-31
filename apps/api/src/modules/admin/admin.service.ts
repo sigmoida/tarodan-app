@@ -30,6 +30,7 @@ import {
   PreviewCommissionDto,
   UpdateCommissionRuleDto,
   UpdatePlatformSettingDto,
+  UpdateWarehouseAddressDto,
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
@@ -282,6 +283,17 @@ export class AdminService {
 
   async updatePlatformSetting(adminId: string, dto: UpdatePlatformSettingDto) {
     return this.settingsService.updatePlatformSetting(adminId, dto);
+  }
+
+  async getWarehouseAddress() {
+    return this.settingsService.getWarehouseAddress();
+  }
+
+  async updateWarehouseAddress(
+    adminId: string,
+    dto: UpdateWarehouseAddressDto,
+  ) {
+    return this.settingsService.updateWarehouseAddress(adminId, dto);
   }
 
   // ==================== USER MANAGEMENT ====================
