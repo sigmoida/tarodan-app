@@ -267,6 +267,13 @@ export class OrderPricingService {
       serviceVatRate: number;
       totalAmount: number;
       sellerNetAmount: number;
+      /** Sepet/checkout özetinin satırları, KDV DAHİL. */
+      summary: {
+        productAmount: number;
+        shippingAmount: number;
+        serviceFeeAmount: number;
+        total: number;
+      };
     };
   }> {
     if (!dto.items?.length) {
@@ -594,6 +601,21 @@ export class OrderPricingService {
       serviceVatRate,
       totalAmount,
       sellerNetAmount,
+      // Ekranın GÖSTERDİĞİ satırlar — sepet ve checkout bunları olduğu gibi
+      // basar, kendileri hesap yapmaz. Üç satırın toplamı totalAmount'a eşittir.
+      //
+      // Kargo satırı TARİFEDEN gelen sabit tutardır (alıcının payı), KDV'siz.
+      // Hizmet KDV'sinin TAMAMI — kargonunki dahil — hizmet bedeli satırına
+      // yazılır: alıcı için kargo pazarlık edilen sabit bir kalem, vergi ise
+      // platformun hizmetine ait tek bir kalemdir.
+      summary: {
+        productAmount:
+          Math.round((itemsSubtotal - couponDiscountTotal) * 100) / 100,
+        shippingAmount: Math.round(shippingAmount * 100) / 100,
+        serviceFeeAmount:
+          Math.round((totalBuyerFee + totalBuyerServiceTax) * 100) / 100,
+        total: totalAmount,
+      },
     };
 
     return {

@@ -137,4 +137,50 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     expect(q.shippingBySeller).toHaveLength(1);
     expect(q.shippingAmount).toBe(0);
   });
+
+  describe("pricing.summary — ekranın bastığı satırlar", () => {
+    /**
+     * Sepet ve checkout artık kendi kırılımını ÜRETMEZ; `pricing.summary`'yi
+     * olduğu gibi basar. Bu yüzden dört alanın toplamı `total`'a KURUŞU
+     * KURUŞUNA eşit olmak zorunda — aksi halde ekranda satırlar toplamı
+     * vermez. Ekranlar KDV'yi kendileri dağıttığında kargonun KDV'si ücret
+     * satırına yığılıyordu: aynı sepet iki ekranda farklı kırılım gösteriyordu.
+     */
+    it("üç satırın toplamı ödenecek tutarı birebir verir", async () => {
+      const q = await makeSvc().getCheckoutQuote({
+        items: [{ productId: "a1" }, { productId: "b1" }],
+      });
+      const s = q.pricing.summary;
+
+      expect(
+        Math.round(
+          (s.productAmount + s.shippingAmount + s.serviceFeeAmount) * 100,
+        ) / 100,
+      ).toBe(s.total);
+      expect(s.total).toBe(q.pricing.totalAmount);
+    });
+
+    it("kargo satırı tarifeden gelen SABİT tutardır, KDV eklenmez", async () => {
+      const q = await makeSvc().getCheckoutQuote({
+        items: [{ productId: "a1" }],
+      });
+      const s = q.pricing.summary;
+
+      expect(s.shippingAmount).toBe(q.pricing.shippingAmount);
+    });
+
+    it("hizmet KDV'sinin TAMAMI hizmet bedeli satırına yazılır", async () => {
+      const q = await makeSvc().getCheckoutQuote({
+        items: [{ productId: "a1" }],
+      });
+      const s = q.pricing.summary;
+
+      // Kargonun KDV'si de bu satırdadır — alıcı için kargo sabit bir kalem.
+      expect(s.serviceFeeAmount).toBe(
+        Math.round(
+          (q.pricing.buyerFeeAmount + q.pricing.buyerServiceTaxAmount) * 100,
+        ) / 100,
+      );
+    });
+  });
 });
