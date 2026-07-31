@@ -438,6 +438,72 @@ export class OrderLifecycleService {
    * - Can only cancel before shipping
    * - If paid, triggers refund process
    */
+  /**
+   * Grup iptali (R4): iptal SEPET bazındadır. Tüm üyeler iptal edilebilir
+   * olmalı — herhangi bir üye taşıyıcıya geçtiyse grup iptali TAMAMEN kapalıdır
+   * (kısmi iptal yok; kalan kalemler teslim sonrası iade akışını kullanır).
+   * Zaten iptal olmuş üyeler atlanır; kalanlar mevcut tekil iptal akışıyla
+   * (ödeme iadesi dahil) sırayla iptal edilir.
+   */
+  async cancelGroup(groupId: string, userId: string, dto: CancelOrderDto) {
+    const group = await this.prisma.checkoutGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        orders: {
+          select: {
+            id: true,
+            status: true,
+            shipment: { select: { status: true } },
+          },
+        },
+      },
+    });
+    if (!group) {
+      throw new NotFoundException(i18nMessage("server.order.groupNotFound"));
+    }
+    if (group.buyerId !== userId) {
+      throw new ForbiddenException(i18nMessage("server.order.cancelForbidden"));
+    }
+
+    const preHandover: ShipmentStatus[] = [
+      ShipmentStatus.pending,
+      ShipmentStatus.cancelled,
+      ShipmentStatus.failed,
+    ];
+    const cancellable = [
+      OrderStatus.pending_payment,
+      OrderStatus.paid,
+      OrderStatus.preparing,
+    ] as OrderStatus[];
+
+    const remaining = group.orders.filter(
+      (o) => o.status !== OrderStatus.cancelled,
+    );
+    if (remaining.length === 0) {
+      throw new BadRequestException(
+        i18nMessage("server.order.groupAlreadyCancelled"),
+      );
+    }
+    const blocked = remaining.some(
+      (o) =>
+        !cancellable.includes(o.status) ||
+        (o.shipment && !preHandover.includes(o.shipment.status)),
+    );
+    if (blocked) {
+      throw new BadRequestException(
+        i18nMessage("server.order.groupCancelBlockedShipped"),
+      );
+    }
+
+    // Sıralı iptal: her sipariş kendi atomik akışından geçer (stok, kupon,
+    // grup ödemesine kısmi iade). Paralel çalıştırma kilit çakışması yaratır.
+    for (const member of remaining) {
+      await this.cancel(member.id, userId, dto);
+    }
+
+    return this.orderQuery.findCheckoutGroup(groupId, userId);
+  }
+
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
     const preflight = await this.prisma.order.findUnique({
       where: { id: orderId },
