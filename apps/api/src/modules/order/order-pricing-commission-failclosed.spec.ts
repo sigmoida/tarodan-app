@@ -6,6 +6,7 @@ import {
   CommissionSellerType,
   CommissionTaxpayerType,
 } from "@prisma/client";
+import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
 /**
  * BLOCKER: `calculateCommission` fail-closed guard'ı `result.ruleId`'ye bakıyordu.
@@ -32,6 +33,7 @@ describe("OrderPricingService.calculateCommission — seller-side fail closed", 
       {} as any,
       {} as any,
       {} as any,
+      testTaxPolicy(),
     );
   };
 

@@ -1,6 +1,7 @@
 import { OrderPricingService } from "./order-pricing.service";
 import { ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
 /**
  * Checkout quote kargosu artık SATICI-BAŞINA (create ile ortak calculateShippingBySeller).
@@ -35,6 +36,8 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
   const makeSvc = () => {
     const prisma = {
       platformSetting: {
+        // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(({ where }: any) => {
           if (where.settingKey === "shipping_base_cost")
             return Promise.resolve({ settingValue: String(BASE) });
@@ -71,10 +74,16 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         },
       }),
     } as any;
-    const svc = new OrderPricingService(prisma, taxService, shippingTariffs, {
-      getEffectiveDisplayPrice: async () => null,
-      getEffectiveDisplayPriceMany: async () => new Map(),
-    } as any);
+    const svc = new OrderPricingService(
+      prisma,
+      taxService,
+      shippingTariffs,
+      {
+        getEffectiveDisplayPrice: async () => null,
+        getEffectiveDisplayPriceMany: async () => new Map(),
+      } as any,
+      testTaxPolicy(),
+    );
     // Komisyonu izole et — bu spec yalnız kargoyu ölçer.
     jest
       .spyOn(svc, "calculateCommission")

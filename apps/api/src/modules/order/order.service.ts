@@ -103,6 +103,10 @@ export class OrderService {
     sellerShippingAmount: number;
     shippingAmount: number;
     sellerNetAmount: number;
+    /** Satıcıya verilen hizmetlerin KDV'si — payout'tan kesilir. */
+    sellerServiceTaxAmount: number;
+    /** Alıcıya verilen hizmetlerin KDV'si — alıcının ödediğine eklenir. */
+    buyerServiceTaxAmount: number;
     shippingDesi: number;
   }> {
     return this.orderPricing.getCommissionPreview(

@@ -1,5 +1,6 @@
 import { OrderPricingService } from "./order-pricing.service";
 import { packageTiers } from "../shipping/testing/tariff-fixture";
+import { noVatTaxPolicy, testTaxPolicy } from "./testing/tax-policy-fixture";
 
 /**
  * İlan formu / ilan listesi komisyon önizlemesi.
@@ -28,11 +29,15 @@ describe("OrderPricingService listing commission preview", () => {
       packageTiers: packageTiers(100, 180, 260),
     }),
   };
+  // Bu suite KARGO BÖLÜŞÜMÜNÜ ölçüyor; vergiler kapatılarak net tutarlar
+  // yalnız bölüşümü yansıtır. Hizmet KDV'sinin nete etkisi aşağıda ayrı
+  // testte ve order-net.helper.spec.ts'te kapsanıyor.
   const service = new OrderPricingService(
     prisma as any,
     {} as any,
     shippingTariffs as any,
     {} as any,
+    noVatTaxPolicy(),
   );
 
   const flatShares = (share: number) => ({
@@ -74,6 +79,44 @@ describe("OrderPricingService listing commission preview", () => {
       shippingDesi: 2,
       packageTier: "small",
     });
+  });
+
+  it("üretim politikası: hizmet KDV'si ve stopaj da netten düşülür", async () => {
+    // Aynı kargo bölüşümü, ama vergiler açık (varsayılan politika).
+    const taxed = new OrderPricingService(
+      prisma as any,
+      {} as any,
+      shippingTariffs as any,
+      {} as any,
+      testTaxPolicy(),
+    );
+    jest.spyOn(taxed, "calculateCommission").mockResolvedValue({
+      sellerFeeAmount: 100,
+      buyerFeeAmount: 30,
+      commissionAmount: 130,
+      sellerCommissionAmount: 60,
+      sellerPlatformFeeAmount: 40,
+      buyerCommissionAmount: 18,
+      buyerServiceFeeAmount: 12,
+      shippingBuyerShare: 40,
+      shippingBuyerShares: flatShares(40),
+    } as any);
+
+    const preview = await (taxed.getCommissionPreview as any)(
+      1000,
+      "seller-1",
+      "category-1",
+      2,
+    );
+
+    // Satıcı hizmet KDV'si: (60 + 40 + 60 kargo) x %20 = 32
+    expect(preview.sellerServiceTaxAmount).toBe(32);
+    // Alıcı hizmet KDV'si: (18 + 12 + 40 kargo) x %20 = 14
+    expect(preview.buyerServiceTaxAmount).toBe(14);
+    // Stopaj bireysel satıcıda da kesilir: 1000 x %1 = 10
+    expect(preview.withholdingTaxAmount).toBe(10);
+    // 1000 − 100 (ücret) − 10 (stopaj) − 60 (kargo payı) − 32 (KDV) = 798
+    expect(preview.sellerNetAmount).toBe(798);
   });
 
   it("büyük paket kademesinde satıcı payı kademe fiyatından hesaplanır", async () => {

@@ -516,6 +516,8 @@ export class OrderCheckoutGroupService {
             sellerShippingAmount: number;
             taxAmount: number;
             withholdingTaxAmount: number;
+            buyerServiceTaxAmount: number;
+            sellerServiceTaxAmount: number;
             totalAmount: number;
             suratIdempotencyKey: string;
           }> = [];
@@ -637,17 +639,36 @@ export class OrderCheckoutGroupService {
                 seller: sellerShippingAmount,
               });
             }
-            const { taxAmount, withholdingTaxAmount } =
-              await this.checkoutCommon.resolveSellerTaxes(
-                entry.product.sellerId,
-                entry.product.categoryId,
-                discountedPrice,
-              );
+            const {
+              taxAmount,
+              withholdingTaxAmount,
+              buyerServiceTaxAmount,
+              sellerServiceTaxAmount,
+            } = await this.checkoutCommon.resolveOrderTaxes({
+              sellerId: entry.product.sellerId,
+              categoryId: entry.product.categoryId,
+              subtotal: discountedPrice,
+              // Hizmet KDV matrahları: bu SATIRA düşen ücretler + kargo payı.
+              // Kargo yalnız satıcının ilk satırına yüklendiği için koli başına
+              // tek kez vergilenir.
+              fees: {
+                buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+                buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+                buyerShippingAmount,
+                sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+                sellerPlatformFeeAmount:
+                  commissionResult.sellerPlatformFeeAmount,
+                sellerShippingAmount,
+              },
+            });
+            // Alıcı: ürün + kargo payı + alıcı ücretleri + ürün KDV'si +
+            // alıcıya verilen hizmetlerin KDV'si.
             const totalAmount =
               discountedPrice +
               shippingCost +
               commissionResult.buyerFeeAmount +
-              taxAmount;
+              taxAmount +
+              buyerServiceTaxAmount;
             const orderNumber = await this.checkoutCommon.generateOrderNumber();
             const suratIdempotencyKey =
               this.checkoutCommon.buildSuratIdempotencyKey([
@@ -665,6 +686,8 @@ export class OrderCheckoutGroupService {
               sellerShippingAmount,
               taxAmount,
               withholdingTaxAmount,
+              buyerServiceTaxAmount,
+              sellerServiceTaxAmount,
               totalAmount,
               suratIdempotencyKey,
             });
@@ -801,6 +824,8 @@ export class OrderCheckoutGroupService {
                 shippingCost: input.shippingCost,
                 taxAmount: input.taxAmount,
                 withholdingTaxAmount: input.withholdingTaxAmount,
+                buyerServiceTaxAmount: input.buyerServiceTaxAmount,
+                sellerServiceTaxAmount: input.sellerServiceTaxAmount,
                 commissionAmount: input.commissionResult.commissionAmount,
                 buyerFeeAmount: input.commissionResult.buyerFeeAmount,
                 sellerFeeAmount: input.commissionResult.sellerFeeAmount,
@@ -838,6 +863,8 @@ export class OrderCheckoutGroupService {
                   commission: input.commissionResult,
                   taxAmount: input.taxAmount,
                   withholdingTaxAmount: input.withholdingTaxAmount,
+                  buyerServiceTaxAmount: input.buyerServiceTaxAmount,
+                  sellerServiceTaxAmount: input.sellerServiceTaxAmount,
                   totalAmount: input.totalAmount,
                 }),
                 status: OrderStatus.pending_payment,

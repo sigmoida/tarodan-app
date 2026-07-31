@@ -1412,7 +1412,17 @@ model Order {
   // satıcı indirim öncesi tutar üzerinden ödenir. Varsayılan 0 (satıcı-fonlu, eski davranış).
   platformFundedDiscount     Decimal                  @default(0) @map("platform_funded_discount") @db.Decimal(10, 2)
   subtotal                   Decimal?                 @db.Decimal(10, 2)
+  // ÜRÜN bedelinin KDV'si. `product_vat_enabled` ayarıyla yönetilir; varsayılan
+  // KAPALI olduğu için yeni siparişlerde 0'dır (vitrin fiyatı KDV dahil sayılır,
+  // beyanı satıcı yapar). Ayar açılırsa TaxRule/TaxRate altyapısı devreye girer.
   taxAmount                  Decimal                  @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  // HİZMET bedellerinin KDV'si — "hizmeti kim aldıysa KDV'sini o öder".
+  // Alıcı tarafı (alıcı komisyonu + koruma hizmeti + alıcı kargo payı) alıcının
+  // ödediğine EKLENİR; satıcı tarafı (satıcı komisyonu + platform hizmet bedeli +
+  // satıcı kargo payı) satıcı payout'undan KESİLİR. Matrahlar yukarıdaki kolonlarda
+  // durduğu için kalem bazında KDV saklanmaz — iki taraf toplamı yeterlidir.
+  buyerServiceTaxAmount      Decimal                  @default(0) @map("buyer_service_tax_amount") @db.Decimal(10, 2)
+  sellerServiceTaxAmount     Decimal                  @default(0) @map("seller_service_tax_amount") @db.Decimal(10, 2)
   // E-ticaret stopajı (GVK 94/19, varsayılan %1): yalnız vergi mükellefi (kurumsal onaylı)
   // satıcıda, KDV hariç ürün bedeli üzerinden. Satıcı payout'undan kesilir; alıcı tutarını etkilemez.
   withholdingTaxAmount       Decimal                  @default(0) @map("withholding_tax_amount") @db.Decimal(10, 2)

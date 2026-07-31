@@ -377,19 +377,33 @@ export class OrderCheckoutDirectService {
         lineShares: [commissionResult.shippingBuyerShares],
       });
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
-      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
-      const { taxAmount, withholdingTaxAmount } =
-        await this.checkoutCommon.resolveSellerTaxes(
-          product.sellerId,
-          product.categoryId,
-          discountedPrice,
-        );
-      // Buyer fee + KDV eklenir (stopaj alıcı tutarını etkilemez; satıcı payout'undan kesilir)
+      // Vergiler: ürün KDV'si (politikayla kapalı), hizmet KDV'si (iki taraf) ve stopaj.
+      const {
+        taxAmount,
+        withholdingTaxAmount,
+        buyerServiceTaxAmount,
+        sellerServiceTaxAmount,
+      } = await this.checkoutCommon.resolveOrderTaxes({
+        sellerId: product.sellerId,
+        categoryId: product.categoryId,
+        subtotal: discountedPrice,
+        fees: {
+          buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+          buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+          buyerShippingAmount,
+          sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+          sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
+          sellerShippingAmount,
+        },
+      });
+      // Alıcı ücretleri + ürün KDV'si + alıcıya verilen hizmetlerin KDV'si eklenir.
+      // (Stopaj ve satıcı hizmet KDV'si alıcı tutarını etkilemez — payout'tan kesilir.)
       const totalAmount =
         discountedPrice +
         shippingCost +
         commissionResult.buyerFeeAmount +
-        taxAmount;
+        taxAmount +
+        buyerServiceTaxAmount;
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -505,6 +519,8 @@ export class OrderCheckoutDirectService {
           shippingCost,
           taxAmount,
           withholdingTaxAmount,
+          buyerServiceTaxAmount,
+          sellerServiceTaxAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -536,6 +552,8 @@ export class OrderCheckoutDirectService {
             commission: commissionResult,
             taxAmount,
             withholdingTaxAmount,
+            buyerServiceTaxAmount,
+            sellerServiceTaxAmount,
             totalAmount,
           }),
           status: OrderStatus.pending_payment,

@@ -9,6 +9,7 @@ import {
   flatPackageTiers,
   packageTiers,
 } from "../shipping/testing/tariff-fixture";
+import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
 /**
  * BLOCKER: `shippingBuyerShare` önizleme ile tahsilat arasında ayrışıyordu.
@@ -191,7 +192,11 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
 
   const makeSvc = () => {
     const prisma = {
-      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      platformSetting: {
+        // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       product: {
         findUnique: jest.fn(({ where }: any) =>
           Promise.resolve(products[where.id] ?? null),
@@ -218,6 +223,7 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
         getEffectiveDisplayPrice: async () => null,
         getEffectiveDisplayPriceMany: async () => new Map(),
       } as any,
+      testTaxPolicy(),
     );
     // Kategoriye göre farklı kargo payı döndür.
     jest.spyOn(svc, "calculateCommission").mockImplementation(

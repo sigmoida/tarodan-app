@@ -30,6 +30,9 @@ import {
 import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import { DiscountService } from "../discount/discount.service";
 import { createHash } from "crypto";
+import { calculateServiceTax } from "./order-service-tax.helper";
+import { sellerNetAmountOf } from "./order-net.helper";
+import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
 /**
  * Commission calculation result interface
@@ -75,6 +78,7 @@ export class OrderPricingService {
     private readonly taxService: TaxService,
     private readonly shippingTariffs: ShippingTariffService,
     private readonly discountService: DiscountService,
+    private readonly taxPolicy: OrderTaxPolicyService,
   ) {}
 
   /**
@@ -647,6 +651,10 @@ export class OrderPricingService {
     sellerShippingAmount: number;
     shippingAmount: number;
     sellerNetAmount: number;
+    /** Satıcıya verilen hizmetlerin KDV'si — payout'tan kesilir. */
+    sellerServiceTaxAmount: number;
+    /** Alıcıya verilen hizmetlerin KDV'si — alıcının ödediğine eklenir. */
+    buyerServiceTaxAmount: number;
     shippingDesi: number;
     /** Desiden çözülen paket boyutu — UI "Orta Paket" gibi gösterebilir. */
     packageTier: ShippingPackageTierCode;
@@ -674,19 +682,37 @@ export class OrderPricingService {
       buyer: buyerShippingAmount,
       seller: sellerShippingAmount,
     } = decision;
-    // Kurumsal satıcıda stopaj da kesileceğinden önizleme neti gerçek payout ile eşleşsin.
-    let withholdingTaxAmount = 0;
-    if (seller?.businessStatus === "approved" && seller?.taxId) {
-      const rate = await this.getWithholdingTaxRate();
-      withholdingTaxAmount = rate > 0 ? Math.round(amount * rate) / 100 : 0;
-    }
-    const sellerNetAmount = Math.max(
-      0,
-      amount -
-        result.sellerFeeAmount -
-        withholdingTaxAmount -
-        sellerShippingAmount,
-    );
+    // Stopaj + hizmet KDV'si önizlemede de düşülür ki gerçek payout ile eşleşsin.
+    const policy = await this.taxPolicy.resolve();
+    const isCorporate =
+      seller?.businessStatus === "approved" && !!seller?.taxId;
+    const withholdingRate = this.taxPolicy.withholdingRateFor(policy, {
+      isCorporate,
+    });
+    const withholdingTaxAmount =
+      withholdingRate > 0 ? Math.round(amount * withholdingRate) / 100 : 0;
+    const { sellerServiceTaxAmount, buyerServiceTaxAmount } =
+      calculateServiceTax(
+        {
+          buyerCommissionAmount: result.buyerCommissionAmount,
+          buyerServiceFeeAmount: result.buyerServiceFeeAmount,
+          buyerShippingAmount,
+          sellerCommissionAmount: result.sellerCommissionAmount,
+          sellerPlatformFeeAmount: result.sellerPlatformFeeAmount,
+          sellerShippingAmount,
+        },
+        this.taxPolicy.effectiveServiceVatRate(policy),
+      );
+    const sellerNetAmount = sellerNetAmountOf({
+      subtotal: amount,
+      // Ürün KDV'si önizlemede modellenmiyor (varsayılan kapalı); açıldığında
+      // checkout tarafı hesaplar ve net'e aktarır.
+      productTaxAmount: 0,
+      sellerFeeAmount: result.sellerFeeAmount,
+      withholdingTaxAmount,
+      sellerShippingAmount,
+      sellerServiceTaxAmount,
+    });
     return {
       sellerFeeAmount: result.sellerFeeAmount,
       buyerFeeAmount: result.buyerFeeAmount,
@@ -698,6 +724,9 @@ export class OrderPricingService {
       // Listing UI compatibility: this line is the shipping deducted from seller.
       shippingAmount: sellerShippingAmount,
       sellerNetAmount,
+      // Hizmet KDV'si — ilan formu "kesintiler" dökümünde gösterilir.
+      sellerServiceTaxAmount,
+      buyerServiceTaxAmount,
       shippingDesi,
       packageTier: decision.tierCode,
     };

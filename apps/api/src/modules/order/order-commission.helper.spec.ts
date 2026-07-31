@@ -13,6 +13,7 @@ import {
   calculateCommissionFromRules,
   mapSellerTypeForCommission,
 } from "./order-commission.helper";
+import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
 describe("mapSellerTypeForCommission", () => {
   it.each([
@@ -115,6 +116,7 @@ describe("commission rule matching by membership tier", () => {
       getEffectiveDisplayPrice: async () => null,
       getEffectiveDisplayPriceMany: async () => new Map(),
     } as any,
+    testTaxPolicy(),
   );
 
   beforeEach(() => {

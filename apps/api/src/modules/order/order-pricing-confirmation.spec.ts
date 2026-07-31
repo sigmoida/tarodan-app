@@ -2,12 +2,19 @@ import { OrderPricingService } from "./order-pricing.service";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { CheckoutDto, DirectBuyDto, GuestCheckoutDto } from "./dto";
+import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
 describe("OrderPricingService checkout confirmation", () => {
   const items = [{ productId: "product-1", unitPrice: 100, quantity: 1 }];
 
   function makeService() {
-    return new OrderPricingService({} as any, {} as any, {} as any, {} as any);
+    return new OrderPricingService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      testTaxPolicy(),
+    );
   }
 
   it("rejects order creation when the client omits the quoted pricing hash", () => {

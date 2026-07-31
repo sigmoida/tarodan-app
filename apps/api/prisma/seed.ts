@@ -1300,6 +1300,60 @@ async function main() {
         description: "Ödeme bekletme süresi (gün)",
       },
     }),
+    // ── Vergi politikası: hiçbir oran koda gömülü değil, hepsi buradan ──
+    prisma.platformSetting.upsert({
+      where: { settingKey: "withholding_tax_rate" },
+      update: {},
+      create: {
+        settingKey: "withholding_tax_rate",
+        settingValue: "1",
+        settingType: "number",
+        description: "E-ticaret stopaj oranı (%) — GVK 94/19",
+      },
+    }),
+    prisma.platformSetting.upsert({
+      where: { settingKey: "product_vat_enabled" },
+      update: {},
+      create: {
+        settingKey: "product_vat_enabled",
+        settingValue: "false",
+        settingType: "boolean",
+        description:
+          "Ürün bedeline KDV uygulansın mı (kapalıysa vitrin fiyatı KDV dahil sayılır)",
+      },
+    }),
+    prisma.platformSetting.upsert({
+      where: { settingKey: "service_vat_enabled" },
+      update: {},
+      create: {
+        settingKey: "service_vat_enabled",
+        settingValue: "true",
+        settingType: "boolean",
+        description:
+          "Hizmet bedellerine (komisyon, hizmet bedeli, kargo payı) KDV uygulansın mı",
+      },
+    }),
+    prisma.platformSetting.upsert({
+      where: { settingKey: "service_vat_rate" },
+      update: {},
+      create: {
+        settingKey: "service_vat_rate",
+        settingValue: "20",
+        settingType: "number",
+        description: "Hizmet bedeli KDV oranı (%)",
+      },
+    }),
+    prisma.platformSetting.upsert({
+      where: { settingKey: "withholding_applies_to_individual" },
+      update: {},
+      create: {
+        settingKey: "withholding_applies_to_individual",
+        settingValue: "true",
+        settingType: "boolean",
+        description:
+          "Stopaj bireysel (vergi mükellefi olmayan) satıcıdan da kesilsin mi",
+      },
+    }),
     prisma.platformSetting.upsert({
       where: { settingKey: "min_offer_percentage" },
       update: {},

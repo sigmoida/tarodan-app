@@ -15,6 +15,11 @@ import {
   splitShippingByBuyerShare,
   type OutboundTariffLike,
 } from "../shipping/shipping-tariff.helper";
+import {
+  calculateServiceTax,
+  type ServiceTaxBreakdown,
+} from "./order-service-tax.helper";
+import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
 /**
  * Sipariş oluşturma primitifleri (Sürat gönderi fail-fast, kurumsal-satıcı KDV,
@@ -32,6 +37,7 @@ export class OrderCheckoutCommonService {
     private readonly suratCargoService: SuratCargoService,
     private readonly taxService: TaxService,
     private readonly orderPricing: OrderPricingService,
+    private readonly taxPolicy: OrderTaxPolicyService,
   ) {}
 
   /**
@@ -57,6 +63,8 @@ export class OrderCheckoutCommonService {
     sellerShippingAmount: number;
     taxAmount: number;
     withholdingTaxAmount: number;
+    buyerServiceTaxAmount: number;
+    sellerServiceTaxAmount: number;
     totalAmount: number;
   }> {
     const { amount, sellerId, categoryId, shippingDesi, shippingTariff } =
@@ -80,17 +88,35 @@ export class OrderCheckoutCommonService {
       billableDesi: shippingDesi,
       lineShares: [commission.shippingBuyerShares],
     });
-    const { taxAmount, withholdingTaxAmount } = await this.resolveSellerTaxes(
+    const {
+      taxAmount,
+      withholdingTaxAmount,
+      buyerServiceTaxAmount,
+      sellerServiceTaxAmount,
+    } = await this.resolveOrderTaxes({
       sellerId,
       categoryId,
-      amount,
-    );
+      subtotal: amount,
+      fees: {
+        buyerCommissionAmount: commission.buyerCommissionAmount,
+        buyerServiceFeeAmount: commission.buyerServiceFeeAmount,
+        buyerShippingAmount,
+        sellerCommissionAmount: commission.sellerCommissionAmount,
+        sellerPlatformFeeAmount: commission.sellerPlatformFeeAmount,
+        sellerShippingAmount,
+      },
+    });
 
-    // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + KDV.
-    // (Stopaj satıcı payout'undan kesilir, alıcıya yansıtılmaz.)
+    // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + ürün KDV'si +
+    // alıcıya verilen hizmetlerin KDV'si. (Stopaj ve satıcı hizmet KDV'si satıcı
+    // payout'undan kesilir, alıcıya yansıtılmaz.)
     const totalAmount =
       Math.round(
-        (amount + buyerShippingAmount + commission.buyerFeeAmount + taxAmount) *
+        (amount +
+          buyerShippingAmount +
+          commission.buyerFeeAmount +
+          taxAmount +
+          buyerServiceTaxAmount) *
           100,
       ) / 100;
 
@@ -101,6 +127,8 @@ export class OrderCheckoutCommonService {
       sellerShippingAmount,
       taxAmount,
       withholdingTaxAmount,
+      buyerServiceTaxAmount,
+      sellerServiceTaxAmount,
       totalAmount,
     };
   }
@@ -131,6 +159,8 @@ export class OrderCheckoutCommonService {
     commission: CommissionResult;
     taxAmount: number;
     withholdingTaxAmount: number;
+    buyerServiceTaxAmount?: number;
+    sellerServiceTaxAmount?: number;
     totalAmount: number;
   }): Prisma.InputJsonObject {
     return {
@@ -177,58 +207,114 @@ export class OrderCheckoutCommonService {
       tax: {
         amount: params.taxAmount,
         withholdingAmount: params.withholdingTaxAmount,
+        // Hizmet bedeli KDV'si — alıcıya EKLENEN ve satıcıdan KESİLEN taraflar.
+        buyerServiceAmount: params.buyerServiceTaxAmount ?? 0,
+        sellerServiceAmount: params.sellerServiceTaxAmount ?? 0,
       },
     };
   }
 
-  /** E-ticaret stopaj oranı (%) — PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
-  private async getWithholdingTaxRate(): Promise<number> {
-    const row = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "withholding_tax_rate" },
-    });
-    const rate = Number(row?.settingValue ?? "1");
-    return Number.isFinite(rate) && rate >= 0 ? rate : 1;
-  }
-
   /**
-   * KDV + stopaj: yalnızca kurumsal satıcıda (businessStatus=approved + taxId dolu).
-   * KDV ürün fiyatına eklenir (alıcı öder); stopaj (GVK 94/19) KDV hariç ürün bedeli
-   * üzerinden hesaplanır ve satıcı payout'undan kesilir. Bireysel satıcı ikisinde de
-   * kapsam dışıdır (stopaj: 330 Seri No'lu GV Genel Tebliği — mükellef olmayana tevkifat yok).
-   * Matrah kargo ve alıcı hizmet bedelini içermez (komisyonla aynı baz).
+   * Geriye-uyum sarmalayıcı: yalnız ürün KDV'si + stopaj döner (hizmet KDV'si
+   * matrah gerektirdiği için burada hesaplanamaz). Yeni kod `resolveOrderTaxes`
+   * çağırmalı.
    */
   async resolveSellerTaxes(
     sellerId: string,
     categoryId: string | null,
     subtotal: number,
   ): Promise<{ taxAmount: number; withholdingTaxAmount: number }> {
-    const seller = await this.prisma.user.findUnique({
-      where: { id: sellerId },
-      select: { businessStatus: true, taxId: true },
-    });
-    if (seller?.businessStatus !== "approved" || !seller?.taxId) {
-      return { taxAmount: 0, withholdingTaxAmount: 0 };
-    }
-    const resolved = await this.taxService.resolveTaxRate(
-      "TR",
-      null,
+    const { taxAmount, withholdingTaxAmount } = await this.resolveOrderTaxes({
+      sellerId,
       categoryId,
-    );
-    if (!resolved) {
-      this.logger.error(
-        `No active tax rule for taxable seller=${sellerId} category=${categoryId}. Failing closed.`,
+      subtotal,
+    });
+    return { taxAmount, withholdingTaxAmount };
+  }
+
+  /**
+   * Bir sipariş satırının TÜM vergileri — tek çağrı, tek politika okuması.
+   *
+   *   taxAmount              ürün KDV'si   → alıcıdan tahsil, satıcıya aktarılır
+   *                                          (`product_vat_enabled`, varsayılan KAPALI)
+   *   buyerServiceTaxAmount  hizmet KDV'si → alıcının ödediğine EKLENİR
+   *   sellerServiceTaxAmount hizmet KDV'si → satıcı payout'undan KESİLİR
+   *   withholdingTaxAmount   stopaj        → satıcı payout'undan KESİLİR
+   *
+   * `fees` verilmezse hizmet KDV'si hesaplanmaz (yalnız ürün KDV'si + stopaj
+   * isteyen eski çağrılar için).
+   */
+  async resolveOrderTaxes(params: {
+    sellerId: string;
+    categoryId: string | null;
+    subtotal: number;
+    fees?: ServiceTaxBreakdown;
+  }): Promise<{
+    taxAmount: number;
+    withholdingTaxAmount: number;
+    buyerServiceTaxAmount: number;
+    sellerServiceTaxAmount: number;
+  }> {
+    const { sellerId, categoryId, subtotal, fees } = params;
+    const [policy, seller] = await Promise.all([
+      this.taxPolicy.resolve(),
+      this.prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { businessStatus: true, taxId: true },
+      }),
+    ]);
+    // Vergi mükellefi = onaylı kurumsal hesap + VKN. Ürün KDV'si ve (ayar
+    // kapalıysa) stopaj yalnız bu satıcılarda doğar.
+    const isCorporate =
+      seller?.businessStatus === "approved" && !!seller?.taxId;
+
+    // ── Ürün KDV'si ──────────────────────────────────────────────────────────
+    // Varsayılan KAPALI: vitrin fiyatı KDV dahil kabul edilir, beyanı satıcı
+    // yapar. Ayar açıldığında TaxRule/TaxRate altyapısı aynen devreye girer —
+    // bu yüzden kaldırılmadı, yalnız kapıya alındı.
+    let taxAmount = 0;
+    if (policy.productVatEnabled && isCorporate) {
+      const resolved = await this.taxService.resolveTaxRate(
+        "TR",
+        null,
+        categoryId,
       );
-      throw new ServiceUnavailableException({
-        code: "TAX_CONFIGURATION_MISSING",
-        message:
-          "Vergi mükellefi satıcı için geçerli bir vergi kuralı bulunamadı.",
-      });
+      if (!resolved) {
+        this.logger.error(
+          `No active tax rule for taxable seller=${sellerId} category=${categoryId}. Failing closed.`,
+        );
+        throw new ServiceUnavailableException({
+          code: "TAX_CONFIGURATION_MISSING",
+          message:
+            "Vergi mükellefi satıcı için geçerli bir vergi kuralı bulunamadı.",
+        });
+      }
+      taxAmount = this.taxService.calculateTaxAmount(subtotal, resolved);
     }
-    const taxAmount = this.taxService.calculateTaxAmount(subtotal, resolved);
-    const withholdingRate = await this.getWithholdingTaxRate();
+
+    // ── Hizmet KDV'si ────────────────────────────────────────────────────────
+    // Satıcının mükellefiyetinden BAĞIMSIZ: bu KDV platformun kendi hizmetinin
+    // vergisidir, tarafların statüsüne bakmaz.
+    const { buyerServiceTaxAmount, sellerServiceTaxAmount } = fees
+      ? calculateServiceTax(
+          fees,
+          this.taxPolicy.effectiveServiceVatRate(policy),
+        )
+      : { buyerServiceTaxAmount: 0, sellerServiceTaxAmount: 0 };
+
+    // ── Stopaj (GVK 94/19) ───────────────────────────────────────────────────
+    const withholdingRate = this.taxPolicy.withholdingRateFor(policy, {
+      isCorporate,
+    });
     const withholdingTaxAmount =
       withholdingRate > 0 ? Math.round(subtotal * withholdingRate) / 100 : 0;
-    return { taxAmount, withholdingTaxAmount };
+
+    return {
+      taxAmount,
+      withholdingTaxAmount,
+      buyerServiceTaxAmount,
+      sellerServiceTaxAmount,
+    };
   }
 
   /**

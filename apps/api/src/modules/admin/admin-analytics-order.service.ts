@@ -18,6 +18,7 @@ import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { OrderService } from "../order/order.service";
 import { PaymentService } from "../payment/payment.service";
 import { NotificationService } from "../notification/notification.service";
+import { sellerNetAmountOf } from "../order/order-net.helper";
 
 /**
  * Admin sipariş işlemleri (+ unbanUser kullanıcı moderasyonu) — AdminAnalyticsService'ten
@@ -359,12 +360,22 @@ export class AdminAnalyticsOrderService {
         commissionAmount: num(o.commissionAmount),
         taxAmount: num(o.taxAmount),
         withholdingTaxAmount: num(o.withholdingTaxAmount),
+        // Hizmet bedeli KDV'si: alıcı tarafı tahsil edildi, satıcı tarafı kesilir.
+        buyerServiceTaxAmount: num(o.buyerServiceTaxAmount),
+        sellerServiceTaxAmount: num(o.sellerServiceTaxAmount),
         totalAmount: num(o.totalAmount),
-        // Bilgilendirici net; kesin ödeme tutarı escrow.amount'tır.
-        sellerNetAmount:
-          (o.subtotal != null ? Number(o.subtotal) : num(o.totalAmount)) -
-          num(o.sellerFeeAmount) -
-          num(o.withholdingTaxAmount),
+        // Bilgilendirici net; kesin ödeme tutarı escrow.amount'tır. Formül ORTAK
+        // helper'dan gelir — bu hesap eskiden burada elle yazılıyordu ve kargo
+        // payını düşmediği için sipariş yanıtındaki netten sapıyordu.
+        sellerNetAmount: sellerNetAmountOf({
+          subtotal:
+            o.subtotal != null ? Number(o.subtotal) : num(o.totalAmount),
+          productTaxAmount: num(o.taxAmount),
+          sellerFeeAmount: num(o.sellerFeeAmount),
+          withholdingTaxAmount: num(o.withholdingTaxAmount),
+          sellerShippingAmount: num(o.sellerShippingAmount),
+          sellerServiceTaxAmount: num(o.sellerServiceTaxAmount),
+        }),
       },
       escrow: (() => {
         const h: any = holdByOrderId.get(o.id);

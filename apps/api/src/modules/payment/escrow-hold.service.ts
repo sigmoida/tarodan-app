@@ -47,12 +47,21 @@ export class EscrowHoldService {
     order: any,
     paymentId: string,
   ): Promise<void> {
-    // Stopaj (GVK 94/19) yalnız kurumsal satıcı siparişlerinde > 0; hold'dan düşülür,
-    // payout'a hiç girmez (platform muhtasar ile beyan eder, satıcı beyannamede mahsup).
+    // Stopaj (GVK 94/19) hold'dan düşülür, payout'a hiç girmez (platform muhtasar
+    // ile beyan eder, satıcı beyannamede mahsup).
+    //
+    // Hizmet bedeli KDV'si İKİ yönden girer ve ikisi de satıcıdan uzaklaşır:
+    //   − buyerServiceTax : alıcıdan tahsil edildi ve `totalAmount` içinde, ama bu
+    //                       Tarodan'ın alıcıya verdiği hizmetin KDV'sidir — satıcıya
+    //                       AKMAMALI, platformda kalıp beyan edilir.
+    //   − sellerServiceTax: satıcıya verilen hizmetin KDV'si — payout'tan KESİLİR.
+    // İkisi de yazılmamış eski siparişte 0 → davranış birebir korunur.
     const rawSellerAmount = round2(
       Number(order.totalAmount) -
         Number(order.commissionAmount) -
         Number(order.withholdingTaxAmount ?? 0) -
+        Number(order.buyerServiceTaxAmount ?? 0) -
+        Number(order.sellerServiceTaxAmount ?? 0) -
         fullShippingAmountOf(order) +
         // F2.4: platform-fonlu kampanya payı satıcıya GERİ eklenir — satıcı indirim
         // öncesi tutar üzerinden ödenir, farkı platform üstlenir. Satıcı-fonlu (varsayılan)

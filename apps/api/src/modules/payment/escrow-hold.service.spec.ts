@@ -37,6 +37,50 @@ describe("EscrowHoldService.createHold", () => {
     return { svc: new EscrowHoldService(commissionLedger), commissionLedger };
   };
 
+  it("hizmet KDV'si: alıcının KDV'si satıcıya AKMAZ, satıcının KDV'si KESİLİR", async () => {
+    // Referans tablo (500 TL): alıcı 614 öder, satıcı 369 almalı.
+    //   614 − 100 (komisyon+ücret) − 5 (stopaj) − 100 (tam kargo)
+    //       − 19 (alıcı KDV'si platformda kalır) − 21 (satıcı KDV'si kesilir) = 369
+    const { svc } = makeSvc();
+    const tx = makeTx();
+
+    await svc.createHold(
+      tx,
+      makeOrder({
+        totalAmount: 614,
+        commissionAmount: 100,
+        withholdingTaxAmount: 5,
+        sellerFeeAmount: 55,
+        buyerFeeAmount: 45,
+        buyerShippingAmount: 50,
+        sellerShippingAmount: 50,
+        shippingCost: 50,
+        buyerServiceTaxAmount: 19,
+        sellerServiceTaxAmount: 21,
+      }),
+      "pay-vat",
+    );
+
+    expect(tx.paymentHold.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ amount: 369 }),
+      }),
+    );
+  });
+
+  it("KDV alanları yoksa (eski sipariş) davranış birebir korunur", async () => {
+    const { svc } = makeSvc();
+    const tx = makeTx();
+
+    await svc.createHold(tx, makeOrder(), "pay-legacy");
+
+    expect(tx.paymentHold.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ amount: 861 }),
+      }),
+    );
+  });
+
   it("hold = total − komisyon − stopaj − TAM kargo; held + releaseAt null; komisyon pending upsert", async () => {
     const { svc, commissionLedger } = makeSvc();
     const tx = makeTx();

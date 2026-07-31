@@ -346,21 +346,33 @@ export class OrderGuestCheckoutService {
         lineShares: [commissionResult.shippingBuyerShares],
       });
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
-      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
+      // Vergiler: ürün KDV'si (politikayla kapalı), hizmet KDV'si (iki taraf) ve stopaj.
       const {
         taxAmount: guestTaxAmount,
         withholdingTaxAmount: guestWithholdingAmount,
-      } = await this.checkoutCommon.resolveSellerTaxes(
-        product.sellerId,
-        product.categoryId,
-        finalPrice,
-      );
-      // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
+        buyerServiceTaxAmount: guestBuyerServiceTax,
+        sellerServiceTaxAmount: guestSellerServiceTax,
+      } = await this.checkoutCommon.resolveOrderTaxes({
+        sellerId: product.sellerId,
+        categoryId: product.categoryId,
+        subtotal: finalPrice,
+        fees: {
+          buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+          buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+          buyerShippingAmount,
+          sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+          sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
+          sellerShippingAmount,
+        },
+      });
+      // Alıcı ücretleri + ürün KDV'si + alıcıya verilen hizmetlerin KDV'si eklenir
+      // (stopaj ve satıcı hizmet KDV'si satıcı payout'undan kesilir).
       const totalAmount =
         finalPrice +
         shippingCost +
         commissionResult.buyerFeeAmount +
-        guestTaxAmount;
+        guestTaxAmount +
+        guestBuyerServiceTax;
       const guestOriginalPrice = Number(product.price);
       const guestDiscountAmount = Math.max(0, guestOriginalPrice - finalPrice);
 
@@ -464,6 +476,8 @@ export class OrderGuestCheckoutService {
           shippingCost,
           taxAmount: guestTaxAmount,
           withholdingTaxAmount: guestWithholdingAmount,
+          buyerServiceTaxAmount: guestBuyerServiceTax,
+          sellerServiceTaxAmount: guestSellerServiceTax,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -492,6 +506,8 @@ export class OrderGuestCheckoutService {
             commission: commissionResult,
             taxAmount: guestTaxAmount,
             withholdingTaxAmount: guestWithholdingAmount,
+            buyerServiceTaxAmount: guestBuyerServiceTax,
+            sellerServiceTaxAmount: guestSellerServiceTax,
             totalAmount,
           }),
           status: OrderStatus.pending_payment,

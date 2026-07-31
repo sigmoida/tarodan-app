@@ -27,6 +27,7 @@ import { ElogoInvoicingService } from "../elogo";
 import { RefundService } from "../refund/refund.service";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
 // resolves without a DB.
@@ -139,7 +140,11 @@ describe("OrderService checkout group (batch checkout)", () => {
     // üretilir → generateUniqueReference bu sayacı çağırır.
     orderPackage: { count: jest.fn().mockResolvedValue(0) },
     commissionRule: { findMany: jest.fn().mockResolvedValue([]) },
-    platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+    platformSetting: {
+      // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     analyticsSnapshot: { upsert: jest.fn() },
     $transaction: jest.fn(),
   };
@@ -224,6 +229,7 @@ describe("OrderService checkout group (batch checkout)", () => {
       providers: [
         OrderService,
         OrderPricingService,
+        OrderTaxPolicyService,
         { provide: ShippingTariffService, useValue: SHIPPING_TARIFF_MOCK },
         OrderCheckoutService,
         OrderCheckoutCommonService,
