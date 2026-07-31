@@ -265,8 +265,11 @@ describe("admin finance list sorting", () => {
 
   it("searches and paginates the payout schedule with displayed aliases", async () => {
     const paymentHold = createDelegate();
+    // Grup ödemesinde sipariş numarası hold.orderId üzerinden aranır/çözülür —
+    // servis artık order delegate'ini de kullanır.
+    const order = { findMany: jest.fn().mockResolvedValue([]) };
     const service = new AdminPayoutService(
-      { paymentHold } as any,
+      { paymentHold, order } as any,
       {} as any,
       {} as any,
     );

@@ -72,10 +72,18 @@ export class AdminShippingService {
     if (status) where.status = status as any;
     if (carrierId) where.provider = carrierId;
 
+    // Varsayılan sıralama paket bitişikliğini korur: aynı OrderPackage'ın
+    // kargoları art arda gelir → sayfa-lokal koli birleştirme sayfa sınırında
+    // NADİREN bölünür (aynı paket iki sayfaya yayılmaz — art arda dizilidir).
     const orderBy = resolveOrderBy<Prisma.ShipmentOrderByWithRelationInput>(
       "Shipment",
       query,
-      { defaultSort: { createdAt: "desc" } },
+      {
+        defaultSort: [
+          { order: { packageId: "desc" } },
+          { createdAt: "desc" },
+        ] as any,
+      },
     );
 
     const result = await paginate(

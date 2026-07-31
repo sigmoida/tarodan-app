@@ -10,7 +10,7 @@ import { AdminAuditService } from "./admin-audit.service";
 import { PaymentService } from "../payment/payment.service";
 import { AdminOrderQueryDto, ResolveDisputeDto } from "./dto";
 import { OrderStatus, Prisma } from "@prisma/client";
-import { paginate } from "../../common/list";
+import { paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Sipariş yönetimi (liste, ihtilaflar, ihtilaf çözümü) — AdminService'in
@@ -71,12 +71,21 @@ export class AdminOrderService {
       query;
 
     const where: Prisma.OrderWhereInput = {};
+    // Birden çok OR bloğu (arama + kullanıcı filtresi) birbirini ezmesin diye
+    // AND altında toplanır — eski kod userId set edilince aramayı yutuyordu.
+    const and: Prisma.OrderWhereInput[] = [];
 
     if (search) {
       const normalized = search.trim().toLowerCase();
       const numeric = Number(search.replace(",", "."));
-      where.OR = [
+      const searchOr: Prisma.OrderWhereInput[] = [
         { orderNumber: { contains: search, mode: "insensitive" } },
+        // Liste satırının kimliği grup numarasıdır — onunla da aranabilmeli.
+        {
+          checkoutGroup: {
+            groupNumber: { contains: search, mode: "insensitive" },
+          },
+        },
         { buyer: { displayName: { contains: search, mode: "insensitive" } } },
         { buyer: { email: { contains: search, mode: "insensitive" } } },
         { seller: { displayName: { contains: search, mode: "insensitive" } } },
@@ -84,9 +93,10 @@ export class AdminOrderService {
         { product: { title: { contains: search, mode: "insensitive" } } },
       ];
       if (Object.values(OrderStatus).includes(normalized as OrderStatus))
-        where.OR.push({ status: normalized as OrderStatus });
+        searchOr.push({ status: normalized as OrderStatus });
       if (Number.isFinite(numeric))
-        where.OR.push({ totalAmount: numeric }, { commissionAmount: numeric });
+        searchOr.push({ totalAmount: numeric }, { commissionAmount: numeric });
+      and.push({ OR: searchOr });
     }
 
     if (status) {
@@ -99,7 +109,7 @@ export class AdminOrderService {
       } else if (userRole === "seller") {
         where.sellerId = userId;
       } else {
-        where.OR = [{ buyerId: userId }, { sellerId: userId }];
+        and.push({ OR: [{ buyerId: userId }, { sellerId: userId }] });
       }
     }
 
@@ -117,16 +127,33 @@ export class AdminOrderService {
       }
     }
 
+    if (and.length > 0) {
+      where.AND = and;
+    }
+
     // Grup (CheckoutGroup) bazında sayfala: bir sepet asla sayfa sınırına
     // bölünmez. `orders.some` order-seviye filtreyle eşleşen EN AZ bir siparişi
     // olan grupları getirir; sonra o grupların TÜM siparişlerini (eksiksiz sepet)
     // çekeriz. Sıralama: grup createdAt (en yeni). Her order backfill ile bir
     // CheckoutGroup'a bağlıdır (grupsuz order admin listesinde görünmez).
+    const groupOrderBy =
+      resolveOrderBy<Prisma.CheckoutGroupOrderByWithRelationInput>(
+        "CheckoutGroup",
+        query,
+        {
+          defaultSort: { createdAt: "desc" },
+          sortMap: {
+            orderNumber: (d) => ({ groupNumber: d }),
+            totalAmount: (d) => ({ totalAmount: d }),
+            "buyer.displayName": (d) => ({ buyer: { displayName: d } }),
+          },
+        },
+      );
     const groupPage = await paginate(
       this.prisma.checkoutGroup,
       {
         where: { orders: { some: where } },
-        orderBy: { createdAt: "desc" as const },
+        orderBy: groupOrderBy,
         select: { id: true },
       },
       query,
@@ -176,10 +203,26 @@ export class AdminOrderService {
         })
       : [];
 
+    // userId/productId filtresi: grup satırı yalnız FİLTREYE UYAN üyeleri taşır
+    // (kullanıcı görünümünde başka satıcının siparişleri sızmaz; ürün görünümünde
+    // sepetin ilgisiz kalemleri dökülmez). Toplamlar da bu kapsamı yansıtır.
+    const memberMatches = (o: (typeof orders)[number]) => {
+      if (productId && o.productId !== productId) return false;
+      if (userId) {
+        if (userRole === "buyer" && o.buyerId !== userId) return false;
+        if (userRole === "seller" && o.sellerId !== userId) return false;
+        if (!userRole && o.buyerId !== userId && o.sellerId !== userId)
+          return false;
+      }
+      return true;
+    };
+    const scopedOrders =
+      userId || productId ? orders.filter(memberMatches) : orders;
+
     // Grup üyelerini sayfadaki grup sırasına (grup createdAt desc) göre bitişik
     // diz ki client-side gruplama sırayı korusun; her grubun gerçek boyutunu tut.
     const byGroup = new Map<string, typeof orders>();
-    for (const o of orders) {
+    for (const o of scopedOrders) {
       const k = o.checkoutGroupId as string;
       const bucket = byGroup.get(k);
       if (bucket) bucket.push(o);
@@ -239,20 +282,28 @@ export class AdminOrderService {
       email: string | null;
     } | null,
     shippingAddress: unknown,
-  ): { id: string; displayName: string | null; email: string | null } | null {
+  ): {
+    id: string;
+    displayName: string | null;
+    email: string | null;
+    isGuest?: boolean;
+  } | null {
     if (!buyer) return buyer;
     const sa = (shippingAddress as any) || {};
     const isGuest =
       buyer.email === "guest@tarodan.system" ||
       buyer.displayName === "GUEST_SYSTEM" ||
       sa?.isGuestOrder === true;
-    if (!isGuest) return buyer;
+    if (!isGuest) return { ...buyer, isGuest: false };
     const guestEmail = sa?.guestEmail || sa?.email || null;
     const guestName = sa?.guestName || sa?.fullName || null;
     return {
+      // id ortak GUEST_SYSTEM hesabıdır — UI bunu bilerek kullanıcı linki
+      // ÜRETMEZ (tıklayınca tüm misafir siparişleri tek "kullanıcı" görünürdü).
       id: buyer.id,
       displayName: guestName || guestEmail || "Misafir",
       email: guestEmail || buyer.email,
+      isGuest: true,
     };
   }
 

@@ -100,6 +100,23 @@ export class AdminPayoutService {
       }),
     ]);
 
+    // "Yaklaşan Ödemeler" kartı kesik UUID değil sipariş numarası göstersin.
+    const nextReleaseOrders = await this.prisma.order.findMany({
+      where: { id: { in: nextReleases.map((r) => r.orderId) } },
+      select: { id: true, orderNumber: true },
+    });
+    const nextReleaseOrderMap = new Map(
+      nextReleaseOrders.map((o) => [o.id, o.orderNumber]),
+    );
+    const nextReleaseRows = nextReleases.map((r) => ({
+      id: r.id,
+      orderId: r.orderId,
+      orderNumber: nextReleaseOrderMap.get(r.orderId) ?? null,
+      amount: Number(r.amount),
+      releaseAt: r.releaseAt,
+      sellerId: r.sellerId,
+    }));
+
     const round2 = (n: number) => Math.round(n * 100) / 100;
 
     return {
@@ -111,13 +128,7 @@ export class AdminPayoutService {
       failedTransferCount,
       countHeld: heldCount,
       countReleased: releasedCount,
-      nextReleases: nextReleases.map((r) => ({
-        id: r.id,
-        orderId: r.orderId,
-        amount: Number(r.amount),
-        releaseAt: r.releaseAt,
-        sellerId: r.sellerId,
-      })),
+      nextReleases: nextReleaseRows,
     };
   }
 
@@ -404,6 +415,10 @@ export class AdminPayoutService {
         sellerName: h.seller.displayName ?? h.seller.email,
         sellerEmail: h.seller.email,
         amount: Number(h.amount),
+        // Kısmi iadede tüketilen pay — net ödenecek = amount - refundedAmount.
+        refundedAmount: Number(h.refundedAmount ?? 0),
+        // GERÇEK iade kilidi — UI neden rozetini bununla üretir (uydurma yok).
+        frozenByRefundId: h.frozenByRefundId ?? null,
         status: h.status,
         releaseAt: h.releaseAt,
         releasedAt: h.releasedAt,
@@ -431,17 +446,20 @@ export class AdminPayoutService {
     };
     if (sellerId) where.sellerId = sellerId;
     if (search) {
-      where.OR = [
+      // Grup ödemesinde payment.order NULL — sipariş numarası hold.orderId
+      // üzerinden aranır (transactions ile aynı desen).
+      const searchOr: Prisma.PaymentHoldWhereInput[] = [
         { seller: { displayName: { contains: search, mode: "insensitive" } } },
         { seller: { email: { contains: search, mode: "insensitive" } } },
-        {
-          payment: {
-            order: {
-              orderNumber: { contains: search, mode: "insensitive" },
-            },
-          },
-        },
       ];
+      const matchingOrders = await this.prisma.order.findMany({
+        where: { orderNumber: { contains: search, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (matchingOrders.length > 0) {
+        searchOr.push({ orderId: { in: matchingOrders.map((o) => o.id) } });
+      }
+      where.OR = searchOr;
     }
 
     const orderBy = resolveOrderBy<Prisma.PaymentHoldOrderByWithRelationInput>(
@@ -463,11 +481,20 @@ export class AdminPayoutService {
         where,
         include: {
           seller: { select: { id: true, displayName: true, email: true } },
-          payment: { select: { order: { select: { orderNumber: true } } } },
         },
         orderBy,
       },
       query,
+    );
+
+    // Grup ödemesinde payment.order NULL'dur — sipariş numarası hold.orderId
+    // üzerinden çözülür (eskiden her sepet hold'u "-" görünüyordu).
+    const scheduleOrders = await this.prisma.order.findMany({
+      where: { id: { in: result.data.map((h) => h.orderId) } },
+      select: { id: true, orderNumber: true },
+    });
+    const scheduleOrderMap = new Map(
+      scheduleOrders.map((o) => [o.id, o.orderNumber]),
     );
 
     return {
@@ -475,11 +502,13 @@ export class AdminPayoutService {
       data: result.data.map((h) => ({
         id: h.id,
         orderId: h.orderId,
-        orderNumber: h.payment.order?.orderNumber ?? "-",
+        orderNumber: scheduleOrderMap.get(h.orderId) ?? "-",
         sellerId: h.sellerId,
         sellerName: h.seller.displayName ?? h.seller.email,
         sellerEmail: h.seller.email,
         amount: Number(h.amount),
+        refundedAmount: Number(h.refundedAmount ?? 0),
+        frozenByRefundId: h.frozenByRefundId ?? null,
         releaseAt: h.releaseAt,
         createdAt: h.createdAt,
       })),

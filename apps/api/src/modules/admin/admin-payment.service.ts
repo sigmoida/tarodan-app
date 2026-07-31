@@ -18,7 +18,12 @@ import {
   ResolveRefundAttemptDto,
   RefundAttemptResolution,
 } from "./dto";
-import { Prisma, PaymentStatus, RefundAttemptStatus } from "@prisma/client";
+import {
+  Prisma,
+  PaymentStatus,
+  RefundAttemptStatus,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
 
@@ -102,6 +107,21 @@ export class AdminPaymentService {
             OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }],
           },
         });
+      // Sepet ödemesi: kimlik order'da değil checkoutGroup'tadır.
+      conditions.push({
+        checkoutGroup: {
+          OR: [
+            { groupNumber: { contains: search, mode: "insensitive" } },
+            {
+              buyer: {
+                displayName: { contains: search, mode: "insensitive" },
+              },
+            },
+            { buyer: { email: { contains: search, mode: "insensitive" } } },
+            ...(userIds.length > 0 ? [{ buyerId: { in: userIds } }] : []),
+          ],
+        },
+      });
       if (Number.isFinite(numericAmount))
         conditions.push({ amount: numericAmount });
       if (Object.values(PaymentStatus).includes(normalized as PaymentStatus))
@@ -135,6 +155,18 @@ export class AdminPaymentService {
               product: { select: { id: true, title: true } },
             },
           },
+          // Sepet ödemesinde kimlik: grup numarası + grup alıcısı + sipariş sayısı.
+          checkoutGroup: {
+            select: {
+              id: true,
+              groupNumber: true,
+              buyer: { select: { id: true, displayName: true, email: true } },
+              orders: {
+                select: { id: true },
+                orderBy: { createdAt: "asc" },
+              },
+            },
+          },
         },
       },
       query,
@@ -145,10 +177,16 @@ export class AdminPaymentService {
       // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
       // ödemelerde order=null olabilir. Null-safe erişim — aksi halde TÜM liste
       // TypeError ile 500 döner.
-      data: result.data.map((p) => ({
+      data: result.data.map((p: any) => ({
         id: p.id,
         orderId: p.orderId,
         orderNumber: p.order?.orderNumber ?? null,
+        // Grup kimliği: liste satırı sepeti temsil eder; link anchor sipariş
+        // üzerinden grup dosyasına çözülür (order id → group file).
+        checkoutGroupId: p.checkoutGroupId ?? null,
+        groupNumber: p.checkoutGroup?.groupNumber ?? null,
+        orderCount: p.checkoutGroup?.orders?.length ?? (p.orderId ? 1 : 0),
+        anchorOrderId: p.checkoutGroup?.orders?.[0]?.id ?? p.orderId ?? null,
         amount: Number(p.amount),
         currency: p.currency,
         provider: p.provider,
@@ -156,7 +194,7 @@ export class AdminPaymentService {
         failureReason: p.failureReason,
         providerPaymentId: p.providerPaymentId,
         providerConversationId: p.providerConversationId,
-        buyer: p.order?.buyer ?? null,
+        buyer: p.order?.buyer ?? p.checkoutGroup?.buyer ?? null,
         seller: p.order?.seller ?? null,
         product: p.order?.product ?? null,
         createdAt: p.createdAt,
@@ -180,12 +218,48 @@ export class AdminPaymentService {
             product: true,
           },
         },
-        paymentHolds: true,
+        // Sepet ödemesi: kapsanan siparişler + grup alıcısı (R3 — ödeme→grup yönü).
+        checkoutGroup: {
+          include: {
+            buyer: {
+              select: { id: true, displayName: true, email: true, phone: true },
+            },
+            orders: {
+              orderBy: { createdAt: "asc" },
+              include: {
+                seller: { select: { id: true, displayName: true } },
+                product: { select: { id: true, title: true } },
+              },
+            },
+          },
+        },
+        // Paylaşılan ödemeye karşı sipariş-başına iade denemeleri.
+        refundAttempts: { orderBy: { createdAt: "desc" } },
+        paymentHolds: {
+          include: { seller: { select: { displayName: true } } },
+        },
       },
     });
 
     if (!payment) {
       throw new NotFoundException("Ödeme bulunamadı");
+    }
+
+    const group: any = (payment as any).checkoutGroup;
+    const attempts: any[] = (payment as any).refundAttempts ?? [];
+    const refundedOf = (orderId: string) =>
+      attempts
+        .filter(
+          (a) =>
+            a.orderId === orderId &&
+            (a.status === "succeeded" || a.status === "finalized"),
+        )
+        .reduce((sum, a) => sum + Number(a.amount), 0);
+    const orderNumberById = new Map<string, string>(
+      (group?.orders ?? []).map((o: any) => [o.id, o.orderNumber]),
+    );
+    if (payment.order) {
+      orderNumberById.set(payment.order.id, payment.order.orderNumber);
     }
 
     // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
@@ -224,11 +298,37 @@ export class AdminPaymentService {
             releasedAt: payment.paymentHolds[0].releasedAt,
           }
         : null,
-      paymentHolds: payment.paymentHolds.map((hold) => ({
+      // Sepet dosyası: grup kimliği + kapsanan siparişler (her satır grup
+      // dosyasına order id ile çözülür) + ödemeye karşı toplam iade.
+      group: group
+        ? {
+            id: group.id,
+            groupNumber: group.groupNumber,
+            totalAmount: Number(group.totalAmount),
+            buyer: group.buyer,
+            orders: (group.orders ?? []).map((o: any) => ({
+              id: o.id,
+              orderNumber: o.orderNumber,
+              status: o.status,
+              totalAmount: Number(o.totalAmount),
+              sellerName: o.seller?.displayName ?? null,
+              productTitle: o.product?.title ?? null,
+              refundedTotal: refundedOf(o.id),
+            })),
+          }
+        : null,
+      refundedTotal: attempts
+        .filter((a) => a.status === "succeeded" || a.status === "finalized")
+        .reduce((sum, a) => sum + Number(a.amount), 0),
+      paymentHolds: payment.paymentHolds.map((hold: any) => ({
         id: hold.id,
         orderId: hold.orderId,
+        orderNumber: orderNumberById.get(hold.orderId) ?? null,
         sellerId: hold.sellerId,
+        sellerName: hold.seller?.displayName ?? null,
         amount: Number(hold.amount),
+        refundedAmount: Number(hold.refundedAmount ?? 0),
+        frozenByRefundId: hold.frozenByRefundId ?? null,
         status: hold.status,
         releaseAt: hold.releaseAt,
         releasedAt: hold.releasedAt,
@@ -390,6 +490,12 @@ export class AdminPaymentService {
               product: { select: { id: true, title: true } },
             },
           },
+          checkoutGroup: {
+            select: {
+              groupNumber: true,
+              buyer: { select: { id: true, displayName: true, email: true } },
+            },
+          },
         },
       },
       query,
@@ -397,15 +503,17 @@ export class AdminPaymentService {
 
     return {
       ...result,
-      data: result.data.map((p) => ({
+      // Payment.order nullable (grup/trade ödemesi) — null deref 500 atıyordu.
+      data: result.data.map((p: any) => ({
         id: p.id,
         orderId: p.orderId,
-        orderNumber: p.order.orderNumber,
+        orderNumber:
+          p.order?.orderNumber ?? p.checkoutGroup?.groupNumber ?? null,
         amount: Number(p.amount),
         provider: p.provider,
         failureReason: p.failureReason,
-        buyer: p.order.buyer,
-        product: p.order.product,
+        buyer: p.order?.buyer ?? p.checkoutGroup?.buyer ?? null,
+        product: p.order?.product ?? null,
         createdAt: p.createdAt,
       })),
     };
@@ -528,6 +636,15 @@ export class AdminPaymentService {
       include: {
         order: { select: { id: true, orderNumber: true } },
         trade: { select: { id: true, tradeNumber: true } },
+        // Deneme, paylaşılan grup ödemesinin KISMİ iadesi olabilir — mutabakat
+        // satırı hangi ödemeye/sepete ait olduğunu göstermek zorunda (R3).
+        payment: {
+          select: {
+            id: true,
+            amount: true,
+            checkoutGroup: { select: { groupNumber: true } },
+          },
+        },
       },
       orderBy: { updatedAt: "asc" },
       take: 100,
@@ -596,50 +713,56 @@ export class AdminPaymentService {
   }
 
   /**
-   * Get refund history (refunded payments with pagination)
+   * İade geçmişi — RefundRequest bazlı (R5: iade sipariş bazındadır).
+   * Eski kurgu Payment.status=refunded satırlarına bakıyordu; grup modelinde
+   * kısmi iadelerde paylaşılan Payment 'completed' kaldığı için grup iadeleri
+   * listede HİÇ görünmüyordu, görünen satırlar da order=null ile boş kalıyordu.
    */
   async getRefundHistory(query: AdminRefundHistoryQueryDto) {
     const { search, startDate: startDateValue, endDate: endDateValue } = query;
     const startDate = startDateValue ? new Date(startDateValue) : undefined;
     const endDate = endDateValue ? new Date(endDateValue) : undefined;
 
-    const where: Prisma.PaymentWhereInput = {
-      status: PaymentStatus.refunded,
+    const where: Prisma.RefundRequestWhereInput = {
+      status: RefundRequestStatus.refunded,
     };
 
     if (search) {
       const userIds = await fulltextUserSearch(this.prisma, search);
-      const conditions: Prisma.PaymentWhereInput[] = [];
-      if (userIds.length > 0)
-        conditions.push({ order: { buyerId: { in: userIds } } });
-      if (search.length >= 3) conditions.push({ id: { startsWith: search } });
-      if (conditions.length === 0) {
-        return {
-          data: [],
-          meta: {
-            total: 0,
-            page: query.page ?? 1,
-            limit: query.limit ?? 20,
-            totalPages: 0,
+      const s = search.trim();
+      const conditions: Prisma.RefundRequestWhereInput[] = [
+        { refundNumber: { contains: s, mode: "insensitive" } },
+        { order: { orderNumber: { contains: s, mode: "insensitive" } } },
+        {
+          order: {
+            product: { title: { contains: s, mode: "insensitive" } },
           },
-        };
+        },
+      ];
+      if (userIds.length > 0) {
+        conditions.push({
+          order: {
+            OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }],
+          },
+        });
       }
       where.OR = conditions;
     }
 
     if (startDate || endDate) {
-      where.updatedAt = {};
-      if (startDate) where.updatedAt.gte = startDate;
-      if (endDate) where.updatedAt.lte = endDate;
+      where.refundedAt = {};
+      if (startDate) where.refundedAt.gte = startDate;
+      if (endDate) where.refundedAt.lte = endDate;
     }
 
-    const orderBy = resolveOrderBy<Prisma.PaymentOrderByWithRelationInput>(
-      "Payment",
-      query,
-      { defaultSort: { updatedAt: "desc" } },
-    );
+    const orderBy =
+      resolveOrderBy<Prisma.RefundRequestOrderByWithRelationInput>(
+        "RefundRequest",
+        query,
+        { defaultSort: { refundedAt: "desc" } },
+      );
     const result = await paginate(
-      this.prisma.payment,
+      this.prisma.refundRequest,
       {
         where,
         include: {
@@ -648,11 +771,6 @@ export class AdminPaymentService {
               buyer: { select: { id: true, displayName: true, email: true } },
               seller: { select: { id: true, displayName: true, email: true } },
               product: { select: { id: true, title: true } },
-              refundRequests: {
-                orderBy: { createdAt: "desc" },
-                take: 1,
-                select: { reason: true },
-              },
             },
           },
         },
@@ -663,22 +781,21 @@ export class AdminPaymentService {
 
     return {
       ...result,
-      data: result.data.map((p) => ({
-        id: p.id,
-        amount: Number(p.amount),
-        status: p.status,
-        refundedAt: p.updatedAt,
-        order: p.order
-          ? {
-              id: p.order.id,
-              orderNumber: p.order.orderNumber,
-              commissionAmount: Number(p.order.commissionAmount ?? 0),
-              reason: p.order.refundRequests?.[0]?.reason ?? null,
-              buyer: p.order.buyer,
-              seller: p.order.seller,
-              product: p.order.product,
-            }
-          : null,
+      data: result.data.map((r: any) => ({
+        id: r.id,
+        refundNumber: r.refundNumber,
+        orderId: r.orderId,
+        orderNumber: r.order?.orderNumber ?? null,
+        amount: Number(r.amount),
+        // İade edilen tutarın yanında GERİ ÇEVRİLEN kesinti (orijinal komisyon
+        // değil — o rakam iade tablosunda yanıltıcıydı).
+        refundedSellerFee: Number(r.refundedSellerFeeAmount ?? 0),
+        reason: r.reason,
+        refundedAt: r.refundedAt ?? r.updatedAt,
+        createdAt: r.createdAt,
+        buyer: r.order?.buyer ?? null,
+        seller: r.order?.seller ?? null,
+        product: r.order?.product ?? null,
       })),
     };
   }

@@ -70,6 +70,7 @@ describe("AdminPayoutService.getPayoutsSummary — transfer ayrışması", () =>
           .mockResolvedValueOnce(3), // released
         findMany: jest.fn().mockResolvedValue([]),
       },
+      order: { findMany: jest.fn().mockResolvedValue([]) },
       payoutTransfer: {
         aggregate: jest
           .fn()
