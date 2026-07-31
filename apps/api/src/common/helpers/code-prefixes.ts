@@ -46,8 +46,14 @@ export function promoteUserCodeToCorporate(code: string): string | null {
 /** Üç harfli işlem referansı önekleri — `generateUniqueReference` ile üretilir. */
 export const REFERENCE_PREFIX = {
   order: "ORD",
-  /** Çok satıcılı ödeme grubu */
+  /** Çok satıcılı ödeme grubu (sepet) */
   checkoutGroup: "GRP",
+  /**
+   * Satıcı paketi = TEK fiziksel koli. Sürat'a `OzelKargoTakipNo` olarak bu
+   * gönderilir ve müşteri kargosunu bu kodla sorgular. Sepette kaç satıcı varsa
+   * o kadar paket kodu üretilir (1 sepet → N paket → M sipariş).
+   */
+  orderPackage: "PKG",
   /** Takas. Not: "TRD" e-arşiv fatura önekiyle çakıştığı için kullanılmaz. */
   trade: "TKS",
   refundRequest: "RFD",

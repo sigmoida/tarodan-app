@@ -697,6 +697,8 @@ export class OrderCheckoutGroupService {
             };
             const pkg = await tx.orderPackage.create({
               data: {
+                packageNumber:
+                  await this.checkoutCommon.generatePackageNumber(),
                 checkoutGroupId: group.id,
                 sellerId,
                 buyerId,

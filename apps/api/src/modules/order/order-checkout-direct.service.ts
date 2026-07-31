@@ -456,6 +456,7 @@ export class OrderCheckoutDirectService {
       // (Faz 2 Shipment.packageId + Faz 3 UI gruplaması her order'ın paketi olduğunu varsayar).
       const singleOrderPackage = await tx.orderPackage.create({
         data: {
+          packageNumber: await this.checkoutCommon.generatePackageNumber(),
           checkoutGroupId: singleOrderGroup.id,
           sellerId: product.sellerId,
           buyerId,
@@ -816,6 +817,7 @@ export class OrderCheckoutDirectService {
       // Teklif siparişi de normal satışla aynı sürümlü kargo tarifesini kullanır.
       const offerOrderPackage = await tx.orderPackage.create({
         data: {
+          packageNumber: await this.checkoutCommon.generatePackageNumber(),
           checkoutGroupId: offerOrderGroup.id,
           sellerId: offer.sellerId,
           buyerId,

@@ -1333,6 +1333,11 @@ model CheckoutGroup {
 // kolon (User ilişkisi yok — denormalize, sorgu için yeterli).
 model OrderPackage {
   id                      String         @id @default(uuid())
+  // Koli numarası (PKG-…): paketin KALICI dış referansı. Sürat'a OzelKargoTakipNo
+  // olarak bu gönderilir, müşteri kargosunu bununla sorgular. Eskiden paketin en
+  // küçük orderNumber'ı TÜRETİLİYORDU; türetilmiş referans paketin sipariş kümesi
+  // değişince kayıyor ve idempotency cache'i ıskalayıp MÜKERRER gönderi açıyordu.
+  packageNumber           String         @unique @map("package_number")
   checkoutGroupId         String?        @map("checkout_group_id")
   sellerId                String         @map("seller_id")
   buyerId                 String         @map("buyer_id")

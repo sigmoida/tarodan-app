@@ -425,6 +425,7 @@ export class OrderGuestCheckoutService {
       // Faz 1: misafir tek siparişi de satıcı-paketi altında (uniform model).
       const guestOrderPackage = await tx.orderPackage.create({
         data: {
+          packageNumber: await this.checkoutCommon.generatePackageNumber(),
           checkoutGroupId: guestOrderGroup.id,
           sellerId: product.sellerId,
           buyerId: guestUser.id,

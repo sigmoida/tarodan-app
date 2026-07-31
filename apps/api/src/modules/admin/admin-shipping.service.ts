@@ -60,6 +60,7 @@ export class AdminShippingService {
         "order.seller.displayName",
         "order.seller.email",
         "provider",
+        "orderPackage.packageNumber",
         "trackingNumber",
         "providerTrackingId",
         "providerRawStatus",
@@ -91,6 +92,9 @@ export class AdminShippingService {
       {
         where,
         include: {
+          // Koli numarası (PKG-…) — kargo etiketindeki ve Sürat'a giden kod.
+          // Kolonun kaynağı artık uuid'den uydurulmuş değil, gerçek alan.
+          orderPackage: { select: { packageNumber: true } },
           order: {
             // `include` returns every Order scalar, so `packageId` (the per-seller
             // OrderPackage) and `quantity` come along for free. Same-seller orders

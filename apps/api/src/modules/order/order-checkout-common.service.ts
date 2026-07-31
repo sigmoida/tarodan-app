@@ -246,6 +246,22 @@ export class OrderCheckoutCommonService {
   }
 
   /**
+   * Koli numarası (ör. "PKG-3QF7N2K9XM") — bir satıcı paketi = bir fiziksel
+   * gönderi. Sürat'a `OzelKargoTakipNo` olarak BU gider ve müşteri kargosunu
+   * bununla sorgular; sipariş numarasından bağımsızdır, çünkü referansı paketin
+   * sipariş kümesinden türetmek küme değişince kayar ve mükerrer gönderi açar.
+   */
+  async generatePackageNumber(): Promise<string> {
+    return generateUniqueReference(
+      REFERENCE_PREFIX.orderPackage,
+      async (code) =>
+        (await this.prisma.orderPackage.count({
+          where: { packageNumber: code },
+        })) > 0,
+    );
+  }
+
+  /**
    * Record commission data to analytics snapshot
    * Requirement: Store commission snapshot (3.3)
    */

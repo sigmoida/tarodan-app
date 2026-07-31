@@ -222,6 +222,10 @@ export class OrderCommonService {
       // Kargo pakete bir kez yüklenir → kardeş order'ın shippingCost'u 0 olabilir; UI bunu
       // "ücretsiz" değil "pakete dahil" göstermek için packageId'ye bakar.
       packageId: order.packageId ?? null,
+      // Koli numarası (PKG-…): Sürat'a iletilen ve kargo etiketinde yazan kod.
+      // Sepet numarasından da sipariş numarasından da BAĞIMSIZDIR — üç seviye
+      // (GRP · PKG · ORD) hiçbir zaman aynı değeri taşımaz.
+      packageNumber: order.package?.packageNumber ?? null,
       amount: totalAmount,
       totalAmount,
       commissionAmount,

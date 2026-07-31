@@ -38,9 +38,14 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
           ),
       },
       orderPackage: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue(over.orderPackage ?? { billableDesi: 3 }),
+        // Paketin Sürat referansı ARTIK saklanan koli numarasıdır (türetilmiş
+        // min-orderNumber değil) → mock hem billableDesi hem packageNumber verir.
+        findUnique: jest.fn().mockResolvedValue(
+          over.orderPackage ?? {
+            billableDesi: 3,
+            packageNumber: "PKG-COLI0001",
+          },
+        ),
       },
       shipment: {
         findFirst: jest.fn().mockResolvedValue(over.existingShipment ?? null),
@@ -54,9 +59,10 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
         }),
       },
     } as any;
-    // order.findMany hepsi `where.packageId` kullanır (resolveSuratRef, paket-booking,
-    // cancel siblings) → mock packageOrders döndürür; cancel testleri sibling'leri
-    // packageOrders olarak (id+status) verir.
+    // order.findMany `where.packageId` ile paket-booking ve cancel sibling'leri
+    // için kullanılır → mock packageOrders döndürür; cancel testleri sibling'leri
+    // packageOrders olarak (id+status) verir. Sürat referansı ise artık
+    // orderPackage.packageNumber'dan okunur.
     const cargo = {
       isIntegrationEnabled: () => true,
       createShipmentWithBarcode: jest.fn().mockImplementation((arg: any) => {
@@ -106,10 +112,10 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     const res = await svc.createSuratBarcodeForOrder("o2");
 
     expect(res).toEqual({ kargoTakipNo: "SURAT-123", labelZpl: "ZPL" });
-    // idempotency + ref paket-bazlı (ref = min orderNumber = ORD-1)
+    // idempotency + ref paket-bazlı; ref = KOLİ NUMARASI (sipariş no değil)
     expect(captured.barcodeCall.idempotencyKey).toBe("surat:package:pkg-1");
-    expect(captured.barcodeCall.correlationId).toBe("ORD-1");
-    expect(captured.barcodeCall.payload.OzelKargoTakipNo).toBe("ORD-1");
+    expect(captured.barcodeCall.correlationId).toBe("PKG-COLI0001");
+    expect(captured.barcodeCall.payload.OzelKargoTakipNo).toBe("PKG-COLI0001");
     // toplam adet (2+1) + birleşik içerik
     expect(captured.barcodeCall.payload.Adet).toBe(3);
     expect(captured.barcodeCall.payload.BirimDesi).toBe(3);
@@ -148,8 +154,8 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     const res = await svc.ensureSuratShipmentForOrder("o2");
 
     expect(res).toBe("created");
-    // trackingNumber = paket ref (ORD-1), order-no (ORD-2) DEĞİL
-    expect(captured.shipmentCreate.trackingNumber).toBe("ORD-1");
+    // trackingNumber = KOLİ numarası, sipariş numarası (ORD-2) DEĞİL
+    expect(captured.shipmentCreate.trackingNumber).toBe("PKG-COLI0001");
     expect(captured.shipmentCreate.providerTrackingId).toBe("SURAT-123");
     expect(captured.shipmentCreate.orderId).toBe("o2");
   });

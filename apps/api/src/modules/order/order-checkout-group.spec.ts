@@ -135,6 +135,9 @@ describe("OrderService checkout group (batch checkout)", () => {
       findUnique: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
     },
+    // Koli numarası (PKG-…) da sipariş/sepet numarası gibi çakışma kontrolüyle
+    // üretilir → generateUniqueReference bu sayacı çağırır.
+    orderPackage: { count: jest.fn().mockResolvedValue(0) },
     commissionRule: { findMany: jest.fn().mockResolvedValue([]) },
     platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     analyticsSnapshot: { upsert: jest.fn() },

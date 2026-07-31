@@ -86,6 +86,13 @@ export class AdminOrderService {
             groupNumber: { contains: search, mode: "insensitive" },
           },
         },
+        // Koli numarası (PKG-…) — müşteri destek talebinde çoğu zaman elindeki
+        // tek kod kargo etiketindeki bu numaradır.
+        {
+          package: {
+            packageNumber: { contains: search, mode: "insensitive" },
+          },
+        },
         { buyer: { displayName: { contains: search, mode: "insensitive" } } },
         { buyer: { email: { contains: search, mode: "insensitive" } } },
         { seller: { displayName: { contains: search, mode: "insensitive" } } },
@@ -178,6 +185,8 @@ export class AdminOrderService {
               },
             },
             checkoutGroup: { select: { groupNumber: true } },
+            // Koli numarası (PKG-…) — kargo etiketindeki kod; Sürat'a bu gider.
+            package: { select: { packageNumber: true } },
             // Kargo durumu + takip no — liste kolonu + expanded detayda paket kargosu.
             shipment: {
               select: {
@@ -252,6 +261,8 @@ export class AdminOrderService {
         // Satıcı-paketi (OrderPackage) referansı — admin listede sepeti satıcı
         // bazında gruplayabilmek için (checkoutGroupId zaten ...o ile geliyor).
         packageId: o.packageId ?? null,
+        // Koli numarası (PKG-…): kargo etiketindeki ve Sürat'a giden kod.
+        packageNumber: (o as any).package?.packageNumber ?? null,
         groupNumber: o.checkoutGroup?.groupNumber ?? null,
         // Grup artık eksiksiz döndüğü için gerçek üye sayısı = grubun boyutu.
         groupItemCount: groupSize.get(o.checkoutGroupId as string) ?? 1,

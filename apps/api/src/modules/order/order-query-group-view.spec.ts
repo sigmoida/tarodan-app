@@ -269,7 +269,7 @@ describe("OrderQueryService group-umbrella views", () => {
       expect(res.data[0].orders).toHaveLength(3);
     });
 
-    it("satıcı: çatı kendi OrderPackage'ı; grup numarası paketin ortak referansı (en küçük orderNumber)", async () => {
+    it("satıcı: çatı kendi OrderPackage'ı; sepeti yoksa başlık KOLİ numarası olur", async () => {
       const { svc, prisma } = makeService();
       prisma.orderPackage.findMany
         .mockResolvedValueOnce([
@@ -278,6 +278,7 @@ describe("OrderQueryService group-umbrella views", () => {
         .mockResolvedValueOnce([
           {
             id: "pkg-A",
+            packageNumber: "PKG-COLI0001",
             sellerId: "sA",
             shippingCost: 29.99,
             createdAt: new Date("2026-07-01"),
@@ -299,11 +300,14 @@ describe("OrderQueryService group-umbrella views", () => {
       expect(res.meta.total).toBe(1);
       const row = res.data[0];
       expect(row.kind).toBe("package");
-      expect(row.groupNumber).toBe("ORD-A");
+      // Sepetsiz pakette başlık koli numarasıdır — hiçbir sipariş numarasıyla
+      // aynı olmaz (üç kod seviyesi birbirinden bağımsızdır).
+      expect(row.groupNumber).toBe("PKG-COLI0001");
       expect(row.payment).toBeNull();
       expect(row.totalAmount).toBe(200);
       expect(row.packages).toHaveLength(1);
       expect(row.packages[0].shippingCost).toBe(29.99);
+      expect(row.packages[0].packageNumber).toBe("PKG-COLI0001");
     });
 
     it("sayfalama birleşik listede çalışır: limit dilimi uygulanır, total tümünü sayar", async () => {

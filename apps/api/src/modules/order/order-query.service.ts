@@ -84,20 +84,36 @@ export class OrderQueryService {
    * Requirement: Guest checkout (requirements.txt)
    */
   async trackGuestOrder(dto: GuestOrderTrackDto) {
-    // GRUP numarası (GRPORD-…) da kabul edilir: sepetin ilk siparişine çözülür,
-    // kardeş sipariş numaraları yanında döner (misafir tüm sepeti takip edebilsin).
+    // Üç kod seviyesinin HEPSİ kabul edilir — müşterinin elindeki hangisiyse:
+    //   ORD-… sipariş satırı · GRP-… sepet · PKG-… koli (kargo etiketindeki kod).
+    // Grup/koli kendi ilk siparişine çözülür; kardeş sipariş numaraları yanında
+    // döner (müşteri tüm sepeti/koliyi takip edebilsin).
     let lookupNumber = dto.orderNumber;
-    const group = await this.prisma.checkoutGroup.findUnique({
-      where: { groupNumber: dto.orderNumber },
-      select: {
-        orders: {
-          orderBy: { createdAt: "asc" },
-          select: { orderNumber: true },
+    const [group, orderPackage] = await Promise.all([
+      this.prisma.checkoutGroup.findUnique({
+        where: { groupNumber: dto.orderNumber },
+        select: {
+          orders: {
+            orderBy: { createdAt: "asc" },
+            select: { orderNumber: true },
+          },
         },
-      },
-    });
-    if (group?.orders?.length) {
-      lookupNumber = group.orders[0].orderNumber;
+      }),
+      this.prisma.orderPackage.findUnique({
+        where: { packageNumber: dto.orderNumber },
+        select: {
+          orders: {
+            orderBy: { createdAt: "asc" },
+            select: { orderNumber: true },
+          },
+        },
+      }),
+    ]);
+    const resolved = group?.orders?.length
+      ? group.orders
+      : orderPackage?.orders;
+    if (resolved?.length) {
+      lookupNumber = resolved[0].orderNumber;
     }
 
     const order = await this.prisma.order.findUnique({
@@ -125,6 +141,8 @@ export class OrderQueryService {
           },
         },
         shipment: true,
+        checkoutGroup: { select: { groupNumber: true } },
+        package: { select: { packageNumber: true } },
       },
     });
 
@@ -159,6 +177,10 @@ export class OrderQueryService {
     return {
       id: order.id,
       orderNumber: order.orderNumber,
+      // Üç kod seviyesi birlikte döner: müşteri hangisini girdiyse diğer ikisini
+      // de görür (sepet · koli · sipariş).
+      groupNumber: order.checkoutGroup?.groupNumber ?? null,
+      packageNumber: order.package?.packageNumber ?? null,
       siblingOrderNumbers,
       status: order.status,
       totalAmount: Number(order.totalAmount),
@@ -304,6 +326,7 @@ export class OrderQueryService {
         },
         // Cati (checkout group) numarasi liste kartinin cati basliginda gosterilir.
         checkoutGroup: { select: { groupNumber: true } },
+        package: { select: { packageNumber: true } },
       },
     });
 
@@ -458,6 +481,9 @@ export class OrderQueryService {
     shipment: true,
     refundRequests: { orderBy: { createdAt: "desc" as const } },
     offer: { select: { status: true } },
+    // Koli numarası (PKG-…) satır bazında da taşınır: satıcı ekranı ve sipariş
+    // detayı kargo etiketindeki kodu doğrudan gösterebilsin.
+    package: { select: { packageNumber: true } },
   };
 
   private paymentSummary(payment: any) {
@@ -506,19 +532,12 @@ export class OrderQueryService {
 
   /** Satıcı çatısı: kendi OrderPackage'ı tek "grup" kartı gibi sunulur. */
   private async formatPackageUmbrella(pkg: any, userId: string) {
-    const orders = [...pkg.orders].sort((a, b) =>
-      String(a.orderNumber).localeCompare(String(b.orderNumber)),
-    );
-    // Paketin ortak Sürat referansı = en küçük orderNumber (resolveSuratRef ile
-    // aynı kural); kargo etiketiyle eşleşen numara budur.
-    const packageRef = orders[0]?.orderNumber ?? pkg.id;
     return {
       kind: "package" as const,
       id: pkg.id,
       // Çatı başlığı sepet numarasıdır: satıcı ve alıcı aynı numarayı görür.
-      // Sepetsiz (eski/teklif kaynaklı) siparişlerde paket referansına düşer.
-      groupNumber: pkg.checkoutGroup?.groupNumber ?? packageRef,
-      packageRef,
+      // Sepetsiz (eski/teklif kaynaklı) siparişlerde koli numarasına düşer.
+      groupNumber: pkg.checkoutGroup?.groupNumber ?? pkg.packageNumber,
       totalAmount: pkg.orders.reduce(
         (sum: number, o: any) => sum + Number(o.totalAmount),
         0,
@@ -760,7 +779,12 @@ export class OrderQueryService {
    */
   private async buildPackagesView(
     orders: any[],
-    packagesMeta: Array<{ id: string; sellerId: string; shippingCost: any }>,
+    packagesMeta: Array<{
+      id: string;
+      packageNumber?: string | null;
+      sellerId: string;
+      shippingCost: any;
+    }>,
     userId: string,
   ) {
     const metaById = new Map(packagesMeta.map((p) => [p.id, p]));
@@ -791,6 +815,9 @@ export class OrderQueryService {
           : null;
         return {
           id: meta?.id ?? pkgId,
+          // Koli numarası (PKG-…) — kargo etiketindeki ve Sürat'a iletilen kod.
+          // Paketsiz sentetik satırda yoktur.
+          packageNumber: meta?.packageNumber ?? null,
           sellerId: meta?.sellerId ?? seller?.id ?? null,
           seller: seller
             ? {
