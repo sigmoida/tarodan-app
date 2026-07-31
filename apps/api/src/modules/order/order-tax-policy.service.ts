@@ -13,24 +13,20 @@ import { PrismaService } from "../../prisma";
  */
 
 export interface OrderTaxPolicy {
-  /**
-   * Ürün bedeline KDV uygulanır mı. Varsayılan KAPALI: vitrin fiyatı KDV dahil
-   * kabul edilir, beyanı satıcı yapar. Açılırsa `TaxRule`/`TaxRate` altyapısı
-   * (kategori bazlı oranlar) devreye girer — o altyapı KALDIRILMADI.
-   */
-  productVatEnabled: boolean;
   /** Hizmet bedellerine (komisyon, hizmet bedeli, kargo payı) KDV uygulanır mı. */
   serviceVatEnabled: boolean;
   /** Hizmet KDV oranı (%). */
   serviceVatRate: number;
   /** E-ticaret stopaj oranı (%) — GVK 94/19. */
   withholdingRate: number;
-  /** Stopaj bireysel (vergi mükellefi olmayan) satıcıdan da kesilsin mi. */
+  /**
+   * Stopaj bireysel (vergi mükellefi olmayan) satıcıdan da kesilsin mi.
+   * Varsayılan KAPALI: stopaj yalnız kurumsal satıcıdan kesilir.
+   */
   withholdingAppliesToIndividual: boolean;
 }
 
 const SETTING_KEYS = [
-  "product_vat_enabled",
   "service_vat_enabled",
   "service_vat_rate",
   "withholding_tax_rate",
@@ -38,11 +34,10 @@ const SETTING_KEYS = [
 ] as const;
 
 const DEFAULTS: OrderTaxPolicy = {
-  productVatEnabled: false,
   serviceVatEnabled: true,
   serviceVatRate: 20,
   withholdingRate: 1,
-  withholdingAppliesToIndividual: true,
+  withholdingAppliesToIndividual: false,
 };
 
 /** "true"/"1"/"yes" → true; ayar yoksa varsayılan. Bozuk değer varsayılana düşer. */
@@ -76,10 +71,6 @@ export class OrderTaxPolicyService {
     );
 
     return {
-      productVatEnabled: asBoolean(
-        byKey.get("product_vat_enabled"),
-        DEFAULTS.productVatEnabled,
-      ),
       serviceVatEnabled: asBoolean(
         byKey.get("service_vat_enabled"),
         DEFAULTS.serviceVatEnabled,
@@ -106,8 +97,9 @@ export class OrderTaxPolicyService {
 
   /**
    * Bu satıcıya uygulanacak stopaj oranı (%).
-   * Bireysel satıcı, ayar kapalıyken kapsam dışıdır (330 Seri No'lu GV Genel
-   * Tebliği yorumu); ayar açıkken herkese uygulanır.
+   * Bireysel satıcı varsayılan olarak kapsam DIŞIDIR — stopaj yalnız kurumsal
+   * (onaylı işletme + VKN) satıcıdan kesilir. `withholding_applies_to_individual`
+   * açılırsa herkese uygulanır.
    */
   withholdingRateFor(
     policy: OrderTaxPolicy,

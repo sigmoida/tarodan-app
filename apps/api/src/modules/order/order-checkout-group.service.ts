@@ -6,6 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { buyerTotalOf } from "./order-total.helper";
 import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
 import { OrderStatus, ProductStatus, Prisma } from "@prisma/client";
@@ -518,6 +519,7 @@ export class OrderCheckoutGroupService {
             withholdingTaxAmount: number;
             buyerServiceTaxAmount: number;
             sellerServiceTaxAmount: number;
+            serviceVatRate: number;
             totalAmount: number;
             suratIdempotencyKey: string;
           }> = [];
@@ -644,6 +646,7 @@ export class OrderCheckoutGroupService {
               withholdingTaxAmount,
               buyerServiceTaxAmount,
               sellerServiceTaxAmount,
+              serviceVatRate,
             } = await this.checkoutCommon.resolveOrderTaxes({
               sellerId: entry.product.sellerId,
               categoryId: entry.product.categoryId,
@@ -663,12 +666,12 @@ export class OrderCheckoutGroupService {
             });
             // Alıcı: ürün + kargo payı + alıcı ücretleri + ürün KDV'si +
             // alıcıya verilen hizmetlerin KDV'si.
-            const totalAmount =
-              discountedPrice +
-              shippingCost +
-              commissionResult.buyerFeeAmount +
-              taxAmount +
-              buyerServiceTaxAmount;
+            const totalAmount = buyerTotalOf({
+              subtotal: discountedPrice,
+              buyerShippingAmount: shippingCost,
+              buyerFeeAmount: commissionResult.buyerFeeAmount,
+              buyerServiceTaxAmount,
+            });
             const orderNumber = await this.checkoutCommon.generateOrderNumber();
             const suratIdempotencyKey =
               this.checkoutCommon.buildSuratIdempotencyKey([
@@ -688,6 +691,7 @@ export class OrderCheckoutGroupService {
               withholdingTaxAmount,
               buyerServiceTaxAmount,
               sellerServiceTaxAmount,
+              serviceVatRate,
               totalAmount,
               suratIdempotencyKey,
             });
@@ -826,6 +830,7 @@ export class OrderCheckoutGroupService {
                 withholdingTaxAmount: input.withholdingTaxAmount,
                 buyerServiceTaxAmount: input.buyerServiceTaxAmount,
                 sellerServiceTaxAmount: input.sellerServiceTaxAmount,
+                serviceVatRate: input.serviceVatRate,
                 commissionAmount: input.commissionResult.commissionAmount,
                 buyerFeeAmount: input.commissionResult.buyerFeeAmount,
                 sellerFeeAmount: input.commissionResult.sellerFeeAmount,

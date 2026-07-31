@@ -5,7 +5,7 @@ import { OrderTaxPolicyService } from "../order-tax-policy.service";
  * her spec'in kendi mock'una `platformSetting.findMany` eklemesi gerekmez.
  *
  * Argümansız çağrı ÜRETİM VARSAYILANLARINI verir: ürün KDV'si kapalı, hizmet
- * KDV'si %20 açık, stopaj %1 (bireysel dahil).
+ * KDV'si %20 açık, stopaj %1 (yalnız kurumsal satıcıdan).
  */
 export const testTaxPolicy = (
   settings: Record<string, string> = {},

@@ -6,8 +6,9 @@
  * ödediğine EKLENİR; satıcıya verilen hizmetlerin (satıcı komisyonu, platform
  * hizmet bedeli, satıcı kargo payı) KDV'si satıcının payout'undan KESİLİR.
  *
- * ÜRÜN BEDELİ MATRAHA GİRMEZ. Ürün KDV'si ayrı bir kavramdır (`Order.taxAmount`),
- * `product_vat_enabled` ayarıyla yönetilir ve bu hesabın dışındadır.
+ * ÜRÜN BEDELİ MATRAHA GİRMEZ — ve ürün bedeline KDV hiç uygulanmaz: vitrin
+ * fiyatı KDV dahil kabul edilir, beyanı satıcıya aittir. Platformun tahsil
+ * ettiği tek KDV budur.
  *
  * Matrahların hepsi sipariş satırında zaten kolon olarak duruyor; bu yüzden kalem
  * bazında KDV saklanmaz, yalnız iki taraf toplamı persist edilir.

@@ -15,7 +15,7 @@
 export interface SellerNetInput {
   /** KDV hariç ürün bedeli (indirim sonrası). */
   subtotal: number;
-  /** Ürün KDV'si — `product_vat_enabled` kapalıyken 0. */
+  /** Ürün KDV'si — sistemde ürün KDV'si yok, her zaman 0. */
   productTaxAmount: number;
   /** Satıcı komisyonu + platform hizmet bedeli. */
   sellerFeeAmount: number;

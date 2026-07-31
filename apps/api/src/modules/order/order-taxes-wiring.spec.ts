@@ -37,13 +37,11 @@ describe("OrderCheckoutCommonService.resolveOrderTaxes", () => {
       },
     };
     const taxService = {
-      resolveTaxRate: jest
-        .fn()
-        .mockResolvedValue({
-          taxRateId: "t1",
-          rate: opts?.productVatRate ?? 20,
-          name: "%20",
-        }),
+      resolveTaxRate: jest.fn().mockResolvedValue({
+        taxRateId: "t1",
+        rate: opts?.productVatRate ?? 20,
+        name: "%20",
+      }),
       calculateTaxAmount: jest.fn(
         (subtotal: number, resolved: { rate: number } | null) =>
           resolved ? Math.round(subtotal * resolved.rate) / 100 : 0,
@@ -60,7 +58,7 @@ describe("OrderCheckoutCommonService.resolveOrderTaxes", () => {
     return { service, prisma, taxService };
   };
 
-  it("varsayılan politika: ürün KDV'si 0, hizmet KDV'si iki tarafta, stopaj bireyselde de var", async () => {
+  it("varsayılan politika: ürün KDV'si 0, hizmet KDV'si iki tarafta, bireyselde stopaj yok", async () => {
     const { service, taxService } = makeService({ isCorporate: false });
 
     const result = await service.resolveOrderTaxes({
@@ -73,8 +71,8 @@ describe("OrderCheckoutCommonService.resolveOrderTaxes", () => {
     expect(result.taxAmount).toBe(0);
     expect(result.buyerServiceTaxAmount).toBe(19);
     expect(result.sellerServiceTaxAmount).toBe(21);
-    // Bireysel satıcı: stopaj ARTIK kesiliyor (500 x %1).
-    expect(result.withholdingTaxAmount).toBe(5);
+    // Bireysel satıcı stopaj kapsamı dışındadır.
+    expect(result.withholdingTaxAmount).toBe(0);
     // Ürün KDV'si kapalıyken vergi kuralı hiç sorgulanmaz.
     expect(taxService.resolveTaxRate).not.toHaveBeenCalled();
   });
@@ -91,42 +89,6 @@ describe("OrderCheckoutCommonService.resolveOrderTaxes", () => {
 
     expect(result.taxAmount).toBe(0);
     expect(result.withholdingTaxAmount).toBe(5);
-  });
-
-  it("ürün KDV'si açılırsa eski davranış geri gelir — altyapı yerinde duruyor", async () => {
-    const { service, taxService } = makeService({
-      isCorporate: true,
-      settings: { product_vat_enabled: "true" },
-    });
-
-    const result = await service.resolveOrderTaxes({
-      sellerId: "s1",
-      categoryId: "c1",
-      subtotal: 500,
-      fees: FEES,
-    });
-
-    expect(taxService.resolveTaxRate).toHaveBeenCalled();
-    expect(result.taxAmount).toBe(100); // 500 x %20
-    // Hizmet KDV'si bundan bağımsız çalışmaya devam eder.
-    expect(result.buyerServiceTaxAmount).toBe(19);
-    expect(result.sellerServiceTaxAmount).toBe(21);
-  });
-
-  it("ürün KDV'si açık + BİREYSEL satıcı → ürün KDV'si yok (mükellef değil)", async () => {
-    const { service } = makeService({
-      isCorporate: false,
-      settings: { product_vat_enabled: "true" },
-    });
-
-    const result = await service.resolveOrderTaxes({
-      sellerId: "s1",
-      categoryId: "c1",
-      subtotal: 500,
-      fees: FEES,
-    });
-
-    expect(result.taxAmount).toBe(0);
   });
 
   it("hizmet KDV'si kapatılırsa iki taraf da sıfırlanır", async () => {

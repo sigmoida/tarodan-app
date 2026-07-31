@@ -343,25 +343,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
     );
 
   // Komisyon %10 → satıcı ücreti 100; hizmet KDV'si (%20) = 20; kargo 0.
-  it("bireysel satıcıdan da stopaj kesilir (kapsam genişledi)", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({
-      sellerType: "individual",
-      membership: null,
-      businessStatus: null,
-      taxId: null,
-    });
-
-    const preview = await service.getCommissionPreview(1000, sellerId, null);
-
-    expect(preview.withholdingTaxAmount).toBe(10);
-    expect(preview.sellerFeeAmount).toBe(100);
-    expect(preview.sellerServiceTaxAmount).toBe(20);
-    // 1000 − 100 (ücret) − 10 (stopaj) − 20 (hizmet KDV) = 870
-    expect(preview.sellerNetAmount).toBe(870);
-  });
-
-  it("bireysel kapsamı kapatılırsa stopaj yalnız kurumsalda kesilir", async () => {
-    withSettings({ withholding_applies_to_individual: "false" });
+  it("bireysel satıcıdan stopaj KESİLMEZ (varsayılan kapsam)", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       sellerType: "individual",
       membership: null,
@@ -372,7 +354,26 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
     const preview = await service.getCommissionPreview(1000, sellerId, null);
 
     expect(preview.withholdingTaxAmount).toBe(0);
+    expect(preview.sellerFeeAmount).toBe(100);
+    expect(preview.sellerServiceTaxAmount).toBe(20);
+    // 1000 − 100 (ücret) − 20 (hizmet KDV) = 880
     expect(preview.sellerNetAmount).toBe(880);
+  });
+
+  it("bireysel kapsamı açılırsa stopaj bireyselden de kesilir", async () => {
+    withSettings({ withholding_applies_to_individual: "true" });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      sellerType: "individual",
+      membership: null,
+      businessStatus: null,
+      taxId: null,
+    });
+
+    const preview = await service.getCommissionPreview(1000, sellerId, null);
+
+    expect(preview.withholdingTaxAmount).toBe(10);
+    // 1000 − 100 (ücret) − 10 (stopaj) − 20 (hizmet KDV) = 870
+    expect(preview.sellerNetAmount).toBe(870);
   });
 
   it("kurumsal satıcıda varsayılan %1 stopaj kesilir", async () => {

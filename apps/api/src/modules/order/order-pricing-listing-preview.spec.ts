@@ -113,10 +113,10 @@ describe("OrderPricingService listing commission preview", () => {
     expect(preview.sellerServiceTaxAmount).toBe(32);
     // Alıcı hizmet KDV'si: (18 + 12 + 40 kargo) x %20 = 14
     expect(preview.buyerServiceTaxAmount).toBe(14);
-    // Stopaj bireysel satıcıda da kesilir: 1000 x %1 = 10
-    expect(preview.withholdingTaxAmount).toBe(10);
-    // 1000 − 100 (ücret) − 10 (stopaj) − 60 (kargo payı) − 32 (KDV) = 798
-    expect(preview.sellerNetAmount).toBe(798);
+    // Bireysel satıcı stopaj kapsamı dışındadır.
+    expect(preview.withholdingTaxAmount).toBe(0);
+    // 1000 − 100 (ücret) − 60 (kargo payı) − 32 (KDV) = 808
+    expect(preview.sellerNetAmount).toBe(808);
   });
 
   it("büyük paket kademesinde satıcı payı kademe fiyatından hesaplanır", async () => {

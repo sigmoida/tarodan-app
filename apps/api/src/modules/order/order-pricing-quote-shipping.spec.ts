@@ -114,7 +114,9 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     });
     expect(q.shippingBySeller).toHaveLength(2);
     expect(q.shippingAmount).toBe(BASE * 2); // BUG öncesi bu BASE idi (az-göster)
-    expect(q.totalAmount).toBe(200 + BASE * 2); // subtotal + 2 kargo
+    // subtotal + 2 kargo + kargo payının hizmet KDV'si (%20). Quote eskiden
+    // hizmet KDV'sini hiç eklemiyordu ve tahsil edilenden düşük gösteriyordu.
+    expect(q.totalAmount).toBe(200 + BASE * 2 + BASE * 2 * 0.2);
   });
 
   it("ÇOK satıcı: BİRLEŞİK toplam eşiği geçse de her satıcı eşik altıysa kargo ÜCRETSİZ OLMAZ", async () => {

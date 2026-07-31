@@ -7,6 +7,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { buyerTotalOf } from "./order-total.helper";
 import { i18nMessage } from "../i18n";
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
 import {
@@ -383,6 +384,7 @@ export class OrderCheckoutDirectService {
         withholdingTaxAmount,
         buyerServiceTaxAmount,
         sellerServiceTaxAmount,
+        serviceVatRate,
       } = await this.checkoutCommon.resolveOrderTaxes({
         sellerId: product.sellerId,
         categoryId: product.categoryId,
@@ -398,12 +400,12 @@ export class OrderCheckoutDirectService {
       });
       // Alıcı ücretleri + ürün KDV'si + alıcıya verilen hizmetlerin KDV'si eklenir.
       // (Stopaj ve satıcı hizmet KDV'si alıcı tutarını etkilemez — payout'tan kesilir.)
-      const totalAmount =
-        discountedPrice +
-        shippingCost +
-        commissionResult.buyerFeeAmount +
-        taxAmount +
-        buyerServiceTaxAmount;
+      const totalAmount = buyerTotalOf({
+        subtotal: discountedPrice,
+        buyerShippingAmount: shippingCost,
+        buyerFeeAmount: commissionResult.buyerFeeAmount,
+        buyerServiceTaxAmount,
+      });
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -521,6 +523,7 @@ export class OrderCheckoutDirectService {
           withholdingTaxAmount,
           buyerServiceTaxAmount,
           sellerServiceTaxAmount,
+          serviceVatRate,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,

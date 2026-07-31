@@ -19,21 +19,19 @@ describe("OrderTaxPolicyService", () => {
     };
   };
 
-  it("varsayılanlar: ürün KDV'si KAPALI, hizmet KDV'si %20 AÇIK, stopaj %1 herkese", async () => {
+  it("varsayılanlar: hizmet KDV'si %20 AÇIK, stopaj %1 yalnız kurumsal", async () => {
     const { service } = makeService();
 
     await expect(service.resolve()).resolves.toEqual({
-      productVatEnabled: false,
       serviceVatEnabled: true,
       serviceVatRate: 20,
       withholdingRate: 1,
-      withholdingAppliesToIndividual: true,
+      withholdingAppliesToIndividual: false,
     });
   });
 
   it("admin ayarları varsayılanları ezer", async () => {
     const { service } = makeService({
-      product_vat_enabled: "true",
       service_vat_enabled: "false",
       service_vat_rate: "10",
       withholding_tax_rate: "2.5",
@@ -41,7 +39,6 @@ describe("OrderTaxPolicyService", () => {
     });
 
     await expect(service.resolve()).resolves.toEqual({
-      productVatEnabled: true,
       serviceVatEnabled: false,
       serviceVatRate: 10,
       withholdingRate: 2.5,
@@ -66,21 +63,21 @@ describe("OrderTaxPolicyService", () => {
     expect(service.effectiveServiceVatRate(policy)).toBe(18);
   });
 
-  it("stopaj: bireysel satıcıda da kesilir (ayar açık)", async () => {
+  it("stopaj: varsayılanda yalnız kurumsal satıcıdan kesilir", async () => {
     const { service } = makeService();
     const policy = await service.resolve();
 
-    expect(service.withholdingRateFor(policy, { isCorporate: false })).toBe(1);
+    expect(service.withholdingRateFor(policy, { isCorporate: false })).toBe(0);
     expect(service.withholdingRateFor(policy, { isCorporate: true })).toBe(1);
   });
 
-  it("stopaj: ayar kapatılırsa yalnız kurumsal satıcıda kesilir", async () => {
+  it("stopaj: ayar açılırsa bireysel satıcıdan da kesilir", async () => {
     const { service } = makeService({
-      withholding_applies_to_individual: "false",
+      withholding_applies_to_individual: "true",
     });
     const policy = await service.resolve();
 
-    expect(service.withholdingRateFor(policy, { isCorporate: false })).toBe(0);
+    expect(service.withholdingRateFor(policy, { isCorporate: false })).toBe(1);
     expect(service.withholdingRateFor(policy, { isCorporate: true })).toBe(1);
   });
 

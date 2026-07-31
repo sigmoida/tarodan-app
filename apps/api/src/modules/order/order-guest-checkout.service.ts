@@ -8,6 +8,7 @@ import {
 import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
+import { buyerTotalOf } from "./order-total.helper";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import {
@@ -352,6 +353,7 @@ export class OrderGuestCheckoutService {
         withholdingTaxAmount: guestWithholdingAmount,
         buyerServiceTaxAmount: guestBuyerServiceTax,
         sellerServiceTaxAmount: guestSellerServiceTax,
+        serviceVatRate: guestServiceVatRate,
       } = await this.checkoutCommon.resolveOrderTaxes({
         sellerId: product.sellerId,
         categoryId: product.categoryId,
@@ -367,12 +369,12 @@ export class OrderGuestCheckoutService {
       });
       // Alıcı ücretleri + ürün KDV'si + alıcıya verilen hizmetlerin KDV'si eklenir
       // (stopaj ve satıcı hizmet KDV'si satıcı payout'undan kesilir).
-      const totalAmount =
-        finalPrice +
-        shippingCost +
-        commissionResult.buyerFeeAmount +
-        guestTaxAmount +
-        guestBuyerServiceTax;
+      const totalAmount = buyerTotalOf({
+        subtotal: finalPrice,
+        buyerShippingAmount: shippingCost,
+        buyerFeeAmount: commissionResult.buyerFeeAmount,
+        buyerServiceTaxAmount: guestBuyerServiceTax,
+      });
       const guestOriginalPrice = Number(product.price);
       const guestDiscountAmount = Math.max(0, guestOriginalPrice - finalPrice);
 
@@ -478,6 +480,7 @@ export class OrderGuestCheckoutService {
           withholdingTaxAmount: guestWithholdingAmount,
           buyerServiceTaxAmount: guestBuyerServiceTax,
           sellerServiceTaxAmount: guestSellerServiceTax,
+          serviceVatRate: guestServiceVatRate,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,

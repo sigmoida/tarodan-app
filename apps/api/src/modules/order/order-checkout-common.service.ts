@@ -19,6 +19,7 @@ import {
   calculateServiceTax,
   type ServiceTaxBreakdown,
 } from "./order-service-tax.helper";
+import { buyerTotalOf } from "./order-total.helper";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
 /**
@@ -65,6 +66,8 @@ export class OrderCheckoutCommonService {
     withholdingTaxAmount: number;
     buyerServiceTaxAmount: number;
     sellerServiceTaxAmount: number;
+    /** Uygulanan hizmet KDV oranı (%) — siparişe snapshot'lanır. */
+    serviceVatRate: number;
     totalAmount: number;
   }> {
     const { amount, sellerId, categoryId, shippingDesi, shippingTariff } =
@@ -93,6 +96,7 @@ export class OrderCheckoutCommonService {
       withholdingTaxAmount,
       buyerServiceTaxAmount,
       sellerServiceTaxAmount,
+      serviceVatRate,
     } = await this.resolveOrderTaxes({
       sellerId,
       categoryId,
@@ -110,15 +114,12 @@ export class OrderCheckoutCommonService {
     // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + ürün KDV'si +
     // alıcıya verilen hizmetlerin KDV'si. (Stopaj ve satıcı hizmet KDV'si satıcı
     // payout'undan kesilir, alıcıya yansıtılmaz.)
-    const totalAmount =
-      Math.round(
-        (amount +
-          buyerShippingAmount +
-          commission.buyerFeeAmount +
-          taxAmount +
-          buyerServiceTaxAmount) *
-          100,
-      ) / 100;
+    const totalAmount = buyerTotalOf({
+      subtotal: amount,
+      buyerShippingAmount,
+      buyerFeeAmount: commission.buyerFeeAmount,
+      buyerServiceTaxAmount,
+    });
 
     return {
       commission,
@@ -129,6 +130,7 @@ export class OrderCheckoutCommonService {
       withholdingTaxAmount,
       buyerServiceTaxAmount,
       sellerServiceTaxAmount,
+      serviceVatRate,
       totalAmount,
     };
   }
@@ -236,7 +238,7 @@ export class OrderCheckoutCommonService {
    * Bir sipariş satırının TÜM vergileri — tek çağrı, tek politika okuması.
    *
    *   taxAmount              ürün KDV'si   → alıcıdan tahsil, satıcıya aktarılır
-   *                                          (`product_vat_enabled`, varsayılan KAPALI)
+   *                                          (ARTIK HEP 0 — ürün KDV'si yok)
    *   buyerServiceTaxAmount  hizmet KDV'si → alıcının ödediğine EKLENİR
    *   sellerServiceTaxAmount hizmet KDV'si → satıcı payout'undan KESİLİR
    *   withholdingTaxAmount   stopaj        → satıcı payout'undan KESİLİR
@@ -254,6 +256,8 @@ export class OrderCheckoutCommonService {
     withholdingTaxAmount: number;
     buyerServiceTaxAmount: number;
     sellerServiceTaxAmount: number;
+    /** Uygulanan hizmet KDV oranı (%) — siparişe snapshot'lanır. */
+    serviceVatRate: number;
   }> {
     const { sellerId, categoryId, subtotal, fees } = params;
     const [policy, seller] = await Promise.all([
@@ -263,43 +267,24 @@ export class OrderCheckoutCommonService {
         select: { businessStatus: true, taxId: true },
       }),
     ]);
-    // Vergi mükellefi = onaylı kurumsal hesap + VKN. Ürün KDV'si ve (ayar
-    // kapalıysa) stopaj yalnız bu satıcılarda doğar.
+    // Vergi mükellefi = onaylı kurumsal hesap + VKN. Stopaj yalnız bu
+    // satıcılarda doğar.
     const isCorporate =
       seller?.businessStatus === "approved" && !!seller?.taxId;
 
     // ── Ürün KDV'si ──────────────────────────────────────────────────────────
-    // Varsayılan KAPALI: vitrin fiyatı KDV dahil kabul edilir, beyanı satıcı
-    // yapar. Ayar açıldığında TaxRule/TaxRate altyapısı aynen devreye girer —
-    // bu yüzden kaldırılmadı, yalnız kapıya alındı.
-    let taxAmount = 0;
-    if (policy.productVatEnabled && isCorporate) {
-      const resolved = await this.taxService.resolveTaxRate(
-        "TR",
-        null,
-        categoryId,
-      );
-      if (!resolved) {
-        this.logger.error(
-          `No active tax rule for taxable seller=${sellerId} category=${categoryId}. Failing closed.`,
-        );
-        throw new ServiceUnavailableException({
-          code: "TAX_CONFIGURATION_MISSING",
-          message:
-            "Vergi mükellefi satıcı için geçerli bir vergi kuralı bulunamadı.",
-        });
-      }
-      taxAmount = this.taxService.calculateTaxAmount(subtotal, resolved);
-    }
+    // YOK. Vitrin fiyatı KDV dahil kabul edilir ve ürün bedelinin beyanı
+    // satıcıya aittir; platform ürün üzerinden KDV tahsil etmez. KDV yalnız
+    // platformun kendi hizmetlerinden (komisyon, kargo payı, hizmet bedeli)
+    // doğar — bkz. order-service-tax.helper.ts.
+    const taxAmount = 0;
 
     // ── Hizmet KDV'si ────────────────────────────────────────────────────────
     // Satıcının mükellefiyetinden BAĞIMSIZ: bu KDV platformun kendi hizmetinin
     // vergisidir, tarafların statüsüne bakmaz.
+    const serviceVatRate = this.taxPolicy.effectiveServiceVatRate(policy);
     const { buyerServiceTaxAmount, sellerServiceTaxAmount } = fees
-      ? calculateServiceTax(
-          fees,
-          this.taxPolicy.effectiveServiceVatRate(policy),
-        )
+      ? calculateServiceTax(fees, serviceVatRate)
       : { buyerServiceTaxAmount: 0, sellerServiceTaxAmount: 0 };
 
     // ── Stopaj (GVK 94/19) ───────────────────────────────────────────────────
@@ -314,6 +299,9 @@ export class OrderCheckoutCommonService {
       withholdingTaxAmount,
       buyerServiceTaxAmount,
       sellerServiceTaxAmount,
+      // Ücret kırılımı verilmediyse KDV hiç hesaplanmamıştır; oranı 0 yazmak
+      // ekranın "KDV uygulanmadı" ile "oran bilinmiyor" ayrımını korur.
+      serviceVatRate: fees ? serviceVatRate : 0,
     };
   }
 

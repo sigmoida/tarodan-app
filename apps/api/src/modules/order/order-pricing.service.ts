@@ -31,6 +31,7 @@ import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import { DiscountService } from "../discount/discount.service";
 import { createHash } from "crypto";
 import { calculateServiceTax } from "./order-service-tax.helper";
+import { buyerTotalOf } from "./order-total.helper";
 import { sellerNetAmountOf } from "./order-net.helper";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
@@ -261,6 +262,9 @@ export class OrderPricingService {
       sellerFeeAmount: number;
       commissionAmount: number;
       taxAmount: number;
+      buyerServiceTaxAmount: number;
+      sellerServiceTaxAmount: number;
+      serviceVatRate: number;
       totalAmount: number;
       sellerNetAmount: number;
     };
@@ -275,7 +279,6 @@ export class OrderPricingService {
     let itemsSubtotal = 0;
     let totalBuyerFee = 0;
     let totalSellerFee = 0;
-    let totalTax = 0;
     const quoteItems: Array<{
       productId: string;
       sellerId: string;
@@ -299,6 +302,16 @@ export class OrderPricingService {
     const sellerShippingShareLines = new Map<
       string,
       ShippingBuyerShareByTier[]
+    >();
+    /** Satıcı başına hizmet KDV matrahları (dört ücret kalemi). */
+    const sellerFeeBases = new Map<
+      string,
+      {
+        buyerCommissionAmount: number;
+        buyerServiceFeeAmount: number;
+        sellerCommissionAmount: number;
+        sellerPlatformFeeAmount: number;
+      }
     >();
 
     // Pass 1: ürünleri çöz + EFEKTİF (kampanya) birim fiyat + satır toplamı (F1.4).
@@ -433,38 +446,30 @@ export class OrderPricingService {
         ...(sellerShippingShareLines.get(product.sellerId) ?? []),
         commissionResult.shippingBuyerShares,
       ]);
+      // Hizmet KDV'si matrahı satıcı (yani oluşacak sipariş) bazında toplanır:
+      // KDV her siparişte kalem bazında yuvarlandığı için quote da aynı
+      // gruplamayı kullanmalı, aksi halde kuruş sapar.
+      const feeBases = sellerFeeBases.get(product.sellerId) ?? {
+        buyerCommissionAmount: 0,
+        buyerServiceFeeAmount: 0,
+        sellerCommissionAmount: 0,
+        sellerPlatformFeeAmount: 0,
+      };
+      feeBases.buyerCommissionAmount += commissionResult.buyerCommissionAmount;
+      feeBases.buyerServiceFeeAmount += commissionResult.buyerServiceFeeAmount;
+      feeBases.sellerCommissionAmount +=
+        commissionResult.sellerCommissionAmount;
+      feeBases.sellerPlatformFeeAmount +=
+        commissionResult.sellerPlatformFeeAmount;
+      sellerFeeBases.set(product.sellerId, feeBases);
+
       const lineBuyerFee = commissionResult.buyerFeeAmount;
       const lineSellerFee = commissionResult.sellerFeeAmount;
       const lineSellerNet = discountedLine - lineSellerFee;
 
-      // KDV: sadece kurumsal satıcılar (businessStatus=approved ve taxId dolu)
-      const isCorporate =
-        product.seller?.businessStatus === "approved" &&
-        !!product.seller?.taxId;
-      let lineTax = 0;
-      if (isCorporate) {
-        const resolved = await this.taxService.resolveTaxRate(
-          "TR",
-          null,
-          product.categoryId,
-        );
-        if (!resolved) {
-          this.logger.error(
-            `No active tax rule for taxable seller=${product.sellerId} category=${product.categoryId}. Quote failed closed.`,
-          );
-          throw new ServiceUnavailableException({
-            code: "TAX_CONFIGURATION_MISSING",
-            message:
-              "Vergi mükellefi satıcı için geçerli bir vergi kuralı bulunamadı.",
-          });
-        }
-        lineTax = this.taxService.calculateTaxAmount(discountedLine, resolved);
-      }
-
       itemsSubtotal += lineSubtotal;
       totalBuyerFee += lineBuyerFee;
       totalSellerFee += lineSellerFee;
-      totalTax += lineTax;
       sellerSubtotals.set(
         product.sellerId,
         (sellerSubtotals.get(product.sellerId) ?? 0) + discountedLine,
@@ -482,7 +487,7 @@ export class OrderPricingService {
         buyerFeeAmount: lineBuyerFee,
         sellerFeeAmount: lineSellerFee,
         sellerNetAmount: Math.max(0, lineSellerNet),
-        taxAmount: lineTax,
+        taxAmount: 0,
         title: product.title ?? undefined,
       });
     }
@@ -509,6 +514,7 @@ export class OrderPricingService {
           sellerId,
           // Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
           shippingCost: decision.buyer,
+          sellerShippingCost: decision.seller,
           billableDesi,
           packageTier: decision.tierCode,
         };
@@ -519,14 +525,41 @@ export class OrderPricingService {
       0,
     );
     const commissionAmount = totalBuyerFee + totalSellerFee;
-    // Toplam = brüt ürün toplamı − kupon + kargo + alıcı ücreti + vergi (create ile
-    // birebir; fee/tax zaten indirimli baz üzerinden hesaplandı).
-    const totalAmount =
-      itemsSubtotal -
-      couponDiscountTotal +
-      shippingAmount +
-      totalBuyerFee +
-      totalTax;
+
+    // Hizmet KDV'si: satıcı başına (= oluşacak sipariş başına) hesaplanır ve
+    // toplanır. Quote bunu ATLARSA ekranda görülen tutar tahsil edilenden
+    // düşük kalır — checkout ile create'in ayrıştığı yer tam burasıydı.
+    const serviceVatRate = this.taxPolicy.effectiveServiceVatRate(
+      await this.taxPolicy.resolve(),
+    );
+    let totalBuyerServiceTax = 0;
+    let totalSellerServiceTax = 0;
+    for (const seller of shippingBySeller) {
+      const bases = sellerFeeBases.get(seller.sellerId);
+      if (!bases) continue;
+      const { buyerServiceTaxAmount, sellerServiceTaxAmount } =
+        calculateServiceTax(
+          {
+            ...bases,
+            buyerShippingAmount: seller.shippingCost,
+            sellerShippingAmount: seller.sellerShippingCost,
+          },
+          serviceVatRate,
+        );
+      totalBuyerServiceTax += buyerServiceTaxAmount;
+      totalSellerServiceTax += sellerServiceTaxAmount;
+    }
+    totalBuyerServiceTax = Math.round(totalBuyerServiceTax * 100) / 100;
+    totalSellerServiceTax = Math.round(totalSellerServiceTax * 100) / 100;
+
+    // Toplam ORTAK formülden gelir (order-total.helper.ts) — quote kendi
+    // aritmetiğini yazmaz.
+    const totalAmount = buyerTotalOf({
+      subtotal: itemsSubtotal - couponDiscountTotal,
+      buyerShippingAmount: shippingAmount,
+      buyerFeeAmount: totalBuyerFee,
+      buyerServiceTaxAmount: totalBuyerServiceTax,
+    });
     const sellerNetAmount = Math.max(
       0,
       itemsSubtotal - couponDiscountTotal - totalSellerFee,
@@ -551,7 +584,14 @@ export class OrderPricingService {
       ),
       sellerFeeAmount: totalSellerFee,
       commissionAmount,
-      taxAmount: totalTax,
+      // Ürün KDV'si kaldırıldı — alan geriye-uyum için 0 döner.
+      taxAmount: 0,
+      // Alıcıdan tahsil edilen hizmet KDV'si + uygulanan oran. Checkout ekranı
+      // kalemleri KDV DAHİL gösterebilsin diye döner: satırların toplamı
+      // ödenecek tutarı birebir vermeli.
+      buyerServiceTaxAmount: totalBuyerServiceTax,
+      sellerServiceTaxAmount: totalSellerServiceTax,
+      serviceVatRate,
       totalAmount,
       sellerNetAmount,
     };
@@ -562,7 +602,8 @@ export class OrderPricingService {
       buyerFeeAmount: totalBuyerFee,
       sellerFeeAmount: totalSellerFee,
       commissionAmount,
-      taxAmount: totalTax,
+      // Ürün KDV'si kaldırıldı — alan geriye-uyum için 0 döner.
+      taxAmount: 0,
       couponDiscount: couponDiscountTotal,
       totalAmount,
       sellerNetAmount,
