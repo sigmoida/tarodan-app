@@ -3859,10 +3859,13 @@ async function main() {
     status: RefundRequestStatus,
     sellerId: string,
     createdAt: Date,
+    refundNumber: string,
   ): Record<string, any> => {
     const plus = (days: number) =>
       new Date(createdAt.getTime() + days * 86400000);
-    const trackingNo = generateReferenceCode(REFERENCE_PREFIX.shipmentFallback);
+    // İade kargosunun takip numarası iade numarasının kendisidir — Sürat'a
+    // `OzelKargoTakipNo` olarak bu gönderilir (refund.service.ts ile aynı).
+    const trackingNo = refundNumber;
     const approve =
       "Talebinizi inceledik, iade onaylandı. İade kargosu hazırlanıyor.";
     const reject =
@@ -4101,20 +4104,18 @@ async function main() {
         data: {
           orderId: order.id,
           provider: "surat",
-          trackingNumber: generateReferenceCode(
-            REFERENCE_PREFIX.shipmentFallback,
-          ),
-          trackingUrl:
-            "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=",
+          trackingNumber: order.orderNumber,
+          trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${order.orderNumber}`,
           status: ShipmentStatus.delivered,
           shippedAt: new Date(createdAt.getTime() + 86400000),
           deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
         },
       });
 
+      const refundNumber = generateRefundNumber();
       const refundRequest = await prisma.refundRequest.create({
         data: {
-          refundNumber: generateRefundNumber(),
+          refundNumber,
           orderId: order.id,
           requesterId: buyer.id,
           reason: sc.reason,
@@ -4122,7 +4123,12 @@ async function main() {
           amount: totalAmount,
           status: sc.status,
           createdAt,
-          ...buildRefundFields(sc.status, product.sellerId, createdAt),
+          ...buildRefundFields(
+            sc.status,
+            product.sellerId,
+            createdAt,
+            refundNumber,
+          ),
         },
       });
       refundRequests.push(refundRequest);
@@ -4239,8 +4245,28 @@ async function main() {
   console.log("Creating trade shipments...");
 
   const tsCarriers = ["surat"];
-  const tsTracking = () =>
-    generateReferenceCode(REFERENCE_PREFIX.shipmentFallback);
+  /**
+   * Takas gönderisinin takip numarası (Sürat `OzelKargoTakipNo`) takas
+   * numarasından TÜRETİLİR — runtime ile birebir aynı kural:
+   *   depoya      : TKS-...-WH-INI / -WH-REC   (trade-shipment.service.ts)
+   *   depodan     : TKS-...-INI    / -REC      (admin-trade-warehouse)
+   *   iade        : TKS-...-RET-INI / -RET-REC (admin-trade-warehouse)
+   * Ayrı bir "SHP-" yedeği yalnız kargo entegrasyonu kapalıyken üretilir.
+   */
+  const tsTracking = (
+    trade: any,
+    leg: "to_warehouse" | "from_warehouse" | "return",
+    isInitiatorSide: boolean,
+  ) => {
+    const side = isInitiatorSide ? "INI" : "REC";
+    const suffix =
+      leg === "to_warehouse"
+        ? `WH-${side}`
+        : leg === "return"
+          ? `RET-${side}`
+          : side;
+    return `${trade.tradeNumber}-${suffix}`;
+  };
   const tsAddrOf = (userId: string) =>
     addresses.find((a) => a.userId === userId)?.id ?? null;
 
@@ -4287,7 +4313,16 @@ async function main() {
       carrier,
       // pending = etiket henüz yok; sonraki tüm durumlarda takip no mevcut.
       trackingNumber:
-        opts.status === ShipmentStatus.pending ? null : tsTracking(),
+        opts.status === ShipmentStatus.pending
+          ? null
+          : tsTracking(
+              trade,
+              opts.leg,
+              // to_warehouse'da gönderen, diğer bacaklarda alıcı taraf belirler.
+              (opts.leg === "to_warehouse"
+                ? opts.shipperId
+                : opts.recipientUserId) === trade.initiatorId,
+            ),
       status: opts.status,
       shippedAt,
       deliveredAt,
@@ -5678,10 +5713,8 @@ async function main() {
       data: {
         orderId: order.id,
         provider: "surat",
-        trackingNumber: generateReferenceCode(
-          REFERENCE_PREFIX.shipmentFallback,
-        ),
-        trackingUrl: "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=",
+        trackingNumber: order.orderNumber,
+        trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${order.orderNumber}`,
         status: ShipmentStatus.delivered,
         shippedAt: new Date(createdAt.getTime() + 86400000),
         deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
