@@ -823,28 +823,31 @@ describe("OrderService checkout group (batch checkout)", () => {
       expect(shippings.filter((s: number) => s > 0)).toHaveLength(2);
     });
 
-    it("BEKLENEN DAVRANIŞ DEĞİL: satıcı başına tek fatura yerine ürün başına fatura çıkar", async () => {
-      // İş kuralı "2 satıcı → 2 fatura (biri 2 kalemli, biri 1 kalemli)" diyor.
-      // Fatura orderId anahtarlı olduğu ve her ürün ayrı Order açtığı için
-      // bugün 3 fatura seti oluşuyor. Bu test o farkı GÖRÜNÜR kılar; gruplama
-      // satıcı bazına taşınırsa burası kırılır ve beklenti güncellenir.
+    it("satıcı başına TEK fatura kaynağı üretir (3 sipariş → 2 paket)", async () => {
+      // Komisyon ve hizmet bedeli faturaları artık `packageId` anahtarlı
+      // kesiliyor (ElogoInvoicingService.resolvePackageInvoiceBasis), sipariş
+      // değil. Paket satıcı başına tek olduğu için 2 satıcı → 2 fatura seti:
+      // biri iki kalemli, diğeri tek kalemli.
       splitTwoAndOne();
 
       await service.checkout(buyerId, threeItemDto() as any);
 
-      const orderIdsPerSeller = mockTx.order.create.mock.calls.reduce(
+      const invoiceSources = new Set(
+        mockTx.order.create.mock.calls.map((c: any) => c[0].data.packageId),
+      );
+      expect(invoiceSources.size).toBe(2);
+
+      const ordersPerPackage = mockTx.order.create.mock.calls.reduce(
         (acc: Record<string, number>, c: any) => {
-          const s = c[0].data.sellerId;
-          acc[s] = (acc[s] ?? 0) + 1;
+          const pkg = c[0].data.packageId;
+          acc[pkg] = (acc[pkg] ?? 0) + 1;
           return acc;
         },
         {},
       );
-
-      // Fatura sayısı = sipariş sayısı (orderId anahtarlı kesim).
-      expect(orderIdsPerSeller[sellerId]).toBe(2);
-      expect(orderIdsPerSeller[sellerId2]).toBe(1);
-      // İstenen: 1 ve 1 (satıcı başına tek fatura, kalemler içinde).
+      // Satıcı 1'in paketi 2 kalem, satıcı 2'nin paketi 1 kalem taşır.
+      expect(ordersPerPackage[`pkg-${sellerId}`]).toBe(2);
+      expect(ordersPerPackage[`pkg-${sellerId2}`]).toBe(1);
     });
   });
 });

@@ -109,11 +109,33 @@ function makePrisma(seed: any = {}) {
       findUnique: jest.fn(
         async ({ where }: any) => seed.orders?.[where.id] ?? null,
       ),
+      // Paketin tüm siparişleri teslim mi? 0 = bekleyen yok (fatura kesilebilir).
+      count: jest.fn(async () => seed.pendingPackageOrders ?? 0),
     },
     commissionLedger: {
       findUnique: jest.fn(
         async ({ where }: any) => seed.ledgers?.[where.orderId] ?? null,
       ),
+      findMany: jest.fn(async ({ where }: any) =>
+        (where?.orderId?.in ?? [])
+          .map((id: string) => seed.ledgers?.[id])
+          .filter(Boolean),
+      ),
+    },
+    // Komisyon/hizmet bedeli faturaları SATICI PAKETİ başına kesilir. Bu
+    // dosyadaki senaryolar tek ürünlüdür, dolayısıyla paket = o siparişin
+    // kendisi: aynı id ile tek siparişlik bir paket türetilir. Çok ürünlü
+    // gruplama ayrıca order-checkout-group.spec.ts'te ölçülür.
+    orderPackage: {
+      findUnique: jest.fn(async ({ where }: any) => {
+        const order = seed.orders?.[where.id];
+        if (!order) return null;
+        return {
+          sellerId: order.sellerId,
+          buyerId: order.buyerId,
+          orders: [{ id: where.id, ...order }],
+        };
+      }),
     },
     membershipPayment: {
       findUnique: jest.fn(

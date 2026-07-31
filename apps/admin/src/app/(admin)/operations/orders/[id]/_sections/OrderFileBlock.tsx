@@ -7,11 +7,7 @@ import {
 } from "@tarodan/shared";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  ChevronRightIcon,
-  PrinterIcon,
-  TruckIcon,
-} from "@heroicons/react/24/outline";
+import { ChevronRightIcon, TruckIcon } from "@heroicons/react/24/outline";
 import {
   Badge,
   Button,
@@ -28,7 +24,6 @@ import {
   canManuallyUpdateOrderStatus,
   getOrderStatusInfo,
 } from "../_lib/status";
-import { printOrderInvoice } from "../_lib/printInvoice";
 import {
   activeRefundOf,
   type OrderFileEntry,
@@ -89,14 +84,6 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
               {t("admin.operations.orders.addTracking")}
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<PrinterIcon className="h-4 w-4" />}
-            onClick={() => printOrderInvoice(entry.id, t)}
-          >
-            {t("admin.operations.orders.printInvoice")}
-          </Button>
         </div>
       }
     >

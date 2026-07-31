@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "crypto";
+import { OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
   ELOGO_MAX_SEND_ATTEMPTS,
@@ -295,9 +296,28 @@ export class ElogoInvoicingService {
    * konmaz ve sonraki tur yeniden dener (issue* idempotenttir).
    */
   async issueOrderRevenueInvoices(orderId: string): Promise<void> {
+    // Komisyon ve hizmet bedeli PAKET başına tek kesilir (satıcı başına tek
+    // fatura); platform satışı ürün faturası olduğu için sipariş başına kalır.
+    //
+    // Paketin bir siparişi teslim olup diğeri olmadıysa fatura BEKLETİLİR:
+    // erken kesilse paketin kalan kalemleri faturaya girmez ve ikinci teslimde
+    // aynı sourceId idempotency yüzünden tamamlanamaz.
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { packageId: true },
+    });
+    const packageId = order?.packageId ?? null;
+    const packageReady = packageId
+      ? await this.isPackageFullyDelivered(packageId)
+      : false;
+
     const results = await Promise.allSettled([
-      this.issueCommissionInvoice(orderId),
-      this.issueServiceFeeInvoice(orderId),
+      ...(packageId && packageReady
+        ? [
+            this.issueCommissionInvoice(packageId),
+            this.issueServiceFeeInvoice(packageId),
+          ]
+        : []),
       this.issuePlatformSaleInvoice(orderId),
     ]);
     const failures = results.filter(
@@ -309,6 +329,11 @@ export class ElogoInvoicingService {
       );
     }
     if (failures.length > 0) return;
+    // Paket henüz tamamlanmadıysa komisyon/hizmet bedeli faturaları KESİLMEDİ.
+    // İşareti şimdi koyarsak bu sipariş backfill penceresinden çıkar; kardeş
+    // sipariş iptal edilirse paket faturası hiç kesilmez. İşaret, paket
+    // faturaları gerçekten kesildiğinde konur.
+    if (packageId && !packageReady) return;
 
     await this.prisma.order
       .update({
@@ -322,41 +347,163 @@ export class ElogoInvoicingService {
       );
   }
 
-  async issueCommissionInvoice(orderId: string): Promise<void> {
-    const [order, ledger] = await Promise.all([
-      this.prisma.order.findUnique({
-        where: { id: orderId },
-        select: {
-          sellerId: true,
-          sellerCommissionAmount: true,
-          sellerPlatformFeeAmount: true,
+  /**
+   * Paketin TÜM siparişleri gelir aşamasına geçti mi (teslim/tamamlandı)?
+   * Kısmi teslimde fatura kesilmez — bkz. issueOrderRevenueInvoices.
+   */
+  private async isPackageFullyDelivered(packageId: string): Promise<boolean> {
+    const pending = await this.prisma.order.count({
+      where: {
+        packageId,
+        status: {
+          notIn: [
+            OrderStatus.delivered,
+            OrderStatus.completed,
+            OrderStatus.awaiting_buyer_confirmation,
+            OrderStatus.cancelled,
+            OrderStatus.refunded,
+          ],
         },
-      }),
-      this.prisma.commissionLedger.findUnique({
-        where: { orderId },
-        select: { sellerCommission: true, refundedSellerCommission: true },
-      }),
-    ]);
-    if (!order || !ledger) return;
-    // Platform kendi ürününü satıyorsa komisyon = kendine kesilemez → atla (yerine platform_sale).
-    if (await this.isPlatformSeller(order.sellerId)) return;
-    // #88: NET komisyon faturalanır (kısmi iade edilen kısım düşülür). İade yoksa
-    // refunded=0 → net=original (davranış aynı). Net ≤ 0 ise faturalanacak bir şey yok.
-    const netCommission =
-      Number(ledger.sellerCommission) -
-      Number(ledger.refundedSellerCommission ?? 0);
-    if (netCommission <= 0) return;
-    // v2: satıcı kesintisi komisyon + platform hizmet bedelinden oluşabilir —
-    // fatura kalem açıklaması bileşimi yansıtır (tek toplam tutar kesilir).
-    const hasCommission = Number(order.sellerCommissionAmount ?? 0) > 0;
-    const hasPlatformFee = Number(order.sellerPlatformFeeAmount ?? 0) > 0;
+      },
+    });
+    return pending === 0;
+  }
+
+  /**
+   * Bir SATICI PAKETİNİN fatura matrahı — komisyon ve hizmet bedeli faturalarının
+   * TEK kaynağı.
+   *
+   * Fatura eskiden `orderId` anahtarlıydı, ama sepet her ÜRÜN için ayrı `Order`
+   * açıyor: aynı satıcıdan iki ürün alan bir sepette o satıcıya iki komisyon +
+   * iki hizmet bedeli faturası kesiliyordu. Paket ise satıcı başına tektir, bu
+   * yüzden matrah paket düzeyinde toplanır ve satıcı başına TEK fatura çıkar;
+   * kalemler paketin siparişlerinden gelir.
+   *
+   * Tutarlar ledger'dan NET okunur (kısmi iade düşülmüş). Kesim yapan üç yol —
+   * teslim yaşam döngüsü, outbox görevi ve backfill cron'u — aynı bu matrahı
+   * kullanır; hiçbiri kendi toplamasını yapmaz.
+   */
+  private async resolvePackageInvoiceBasis(packageId: string): Promise<{
+    sellerId: string;
+    buyerId: string;
+    netCommission: number;
+    netBuyerFee: number;
+    hasSellerCommission: boolean;
+    hasSellerPlatformFee: boolean;
+    hasBuyerServiceFee: boolean;
+    hasBuyerCommission: boolean;
+    shippingAddress: unknown;
+  } | null> {
+    const pkg = await this.prisma.orderPackage.findUnique({
+      where: { id: packageId },
+      select: {
+        sellerId: true,
+        buyerId: true,
+        orders: {
+          select: {
+            id: true,
+            sellerCommissionAmount: true,
+            sellerPlatformFeeAmount: true,
+            buyerServiceFeeAmount: true,
+            buyerCommissionAmount: true,
+            shippingAddress: true,
+          },
+        },
+      },
+    });
+    if (!pkg || pkg.orders.length === 0) return null;
+
+    const ledgers = await this.prisma.commissionLedger.findMany({
+      where: { orderId: { in: pkg.orders.map((o) => o.id) } },
+      select: {
+        sellerCommission: true,
+        refundedSellerCommission: true,
+        buyerFee: true,
+        refundedBuyerFee: true,
+      },
+    });
+
+    const sum = (values: number[]) =>
+      Math.round(values.reduce((a, b) => a + b, 0) * 100) / 100;
+
+    return {
+      sellerId: pkg.sellerId,
+      buyerId: pkg.buyerId,
+      netCommission: sum(
+        ledgers.map(
+          (l) =>
+            Number(l.sellerCommission) -
+            Number(l.refundedSellerCommission ?? 0),
+        ),
+      ),
+      netBuyerFee: sum(
+        ledgers.map(
+          (l) => Number(l.buyerFee) - Number(l.refundedBuyerFee ?? 0),
+        ),
+      ),
+      hasSellerCommission: pkg.orders.some(
+        (o) => Number(o.sellerCommissionAmount ?? 0) > 0,
+      ),
+      hasSellerPlatformFee: pkg.orders.some(
+        (o) => Number(o.sellerPlatformFeeAmount ?? 0) > 0,
+      ),
+      hasBuyerServiceFee: pkg.orders.some(
+        (o) => Number(o.buyerServiceFeeAmount ?? 0) > 0,
+      ),
+      hasBuyerCommission: pkg.orders.some(
+        (o) => Number(o.buyerCommissionAmount ?? 0) > 0,
+      ),
+      // Misafir alıcı bilgisi paketteki siparişlerde aynıdır.
+      shippingAddress: pkg.orders[0].shippingAddress,
+    };
+  }
+
+  /** Komisyon faturası → SATICIYA, satıcı paketi başına TEK. */
+  async issueCommissionInvoice(packageId: string): Promise<void> {
+    const basis = await this.resolvePackageInvoiceBasis(packageId);
+    if (!basis) return;
+    // Platform kendi ürününü satıyorsa komisyon kendine kesilemez → platform_sale.
+    if (await this.isPlatformSeller(basis.sellerId)) return;
+    if (basis.netCommission <= 0) return;
+
     const desc =
-      hasCommission && hasPlatformFee
+      basis.hasSellerCommission && basis.hasSellerPlatformFee
         ? "Aracılık komisyonu ve platform hizmet bedeli"
-        : hasPlatformFee
+        : basis.hasSellerPlatformFee
           ? "Platform hizmet bedeli"
-          : undefined; // komisyon-only → varsayılan LINE_DESCRIPTION.commission
-    await this.cut("commission", orderId, order.sellerId, netCommission, desc);
+          : undefined;
+    await this.cut(
+      "commission",
+      packageId,
+      basis.sellerId,
+      basis.netCommission,
+      desc,
+    );
+  }
+
+  /** Hizmet bedeli faturası → ALICIYA, satıcı paketi başına TEK. */
+  async issueServiceFeeInvoice(packageId: string): Promise<void> {
+    const basis = await this.resolvePackageInvoiceBasis(packageId);
+    if (!basis) return;
+    // Platform satışında hizmet bedeli platform_sale faturasına dahildir; ayrı
+    // kesilirse çift faturalanır.
+    if (await this.isPlatformSeller(basis.sellerId)) return;
+    if (basis.netBuyerFee <= 0) return;
+
+    const desc =
+      basis.hasBuyerServiceFee && basis.hasBuyerCommission
+        ? "Alıcı koruma hizmet bedeli ve komisyonu"
+        : basis.hasBuyerCommission
+          ? "Alıcı komisyonu"
+          : undefined;
+    await this.cut(
+      "service_fee",
+      packageId,
+      basis.buyerId,
+      basis.netBuyerFee,
+      desc,
+      resolveGuestInvoiceRecipient(basis.shippingAddress),
+    );
   }
 
   /**
@@ -410,51 +557,6 @@ export class ElogoInvoicingService {
       .findUnique({ where: { id: sellerId }, select: { sellerType: true } })
       .catch(() => null);
     return u?.sellerType === "platform";
-  }
-
-  /** Hizmet bedeli faturası → ALICIYA (ledger.buyerFee). Yalnız buyerFee > 0 ise. */
-  async issueServiceFeeInvoice(orderId: string): Promise<void> {
-    const [order, ledger] = await Promise.all([
-      this.prisma.order.findUnique({
-        where: { id: orderId },
-        select: {
-          buyerId: true,
-          sellerId: true,
-          buyerServiceFeeAmount: true,
-          buyerCommissionAmount: true,
-          shippingAddress: true,
-        },
-      }),
-      this.prisma.commissionLedger.findUnique({
-        where: { orderId },
-        select: { buyerFee: true, refundedBuyerFee: true },
-      }),
-    ]);
-    if (!order || !ledger) return;
-    // Platform (Tarodan) KENDİ ürününü satıyorsa hizmet bedeli AYRI kesilmez — platform_sale faturası
-    // zaten tam tutarı (buyer fee dahil) içerir. Aksi halde buyer fee çift faturalanır.
-    if (await this.isPlatformSeller(order.sellerId)) return;
-    // #88: NET hizmet bedeli (kısmi iade düşülür). İade yoksa net=original.
-    const netBuyerFee =
-      Number(ledger.buyerFee) - Number(ledger.refundedBuyerFee ?? 0);
-    if (netBuyerFee <= 0) return;
-    // v2: alıcı kesintisi koruma hizmet bedeli + alıcı komisyonundan oluşabilir.
-    const hasService = Number(order.buyerServiceFeeAmount ?? 0) > 0;
-    const hasBuyerCommission = Number(order.buyerCommissionAmount ?? 0) > 0;
-    const desc =
-      hasService && hasBuyerCommission
-        ? "Alıcı koruma hizmet bedeli ve komisyonu"
-        : hasBuyerCommission
-          ? "Alıcı komisyonu"
-          : undefined; // service-only → varsayılan LINE_DESCRIPTION.service_fee
-    await this.cut(
-      "service_fee",
-      orderId,
-      order.buyerId,
-      netBuyerFee,
-      desc,
-      resolveGuestInvoiceRecipient(order.shippingAddress),
-    );
   }
 
   /** Üyelik faturası → ÜYEYE (membershipPayment.amount). */
