@@ -42,6 +42,7 @@
     "@tarodan/auth": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/i18n": "workspace:*",
+    "@tarodan/shared": "workspace:*",
     "@tarodan/logger": "workspace:*",
     "@tarodan/types": "workspace:*",
     "@tarodan/ui": "workspace:*",

@@ -58,6 +58,12 @@ export interface CommissionRevenue {
   totalCommission: number;
   totalBuyerFee: number;
   totalSellerFee: number;
+  /** Ürün cirosu (GMV) — Tarodan payının oranlandığı taban. */
+  totalSubtotal: number;
+  /** Devlete giden: iki taraf hizmet KDV'si + stopaj. */
+  totalTax: number;
+  /** Taşıyıcıya giden kargo (iki tarafın payı). */
+  totalShipping: number;
   byMonth: Array<{ period: string; commission: number; orderCount: number }>;
 }
 

@@ -152,13 +152,15 @@ function PackageSizePicker() {
   );
 }
 
-/** Per-sale summary shown to the seller: only the net take-home ("elde kalan"),
- *  with all commission/withholding deductions already folded in, plus the
- *  seller-paid shipping deduction. No itemised commission/list-price rows.
+/**
+ * Satıcıya gösterilen satış başına özet: TAM İKİ SATIR — üstte satıcının
+ * üstlendiği kargo ücreti, altta hak ediş. Komisyon/KDV/stopaj kalemleri hak
+ * edişin içinde katlanmış durumda; bu ekranda satıcının sorduğu iki soru var:
+ * "kargoya ne ödeyeceğim" ve "elime ne geçecek".
  *
- *  Kargo satırı SORUYU açıkça yanıtlar: satıcı kargo ödeyecek mi? Pay 0 ise
- *  "ödemezsiniz" cümlesi görünür; pay > 0 ise kesinti tonuyla tutar gösterilir.
- *  Çıplak "₺0,00" satırı bu ayrımı vermiyordu. */
+ * Kargo payı 0 olduğunda satır GİZLENMEZ, ₺0,00 gösterilir: satır kaybolunca
+ * satıcı kargonun sıfır mı olduğunu yoksa hesaba hiç katılmadığını mı bilemiyor.
+ */
 function PricingBreakdown({
   preview,
 }: {
@@ -170,19 +172,15 @@ function PricingBreakdown({
   return (
     <div className="space-y-2">
       <Row
-        label={t("product.netToYou")}
+        label={t("product.shippingFee")}
+        value={fmt(shippingAmount)}
+        tone={shippingAmount > 0 ? "deduction" : "default"}
+      />
+      <Row
+        label={t("product.sellerEarning")}
         value={fmt(sellerNetAmount)}
         tone="net"
       />
-      {shippingAmount > 0 ? (
-        <Row
-          label={t("product.sellerShippingShare")}
-          value={fmt(shippingAmount)}
-          tone="deduction"
-        />
-      ) : (
-        <p className="text-xs text-muted">{t("product.shippingPaidByBuyer")}</p>
-      )}
     </div>
   );
 }

@@ -42,6 +42,10 @@ export interface CheckoutQuote {
     sellerFeeAmount: number;
     commissionAmount: number;
     taxAmount: number;
+    /** Alıcıdan tahsil edilen hizmet KDV'si (komisyon + kargo payı + hizmet bedeli). */
+    buyerServiceTaxAmount: number;
+    /** Uygulanan hizmet KDV oranı (%) — satır bazında KDV bunun üzerinden türetilir. */
+    serviceVatRate: number;
     totalAmount: number;
     sellerNetAmount: number;
   };

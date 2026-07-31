@@ -24,6 +24,8 @@ export interface OrderFileFinance {
   buyerServiceTaxAmount: number;
   /** Satıcıya verilen hizmetlerin KDV'si — satıcı payout'undan kesilir. */
   sellerServiceTaxAmount: number;
+  /** Tahsil anındaki hizmet KDV oranı (%) — kalem bazında KDV bununla türetilir. */
+  serviceVatRate: number;
   totalAmount: number;
   sellerNetAmount: number;
 }

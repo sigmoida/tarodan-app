@@ -45,6 +45,7 @@ const nextConfig = {
     '@tarodan/ui',
     '@tarodan/design-tokens',
     '@tarodan/api-client',
+    '@tarodan/shared',
   ],
   experimental: {
     // Tree-shake the 112 barrel imports from @heroicons/react to per-icon

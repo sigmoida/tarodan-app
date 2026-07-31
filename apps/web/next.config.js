@@ -91,6 +91,7 @@ const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
   transpilePackages: [
+    '@tarodan/shared',
     '@tarodan/ui',
     '@tarodan/design-tokens',
     '@tarodan/api-client',

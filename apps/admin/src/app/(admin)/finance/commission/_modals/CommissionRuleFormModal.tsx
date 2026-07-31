@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
-import { Input, Select } from "@tarodan/ui";
+import { Input, Select, Tooltip, TooltipProvider } from "@tarodan/ui";
+import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import {
   FormModal,
   FormError,
@@ -20,6 +21,10 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
 import { extractErrorMessage } from "@/lib/error";
 import { fmtTry } from "@/lib/format";
+import {
+  buildOrderBreakdown,
+  type OrderBreakdownLineKey,
+} from "@tarodan/shared";
 import {
   type CommissionRule,
   type CommissionFormValues,
@@ -81,7 +86,10 @@ function RateBlock({
   const t = useTranslations();
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
-      <h3 className="text-sm font-medium text-heading">{title}</h3>
+      <h3 className="flex items-center gap-1.5 text-sm font-medium text-heading">
+        {title}
+        <HintIcon text={t("admin.finance.commission.feeBoundsHint")} />
+      </h3>
       <div className="grid grid-cols-3 gap-3">
         <FormInput
           name={rateName}
@@ -109,6 +117,17 @@ function RateBlock({
         />
       </div>
     </div>
+  );
+}
+
+/** Başlık yanına konan kısa açıklama — alan başına tekrar etmemesi için grup düzeyinde. */
+function HintIcon({ text }: { text: string }) {
+  return (
+    <Tooltip content={<span className="block max-w-xs">{text}</span>}>
+      <span className="inline-flex cursor-help align-middle text-subtle">
+        <InformationCircleIcon className="h-4 w-4" aria-label={text} />
+      </span>
+    </Tooltip>
   );
 }
 
@@ -259,6 +278,20 @@ function ShippingSplitSection() {
 }
 
 /** Live client-side breakdown for an example order — commission + shipping split + VAT/stopaj. */
+/**
+ * Primitifin kalem anahtarı → çeviri anahtarı. Değerler TAM literal: next-intl
+ * anahtarları tip düzeyinde doğruluyor, şablon literali (`...${key}`) kabul
+ * edilmiyor.
+ */
+const LINE_LABEL = {
+  buyerCommission: "admin.finance.commission.buyerCommission",
+  buyerShipping: "admin.finance.commission.buyerShipping",
+  buyerServiceFee: "admin.finance.commission.buyerServiceFee",
+  sellerCommission: "admin.finance.commission.sellerCommission",
+  sellerShipping: "admin.finance.commission.sellerShipping",
+  sellerPlatformFee: "admin.finance.commission.sellerPlatformFee",
+} as const satisfies Record<OrderBreakdownLineKey, string>;
+
 function BreakdownPreview() {
   const t = useTranslations();
   const { watch } = useFormContext<CommissionFormValues>();
@@ -323,43 +356,75 @@ function BreakdownPreview() {
   );
   const buyerShipping = Math.round(shipping * (buyerShare / 100) * 100) / 100;
   const sellerShipping = Math.round((shipping - buyerShipping) * 100) / 100;
+  // Stopaj yalnız kurumsal satıcıda doğar; ürün KDV'si tahsil EDİLMEZ (vitrin
+  // fiyatı KDV dahil kabul edilir), bu yüzden alıcı toplamına eklenmez.
   const isCorporate = v.taxpayerType === "corporate";
-  // KDV = sale VAT (corporate only); stopaj = withholding (corporate only); komisyon KDV on the seller fees.
-  const saleVat = isCorporate
-    ? Math.round(amount * (vatRate / 100) * 100) / 100
-    : 0;
   const stopaj = isCorporate
     ? Math.round(amount * (whRate / 100) * 100) / 100
     : 0;
-  const commissionVat =
-    Math.round((sellerCommission + sellerPlatformFee) * (vatRate / 100) * 100) /
-    100;
 
-  const buyerPays =
-    amount + buyerCommission + buyerServiceFee + buyerShipping + saleVat;
-  // Sürat faturası platforma gelir: satıcının escrow'undan TAM kargo düşülür ve
-  // alıcının ödediği pay platformda kalıp taşıyıcı maliyetini karşılar. Satıcının
-  // ekonomik yükü kendi payı kadardır — önizleme bunu gösterir.
-  const sellerReceives =
-    amount +
-    saleVat -
-    sellerCommission -
-    sellerPlatformFee -
-    sellerShipping -
-    stopaj;
+  // Hesabın tamamı ORTAK primitiften gelir: bu ekran kendi formülünü yazarsa
+  // önizleme ile gerçek tahsilat sessizce ayrışır.
+  const breakdown = buildOrderBreakdown({
+    subtotal: amount,
+    sellerCommissionAmount: sellerCommission,
+    sellerPlatformFeeAmount: sellerPlatformFee,
+    sellerShippingAmount: sellerShipping,
+    buyerCommissionAmount: buyerCommission,
+    buyerServiceFeeAmount: buyerServiceFee,
+    buyerShippingAmount: buyerShipping,
+    withholdingTaxAmount: stopaj,
+    serviceVatRate: vatRate,
+  });
 
+  /**
+   * Kalem satırı: tutar + o kalemin KDV'si. Tutar 0 olsa bile satır GİZLENMEZ —
+   * satıcı, kuralın o kalemi hiç almadığını ancak sıfır görerek anlayabilir.
+   */
   const Row = ({
     label,
     value,
+    vat,
     tone,
   }: {
     label: string;
     value: number;
+    vat?: number;
     tone?: string;
   }) => (
-    <div className="flex justify-between">
+    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-4">
       <span className="text-muted">{label}</span>
-      <span className={tone ?? "text-heading"}>{fmtTry(value)}</span>
+      <span className={`tabular-nums ${tone ?? "text-heading"}`}>
+        {fmtTry(value)}
+      </span>
+      <span className="w-20 text-right text-xs tabular-nums text-muted">
+        {vat == null ? "" : fmtTry(vat)}
+      </span>
+    </div>
+  );
+
+  /** Ara/son toplam satırı — KDV sütunu boş kalır. */
+  const TotalRow = ({
+    label,
+    value,
+    tone,
+    strong,
+  }: {
+    label: string;
+    value: number;
+    tone?: string;
+    strong?: boolean;
+  }) => (
+    <div
+      className={`grid grid-cols-[1fr_auto_auto] items-baseline gap-x-4 border-t border-border pt-1.5 ${
+        strong ? "font-semibold" : ""
+      }`}
+    >
+      <span>{label}</span>
+      <span className={`tabular-nums ${tone ?? "text-heading"}`}>
+        {fmtTry(value)}
+      </span>
+      <span className="w-20" />
     </div>
   );
 
@@ -425,53 +490,106 @@ function BreakdownPreview() {
         </p>
       )}
       <div className="space-y-1.5 rounded-lg bg-surface-alt p-4 text-sm">
-        <Row
-          label={t("admin.finance.commission.buyerCommission")}
-          value={buyerCommission}
-        />
-        <Row
-          label={t("admin.finance.commission.buyerServiceFee")}
-          value={buyerServiceFee}
-        />
-        <Row
-          label={t("admin.finance.commission.buyerShipping")}
-          value={buyerShipping}
-        />
-        {saleVat > 0 && (
-          <Row label={t("admin.finance.commission.vat")} value={saleVat} />
-        )}
-        <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
-          <span>{t("admin.finance.commission.buyerPays")}</span>
-          <span className="text-primary-700">{fmtTry(buyerPays)}</span>
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 text-xs uppercase tracking-wide text-muted">
+          <span>{t("admin.finance.commission.buyerSide")}</span>
+          <span className="text-right">
+            {t("admin.finance.commission.lineAmount")}
+          </span>
+          <span className="w-20 text-right">
+            {t("admin.finance.commission.lineVat")}
+          </span>
         </div>
-        <div className="pt-2" />
         <Row
-          label={t("admin.finance.commission.sellerCommission")}
-          value={sellerCommission}
+          label={t("admin.finance.commission.productPrice")}
+          value={breakdown.subtotal}
         />
-        <Row
-          label={t("admin.finance.commission.sellerPlatformFee")}
-          value={sellerPlatformFee}
-        />
-        <Row
-          label={t("admin.finance.commission.sellerShipping")}
-          value={sellerShipping}
-        />
-        <Row
-          label={t("admin.finance.commission.commissionVat")}
-          value={commissionVat}
-        />
-        {stopaj > 0 && (
+        {breakdown.buyer.lines.map((line) => (
           <Row
-            label={t("admin.finance.commission.withholding")}
-            value={stopaj}
+            key={line.key}
+            label={t(LINE_LABEL[line.key])}
+            value={line.amount}
+            vat={line.vat}
           />
-        )}
-        <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
-          <span>{t("admin.finance.commission.sellerReceives")}</span>
-          <span className="text-success-700">{fmtTry(sellerReceives)}</span>
+        ))}
+        <TotalRow
+          label={t("admin.finance.commission.buyerVatTotal")}
+          value={breakdown.buyer.vatTotal}
+        />
+        <TotalRow
+          label={t("admin.finance.commission.buyerAddedTotal")}
+          value={breakdown.buyer.addedTotal}
+        />
+        <TotalRow
+          label={t("admin.finance.commission.buyerPays")}
+          value={breakdown.buyer.payable}
+          tone="text-primary-700"
+          strong
+        />
+
+        <div className="pt-3" />
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 text-xs uppercase tracking-wide text-muted">
+          <span>{t("admin.finance.commission.sellerSide")}</span>
+          <span className="text-right">
+            {t("admin.finance.commission.lineAmount")}
+          </span>
+          <span className="w-20 text-right">
+            {t("admin.finance.commission.lineVat")}
+          </span>
+        </div>
+        {breakdown.seller.lines.map((line) => (
+          <Row
+            key={line.key}
+            label={t(LINE_LABEL[line.key])}
+            value={line.amount}
+            vat={line.vat}
+          />
+        ))}
+        <TotalRow
+          label={t("admin.finance.commission.sellerVatTotal")}
+          value={breakdown.seller.vatTotal}
+        />
+        {/* Stopaj bir KDV değil; bireysel satıcıda 0 olarak durur. */}
+        <Row
+          label={t("admin.finance.commission.withholding")}
+          value={breakdown.seller.withholding}
+        />
+        <TotalRow
+          label={t("admin.finance.commission.sellerDeductionTotal")}
+          value={breakdown.seller.deductionTotal}
+        />
+        <TotalRow
+          label={t("admin.finance.commission.sellerReceives")}
+          value={breakdown.seller.net}
+          tone="text-success-700"
+          strong
+        />
+
+        <div className="pt-3" />
+        <div className="text-xs uppercase tracking-wide text-muted">
+          {t("admin.finance.commission.platformSplitTitle")}
+        </div>
+        <Row
+          label={t("admin.finance.commission.platformRevenue")}
+          value={breakdown.platform.revenue}
+          tone="text-heading font-medium"
+        />
+        <Row
+          label={t("admin.finance.commission.platformTax")}
+          value={breakdown.platform.tax}
+        />
+        <Row
+          label={t("admin.finance.commission.platformShipping")}
+          value={breakdown.platform.shipping}
+        />
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 text-xs text-muted">
+          <span>{t("admin.finance.commission.platformTakeRate")}</span>
+          <span className="tabular-nums">%{breakdown.platform.takeRate}</span>
+          <span className="w-20" />
         </div>
       </div>
+      <p className="text-xs text-muted">
+        {t("admin.finance.commission.emptyLineNote")}
+      </p>
       <p className="text-xs text-muted">
         {t("admin.finance.commission.previewTaxNote")}
       </p>
@@ -507,7 +625,11 @@ export function CommissionRuleFormModal({
       successMessage: isEdit
         ? t("admin.finance.commission.ruleUpdated")
         : t("admin.finance.commission.ruleCreated"),
-      showErrorToast: false,
+      // Toast AÇIK: form uzun ve kaydet düğmesi en altta; inline <FormError />
+      // formun tepesinde render edildiği için 400'ün gerekçesi (ör. çakışan
+      // kural) ekran dışında kalıyor ve kullanıcı hiçbir uyarı görmüyordu.
+      // Toast + inline hata birlikte durur; ikisi de aynı sunucu mesajını yazar.
+      errorMessage: t("admin.finance.commission.saveFailed"),
       onSuccess: onClose,
     },
   );
@@ -533,104 +655,112 @@ export function CommissionRuleFormModal({
   };
 
   return (
-    <FormModal
-      open={open}
-      onClose={onClose}
-      title={
-        isEdit
-          ? t("admin.finance.commission.editRule")
-          : t("admin.finance.commission.newRule")
-      }
-      form={form}
-      onSubmit={submit}
-      isSubmitting={save.isPending}
-      submitLabel={isEdit ? t("common.update") : t("common.create")}
-      size="2xl"
-    >
-      <FormError />
-      <FormInput
-        name="name"
-        label={t("admin.finance.commission.ruleName")}
-        placeholder={t("admin.finance.commission.ruleNamePlaceholder")}
-      />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <FormSelect
-          name="categoryId"
-          label={t("common.category")}
-          options={categoryOptions}
-        />
-        <FormSelect
-          name="sellerType"
-          label={t("admin.finance.commission.sellerType")}
-          options={sellerTypes(t)}
-        />
-        <FormSelect
-          name="taxpayerType"
-          label={t("admin.finance.commission.taxpayerType")}
-          options={taxpayerTypes(t)}
-        />
-      </div>
-
-      {/* Kademeli eşleşme: ürün/satır tutar aralığı */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <TooltipProvider>
+      <FormModal
+        open={open}
+        onClose={onClose}
+        title={
+          isEdit
+            ? t("admin.finance.commission.editRule")
+            : t("admin.finance.commission.newRule")
+        }
+        form={form}
+        onSubmit={submit}
+        isSubmitting={save.isPending}
+        submitLabel={isEdit ? t("common.update") : t("common.create")}
+        size="2xl"
+      >
+        <FormError />
         <FormInput
-          name="minAmount"
-          label={t("admin.finance.commission.minAmountLabel")}
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder={t("admin.finance.commission.noLowerBound")}
+          name="name"
+          label={t("admin.finance.commission.ruleName")}
+          placeholder={t("admin.finance.commission.ruleNamePlaceholder")}
         />
-        <FormInput
-          name="maxAmount"
-          label={t("admin.finance.commission.maxAmountLabel")}
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder={t("admin.finance.commission.noUpperBound")}
-        />
-        <FormSelect
-          name="appliesTo"
-          label={t("admin.finance.commission.appliesTo")}
-          options={appliesToOptions(t)}
-        />
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <RateBlock
-          title={t("admin.finance.commission.sellerCommission")}
-          rateName="sellerCommissionRate"
-          minName="sellerCommissionMin"
-          maxName="sellerCommissionMax"
-        />
-        <RateBlock
-          title={t("admin.finance.commission.sellerPlatformFee")}
-          rateName="sellerPlatformFeeRate"
-          minName="sellerPlatformFeeMin"
-          maxName="sellerPlatformFeeMax"
-        />
-        <RateBlock
-          title={t("admin.finance.commission.buyerServiceFee")}
-          rateName="buyerServiceFeeRate"
-          minName="buyerServiceFeeMin"
-          maxName="buyerServiceFeeMax"
-        />
-        <RateBlock
-          title={t("admin.finance.commission.buyerCommission")}
-          rateName="buyerCommissionRate"
-          minName="buyerCommissionMin"
-          maxName="buyerCommissionMax"
-        />
-      </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <FormSelect
+            name="categoryId"
+            label={t("common.category")}
+            options={categoryOptions}
+          />
+          <FormSelect
+            name="sellerType"
+            label={t("admin.finance.commission.sellerType")}
+            options={sellerTypes(t)}
+          />
+          <FormSelect
+            name="taxpayerType"
+            label={t("admin.finance.commission.taxpayerType")}
+            options={taxpayerTypes(t)}
+          />
+        </div>
 
-      <ShippingSplitSection />
+        {/* Kademeli eşleşme: ürün/satır tutar aralığı */}
+        <div>
+          <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-heading">
+            {t("admin.finance.commission.amountRangeTitle")}
+            <HintIcon text={t("admin.finance.commission.amountRangeHint")} />
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <FormInput
+            name="minAmount"
+            label={t("admin.finance.commission.minAmountLabel")}
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder={t("admin.finance.commission.noLowerBound")}
+          />
+          <FormInput
+            name="maxAmount"
+            label={t("admin.finance.commission.maxAmountLabel")}
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder={t("admin.finance.commission.noUpperBound")}
+          />
+          <FormSelect
+            name="appliesTo"
+            label={t("admin.finance.commission.appliesTo")}
+            options={appliesToOptions(t)}
+          />
+        </div>
 
-      <BreakdownPreview />
-      <FormCheckbox
-        name="isActive"
-        label={t("admin.finance.commission.ruleActive")}
-      />
-    </FormModal>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <RateBlock
+            title={t("admin.finance.commission.sellerCommission")}
+            rateName="sellerCommissionRate"
+            minName="sellerCommissionMin"
+            maxName="sellerCommissionMax"
+          />
+          <RateBlock
+            title={t("admin.finance.commission.sellerPlatformFee")}
+            rateName="sellerPlatformFeeRate"
+            minName="sellerPlatformFeeMin"
+            maxName="sellerPlatformFeeMax"
+          />
+          <RateBlock
+            title={t("admin.finance.commission.buyerServiceFee")}
+            rateName="buyerServiceFeeRate"
+            minName="buyerServiceFeeMin"
+            maxName="buyerServiceFeeMax"
+          />
+          <RateBlock
+            title={t("admin.finance.commission.buyerCommission")}
+            rateName="buyerCommissionRate"
+            minName="buyerCommissionMin"
+            maxName="buyerCommissionMax"
+          />
+        </div>
+
+        <ShippingSplitSection />
+
+        <BreakdownPreview />
+        <FormCheckbox
+          name="isActive"
+          label={t("admin.finance.commission.ruleActive")}
+        />
+      </FormModal>
+    </TooltipProvider>
   );
 }

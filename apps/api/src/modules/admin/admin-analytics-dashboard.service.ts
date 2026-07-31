@@ -812,9 +812,20 @@ export class AdminAnalyticsDashboardService {
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
       }),
-      // Buyer/seller fee breakdown
+      // Paranın tam dağılımı: platformda kalan ücretler, devlete giden vergi,
+      // taşıyıcıya giden kargo ve bunların oranlandığı ürün cirosu. Ekran
+      // "Tarodan'a ne kaldı" sorusunu ancak dördü birlikte yanıtlayabiliyor.
       this.prisma.order.aggregate({
-        _sum: { buyerFeeAmount: true, sellerFeeAmount: true },
+        _sum: {
+          buyerFeeAmount: true,
+          sellerFeeAmount: true,
+          subtotal: true,
+          buyerServiceTaxAmount: true,
+          sellerServiceTaxAmount: true,
+          withholdingTaxAmount: true,
+          buyerShippingAmount: true,
+          sellerShippingAmount: true,
+        },
         where: {
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
@@ -872,6 +883,17 @@ export class AdminAnalyticsDashboardService {
       totalCommission: Number(totalCommission._sum.commissionAmount || 0),
       totalBuyerFee: Number(totalFees._sum.buyerFeeAmount || 0),
       totalSellerFee: Number(totalFees._sum.sellerFeeAmount || 0),
+      // Ürün cirosu (GMV) — Tarodan payının oranlandığı taban.
+      totalSubtotal: Number(totalFees._sum.subtotal || 0),
+      // Devlete giden: iki taraf hizmet KDV'si + stopaj.
+      totalTax:
+        Number(totalFees._sum.buyerServiceTaxAmount || 0) +
+        Number(totalFees._sum.sellerServiceTaxAmount || 0) +
+        Number(totalFees._sum.withholdingTaxAmount || 0),
+      // Taşıyıcıya giden: iki tarafın kargo payı.
+      totalShipping:
+        Number(totalFees._sum.buyerShippingAmount || 0) +
+        Number(totalFees._sum.sellerShippingAmount || 0),
       byMonth: commissionByMonth.map((m) => ({
         month: m.month,
         total: Number(m.total || 0),
