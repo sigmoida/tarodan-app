@@ -355,6 +355,18 @@ export class OrderController {
   }
 
   /**
+   * GET /orders/seller/pending-count — satıcının bekleyen (ödendi/hazırlanıyor)
+   * PAKET sayısı. Satıcı paneli kartı bu birimi kullanır (liste ile aynı).
+   */
+  @Get("seller/pending-count")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Seller pending package count (paid/preparing)" })
+  async getSellerPendingCount(@CurrentUser("id") userId: string) {
+    return this.orderService.getSellerPendingCount(userId);
+  }
+
+  /**
    * GET /orders/groups - Alıcının sipariş grupları (gruplu liste).
    * NOT: ':id' rotasından ÖNCE tanımlı olmalı (yoksa 'groups' :id'e yakalanır).
    */
@@ -368,13 +380,23 @@ export class OrderController {
     @CurrentUser("id") userId: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @Query("role") role?: string,
+    @Query("tab") tab?: string,
   ) {
     const pageNum = Math.max(1, parseInt(page || "1", 10) || 1);
     const limitNum = Math.min(
       50,
       Math.max(1, parseInt(limit || "20", 10) || 20),
     );
-    return this.orderService.findUserCheckoutGroups(userId, pageNum, limitNum);
+    return this.orderService.findUserOrderGroups(userId, {
+      role: role === "seller" ? "seller" : "buyer",
+      tab:
+        tab === "cancelled" || tab === "refunds"
+          ? (tab as "cancelled" | "refunds")
+          : "active",
+      page: pageNum,
+      limit: limitNum,
+    });
   }
 
   /**
@@ -392,6 +414,44 @@ export class OrderController {
     @CurrentUser("id") userId: string,
   ) {
     return this.orderService.findCheckoutGroup(id, userId);
+  }
+
+  /**
+   * POST /orders/groups/:id/cancel — GRUP iptali (R4): sepetin tamamı iptal
+   * edilir; herhangi bir üye kargoya verildiyse iptal tamamen kapalıdır.
+   */
+  @Post("groups/:id/cancel")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Cancel the whole checkout group (cart-based cancel)",
+  })
+  @ApiParam({ name: "id", description: "Checkout group ID" })
+  async cancelGroup(
+    @Param("id") id: string,
+    @CurrentUser("id") userId: string,
+    @Body() dto: CancelOrderDto,
+  ) {
+    return this.orderService.cancelGroup(id, userId, dto);
+  }
+
+  /**
+   * GET /orders/:id/group - Siparişin GRUP ÇATISI görünümü. Gruplu sipariş
+   * grubunu döndürür; grupsuz (ör. teklif) sipariş tek siparişlik sentetik
+   * grup olur. Eski order linkleri/e-postaları bu rota üzerinden çatıya çözülür.
+   */
+  @Get(":id/group")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Resolve an order to its group-umbrella view (synthetic if none)",
+  })
+  @ApiParam({ name: "id", description: "Order ID" })
+  async findGroupViewByOrder(
+    @Param("id") id: string,
+    @CurrentUser("id") userId: string,
+  ) {
+    return this.orderService.findGroupViewByOrder(id, userId);
   }
 
   /**

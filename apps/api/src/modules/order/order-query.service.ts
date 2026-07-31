@@ -84,8 +84,24 @@ export class OrderQueryService {
    * Requirement: Guest checkout (requirements.txt)
    */
   async trackGuestOrder(dto: GuestOrderTrackDto) {
+    // GRUP numarası (GRPORD-…) da kabul edilir: sepetin ilk siparişine çözülür,
+    // kardeş sipariş numaraları yanında döner (misafir tüm sepeti takip edebilsin).
+    let lookupNumber = dto.orderNumber;
+    const group = await this.prisma.checkoutGroup.findUnique({
+      where: { groupNumber: dto.orderNumber },
+      select: {
+        orders: {
+          orderBy: { createdAt: "asc" },
+          select: { orderNumber: true },
+        },
+      },
+    });
+    if (group?.orders?.length) {
+      lookupNumber = group.orders[0].orderNumber;
+    }
+
     const order = await this.prisma.order.findUnique({
-      where: { orderNumber: dto.orderNumber },
+      where: { orderNumber: lookupNumber },
       include: {
         product: {
           include: {
@@ -126,9 +142,24 @@ export class OrderQueryService {
       throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
+    // Aynı sepetin diğer siparişleri — misafir tek numarayla tüm sepeti bulur.
+    const siblingOrderNumbers = order.checkoutGroupId
+      ? (
+          await this.prisma.order.findMany({
+            where: {
+              checkoutGroupId: order.checkoutGroupId,
+              id: { not: order.id },
+            },
+            orderBy: { createdAt: "asc" },
+            select: { orderNumber: true },
+          })
+        ).map((o) => o.orderNumber)
+      : [];
+
     return {
       id: order.id,
       orderNumber: order.orderNumber,
+      siblingOrderNumbers,
       status: order.status,
       totalAmount: Number(order.totalAmount),
       product: {
@@ -369,6 +400,349 @@ export class OrderQueryService {
     return pool.every((o) => o.status === first) ? String(first) : "mixed";
   }
 
+  /** Üyelik/boost sanal siparişlerini grup görünümlerinden dışarıda tut. */
+  private readonly virtualOrderExclusion: Prisma.OrderWhereInput = {
+    NOT: {
+      OR: [
+        { productId: { startsWith: "membership-" } },
+        { productId: { startsWith: "boost-" } },
+      ],
+    },
+  };
+
+  /**
+   * Sekme → üye siparişi koşulu. Seçim koşuludur: grubu/paketi LİSTEYE ALIP
+   * ALMAMAYA karar verir; karta her zaman TAM üye kümesi döner (filtre satın
+   * almayı değil seçimi daraltır — aksi halde "3 ürünlük sepet" başlığı ve
+   * toplamlar sekmeye göre yalan söylerdi).
+   */
+  private memberWhereForTab(
+    tab: "active" | "cancelled" | "refunds",
+  ): Prisma.OrderWhereInput {
+    if (tab === "cancelled") {
+      return { status: OrderStatus.cancelled, ...this.virtualOrderExclusion };
+    }
+    if (tab === "refunds") {
+      return {
+        refundRequests: { some: {} },
+        ...this.virtualOrderExclusion,
+      };
+    }
+    return {
+      status: { not: OrderStatus.cancelled },
+      ...this.virtualOrderExclusion,
+    };
+  }
+
+  /** Grup listesi/detayındaki sipariş include'u (tek kaynak). */
+  private readonly groupOrderInclude = {
+    product: {
+      include: { images: { take: 1, orderBy: { sortOrder: "asc" as const } } },
+    },
+    buyer: {
+      select: {
+        id: true,
+        displayName: true,
+        isVerified: true,
+        avatarUrl: true,
+      },
+    },
+    seller: {
+      select: {
+        id: true,
+        displayName: true,
+        isVerified: true,
+        avatarUrl: true,
+      },
+    },
+    shipment: true,
+    refundRequests: { orderBy: { createdAt: "desc" as const } },
+    offer: { select: { status: true } },
+  };
+
+  private paymentSummary(payment: any) {
+    if (!payment) return null;
+    return {
+      id: payment.id,
+      status: payment.status,
+      amount: Number(payment.amount),
+      provider: payment.provider ?? null,
+      paidAt: payment.paidAt ?? null,
+    };
+  }
+
+  /** Grupsuz (ör. teklif kabulü) sipariş = tek siparişlik sentetik grup çatısı. */
+  private async formatSyntheticGroupView(
+    order: any,
+    userId: string,
+    viewerRole: "buyer" | "seller",
+  ) {
+    const packages = await this.buildPackagesView(
+      [order],
+      [
+        {
+          id: `nopkg:${order.id}`,
+          sellerId: order.sellerId,
+          shippingCost: order.shippingCost ?? 0,
+        },
+      ],
+      userId,
+    );
+    return {
+      kind: "synthetic" as const,
+      id: order.id,
+      groupNumber: order.orderNumber,
+      totalAmount: Number(order.totalAmount),
+      status: String(order.status),
+      createdAt: order.createdAt,
+      viewerRole,
+      // Ödeme tutarı alıcıya aittir; satıcı dilimi ödeme detayını görmez.
+      payment:
+        viewerRole === "buyer" ? this.paymentSummary(order.payment) : null,
+      packages,
+      orders: [await this.orderCommon.formatOrderResponse(order, userId)],
+    };
+  }
+
+  /** Satıcı çatısı: kendi OrderPackage'ı tek "grup" kartı gibi sunulur. */
+  private async formatPackageUmbrella(pkg: any, userId: string) {
+    const orders = [...pkg.orders].sort((a, b) =>
+      String(a.orderNumber).localeCompare(String(b.orderNumber)),
+    );
+    return {
+      kind: "package" as const,
+      id: pkg.id,
+      // Paketin ortak Sürat referansı = en küçük orderNumber (resolveSuratRef
+      // ile aynı kural) — satıcının gördüğü çatı numarası kargo ile eşleşir.
+      groupNumber: orders[0]?.orderNumber ?? pkg.id,
+      totalAmount: pkg.orders.reduce(
+        (sum: number, o: any) => sum + Number(o.totalAmount),
+        0,
+      ),
+      status: this.deriveGroupStatus(pkg.orders),
+      createdAt: pkg.createdAt,
+      viewerRole: "seller" as const,
+      payment: null,
+      packages: await this.buildPackagesView(pkg.orders, [pkg], userId),
+      orders: await Promise.all(
+        pkg.orders.map((o: any) =>
+          this.orderCommon.formatOrderResponse(o, userId),
+        ),
+      ),
+    };
+  }
+
+  /**
+   * Satıcı "bekleyen sipariş" sayacı — birim PAKET ÇATISIDIR (satıcı listesiyle
+   * aynı birim): ödenmiş/hazırlanan üyesi olan paketler + paketsiz bekleyen
+   * siparişler. (Eski sayaç order-bazlıydı ve yalnız ilk sayfadan sayıyordu.)
+   */
+  async getSellerPendingCount(sellerId: string): Promise<{ pending: number }> {
+    const pendingStatuses = [OrderStatus.paid, OrderStatus.preparing];
+    const [packages, loose] = await Promise.all([
+      this.prisma.orderPackage.count({
+        where: {
+          sellerId,
+          orders: { some: { status: { in: pendingStatuses } } },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          sellerId,
+          packageId: null,
+          status: { in: pendingStatuses },
+        },
+      }),
+    ]);
+    return { pending: packages + loose };
+  }
+
+  /**
+   * Sipariş id'sinden grup çatısına çözümleme. Gruplu sipariş grup görünümünü
+   * döndürür (eski order-detay linkleri ve e-postalar kırılmaz); grupsuz sipariş
+   * tek siparişlik sentetik grup olur. GET /orders/:id/group
+   */
+  async findGroupViewByOrder(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        ...this.groupOrderInclude,
+        shipment: {
+          include: { events: { orderBy: { createdAt: "desc" }, take: 5 } },
+        },
+        payment: true,
+        offer: { select: { status: true } },
+      },
+    });
+    if (!order) {
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
+    }
+    if (order.buyerId !== userId && order.sellerId !== userId) {
+      throw new ForbiddenException(i18nMessage("server.order.viewForbidden"));
+    }
+    if (order.checkoutGroupId) {
+      return this.findCheckoutGroup(order.checkoutGroupId, userId);
+    }
+    const viewerRole = order.buyerId === userId ? "buyer" : "seller";
+    return this.formatSyntheticGroupView(order, userId, viewerRole);
+  }
+
+  /**
+   * Birleşik grup listesi: alıcı için CheckoutGroup + grupsuz siparişler,
+   * satıcı için kendi OrderPackage çatıları + paketsiz siparişleri — tek
+   * sayfalı akışta, createdAt'e göre. GET /orders/groups
+   */
+  async findUserOrderGroups(
+    userId: string,
+    params: {
+      role?: "buyer" | "seller";
+      tab?: "active" | "cancelled" | "refunds";
+      page?: number;
+      limit?: number;
+    } = {},
+  ) {
+    const { role = "buyer", tab = "active", page = 1, limit = 20 } = params;
+    const memberWhere = this.memberWhereForTab(tab);
+
+    // Aday (hafif) sorgular: kullanıcı-başına satır sayısı küçük olduğundan
+    // birleşik sayfalama id+createdAt üzerinden bellekte yapılır.
+    type LightEntry = {
+      type: "group" | "package" | "order";
+      id: string;
+      createdAt: Date;
+    };
+    let lightUmbrellas: LightEntry[] = [];
+    let lightLoose: LightEntry[] = [];
+
+    if (role === "seller") {
+      const pkgs = await this.prisma.orderPackage.findMany({
+        where: { sellerId: userId, orders: { some: memberWhere } },
+        select: { id: true, createdAt: true },
+      });
+      lightUmbrellas = pkgs.map((p) => ({
+        type: "package" as const,
+        id: p.id,
+        createdAt: p.createdAt,
+      }));
+      const loose = await this.prisma.order.findMany({
+        where: { packageId: null, sellerId: userId, ...memberWhere },
+        select: { id: true, createdAt: true },
+      });
+      lightLoose = loose.map((o) => ({
+        type: "order" as const,
+        id: o.id,
+        createdAt: o.createdAt,
+      }));
+    } else {
+      const groups = await this.prisma.checkoutGroup.findMany({
+        where: { buyerId: userId, orders: { some: memberWhere } },
+        select: { id: true, createdAt: true },
+      });
+      lightUmbrellas = groups.map((g) => ({
+        type: "group" as const,
+        id: g.id,
+        createdAt: g.createdAt,
+      }));
+      const loose = await this.prisma.order.findMany({
+        where: { checkoutGroupId: null, buyerId: userId, ...memberWhere },
+        select: { id: true, createdAt: true },
+      });
+      lightLoose = loose.map((o) => ({
+        type: "order" as const,
+        id: o.id,
+        createdAt: o.createdAt,
+      }));
+    }
+
+    const entries = [...lightUmbrellas, ...lightLoose].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    const total = entries.length;
+    const slice = entries.slice((page - 1) * limit, page * limit);
+
+    // Hidrasyon: dilimdeki id'ler tam include ile çekilir, dilim sırası korunur.
+    const groupIds = slice.filter((e) => e.type === "group").map((e) => e.id);
+    const pkgIds = slice.filter((e) => e.type === "package").map((e) => e.id);
+    const orderIds = slice.filter((e) => e.type === "order").map((e) => e.id);
+
+    const [groups, pkgs, looseOrders] = await Promise.all([
+      groupIds.length
+        ? this.prisma.checkoutGroup.findMany({
+            where: { id: { in: groupIds } },
+            include: {
+              orders: { include: this.groupOrderInclude },
+              packages: true,
+              payment: true,
+            },
+          })
+        : Promise.resolve([]),
+      pkgIds.length
+        ? this.prisma.orderPackage.findMany({
+            where: { id: { in: pkgIds } },
+            include: { orders: { include: this.groupOrderInclude } },
+          })
+        : Promise.resolve([]),
+      orderIds.length
+        ? this.prisma.order.findMany({
+            where: { id: { in: orderIds } },
+            include: { ...this.groupOrderInclude, payment: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const groupById = new Map(groups.map((g: any) => [g.id, g]));
+    const pkgById = new Map(pkgs.map((p: any) => [p.id, p]));
+    const orderById = new Map(looseOrders.map((o: any) => [o.id, o]));
+
+    const data = (
+      await Promise.all(
+        slice.map(async (entry) => {
+          if (entry.type === "group") {
+            const group = groupById.get(entry.id);
+            if (!group) return null;
+            return {
+              kind: "group" as const,
+              id: group.id,
+              groupNumber: group.groupNumber,
+              totalAmount: Number(group.totalAmount),
+              status: this.deriveGroupStatus(group.orders),
+              createdAt: group.createdAt,
+              viewerRole: "buyer" as const,
+              payment: this.paymentSummary(group.payment),
+              packages: await this.buildPackagesView(
+                group.orders,
+                group.packages,
+                userId,
+              ),
+              orders: await Promise.all(
+                group.orders.map((o: any) =>
+                  this.orderCommon.formatOrderResponse(o, userId),
+                ),
+              ),
+            };
+          }
+          if (entry.type === "package") {
+            const pkg = pkgById.get(entry.id);
+            if (!pkg) return null;
+            return this.formatPackageUmbrella(pkg, userId);
+          }
+          const order = orderById.get(entry.id);
+          if (!order) return null;
+          return this.formatSyntheticGroupView(
+            order,
+            userId,
+            role === "seller" ? "seller" : "buyer",
+          );
+        }),
+      )
+    ).filter(Boolean);
+
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
   /**
    * Faz 3: Grup siparişini SATICI PAKETİ (çatı) hiyerarşisiyle sun. Bir sepetteki
    * order'lar packageId'ye göre gruplanır → UI satıcı başına TEK kart gösterebilir:
@@ -435,77 +809,9 @@ export class OrderQueryService {
    * GET /orders/groups
    */
   async findUserCheckoutGroups(userId: string, page = 1, limit = 20) {
-    const where: Prisma.CheckoutGroupWhereInput = {
-      buyerId: userId,
-      // Tüm siparişleri iptal olan grupları varsayılan listede gösterme
-      orders: { some: { status: { not: OrderStatus.cancelled } } },
-    };
-
-    const total = await this.prisma.checkoutGroup.count({ where });
-    const groups = await this.prisma.checkoutGroup.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        orders: {
-          include: {
-            product: {
-              include: { images: { take: 1, orderBy: { sortOrder: "asc" } } },
-            },
-            buyer: {
-              select: {
-                id: true,
-                displayName: true,
-                isVerified: true,
-                avatarUrl: true,
-              },
-            },
-            seller: {
-              select: {
-                id: true,
-                displayName: true,
-                isVerified: true,
-                avatarUrl: true,
-              },
-            },
-            shipment: true,
-          },
-        },
-        packages: true,
-      },
-    });
-
-    const data = await Promise.all(
-      groups.map(async (group) => {
-        const visibleOrders = group.orders.filter(
-          (o) => o.status !== OrderStatus.cancelled,
-        );
-        const orders = visibleOrders.length > 0 ? visibleOrders : group.orders;
-        return {
-          id: group.id,
-          groupNumber: group.groupNumber,
-          totalAmount: Number(group.totalAmount),
-          status: this.deriveGroupStatus(group.orders),
-          createdAt: group.createdAt,
-          // Faz 3: satıcı-paketi hiyerarşisi (UI satıcı başına tek kart + tek kargo).
-          packages: await this.buildPackagesView(
-            orders,
-            group.packages,
-            userId,
-          ),
-          // Geriye-dönük: düz order listesi.
-          orders: await Promise.all(
-            orders.map((o) => this.orderCommon.formatOrderResponse(o, userId)),
-          ),
-        };
-      }),
-    );
-
-    return {
-      data,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+    // Geriye-dönük imza (mobil/eski istemciler): birleşik grup listesinin
+    // alıcı/aktif varsayılanına delege eder.
+    return this.findUserOrderGroups(userId, { role: "buyer", page, limit });
   }
 
   /**
@@ -547,6 +853,7 @@ export class OrderQueryService {
             // Grup içi siparişlerde de "Ödeme Yapıldı"/paidAt çözülsün diye group payment.
             checkoutGroup: { include: { payment: true } },
             refundRequests: { orderBy: { createdAt: "desc" } },
+            offer: { select: { status: true } },
           },
         },
         payment: {
@@ -565,36 +872,42 @@ export class OrderQueryService {
     if (!group) {
       throw new NotFoundException(i18nMessage("server.order.groupNotFound"));
     }
-    if (group.buyerId !== userId) {
+
+    // Alıcı tam grubu görür; satıcı yalnız KENDİ paket dilimini görür (grubun
+    // toplam ödemesi ve diğer satıcıların siparişleri satıcıya sızmaz).
+    const isBuyer = group.buyerId === userId;
+    const sellerOrders = group.orders.filter((o) => o.sellerId === userId);
+    if (!isBuyer && sellerOrders.length === 0) {
       throw new ForbiddenException(
         i18nMessage("server.order.groupViewForbidden"),
       );
     }
+    const viewerRole = isBuyer ? ("buyer" as const) : ("seller" as const);
+    const visibleOrders = isBuyer ? group.orders : sellerOrders;
+    const visiblePackages = isBuyer
+      ? group.packages
+      : group.packages.filter((p) => p.sellerId === userId);
 
     return {
+      kind: "group" as const,
       id: group.id,
       groupNumber: group.groupNumber,
-      totalAmount: Number(group.totalAmount),
-      status: this.deriveGroupStatus(group.orders),
+      totalAmount: isBuyer
+        ? Number(group.totalAmount)
+        : visibleOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
+      status: this.deriveGroupStatus(visibleOrders),
       createdAt: group.createdAt,
-      payment: group.payment
-        ? {
-            id: group.payment.id,
-            status: group.payment.status,
-            amount: Number(group.payment.amount),
-            provider: group.payment.provider,
-            paidAt: group.payment.paidAt,
-          }
-        : null,
+      viewerRole,
+      payment: isBuyer ? this.paymentSummary(group.payment) : null,
       // Faz 3: satıcı-paketi (çatı) hiyerarşisi — UI satıcı başına tek kart + tek
       // kargo takibi + tek kargo ücreti. Düz `orders` geriye-dönük korunur.
       packages: await this.buildPackagesView(
-        group.orders,
-        group.packages,
+        visibleOrders,
+        visiblePackages,
         userId,
       ),
       orders: await Promise.all(
-        group.orders.map((o) =>
+        visibleOrders.map((o) =>
           this.orderCommon.formatOrderResponse(o, userId),
         ),
       ),

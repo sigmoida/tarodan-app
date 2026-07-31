@@ -204,8 +204,28 @@ export class OrderService {
     return this.orderQuery.findUserCheckoutGroups(userId, page, limit);
   }
 
+  async findUserOrderGroups(
+    userId: string,
+    params: {
+      role?: "buyer" | "seller";
+      tab?: "active" | "cancelled" | "refunds";
+      page?: number;
+      limit?: number;
+    } = {},
+  ) {
+    return this.orderQuery.findUserOrderGroups(userId, params);
+  }
+
   async findCheckoutGroup(groupId: string, userId: string) {
     return this.orderQuery.findCheckoutGroup(groupId, userId);
+  }
+
+  async findGroupViewByOrder(orderId: string, userId: string) {
+    return this.orderQuery.findGroupViewByOrder(orderId, userId);
+  }
+
+  async getSellerPendingCount(sellerId: string) {
+    return this.orderQuery.getSellerPendingCount(sellerId);
   }
 
   // Taşındı: order-lifecycle.service.ts — imzalar aynen korunuyor (facade delege).
@@ -267,6 +287,10 @@ export class OrderService {
       hours,
       reason,
     );
+  }
+
+  async cancelGroup(groupId: string, userId: string, dto: CancelOrderDto) {
+    return this.orderLifecycle.cancelGroup(groupId, userId, dto);
   }
 
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
