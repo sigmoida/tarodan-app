@@ -5,6 +5,7 @@ import { OrderService } from "./order.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCheckoutService } from "./order-checkout.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderTaxPolicyService } from "./order-tax-policy.service";
 import { OrderCheckoutDirectService } from "./order-checkout-direct.service";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import { OrderGuestCheckoutService } from "./order-guest-checkout.service";
@@ -53,6 +54,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     OrderPricingService,
     OrderCheckoutService,
     OrderCheckoutCommonService,
+    // Vergi politikası (ürün KDV / hizmet KDV / stopaj kapsamı) — tek kaynak.
+    OrderTaxPolicyService,
     OrderCheckoutDirectService,
     OrderCheckoutGroupService,
     OrderGuestCheckoutService,
@@ -66,6 +69,6 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   ],
   // OrderCheckoutCommonService: teklif/sipariş bedel primitifleri (OfferService
   // teklif kabulünde aynı hesabı kullanır — tek kaynak).
-  exports: [OrderService, OrderCheckoutCommonService],
+  exports: [OrderService, OrderCheckoutCommonService, OrderTaxPolicyService],
 })
 export class OrderModule {}
