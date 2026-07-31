@@ -11,7 +11,7 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import { StorageService } from "../storage/storage.service";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 

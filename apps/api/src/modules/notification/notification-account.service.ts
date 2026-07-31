@@ -6,8 +6,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
-import { SendGridProvider } from "./providers/sendgrid.provider";
-import { SmtpProvider } from "./providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import {
   escapeEmailHtml,
   renderManagedEmailTemplate,
@@ -23,7 +22,6 @@ export class NotificationAccountService {
     private readonly dispatch: NotificationDispatchService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly sendGridProvider: SendGridProvider,
     private readonly smtpProvider: SmtpProvider,
   ) {}
 
@@ -93,25 +91,15 @@ export class NotificationAccountService {
       },
     );
 
-    let result;
-    if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendEmail({
-        to: adminEmail,
-        subject,
-        html,
-      });
-    } else if (this.smtpProvider.isConfigured()) {
-      result = await this.smtpProvider.sendEmail({
-        to: adminEmail,
-        subject,
-        html,
-      });
-    } else {
-      this.logger.warn(
-        "Guest contact bildirimi için mail sağlayıcı (SendGrid/SMTP) yapılandırılmamış",
-      );
+    if (!this.smtpProvider.isConfigured()) {
+      this.logger.warn("Guest contact bildirimi için SMTP yapılandırılmamış");
       return { success: false, error: "No email provider configured" };
     }
+    const result = await this.smtpProvider.sendEmail({
+      to: adminEmail,
+      subject,
+      html,
+    });
 
     if (result.success) {
       this.logger.log(
@@ -154,22 +142,14 @@ export class NotificationAccountService {
     );
 
     let result;
-    if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendEmail({
-        to: user.email,
-        subject: email.subject,
-        html: email.html,
-      });
-    } else if (this.smtpProvider.isConfigured()) {
+    if (this.smtpProvider.isConfigured()) {
       result = await this.smtpProvider.sendEmail({
         to: user.email,
         subject: email.subject,
         html: email.html,
       });
     } else {
-      this.logger.warn(
-        "Neither SendGrid nor SMTP is configured for password reset email",
-      );
+      this.logger.warn("SMTP is not configured for password reset email");
       result = { success: false, error: "No email provider configured" };
     }
 
@@ -226,22 +206,14 @@ export class NotificationAccountService {
     );
 
     let result;
-    if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendEmail({
-        to: user.email,
-        subject: email.subject,
-        html: email.html,
-      });
-    } else if (this.smtpProvider.isConfigured()) {
+    if (this.smtpProvider.isConfigured()) {
       result = await this.smtpProvider.sendEmail({
         to: user.email,
         subject: email.subject,
         html: email.html,
       });
     } else {
-      this.logger.warn(
-        "Neither SendGrid nor SMTP is configured for email verification",
-      );
+      this.logger.warn("SMTP is not configured for email verification");
       result = { success: false, error: "No email provider configured" };
     }
 

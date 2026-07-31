@@ -24,16 +24,12 @@ describe("NotificationAccountService.sendEmailVerification", () => {
       ),
       logNotification: jest.fn().mockResolvedValue(undefined),
     };
-    const sendGridProvider = {
+    const smtpProvider = {
       isConfigured: jest.fn().mockReturnValue(true),
       sendEmail: jest.fn().mockResolvedValue({
         success: true,
         messageId: "message-1",
       }),
-    };
-    const smtpProvider = {
-      isConfigured: jest.fn().mockReturnValue(false),
-      sendEmail: jest.fn(),
     };
     const configService = {
       get: jest.fn().mockReturnValue("https://tarodan.com.tr"),
@@ -43,7 +39,6 @@ describe("NotificationAccountService.sendEmailVerification", () => {
       dispatch as never,
       prisma as never,
       configService as never,
-      sendGridProvider as never,
       smtpProvider as never,
     );
 
@@ -56,7 +51,7 @@ describe("NotificationAccountService.sendEmailVerification", () => {
     expect(prisma.emailTemplate.findUnique).toHaveBeenCalledWith({
       where: { key: "email-verification" },
     });
-    expect(sendGridProvider.sendEmail).toHaveBeenCalledWith(
+    expect(smtpProvider.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "new-user@example.com",
         subject: "E-posta Adresinizi Doğrulayın",
@@ -65,7 +60,7 @@ describe("NotificationAccountService.sendEmailVerification", () => {
         ),
       }),
     );
-    expect(sendGridProvider.sendEmail).toHaveBeenCalledWith(
+    expect(smtpProvider.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         html: expect.stringContaining(
           "https://tarodan.com.tr/tarodan-logo.jpg",
@@ -93,7 +88,6 @@ describe("NotificationAccountService.sendGuestCheckoutVerificationCode", () => {
     };
     const service = new NotificationAccountService(
       dispatch as never,
-      {} as never,
       {} as never,
       {} as never,
       {} as never,

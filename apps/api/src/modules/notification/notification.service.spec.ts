@@ -6,10 +6,9 @@ import { I18nService } from "../i18n/i18n.service";
 import { NotificationCommerceService } from "./notification-commerce.service";
 import { NotificationAccountService } from "./notification-account.service";
 import { PrismaService } from "../../prisma";
-import { SendGridProvider } from "./providers/sendgrid.provider";
 import { ExpoPushProvider } from "./providers/expo-push.provider";
 import { SmsProvider } from "./providers/sms.provider";
-import { SmtpProvider } from "./providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import { StorageService } from "../storage/storage.service";
 import { RealtimeService } from "../websocket/realtime.service";
 import { NotificationType, NotificationChannel } from "./dto";
@@ -60,13 +59,6 @@ describe("NotificationService in-app dedupe", () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         {
-          provide: SendGridProvider,
-          useValue: {
-            sendEmail: jest.fn().mockResolvedValue({ success: true }),
-            isConfigured: () => false,
-          },
-        },
-        {
           provide: ExpoPushProvider,
           useValue: {
             sendToUser: jest.fn().mockResolvedValue([{ success: true }]),
@@ -81,7 +73,13 @@ describe("NotificationService in-app dedupe", () => {
             isConfigured: () => false,
           },
         },
-        { provide: SmtpProvider, useValue: { isConfigured: () => false } },
+        {
+          provide: SmtpProvider,
+          useValue: {
+            sendEmail: jest.fn().mockResolvedValue({ success: true }),
+            isConfigured: () => false,
+          },
+        },
         {
           provide: StorageService,
           useValue: { getPublicAssetUrl: jest.fn().mockReturnValue(null) },

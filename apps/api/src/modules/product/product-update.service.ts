@@ -13,7 +13,7 @@ import { SearchService } from "../search/search.service";
 import { notifyWebRevalidate } from "../../common/revalidate";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import { UpdateProductDto } from "./dto";
 import { ProductStatus, Prisma } from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";

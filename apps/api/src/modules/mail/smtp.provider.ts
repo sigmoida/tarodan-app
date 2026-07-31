@@ -1,6 +1,17 @@
 /**
- * SMTP Email Provider using Nodemailer
- * Sends emails via configured SMTP server
+ * SMTP Email Provider using Nodemailer.
+ *
+ * The single outbound mail transport for the whole API — notification dispatch,
+ * the `email` queue worker, invoices and marketing all send through this class.
+ * Do not stand up another `nodemailer.createTransport()` elsewhere: each one is
+ * a separate connection pool with its own (drifting) From address and TLS
+ * policy, which is exactly how the old SendGrid provider ended up mailing from
+ * a different sender than the rest of the app.
+ *
+ * Sender identity comes from MAIL_FROM and nothing else. Most shared hosts
+ * (including mail.akilliticaret.com) require the From address to match the
+ * authenticated SMTP_USER, so overriding `from` per-call will usually be
+ * rejected by the server.
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -35,15 +46,28 @@ export class SmtpProvider {
 
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>("SMTP_HOST", "");
-    const port = this.configService.get<number>("SMTP_PORT", 587);
+    // .env values arrive as strings; nodemailer wants a number for `port`.
+    const port = Number.parseInt(
+      this.configService.get<string>("SMTP_PORT", "587"),
+      10,
+    );
     const user = this.configService.get<string>("SMTP_USER", "");
     const pass = this.configService.get<string>("SMTP_PASS", "");
     const secure =
       this.configService.get<string>("SMTP_SECURE", "false") === "true";
+    // Shared hosting often serves a certificate that does not match the mail
+    // hostname, which would abort STARTTLS. Default stays permissive to keep
+    // delivery working; set SMTP_TLS_REJECT_UNAUTHORIZED=true once the host is
+    // known to present a valid certificate.
+    const rejectUnauthorized =
+      this.configService.get<string>(
+        "SMTP_TLS_REJECT_UNAUTHORIZED",
+        "false",
+      ) === "true";
 
     this.fromEmail = this.configService.get<string>(
       "MAIL_FROM",
-      "noreply@tarodan.com.tr",
+      "info@tarodan.com.tr",
     );
     // Host yeterli (Mailhog/dev auth istemez); user+pass varsa auth uygulanır (prod).
     this.enabled = !!host;
@@ -55,8 +79,7 @@ export class SmtpProvider {
         secure,
         auth: user && pass ? { user, pass } : undefined,
         tls: {
-          // For Office 365, we need to allow less secure TLS
-          rejectUnauthorized: false,
+          rejectUnauthorized,
         },
       });
 
@@ -126,5 +149,14 @@ export class SmtpProvider {
    */
   isConfigured(): boolean {
     return this.enabled;
+  }
+
+  /**
+   * The configured MAIL_FROM identity. Exposed so callers that persist an audit
+   * trail (EmailLog) can record the same sender the transport will actually use,
+   * instead of re-deriving it from config and drifting.
+   */
+  get defaultFrom(): string {
+    return this.fromEmail;
   }
 }

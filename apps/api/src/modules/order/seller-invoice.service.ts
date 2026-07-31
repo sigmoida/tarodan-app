@@ -10,7 +10,7 @@ import { OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { StorageService } from "../storage/storage.service";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { isBusinessMembershipEntitled } from "../membership/membership.util";
 

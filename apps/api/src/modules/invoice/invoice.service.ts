@@ -21,7 +21,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { NotificationService } from "../notification/notification.service";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import { NotificationType, NotificationChannel } from "../notification/dto";
 import { TaxService } from "../tax";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";

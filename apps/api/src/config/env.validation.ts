@@ -23,9 +23,17 @@ import { z } from "zod";
  * through, that boot-time snapshot would shadow any var set at runtime — e.g.
  * a test doing `process.env.PAYMENT_BYPASS = 'true'` in `beforeAll` would be
  * silently overridden by the frozen `false` captured at import. Returning only
- * the validated keys leaves all other vars to resolve live from `process.env`
- * (env files are still loaded there by ConfigModule), so this only *adds*
- * guarantees for the keys below without hijacking the rest of the config.
+ * the validated keys leaves all other vars to resolve live from `process.env`,
+ * so this only *adds* guarantees for the keys below without hijacking the rest
+ * of the config.
+ *
+ * CAVEAT — anything that must be settable from an env FILE has to be declared
+ * below. ConfigModule reads env files with `dotenv.parse()`, which does not
+ * populate `process.env`; only the keys this schema returns are written back
+ * (`assignVariablesToProcess`). So a var living solely in `apps/api/.env` and
+ * missing from the schema resolves to its code default at runtime, silently.
+ * Vars exported by the real environment (docker-compose `environment:`, shell,
+ * Coolify) are unaffected — they are already in `process.env`.
  */
 
 const KNOWN_PLACEHOLDER = /change-in-production/i;
@@ -78,7 +86,23 @@ const envSchema = z
 
     // Production delivery/telemetry dependencies.
     SENDGRID_API_KEY: z.string().optional(),
+    // Mail delivery. These MUST stay declared here: ConfigModule only writes the
+    // keys returned by this schema back into `process.env`, and it reads env
+    // files with `dotenv.parse()` (which does not touch `process.env` itself).
+    // An undeclared key that only exists in `apps/api/.env` therefore never
+    // reaches `ConfigService.get()` — SMTP_PASS would silently fall back to ""
+    // and every mail would fail to authenticate.
     SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.string().optional(),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_SECURE: z.string().optional(),
+    SMTP_TLS_REJECT_UNAUTHORIZED: z.string().optional(),
+    // Free-form: accepts both "info@tarodan.com.tr" and "Tarodan <info@…>".
+    MAIL_FROM: z.string().optional(),
+    SUPPORT_EMAIL: z.string().optional(),
+    SUPPORT_NOTIFICATION_EMAIL: z.string().optional(),
+    EMAIL_LOGO_URL: z.string().optional(),
     AWS_ACCESS_KEY_ID: z.string().optional(),
     AWS_SECRET_ACCESS_KEY: z.string().optional(),
     AWS_REGION: z.string().optional(),
@@ -382,13 +406,26 @@ const envSchema = z
       }
     }
 
-    if (!env.SENDGRID_API_KEY?.trim() && !env.SMTP_HOST?.trim()) {
+    // Mail delivery is SMTP-only since the SendGrid provider was removed.
+    // Without SMTP_HOST the transport silently degrades to logging every mail,
+    // so production must fail to boot instead.
+    if (!env.SMTP_HOST?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["SENDGRID_API_KEY"],
-        message:
-          "SENDGRID_API_KEY or SMTP_HOST is required for production email delivery",
+        path: ["SMTP_HOST"],
+        message: "SMTP_HOST is required for production email delivery",
       });
+    }
+    // A host without credentials is almost always a half-finished config: the
+    // relay accepts the connection, then rejects every message as unauthorized.
+    for (const key of ["SMTP_USER", "SMTP_PASS"] as const) {
+      if (env.SMTP_HOST?.trim() && !env[key]?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required in production when SMTP_HOST is set`,
+        });
+      }
     }
     for (const key of [
       "AWS_ACCESS_KEY_ID",

@@ -1,6 +1,10 @@
 /**
  * Email Worker
- * Processes email sending jobs via SendGrid
+ * Processes email sending jobs from the `email` queue.
+ *
+ * Delivery is delegated to the shared SmtpProvider — this worker deliberately
+ * owns no transport of its own, so queued mail cannot drift away from the rest
+ * of the app's sender identity or TLS settings.
  */
 import {
   Processor,
@@ -12,7 +16,7 @@ import { Logger } from "@nestjs/common";
 import { Job } from "bull";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma";
-import * as nodemailer from "nodemailer";
+import { SmtpProvider } from "../modules/mail/smtp.provider";
 import {
   renderEmailTemplate,
   getEmailTemplateSubject,
@@ -41,40 +45,12 @@ export interface EmailJobData {
 @Processor("email")
 export class EmailWorker {
   private readonly logger = new Logger(EmailWorker.name);
-  private transporter: nodemailer.Transporter | null;
-  private readonly enabled: boolean;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {
-    // Initialize SMTP transporter (Gmail or other SMTP provider)
-    const host = this.configService.get<string>("SMTP_HOST", "");
-    const port = this.configService.get<number>("SMTP_PORT", 587);
-    const user = this.configService.get<string>("SMTP_USER", "");
-    const pass = this.configService.get<string>("SMTP_PASS", "");
-    const secure =
-      this.configService.get<string>("SMTP_SECURE", "false") === "true";
-
-    this.enabled = Boolean(host);
-
-    if (this.enabled) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        ...(user && pass ? { auth: { user, pass } } : {}),
-        tls: {
-          rejectUnauthorized: false,
-        },
-      });
-      this.logger.log(`Email worker initialized with SMTP: ${host}:${port}`);
-    } else {
-      this.logger.warn("SMTP not configured - emails will be logged only");
-      // Create a mock transporter that just logs
-      this.transporter = null;
-    }
-  }
+    private readonly smtp: SmtpProvider,
+  ) {}
 
   @Process("send")
   async handleSend(job: Job<EmailJobData>) {
@@ -92,10 +68,7 @@ export class EmailWorker {
       templateData,
     } = job.data;
     if (!html) throw new Error("Email HTML content is required");
-    const fromEmail =
-      from ||
-      this.configService.get<string>("MAIL_FROM") ||
-      "noreply@tarodan.com.tr";
+    const fromEmail = from || this.smtp.defaultFrom;
 
     // Create EmailLog entry with 'queued' status
     let emailLog: any = null;
@@ -107,7 +80,7 @@ export class EmailWorker {
           subject,
           template: template || null,
           status: "queued",
-          provider: this.enabled ? "smtp" : "mock",
+          provider: this.smtp.isConfigured() ? "smtp" : "mock",
           userId: (templateData as Record<string, any>)?.userId || null,
           metadata: templateData ? (templateData as any) : undefined,
         },
@@ -116,44 +89,23 @@ export class EmailWorker {
       this.logger.warn(`Failed to create email log: ${logError.message}`);
     }
 
-    // If SMTP not configured, just log and return success
-    if (!this.enabled || !this.transporter) {
-      this.logger.log(`[EMAIL-MOCK] To: ${to}, Subject: ${subject}`);
+    // SmtpProvider handles the unconfigured case itself (logs and reports a
+    // mock message id), so there is no separate mock branch here.
+    const result = await this.smtp.sendEmail({
+      from: fromEmail,
+      to,
+      subject,
+      html,
+      text: text || this.stripHtml(html),
+      replyTo,
+      attachments,
+    });
 
-      // Update log status to sent (mock)
-      if (emailLog) {
-        await this.prisma.emailLog
-          .update({
-            where: { id: emailLog.id },
-            data: {
-              status: "sent",
-              sentAt: new Date(),
-              messageId: `mock-${Date.now()}`,
-            },
-          })
-          .catch(() => {});
-      }
-
-      return { success: true, messageId: `mock-${Date.now()}` };
-    }
-
-    try {
-      const mailOptions: nodemailer.SendMailOptions = {
-        from: fromEmail,
-        to,
-        subject,
-        html,
-        text: text || this.stripHtml(html),
-        replyTo,
-        attachments,
-      };
-
-      const result = await this.transporter.sendMail(mailOptions);
+    if (result.success) {
       this.logger.log(
         `Email sent successfully to ${to}, messageId: ${result.messageId}`,
       );
 
-      // Update log status to sent
       if (emailLog) {
         await this.prisma.emailLog
           .update({
@@ -168,21 +120,23 @@ export class EmailWorker {
       }
 
       return { success: true, messageId: result.messageId };
-    } catch (error) {
-      this.logger.error(`Failed to send email to ${to}: ${error.message}`);
-
-      // Update log status to failed
-      if (emailLog) {
-        await this.prisma.emailLog
-          .update({
-            where: { id: emailLog.id },
-            data: { status: "failed", errorMessage: error.message },
-          })
-          .catch(() => {});
-      }
-
-      throw error;
     }
+
+    const errorMessage = result.error || "Unknown SMTP error";
+    this.logger.error(`Failed to send email to ${to}: ${errorMessage}`);
+
+    if (emailLog) {
+      await this.prisma.emailLog
+        .update({
+          where: { id: emailLog.id },
+          data: { status: "failed", errorMessage },
+        })
+        .catch(() => {});
+    }
+
+    // Rethrow so Bull records the failure and applies its retry policy —
+    // SmtpProvider swallows transport errors into a result object.
+    throw new Error(errorMessage);
   }
 
   @Process("send-template")

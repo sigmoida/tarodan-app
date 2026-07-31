@@ -18,7 +18,7 @@ import {
 import { ElogoService } from "./elogo.service";
 import { TaxService } from "../tax/tax.service";
 import { StorageService } from "../storage/storage.service";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import { buildInvoiceXml, type UblParty } from "./ubl/ubl-invoice.builder";
 import type { ElogoDocumentType } from "./elogo.types";
 import {

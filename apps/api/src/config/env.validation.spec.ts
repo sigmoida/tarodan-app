@@ -48,7 +48,9 @@ describe("validateEnv", () => {
     ELOGO_WS_PASSWORD: "service-password",
     ELOGO_COMPANY_VKN: "1234567890",
     ELOGO_COMPANY_TITLE: "Tarodan",
-    SENDGRID_API_KEY: "sendgrid-key",
+    SMTP_HOST: "mail.akilliticaret.com",
+    SMTP_USER: "info@tarodan.com.tr",
+    SMTP_PASS: "smtp-password",
     AWS_ACCESS_KEY_ID: "aws-access-key",
     AWS_SECRET_ACCESS_KEY: "aws-secret-key",
     AWS_REGION: "eu-west-1",
@@ -259,18 +261,14 @@ describe("validateEnv", () => {
   });
 
   it("requires a real email provider, object storage and error reporting", () => {
-    const {
-      SENDGRID_API_KEY,
-      AWS_ACCESS_KEY_ID,
-      SENTRY_DSN,
-      ...withoutProviders
-    } = prodBase;
-    void SENDGRID_API_KEY;
+    const { SMTP_HOST, AWS_ACCESS_KEY_ID, SENTRY_DSN, ...withoutProviders } =
+      prodBase;
+    void SMTP_HOST;
     void AWS_ACCESS_KEY_ID;
     void SENTRY_DSN;
 
     expect(() => validateEnv(withoutProviders)).toThrow(
-      /SENDGRID_API_KEY|SMTP_HOST|AWS_ACCESS_KEY_ID|SENTRY_DSN/,
+      /SMTP_HOST|AWS_ACCESS_KEY_ID|SENTRY_DSN/,
     );
   });
 

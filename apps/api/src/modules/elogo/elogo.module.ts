@@ -9,7 +9,7 @@ import { ElogoScheduledProcessor } from "./elogo-scheduled.processor";
 import { ElogoInvoiceController } from "./elogo-invoice.controller";
 import { StorageModule } from "../storage/storage.module";
 import { TaxModule } from "../tax/tax.module";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { MailModule } from "../mail/mail.module";
 import {
   ElogoSoapClient,
   LiveElogoSoapClient,
@@ -24,6 +24,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
  */
 @Module({
   imports: [
+    MailModule,
     ConfigModule,
     StorageModule,
     TaxModule,
@@ -43,7 +44,6 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
       },
       inject: [ConfigService],
     },
-    SmtpProvider,
     ElogoService,
     ElogoInvoicingService,
     ElogoSchedulerService,

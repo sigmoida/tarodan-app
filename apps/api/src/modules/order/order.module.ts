@@ -16,7 +16,7 @@ import { OrderSchedulerService } from "./order-scheduler.service";
 import { OrderScheduledProcessor } from "./order-scheduled.processor";
 import { SellerInvoiceController } from "./seller-invoice.controller";
 import { SellerInvoiceService } from "./seller-invoice.service";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { MailModule } from "../mail/mail.module";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { EventModule } from "../events";
@@ -34,6 +34,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
+    MailModule,
     PrismaModule,
     EventModule,
     NotificationModule,
@@ -65,7 +66,6 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     OrderSchedulerService,
     ...scheduledProcessors(OrderScheduledProcessor),
     SellerInvoiceService,
-    SmtpProvider,
   ],
   // OrderCheckoutCommonService: teklif/sipariş bedel primitifleri (OfferService
   // teklif kabulünde aynı hesabı kullanır — tek kaynak).

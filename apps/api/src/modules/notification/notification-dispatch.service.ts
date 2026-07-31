@@ -16,10 +16,9 @@ import {
   NotificationChannel,
   RegisterPushTokenDto,
 } from "./dto";
-import { SendGridProvider } from "./providers/sendgrid.provider";
 import { ExpoPushProvider } from "./providers/expo-push.provider";
 import { SmsProvider } from "./providers/sms.provider";
-import { SmtpProvider } from "./providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import { RealtimeService } from "../websocket/realtime.service";
 import {
   escapeEmailHtml,
@@ -49,7 +48,6 @@ export class NotificationDispatchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly sendGridProvider: SendGridProvider,
     private readonly expoPushProvider: ExpoPushProvider,
     private readonly smsProvider: SmsProvider,
     private readonly smtpProvider: SmtpProvider,
@@ -220,7 +218,7 @@ export class NotificationDispatchService {
   }
 
   /**
-   * Send email using SendGrid provider
+   * Send email using the shared SMTP transport
    */
   private async sendEmailReal(
     to: string,
@@ -236,7 +234,7 @@ export class NotificationDispatchService {
           : "http://localhost:3000");
       const safeSubject = escapeEmailHtml(subject);
       const safeBody = escapeEmailHtml(body).replace(/\n/g, "<br>");
-      const result = await this.sendGridProvider.sendEmail({
+      const result = await this.smtpProvider.sendEmail({
         to,
         subject,
         html: wrapEmailTemplateLayout(
@@ -702,13 +700,6 @@ export class NotificationDispatchService {
         dbTemplate,
         frontendUrl,
       );
-      if (this.sendGridProvider.isConfigured()) {
-        return this.sendGridProvider.sendEmail({
-          to: email,
-          subject: rendered.subject,
-          html: rendered.html,
-        });
-      }
       if (this.smtpProvider.isConfigured()) {
         return this.smtpProvider.sendEmail({
           to: email,
@@ -734,7 +725,7 @@ export class NotificationDispatchService {
    */
   getProviderStatus() {
     return {
-      sendgrid: this.sendGridProvider.isConfigured(),
+      email: this.smtpProvider.isConfigured(),
       expo: this.expoPushProvider.isConfigured(),
       sms: this.smsProvider.isConfigured(),
     };
