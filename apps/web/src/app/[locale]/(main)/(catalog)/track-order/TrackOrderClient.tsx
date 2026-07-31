@@ -6,6 +6,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
+  ChevronRightIcon,
   TruckIcon,
   MapPinIcon,
   MagnifyingGlassIcon,
@@ -132,6 +133,18 @@ export default function TrackOrderClient() {
                   },
                 )}
               </p>
+              {order.siblingOrderNumbers &&
+                order.siblingOrderNumbers.length > 0 && (
+                  <p className="text-sm text-muted mt-2">
+                    {t("order.cartSiblings")}{" "}
+                    {order.siblingOrderNumbers.map((num, i) => (
+                      <span key={num} className="font-mono">
+                        {i > 0 && ", "}
+                        {num}
+                      </span>
+                    ))}
+                  </p>
+                )}
             </div>
             <StatusBadge
               status={order.status}
@@ -259,9 +272,10 @@ export default function TrackOrderClient() {
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary-500 hover:underline"
+                          className="inline-flex items-center text-primary-500 hover:underline"
                         >
-                          {t("order.trackShipment")} →
+                          {t("order.trackShipment")}
+                          <ChevronRightIcon className="ml-1 h-4 w-4" />
                         </a>
                       )}
                     </div>

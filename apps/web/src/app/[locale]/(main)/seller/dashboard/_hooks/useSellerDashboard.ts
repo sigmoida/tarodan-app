@@ -5,8 +5,6 @@
 import { api } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 
-const PENDING_ORDER_STATUSES = ["paid", "preparing"];
-
 /** Seller dashboard metrics: revenue + listing counts + pending order count.
  *  Auth is already enforced by the server page, so the queries just run. */
 export function useSellerDashboard() {
@@ -22,26 +20,26 @@ export function useSellerDashboard() {
       (await api.get("/products/my/stats").catch(() => null))?.data ?? null,
   });
 
-  const sellerOrdersQuery = useWebList<Array<{ status: string }>>({
+  // Bekleyen sayacı sunucudan, PAKET çatısı biriminde — eski sayaç order-bazlıydı
+  // ve yalnız ilk sayfayı sayıyordu (satış listesiyle asla tutmuyordu).
+  const pendingQuery = useWebList<{ pending: number }>({
     resource: "orders",
+    params: ["seller-pending"],
     fetcher: async () => {
-      const res = await api.get("/orders", { params: { role: "seller" } });
-      return res.data?.orders ?? res.data?.data ?? [];
+      const res = await api.get("/orders/seller/pending-count");
+      return res.data;
     },
   });
 
   const stats = statsQuery.data;
   const listingStats = listingStatsQuery.data;
-  const orders: Array<{ status: string }> = sellerOrdersQuery.data ?? [];
 
   return {
     totalRevenue: Number(stats?.totalRevenue ?? 0),
     activeCount:
       listingStats?.counts?.active ?? stats?.activeProductsCount ?? 0,
     soldCount: listingStats?.counts?.sold ?? stats?.soldProductsCount ?? 0,
-    pendingCount: orders.filter((o) =>
-      PENDING_ORDER_STATUSES.includes(o.status),
-    ).length,
+    pendingCount: pendingQuery.data?.pending ?? 0,
     isLoading: statsQuery.isLoading || listingStatsQuery.isLoading,
   };
 }

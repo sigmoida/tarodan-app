@@ -1,6 +1,8 @@
 export interface GuestOrderDetail {
   id: string;
   orderNumber: string;
+  /** Aynı sepetin diğer sipariş numaraları (paket/grup farkındalığı). */
+  siblingOrderNumbers?: string[];
   status: string;
   totalAmount: number;
   product: { id: string; title: string; image?: string };

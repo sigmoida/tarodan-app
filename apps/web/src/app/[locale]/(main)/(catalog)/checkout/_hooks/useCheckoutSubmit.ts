@@ -3,6 +3,7 @@
 "use client";
 
 import { useRef, type Dispatch, type SetStateAction } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { ordersApi, paymentsApi } from "@/lib/api";
 import { getFullPhoneNumber, normalizePhoneForPayload } from "@/lib/phone";
@@ -78,6 +79,17 @@ export function useCheckoutSubmit({
   /** Unit-price hash from the quote; 409 PRICING_CHANGED if a price/campaign moved. */
   expectedPricingHash?: string | null;
 }) {
+  const queryClient = useQueryClient();
+  // Checkout sipariş(ler) yarattı: sipariş listesi/sayaç/profil cache'leri
+  // tazelenmeli — aksi halde alıcı 5 dk boyunca bayat liste ve sayaç görür.
+  const invalidateOrderCaches = () => {
+    // "orders-counts"/"profile" useWebList resource anahtarlarıdır (registry'de
+    // yok) — kural gereği değişken-köklü form kullanılır.
+    for (const resource of ["orders", "orders-counts", "profile"]) {
+      const key = [resource];
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
   // Checkout idempotency: retries for the same cart (double click, retry after a
   // network error) return the SAME group server-side. Generated on first submit.
   const checkoutIdempotencyKeyRef = useRef<string | null>(null);
@@ -517,6 +529,8 @@ export function useCheckoutSubmit({
         if (!checkoutGroupId || !orderId) {
           toast.error(t("checkout.orderCreatedPaymentFailed"));
           setIsLoading(false);
+          invalidateOrderCaches();
+          invalidateOrderCaches();
           router.push("/profile/orders");
           return;
         }
@@ -539,6 +553,7 @@ export function useCheckoutSubmit({
             // Guard against the cart-empty redirect before clearing the cart.
             onCheckoutSubmitted();
             await clearCart();
+            invalidateOrderCaches();
 
             // TEK ödeme yüzeyi: misafir + üye aynı site-içi kart formuna gider.
             if (paymentData.paymentId) {
@@ -583,6 +598,7 @@ export function useCheckoutSubmit({
 
       // Beklenmeyen durum: sipariş oluştu ama ödeme adımına düşülemedi.
       toast.error(t("checkout.completePaymentFromOrders"));
+      invalidateOrderCaches();
       router.push("/profile/orders");
     } catch (error: any) {
       toast.error(error.response?.data?.message || t("checkout.orderFailed"));

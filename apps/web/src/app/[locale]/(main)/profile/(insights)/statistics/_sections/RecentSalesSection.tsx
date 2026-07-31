@@ -26,7 +26,7 @@ export default function RecentSalesSection({ sales }: { sales: RecentSale[] }) {
         {sales.map((sale) => (
           <Link
             key={sale.id}
-            href={`/profile/orders?highlight=${sale.orderId}`}
+            href={`/profile/orders/${sale.orderId}`}
             className="group flex items-center gap-4 rounded-lg p-3 transition-colors hover:bg-surface"
           >
             <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-surface-alt">

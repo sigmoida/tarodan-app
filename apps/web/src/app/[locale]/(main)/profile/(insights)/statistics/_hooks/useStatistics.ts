@@ -32,8 +32,11 @@ export function useStatistics(enabled: boolean) {
         const [productsRes, ordersRes, tradesRes, collectionsRes, profileRes] =
           await Promise.all([
             api.get("/products/my").catch(() => ({ data: { data: [] } })),
+            // Birim = liste birimi: sipariş değil GRUP (alıcı çatısı).
             api
-              .get("/orders", { params: { role: "buyer", limit: 100 } })
+              .get("/orders/groups", {
+                params: { role: "buyer", limit: 50 },
+              })
               .catch(() => ({ data: { data: [] } })),
             api.get("/trades").catch(() => ({ data: { data: [] } })),
             api.get("/collections/me").catch(() => ({ data: { data: [] } })),

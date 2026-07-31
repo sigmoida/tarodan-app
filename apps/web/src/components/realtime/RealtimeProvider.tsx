@@ -54,6 +54,10 @@ export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.trades.pendingCount(),
         });
+        // Sipariş bildirimleri (kargoya verildi / teslim edildi / kargo kodu
+        // hazır) açık grup listesini ve grup ekranını da tazelesin.
+        queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail() });
       };
       const onThreadUpdated = (_p: ThreadUpdatedEvent) => {
         queryClient.invalidateQueries({

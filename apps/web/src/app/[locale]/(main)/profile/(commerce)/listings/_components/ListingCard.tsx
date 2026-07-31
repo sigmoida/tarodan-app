@@ -219,7 +219,7 @@ export default function ListingCard({
           )}
           {listing.status === "sold" && listing.orderId && (
             <ButtonLink
-              href={`/profile/orders?highlight=${listing.orderId}`}
+              href={`/profile/orders/${listing.orderId}`}
               size="sm"
               className="flex-1 gap-1"
             >

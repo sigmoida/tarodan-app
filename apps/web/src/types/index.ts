@@ -6,8 +6,8 @@ export interface User {
   id: number;
   username: string;
   email: string;
-  role: 'user' | 'admin' | 'product_manager' | 'sales_manager';
-  membership_type: 'free' | 'premium' | 'pro';
+  role: "user" | "admin" | "product_manager" | "sales_manager";
+  membership_type: "free" | "premium" | "pro";
   avatar_url?: string;
   rating?: number;
   listings_count?: number;
@@ -26,22 +26,29 @@ export interface Listing {
   condition: string;
   category?: string;
   trade_available: boolean;
-  status: 'pending' | 'active' | 'sold' | 'inactive' | 'reserved' | 'rejected' | 'deleted';
+  status:
+    | "pending"
+    | "active"
+    | "sold"
+    | "inactive"
+    | "reserved"
+    | "rejected"
+    | "deleted";
   seller: User;
   created_at: string;
   updated_at: string;
 }
 
-export type TradeStatus = 
-  | 'pending'
-  | 'accepted'
-  | 'rejected'
-  | 'initiator_shipped'
-  | 'receiver_shipped'
-  | 'initiator_delivered'
-  | 'receiver_delivered'
-  | 'confirmed'
-  | 'cancelled';
+export type TradeStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "initiator_shipped"
+  | "receiver_shipped"
+  | "initiator_delivered"
+  | "receiver_delivered"
+  | "confirmed"
+  | "cancelled";
 
 export interface Trade {
   id: number;
@@ -51,7 +58,7 @@ export interface Trade {
   initiator_listings: Listing[];
   receiver_listings: Listing[];
   cash_amount: number;
-  cash_direction: 'none' | 'initiator_to_receiver' | 'receiver_to_initiator';
+  cash_direction: "none" | "initiator_to_receiver" | "receiver_to_initiator";
   initiator_tracking?: string;
   receiver_tracking?: string;
   countdown_expires_at?: string;
@@ -70,18 +77,6 @@ export interface CartItem {
     id: number;
     username: string;
   };
-}
-
-export interface Order {
-  id: number;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  items: OrderItem[];
-  total: number;
-  shipping_address: ShippingAddress;
-  tracking_number?: string;
-  shipping_provider?: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface OrderItem {
@@ -136,7 +131,7 @@ export interface Rating {
 export interface Commission {
   id: number;
   rate: number;
-  type: 'buyer' | 'seller' | 'split';
+  type: "buyer" | "seller" | "split";
   min_amount?: number;
   max_amount?: number;
 }
@@ -145,7 +140,7 @@ export interface Membership {
   id: string;
   name: string;
   price: number;
-  period: 'monthly' | 'yearly';
+  period: "monthly" | "yearly";
   features: MembershipFeature[];
 }
 
@@ -184,5 +179,3 @@ export interface AuthResponse {
   user: User;
   token: string;
 }
-
-
