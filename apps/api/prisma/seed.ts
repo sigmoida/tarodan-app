@@ -38,6 +38,11 @@ import { SEED_AVATAR_BY_EMAIL } from "../src/common/seed-media-mapping";
 import { EMAIL_TEMPLATE_DEFINITIONS } from "../src/common/email/email-template-registry";
 import { normalizeSeedCommerce } from "./seed-commerce";
 import {
+  REFERENCE_PREFIX,
+  reprefixReference,
+} from "../src/common/helpers/code-prefixes";
+import { generateReferenceCode } from "../src/common/helpers/generate-reference";
+import {
   billableDesiForTier,
   tierCodeForDesi,
 } from "../src/modules/shipping/shipping-package-tier";
@@ -70,19 +75,21 @@ function initStorageService(): StorageService | null {
 const randomPrice = (min: number, max: number) =>
   Math.round((Math.random() * (max - min) + min) * 100) / 100;
 
-// Helper to generate order number (matches the runtime ORD-XXXXXXXXXX format;
-// non-ambiguous alphabet, dev/seed data only)
-const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
-const generateOrderNumber = () =>
-  `ORD-${Array.from({ length: 10 }, () => REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)]).join("")}`;
-
-// Helper to generate trade number
-const generateTradeNumber = () =>
-  `TRD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-// Helper to generate ticket number
+// İşlem referansları: çalışma zamanındaki üreticinin aynısı kullanılır, böylece
+// seed verisi gerçek veriyle aynı biçimi taşır (bkz. docs/CODE_SCHEME.md).
+const generateOrderNumber = () => generateReferenceCode(REFERENCE_PREFIX.order);
+const generateTradeNumber = () => generateReferenceCode(REFERENCE_PREFIX.trade);
 const generateTicketNumber = () =>
-  `TKT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+  generateReferenceCode(REFERENCE_PREFIX.supportTicket);
+const generatePayoutRef = () =>
+  generateReferenceCode(REFERENCE_PREFIX.payoutTransfer);
+
+/** Tek satıcılı sepette grup no sipariş numarasından türetilir (runtime ile aynı). */
+const groupNumberFor = (orderNumber: string) =>
+  reprefixReference(orderNumber, REFERENCE_PREFIX.checkoutGroup);
+/** Çok satırlı sepetlerde grubun kendi referansı olur. */
+const generateGroupNumber = () =>
+  generateReferenceCode(REFERENCE_PREFIX.checkoutGroup);
 
 // Helper for random date in past
 const randomPastDate = (daysBack: number) => {
@@ -1485,18 +1492,36 @@ async function main() {
     },
   });
 
-  // Tarodan central warehouse address — required for safe-trade escrow.
-  // admin.service.ts → resolveWarehouseAddressId reads the
-  // `warehouse_address_id` platform setting; without it, approveWarehouseTrade
-  // throws BadRequestException("Depo adresi yapılandırılmamış").
+  // Platform Seller
+  const platformSeller = await prisma.user.upsert({
+    where: { email: "platform@tarodan.com" },
+    update: {},
+    create: {
+      email: "platform@tarodan.com",
+      phone: "+905550000003",
+      passwordHash: passwordHash,
+      displayName: "Tarodan Official Store",
+      bio: "Resmi Tarodan mağazası. Garantili ürünler.",
+      isVerified: true,
+      isEmailVerified: true,
+      isSeller: true,
+      sellerType: SellerType.platform,
+    },
+  });
+
+  // Tarodan merkez depo adresi — güvenli takas (escrow) için zorunlu.
+  // admin-trade-common.service.ts → resolveWarehouseAddressId `warehouse_address_id`
+  // ayarını okur; tanımsızsa approveWarehouseTrade "Depo adresi yapılandırılmamış"
+  // hatası verir. Adres, admin paneli (System → Ayarlar → Depo) ile aynı sahibe
+  // yazılır: platform satıcı hesabı — böylece admin personeli değişse de kalır.
   const existingWarehouseAddr = await prisma.address.findFirst({
-    where: { userId: superAdmin.id, title: "Tarodan Deposu" },
+    where: { userId: platformSeller.id, title: "Tarodan Deposu" },
   });
   const warehouseAddress =
     existingWarehouseAddr ??
     (await prisma.address.create({
       data: {
-        userId: superAdmin.id,
+        userId: platformSeller.id,
         title: "Tarodan Deposu",
         fullName: "Tarodan Lojistik",
         phone: "+905000000000",
@@ -1518,23 +1543,6 @@ async function main() {
     },
   });
   console.log(`✅ Warehouse address ready: ${warehouseAddress.id}`);
-
-  // Platform Seller
-  const platformSeller = await prisma.user.upsert({
-    where: { email: "platform@tarodan.com" },
-    update: {},
-    create: {
-      email: "platform@tarodan.com",
-      phone: "+905550000003",
-      passwordHash: passwordHash,
-      displayName: "Tarodan Official Store",
-      bio: "Resmi Tarodan mağazası. Garantili ürünler.",
-      isVerified: true,
-      isEmailVerified: true,
-      isSeller: true,
-      sellerType: SellerType.platform,
-    },
-  });
 
   // Create diverse user base
   const userNames = [
@@ -3573,11 +3581,22 @@ async function main() {
   console.log(`✅ Created ${offers.length} offers`);
 
   // ==========================================================================
-  // 15. Create Orders (25+ orders)
+  // 15. Sepetler: CheckoutGroup + satıcı paketi + siparişler
   // ==========================================================================
-  console.log("Creating orders...");
+  // Gerçek checkout ile aynı şekil: bir SEPET = bir CheckoutGroup, sepetteki
+  // her ürün satırı bir Order, aynı satıcının satırları tek bir OrderPackage
+  // (kargo paketi) altında toplanır. Böylece admin/web tarafındaki grup bazlı
+  // sipariş takibi seed verisiyle de görülebilir.
+  console.log("Creating carts (checkout groups) and orders...");
 
   const orders: any[] = [];
+  const seededCarts: {
+    group: any;
+    orders: any[];
+    packages: Map<string, any>;
+    status: OrderStatus;
+  }[] = [];
+
   const orderStatuses = [
     OrderStatus.pending_payment,
     OrderStatus.paid,
@@ -3587,76 +3606,180 @@ async function main() {
     OrderStatus.completed,
   ];
 
-  for (let i = 0; i < 30; i++) {
-    const product = activeProducts[i % activeProducts.length];
-    const buyers = users.filter((u) => u.id !== product.sellerId);
-    const buyer = buyers[Math.floor(Math.random() * buyers.length)];
-    const status =
-      orderStatuses[Math.floor(Math.random() * orderStatuses.length)];
-    // Invariant (order.service checkout ile aynı): totalAmount = subtotal + shipping + buyerFee
-    const subtotal = Number(product.price);
-    const shippingCost = 30;
-    const totalAmount = subtotal + shippingCost;
-    const commission = subtotal * 0.05;
-    const buyerAddress = addresses.find((a) => a.userId === buyer.id);
+  // Ürünleri satıcıya göre grupla; her sepet satırı benzersiz bir ürün alsın.
+  const productsBySeller = new Map<string, any[]>();
+  for (const product of activeProducts) {
+    const list = productsBySeller.get(product.sellerId) ?? [];
+    list.push(product);
+    productsBySeller.set(product.sellerId, list);
+  }
+  const sellersWithStock = [...productsBySeller.keys()].filter(
+    (sellerId) => (productsBySeller.get(sellerId)?.length ?? 0) >= 3,
+  );
+  const takeProduct = (sellerId: string) =>
+    productsBySeller.get(sellerId)?.shift();
 
-    try {
+  // Sepet çeşitleri: tek ürün, aynı satıcıdan çok ürün (tek paket) ve
+  // çok satıcılı sepet (satıcı başına ayrı paket).
+  const CART_SHAPES: { sellers: number; linesPerSeller: number }[] = [
+    { sellers: 1, linesPerSeller: 1 },
+    { sellers: 1, linesPerSeller: 2 },
+    { sellers: 2, linesPerSeller: 1 },
+    { sellers: 1, linesPerSeller: 1 },
+    { sellers: 1, linesPerSeller: 3 },
+    { sellers: 2, linesPerSeller: 2 },
+    { sellers: 1, linesPerSeller: 1 },
+    { sellers: 3, linesPerSeller: 1 },
+    { sellers: 1, linesPerSeller: 2 },
+    { sellers: 2, linesPerSeller: 1 },
+    { sellers: 1, linesPerSeller: 1 },
+    { sellers: 1, linesPerSeller: 2 },
+  ];
+
+  const SHIPPING_PER_PACKAGE = 30;
+  let sellerCursor = 0;
+
+  for (let cartIndex = 0; cartIndex < CART_SHAPES.length; cartIndex++) {
+    const shape = CART_SHAPES[cartIndex];
+    const status = orderStatuses[cartIndex % orderStatuses.length];
+    const createdAt = randomPastDate(30);
+
+    // Sepetin satıcıları (birbirinden farklı) ve satırları.
+    const cartSellers: string[] = [];
+    for (let s = 0; s < shape.sellers; s++) {
+      const sellerId = sellersWithStock[sellerCursor % sellersWithStock.length];
+      sellerCursor++;
+      if (!cartSellers.includes(sellerId)) cartSellers.push(sellerId);
+    }
+    const lines: { sellerId: string; product: any }[] = [];
+    for (const sellerId of cartSellers) {
+      for (let l = 0; l < shape.linesPerSeller; l++) {
+        const product = takeProduct(sellerId);
+        if (product) lines.push({ sellerId, product });
+      }
+    }
+    if (!lines.length) continue;
+
+    // Alıcı: sepetteki hiçbir satıcı olamaz.
+    const buyer = users.find((u) => !cartSellers.includes(u.id));
+    if (!buyer) continue;
+    const buyerAddress = addresses.find((a) => a.userId === buyer.id);
+    const shippingSnapshot = buyerAddress
+      ? {
+          fullName: buyerAddress.fullName,
+          phone: buyerAddress.phone,
+          city: buyerAddress.city,
+          district: buyerAddress.district,
+          address: buyerAddress.address,
+        }
+      : undefined;
+
+    const packageCount = cartSellers.length;
+    const groupTotal =
+      lines.reduce((sum, line) => sum + Number(line.product.price), 0) +
+      SHIPPING_PER_PACKAGE * packageCount;
+
+    // Sipariş numaraları önce üretilir: tek satırlı sepette grup numarası
+    // siparişten TÜRETİLİR (runtime ile aynı), çok satırlıda kendi referansı olur.
+    const orderNumbers = lines.map(() => generateOrderNumber());
+    const group = await prisma.checkoutGroup.create({
+      data: {
+        groupNumber:
+          orderNumbers.length === 1
+            ? groupNumberFor(orderNumbers[0])
+            : generateGroupNumber(),
+        buyerId: buyer.id,
+        idempotencyKey: `seed-cart-${cartIndex}-${randomUUID()}`,
+        totalAmount: groupTotal,
+        isGuest: false,
+        createdAt,
+      },
+    });
+
+    // Satıcı başına bir kargo paketi.
+    const packages = new Map<string, any>();
+    for (const sellerId of cartSellers) {
+      const pkg = await prisma.orderPackage.create({
+        data: {
+          checkoutGroupId: group.id,
+          sellerId,
+          buyerId: buyer.id,
+          shippingCost: SHIPPING_PER_PACKAGE,
+          createdAt,
+        },
+      });
+      packages.set(sellerId, pkg);
+    }
+
+    // Kargo bedeli paket başına bir kez: paketin ilk satırına yazılır.
+    const shippingChargedFor = new Set<string>();
+    const cartOrders: any[] = [];
+    for (const [lineIndex, line] of lines.entries()) {
+      const subtotal = Number(line.product.price);
+      const shippingCost = shippingChargedFor.has(line.sellerId)
+        ? 0
+        : SHIPPING_PER_PACKAGE;
+      shippingChargedFor.add(line.sellerId);
+
       const order = await prisma.order.create({
         data: {
-          orderNumber: generateOrderNumber(),
+          orderNumber: orderNumbers[lineIndex],
           buyerId: buyer.id,
-          sellerId: product.sellerId,
-          productId: product.id,
-          totalAmount: totalAmount,
-          subtotal: subtotal,
-          shippingCost: shippingCost,
-          commissionAmount: commission,
-          status: status,
+          sellerId: line.sellerId,
+          productId: line.product.id,
+          checkoutGroupId: group.id,
+          packageId: packages.get(line.sellerId)!.id,
+          quantity: 1,
+          unitPrice: subtotal,
+          totalAmount: subtotal + shippingCost,
+          subtotal,
+          shippingCost,
+          commissionAmount: subtotal * 0.05,
+          status,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          shippingAddress: buyerAddress
-            ? {
-                fullName: buyerAddress.fullName,
-                phone: buyerAddress.phone,
-                city: buyerAddress.city,
-                district: buyerAddress.district,
-                address: buyerAddress.address,
-              }
-            : undefined,
-          createdAt: randomPastDate(30),
+          shippingAddress: shippingSnapshot,
+          createdAt,
         },
       });
       orders.push(order);
-    } catch (e) {
-      // Ignore errors
+      cartOrders.push(order);
     }
+
+    seededCarts.push({ group, orders: cartOrders, packages, status });
   }
 
-  console.log(`✅ Created ${orders.length} orders`);
+  const multiLineCarts = seededCarts.filter((c) => c.orders.length > 1).length;
+  const multiSellerCarts = seededCarts.filter(
+    (c) => c.packages.size > 1,
+  ).length;
+  console.log(
+    `✅ Created ${seededCarts.length} carts (${multiLineCarts} multi-line, ${multiSellerCarts} multi-seller) → ${orders.length} orders`,
+  );
 
   // ==========================================================================
-  // 16. Create Payments for Orders
+  // 16. Sepet başına ÖDEME (grup seviyesinde)
   // ==========================================================================
+  // Ödeme sepetin tamamına aittir; sipariş başına ödeme yaratmak çok satırlı
+  // sepette "aynı grupta çakışan ödeme" hatasına yol açar (seed-commerce.ts).
   console.log("Creating payments...");
 
-  const paidOrders = orders.filter(
-    (o) => o.status !== OrderStatus.pending_payment,
-  );
-  for (const order of paidOrders) {
-    try {
-      await prisma.payment.create({
-        data: {
-          orderId: order.id,
-          provider: "paytr",
-          providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
-          amount: order.totalAmount,
-          currency: "TRY",
-          status: PaymentStatus.completed,
-          paidAt: new Date(order.createdAt.getTime() + 3600000), // 1 hour after order
-        },
-      });
-    } catch (e) {
-      // Ignore duplicates
-    }
+  for (const cart of seededCarts) {
+    if (cart.status === OrderStatus.pending_payment) continue;
+    const paidAmount = cart.orders.reduce(
+      (sum, order) => sum + Number(order.totalAmount),
+      0,
+    );
+    await prisma.payment.create({
+      data: {
+        checkoutGroupId: cart.group.id,
+        provider: "paytr",
+        providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+        amount: paidAmount,
+        currency: "TRY",
+        status: PaymentStatus.completed,
+        paidAt: new Date(cart.orders[0].createdAt.getTime() + 3600000),
+      },
+    });
   }
 
   console.log(`✅ Created payments`);
@@ -3666,6 +3789,9 @@ async function main() {
   // ==========================================================================
   console.log("Creating shipments...");
 
+  // Bir PAKET tek koli olarak gider: aynı paketteki tüm siparişler aynı takip
+  // numarasını paylaşır (runtime'da da takip no paketteki en küçük sipariş
+  // numarasından türetilir). Böylece çok ürünlü sepette tek kargo görünür.
   const shippedOrders = orders.filter((o) =>
     [
       OrderStatus.shipped,
@@ -3673,20 +3799,33 @@ async function main() {
       OrderStatus.completed,
     ].includes(o.status),
   );
+  const trackingByPackage = new Map<string, string>();
+  for (const order of shippedOrders) {
+    const packageKey = order.packageId ?? order.id;
+    if (!trackingByPackage.has(packageKey)) {
+      const siblings = shippedOrders.filter(
+        (o) => (o.packageId ?? o.id) === packageKey,
+      );
+      const packageRef = siblings.map((o) => o.orderNumber).sort()[0] as string;
+      trackingByPackage.set(packageKey, packageRef);
+    }
+  }
+
   for (const order of shippedOrders) {
     const carrier = "surat";
     const shipmentStatus =
       order.status === OrderStatus.shipped
         ? ShipmentStatus.in_transit
         : ShipmentStatus.delivered;
+    const trackingNumber = trackingByPackage.get(order.packageId ?? order.id)!;
 
     try {
       await prisma.shipment.create({
         data: {
           orderId: order.id,
           provider: carrier,
-          trackingNumber: `${carrier.toUpperCase()}${Math.random().toString().substring(2, 14)}`,
-          trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=`,
+          trackingNumber,
+          trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${trackingNumber}`,
           status: shipmentStatus,
           shippedAt: new Date(order.createdAt.getTime() + 86400000), // 1 day after order
           deliveredAt:
@@ -3711,7 +3850,7 @@ async function main() {
 
   // Benzersiz iade numarası — runtime RFD-XXXXXXXXXX formatıyla uyumlu (dev/seed).
   const generateRefundNumber = () =>
-    `RFD-${Array.from({ length: 10 }, () => REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)]).join("")}`;
+    generateReferenceCode(REFERENCE_PREFIX.refundRequest);
 
   const daysAgoDate = (days: number) => new Date(Date.now() - days * 86400000);
 
@@ -3723,7 +3862,7 @@ async function main() {
   ): Record<string, any> => {
     const plus = (days: number) =>
       new Date(createdAt.getTime() + days * 86400000);
-    const trackingNo = `RFD${Math.random().toString().substring(2, 14)}`;
+    const trackingNo = generateReferenceCode(REFERENCE_PREFIX.shipmentFallback);
     const approve =
       "Talebinizi inceledik, iade onaylandı. İade kargosu hazırlanıyor.";
     const reject =
@@ -3962,7 +4101,9 @@ async function main() {
         data: {
           orderId: order.id,
           provider: "surat",
-          trackingNumber: `SURAT${Math.random().toString().substring(2, 14)}`,
+          trackingNumber: generateReferenceCode(
+            REFERENCE_PREFIX.shipmentFallback,
+          ),
           trackingUrl:
             "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=",
           status: ShipmentStatus.delivered,
@@ -4098,8 +4239,8 @@ async function main() {
   console.log("Creating trade shipments...");
 
   const tsCarriers = ["surat"];
-  const tsTracking = (carrier: string) =>
-    `${carrier.toUpperCase()}${Math.random().toString().substring(2, 14)}`;
+  const tsTracking = () =>
+    generateReferenceCode(REFERENCE_PREFIX.shipmentFallback);
   const tsAddrOf = (userId: string) =>
     addresses.find((a) => a.userId === userId)?.id ?? null;
 
@@ -4146,7 +4287,7 @@ async function main() {
       carrier,
       // pending = etiket henüz yok; sonraki tüm durumlarda takip no mevcut.
       trackingNumber:
-        opts.status === ShipmentStatus.pending ? null : tsTracking(carrier),
+        opts.status === ShipmentStatus.pending ? null : tsTracking(),
       status: opts.status,
       shippedAt,
       deliveredAt,
@@ -4474,7 +4615,7 @@ async function main() {
         {
           fromAdmin: false,
           content:
-            'Merhaba, sipariş #ORD-00123 için ödeme yapmaya çalıştım. Banka hesabımdan 450 TL çekildi ancak sipariş "Ödeme Bekleniyor" durumunda kalmaya devam ediyor. Ne yapmalıyım?',
+            'Merhaba, sipariş #ORD-4K7M2QF3XN için ödeme yapmaya çalıştım. Banka hesabımdan 450 TL çekildi ancak sipariş "Ödeme Bekleniyor" durumunda kalmaya devam ediyor. Ne yapmalıyım?',
         },
         {
           fromAdmin: true,
@@ -4534,7 +4675,7 @@ async function main() {
         {
           fromAdmin: true,
           content:
-            "Merhaba, takas talebinizi aldık. Takas ID'nizi (TRD-XXXXX formatında) paylaşabilir misiniz?",
+            "Merhaba, takas talebinizi aldık. Takas numaranızı (TKS-XXXXXXXXXX formatında) paylaşabilir misiniz?",
           isInternal: false,
         },
         {
@@ -4545,7 +4686,7 @@ async function main() {
         },
         {
           fromAdmin: false,
-          content: "Takas numarası: TRD-1A2B3C4D. Teşekkürler.",
+          content: "Takas numarası: TKS-9F3KQ2M7XP. Teşekkürler.",
         },
         {
           fromAdmin: true,
@@ -5036,6 +5177,69 @@ async function main() {
   console.log(`✅ Created search indexes`);
 
   // ==========================================================================
+  // 23b. Erken Erişim PIN'leri (lansman öncesi site kilidi)
+  // ==========================================================================
+  // Admin → Sistem → Erken Erişim ekranındaki durumların hepsi görünsün:
+  // aktif, kullanım limiti dolmuş, süresi geçmiş ve iptal edilmiş.
+  console.log("Creating early access pins...");
+  const siteAccessPins = [
+    {
+      code: "DEMO2026",
+      label: "Demo Davetli",
+      email: "davetli@demo.com",
+      isActive: true,
+      usedCount: 2,
+      lastUsedAt: daysAgoDate(1),
+      lastSentAt: daysAgoDate(3),
+    },
+    {
+      code: "BASINDAV",
+      label: "Basın Daveti (limit doldu)",
+      email: "basin@demo.com",
+      isActive: true,
+      maxUses: 3,
+      usedCount: 3,
+      lastUsedAt: daysAgoDate(2),
+      lastSentAt: daysAgoDate(6),
+    },
+    {
+      code: "SURESIZ2",
+      label: "Süresi Dolmuş Davet",
+      email: null,
+      isActive: true,
+      expiresAt: daysAgoDate(2),
+      usedCount: 1,
+      lastUsedAt: daysAgoDate(5),
+    },
+    {
+      code: "IPTALPIN",
+      label: "İptal Edilmiş Davet",
+      email: "iptal@demo.com",
+      isActive: false,
+      usedCount: 4,
+      lastUsedAt: daysAgoDate(8),
+    },
+  ];
+  for (const pin of siteAccessPins) {
+    await prisma.siteAccessPin.upsert({
+      where: { code: pin.code },
+      update: {},
+      create: {
+        code: pin.code,
+        label: pin.label,
+        email: pin.email ?? null,
+        isActive: pin.isActive,
+        expiresAt: pin.expiresAt ?? null,
+        maxUses: pin.maxUses ?? null,
+        usedCount: pin.usedCount,
+        lastUsedAt: pin.lastUsedAt ?? null,
+        lastSentAt: pin.lastSentAt ?? null,
+      },
+    });
+  }
+  console.log(`✅ Created ${siteAccessPins.length} early access pins`);
+
+  // ==========================================================================
   // 24. Email Templates
   // ==========================================================================
   console.log("Creating email templates...");
@@ -5272,7 +5476,7 @@ async function main() {
   console.log("Creating Chunk A: account & membership states...");
 
   // Benzersiz payout transId üretici (PayoutTransfer.transId @unique).
-  const genTransId = () => `PT-${randomUUID()}`;
+  const genTransId = () => generatePayoutRef();
   const arabaCat = categories.find((c) => c.slug === "araba") || categories[0];
 
   // --- 28a. Kurumsal satıcı: onaylı işletme + business üyelik + IBAN ---
@@ -5298,6 +5502,15 @@ async function main() {
       taxId: "1234567890",
     },
   });
+
+  // Hesap tipi kodu kurumsalı yansıtmalı: bireysel varsayılanı (B) yerine K.
+  // Numara kalıcı kimliktir, yalnızca önek değişir (bkz. docs/CODE_SCHEME.md).
+  if (corporateSeller.adminCode.startsWith("B")) {
+    await prisma.user.update({
+      where: { id: corporateSeller.id },
+      data: { adminCode: `K${corporateSeller.adminCode.slice(1)}` },
+    });
+  }
 
   await prisma.userMembership.upsert({
     where: { userId: corporateSeller.id },
@@ -5465,7 +5678,9 @@ async function main() {
       data: {
         orderId: order.id,
         provider: "surat",
-        trackingNumber: `SURAT${Math.random().toString().substring(2, 14)}`,
+        trackingNumber: generateReferenceCode(
+          REFERENCE_PREFIX.shipmentFallback,
+        ),
         trackingUrl: "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=",
         status: ShipmentStatus.delivered,
         shippedAt: new Date(createdAt.getTime() + 86400000),
@@ -5897,7 +6112,7 @@ async function main() {
       const createdAt = daysAgoDate(8);
       const group = await prisma.checkoutGroup.create({
         data: {
-          groupNumber: `GRP${generateOrderNumber()}`,
+          groupNumber: generateGroupNumber(),
           buyerId: buyerDeniz.id,
           idempotencyKey: `idem-${randomUUID()}`,
           totalAmount: groupTotal,
@@ -5967,7 +6182,7 @@ async function main() {
       const createdAt = daysAgoDate(6);
       const group = await prisma.checkoutGroup.create({
         data: {
-          groupNumber: `GRP${generateOrderNumber()}`,
+          groupNumber: generateGroupNumber(),
           buyerId: buyerDeniz.id,
           idempotencyKey: `idem-${randomUUID()}`,
           totalAmount: groupTotal,
@@ -6585,8 +6800,15 @@ async function main() {
 
   // --- 29g. eLogo geçmiş faturaları: Invoice + ElogoInvoice + SellerUploadedInvoice (SADECE DB kaydı) ---
   const elogoYear = new Date().getFullYear();
+  // GİB zorunlu 16 karakter: 3 harf önek + 4 hane yıl + 9 hane sıra no.
+  let elogoSeq = 0;
   const genElogoNumber = () =>
-    `TRD${elogoYear}${String(Math.floor(Math.random() * 1e10)).padStart(10, "0")}`;
+    `TRD${elogoYear}${String((elogoSeq += 1)).padStart(9, "0")}`;
+  // İç belge (sipariş makbuzu) numarası runtime ile aynı: SPR-YYYYMM-NNNNNN.
+  const invoicePeriod = `${elogoYear}${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  let invoiceSeq = 0;
+  const genInvoiceNumber = () =>
+    `SPR-${invoicePeriod}-${String((invoiceSeq += 1)).padStart(6, "0")}`;
   const round2 = (n: number) => Math.round(n * 100) / 100;
 
   const invoiceSaleOrders = corpSales.map((s) => s.order);
@@ -6604,7 +6826,7 @@ async function main() {
     // Sipariş makbuzu (buyer-facing Invoice).
     await prisma.invoice.create({
       data: {
-        invoiceNumber: `FTR-${elogoYear}-${randomUUID().slice(0, 8).toUpperCase()}`,
+        invoiceNumber: genInvoiceNumber(),
         orderId: o.id,
         buyerId: o.buyerId,
         sellerId: o.sellerId,

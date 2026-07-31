@@ -1,5 +1,9 @@
 import { createHash } from "crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
+import {
+  REFERENCE_PREFIX,
+  reprefixReference,
+} from "../src/common/helpers/code-prefixes";
 
 const money = (value: number): number =>
   Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
@@ -196,7 +200,11 @@ export async function normalizeSeedCommerce(
   for (const order of physicalOrders) {
     let checkoutGroupId = order.checkoutGroupId;
     if (!checkoutGroupId) {
-      const groupNumber = `GRP${order.orderNumber}`;
+      // Runtime ile aynı türetim: ORD-K7X9M2QF3N → GRP-K7X9M2QF3N.
+      const groupNumber = reprefixReference(
+        order.orderNumber,
+        REFERENCE_PREFIX.checkoutGroup,
+      );
       const group = await prisma.checkoutGroup.upsert({
         where: { groupNumber },
         update: {
