@@ -247,7 +247,19 @@ services:
       PROCESS_ROLE: ${API_PROCESS_ROLE:-all}
       JWT_SECRET: ${JWT_SECRET}
       ELASTICSEARCH_URL: http://elasticsearch:9200
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      # Outbound mail. SMTP_HOST is what switches delivery on: without it the
+      # API boots happily and silently drops every mail into a [EMAIL-MOCK] log.
+      # All mail leaves as info@tarodan.com.tr; destek@ is only a recipient.
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_TLS_REJECT_UNAUTHORIZED: ${SMTP_TLS_REJECT_UNAUTHORIZED:-false}
+      MAIL_FROM: ${MAIL_FROM:-Tarodan <info@tarodan.com.tr>}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-destek@tarodan.com.tr}
+      SUPPORT_NOTIFICATION_EMAIL: ${SUPPORT_NOTIFICATION_EMAIL:-destek@tarodan.com.tr}
+      EMAIL_LOGO_URL: ${EMAIL_LOGO_URL}
       IYZICO_API_KEY: ${IYZICO_API_KEY}
       IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
       SENTRY_DSN: ${SENTRY_DSN}
@@ -317,7 +329,19 @@ services:
       # worker.ts Sentry'yi DSN yoksa hiç başlatmıyor → tüm arka-plan katmanı hata
       # takibi olmadan koşuyordu.
       SENTRY_DSN: ${SENTRY_DSN}
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      # Outbound mail. SMTP_HOST is what switches delivery on: without it the
+      # API boots happily and silently drops every mail into a [EMAIL-MOCK] log.
+      # All mail leaves as info@tarodan.com.tr; destek@ is only a recipient.
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_TLS_REJECT_UNAUTHORIZED: ${SMTP_TLS_REJECT_UNAUTHORIZED:-false}
+      MAIL_FROM: ${MAIL_FROM:-Tarodan <info@tarodan.com.tr>}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-destek@tarodan.com.tr}
+      SUPPORT_NOTIFICATION_EMAIL: ${SUPPORT_NOTIFICATION_EMAIL:-destek@tarodan.com.tr}
+      EMAIL_LOGO_URL: ${EMAIL_LOGO_URL}
       # Payout transferleri, iadeler ve durum sorguları worker'da koşar; PayTR
       # anahtarları olmadan para işleri hiç yapılamaz.
       PAYTR_MERCHANT_ID: ${PAYTR_MERCHANT_ID}
