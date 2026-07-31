@@ -43,6 +43,14 @@ export default function SellerActions({
     const cargoCode = order.shipment?.cargoCode ?? null;
     return (
       <SectionCard title={t("order.cargoReference")}>
+        {/* Bu kod hangi koliye ait: aynı alıcının aynı sepetteki diğer ürünleri
+            de bu kolide gider, tek etiketle gönderilir. */}
+        {order.packageNumber && (
+          <p className="mb-3 text-sm text-muted">
+            {t("order.packageNumber")}:{" "}
+            <span className="font-mono text-body">{order.packageNumber}</span>
+          </p>
+        )}
         {cargoCode ? (
           <>
             <p className="text-muted mb-4">

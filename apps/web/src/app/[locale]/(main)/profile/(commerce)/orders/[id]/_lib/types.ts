@@ -18,6 +18,8 @@ export interface OrderDetail {
   /** Satıcı paketi (çatı). Set ve shippingCost=0 ise kargo pakette bir kez ödendi
    * (kardeş order) → UI "Ücretsiz" değil "Kargo pakete dahil" gösterir. */
   packageId?: string | null;
+  /** Koli numarası (PKG-…) — Sürat'a giden, kargo etiketinde yazan kod. */
+  packageNumber?: string | null;
   buyerFeeAmount?: number;
   sellerFeeAmount?: number;
   pricing?: {

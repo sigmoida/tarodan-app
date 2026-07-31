@@ -121,6 +121,12 @@ export const hasVisibleShipment = (order: Order): boolean =>
 /** Sunucudan gelen paket görünümü: satıcı + tek kargo ücreti + tek kargo takibi. */
 export interface ServerPackageView {
   id: string;
+  /**
+   * Koli numarası (PKG-…): sepet numarasından ve sipariş numaralarından
+   * BAĞIMSIZ. Sürat'a `OzelKargoTakipNo` olarak bu gider, kargo etiketinde bu
+   * yazar ve müşteri kargosunu bu kodla sorgular.
+   */
+  packageNumber: string | null;
   sellerId: string | null;
   seller: {
     id: string;
@@ -150,8 +156,6 @@ export interface ServerOrderGroup {
   kind: "group" | "package" | "synthetic";
   id: string;
   groupNumber: string;
-  /** Satıcı çatısında paketin kargo referansı (= paketteki en küçük sipariş no). */
-  packageRef?: string | null;
   totalAmount: number;
   status: string;
   createdAt: string;
@@ -168,14 +172,13 @@ export interface ServerOrderGroup {
 }
 
 /**
- * Takip numarası: taşıyıcının verdiği gerçek kod varsa o, yoksa bizim paket
- * referansımız (paketteki en küçük sipariş numarası). Bu referans Sürat'a
- * `OzelKargoTakipNo` olarak gönderildiği için müşteri onunla da sorgulayabilir;
- * kargo kodu gelene kadar ekranın boş kalmaması için gösterilir.
+ * Taşıyıcının verdiği GERÇEK kargo kodu (Sürat KargoTakipNo). Yoksa null —
+ * kolinin kendi numarası ayrı bir satırda zaten gösterilir, oraya düşmeye gerek
+ * yok (aynı değeri iki kez yazmak "kodlar birbirine karıştı" hissi yaratıyordu).
  */
 export const visibleCargoCode = (
   cargo: ServerPackageView["cargo"],
-): string | null => cargo?.cargoCode ?? cargo?.trackingNumber ?? null;
+): string | null => cargo?.cargoCode ?? null;
 
 /** İptal edilebilir sipariş durumları (kargo öncesi). */
 const CANCELLABLE_STATUSES = ["pending_payment", "paid", "preparing"];

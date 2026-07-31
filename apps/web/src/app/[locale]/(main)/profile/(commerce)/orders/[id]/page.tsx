@@ -165,21 +165,31 @@ export default function OrderGroupDetailPage() {
                     : "space-y-6"
                 }
               >
-                {multiPackage && (
+                {/* Koli başlığı: tek satıcılı sepette de gösterilir — koli
+                    numarası (PKG-…) sepet ve sipariş numaralarından bağımsız
+                    üçüncü seviyedir ve kargo etiketinde bu yazar. */}
+                {(multiPackage || pkg.packageNumber) && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-heading">
-                      {pkg.seller?.displayName
+                      {multiPackage && pkg.seller?.displayName
                         ? t("order.sellerPackage", {
                             name: pkg.seller.displayName,
                           })
-                        : t("order.multiItemOrder")}
+                        : t("order.packageNumber")}
                     </p>
-                    {cargoCode && (
-                      <p className="text-xs text-muted">
-                        {t("order.trackingNumber")}:{" "}
-                        <span className="font-mono">{cargoCode}</span>
-                      </p>
-                    )}
+                    <div className="flex flex-wrap items-center gap-x-4 text-xs text-muted">
+                      {pkg.packageNumber && (
+                        <p>
+                          <span className="font-mono">{pkg.packageNumber}</span>
+                        </p>
+                      )}
+                      {cargoCode && (
+                        <p>
+                          {t("order.trackingNumber")}:{" "}
+                          <span className="font-mono">{cargoCode}</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
                 {pkgOrders.map((order, orderIndex) => (

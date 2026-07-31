@@ -124,12 +124,6 @@ export default function OrderGroupCard({
   const t = useTranslations();
   const date = group.createdAt;
   const multiPackage = group.packages.length > 1;
-  // Satıcı çatısında sepet numarasının yanında paketin kargo referansı da
-  // gösterilir; ikisi aynıysa (sepetsiz sipariş) tek numara kalır.
-  const packageRef =
-    group.packageRef && group.packageRef !== group.groupNumber
-      ? group.packageRef
-      : null;
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated">
@@ -137,12 +131,9 @@ export default function OrderGroupCard({
       <div className="p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="font-mono text-sm text-muted">
-              {group.groupNumber}
-              {packageRef && (
-                <span className="text-subtle"> · {packageRef}</span>
-              )}
-            </p>
+            {/* Başlık YALNIZ sepet numarasıdır: sipariş numarası her satırda,
+                kargo numarası paket altında zaten yazıyor. */}
+            <p className="font-mono text-sm text-muted">{group.groupNumber}</p>
             <p className="text-sm text-subtle">{formatDate(date)}</p>
           </div>
           <div className="flex items-center gap-3">
@@ -198,8 +189,21 @@ export default function OrderGroupCard({
                   <OrderLine key={order.id} order={order} actions={actions} />
                 ))}
               </div>
-              {(cargoCode || pkg.shippingCost > 0) && (
+              {/* Kargo bedeli burada GÖSTERİLMEZ: kart tutarı zaten sepetin
+                  ödenen toplamıdır, kalem kalem döküm detay sayfasındadır. */}
+              {(pkg.packageNumber || cargoCode) && (
                 <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-surface-alt p-3 text-sm">
+                  {/* Teslimat no: bu kutudaki ürünler TEK kolide gider. Sürat'a
+                      giden ve kargo etiketinde yazan kod budur. */}
+                  {pkg.packageNumber && (
+                    <p>
+                      <span className="text-muted">
+                        {t("order.packageNumber")}:
+                      </span>{" "}
+                      <span className="font-mono">{pkg.packageNumber}</span>
+                    </p>
+                  )}
+                  {/* Taşıyıcının kendi kodu — Sürat barkodu oluştuğunda dolar. */}
                   {cargoCode && (
                     <p>
                       <span className="text-muted">
@@ -208,27 +212,20 @@ export default function OrderGroupCard({
                       <span className="font-mono">{cargoCode}</span>
                     </p>
                   )}
-                  {pkg.shippingCost > 0 && (
-                    <p>
-                      <span className="text-muted">
-                        {t("checkout.shipping")}:
-                      </span>{" "}
-                      {formatTL(pkg.shippingCost)}
-                    </p>
-                  )}
-                  {/* Takip PAKET başına tektir — koli/barkod paylaşılır (R6). */}
-                  {cargoCode && group.viewerRole === "buyer" && (
-                    <ButtonLink
-                      href={`/track-order?orderNumber=${encodeURIComponent(
-                        pkg.orders[0]?.orderNumber ?? "",
-                      )}&email=${encodeURIComponent(actions.userEmail || "")}`}
-                      variant="outline"
-                      size="sm"
-                      className="ml-auto"
-                    >
-                      {t("order.trackOrder")}
-                    </ButtonLink>
-                  )}
+                  {/* Takip TESLİMAT başına tektir — sorgu anahtarı da bu koddur. */}
+                  {(pkg.packageNumber || cargoCode) &&
+                    group.viewerRole === "buyer" && (
+                      <ButtonLink
+                        href={`/track-order?orderNumber=${encodeURIComponent(
+                          pkg.packageNumber ?? pkg.orders[0]?.orderNumber ?? "",
+                        )}&email=${encodeURIComponent(actions.userEmail || "")}`}
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto"
+                      >
+                        {t("order.trackOrder")}
+                      </ButtonLink>
+                    )}
                 </div>
               )}
             </div>

@@ -133,6 +133,24 @@ export default function TrackOrderClient() {
                   },
                 )}
               </p>
+              {/* Üç kod seviyesi: sepet (GRP) · koli (PKG) · sipariş (ORD).
+                  Müşteri hangisini girdiyse diğerlerini de burada görür. */}
+              {(order.groupNumber || order.packageNumber) && (
+                <p className="text-sm text-muted mt-2 flex flex-wrap gap-x-4">
+                  {order.groupNumber && (
+                    <span>
+                      {t("order.groupNumber")}:{" "}
+                      <span className="font-mono">{order.groupNumber}</span>
+                    </span>
+                  )}
+                  {order.packageNumber && (
+                    <span>
+                      {t("order.packageNumber")}:{" "}
+                      <span className="font-mono">{order.packageNumber}</span>
+                    </span>
+                  )}
+                </p>
+              )}
               {order.siblingOrderNumbers &&
                 order.siblingOrderNumbers.length > 0 && (
                   <p className="text-sm text-muted mt-2">
