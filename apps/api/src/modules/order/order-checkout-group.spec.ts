@@ -731,4 +731,120 @@ describe("OrderService checkout group (batch checkout)", () => {
       expect(orderData.discountAmount).toBeGreaterThan(0);
     });
   });
+
+  /**
+   * FATURA GRUPLAMASI — çok satıcılı sepette kaç fatura kesilir?
+   *
+   * e-Logo gelir faturaları TAMAMEN `orderId` anahtarlıdır
+   * (`issueCommissionInvoice(orderId)`, `issueServiceFeeInvoice(orderId)`,
+   * `dedupeKey: invoice.order_revenue:<orderId>`). Dolayısıyla "kaç fatura"
+   * sorusunun cevabı "kaç Order yaratıldığı"dır — bu testler o sayıyı ve
+   * satıcı dağılımını sabitler.
+   */
+  describe("çok satıcılı sepet → fatura gruplaması", () => {
+    const productC = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb3";
+
+    const threeItemDto = () => {
+      const items = [
+        { productId: productA },
+        { productId: productB },
+        { productId: productC },
+      ];
+      return {
+        items,
+        idempotencyKey,
+        shippingAddressId: addressId,
+        expectedShippingTariffVersion: 1,
+        expectedPricingHash: pricingHashFor(items),
+      };
+    };
+
+    /** A + B → satıcı 1, C → satıcı 2 (kullanıcının 2+1 senaryosu). */
+    const splitTwoAndOne = () => {
+      // Satır kilidi sorgusu istenen ürün sayısı kadar satır dönmeli; varsayılan
+      // mock iki ürüne göre sabit.
+      mockTx.$queryRaw.mockResolvedValue([
+        { id: productA },
+        { id: productB },
+        { id: productC },
+      ]);
+      mockTx.product.findMany.mockResolvedValue([
+        makeProduct(productA),
+        makeProduct(productB),
+        makeProduct(productC, {
+          sellerId: sellerId2,
+          seller: {
+            id: sellerId2,
+            email: "s2@test.com",
+            displayName: "Seller2",
+          },
+        }),
+      ]);
+    };
+
+    it("satıcı başına DEĞİL, ürün başına sipariş yaratır (2+1 → 3 sipariş)", async () => {
+      splitTwoAndOne();
+
+      await service.checkout(buyerId, threeItemDto() as any);
+
+      // Paketler satıcı başına gruplanıyor…
+      expect(mockTx.orderPackage.create).toHaveBeenCalledTimes(2);
+      // …ama siparişler ürün başına açılıyor.
+      expect(mockTx.order.create).toHaveBeenCalledTimes(3);
+    });
+
+    it("her sipariş kendi satıcısının paketine bağlanır", async () => {
+      splitTwoAndOne();
+
+      await service.checkout(buyerId, threeItemDto() as any);
+
+      const orders = mockTx.order.create.mock.calls.map((c: any) => ({
+        seller: c[0].data.sellerId,
+        pkg: c[0].data.packageId,
+      }));
+
+      expect(orders.filter((o: any) => o.seller === sellerId)).toHaveLength(2);
+      expect(orders.filter((o: any) => o.seller === sellerId2)).toHaveLength(1);
+      // Aynı satıcının iki siparişi TEK pakete bağlı.
+      const sellerOnePkgs = new Set(
+        orders.filter((o: any) => o.seller === sellerId).map((o: any) => o.pkg),
+      );
+      expect(sellerOnePkgs.size).toBe(1);
+    });
+
+    it("kargo satıcı başına BİR kez alınır (3 ürün → 2 kargo ücreti)", async () => {
+      splitTwoAndOne();
+
+      await service.checkout(buyerId, threeItemDto() as any);
+
+      const shippings = mockTx.order.create.mock.calls.map(
+        (c: any) => c[0].data.shippingCost,
+      );
+      expect(shippings.filter((s: number) => s > 0)).toHaveLength(2);
+    });
+
+    it("BEKLENEN DAVRANIŞ DEĞİL: satıcı başına tek fatura yerine ürün başına fatura çıkar", async () => {
+      // İş kuralı "2 satıcı → 2 fatura (biri 2 kalemli, biri 1 kalemli)" diyor.
+      // Fatura orderId anahtarlı olduğu ve her ürün ayrı Order açtığı için
+      // bugün 3 fatura seti oluşuyor. Bu test o farkı GÖRÜNÜR kılar; gruplama
+      // satıcı bazına taşınırsa burası kırılır ve beklenti güncellenir.
+      splitTwoAndOne();
+
+      await service.checkout(buyerId, threeItemDto() as any);
+
+      const orderIdsPerSeller = mockTx.order.create.mock.calls.reduce(
+        (acc: Record<string, number>, c: any) => {
+          const s = c[0].data.sellerId;
+          acc[s] = (acc[s] ?? 0) + 1;
+          return acc;
+        },
+        {},
+      );
+
+      // Fatura sayısı = sipariş sayısı (orderId anahtarlı kesim).
+      expect(orderIdsPerSeller[sellerId]).toBe(2);
+      expect(orderIdsPerSeller[sellerId2]).toBe(1);
+      // İstenen: 1 ve 1 (satıcı başına tek fatura, kalemler içinde).
+    });
+  });
 });

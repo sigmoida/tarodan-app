@@ -644,7 +644,9 @@
     "discountStart": "Başlangıç",
     "discountEnd": "Bitiş",
     "discountComingSoonNote": "* Not: Bu özellik yakında aktif olacaktır. Şimdilik ürün fiyatını doğrudan değiştirebilirsiniz.",
-    "appliedDiscounts": "Bu Ürüne Uygulanan İndirimler"
+    "appliedDiscounts": "Bu Ürüne Uygulanan İndirimler",
+    "shippingFee": "Kargo ücreti",
+    "sellerEarning": "Hak edişiniz"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -787,7 +789,12 @@
     "shippingCalculatedAtCheckout": "Ödeme adımında hesaplanır",
     "loginFasterCheckout": "Hızlı ödeme için giriş yapın",
     "cartSavedAfterLogin": "Sepetiniz giriş yaptıktan sonra korunacak.",
-    "platformServiceFee": "Platform Hizmet Bedeli"
+    "platformServiceFee": "Platform Hizmet Bedeli",
+    "productFee": "Ürün ücreti",
+    "shippingFee": "Kargo ücreti",
+    "platformFee": "Platform bedeli",
+    "buyerPayable": "Ödenecek tutar",
+    "vatIncluded": "KDV dahil"
   },
   "order": {
     "myOrders": "Siparişlerim",
@@ -998,7 +1005,8 @@
     "statusAwaitingConfirmation": "Onay Bekleniyor",
     "cancelGroupTitle": "Sepeti İptal Et",
     "cancelGroupAllNotice": "Bu işlem sepetteki {count} siparişin tamamını iptal eder; yapılan ödeme tek seferde iade edilir. Kısmi iptal yoktur.",
-    "cartSiblings": "Bu sepette başka siparişler de var:"
+    "cartSiblings": "Bu sepette başka siparişler de var:",
+    "refundReasonDeliveryDelayed": "Teslimat gecikti"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -3867,8 +3875,8 @@
         "examplePrice": "Örnek Ürün Fiyatı (₺)",
         "calculating": "Hesaplanıyor...",
         "previewFailed": "Komisyon önizlemesi hesaplanamadı.",
-        "calculationTitle": "Komisyon Hesaplama",
-        "calculationDescription": "Komisyon kuralları eşleşme sırasına göre değerlendirilir. Bir sipariş için ilk eşleşen kural uygulanır. Eşleşme sırası: Kategori + Satıcı Tipi > Kategori + Tümü > Satıcı Tipi > Varsayılan (Tümü + Tümü). Aynı kombinasyon (kategori + satıcı tipi) için sadece bir kural oluşturulabilir.",
+        "calculationTitle": "Kural Eşleşme Önceliği",
+        "calculationDescription": "Bir sipariş için TÜM eşleşen kurallar arasından en ÖZEL olan seçilir. Özgüllük puanı: kategori eşleşmesi +4, mükellef tipi (bireysel/kurumsal) +2, satıcı tipi (üyelik) +1, sınırlı tutar aralığı +0,5. Puanlar eşitse `priority` değeri büyük olan kazanır. Satıcı ve alıcı kuralları AYRI eşleştirilir. Aynı kategoriye birden çok kural tanımlanabilir; çakışan aralıklar kaydederken engellenir.",
         "defaultMissingTitle": "Varsayılan komisyon kuralı tanımlı değil",
         "defaultMissingDescription": "Eşleşen kural olmayan siparişler 0 komisyon ile oluşturulacaktır. Ödeme akışı etkilenmez. İsterseniz “Kategori: Tümü” ve “Satıcı Tipi: Tümü” ile bir varsayılan kural ekleyebilirsiniz.",
         "sellerTypes": {
@@ -3957,7 +3965,29 @@
           "exampleSellerGets": "Satıcı alır",
           "examplePlatform": "Tarodan'a yatan",
           "exampleNote": "Satıcı hak edişi 500 − 55 (ücretler) − 50 (kargo payı) − 21 (KDV) − 5 (stopaj) = 369 ₺. Tarodan'a yatan tutar KDV ve stopajı içerir; ikisi de gelir değildir."
-        }
+        },
+        "productPrice": "Ürün fiyatı",
+        "buyerSide": "Alıcı tarafı",
+        "sellerSide": "Satıcı tarafı",
+        "lineAmount": "Tutar",
+        "lineVat": "KDV",
+        "buyerVatTotal": "Alıcı KDV toplamı",
+        "buyerAddedTotal": "Alıcıya eklenen",
+        "sellerVatTotal": "Satıcı KDV toplamı",
+        "sellerDeductionTotal": "Satıcı kesinti toplamı",
+        "platformSplitTitle": "Para nereye gidiyor",
+        "platformRevenue": "Tarodan'a kalan",
+        "platformTakeRate": "Tarodan payı (ürün fiyatına oranla)",
+        "platformTax": "Vergi (KDV + stopaj)",
+        "platformShipping": "Kargo (taşıyıcıya)",
+        "emptyLineNote": "Kuralda tanımlanmayan kalemler 0 olarak gösterilir.",
+        "gmv": "Ürün cirosu (GMV)",
+        "taxToState": "Vergi (KDV + stopaj)",
+        "shippingToCarrier": "Kargo (taşıyıcıya)",
+        "takeRateFooter": "Ürün cirosunun %{rate}'i",
+        "feeBoundsHint": "Yüzdeyle bulunan ücret bu TL aralığına kırpılır. Örn. %6 taban 10 ₺ ise 100 ₺'lik üründe 6 yerine 10 ₺ alınır. Boş = kırpma yok.",
+        "amountRangeHint": "Bu kuralın HANGİ fiyat aralığındaki ürünlere uygulanacağı. Hesaba girmez, yalnız kural seçimini belirler. Boş = sınırsız.",
+        "amountRangeTitle": "Uygulanacak tutar aralığı"
       },
       "invoices": {
         "title": "Faturalar",
@@ -4417,7 +4447,25 @@
           },
           "deliveredAt": "Teslim",
           "confirmationDeadline": "Onay penceresi bitişi",
-          "guestBuyer": "Misafir alıcı"
+          "guestBuyer": "Misafir alıcı",
+          "sellerSide": "Satıcı tarafı",
+          "buyerSide": "Alıcı tarafı",
+          "lineAmount": "Tutar",
+          "lineVat": "KDV",
+          "sellerVatTotal": "Satıcı KDV toplamı",
+          "buyerVatTotal": "Alıcı KDV toplamı",
+          "sellerDeductionTotal": "Satıcı kesinti toplamı",
+          "buyerAddedTotal": "Alıcıya eklenen",
+          "platformRevenue": "Tarodan'a kalan",
+          "platformTakeRate": "Tarodan payı",
+          "platformTax": "Vergi (KDV + stopaj)",
+          "platformShipping": "Kargo (taşıyıcıya)",
+          "moneySplit": "Para nereye gitti",
+          "sellerCommission": "Satıcı komisyonu",
+          "sellerPlatformFee": "Platform hizmet bedeli",
+          "buyerCommission": "Alıcı komisyonu",
+          "buyerServiceFee": "Alıcı koruma hizmeti",
+          "productPrice": "Ürün bedeli"
         }
       },
       "trades": {

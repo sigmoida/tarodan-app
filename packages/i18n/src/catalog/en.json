@@ -644,7 +644,9 @@
     "discountStart": "Start",
     "discountEnd": "End",
     "discountComingSoonNote": "* Note: This feature will be enabled soon. For now you can change the product price directly.",
-    "appliedDiscounts": "Discounts Applied to This Product"
+    "appliedDiscounts": "Discounts Applied to This Product",
+    "shippingFee": "Shipping fee",
+    "sellerEarning": "Your earnings"
   },
   "cart": {
     "myCart": "My Cart",
@@ -787,7 +789,12 @@
     "shippingCalculatedAtCheckout": "Calculated at checkout",
     "loginFasterCheckout": "Sign in for faster checkout",
     "cartSavedAfterLogin": "Your cart will be saved after login.",
-    "platformServiceFee": "Platform Service Fee"
+    "platformServiceFee": "Platform Service Fee",
+    "productFee": "Product price",
+    "shippingFee": "Shipping fee",
+    "platformFee": "Platform fee",
+    "buyerPayable": "Amount due",
+    "vatIncluded": "VAT included"
   },
   "order": {
     "myOrders": "My Orders",
@@ -998,7 +1005,8 @@
     "statusAwaitingConfirmation": "Awaiting Confirmation",
     "cancelGroupTitle": "Cancel Cart",
     "cancelGroupAllNotice": "This cancels all {count} orders in the cart; the payment is refunded in full. Partial cancellation is not available.",
-    "cartSiblings": "This cart has other orders too:"
+    "cartSiblings": "This cart has other orders too:",
+    "refundReasonDeliveryDelayed": "Delivery was late"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -3867,8 +3875,8 @@
         "examplePrice": "Example Product Price (₺)",
         "calculating": "Calculating...",
         "previewFailed": "The commission preview could not be calculated.",
-        "calculationTitle": "Commission Calculation",
-        "calculationDescription": "Commission rules are evaluated in match order. The first matching rule is applied to an order. Match order: Category + Seller Type > Category + All > Seller Type > Default (All + All). Only one rule can be created for the same category and seller type combination.",
+        "calculationTitle": "Rule Matching Priority",
+        "calculationDescription": "Among all rules that match an order, the MOST specific one wins. Specificity score: category match +4, taxpayer type (individual/corporate) +2, seller type (membership) +1, bounded amount range +0.5. On a tie the higher `priority` wins. Seller and buyer rules are matched SEPARATELY. A category may have several rules; overlapping ranges are rejected on save.",
         "defaultMissingTitle": "No default commission rule is defined",
         "defaultMissingDescription": "Orders without a matching rule will be created with zero commission. The payment flow is unaffected. You can add a default rule with “Category: All” and “Seller Type: All”.",
         "sellerTypes": {
@@ -3957,7 +3965,29 @@
           "exampleSellerGets": "Seller receives",
           "examplePlatform": "Collected by Tarodan",
           "exampleNote": "Seller payout is 500 − 55 (fees) − 50 (shipping share) − 21 (VAT) − 5 (withholding) = 369 ₺. The amount collected by Tarodan includes VAT and withholding; neither is revenue."
-        }
+        },
+        "productPrice": "Product price",
+        "buyerSide": "Buyer side",
+        "sellerSide": "Seller side",
+        "lineAmount": "Amount",
+        "lineVat": "VAT",
+        "buyerVatTotal": "Buyer VAT total",
+        "buyerAddedTotal": "Added for buyer",
+        "sellerVatTotal": "Seller VAT total",
+        "sellerDeductionTotal": "Seller deduction total",
+        "platformSplitTitle": "Where the money goes",
+        "platformRevenue": "Kept by Tarodan",
+        "platformTakeRate": "Tarodan share (of product price)",
+        "platformTax": "Tax (VAT + withholding)",
+        "platformShipping": "Shipping (to carrier)",
+        "emptyLineNote": "Lines the rule does not define are shown as 0.",
+        "gmv": "Product volume (GMV)",
+        "taxToState": "Tax (VAT + withholding)",
+        "shippingToCarrier": "Shipping (to carrier)",
+        "takeRateFooter": "{rate}% of product volume",
+        "feeBoundsHint": "The percentage fee is clamped to this TL range. E.g. 6% with a 10 ₺ floor charges 10 ₺ instead of 6 ₺ on a 100 ₺ item. Empty = no clamping.",
+        "amountRangeHint": "WHICH price range this rule applies to. Not part of the calculation — it only decides rule selection. Empty = unbounded.",
+        "amountRangeTitle": "Applicable amount range"
       },
       "invoices": {
         "title": "Invoices",
@@ -4417,7 +4447,25 @@
           },
           "deliveredAt": "Delivered",
           "confirmationDeadline": "Confirmation window ends",
-          "guestBuyer": "Guest buyer"
+          "guestBuyer": "Guest buyer",
+          "sellerSide": "Seller side",
+          "buyerSide": "Buyer side",
+          "lineAmount": "Amount",
+          "lineVat": "VAT",
+          "sellerVatTotal": "Seller VAT total",
+          "buyerVatTotal": "Buyer VAT total",
+          "sellerDeductionTotal": "Seller deduction total",
+          "buyerAddedTotal": "Added for buyer",
+          "platformRevenue": "Kept by Tarodan",
+          "platformTakeRate": "Tarodan share",
+          "platformTax": "Tax (VAT + withholding)",
+          "platformShipping": "Shipping (to carrier)",
+          "moneySplit": "Where the money went",
+          "sellerCommission": "Seller commission",
+          "sellerPlatformFee": "Platform service fee",
+          "buyerCommission": "Buyer commission",
+          "buyerServiceFee": "Buyer protection fee",
+          "productPrice": "Product price"
         }
       },
       "trades": {
