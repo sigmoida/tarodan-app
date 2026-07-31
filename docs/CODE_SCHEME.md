@@ -40,8 +40,9 @@ son güvence ilgili kolondaki `@unique`.
 
 | Önek  | İşlem                                                   |
 | ----- | ------------------------------------------------------- |
-| `ORD` | Sipariş                                                 |
-| `GRP` | Çok satıcılı ödeme grubu                                |
+| `ORD` | Sipariş satırı (bir üründen bir adet-grubu)             |
+| `GRP` | Sepet / ödeme grubu                                     |
+| `PKG` | Koli (satıcı paketi) — Sürat'a giden `OzelKargoTakipNo` |
 | `TKS` | Takas                                                   |
 | `RFD` | İade talebi                                             |
 | `TKT` | Destek talebi                                           |
@@ -51,6 +52,38 @@ son güvence ilgili kolondaki `@unique`.
 | `PYT` | Satıcıya para gönderimi                                 |
 | `SHP` | Kargo entegrasyonu kapalıyken yedek takip no            |
 | `VCH` | Hediye / kupon kodu (yönetici öneki geçersiz kılabilir) |
+
+### 2.1 Sipariş üç seviyede numaralanır
+
+Bir alışverişte **her zaman üç ayrı seviye** vardır ve hiçbiri diğerinin
+türevi değildir:
+
+```
+GRP-…  sepet          → 1 tane   (alıcı bir kez öder)
+PKG-…  koli           → satıcı sayısı kadar (her satıcı ayrı kargolar)
+ORD-…  sipariş satırı → ürün satırı sayısı kadar
+```
+
+| Sepet içeriği     | GRP | PKG | ORD |
+| ----------------- | --- | --- | --- |
+| 1 ürün / 1 satıcı | 1   | 1   | 1   |
+| 2 ürün / 1 satıcı | 1   | 1   | 2   |
+| 3 ürün / 2 satıcı | 1   | 2   | 3   |
+
+**Kargo referansı `PKG-…`'dir.** Sürat'a `OzelKargoTakipNo` olarak bu gönderilir,
+Sürat karşılığında kendi `KargoTakipNo`'sunu döner (`providerTrackingId`), müşteri
+de kargosunu bu koli koduyla sorgulayabilir (`/track-order` üç kodu da kabul eder).
+
+Bu numara **saklanır** (`OrderPackage.packageNumber`), türetilmez. Eskiden koli
+referansı "paketteki en küçük `orderNumber`" olarak hesaplanıyordu; paketin
+sipariş kümesi değişince (iptal, `packageId` taşıması) referans kayıyor, 48
+saatlik barkod retry penceresinde Sürat'ın idempotency önbelleğini (anahtar =
+`OzelKargoTakipNo`) ıskalıyor ve **mükerrer fiziksel gönderi** açabiliyordu.
+
+Aynı koliyi paylaşan gönderi satırları `Shipment.packageId` ile bağlıdır: Sürat
+koli başına **bir kez** sorgulanır ve taşıyıcı webhook'u kolinin **tüm** sipariş
+satırlarına yayılır. Kayıt yine sipariş başınadır — iade, escrow ve muhasebe
+sipariş bazlı kalır.
 
 Notlar:
 
