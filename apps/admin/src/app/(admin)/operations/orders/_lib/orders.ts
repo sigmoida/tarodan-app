@@ -17,7 +17,7 @@ export interface Order {
   shipmentId?: string | null;
   shipmentTrackingNumber?: string | null;
   internalTrackingNumber?: string | null;
-  buyer: { id: string; displayName: string; email?: string };
+  buyer: { id: string; displayName: string; email?: string; isGuest?: boolean };
   seller: { id: string; displayName: string; email?: string };
   product?: { id: string; title: string };
   createdAt: string;
@@ -76,7 +76,7 @@ export interface OrderGroupRow {
   checkoutGroupId: string | null;
   /** groupNumber for a group, orderNumber for a standalone order */
   displayNumber: string;
-  buyer: { id: string; displayName: string; email?: string };
+  buyer: { id: string; displayName: string; email?: string; isGuest?: boolean };
   createdAt: string;
   itemCount: number;
   totalAmount: number;

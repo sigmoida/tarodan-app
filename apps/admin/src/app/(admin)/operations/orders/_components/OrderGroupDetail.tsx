@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Badge, orderStatusConfig } from "@tarodan/ui";
 import { ShoppingBagIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
@@ -11,10 +10,10 @@ function LineItem({ item }: { item: OrderLineItem }) {
   const t = useTranslations();
   return (
     <div className="grid min-w-[1120px] grid-cols-[minmax(400px,2fr)_minmax(280px,1.25fr)_minmax(220px,1fr)_auto_112px] items-center gap-4 rounded-md px-3 py-2 hover:bg-surface-alt">
-      <Link
-        href={`/operations/orders/${item.id}`}
-        className="flex min-w-0 items-center gap-3"
-      >
+      {/* Bilgi amaçlı alan — tıklama aksiyonu yok. Grup dosyasına gidiş yalnız
+          "Grup No" kolonundan yapılır; buradaki link aynı ekrana giden gereksiz
+          ikinci bir yoldu. */}
+      <div className="flex min-w-0 items-center gap-3">
         {item.productImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -28,7 +27,7 @@ function LineItem({ item }: { item: OrderLineItem }) {
           </span>
         )}
         <div className="min-w-0">
-          <TruncatedText className="text-sm font-medium text-heading hover:text-primary-600">
+          <TruncatedText className="text-sm font-medium text-heading">
             {item.product?.title ??
               t("admin.operations.orders.itemCountUnit", { count: 1 })}
           </TruncatedText>
@@ -36,7 +35,7 @@ function LineItem({ item }: { item: OrderLineItem }) {
             {item.orderNumber}
           </span>
         </div>
-      </Link>
+      </div>
       <CellUser
         name={item.seller.displayName}
         secondary={item.seller.email}

@@ -19,6 +19,8 @@ export const operationsApi = {
   // Orders
   getOrders: (params?: any) => api.get("/admin/orders", { params }),
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
+  /** Grup dosyası: order id grup çatısına çözülür (ödeme + paketler + sipariş finans/escrow/iade). */
+  getOrderFile: (id: string) => api.get(`/admin/orders/${id}/file`),
   updateOrderStatus: (id: string, status: string, notes: string) =>
     api.patch(`/admin/orders/${id}`, { status, notes }),
   addOrderTracking: (

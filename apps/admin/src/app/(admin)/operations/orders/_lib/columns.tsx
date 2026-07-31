@@ -118,14 +118,15 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
               )}
           </div>
         ),
-      { minWidth: 190, sortKey: "status", sortType: "text" },
+      { minWidth: 190 },
     ),
     col.user<OrderGroupRow>(
       t("admin.operations.orders.buyer"),
       (o) => ({
         name: o.buyer.displayName,
         secondary: o.buyer.email,
-        href: `/accounts/users/${o.buyer.id}`,
+        // Misafir alıcının id'si ortak GUEST_SYSTEM hesabı — link üretilmez.
+        href: o.buyer.isGuest ? undefined : `/accounts/users/${o.buyer.id}`,
       }),
       {
         minWidth: 480,
@@ -147,8 +148,6 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
       },
       {
         minWidth: 480,
-        sortKey: "product.title",
-        sortType: "text",
       },
     ),
     col.number<OrderGroupRow>(
@@ -184,8 +183,6 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
       },
       {
         minWidth: 130,
-        sortKey: "commissionAmount",
-        sortType: "number",
       },
     ),
     col.badge<OrderGroupRow>(
