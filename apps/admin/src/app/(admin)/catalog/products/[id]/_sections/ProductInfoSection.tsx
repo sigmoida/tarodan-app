@@ -88,6 +88,7 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
         </Row>
       </div>
       <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">
+        <Row label={t("product.productCode")}>{product.productCode}</Row>
         <Row label={t("product.brand")}>
           {product.brand?.name ?? t("admin.catalog.products.notSpecified")}
         </Row>

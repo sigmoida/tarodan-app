@@ -561,6 +561,10 @@ model Manufacturer {
 
 model Product {
   id                  String             @id @default(uuid())
+  /// İnsan-okunur ilan numarası: "U" + 6 hane sıra no (U010001). Kalıcı,
+  /// kullanıcıya gösterilir (ilan detayı, şikayet formu, destek). Postgres
+  /// tarafında generate_product_code() ile üretilir; uygulama yazmaz.
+  productCode         String             @unique @default(dbgenerated("generate_product_code()")) @map("product_code")
   sellerId            String             @map("seller_id")
   categoryId          String             @map("category_id")
   title               String

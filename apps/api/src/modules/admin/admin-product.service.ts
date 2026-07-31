@@ -95,6 +95,8 @@ export class AdminProductService {
       const productIds = await fulltextProductSearch(this.prisma, search);
       where.OR = [
         { id: { in: productIds } },
+        // İlan numarası (U010001) — destek/şikayet akışlarında doğrudan aranır.
+        { productCode: { contains: search.trim(), mode: "insensitive" } },
         { seller: { displayName: { contains: search, mode: "insensitive" } } },
         { seller: { email: { contains: search, mode: "insensitive" } } },
         { category: { name: { contains: search, mode: "insensitive" } } },
@@ -226,6 +228,7 @@ export class AdminProductService {
     // Create CSV header
     const headers = [
       "ID",
+      "İlan No",
       "Başlık",
       "Fiyat",
       "Durum",
@@ -239,6 +242,7 @@ export class AdminProductService {
     // Create CSV rows
     const rows = products.map((p) => [
       p.id,
+      p.productCode,
       `"${(p.title || "").replace(/"/g, '""')}"`,
       Number(p.price).toFixed(2),
       p.status,

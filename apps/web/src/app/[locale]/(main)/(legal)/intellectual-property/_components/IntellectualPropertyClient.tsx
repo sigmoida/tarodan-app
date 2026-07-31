@@ -51,7 +51,10 @@ export default function IntellectualPropertyClient() {
               İhlal edildiğini iddia ettiğiniz eserin tanımı ve (varsa) orijinal
               linki
             </li>
-            <li>Platformdaki ihlal içeriğinin konumu (URL, ilan no)</li>
+            <li>
+              Platformdaki ihlal içeriğinin konumu (ilan sayfasındaki &quot;İlan
+              No&quot; — örn. U010001 — veya sayfa adresi)
+            </li>
             <li>İletişim bilgileriniz (ad, e-posta, telefon)</li>
             <li>
               İçeriğin izniniz olmadan kullanıldığına dair iyi niyetli inanç

@@ -17,6 +17,8 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export interface ProductDetail {
   id: string;
+  /** İnsan-okunur ilan numarası (U010001) — kalıcı, kullanıcıya gösterilir. */
+  productCode: string;
   title: string;
   description: string;
   price: number;

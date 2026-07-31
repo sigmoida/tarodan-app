@@ -253,6 +253,7 @@ export class ProductCommonService {
 
     return {
       id: product.id,
+      productCode: product.productCode,
       sellerId, // flat sellerId (nested seller.id'ye ek) — API tüketicileri için
       title: product.title,
       description: product.description,

@@ -18,6 +18,7 @@ import {
   SellerDocumentStatus,
 } from "@prisma/client";
 import { paginate } from "../../common/list";
+import { promoteUserCodeToCorporate } from "../../common/helpers/code-prefixes";
 import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
 
 /**
@@ -415,6 +416,10 @@ export class AdminSellerApplicationService {
       );
     }
 
+    const corporateCode = promoteUserCodeToCorporate(
+      application.user.adminCode,
+    );
+
     await this.prisma.$transaction([
       this.prisma.corporateApplication.update({
         where: { id: applicationId },
@@ -438,6 +443,9 @@ export class AdminSellerApplicationService {
           companyName: application.companyLegalName,
           taxId: application.taxId,
           companyType: application.companyType,
+          // Hesap tipi bireyselden kurumsala geçtiği için kodun öneki de
+          // güncellenir; numara (kalıcı kimlik) korunur: B010023 → K010023.
+          ...(corporateCode ? { adminCode: corporateCode } : {}),
         },
       }),
     ]);

@@ -34,6 +34,11 @@ import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
 import { SecurityService } from "../security/security.service";
 import { isUsernameAllowed, normalizeUsername } from "./username.util";
+import { ENTITY_PREFIX } from "../../common/helpers/code-prefixes";
+
+/** Hesap tipi öneki — yalnızca bireysel (B) veya kurumsal (K). */
+type EntityUserPrefix =
+  typeof ENTITY_PREFIX.individualUser | typeof ENTITY_PREFIX.corporateUser;
 
 @Injectable()
 export class AuthService {
@@ -72,7 +77,11 @@ export class AuthService {
     return null;
   }
 
-  private async nextAdminCode(prefix: "B" | "S" | "K"): Promise<string> {
+  /**
+   * Hesap tipi kodu: B (bireysel) veya K (kurumsal). Satıcılık ayrı bir
+   * bayraktır, önek değildir — bireysel satıcı da B taşır.
+   */
+  private async nextAdminCode(prefix: EntityUserPrefix): Promise<string> {
     const [row] = await this.prisma.$queryRaw<Array<{ code: string }>>`
       SELECT generate_user_admin_code(${prefix}) AS code
     `;
@@ -180,7 +189,8 @@ export class AuthService {
 
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const adminCode = await this.nextAdminCode(dto.isSeller ? "S" : "B");
+    // Bireysel satıcı da bireysel hesaptır: önek satıcılığa göre değişmez.
+    const adminCode = await this.nextAdminCode(ENTITY_PREFIX.individualUser);
 
     // Create user
     let user;
@@ -587,7 +597,7 @@ export class AuthService {
 
     const [passwordHash, adminCode] = await Promise.all([
       bcrypt.hash(dto.password, 12),
-      this.nextAdminCode("K"),
+      this.nextAdminCode(ENTITY_PREFIX.corporateUser),
     ]);
     const now = new Date();
     let user;

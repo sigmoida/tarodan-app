@@ -17,6 +17,8 @@ export const aiCheckKey = (s?: string | null) =>
 
 export interface Product {
   id: string;
+  /** İnsan-okunur ilan numarası (U010001). */
+  productCode: string;
   title: string;
   price: number;
   originalPrice?: number | null;
@@ -56,6 +58,7 @@ const PLACEHOLDER = "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
 export function mapProducts(raw: any[], t: T): Product[] {
   return raw.map((p: any) => ({
     id: p.id,
+    productCode: p.productCode,
     title: p.title,
     price: Number(p.price),
     originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,

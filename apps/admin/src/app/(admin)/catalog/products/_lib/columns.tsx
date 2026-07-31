@@ -36,6 +36,9 @@ export function productColumns(t: T) {
       }),
       { minWidth: 560, sortKey: "title", sortType: "text" },
     ),
+    col.code<Product>(t("product.productCode"), "productCode", {
+      minWidth: 110,
+    }),
     col.user<Product>(
       t("admin.catalog.products.seller"),
       (p) => ({
