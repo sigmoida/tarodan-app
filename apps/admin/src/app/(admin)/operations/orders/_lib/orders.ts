@@ -32,6 +32,8 @@ export interface Order {
   offerId?: string | null;
   checkoutGroupId?: string | null;
   packageId?: string | null;
+  /** Koli numarası (PKG-…): kargo etiketindeki ve Sürat'a giden kod. */
+  packageNumber?: string | null;
   groupNumber?: string | null;
   groupItemCount: number;
   productImageUrl?: string | null;
@@ -51,6 +53,7 @@ export interface OrderLineItem {
   productImageUrl?: string | null;
   seller: { id: string; displayName: string; email?: string };
   packageId?: string | null;
+  packageNumber?: string | null;
   activeRefundRequest?: Order["activeRefundRequest"];
   cancellationType?: string | null;
 }
@@ -58,6 +61,8 @@ export interface OrderLineItem {
 /** A satıcı-paketi (çatı): the line items of one seller within a checkout group. */
 export interface SellerPackage {
   key: string;
+  /** Koli numarası (PKG-…) — bir sepette satıcı sayısı kadar koli olur. */
+  packageNumber: string | null;
   seller: { id: string; displayName: string; email?: string };
   items: OrderLineItem[];
 }
@@ -128,6 +133,7 @@ export function mapOrders(raw: any[], t: T): Order[] {
     offerId: o.offerId ?? null,
     checkoutGroupId: o.checkoutGroupId ?? null,
     packageId: o.packageId ?? null,
+    packageNumber: o.packageNumber ?? null,
     groupNumber: o.groupNumber ?? null,
     groupItemCount: Number(o.groupItemCount || 1),
     productImageUrl: o.productImageUrl ?? null,
@@ -150,6 +156,7 @@ function toLineItem(o: Order): OrderLineItem {
     productImageUrl: o.productImageUrl,
     seller: o.seller,
     packageId: o.packageId ?? null,
+    packageNumber: o.packageNumber ?? null,
     activeRefundRequest: o.activeRefundRequest,
     cancellationType: o.cancellationType,
   };
@@ -163,7 +170,12 @@ function buildPackages(items: OrderLineItem[]): SellerPackage[] {
     const key = it.packageId ?? `seller:${it.seller.id}`;
     let pkg = map.get(key);
     if (!pkg) {
-      pkg = { key, seller: it.seller, items: [] };
+      pkg = {
+        key,
+        packageNumber: it.packageNumber ?? null,
+        seller: it.seller,
+        items: [],
+      };
       map.set(key, pkg);
       order.push(key);
     }

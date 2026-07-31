@@ -25,9 +25,14 @@ interface PhysicalShipmentColumnProps {
   toggleRow: (id: string) => void;
 }
 
+/**
+ * Kolinin başlığı = gerçek koli numarası (PKG-…). Bu kod Sürat'a
+ * `OzelKargoTakipNo` olarak gider ve kargo etiketinde yazar; müşteri de bununla
+ * sorgular. (Eskiden uuid'nin son 10 hanesinden sahte bir PKG- uydurulurdu.)
+ * Paketsiz eski kayıtlar taşıyıcı koduna, o da yoksa satır id'sine düşer.
+ */
 function parcelLabel(row: PhysicalShipmentRow): string {
-  const packageId = row.id.startsWith("pkg:") ? row.id.slice(4) : null;
-  if (packageId) return `PKG-${packageId.slice(-10).toUpperCase()}`;
+  if (row.packageNumber) return row.packageNumber;
   return row.providerTrackingId ?? row.trackingNumber ?? row.id.slice(5);
 }
 

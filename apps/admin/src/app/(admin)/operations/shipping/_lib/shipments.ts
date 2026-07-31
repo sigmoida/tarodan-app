@@ -8,7 +8,8 @@ import type { OrderShipmentRow, PhysicalShipmentRow } from "./types";
  * tracking yet) the row stands alone, keyed by its own shipment id.
  */
 function parcelKey(r: OrderShipmentRow): string {
-  if (r.order?.packageId) return `pkg:${r.order.packageId}`;
+  const packageId = r.packageId ?? r.order?.packageId;
+  if (packageId) return `pkg:${packageId}`;
   const tracking = r.providerTrackingId || r.trackingNumber;
   if (tracking) return `trk:${r.provider ?? ""}:${tracking}`;
   return `ship:${r.id}`;
@@ -34,6 +35,7 @@ export function toPhysicalShipments(
     if (!parcel) {
       parcel = {
         id: key,
+        packageNumber: r.orderPackage?.packageNumber ?? null,
         provider: r.provider,
         trackingNumber: r.trackingNumber,
         providerTrackingId: r.providerTrackingId,
@@ -49,6 +51,8 @@ export function toPhysicalShipments(
     } else if (
       new Date(r.updatedAt).getTime() > new Date(parcel.updatedAt).getTime()
     ) {
+      parcel.packageNumber =
+        r.orderPackage?.packageNumber ?? parcel.packageNumber;
       parcel.provider = r.provider;
       parcel.trackingNumber = r.trackingNumber;
       parcel.providerTrackingId = r.providerTrackingId;

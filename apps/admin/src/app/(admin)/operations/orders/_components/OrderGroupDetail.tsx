@@ -73,10 +73,31 @@ function LineItem({ item }: { item: OrderLineItem }) {
   );
 }
 
-/** A bordered box of line items (one satıcı paketi, or the whole group). */
-function ItemsBox({ items }: { items: OrderLineItem[] }) {
+/**
+ * A bordered box of line items = BİR KOLİ (satıcı paketi). Başlıkta kolinin
+ * kendi numarası (PKG-…) yazar: sepet numarasından ve sipariş numaralarından
+ * bağımsız, Sürat'a giden ve kargo etiketinde okunan kod.
+ */
+function ItemsBox({
+  items,
+  packageNumber,
+}: {
+  items: OrderLineItem[];
+  packageNumber?: string | null;
+}) {
+  const t = useTranslations();
   return (
     <div className="rounded-lg border border-border-subtle bg-surface">
+      {packageNumber && (
+        <div className="flex items-center gap-2 border-b border-border-subtle px-3 py-2">
+          <span className="text-xs text-muted">
+            {t("admin.operations.common.packageNumber")}
+          </span>
+          <span className="font-mono text-sm font-medium text-heading">
+            {packageNumber}
+          </span>
+        </div>
+      )}
       <div className="divide-y divide-border-subtle">
         {items.map((item) => (
           <LineItem key={item.id} item={item} />
@@ -96,14 +117,21 @@ export function OrderGroupDetail({ row }: { row: OrderGroupRow }) {
     return (
       <div className="space-y-2 bg-surface-alt/40 px-4 py-3">
         {row.packages.map((pkg) => (
-          <ItemsBox key={pkg.key} items={pkg.items} />
+          <ItemsBox
+            key={pkg.key}
+            items={pkg.items}
+            packageNumber={pkg.packageNumber}
+          />
         ))}
       </div>
     );
   }
   return (
     <div className="bg-surface-alt/40 px-4 py-2">
-      <ItemsBox items={row.items} />
+      <ItemsBox
+        items={row.items}
+        packageNumber={row.packages[0]?.packageNumber}
+      />
     </div>
   );
 }

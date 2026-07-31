@@ -2,6 +2,10 @@
 export interface OrderShipmentRow {
   id: string;
   provider: string | null;
+  /** Koli (OrderPackage) — aynı koliyi paylaşan satırlar tek gönderidir. */
+  packageId: string | null;
+  /** Koli numarası (PKG-…): kargo etiketindeki ve Sürat'a giden kod. */
+  orderPackage?: { packageNumber: string } | null;
   trackingNumber: string | null;
   /** Real Sürat cargo code (KargoTakipNo). */
   providerTrackingId: string | null;
@@ -39,6 +43,8 @@ export interface ParcelLineItem {
 export interface PhysicalShipmentRow {
   /** Stable dedupe id: `pkg:<id>` | `trk:<provider>:<tracking>` | `ship:<id>`. */
   id: string;
+  /** Koli numarası (PKG-…) — paketsiz eski kayıtlarda null. */
+  packageNumber: string | null;
   provider: string | null;
   trackingNumber: string | null;
   providerTrackingId: string | null;
