@@ -98,6 +98,8 @@ const envSchema = z
     SMTP_PASS: z.string().optional(),
     SMTP_SECURE: z.string().optional(),
     SMTP_TLS_REJECT_UNAUTHORIZED: z.string().optional(),
+    SMTP_IGNORE_TLS: z.string().optional(),
+    SMTP_MIN_TLS_VERSION: z.string().optional(),
     // Free-form: accepts both "info@tarodan.com.tr" and "Tarodan <info@…>".
     MAIL_FROM: z.string().optional(),
     SUPPORT_EMAIL: z.string().optional(),

@@ -256,6 +256,10 @@ services:
       SMTP_PASS: ${SMTP_PASS}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_TLS_REJECT_UNAUTHORIZED: ${SMTP_TLS_REJECT_UNAUTHORIZED:-false}
+      # Legacy relays: SMTP_MIN_TLS_VERSION=TLSv1 to keep STARTTLS on a host
+      # stuck below TLSv1.2, or SMTP_IGNORE_TLS=true to skip STARTTLS entirely.
+      SMTP_MIN_TLS_VERSION: ${SMTP_MIN_TLS_VERSION}
+      SMTP_IGNORE_TLS: ${SMTP_IGNORE_TLS:-false}
       MAIL_FROM: ${MAIL_FROM:-Tarodan <info@tarodan.com.tr>}
       SUPPORT_EMAIL: ${SUPPORT_EMAIL:-destek@tarodan.com.tr}
       SUPPORT_NOTIFICATION_EMAIL: ${SUPPORT_NOTIFICATION_EMAIL:-destek@tarodan.com.tr}
@@ -338,6 +342,10 @@ services:
       SMTP_PASS: ${SMTP_PASS}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_TLS_REJECT_UNAUTHORIZED: ${SMTP_TLS_REJECT_UNAUTHORIZED:-false}
+      # Legacy relays: SMTP_MIN_TLS_VERSION=TLSv1 to keep STARTTLS on a host
+      # stuck below TLSv1.2, or SMTP_IGNORE_TLS=true to skip STARTTLS entirely.
+      SMTP_MIN_TLS_VERSION: ${SMTP_MIN_TLS_VERSION}
+      SMTP_IGNORE_TLS: ${SMTP_IGNORE_TLS:-false}
       MAIL_FROM: ${MAIL_FROM:-Tarodan <info@tarodan.com.tr>}
       SUPPORT_EMAIL: ${SUPPORT_EMAIL:-destek@tarodan.com.tr}
       SUPPORT_NOTIFICATION_EMAIL: ${SUPPORT_NOTIFICATION_EMAIL:-destek@tarodan.com.tr}

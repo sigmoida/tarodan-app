@@ -37,6 +37,9 @@ export interface SmtpResponse {
   error?: string;
 }
 
+/** Accepted SMTP_MIN_TLS_VERSION values, mirroring Node's SecureVersion. */
+const SECURE_VERSIONS = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"] as const;
+
 @Injectable()
 export class SmtpProvider {
   private readonly logger = new Logger(SmtpProvider.name);
@@ -64,6 +67,27 @@ export class SmtpProvider {
         "SMTP_TLS_REJECT_UNAUTHORIZED",
         "false",
       ) === "true";
+    // Skip STARTTLS even when the server advertises it. Needed for relays that
+    // announce STARTTLS but cannot complete a handshake Node will accept; the
+    // session (credentials included) then travels in the clear, so only enable
+    // this when the provider states the mailbox has no encryption.
+    const ignoreTLS =
+      this.configService.get<string>("SMTP_IGNORE_TLS", "false") === "true";
+    // Node 20 ships OpenSSL 3, which refuses anything below TLSv1.2 outright:
+    // a host still on TLSv1/TLSv1.1 fails with
+    // "ssl_choose_client_version: unsupported protocol". Lowering minVersion is
+    // not enough on its own — OpenSSL's default security level also rejects the
+    // old ciphers — so drop SECLEVEL alongside it.
+    const configuredMinVersion = this.configService
+      .get<string>("SMTP_MIN_TLS_VERSION", "")
+      .trim();
+    const minVersion = SECURE_VERSIONS.find((v) => v === configuredMinVersion);
+    if (configuredMinVersion && !minVersion) {
+      this.logger.warn(
+        `Ignoring invalid SMTP_MIN_TLS_VERSION="${configuredMinVersion}" (expected one of ${SECURE_VERSIONS.join(", ")})`,
+      );
+    }
+    const allowsLegacyTls = minVersion === "TLSv1" || minVersion === "TLSv1.1";
 
     this.fromEmail = this.configService.get<string>(
       "MAIL_FROM",
@@ -77,9 +101,12 @@ export class SmtpProvider {
         host,
         port,
         secure,
+        ignoreTLS,
         auth: user && pass ? { user, pass } : undefined,
         tls: {
           rejectUnauthorized,
+          ...(minVersion ? { minVersion } : {}),
+          ...(allowsLegacyTls ? { ciphers: "DEFAULT@SECLEVEL=0" } : {}),
         },
       });
 
