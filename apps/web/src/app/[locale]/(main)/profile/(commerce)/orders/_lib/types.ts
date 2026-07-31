@@ -150,6 +150,8 @@ export interface ServerOrderGroup {
   kind: "group" | "package" | "synthetic";
   id: string;
   groupNumber: string;
+  /** Satıcı çatısında paketin kargo referansı (= paketteki en küçük sipariş no). */
+  packageRef?: string | null;
   totalAmount: number;
   status: string;
   createdAt: string;
@@ -165,12 +167,15 @@ export interface ServerOrderGroup {
   orders: Order[];
 }
 
-/** Sürat'ta yalnız taşıyıcının gerçek kodu; iç paket referansı gösterilmez. */
+/**
+ * Takip numarası: taşıyıcının verdiği gerçek kod varsa o, yoksa bizim paket
+ * referansımız (paketteki en küçük sipariş numarası). Bu referans Sürat'a
+ * `OzelKargoTakipNo` olarak gönderildiği için müşteri onunla da sorgulayabilir;
+ * kargo kodu gelene kadar ekranın boş kalmaması için gösterilir.
+ */
 export const visibleCargoCode = (
   cargo: ServerPackageView["cargo"],
-): string | null =>
-  cargo?.cargoCode ??
-  (cargo && cargo.provider !== "surat" ? (cargo.trackingNumber ?? null) : null);
+): string | null => cargo?.cargoCode ?? cargo?.trackingNumber ?? null;
 
 /** İptal edilebilir sipariş durumları (kargo öncesi). */
 const CANCELLABLE_STATUSES = ["pending_payment", "paid", "preparing"];

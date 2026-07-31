@@ -509,12 +509,16 @@ export class OrderQueryService {
     const orders = [...pkg.orders].sort((a, b) =>
       String(a.orderNumber).localeCompare(String(b.orderNumber)),
     );
+    // Paketin ortak Sürat referansı = en küçük orderNumber (resolveSuratRef ile
+    // aynı kural); kargo etiketiyle eşleşen numara budur.
+    const packageRef = orders[0]?.orderNumber ?? pkg.id;
     return {
       kind: "package" as const,
       id: pkg.id,
-      // Paketin ortak Sürat referansı = en küçük orderNumber (resolveSuratRef
-      // ile aynı kural) — satıcının gördüğü çatı numarası kargo ile eşleşir.
-      groupNumber: orders[0]?.orderNumber ?? pkg.id,
+      // Çatı başlığı sepet numarasıdır: satıcı ve alıcı aynı numarayı görür.
+      // Sepetsiz (eski/teklif kaynaklı) siparişlerde paket referansına düşer.
+      groupNumber: pkg.checkoutGroup?.groupNumber ?? packageRef,
+      packageRef,
       totalAmount: pkg.orders.reduce(
         (sum: number, o: any) => sum + Number(o.totalAmount),
         0,
@@ -680,7 +684,12 @@ export class OrderQueryService {
       pkgIds.length
         ? this.prisma.orderPackage.findMany({
             where: { id: { in: pkgIds } },
-            include: { orders: { include: this.groupOrderInclude } },
+            include: {
+              orders: { include: this.groupOrderInclude },
+              // Satıcı da sepet (çatı) numarasını görür — alıcıyla aynı
+              // numarayı konuşabilmek için.
+              checkoutGroup: { select: { groupNumber: true } },
+            },
           })
         : Promise.resolve([]),
       orderIds.length

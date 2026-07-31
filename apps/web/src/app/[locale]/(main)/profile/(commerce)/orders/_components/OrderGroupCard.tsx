@@ -3,12 +3,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import {
-  StatusBadge,
-  orderStatusConfig,
-  Badge,
-  ThumbnailStack,
-} from "@tarodan/ui";
+import { StatusBadge, orderStatusConfig } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useLocale, useTranslations } from "next-intl";
@@ -127,33 +122,36 @@ export default function OrderGroupCard({
   onCancelGroup,
 }: OrderGroupCardProps) {
   const t = useTranslations();
-  const isMulti = group.orders.length > 1;
   const date = group.createdAt;
   const multiPackage = group.packages.length > 1;
+  // Satıcı çatısında sepet numarasının yanında paketin kargo referansı da
+  // gösterilir; ikisi aynıysa (sepetsiz sipariş) tek numara kalır.
+  const packageRef =
+    group.packageRef && group.packageRef !== group.groupNumber
+      ? group.packageRef
+      : null;
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated">
-      {/* Umbrella header — count-aware */}
+      {/* Umbrella header — tek ve çok ürünlü sepette aynı düzen */}
       <div className="p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="font-mono text-sm text-muted">{group.groupNumber}</p>
+            <p className="font-mono text-sm text-muted">
+              {group.groupNumber}
+              {packageRef && (
+                <span className="text-subtle"> · {packageRef}</span>
+              )}
+            </p>
             <p className="text-sm text-subtle">{formatDate(date)}</p>
           </div>
           <div className="flex items-center gap-3">
-            {isMulti && (
-              <Badge variant="outline" size="sm">
-                {group.orders.length} {t("collection.items")}
-              </Badge>
-            )}
-            {!isMulti && (
-              <div className="text-right">
-                <p className="text-xs text-muted">{t("common.total")}</p>
-                <p className="text-lg font-semibold text-primary-500">
-                  {formatTL(group.totalAmount)}
-                </p>
-              </div>
-            )}
+            <div className="text-right">
+              <p className="text-xs text-muted">{t("common.total")}</p>
+              <p className="text-lg font-semibold text-primary-500">
+                {formatTL(group.totalAmount)}
+              </p>
+            </div>
             {isGroupCancellable(group) && (
               <Button
                 variant="danger"
@@ -174,43 +172,6 @@ export default function OrderGroupCard({
             </ButtonLink>
           </div>
         </div>
-        {isMulti && (
-          <div className="mt-4 flex items-center gap-4">
-            <ThumbnailStack
-              items={group.orders}
-              getKey={(o) => o.id}
-              max={4}
-              size="lg"
-              renderItem={(o) => {
-                const { image } = getOrderPrimary(o);
-                return (
-                  <OptimizedImage
-                    src={image || PLACEHOLDER}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    fallbackSrc={PLACEHOLDER}
-                    logContext={{ orderId: o.id, page: "orders-group" }}
-                  />
-                );
-              }}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-heading">
-                {t("order.cartOfItems", { count: group.orders.length })}
-              </p>
-              <p className="text-sm text-muted">
-                {t("order.shipsPerSellerPackage")}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted">{t("common.total")}</p>
-              <p className="text-lg font-semibold text-primary-500">
-                {formatTL(group.totalAmount)}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Body — product line(s) grouped per seller-package ("çatı"). Same seller =
