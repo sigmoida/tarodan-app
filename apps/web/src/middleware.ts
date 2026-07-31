@@ -4,8 +4,9 @@ import { createAuthMiddleware } from "@tarodan/auth/middleware";
 import { defaultLocale, locales } from "@tarodan/i18n";
 import { webAuthConfig } from "@/lib/auth.config";
 import { routing } from "@/i18n/routing";
-import { SITE_UNLOCK_COOKIE, safeEqual, siteUnlockToken } from "@/lib/siteLock";
+import { SITE_UNLOCK_COOKIE } from "@/lib/siteLock";
 import { internalComingSoonPath, isSiteLocked } from "@/lib/siteLockPolicy.mjs";
+import { verifyUnlockCookie } from "@/lib/siteUnlockCookie.mjs";
 
 /**
  * Web middleware = i18n routing (#214) composed with the edge auth gate.
@@ -112,11 +113,15 @@ export async function middleware(request: NextRequest) {
     rest !== "/coming-soon" &&
     !rest.startsWith("/coming-soon/")
   ) {
-    const pin = process.env.SITE_UNLOCK_PIN;
-    const cookieToken = request.cookies.get(SITE_UNLOCK_COOKIE)?.value;
+    const secret = process.env.SITE_UNLOCK_SECRET;
+    const cookieValue = request.cookies.get(SITE_UNLOCK_COOKIE)?.value;
     let unlocked = false;
-    if (pin && cookieToken) {
-      unlocked = safeEqual(cookieToken, await siteUnlockToken(pin));
+    if (secret && cookieValue) {
+      unlocked = await verifyUnlockCookie(
+        secret,
+        cookieValue,
+        Math.floor(Date.now() / 1000),
+      );
     }
     if (!unlocked) {
       const destination = request.nextUrl.clone();

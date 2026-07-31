@@ -102,6 +102,8 @@ import { CartModule } from "./modules/cart";
 import { TaxModule } from "./modules/tax";
 // Static pages (public GET /api/pages/:slug)
 import { PagesModule } from "./modules/pages";
+// Pre-launch early-access invite codes (public POST /api/site-access/verify)
+import { SiteAccessModule } from "./modules/site-access/site-access.module";
 
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ErrorLogInterceptor } from "./common/interceptors/error-log.interceptor";
@@ -255,6 +257,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     TaxModule,
     // Static pages (public GET /api/pages/:slug)
     PagesModule,
+    SiteAccessModule,
     // Dev/test hook'ları — yalnız NODE_ENV=test'te yüklenir
     ...(process.env.NODE_ENV === "test" ? [DevModule] : []),
   ],

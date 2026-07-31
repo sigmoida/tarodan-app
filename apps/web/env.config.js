@@ -16,6 +16,11 @@ const optionalSecret = z.preprocess(
   z.string().min(6).max(128).optional(),
 );
 
+const optionalUnlockSecret = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(32).max(256).optional(),
+);
+
 function createSchema(isProduction) {
   return z
     .object({
@@ -36,19 +41,23 @@ function createSchema(isProduction) {
       SENTRY_ORG: z.string().default("tarodan"),
       SENTRY_PROJECT: z.string().default("web"),
       // Pre-launch storefront gate (#398): flip SITE_LOCKED=true on the prod
-      // Coolify web app to route every visitor to /coming-soon; a matching PIN
-      // (server-only, never bundled) lets restricted users through by setting
-      // a httpOnly cookie. Left unset on staging/dev so the site stays open.
+      // Coolify web app to route every visitor to /coming-soon. Admin-managed
+      // invite codes (verified via the API) let restricted users through by
+      // setting an httpOnly cookie signed with SITE_UNLOCK_SECRET. Rotating
+      // the secret invalidates every issued unlock cookie at once.
+      // SITE_UNLOCK_PIN is an optional API-independent emergency fallback.
+      // Left unset on staging/dev so the site stays open.
       SITE_LOCKED: boolFromEnv,
+      SITE_UNLOCK_SECRET: optionalUnlockSecret,
       SITE_UNLOCK_PIN: optionalSecret,
     })
     .superRefine((values, ctx) => {
-      if (values.SITE_LOCKED && !values.SITE_UNLOCK_PIN) {
+      if (values.SITE_LOCKED && !values.SITE_UNLOCK_SECRET) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["SITE_UNLOCK_PIN"],
+          path: ["SITE_UNLOCK_SECRET"],
           message:
-            "SITE_UNLOCK_PIN is required when SITE_LOCKED=true (nobody could unlock the site otherwise).",
+            "SITE_UNLOCK_SECRET is required when SITE_LOCKED=true (unlock cookies could not be issued or verified otherwise).",
         });
       }
     });

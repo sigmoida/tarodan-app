@@ -18,6 +18,11 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     group: "Hesap",
   },
   {
+    key: "site-access-invite",
+    name: "Erken erişim daveti",
+    group: "Hesap",
+  },
+  {
     key: "order-confirmation",
     name: "Sipariş onayı (alıcı)",
     group: "Sipariş",

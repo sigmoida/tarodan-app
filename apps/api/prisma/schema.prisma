@@ -2307,6 +2307,28 @@ model PlatformSetting {
   @@map("platform_settings")
 }
 
+// Pre-launch early-access invite codes for the SITE_LOCKED storefront gate.
+// Codes are stored in plaintext on purpose: they only gate pre-launch
+// visibility and admins must be able to re-view/resend them.
+model SiteAccessPin {
+  id         String    @id @default(uuid())
+  code       String    @unique
+  label      String
+  email      String?
+  isActive   Boolean   @default(true) @map("is_active")
+  expiresAt  DateTime? @map("expires_at")
+  maxUses    Int?      @map("max_uses") // null = unlimited
+  usedCount  Int       @default(0) @map("used_count")
+  lastUsedAt DateTime? @map("last_used_at")
+  lastSentAt DateTime? @map("last_sent_at")
+  createdBy  String?   @map("created_by") // AdminUser.id, no FK so history survives staff removal
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("site_access_pins")
+}
+
 model AuditLog {
   id          String    @id @default(uuid())
   adminUserId String    @map("admin_user_id")

@@ -15,6 +15,7 @@ import {
   BanknotesIcon,
   DocumentTextIcon,
   TruckIcon,
+  KeyIcon,
   BellAlertIcon,
   CubeIcon,
   BuildingOffice2Icon,
@@ -462,6 +463,16 @@ export function getNavGroups(t: T): NavGroup[] {
           icon: TruckIcon,
           description: t("admin.shippingTariffs.description"),
           keywords: ["shipping", "tariff"],
+          permission: "settings",
+        },
+        {
+          name: t("admin.nav.items.earlyAccess.name"),
+          href: "/system/early-access",
+          icon: KeyIcon,
+          description: t("admin.nav.items.earlyAccess.description"),
+          keywords: t("admin.nav.items.earlyAccess.keywords")
+            .split(",")
+            .map((k) => k.trim()),
           permission: "settings",
         },
         {

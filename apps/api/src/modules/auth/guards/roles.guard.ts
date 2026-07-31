@@ -59,6 +59,7 @@ const PERMISSION_MAP: Record<string, string[]> = {
   tax: ["tax"],
   shipping: ["shipping"],
   settings: ["settings", "payment_settings"],
+  "site-access-pins": ["settings"],
   logs: ["logs"],
   "audit-logs": ["audit_logs"],
   moderation: ["ai_moderation"],

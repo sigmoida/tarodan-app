@@ -264,6 +264,7 @@ export function getEmailTemplateSubject(
     "trade-completed": "Takasınız Tamamlandı",
     "guest-checkout-otp": "Misafir Sipariş Doğrulama Kodu",
     "email-change-otp": "E-posta Değişikliği Doğrulama Kodu",
+    "site-access-invite": "Tarodan Erken Erişim Davetiniz",
     "invoice-buyer": `Faturanız - ${data?.invoiceNumber || ""}`,
     "invoice-seller": `Satış Faturası - ${data?.invoiceNumber || ""}`,
     "elogo-invoice": `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ""}`,
@@ -1026,6 +1027,25 @@ export function renderEmailTemplate(
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Bu değişikliği siz talep etmediyseniz bu e-postayı görmezden gelebilirsiniz; hesabınız etkilenmez.</p>
     `,
       "E-posta Değişikliği Doğrulama Kodu",
+    ),
+
+    "site-access-invite": wrapEmail(
+      `
+      ${titleBlock("Tarodan Erken Erişim Davetiniz")}
+      ${greeting(data?.name)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tarodan'ı herkesten önce keşfetmeniz için davet edildiniz. Aşağıdaki erişim kodunu sitedeki giriş ekranına yazmanız yeterli:</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <div style="display: inline-block; background: #f3f4f6; border: 2px dashed #d1d5db; border-radius: 16px; padding: 24px 48px;">
+          <p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #111827; margin: 0; font-family: monospace;">${data?.code || ""}</p>
+        </div>
+      </div>
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Siteye Git", frontendUrl)}
+      </div>
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu kod size özeldir; başkasıyla paylaşmayın.</p>`)}
+      <p style="font-size: 14px; color: #6b7280; margin: 24px 0 0 0;">Görüşmek üzere!<br/><strong style="color: #f97316;">Tarodan Ekibi</strong></p>
+    `,
+      "Tarodan Erken Erişim Davetiniz",
     ),
 
     "invoice-buyer": wrapEmail(

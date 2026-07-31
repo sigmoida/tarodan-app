@@ -26,6 +26,9 @@ import { AdminService } from "./admin.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCommissionService } from "./admin-commission.service";
 import { AdminSettingsService } from "./admin-settings.service";
+import { AdminSiteAccessService } from "./admin-site-access.service";
+import { AdminSiteAccessController } from "./admin-site-access.controller";
+import { SiteAccessModule } from "../site-access/site-access.module";
 import { AdminUserService } from "./admin-user.service";
 import { AdminStaffService } from "./admin-staff.service";
 import { AdminProductService } from "./admin-product.service";
@@ -106,6 +109,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ModerationModule,
     ElogoModule,
     ShippingTariffModule,
+    SiteAccessModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [
@@ -131,12 +135,14 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminReviewController,
     AdminSellerApplicationController,
     AdminAdPackageController,
+    AdminSiteAccessController,
   ],
   providers: [
     AdminService,
     AdminAuditService,
     AdminCommissionService,
     AdminSettingsService,
+    AdminSiteAccessService,
     AdminUserService,
     AdminStaffService,
     AdminProductService,
