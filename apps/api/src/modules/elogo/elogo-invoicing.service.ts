@@ -21,7 +21,12 @@ import { StorageService } from "../storage/storage.service";
 import { SmtpProvider } from "../notification/providers/smtp.provider";
 import { buildInvoiceXml, type UblParty } from "./ubl/ubl-invoice.builder";
 import type { ElogoDocumentType } from "./elogo.types";
-import { Prisma, type ElogoInvoice } from "@prisma/client";
+import {
+  Prisma,
+  type ElogoInvoice,
+  type ElogoInvoiceType,
+} from "@prisma/client";
+import { invoiceAmountsFor } from "./invoice-amounts";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 
@@ -101,13 +106,6 @@ export class ElogoInvoicingService {
   private get xsltUuid(): string | undefined {
     return this.cfg("ELOGO_INVOICE_XSLT_UUID") || undefined;
   }
-  /** Saklanan tutarlar KDV dahil mi (gross)? Varsayılan: evet (tüketici fiyatları KDV dahildir). */
-  private get amountsIncludeVat(): boolean {
-    return (
-      this.cfg("ELOGO_AMOUNTS_INCLUDE_VAT", "true").toLowerCase() !== "false"
-    );
-  }
-
   private supplierParty(): UblParty {
     return {
       vknTckn: this.cfg("ELOGO_COMPANY_VKN", this.cfg("ELOGO_WS_USERNAME", "")),
@@ -124,19 +122,17 @@ export class ElogoInvoicingService {
   private round2(n: number): number {
     return Math.round((n + Number.EPSILON) * 100) / 100;
   }
-  /** Saklanan tutar → KDV hariç matrah. amountsIncludeVat=false ise tutar zaten matrahtır. */
-  private toNet(amount: number, vatRate: number): number {
-    return this.amountsIncludeVat
-      ? this.round2(amount / (1 + vatRate / 100))
-      : this.round2(amount);
-  }
+  /**
+   * Tutarın KDV yönü faturanın TÜRÜNDEN gelir, ortamdan değil — komisyon/hizmet
+   * bedeli matrahtır (KDV eklenir), tüketici fiyatları brüttür (KDV ayrıştırılır).
+   * Kural ve gerekçesi: `invoice-amounts.ts`.
+   */
   private invoiceAmounts(
+    type: ElogoInvoiceType,
     amount: number,
     vatRate: number,
   ): { net: number; tax: number; total: number } {
-    const net = this.toNet(amount, vatRate);
-    const tax = this.round2(net * (vatRate / 100));
-    return { net, tax, total: this.round2(net + tax) };
+    return invoiceAmountsFor(type, amount, vatRate);
   }
   private ymd(d: Date): string {
     return d.toISOString().slice(0, 10);
@@ -707,7 +703,7 @@ export class ElogoInvoicingService {
       return;
     }
     const rate = Number(inv.vatRate);
-    const amounts = this.invoiceAmounts(gross, rate);
+    const amounts = this.invoiceAmounts(inv.type, gross, rate);
     await this.prisma.elogoInvoice.update({
       where: { id: inv.id },
       data: {
@@ -1072,7 +1068,7 @@ export class ElogoInvoicingService {
       );
       const now = new Date();
       const vatRate = await this.resolveVatRate();
-      const amounts = this.invoiceAmounts(grossAmount, vatRate);
+      const amounts = this.invoiceAmounts(type, grossAmount, vatRate);
 
       // Sequence artışı ve unique(type,sourceId) aynı SERIALIZABLE transaction'da:
       // yarışın kaybedeni numara tüketmez; kazanan kayıt tek ETTN ile gönderilir.
@@ -1847,7 +1843,8 @@ export class ElogoInvoicingService {
           inv.type === "commission"
             ? Number(ledger.sellerCommission)
             : Number(ledger.buyerFee);
-        return this.invoiceAmounts(sourceAmount, Number(inv.vatRate)).total;
+        return this.invoiceAmounts(inv.type, sourceAmount, Number(inv.vatRate))
+          .total;
       }
     }
     if (inv.type === "platform_sale" || inv.type === "membership") {
@@ -1859,6 +1856,7 @@ export class ElogoInvoicingService {
         .catch(() => null);
       if (order) {
         return this.invoiceAmounts(
+          inv.type,
           Number(order.totalAmount),
           Number(inv.vatRate),
         ).total;
@@ -1872,6 +1870,7 @@ export class ElogoInvoicingService {
           .catch(() => null);
         if (membershipPayment) {
           return this.invoiceAmounts(
+            inv.type,
             Number(membershipPayment.amount),
             Number(inv.vatRate),
           ).total;
@@ -1886,8 +1885,11 @@ export class ElogoInvoicingService {
         })
         .catch(() => null);
       if (boost) {
-        return this.invoiceAmounts(Number(boost.price), Number(inv.vatRate))
-          .total;
+        return this.invoiceAmounts(
+          inv.type,
+          Number(boost.price),
+          Number(inv.vatRate),
+        ).total;
       }
     }
     return Number(inv.originalTotal ?? inv.total);

@@ -7,7 +7,6 @@ function fakeConfig(values: Record<string, string> = {}): ConfigService {
     ELOGO_COMPANY_VKN: "7620277268",
     ELOGO_COMPANY_TITLE: "TARODAN",
     ELOGO_VAT_RATE: "20",
-    ELOGO_AMOUNTS_INCLUDE_VAT: "true",
     ELOGO_INVOICE_PREFIX: "TRD",
     ELOGO_INVOICE_XSLT_UUID: "XSLT-UUID",
     ...values,
@@ -188,7 +187,9 @@ function makeElogo(over: Partial<Record<string, any>> = {}): ElogoService {
 }
 
 describe("ElogoInvoicingService", () => {
-  it("komisyon: satıcıya e-Arşiv keser, KDV-dahil 120 → matrah 100, gönderim şekli marker", async () => {
+  // Komisyon MATRAH bazlıdır: ledger tutarı KDV hariçtir (KDV artık siparişte
+  // ayrı kolonda), fatura KDV'yi ÜSTÜNE ekler → 120 matrah + 24 KDV = 144.
+  it("komisyon: satıcıya e-Arşiv keser, matrah 120 → KDV 24, gönderim şekli marker", async () => {
     const prisma = makePrisma({
       orders: { o1: { sellerId: "s1" } },
       ledgers: { o1: { sellerCommission: 120, refundedSellerCommission: 0 } },
@@ -204,12 +205,13 @@ describe("ElogoInvoicingService", () => {
     expect(params.documentType).toBe("EARCHIVE");
     expect(params.documentNumber).toMatch(/^TRD\d{13}$/);
     expect(params.ublXml).toContain("<cbc:ID>gonderimSekli</cbc:ID>");
-    expect(params.ublXml).toContain("100.00"); // matrah
+    expect(params.ublXml).toContain("120.00"); // matrah = saklanan tutar
     expect(params.xsltUuid).toBe("XSLT-UUID");
     const rec = prisma.invoices[0];
     expect(rec.status).toBe("sent");
-    expect(Number(rec.total)).toBeCloseTo(120, 2);
-    expect(Number(rec.taxAmount)).toBeCloseTo(20, 2);
+    expect(Number(rec.netAmount)).toBeCloseTo(120, 2);
+    expect(Number(rec.taxAmount)).toBeCloseTo(24, 2);
+    expect(Number(rec.total)).toBeCloseTo(144, 2);
   });
 
   it("alıcı adresi UBL PostalAddress'e yazılır (Country-only şema hatası önlenir)", async () => {
@@ -324,7 +326,7 @@ describe("ElogoInvoicingService", () => {
     await svc.issueCommissionInvoice("o1");
 
     expect(elogo.sendDocument).toHaveBeenCalledTimes(1);
-    expect(Number(prisma.invoices[0].total)).toBeCloseTo(72, 2); // 120 - 48
+    expect(Number(prisma.invoices[0].total)).toBeCloseTo(86.4, 2); // (120 − 48) matrah + %20
   });
 
   it("komisyon: tam iade (net ≤ 0) → fatura kesilmez (#88)", async () => {
@@ -435,7 +437,8 @@ describe("ElogoInvoicingService", () => {
     const returns = prisma.invoices.filter((i) => i.type === "return_invoice");
     expect(returns).toHaveLength(1);
     expect(returns[0].sourceId).toBe("i1:ra1");
-    expect(Number(returns[0].total)).toBeCloseTo(30, 2);
+    // 25 matrah + %20 KDV (komisyon matrah bazlı)
+    expect(Number(returns[0].total)).toBeCloseTo(36, 2);
     expect(returns[0].billingReferenceIssueDate).toEqual(issuedAt);
   });
 
@@ -486,7 +489,7 @@ describe("ElogoInvoicingService", () => {
     });
 
     expect(prisma.invoices[0].status).toBe("pending");
-    expect(Number(prisma.invoices[0].total)).toBeCloseTo(90, 2);
+    expect(Number(prisma.invoices[0].total)).toBeCloseTo(108, 2); // 90 matrah + %20
     expect(prisma.invoices[0].refundAdjustedAt).toEqual(finalizedAt);
   });
 
