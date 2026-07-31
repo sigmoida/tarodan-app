@@ -1,5 +1,16 @@
 # 05 — Siparişler, Kargo Takibi ve Faturalar
 
+> **GRUP ÇATISI (2026-07 güncellemesi):** Sunum kuralı değişti — her şey GRUP
+> bazında gösterilir. Tek satın alım bile 1 siparişlik gruptur; ayrı tıklanabilir
+> sipariş detayı YOKTUR (order id → grup görünümüne çözülür). Liste için
+> `GET /orders/groups?role=&tab=` (alıcı=CheckoutGroup, satıcı=kendi paketi),
+> detay için `GET /orders/:id/group` kullanılır. Ödeme grup başına TEKTİR
+> (`orderId` ile başlatma sunucuda gruba yönlendirilir); İPTAL grup bazındadır
+> (`POST /orders/groups/:id/cancel`, kısmen kargolanmış sepette tamamen kapalı);
+> iade sipariş bazında kalır; kargo SATICI PAKETİ başınadır (tek koli/tek barkod
+> — paket içindeki siparişlere ayrı kargo kartı çizilmez). Aşağıdaki tekil
+> `/orders` akışları YALNIZ veri referansıdır, sunum için kullanılmaz.
+
 > Önce `00-README.md` ve `11-api-contract.md`. Mobilde bu alan **eş** durumda;
 > tek eksik satıcı fatura yükleme (§5).
 

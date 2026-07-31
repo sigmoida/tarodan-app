@@ -1562,6 +1562,8 @@ model PaymentHold {
 
   @@unique([paymentId, orderId])
   @@index([paymentId])
+  // Grup dosyası + payouts artık hold'ları orderId ile sorguluyor.
+  @@index([orderId])
   @@map("payment_holds")
 }
 

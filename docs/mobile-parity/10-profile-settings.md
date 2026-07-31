@@ -20,18 +20,18 @@ apps/web/src/app/[locale]/(main)/profile/_hooks/                  # form hook'la
 Web bu ekranı **8 paralel çağrı** ile kuruyor; her biri **tek tek hata yakalar** (biri
 başarısız olursa ekran yine çalışır). Aynı yaklaşımı uygula.
 
-| Method | Path                      | Amaç                           |
-| ------ | ------------------------- | ------------------------------ |
-| `GET`  | `/users/me`               | Profil                         |
-| `GET`  | `/users/me/stats`         | Puan, yorum, takipçi, sayaçlar |
-| `GET`  | `/orders?limit=1`         | Sipariş sayısı (`meta.total`)  |
-| `GET`  | `/products/my?limit=100`  | Aktif ilan sayısı              |
-| `GET`  | `/trades?limit=1`         | Takas sayısı                   |
-| `GET`  | `/collections/my?limit=1` | Koleksiyon sayısı              |
-| `GET`  | `/offers/pending-count`   | Teklif badge (`.received`)     |
-| `GET`  | `/trades/pending-count`   | Takas badge (`.received`)      |
-| `GET`  | `/wishlist`               | Favori badge                   |
-| `GET`  | `/messages/unread-count`  | Okunmamış mesaj badge          |
+| Method | Path                                | Amaç                                                               |
+| ------ | ----------------------------------- | ------------------------------------------------------------------ |
+| `GET`  | `/users/me`                         | Profil                                                             |
+| `GET`  | `/users/me/stats`                   | Puan, yorum, takipçi, sayaçlar                                     |
+| `GET`  | `/orders/groups?role=buyer&limit=1` | Sipariş GRUBU sayısı (`meta.total`) — birim gruptur, sipariş değil |
+| `GET`  | `/products/my?limit=100`            | Aktif ilan sayısı                                                  |
+| `GET`  | `/trades?limit=1`                   | Takas sayısı                                                       |
+| `GET`  | `/collections/my?limit=1`           | Koleksiyon sayısı                                                  |
+| `GET`  | `/offers/pending-count`             | Teklif badge (`.received`)                                         |
+| `GET`  | `/trades/pending-count`             | Takas badge (`.received`)                                          |
+| `GET`  | `/wishlist`                         | Favori badge                                                       |
+| `GET`  | `/messages/unread-count`            | Okunmamış mesaj badge                                              |
 
 > Bu blok **pencere odağında yeniden çekilmemeli** (web'de bilinçli kapatılmış — istek
 > fırtınası oluşturuyordu). Mobilde uygulama ön plana geldiğinde makul bir `staleTime`
@@ -189,13 +189,13 @@ Başarıda oturumu kapat ve anasayfaya dön.
 
 ## 12. Satıcı paneli / istatistikler
 
-| Method | Path                                      | Auth   | Amaç                                                       |
-| ------ | ----------------------------------------- | ------ | ---------------------------------------------------------- |
-| `GET`  | `/users/me/stats`                         | bearer | `totalRevenue`, aktif/satılmış ilan sayısı                 |
-| `GET`  | `/products/my/stats`                      | bearer | `counts.active`, `counts.sold` (tercih edilen)             |
-| `GET`  | `/orders?role=seller`                     | bearer | Bekleyen = durum ∈ `{paid, preparing}` (istemcide sayılır) |
-| `GET`  | `/users/me/analytics?period=7d\|30d\|90d` | bearer | Görüntülenme/beğeni/satış/gelir                            |
-| `GET`  | `/orders/seller/earnings`                 | bearer | `{ totalEarnings, pendingEarnings }`                       |
+| Method | Path                                      | Auth   | Amaç                                                                    |
+| ------ | ----------------------------------------- | ------ | ----------------------------------------------------------------------- |
+| `GET`  | `/users/me/stats`                         | bearer | `totalRevenue`, aktif/satılmış ilan sayısı                              |
+| `GET`  | `/products/my/stats`                      | bearer | `counts.active`, `counts.sold` (tercih edilen)                          |
+| `GET`  | `/orders/seller/pending-count`            | bearer | Bekleyen PAKET sayısı sunucudan (`.pending`) — istemcide sayım YAPILMAZ |
+| `GET`  | `/users/me/analytics?period=7d\|30d\|90d` | bearer | Görüntülenme/beğeni/satış/gelir                                         |
+| `GET`  | `/orders/seller/earnings`                 | bearer | `{ totalEarnings, pendingEarnings }`                                    |
 
 ---
 
