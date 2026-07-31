@@ -15,6 +15,7 @@ import { ResourceList, useResourceList } from "@/components/list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { CommissionSummary } from "./_components/CommissionSummary";
+import { CalculationExplainer } from "./_components/CalculationExplainer";
 import { TradeRateCard } from "./_components/TradeRateCard";
 import { CommissionTable } from "./_components/CommissionTable";
 import { CommissionRuleFormModal } from "./_modals/CommissionRuleFormModal";
@@ -120,6 +121,9 @@ export default function CommissionPage() {
         }
       />
       <CommissionSummary />
+      {/* Hesaplama mantığı + formül: bu ekrandaki oranların bir siparişte nasıl
+          tutara dönüştüğünü gösterir. */}
+      <CalculationExplainer />
       <Alert
         variant="info"
         title={t("admin.finance.commission.calculationTitle")}
