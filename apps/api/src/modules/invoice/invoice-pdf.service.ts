@@ -186,32 +186,24 @@ export class InvoicePdfService {
   }
 
   /**
-   * Generate unique invoice number
+   * Aylık sıralı belge numarası: SPR-YYYYMM-NNNNNN.
+   *
+   * Sayaç `document_sequences` üzerinde upsert + increment ile ATOMİK alınır;
+   * "o ayın en büyük numarasını oku +1 yaz" yaklaşımı eşzamanlı iki faturada
+   * aynı numarayı üretip unique index'e takılıyordu.
    */
   async generateInvoiceNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, "0");
+    const now = new Date();
+    const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const scope = `SPR-${period}`;
 
-    // Get last invoice number for this month
-    const lastInvoice = await this.prisma.invoice.findFirst({
-      where: {
-        invoiceNumber: {
-          startsWith: `SPR-${year}${month}`,
-        },
-      },
-      orderBy: { invoiceNumber: "desc" },
+    const row = await this.prisma.documentSequence.upsert({
+      where: { scope },
+      create: { scope, lastValue: 1 },
+      update: { lastValue: { increment: 1 } },
     });
 
-    let sequence = 1;
-    if (lastInvoice) {
-      const lastSequence = parseInt(
-        lastInvoice.invoiceNumber.split("-")[2],
-        10,
-      );
-      sequence = lastSequence + 1;
-    }
-
-    return `SPR-${year}${month}-${String(sequence).padStart(6, "0")}`;
+    return `${scope}-${String(row.lastValue).padStart(6, "0")}`;
   }
 
   /**

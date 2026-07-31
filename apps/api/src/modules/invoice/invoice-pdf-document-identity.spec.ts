@@ -53,7 +53,11 @@ describe("InvoicePdfService — belge kimliği (sipariş özeti, fatura değil)"
 
   it("belge numarası resmî eLogo önekini (TRD) taklit etmez", async () => {
     const prisma = {
-      invoice: { findFirst: jest.fn().mockResolvedValue(null) },
+      documentSequence: {
+        upsert: jest
+          .fn()
+          .mockResolvedValue({ scope: "SPR-202607", lastValue: 1 }),
+      },
     };
     const svc = new InvoicePdfService(
       prisma as any,

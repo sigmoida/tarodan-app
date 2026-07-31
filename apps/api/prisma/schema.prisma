@@ -1906,6 +1906,19 @@ model ElogoDocSequence {
   @@map("elogo_doc_sequences")
 }
 
+/// Tarodan iç belge sayaçları (ör. PDF fatura no: scope = "SPR-202607").
+/// Numara `upsert + increment` ile ATOMİK alınır — "en büyüğü oku +1 yaz"
+/// yaklaşımı eşzamanlı iki belgede aynı numarayı üretip unique index'e
+/// takılıyordu.
+model DocumentSequence {
+  id        String   @id @default(uuid())
+  scope     String   @unique
+  lastValue Int      @default(0) @map("last_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("document_sequences")
+}
+
 /// Kurumsal (şirket) satıcının siparişe elle yüklediği ÜRÜN faturası PDF'i.
 /// Tarodan'ın eLogo gelir e-Arşivlerinden (komisyon/hizmet) AYRI; satıcının kendi
 /// sisteminden kestiği fatura. Sipariş başına TEK (orderId @unique); değiştirilebilir.
