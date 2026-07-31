@@ -31,10 +31,9 @@ export const AMOUNT_BASIS_BY_TYPE: Record<
   platform_sale: "gross",
   membership: "gross",
   boost: "gross",
-  // Takas nakit komisyonu: takas akışına hizmet KDV'si HENÜZ girmedi, bu yüzden
-  // `tradeCashPayment.commission` tahsil edilen brüt tutardır. Takas tarafı da
-  // hizmet KDV'sine geçirilirse burası "net" olmalıdır.
-  trade_commission: "gross",
+  // Takas nakit komisyonu da matrah saklar: KDV'si `commission_tax_amount`
+  // kolonunda ayrı durur ve ödeyenin toplamına eklenir.
+  trade_commission: "net",
   // İade faturası kaynak faturanın tutarını terslediği için onun matrahını izler;
   // pratikte `repriceUnsentInvoice`/refund yolu kendi kaynağından hesaplar.
   return_invoice: "gross",

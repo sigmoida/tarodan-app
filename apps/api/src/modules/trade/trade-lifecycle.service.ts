@@ -50,6 +50,8 @@ import {
   generateReferenceCode,
   generateUniqueReference,
 } from "../../common/helpers/generate-reference";
+import { calculateServiceTax } from "../order/order-service-tax.helper";
+import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
 
 /**
  * Takas yaşam döngüsü metodları (create/accept/reject/counter/cancel/ship/
@@ -62,6 +64,8 @@ export class TradeLifecycleService {
 
   constructor(
     private readonly prisma: PrismaService,
+    // Vergi politikası siparişlerle ORTAK — takas kendi oranını tutmaz.
+    private readonly taxPolicy: OrderTaxPolicyService,
     private readonly membershipService: MembershipService,
     private readonly notificationService: NotificationService,
     private readonly paymentService: PaymentService,
@@ -490,6 +494,22 @@ export class TradeLifecycleService {
         const ratePct = Number(rateRow?.settingValue ?? "5") || 5;
         const commission =
           Math.round(trade.cashAmount.toNumber() * (ratePct / 100) * 100) / 100;
+        // Aracılık komisyonu bir hizmettir → KDV'si hizmeti alan taraftan (nakit
+        // ödeyen) alınır ve ödediği toplama eklenir. Oran siparişlerle AYNI
+        // politikadan gelir; `commission` KDV hariç matrah olarak saklanır.
+        const taxPolicy = await this.taxPolicy.resolve();
+        const { sellerServiceTaxAmount: commissionTaxAmount } =
+          calculateServiceTax(
+            {
+              buyerCommissionAmount: 0,
+              buyerServiceFeeAmount: 0,
+              buyerShippingAmount: 0,
+              sellerCommissionAmount: commission,
+              sellerPlatformFeeAmount: 0,
+              sellerShippingAmount: 0,
+            },
+            this.taxPolicy.effectiveServiceVatRate(taxPolicy),
+          );
         await tx.tradeCashPayment.create({
           data: {
             tradeId,
@@ -500,7 +520,14 @@ export class TradeLifecycleService {
                 : trade.initiatorId,
             amount: trade.cashAmount,
             commission,
-            totalAmount: trade.cashAmount.toNumber() + commission,
+            commissionTaxAmount,
+            totalAmount:
+              Math.round(
+                (trade.cashAmount.toNumber() +
+                  commission +
+                  commissionTaxAmount) *
+                  100,
+              ) / 100,
             provider: "pending",
             status: PaymentStatus.pending,
           },

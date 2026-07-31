@@ -43,9 +43,13 @@ describe("invoiceAmountsFor", () => {
     expect(invoiceAmountsFor("boost", 240, 20).net).toBe(200);
   });
 
-  it("takas komisyonu brüt kalır — takas akışına hizmet KDV'si girmedi", () => {
-    expect(AMOUNT_BASIS_BY_TYPE.trade_commission).toBe("gross");
-    expect(invoiceAmountsFor("trade_commission", 120, 20).net).toBe(100);
+  it("takas komisyonu da matrah bazlıdır (250 → 250 + 50 = 300)", () => {
+    expect(AMOUNT_BASIS_BY_TYPE.trade_commission).toBe("net");
+    expect(invoiceAmountsFor("trade_commission", 250, 20)).toEqual({
+      net: 250,
+      tax: 50,
+      total: 300,
+    });
   });
 
   it("KDV oranı 0 ise iki ailede de vergi doğmaz", () => {

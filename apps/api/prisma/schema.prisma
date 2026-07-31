@@ -930,7 +930,10 @@ model TradeCashPayment {
   payerId           String           @map("payer_id")
   recipientId       String           @map("recipient_id")
   amount            Decimal          @db.Decimal(10, 2)
+  // Takas aracılık komisyonu — KDV HARİÇ matrah (siparişteki ücretlerle aynı semantik).
   commission        Decimal          @db.Decimal(10, 2)
+  // Komisyonun KDV'si: hizmeti alan taraf (nakit ödeyen) öder, totalAmount'a dahildir.
+  commissionTaxAmount Decimal        @default(0) @map("commission_tax_amount") @db.Decimal(10, 2)
   totalAmount       Decimal          @map("total_amount") @db.Decimal(10, 2)
   provider          String
   providerPaymentId String?          @map("provider_payment_id")
