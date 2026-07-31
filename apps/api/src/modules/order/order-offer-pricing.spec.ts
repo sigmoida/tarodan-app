@@ -26,8 +26,6 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
     corporate: boolean;
     buyerShare?: number;
     withholdingRate?: number;
-    /** Ürün KDV'si varsayılan KAPALI; eski davranışı ölçen testler açar. */
-    productVat?: boolean;
   }) => {
     const prisma = {
       user: {
@@ -48,9 +46,6 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
                   settingValue: String(opts.withholdingRate),
                 },
               ]
-            : []),
-          ...(opts.productVat
-            ? [{ settingKey: "product_vat_enabled", settingValue: "true" }]
             : []),
         ]),
       },
@@ -107,23 +102,16 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
   };
 
   // Hizmet KDV matrahları: alıcı 4 + 6 + kargo, satıcı 15 + 5 + kargo.
-  it("ürün KDV'si AÇIKKEN kurumsal satıcı: ürün KDV'si + stopaj + hizmet KDV'si", async () => {
-    const { service } = makeService({
-      corporate: true,
-      withholdingRate: 1,
-      productVat: true,
-    });
+
+  it("uygulanan hizmet KDV oranını da döndürür (siparişe snapshot'lanır)", async () => {
+    // Oran siparişte dondurulmazsa ekranlar kalem bazında KDV'yi (komisyon KDV'si /
+    // kargo KDV'si / hizmet bedeli KDV'si) üretemez; güncel ayardan okumak da
+    // oran değiştiğinde eski siparişi yanlış gösterir.
+    const { service } = makeService({ corporate: true, withholdingRate: 1 });
 
     const pricing = await service.resolveOfferOrderPricing(params);
 
-    expect(pricing.taxAmount).toBe(200); // 1000 * %20
-    expect(pricing.withholdingTaxAmount).toBe(10); // 1000 * %1
-    // Alıcı hizmet KDV'si: (4 + 6 + 50) * %20 = 12
-    expect(pricing.buyerServiceTaxAmount).toBe(12);
-    // Satıcı hizmet KDV'si: (15 + 5 + 0) * %20 = 4
-    expect(pricing.sellerServiceTaxAmount).toBe(4);
-    // toplam = teklif + alıcı kargosu + alıcı ücreti + ürün KDV + alıcı hizmet KDV
-    expect(pricing.totalAmount).toBe(1000 + 50 + 10 + 200 + 12);
+    expect(pricing.serviceVatRate).toBe(20);
   });
 
   it("varsayılan politika: ürün KDV'si 0, hizmet KDV'si yine tahsil edilir", async () => {
@@ -136,15 +124,16 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
     expect(pricing.totalAmount).toBe(1000 + 50 + 10 + 12);
   });
 
-  it("bireysel satıcı: ürün KDV'si yok, stopaj ARTIK kesilir, kargo tahsil edilir", async () => {
+  it("bireysel satıcı: ürün KDV'si de stopaj da yok, kargo tahsil edilir", async () => {
     const { service } = makeService({ corporate: false, withholdingRate: 1 });
 
     const pricing = await service.resolveOfferOrderPricing(params);
 
     expect(pricing.taxAmount).toBe(0);
-    // Stopaj kapsamı genişledi: bireysel satıcıdan da kesiliyor.
-    expect(pricing.withholdingTaxAmount).toBe(10);
+    // Stopaj yalnız kurumsal satıcıdan kesilir.
+    expect(pricing.withholdingTaxAmount).toBe(0);
     expect(pricing.buyerShippingAmount).toBe(50);
+    // Alıcı tarafı stopajdan etkilenmez: stopaj satıcı payout'undan kesilir.
     expect(pricing.totalAmount).toBe(1000 + 50 + 10 + 12);
   });
 
@@ -172,10 +161,7 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
   });
 
   it("teklif tutarı komisyon ve vergi hesaplarına baz olarak geçirilir", async () => {
-    const { service, orderPricing } = makeService({
-      corporate: true,
-      productVat: true,
-    });
+    const { service, orderPricing } = makeService({ corporate: true });
 
     await service.resolveOfferOrderPricing(params);
 

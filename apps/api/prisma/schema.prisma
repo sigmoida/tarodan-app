@@ -1426,6 +1426,11 @@ model Order {
   // durduğu için kalem bazında KDV saklanmaz — iki taraf toplamı yeterlidir.
   buyerServiceTaxAmount      Decimal                  @default(0) @map("buyer_service_tax_amount") @db.Decimal(10, 2)
   sellerServiceTaxAmount     Decimal                  @default(0) @map("seller_service_tax_amount") @db.Decimal(10, 2)
+  // Tahsil anındaki hizmet KDV oranı (%). Toplamlar yukarıda duruyor ama ekranlar
+  // "komisyon KDV'si / kargo KDV'si / hizmet bedeli KDV'si" kırılımını gösterebilsin
+  // diye oran da snapshot'lanır: ayar sonradan değişse bile eski sipariş, tahsil
+  // edildiği oranla görüntülenir.
+  serviceVatRate             Decimal                  @default(0) @map("service_vat_rate") @db.Decimal(5, 2)
   // E-ticaret stopajı (GVK 94/19, varsayılan %1): yalnız vergi mükellefi (kurumsal onaylı)
   // satıcıda, KDV hariç ürün bedeli üzerinden. Satıcı payout'undan kesilir; alıcı tutarını etkilemez.
   withholdingTaxAmount       Decimal                  @default(0) @map("withholding_tax_amount") @db.Decimal(10, 2)
@@ -2911,6 +2916,10 @@ enum ShipmentStatus {
 }
 
 enum RefundReason {
+  /// Kargoya verilmiş ama zamanında teslim edilmemiş gönderi. İptal nedeni
+  /// olarak da var (OrderCancellationReason.delivery_delayed); teslim sonrası
+  /// iptal edilemediği için iade tarafında da karşılığı olmalı.
+  delivery_delayed
   changed_mind
   damaged
   wrong_item

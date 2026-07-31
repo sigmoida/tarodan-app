@@ -363,6 +363,8 @@ export class AdminAnalyticsOrderService {
         // Hizmet bedeli KDV'si: alıcı tarafı tahsil edildi, satıcı tarafı kesilir.
         buyerServiceTaxAmount: num(o.buyerServiceTaxAmount),
         sellerServiceTaxAmount: num(o.sellerServiceTaxAmount),
+        // Tahsil anındaki oran — ekran kalem bazında KDV'yi bununla türetir.
+        serviceVatRate: num(o.serviceVatRate),
         totalAmount: num(o.totalAmount),
         // Bilgilendirici net; kesin ödeme tutarı escrow.amount'tır. Formül ORTAK
         // helper'dan gelir — bu hesap eskiden burada elle yazılıyordu ve kargo

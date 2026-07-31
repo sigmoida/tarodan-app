@@ -1312,17 +1312,6 @@ async function main() {
       },
     }),
     prisma.platformSetting.upsert({
-      where: { settingKey: "product_vat_enabled" },
-      update: {},
-      create: {
-        settingKey: "product_vat_enabled",
-        settingValue: "false",
-        settingType: "boolean",
-        description:
-          "Ürün bedeline KDV uygulansın mı (kapalıysa vitrin fiyatı KDV dahil sayılır)",
-      },
-    }),
-    prisma.platformSetting.upsert({
       where: { settingKey: "service_vat_enabled" },
       update: {},
       create: {
@@ -1348,7 +1337,7 @@ async function main() {
       update: {},
       create: {
         settingKey: "withholding_applies_to_individual",
-        settingValue: "true",
+        settingValue: "false",
         settingType: "boolean",
         description:
           "Stopaj bireysel (vergi mükellefi olmayan) satıcıdan da kesilsin mi",

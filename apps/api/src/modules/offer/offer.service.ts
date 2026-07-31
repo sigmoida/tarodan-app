@@ -391,6 +391,12 @@ export class OfferService {
           sellerShippingAmount: offerPricing.sellerShippingAmount,
           taxAmount: offerPricing.taxAmount,
           withholdingTaxAmount: offerPricing.withholdingTaxAmount,
+          // Hizmet KDV'si `totalAmount` içinde tahsil ediliyordu ama kolonlara
+          // yazılmadığı için teklif siparişlerinde 0 görünüyordu: satıcı payout'u
+          // KDV'yi düşmüyor, ekranlar ve e-fatura kırılımı eksik kalıyordu.
+          buyerServiceTaxAmount: offerPricing.buyerServiceTaxAmount,
+          sellerServiceTaxAmount: offerPricing.sellerServiceTaxAmount,
+          serviceVatRate: offerPricing.serviceVatRate,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
