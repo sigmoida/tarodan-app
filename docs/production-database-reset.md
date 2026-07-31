@@ -18,12 +18,14 @@ which preserves a recovery path and prevents an accidental media wipe.
 
 ## One-Time Setup
 
+SSH access reuses the repository-level `SERVER_HOST`, `SERVER_USERNAME` and
+`SERVER_PASSWORD` secrets: staging and production run on the same Coolify host,
+so the SSH endpoint never distinguishes them — `COOLIFY_PROD_UUIDS` and the
+in-script production fingerprint guards do.
+
 Create a protected GitHub environment named `production`, add a required
 reviewer, and add these environment secrets:
 
-- `PRODUCTION_HOST`
-- `PRODUCTION_USERNAME`
-- `PRODUCTION_SSH_KEY`
 - `PRODUCTION_BOOTSTRAP_ADMIN_EMAIL`
 - `PRODUCTION_BOOTSTRAP_ADMIN_PASSWORD` (16-72 bytes)
 

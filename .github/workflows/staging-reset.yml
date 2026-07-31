@@ -11,9 +11,16 @@
 #   3. Seeding WITH images is refused while S3_ENV_PREFIX=prod (would copy demo
 #      assets into production storage) — set S3_ENV_PREFIX=staging or skip images.
 #
-# Required GitHub environment "staging" secrets:
-#   STAGING_HOST, STAGING_USERNAME, STAGING_SSH_KEY   (SSH into the staging VPS)
+# Required repository secrets:
+#   SERVER_HOST, SERVER_USERNAME, SERVER_PASSWORD     (SSH into the Coolify VPS)
 #   COOLIFY_STAGING_UUIDS                             (api,web,admin UUIDs; api = first)
+#
+# The SSH credentials are the shared SERVER_* pair, not a staging-only set: the
+# staging apps live on the same Coolify host. Which environment gets wiped is
+# decided by COOLIFY_STAGING_UUIDS (container lookup) plus the staging-hostname
+# guard below — never by the SSH endpoint. Earlier revisions expected
+# STAGING_HOST/STAGING_USERNAME/STAGING_SSH_KEY, which were never created, so
+# every manual run died at "missing server host" before reaching the guards.
 # Optional repo/environment variable:
 #   STAGING_WEEKLY_RESET=true  -> enables the Monday-morning scheduled reset.
 name: Staging Reset
@@ -61,7 +68,29 @@ jobs:
         id: uuid
         env:
           UUIDS: ${{ secrets.COOLIFY_STAGING_UUIDS }}
-        run: echo "api=$(echo "$UUIDS" | cut -d, -f1)" >> "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          api="$(printf '%s' "$UUIDS" | cut -d, -f1 | xargs)"
+          [ -n "$api" ] || { echo "::error::COOLIFY_STAGING_UUIDS is empty."; exit 1; }
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+
+      # ssh-action reports a missing secret as a bare "missing server host" with
+      # no hint about which one. Name it here instead.
+      - name: Verify SSH secrets are configured
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USERNAME: ${{ secrets.SERVER_USERNAME }}
+          PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${HOST:-}" ] || missing="$missing SERVER_HOST"
+          [ -n "${USERNAME:-}" ] || missing="$missing SERVER_USERNAME"
+          [ -n "${PASSWORD:-}" ] || missing="$missing SERVER_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            exit 1
+          fi
 
       - name: Reset + seed over SSH (Coolify api container)
         uses: appleboy/ssh-action@v1
@@ -73,9 +102,9 @@ jobs:
           SKIP_BACKUP: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_backup) && '1' || '0' }}
           SEED_SKIP_IMAGES: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_images) && '1' || '0' }}
         with:
-          host: ${{ secrets.STAGING_HOST }}
-          username: ${{ secrets.STAGING_USERNAME }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
           command_timeout: 30m
           envs: RESET_CONFIRM,API_UUID,DRY_RUN,SKIP_BACKUP,SEED_SKIP_IMAGES
           # Staging runs under Coolify: no docker-compose, DB/Redis/ES containers

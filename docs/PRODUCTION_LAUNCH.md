@@ -37,9 +37,12 @@ enforces this by contract.
 
 ## Step 2 — Secrets & environment check
 
+SSH uses the repository-level `SERVER_HOST` / `SERVER_USERNAME` /
+`SERVER_PASSWORD` pair — the same Coolify host serves both environments, and
+`COOLIFY_PROD_UUIDS` plus the in-script guards decide what gets wiped.
+
 GitHub `production` environment (protected, required reviewer):
 
-- `PRODUCTION_HOST`, `PRODUCTION_USERNAME`, `PRODUCTION_SSH_KEY`
 - `PRODUCTION_BOOTSTRAP_ADMIN_EMAIL`
 - `PRODUCTION_BOOTSTRAP_ADMIN_PASSWORD` (16–72 bytes)
 - `COOLIFY_PROD_UUIDS` (`api,web,admin`)

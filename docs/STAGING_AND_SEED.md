@@ -39,9 +39,12 @@ taze DB'den kendisi doldurur (`syncIndexIfEmpty`).
 
 ### Kurulum (bir kez)
 
-1. GitHub'da `staging` environment'ı oluştur (istenirse required reviewers ile
-   onay kapısı eklenebilir) ve secret'ları tanımla:
-   `STAGING_HOST`, `STAGING_USERNAME`, `STAGING_SSH_KEY`.
+1. SSH için ayrı bir secret gerekmez: workflow, Coolify sunucusuna repo
+   seviyesindeki `SERVER_HOST` / `SERVER_USERNAME` / `SERVER_PASSWORD` ile
+   bağlanır. Hangi ortamın silineceğini SSH ucu değil, `COOLIFY_STAGING_UUIDS`
+   ile bulunan container ve script içindeki `*.staging.tarodan.shop` parmak izi
+   kontrolü belirler. (İstenirse `staging` environment'ı oluşturulup required
+   reviewers ile onay kapısı eklenebilir.)
 2. Coolify staging API env'inde `S3_ENV_PREFIX=staging` kullan.
 3. (Opsiyonel) Haftalık otomatik reset için repo/environment variable:
    `STAGING_WEEKLY_RESET=true` → her Pazartesi 06:00 TRT. Tanımlı değilse cron

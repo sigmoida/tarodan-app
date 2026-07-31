@@ -3,6 +3,16 @@ name: Production Database Reset
 # This workflow is intentionally separate from Release Production. A merge or
 # deploy must never erase production data. Run it only during the pre-launch
 # maintenance window, while the storefront lock is enabled.
+#
+# Required repository secrets:
+#   SERVER_HOST, SERVER_USERNAME, SERVER_PASSWORD  (SSH into the Coolify VPS)
+#   COOLIFY_PROD_UUIDS                             (api,web,... UUIDs; api = first)
+#   PRODUCTION_BOOTSTRAP_ADMIN_EMAIL / _PASSWORD   (first admin after the wipe)
+#
+# The SSH credentials are the shared SERVER_* pair. Which environment gets wiped
+# is decided by COOLIFY_PROD_UUIDS and the in-script guards, never by the SSH
+# endpoint. Earlier revisions expected PRODUCTION_HOST/USERNAME/SSH_KEY, which
+# were never created — the run would have died at "missing server host".
 on:
   workflow_dispatch:
     inputs:
@@ -43,6 +53,24 @@ jobs:
           echo "api=$api" >> "$GITHUB_OUTPUT"
           echo "web=$web" >> "$GITHUB_OUTPUT"
 
+      # ssh-action reports a missing secret as a bare "missing server host" with
+      # no hint about which one. Name it here instead.
+      - name: Verify SSH secrets are configured
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USERNAME: ${{ secrets.SERVER_USERNAME }}
+          PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${HOST:-}" ] || missing="$missing SERVER_HOST"
+          [ -n "${USERNAME:-}" ] || missing="$missing SERVER_USERNAME"
+          [ -n "${PASSWORD:-}" ] || missing="$missing SERVER_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            exit 1
+          fi
+
       - name: Guard, backup, reset and smoke test
         uses: appleboy/ssh-action@v1
         env:
@@ -53,9 +81,9 @@ jobs:
           BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.PRODUCTION_BOOTSTRAP_ADMIN_EMAIL }}
           BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_BOOTSTRAP_ADMIN_PASSWORD }}
         with:
-          host: ${{ secrets.PRODUCTION_HOST }}
-          username: ${{ secrets.PRODUCTION_USERNAME }}
-          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
           command_timeout: 40m
           envs: RESET_CONFIRM,DRY_RUN,API_UUID,WEB_UUID,BOOTSTRAP_ADMIN_EMAIL,BOOTSTRAP_ADMIN_PASSWORD
           script: |
