@@ -171,6 +171,20 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
         <FinRow label={t("admin.operations.orders.financial.sellerFee")}>
           {fmtTry(f.sellerFeeAmount)}
         </FinRow>
+        {/* Hizmet bedeli KDV'si: alıcıdan tahsil edilen ve satıcıdan kesilen
+            taraflar ayrı gösterilir — yönleri farklı. */}
+        {f.buyerServiceTaxAmount > 0 && (
+          <FinRow label={t("admin.operations.orders.file.buyerServiceVat")}>
+            {fmtTry(f.buyerServiceTaxAmount)}
+          </FinRow>
+        )}
+        {f.sellerServiceTaxAmount > 0 && (
+          <FinRow label={t("admin.operations.orders.file.sellerServiceVat")}>
+            <span className="text-danger-600">
+              −{fmtTry(f.sellerServiceTaxAmount)}
+            </span>
+          </FinRow>
+        )}
         {f.taxAmount > 0 && (
           <FinRow label={t("admin.operations.orders.file.vat")}>
             {fmtTry(f.taxAmount)}

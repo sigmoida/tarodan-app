@@ -20,6 +20,10 @@ export interface OrderFileFinance {
   commissionAmount: number;
   taxAmount: number;
   withholdingTaxAmount: number;
+  /** Alıcıya verilen hizmetlerin KDV'si — alıcının ödediğine dahil. */
+  buyerServiceTaxAmount: number;
+  /** Satıcıya verilen hizmetlerin KDV'si — satıcı payout'undan kesilir. */
+  sellerServiceTaxAmount: number;
   totalAmount: number;
   sellerNetAmount: number;
 }
