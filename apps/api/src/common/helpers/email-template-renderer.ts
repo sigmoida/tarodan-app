@@ -54,7 +54,7 @@ function normalizeEmailBrandOptions(
       `${frontendUrl}/tarodan-logo.jpg`,
     supportEmail: options?.supportEmail || "destek@tarodan.com.tr",
     preferencesUrl:
-      options?.preferencesUrl || `${frontendUrl}/profile/settings`,
+      options?.preferencesUrl || `${frontendUrl}/profile/security`,
   };
 }
 
@@ -119,7 +119,7 @@ export function wrapEmailTemplateLayout(
   );
   const preferencesUrl = safeEmailUrl(
     brand.preferencesUrl,
-    `${frontendUrl}/profile/settings`,
+    `${frontendUrl}/profile/security`,
   );
   const supportEmail = escapeEmailHtml(brand.supportEmail);
 
@@ -304,13 +304,13 @@ export function renderEmailTemplate(
   const orderPaidTrackUrl =
     isGuest && rawData?.orderNumber
       ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(rawData.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ""}`
-      : `${frontendUrl}/orders/${rawData?.orderId || ""}`;
+      : `${frontendUrl}/profile/orders/${rawData?.orderId || ""}`;
   // Grup (sepet) ödemesinde tek takip linki: üye → sipariş listesi, misafir →
   // temsilci siparişin track-order sayfası (grup için tekil sipariş sayfası yok).
   const orderPaidGroupTrackUrl =
     isGuest && rawData?.orderNumber
       ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(rawData.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ""}`
-      : `${frontendUrl}/orders`;
+      : `${frontendUrl}/profile/orders`;
 
   data = escapeEmailTemplateData(rawData);
   const wrapEmail = (content: string, title: string) =>
@@ -379,7 +379,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "Sipariş Onayı",
@@ -398,7 +398,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Siparişiniz hazırlandığında size bilgi vereceğiz.</p>`)}
     `,
@@ -544,7 +544,7 @@ export function renderEmailTemplate(
       `)}
       <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">Siparişiniz teslim edildi. Teslim tarihinden itibaren <strong>14 gün içinde koşulsuz iade</strong> hakkınız bulunmaktadır.</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: 14 günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
     `,
@@ -579,7 +579,7 @@ export function renderEmailTemplate(
       `)}
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : "24 saat içinde"} dolacak.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Teklifi İncele", `${frontendUrl}/seller/offers/${data?.offerId || ""}`)}
+        ${primaryButton("Teklifi İncele", `${frontendUrl}/profile/offers`)}
       </div>
     `,
       "Yeni Teklif Aldınız!",
@@ -601,7 +601,7 @@ export function renderEmailTemplate(
       `)}
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Siparişinizi tamamlamak için ödeme yapmanız gerekmektedir.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Ödeme Yap", `${frontendUrl}/orders/${data?.orderId || ""}/payment`)}
+        ${primaryButton("Ödeme Yap", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "Teklifiniz Kabul Edildi!",
@@ -713,7 +713,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "İade İşleminiz Tamamlandı",
@@ -752,7 +752,7 @@ export function renderEmailTemplate(
         }
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton(data?.ctaText || "Premium Üye Ol", data?.ctaUrl || `${frontendUrl}/membership`)}
+        ${primaryButton(data?.ctaText || "Premium Üye Ol", data?.ctaUrl || `${frontendUrl}/profile/membership`)}
       </div>
     `,
       "Premium Üyelik",
@@ -770,7 +770,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Üyeliğimi Yenile", data?.renewUrl || `${frontendUrl}/membership`)}
+        ${primaryButton("Üyeliğimi Yenile", data?.renewUrl || `${frontendUrl}/profile/membership`)}
       </div>
     `,
       "Üyeliğiniz Sona Eriyor",
@@ -783,7 +783,7 @@ export function renderEmailTemplate(
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.tierName || "Üyeliğiniz"}</strong> üyeliğinizin süresi <strong style="color: #dc2626;">yarın (${data?.expirationDate || ""})</strong> sona eriyor.</p>
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Üyeliğiniz sona erdiğinde Premium özelliklere erişiminiz kısıtlanacaktır.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Hemen Yenile", data?.renewUrl || `${frontendUrl}/membership`)}
+        ${primaryButton("Hemen Yenile", data?.renewUrl || `${frontendUrl}/profile/membership`)}
       </div>
     `,
       "Üyeliğiniz Yarın Sona Eriyor!",
@@ -795,7 +795,7 @@ export function renderEmailTemplate(
       ${greeting(data?.name)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tarodan hesabınızı etkinleştirmek için e-posta adresinizi doğrulamanız gerekmektedir.</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("E-postamı Doğrula", data?.verificationUrl || data?.verifyUrl || `${frontendUrl}/verify`)}
+        ${primaryButton("E-postamı Doğrula", data?.verificationUrl || data?.verifyUrl || `${frontendUrl}/verify-email`)}
       </div>
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu link ${data?.expiresIn || "24 saat"} içinde geçerliliğini yitirecektir.</p>`)}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0;">Bu hesabı siz oluşturmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>
@@ -816,7 +816,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "Ödeme Alındı",
@@ -855,7 +855,7 @@ export function renderEmailTemplate(
       `)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 20px 0;">${data?.invitationUrl ? `Bağlantı ${data?.invitationExpiresHours || 72} saat geçerlidir.` : "Başlamak için satıcı panelinizi ziyaret edebilirsiniz:"}</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton(data?.invitationUrl ? "Kurumsal Hesabı Oluştur" : "Satıcı Paneline Git", data?.invitationUrl || `${frontendUrl}/seller`)}
+        ${primaryButton(data?.invitationUrl ? "Kurumsal Hesabı Oluştur" : "Satıcı Paneline Git", data?.invitationUrl || `${frontendUrl}/seller/dashboard`)}
       </div>
       <p style="font-size: 14px; color: #6b7280; margin: 0;">İyi satışlar dileriz!<br/><strong style="color: #f97316;">Tarodan Ekibi</strong></p>
     `,
@@ -926,7 +926,7 @@ export function renderEmailTemplate(
       `)}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0;">İade tutarı ödeme yönteminize bağlı olarak 3–5 iş günü içinde yansıyacaktır.</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "Satıcı Kargoya Vermedi — İadeniz Yapıldı",
@@ -941,7 +941,7 @@ export function renderEmailTemplate(
       </p>
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Takas teklifleri sınırlı süre geçerlidir. Hızlı yanıt verin.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Teklifi İncele", data?.tradeUrl || `${frontendUrl}/trades`)}
+        ${primaryButton("Teklifi İncele", data?.tradeUrl || `${frontendUrl}/profile/trades`)}
       </div>
     `,
       "Yeni Takas Teklifi Aldınız!",
@@ -957,7 +957,7 @@ export function renderEmailTemplate(
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Takas onaylandı. Şimdi ürününüzü kargolayın.</p>`)}
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Ürününüzü en kısa sürede kargoya vermeyi unutmayın.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Takası Görüntüle", data?.tradeUrl || `${frontendUrl}/trades`)}
+        ${primaryButton("Takası Görüntüle", data?.tradeUrl || `${frontendUrl}/profile/trades`)}
       </div>
     `,
       "Takas Teklifiniz Kabul Edildi!",
@@ -976,7 +976,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Takası Takip Et", data?.tradeUrl || `${frontendUrl}/trades`)}
+        ${primaryButton("Takası Takip Et", data?.tradeUrl || `${frontendUrl}/profile/trades`)}
       </div>
     `,
       "Takasınız Kargoya Verildi!",
@@ -991,7 +991,7 @@ export function renderEmailTemplate(
       </p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Takas başarıyla tamamlandı</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Takası Görüntüle", data?.tradeUrl || `${frontendUrl}/trades`)}
+        ${primaryButton("Takası Görüntüle", data?.tradeUrl || `${frontendUrl}/profile/trades`)}
       </div>
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">İyi takaslar dileriz!<br/><strong style="color: #f97316;">Tarodan Ekibi</strong></p>
     `,
@@ -1043,7 +1043,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", data?.invoiceUrl || `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", data?.invoiceUrl || `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
       <p style="font-size: 13px; color: #9ca3af; margin: 16px 0 0 0;">Fatura bilgileriniz yasal yükümlülükler gereği saklanmaktadır.</p>
     `,
@@ -1151,7 +1151,7 @@ export function renderEmailTemplate(
       `)}
       ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İptal nedeni:</strong> ${data.reason}</p>`) : ""}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Satıcı Paneline Git", `${frontendUrl}/seller/orders`)}
+        ${primaryButton("Satıcı Paneline Git", `${frontendUrl}/profile/orders?filter=seller`)}
       </div>
     `,
       "Sipariş İptal Edildi",
@@ -1194,7 +1194,7 @@ export function renderEmailTemplate(
       `)}
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İade tutarı ödeme yönteminize 3–5 iş günü içinde yansıyacaktır.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "İade Talebiniz Onaylandı",
@@ -1214,7 +1214,7 @@ export function renderEmailTemplate(
       ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>Red nedeni:</strong> ${data.reason}</p>`) : ""}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0;">Karara itiraz etmek veya daha fazla bilgi almak için destek ekibimizle iletişime geçebilirsiniz.</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
       <p style="font-size: 14px; color: #6b7280; margin: 0;">Sorularınız için: <a href="mailto:destek@tarodan.com.tr" style="color: #d95700;">destek@tarodan.com.tr</a></p>
     `,
@@ -1236,7 +1236,7 @@ export function renderEmailTemplate(
       `)}
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Ürünü orijinal ambalajında, eksiksiz şekilde gönderdiğinizden emin olun. İadeniz, ürün satıcıya ulaştıktan sonra tamamlanacaktır.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton(data?.returnUrl ? "İade Etiketini Görüntüle" : "Siparişi Görüntüle", data?.returnUrl || `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton(data?.returnUrl ? "İade Etiketini Görüntüle" : "Siparişi Görüntüle", data?.returnUrl || `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "İade Kargo Bilgileri",
@@ -1257,7 +1257,7 @@ export function renderEmailTemplate(
       `)}
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İade tutarı ödeme yönteminize 3–5 iş günü içinde yansır. Bankanıza bağlı olarak süre değişebilir.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "İadeniz Tamamlandı",
@@ -1276,7 +1276,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Talebi Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Talebi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "İade Talebiniz Alındı",
@@ -1295,7 +1295,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Satışı Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Satışı Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "İade Kargosu Yola Çıktı",
@@ -1314,7 +1314,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Satışı Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Satışı Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "İade Tamamlandı",
@@ -1333,7 +1333,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Satışı Görüntüle", `${frontendUrl}/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Satışı Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
     `,
       "İade Otomatik Onaylandı",
@@ -1352,7 +1352,7 @@ export function renderEmailTemplate(
         ${data?.comment ? `<p style="margin: 16px 0 0 0; font-size: 15px; color: #374151; font-style: italic;">"${data.comment}"</p>` : ""}
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Değerlendirmeyi Görüntüle", data?.reviewUrl || `${frontendUrl}/seller/reviews`)}
+        ${primaryButton("Değerlendirmeyi Görüntüle", data?.reviewUrl || `${frontendUrl}/profile/statistics`)}
       </div>
     `,
       "Yeni Değerlendirme Aldınız",
@@ -1370,7 +1370,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("İlanı Yenile", data?.listingUrl || `${frontendUrl}/seller/listings`)}
+        ${primaryButton("İlanı Yenile", data?.listingUrl || `${frontendUrl}/profile/listings`)}
       </div>
     `,
       "İlanınızın Süresi Doluyor",
@@ -1383,7 +1383,7 @@ export function renderEmailTemplate(
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi doldu ve yayından kaldırıldı. Tekrar yayınlayarak alıcılarla buluşmaya devam edebilirsiniz.</p>
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanınızı birkaç tıklamayla yeniden yayınlayabilirsiniz.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("İlanı Yeniden Yayınla", data?.listingUrl || `${frontendUrl}/seller/listings`)}
+        ${primaryButton("İlanı Yeniden Yayınla", data?.listingUrl || `${frontendUrl}/profile/listings`)}
       </div>
     `,
       "İlanınızın Süresi Doldu",
@@ -1395,7 +1395,7 @@ export function renderEmailTemplate(
       ${greeting(data?.name || data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.followerName || "Yeni bir kullanıcı"}</strong> sizi takip etmeye başladı. Profilinizdeki yeni ilanlar takipçilerinize bildirilir.</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Takipçiyi Görüntüle", data?.followerUrl || `${frontendUrl}/profile/followers`)}
+        ${primaryButton("Takipçiyi Görüntüle", data?.followerUrl || `${frontendUrl}/profile`)}
       </div>
     `,
       "Yeni Takipçiniz Var",
@@ -1440,7 +1440,7 @@ export function renderEmailTemplate(
       `)}
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Tutarın hesabınıza geçmesi bankanıza bağlı olarak 1–2 iş günü sürebilir.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Kazançlarımı Görüntüle", `${frontendUrl}/seller/earnings`)}
+        ${primaryButton("Kazançlarımı Görüntüle", `${frontendUrl}/profile/statistics`)}
       </div>
     `,
       "Ödemeniz Aktarıldı",
