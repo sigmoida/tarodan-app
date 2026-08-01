@@ -5214,8 +5214,6 @@
       "saveButton": "Save Settings",
       "saved": "Settings saved",
       "search": {
-        "title": "Search Index (Elasticsearch)",
-        "description": "Rebuilds the product search index from scratch, applying price and boost changes to existing products. Usually run once after a deploy.",
         "reindexButton": "Reindex",
         "confirmTitle": "Reindex search",
         "confirmDescription": "The entire product search index will be dropped and rebuilt. This may take a few minutes. Continue?",

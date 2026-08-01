@@ -9,7 +9,7 @@ import { PageLoading } from "@/components/PageLoading";
 import { AdminTabs } from "@/components/AdminTabs";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { useSettingsPage } from "./_lib/useSettingsPage";
-import { SearchIndexCard } from "./_components/SearchIndexCard";
+import { SearchReindexButton } from "./_components/SearchReindexButton";
 import { WarehouseAddressCard } from "./_components/WarehouseAddressCard";
 
 export default function SettingsPage() {
@@ -45,7 +45,9 @@ export default function SettingsPage() {
       <PageHeader
         title={t("admin.settings.page.title")}
         description={t("admin.settings.page.description")}
-      />
+      >
+        <SearchReindexButton />
+      </PageHeader>
 
       <AdminTabs tabs={tabs} value={tab} onChange={setTab} />
 
@@ -81,10 +83,6 @@ export default function SettingsPage() {
               </Button>
             </div>
           </Form>
-
-          <div className="mt-6">
-            <SearchIndexCard />
-          </div>
         </>
       )}
     </AdminPage>
