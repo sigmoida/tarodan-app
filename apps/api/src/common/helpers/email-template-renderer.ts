@@ -286,6 +286,8 @@ export function getEmailTemplateSubject(
     "new-follower": `${data?.followerName || "Yeni bir kullanıcı"} sizi takip etmeye başladı`,
     "back-in-stock": `Stoğa Geri Geldi: ${data?.productTitle || "Takip Ettiğiniz Ürün"}`,
     "payout-released-seller": `Ödemeniz Aktarıldı - ${formatEmailPrice(data?.payoutAmount || 0)} TL`,
+    "payout-returned-seller": `Ödemeniz Geri Döndü - ${formatEmailPrice(data?.payoutAmount || 0)} TL`,
+    "payout-failed-seller": `Ödemeniz Aktarılamadı - ${formatEmailPrice(data?.payoutAmount || 0)} TL`,
   };
   return data?.subject || subjects[template] || "Tarodan Bildirim";
 }
@@ -1464,6 +1466,45 @@ export function renderEmailTemplate(
       </div>
     `,
       "Ödemeniz Aktarıldı",
+    ),
+
+    "payout-returned-seller": wrapEmail(
+      `
+      ${titleBlock("Ödemeniz Geri Döndü", "⚠️")}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Size gönderdiğimiz ödeme, bankanız tarafından geri gönderildi. Bu genellikle IBAN'ın kapalı, bloke veya hatalı olmasından kaynaklanır. Tutar güvende — banka bilgileriniz güncellendikten sonra yeniden aktarılacak.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Tutar", formatEmailPrice(data?.payoutAmount || 0) + " TL", true)}
+          ${data?.bankAccountLast4 ? detailRow("Hesap", "•••• " + data.bankAccountLast4) : ""}
+          ${data?.failureReason ? detailRow("Banka açıklaması", String(data.failureReason)) : ""}
+        </table>
+      `)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Lütfen profilinizden IBAN bilgilerinizi kontrol edip güncelleyin; aktarım sonrasında yeniden denenecektir.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Banka Bilgilerimi Güncelle", `${frontendUrl}/profile`)}
+      </div>
+    `,
+      "Ödemeniz Geri Döndü",
+    ),
+
+    "payout-failed-seller": wrapEmail(
+      `
+      ${titleBlock("Ödemeniz Aktarılamadı", "⚠️")}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bir satışınıza ait ödeme, banka hesabınıza aktarılamadı. Tutar güvende — banka bilgileriniz doğrulandıktan sonra yeniden aktarılacak.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Tutar", formatEmailPrice(data?.payoutAmount || 0) + " TL", true)}
+          ${data?.bankAccountLast4 ? detailRow("Hesap", "•••• " + data.bankAccountLast4) : ""}
+        </table>
+      `)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Lütfen profilinizden IBAN ve hesap sahibi bilgilerinizin doğru olduğundan emin olun. Sorun devam ederse destek ekibimizle iletişime geçin.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Banka Bilgilerimi Güncelle", `${frontendUrl}/profile`)}
+      </div>
+    `,
+      "Ödemeniz Aktarılamadı",
     ),
   };
 

@@ -21,6 +21,7 @@ import {
 import { NotificationService } from "../notification/notification.service";
 import { LedgerService } from "../ledger/ledger.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { isValidTrIban } from "../../common/validators/tr-iban";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 
 /** IBAN'ı log-güvenli hale getir (KVKK): yalnız son 4 hane. */
@@ -125,20 +126,46 @@ export class PayoutService {
 
   /**
    * Y4: TR IBAN format + ISO 7064 mod-97 checksum doğrulaması. Yazım hatalı IBAN'ları
-   * PayTR'ye gitmeden yakalar (kör transfer riskini azaltır). "TR" + 24 rakam = 26 hane.
+   * PayTR'ye gitmeden yakalar (kör transfer riskini azaltır). Tek kaynak:
+   * common/validators/tr-iban (DTO'daki IsTrIban ile aynı fonksiyon).
    */
   private isValidTrIban(iban: string): boolean {
-    const v = (iban || "").replace(/\s/g, "").toUpperCase();
-    if (!/^TR\d{24}$/.test(v)) return false;
-    const rearranged = v.slice(4) + v.slice(0, 4);
-    const numeric = rearranged.replace(/[A-Z]/g, (c) =>
-      (c.charCodeAt(0) - 55).toString(),
-    );
-    let remainder = 0;
-    for (const ch of numeric) {
-      remainder = (remainder * 10 + Number(ch)) % 97;
+    return isValidTrIban(iban);
+  }
+
+  /**
+   * Payout aktarılamadı bildirimi — returned (banka geri gönderdi) veya kalıcı
+   * failed. Satıcı banka bilgilerini düzeltebilsin diye başarı maili kadar
+   * bu da zorunlu; geçici retry'larda ÇAĞRILMAZ (spam olmasın). Asla throw etmez.
+   */
+  private async sendPayoutProblemEmail(params: {
+    sellerId: string;
+    template: "payout-returned-seller" | "payout-failed-seller";
+    netAmount: number;
+    iban: string;
+    reason?: string;
+  }): Promise<void> {
+    try {
+      const seller = await this.prisma.user.findUnique({
+        where: { id: params.sellerId },
+        select: { displayName: true },
+      });
+      const last4 = (params.iban || "").replace(/\s/g, "").slice(-4);
+      await this.notificationService.sendTemplateEmailToUser(
+        params.sellerId,
+        params.template,
+        {
+          sellerName: seller?.displayName ?? "",
+          payoutAmount: params.netAmount,
+          bankAccountLast4: last4 || undefined,
+          failureReason: params.reason,
+        },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `${params.template} email failed for seller ${params.sellerId}: ${err?.message}`,
+      );
     }
-    return remainder === 1;
   }
 
   /**
@@ -680,7 +707,16 @@ export class PayoutService {
             failureReason: "no_bank_account",
           },
         });
-        if (failedClaim.count > 0) failed++;
+        if (failedClaim.count > 0) {
+          failed++;
+          await this.sendPayoutProblemEmail({
+            sellerId: payout.sellerId,
+            template: "payout-failed-seller",
+            netAmount: netToTransfer,
+            iban: transferIban,
+            reason: "no_bank_account",
+          });
+        }
         continue;
       }
 
@@ -698,7 +734,16 @@ export class PayoutService {
         this.logger.warn(
           `Payout ${payout.id} için geçersiz IBAN formatı — transfer yapılmadı`,
         );
-        if (failedClaim.count > 0) failed++;
+        if (failedClaim.count > 0) {
+          failed++;
+          await this.sendPayoutProblemEmail({
+            sellerId: payout.sellerId,
+            template: "payout-failed-seller",
+            netAmount: netToTransfer,
+            iban: transferIban,
+            reason: "invalid_iban_format",
+          });
+        }
         continue;
       }
 
@@ -1204,6 +1249,14 @@ export class PayoutService {
             transfer.transferIban,
             false,
           );
+          // Satıcı haber almalı: para escrow'a döndü, IBAN güncellenmeli.
+          await this.sendPayoutProblemEmail({
+            sellerId: transfer.sellerId,
+            template: "payout-returned-seller",
+            netAmount: Number(transfer.netAmount),
+            iban: transfer.transferIban,
+            reason: returned.reason || undefined,
+          });
           updated++;
           this.logger.warn(
             `Payout ${transfer.transId} returned: ${returned.reason}`,
@@ -1274,6 +1327,14 @@ export class PayoutService {
       this.logger.error(
         `Payout ${payout.transId} permanently failed after ${newRetryCount} attempts: ${reason}`,
       );
+      // Yalnız KALICI başarısızlıkta mail — geçici retry'lar sessiz.
+      await this.sendPayoutProblemEmail({
+        sellerId: payout.sellerId,
+        template: "payout-failed-seller",
+        netAmount: Number(payout.netAmount),
+        iban: payout.transferIban,
+        reason,
+      });
     } else {
       // Exponential backoff: 15min, 1hr, 4hr
       const backoffMinutes = Math.pow(4, newRetryCount) * 15;

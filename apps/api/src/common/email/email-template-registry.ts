@@ -78,6 +78,16 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     group: "Ödeme",
   },
   {
+    key: "payout-returned-seller",
+    name: "Ödeme geri döndü (satıcı)",
+    group: "Ödeme",
+  },
+  {
+    key: "payout-failed-seller",
+    name: "Ödeme aktarılamadı (satıcı)",
+    group: "Ödeme",
+  },
+  {
     key: "offer-received",
     name: "Yeni teklif (satıcı)",
     group: "Teklif",
