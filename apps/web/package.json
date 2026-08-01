@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "sync:brand": "node ../../scripts/sync-brand-assets.mjs public --manufacturer-logos",
-    "dev": "node ../../scripts/sync-brand-assets.mjs public --manufacturer-logos && next dev -p 3000",
-    "build": "node ../../scripts/sync-brand-assets.mjs public --manufacturer-logos && next build",
+    "sync:brand": "node ../../scripts/sync-brand-assets.mjs public",
+    "dev": "node ../../scripts/sync-brand-assets.mjs public && next dev -p 3000",
+    "build": "node ../../scripts/sync-brand-assets.mjs public && next build",
     "start": "next start -p 3000",
     "test": "node --test scripts/*.test.mjs",
     "lint": "next lint",

@@ -8,8 +8,9 @@
 // so admin had no way to serve the transparent mark and fell back to the opaque
 // JPEG data URI on its coloured header.
 //
-// The package and repo-root photos/logolar directory are the sources of truth;
-// these public files are generated build artifacts (gitignored). Invoked inline
+// The @tarodan/brand package is the source of truth; these public files are
+// generated build artifacts (gitignored). Manufacturer logos artık BUCKET'tan
+// servis edilir ({env}/brands/… — bkz. seed-media.ts); repo kopyalama kaldırıldı. Invoked inline
 // at the start of each app's `dev` and `build` scripts (not via pnpm pre/post
 // hooks — those need `enable-pre-post-scripts`, which is off by default in pnpm
 // 8, so the Docker prod build silently skipped them and shipped without logos).
@@ -21,10 +22,7 @@
 
 import { createRequire } from "node:module";
 import {
-  copyFileSync,
-  existsSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
@@ -38,14 +36,13 @@ const require = createRequire(join(process.cwd(), "package.json"));
 const brandDir = dirname(require.resolve("@tarodan/brand/package.json"));
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const [targetArg, ...flags] = process.argv.slice(2);
+const [targetArg] = process.argv.slice(2);
 if (!targetArg) {
   throw new Error(
-    "Usage: node scripts/sync-brand-assets.mjs <publicDir> [--manufacturer-logos]",
+    "Usage: node scripts/sync-brand-assets.mjs <publicDir>",
   );
 }
 const publicDir = resolve(process.cwd(), targetArg);
-const withManufacturerLogos = flags.includes("--manufacturer-logos");
 
 /** [ asset module in @tarodan/brand, output file in public/ ] */
 const ASSETS = [
@@ -70,29 +67,3 @@ for (const [sourceRel, outFile] of ASSETS) {
     `@tarodan/brand → ${targetArg}/${outFile} (${Math.round(bytes.length / 1024)} KB)`,
   );
 }
-
-// Manufacturer logos are storefront catalog art — only the web app serves them.
-if (!withManufacturerLogos) process.exit(0);
-
-const manufacturerLogoSource = join(repoRoot, "photos", "logolar");
-if (!existsSync(manufacturerLogoSource)) {
-  throw new Error(
-    `Manufacturer logo source is missing: ${manufacturerLogoSource}`,
-  );
-}
-
-const manufacturerLogoOutput = join(publicDir, "photos", "logolar");
-mkdirSync(manufacturerLogoOutput, { recursive: true });
-
-let manufacturerLogoCount = 0;
-for (const file of readdirSync(manufacturerLogoSource)) {
-  if (!/\.(png|jpe?g|webp|svg)$/i.test(file)) continue;
-  copyFileSync(
-    join(manufacturerLogoSource, file),
-    join(manufacturerLogoOutput, file),
-  );
-  manufacturerLogoCount += 1;
-}
-console.log(
-  `photos/logolar → ${targetArg}/photos/logolar (${manufacturerLogoCount} logos)`,
-);
