@@ -70,25 +70,11 @@ export class EmailWorker {
     if (!html) throw new Error("Email HTML content is required");
     const fromEmail = from || this.smtp.defaultFrom;
 
-    // Create EmailLog entry with 'queued' status
-    let emailLog: any = null;
-    try {
-      emailLog = await this.prisma.emailLog.create({
-        data: {
-          to,
-          from: fromEmail,
-          subject,
-          template: template || null,
-          status: "queued",
-          provider: this.smtp.isConfigured() ? "smtp" : "mock",
-          userId: (templateData as Record<string, any>)?.userId || null,
-          metadata: templateData ? (templateData as any) : undefined,
-        },
-      });
-    } catch (logError) {
-      this.logger.warn(`Failed to create email log: ${logError.message}`);
-    }
-
+    // EmailLog kaydı ARTIK BURADA YAZILMAZ: tek yazar SmtpProvider.sendEmail
+    // (her gönderim oradan geçer). Burada da yazsaydık kuyruktan giden
+    // e-postalar iki satır üretirdi. Şablon/kullanıcı bağlamı yalnız burada
+    // bilindiği için sendEmail'e parametre olarak geçirilir.
+    //
     // SmtpProvider handles the unconfigured case itself (logs and reports a
     // mock message id), so there is no separate mock branch here.
     const result = await this.smtp.sendEmail({
@@ -99,40 +85,22 @@ export class EmailWorker {
       text: text || this.stripHtml(html),
       replyTo,
       attachments,
+      template: template || undefined,
+      userId: (templateData as Record<string, any>)?.userId || undefined,
+      metadata: templateData
+        ? (templateData as Record<string, unknown>)
+        : undefined,
     });
 
     if (result.success) {
       this.logger.log(
         `Email sent successfully to ${to}, messageId: ${result.messageId}`,
       );
-
-      if (emailLog) {
-        await this.prisma.emailLog
-          .update({
-            where: { id: emailLog.id },
-            data: {
-              status: "sent",
-              sentAt: new Date(),
-              messageId: result.messageId,
-            },
-          })
-          .catch(() => {});
-      }
-
       return { success: true, messageId: result.messageId };
     }
 
     const errorMessage = result.error || "Unknown SMTP error";
     this.logger.error(`Failed to send email to ${to}: ${errorMessage}`);
-
-    if (emailLog) {
-      await this.prisma.emailLog
-        .update({
-          where: { id: emailLog.id },
-          data: { status: "failed", errorMessage },
-        })
-        .catch(() => {});
-    }
 
     // Rethrow so Bull records the failure and applies its retry policy —
     // SmtpProvider swallows transport errors into a result object.

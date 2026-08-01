@@ -705,6 +705,10 @@ export class NotificationDispatchService {
           to: email,
           subject: rendered.subject,
           html: rendered.html,
+          // Şablon anahtarı yalnız burada bilinir; geçirilmezse EmailLog
+          // satırı hangi şablonun gönderildiğini kaybederdi. (Bu uç adrese
+          // gönderim yapar, kullanıcı kimliği kapsamda yoktur.)
+          template: templateKey,
         });
       }
       return { success: false, error: "No email provider configured" };

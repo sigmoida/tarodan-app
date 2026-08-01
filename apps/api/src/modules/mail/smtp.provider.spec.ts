@@ -17,7 +17,10 @@ function buildProvider(env: Record<string, string>): SmtpProvider {
   const configService = {
     get: (key: string, fallback?: string) => env[key] ?? fallback,
   };
-  return new SmtpProvider(configService as never);
+  // EmailLog kaydı için prisma bağımlılığı (bu spec transport seçeneklerini
+  // ölçüyor; kayıt yolu smtp-email-log.spec.ts'te).
+  const prisma = { emailLog: { create: jest.fn() } };
+  return new SmtpProvider(configService as never, prisma as never);
 }
 
 describe("SmtpProvider transport options", () => {

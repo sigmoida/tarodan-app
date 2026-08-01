@@ -16,10 +16,18 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
+import { PrismaService } from "../../prisma";
 
 export interface SmtpEmailOptions {
   to: string;
   subject: string;
+  /**
+   * Kayıt için opsiyonel bağlam. Şablon anahtarını yalnız çağıran bilir
+   * (render'dan sonra bilgi kayboluyordu); verilirse EmailLog satırına geçer.
+   */
+  template?: string;
+  userId?: string;
+  metadata?: Record<string, unknown>;
   text?: string;
   html?: string;
   from?: string;
@@ -47,7 +55,11 @@ export class SmtpProvider {
   private readonly fromEmail: string;
   private readonly enabled: boolean;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    // PrismaModule @Global — modül döngüsü yok.
+    private readonly prisma: PrismaService,
+  ) {
     const host = this.configService.get<string>("SMTP_HOST", "");
     // .env values arrive as strings; nodemailer wants a number for `port`.
     const port = Number.parseInt(
@@ -138,7 +150,13 @@ export class SmtpProvider {
           `[EMAIL-MOCK] HTML content length: ${options.html.length}`,
         );
       }
-      return { success: true, messageId: `mock-${Date.now()}` };
+      const mockId = `mock-${Date.now()}`;
+      await this.recordEmailLog(options, {
+        status: "sent",
+        provider: "mock",
+        messageId: mockId,
+      });
+      return { success: true, messageId: mockId };
     }
 
     try {
@@ -162,12 +180,63 @@ export class SmtpProvider {
         `Email sent via SMTP to ${options.to}, ID: ${info.messageId}`,
       );
 
+      await this.recordEmailLog(options, {
+        status: "sent",
+        provider: "smtp",
+        messageId: info.messageId,
+      });
+
       return { success: true, messageId: info.messageId };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       this.logger.error(`Failed to send email via SMTP: ${errorMessage}`);
+      await this.recordEmailLog(options, {
+        status: "failed",
+        provider: "smtp",
+        errorMessage,
+      });
       return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Gönderim kaydı — TEK yazar burasıdır: her e-posta (mock dahil) bu huniden
+   * geçtiği için Loglar → E-postalar sekmesi gerçek trafiği gösterir.
+   *
+   * BEST-EFFORT: kayıt hatası gönderim sonucunu DEĞİŞTİRMEZ. `delivered` /
+   * `bounced` durumları bilinçli olarak yazılmaz — sağlayıcı webhook'u yok,
+   * uydurmak yerine yazılmıyor.
+   */
+  private async recordEmailLog(
+    options: SmtpEmailOptions,
+    result: {
+      status: "sent" | "failed";
+      provider: string;
+      messageId?: string;
+      errorMessage?: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.prisma.emailLog.create({
+        data: {
+          to: options.to,
+          from: options.from || this.fromEmail,
+          subject: options.subject,
+          template: options.template,
+          userId: options.userId,
+          status: result.status,
+          provider: result.provider,
+          messageId: result.messageId,
+          errorMessage: result.errorMessage,
+          ...(result.status === "sent" ? { sentAt: new Date() } : {}),
+          ...(options.metadata ? { metadata: options.metadata as any } : {}),
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `EmailLog yazılamadı: ${error instanceof Error ? error.message : error}`,
+      );
     }
   }
 
