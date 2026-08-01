@@ -158,9 +158,13 @@ export class AdminAuditService {
    * Get audit logs
    */
   async getAuditLogs(query: AuditLogQueryDto) {
-    const { action, adminId, fromDate, toDate, search } = query;
+    const { action, adminId, entityType, fromDate, toDate, search } = query;
 
     const where: Prisma.AuditLogWhereInput = {};
+
+    if (entityType) {
+      where.entityType = entityType;
+    }
 
     if (action) {
       where.action = action;

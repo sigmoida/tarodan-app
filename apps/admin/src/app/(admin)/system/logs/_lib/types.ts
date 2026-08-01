@@ -147,9 +147,13 @@ export const actionLabels = (t: T): Record<string, string> => ({
   user_unban: t("admin.system.logs.actions.userUnban"),
   product_approve: t("admin.system.logs.actions.productApprove"),
   product_reject: t("admin.system.logs.actions.productReject"),
-  product_delete: t("admin.system.logs.actions.productDelete"),
-  order_update: t("admin.system.logs.actions.orderUpdate"),
-  payment_refund: t("admin.system.logs.actions.paymentRefund"),
+  // Gerçek aksiyon adları (audit yazan servislerden): eskiden burada
+  // `product_delete` / `order_update` / `payment_refund` yazıyordu — hiçbiri
+  // kodda üretilmiyor, dolayısıyla filtre hiçbir satırla eşleşmiyordu.
+  product_delete_soft: t("admin.system.logs.actions.productDelete"),
+  product_delete_hard: t("admin.system.logs.actions.productDeleteHard"),
+  order_status_update: t("admin.system.logs.actions.orderUpdate"),
+  payment_manual_refund: t("admin.system.logs.actions.paymentRefund"),
   category_create: t("admin.system.logs.actions.categoryCreate"),
   category_update: t("admin.system.logs.actions.categoryUpdate"),
   category_delete: t("admin.system.logs.actions.categoryDelete"),

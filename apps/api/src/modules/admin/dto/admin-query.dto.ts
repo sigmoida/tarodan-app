@@ -159,6 +159,14 @@ export class AuditLogQueryDto extends AdminListQueryDto {
   @IsString()
   adminId?: string;
 
+  // Panelde "Varlık Türü" filtresi hep vardı ama DTO'da tanımlı olmadığı için
+  // global `whitelist` onu sessizce kırpıyordu: dropdown çalışıyor görünüp
+  // listeyi hiç değiştirmiyordu.
+  @ApiPropertyOptional({ example: "Product" })
+  @IsOptional()
+  @IsString()
+  entityType?: string;
+
   @ApiPropertyOptional({ example: "2024-01-01" })
   @IsOptional()
   @IsDateString()

@@ -2954,6 +2954,7 @@
           "userUnban": "Ban Kaldırıldı",
           "productApprove": "Ürün Onaylandı",
           "productReject": "Ürün Reddedildi",
+          "productDeleteHard": "Ürün kalıcı silme",
           "productDelete": "Ürün Silindi",
           "orderUpdate": "Sipariş Güncellendi",
           "paymentRefund": "Ödeme İadesi",
@@ -3000,6 +3001,7 @@
         },
         "stats": {
           "unresolvedCritical": "Çözülmemiş Kritik",
+          "failureRate": "Başarısızlık oranı",
           "deliveryRate": "Teslim Oranı",
           "bounceRate": "Bounce Oranı"
         },

@@ -2954,6 +2954,7 @@
           "userUnban": "User Unbanned",
           "productApprove": "Product Approved",
           "productReject": "Product Rejected",
+          "productDeleteHard": "Product hard delete",
           "productDelete": "Product Deleted",
           "orderUpdate": "Order Updated",
           "paymentRefund": "Payment Refunded",
@@ -3000,6 +3001,7 @@
         },
         "stats": {
           "unresolvedCritical": "Unresolved Critical",
+          "failureRate": "Failure rate",
           "deliveryRate": "Delivery Rate",
           "bounceRate": "Bounce Rate"
         },

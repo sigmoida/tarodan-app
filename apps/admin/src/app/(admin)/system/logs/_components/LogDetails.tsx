@@ -132,13 +132,10 @@ export function AuditDetail({ log }: { log: AuditLog }) {
           value={log.entityId}
           mono
         />
-        {log.ipAddress && (
-          <Field
-            label={t("admin.system.logs.details.ipAddress")}
-            value={log.ipAddress}
-            mono
-          />
-        )}
+        {/* IP adresi satırı KALDIRILDI: createAuditLog istek bağlamına
+            erişemediği için (6 pozisyonel parametre, ~20 servisten çağrılıyor,
+            uygulamada CLS yok) bu kolon hiç yazılmıyor ve satır hiç dolmuyordu.
+            IP'yi gerçekten kaydetmek ayrı bir iş. */}
       </div>
 
       {log.oldValue && (

@@ -354,18 +354,15 @@ export class AdminLogsService {
           },
           {} as Record<string, number>,
         ),
-        deliveryRate: (() => {
-          const sent = stats.find((s) => s.status === "sent")?._count?.id || 0;
-          const delivered =
-            stats.find((s) => s.status === "delivered")?._count?.id || 0;
-          const total = sent + delivered;
-          return total > 0 ? Math.round((delivered / total) * 100) : 0;
-        })(),
-        bounceRate: (() => {
+        // `delivered` / `bounced` HİÇBİR kod yolunda yazılmıyor (sağlayıcı
+        // webhook'u yok), o yüzden eski "teslimat/bounce oranı" hesapları
+        // matematiksel olarak daima 0 dönüyordu. Yerine gerçekten
+        // hesaplanabilen başarısızlık oranı: failed / toplam.
+        failureRate: (() => {
           const total = stats.reduce((sum, s) => sum + s._count.id, 0);
-          const bounced =
-            stats.find((s) => s.status === "bounced")?._count?.id || 0;
-          return total > 0 ? Math.round((bounced / total) * 100) : 0;
+          const failed =
+            stats.find((s) => s.status === "failed")?._count?.id || 0;
+          return total > 0 ? Math.round((failed / total) * 100) : 0;
         })(),
       },
     };

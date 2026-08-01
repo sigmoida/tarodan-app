@@ -3,17 +3,18 @@
 "use client";
 
 import { Select } from "@tarodan/ui";
-import { type LogTab } from "../_lib/types";
+import { type LogTab, actionLabels, entityLabels } from "../_lib/types";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 const buildOptions = (t: ReturnType<typeof useTranslations<never>>) => ({
+  // Interceptor yalnız `error` (5xx) ve `warning` (4xx) üretir; `critical`/`low`
+  // hiç yazılmadığı için seçenek olarak sunulmaz. (Güvenlik sekmesi dört
+  // seviyeyi de gerçekten yazar, o liste dokunulmadan kalır.)
   errorSeverity: [
     { value: "all", label: t("admin.system.logs.filters.allLevels") },
-    { value: "critical", label: t("admin.system.logs.levels.critical") },
     { value: "error", label: t("admin.system.logs.levels.error") },
     { value: "warning", label: t("admin.system.logs.levels.warning") },
-    { value: "low", label: t("admin.system.logs.levels.low") },
   ],
   securitySeverity: [
     { value: "all", label: t("admin.system.logs.filters.allLevels") },
@@ -30,12 +31,9 @@ const buildOptions = (t: ReturnType<typeof useTranslations<never>>) => ({
   emailStatus: [
     { value: "all", label: t("common.allStatuses") },
     { value: "sent", label: t("admin.system.logs.emailStatuses.sent") },
-    {
-      value: "delivered",
-      label: t("admin.system.logs.emailStatuses.delivered"),
-    },
+    // `delivered`/`bounced` hiçbir kod yolunda yazılmıyor (sağlayıcı webhook'u
+    // yok) → seçenek olarak sunulmaz.
     { value: "queued", label: t("admin.system.logs.emailStatuses.queued") },
-    { value: "bounced", label: t("admin.system.logs.emailStatuses.bounced") },
     { value: "failed", label: t("admin.system.logs.emailStatuses.failed") },
   ],
   emailTemplate: [
@@ -54,37 +52,22 @@ const buildOptions = (t: ReturnType<typeof useTranslations<never>>) => ({
       label: t("admin.system.logs.templates.shippingUpdate"),
     },
   ],
+  // Aksiyon ve varlık seçenekleri tabloyla AYNI haritadan türetilir: elle
+  // yazılmış liste hem eksikti (16 aksiyondan 7'si) hem de üç değeri kodda
+  // hiç üretilmiyordu — filtre çalışıyor görünüp boş sonuç döndürüyordu.
   auditAction: [
     { value: "", label: t("admin.system.logs.filters.allActions") },
-    { value: "user_ban", label: t("admin.system.logs.actions.userBan") },
-    { value: "user_unban", label: t("admin.system.logs.actions.userUnban") },
-    {
-      value: "product_approve",
-      label: t("admin.system.logs.actions.productApprove"),
-    },
-    {
-      value: "product_reject",
-      label: t("admin.system.logs.actions.productReject"),
-    },
-    {
-      value: "product_delete",
-      label: t("admin.system.logs.actions.productDelete"),
-    },
-    {
-      value: "order_update",
-      label: t("admin.system.logs.actions.orderUpdate"),
-    },
-    {
-      value: "payment_refund",
-      label: t("admin.system.logs.actions.paymentRefund"),
-    },
+    ...Object.entries(actionLabels(t)).map(([value, label]) => ({
+      value,
+      label,
+    })),
   ],
   auditEntity: [
     { value: "", label: t("admin.system.logs.filters.allEntityTypes") },
-    { value: "User", label: t("admin.system.logs.entities.user") },
-    { value: "Product", label: t("admin.system.logs.entities.product") },
-    { value: "Order", label: t("admin.system.logs.entities.order") },
-    { value: "Payment", label: t("admin.system.logs.entities.payment") },
+    ...Object.entries(entityLabels(t)).map(([value, label]) => ({
+      value,
+      label,
+    })),
   ],
 });
 

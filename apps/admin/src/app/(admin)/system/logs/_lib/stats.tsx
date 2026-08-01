@@ -35,12 +35,6 @@ export function statCards(
   if (tab === "errors") {
     return [
       {
-        icon: ExclamationTriangleIcon,
-        tone: "danger",
-        label: t("admin.system.logs.levels.critical"),
-        value: stats.critical ?? 0,
-      },
-      {
         icon: ExclamationCircleIcon,
         tone: "warning",
         label: t("admin.system.logs.levels.error"),
@@ -91,16 +85,12 @@ export function statCards(
   if (tab === "emails") {
     return [
       {
-        icon: CheckCircleIcon,
-        tone: "success",
-        label: t("admin.system.logs.stats.deliveryRate"),
-        value: `${stats.deliveryRate ?? 0}%`,
-      },
-      {
+        // `delivered`/`bounced` hiç yazılmadığı için eski teslimat/bounce
+        // oranları daima %0'dı; bu oran gerçekten hesaplanabilir.
         icon: ArrowUturnLeftIcon,
         tone: "danger",
-        label: t("admin.system.logs.stats.bounceRate"),
-        value: `${stats.bounceRate ?? 0}%`,
+        label: t("admin.system.logs.stats.failureRate"),
+        value: `${stats.failureRate ?? 0}%`,
       },
       {
         icon: PaperAirplaneIcon,
