@@ -2,7 +2,11 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
 import { StorageService } from "../storage/storage.service";
-import { isPremiumEntitled } from "../membership/membership.util";
+import {
+  canTradeFromMembership,
+  isPremiumEntitled,
+} from "../membership/membership.util";
+import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductStatus } from "@prisma/client";
 import { getAvailableQuantity } from "./helpers/product-availability.helper";
 
@@ -59,8 +63,12 @@ export class ProductCommonService {
         rating: number | null;
         totalRatings: number;
         isPremium: boolean;
+        canTrade: boolean;
       }
     >();
+    const freeTierCanTrade = sellerIds.length
+      ? await getFreeTierCanTrade(this.prisma)
+      : false;
     if (sellerIds.length) {
       const [listings, sales, ratings, memberships] = await Promise.all([
         this.prisma.product.groupBy({
@@ -85,7 +93,7 @@ export class ProductCommonService {
             userId: true,
             status: true,
             currentPeriodEnd: true,
-            tier: { select: { type: true, isActive: true } },
+            tier: { select: { type: true, isActive: true, canTrade: true } },
             user: {
               select: {
                 businessStatus: true,
@@ -111,6 +119,12 @@ export class ProductCommonService {
           isPremium: isPremiumEntitled(
             membershipMap.get(sid) ?? null,
             membershipMap.get(sid)?.user,
+          ),
+          // Takas ÜCRETLİ bir üyelik özelliği; ürünün bayrağı yalnız niyettir.
+          canTrade: canTradeFromMembership(
+            membershipMap.get(sid) ?? null,
+            membershipMap.get(sid)?.user,
+            freeTierCanTrade,
           ),
         });
       }
@@ -181,6 +195,7 @@ export class ProductCommonService {
           rating: number | null;
           totalRatings: number;
           isPremium: boolean;
+          canTrade: boolean;
         }
       >;
       productRatings: Map<string, { average: number | null; count: number }>;
@@ -195,6 +210,7 @@ export class ProductCommonService {
     const sellerRating = s?.rating ?? null;
     const sellerTotalRatings = s?.totalRatings ?? 0;
     const sellerIsPremium = s?.isPremium ?? false;
+    const sellerCanTrade = s?.canTrade ?? false;
 
     // Get product rating stats (use cached columns when available, else precomputed aggregate)
     let ratingAverage: number | null = null;
@@ -274,6 +290,10 @@ export class ProductCommonService {
       isBoxed: product.isBoxed,
       status: product.status,
       isTradeEnabled: product.isTradeEnabled || false,
+      // Satıcının NİYETİ (isTradeEnabled) ile GERÇEKTEN takas edilebilirliği
+      // ayrı alanlardır: üyelik bitince yetki düşer, bayrak üründe kalır.
+      // Rozet/buton bu alanı kullanır; bayrak sahibinin düzenleme formuna aittir.
+      tradeAvailable: (product.isTradeEnabled || false) && sellerCanTrade,
       viewCount: product.viewCount || 0,
       likeCount: product.likeCount || 0,
       quantity:

@@ -139,7 +139,12 @@ export default function ProductCard({
   const onSale = isProductOnSaleDisplay(product);
   const effectivePrice = getProductEffectivePrice(product);
   const originalPrice = getProductOriginalPriceForDisplay(product);
-  const isTrade = Boolean(product.trade_available || product.isTradeEnabled);
+  // `tradeAvailable` API'nin türettiği efektif değerdir (satıcının üyeliği
+  // takas hakkını kaybettiyse false). Yoksa eski alanlara düşülür.
+  const isTrade = Boolean(
+    product.tradeAvailable ??
+    (product.trade_available || product.isTradeEnabled),
+  );
   const firstImage = Array.isArray(product.images)
     ? product.images[0]
     : undefined;

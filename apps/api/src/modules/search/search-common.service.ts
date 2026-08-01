@@ -362,6 +362,9 @@ export class SearchCommonService implements OnModuleInit {
               material: { type: "keyword" },
               vehicleType: { type: "keyword" },
               isTradeEnabled: { type: "boolean" },
+              // Satıcının efektif takas yetkisi (üyelikten türetilir).
+              sellerCanTrade: { type: "boolean" },
+              tradeAvailable: { type: "boolean" },
               isPreorder: { type: "boolean" },
               isLimited: { type: "boolean" },
               isSet: { type: "boolean" },

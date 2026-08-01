@@ -19,6 +19,9 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PaymentProvidersModule,
     BullModule.registerQueue({ name: "email" }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    // Takas yetkisi düşen satıcının ürünleri yeniden indekslenir (arama
+    // dokümanındaki sellerCanTrade üyelikten türetilir).
+    BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
   ],
   controllers: [MembershipController],
   providers: [

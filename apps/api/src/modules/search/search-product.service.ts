@@ -8,7 +8,10 @@ import { ProductStatus } from "@prisma/client";
 import { StorageService } from "../storage/storage.service";
 import { buildProductWhere } from "../product/helpers/build-product-where";
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
-import { tradeCapableSellerWhere } from "../membership/membership.util";
+import {
+  canTradeFromMembership,
+  tradeCapableSellerWhere,
+} from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import {
   SearchCommonService,
@@ -223,7 +226,13 @@ export class SearchProductService {
     }
 
     // Boolean filters
-    if (tradeOnly) filter.push({ term: { isTradeEnabled: true } });
+    if (tradeOnly) {
+      // Bayrak niyet, yetki üyelikten: Postgres yolundaki kuralın ES karşılığı.
+      filter.push({ term: { isTradeEnabled: true } });
+      if (!(await getFreeTierCanTrade(this.prisma))) {
+        filter.push({ term: { sellerCanTrade: true } });
+      }
+    }
     if (preOrder) filter.push({ term: { isPreorder: true } });
     if (limited) filter.push({ term: { isLimited: true } });
     if (setFilter) filter.push({ term: { isSet: true } });
@@ -417,7 +426,10 @@ export class SearchProductService {
 
   // ──────────────────────────── Indexing ────────────────────────────
 
-  private buildProductDocument(product: any): Record<string, any> {
+  private buildProductDocument(
+    product: any,
+    freeTierCanTrade: boolean,
+  ): Record<string, any> {
     const scaleAttr = product.productAttributes?.find(
       (pa: any) => pa.attribute?.group?.slug === "scale",
     );
@@ -483,6 +495,22 @@ export class SearchProductService {
       // gerekmeden düşer (expiry-safe).
       boostedUntil: product.boostedUntil ?? undefined,
       boostedAt: product.boostedAt ?? undefined,
+      // Satıcının EFEKTİF takas yetkisi — ES üyelik tablosunu göremediği için
+      // dokümana denormalize edilir. Üyelik değişimi ürün düzenlemesi olmadığı
+      // için üyelik yolları etkilenen satıcının ürünlerini yeniden indeksler.
+      sellerCanTrade: canTradeFromMembership(
+        product.seller?.membership ?? null,
+        product.seller ?? null,
+        freeTierCanTrade,
+      ),
+      // Önyüzün okuduğu tek alan: niyet VE yetki. REST DTO'su ile aynı ad.
+      tradeAvailable:
+        product.isTradeEnabled === true &&
+        canTradeFromMembership(
+          product.seller?.membership ?? null,
+          product.seller ?? null,
+          freeTierCanTrade,
+        ),
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     };
@@ -493,7 +521,24 @@ export class SearchProductService {
     brand: { select: { id: true, name: true } },
     manufacturer: { select: { id: true, name: true } },
     carModel: { select: { id: true, name: true } },
-    seller: { select: { id: true, displayName: true } },
+    seller: {
+      select: {
+        id: true,
+        displayName: true,
+        // Takas yetkisi ÜYELİKTEN gelir; ürünün bayrağı yalnız niyettir.
+        // Dokümana denormalize edilir çünkü ES üyelik tablosunu göremez.
+        businessStatus: true,
+        companyName: true,
+        taxId: true,
+        membership: {
+          select: {
+            status: true,
+            currentPeriodEnd: true,
+            tier: { select: { type: true, isActive: true, canTrade: true } },
+          },
+        },
+      },
+    },
     images: {
       take: 1,
       orderBy: { sortOrder: "asc" as const },
@@ -518,7 +563,10 @@ export class SearchProductService {
       await this.common.client.index({
         index: this.common.productsIndex,
         id: product.id,
-        document: this.buildProductDocument(product),
+        document: this.buildProductDocument(
+          product,
+          await getFreeTierCanTrade(this.prisma),
+        ),
       });
       await this.common.updateIndexStats();
     } catch (error) {
@@ -606,9 +654,10 @@ export class SearchProductService {
       await this.forceRecreateIndex();
 
       if (products.length > 0) {
+        const freeTierCanTrade = await getFreeTierCanTrade(this.prisma);
         const operations = products.flatMap((product) => [
           { index: { _index: this.common.productsIndex, _id: product.id } },
-          this.buildProductDocument(product),
+          this.buildProductDocument(product, freeTierCanTrade),
         ]);
 
         await this.common.client.bulk({ refresh: true, operations });

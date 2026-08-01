@@ -4,7 +4,11 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Optional,
 } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import {
   MembershipTierType,
@@ -53,6 +57,12 @@ export class MembershipSubscriptionService {
     private readonly common: MembershipCommonService,
     private readonly providerEvents: PaymentProviderEventService,
     private readonly virtualOrder?: VirtualOrderFulfillmentService,
+    // Takas yetkisi düşünce satıcının ürünlerini yeniden indeksle: arama
+    // dokümanındaki `sellerCanTrade` üyelikten türetilir ve ürün düzenlemesi
+    // olmadan bayatlar. @Optional — mevcut spec harness'ları konumsal kurar.
+    @Optional()
+    @InjectQueue(QUEUE_NAMES.SEARCH)
+    private readonly searchQueue?: Queue,
   ) {}
 
   // ==========================================================================
@@ -1328,6 +1338,22 @@ export class MembershipSubscriptionService {
               this.logger.log(
                 `Auto-cancelled ${cancelledPending.count} pending trade offer(s) for downgraded user`,
               );
+            }
+
+            // Arama dokümanındaki `sellerCanTrade` üyelikten türetilir; ürün
+            // düzenlenmediği için kendiliğinden tazelenmez ve satıcının
+            // ilanları "takasa açık" görünmeye devam ederdi. Etkilenen ürünleri
+            // yeniden indeksle (best-effort: indeksleme downgrade'i bloklamaz).
+            const tradeFlagged = await this.prisma.product.findMany({
+              where: { sellerId: membership.userId, isTradeEnabled: true },
+              select: { id: true },
+            });
+            if (tradeFlagged.length > 0) {
+              await this.searchQueue?.add("bulk-index", {
+                type: "bulk-index",
+                entityType: "product",
+                entityIds: tradeFlagged.map((p) => p.id),
+              });
             }
           } catch (tradeErr: any) {
             // Takas iptali downgrade'i bloklamasın; üyelik düşürme başarılı sayılır.
