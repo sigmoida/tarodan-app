@@ -6,7 +6,8 @@ import {
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Button } from "@tarodan/ui";
+import { Alert, Button } from "@tarodan/ui";
+import { SectionCard } from "@/components/detail/SectionCard";
 import { usePermissionMatrix } from "../_lib/usePermissionMatrix";
 import { RoleSummaryCards } from "./RoleSummaryCards";
 import { PermissionMatrixGrid } from "./PermissionMatrixGrid";
@@ -24,6 +25,7 @@ export function PermissionMatrixTab() {
   const {
     isSuperAdmin,
     matrixLoading,
+    matrixError,
     permissions,
     editMode,
     matrixDirty,
@@ -37,7 +39,7 @@ export function PermissionMatrixTab() {
   return (
     <div className="space-y-4">
       {/* Top control bar */}
-      <div className="bg-surface-elevated rounded-lg border border-border p-6 shadow-sm flex flex-wrap items-start justify-between gap-4">
+      <SectionCard bodyClassName="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className="text-lg font-semibold text-heading">
             {t("admin.roles.matrix.title")}
@@ -48,7 +50,7 @@ export function PermissionMatrixTab() {
               : t("admin.roles.matrix.viewOnlyHint")}
           </p>
         </div>
-        {isSuperAdmin && (
+        {isSuperAdmin && !matrixError && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {editMode ? (
               <>
@@ -85,20 +87,26 @@ export function PermissionMatrixTab() {
             )}
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* Unsaved changes warning */}
       {editMode && matrixDirty && (
-        <div className="flex items-center gap-2 rounded-lg border border-warning-200 bg-warning-50 px-4 py-2.5 text-sm text-warning-800">
-          <InformationCircleIcon className="h-4 w-4 shrink-0" />
+        <Alert
+          variant="warning"
+          icon={<InformationCircleIcon className="h-4 w-4" />}
+        >
           {t("admin.roles.matrix.unsavedWarning")}
-        </div>
+        </Alert>
       )}
 
-      {matrixLoading ? (
-        <div className="bg-surface-elevated rounded-lg border border-border p-6 shadow-sm flex h-40 items-center justify-center text-sm text-muted">
+      {matrixError ? (
+        // Matris okunamadı: eksik bir kopya GÖSTERİLMEZ (kaydedilirse tüm
+        // rollerin izinleri silinirdi) — düzenleme de kapalı kalır.
+        <Alert variant="danger">{t("admin.roles.matrixLoadError")}</Alert>
+      ) : matrixLoading ? (
+        <SectionCard bodyClassName="flex h-40 items-center justify-center text-sm text-muted">
           {t("admin.roles.matrix.loading")}
-        </div>
+        </SectionCard>
       ) : (
         <>
           <RoleSummaryCards permissions={permissions} />

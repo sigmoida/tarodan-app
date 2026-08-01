@@ -4,12 +4,14 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { PlusIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Button, Checkbox, Chip, IconButton, Spinner } from "@tarodan/ui";
+import { Alert, Button, Checkbox, Chip, Spinner } from "@tarodan/ui";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { DataTable } from "@/components/DataTable";
+import { SectionCard } from "@/components/detail/SectionCard";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useClientTableSort } from "@/hooks/useClientTableSort";
 import { useSession } from "@/context/SessionContext";
@@ -47,7 +49,7 @@ export function StaffAssignmentsTab({
   const permissions = permissionsQuery.data ?? {};
 
   const staffQuery = useQuery({
-    queryKey: ["staff"],
+    queryKey: adminKeys.all("staff"),
     queryFn: async () => {
       const res = await adminApi.getStaff();
       return {
@@ -69,7 +71,7 @@ export function StaffAssignmentsTab({
 
   // Role-assignment setting — optimistic toggle, persisted via mutation.
   useQuery({
-    queryKey: ["staff-settings"],
+    queryKey: adminKeys.all("staff-settings"),
     queryFn: async () => {
       const val = !!(await adminApi.getStaffSettings()).data?.allowAdminAssign;
       setAllowAdminAssign(val);
@@ -124,43 +126,31 @@ export function StaffAssignmentsTab({
     <div className="space-y-4">
       {/* Temporary password notice */}
       {createdInfo && (
-        <div className="flex items-start justify-between gap-4 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800">
-          <div className="min-w-0">
-            <strong>{createdInfo.email}</strong>{" "}
-            {t("admin.roles.staffCreatedNotice")}{" "}
-            <code className="rounded bg-surface-elevated px-2 py-0.5 font-mono">
-              {createdInfo.password}
-            </code>{" "}
-            {t("admin.roles.staffCreatedNoticeSuffix")}
-          </div>
-          <IconButton
-            aria-label={t("common.close")}
-            variant="ghost"
-            onClick={() => setCreatedInfo(null)}
-            className="shrink-0 text-warning-800"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </IconButton>
-        </div>
+        <Alert variant="warning" onClose={() => setCreatedInfo(null)}>
+          <strong>{createdInfo.email}</strong>{" "}
+          {t("admin.roles.staffCreatedNotice")}{" "}
+          <code className="rounded bg-surface-elevated px-2 py-0.5 font-mono">
+            {createdInfo.password}
+          </code>{" "}
+          {t("admin.roles.staffCreatedNoticeSuffix")}
+        </Alert>
       )}
 
-      <div className="bg-surface-elevated rounded-lg border border-border p-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <SectionCard bodyClassName="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h3 className="text-lg font-semibold text-heading">
             {t("admin.roles.staffHeading")}
           </h3>
           <div className="flex items-center gap-1.5">
             {ROLES.map((r) => {
-              const meta = roleMeta[r];
               const active = roleFilter === r;
               return (
                 <Chip
                   key={r}
                   active={active}
-                  activeClassName={meta.color}
                   onClick={() => setRoleFilter(active ? null : r)}
                 >
-                  {meta.label} {roleCounts[r] ?? 0}
+                  {roleMeta[r].label} {roleCounts[r] ?? 0}
                 </Chip>
               );
             })}
@@ -187,7 +177,7 @@ export function StaffAssignmentsTab({
             {t("admin.roles.assignStaffButton")}
           </Button>
         </div>
-      </div>
+      </SectionCard>
 
       <DataTable
         columns={columns}

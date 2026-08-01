@@ -253,6 +253,16 @@ export class AdminUserController {
     return this.adminService.getRolePermissions();
   }
 
+  @Get("staff/role-permissions/defaults")
+  @Roles(AdminRole.super_admin)
+  @BypassPermissionMatrix() // matris bozuksa da "varsayılana dön" çalışabilmeli
+  @ApiOperation({
+    summary: "Factory default role → permission matrix (super_admin only)",
+  })
+  async getDefaultRolePermissions() {
+    return this.adminService.getDefaultRolePermissions();
+  }
+
   @Put("staff/role-permissions")
   @Roles(AdminRole.super_admin)
   @ApiOperation({

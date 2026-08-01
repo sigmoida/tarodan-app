@@ -31,6 +31,9 @@ export const usersApi = {
   getStaffSettings: () => api.get("/admin/staff/settings"),
   setStaffSettings: (allowAdminAssign: boolean) =>
     api.patch("/admin/staff/settings", { allowAdminAssign }),
+  /** Fabrika varsayılanları — "Varsayılanlara sıfırla" tek kaynaktan okur. */
+  getDefaultRolePermissions: () =>
+    api.get<Record<string, string[]>>("/admin/staff/role-permissions/defaults"),
   getRolePermissions: () =>
     api.get<Record<string, string[]>>("/admin/staff/role-permissions"),
   setRolePermissions: (permissions: Record<string, string[]>) =>

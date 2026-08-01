@@ -344,6 +344,10 @@ export class AdminService {
     return this.staffService.getRolePermissions();
   }
 
+  async getDefaultRolePermissions(): Promise<Record<string, string[]>> {
+    return this.staffService.getDefaultRolePermissions();
+  }
+
   async setRolePermissions(
     actingUserId: string,
     dto: SetRolePermissionsDto,

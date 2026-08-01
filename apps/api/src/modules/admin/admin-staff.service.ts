@@ -167,6 +167,16 @@ export class AdminStaffService {
     }
   }
 
+  /**
+   * Fabrika varsayılanı rol → izin eşleşmesi. Panelin "Varsayılanlara sıfırla"
+   * eylemi bunu okur: varsayılanların ikinci bir kopyası önyüzde TUTULMAZ
+   * (kopya kaçınılmaz olarak kayıyor ve sıfırlama, haritada olmayan izinleri
+   * — reports/invoices gibi — sessizce siliyordu).
+   */
+  async getDefaultRolePermissions(): Promise<Record<string, string[]>> {
+    return DEFAULT_ROLE_PERMISSIONS;
+  }
+
   /** Rol → izin eşleşmesini güncelle (yalnız super_admin). */
   async setRolePermissions(
     actingUserId: string,

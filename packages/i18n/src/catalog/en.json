@@ -5717,6 +5717,10 @@
           "label": "Reviews",
           "description": "View, approve, and reject user reviews."
         },
+        "reports": {
+          "label": "User Reports",
+          "description": "View and resolve reports filed by users."
+        },
         "staff": {
           "label": "Role Management",
           "description": "Create admin accounts, assign roles, and edit the permission matrix."
@@ -5764,6 +5768,10 @@
         "tax": {
           "label": "Tax Settings",
           "description": "Manage VAT zones, tax rates, and rules."
+        },
+        "invoices": {
+          "label": "Invoices",
+          "description": "View the e-invoice list and download invoice PDFs."
         },
         "aiModeration": {
           "label": "AI Moderation",

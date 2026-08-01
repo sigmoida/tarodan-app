@@ -3,11 +3,11 @@
 import React from "react";
 import {
   LockClosedIcon,
-  CheckIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { CheckToggle, DisclosureButton, IconButton } from "@tarodan/ui";
+import { Checkbox, DisclosureButton, IconButton } from "@tarodan/ui";
+import { SectionCard } from "@/components/detail/SectionCard";
 import { ROLES, getRoleMeta, getPermissionGroups } from "../_lib/constants";
 import type { PermissionMatrix } from "../_lib/usePermissionMatrix";
 
@@ -18,6 +18,10 @@ import type { PermissionMatrix } from "../_lib/usePermissionMatrix";
  * `<table>` rather than the `DataTable`/`col.*` factory — the factory models
  * one row per record, not a group-header + tri-state-group + dynamic-role-column
  * grid. All state and toggles come from `usePermissionMatrix`.
+ *
+ * Every cell — editable, read-only and the always-on super-admin column — is the
+ * SAME shared `Checkbox`; read-only cells are simply disabled. One control, one
+ * visual language, so the legend can render the exact same thing.
  */
 export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
   const t = useTranslations();
@@ -37,7 +41,7 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
   } = matrix;
 
   return (
-    <div className="bg-surface-elevated rounded-lg border border-border p-6 shadow-sm overflow-x-auto">
+    <SectionCard bodyClassName="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-border">
@@ -49,14 +53,12 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                 key={role}
                 className="min-w-[8rem] bg-surface-alt px-4 py-3 text-center font-medium"
               >
-                <div
-                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${roleMeta[role].color}`}
-                >
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-heading">
                   {role === "super_admin" && (
-                    <LockClosedIcon className="h-3 w-3" />
+                    <LockClosedIcon className="h-3.5 w-3.5 text-subtle" />
                   )}
                   {roleMeta[role].label}
-                </div>
+                </span>
               </th>
             ))}
           </tr>
@@ -77,7 +79,11 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                     >
                       {g.group}
                       <span className="font-normal normal-case tracking-normal text-muted">
-                        ({t("admin.roles.permissionCountLabel", { count: g.permissions.length })})
+                        (
+                        {t("admin.roles.permissionCountLabel", {
+                          count: g.permissions.length,
+                        })}
+                        )
                       </span>
                     </DisclosureButton>
                   </td>
@@ -91,15 +97,14 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                         className="bg-surface-alt/60 px-4 py-2 text-center"
                       >
                         {locked ? (
-                          <span className="text-xs font-medium text-success-600">
+                          <span className="text-xs text-muted">
                             {t("admin.roles.allLabel")}
                           </span>
                         ) : editMode && isSuperAdmin ? (
-                          <CheckToggle
-                            size="sm"
+                          <Checkbox
                             checked={state === "all"}
                             indeterminate={state === "partial"}
-                            onClick={() =>
+                            onChange={() =>
                               toggleGroup(g, role, state !== "all")
                             }
                             title={
@@ -140,7 +145,9 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                         <td className="sticky left-0 z-10 bg-inherit px-4 py-2.5">
                           <div className="flex items-start gap-2">
                             <IconButton
-                              aria-label={t("admin.roles.matrix.descriptionLabel")}
+                              aria-label={t(
+                                "admin.roles.matrix.descriptionLabel",
+                              )}
                               title={t("admin.roles.matrix.descriptionLabel")}
                               onClick={() => toggleExpandedPerm(perm.key)}
                               className="mt-0.5 h-auto w-auto shrink-0 p-0 text-muted hover:bg-transparent hover:text-primary-600"
@@ -148,11 +155,9 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                               <InformationCircleIcon className="h-4 w-4" />
                             </IconButton>
                             <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-medium text-heading">
-                                  {perm.label}
-                                </span>
-                              </div>
+                              <span className="text-sm font-medium text-heading">
+                                {perm.label}
+                              </span>
                               {isExpanded && (
                                 <div className="mt-1.5 space-y-1">
                                   <p className="text-xs leading-relaxed text-muted">
@@ -175,37 +180,34 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                         </td>
 
                         {ROLES.map((role) => {
-                          const checked = hasPermission(role, perm.key);
                           const locked = role === "super_admin";
+                          const checked =
+                            locked || hasPermission(role, perm.key);
                           const interactive =
                             editMode && !locked && isSuperAdmin;
                           return (
                             <td key={role} className="px-4 py-2.5 text-center">
-                              {interactive ? (
-                                <CheckToggle
-                                  checked={checked}
-                                  onClick={() =>
-                                    togglePermission(role, perm.key)
-                                  }
-                                  title={checked ? t("common.remove") : t("common.add")}
-                                  className="mx-auto"
-                                />
-                              ) : locked ? (
-                                <span
-                                  className="mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full bg-success-500/15"
-                                  title={t("admin.roles.matrix.superAdminAlwaysHasPermission")}
-                                >
-                                  <LockClosedIcon className="h-3.5 w-3.5 text-success-600" />
-                                </span>
-                              ) : checked ? (
-                                <span className="mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary-500/10">
-                                  <CheckIcon className="h-3.5 w-3.5 text-primary-600" />
-                                </span>
-                              ) : (
-                                <span className="mx-auto inline-flex h-6 w-6 items-center justify-center">
-                                  <span className="block h-2 w-2 rounded-full bg-border" />
-                                </span>
-                              )}
+                              <Checkbox
+                                checked={checked}
+                                disabled={!interactive}
+                                onChange={
+                                  interactive
+                                    ? () => togglePermission(role, perm.key)
+                                    : undefined
+                                }
+                                title={
+                                  locked
+                                    ? t(
+                                        "admin.roles.matrix.superAdminAlwaysHasPermission",
+                                      )
+                                    : interactive
+                                      ? checked
+                                        ? t("common.remove")
+                                        : t("common.add")
+                                      : undefined
+                                }
+                                className="mx-auto"
+                              />
                             </td>
                           );
                         })}
@@ -217,6 +219,6 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
           })}
         </tbody>
       </table>
-    </div>
+    </SectionCard>
   );
 }

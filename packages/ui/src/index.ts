@@ -75,7 +75,6 @@ export { Label, type LabelProps } from "./components/Label";
 export { FormField, type FormFieldProps } from "./components/FormField";
 export { Logo, type LogoProps } from "./components/Logo";
 export { Chip, type ChipProps } from "./components/Chip";
-export { CheckToggle, type CheckToggleProps } from "./components/CheckToggle";
 export {
   DisclosureButton,
   type DisclosureButtonProps,

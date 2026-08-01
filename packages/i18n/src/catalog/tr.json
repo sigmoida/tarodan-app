@@ -5717,6 +5717,10 @@
           "label": "Yorumlar",
           "description": "Kullanıcı yorumlarını görüntüleme, onaylama ve reddetme."
         },
+        "reports": {
+          "label": "Şikayetler",
+          "description": "Kullanıcı şikayet bildirimlerini görüntüleme ve sonuçlandırma."
+        },
         "staff": {
           "label": "Rol Yönetimi",
           "description": "Yönetici hesabı oluşturma, rol atama ve izin matrisi düzenleme."
@@ -5764,6 +5768,10 @@
         "tax": {
           "label": "Vergi Ayarları",
           "description": "KDV bölgeleri, vergi oranları ve kural yönetimi."
+        },
+        "invoices": {
+          "label": "Faturalar",
+          "description": "E-fatura listesi ve fatura PDF'lerini görüntüleme."
         },
         "aiModeration": {
           "label": "AI Denetim",
