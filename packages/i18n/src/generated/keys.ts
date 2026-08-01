@@ -2687,7 +2687,7 @@ export type MessageKey =
   | "admin.system.testTools.adjustRecordMiddle"
   | "admin.system.testTools.apply"
   | "admin.system.testTools.cronError"
-  | "admin.system.testTools.cronSuccess"
+  | "admin.system.testTools.cronQueued"
   | "admin.system.testTools.cronsDescription"
   | "admin.system.testTools.cronsTitle"
   | "admin.system.testTools.dates"

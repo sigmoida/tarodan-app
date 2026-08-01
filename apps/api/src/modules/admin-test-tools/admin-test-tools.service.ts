@@ -1,22 +1,21 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import type { Queue } from "bull";
 import { PrismaService } from "../../prisma";
-import { PaymentService } from "../payment/payment.service";
-import { TradeService } from "../trade/trade.service";
-import { MembershipService } from "../membership/membership.service";
-import { OfferSchedulerService } from "../offer/offer-scheduler.service";
-import { MembershipSchedulerService } from "../membership/membership-scheduler.service";
-import { ProductSchedulerService } from "../product/product-scheduler.service";
-import { RefundSchedulerService } from "../refund/refund-scheduler.service";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { CRON_CATALOG } from "../../workers/cron-catalog";
 
 /**
  * Admin "Test Araçları / Zaman Makinesi" arka uç mantığı.
  *
  * Süre/zaman-bazlı akışları manuel test etmek için: (1) cron tetikleme, (2) tek bir kaydın
- * ilgili tarih alanını geri/ileri alma. YENİ İŞ MANTIĞI YOK — mevcut servis metodlarını
- * çağırır; süre ayarlamada her tip için yalnızca SABİT tanımlı tarih alanlarına dokunur.
+ * ilgili tarih alanını geri/ileri alma. YENİ İŞ MANTIĞI YOK. Cron tetikleme `scheduled`
+ * kuyruğuna fiş atar — iş, zamanlanmış koşumla AYNI yoldan (worker process'i, runTrackedJob
+ * izlemesi, aynı-ad sıralı işleme) geçer; HTTP process'inde doğrudan servis çağrısı yoktur.
+ * Tetiklenebilir liste tek kaynaktan (CRON_CATALOG.triggerable) gelir.
  *
- * Güvenlik: controller süper-admin + audit ile gate'ler. Burada her işlem TEK kayıt hedefler;
- * toplu/where-bazlı güncelleme yoktur (kazara tüm tabloyu vurma imkânsız).
+ * Güvenlik: controller süper-admin + audit ile gate'ler. Süre ayarlamada her işlem TEK kayıt
+ * hedefler; toplu/where-bazlı güncelleme yoktur (kazara tüm tabloyu vurma imkânsız).
  */
 
 export type TestToolType =
@@ -40,26 +39,13 @@ export interface SearchItem {
   dates: Record<string, string | null>;
 }
 
-interface CronDef {
-  key: string;
-  label: string;
-  description: string;
-  run: () => Promise<unknown>;
-}
-
 @Injectable()
 export class AdminTestToolsService {
   private readonly logger = new Logger(AdminTestToolsService.name);
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly payment: PaymentService,
-    private readonly trade: TradeService,
-    private readonly membership: MembershipService,
-    private readonly offerScheduler: OfferSchedulerService,
-    private readonly membershipScheduler: MembershipSchedulerService,
-    private readonly productScheduler: ProductSchedulerService,
-    private readonly refundScheduler: RefundSchedulerService,
+    @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
 
   // ─────────────────────────── Ortam ───────────────────────────
@@ -69,84 +55,29 @@ export class AdminTestToolsService {
   }
 
   // ─────────────────────────── Cron'lar ───────────────────────────
-  private cronDefs(): CronDef[] {
-    return [
-      {
-        key: "check-expired-memberships",
-        label: "Süresi dolan üyelikleri düşür",
-        description:
-          "currentPeriodEnd geçmiş active/cancelled üyelikleri free yapar",
-        run: () => this.membership.checkExpiredMemberships(),
-      },
-      {
-        key: "process-auto-renewals",
-        label: "Üyelik oto-yenileme",
-        description:
-          "autoRenew + kayıtlı kart ile süresi dolan üyeliği yeniler",
-        run: () => this.membershipScheduler.runProcessAutoRenewals(),
-      },
-      {
-        key: "expire-boosts",
-        label: "Öne çıkarma süre-dolum",
-        description: "boostedUntil geçmiş ürünlerin rankTier’ını indirir",
-        run: () => this.productScheduler.runExpireBoosts(),
-      },
-      {
-        key: "cancel-expired-payments",
-        label: "Süresi dolan ödemeleri iptal et",
-        description: "paymentExpiresAt geçmiş bekleyen siparişleri iptal eder",
-        run: () => this.payment.cancelExpiredPayments(),
-      },
-      {
-        key: "release-expired-reservations",
-        label: "Süresi dolan rezervasyonları serbest bırak",
-        description: "bekleyen sipariş stok rezervasyonlarını serbest bırakır",
-        run: () => this.payment.releaseExpiredOrderReservations(),
-      },
-      {
-        key: "release-holds-due",
-        label: "Vadesi gelen escrow hold serbest",
-        description:
-          "releaseAt geçmiş ödeme hold’larını satıcıya serbest bırakır",
-        run: () => this.payment.releaseHoldsDue(),
-      },
-      {
-        key: "expire-offers",
-        label: "Süresi dolan teklifleri kapat",
-        description: "expiresAt geçmiş teklifleri sonlandırır",
-        run: () => this.offerScheduler.runHandleExpiredOffers(),
-      },
-      {
-        key: "cancel-expired-trades",
-        label: "Süresi dolan takasları iptal et",
-        description: "deadline geçmiş takasları otomatik iptal eder",
-        run: () => this.trade.autoCancelExpiredTrades(),
-      },
-      {
-        key: "refund-crons",
-        label: "İade cron’ları",
-        description:
-          "satıcı yanıt süresi geçen iadeleri otomatik kabul + iade akışı adımları",
-        run: () => this.refundScheduler.runRefundCrons(),
-      },
-    ];
-  }
-
   listCrons() {
-    return this.cronDefs().map(({ key, label, description }) => ({
-      key,
-      label,
-      description,
-    }));
+    return CRON_CATALOG.filter((c) => c.triggerable).map(
+      ({ key, label, description }) => ({ key, label, description }),
+    );
   }
 
+  /**
+   * Cron'u kuyruğa fiş atarak tetikler. Bilinmeyen anahtar VE triggerable=false
+   * aynı hatayı alır: whitelist listCrons'un döndüğüdür — toplu gönderim yapan
+   * işler (marketing vb.) API'den de tetiklenemez, yalnız UI'da gizli değildir.
+   */
   async runCron(
     key: string,
-  ): Promise<{ key: string; result: unknown; ranAt: string }> {
-    const def = this.cronDefs().find((c) => c.key === key);
+  ): Promise<{ key: string; jobId: string; queuedAt: string }> {
+    const def = CRON_CATALOG.find((c) => c.key === key && c.triggerable);
     if (!def) throw new BadRequestException(`Bilinmeyen cron: ${key}`);
-    const result = await def.run();
-    return { key, result: result ?? null, ranAt: new Date().toISOString() };
+    const job = await this.scheduledQueue.add(
+      key,
+      {},
+      { removeOnComplete: 50, removeOnFail: 50 },
+    );
+    this.logger.log(`Test aracı cron tetikledi: ${key} (job=${job.id})`);
+    return { key, jobId: String(job.id), queuedAt: new Date().toISOString() };
   }
 
   // ─────────────────────────── Arama ───────────────────────────
