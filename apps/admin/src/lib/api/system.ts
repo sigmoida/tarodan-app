@@ -108,4 +108,18 @@ export const systemApi = {
   // Medya tarayıcısı (Faz 3): bucket klasörleri + dosya sahipliği (read-only)
   getMediaBrowse: (prefix = "") =>
     api.get("/admin/media/browse", { params: { prefix } }),
+
+  // AI moderasyon — eşikler 0..1 ORANI olarak taşınır (panel % ile gösterir).
+  getAiModerationConfig: () =>
+    api.get<{
+      enabled: boolean;
+      relevanceThreshold: number;
+      nsfwThreshold: number;
+    }>("/admin/moderation/ai-config"),
+  setAiModerationConfig: (body: {
+    relevanceThreshold: number;
+    nsfwThreshold: number;
+  }) => api.post("/admin/moderation/ai-config", body),
+  testModerationImage: (imageUrl: string) =>
+    api.post("/admin/moderation/test-image", { imageUrl }),
 };

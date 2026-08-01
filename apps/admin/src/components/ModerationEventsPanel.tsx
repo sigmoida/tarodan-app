@@ -130,7 +130,9 @@ function moderationColumns(
         `${e.kind === "text" ? t("admin.shared.moderation.text") : t("admin.shared.moderation.image")}${
           e.field ? ` · ${fieldLabels(t)[e.field] ?? e.field}` : ""
         }`,
-      { minWidth: 140, sortKey: "kind", sortType: "text" },
+      // "Görsel · Ürün Görseli" gibi birleşik etiketler 140px'e sığmayıp
+      // "Görsel · Ürün …" diye kırpılıyordu; genişlet + sarmala.
+      { minWidth: 200, grow: 2, wrap: true, sortKey: "kind", sortType: "text" },
     ),
     col.badge<ModerationEvent>(
       t("admin.shared.moderation.result"),
@@ -174,7 +176,9 @@ function moderationColumns(
     col.text<ModerationEvent>(
       t("admin.shared.moderation.reason"),
       (e) => e.reason,
-      { grow: 2, sortKey: "reason" },
+      // Sebep tam cümledir ("Görsel ürünle alakasız — …"); kırpmak bilgiyi
+      // yok ediyordu, satır kaydırarak tamamını göster.
+      { grow: 4, minWidth: 260, wrap: true, sortKey: "reason" },
     ),
     col.user<ModerationEvent>(
       t("common.user"),

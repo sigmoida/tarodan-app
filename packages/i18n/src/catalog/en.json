@@ -5420,11 +5420,13 @@
         "title": "AI Moderation",
         "description": "Shared AI moderation for all entities (product · user · collection · image · text) — thresholds, image testing, and a unified event log",
         "disabledWarning": "AI moderation service is disabled (AI_MODERATION_ENABLED=false). Threshold settings and image testing are unavailable; past log entries are still listed.",
+        "configLoadError": "The AI configuration could not be loaded. Editing is disabled because the current thresholds are unknown.",
         "logTitle": "Moderation Log",
         "logDescription": "Content blocked / flagged by AI across all entities"
       },
       "thresholds": {
         "saved": "Thresholds saved",
+        "unavailable": "Current thresholds could not be loaded; editing is disabled.",
         "title": "AI Thresholds",
         "relevanceLabel": "Acceptance threshold (relevance %)",
         "relevanceHelper": "If a product image's relevance score is above this percentage, it's auto-accepted; below it, it goes to admin review.",
@@ -5441,7 +5443,8 @@
         "orLabel": "or",
         "chooseFile": "choose a file from your computer",
         "scores": "Relevance: {relevance}% · Inappropriateness: {nsfw}%",
-        "labels": "Labels:"
+        "labels": "Labels:",
+        "fileTooLarge": "File is too large (max {limit} KB). Pick a smaller image or test with a URL."
       },
       "badge": {
         "flagged": "Suspected inappropriate",

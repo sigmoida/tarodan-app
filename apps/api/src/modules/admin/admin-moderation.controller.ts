@@ -50,6 +50,7 @@ import { AdminRoute } from "../auth/decorators/admin-route.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { AdminRole } from "@prisma/client";
 import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
+import { SetAiConfigDto } from "./dto/ai-config.dto";
 import {
   OverrideRefundPolicyDto,
   SetReturnShippingPayerDto,
@@ -184,9 +185,7 @@ export class AdminModerationController {
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @RequirePermission("ai_moderation")
   @ApiOperation({ summary: "AI eşiklerini ayarla (canlı + kalıcı)" })
-  async setAiConfig(
-    @Body() body: { relevanceThreshold?: number; nsfwThreshold?: number },
-  ) {
+  async setAiConfig(@Body() body: SetAiConfigDto) {
     return this.adminService.setAiConfig(
       body.relevanceThreshold,
       body.nsfwThreshold,

@@ -5420,11 +5420,13 @@
         "title": "AI Denetim",
         "description": "Tüm varlıklar (ürün · kullanıcı · koleksiyon · görsel · metin) için ortak AI moderasyonu — eşikler, görsel testi ve birleşik olay günlüğü",
         "disabledWarning": "AI moderasyon servisi kapalı (AI_MODERATION_ENABLED=false). Eşik ayarı ve görsel testi devre dışı; geçmiş günlük kayıtları yine listelenir.",
+        "configLoadError": "AI yapılandırması okunamadı. Mevcut eşikler bilinmediği için düzenleme kapalı.",
         "logTitle": "Denetim Günlüğü",
         "logDescription": "Tüm varlıklarda AI tarafından engellenen / işaretlenen içerikler"
       },
       "thresholds": {
         "saved": "Eşikler kaydedildi",
+        "unavailable": "Mevcut eşikler okunamadı; düzenleme kapalı.",
         "title": "AI Eşikleri",
         "relevanceLabel": "Kabul eşiği (ilgililik %)",
         "relevanceHelper": "Ürün görseli bu yüzdenin üstünde ilgililik alırsa otomatik kabul edilir; altındakiler admin onayına düşer.",
@@ -5441,7 +5443,8 @@
         "orLabel": "veya",
         "chooseFile": "bilgisayardan dosya seç",
         "scores": "İlgililik: %{relevance} · Uygunsuzluk: %{nsfw}",
-        "labels": "Etiketler:"
+        "labels": "Etiketler:",
+        "fileTooLarge": "Dosya çok büyük (en fazla {limit} KB). Daha küçük bir görsel seçin ya da URL ile test edin."
       },
       "badge": {
         "flagged": "Uygunsuz şüphesi",
