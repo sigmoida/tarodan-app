@@ -84,27 +84,6 @@ export interface IPaymentProvider {
     raw?: Record<string, unknown>;
   }>;
 
-  /** Kayıtlı kartla kullanıcı-mevcut (CIT) ödeme — recurring DEĞİL. */
-  capiPaymentByRegisteredCard(params: {
-    utoken: string;
-    ctoken: string;
-    amount: number;
-    merchantOid: string;
-    buyer: PayTRBuyer;
-    basketItems: PayTRBasketItem[];
-    requireCvv?: boolean;
-    cvv?: string;
-    installmentCount?: number;
-    non3d?: boolean;
-    successQueryParams?: string;
-  }): Promise<{
-    status: "success" | "failed" | "wait_callback";
-    reason?: string;
-    tryAgain?: boolean;
-    threeDSHtml?: string;
-    raw?: Record<string, unknown>;
-  }>;
-
   capiListCards(utoken: string): Promise<
     Array<{
       ctoken: string;

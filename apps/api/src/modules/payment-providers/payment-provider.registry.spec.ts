@@ -32,9 +32,6 @@ class StubPaymentProvider implements IPaymentProvider {
   async chargeRecurring() {
     return { status: "success" as const };
   }
-  async capiPaymentByRegisteredCard() {
-    return { status: "success" as const };
-  }
   async capiListCards() {
     return [];
   }
