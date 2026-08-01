@@ -24,6 +24,8 @@ import { AdminSellerApplicationController } from "./admin-seller-application.con
 import { AdminAdPackageController } from "./admin-ad-package.controller";
 import { AdminService } from "./admin.service";
 import { AdminPspReconciliationService } from "./admin-psp-reconciliation.service";
+import { AdminMediaService } from "./admin-media.service";
+import { AdminMediaController } from "./admin-media.controller";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCommissionService } from "./admin-commission.service";
 import { AdminSettingsService } from "./admin-settings.service";
@@ -114,6 +116,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [
+    AdminMediaController,
     AdminCommissionController,
     AdminUserController,
     AdminProductController,
@@ -141,6 +144,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   providers: [
     AdminService,
     AdminPspReconciliationService,
+    AdminMediaService,
     AdminAuditService,
     AdminCommissionService,
     AdminSettingsService,

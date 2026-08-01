@@ -440,6 +440,50 @@ export class StorageService implements OnModuleInit {
     return results;
   }
 
+  /**
+   * Delimiter'lı klasör görünümü (admin medya tarayıcısı): verilen prefix'in
+   * altındaki alt-klasörler (CommonPrefixes) + dosyalar. Prefix env ile
+   * başlamıyorsa eklenir — tarayıcı kendi env'inin dışına çıkamaz.
+   */
+  async listFolder(prefix: string): Promise<{
+    folders: string[];
+    files: Array<{ key: string; size: number; lastModified: Date }>;
+  }> {
+    if (!this.isS3Available) return { folders: [], files: [] };
+    const cleaned = prefix.replace(/^\/+/, "");
+    const base = cleaned.startsWith(this.envPrefix)
+      ? cleaned
+      : `${this.envPrefix}/${cleaned}`;
+    const fullPrefix = base === "" || base.endsWith("/") ? base : `${base}/`;
+
+    const folders: string[] = [];
+    const files: Array<{ key: string; size: number; lastModified: Date }> = [];
+    let continuationToken: string | undefined;
+    do {
+      const page = await this.s3Client!.send(
+        new ListObjectsV2Command({
+          Bucket: this.baseBucket,
+          Prefix: fullPrefix,
+          Delimiter: "/",
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const cp of page.CommonPrefixes ?? []) {
+        if (cp.Prefix) folders.push(cp.Prefix);
+      }
+      for (const obj of page.Contents ?? []) {
+        if (!obj.Key || obj.Key === fullPrefix) continue;
+        files.push({
+          key: obj.Key,
+          size: obj.Size ?? 0,
+          lastModified: obj.LastModified ?? new Date(0),
+        });
+      }
+      continuationToken = page.NextContinuationToken;
+    } while (continuationToken);
+    return { folders, files };
+  }
+
   /** Tam key ile S3 nesnesi + varsa MediaFile kaydını siler (temizlik cron'u için). */
   async deleteFileByKey(key: string): Promise<void> {
     await this.prisma.mediaFile.deleteMany({ where: { key } });

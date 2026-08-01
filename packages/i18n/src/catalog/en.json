@@ -3074,6 +3074,29 @@
           "trade": "trade ID",
           "userEmail": "user email"
         }
+      },
+      "media": {
+        "title": "Media",
+        "subtitle": "Read-only view of bucket folders and file ownership",
+        "up": "Up",
+        "root": "Root",
+        "empty": "No files in this folder.",
+        "preview": "Preview",
+        "file": "File",
+        "sizeCol": "Size",
+        "date": "Date",
+        "usage": "Usage",
+        "private": "Private",
+        "orphan": "Orphan",
+        "copyUrl": "Copy URL",
+        "urlCopied": "URL copied",
+        "usageType": {
+          "product": "Product",
+          "collection": "Collection",
+          "brand": "Brand",
+          "avatar": "Avatar",
+          "upload": "Upload"
+        }
       }
     },
     "catalog": {
@@ -5980,6 +6003,10 @@
           "name": "Boost Purchases",
           "description": "Track purchased boost packages and their buyers",
           "keywords": "purchase,boost,package,showcase"
+        },
+        "media": {
+          "name": "Media",
+          "description": "Bucket folders, files and ownership tracking."
         }
       }
     },

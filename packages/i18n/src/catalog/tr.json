@@ -3074,6 +3074,29 @@
           "trade": "takas id",
           "userEmail": "kullanıcı e-posta"
         }
+      },
+      "media": {
+        "title": "Medya",
+        "subtitle": "Bucket klasörlerinin ve dosya sahipliğinin takibi (salt okunur)",
+        "up": "Yukarı",
+        "root": "Kök",
+        "empty": "Bu klasörde dosya yok.",
+        "preview": "Önizleme",
+        "file": "Dosya",
+        "sizeCol": "Boyut",
+        "date": "Tarih",
+        "usage": "Kullanım",
+        "private": "Özel",
+        "orphan": "Sahipsiz",
+        "copyUrl": "URL kopyala",
+        "urlCopied": "URL kopyalandı",
+        "usageType": {
+          "product": "Ürün",
+          "collection": "Koleksiyon",
+          "brand": "Marka",
+          "avatar": "Avatar",
+          "upload": "Yükleme"
+        }
       }
     },
     "catalog": {
@@ -5980,6 +6003,10 @@
           "name": "Paket Satın Alımları",
           "description": "Alınan öne çıkarma paketlerini ve alıcıları takip edin",
           "keywords": "satın alım,boost,paket,vitrin,purchase"
+        },
+        "media": {
+          "name": "Medya",
+          "description": "Bucket klasörleri, dosyalar ve sahiplik takibi."
         }
       }
     },

@@ -104,4 +104,8 @@ export const systemApi = {
   }) => api.get("/user-reports/admin", { params }),
   getUserReportStats: () => api.get("/user-reports/admin/stats"),
   getUserReportById: (id: string) => api.get(`/user-reports/admin/${id}`),
+
+  // Medya tarayıcısı (Faz 3): bucket klasörleri + dosya sahipliği (read-only)
+  getMediaBrowse: (prefix = "") =>
+    api.get("/admin/media/browse", { params: { prefix } }),
 };

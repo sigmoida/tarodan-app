@@ -30,6 +30,7 @@ import {
   BeakerIcon,
   TicketIcon,
   SparklesIcon,
+  PhotoIcon,
 } from "@heroicons/react/24/outline";
 
 /**
@@ -470,6 +471,14 @@ export function getNavGroups(t: T): NavGroup[] {
           icon: TruckIcon,
           description: t("admin.shippingTariffs.description"),
           keywords: ["shipping", "tariff"],
+          permission: "settings",
+        },
+        {
+          name: t("admin.nav.items.media.name"),
+          href: "/system/media",
+          icon: PhotoIcon,
+          description: t("admin.nav.items.media.description"),
+          keywords: ["media", "bucket", "s3", "gorsel"],
           permission: "settings",
         },
         {
