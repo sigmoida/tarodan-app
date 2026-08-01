@@ -47,6 +47,9 @@ class StubPaymentProvider implements IPaymentProvider {
   async getReturnedTransfers() {
     return {};
   }
+  verifyTransferCallback() {
+    return true;
+  }
 }
 
 describe("PaymentProviderRegistry (#89)", () => {

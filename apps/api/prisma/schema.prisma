@@ -1777,6 +1777,12 @@ model PayoutTransfer {
   retryCount             Int                           @default(0) @map("retry_count")
   maxRetries             Int                           @default(3) @map("max_retries")
   nextRetryAt            DateTime?                     @map("next_retry_at")
+  // PayTR aşama-1 (talimat kabulü) anı ve o an GERÇEKTEN gönderilen net tutar.
+  // Aşama-2 callback'i saatler/günler sonra gelir; mail + ledger o anki
+  // netAmount'a değil bu snapshot'a bakar (adjustment/iade netAmount'ı değiştirebilir).
+  // submittedAt doluysa payout PayTR'ye iletilmiştir → zombi tespiti bunu takılı saymaz.
+  submittedAt            DateTime?                     @map("submitted_at")
+  submittedAmount        Decimal?                      @map("submitted_amount") @db.Decimal(10, 2)
   processedAt            DateTime?                     @map("processed_at")
   createdAt              DateTime                      @default(now()) @map("created_at")
   updatedAt              DateTime                      @updatedAt @map("updated_at")

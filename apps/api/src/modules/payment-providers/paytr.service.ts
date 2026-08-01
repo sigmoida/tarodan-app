@@ -1271,6 +1271,27 @@ export class PayTRService implements IPaymentProvider {
   }
 
   /**
+   * Aşama-2: platform transfer SONUCU callback'inin hash doğrulaması.
+   * Doküman: hash = base64(HMAC-SHA256(trans_ids + merchant_salt, merchant_key)).
+   *
+   * DİKKAT: `transIds` HAM gövde string'idir — JSON parse edilip yeniden
+   * serialize edilirse boşluk/kaçış farkından hash tutmaz. Doğrulama ham
+   * string üzerinden yapılır; parse işi çağırana aittir.
+   */
+  verifyTransferCallback(params: { transIds: string; hash: string }): boolean {
+    if (!params.transIds || !params.hash) return false;
+    const expected = crypto
+      .createHmac("sha256", this.merchantKey)
+      .update(params.transIds + this.merchantSalt)
+      .digest("base64");
+    const expectedBuf = Buffer.from(expected);
+    const receivedBuf = Buffer.from(params.hash);
+    // timingSafeEqual uzunluk farkında throw eder — kısa/sahte hash 500 üretmesin.
+    if (expectedBuf.length !== receivedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
+  }
+
+  /**
    * Query returned (failed) transfers within a date range.
    */
   async getReturnedTransfers(params: {

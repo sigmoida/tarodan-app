@@ -65,6 +65,10 @@ const envSchema = z
     PAYTR_MERCHANT_SALT: z.string().optional(),
     PAYTR_TEST_MODE: z.string().optional(),
     PAYTR_CALLBACK_URL: z.string().optional(),
+    // "true" iken payout, aşama-1 kabulünde completed OLMAZ; PayTR'nin transfer
+    // sonucu callback'ini (2. aşama) bekler. Panelde "Platform Transfer Sonucu
+    // Bildirim URL" tanımlanmadan AÇMAYIN — hiçbir payout tamamlanamaz.
+    PAYTR_TRANSFER_CALLBACK_ENABLED: z.string().optional(),
     PAYOUTS_DISABLED: z.string().optional(),
 
     // Surat cargo — when the integration is enabled, production must ship for real

@@ -136,6 +136,9 @@ export interface IPaymentProvider {
     startDate: string;
     endDate: string;
   }): Promise<any>;
+
+  /** Aşama-2 (platform transfer sonucu) callback hash doğrulaması — ham trans_ids string'i ile. */
+  verifyTransferCallback(params: { transIds: string; hash: string }): boolean;
 }
 
 /** Canonical provider keys (matches `Payment.provider`). */

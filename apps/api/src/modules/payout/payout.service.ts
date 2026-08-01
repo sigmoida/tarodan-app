@@ -47,6 +47,12 @@ const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
 
 const IBAN_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
 
+/**
+ * Aşama-1 kabulünden sonra transfer sonucu callback'inin makul bekleme süresi.
+ * Banka EFT'si gün aşabilir; bu pencere aşılırsa alarm (otomatik aksiyon yok).
+ */
+const PAYOUT_CALLBACK_OVERDUE_MS = 3 * 24 * 60 * 60 * 1000;
+
 /** Tutar eşiği: bu değerin altındaki net ödeme "sıfır" kabul edilir (kuruş artıkları). */
 const PAYOUT_MIN_NET = 0.01;
 
@@ -718,59 +724,48 @@ export class PayoutService {
           });
 
         if (result.status === "success") {
-          await this.prisma.payoutTransfer.update({
-            where: { id: payout.id },
-            data: {
-              status: PayoutStatus.completed,
-              providerResponse: result as any,
-              processedAt: new Date(),
-            },
-          });
-          // Başarılı transfer = IBAN gerçek ve çalışıyor → otomatik doğrula.
-          await this.syncBankAccountVerification(
-            payout.sellerId,
-            transferIban,
-            true,
-          );
-          await this.sendPayoutReleasedEmail(
-            payout.sellerId,
-            netToTransfer,
-            transferIban,
-          );
-          processed++;
-          // 11.1c (G4/KVKK): tam IBAN loglanmaz — yalnız son 4 hane (email'le simetrik).
-          this.logger.log(
-            `Payout ${payout.transId} completed: ${netToTransfer} TL → ${maskIban(transferIban)}`,
-          );
-          // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
-          // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
-          // → sipariş bazında escrow net 0'a iner. Best-effort (payout'u bozmaz).
-          try {
-            const net = netToTransfer;
-            if (net > 0)
-              await this.ledger?.record(this.prisma, {
-                eventType: LedgerEventType.payout_completed,
-                entries: [
-                  {
-                    account: LedgerAccount.seller_escrow,
-                    direction: LedgerDirection.credit,
-                    amount: net,
-                  },
-                  {
-                    account: LedgerAccount.payout,
-                    direction: LedgerDirection.debit,
-                    amount: net,
-                  },
-                ],
-                refs: {
-                  payoutId: payout.id,
-                  sellerId: payout.sellerId,
-                },
-              });
-          } catch (e: any) {
-            this.logger.warn(
-              `Ledger payout kaydı başarısız (payout ${payout.id}): ${e?.message}`,
+          // Aşama-1 kabul anının snapshot'ı: callback (2. aşama) saatler/günler
+          // sonra geldiğinde mail + ledger'ın kullanacağı GERÇEK gönderilen
+          // tutar — adjustment/iade sonrası netAmount değişebilir.
+          const submittedAt = new Date();
+          if (this.transferCallbackEnabled()) {
+            // 2. aşama akışı: PayTR yalnız TALİMATI kabul etti; para henüz
+            // satıcıya ulaşmadı. Payout processing'te bekler; completed + yan
+            // etkiler transfer sonucu callback'inde (handleTransferResultCallback).
+            await this.prisma.payoutTransfer.update({
+              where: { id: payout.id },
+              data: {
+                providerResponse: result as any,
+                submittedAt,
+                submittedAmount: netToTransfer,
+              },
+            });
+            processed++;
+            this.logger.log(
+              `Payout ${payout.transId} submitted (transfer sonucu callback'i bekleniyor): ${netToTransfer} TL → ${maskIban(transferIban)}`,
             );
+          } else {
+            // Eski akış (bayrak kapalı): senkron kabul = tamamlandı. PayTR
+            // panelinde "Platform Transfer Sonucu Bildirim URL" tanımlanana
+            // kadar güvenli varsayılan — aksi halde hiçbir payout tamamlanamaz.
+            await this.prisma.payoutTransfer.update({
+              where: { id: payout.id },
+              data: {
+                status: PayoutStatus.completed,
+                providerResponse: result as any,
+                processedAt: submittedAt,
+                submittedAt,
+                submittedAmount: netToTransfer,
+              },
+            });
+            await this.applyPayoutCompletionEffects({
+              payoutId: payout.id,
+              sellerId: payout.sellerId,
+              transId: payout.transId,
+              transferIban,
+              netAmount: netToTransfer,
+            });
+            processed++;
           }
         } else {
           await this.handlePayoutFailure(
@@ -792,6 +787,164 @@ export class PayoutService {
       );
     }
     return { processed, failed };
+  }
+
+  /**
+   * PAYTR_TRANSFER_CALLBACK_ENABLED=true → payout, aşama-1 kabulünde completed
+   * olmaz; PayTR'nin transfer sonucu callback'ini (2. aşama) bekler.
+   */
+  private transferCallbackEnabled(): boolean {
+    return (
+      this.configService.get<string>("PAYTR_TRANSFER_CALLBACK_ENABLED") ===
+      "true"
+    );
+  }
+
+  /**
+   * "Para satıcıya ulaştı" yan etkileri — TEK kaynak. Eski senkron akış da
+   * 2. aşama callback'i de burayı çağırır: IBAN otomatik doğrulama, satıcıya
+   * "ödemeniz aktarıldı" maili, ledger settle kaydı ve log. İki yerde
+   * kopyalanırsa akışlar sessizce ayrışır.
+   */
+  private async applyPayoutCompletionEffects(params: {
+    payoutId: string;
+    sellerId: string;
+    transId: string;
+    transferIban: string;
+    netAmount: number;
+  }): Promise<void> {
+    // Başarılı transfer = IBAN gerçek ve çalışıyor → otomatik doğrula.
+    await this.syncBankAccountVerification(
+      params.sellerId,
+      params.transferIban,
+      true,
+    );
+    await this.sendPayoutReleasedEmail(
+      params.sellerId,
+      params.netAmount,
+      params.transferIban,
+    );
+    // 11.1c (G4/KVKK): tam IBAN loglanmaz — yalnız son 4 hane (email'le simetrik).
+    this.logger.log(
+      `Payout ${params.transId} completed: ${params.netAmount} TL → ${maskIban(params.transferIban)}`,
+    );
+    // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
+    // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
+    // → sipariş bazında escrow net 0'a iner. Best-effort (payout'u bozmaz).
+    try {
+      const net = params.netAmount;
+      if (net > 0)
+        await this.ledger?.record(this.prisma, {
+          eventType: LedgerEventType.payout_completed,
+          entries: [
+            {
+              account: LedgerAccount.seller_escrow,
+              direction: LedgerDirection.credit,
+              amount: net,
+            },
+            {
+              account: LedgerAccount.payout,
+              direction: LedgerDirection.debit,
+              amount: net,
+            },
+          ],
+          refs: {
+            payoutId: params.payoutId,
+            sellerId: params.sellerId,
+          },
+        });
+    } catch (e: any) {
+      this.logger.warn(
+        `Ledger payout kaydı başarısız (payout ${params.payoutId}): ${e?.message}`,
+      );
+    }
+  }
+
+  /**
+   * PayTR platform transfer SONUCU callback'i (2. aşama). PayTR, panelde
+   * tanımlı "Platform Transfer Sonucu Bildirim URL"e tamamlanan transferlerin
+   * trans_id listesini POST'lar; "OK" yanıtı görmedikçe bildirimi tekrarlar.
+   * Bu yüzden geçersiz gövde/hash dahil HER durumda "OK" dönülür — sorun
+   * yalnız loglanır, statü değişmez.
+   *
+   * `transIds` HAM gövde string'idir: hash bu ham string üzerinden doğrulanır
+   * (parse/re-serialize hash'i bozar), JSON parse doğrulamadan SONRA yapılır.
+   */
+  async handleTransferResultCallback(
+    transIds: string | undefined,
+    hash: string | undefined,
+  ): Promise<string> {
+    if (!transIds || !hash) {
+      this.logger.warn(
+        `PayTR transfer callback eksik alan: trans_ids=${transIds ? "var" : "yok"} hash=${hash ? "var" : "yok"}`,
+      );
+      return "OK";
+    }
+
+    const valid = this.paymentProviders
+      .resolve()
+      .verifyTransferCallback({ transIds, hash });
+    if (!valid) {
+      this.logger.error(
+        `PayTR transfer callback hash uyuşmadı — bildirim YOK SAYILDI. trans_ids=${transIds.slice(0, 200)}`,
+      );
+      return "OK";
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(transIds);
+    } catch {
+      this.logger.error(
+        `PayTR transfer callback trans_ids JSON parse edilemedi: ${transIds.slice(0, 200)}`,
+      );
+      return "OK";
+    }
+    if (!Array.isArray(parsed)) {
+      this.logger.error(
+        `PayTR transfer callback trans_ids dizi değil: ${transIds.slice(0, 200)}`,
+      );
+      return "OK";
+    }
+
+    for (const raw of parsed) {
+      const transId = String(raw);
+      const payout = await this.prisma.payoutTransfer.findUnique({
+        where: { transId },
+      });
+      if (!payout) {
+        this.logger.warn(
+          `PayTR transfer callback: bilinmeyen trans_id=${transId} — atlandı`,
+        );
+        continue;
+      }
+
+      // Atomik claim + idempotens: yalnız processing → completed. Tekrarlanan
+      // callback'te count=0 döner, mail/ledger ikinci kez tetiklenmez.
+      const claim = await this.prisma.payoutTransfer.updateMany({
+        where: { id: payout.id, status: PayoutStatus.processing },
+        data: { status: PayoutStatus.completed, processedAt: new Date() },
+      });
+      if (claim.count === 0) {
+        if (payout.status !== PayoutStatus.completed) {
+          this.logger.warn(
+            `PayTR transfer callback: payout ${payout.id} beklenmeyen statüde (${payout.status}) — dokunulmadı`,
+          );
+        }
+        continue;
+      }
+
+      await this.applyPayoutCompletionEffects({
+        payoutId: payout.id,
+        sellerId: payout.sellerId,
+        transId: payout.transId,
+        transferIban: payout.transferIban,
+        // Aşama-1'de gerçekten gönderilen tutar; eski kayıtlar için netAmount.
+        netAmount: Number(payout.submittedAmount ?? payout.netAmount),
+      });
+    }
+
+    return "OK";
   }
 
   /**
@@ -905,8 +1058,15 @@ export class PayoutService {
    */
   async detectStuckProcessingPayouts(thresholdMinutes = 30): Promise<number> {
     const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+    // submittedAt=null şartı: PayTR'ye İLETİLMİŞ (aşama-1 kabul edilmiş) payout
+    // 2. aşama callback'ini beklerken processing'te durur — bu zombi değildir.
+    // Zombi = claim edilmiş ama PayTR çağrısı hiç tamamlanamadan kalmış kayıt.
     const stuck = await this.prisma.payoutTransfer.findMany({
-      where: { status: PayoutStatus.processing, updatedAt: { lt: cutoff } },
+      where: {
+        status: PayoutStatus.processing,
+        submittedAt: null,
+        updatedAt: { lt: cutoff },
+      },
       select: {
         id: true,
         transId: true,
@@ -923,7 +1083,29 @@ export class PayoutService {
           `PayTR panelinden doğrulayın (çift-ödeme riski).`,
       );
     }
-    return stuck.length;
+
+    // Callback gecikmesi: talimat kabul edilmiş ama sonuç bildirimi makul
+    // süredir gelmemiş. Otomatik aksiyon YOK (transfer gerçekleşmiş olabilir);
+    // alarm + manuel inceleme. Bayrak kapalıyken bu duruma düşülmez (senkron
+    // akış submittedAt yazdığı anda completed yapar) → sorgu doğal olarak boş.
+    const callbackCutoff = new Date(Date.now() - PAYOUT_CALLBACK_OVERDUE_MS);
+    const overdue = await this.prisma.payoutTransfer.findMany({
+      where: {
+        status: PayoutStatus.processing,
+        submittedAt: { lt: callbackCutoff },
+      },
+      select: { id: true, transId: true, sellerId: true, submittedAt: true },
+    });
+    for (const p of overdue) {
+      this.logger.error(
+        `PAYOUT CALLBACK GECİKTİ (manuel inceleme gerekir): payout ${p.id} transId=${p.transId} ` +
+          `sellerId=${p.sellerId} — talimat ${p.submittedAt?.toISOString()} tarihinde kabul edildi, ` +
+          `transfer sonucu bildirimi hâlâ gelmedi. PayTR panelinden transferi ve panel ` +
+          `"Platform Transfer Sonucu Bildirim URL" ayarını kontrol edin.`,
+      );
+    }
+
+    return stuck.length + overdue.length;
   }
 
   /**
@@ -954,7 +1136,15 @@ export class PayoutService {
         const transfer = await this.prisma.payoutTransfer.findUnique({
           where: { transId: returned.trans_id },
         });
-        if (transfer && transfer.status === PayoutStatus.completed) {
+        // `processing` de kapsanır: 2. aşama akışında transfer bankadan geri
+        // dönerse PayTR onu tamamlananlar callback'ine hiç koymaz — payout
+        // completed'a geçemeden geri döner. Yalnız completed'ı yakalasaydık
+        // kayıt sonsuza dek processing'te kalırdı.
+        if (
+          transfer &&
+          (transfer.status === PayoutStatus.completed ||
+            transfer.status === PayoutStatus.processing)
+        ) {
           await this.prisma.payoutTransfer.update({
             where: { id: transfer.id },
             data: {
