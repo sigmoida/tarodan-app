@@ -48,6 +48,7 @@ const publicDir = resolve(process.cwd(), targetArg);
 const ASSETS = [
   ["src/assets/tarodan-logo.ts", "tarodan-logo.jpg"],
   ["src/assets/tarodan-logo-transparent.ts", "tarodan-logo-transparent.png"],
+  ["src/assets/tarodan-favicon.ts", "tarodan-favicon.png"],
 ];
 
 function dataUriBytes(fileText, sourceRel) {

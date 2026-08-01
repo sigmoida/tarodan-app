@@ -42,7 +42,7 @@ export const metadata: Metadata = {
       "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu",
   },
   icons: {
-    icon: "/tarodanfavicon.png",
+    icon: "/tarodan-favicon.png",
   },
 };
 

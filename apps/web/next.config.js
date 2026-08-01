@@ -34,26 +34,20 @@ function getCacheHeaders() {
       source: '/favicon.ico',
       headers: [{ key: 'Cache-Control', value: oneDay }],
     },
-    {
-      source: '/tarodanfavicon.png',
+    // Kabuk varlıkları (favicon/logolar @tarodan/brand'dan üretilir; rozetler +
+    // placeholder repo'da) — hepsi kökte, tek tek 1 haftalık cache alır.
+    ...[
+      '/tarodan-favicon.png',
+      '/tarodan-logo.jpg',
+      '/tarodan-logo-transparent.png',
+      '/product-placeholder.svg',
+      '/app-store-badge.svg',
+      '/google-play-badge.svg',
+      '/secure-payment-badge.svg',
+    ].map((source) => ({
+      source,
       headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
-    {
-      source: '/logo.svg',
-      headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
-    {
-      source: '/tarodan-logo.jpg',
-      headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
-    {
-      source: '/images/:path*',
-      headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
-    {
-      source: '/photos/:path*',
-      headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
+    })),
   ];
 }
 

@@ -3,7 +3,7 @@
  * servisleri (placehold.co/picsum) tamamen kaldırıldı; gerçek görseller
  * her zaman API'nin verdiği mutlak URL'den (S3/CDN) gelir.
  */
-const PRODUCT_PLACEHOLDER = "/images/product-placeholder.svg";
+const PRODUCT_PLACEHOLDER = "/product-placeholder.svg";
 
 export const getImageUrl = (
   image: any,

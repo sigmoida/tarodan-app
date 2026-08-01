@@ -24,6 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: APP_NAME,
     description: t("admin.nav.defaultDescription"),
     robots: { index: false, follow: false },
+    // @tarodan/brand'dan sync-brand-assets.mjs ile üretilir (build artifact).
+    icons: { icon: "/tarodan-favicon.png" },
   };
 }
 

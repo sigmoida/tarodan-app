@@ -135,14 +135,14 @@ export default function Footer() {
 						    intrinsic size so no layout shift, and items-center aligns them. */}
             <div className="flex items-center gap-2 sm:justify-end">
               <Image
-                src="/Download_on_the_App_Store_Badge_US-UK_RGB_blk_092917.svg"
+                src="/app-store-badge.svg"
                 alt={t("footer.downloadAppStore")}
                 width={120}
                 height={40}
                 className="h-11 w-auto"
               />
               <Image
-                src="/GetItOnGooglePlay_Badge_Web_color_English.svg"
+                src="/google-play-badge.svg"
                 alt={t("footer.downloadGooglePlay")}
                 width={239}
                 height={71}
@@ -226,7 +226,7 @@ export default function Footer() {
               {t("footer.cookieSettings")}
             </Button>
             <Image
-              src="/idHcfrz3L6_1783526429272.svg"
+              src="/secure-payment-badge.svg"
               alt={t("checkout.securePayment")}
               width={135}
               height={24}

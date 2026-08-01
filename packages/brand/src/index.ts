@@ -8,5 +8,6 @@
  * decision layered on top of this package.
  */
 
-export { tarodanLogoDataUri } from './assets/tarodan-logo';
-export { tarodanLogoTransparentDataUri } from './assets/tarodan-logo-transparent';
+export { tarodanLogoDataUri } from "./assets/tarodan-logo";
+export { tarodanLogoTransparentDataUri } from "./assets/tarodan-logo-transparent";
+export { tarodanFaviconDataUri } from "./assets/tarodan-favicon";
