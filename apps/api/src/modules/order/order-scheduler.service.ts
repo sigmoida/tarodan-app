@@ -38,10 +38,13 @@ export class OrderSchedulerService implements OnModuleInit {
       "*/10 * * * *",
       this.logger,
     );
+    // 10 dk: sık koşan işlerin en ağırı (fatura üretimi + eLogo + takas
+    // komisyonu taramaları). Teslim-sonrası faturalamanın dakika hassasiyeti
+    // yok; iş idempotent taramadır, kaçan tick'i sonraki telafi eder.
     await registerRepeatableCron(
       this.scheduledQueue,
       "process-delivered-orders",
-      "*/2 * * * *",
+      "*/10 * * * *",
       this.logger,
     );
   }
