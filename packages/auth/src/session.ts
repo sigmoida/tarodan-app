@@ -270,12 +270,13 @@ export function createSession<TUser>(
   };
 
   async function getSession(): Promise<TUser | null> {
-    const { access } = await readTokens();
-    if (!access) return null;
-    const res = await fetch(`${apiBaseUrl}${endpoints.profile}`, {
-      headers: { Authorization: `Bearer ${access}` },
-      cache: "no-store",
-    });
+    // apiFetch üzerinden: süresi dolmuş access REFRESH edilir (rotasyon cache'i
+    // + API grace penceresiyle güvenli). Eski çıplak-fetch hali herhangi bir
+    // 401'de refresh denemeden null dönüyor ve layout guard'ları canlı oturumu
+    // "expired=session" ile login'e atıyordu.
+    const { access, refresh } = await readTokens();
+    if (!access && !refresh) return null;
+    const { res } = await apiFetch(endpoints.profile);
     if (!res.ok) return null;
     const raw = await res.json().catch(() => null);
     return mapUser(raw);

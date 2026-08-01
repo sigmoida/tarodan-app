@@ -1027,6 +1027,21 @@ export class AuthService {
           i18nMessage("server.auth.adminAccountNotFoundOrInactive"),
         );
       }
+      // Taşınan AdminSession token'ı DOĞRULANMADAN yeni token üretmek, ölü
+      // (30 dk hareketsizlik) session'lı "başarılı" refresh'ler doğuruyordu:
+      // üretilen access her istekte 401 yiyor, panel login'e atıyordu.
+      // validateAdminSession aynı zamanda süreyi uzatır — aktif panelde sessiz
+      // refresh de oturumu canlı tutar. Ölü session = 401 → tek, temiz eject.
+      if (opts.adminSessionToken) {
+        const sessionAdminId = await this.securityService.validateAdminSession(
+          opts.adminSessionToken,
+        );
+        if (!sessionAdminId) {
+          throw new UnauthorizedException(
+            i18nMessage("server.auth.invalidAdminToken"),
+          );
+        }
+      }
       return this.generateAdminTokens(
         user.id,
         user.email,
