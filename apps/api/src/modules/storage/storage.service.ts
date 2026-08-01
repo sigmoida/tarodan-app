@@ -15,6 +15,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as crypto from "crypto";
@@ -28,10 +29,12 @@ export interface UploadResult {
   bucket: string;
   size: number;
   mimeType: string;
+  /** Yazılan MediaFile kaydının id'si (skipMediaFile'da undefined) — private servis uçları için. */
+  mediaFileId?: string;
 }
 
 export interface UploadOptions {
-  bucket: "products" | "avatars" | "documents" | "collections" | "tickets";
+  bucket: StorageBucketType;
   folder?: string;
   filename?: string;
   mimeType?: string;
@@ -60,6 +63,17 @@ const ALLOWED_DOCUMENT_TYPES = [
   "image/webp",
 ];
 const DOCUMENT_BUCKETS = ["documents", "tickets"];
+
+/** Tüm bucket çatıları — union TEK yerde (5 dosyada kopyalanmasın). */
+export type StorageBucketType =
+  | "products"
+  | "avatars"
+  | "documents"
+  | "collections"
+  | "tickets"
+  | "messages"
+  | "reviews"
+  | "brands";
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 /**
@@ -67,12 +81,20 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
  *
  * PUBLIC: S3'te public-read (doğrudan, cache'lenebilir URL ile servis edilir).
  *   → S3 policy "PublicReadProductAndCollectionImages":
- *     {dev,staging,prod}/{products,collections,avatars}/*.
+ *     {dev,staging,prod}/{products,collections,avatars,reviews,brands}/*.
  *   products/collections: katalog görselleri. avatars: herkese görünür profil foto.
- * PRIVATE (bu listede OLMAYAN: documents, tickets): hassas içerik (fatura vb.) —
+ *   reviews: değerlendirme/kanıt görselleri. brands: marka logoları.
+ * PRIVATE (bu listede OLMAYAN: documents, tickets, messages): hassas içerik —
  *   yalnızca kendi yetkili modülünün endpoint'inden, presigned ile servis edilir.
+ *   messages BİLEREK private: özel mesaj ekleri public URL'de olmaz (Faz 0).
  */
-export const PUBLIC_BUCKETS = ["products", "collections", "avatars"] as const;
+export const PUBLIC_BUCKETS = [
+  "products",
+  "collections",
+  "avatars",
+  "reviews",
+  "brands",
+] as const;
 
 export function isPublicBucket(bucket: string): boolean {
   return (PUBLIC_BUCKETS as readonly string[]).includes(bucket);
@@ -81,7 +103,7 @@ export function isPublicBucket(bucket: string): boolean {
 /** Public object key: <environment>/<public bucket>/<object path>. */
 export function isPublicStorageKey(key: string): boolean {
   const normalized = key.startsWith("/") ? key.slice(1) : key;
-  return /^[a-z0-9][a-z0-9_-]*\/(?:products|collections|avatars)\//i.test(
+  return /^[a-z0-9][a-z0-9_-]*\/(?:products|collections|avatars|reviews|brands)\//i.test(
     normalized,
   );
 }
@@ -102,6 +124,11 @@ export class StorageService implements OnModuleInit {
     documents: "documents",
     collections: "collections",
     tickets: "tickets",
+    // Faz 0: mesaj ekleri PRIVATE kökte; review/kanıt görselleri kendi public kökünde.
+    messages: "messages",
+    reviews: "reviews",
+    // Faz 1: marka logoları (public).
+    brands: "brands",
   };
 
   constructor(
@@ -272,8 +299,9 @@ export class StorageService implements OnModuleInit {
       await this.s3Client.send(command);
 
       // Database'e kaydet (skipMediaFile=true ise atla - public product/collection assets)
+      let mediaFileId: string | undefined;
       if (!options.skipMediaFile) {
-        await this.prisma.mediaFile.create({
+        const mediaFile = await this.prisma.mediaFile.create({
           data: {
             bucket: options.bucket, // Orijinal bucket tipi (products, avatars, vs.)
             key, // Full S3 key (dev/products/...)
@@ -287,6 +315,7 @@ export class StorageService implements OnModuleInit {
             url: key, // URL yerine key saklanıyor, presigned URL endpoint'ten alınacak
           },
         });
+        mediaFileId = mediaFile.id;
       }
 
       this.logger.log(`✅ File uploaded (private): ${key}`);
@@ -296,6 +325,8 @@ export class StorageService implements OnModuleInit {
         bucket: options.bucket, // Orijinal bucket tipi
         size: buffer.length,
         mimeType: options.mimeType || "application/octet-stream",
+        // Private servis uçları (message-attachment) MediaFile id ile çalışır.
+        mediaFileId,
       };
     } catch (error: any) {
       this.logger.error(`❌ S3 upload error: ${error.message}`, error);
@@ -374,6 +405,50 @@ export class StorageService implements OnModuleInit {
   /**
    * Delete file
    */
+  /**
+   * Prefix altındaki nesneleri listeler (tam key + boyut + tarih).
+   * Temp temizliği ve admin medya tarayıcısı için; prefix env ile başlamıyorsa eklenir.
+   */
+  async listObjects(
+    prefix: string,
+  ): Promise<Array<{ key: string; size: number; lastModified: Date }>> {
+    if (!this.isS3Available) return [];
+    const fullPrefix = prefix.startsWith(this.envPrefix)
+      ? prefix
+      : `${this.envPrefix}/${prefix.replace(/^\//, "")}`;
+    const results: Array<{ key: string; size: number; lastModified: Date }> =
+      [];
+    let continuationToken: string | undefined;
+    do {
+      const page = await this.s3Client!.send(
+        new ListObjectsV2Command({
+          Bucket: this.baseBucket,
+          Prefix: fullPrefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const obj of page.Contents ?? []) {
+        if (!obj.Key) continue;
+        results.push({
+          key: obj.Key,
+          size: obj.Size ?? 0,
+          lastModified: obj.LastModified ?? new Date(0),
+        });
+      }
+      continuationToken = page.NextContinuationToken;
+    } while (continuationToken);
+    return results;
+  }
+
+  /** Tam key ile S3 nesnesi + varsa MediaFile kaydını siler (temizlik cron'u için). */
+  async deleteFileByKey(key: string): Promise<void> {
+    await this.prisma.mediaFile.deleteMany({ where: { key } });
+    if (!this.isS3Available) return;
+    await this.s3Client!.send(
+      new DeleteObjectCommand({ Bucket: this.baseBucket, Key: key }),
+    );
+  }
+
   async deleteFile(bucket: string, key: string): Promise<void> {
     // Database'den sil
     await this.prisma.mediaFile.deleteMany({

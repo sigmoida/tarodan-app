@@ -1,10 +1,18 @@
-import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { v4 as uuidv4 } from "uuid";
 import { MembershipService } from "../membership/membership.service";
+import { PrismaService } from "../../prisma";
 import {
   StorageService,
   UploadOptions as StorageUploadOptions,
+  StorageBucketType,
+  isPublicBucket,
 } from "../storage/storage.service";
 import {
   configureSharpSafety,
@@ -27,7 +35,7 @@ try {
 }
 
 export interface UploadOptions {
-  bucket?: "products" | "avatars" | "documents" | "collections" | "tickets";
+  bucket?: StorageBucketType;
   folder?: string;
   maxSize?: number;
   allowedTypes?: string[];
@@ -42,26 +50,60 @@ export interface UploadOptions {
 }
 
 export interface UploadResult {
-  url?: string; // Deprecated - presigned URL için kullanılmalı
+  url?: string; // Public kökte kalıcı URL; private kökte presigned/servis ucu
   key: string;
   bucket: string;
   size: number;
   mimeType: string;
   thumbnail?: string;
+  /** Yazılan MediaFile kaydı — private servis uçları (message-attachment) için. */
+  mediaFileId?: string;
 }
 
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
-  private readonly defaultBucket:
-    "products" | "avatars" | "documents" | "collections" | "tickets" =
-    "products";
+  private readonly defaultBucket: StorageBucketType = "products";
 
   constructor(
     private configService: ConfigService,
     private membershipService: MembershipService,
     private storageService: StorageService,
+    private prisma: PrismaService,
   ) {}
+
+  /**
+   * Faz 0: private mesaj ekinin KALICI istemci URL'si — public S3 URL yerine
+   * yetkili servis ucu. Message.content'e bu gömülür; okuma anında presigned'a
+   * yönlendirilir (getMessageAttachmentPresignedUrl).
+   */
+  buildMessageAttachmentUrl(mediaFileId: string): string {
+    const apiUrl = (
+      this.configService.get<string>("API_URL") || "http://localhost:3001"
+    ).replace(/\/$/, "");
+    return `${apiUrl}/api/media/message-attachment/${mediaFileId}`;
+  }
+
+  /**
+   * Mesaj ekini presigned URL'e çözer. Yalnız `messages` kökündeki dosyalar —
+   * bu uç üzerinden başka bucket'lara (fatura vb.) erişilemez. Çağıran
+   * controller JWT zorunlu kılar; uuid tahmin edilemezliği + kısa süreli
+   * presigned ile birlikte erişim modeli budur (thread-üyeliği denetimi v2).
+   */
+  async getMessageAttachmentPresignedUrl(mediaFileId: string): Promise<string> {
+    const file = await this.prisma.mediaFile.findUnique({
+      where: { id: mediaFileId },
+      select: { key: true, bucket: true },
+    });
+    if (!file || file.bucket !== "messages") {
+      throw new NotFoundException("Dosya bulunamadı");
+    }
+    return this.storageService.getPresignedDownloadUrl(
+      "messages",
+      file.key,
+      600, // 10 dk — her görüntülemede yeniden çözülür
+    );
+  }
 
   async upload(
     file: Express.Multer.File,
@@ -126,20 +168,28 @@ export class MediaService {
         bucket: uploadResult.bucket,
         size: uploadResult.size,
         mimeType: uploadResult.mimeType,
+        mediaFileId: uploadResult.mediaFileId,
       };
 
-      // Generate a presigned download URL so the frontend can preview / store it
-      try {
-        result.url = await this.storageService.getPresignedDownloadUrl(
-          bucket,
-          uploadResult.key,
-          3600, // 1 hour
-        );
-      } catch (err: any) {
-        this.logger.warn(
-          `Presigned URL generation failed for ${uploadResult.key}: ${err.message}`,
-        );
-        // Fallback: keep url undefined — frontend should handle this gracefully
+      // URL politikası (Faz 0): public kökteki nesne KALICI public URL alır.
+      // Eskiden 1 saatlik presigned dönüyordu ve içerik alanlarına (mesaj/rating)
+      // gömülen URL bir saat sonra ÖLÜYORDU. Private köklerde presigned kalır;
+      // messages'ın kalıcı yetkili ucu controller'da kurulur.
+      if (isPublicBucket(bucket)) {
+        result.url = this.storageService.getPublicAssetUrl(uploadResult.key);
+      } else {
+        try {
+          result.url = await this.storageService.getPresignedDownloadUrl(
+            bucket,
+            uploadResult.key,
+            3600, // 1 hour
+          );
+        } catch (err: any) {
+          this.logger.warn(
+            `Presigned URL generation failed for ${uploadResult.key}: ${err.message}`,
+          );
+          // Fallback: keep url undefined — frontend should handle this gracefully
+        }
       }
 
       // Generate thumbnail if requested and sharp is available
@@ -269,38 +319,24 @@ export class MediaService {
     }
   }
 
+  /**
+   * Faz 0: S3→S3 sunucu-taraflı kopya (StorageService.copyFile,
+   * MetadataDirective=COPY). Eski sürüm indir+yeniden-yükle yapıyor ve
+   * content-type'ı application/octet-stream'e DÜŞÜRÜYORDU — tarayıcı görseli
+   * indirilebilir dosya sanıyordu.
+   */
   async copyFile(
     sourceKey: string,
     destKey: string,
-    sourceBucket: string = this.defaultBucket,
-    destBucket: string = this.defaultBucket,
+    _sourceBucket: string = this.defaultBucket,
+    destBucket: StorageBucketType = this.defaultBucket,
   ): Promise<void> {
     try {
-      // S3'te copy işlemi için önce source'u indir, sonra yeni yere yükle
-      const sourcePresignedUrl =
-        await this.storageService.getPresignedDownloadUrl(
-          sourceBucket,
-          sourceKey,
-          3600,
-        );
-
-      // Fetch source file
-      const response = await fetch(sourcePresignedUrl);
-      const buffer = Buffer.from(await response.arrayBuffer());
-
-      // Get file info from database to get mimeType
-      // For now, we'll try to infer from key or use default
-      const mimeType = "application/octet-stream"; // Default
-
-      // Upload to destination
-      await this.storageService.uploadFile(buffer, {
-        bucket: destBucket as
-          "products" | "avatars" | "documents" | "collections" | "tickets",
+      await this.storageService.copyFile(sourceKey, {
+        bucket: destBucket,
         folder: destKey.substring(0, destKey.lastIndexOf("/")),
         filename: destKey.substring(destKey.lastIndexOf("/") + 1),
-        mimeType,
       });
-
       this.logger.log(`File copied from ${sourceKey} to ${destKey}`);
     } catch (error: any) {
       this.logger.error(`Copy failed: ${error.message}`);
