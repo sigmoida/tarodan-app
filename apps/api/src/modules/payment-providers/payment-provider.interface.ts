@@ -4,6 +4,9 @@ import type {
   PayTRCallbackData,
   PayTRRefundResponse,
   PayTRStatusInquiryResult,
+  PaytrStatementEntry,
+  PaytrSettlementSummaryEntry,
+  PaytrSettlementDetailEntry,
 } from "./paytr.service";
 
 /**
@@ -120,6 +123,23 @@ export interface IPaymentProvider {
 
   /** Aşama-2 (platform transfer sonucu) callback hash doğrulaması — ham trans_ids string'i ile. */
   verifyTransferCallback(params: { transIds: string; hash: string }): boolean;
+
+  /** Satış+iade işlem dökümü (maks 3 gün) — PSP mutabakatı. */
+  getTransactionStatement(params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PaytrStatementEntry[]>;
+
+  /** Hakediş özeti: gerçekleşen + projeksiyon (maks 31 gün). */
+  getSettlementSummary(params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PaytrSettlementSummaryEntry[]>;
+
+  /** Hakediş günü sipariş dökümü. */
+  getSettlementDetail(params: {
+    date: string;
+  }): Promise<PaytrSettlementDetailEntry[]>;
 }
 
 /** Canonical provider keys (matches `Payment.provider`). */

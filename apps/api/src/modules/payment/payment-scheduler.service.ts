@@ -10,6 +10,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { PaymentService } from "./payment.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { EventService } from "../events/event.service";
+import { PaytrReportSyncService } from "./paytr-report-sync.service";
 import { PayoutService } from "../payout/payout.service";
 
 /**
@@ -24,6 +25,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     private readonly paymentService: PaymentService,
     private readonly productLockService: ProductLockService,
     private readonly eventService: EventService,
+    private readonly paytrReportSync: PaytrReportSyncService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     @Optional() private readonly payoutService?: PayoutService,
   ) {}
@@ -47,6 +49,38 @@ export class PaymentSchedulerService implements OnModuleInit {
       "*/30 * * * *",
       this.logger,
     );
+    // PSP mutabakat senkronu (PAYTR_REPORT_SYNC_ENABLED=true iken gerçek istek atar):
+    // gece dünün işlem dökümü + hakediş özet/detayları yerel tablolara alınır.
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "paytr-statement-sync",
+      "0 5 * * *",
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "paytr-settlement-sync",
+      "30 5 * * *",
+      this.logger,
+    );
+  }
+
+  /** Gerçek iş — Bull processor 'paytr-statement-sync' buradan çağırır. */
+  async runSyncPaytrStatement(log: (msg: string) => void = () => {}) {
+    const result = await this.paytrReportSync.syncTransactionStatement();
+    log(
+      `PayTR işlem dökümü: ${result.fetched} satır alındı, ${result.upserted} upsert`,
+    );
+    return { summary: `${result.upserted} satır`, stats: result };
+  }
+
+  /** Gerçek iş — Bull processor 'paytr-settlement-sync' buradan çağırır. */
+  async runSyncPaytrSettlements(log: (msg: string) => void = () => {}) {
+    const result = await this.paytrReportSync.syncSettlements();
+    log(
+      `PayTR hakediş: ${result.settlements} hakediş, ${result.itemsFetchedFor} detay çekildi`,
+    );
+    return { summary: `${result.settlements} hakediş`, stats: result };
   }
 
   /**

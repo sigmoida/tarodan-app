@@ -19,6 +19,7 @@ import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
+import { PaytrReportSyncService } from "./paytr-report-sync.service";
 import { PaymentSchedulerService } from "./payment-scheduler.service";
 import { PaymentScheduledProcessor } from "./payment-scheduled.processor";
 import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
@@ -94,6 +95,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     VirtualOrderFulfillmentService,
     PaymentProviderEventService,
     PaymentLifecycleService,
+    PaytrReportSyncService,
     PaymentSchedulerService,
     ...scheduledProcessors(PaymentScheduledProcessor),
     PaymentOutboxHandlers,

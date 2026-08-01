@@ -69,6 +69,10 @@ const envSchema = z
     // sonucu callback'ini (2. aşama) bekler. Panelde "Platform Transfer Sonucu
     // Bildirim URL" tanımlanmadan AÇMAYIN — hiçbir payout tamamlanamaz.
     PAYTR_TRANSFER_CALLBACK_ENABLED: z.string().optional(),
+    // "true" iken gece cron'ları PayTR rapor uçlarından (islem-dokumu,
+    // odeme-dokumu/detayi) işlem dökümü + hakediş senkronu yapar. Rapor uçları
+    // panelde ayrı yetki isteyebilir — yetki teyit edilmeden AÇMAYIN.
+    PAYTR_REPORT_SYNC_ENABLED: z.string().optional(),
     PAYOUTS_DISABLED: z.string().optional(),
 
     // Surat cargo — when the integration is enabled, production must ship for real

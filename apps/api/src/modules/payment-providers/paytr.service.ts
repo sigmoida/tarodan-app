@@ -123,6 +123,46 @@ export type PayTRStatusInquirySuccess = {
 export type PayTRStatusInquiryResult =
   PayTRStatusInquirySuccess | { ok: false; errNo?: string; errMsg?: string };
 
+/** İşlem dökümü (rapor/islem-dokumu) satırı — PSP mutabakatının işlem-seviyesi kaynağı. */
+export interface PaytrStatementEntry {
+  type: "sale" | "refund"; // islem_tipi S | I
+  merchantOid: string;
+  amountTl: number;
+  /** PayTR'nin kestiği komisyon (kesinti_tutari) — iade satırında olmayabilir. */
+  feeTl: number | null;
+  feeRatePct: number | null;
+  netTl: number | null;
+  currency: string;
+  installment: number | null;
+  cardBrand?: string;
+  maskedPan?: string;
+  paymentType?: string; // KART | EFT
+  /** İşlem günü, ISO (YYYY-MM-DD). PayTR "GG.AA.YYYY" verir, normalize edilir. */
+  transactionDate: string;
+  raw: Record<string, unknown>;
+}
+
+/** Ödeme özeti (rapor/odeme-dokumu) satırı: gerçekleşen ya da (projection) gelecek hakediş. */
+export interface PaytrSettlementSummaryEntry {
+  datePaid: string; // YYYY-MM-DD
+  currency: string;
+  salesTl: number;
+  returnsTl: number;
+  netTl: number;
+  merchantIban?: string;
+  /** future_payments bloğundan gelen "aktarılacak" satırı. */
+  projection: boolean;
+  raw: Record<string, unknown>;
+}
+
+/** Ödeme detayı (rapor/odeme-detayi) kalemi: hakediş günündeki sipariş dökümü. */
+export interface PaytrSettlementDetailEntry {
+  merchantOid: string;
+  amountTl: number;
+  currency: string;
+  raw: Record<string, unknown>;
+}
+
 /** PAYTR_TEST_MODE: true / 1 / yes → test */
 export function parsePaytrTestMode(raw: string | undefined): boolean {
   if (raw === undefined || raw === "") return true;
@@ -1150,6 +1190,196 @@ export class PayTRService implements IPaymentProvider {
         `PayTR platform transfer başarısız: ${error.message}`,
       );
     }
+  }
+
+  // ==========================================================================
+  // RAPOR SERVİSLERİ — PSP mutabakat katmanının veri kaynakları.
+  // İşlem dökümü: hangi işlemler oldu + PayTR ne kesti (maks 3 günlük aralık).
+  // Ödeme özeti/detayı: hesaba ne zaman ne aktarıldı/aktarılacak (hakediş).
+  // ==========================================================================
+
+  /** "GG.AA.YYYY[ ...]" → "YYYY-MM-DD"; ISO gelirse dokunmaz. */
+  private static normalizeReportDate(value: unknown): string {
+    const s = String(value ?? "")
+      .trim()
+      .split(" ")[0];
+    const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : s;
+  }
+
+  private static reportMoney(value: unknown): number | null {
+    return PayTRService.parsePaytrMoneyString(
+      value != null && value !== "" ? String(value) : undefined,
+    );
+  }
+
+  /** Rapor uçlarının ortak POST + zarf işleme kalıbı. failed = kayıt yok → null. */
+  private async postReport(
+    url: string,
+    form: Record<string, string>,
+  ): Promise<Record<string, unknown> | null> {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(form).toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
+      });
+      const rawText = await response.text();
+      const data = this.parsePaytrJson<Record<string, unknown>>(rawText);
+      if (!data) {
+        throw new BadRequestException(
+          `PayTR rapor geçersiz/boş yanıt (${url})`,
+        );
+      }
+      const status = String(data.status ?? "");
+      // "failed" = aralıkta kayıt yok — hata değil, boş sonuç.
+      if (status === "failed") return null;
+      if (status !== "success") {
+        throw new BadRequestException(
+          String(data.err_msg ?? `PayTR rapor hatası (${url})`),
+        );
+      }
+      return data;
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.error(
+        `PayTR rapor isteği başarısız (${url}): ${error?.message}`,
+      );
+      throw new BadRequestException(
+        `PayTR rapor isteği başarısız: ${error?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Satış + iade işlem dökümü. Tarihler "YYYY-MM-DD hh:mm:ss", aralık en fazla 3 gün.
+   * Hash = merchant_id + start_date + end_date + merchant_salt.
+   */
+  async getTransactionStatement(params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PaytrStatementEntry[]> {
+    const paytrToken = this.generateHash(
+      this.merchantId + params.startDate + params.endDate + this.merchantSalt,
+    );
+    const data = await this.postReport(
+      "https://www.paytr.com/rapor/islem-dokumu",
+      {
+        merchant_id: this.merchantId,
+        start_date: params.startDate,
+        end_date: params.endDate,
+        paytr_token: paytrToken,
+      },
+    );
+    if (!data) return [];
+    const rows = Array.isArray(data.data) ? data.data : [];
+    return rows.map((r: any) => ({
+      type:
+        String(r?.islem_tipi ?? "").toUpperCase() === "I" ? "refund" : "sale",
+      merchantOid: String(r?.siparis_no ?? ""),
+      amountTl: PayTRService.reportMoney(r?.islem_tutari) ?? 0,
+      feeTl: PayTRService.reportMoney(r?.kesinti_tutari),
+      feeRatePct: PayTRService.reportMoney(r?.kesinti_orani),
+      netTl: PayTRService.reportMoney(r?.net_tutar),
+      currency: String(r?.para_birimi ?? "TL"),
+      installment:
+        r?.taksit != null && r.taksit !== ""
+          ? Number.parseInt(String(r.taksit), 10)
+          : null,
+      cardBrand: r?.kart_marka != null ? String(r.kart_marka) : undefined,
+      maskedPan: r?.kart_no != null ? String(r.kart_no) : undefined,
+      paymentType: r?.odeme_tipi != null ? String(r.odeme_tipi) : undefined,
+      transactionDate: PayTRService.normalizeReportDate(r?.islem_tarihi),
+      raw: r as Record<string, unknown>,
+    }));
+  }
+
+  /**
+   * Ödeme özeti (hakediş): gerçekleşen aktarımlar + future_payments projeksiyonları.
+   * Tarihler "YYYY-MM-DD", aralık en fazla 31 gün. Hash = mid + start + end + salt.
+   */
+  async getSettlementSummary(params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PaytrSettlementSummaryEntry[]> {
+    const paytrToken = this.generateHash(
+      this.merchantId + params.startDate + params.endDate + this.merchantSalt,
+    );
+    const data = await this.postReport(
+      "https://www.paytr.com/rapor/odeme-dokumu",
+      {
+        merchant_id: this.merchantId,
+        start_date: params.startDate,
+        end_date: params.endDate,
+        paytr_token: paytrToken,
+      },
+    );
+    if (!data) return [];
+
+    // Alan adları varyasyonlu gelebilir (sales/sale_amounts vb.) — toleranslı oku.
+    const mapEntry = (
+      r: any,
+      projection: boolean,
+    ): PaytrSettlementSummaryEntry => ({
+      datePaid: PayTRService.normalizeReportDate(r?.date_paid ?? r?.date),
+      currency: String(r?.currency ?? "TL"),
+      salesTl:
+        PayTRService.reportMoney(
+          r?.sales ?? r?.sale_amounts ?? r?.sale_amount,
+        ) ?? 0,
+      returnsTl:
+        PayTRService.reportMoney(
+          r?.return ?? r?.return_amounts ?? r?.return_amount,
+        ) ?? 0,
+      netTl:
+        PayTRService.reportMoney(r?.net ?? r?.net_amounts ?? r?.net_amount) ??
+        0,
+      merchantIban:
+        r?.merchant_iban != null ? String(r.merchant_iban) : undefined,
+      projection,
+      raw: r as Record<string, unknown>,
+    });
+
+    const realizedRaw = Array.isArray(data.data)
+      ? data.data
+      : data.date_paid != null
+        ? [data]
+        : [];
+    const futureRaw = Array.isArray(data.future_payments)
+      ? data.future_payments
+      : [];
+    return [
+      ...realizedRaw.map((r: any) => mapEntry(r, false)),
+      ...futureRaw.map((r: any) => mapEntry(r, true)),
+    ];
+  }
+
+  /**
+   * Ödeme detayı: hakediş günündeki sipariş dökümü. Hash = mid + date + salt.
+   */
+  async getSettlementDetail(params: {
+    date: string; // YYYY-MM-DD
+  }): Promise<PaytrSettlementDetailEntry[]> {
+    const paytrToken = this.generateHash(
+      this.merchantId + params.date + this.merchantSalt,
+    );
+    const data = await this.postReport(
+      "https://www.paytr.com/rapor/odeme-detayi/",
+      {
+        merchant_id: this.merchantId,
+        date: params.date,
+        paytr_token: paytrToken,
+      },
+    );
+    if (!data) return [];
+    const rows = Array.isArray(data.data) ? data.data : [];
+    return rows.map((r: any) => ({
+      merchantOid: String(r?.merchant_oid ?? ""),
+      amountTl: PayTRService.reportMoney(r?.payment ?? r?.amount) ?? 0,
+      currency: String(r?.currency ?? "TL"),
+      raw: r as Record<string, unknown>,
+    }));
   }
 
   /**
