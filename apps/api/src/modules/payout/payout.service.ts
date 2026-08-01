@@ -471,6 +471,47 @@ export class PayoutService {
             amount: allocation.amount,
           })),
         });
+        // F1 (ledger): kesinti escrow'dan platforma geçer. Capture'da hold.amount
+        // kadar borçlanan seller_escrow, payout ledger'ında yalnız transfer edilen
+        // net kadar kapanır — kesinti burada kapatılmazsa escrow'da kalıntı sonsuza
+        // dek açık kalır (fullyConsumed payout'ta escrow'u kapatan TEK kayıt budur).
+        // Best-effort: defter hatası payout üretimini BOZMAZ (mevcut kalıp).
+        if (adjustmentDeduction > 0) {
+          try {
+            await this.ledger?.record(tx, {
+              eventType: LedgerEventType.adjustment,
+              entries: [
+                {
+                  account: LedgerAccount.seller_debt_recovery,
+                  direction: LedgerDirection.debit,
+                  amount: adjustmentDeduction,
+                },
+                {
+                  account: LedgerAccount.seller_escrow,
+                  direction: LedgerDirection.credit,
+                  amount: adjustmentDeduction,
+                  sellerId: hold.sellerId,
+                },
+              ],
+              refs: {
+                payoutId: payout.id,
+                sellerId: hold.sellerId,
+                orderId: order.id,
+                holdId: hold.id,
+              },
+              metadata: {
+                allocations: allocations.map((a) => ({
+                  adjustmentId: a.adjustmentId,
+                  amount: a.amount,
+                })),
+              },
+            });
+          } catch (e: any) {
+            this.logger.warn(
+              `Ledger adjustment kaydı başarısız (payout ${payout.id}): ${e?.message}`,
+            );
+          }
+        }
         for (const allocation of allocations) {
           const settled = allocation.remainingAmount <= 0.01;
           await tx.sellerAccountAdjustment.update({
@@ -492,6 +533,9 @@ export class PayoutService {
    */
   async processPendingPayouts(): Promise<{
     processed: number;
+    /** F2: aşama-1'de KABUL edilen (para henüz gitmemiş, callback bekleyen) talimatlar.
+     *  processed'e sayılırsa scheduler log'u para gitmeden "N tamamlandı" der. */
+    submitted: number;
     failed: number;
   }> {
     // Y15: Staging/test ortamında gerçek (geri alınamaz) banka transferini engelle.
@@ -500,7 +544,7 @@ export class PayoutService {
       this.logger.warn(
         "Payout işleme devre dışı (PAYOUTS_DISABLED=true) — atlanıyor",
       );
-      return { processed: 0, failed: 0 };
+      return { processed: 0, submitted: 0, failed: 0 };
     }
 
     const pending = await this.prisma.payoutTransfer.findMany({
@@ -526,6 +570,7 @@ export class PayoutService {
     });
 
     let processed = 0;
+    let submitted = 0;
     let failed = 0;
 
     for (const payout of pending) {
@@ -740,7 +785,7 @@ export class PayoutService {
                 submittedAmount: netToTransfer,
               },
             });
-            processed++;
+            submitted++;
             this.logger.log(
               `Payout ${payout.transId} submitted (transfer sonucu callback'i bekleniyor): ${netToTransfer} TL → ${maskIban(transferIban)}`,
             );
@@ -781,12 +826,12 @@ export class PayoutService {
       }
     }
 
-    if (processed > 0 || failed > 0) {
+    if (processed > 0 || submitted > 0 || failed > 0) {
       this.logger.log(
-        `Payouts processed: ${processed} success, ${failed} failed`,
+        `Payouts processed: ${processed} success, ${submitted} submitted (awaiting callback), ${failed} failed`,
       );
     }
-    return { processed, failed };
+    return { processed, submitted, failed };
   }
 
   /**

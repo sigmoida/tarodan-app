@@ -3369,6 +3369,7 @@ enum LedgerAccount {
   payout // dış para çıkışı (satıcıya transfer)
   refund // dış para çıkışı (alıcıya iade)
   psp_fee // PSP (PayTR) işlem kesintisi — tahsilattan hiç bize ulaşmayan gider
+  seller_debt_recovery // satıcı borcu tahsilatı (kargo açığı/iade kargosu) — escrow'dan platforma
 }
 
 enum LedgerDirection {

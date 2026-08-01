@@ -138,8 +138,9 @@ describe("PayoutService stage-1 with transfer-result callback flag", () => {
     // "Para gitti" yan etkileri callback'e kadar TETİKLENMEZ.
     expect(notification.sendTemplateEmailToUser).not.toHaveBeenCalled();
     expect(ledger.record).not.toHaveBeenCalled();
-    // Kabul edilen talimat "failed" DEĞİLDİR.
-    expect(result.failed).toBe(0);
+    // F2: kabul edilen talimat "tamamlandı" DEĞİL "iletildi"dir — processed
+    // sayacına yazılırsa scheduler log'u para gitmeden "N tamamlandı" der.
+    expect(result).toMatchObject({ processed: 0, submitted: 1, failed: 0 });
   });
 
   it("flag OFF: legacy behavior — success completes immediately with side effects", async () => {
@@ -152,7 +153,7 @@ describe("PayoutService stage-1 with transfer-result callback flag", () => {
     const result = await service.processPendingPayouts();
 
     expect(prisma.state.status).toBe(PayoutStatus.completed);
-    expect(result.processed).toBe(1);
+    expect(result).toMatchObject({ processed: 1, submitted: 0 });
     expect(notification.sendTemplateEmailToUser).toHaveBeenCalledTimes(1);
     expect(ledger.record).toHaveBeenCalledTimes(1);
   });

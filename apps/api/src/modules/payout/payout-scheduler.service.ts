@@ -57,12 +57,13 @@ export class PayoutSchedulerService implements OnModuleInit {
 
       // 2) Process all pending payouts
       const result = await this.payoutService.processPendingPayouts();
+      // F2: "iletildi" ≠ "tamamlandı" — callback akışında para henüz gitmedi.
       log(
-        `Payout işleme: ${result.processed} tamamlandı · ${result.failed} başarısız`,
+        `Payout işleme: ${result.processed} tamamlandı · ${result.submitted} iletildi (callback bekleniyor) · ${result.failed} başarısız`,
       );
-      if (result.processed > 0 || result.failed > 0) {
+      if (result.processed > 0 || result.submitted > 0 || result.failed > 0) {
         this.logger.log(
-          `Payout processing: ${result.processed} completed, ${result.failed} failed`,
+          `Payout processing: ${result.processed} completed, ${result.submitted} submitted, ${result.failed} failed`,
         );
       }
 
@@ -75,10 +76,11 @@ export class PayoutSchedulerService implements OnModuleInit {
         );
       }
       return {
-        summary: `${result.processed} işlendi · ${result.failed} başarısız${stuck ? ` · ${stuck} takılı` : ""}`,
+        summary: `${result.processed} işlendi${result.submitted ? ` · ${result.submitted} iletildi` : ""} · ${result.failed} başarısız${stuck ? ` · ${stuck} takılı` : ""}`,
         stats: {
           retried,
           processed: result.processed,
+          submitted: result.submitted,
           failed: result.failed,
           stuck,
         },
