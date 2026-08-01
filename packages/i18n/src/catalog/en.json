@@ -3600,7 +3600,9 @@
         "bodyPlaceholder": "Notification text shown to users",
         "deliveryChannel": "Delivery Channel",
         "audience": "Audience",
-        "userIdsLabel": "User IDs (comma-separated)",
+        "userSearchPlaceholder": "Search by username, name or email",
+        "userSearchEmpty": "No matching users",
+        "userSearchHint": "Type at least 2 characters to search",
         "sellerStatus": "Seller Status",
         "allOption": "All",
         "onlySellers": "Sellers Only",
@@ -3619,22 +3621,20 @@
         "ready": "Ready to send",
         "missingFields": "Some fields are missing",
         "tabs": {
-          "send": "Send Notification",
           "scheduled": "Scheduled",
           "history": "History"
         },
         "channel": {
           "mobileApp": "Mobile app",
           "email": "Email",
-          "emailInbox": "Email inbox",
-          "sms": "Text message"
+          "emailInbox": "Email inbox"
         },
         "target": {
           "allUsers": "All Users",
           "everyone": "Everyone registered on the platform",
           "segmentDescription": "Seller/buyer and membership type",
           "specificUsers": "Specific Users",
-          "idList": "Target with an ID list"
+          "idList": "Search by username and pick"
         },
         "status": {
           "sent": "Sent",

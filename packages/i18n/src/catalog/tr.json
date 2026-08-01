@@ -3600,7 +3600,9 @@
         "bodyPlaceholder": "Kullanıcılara gösterilecek bildirim metni",
         "deliveryChannel": "Gönderim Kanalı",
         "audience": "Hedef Kitle",
-        "userIdsLabel": "Kullanıcı ID'leri (virgülle ayırın)",
+        "userSearchPlaceholder": "Kullanıcı adı, ad veya e-posta ile ara",
+        "userSearchEmpty": "Eşleşen kullanıcı bulunamadı",
+        "userSearchHint": "Aramak için en az 2 karakter yazın",
         "sellerStatus": "Satıcı Durumu",
         "allOption": "Hepsi",
         "onlySellers": "Sadece Satıcılar",
@@ -3619,22 +3621,20 @@
         "ready": "Gönderime hazır",
         "missingFields": "Eksik alanlar var",
         "tabs": {
-          "send": "Bildirim Gönder",
           "scheduled": "Zamanlanmış",
           "history": "Geçmiş"
         },
         "channel": {
           "mobileApp": "Mobil uygulama",
           "email": "E-posta",
-          "emailInbox": "E-posta gelen kutusu",
-          "sms": "Kısa mesaj"
+          "emailInbox": "E-posta gelen kutusu"
         },
         "target": {
           "allUsers": "Tüm Kullanıcılar",
           "everyone": "Platforma kayıtlı herkes",
           "segmentDescription": "Satıcı/alıcı, üyelik tipi",
           "specificUsers": "Belirli Kullanıcılar",
-          "idList": "ID listesiyle hedefleme"
+          "idList": "Kullanıcı adıyla arayıp seçin"
         },
         "status": {
           "sent": "Gönderildi",

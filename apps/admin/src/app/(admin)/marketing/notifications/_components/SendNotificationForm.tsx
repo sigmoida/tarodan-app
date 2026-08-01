@@ -4,6 +4,7 @@ import { useState, type ComponentType } from "react";
 import clsx from "clsx";
 import { Button } from "@tarodan/ui";
 import {
+  FormDateTimePicker,
   FormInput,
   FormModal,
   FormSelect,
@@ -12,11 +13,9 @@ import {
 } from "@tarodan/ui/form";
 import {
   BellIcon,
-  PaperAirplaneIcon,
   ClockIcon,
   DevicePhoneMobileIcon,
   EnvelopeIcon,
-  ChatBubbleLeftRightIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
@@ -33,6 +32,7 @@ import {
   sendNotificationSchema,
   scheduleNotificationSchema,
 } from "../_lib/types";
+import { UserPicker } from "./UserPicker";
 
 function Tile({
   active,
@@ -78,15 +78,20 @@ function Tile({
   );
 }
 
+/**
+ * "Bildirim Oluştur" modalı. Sayfa açılışında KENDİLİĞİNDEN açılmaz — sayfa
+ * başlığındaki buton mount eder; kapatma/gönderme `onClose` ile sayfaya döner.
+ */
 export function SendNotificationForm({
+  onClose,
   onScheduled,
 }: {
+  onClose: () => void;
   onScheduled: () => void;
 }) {
   const t = useTranslations();
   const channels = channelMeta(t);
   const targets = targetMeta(t);
-  const [open, setOpen] = useState(true);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const form = useZodForm(sendNotificationSchema(t), {
     defaultValues: emptySendForm,
@@ -100,8 +105,12 @@ export function SendNotificationForm({
     (formValues: SendForm) =>
       adminApi.sendNotification(sendFormToPayload(formValues)),
     {
+      invalidates: ["notification-history"],
       successMessage: t("admin.marketing.notifications.sent"),
-      onSuccess: () => form.reset(emptySendForm),
+      onSuccess: () => {
+        form.reset(emptySendForm);
+        onClose();
+      },
     },
   );
   const schedule = useAdminMutation(
@@ -136,21 +145,6 @@ export function SendNotificationForm({
     if (await form.trigger()) setScheduleOpen(true);
   };
 
-  if (!open) {
-    return (
-      <SectionCard>
-        <div className="flex justify-center py-8">
-          <Button
-            leftIcon={<PaperAirplaneIcon className="h-4 w-4" />}
-            onClick={() => setOpen(true)}
-          >
-            {t("admin.marketing.notifications.createNew")}
-          </Button>
-        </div>
-      </SectionCard>
-    );
-  }
-
   const titleOk = values.title.length > 0 && values.title.length <= 65;
   const bodyOk = values.body.length > 0 && values.body.length <= 240;
   const canSend = titleOk && bodyOk && values.channels.length > 0;
@@ -159,7 +153,7 @@ export function SendNotificationForm({
     <>
       <FormModal
         open
-        onClose={() => setOpen(false)}
+        onClose={onClose}
         title={t("admin.marketing.notifications.create")}
         form={form}
         onSubmit={(formValues) => send.mutate(formValues)}
@@ -224,7 +218,7 @@ export function SendNotificationForm({
               title={t("admin.marketing.notifications.deliveryChannel")}
               bodyClassName="space-y-4"
             >
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {channels.map((channel) => (
                   <Tile
                     key={channel.key}
@@ -269,13 +263,7 @@ export function SendNotificationForm({
                 ))}
               </div>
 
-              {values.targetType === "user_ids" && (
-                <FormInput
-                  name="userIds"
-                  label={t("admin.marketing.notifications.userIdsLabel")}
-                  placeholder="uuid1, uuid2, uuid3"
-                />
-              )}
+              {values.targetType === "user_ids" && <UserPicker />}
 
               {values.targetType === "segment" && (
                 <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface-alt p-4">
@@ -399,25 +387,6 @@ export function SendNotificationForm({
                 </div>
               )}
 
-              {values.channels.includes("sms") && (
-                <div>
-                  <p className="mb-2 flex items-center gap-1 text-xs text-muted">
-                    <ChatBubbleLeftRightIcon className="h-3.5 w-3.5" /> SMS
-                  </p>
-                  <div className="flex">
-                    <div className="max-w-xs rounded-2xl rounded-tl-sm bg-success-100 px-4 py-2.5 text-sm leading-relaxed text-success-900 shadow-sm">
-                      {values.title && values.body ? (
-                        `${values.title}: ${values.body}`
-                      ) : (
-                        <span className="italic text-muted">
-                          {t("admin.marketing.notifications.messagePreview")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {values.channels.length === 0 && (
                 <div className="py-8 text-center text-muted">
                   <BellIcon className="mx-auto mb-2 h-10 w-10 text-subtle" />
@@ -484,9 +453,8 @@ export function SendNotificationForm({
           isSubmitting={schedule.isPending}
           submitLabel={t("admin.marketing.notifications.schedule")}
         >
-          <FormInput
+          <FormDateTimePicker
             name="scheduledFor"
-            type="datetime-local"
             label={t("admin.marketing.notifications.scheduleDateTime")}
             min={new Date().toISOString().slice(0, 16)}
           />

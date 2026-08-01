@@ -16,9 +16,17 @@ export {
   type FormDatePickerProps,
 } from "./components/form/FormDatePicker";
 export {
+  FormDateTimePicker,
+  type FormDateTimePickerProps,
+} from "./components/form/FormDateTimePicker";
+export {
   FormSearchableSelect,
   type FormSearchableSelectProps,
 } from "./components/form/FormSearchableSelect";
+export {
+  FormSearchableMultiSelect,
+  type FormSearchableMultiSelectProps,
+} from "./components/form/FormSearchableMultiSelect";
 export { FormPhone, type FormPhoneProps } from "./components/form/FormPhone";
 export { FormIban, type FormIbanProps } from "./components/form/FormIban";
 export {

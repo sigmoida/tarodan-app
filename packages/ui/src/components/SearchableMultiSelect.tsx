@@ -6,104 +6,68 @@ import React from "react";
 import { cn } from "../lib/utils";
 import { matchesSearch } from "../lib/search";
 import { Input } from "./Input";
+import { Label } from "./Label";
 import { selectTriggerClasses } from "./Select";
+import {
+  Chevron,
+  CheckMark,
+  type SearchableSelectOption,
+} from "./SearchableSelect";
 
-export interface SearchableSelectOption {
-  value: string;
-  label: string;
-  disabled?: boolean;
-}
-
-export interface SearchableSelectProps {
-  /** Selected option value ("" when nothing is selected). */
-  value: string;
-  onChange: (value: string) => void;
+export interface SearchableMultiSelectProps {
+  /** Selected options — objects (not bare values) so chips keep their labels
+   *  even when the current search results no longer include them. */
+  value: SearchableSelectOption[];
+  onChange: (value: SearchableSelectOption[]) => void;
+  /** Options shown in the open menu. In async mode (see `onQueryChange`) pass
+   *  the server's results; otherwise the full list (filtered locally). */
   options: SearchableSelectOption[];
-  /** Trigger text shown when nothing is selected. */
+  /** Controlled search for ASYNC lookups: the parent receives the query,
+   *  fetches, and re-renders `options`. When omitted the component filters
+   *  `options` locally (Turkish-correct matching). */
+  onQueryChange?: (query: string) => void;
+  /** Async fetch in flight — shows `loadingText` instead of `emptyText`. */
+  loading?: boolean;
   placeholder?: string;
-  /** Placeholder for the filter box inside the open menu. */
   searchPlaceholder?: string;
-  /** Shown when the filter matches no options. */
   emptyText?: string;
+  loadingText?: string;
   disabled?: boolean;
   error?: string;
-  /** Label rendered above (matches the shared `Select`/`Input`). */
   label?: string;
-  /** Helper text below (hidden when `error` is present). */
   helperText?: string;
   selectSize?: "sm" | "md" | "lg";
-  required?: boolean;
   id?: string;
-  name?: string;
-  /** Class applied to the trigger (as with `Select`). */
   className?: string;
   "aria-label"?: string;
 }
 
-/** Shared with SearchableMultiSelect — keep the two dropdowns visually identical. */
-export function Chevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      className={cn(
-        "h-4 w-4 flex-shrink-0 text-subtle transition-transform",
-        open && "rotate-180",
-      )}
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      aria-hidden="true"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="m6 8 4 4 4-4" />
-    </svg>
-  );
-}
-
-/** Shared with SearchableMultiSelect. */
-export function CheckMark() {
-  return (
-    <svg
-      className="h-4 w-4 flex-shrink-0 text-primary-600"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="m5 10 3.5 3.5L15 7"
-      />
-    </svg>
-  );
-}
-
 /**
- * Select with a built-in search box — the single shared searchable dropdown.
- * Its trigger reuses `selectTriggerClasses`, so it is visually identical to the
- * design-system `Select`; the open menu adds a filter `Input` (Turkish-correct,
- * accent-insensitive matching via `matchesSearch`) over a scrollable list with
- * keyboard navigation. For react-hook-form use `FormSearchableSelect`.
+ * Multi-select twin of `SearchableSelect`: same trigger/menu styling, but the
+ * trigger renders removable chips for each selection and choosing an option
+ * toggles it without closing the menu. Supports async lookups via
+ * `onQueryChange` + `loading`. For react-hook-form use
+ * `FormSearchableMultiSelect`.
  */
-export function SearchableSelect({
+export function SearchableMultiSelect({
   value,
   onChange,
   options,
+  onQueryChange,
+  loading,
   placeholder,
   searchPlaceholder,
   emptyText = "Sonuç bulunamadı",
+  loadingText = "Aranıyor…",
   disabled,
   error,
   label,
   helperText,
   selectSize = "md",
-  required,
   id,
-  name,
   className,
   "aria-label": ariaLabel,
-}: SearchableSelectProps) {
+}: SearchableMultiSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [openUp, setOpenUp] = React.useState(false);
@@ -117,18 +81,28 @@ export function SearchableSelect({
   const selectId =
     id || (label ? label.toLowerCase().replace(/\s+/g, "-") : reactId);
 
-  const selected = options.find((o) => o.value === value);
+  const isAsync = !!onQueryChange;
   const filtered = React.useMemo(
-    () => options.filter((o) => matchesSearch(o.label, query)),
-    [options, query],
+    () =>
+      isAsync ? options : options.filter((o) => matchesSearch(o.label, query)),
+    [options, query, isAsync],
   );
+  const selectedValues = React.useMemo(
+    () => new Set(value.map((o) => o.value)),
+    [value],
+  );
+
+  const setSearch = (q: string) => {
+    setQuery(q);
+    onQueryChange?.(q);
+  };
 
   const close = React.useCallback(() => {
     setOpen(false);
     setQuery("");
-  }, []);
+    onQueryChange?.("");
+  }, [onQueryChange]);
 
-  // Close on outside click while open.
   React.useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -140,23 +114,12 @@ export function SearchableSelect({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open, close]);
 
-  // On open: clear the query, focus the search box, highlight the selection.
   React.useEffect(() => {
     if (!open) return;
-    setQuery("");
-    setHighlight(
-      Math.max(
-        0,
-        options.findIndex((o) => o.value === value),
-      ),
-    );
     const raf = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(raf);
-    // Intentionally runs only when the menu opens, not on every options/value
-    // change, so typing a filter isn't reset by an unrelated re-render.
   }, [open]);
 
-  // Keep the highlight within the (filtered) list and scrolled into view.
   React.useEffect(() => {
     setHighlight((h) =>
       Math.min(Math.max(h, 0), Math.max(0, filtered.length - 1)),
@@ -178,10 +141,18 @@ export function SearchableSelect({
     setOpen(true);
   };
 
-  const choose = (opt: SearchableSelectOption) => {
+  /** Toggle without closing — multi-select keeps the menu open for more picks. */
+  const toggle = (opt: SearchableSelectOption) => {
     if (opt.disabled) return;
-    onChange(opt.value);
-    close();
+    onChange(
+      selectedValues.has(opt.value)
+        ? value.filter((o) => o.value !== opt.value)
+        : [...value, opt],
+    );
+  };
+
+  const remove = (val: string) => {
+    onChange(value.filter((o) => o.value !== val));
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -194,10 +165,12 @@ export function SearchableSelect({
     } else if (e.key === "Enter") {
       e.preventDefault();
       const opt = filtered[highlight];
-      if (opt) choose(opt);
+      if (opt) toggle(opt);
     } else if (e.key === "Escape") {
       e.preventDefault();
       close();
+    } else if (e.key === "Backspace" && !query && value.length > 0) {
+      remove(value[value.length - 1].value);
     }
   };
 
@@ -206,22 +179,44 @@ export function SearchableSelect({
       <button
         type="button"
         id={selectId}
-        name={name}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-required={required}
         aria-label={ariaLabel}
         onClick={() => (open ? close() : openMenu())}
         className={cn(
           selectTriggerClasses(error, selectSize),
-          !selected && "text-subtle",
+          "h-auto min-h-10 flex-wrap gap-1.5 py-1.5",
+          value.length === 0 && "text-subtle",
           className,
         )}
       >
-        <span className="truncate">
-          {selected ? selected.label : placeholder}
-        </span>
+        {value.length === 0 ? (
+          <span className="truncate">{placeholder}</span>
+        ) : (
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            {value.map((opt) => (
+              <span
+                key={opt.value}
+                className="inline-flex max-w-full items-center gap-1 rounded-md bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700"
+              >
+                <span className="truncate">{opt.label}</span>
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`${opt.label} kaldır`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    remove(opt.value);
+                  }}
+                  className="text-primary-400 transition-colors hover:text-primary-700"
+                >
+                  ×
+                </span>
+              </span>
+            ))}
+          </span>
+        )}
         <Chevron open={open} />
       </button>
 
@@ -236,7 +231,7 @@ export function SearchableSelect({
             <Input
               ref={inputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder={searchPlaceholder}
               inputSize="sm"
@@ -245,15 +240,16 @@ export function SearchableSelect({
           <ul
             ref={listRef}
             role="listbox"
+            aria-multiselectable
             className="max-h-56 overflow-y-auto p-1"
           >
             {filtered.length === 0 ? (
               <li className="px-3 py-2 text-center text-sm text-muted">
-                {emptyText}
+                {loading ? loadingText : emptyText}
               </li>
             ) : (
               filtered.map((opt, i) => {
-                const active = opt.value === value;
+                const active = selectedValues.has(opt.value);
                 return (
                   <li
                     key={opt.value}
@@ -262,7 +258,7 @@ export function SearchableSelect({
                     onMouseEnter={() => setHighlight(i)}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      choose(opt);
+                      toggle(opt);
                     }}
                     className={cn(
                       "flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-sm",
@@ -288,26 +284,16 @@ export function SearchableSelect({
   return (
     <div className="w-full">
       {label && (
-        <label
-          htmlFor={selectId}
-          className="mb-1.5 block text-sm font-medium text-body"
-        >
+        <Label htmlFor={selectId} className="mb-1.5 block">
           {label}
-        </label>
+        </Label>
       )}
       {combo}
-      {(error || helperText) && (
-        <p
-          className={cn(
-            "mt-1 text-sm",
-            error ? "text-danger-600" : "text-muted",
-          )}
-        >
-          {error || helperText}
-        </p>
-      )}
+      {error ? (
+        <p className="mt-1.5 text-sm text-danger-600">{error}</p>
+      ) : helperText ? (
+        <p className="mt-1.5 text-sm text-muted">{helperText}</p>
+      ) : null}
     </div>
   );
 }
-
-SearchableSelect.displayName = "SearchableSelect";

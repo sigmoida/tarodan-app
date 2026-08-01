@@ -5,6 +5,10 @@ export type { IconButtonProps } from "./components/IconButton";
 export { Input, type InputProps } from "./components/Input";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
 export {
+  DateTimePicker,
+  type DateTimePickerProps,
+} from "./components/DateTimePicker";
+export {
   CardNumberInput,
   type CardNumberInputProps,
   ExpiryDateInput,
@@ -53,6 +57,10 @@ export {
   type SearchableSelectProps,
   type SearchableSelectOption,
 } from "./components/SearchableSelect";
+export {
+  SearchableMultiSelect,
+  type SearchableMultiSelectProps,
+} from "./components/SearchableMultiSelect";
 export { foldForSearch, matchesSearch } from "./lib/search";
 export { Toggle, type ToggleProps } from "./components/Toggle";
 export { Checkbox, type CheckboxProps } from "./components/Checkbox";

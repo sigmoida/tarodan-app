@@ -1,10 +1,8 @@
 import {
   BellIcon,
-  PaperAirplaneIcon,
   ClockIcon,
   DevicePhoneMobileIcon,
   EnvelopeIcon,
-  ChatBubbleLeftRightIcon,
   UsersIcon,
   UserIcon,
   AdjustmentsHorizontalIcon,
@@ -37,14 +35,10 @@ export interface ScheduledNotification {
   createdAt: string;
 }
 
-export type TabType = "send" | "scheduled" | "history";
+export type TabType = "scheduled" | "history";
 
+// "Oluştur" artık sekme değil: sayfa başlığındaki buton modalı açar.
 export const notificationTabs = (t: T) => [
-  {
-    key: "send",
-    label: t("admin.marketing.notifications.tabs.send"),
-    icon: PaperAirplaneIcon,
-  },
   {
     key: "scheduled",
     label: t("admin.marketing.notifications.tabs.scheduled"),
@@ -57,6 +51,9 @@ export const notificationTabs = (t: T) => [
   },
 ];
 
+// SMS bilinçli olarak YOK: backend'de SMS gönderim altyapısı bulunmuyor
+// (emitAdminBroadcast yalnız email + push kuyruklar); çalışmayan kanalı
+// seçtirmek yanıltıcıydı. SMS sağlayıcısı eklendiğinde buraya geri gelir.
 export const channelMeta = (t: T) =>
   [
     {
@@ -70,12 +67,6 @@ export const channelMeta = (t: T) =>
       label: t("admin.marketing.notifications.channel.email"),
       icon: EnvelopeIcon,
       desc: t("admin.marketing.notifications.channel.emailInbox"),
-    },
-    {
-      key: "sms",
-      label: "SMS",
-      icon: ChatBubbleLeftRightIcon,
-      desc: t("admin.marketing.notifications.channel.sms"),
     },
   ] as const;
 
@@ -133,18 +124,20 @@ export const sendNotificationSchema = (t: T) =>
         .min(1, t("admin.marketing.notifications.validation.bodyRequired"))
         .max(240, t("admin.marketing.notifications.validation.bodyMax")),
       channels: z
-        .array(z.enum(["push", "email", "sms"]))
+        .array(z.enum(["push", "email"]))
         .min(1, t("admin.marketing.notifications.validation.channelRequired")),
       targetType: z.enum(["all", "segment", "user_ids"]),
-      userIds: z.string(),
+      // Seçimler {value: userId, label: görünen ad} olarak taşınır — çipler
+      // arama sonuçları değişse de etiketini korur (SearchableMultiSelect).
+      users: z.array(z.object({ value: z.string(), label: z.string() })),
       isSeller: z.enum(["", "true", "false"]),
-      membershipTier: z.enum(["", "free", "premium", "business"]),
+      membershipTier: z.enum(["", "free", "basic", "premium", "business"]),
     })
     .superRefine((values, ctx) => {
-      if (values.targetType === "user_ids" && !values.userIds.trim()) {
+      if (values.targetType === "user_ids" && values.users.length === 0) {
         ctx.addIssue({
           code: "custom",
-          path: ["userIds"],
+          path: ["users"],
           message: t("admin.marketing.notifications.validation.userIdRequired"),
         });
       }
@@ -167,7 +160,7 @@ export const emptySendForm: SendForm = {
   body: "",
   channels: ["push"],
   targetType: "all",
-  userIds: "",
+  users: [],
   isSeller: "",
   membershipTier: "",
 };
@@ -175,12 +168,7 @@ export const emptySendForm: SendForm = {
 /** Build the send/schedule API payload from the compose form. */
 export function sendFormToPayload(f: SendForm) {
   const userIds =
-    f.targetType === "user_ids"
-      ? f.userIds
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : undefined;
+    f.targetType === "user_ids" ? f.users.map((u) => u.value) : undefined;
   const segmentCriteria =
     f.targetType === "segment"
       ? {
