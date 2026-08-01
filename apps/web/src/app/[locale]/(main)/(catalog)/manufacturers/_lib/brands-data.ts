@@ -8,7 +8,6 @@
  */
 export interface BrandData {
   name: string;
-  logoUrl: string;
   country: string;
   countryFlag: string;
   founded: number;
@@ -25,7 +24,6 @@ export interface BrandData {
 export const BRANDS_DATA: BrandData[] = [
   {
     name: "Hot Wheels",
-    logoUrl: "/photos/logolar/2158430f294b152f30824d6bb1ac7bf9.jpg",
     country: "USA",
     countryFlag: "🇺🇸",
     founded: 1968,
@@ -49,7 +47,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Matchbox",
-    logoUrl: "/photos/logolar/images.png",
     country: "UK",
     countryFlag: "🇬🇧",
     founded: 1953,
@@ -71,7 +68,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Tamiya",
-    logoUrl: "/photos/logolar/tamiya-logo-png_seeklogo-324507.png",
     country: "Japan",
     countryFlag: "🇯🇵",
     founded: 1946,
@@ -92,7 +88,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "AUTOart",
-    logoUrl: "/photos/logolar/download.png",
     country: "Hong Kong",
     countryFlag: "🇭🇰",
     founded: 1998,
@@ -114,7 +109,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Kyosho",
-    logoUrl: "/photos/logolar/Kyosho_corp_logo.png",
     country: "Japan",
     countryFlag: "🇯🇵",
     founded: 1963,
@@ -135,7 +129,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Maisto",
-    logoUrl: "/photos/logolar/maisto-logo.png",
     country: "Thailand",
     countryFlag: "🇹🇭",
     founded: 1990,
@@ -157,7 +150,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Bburago",
-    logoUrl: "/photos/logolar/Bburago_Logo.png",
     country: "Italy",
     countryFlag: "🇮🇹",
     founded: 1974,
@@ -178,7 +170,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Greenlight",
-    logoUrl: "/photos/logolar/Greenlight_collectibles_logo.png",
     country: "USA",
     countryFlag: "🇺🇸",
     founded: 2002,
@@ -200,7 +191,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Minichamps",
-    logoUrl: "/photos/logolar/minichamps_logo.png",
     country: "Germany",
     countryFlag: "🇩🇪",
     founded: 1990,
@@ -221,7 +211,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "MINI GT",
-    logoUrl: "/photos/logolar/mini-gt-logo-png_seeklogo-523421.png",
     country: "Hong Kong",
     countryFlag: "🇭🇰",
     founded: 2018,
@@ -242,7 +231,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Tomica",
-    logoUrl: "/photos/logolar/Tomica_brand_textlogo.png",
     country: "Japan",
     countryFlag: "🇯🇵",
     founded: 1970,
@@ -263,7 +251,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Majorette",
-    logoUrl: "/photos/logolar/majorette-logo-png_seeklogo-492958.png",
     country: "France",
     countryFlag: "🇫🇷",
     founded: 1961,
@@ -284,7 +271,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "GT Spirit",
-    logoUrl: "/photos/logolar/GT-Spirit-Logo.webp",
     country: "France",
     countryFlag: "🇫🇷",
     founded: 2012,
@@ -305,7 +291,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "CMC",
-    logoUrl: "/photos/logolar/cmc_logo-640x320.jpg",
     country: "Germany",
     countryFlag: "🇩🇪",
     founded: 1995,
@@ -326,7 +311,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Norev",
-    logoUrl: "/photos/logolar/5bc0b46797d85-thumbnail.jpg",
     country: "France",
     countryFlag: "🇫🇷",
     founded: 1946,
@@ -347,8 +331,6 @@ export const BRANDS_DATA: BrandData[] = [
   },
   {
     name: "Schuco",
-    logoUrl:
-      "/photos/logolar/logo-bmw-schuco-modell-car-toy-diecast-toy-model-car-model-building-siku-toys-png-clipart.jpg",
     country: "Germany",
     countryFlag: "🇩🇪",
     founded: 1912,

@@ -407,7 +407,8 @@ export class AdminCatalogService {
       id: b.id,
       name: b.name,
       slug: b.slug,
-      logo: b.logo,
+      // Faz 1: logo S3 key taşır — URL tek yerden kurulur.
+      logo: this.resolveProductImageUrl(b.logo),
       description: b.description,
       website: b.website,
       country: b.country,

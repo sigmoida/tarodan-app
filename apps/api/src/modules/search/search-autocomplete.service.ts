@@ -1,16 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { ProductStatus } from '@prisma/client';
-import { StorageService } from '../storage/storage.service';
-import { fulltextProductSearch } from '../product/helpers/fulltext-search';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { ProductStatus } from "@prisma/client";
+import { StorageService } from "../storage/storage.service";
+import { resolveBrandLogoUrl } from "../brand/brand-logo-url";
+import { fulltextProductSearch } from "../product/helpers/fulltext-search";
 import {
   fulltextBrandSearch,
   fulltextCategorySearch,
   fulltextCarModelSearch,
   fulltextManufacturerSearch,
   fulltextAttributeSearch,
-} from '../../common/helpers/fulltext-search';
-import { SearchCommonService } from './search-common.service';
+} from "../../common/helpers/fulltext-search";
+import { SearchCommonService } from "./search-common.service";
 
 /**
  * Otomatik tamamlama alt servisi (search.service.ts'ten birebir taşındı):
@@ -32,7 +33,8 @@ export class SearchAutocompleteService {
   // ──────────────────────────── Autocomplete ────────────────────────────
 
   async autocomplete(query: string, limit = 10): Promise<string[]> {
-    if (!this.common.isAvailable()) return this.fallbackAutocomplete(query, limit);
+    if (!this.common.isAvailable())
+      return this.fallbackAutocomplete(query, limit);
 
     try {
       const response = await this.common.client.search({
@@ -40,21 +42,35 @@ export class SearchAutocompleteService {
         query: {
           bool: {
             should: [
-              { match: { 'title.edge_ngram': { query, boost: 4 } } },
-              { match: { 'title.ngram': { query, boost: 2 } } },
+              { match: { "title.edge_ngram": { query, boost: 4 } } },
+              { match: { "title.ngram": { query, boost: 2 } } },
               {
                 multi_match: {
                   query,
-                  type: 'phrase_prefix',
-                  fields: ['title^2', 'categoryName', 'manufacturerName', 'brandName'],
+                  type: "phrase_prefix",
+                  fields: [
+                    "title^2",
+                    "categoryName",
+                    "manufacturerName",
+                    "brandName",
+                  ],
                   boost: 3,
                 },
               },
-              { fuzzy: { title: { value: query.toLowerCase(), fuzziness: 'AUTO', prefix_length: 1, boost: 1.5 } } },
+              {
+                fuzzy: {
+                  title: {
+                    value: query.toLowerCase(),
+                    fuzziness: "AUTO",
+                    prefix_length: 1,
+                    boost: 1.5,
+                  },
+                },
+              },
               {
                 multi_match: {
                   query,
-                  fields: ['title^2', 'categoryName', 'manufacturerName'],
+                  fields: ["title^2", "categoryName", "manufacturerName"],
                   fuzziness: 2,
                   prefix_length: 1,
                   boost: 1,
@@ -68,21 +84,24 @@ export class SearchAutocompleteService {
             ],
           },
         },
-        _source: ['title'],
+        _source: ["title"],
         size: limit * 2,
-        collapse: { field: 'title.keyword' },
+        collapse: { field: "title.keyword" },
       });
 
       return response.hits.hits
         .map((hit: any) => hit._source.title)
         .slice(0, limit);
     } catch (error) {
-      this.logger.warn('Elasticsearch autocomplete error, using fallback');
+      this.logger.warn("Elasticsearch autocomplete error, using fallback");
       return this.fallbackAutocomplete(query, limit);
     }
   }
 
-  private async fallbackAutocomplete(query: string, limit: number): Promise<string[]> {
+  private async fallbackAutocomplete(
+    query: string,
+    limit: number,
+  ): Promise<string[]> {
     const productIds = await fulltextProductSearch(this.prisma, query, limit);
     if (productIds.length === 0) return [];
 
@@ -94,7 +113,7 @@ export class SearchAutocompleteService {
       },
       select: { title: true },
       take: limit,
-      distinct: ['title'],
+      distinct: ["title"],
     });
     return products.map((p) => p.title);
   }
@@ -102,11 +121,32 @@ export class SearchAutocompleteService {
   // ──────────────────────────── Rich Autocomplete ────────────────────────────
 
   async autocompleteRich(query: string): Promise<{
-    products: Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>;
-    brands: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
+    products: Array<{
+      id: string;
+      title: string;
+      imageUrl?: string;
+      price: number;
+      brandName?: string;
+    }>;
+    brands: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo?: string | null;
+    }>;
     categories: Array<{ id: string; name: string; slug: string }>;
-    manufacturers: Array<{ id: string; name: string; slug: string; logo?: string | null }>;
-    carModels: Array<{ id: string; name: string; slug: string; brandId: string }>;
+    manufacturers: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo?: string | null;
+    }>;
+    carModels: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      brandId: string;
+    }>;
     scales: string[];
     materials: Array<{ slug: string; label: string }>;
     conditions: Array<{ value: string; label: string }>;
@@ -114,11 +154,31 @@ export class SearchAutocompleteService {
   }> {
     const trimmed = query.trim();
     if (!trimmed) {
-      return { products: [], brands: [], categories: [], manufacturers: [], carModels: [], scales: [], materials: [], conditions: [], suggestions: [] };
+      return {
+        products: [],
+        brands: [],
+        categories: [],
+        manufacturers: [],
+        carModels: [],
+        scales: [],
+        materials: [],
+        conditions: [],
+        suggestions: [],
+      };
     }
 
     // Same pattern as brands/categories/manufacturers: direct search per entity type
-    const [products, brands, categories, manufacturers, carModels, scales, materials, conditions, suggestions] = await Promise.all([
+    const [
+      products,
+      brands,
+      categories,
+      manufacturers,
+      carModels,
+      scales,
+      materials,
+      conditions,
+      suggestions,
+    ] = await Promise.all([
       this.richAutocompleteProducts(trimmed, 5),
       this.richAutocompleteBrands(trimmed, 3),
       this.richAutocompleteCategories(trimmed, 3),
@@ -130,13 +190,31 @@ export class SearchAutocompleteService {
       this.autocomplete(trimmed, 5),
     ]);
 
-    return { products, brands, categories, manufacturers, carModels, scales, materials, conditions, suggestions };
+    return {
+      products,
+      brands,
+      categories,
+      manufacturers,
+      carModels,
+      scales,
+      materials,
+      conditions,
+      suggestions,
+    };
   }
 
   private async richAutocompleteProducts(
     query: string,
     limit: number,
-  ): Promise<Array<{ id: string; title: string; imageUrl?: string; price: number; brandName?: string }>> {
+  ): Promise<
+    Array<{
+      id: string;
+      title: string;
+      imageUrl?: string;
+      price: number;
+      brandName?: string;
+    }>
+  > {
     if (this.common.isAvailable()) {
       try {
         const response = await this.common.client.search({
@@ -144,21 +222,40 @@ export class SearchAutocompleteService {
           query: {
             bool: {
               should: [
-                { match: { 'title.edge_ngram': { query, boost: 4 } } },
-                { match: { 'title.ngram': { query, boost: 2 } } },
+                { match: { "title.edge_ngram": { query, boost: 4 } } },
+                { match: { "title.ngram": { query, boost: 2 } } },
                 { match: { carModelName: { query, boost: 2 } } },
-                { match: { 'carModelName.edge_ngram': { query, boost: 1 } } },
-                { match: { 'carModelName.ngram': { query, boost: 2 } } },
-                { match_phrase_prefix: { carModelName: { query, boost: 2, max_expansions: 20 } } },
+                { match: { "carModelName.edge_ngram": { query, boost: 1 } } },
+                { match: { "carModelName.ngram": { query, boost: 2 } } },
+                {
+                  match_phrase_prefix: {
+                    carModelName: { query, boost: 2, max_expansions: 20 },
+                  },
+                },
                 {
                   multi_match: {
                     query,
-                    type: 'phrase_prefix',
-                    fields: ['title^2', 'categoryName', 'manufacturerName', 'brandName', 'carModelName^2'],
+                    type: "phrase_prefix",
+                    fields: [
+                      "title^2",
+                      "categoryName",
+                      "manufacturerName",
+                      "brandName",
+                      "carModelName^2",
+                    ],
                     boost: 3,
                   },
                 },
-                { fuzzy: { title: { value: query.toLowerCase(), fuzziness: 'AUTO', prefix_length: 1, boost: 1.5 } } },
+                {
+                  fuzzy: {
+                    title: {
+                      value: query.toLowerCase(),
+                      fuzziness: "AUTO",
+                      prefix_length: 1,
+                      boost: 1.5,
+                    },
+                  },
+                },
               ],
               minimum_should_match: 1,
               filter: [
@@ -167,7 +264,7 @@ export class SearchAutocompleteService {
               ],
             },
           },
-          _source: ['id', 'title', 'imageUrl', 'price', 'brandName'],
+          _source: ["id", "title", "imageUrl", "price", "brandName"],
           size: limit,
         });
 
@@ -187,28 +284,35 @@ export class SearchAutocompleteService {
 
     // Prisma fallback – tsvector search for product IDs, then hydrate (only title+description)
     const productIds = await fulltextProductSearch(this.prisma, query, limit);
-    const products = productIds.length > 0
-      ? await this.prisma.product.findMany({
-          where: {
-            id: { in: productIds },
-            status: ProductStatus.active,
-            NOT: this.common.virtualProductPrismaNot(),
-          },
-          select: {
-            id: true,
-            title: true,
-            price: true,
-            images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { cardKey: true } },
-            brand: { select: { name: true } },
-          },
-          take: limit,
-        })
-      : [];
+    const products =
+      productIds.length > 0
+        ? await this.prisma.product.findMany({
+            where: {
+              id: { in: productIds },
+              status: ProductStatus.active,
+              NOT: this.common.virtualProductPrismaNot(),
+            },
+            select: {
+              id: true,
+              title: true,
+              price: true,
+              images: {
+                take: 1,
+                orderBy: { sortOrder: "asc" as const },
+                select: { cardKey: true },
+              },
+              brand: { select: { name: true } },
+            },
+            take: limit,
+          })
+        : [];
 
     return products.map((p) => ({
       id: p.id,
       title: p.title,
-      imageUrl: p.images[0]?.cardKey ? this.storageService.getPublicAssetUrl(p.images[0].cardKey) : undefined,
+      imageUrl: p.images[0]?.cardKey
+        ? this.storageService.getPublicAssetUrl(p.images[0].cardKey)
+        : undefined,
       price: parseFloat(p.price.toString()),
       brandName: (p as any).brand?.name,
     }));
@@ -216,38 +320,77 @@ export class SearchAutocompleteService {
 
   // Known car brands for autocomplete (matched against product titles / brand relation)
   private static readonly KNOWN_CAR_BRANDS = [
-    'Audi', 'Alfa Romeo', 'BMW', 'Chevrolet', 'Dodge', 'Ferrari', 'Ford',
-    'Honda', 'Jaguar', 'Lamborghini', 'Land Rover', 'Maserati', 'McLaren',
-    'Mercedes-Benz', 'Nissan', 'Porsche', 'Subaru', 'Tesla', 'Toyota', 'Volkswagen',
-    'Aston Martin', 'Bentley', 'Bugatti', 'Cadillac', 'Citroën', 'Fiat',
-    'Hyundai', 'Jeep', 'Kia', 'Lexus', 'Mazda', 'Mini', 'Mitsubishi',
-    'Opel', 'Peugeot', 'Renault', 'Rolls-Royce', 'Seat', 'Škoda', 'Volvo',
+    "Audi",
+    "Alfa Romeo",
+    "BMW",
+    "Chevrolet",
+    "Dodge",
+    "Ferrari",
+    "Ford",
+    "Honda",
+    "Jaguar",
+    "Lamborghini",
+    "Land Rover",
+    "Maserati",
+    "McLaren",
+    "Mercedes-Benz",
+    "Nissan",
+    "Porsche",
+    "Subaru",
+    "Tesla",
+    "Toyota",
+    "Volkswagen",
+    "Aston Martin",
+    "Bentley",
+    "Bugatti",
+    "Cadillac",
+    "Citroën",
+    "Fiat",
+    "Hyundai",
+    "Jeep",
+    "Kia",
+    "Lexus",
+    "Mazda",
+    "Mini",
+    "Mitsubishi",
+    "Opel",
+    "Peugeot",
+    "Renault",
+    "Rolls-Royce",
+    "Seat",
+    "Škoda",
+    "Volvo",
   ];
 
   private async richAutocompleteBrands(
     query: string,
     limit: number,
-  ): Promise<Array<{ id: string; name: string; slug: string; logo?: string | null }>> {
+  ): Promise<
+    Array<{ id: string; name: string; slug: string; logo?: string | null }>
+  > {
     const brandIds = await fulltextBrandSearch(this.prisma, query, limit);
 
     if (brandIds.length > 0) {
-      return this.prisma.brand.findMany({
+      const brands = await this.prisma.brand.findMany({
         where: { id: { in: brandIds }, isActive: true },
         select: { id: true, name: true, slug: true, logo: true },
         take: limit,
-        orderBy: { name: 'asc' },
+        orderBy: { name: "asc" },
       });
+      // Faz 1: logo S3 key taşır — istemciye URL çözümlenmiş döner.
+      return brands.map((b) => ({ ...b, logo: this.resolveLogo(b.logo) }));
     }
 
     // Fallback: match against known car brands (static list)
     const lowerQ = query.toLowerCase();
-    const matched = SearchAutocompleteService.KNOWN_CAR_BRANDS
-      .filter(b => b.toLowerCase().includes(lowerQ))
+    const matched = SearchAutocompleteService.KNOWN_CAR_BRANDS.filter((b) =>
+      b.toLowerCase().includes(lowerQ),
+    )
       .slice(0, limit)
-      .map(name => ({
-        id: `brand-${name.toLowerCase().replace(/\s+/g, '-')}`,
+      .map((name) => ({
+        id: `brand-${name.toLowerCase().replace(/\s+/g, "-")}`,
         name,
-        slug: name.toLowerCase().replace(/\s+/g, '-'),
+        slug: name.toLowerCase().replace(/\s+/g, "-"),
         logo: null,
       }));
     return matched;
@@ -264,29 +407,48 @@ export class SearchAutocompleteService {
       where: { id: { in: categoryIds }, isActive: true },
       select: { id: true, name: true, slug: true },
       take: limit,
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
   private async richAutocompleteManufacturers(
     query: string,
     limit: number,
-  ): Promise<Array<{ id: string; name: string; slug: string; logo?: string | null }>> {
-    const manufacturerIds = await fulltextManufacturerSearch(this.prisma, query, limit);
+  ): Promise<
+    Array<{ id: string; name: string; slug: string; logo?: string | null }>
+  > {
+    const manufacturerIds = await fulltextManufacturerSearch(
+      this.prisma,
+      query,
+      limit,
+    );
     if (manufacturerIds.length === 0) return [];
 
-    return this.prisma.manufacturer.findMany({
+    const manufacturers = await this.prisma.manufacturer.findMany({
       where: { id: { in: manufacturerIds } },
       select: { id: true, name: true, slug: true, logo: true },
       take: limit,
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
+    return manufacturers.map((m) => ({
+      ...m,
+      logo: this.resolveLogo(m.logo),
+    }));
+  }
+
+  /** Faz 1: logo S3 key'dir; URL tek yerden kurulur (eski "/" yolları null). */
+  private resolveLogo(logo: string | null): string | null {
+    return resolveBrandLogoUrl(logo, (key) =>
+      this.storageService.getPublicAssetUrl(key),
+    );
   }
 
   private async richAutocompleteCarModels(
     query: string,
     limit: number,
-  ): Promise<Array<{ id: string; name: string; slug: string; brandId: string }>> {
+  ): Promise<
+    Array<{ id: string; name: string; slug: string; brandId: string }>
+  > {
     const ids = await fulltextCarModelSearch(this.prisma, query, limit);
     if (ids.length === 0) return [];
 
@@ -294,16 +456,23 @@ export class SearchAutocompleteService {
       where: { id: { in: ids }, isActive: true },
       select: { id: true, name: true, slug: true, brandId: true },
       take: limit,
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
-  private async richAutocompleteScales(query: string, limit: number): Promise<string[]> {
+  private async richAutocompleteScales(
+    query: string,
+    limit: number,
+  ): Promise<string[]> {
     const ids = await fulltextAttributeSearch(this.prisma, query, 50);
     if (ids.length === 0) return [];
 
     const attrs = await this.prisma.attribute.findMany({
-      where: { id: { in: ids }, isActive: true, group: { slug: 'scale', isActive: true } },
+      where: {
+        id: { in: ids },
+        isActive: true,
+        group: { slug: "scale", isActive: true },
+      },
       select: { value: true, displayValue: true },
     });
     const scaleSet = new Set<string>();
@@ -321,14 +490,20 @@ export class SearchAutocompleteService {
     if (ids.length === 0) return [];
 
     const attrs = await this.prisma.attribute.findMany({
-      where: { id: { in: ids }, isActive: true, group: { slug: 'material', isActive: true } },
+      where: {
+        id: { in: ids },
+        isActive: true,
+        group: { slug: "material", isActive: true },
+      },
       select: { slug: true, value: true, displayValue: true },
     });
     const map = new Map<string, string>();
     for (const a of attrs) {
       map.set(a.slug, a.displayValue || a.value);
     }
-    return Array.from(map.entries()).map(([slug, label]) => ({ slug, label })).slice(0, limit);
+    return Array.from(map.entries())
+      .map(([slug, label]) => ({ slug, label }))
+      .slice(0, limit);
   }
 
   private async richAutocompleteConditions(
@@ -336,13 +511,22 @@ export class SearchAutocompleteService {
     limit: number,
   ): Promise<Array<{ value: string; label: string }>> {
     const conditionLabels: Record<string, string> = {
-      new: 'Yeni',
-      very_good: 'Mükemmel',
-      good: 'İyi',
-      fair: 'Orta',
+      new: "Yeni",
+      very_good: "Mükemmel",
+      good: "İyi",
+      fair: "Orta",
     };
-    const list = Object.entries(conditionLabels).map(([value, label]) => ({ value, label }));
+    const list = Object.entries(conditionLabels).map(([value, label]) => ({
+      value,
+      label,
+    }));
     const q = query.toLowerCase();
-    return list.filter((c) => c.value.toLowerCase().includes(q) || c.label.toLowerCase().includes(q)).slice(0, limit);
+    return list
+      .filter(
+        (c) =>
+          c.value.toLowerCase().includes(q) ||
+          c.label.toLowerCase().includes(q),
+      )
+      .slice(0, limit);
   }
 }

@@ -33,6 +33,32 @@ export const seedCollectionAssetKey = (
   prefix = "seed-assets",
 ): string => `${prefix}/collections/${collectionSlug}.webp`;
 
+/**
+ * Faz 1 — üretici (manufacturer) logoları: slug → kaynak dosya adı.
+ * `scripts/upload-brand-logos.ts` bu eşlemeyle apps/web'in eski statik
+ * dosyalarını `seed-assets/brands/{slug}.{ext}`e yükler; `seed-media.ts`
+ * oradan env prefix'ine kopyalayıp `manufacturer.logo`ya S3 KEY yazar.
+ */
+export const SEED_BRAND_LOGO_FILES: Readonly<Record<string, string>> = {
+  "hot-wheels": "2158430f294b152f30824d6bb1ac7bf9.jpg",
+  matchbox: "images.png",
+  majorette: "majorette-logo-png_seeklogo-492958.png",
+  tomica: "Tomica_brand_textlogo.png",
+  bburago: "Bburago_Logo.png",
+  maisto: "maisto-logo.png",
+  autoart: "download.png",
+  minichamps: "minichamps_logo.png",
+  kyosho: "Kyosho_corp_logo.png",
+  cmc: "cmc_logo-640x320.jpg",
+  "gt-spirit": "GT-Spirit-Logo.webp",
+  schuco:
+    "logo-bmw-schuco-modell-car-toy-diecast-toy-model-car-model-building-siku-toys-png-clipart.jpg",
+  norev: "5bc0b46797d85-thumbnail.jpg",
+  greenlight: "Greenlight_collectibles_logo.png",
+  tamiya: "tamiya-logo-png_seeklogo-324507.png",
+  "mini-gt": "mini-gt-logo-png_seeklogo-523421.png",
+};
+
 export const SEED_AVATAR_BY_EMAIL: Readonly<Record<string, string>> = {
   "admin@tarodan.com": "avatar-13.webp",
   "moderator@tarodan.com": "avatar-09.webp",

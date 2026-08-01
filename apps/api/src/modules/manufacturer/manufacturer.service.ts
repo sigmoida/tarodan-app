@@ -13,7 +13,9 @@ export class ManufacturerService {
 
   private resolveLogoUrl(logo: string | null | undefined): string | null {
     if (!logo) return null;
-    if (logo.startsWith("/")) return logo;
+    // Faz 1: eski repo yolları ("/photos/logolar/…") null'a düşer — statikler
+    // kaldırıldı, logolar bucket'tan ({env}/brands/{slug}) servis edilir.
+    if (logo.startsWith("/")) return null;
 
     // If stored value is a presigned S3 URL, extract the key and use permanent public URL
     if (logo.startsWith("http://") || logo.startsWith("https://")) {
