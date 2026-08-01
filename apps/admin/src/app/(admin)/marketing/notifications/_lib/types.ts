@@ -147,7 +147,15 @@ export const scheduleNotificationSchema = (t: T) =>
   z.object({
     scheduledFor: z
       .string()
-      .min(1, t("admin.marketing.notifications.validation.scheduleRequired")),
+      .min(1, t("admin.marketing.notifications.validation.scheduleRequired"))
+      // Saat dahil GELECEK olmalı: takvimin min'i yalnız tarihi sınırlar ve
+      // UTC/yerel farkı yüzünden geçmiş seçilebiliyordu — backend 400
+      // dönüyor, kullanıcı genel hata görüyordu. datetime-local yerel saattir,
+      // new Date(v) de yerel yorumlar; karşılaştırma tutarlı.
+      .refine(
+        (v) => new Date(v).getTime() > Date.now(),
+        t("admin.marketing.notifications.validation.scheduleFuture"),
+      ),
   });
 
 export type SendForm = z.infer<ReturnType<typeof sendNotificationSchema>>;

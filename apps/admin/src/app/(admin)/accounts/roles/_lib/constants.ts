@@ -297,6 +297,14 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         description: t("admin.roles.permissions.invoices.description"),
         pages: ["/finance/invoices"],
       },
+      // Backend `settings: ["settings", "payment_settings"]` — bu anahtar
+      // matriste yoksa hiç verilemez, oysa guard onu geçerli sayıyor.
+      {
+        key: "payment_settings",
+        label: t("admin.roles.permissions.paymentSettings.label"),
+        description: t("admin.roles.permissions.paymentSettings.description"),
+        pages: ["/system/settings"],
+      },
     ],
   },
   {
@@ -325,6 +333,14 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "logs",
         label: t("admin.roles.permissions.logs.label"),
         description: t("admin.roles.permissions.logs.description"),
+        pages: ["/system/logs"],
+      },
+      // Backend `"audit-logs": ["audit_logs"]` ayrı bir izinle korunuyor:
+      // matriste görünmezse denetim sekmesi kimseye açılamaz.
+      {
+        key: "audit_logs",
+        label: t("admin.roles.permissions.auditLogs.label"),
+        description: t("admin.roles.permissions.auditLogs.description"),
         pages: ["/system/logs"],
       },
     ],

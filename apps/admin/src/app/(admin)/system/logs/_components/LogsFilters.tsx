@@ -31,24 +31,26 @@ const buildOptions = (t: ReturnType<typeof useTranslations<never>>) => ({
   emailStatus: [
     { value: "all", label: t("common.allStatuses") },
     { value: "sent", label: t("admin.system.logs.emailStatuses.sent") },
-    // `delivered`/`bounced` hiçbir kod yolunda yazılmıyor (sağlayıcı webhook'u
-    // yok) → seçenek olarak sunulmaz.
-    { value: "queued", label: t("admin.system.logs.emailStatuses.queued") },
+    // `delivered`/`bounced` hiç yazılmıyor (webhook yok); `queued` da artık
+    // yazılmıyor — kayıt tek noktadan (SmtpProvider) sent/failed olarak düşer.
     { value: "failed", label: t("admin.system.logs.emailStatuses.failed") },
   ],
+  // Değerler GERÇEK şablon anahtarlarıdır (email-template-registry, kebab-case).
+  // Eski liste alt-çizgili uydurma değerler taşıyordu (password_reset vb.) ve
+  // API tam eşitlikle süzdüğü için 4 seçeneğin 3'ü hiçbir satırla eşleşmiyordu.
   emailTemplate: [
     { value: "all", label: t("admin.system.logs.filters.allTemplates") },
     { value: "welcome", label: t("admin.system.logs.templates.welcome") },
     {
-      value: "password_reset",
+      value: "password-reset",
       label: t("admin.system.logs.templates.passwordReset"),
     },
     {
-      value: "order_confirmation",
+      value: "order-confirmation",
       label: t("admin.system.logs.templates.orderConfirmation"),
     },
     {
-      value: "shipping_update",
+      value: "order-shipped",
       label: t("admin.system.logs.templates.shippingUpdate"),
     },
   ],

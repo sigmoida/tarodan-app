@@ -34,6 +34,15 @@ import {
 } from "../_lib/types";
 import { UserPicker } from "./UserPicker";
 
+/** datetime-local için YEREL "şimdi" (yyyy-mm-ddTHH:mm). */
+function localDateTimeMin(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
+}
+
 function Tile({
   active,
   icon: Icon,
@@ -294,6 +303,7 @@ export function SendNotificationForm({
                         label: t("admin.marketing.notifications.allOption"),
                       },
                       { value: "free", label: "Free" },
+                      { value: "basic", label: "Basic" },
                       { value: "premium", label: "Premium" },
                       { value: "business", label: "Business" },
                     ]}
@@ -456,7 +466,10 @@ export function SendNotificationForm({
           <FormDateTimePicker
             name="scheduledFor"
             label={t("admin.marketing.notifications.scheduleDateTime")}
-            min={new Date().toISOString().slice(0, 16)}
+            // min YEREL tarih olmalı: toISOString UTC döndürür ve TR'de
+            // 00:00-03:00 arası takvim düne izin veriyordu. Saat sınırını zod
+            // (scheduleFuture) tutar.
+            min={localDateTimeMin()}
           />
         </FormModal>
       )}

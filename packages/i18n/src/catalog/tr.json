@@ -3658,6 +3658,7 @@
           "bodyMax": "İçerik en fazla 240 karakter olabilir",
           "channelRequired": "En az bir kanal seçin",
           "userIdRequired": "En az bir kullanıcı ID girin",
+          "scheduleFuture": "Gönderim zamanı gelecekte olmalı",
           "scheduleRequired": "Gönderim tarihi ve saati zorunludur"
         }
       },
@@ -5775,6 +5776,10 @@
           "label": "Faturalar",
           "description": "E-fatura listesi ve fatura PDF'lerini görüntüleme."
         },
+        "paymentSettings": {
+          "label": "Ödeme Ayarları",
+          "description": "Sistem ayarlarındaki ödeme/PSP yapılandırması bölümü."
+        },
         "aiModeration": {
           "label": "AI Denetim",
           "description": "AI moderasyon olayları, skorlar ve eşik ayarları."
@@ -5789,7 +5794,11 @@
         },
         "logs": {
           "label": "Loglar",
-          "description": "Sistem hata logları, güvenlik olayları, e-posta logları ve denetim izi."
+          "description": "Sistem hata logları, güvenlik olayları ve e-posta logları."
+        },
+        "auditLogs": {
+          "label": "Denetim İzi",
+          "description": "Denetim sekmesi: hangi yönetici neyi ne zaman değiştirdi kayıtları."
         }
       },
       "form": {

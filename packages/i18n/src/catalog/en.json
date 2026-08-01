@@ -3658,6 +3658,7 @@
           "bodyMax": "Content can be at most 240 characters",
           "channelRequired": "Select at least one channel",
           "userIdRequired": "Enter at least one user ID",
+          "scheduleFuture": "The send time must be in the future",
           "scheduleRequired": "Delivery date and time are required"
         }
       },
@@ -5775,6 +5776,10 @@
           "label": "Invoices",
           "description": "View the e-invoice list and download invoice PDFs."
         },
+        "paymentSettings": {
+          "label": "Payment Settings",
+          "description": "The payment/PSP configuration section of system settings."
+        },
         "aiModeration": {
           "label": "AI Moderation",
           "description": "AI moderation events, scores, and threshold settings."
@@ -5789,7 +5794,11 @@
         },
         "logs": {
           "label": "Logs",
-          "description": "System error logs, security events, email logs, and audit trail."
+          "description": "System error logs, security events, and email logs."
+        },
+        "auditLogs": {
+          "label": "Audit Trail",
+          "description": "Audit tab: records of which admin changed what and when."
         }
       },
       "form": {
