@@ -40,6 +40,13 @@ import { ENTITY_PREFIX } from "../../common/helpers/code-prefixes";
 type EntityUserPrefix =
   typeof ENTITY_PREFIX.individualUser | typeof ENTITY_PREFIX.corporateUser;
 
+/**
+ * Rotasyonla iptal edilmiş refresh token'ın hâlâ kabul edildiği pencere.
+ * Yarış senaryosu için yeterince uzun, çalıntı-token replay'i için anlamsız
+ * kılacak kadar kısa (token zaten hash'li saklanıyor, cookie httpOnly).
+ */
+const REFRESH_ROTATION_GRACE_MS = 60 * 1000;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -1303,9 +1310,9 @@ export class AuthService {
     });
 
     if (existing) {
-      if (existing.revokedAt) {
+      if (existing.userId !== userId) {
         throw new UnauthorizedException(
-          i18nMessage("server.auth.refreshTokenRevoked"),
+          i18nMessage("server.auth.invalidRefreshToken"),
         );
       }
       if (existing.expiresAt < new Date()) {
@@ -1313,10 +1320,21 @@ export class AuthService {
           i18nMessage("server.auth.refreshTokenExpired"),
         );
       }
-      if (existing.userId !== userId) {
-        throw new UnauthorizedException(
-          i18nMessage("server.auth.invalidRefreshToken"),
-        );
+      if (existing.revokedAt) {
+        // Rotasyon yarışı penceresi: çok-sekmeli/paralel istemcide (tek sekme
+        // bile onlarca eşzamanlı istek atar) yeni cookie tarayıcıya ulaşmadan
+        // ESKİ token'la yola çıkmış bir refresh kaçınılmaz; RSC render'ı da
+        // cookie yazamadığı için rotasyonu "yakabiliyor". İptalden sonraki kısa
+        // pencerede eski token hâlâ kabul edilir (yeni çift üretilir, tekrar
+        // tüketim yok); pencere dışı kullanım gerçek replay'dir → red.
+        const withinGrace =
+          Date.now() - existing.revokedAt.getTime() < REFRESH_ROTATION_GRACE_MS;
+        if (!withinGrace) {
+          throw new UnauthorizedException(
+            i18nMessage("server.auth.refreshTokenRevoked"),
+          );
+        }
+        return;
       }
       // Atomik tüketim: iki eşzamanlı refresh isteğinden yalnız biri revokedAt:null
       // koşulunu sağlayabilir.

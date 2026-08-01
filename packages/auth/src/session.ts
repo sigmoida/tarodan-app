@@ -155,16 +155,39 @@ export function createSession<TUser>(
   // spends its rotating token once. Keying this map is essential: a process can
   // serve multiple users concurrently and must never share one user's refreshed
   // credentials with another user.
+  //
+  // A SUCCESSFUL rotation stays cached for a short window instead of being
+  // dropped the moment it settles: requests that left the browser with the OLD
+  // refresh cookie (parallel tabs, or an RSC render that couldn't persist the
+  // cookies it rotated) land here late, and re-hitting the upstream with the
+  // now-revoked token would kill the live session. They get the same new pair.
+  // Failed attempts are never cached so retries stay possible.
+  const ROTATION_RESULT_TTL_MS = 60_000;
   const inflight = new Map<string, Promise<RefreshOutcome>>();
   const runRefresh = (refresh: string): Promise<RefreshOutcome> => {
     const existing = inflight.get(refresh);
     if (existing) return existing;
 
-    const pending = doRefresh(refresh).finally(() => {
+    const drop = () => {
       if (inflight.get(refresh) === pending) {
         inflight.delete(refresh);
       }
-    });
+    };
+    const pending: Promise<RefreshOutcome> = doRefresh(refresh).then(
+      (outcome) => {
+        if (outcome.status === "ok") {
+          const timer = setTimeout(drop, ROTATION_RESULT_TTL_MS);
+          (timer as { unref?: () => void }).unref?.();
+        } else {
+          drop();
+        }
+        return outcome;
+      },
+      (err) => {
+        drop();
+        throw err;
+      },
+    );
     inflight.set(refresh, pending);
     return pending;
   };
