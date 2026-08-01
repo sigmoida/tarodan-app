@@ -232,7 +232,12 @@ describe("PaymentService trade cash refund idempotency", () => {
         providerSucceededAt: expect.any(Date),
       },
     });
-    expect(mockPaytr.createRefund).toHaveBeenCalledWith("ORDER123", 99.5);
+    // reference_no = attempt id: PayTR durum-sorgu mutabakatı için gönderilir.
+    expect(mockPaytr.createRefund).toHaveBeenCalledWith(
+      "ORDER123",
+      99.5,
+      "refund-attempt-1",
+    );
     expect(mockTx.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "pay-1" },

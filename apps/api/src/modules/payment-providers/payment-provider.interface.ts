@@ -42,6 +42,8 @@ export interface IPaymentProvider {
   createRefund(
     merchantOid: string,
     amount: number,
+    /** Opsiyonel takip referansı — PayTR durum-sorgu yanıtında geri döner. */
+    referenceNo?: string,
   ): Promise<PayTRRefundResponse>;
 
   createDirectPaymentForm(

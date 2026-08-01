@@ -738,7 +738,13 @@ export class PaymentRefundService {
             try {
               refundResult = await this.paymentProviders
                 .resolve(payment.provider)
-                .createRefund(paytrOid, amountToRefund);
+                // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
+                // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
+                .createRefund(
+                  paytrOid,
+                  amountToRefund,
+                  refundAttempt.attempt.id,
+                );
             } catch (err) {
               const reason = (err as Error).message || "refund request failed";
               if (err instanceof ProviderRefundRejectedException) {
@@ -1414,7 +1420,12 @@ export class PaymentRefundService {
         try {
           refundResult = (await this.paymentProviders
             .resolve(payment.provider)
-            .createRefund(oid, amount)) as unknown as Record<string, unknown>;
+            // reference_no = attempt id (durum-sorgu mutabakatı için).
+            .createRefund(
+              oid,
+              amount,
+              refundAttempt.attempt.id,
+            )) as unknown as Record<string, unknown>;
         } catch (e: any) {
           const reason = e?.message || "trade refund request failed";
           if (e instanceof ProviderRefundRejectedException) {

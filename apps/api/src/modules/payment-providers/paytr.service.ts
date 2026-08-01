@@ -77,17 +77,14 @@ export interface PayTRCallbackData {
   installment_count?: string;
 }
 
-export interface PayTRRefundRequest {
-  merchantOid: string;
-  returnAmount: number; // in kuruş
-}
-
 export interface PayTRRefundResponse {
   status: "success" | "error";
   err_no?: string;
   err_msg?: string;
   merchant_oid?: string;
   return_amount?: number;
+  /** İstekte gönderildiyse PayTR aynen geri döner (durum-sorgu eşlemesi için). */
+  reference_no?: string;
 }
 
 /** PayTR durum-sorgu: başarılı yanıt (status === 'success') */
@@ -408,6 +405,7 @@ export class PayTRService implements IPaymentProvider {
   async createRefund(
     merchantOid: string,
     amount: number, // in TL
+    referenceNo?: string,
   ): Promise<PayTRRefundResponse> {
     const oid = merchantOid.includes("-")
       ? merchantOid.replace(/-/g, "")
@@ -418,7 +416,7 @@ export class PayTRService implements IPaymentProvider {
     // ile aynı /odeme birim kuralı). Hash de aynı string ile üretilir.
     const returnAmount = amount.toFixed(2); // ONDALIK TL
 
-    // Build hash for refund
+    // Build hash for refund — reference_no doküman gereği token'a KATILMAZ.
     const hashStr = `${this.merchantId}${oid}${returnAmount}${this.merchantSalt}`;
     const paytrToken = this.generateHash(hashStr);
 
@@ -428,6 +426,12 @@ export class PayTRService implements IPaymentProvider {
       return_amount: returnAmount,
       paytr_token: paytrToken,
     });
+    // Opsiyonel takip referansı (durum-sorgu yanıtında geri döner). PayTR
+    // alfanümerik/max 64 ister; UUID tireleri vb. temizlenir.
+    const cleanRef = (referenceNo ?? "")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .slice(0, 64);
+    if (cleanRef) formData.set("reference_no", cleanRef);
 
     try {
       const response = await fetch("https://www.paytr.com/odeme/iade", {
@@ -474,8 +478,9 @@ export class PayTRService implements IPaymentProvider {
   async createPartialRefund(
     merchantOid: string,
     amount: number, // in TL
+    referenceNo?: string,
   ): Promise<PayTRRefundResponse> {
-    return this.createRefund(merchantOid, amount);
+    return this.createRefund(merchantOid, amount, referenceNo);
   }
 
   // ==========================================================================
