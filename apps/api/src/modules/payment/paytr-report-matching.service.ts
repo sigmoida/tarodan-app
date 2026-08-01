@@ -1,11 +1,15 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import {
+  LedgerAccount,
+  LedgerDirection,
+  LedgerEventType,
   PaytrMatchStatus,
   PaytrStatementLineType,
   PaymentStatus,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { LedgerService } from "../ledger/ledger.service";
 
 /** Tutar eşlemesi toleransı (kuruş yuvarlamaları). */
 const MATCH_TOLERANCE_TL = 0.05;
@@ -31,7 +35,13 @@ const REVERSE_SWEEP_DAYS = 4;
 export class PaytrReportMatchingService {
   private readonly logger = new Logger(PaytrReportMatchingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Faz 5: PayTR kesintisinin psp_fee gider kaydı. @Optional + best-effort —
+    // defter hatası mutabakatı BOZMAZ (fulfillment-finalizer ile aynı kalıp).
+    @Optional()
+    private readonly ledger?: LedgerService,
+  ) {}
 
   /** Oid → Payment: önce güncel oid (providerConversationId), sonra oid geçmişi (Y8). */
   private async findPaymentByOid(
@@ -212,6 +222,79 @@ export class PaytrReportMatchingService {
       }
     }
     return missing;
+  }
+
+  /**
+   * Faz 5: eşleşmiş satış satırlarının PayTR kesintisini (kesinti_tutari)
+   * deftere psp_fee gideri olarak yazar.
+   *
+   * Dengeli grup: debit psp_fee / credit buyer_payment — capture'da tamamı
+   * buyer_payment'a yazılan tahsilatın kesinti kadarı bize hiç ulaşmaz; bu
+   * kayıt "PayTR raporu vs ledger" (Faz 6.5) ücret mutabakatını mümkün kılar.
+   *
+   * İdempotens: satır `ledgerRecordedAt` ile damgalanır ve damgalı satır
+   * sorguya hiç girmez. Ledger hatasında damga YAZILMAZ (sonraki tur dener)
+   * ve tur kırılmaz — yalnız o satır atlanır.
+   */
+  async accruePspFees(): Promise<{ recorded: number; failed: number }> {
+    if (!this.ledger) return { recorded: 0, failed: 0 };
+
+    const lines = await this.prisma.paytrStatementLine.findMany({
+      where: {
+        type: PaytrStatementLineType.sale,
+        matchStatus: PaytrMatchStatus.matched,
+        ledgerRecordedAt: null,
+        fee: { gt: 0 },
+      },
+      orderBy: { transactionDate: "asc" },
+      take: MATCH_BATCH,
+    });
+
+    let recorded = 0;
+    let failed = 0;
+    for (const line of lines) {
+      const fee = Number(line.fee);
+      if (!(fee > 0)) continue;
+      try {
+        await this.ledger.record(this.prisma, {
+          eventType: LedgerEventType.psp_fee_accrued,
+          currency: line.currency,
+          entries: [
+            {
+              account: LedgerAccount.psp_fee,
+              direction: LedgerDirection.debit,
+              amount: fee,
+            },
+            {
+              account: LedgerAccount.buyer_payment,
+              direction: LedgerDirection.credit,
+              amount: fee,
+            },
+          ],
+          refs: { paymentId: line.paymentId },
+          metadata: {
+            statementLineId: line.id,
+            merchantOid: line.merchantOid,
+            transactionDate: line.transactionDate.toISOString().slice(0, 10),
+          },
+        });
+        await this.prisma.paytrStatementLine.update({
+          where: { id: line.id },
+          data: { ledgerRecordedAt: new Date() },
+        });
+        recorded++;
+      } catch (error: any) {
+        failed++;
+        this.logger.warn(
+          `psp_fee ledger kaydı başarısız (satır ${line.id}): ${error?.message}`,
+        );
+      }
+    }
+
+    if (recorded > 0) {
+      this.logger.log(`PayTR kesintisi deftere yazıldı: ${recorded} satır`);
+    }
+    return { recorded, failed };
   }
 
   /**

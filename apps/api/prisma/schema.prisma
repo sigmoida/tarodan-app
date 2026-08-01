@@ -1734,6 +1734,8 @@ model PaytrStatementLine {
   matchStatus     PaytrMatchStatus       @default(unmatched) @map("match_status")
   paymentId       String?                @map("payment_id")
   refundAttemptId String?                @map("refund_attempt_id")
+  // psp_fee_accrued ledger kaydı yazıldı mı (idempotens damgası) — Faz 5.
+  ledgerRecordedAt DateTime?             @map("ledger_recorded_at")
   raw             Json?
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
@@ -3356,6 +3358,7 @@ enum LedgerEventType {
   refund_issued // alıcıya iade
   trade_commission // takas komisyonu
   adjustment // manuel düzeltme (ters kayıt)
+  psp_fee_accrued // PayTR işlem kesintisi (islem-dokumu satırından, gün sonu sync)
 }
 
 enum LedgerAccount {
@@ -3365,6 +3368,7 @@ enum LedgerAccount {
   withholding_tax // stopaj (GVK 94/19 — muhtasar ile beyan)
   payout // dış para çıkışı (satıcıya transfer)
   refund // dış para çıkışı (alıcıya iade)
+  psp_fee // PSP (PayTR) işlem kesintisi — tahsilattan hiç bize ulaşmayan gider
 }
 
 enum LedgerDirection {

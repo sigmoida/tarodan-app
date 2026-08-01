@@ -80,6 +80,13 @@ export class PaymentSchedulerService implements OnModuleInit {
       `PayTR mutabakat: ${match.matched} eşleşti · ${match.mismatched} tutar farkı · ` +
         `${match.unmatched} karşılıksız · ${match.missingInPaytr} dökümde olmayan ödeme`,
     );
+    // Faz 5: eşleşen satışların PayTR kesintisi deftere (psp_fee) yazılır.
+    const fees = await this.paytrReportMatching.accruePspFees();
+    if (fees.recorded > 0 || fees.failed > 0) {
+      log(
+        `PayTR kesintisi deftere: ${fees.recorded} kayıt${fees.failed ? ` · ${fees.failed} hata` : ""}`,
+      );
+    }
     return {
       summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · ⚠ ${match.mismatched + match.missingInPaytr} fark` : ""}`,
       stats: { ...result, ...match },
