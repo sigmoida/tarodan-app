@@ -399,6 +399,13 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "payments",
         },
         {
+          name: t("admin.nav.items.pspReconciliation.name"),
+          href: "/finance/psp",
+          icon: ArrowsRightLeftIcon,
+          description: t("admin.nav.items.pspReconciliation.description"),
+          permission: "payments",
+        },
+        {
           name: t("admin.nav.items.commission.name"),
           href: "/finance/commission",
           icon: CurrencyDollarIcon,

@@ -27,6 +27,7 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AdminService } from "./admin.service";
+import { AdminPspReconciliationService } from "./admin-psp-reconciliation.service";
 import { AdvertisementService } from "../advertisement/advertisement.service";
 import { MediaService } from "../media/media.service";
 import {
@@ -114,7 +115,10 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminPaymentController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly pspReconciliation: AdminPspReconciliationService,
+  ) {}
 
   // ==================== PAYMENT MANAGEMENT ====================
 
@@ -223,6 +227,51 @@ export class AdminPaymentController {
   @ApiResponse({ status: HttpStatus.OK, description: "Finance overview" })
   async getFinanceOverview() {
     return this.adminService.getFinanceOverview();
+  }
+
+  // ==================== PSP (PAYTR) RECONCILIATION ====================
+
+  @Get("finance/psp/reconciliation")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "PSP reconciliation day cards: PayTR statement vs our records, diffs + match counts",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Day cards" })
+  async getPspReconciliation(@Query("days") days?: string) {
+    const parsed = days ? Number.parseInt(days, 10) : 7;
+    return this.pspReconciliation.getReconciliationSummary(
+      Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 31) : 7,
+    );
+  }
+
+  @Get("finance/psp/statement-lines")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "PayTR statement lines (default: problem rows — unmatched/amount_mismatch)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Statement lines" })
+  async getPspStatementLines(
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.pspReconciliation.getStatementLines({
+      status,
+      page: page ? Number.parseInt(page, 10) : undefined,
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get("finance/psp/settlements")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "PayTR settlements (realized + future_payments projections)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Settlements" })
+  async getPspSettlements() {
+    return this.pspReconciliation.getSettlements();
   }
 
   @Get("invoices/summary")

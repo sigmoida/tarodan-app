@@ -4131,6 +4131,62 @@
         "refundedTotal": "İade edilen",
         "manualRefundGroupHint": "Sepet ödemesinde iade sipariş bazında yapılır — ilgili siparişin iade talebini kullanın."
       },
+      "psp": {
+        "title": "PayTR Mutabakat",
+        "subtitle": "PayTR raporları ile sistem kayıtlarının gün bazlı karşılaştırması",
+        "tabs": {
+          "summary": "Gün Özetleri",
+          "lines": "Döküm Satırları",
+          "settlements": "Hakedişler"
+        },
+        "summary": {
+          "empty": "Henüz PayTR rapor verisi yok. Gece senkronu (PAYTR_REPORT_SYNC_ENABLED) çalıştığında burada gün kartları görünür.",
+          "notCovered": "Döküm yok",
+          "clean": "Temiz",
+          "problems": "{count} sorun",
+          "ours": "Bizim",
+          "sales": "Satış",
+          "refunds": "İade",
+          "fee": "PayTR kesintisi",
+          "net": "Net",
+          "matched": "{count} eşleşti",
+          "mismatched": "{count} tutar farkı",
+          "unmatched": "{count} karşılıksız",
+          "missing": "{count} dökümde yok"
+        },
+        "lines": {
+          "description": "Varsayılan görünüm sorunlu satırlardır: sistemde karşılığı bulunamayan ya da tutarı uyuşmayan PayTR hareketleri.",
+          "empty": "Bu filtrede satır yok.",
+          "date": "İşlem günü",
+          "type": "Tür",
+          "amount": "Tutar",
+          "fee": "Kesinti",
+          "matchStatus": "Eşleşme",
+          "reference": "Kayıt",
+          "sale": "Satış",
+          "refund": "İade",
+          "status": {
+            "matched": "Eşleşti",
+            "unmatched": "Karşılıksız",
+            "amount_mismatch": "Tutar farkı"
+          },
+          "filter": {
+            "problem": "Sorunlu satırlar",
+            "all": "Tümü",
+            "matched": "Eşleşenler",
+            "unmatched": "Karşılıksız",
+            "amountMismatch": "Tutar farkı"
+          }
+        },
+        "settlements": {
+          "empty": "Henüz hakediş kaydı yok.",
+          "datePaid": "Ödeme günü",
+          "state": "Durum",
+          "items": "Kalem",
+          "realized": "Aktarıldı",
+          "projection": "Aktarılacak"
+        }
+      },
       "payouts": {
         "title": "Satıcı Ödemeleri",
         "subtitle": "Emanette tutulan ödemeler ve serbest bırakma takvimi",
@@ -5864,6 +5920,10 @@
           "name": "Ödemeler",
           "description": "Ödeme işlemlerini görüntüleyin ve yönetin",
           "keywords": "ödeme,payment,hold"
+        },
+        "pspReconciliation": {
+          "name": "PayTR Mutabakat",
+          "description": "PayTR raporları ile sistem kayıtlarının karşılaştırması ve hakedişler."
         },
         "commission": {
           "name": "Komisyon",

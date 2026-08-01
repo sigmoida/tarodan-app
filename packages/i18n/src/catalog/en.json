@@ -4131,6 +4131,62 @@
         "refundedTotal": "Refunded",
         "manualRefundGroupHint": "Cart payments are refunded per order — use the related order's refund request."
       },
+      "psp": {
+        "title": "PayTR Reconciliation",
+        "subtitle": "Day-by-day comparison of PayTR reports against system records",
+        "tabs": {
+          "summary": "Day Summaries",
+          "lines": "Statement Lines",
+          "settlements": "Settlements"
+        },
+        "summary": {
+          "empty": "No PayTR report data yet. Day cards appear here once the nightly sync (PAYTR_REPORT_SYNC_ENABLED) runs.",
+          "notCovered": "No statement",
+          "clean": "Clean",
+          "problems": "{count} issues",
+          "ours": "Ours",
+          "sales": "Sales",
+          "refunds": "Refunds",
+          "fee": "PayTR fee",
+          "net": "Net",
+          "matched": "{count} matched",
+          "mismatched": "{count} amount mismatch",
+          "unmatched": "{count} unmatched",
+          "missing": "{count} missing in statement"
+        },
+        "lines": {
+          "description": "The default view shows problem rows: PayTR movements with no counterpart in the system or with a diverging amount.",
+          "empty": "No rows for this filter.",
+          "date": "Transaction day",
+          "type": "Type",
+          "amount": "Amount",
+          "fee": "Fee",
+          "matchStatus": "Match",
+          "reference": "Record",
+          "sale": "Sale",
+          "refund": "Refund",
+          "status": {
+            "matched": "Matched",
+            "unmatched": "Unmatched",
+            "amount_mismatch": "Amount mismatch"
+          },
+          "filter": {
+            "problem": "Problem rows",
+            "all": "All",
+            "matched": "Matched",
+            "unmatched": "Unmatched",
+            "amountMismatch": "Amount mismatch"
+          }
+        },
+        "settlements": {
+          "empty": "No settlement records yet.",
+          "datePaid": "Payout day",
+          "state": "State",
+          "items": "Items",
+          "realized": "Transferred",
+          "projection": "Upcoming"
+        }
+      },
       "payouts": {
         "title": "Seller Payouts",
         "subtitle": "Payments held in escrow and their release schedule",
@@ -5864,6 +5920,10 @@
           "name": "Payments",
           "description": "View and manage payment transactions",
           "keywords": "payment,hold"
+        },
+        "pspReconciliation": {
+          "name": "PayTR Reconciliation",
+          "description": "Comparison of PayTR reports against system records, plus settlements."
         },
         "commission": {
           "name": "Commission",

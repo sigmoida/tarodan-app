@@ -23,6 +23,7 @@ import { AdminReviewController } from "./admin-review.controller";
 import { AdminSellerApplicationController } from "./admin-seller-application.controller";
 import { AdminAdPackageController } from "./admin-ad-package.controller";
 import { AdminService } from "./admin.service";
+import { AdminPspReconciliationService } from "./admin-psp-reconciliation.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCommissionService } from "./admin-commission.service";
 import { AdminSettingsService } from "./admin-settings.service";
@@ -139,6 +140,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   ],
   providers: [
     AdminService,
+    AdminPspReconciliationService,
     AdminAuditService,
     AdminCommissionService,
     AdminSettingsService,

@@ -140,6 +140,17 @@ export const financeApi = {
     page?: number;
     limit?: number;
   }) => api.get("/admin/payouts/adjustments", { params }),
+
+  // PSP (PayTR) mutabakat — gece rapor sync'inin doldurduğu yerel tablolardan okur
+  getPspReconciliation: (days = 7) =>
+    api.get("/admin/finance/psp/reconciliation", { params: { days } }),
+  getPspStatementLines: (params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get("/admin/finance/psp/statement-lines", { params }),
+  getPspSettlements: () => api.get("/admin/finance/psp/settlements"),
+
   getPayoutsTransactions: (params?: {
     search?: string;
     sellerId?: string;
