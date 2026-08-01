@@ -6652,6 +6652,7 @@
       "itemAlreadyInActiveTrade": "One of the products you offered is already part of an active trade. Cancel the existing trade first or wait for it to be resolved.",
       "membershipExpiredForAccept": "Your membership appears to have expired. Renew your Basic or higher membership to accept a trade.",
       "membershipRequiredForCounter": "A Basic or higher membership is required to send a counter-offer. Please renew your membership.",
+      "receiverCannotTrade": "The other party's membership does not allow trading; a trade offer cannot be sent for this listing right now.",
       "noShipmentToConfirm": "No shipment found to confirm",
       "noShippingAddress": "Add a delivery address for the trade. You can add an address via Profile → My Addresses.",
       "notAuthorizedForAction": "You are not authorized to perform this trade action",

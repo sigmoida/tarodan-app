@@ -8,6 +8,8 @@ import { ProductStatus } from "@prisma/client";
 import { StorageService } from "../storage/storage.service";
 import { buildProductWhere } from "../product/helpers/build-product-where";
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
+import { tradeCapableSellerWhere } from "../membership/membership.util";
+import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import {
   SearchCommonService,
   SearchOptions,
@@ -676,6 +678,15 @@ export class SearchProductService {
         material: options.material,
         manufacturer: options.manufacturer,
         tradeOnly: options.tradeOnly,
+        // ES yolu ile aynı kural: satıcının GÜNCEL takas yetkisi de aranır,
+        // yoksa aynı sorgu hangi motorun servis ettiğine göre farklı sonuç verir.
+        ...(options.tradeOnly
+          ? {
+              tradeCapableSeller: tradeCapableSellerWhere(
+                await getFreeTierCanTrade(this.prisma),
+              ),
+            }
+          : {}),
         preOrder: options.preOrder,
         limited: options.limited,
         set: options.set,

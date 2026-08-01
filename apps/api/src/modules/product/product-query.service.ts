@@ -14,6 +14,8 @@ import { ProductStatus, Prisma } from "@prisma/client";
 import { buildProductWhere } from "./helpers/build-product-where";
 import { fulltextProductSearch } from "./helpers/fulltext-search";
 import { ACTIVE_TRADE_STATUSES } from "../trade/trade.constants";
+import { tradeCapableSellerWhere } from "../membership/membership.util";
+import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductCommonService } from "./product-common.service";
 
 /**
@@ -350,7 +352,19 @@ export class ProductQueryService {
     }
 
     const where = buildProductWhere(
-      { ...query, material: query.material },
+      {
+        ...query,
+        material: query.material,
+        // Takas filtresinde satıcının GÜNCEL yetkisi de aranır (bayrak yalnız
+        // niyettir; üyelik bitince üründe kalır).
+        ...(query.tradeOnly
+          ? {
+              tradeCapableSeller: tradeCapableSellerWhere(
+                await getFreeTierCanTrade(this.prisma),
+              ),
+            }
+          : {}),
+      },
       { fulltextIds },
     );
 

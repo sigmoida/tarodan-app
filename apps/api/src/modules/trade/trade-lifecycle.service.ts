@@ -129,6 +129,19 @@ export class TradeLifecycleService {
       throw new BadRequestException(initiatorCanTrade.reason);
     }
 
+    // ALICI da yetkili olmalı. Eskiden yalnız başlatan denetleniyordu; alıcının
+    // yetkisi ancak KABUL anında bakılıyordu. Üyeliği biten bir satıcının
+    // ilanları "takasa açık" kaldığı için teklif oluşturulabiliyor, alıcı
+    // kabul edemiyor ve teklif yanıt süresi dolana dek askıda kalıyordu.
+    const receiverCanTrade = await this.membershipService.canCreateTrade(
+      dto.receiverId,
+    );
+    if (!receiverCanTrade.allowed) {
+      throw new BadRequestException(
+        i18nMessage("server.trade.receiverCannotTrade"),
+      );
+    }
+
     // Validate initiator owns the products (no isTradeEnabled check - user can offer any of their own items)
     const initiatorProducts = await this.prisma.product.findMany({
       where: {
@@ -696,6 +709,16 @@ export class TradeLifecycleService {
     if (!userCanTrade.allowed) {
       throw new BadRequestException(
         i18nMessage("server.trade.membershipRequiredForCounter"),
+      );
+    }
+
+    // Karşı teklifin muhatabı da yetkili olmalı — aksi halde kabul edemeyeceği
+    // bir teklif üretilir (bkz. createTrade'deki aynı kapı).
+    const originalInitiatorCanTrade =
+      await this.membershipService.canCreateTrade(trade.initiatorId);
+    if (!originalInitiatorCanTrade.allowed) {
+      throw new BadRequestException(
+        i18nMessage("server.trade.receiverCannotTrade"),
       );
     }
 

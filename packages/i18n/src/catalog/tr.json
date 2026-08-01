@@ -6652,6 +6652,7 @@
       "itemAlreadyInActiveTrade": "Teklif ettiğiniz ürünlerden biri zaten aktif bir takas teklifinde. Önce mevcut takası iptal edin veya sonuçlanmasını bekleyin.",
       "membershipExpiredForAccept": "Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Temel veya üstü üyeliğinizi yenileyin.",
       "membershipRequiredForCounter": "Karşı teklif göndermek için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.",
+      "receiverCannotTrade": "Karşı tarafın üyeliği takasa uygun değil; bu ilan için şu anda takas teklifi gönderilemiyor.",
       "noShipmentToConfirm": "Onaylanacak gönderim bulunamadı",
       "noShippingAddress": "Takas için bir teslimat adresi ekleyin. Profil → Adreslerim üzerinden adres ekleyebilirsiniz.",
       "notAuthorizedForAction": "Bu takas işlemi için yetkiniz yok",
