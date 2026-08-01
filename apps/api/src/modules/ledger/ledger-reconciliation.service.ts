@@ -3,7 +3,13 @@ import { ConfigService } from "@nestjs/config";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { PrismaService } from "../../prisma";
-import { PaymentStatus, LedgerDirection } from "@prisma/client";
+import {
+  PaymentStatus,
+  LedgerDirection,
+  LedgerAccount,
+  PaytrMatchStatus,
+  PaytrStatementLineType,
+} from "@prisma/client";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { LedgerBalanceService } from "./ledger-balance.service";
@@ -16,8 +22,17 @@ export interface ReconciliationReport {
   overRefundedPayments: number;
   /** Faz 6.3: defterden türetilen (Payment metadata'sından DEĞİL) sipariş-bazlı fazla-iade. */
   overRefundedOrders: number;
+  /** Damgalı (ledgerRecordedAt dolu) PayTR döküm satırlarının kesinti toplamı. */
+  pspFeeStampedTotal: number;
+  /** Penceredeki ledger psp_fee DEBIT toplamı — damgalı toplama eşit olmalı. */
+  pspFeeLedgerTotal: number;
+  /** 2+ gündür damgalanmamış (deftere yazılamamış) eşleşmiş fee'li satır sayısı. */
+  pspFeeAccrualLag: number;
   driftAlarms: string[];
 }
+
+/** PSP kesinti tahakkuku bu süreden uzun gecikirse alarm (gece cron'u art arda hata veriyordur). */
+const PSP_FEE_LAG_DAYS = 2;
 
 /**
  * LedgerReconciliationService (Faz 6.5) — GÜNLÜK drift denetimi. Yalnız OKUR (para
@@ -132,15 +147,65 @@ export class LedgerReconciliationService implements OnModuleInit {
       }
     }
 
+    // 4) PSP kesinti bütünlüğü (Faz 6.5 "ledger vs PSP raporu" kapanışı):
+    //    damgalı döküm satırlarının fee toplamı = penceredeki psp_fee DEBIT toplamı.
+    //    Damga ile defter yazımı aynı anda atıldığından iki taraf da kendi zaman
+    //    alanıyla (ledgerRecordedAt / createdAt) AYNI pencereye dilimlenir; sapma
+    //    = kaybolan/çift yazılan defter satırı ya da damgalanıp yazılamayan satır.
+    const stampedLines = await this.prisma.paytrStatementLine.findMany({
+      where: { ledgerRecordedAt: { gte: since } },
+      select: { fee: true },
+    });
+    const pspFeeStampedTotal = stampedLines.reduce(
+      (sum, l) => sum + Number(l.fee ?? 0),
+      0,
+    );
+    const pspFeeLedgerTotal = entries.reduce(
+      (sum, e) =>
+        e.account === LedgerAccount.psp_fee &&
+        e.direction === LedgerDirection.debit
+          ? sum + Number(e.amount)
+          : sum,
+      0,
+    );
+    if (Math.abs(pspFeeStampedTotal - pspFeeLedgerTotal) > EPSILON) {
+      const msg = `PSP_FEE_LEDGER_DRIFT stamped=${pspFeeStampedTotal.toFixed(2)} ledger=${pspFeeLedgerTotal.toFixed(2)}`;
+      driftAlarms.push(msg);
+      this.logger.error(`RECONCILE ALARM: ${msg}`);
+    }
+
+    // 5) PSP kesinti tahakkuku birikmesi: eşleşmiş, fee'li ama 2+ gündür deftere
+    //    yazılamamış satırlar — accruePspFees her gece hata veriyorsa burada patlar.
+    const lagCutoff = new Date(
+      Date.now() - PSP_FEE_LAG_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const pspFeeAccrualLag = await this.prisma.paytrStatementLine.count({
+      where: {
+        type: PaytrStatementLineType.sale,
+        matchStatus: PaytrMatchStatus.matched,
+        ledgerRecordedAt: null,
+        fee: { gt: 0 },
+        transactionDate: { lt: lagCutoff },
+      },
+    });
+    if (pspFeeAccrualLag > 0) {
+      const msg = `PSP_FEE_ACCRUAL_LAG count=${pspFeeAccrualLag} — kesinti tahakkuku ${PSP_FEE_LAG_DAYS}+ gündür geride`;
+      driftAlarms.push(msg);
+      this.logger.error(`RECONCILE ALARM: ${msg}`);
+    }
+
     const report: ReconciliationReport = {
       ledgerGroupsChecked: groupNet.size,
       unbalancedGroups,
       overRefundedPayments,
       overRefundedOrders,
+      pspFeeStampedTotal: Math.round(pspFeeStampedTotal * 100) / 100,
+      pspFeeLedgerTotal: Math.round(pspFeeLedgerTotal * 100) / 100,
+      pspFeeAccrualLag,
       driftAlarms,
     };
     log(
-      `Reconcile: ${groupNet.size} defter grubu · ${unbalancedGroups} dengesiz · ${overRefundedPayments} ödeme-fazla-iade · ${overRefundedOrders} sipariş-fazla-iade`,
+      `Reconcile: ${groupNet.size} defter grubu · ${unbalancedGroups} dengesiz · ${overRefundedPayments} ödeme-fazla-iade · ${overRefundedOrders} sipariş-fazla-iade · psp-fee ${report.pspFeeStampedTotal}/${report.pspFeeLedgerTotal}${pspFeeAccrualLag ? ` · ${pspFeeAccrualLag} tahakkuk gecikmesi` : ""}`,
     );
     if (driftAlarms.length === 0) {
       this.logger.log(

@@ -7,6 +7,11 @@ describe("LedgerReconciliationService.reconcile", () => {
     return {
       ledgerEntry: { findMany: jest.fn().mockResolvedValue(ledgerEntries) },
       payment: { findMany: jest.fn().mockResolvedValue(payments) },
+      // PSP kesinti driftleri (4-5) bu testlerin konusu değil — boş/sıfır döner.
+      paytrStatementLine: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
     } as any;
   }
 
