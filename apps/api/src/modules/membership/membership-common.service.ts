@@ -29,72 +29,6 @@ export class MembershipCommonService {
   ) {}
 
   // ==========================================================================
-  // PLATFORM İLAN LİMİTİ OVERRIDE'LARI — TEK KAYNAK
-  // ==========================================================================
-
-  private static readonly LISTING_LIMIT_SETTING_KEY: Record<
-    MembershipTierType,
-    string
-  > = {
-    [MembershipTierType.free]: "free_listing_limit",
-    [MembershipTierType.basic]: "basic_listing_limit",
-    [MembershipTierType.premium]: "premium_listing_limit",
-    [MembershipTierType.business]: "business_listing_limit",
-  };
-
-  /**
-   * Tier'ın ilan limitini geçersiz kılan PlatformSetting değeri; ayar yoksa ya
-   * da geçersizse null. Free tier'da yalnız pozitif değer geçerli (sınırsız
-   * ücretsiz üyelik yok); ücretli tier'larda -1 = sınırsız kabul edilir.
-   */
-  private async resolveListingLimitOverride(
-    type: MembershipTierType,
-  ): Promise<number | null> {
-    const row = await this.prisma.platformSetting.findUnique({
-      where: {
-        settingKey: MembershipCommonService.LISTING_LIMIT_SETTING_KEY[type],
-      },
-    });
-    if (!row?.settingValue) return null;
-    const limit = parseInt(row.settingValue, 10);
-    if (isNaN(limit)) return null;
-    if (type === MembershipTierType.free) {
-      return limit > 0 ? limit : null;
-    }
-    return limit === -1 || limit > 0 ? limit : null;
-  }
-
-  /**
-   * Tier benzeri bir nesnenin ilan limitlerini platform override'ıyla YERİNDE
-   * günceller ve aynı nesneyi döndürür.
-   *
-   * UYGULANAN limitin (getUserMembership → kullanım istatistikleri → ilan
-   * oluşturma kapısı) ve VAAT EDİLEN limitin (`/membership/tiers` → üyelik
-   * sayfası + checkout kartları) TEK kaynağı budur. Eskiden override yalnız
-   * uygulama tarafında (üstelik iki yerde kopyalanmış if/else zincirleriyle)
-   * vardı; admin Sistem Ayarları'ndan limiti değiştirince sayfa eski limiti
-   * vaat ediyor, kullanıcı yenisine takılıyordu.
-   */
-  async applyListingLimitOverride<
-    T extends {
-      type: MembershipTierType;
-      maxFreeListings: number;
-      maxTotalListings: number;
-    },
-  >(tier: T): Promise<T> {
-    const override = await this.resolveListingLimitOverride(tier.type);
-    if (override == null) return tier;
-    if (tier.type === MembershipTierType.free) {
-      // Free'de toplam = ücretsiz: tek limit ikisini de belirler.
-      tier.maxFreeListings = override;
-      tier.maxTotalListings = override;
-    } else {
-      tier.maxTotalListings = override;
-    }
-    return tier;
-  }
-
-  // ==========================================================================
   // GET USER'S MEMBERSHIP
   // ==========================================================================
   async getUserMembership(userId: string): Promise<UserMembershipResponseDto> {
@@ -267,9 +201,6 @@ export class MembershipCommonService {
       pendingPayment = true;
     }
 
-    // Platform override'ı ÖNCE tier nesnesine uygulanır (getUserUsageStats bu
-    // limitle sayar), DTO sonra eşlenir ve değerleri otomatik devralır.
-    await this.applyListingLimitOverride(effectiveTier);
     const tierDto = this.mapTierToDto(effectiveTier);
 
     // Get usage stats (this will use the overridden maxFreeListings)
@@ -321,62 +252,11 @@ export class MembershipCommonService {
     // Count featured listings (placeholder - would need featured flag on product)
     const featuredListings = 0;
 
-    // Check platform setting for listing limit override based on tier type
-    let maxFreeListings = tier.maxFreeListings;
-    let maxTotalListings = tier.maxTotalListings;
-
-    if (tier.type === MembershipTierType.free) {
-      const freeListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "free_listing_limit" },
-        });
-      if (freeListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          freeListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit) && platformLimit > 0) {
-          maxFreeListings = platformLimit;
-          maxTotalListings = platformLimit; // For free tier, total = free
-        }
-      }
-    } else if (tier.type === MembershipTierType.premium) {
-      const premiumListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "premium_listing_limit" },
-        });
-      if (premiumListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          premiumListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit)) {
-          if (platformLimit === -1) {
-            maxTotalListings = -1; // Unlimited
-          } else if (platformLimit > 0) {
-            maxTotalListings = platformLimit;
-          }
-        }
-      }
-    } else if (tier.type === MembershipTierType.business) {
-      const businessListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "business_listing_limit" },
-        });
-      if (businessListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          businessListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit)) {
-          if (platformLimit === -1) {
-            maxTotalListings = -1; // Unlimited
-          } else if (platformLimit > 0) {
-            maxTotalListings = platformLimit;
-          }
-        }
-      }
-    }
+    // Limitler DOĞRUDAN katman satırından gelir — tek kaynak MembershipTier.
+    // Buradaki eski platform-ayarı override zinciri kaldırıldı (basic dalı da
+    // yoktu, yani ayar ile davranış zaten çelişiyordu).
+    const maxFreeListings = tier.maxFreeListings;
+    const maxTotalListings = tier.maxTotalListings;
 
     // Calculate remaining
     const usedFreeListings = Math.min(activeListings, maxFreeListings);

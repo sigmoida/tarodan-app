@@ -5247,22 +5247,6 @@
         }
       },
       "fields": {
-        "freeListingLimit": {
-          "label": "Ücretsiz İlan Limiti",
-          "helper": "Ücretsiz üyelerin ilan limiti"
-        },
-        "basicListingLimit": {
-          "label": "Temel İlan Limiti",
-          "helper": "Temel üyelerin ilan limiti (-1 = sınırsız)"
-        },
-        "premiumListingLimit": {
-          "label": "Premium İlan Limiti",
-          "helper": "Premium üyelerin ilan limiti (-1 = sınırsız)"
-        },
-        "businessListingLimit": {
-          "label": "Business İlan Limiti",
-          "helper": "Business üyelerin ilan limiti (-1 = sınırsız)"
-        },
         "minProductPrice": {
           "label": "Minimum Ürün Fiyatı (₺)",
           "helper": "Yeni ilanlar için minimum fiyat (mevcut ilanlar etkilenmez)"

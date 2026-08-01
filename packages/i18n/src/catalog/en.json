@@ -5247,22 +5247,6 @@
         }
       },
       "fields": {
-        "freeListingLimit": {
-          "label": "Free Listing Limit",
-          "helper": "Listing limit for free members"
-        },
-        "basicListingLimit": {
-          "label": "Basic Listing Limit",
-          "helper": "Listing limit for basic members (-1 = unlimited)"
-        },
-        "premiumListingLimit": {
-          "label": "Premium Listing Limit",
-          "helper": "Listing limit for premium members (-1 = unlimited)"
-        },
-        "businessListingLimit": {
-          "label": "Business Listing Limit",
-          "helper": "Listing limit for business members (-1 = unlimited)"
-        },
         "minProductPrice": {
           "label": "Minimum Product Price (₺)",
           "helper": "Minimum price for new listings (existing listings unaffected)"

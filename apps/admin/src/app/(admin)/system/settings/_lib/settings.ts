@@ -5,10 +5,6 @@ import { settingsToMap } from "@/lib/settings";
 type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Settings {
-  freeListingLimit: number;
-  basicListingLimit: number;
-  premiumListingLimit: number;
-  businessListingLimit: number;
   tradeResponseHours: number;
   tradePaymentHours: number;
   tradeShippingDays: number;
@@ -36,19 +32,12 @@ type FieldMeta = Omit<FieldDef, "label" | "helper">;
 
 /** Field metadata (no display text) — the source of truth for parsing + validation. */
 const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
+  // İlan LİMİTLERİ burada YOK: üyelikle belirlenen her özellik yalnız Üyelik
+  // Katmanları ekranından yönetilir (tek kaynak MembershipTier). Buradaki
+  // `*_listing_limit` ayarları katman limitlerini eziyordu ve form, olmayan
+  // ayar için uydurma varsayılan gösterdiğinden tek bir kaydetme premium/
+  // business katmanlarını sessizce sınırsız yapıyordu.
   listing: [
-    { key: "freeListingLimit", backendKey: "free_listing_limit", min: 0 },
-    { key: "basicListingLimit", backendKey: "basic_listing_limit", min: -1 },
-    {
-      key: "premiumListingLimit",
-      backendKey: "premium_listing_limit",
-      min: -1,
-    },
-    {
-      key: "businessListingLimit",
-      backendKey: "business_listing_limit",
-      min: -1,
-    },
     {
       key: "minProductPrice",
       backendKey: "min_product_price",
@@ -79,22 +68,6 @@ const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
 /** Per-field translation keys (label/helper) — display-only, kept apart from `FIELD_DEFS`. */
 // `as const` keeps the key literals narrow so next-intl's typed t() accepts them.
 const FIELD_LABEL_KEYS = {
-  freeListingLimit: {
-    label: "admin.settings.fields.freeListingLimit.label",
-    helper: "admin.settings.fields.freeListingLimit.helper",
-  },
-  basicListingLimit: {
-    label: "admin.settings.fields.basicListingLimit.label",
-    helper: "admin.settings.fields.basicListingLimit.helper",
-  },
-  premiumListingLimit: {
-    label: "admin.settings.fields.premiumListingLimit.label",
-    helper: "admin.settings.fields.premiumListingLimit.helper",
-  },
-  businessListingLimit: {
-    label: "admin.settings.fields.businessListingLimit.label",
-    helper: "admin.settings.fields.businessListingLimit.helper",
-  },
   minProductPrice: {
     label: "admin.settings.fields.minProductPrice.label",
     helper: "admin.settings.fields.minProductPrice.helper",
@@ -158,10 +131,6 @@ export function tabFields(t: T): Record<SettingsTab, FieldDef[]> {
 }
 
 const DEFAULTS: Settings = {
-  freeListingLimit: 10,
-  basicListingLimit: 50,
-  premiumListingLimit: -1,
-  businessListingLimit: -1,
   tradeResponseHours: 72,
   tradePaymentHours: 48,
   tradeShippingDays: 7,

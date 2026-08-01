@@ -5,14 +5,19 @@ import { MembershipService } from "./membership.service";
 import { MembershipSubscriptionService } from "./membership-subscription.service";
 
 /**
- * İlan limiti override'ları (PlatformSetting `*_listing_limit`) UYGULANAN
- * limitin parçası; o hâlde VAAT EDİLEN limit de aynı kaynaktan geçmeli.
+ * ÜYELİK KATMANI = TEK KAYNAK.
  *
- * `/membership/tiers` (üyelik sayfası + checkout kartlarının kaynağı) tier
- * satırını override'sız döndürüyordu: admin Sistem Ayarları'ndan limiti
- * değiştirdiğinde sayfa eski limiti vaat ediyor, kullanıcı yenisine takılıyordu.
+ * İlan limitleri eskiden `platform_settings`'teki `*_listing_limit`
+ * anahtarlarıyla ezilebiliyordu. Bu anahtarlar seed'de yoktu; ama Sistem
+ * Ayarları sayfası olmayan ayar için uydurma varsayılan gösteriyor (premium/
+ * business için -1) ve Kaydet aktif sekmenin TÜM alanlarını yazıyordu. Sonuç:
+ * ilan sekmesinde herhangi bir kaydetme premium (200) ve business (1000)
+ * katmanlarını sessizce SINIRSIZ yapıyordu.
+ *
+ * Bu spec, override mekanizmasının geri gelmemesini korur: ayar satırı VARSA
+ * BİLE katman satırındaki limit geçerlidir.
  */
-describe("MembershipService.getAllTiers — platform listing-limit overrides", () => {
+describe("MembershipService.getAllTiers — limitler yalnız katman satırından", () => {
   const tierRow = (
     type: MembershipTierType,
     maxFree: number,
@@ -43,28 +48,29 @@ describe("MembershipService.getAllTiers — platform listing-limit overrides", (
     tierRow(MembershipTierType.business, 200, 1000, 3),
   ];
 
-  const makeService = (settings: Record<string, string | undefined>) => {
+  /** `settings` bilerek doldurulabilir: hiçbiri sonucu ETKİLEMEMELİ. */
+  const makeService = (settings: Record<string, string | undefined> = {}) => {
+    const platformSettingFindUnique = jest.fn(({ where }: any) =>
+      Promise.resolve(
+        settings[where.settingKey] != null
+          ? {
+              settingKey: where.settingKey,
+              settingValue: settings[where.settingKey],
+            }
+          : null,
+      ),
+    );
     const prisma = {
       membershipTier: { findMany: jest.fn().mockResolvedValue(tiers) },
-      platformSetting: {
-        findUnique: jest.fn(({ where }: any) =>
-          Promise.resolve(
-            settings[where.settingKey] != null
-              ? {
-                  settingKey: where.settingKey,
-                  settingValue: settings[where.settingKey],
-                }
-              : null,
-          ),
-        ),
-      },
+      platformSetting: { findUnique: platformSettingFindUnique },
     } as unknown as PrismaService;
     const common = new MembershipCommonService(prisma, {} as any);
-    return new MembershipService(
+    const service = new MembershipService(
       prisma,
       common,
       {} as MembershipSubscriptionService,
     );
+    return { service, platformSettingFindUnique };
   };
 
   const byType = (
@@ -76,45 +82,44 @@ describe("MembershipService.getAllTiers — platform listing-limit overrides", (
     type: string,
   ) => list.find((t) => t.type === type)!;
 
-  it("override yokken tier satırındaki limitler döner", async () => {
-    const service = makeService({});
+  it("katman satırındaki limitler olduğu gibi döner", async () => {
+    const { service } = makeService();
 
     const result = await service.getAllTiers();
 
+    expect(byType(result, "free").maxFreeListings).toBe(5);
     expect(byType(result, "free").maxTotalListings).toBe(10);
     expect(byType(result, "basic").maxTotalListings).toBe(50);
     expect(byType(result, "premium").maxTotalListings).toBe(200);
     expect(byType(result, "business").maxTotalListings).toBe(1000);
   });
 
-  it("her tier kendi platform ayarı override'ını yansıtır (uygulanan = vaat edilen)", async () => {
-    const service = makeService({
+  it("kalıntı *_listing_limit ayarları limitleri EZEMEZ", async () => {
+    // Sahada bu satırlar (Ayarlar ekranından kaydeden bir admin yüzünden)
+    // oluşmuş olabilir; migration onları siler, ama kod da bağışık olmalı.
+    const { service } = makeService({
       free_listing_limit: "7",
       basic_listing_limit: "60",
-      premium_listing_limit: "100",
+      premium_listing_limit: "-1",
       business_listing_limit: "-1",
     });
 
     const result = await service.getAllTiers();
 
-    // Free: toplam = ücretsiz = platform limiti.
-    expect(byType(result, "free").maxFreeListings).toBe(7);
-    expect(byType(result, "free").maxTotalListings).toBe(7);
-    expect(byType(result, "basic").maxTotalListings).toBe(60);
-    expect(byType(result, "premium").maxTotalListings).toBe(100);
-    // -1 = sınırsız.
-    expect(byType(result, "business").maxTotalListings).toBe(-1);
+    expect(byType(result, "free").maxFreeListings).toBe(5);
+    expect(byType(result, "free").maxTotalListings).toBe(10);
+    expect(byType(result, "basic").maxTotalListings).toBe(50);
+    expect(byType(result, "premium").maxTotalListings).toBe(200);
+    expect(byType(result, "business").maxTotalListings).toBe(1000);
   });
 
-  it("geçersiz ayar değeri tier satırını bozmaz", async () => {
-    const service = makeService({
-      premium_listing_limit: "abc",
-      free_listing_limit: "0", // free için yalnız > 0 geçerli
+  it("katman listesi için hiç platform ayarı OKUNMAZ", async () => {
+    const { service, platformSettingFindUnique } = makeService({
+      premium_listing_limit: "-1",
     });
 
-    const result = await service.getAllTiers();
+    await service.getAllTiers();
 
-    expect(byType(result, "premium").maxTotalListings).toBe(200);
-    expect(byType(result, "free").maxTotalListings).toBe(10);
+    expect(platformSettingFindUnique).not.toHaveBeenCalled();
   });
 });

@@ -51,16 +51,9 @@ export class MembershipService {
       orderBy: { sortOrder: "asc" },
     });
 
-    // Vaat edilen limit = uygulanan limit: platform override'ları burada da
-    // geçerli (üyelik sayfası + checkout kartları bu ucu okur). Prisma satırı
-    // mutasyona uğramasın diye kopya üzerinde uygulanır.
-    return Promise.all(
-      tiers.map(async (tier) =>
-        this.common.mapTierToDto(
-          await this.common.applyListingLimitOverride({ ...tier }),
-        ),
-      ),
-    );
+    // Vaat edilen limit = uygulanan limit: ikisi de doğrudan katman satırından
+    // gelir (üyelik sayfası + checkout kartları bu ucu okur).
+    return tiers.map((tier) => this.common.mapTierToDto(tier));
   }
 
   // ==========================================================================
@@ -108,9 +101,7 @@ export class MembershipService {
         );
       }
 
-      // getUserMembership platform override'larını zaten uyguladı
-      // (applyListingLimitOverride — tek kaynak); burada ikinci bir kopya
-      // zincir tutmak drift üretiyordu (basic dalı eksikti).
+      // Limitler katman satırından gelir — tek kaynak MembershipTier.
       const maxFreeListings = membership.tier.maxFreeListings;
       const maxTotalListings = membership.tier.maxTotalListings;
 
@@ -123,8 +114,8 @@ export class MembershipService {
         canCreateCollection: membership.tier.canCreateCollections,
         isAdFree: membership.tier.isAdFree, // reklamsız avantajı (admin tier ayarı)
         maxImages: membership.tier.maxImagesPerListing,
-        maxFreeListings: maxFreeListings, // Use platform setting override for free tier
-        maxTotalListings: maxTotalListings, // Use platform setting override for all tiers
+        maxFreeListings,
+        maxTotalListings,
         remainingFreeListings: membership.remainingFreeListings, // Already calculated correctly by getUserUsageStats
         remainingTotalListings: membership.remainingTotalListings, // Already calculated correctly by getUserUsageStats
         remainingFeaturedSlots: membership.remainingFeaturedSlots,

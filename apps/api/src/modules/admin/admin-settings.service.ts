@@ -25,17 +25,13 @@ export class AdminSettingsService {
   }
 
   /**
-   * Get public platform settings (listing limits, message settings, and membership prices)
+   * Get public platform settings (message settings and membership prices)
    */
   async getPublicSettings() {
     const settings = await this.prisma.platformSetting.findMany({
       where: {
         settingKey: {
           in: [
-            "free_listing_limit",
-            "basic_listing_limit",
-            "premium_listing_limit",
-            "business_listing_limit",
             "max_message_length",
             "basic_monthly_price",
             "premium_monthly_price",
