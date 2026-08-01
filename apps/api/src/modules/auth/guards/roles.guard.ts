@@ -23,7 +23,7 @@ import { i18nMessage } from "../../i18n";
 // GET ve yazma isteklerinin ikisi de aynı izni gerektirir — sayfa erişim modeli.
 // @RequirePermission decorator varsa bu tabloyu override eder.
 //
-const PERMISSION_MAP: Record<string, string[]> = {
+export const PERMISSION_MAP: Record<string, string[]> = {
   dashboard: ["dashboard"],
   analytics: ["analytics"],
   reports: ["analytics"],
@@ -33,6 +33,10 @@ const PERMISSION_MAP: Record<string, string[]> = {
   "refund-requests": ["refund_requests"],
   refunds: ["refund_history", "refund_requests"],
   payments: ["payments"],
+  // /finance/overview + /finance/psp/* ve ödeme ekranının mutabakat sekmesi —
+  // hepsi menüde "payments" izniyle görünür.
+  finance: ["payments"],
+  "refund-attempts": ["payments"],
   products: ["products"],
   "products-export": ["products"],
   categories: ["categories"],
@@ -44,6 +48,9 @@ const PERMISSION_MAP: Record<string, string[]> = {
   attributes: ["attributes"],
   discounts: ["discounts"],
   ads: ["ads"],
+  // Reklam paketleri + boost satın alımları: menüde /marketing/ad-packages ve
+  // /marketing/boost-purchases sayfaları "ads" izniyle gösterilir.
+  "ad-packages": ["ads"],
   notifications: ["notifications"],
   "email-templates": ["email_templates"],
   pages: ["pages"],
@@ -68,21 +75,33 @@ const PERMISSION_MAP: Record<string, string[]> = {
   media: ["products"],
 };
 
+/**
+ * URL yol parçaları — TEK ayrıştırma noktası. Küçük harfe çevirir: Express
+ * varsayılan olarak harfe DUYARSIZ yönlendirir (`case sensitive routing`
+ * açılmadı), yani /api/ADMIN/payouts aynı handler'a düşer. Harfe duyarlı
+ * ayrıştırma "admin"i bulamaz, izin anahtarı çözülemez ve istek yalnız rol
+ * kontrolüne düşerdi — matrisin tamamı atlanırdı.
+ */
+function urlParts(url: string): string[] {
+  const clean = url.split("?")[0].toLowerCase();
+  return clean.split("/").filter(Boolean);
+}
+
 /** URL'den ilk admin path segmentini çıkar: /api/admin/orders/123 → "orders" */
 function extractSegment(url: string): string {
-  // url örn: /api/admin/orders veya /admin/orders/123?foo=bar
-  const clean = url.split("?")[0];
-  const parts = clean.split("/").filter(Boolean);
-  // "api" ve "admin" segmentlerini atla
-  const adminIdx = parts.lastIndexOf("admin");
-  return parts[adminIdx + 1] ?? "";
+  const parts = urlParts(url);
+  // İLK "admin" işaretçisi kullanılır: lastIndexOf, "admin" adlı bir path
+  // parametresinde (örn. /api/admin/email-templates/admin) işaretçiyi sona
+  // kaydırıp segmenti boşaltıyor ve matrisi atlatıyordu.
+  const adminIdx = parts.indexOf("admin");
+  return adminIdx === -1 ? "" : (parts[adminIdx + 1] ?? "");
 }
 
 // Kanonik admin route'ları (@Controller('admin')) içinde segmenti PERMISSION_MAP'e
 // KASITLI olarak eklenmemiş, yalnızca rol ile korunan mevcut route'lar. Bunlar
 // fail-open bırakılır ki mevcut (moderator dahil) erişimleri korunsun. Bu kümenin
 // DIŞINDAKİ, eşlenmemiş yeni bir admin segmenti fail-closed olur (aşağıya bakın).
-const ROLE_ONLY_ADMIN_SEGMENTS = new Set<string>([
+export const ROLE_ONLY_ADMIN_SEGMENTS = new Set<string>([
   "invoices",
   "seller-invoices",
   "trade-commission-rate",
@@ -94,7 +113,7 @@ const ROLE_ONLY_ADMIN_SEGMENTS = new Set<string>([
  * kanonik DEĞİLDİR ve fail-closed kapsamına alınmaz (mevcut davranış korunur).
  */
 function isCanonicalAdminUrl(url: string): boolean {
-  const parts = url.split("?")[0].split("/").filter(Boolean);
+  const parts = urlParts(url);
   const p = parts[0] === "api" ? parts.slice(1) : parts;
   return p[0] === "admin";
 }
