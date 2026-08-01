@@ -20,6 +20,7 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PaytrReportSyncService } from "./paytr-report-sync.service";
+import { PaytrReportMatchingService } from "./paytr-report-matching.service";
 import { PaymentSchedulerService } from "./payment-scheduler.service";
 import { PaymentScheduledProcessor } from "./payment-scheduled.processor";
 import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
@@ -96,6 +97,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PaymentProviderEventService,
     PaymentLifecycleService,
     PaytrReportSyncService,
+    PaytrReportMatchingService,
     PaymentSchedulerService,
     ...scheduledProcessors(PaymentScheduledProcessor),
     PaymentOutboxHandlers,

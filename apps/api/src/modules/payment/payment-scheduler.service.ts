@@ -11,6 +11,7 @@ import { PaymentService } from "./payment.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { EventService } from "../events/event.service";
 import { PaytrReportSyncService } from "./paytr-report-sync.service";
+import { PaytrReportMatchingService } from "./paytr-report-matching.service";
 import { PayoutService } from "../payout/payout.service";
 
 /**
@@ -26,6 +27,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     private readonly productLockService: ProductLockService,
     private readonly eventService: EventService,
     private readonly paytrReportSync: PaytrReportSyncService,
+    private readonly paytrReportMatching: PaytrReportMatchingService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     @Optional() private readonly payoutService?: PayoutService,
   ) {}
@@ -71,7 +73,17 @@ export class PaymentSchedulerService implements OnModuleInit {
     log(
       `PayTR işlem dökümü: ${result.fetched} satır alındı, ${result.upserted} upsert`,
     );
-    return { summary: `${result.upserted} satır`, stats: result };
+    // Faz 3: sync'in hemen ardından eşleştirme + ters yön taraması (yerel DB,
+    // PayTR'ye istek atmaz; tablo boşken doğal no-op).
+    const match = await this.paytrReportMatching.matchStatementLines();
+    log(
+      `PayTR mutabakat: ${match.matched} eşleşti · ${match.mismatched} tutar farkı · ` +
+        `${match.unmatched} karşılıksız · ${match.missingInPaytr} dökümde olmayan ödeme`,
+    );
+    return {
+      summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · ⚠ ${match.mismatched + match.missingInPaytr} fark` : ""}`,
+      stats: { ...result, ...match },
+    };
   }
 
   /** Gerçek iş — Bull processor 'paytr-settlement-sync' buradan çağırır. */
@@ -80,7 +92,15 @@ export class PaymentSchedulerService implements OnModuleInit {
     log(
       `PayTR hakediş: ${result.settlements} hakediş, ${result.itemsFetchedFor} detay çekildi`,
     );
-    return { summary: `${result.settlements} hakediş`, stats: result };
+    // Faz 3: hakediş iç tutarlılığı + kalem→Payment bağları.
+    const verify = await this.paytrReportMatching.verifySettlements();
+    log(
+      `PayTR hakediş doğrulama: ${verify.checked} denetlendi · ${verify.mismatches} fark`,
+    );
+    return {
+      summary: `${result.settlements} hakediş${verify.mismatches > 0 ? ` · ⚠ ${verify.mismatches} fark` : ""}`,
+      stats: { ...result, ...verify },
+    };
   }
 
   /**
