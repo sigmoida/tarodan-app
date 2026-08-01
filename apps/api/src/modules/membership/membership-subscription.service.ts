@@ -9,6 +9,7 @@ import {
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../workers/constants";
+import { enqueueTradeListingReindex } from "./trade-listing-reindex";
 import { PrismaService } from "../../prisma";
 import {
   MembershipTierType,
@@ -1340,21 +1341,13 @@ export class MembershipSubscriptionService {
               );
             }
 
-            // Arama dokümanındaki `sellerCanTrade` üyelikten türetilir; ürün
-            // düzenlenmediği için kendiliğinden tazelenmez ve satıcının
-            // ilanları "takasa açık" görünmeye devam ederdi. Etkilenen ürünleri
-            // yeniden indeksle (best-effort: indeksleme downgrade'i bloklamaz).
-            const tradeFlagged = await this.prisma.product.findMany({
-              where: { sellerId: membership.userId, isTradeEnabled: true },
-              select: { id: true },
-            });
-            if (tradeFlagged.length > 0) {
-              await this.searchQueue?.add("bulk-index", {
-                type: "bulk-index",
-                entityType: "product",
-                entityIds: tradeFlagged.map((p) => p.id),
-              });
-            }
+            // Arama dokümanındaki `sellerCanTrade` bayatlamasın — ortak
+            // tetikleme (aktivasyon ve admin değişikliğiyle aynı yardımcı).
+            await enqueueTradeListingReindex(
+              this.prisma,
+              this.searchQueue,
+              membership.userId,
+            );
           } catch (tradeErr: any) {
             // Takas iptali downgrade'i bloklamasın; üyelik düşürme başarılı sayılır.
             this.logger.warn(

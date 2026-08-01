@@ -13,6 +13,7 @@ import {
   tradeCapableSellerWhere,
 } from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
+import { tradeOnlyEsFilters } from "./trade-only-es-filter";
 import {
   SearchCommonService,
   SearchOptions,
@@ -228,10 +229,10 @@ export class SearchProductService {
     // Boolean filters
     if (tradeOnly) {
       // Bayrak niyet, yetki üyelikten: Postgres yolundaki kuralın ES karşılığı.
-      filter.push({ term: { isTradeEnabled: true } });
-      if (!(await getFreeTierCanTrade(this.prisma))) {
-        filter.push({ term: { sellerCanTrade: true } });
-      }
+      // Eski dokümanlar için tolerans dahil — bkz. tradeOnlyEsFilters.
+      filter.push(
+        ...tradeOnlyEsFilters(await getFreeTierCanTrade(this.prisma)),
+      );
     }
     if (preOrder) filter.push({ term: { isPreorder: true } });
     if (limited) filter.push({ term: { isLimited: true } });

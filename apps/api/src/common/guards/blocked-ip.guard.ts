@@ -51,12 +51,15 @@ export class BlockedIpGuard implements CanActivate {
     return true;
   }
 
-  /** error-log.interceptor ile aynı çıkarım: XFF ilk atlama → req.ip → socket. */
+  /**
+   * `req.ip` esas alınır — main.ts `trust proxy` ayarladığı için Express bunu
+   * güvenilen proxy zincirinden doğru çözer. Ham X-Forwarded-For'un İLK girdisi
+   * BİLEREK okunmaz: o girdi istemci kontrolündedir (nginx istemcinin
+   * gönderdiği başlığa ekleme yapar), engelli istemci sahte başlıkla kaçar,
+   * temiz istemci sahte başlıkla suçlanabilirdi.
+   */
   private clientIp(req: any): string | null {
-    const forwarded = req.headers?.["x-forwarded-for"];
-    const first =
-      typeof forwarded === "string" ? forwarded.split(",")[0]?.trim() : null;
-    return first || req.ip || req.socket?.remoteAddress || null;
+    return req.ip || req.socket?.remoteAddress || null;
   }
 
   private async loadBlockedIps(): Promise<Set<string>> {

@@ -41,6 +41,19 @@ describe("LogRetentionService", () => {
     expect(result).toMatchObject({ error: 120, security: 3, email: 40 });
   });
 
+  it("çözülmemiş ip_block kayıtları YAŞI NE OLURSA OLSUN silinmez", async () => {
+    // Engel listesi = çözülmemiş ip_block SecurityLog satırları
+    // (BlockedIpGuard). Temizlik yalnız yaşa baksaydı her IP engeli 180 günde
+    // sessizce, iz bırakmadan kalkardı.
+    const prisma = makePrisma({});
+    const service = new LogRetentionService(prisma as any);
+
+    await service.purgeExpiredLogs();
+
+    const where = prisma.securityLog.deleteMany.mock.calls[0][0].where;
+    expect(where.NOT).toEqual({ eventType: "ip_block", resolved: false });
+  });
+
   it("DENETİM izine asla dokunmaz", async () => {
     const prisma = makePrisma({});
     const service = new LogRetentionService(prisma as any);

@@ -119,6 +119,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ShippingTariffModule,
     SiteAccessModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
   ],
   controllers: [
     AdminMediaController,

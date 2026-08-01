@@ -6,6 +6,11 @@ import {
   OrderStatus,
   PaymentStatus,
 } from "@prisma/client";
+import { Optional } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { enqueueTradeListingReindex } from "../membership/trade-listing-reindex";
 import { PrismaService } from "../../prisma";
 import {
   computeRelevanceScore,
@@ -33,7 +38,25 @@ export class VirtualOrderFulfillmentService {
     private readonly prisma: PrismaService,
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly outbox?: OutboxService,
+    // Aktivasyon takas yetkisini değiştirir; arama dokümanı (sellerCanTrade)
+    // ancak reindex'le tazelenir. @Optional — spec harness'ları konumsal kurar.
+    @Optional()
+    @InjectQueue(QUEUE_NAMES.SEARCH)
+    private readonly searchQueue?: Queue,
   ) {}
+
+  /**
+   * POST-COMMIT: satıcının takas bayraklı ilanlarını yeniden indeksle.
+   * Fire-and-forget — issueMembershipInvoice ile aynı kalıp; reindex hatası
+   * ödeme akışını bozmaz.
+   */
+  reindexSellerTradeListings(sellerId: string): void {
+    void enqueueTradeListingReindex(
+      this.prisma,
+      this.searchQueue,
+      sellerId,
+    ).catch(() => undefined);
+  }
 
   /**
    * Üyelik siparişi aktivasyonu (in-tx): üyeliği active yap, premium ise satıcının
@@ -153,6 +176,7 @@ export class VirtualOrderFulfillmentService {
           ...tierPatch,
         },
       });
+      this.reindexSellerTradeListings(payment.order.buyerId);
 
       if (intent) {
         const completedIntent = await tx.membershipPayment.updateMany({
@@ -417,6 +441,7 @@ export class VirtualOrderFulfillmentService {
             scheduledBillingPeriod: null,
           },
         });
+        this.reindexSellerTradeListings(attempt.membership.userId);
 
         const grantsPremium = isPremiumEntitled(
           {

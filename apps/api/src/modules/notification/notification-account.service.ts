@@ -99,6 +99,7 @@ export class NotificationAccountService {
       to: adminEmail,
       subject,
       html,
+      template: "guest-contact-admin",
     });
 
     if (result.success) {
@@ -147,6 +148,9 @@ export class NotificationAccountService {
         to: user.email,
         subject: email.subject,
         html: email.html,
+        // EmailLog satırı şablonu bilsin (filtre/denetim için). Bu noktada
+        // yalnız e-posta+ad taşınıyor; kullanıcı kimliği kapsamda değil.
+        template: "password-reset",
       });
     } else {
       this.logger.warn("SMTP is not configured for password reset email");
@@ -211,6 +215,7 @@ export class NotificationAccountService {
         to: user.email,
         subject: email.subject,
         html: email.html,
+        template: "email-verification",
       });
     } else {
       this.logger.warn("SMTP is not configured for email verification");

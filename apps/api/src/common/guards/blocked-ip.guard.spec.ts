@@ -49,18 +49,36 @@ describe("BlockedIpGuard", () => {
     await expect(guard.canActivate(ctx(req()))).resolves.toBe(true);
   });
 
-  it("x-forwarded-for'un İLK atlaması esas alınır (proxy arkası)", async () => {
-    const { guard } = makeGuard(["203.0.113.7"]);
+  it("sahte X-Forwarded-For ile engel ATLATILAMAZ (req.ip esastır)", async () => {
+    // `trust proxy` ayarlı: Express req.ip'i güvenilen proxy zincirinden doğru
+    // çözer. Ham XFF'in İLK girdisi ise istemci kontrolündedir — nginx
+    // istemcinin gönderdiği başlığa EKLEME yapar ("8.8.8.8, gerçekIP").
+    // Guard ilk girdiyi okusaydı engelli istemci sahte başlıkla kaçardı.
+    const { guard } = makeGuard(["10.0.0.9"]);
     await expect(
       guard.canActivate(
         ctx(
           req({
-            headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1" },
-            ip: "10.0.0.1",
+            headers: { "x-forwarded-for": "8.8.8.8, 10.0.0.9" },
+            ip: "10.0.0.9", // trust proxy'nin çözdüğü gerçek istemci
           }),
         ),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("XFF'te sahte IP engelliyken gerçek IP temizse istek GEÇER (iftira olmaz)", async () => {
+    const { guard } = makeGuard(["8.8.8.8"]);
+    await expect(
+      guard.canActivate(
+        ctx(
+          req({
+            headers: { "x-forwarded-for": "8.8.8.8, 10.0.0.1" },
+            ip: "10.0.0.1",
+          }),
+        ),
+      ),
+    ).resolves.toBe(true);
   });
 
   it("admin yüzeyi muaftır (engel oradan kaldırılır — kilitlenme olmasın)", async () => {

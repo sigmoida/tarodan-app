@@ -37,7 +37,15 @@ export class LogRetentionService {
       ),
       this.purge("security", () =>
         this.prisma.securityLog.deleteMany({
-          where: { createdAt: { lt: this.cutoff(RETENTION_DAYS.security) } },
+          where: {
+            createdAt: { lt: this.cutoff(RETENTION_DAYS.security) },
+            // ÇÖZÜLMEMİŞ ip_block satırları AKTİF ENGEL LİSTESİDİR
+            // (BlockedIpGuard bunlardan beslenir): yaşa bakılmaksızın korunur,
+            // yoksa her IP engeli 180 günde sessizce kalkardı. Engel kaldırma
+            // kararı admin'indir (kaydı çözmek); çözülen kayıt normal saklama
+            // süresine tabi olur.
+            NOT: { eventType: "ip_block", resolved: false },
+          },
         }),
       ),
       this.purge("email", () =>

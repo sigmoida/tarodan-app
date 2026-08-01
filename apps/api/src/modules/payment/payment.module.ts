@@ -64,6 +64,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ElogoModule,
     DiscountModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    // Üyelik aktivasyonunda satıcının takas ilanları yeniden indekslenir.
+    BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
