@@ -5360,7 +5360,8 @@
       "page": {
         "title": "Membership Tiers",
         "description": "Manage membership tiers and their prices",
-        "empty": "No membership tiers yet"
+        "empty": "No membership tiers yet",
+        "discountLoadError": "The yearly discount rate could not be loaded. Yearly prices are unavailable and tier editing is temporarily disabled."
       },
       "yearlyDiscount": {
         "title": "Yearly Discount Rate",
@@ -5370,8 +5371,14 @@
       },
       "validation": {
         "required": "Required",
-        "discountRange": "Enter a value between 0 and 100",
-        "nameRequired": "Name is required"
+        "discountRange": "Enter a value between 0 and 90",
+        "nameRequired": "Name is required",
+        "nameMax": "Name can be at most 100 characters",
+        "descriptionMax": "Description can be at most 500 characters",
+        "freePriceZero": "The free tier's price must be 0",
+        "paidPricePositive": "A paid tier's price must be greater than 0",
+        "nonNegativeInt": "Enter a whole number of 0 or more",
+        "totalListingsRange": "Enter -1 (unlimited) or at least 1"
       },
       "modal": {
         "editTitle": "Edit Membership Tier — {name}",

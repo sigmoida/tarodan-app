@@ -5360,7 +5360,8 @@
       "page": {
         "title": "Üyelik Katmanları",
         "description": "Üyelik katmanlarını ve fiyatlarını yönetin",
-        "empty": "Henüz üyelik katmanı yok"
+        "empty": "Henüz üyelik katmanı yok",
+        "discountLoadError": "Yıllık indirim oranı okunamadı. Yıllık fiyatlar gösterilemiyor ve katman düzenleme geçici olarak kapalı."
       },
       "yearlyDiscount": {
         "title": "Yıllık İndirim Oranı",
@@ -5370,8 +5371,14 @@
       },
       "validation": {
         "required": "Zorunlu",
-        "discountRange": "0 ile 100 arasında bir değer girin",
-        "nameRequired": "Ad gerekli"
+        "discountRange": "0 ile 90 arasında bir değer girin",
+        "nameRequired": "Ad gerekli",
+        "nameMax": "Ad en fazla 100 karakter olabilir",
+        "descriptionMax": "Açıklama en fazla 500 karakter olabilir",
+        "freePriceZero": "Ücretsiz katmanın fiyatı 0 olmalıdır",
+        "paidPricePositive": "Ücretli katmanın fiyatı 0'dan büyük olmalıdır",
+        "nonNegativeInt": "0 veya daha büyük bir tam sayı girin",
+        "totalListingsRange": "-1 (sınırsız) ya da en az 1 girin"
       },
       "modal": {
         "editTitle": "Üyelik Katmanı Düzenle — {name}",

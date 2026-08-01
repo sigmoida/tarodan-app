@@ -26,16 +26,62 @@ export interface MembershipTier {
 export const computedYearly = (monthly: number, discountPct: number) =>
   Math.round(monthly * 12 * (1 - discountPct / 100) * 100) / 100;
 
-/** Form schema — validation-only; numbers are shaped in the mutationFn. */
-export const tierSchema = (t: T) =>
+/** Numeric string field with a predicate — inputs are native `type="number"`. */
+const numField = (check: (n: number) => boolean, message: string) =>
+  z
+    .string()
+    .optional()
+    .default("0")
+    .refine((v) => {
+      const n = Number(v);
+      return v.trim() !== "" && !Number.isNaN(n) && check(n);
+    }, message);
+
+/**
+ * Form schema — validation-only; numbers are shaped in the mutationFn.
+ *
+ * Sınırlar API ile BİREBİR: ad/açıklama uzunlukları (100/500), negatif olmayan
+ * sayaçlar ve `maxTotalListings ∈ {-1} ∪ [1,∞)` kuralı UpdateMembershipTierDto
+ * + admin-membership.service'ten gelir. Eskiden istemci hiçbirini bilmiyordu ve
+ * kullanıcı ham 400 mesajlarıyla karşılaşıyordu. `isFree`, ücretsiz katmanın
+ * fiyatının 0 OLMAK ZORUNDA / ücretlinin 0'dan BÜYÜK olma kuralını ayırır.
+ */
+export const tierSchema = (t: T, isFree = false) =>
   z.object({
-    name: z.string().min(1, t("admin.tiers.validation.nameRequired")),
-    description: z.string().optional().default(""),
-    monthlyPrice: z.string().optional().default("0"),
-    maxFreeListings: z.string().optional().default("0"),
-    maxTotalListings: z.string().optional().default("0"),
-    maxImagesPerListing: z.string().optional().default("0"),
-    sortOrder: z.string().optional().default("0"),
+    name: z
+      .string()
+      .min(1, t("admin.tiers.validation.nameRequired"))
+      .max(100, t("admin.tiers.validation.nameMax")),
+    description: z
+      .string()
+      .optional()
+      .default("")
+      .refine(
+        (v) => v.length <= 500,
+        t("admin.tiers.validation.descriptionMax"),
+      ),
+    monthlyPrice: numField(
+      (n) => (isFree ? n === 0 : n > 0),
+      isFree
+        ? t("admin.tiers.validation.freePriceZero")
+        : t("admin.tiers.validation.paidPricePositive"),
+    ),
+    maxFreeListings: numField(
+      (n) => Number.isInteger(n) && n >= 0,
+      t("admin.tiers.validation.nonNegativeInt"),
+    ),
+    maxTotalListings: numField(
+      (n) => Number.isInteger(n) && (n === -1 || n >= 1),
+      t("admin.tiers.validation.totalListingsRange"),
+    ),
+    maxImagesPerListing: numField(
+      (n) => Number.isInteger(n) && n >= 0,
+      t("admin.tiers.validation.nonNegativeInt"),
+    ),
+    sortOrder: numField(
+      (n) => Number.isInteger(n) && n >= 0,
+      t("admin.tiers.validation.nonNegativeInt"),
+    ),
     canCreateCollections: z.boolean().default(false),
     canTrade: z.boolean().default(false),
     isAdFree: z.boolean().default(false),

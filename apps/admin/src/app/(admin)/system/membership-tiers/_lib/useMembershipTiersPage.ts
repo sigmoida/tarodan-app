@@ -35,7 +35,11 @@ export function useMembershipTiersPage() {
 
   return {
     rows,
-    yearlyDiscount: yearlyDiscountQuery.data ?? 20,
+    // null = okunamadı. Varsayılana (20) düşmek TEHLİKELİ: düzenleme modalı
+    // yıllık fiyatı bu orandan hesaplayıp payload'a yazıyor, yani uydurulmuş
+    // bir oran yanlış fiyatı KALICI hale getirirdi. Okunamadığında türetilen
+    // değerler "—" gösterilir ve düzenleme kapatılır.
+    yearlyDiscount: yearlyDiscountQuery.data ?? null,
     yearlyDiscountLoading: yearlyDiscountQuery.isLoading,
     yearlyDiscountError: yearlyDiscountQuery.isError,
     yearlyDiscountRetrying: yearlyDiscountQuery.isRefetching,

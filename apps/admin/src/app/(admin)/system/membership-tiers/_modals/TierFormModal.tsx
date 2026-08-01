@@ -34,7 +34,9 @@ export function TierFormModal({
 }) {
   const t = useTranslations();
   const isFree = tier.type === "free";
-  const form = useZodForm(tierSchema(t), { defaultValues: tierToForm(tier) });
+  const form = useZodForm(tierSchema(t, isFree), {
+    defaultValues: tierToForm(tier),
+  });
   const monthly = parseFloat(form.watch("monthlyPrice")) || 0;
   const yearly = computedYearly(monthly, yearlyDiscount);
 
