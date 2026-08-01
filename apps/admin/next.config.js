@@ -55,24 +55,8 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'placehold.co',
-      },
-      {
-        protocol: 'https',
-        hostname: 'via.placeholder.com',
-      },
-      {
         protocol: 'http',
         hostname: 'localhost',
-      },
-      {
-        protocol: 'https',
-        hostname: 'autopartia.com',
-      },
-      {
-        protocol: 'http',
-        hostname: 'autopartia.com',
       },
       {
         // AWS S3 presigned URL'ler (amzn-tarodan bucket)

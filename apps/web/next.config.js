@@ -125,18 +125,6 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'placehold.co',
-      },
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-      },
-      {
-        protocol: 'https',
-        hostname: 'via.placeholder.com',
-      },
-      {
         protocol: 'http',
         hostname: 'localhost',
       },
@@ -146,31 +134,11 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'autopartia.com',
-      },
-      {
-        protocol: 'http',
-        hostname: 'autopartia.com',
-      },
-      {
-        protocol: 'https',
         hostname: 'amzn-tarodan.s3.eu-west-1.amazonaws.com',
       },
       {
         protocol: 'https',
         hostname: 's3.eu-west-1.amazonaws.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'api.dicebear.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'ui-avatars.com',
       },
     ],
     dangerouslyAllowSVG: true,
