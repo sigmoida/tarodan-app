@@ -149,8 +149,9 @@ const nextConfig = {
     return {
       beforeFiles: [
         {
+          // @tarodan/brand'dan sync-brand-assets.mjs ile üretilir (build artifact).
           source: '/favicon.ico',
-          destination: '/tarodanfavicon.png',
+          destination: '/tarodan-favicon.png',
         },
         {
           source: '/api/payment/callback/:path*',

@@ -100,6 +100,15 @@ export function isPublicBucket(bucket: string): boolean {
   return (PUBLIC_BUCKETS as readonly string[]).includes(bucket);
 }
 
+/**
+ * Key/prefix env kökünde mi — SINIR duyarlı. Düz `startsWith(envPrefix)`
+ * `"products/…".startsWith("prod")` için true döner ve prod'da env'siz S3
+ * sorgusuna yol açar; yalnız tam segment eşleşmesi prefix'li sayılır.
+ */
+export function hasEnvPrefix(envPrefix: string, keyOrPrefix: string): boolean {
+  return keyOrPrefix === envPrefix || keyOrPrefix.startsWith(`${envPrefix}/`);
+}
+
 /** Public object key: <environment>/<public bucket>/<object path>. */
 export function isPublicStorageKey(key: string): boolean {
   const normalized = key.startsWith("/") ? key.slice(1) : key;
@@ -413,7 +422,7 @@ export class StorageService implements OnModuleInit {
     prefix: string,
   ): Promise<Array<{ key: string; size: number; lastModified: Date }>> {
     if (!this.isS3Available) return [];
-    const fullPrefix = prefix.startsWith(this.envPrefix)
+    const fullPrefix = hasEnvPrefix(this.envPrefix, prefix)
       ? prefix
       : `${this.envPrefix}/${prefix.replace(/^\//, "")}`;
     const results: Array<{ key: string; size: number; lastModified: Date }> =
@@ -451,7 +460,7 @@ export class StorageService implements OnModuleInit {
   }> {
     if (!this.isS3Available) return { folders: [], files: [] };
     const cleaned = prefix.replace(/^\/+/, "");
-    const base = cleaned.startsWith(this.envPrefix)
+    const base = hasEnvPrefix(this.envPrefix, cleaned)
       ? cleaned
       : `${this.envPrefix}/${cleaned}`;
     const fullPrefix = base === "" || base.endsWith("/") ? base : `${base}/`;
@@ -504,7 +513,7 @@ export class StorageService implements OnModuleInit {
       try {
         // Key zaten full path içeriyor (dev/products/...)
         // Eğer sadece relative key geliyorsa, env prefix ekle
-        const fullKey = key.startsWith(this.envPrefix)
+        const fullKey = hasEnvPrefix(this.envPrefix, key)
           ? key
           : `${this.envPrefix}/${this.bucketFolders[bucket as keyof typeof this.bucketFolders]}/${key}`;
 
@@ -569,7 +578,7 @@ export class StorageService implements OnModuleInit {
     }
 
     // Key zaten full path içeriyorsa kullan, değilse oluştur
-    const fullKey = key.startsWith(this.envPrefix)
+    const fullKey = hasEnvPrefix(this.envPrefix, key)
       ? key
       : `${this.envPrefix}/${bucketFolder}/${key}`;
 
@@ -606,7 +615,7 @@ export class StorageService implements OnModuleInit {
     const bucketFolder =
       this.bucketFolders[bucket as keyof typeof this.bucketFolders];
     // Key zaten full path içeriyorsa kullan, değilse oluştur
-    const fullKey = key.startsWith(this.envPrefix)
+    const fullKey = hasEnvPrefix(this.envPrefix, key)
       ? key
       : `${this.envPrefix}/${bucketFolder}/${key}`;
 
