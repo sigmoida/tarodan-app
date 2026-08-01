@@ -20,6 +20,8 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
     const service = new RefundReconciliationService(
       prisma as any, // prisma
       paymentRefund as any, // paymentRefund
+      { resolve: () => ({}) } as any, // paymentProviders (bu testte kullanılmaz)
+      { get: jest.fn().mockReturnValue(undefined) } as any, // configService
     );
     return { service, prisma, paymentRefund };
   };

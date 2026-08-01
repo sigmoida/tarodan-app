@@ -158,6 +158,20 @@ export class PaymentSchedulerService implements OnModuleInit {
       }
     });
 
+    // Sonucu belirsiz (manual_review) iadeleri durum-sorgu `returns` +
+    // reference_no ile otomatik çöz: PayTR'ye ulaşmışsa succeeded (finalize
+    // mevcut yolda), ulaşmamışsa failed (mevcut retry yolu yeniden gönderir).
+    // reconcileStuckRefundMarkers'tan SONRA, processRefundedOrders'tan ÖNCE:
+    // çözülen attempt'i aynı turda finalize/retry yakalayabilsin.
+    await this.runStep("resolveUnknownRefundOutcomes", async () => {
+      const resolved = await this.paymentService.resolveUnknownRefundOutcomes();
+      if (resolved.confirmed > 0 || resolved.requeued > 0) {
+        this.logger.warn(
+          `Refund resolve: ${resolved.confirmed} PayTR'de doğrulandı, ${resolved.requeued} yeniden kuyruğa alındı (${resolved.checked} sorgulandı)`,
+        );
+      }
+    });
+
     // K3: Alıcının iptal ettiği (status=refunded) ama henüz iade edilmemiş siparişleri
     // bul ve iadeyi tetikle. OrderService.cancel yalnız status'u refunded yapıyordu;
     // bu adım gerçek PayTR iadesini + hold iptalini güvenilir şekilde tamamlar.

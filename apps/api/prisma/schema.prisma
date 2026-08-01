@@ -1732,6 +1732,11 @@ model PaymentProviderEvent {
   totalAmount         Decimal?                 @map("total_amount") @db.Decimal(12, 2) // total_amount (çekilen)
   failedReasonCode    String?                  @map("failed_reason_code")
   failedReasonMsg     String?                  @map("failed_reason_msg")
+  // PSP ücret mutabakatı (durum-sorgu kesinti_tutari / net_tutar): PayTR'nin bu
+  // işlemden kestiği komisyon ve kesinti sonrası net. Ledger vs PSP raporu
+  // karşılaştırması bu kolonlardan beslenir.
+  providerFee         Decimal?                 @map("provider_fee") @db.Decimal(12, 2)
+  providerNet         Decimal?                 @map("provider_net") @db.Decimal(12, 2)
   utoken              String?
   testMode            Boolean?                 @map("test_mode")
   hashValid           Boolean?                 @map("hash_valid") // yalnız callback: hash doğrulaması geçti mi

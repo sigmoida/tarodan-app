@@ -78,6 +78,14 @@ export class PaymentReconciliationService {
     return this.psp.detectOrphanCapturedFailedPayments();
   }
 
+  resolveUnknownRefundOutcomes(): Promise<{
+    checked: number;
+    confirmed: number;
+    requeued: number;
+  }> {
+    return this.refund.resolveUnknownRefundOutcomes();
+  }
+
   reconcileStuckRefundMarkers(): Promise<{
     checked: number;
     recovered: number;

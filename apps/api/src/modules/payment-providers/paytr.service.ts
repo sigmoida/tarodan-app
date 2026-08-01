@@ -100,6 +100,22 @@ export type PayTRStatusInquirySuccess = {
   paymentType?: string;
   /** Taksit sayısı (0/1 = tek çekim). */
   installmentCount?: number;
+  /** PayTR'nin bu işlemden kestiği komisyon (TL) — `kesinti_tutari`. PSP ücret mutabakatı için. */
+  providerFeeTl?: number;
+  /** Kesinti sonrası kalan tutar (TL) — `net_tutar`. */
+  providerNetTl?: number;
+  /**
+   * İade hareketleri (`returns`). `referenceNo`, iade talebinde gönderdiğimiz
+   * `reference_no`'dur (= RefundAttempt.id, tiresiz) — sonucu belirsiz iade
+   * denemelerinin otomatik çözümü bu eşlemeye dayanır. PayTR göndermediyse
+   * alan undefined kalır (boş string değil): "referanssız iade" ayrımı bozulmasın.
+   */
+  returns?: Array<{
+    amountTl: number | null;
+    referenceNo?: string;
+    date?: string;
+    type?: string;
+  }>;
   /** Ham PayTR durum-sorgu zarfı (denetim/mutabakat). PAN/CVV içermez. */
   raw?: Record<string, unknown>;
 };
@@ -294,6 +310,28 @@ export class PayTRService implements IPaymentProvider {
           ? Number.parseInt(String(installmentRaw), 10)
           : undefined;
 
+      // PSP kesintisi (virgüllü gelebilir: "2,35") — ücret mutabakatı için.
+      const providerFeeTl = PayTRService.parsePaytrMoneyString(
+        data.kesinti_tutari != null ? String(data.kesinti_tutari) : undefined,
+      );
+      const providerNetTl = PayTRService.parsePaytrMoneyString(
+        data.net_tutar != null ? String(data.net_tutar) : undefined,
+      );
+
+      // İade listesi — reference_no eşlemesi için normalize edilir.
+      const returnsRaw = Array.isArray(data.returns) ? data.returns : [];
+      const returns = returnsRaw.map((r: any) => ({
+        amountTl: PayTRService.parsePaytrMoneyString(
+          r?.return_amount != null ? String(r.return_amount) : undefined,
+        ),
+        referenceNo:
+          r?.reference_no != null && String(r.reference_no) !== ""
+            ? String(r.reference_no)
+            : undefined,
+        date: r?.return_date != null ? String(r.return_date) : undefined,
+        type: r?.return_type != null ? String(r.return_type) : undefined,
+      }));
+
       return {
         ok: true,
         paymentTotalTl,
@@ -304,6 +342,9 @@ export class PayTRService implements IPaymentProvider {
         installmentCount: Number.isFinite(installmentCount as number)
           ? installmentCount
           : undefined,
+        providerFeeTl: providerFeeTl ?? undefined,
+        providerNetTl: providerNetTl ?? undefined,
+        returns,
         raw: data,
       };
     } catch (error: any) {

@@ -264,6 +264,14 @@ export class PaymentService {
     return this.paymentReconciliation.detectOrphanCapturedFailedPayments();
   }
 
+  async resolveUnknownRefundOutcomes(): Promise<{
+    checked: number;
+    confirmed: number;
+    requeued: number;
+  }> {
+    return this.paymentReconciliation.resolveUnknownRefundOutcomes();
+  }
+
   async reconcileStuckRefundMarkers(): Promise<{
     checked: number;
     recovered: number;
