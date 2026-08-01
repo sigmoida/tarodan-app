@@ -17,6 +17,8 @@ const MATCH_TOLERANCE_TL = 0.05;
 const MATCH_BATCH = 200;
 /** Ters yön taramasının geriye bakış penceresi (statement pencersiyle hizalı + pay). */
 const REVERSE_SWEEP_DAYS = 4;
+/** PayTR rapor günleri İstanbul saatiyledir; TR 2016'dan beri sabit UTC+3 (DST yok). */
+const ISTANBUL_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
 
 /**
  * Faz 3 — PSP mutabakat fark motoru. Rapor sync'inin (Faz 2) doldurduğu yerel
@@ -187,19 +189,28 @@ export class PaytrReportMatchingService {
     });
     if (coveredDays.length === 0) return 0;
 
+    // Oid üyeliği PENCERE-GLOBAL sete karşı kontrol edilir, gün-lokal sete değil:
+    // gün sınırındaki bir ödemenin döküm satırı komşu (İstanbul) günde olabilir;
+    // gün-lokal set bunu sahte "dökümde yok" alarmına çevirir.
+    const windowSaleLines = await this.prisma.paytrStatementLine.findMany({
+      where: {
+        transactionDate: { gte: cutoff },
+        type: PaytrStatementLineType.sale,
+      },
+      select: { merchantOid: true },
+    });
+    const paytrOids = new Set(windowSaleLines.map((l) => l.merchantOid));
+
     let missing = 0;
     for (const { transactionDate } of coveredDays) {
-      const dayStart = transactionDate;
+      // PayTR günleri İSTANBUL'dur (UTC+3, 2016'dan beri sabit — DST yok).
+      // transactionDate İstanbul gününün 00:00'ını UTC-gece-yarısı olarak taşır;
+      // gerçek pencere UTC'de 3 saat geriden başlar. UTC pencere kullanmak
+      // 21:00-24:00 UTC ödemelerini yanlış güne düşürüyordu.
+      const dayStart = new Date(
+        transactionDate.getTime() - ISTANBUL_UTC_OFFSET_MS,
+      );
       const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-      const dayLines = await this.prisma.paytrStatementLine.findMany({
-        where: {
-          transactionDate: dayStart,
-          type: PaytrStatementLineType.sale,
-        },
-        select: { merchantOid: true },
-      });
-      const paytrOids = new Set(dayLines.map((l) => l.merchantOid));
 
       const payments = await this.prisma.payment.findMany({
         where: {

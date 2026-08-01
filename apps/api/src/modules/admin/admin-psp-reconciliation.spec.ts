@@ -140,6 +140,42 @@ describe("AdminPspReconciliationService.getReconciliationSummary", () => {
     expect(day.salesDiff).toBeCloseTo(25);
   });
 
+  it("buckets our records by the ISTANBUL day and matches oids window-wide", async () => {
+    // 31 Tem 22:00 UTC = 1 Ağu 01:00 İstanbul → ödeme 1 Ağustos kartına düşmeli
+    // ve oid'i pencere genelinde arandığı için "dökümde yok" sayılmamalı.
+    const prisma = makePrisma({
+      lines: [
+        {
+          merchantOid: "ORD-LATE",
+          type: PaytrStatementLineType.sale,
+          amount: 75,
+          fee: 1,
+          net: 74,
+          transactionDate: new Date("2026-08-01T00:00:00.000Z"),
+          matchStatus: PaytrMatchStatus.matched,
+        },
+      ],
+      payments: [
+        {
+          id: "pay-late",
+          amount: 75,
+          paidAt: new Date("2026-07-31T22:00:00Z"),
+          providerConversationId: "ORD-LATE",
+          status: PaymentStatus.completed,
+        },
+      ],
+    });
+    const service = new AdminPspReconciliationService(prisma as any);
+
+    const result = await service.getReconciliationSummary(7);
+    const aug1 = result.days.find((d: any) => d.date === "2026-08-01");
+    const jul31 = result.days.find((d: any) => d.date === "2026-07-31");
+
+    expect(aug1?.ours.salesCount).toBe(1);
+    expect(aug1?.missingInPaytr).toBe(0);
+    expect(jul31?.ours.salesCount ?? 0).toBe(0);
+  });
+
   it("does not count missingInPaytr on a day without statement coverage", async () => {
     const prisma = makePrisma({
       lines: [], // hiç döküm yok

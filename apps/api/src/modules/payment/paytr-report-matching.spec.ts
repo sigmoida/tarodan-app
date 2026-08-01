@@ -187,6 +187,35 @@ describe("PaytrReportMatchingService.matchStatementLines", () => {
     expect(r.missingInPaytr).toBe(1);
   });
 
+  it("aligns the payment window to the ISTANBUL day and checks oids window-wide", async () => {
+    // PayTR günleri İstanbul'dur (UTC+3). 31 Tem 22:00 UTC'de biten ödeme
+    // İstanbul'da 1 Ağustos'tur ve dökümde ertesi günün satırında görünür —
+    // UTC pencereli, gün-lokal set'li eski mantık bunu sahte
+    // PAYTR_MISSING_TRANSACTION alarmına çeviriyordu.
+    const prisma = makePrisma({
+      lines: [],
+      coveredDays: [DAY],
+      dayOids: ["ORD-LATE"], // pencere-GLOBAL satış oid seti (ertesi günün satırı dahil)
+      dayPayments: [
+        {
+          id: "pay-late",
+          providerConversationId: "ORD-LATE",
+          amount: 75,
+          status: PaymentStatus.completed,
+        },
+      ],
+    });
+    const service = new PaytrReportMatchingService(prisma as any);
+
+    const r = await service.matchStatementLines();
+
+    expect(r.missingInPaytr).toBe(0);
+    // Ödeme sorgusu İstanbul gününe hizalı olmalı: [00:00-3s, 24:00-3s) UTC.
+    const where = prisma.payment.findMany.mock.calls[0][0].where;
+    expect(where.paidAt.gte.toISOString()).toBe("2026-07-30T21:00:00.000Z");
+    expect(where.paidAt.lt.toISOString()).toBe("2026-07-31T21:00:00.000Z");
+  });
+
   it("skips the reverse sweep entirely when no day has statement coverage", async () => {
     const prisma = makePrisma({ lines: [], coveredDays: [] });
     const service = new PaytrReportMatchingService(prisma as any);

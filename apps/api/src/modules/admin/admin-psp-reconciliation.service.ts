@@ -10,6 +10,16 @@ import { PrismaService } from "../../prisma";
 /** Gün anahtarı: UTC ISO gün (rapor tabloları gün hassasiyetinde saklar). */
 const dayKey = (d: Date): string => d.toISOString().slice(0, 10);
 
+/** PayTR rapor günleri İstanbul saatiyledir; TR 2016'dan beri sabit UTC+3 (DST yok). */
+const ISTANBUL_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
+/**
+ * Gerçek bir UTC anını İSTANBUL gününe diler — PayTR döküm günleriyle aynı
+ * eksende. paidAt'i UTC gününe dilemek 21:00-24:00 UTC ödemelerini bir önceki
+ * güne düşürüyor, gün kartlarında sahte fark + "dökümde yok" üretiyordu.
+ */
+const istanbulDayKey = (d: Date): string =>
+  dayKey(new Date(d.getTime() + ISTANBUL_UTC_OFFSET_MS));
+
 export interface DayCard {
   date: string;
   /** O gün için PayTR dökümü var mı? Yoksa missingInPaytr hesaplanmaz. */
@@ -113,8 +123,10 @@ export class AdminPspReconciliationService {
       return card;
     };
 
-    // PayTR tarafı + gün-bazlı satış oid kümesi (ters yön için).
-    const saleOidsByDay = new Map<string, Set<string>>();
+    // PayTR tarafı + pencere-GLOBAL satış oid kümesi (ters yön için).
+    // Set gün-lokal DEĞİL: gün sınırındaki ödemenin döküm satırı komşu günde
+    // olabilir; gün-lokal set sahte "dökümde yok" üretir.
+    const windowSaleOids = new Set<string>();
     for (const line of lines) {
       const date = dayKey(line.transactionDate);
       const card = cardOf(date);
@@ -124,9 +136,7 @@ export class AdminPspReconciliationService {
         card.paytr.salesTotal = round2(
           card.paytr.salesTotal + Number(line.amount),
         );
-        let oids = saleOidsByDay.get(date);
-        if (!oids) saleOidsByDay.set(date, (oids = new Set()));
-        oids.add(line.merchantOid);
+        windowSaleOids.add(line.merchantOid);
       } else {
         card.paytr.refundCount++;
         card.paytr.refundTotal = round2(
@@ -141,27 +151,27 @@ export class AdminPspReconciliationService {
       else card.match.unmatched++;
     }
 
-    // Bizim taraf + ters yön (yalnız dökümü olan günlerde).
+    // Bizim taraf — İSTANBUL gününe dilinir (PayTR döküm günleriyle aynı eksen)
+    // + ters yön (yalnız dökümü olan günlerde, pencere-global sete karşı).
     for (const payment of payments) {
       if (!payment.paidAt) continue;
-      const date = dayKey(payment.paidAt);
+      const date = istanbulDayKey(payment.paidAt);
       const card = cardOf(date);
       card.ours.salesCount++;
       card.ours.salesTotal = round2(
         card.ours.salesTotal + Number(payment.amount),
       );
-      const oids = saleOidsByDay.get(date);
       if (
         card.paytrCovered &&
         payment.providerConversationId &&
-        !oids?.has(payment.providerConversationId)
+        !windowSaleOids.has(payment.providerConversationId)
       ) {
         card.missingInPaytr++;
       }
     }
     for (const refund of refunds) {
       if (!refund.providerSucceededAt) continue;
-      const card = cardOf(dayKey(refund.providerSucceededAt));
+      const card = cardOf(istanbulDayKey(refund.providerSucceededAt));
       card.ours.refundTotal = round2(
         card.ours.refundTotal + Number(refund.amount),
       );

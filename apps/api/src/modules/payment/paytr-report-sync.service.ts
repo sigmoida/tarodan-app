@@ -64,6 +64,15 @@ export class PaytrReportSyncService {
     for (const entry of entries) {
       if (!entry.merchantOid) continue;
       const transactionDate = new Date(`${entry.transactionDate}T00:00:00Z`);
+      // Tek satırın bozuk tarihi TÜM gece sync'ini düşürmesin: Invalid Date
+      // Prisma'da throw eder → o gece hiçbir satır yazılmazdı. Satır atlanır,
+      // ham hâli logda kalır (kayan pencere ertesi gece yine dener).
+      if (Number.isNaN(transactionDate.getTime())) {
+        this.logger.warn(
+          `PayTR döküm satırı atlandı: islem_tarihi parse edilemedi (oid=${entry.merchantOid}, tarih="${entry.transactionDate}")`,
+        );
+        continue;
+      }
       const shared = {
         fee: entry.feeTl,
         feeRate: entry.feeRatePct,

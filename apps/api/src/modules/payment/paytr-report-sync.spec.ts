@@ -21,13 +21,11 @@ function makePrisma() {
       upsert: jest.fn().mockResolvedValue({}),
     },
     paytrSettlement: {
-      upsert: jest
-        .fn()
-        .mockImplementation(({ create }: any) =>
-          Promise.resolve({
-            id: `stl-${create.datePaid.toISOString().slice(0, 10)}`,
-          }),
-        ),
+      upsert: jest.fn().mockImplementation(({ create }: any) =>
+        Promise.resolve({
+          id: `stl-${create.datePaid.toISOString().slice(0, 10)}`,
+        }),
+      ),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       create: jest.fn().mockResolvedValue({}),
     },
@@ -105,6 +103,19 @@ describe("PaytrReportSyncService.syncTransactionStatement", () => {
     expect(getTransactionStatement).not.toHaveBeenCalled();
     expect(prisma.paytrStatementLine.upsert).not.toHaveBeenCalled();
     expect(r).toEqual({ fetched: 0, upserted: 0 });
+  });
+
+  it("skips a row with an unparseable transaction date instead of failing the sync", async () => {
+    // PayTR bir satırda islem_tarihi'ni boş/formatsız dönerse Invalid Date
+    // Prisma'da throw eder ve TÜM gece sync'i boşa giderdi — satır atlanır.
+    const { service, prisma } = makeService({
+      statement: [{ ...SALE, transactionDate: "" }, SALE],
+    });
+
+    const r = await service.syncTransactionStatement();
+
+    expect(r).toEqual({ fetched: 2, upserted: 1 });
+    expect(prisma.paytrStatementLine.upsert).toHaveBeenCalledTimes(1);
   });
 
   it("upserts each row with the dedup key (idempotent window sync)", async () => {
