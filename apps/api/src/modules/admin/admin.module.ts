@@ -66,6 +66,11 @@ import { AdminReviewService } from "./admin-review.service";
 import { AdminSellerApplicationService } from "./admin-seller-application.service";
 import { AdminAdPackageService } from "./admin-ad-package.service";
 import { ScheduledNotificationScheduler } from "./scheduled-notification.scheduler";
+import { LogRetentionService } from "./log-retention.service";
+import {
+  LogRetentionScheduler,
+  LogRetentionProcessor,
+} from "./log-retention.scheduler";
 import { ScheduledNotificationProcessor } from "./scheduled-notification.processor";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
@@ -184,6 +189,9 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminAdPackageService,
     ScheduledNotificationScheduler,
     ...scheduledProcessors(ScheduledNotificationProcessor),
+    LogRetentionService,
+    LogRetentionScheduler,
+    ...scheduledProcessors(LogRetentionProcessor),
   ],
   exports: [AdminService],
 })
