@@ -28,6 +28,7 @@ import { SellerType, OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
+import { NewsletterService } from "../marketing/newsletter.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
 import { PaymentService } from "../payment/payment.service";
@@ -61,6 +62,7 @@ export class AuthService {
     private readonly googleAuthService: GoogleAuthService,
     private readonly appleAuthService: AppleAuthService,
     private readonly securityService: SecurityService,
+    private readonly newsletterService: NewsletterService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -196,6 +198,10 @@ export class AuthService {
 
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 12);
+    // Tek okuma noktası: hem user satırına hem bülten listesine aynı değer gider.
+    const marketingConsent = Boolean(
+      dto.marketingConsent || dto.acceptsMarketingEmails,
+    );
     // Bireysel satıcı da bireysel hesaptır: önek satıcılığa göre değişmez.
     const adminCode = await this.nextAdminCode(ENTITY_PREFIX.individualUser);
 
@@ -216,26 +222,18 @@ export class AuthService {
           sellerType: dto.isSeller ? SellerType.individual : null,
           isVerified: false, // Email verification required
           isEmailVerified: false, // Will be true after email verification
-          // acceptsMarketingEmails: dto.marketingConsent ?? dto.acceptsMarketingEmails ?? false, // Will be available after migration
+          acceptsMarketingEmails: marketingConsent,
         },
       });
     } catch (error) {
       this.rethrowUserUniqueConstraint(error);
     }
 
-    // Update acceptsMarketingEmails after user creation (until migration is done)
-    if (dto.marketingConsent || dto.acceptsMarketingEmails) {
-      try {
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { acceptsMarketingEmails: true } as any, // Type assertion until migration
-        });
-      } catch (error) {
-        // Ignore if field doesn't exist yet
-        this.logger.warn(
-          "acceptsMarketingEmails field not available yet, migration needed",
-        );
-      }
+    // Pazarlama izni verildiyse üyeyi bülten listesine de yaz. Gönderimler
+    // `newsletter_subscribers`'ı TEK alıcı listesi olarak okur; buraya
+    // yazılmayan üye hiç bülten almaz (bkz. NewsletterService).
+    if (marketingConsent) {
+      await this.newsletterService.syncUserConsent(user.email, true);
     }
 
     // Check if there are guest orders with this email and link them to the new user
@@ -307,7 +305,7 @@ export class AuthService {
     await this.sendEmailVerification(user.id, user.email);
 
     // Send welcome email if user accepted marketing emails
-    if (dto.marketingConsent || dto.acceptsMarketingEmails) {
+    if (marketingConsent) {
       try {
         await this.notificationService.sendWelcomeEmail(user.id);
       } catch (error) {

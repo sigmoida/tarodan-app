@@ -54,6 +54,7 @@ function makeService(sessionValid: boolean) {
     {} as any,
     {} as any,
     securityService as any,
+    { syncUserConsent: jest.fn() } as any,
     {} as any,
   );
   jest

@@ -90,12 +90,6 @@ export default function NewsletterClient() {
           </Button>
         </Form>
       </SectionCard>
-
-      <p className="text-center text-sm text-muted">
-        <Link href="/privacy" className="text-primary-500 hover:underline">
-          {t("footer.privacy")}
-        </Link>
-      </p>
     </DocPage>
   );
 }

@@ -20,6 +20,7 @@ import { RolesGuard } from "./guards/roles.guard";
 import { PhoneVerificationService } from "./phone-verification.service";
 import { EmailChangeService } from "./email-change.service";
 import { SecurityModule } from "../security/security.module";
+import { MarketingModule } from "../marketing/marketing.module";
 
 @Module({
   imports: [
@@ -38,6 +39,9 @@ import { SecurityModule } from "../security/security.module";
     CacheModule,
     StorageModule,
     SecurityModule,
+    // Kayıtta pazarlama izni verilirse üye bülten listesine yazılır
+    // (NewsletterService). MarketingModule Auth'a bağlı değil, döngü yok.
+    MarketingModule,
   ],
   controllers: [AuthController, AdminAuthController],
   providers: [

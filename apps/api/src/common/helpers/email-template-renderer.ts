@@ -8,6 +8,12 @@ export interface EmailBrandOptions {
   logoUrl?: string;
   supportEmail?: string;
   preferencesUrl?: string;
+  /**
+   * Pazarlama gönderimlerinde alıcıya özel abonelikten çıkış linki. Yalnız
+   * verildiğinde footer'a basılır — işlemsel mailler (şifre sıfırlama, sipariş
+   * bildirimi) abonelikten çıkışa tabi değildir, orada boş bırakılır.
+   */
+  unsubscribeUrl?: string;
 }
 
 export const EMAIL_CONTENT_START = "<!-- TARODAN_CONTENT_START -->";
@@ -55,6 +61,7 @@ function normalizeEmailBrandOptions(
     supportEmail: options?.supportEmail || "destek@tarodan.com.tr",
     preferencesUrl:
       options?.preferencesUrl || `${frontendUrl}/profile/security`,
+    unsubscribeUrl: options?.unsubscribeUrl || "",
   };
 }
 
@@ -122,6 +129,17 @@ export function wrapEmailTemplateLayout(
     `${frontendUrl}/profile/security`,
   );
   const supportEmail = escapeEmailHtml(brand.supportEmail);
+  // Abonelikten çıkış linki yalnız pazarlama gönderimlerinde dolu gelir; boşsa
+  // footer'a hiçbir şey basılmaz (işlemsel maillerde çıkış linki olmamalı).
+  const unsubscribeUrl = brand.unsubscribeUrl
+    ? safeEmailUrl(brand.unsubscribeUrl, "")
+    : "";
+  const unsubscribeBlock = unsubscribeUrl
+    ? `
+              <p style="margin: 0 0 12px; font-size: 12px; line-height: 1.6;">
+                Bu e-postaları almak istemiyorsanız <a href="${unsubscribeUrl}" style="color: #52525b; text-decoration: underline;">abonelikten çıkabilirsiniz</a>.
+              </p>`
+    : "";
 
   return `
 <!DOCTYPE html>
@@ -159,7 +177,7 @@ export function wrapEmailTemplateLayout(
               <p style="margin: 0 0 12px; font-size: 12px; line-height: 1.6;">
                 <a href="${frontendUrl}" style="color: #52525b; text-decoration: none; margin-right: 14px;">Tarodan</a>
                 <a href="${preferencesUrl}" style="color: #52525b; text-decoration: none;">Bildirim tercihleri</a>
-              </p>
+              </p>${unsubscribeBlock}
               <p style="margin: 0; font-size: 11px; line-height: 1.6; color: #a1a1aa;">
                 © ${new Date().getFullYear()} Tarodan. Bu e-posta ${escapeEmailHtml(data?.to || "size")} gönderilmiştir.
               </p>

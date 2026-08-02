@@ -685,6 +685,15 @@ export class UserProfileService {
           await tx.address.deleteMany({ where: { userId } });
           await tx.notificationLog.deleteMany({ where: { userId } });
 
+          // 3b) Pazarlama listesinden çıkar. E-posta birazdan
+          // `deleted_...@deleted.local` olarak anonimleştirileceği için abone
+          // satırı gerçek adresle öksüz kalır ve hesap silinmiş olmasına rağmen
+          // bülten gitmeye devam ederdi. Aynı transaction'da olmalı.
+          await tx.newsletterSubscriber.updateMany({
+            where: { email: user.email.toLowerCase(), unsubscribedAt: null },
+            data: { unsubscribedAt: new Date(), updatedAt: new Date() },
+          });
+
           // 4) PII'yi anonimleştir + login engelle. Unique alanları (email/phone/companyName)
           //    serbest bırak ki kullanıcı aynı bilgiyle yeniden kayıt olabilsin.
           await tx.user.update({

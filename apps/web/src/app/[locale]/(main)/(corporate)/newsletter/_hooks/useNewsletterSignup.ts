@@ -13,8 +13,10 @@ export function useNewsletterSignup() {
   const t = useTranslations();
   const locale = useLocale();
   const [success, setSuccess] = useState(false);
+  // Onay kutuları BOŞ başlar: ETK/KVKK'da ön işaretli kutu geçerli açık rıza
+  // sayılmaz, kullanıcının kendisi işaretlemeli.
   const form = useZodForm(newsletterSchema(locale), {
-    defaultValues: { email: "", newsletter: true, promotions: true },
+    defaultValues: { email: "", newsletter: false, promotions: false },
   });
 
   const subscribe = useWebMutation(

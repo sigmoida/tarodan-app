@@ -11,6 +11,7 @@ import { NotificationService } from "../notification/notification.service";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
 import { SecurityService } from "../security/security.service";
+import { NewsletterService } from "../marketing/newsletter.service";
 
 describe("AuthService.loginWithGoogle", () => {
   let service: AuthService;
@@ -79,6 +80,10 @@ describe("AuthService.loginWithGoogle", () => {
           useValue: { verifyIdentityToken: jest.fn() },
         },
         { provide: SecurityService, useValue: { validateTOTP: jest.fn() } },
+        {
+          provide: NewsletterService,
+          useValue: { syncUserConsent: jest.fn() },
+        },
       ],
     }).compile();
     service = moduleRef.get(AuthService);

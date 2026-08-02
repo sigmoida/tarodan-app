@@ -32,6 +32,12 @@ export interface SmtpEmailOptions {
   html?: string;
   from?: string;
   replyTo?: string;
+  /**
+   * Ek SMTP başlıkları. Pazarlama gönderimlerinde `List-Unsubscribe` ve
+   * `List-Unsubscribe-Post` için kullanılır: Gmail ve Yahoo 2024'ten beri toplu
+   * gönderende bu başlıkları şart koşuyor, yoksa mailler spam'e düşüyor.
+   */
+  headers?: Record<string, string>;
   attachments?: Array<{
     filename: string;
     content: Buffer | string;
@@ -167,6 +173,7 @@ export class SmtpProvider {
         text: options.text,
         html: options.html,
         replyTo: options.replyTo,
+        ...(options.headers ? { headers: options.headers } : {}),
         attachments: options.attachments?.map((att) => ({
           filename: att.filename,
           content: att.content,
