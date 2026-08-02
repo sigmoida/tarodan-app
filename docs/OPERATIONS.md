@@ -78,10 +78,12 @@ Anahtar düzeni: ürün `seed-assets/products/<slugBase>-card.webp` + `-detail.w
 `apps/web/src/lib/assetCdn.ts`, `NEXT_PUBLIC_ASSET_CDN_URL`) · avatar
 `seed-assets/avatars/avatar-XX.webp`.
 
-Bucket policy: `infrastructure/config/s3-bucket-policy-public-read.json` —
+Bucket policy: [`docs/s3-bucket-policy-public-read.json`](./s3-bucket-policy-public-read.json) —
 `seed-assets/hero/*` ve `{dev,staging,prod}/{products,collections,avatars}/*`
-public-read. Değişiklik sonrası:
-`aws s3api put-bucket-policy --bucket amzn-tarodan --policy file://infrastructure/config/s3-bucket-policy-public-read.json`
+public-read (ürün/koleksiyon görselleri doğrudan S3'ten servis edilir).
+Uygulamak için: AWS Console → S3 → `amzn-tarodan` → Permissions → Bucket policy
+(mevcut policy varsa `Statement`'ı birleştir), ya da CLI:
+`aws s3api put-bucket-policy --bucket amzn-tarodan --policy file://docs/s3-bucket-policy-public-read.json`
 
 `SEED_SKIP_IMAGES=1` seed'in tüm görsel adımlarını atlar (S3 erişimi gerekmez);
 e2e global-setup bunu kullanır ve seed hatası yutulmaz. Lokal akış:

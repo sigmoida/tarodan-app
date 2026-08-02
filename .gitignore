@@ -74,3 +74,6 @@ PayTR IFrame API/
 
 # Claude Code skills lockfile (local)
 skills-lock.json
+
+# Conductor (local workspace settings) — repoya girmez
+.conductor/
