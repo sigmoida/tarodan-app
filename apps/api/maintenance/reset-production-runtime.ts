@@ -30,13 +30,36 @@ function productionIndexPrefix(): string {
   return prefix;
 }
 
-async function clearRedis(): Promise<void> {
+async function clearCacheRedis(): Promise<void> {
   const redis = new Redis(required("REDIS_URL"), {
     maxRetriesPerRequest: 1,
     enableReadyCheck: true,
   });
   try {
     // flushdb is deliberately scoped to the database selected by REDIS_URL.
+    await redis.flushdb();
+  } finally {
+    redis.disconnect();
+  }
+}
+
+/**
+ * Bull connects to a SEPARATE, durable Redis via REDIS_HOST/REDIS_PORT/REDIS_PASSWORD
+ * (bull-root.module.ts) — flushing the cache URL does not touch it. Left alone,
+ * every delayed job scheduled before the wipe (payment expiry, payouts, emails,
+ * DLQ entries) survives and then fires against order/payment ids that no longer
+ * exist. Repeatable crons are re-registered by the schedulers on the API boot
+ * that follows this reset, so clearing the queue state is safe.
+ */
+async function clearQueueRedis(): Promise<void> {
+  const redis = new Redis({
+    host: required("REDIS_HOST"),
+    port: Number(process.env.REDIS_PORT?.trim() || 6379),
+    password: process.env.REDIS_PASSWORD?.trim() || undefined,
+    maxRetriesPerRequest: 1,
+    enableReadyCheck: true,
+  });
+  try {
     await redis.flushdb();
   } finally {
     redis.disconnect();
@@ -62,9 +85,12 @@ async function clearSearchIndices(prefix: string): Promise<void> {
 
 async function main(): Promise<void> {
   const prefix = productionIndexPrefix();
-  await clearRedis();
+  await clearCacheRedis();
+  await clearQueueRedis();
   await clearSearchIndices(prefix);
-  console.log("Production Redis database and search indices are clean.");
+  console.log(
+    "Production cache Redis, queue Redis and search indices are clean.",
+  );
 }
 
 main().catch((error) => {

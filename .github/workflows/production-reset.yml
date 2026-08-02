@@ -6,7 +6,7 @@ name: Production Database Reset
 #
 # Required repository secrets:
 #   SERVER_HOST, SERVER_USERNAME, SERVER_PASSWORD  (SSH into the Coolify VPS)
-#   COOLIFY_PROD_UUIDS                             (api,web,... UUIDs; api = first)
+#   COOLIFY_PROD_UUIDS                             (api,web,admin UUIDs, in that order)
 #   PRODUCTION_BOOTSTRAP_ADMIN_EMAIL / _PASSWORD   (first admin after the wipe)
 #
 # The SSH credentials are the shared SERVER_* pair. Which environment gets wiped
@@ -34,9 +34,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A mistyped confirmation used to make the reset job SKIP, which renders as a
+  # green run — indistinguishable from "the reset succeeded". Fail loudly here,
+  # before the protected environment is even requested.
+  guard:
+    name: Validate the confirmation phrase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require RESET_PRODUCTION
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [ "${CONFIRM:-}" != "RESET_PRODUCTION" ]; then
+            echo "::error::confirm must be exactly RESET_PRODUCTION (got: '${CONFIRM:-}'). Nothing was touched."
+            exit 1
+          fi
+
   reset:
     name: Backup, reset and verify empty production
-    if: ${{ inputs.confirm == 'RESET_PRODUCTION' }}
+    needs: guard
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: production
@@ -49,9 +66,14 @@ jobs:
           set -euo pipefail
           api="$(printf '%s' "$UUIDS" | cut -d, -f1 | xargs)"
           web="$(printf '%s' "$UUIDS" | cut -d, -f2 | xargs)"
+          admin="$(printf '%s' "$UUIDS" | cut -d, -f3 | xargs)"
           [ -n "$api" ] && [ -n "$web" ]
+          if [ -z "$admin" ]; then
+            echo "::warning::COOLIFY_PROD_UUIDS has no admin UUID; the admin app will not be restarted or cache-cleared."
+          fi
           echo "api=$api" >> "$GITHUB_OUTPUT"
           echo "web=$web" >> "$GITHUB_OUTPUT"
+          echo "admin=$admin" >> "$GITHUB_OUTPUT"
 
       # ssh-action reports a missing secret as a bare "missing server host" with
       # no hint about which one. Name it here instead.
@@ -78,6 +100,7 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
           API_UUID: ${{ steps.uuid.outputs.api }}
           WEB_UUID: ${{ steps.uuid.outputs.web }}
+          ADMIN_UUID: ${{ steps.uuid.outputs.admin }}
           BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.PRODUCTION_BOOTSTRAP_ADMIN_EMAIL }}
           BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_BOOTSTRAP_ADMIN_PASSWORD }}
         with:
@@ -85,7 +108,7 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           command_timeout: 40m
-          envs: RESET_CONFIRM,DRY_RUN,API_UUID,WEB_UUID,BOOTSTRAP_ADMIN_EMAIL,BOOTSTRAP_ADMIN_PASSWORD
+          envs: RESET_CONFIRM,DRY_RUN,API_UUID,WEB_UUID,ADMIN_UUID,BOOTSTRAP_ADMIN_EMAIL,BOOTSTRAP_ADMIN_PASSWORD
           script: |
             set -euo pipefail
             log() { echo "[production-reset] $*"; }
@@ -110,7 +133,12 @@ jobs:
             WEB_CID="$(find_app_container "$WEB_UUID")"
             [ -n "$API_CID" ] || die "Production API container was not found."
             [ -n "$WEB_CID" ] || die "Production web container was not found."
-            log "api container: $API_CID | web container: $WEB_CID"
+            ADMIN_CID=""
+            if [ -n "${ADMIN_UUID:-}" ]; then
+              ADMIN_CID="$(find_app_container "$ADMIN_UUID")"
+              [ -n "$ADMIN_CID" ] || die "Admin UUID was given but its container was not found."
+            fi
+            log "api container: $API_CID | web container: $WEB_CID | admin container: ${ADMIN_CID:-none}"
 
             env_from() {
               docker exec "$1" printenv "$2" 2>/dev/null || true
@@ -135,9 +163,13 @@ jobs:
               https://tarodan.shop|https://www.tarodan.shop) : ;;
               *) die "FRONTEND_URL is not an exact production storefront URL." ;;
             esac
+            # API_URL is an ORIGIN. The application appends "/api" itself when it
+            # derives the PayTR callback and the message-attachment URL
+            # (paytr.service.ts, media.service.ts), so a value ending in "/api"
+            # silently produces ".../api/api/..." links. Refuse that shape here.
             case "$API_URL_VALUE" in
-              https://tarodan.shop/api|https://www.tarodan.shop/api|https://api.tarodan.shop/api) : ;;
-              *) die "API_URL is not an approved production API URL." ;;
+              https://tarodan.shop|https://www.tarodan.shop|https://api.tarodan.shop) : ;;
+              *) die "API_URL must be a production origin with no /api suffix (the app appends it)." ;;
             esac
             case "$FRONTEND_URL_VALUE $API_URL_VALUE" in
               *staging*) die "A staging URL was found in the production container." ;;
@@ -176,6 +208,19 @@ jobs:
             fi
             [ -n "$PG_CID" ] || die "PostgreSQL container '$PG_HOST' was not found; backup cannot be guaranteed."
 
+            # reset-production-runtime requires these explicitly, while the app
+            # itself falls back to defaults for them. Without this preflight the
+            # runtime step dies AFTER the database has already been wiped, and a
+            # dry run would have reported everything as fine.
+            RUNTIME_MISSING=""
+            for key in REDIS_URL REDIS_HOST ELASTICSEARCH_USERNAME ELASTICSEARCH_PASSWORD; do
+              [ -n "$(env_from "$API_CID" "$key")" ] || RUNTIME_MISSING="$RUNTIME_MISSING $key"
+            done
+            if [ -z "$(env_from "$API_CID" ELASTICSEARCH_NODE)" ] && [ -z "$(env_from "$API_CID" ELASTICSEARCH_URL)" ]; then
+              RUNTIME_MISSING="$RUNTIME_MISSING ELASTICSEARCH_NODE|ELASTICSEARCH_URL"
+            fi
+            [ -z "$RUNTIME_MISSING" ] || die "Runtime reset needs these API env vars:$RUNTIME_MISSING"
+
             log "All production guards passed."
             if [ "${DRY_RUN:-1}" = "1" ]; then
               log "DRY_RUN=1. No data or runtime state was changed."
@@ -211,7 +256,7 @@ jobs:
               "$API_CID" sh -c \
               'cd /app && node dist-seed/prisma/bootstrap-production-admin.js'
 
-            log "Clearing the selected Redis DB and production-only search indices..."
+            log "Clearing cache/queue Redis databases and production-only search indices..."
             docker exec "$API_CID" sh -c \
               'cd /app && node dist-seed/maintenance/reset-production-runtime.js'
 
@@ -219,9 +264,16 @@ jobs:
             # responses. Remove it before restarting the storefront.
             docker exec "$WEB_CID" sh -c \
               'rm -rf /app/apps/web/.next/cache/* /app/.next/cache/*' || die "Web cache could not be cleared."
+            if [ -n "$ADMIN_CID" ]; then
+              docker exec "$ADMIN_CID" sh -c \
+                'rm -rf /app/apps/admin/.next/cache/* /app/.next/cache/*' || die "Admin cache could not be cleared."
+            fi
 
-            log "Restarting API and locked storefront..."
-            docker restart "$API_CID" "$WEB_CID" >/dev/null
+            log "Restarting API, locked storefront and admin..."
+            # The admin app is restarted too: it keeps serving throughout the
+            # wipe and would otherwise hold cached payloads and Prisma-free but
+            # stale client state from before the reset.
+            docker restart "$API_CID" "$WEB_CID" ${ADMIN_CID:+"$ADMIN_CID"} >/dev/null
 
             ready=0
             for attempt in $(seq 1 60); do

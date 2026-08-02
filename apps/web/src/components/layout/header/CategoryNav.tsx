@@ -11,9 +11,7 @@ import {
   NavigationMenuContent,
   NavigationMenuLink,
 } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
-import { CATEGORY_BAR_ITEMS } from "./nav/config";
-import { SCALE_FALLBACK } from "@/lib/constants";
+import { useTranslations } from "next-intl";
 import { useNavCatalog } from "./_hooks/useNavCatalog";
 import CategoriesPanel from "./nav/CategoriesPanel";
 import ScalesPanel from "./nav/ScalesPanel";
@@ -24,13 +22,15 @@ const NAV_TRIGGER_CLASS =
   "text-body hover:text-heading hover:bg-surface-elevated data-[state=open]:bg-surface-elevated data-[state=open]:text-heading";
 
 export default function CategoryNav() {
-  const locale = useLocale();
   const t = useTranslations();
-  const { categories, manufacturers, scales } = useNavCatalog();
+  const {
+    categories,
+    manufacturers,
+    scales,
+    navItems: items,
+  } = useNavCatalog();
 
-  const items = CATEGORY_BAR_ITEMS[locale as "tr" | "en"];
   const vehicleTypes = categories.map((c) => ({ label: c.name, slug: c.slug }));
-  const scaleItems = scales.length > 0 ? scales : SCALE_FALLBACK;
 
   return (
     <NavigationMenu viewport={false} className="w-full max-w-none">
@@ -55,10 +55,7 @@ export default function CategoryNav() {
                       manufacturers={manufacturers}
                     />
                   ) : (
-                    <ScalesPanel
-                      title={t("product.scale")}
-                      scales={scaleItems}
-                    />
+                    <ScalesPanel title={t("product.scale")} scales={scales} />
                   )}
                 </NavigationMenuContent>
               </>

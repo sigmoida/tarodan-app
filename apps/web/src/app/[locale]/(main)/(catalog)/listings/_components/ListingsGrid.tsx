@@ -59,8 +59,15 @@ export default function ListingsGrid() {
         <p className="text-muted text-lg font-medium mb-1">
           {t("product.noListings")}
         </p>
+        {/*
+          "Filtrelerinizi değiştirmeyi deneyin" hiç filtre uygulanmamışken de
+          yazıyordu — katalog boşken ziyaretçiye var olmayan bir filtreyi
+          suçluyordu. Filtre yokken ilan vermeye davet ediyoruz.
+        */}
         <p className="text-subtle text-sm mb-4">
-          {t("product.tryAdjustingFilters")}
+          {activeFilterCount > 0
+            ? t("product.tryAdjustingFilters")
+            : t("home.beTheFirst")}
         </p>
         {activeFilterCount > 0 && (
           <Button variant="primary" size="md" onClick={clearFilters}>

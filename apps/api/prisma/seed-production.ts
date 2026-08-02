@@ -186,6 +186,21 @@ async function seedPlatformSeller(): Promise<void> {
   });
 }
 
+/**
+ * Kargo tarifesi + paket kademeleri READINESS SÖZLEŞMESİDİR: /health/ready aktif
+ * bir surat tarifesi ve small/medium/large kademelerinin varlığını arar.
+ *
+ * Fiyat BURADAN GELMEZ. `20260727200000_shipping_tariffs` migration'ı zaten
+ * aktif bir v1 tarifesi, `20260730180000_add_shipping_package_tiers` da üç
+ * kademeyi tarifenin paket ücretinden türeterek yaratır — yani taze bir
+ * veritabanında bu upsert her zaman `update` dalına düşer. Buraya "daha güzel"
+ * varsayılan fiyatlar yazmak onları sessizce ölü koda çevirir (bir dönem öyleydi:
+ * 100/130/160 yazıyordu, canlıda hiç uygulanmıyordu). O yüzden create dalı da
+ * migration ile AYNI sonucu üretir ve iki yol tek bir gerçeği anlatır:
+ * **kademe fiyatları ve örnek ölçüler admin panelinden girilir.**
+ */
+const LAUNCH_TARIFF_PACKAGE_FEE = 29.99;
+
 async function seedShippingTariff(): Promise<void> {
   await prisma.shippingTariff.upsert({
     where: {
@@ -200,29 +215,25 @@ async function seedShippingTariff(): Promise<void> {
       status: ShippingTariffStatus.active,
       version: 1,
       currency: "TRY",
-      outboundPackageFee: 29.99,
+      outboundPackageFee: LAUNCH_TARIFF_PACKAGE_FEE,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      returnPackageFee: 29.99,
-      tradeLegFee: 29.99,
+      returnPackageFee: LAUNCH_TARIFF_PACKAGE_FEE,
+      tradeLegFee: LAUNCH_TARIFF_PACKAGE_FEE,
       effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
-      // Satıcıya gösterilen üç paket boyutu; kargo fiyatı bu satırlardan çözülür.
       packageTiers: {
-        create: SHIPPING_PACKAGE_TIER_DEFAULTS.map((tier, index) => ({
+        create: SHIPPING_PACKAGE_TIER_DEFAULTS.map((tier) => ({
           code: tier.code,
           label: tier.label,
           minDesi: tier.minDesi,
           maxDesi: tier.maxDesi,
-          amount: [100, 130, 160][index],
-          ...[
-            { sampleWidth: 25, sampleHeight: 20, sampleLength: 12 },
-            { sampleWidth: 40, sampleHeight: 30, sampleLength: 12 },
-            { sampleWidth: 50, sampleHeight: 40, sampleLength: 15 },
-          ][index],
+          amount: LAUNCH_TARIFF_PACKAGE_FEE,
           sortOrder: tier.sortOrder,
         })),
       },
     },
+    // Operatörün admin panelinde girdiği fiyatları her container açılışında
+    // ezmemek için update dalı bilinçli olarak boştur (bu seed her boot'ta koşar).
     update: {},
   });
 }

@@ -3,16 +3,15 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@tarodan/ui";
-import { SCALE_FALLBACK } from "@/lib/constants";
 import { useNavCatalog } from "../_hooks/useNavCatalog";
-import { CATEGORY_BAR_ITEMS, groupManufacturers, navHref } from "./config";
+import { groupManufacturers, navHref } from "./config";
 
 const ROW_CLASS =
   "flex items-center px-4 py-3 text-sm font-medium text-body transition-colors hover:bg-surface-alt hover:text-heading";
@@ -34,12 +33,14 @@ export default function MobileCatalogNav({
   /** Bir bağlantıya gidildiğinde çekmeceyi kapatır. */
   onNavigate: () => void;
 }) {
-  const locale = useLocale();
   const t = useTranslations();
-  const { categories, manufacturers, scales } = useNavCatalog();
+  const {
+    categories,
+    manufacturers,
+    scales,
+    navItems: items,
+  } = useNavCatalog();
 
-  const items = CATEGORY_BAR_ITEMS[locale as "tr" | "en"];
-  const scaleItems = scales.length > 0 ? scales : SCALE_FALLBACK;
   const manufacturerGroups = groupManufacturers(manufacturers);
 
   return (
@@ -111,7 +112,7 @@ export default function MobileCatalogNav({
             </AccordionTrigger>
             <AccordionContent>
               <div className="flex flex-wrap gap-2 px-4 py-2">
-                {scaleItems.map((scale) => (
+                {scales.map((scale) => (
                   <Link
                     key={scale}
                     href={navHref.scale(scale)}

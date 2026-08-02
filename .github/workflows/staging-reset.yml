@@ -174,8 +174,11 @@ jobs:
             docker exec "$API_CID" sh -c "cd /app && npx prisma migrate reset --force --skip-seed --schema=prisma/schema.prisma && ${SEED_PREFIX}node dist-seed/prisma/seed.js"
 
             # --- Flush Redis via the api container's own ioredis + REDIS_URL ---
-            log "flushing redis..."
-            docker exec "$API_CID" node -e "const R=require('ioredis');const r=new R(process.env.REDIS_URL);r.flushall().then(()=>{console.log('redis flushed');process.exit(0)}).catch(e=>{console.error('flush failed:',e.message);process.exit(0)})" || log "redis flush failed (non-fatal)"
+            # flushdb, never flushall: staging and production run on the same
+            # Coolify host, so a flushall here would wipe every database on a
+            # shared Redis server — including production's cache and queues.
+            log "flushing redis (selected db only)..."
+            docker exec "$API_CID" node -e "const R=require('ioredis');const r=new R(process.env.REDIS_URL);r.flushdb().then(()=>{console.log('redis flushed');process.exit(0)}).catch(e=>{console.error('flush failed:',e.message);process.exit(0)})" || log "redis flush failed (non-fatal)"
 
             # --- Refresh Elasticsearch: restart api so boot sync reconciles ----
             log "restarting api so Elasticsearch reindexes from the fresh DB..."

@@ -119,12 +119,47 @@ seed'lenmez — reset sonrası admin panelinden elle girilir.
 
 GitHub `production` environment'ı (korumalı, required reviewer):
 `PRODUCTION_BOOTSTRAP_ADMIN_EMAIL`, `PRODUCTION_BOOTSTRAP_ADMIN_PASSWORD`
-(16–72 byte), `COOLIFY_PROD_UUIDS` (`api,web,admin` sırasıyla).
+(16–72 byte), `COOLIFY_PROD_UUIDS` (`api,web,admin` sırasıyla — üçüncü UUID
+verilmezse admin app restart edilmez ve cache'i temizlenmez).
 
-Production container'ları (workflow aksi halde reddeder): `NODE_ENV=production`,
-`APP_ENV=production`, gerçek production `FRONTEND_URL`/`API_URL`,
-`S3_ENV_PREFIX=prod`, `PAYMENT_BYPASS=false`, `PAYTR_TEST_MODE=false`,
-`PAYOUTS_DISABLED=false`, web `SITE_LOCKED=true` + `SITE_UNLOCK_SECRET`.
+Reset workflow'unun API container'ında aradığı değerler (biri tutmazsa hiçbir
+şeye dokunmadan reddeder):
+
+| Değişken                                                                               | Beklenen                                       | Not                                                                                      |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `NODE_ENV` / `APP_ENV`                                                                 | `production`                                   |                                                                                          |
+| `PROCESS_ROLE`                                                                         | `all` veya `web`                               |                                                                                          |
+| `FRONTEND_URL`                                                                         | `https://tarodan.shop` (veya `www`)            |                                                                                          |
+| `API_URL`                                                                              | `https://api.tarodan.shop` — **`/api` EKLEME** | Uygulama `/api`'yi kendisi ekler; sonuna yazılırsa mesaj eki URL'leri `…/api/api/…` olur |
+| `S3_ENV_PREFIX`                                                                        | `prod`                                         |                                                                                          |
+| `PAYMENT_BYPASS` / `PAYOUTS_DISABLED`                                                  | `false` (harfi harfine)                        |                                                                                          |
+| `PAYTR_TEST_MODE`                                                                      | `false` veya `0`                               |                                                                                          |
+| `ELASTICSEARCH_INDEX_PREFIX`                                                           | boş veya `production`                          |                                                                                          |
+| `REDIS_URL`, `REDIS_HOST`                                                              | dolu                                           | Cache ve **kuyruk** Redis'i ayrı; ikisi de temizlenir                                    |
+| `ELASTICSEARCH_NODE` (veya `_URL`), `ELASTICSEARCH_USERNAME`, `ELASTICSEARCH_PASSWORD` | dolu                                           | Uygulama bunları default'lar, runtime reset ZORUNLU kılar                                |
+| web `SITE_LOCKED`                                                                      | `true`                                         | ayrıca `SITE_UNLOCK_SECRET` ≥32 karakter                                                 |
+
+Son beş satır özellikle önemli: bunlar yalnız **veritabanı silindikten sonra**
+çalışan runtime reset adımının ihtiyacı olduğu için, eksiklikleri eskiden yarı
+yolda patlamaya yol açıyordu. Artık dry run da kontrol eder.
+
+**Launch'ta kapalı kalması gereken bayraklar:**
+`PAYTR_TRANSFER_CALLBACK_ENABLED` (PayTR panelinde transfer-sonuç bildirim URL'i
+tanımlanmadan açılırsa hiçbir payout tamamlanamaz), `PAYTR_REPORT_SYNC_ENABLED`
+(panel yetkisi ister), `SHIPPING_WEBHOOK_ENABLED`,
+`FEATURE_48H_CONFIRMATION_WINDOW`, `PAYTR_CARD_STORAGE_ENABLED`,
+`PAYTR_RECURRING_ENABLED`, `BULLBOARD_ENABLED`, `ENABLE_SWAGGER`.
+
+**PayTR panel tarafı:** ödeme bildirim URL'i
+`https://<api-host>/api/payments/callback/paytr` (env'deki `PAYTR_CALLBACK_URL`
+ile birebir aynı olmalı, düz `OK` döner) · payout transfer-sonuç URL'i
+`https://<api-host>/api/payouts/callback/paytr-transfer` (yalnız bayrağı
+açacağın gün) · mağaza canlı modda.
+
+**Sürat depo etiketi:** `TARODAN_WAREHOUSE_NAME/ADDRESS/CITY/DISTRICT/PHONE`
+set edilmezse gönderi etiketine "Tarodan Merkez Depo Adresi / Maltepe /
+05000000000" placeholder'ları basılır — admin'deki Warehouse sekmesi bunları
+KAPSAMAZ, ayrı env'dir.
 
 ### Adım 3-4 — Dry run + reset
 
@@ -148,15 +183,37 @@ silinmez; eski nesneler zararsız yetim olarak kalır (kurtarma yolu).
 
 ### Adım 5 — Admin içerik girişi (site hâlâ kilitli)
 
-1. **Katalog** (sıra önemli): Categories (ağaç + sıralama) → Manufacturers
+1. **İş değerlerini onayla** — seed/migration'dan gelen varsayılanlar
+   çalışır durumdadır ama iş kararı DEĞİLDİR (tablo aşağıda).
+2. **Katalog** (sıra önemli): Categories (ağaç + sıralama) → Manufacturers
    (logolu) → Brands → Car Models (marka ister) → Attributes (grup + değerler).
-2. **Statik sayfalar** — `Marketing → Pages`: **about, faq, privacy, terms**.
-   Vitrin bunları DB'den okur, yoksa 404 verir.
-3. **Settings** — sayısal ilan/takas/mesaj değerlerini gözden geçir;
-   **Warehouse** sekmesini doldur (güvenli takas depo operasyonunun önkoşulu).
-4. **E-posta şablonları** — opsiyonel; kod varsayılanları hazır.
-5. **Staff** — ek admin hesapları; süper-admin'de 2FA aç.
-6. **Early-access PIN'leri** — reset mevcut pinleri siler; yeniden oluştur.
+   `scale` ve `material` grupları özellikle önemli: filtre kenar çubuğu ve
+   üst menüdeki "Ölçek" başlığı doğrudan bunlardan beslenir, boşken görünmezler.
+3. **Statik sayfalar** — `Marketing → Pages`: **about, faq, privacy, terms**.
+   Vitrin bunları DB'den okur, yoksa 404 verir; **yayınlanmamış (draft) sayfa da
+   404'tür**. `/terms` ve `/privacy` kayıt formundaki onay kutusundan linklidir.
+4. **Settings** — Listing sekmesini bir kez **kaydet**: min/max ürün fiyatı
+   kaydedilene kadar hiç uygulanmaz (arayüzdeki 10/100000 yalnız placeholder).
+   **Warehouse** sekmesini doldur (güvenli takas depo operasyonunun önkoşulu;
+   boşken ilk takas onayı 400 verir ve `/health/ready` bunu kontrol etmez).
+5. **E-posta şablonları** — opsiyonel; kod varsayılanları hazır.
+6. **Staff** — ek admin hesapları (geçici şifre ekranda gösterilir, SMTP
+   gerekmez); süper-admin'de 2FA aç.
+7. **Early-access PIN'leri** — reset mevcut pinleri siler; yeniden oluştur.
+   Davet e-postası SMTP kurulu değilken de "gönderildi" der (sessiz hata) —
+   güvenli yol "kodu kopyala".
+
+#### Onay bekleyen varsayılan iş değerleri
+
+| Ne                         | Gelen değer                                                                   | Nerede değişir                                                    |
+| -------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Komisyon (catch-all)       | satıcıdan **%5**, alıcıdan **%0** — alıcı komisyonu ve hizmet bedeli tanımsız | Finance → Commission                                              |
+| Pasif duran kural          | `Platform Hizmet Bedeli (Alıcı)` %3, `is_active=false`                        | alıcı bedeli alınacaksa aktive et                                 |
+| Kargo kademeleri           | migration'dan **üçü de 29,99 ₺**, örnek ölçüler boş                           | System → Shipping Tariffs (reset log'u "REVIEW" satırıyla uyarır) |
+| Kargo payı (kademe başına) | küçük 100/0, orta 70/30, büyük 50/50 (alıcı/satıcı)                           | Finance → Commission                                              |
+| Üyelik                     | free 0 ₺ (**takas kapalı**), basic 49,99, premium 99,99, business 249,99 ₺/ay | Membership Tiers                                                  |
+| Vergi                      | KDV %20, hizmet KDV'si açık, stopaj %1 (yalnız kurumsal)                      | System → Settings                                                 |
+| Serbest kargo eşiği        | 500 ₺                                                                         | System → Shipping Tariffs                                         |
 
 ### Adım 6-7 — Kademeli açılış ve sonrası
 
@@ -167,6 +224,15 @@ herkesi anında düşürmek için `SITE_UNLOCK_SECRET` rotate et.
 **Tam açılış:** Coolify'da `SITE_LOCKED=false` + web restart; smoke test
 (anasayfa boş raylarla açılır, kategori gezinme, kayıt + giriş,
 `/api/health/ready` yeşil — ready kontrolü catch-all komisyon kuralunu da doğrular).
+Arama motorlarına açmak için web `NEXT_PUBLIC_ALLOW_INDEXING=true` — ama 4 CMS
+sayfası yayınlanmadan açma, `sitemap.xml` onları listeler ve soft-404 üretir.
+
+**Vitrin boşken beklenen görünüm** (hepsi bilinçli): üretici/kategori/ölçek
+menüleri ve marka şeridi hiç çıkmaz, "popüler aramalar" çipleri kataloğun kendi
+üreticilerinden türer (boşken görünmez), indirim rayı çizilmez, ilan listesi
+"Henüz ilan yok / İlk ilanı siz verin" der. Filtre kenar çubuğundaki yedek
+listeler yalnız API **hata verdiğinde** devreye girer — boş yanıt boş liste
+demektir.
 
 **Rollback:** vitrin kilitliyken workflow'un yazdığı yedeği production
 PostgreSQL container'ından `pg_restore --clean --if-exists` ile geri yükle;

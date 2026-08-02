@@ -311,28 +311,32 @@ export function useSidebarFilters({
       matchesSearch(m.name, modelSearch),
   );
 
-  const displayManufacturers =
-    manufacturerList.length > 0
-      ? manufacturerList.filter((m) =>
-          matchesSearch(m.name, manufacturerSearch),
-        )
-      : MANUFACTURERS_FALLBACK.filter((m) =>
-          matchesSearch(m, manufacturerSearch),
-        ).map((name) => ({
-          id: "",
-          name,
-          slug: name.toLowerCase().replace(/\s+/g, "-"),
-        }));
+  // Fallback listeleri YALNIZ istek başarısızken devreye girer. Eskiden "liste
+  // boşsa" koşuluna bağlıydılar; boş katalogda (yeni kurulum) bu, olmayan 18
+  // üretici + 5 ölçek + 4 malzeme reklam edip her tıklamayı sıfır sonuca
+  // götürüyordu. Başarılı ama boş yanıt bir gerçektir — onu göstermeliyiz.
+  const useManufacturerFallback =
+    manufacturersQuery.isError && manufacturerList.length === 0;
+  const useFilterFallback = filtersQuery.isError;
+
+  const displayManufacturers = useManufacturerFallback
+    ? MANUFACTURERS_FALLBACK.filter((m) =>
+        matchesSearch(m, manufacturerSearch),
+      ).map((name) => ({
+        id: "",
+        name,
+        slug: name.toLowerCase().replace(/\s+/g, "-"),
+      }))
+    : manufacturerList.filter((m) => matchesSearch(m.name, manufacturerSearch));
 
   const filteredCategories = categories.filter((c) =>
     matchesSearch(c.name, categorySearch),
   );
-  const scaleOptions = scaleList.length > 0 ? scaleList : SCALE_FALLBACK;
+  const scaleOptions = useFilterFallback ? SCALE_FALLBACK : scaleList;
   const filteredScales = scaleOptions.filter((s) =>
     matchesSearch(s, scaleSearch),
   );
-  const materialOptions =
-    materialList.length > 0 ? materialList : MATERIAL_FALLBACK;
+  const materialOptions = useFilterFallback ? MATERIAL_FALLBACK : materialList;
   const filteredMaterials = materialOptions.filter((m) =>
     matchesSearch(m.label, materialSearch),
   );
