@@ -367,13 +367,9 @@ export function getNavGroups(t: T): NavGroup[] {
           description: t("admin.nav.items.emailTemplates.description"),
           permission: "email_templates",
         },
-        {
-          name: t("admin.nav.items.pages.name"),
-          href: "/marketing/pages",
-          icon: DocumentTextIcon,
-          description: t("admin.nav.items.pages.description"),
-          permission: "pages",
-        },
+        // "Sayfalar" (/marketing/pages) ekranı kaldırıldı: kurumsal metinler
+        // (hakkımızda, SSS, sözleşmeler …) artık web tarafında kodla yönetiliyor.
+        // Backend'deki pages modülü duruyor; ekran ileride geri gelebilir.
       ],
     },
     {
