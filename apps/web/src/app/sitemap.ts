@@ -37,26 +37,21 @@ const STATIC_PATHS = [
   // shopping
   "/sell",
   "/payment-options",
-  "/shipping-delivery",
-  "/returns-exchanges",
   "/platform-service-fee",
   // support
-  "/help",
   "/support",
   "/faq",
   "/guides",
-  "/collectors-guide",
-  "/size-guide",
   // trust
   "/secure-swap",
   "/buyer-protection",
   "/authenticity",
   "/security-features",
   // legal
-  "/terms",
-  "/privacy",
+  // NOT: /terms, /privacy ve /distance-sales içerikleri yenilenirken
+  // `robots: noindex` ile yayında — noindex sayfa sitemap'e konmaz. İçerik
+  // döndüğünde noindex ile birlikte bu satırlar da geri eklenecek.
   "/cookies",
-  "/distance-sales",
   "/refund-policy",
   "/seller-agreement",
   "/intellectual-property",

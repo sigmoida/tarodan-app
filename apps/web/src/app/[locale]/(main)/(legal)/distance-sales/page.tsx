@@ -1,23 +1,17 @@
 /** @format */
 
 import type { Metadata } from "next";
-import { localizedCanonical } from "@/lib/seo";
-import DistanceSalesClient from "./_components/DistanceSalesClient";
+import { DocUnderRevision } from "@/components/layout/DocUnderRevision";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
-  const { locale } = await params;
+/** İçerik yenilenene kadar "Güncelleniyor" yer tutucusu gösterilir. */
+export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Mesafeli Satış Sözleşmesi · Tarodan",
-    description:
-      "TARODAN mesafeli satış sözleşmesi: taraflar, sözleşme konusu ürün, teslimat, cayma hakkı, uyuşmazlık ve yürürlük hükümleri.",
-    alternates: localizedCanonical(locale, "/distance-sales"),
+    description: "Tarodan mesafeli satış sözleşmesi güncellenmektedir.",
+    robots: { index: false },
   };
 }
 
 export default function DistanceSalesPage() {
-  return <DistanceSalesClient />;
+  return <DocUnderRevision title="Mesafeli Satış Sözleşmesi" />;
 }

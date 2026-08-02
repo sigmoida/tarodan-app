@@ -1,23 +1,17 @@
 /** @format */
 
 import type { Metadata } from "next";
-import { localizedCanonical } from "@/lib/seo";
-import ShippingDeliveryClient from "./_components/ShippingDeliveryClient";
+import { DocUnderRevision } from "@/components/layout/DocUnderRevision";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
-  const { locale } = await params;
+/** İçerik yenilenene kadar "Güncelleniyor" yer tutucusu gösterilir. */
+export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Kargo ve Teslimat · Tarodan",
-    description:
-      "Tarodan kargo yöntemleri, kargo ücretleri, teslimat süreleri ve sipariş takibi hakkında bilmeniz gerekenler.",
-    alternates: localizedCanonical(locale, "/shipping-delivery"),
+    description: "Tarodan kargo ve teslimat bilgileri güncellenmektedir.",
+    robots: { index: false },
   };
 }
 
 export default function ShippingDeliveryPage() {
-  return <ShippingDeliveryClient />;
+  return <DocUnderRevision title="Kargo ve Teslimat" />;
 }

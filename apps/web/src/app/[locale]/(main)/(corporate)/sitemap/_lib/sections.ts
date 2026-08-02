@@ -5,7 +5,13 @@ export interface SitemapSection {
   links: { href: string; labelKey: string }[];
 }
 
-/** Sitemap taxonomy — mirrors the header/footer navigation groups. */
+/**
+ * Sitemap taksonomisi — footer sütunlarını birebir yansıtır (kurumsal / yardım
+ * & destek / alışveriş / yasal), önüne de header ve hesap akışlarından gelen
+ * pazar yeri, satış ve hesap grupları eklenir. Footer'dan bir link kalktığında
+ * buradan da kalkar; yoksa site haritası kullanıcının hiçbir yerden
+ * ulaşamayacağı sayfaları listelemeye devam eder.
+ */
 export const SITEMAP_SECTIONS: SitemapSection[] = [
   {
     titleKey: "utility.sitemap.marketplace",
@@ -15,8 +21,6 @@ export const SITEMAP_SECTIONS: SitemapSection[] = [
       { href: "/profile/trades", labelKey: "nav.trades" },
       { href: "/collections", labelKey: "nav.collections" },
       { href: "/manufacturers", labelKey: "nav.brands" },
-      { href: "/models", labelKey: "nav.models" },
-      { href: "/membership", labelKey: "membership.title" },
     ],
   },
   {
@@ -43,20 +47,30 @@ export const SITEMAP_SECTIONS: SitemapSection[] = [
     ],
   },
   {
-    titleKey: "footer.support",
+    titleKey: "footer.corporate",
     links: [
       { href: "/about", labelKey: "footer.about" },
       { href: "/contact", labelKey: "footer.contact" },
-      { href: "/help", labelKey: "footer.help" },
+      { href: "/newsletter", labelKey: "footer.newsletter" },
+    ],
+  },
+  {
+    titleKey: "footer.helpSupport",
+    links: [
+      { href: "/support", labelKey: "footer.helpSupport" },
       { href: "/faq", labelKey: "footer.faq" },
       { href: "/guides", labelKey: "footer.guides" },
-      { href: "/shipping-delivery", labelKey: "footer.shipping" },
-      { href: "/payment-options", labelKey: "footer.paymentOptions" },
-      { href: "/returns-exchanges", labelKey: "footer.returns" },
-      { href: "/security-features", labelKey: "footer.security" },
-      { href: "/size-guide", labelKey: "footer.sizeGuide" },
-      { href: "/authenticity", labelKey: "footer.authenticity" },
       { href: "/collectors-guide", labelKey: "footer.collectorsGuide" },
+      { href: "/size-guide", labelKey: "footer.sizeGuide" },
+      { href: "/secure-swap", labelKey: "footer.secureSwap" },
+    ],
+  },
+  {
+    titleKey: "common.shopping",
+    links: [
+      { href: "/shipping-delivery", labelKey: "footer.shipping" },
+      { href: "/track-order", labelKey: "order.trackOrder" },
+      { href: "/membership", labelKey: "membership.title" },
     ],
   },
   {
@@ -68,11 +82,6 @@ export const SITEMAP_SECTIONS: SitemapSection[] = [
       { href: "/distance-sales", labelKey: "footer.distanceSales" },
       { href: "/refund-policy", labelKey: "footer.refundPolicy" },
       { href: "/seller-agreement", labelKey: "footer.sellerAgreement" },
-      { href: "/buyer-protection", labelKey: "footer.buyerProtection" },
-      {
-        href: "/intellectual-property",
-        labelKey: "footer.intellectualProperty",
-      },
     ],
   },
 ];

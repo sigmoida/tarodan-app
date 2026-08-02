@@ -1,33 +1,19 @@
-import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { DocPage } from "@/components/layout/DocPage";
-import SectionCard from "@/components/ui/SectionCard";
-import { PageContent } from "@/app/[locale]/(main)/(trash)/sayfa/[slug]/PageContent";
-import { getTermsPage } from "./_lib/data";
+import { DocUnderRevision } from "@/components/layout/DocUnderRevision";
 
+/**
+ * İçerik yenilenene kadar sayfa "Güncelleniyor" yer tutucusunu gösterir.
+ * Metin normalde CMS'ten geliyordu (`_lib/data.ts` → `/api/pages/terms`);
+ * o fetch geri bağlandığında burası eski haline döner.
+ */
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getTermsPage();
-  if (!page) return { title: "Kullanım Koşulları" };
   return {
-    title: page.metaTitle || page.title,
-    description: page.metaDescription || undefined,
-    keywords: page.metaKeywords || undefined,
-    openGraph: {
-      title: page.metaTitle || page.title,
-      description: page.metaDescription || undefined,
-    },
+    title: "Kullanım Koşulları · Tarodan",
+    description: "Tarodan kullanım koşulları güncellenmektedir.",
+    robots: { index: false },
   };
 }
 
-export default async function TermsPage() {
-  const page = await getTermsPage();
-  if (!page) notFound();
-
-  return (
-    <DocPage title={page.title}>
-      <SectionCard className="p-0">
-        <PageContent content={page.content} />
-      </SectionCard>
-    </DocPage>
-  );
+export default function TermsPage() {
+  return <DocUnderRevision title="Kullanım Koşulları" />;
 }

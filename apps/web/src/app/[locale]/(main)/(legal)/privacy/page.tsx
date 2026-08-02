@@ -1,33 +1,19 @@
-import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { DocPage } from "@/components/layout/DocPage";
-import SectionCard from "@/components/ui/SectionCard";
-import { PageContent } from "@/app/[locale]/(main)/(trash)/sayfa/[slug]/PageContent";
-import { getPrivacyPage } from "./_lib/data";
+import { DocUnderRevision } from "@/components/layout/DocUnderRevision";
 
+/**
+ * İçerik yenilenene kadar sayfa "Güncelleniyor" yer tutucusunu gösterir.
+ * Metin normalde CMS'ten geliyordu (`_lib/data.ts` → `/api/pages/privacy`);
+ * o fetch geri bağlandığında burası eski haline döner.
+ */
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPrivacyPage();
-  if (!page) return { title: "Gizlilik Politikası" };
   return {
-    title: page.metaTitle || page.title,
-    description: page.metaDescription || undefined,
-    keywords: page.metaKeywords || undefined,
-    openGraph: {
-      title: page.metaTitle || page.title,
-      description: page.metaDescription || undefined,
-    },
+    title: "Gizlilik Politikası · Tarodan",
+    description: "Tarodan gizlilik politikası güncellenmektedir.",
+    robots: { index: false },
   };
 }
 
-export default async function PrivacyPage() {
-  const page = await getPrivacyPage();
-  if (!page) notFound();
-
-  return (
-    <DocPage title={page.title}>
-      <SectionCard className="p-0">
-        <PageContent content={page.content} />
-      </SectionCard>
-    </DocPage>
-  );
+export default function PrivacyPage() {
+  return <DocUnderRevision title="Gizlilik Politikası" />;
 }
