@@ -11,9 +11,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   return {
-    title: "Satıcı Sözleşmesi · Tarodan",
+    title: "Satıcı Sözleşmeleri · Tarodan",
     description:
-      "TARODAN platformunda satıcı olmanın koşulları, komisyon ve ödemeler, satıcı yükümlülükleri, yasak ürünler ve fesih şartları.",
+      "Tarodan bireysel ve kurumsal satıcı üyelik ve satış sözleşmeleri: onboarding, listeleme, kargo, güvenli ödeme havuzu, komisyon ve hizmet bedelleri.",
     alternates: localizedCanonical(locale, "/seller-agreement"),
   };
 }

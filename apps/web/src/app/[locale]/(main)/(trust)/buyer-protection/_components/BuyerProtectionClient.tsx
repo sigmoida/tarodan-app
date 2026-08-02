@@ -45,10 +45,10 @@ export default async function BuyerProtectionClient() {
             </Link>{" "}
             ve{" "}
             <Link
-              href="/returns-exchanges"
+              href="/refund-policy"
               className="inline-flex items-center text-primary-500 hover:underline"
             >
-              İade ve Değişim
+              İade ve İptal Koşulları
             </Link>{" "}
             sayfalarına bakınız.
           </p>
@@ -115,10 +115,10 @@ export default async function BuyerProtectionClient() {
             <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
           <Link
-            href="/returns-exchanges"
+            href="/refund-policy"
             className="inline-flex items-center text-primary-500 hover:underline"
           >
-            İade ve Değişim
+            İade ve İptal Koşulları
             <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
           <Link
