@@ -9,6 +9,7 @@ import { SentryService } from "./sentry.service";
 import { SentryInterceptor } from "./sentry.interceptor";
 import { initAppLogger } from "../../common/logging/logger";
 import { redactSensitive } from "../../common/security/redact-sensitive";
+import { applySentryEventPolicy, resolveSentryRelease } from "./sentry-event";
 
 @Global()
 @Module({
@@ -35,18 +36,16 @@ export class SentryModule implements OnModuleInit {
       Sentry.init({
         dsn,
         environment,
+        // Sürüm etiketi: "bu hata hangi deploy'la geldi" sorusunu cevaplar ve
+        // Sentry'nin regresyon takibini (çözülen issue yeni sürümde tekrar
+        // açılırsa uyarma) çalıştırır.
+        release: resolveSentryRelease(),
         tracesSampleRate: environment === "production" ? 0.2 : 1.0,
         profilesSampleRate: environment === "production" ? 0.1 : 1.0,
         // Sentry v8's default Node integrations include inbound and outbound
         // HTTP instrumentation; no deprecated @sentry/tracing shim is needed.
-        // Filter out health check endpoints
-        beforeSend(event) {
-          const request = event.request;
-          if (request?.url?.includes("/health")) {
-            return null;
-          }
-          return redactSensitive(event) as typeof event;
-        },
+        // Sağlık kontrolü filtresi + redaksiyon + korelasyon tag'i: tek kapı.
+        beforeSend: applySentryEventPolicy,
         // Capture user context
         beforeBreadcrumb(breadcrumb) {
           if (

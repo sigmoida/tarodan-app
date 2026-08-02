@@ -7,7 +7,10 @@ import { Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { AppModule } from "./app.module";
 import { AppNestLogger } from "./common/logging/nest-logger";
-import { redactSensitive } from "./common/security/redact-sensitive";
+import {
+  applySentryEventPolicy,
+  resolveSentryRelease,
+} from "./modules/sentry/sentry-event";
 
 /**
  * Initialize Sentry for the worker process (#71). The worker runs as a separate
@@ -26,8 +29,11 @@ function initWorkerSentry(logger: Logger): boolean {
   Sentry.init({
     dsn,
     environment,
+    // API ile aynı sürüm etiketi + olay politikası: worker hataları da doğru
+    // deploy'a bağlanır (korelasyon tag'i yalnız HTTP bağlamında dolar).
+    release: resolveSentryRelease(),
     tracesSampleRate: environment === "production" ? 0.2 : 1.0,
-    beforeSend: (event) => redactSensitive(event) as typeof event,
+    beforeSend: applySentryEventPolicy,
   });
   logger.log("Sentry initialized (worker)");
   return true;
