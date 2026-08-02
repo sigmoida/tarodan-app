@@ -1010,7 +1010,7 @@ export class OrderCheckoutDirectService {
         }
       }
     } catch (error) {
-      this.logger.error("Failed to send product sold notifications:", error);
+      this.logger.warn("Failed to send product sold notifications:", error);
     }
   }
 }

@@ -561,7 +561,7 @@ export class OfferService {
         );
       }
     } catch (error) {
-      this.logger.error(`Failed to send offer rejected notification: ${error}`);
+      this.logger.warn(`Failed to send offer rejected notification: ${error}`);
     }
 
     return await this.formatOfferResponse(rejectedOffer);
@@ -683,7 +683,7 @@ export class OfferService {
           },
         );
       } catch (e) {
-        this.logger.error(`counter notification: ${e}`);
+        this.logger.warn(`counter notification: ${e}`);
       }
 
       return await this.formatOfferResponse(counterOffer);
@@ -808,7 +808,7 @@ export class OfferService {
           },
         );
       } catch (e) {
-        this.logger.error(`buyerCounter notification: ${e}`);
+        this.logger.warn(`buyerCounter notification: ${e}`);
       }
 
       return await this.formatOfferResponse(newOffer);

@@ -32,7 +32,8 @@ export class OrderCommonService {
       await this.cache.delPattern("products:list:*");
       this.logger.log(`Product cache invalidated for ${productId}`);
     } catch (error) {
-      this.logger.error(`Failed to invalidate product cache: ${error}`);
+      // Önbellek bayatlar, TTL dolunca kendini toparlar: alarm değil uyarı.
+      this.logger.warn(`Failed to invalidate product cache: ${error}`);
     }
   }
 

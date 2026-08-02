@@ -950,7 +950,7 @@ export class TradeLifecycleService {
         },
       );
     } catch (error) {
-      this.logger.error(`Failed to send counter trade notification: ${error}`);
+      this.logger.warn(`Failed to send counter trade notification: ${error}`);
     }
 
     return this.tradeQuery.getTradeById(tradeId, userId);

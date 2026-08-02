@@ -89,7 +89,7 @@ export class TradeReconciliationService {
         }
       }
     } catch (err: any) {
-      this.logger.error(`notifyAdminsOfStuckTrades failed: ${err?.message}`);
+      this.logger.warn(`notifyAdminsOfStuckTrades failed: ${err?.message}`);
     }
   }
 
