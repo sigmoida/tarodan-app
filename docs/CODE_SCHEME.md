@@ -120,4 +120,4 @@ Doğrulama tokenları (`randomBytes(32)`, DB'ye SHA-256 özeti), OTP'ler
 (`randomInt`, 6 hane, kısa TTL + deneme sayacı), 2FA sırrı (Base32, AES-256-GCM
 ile şifreli) ve erken erişim PIN'leri (`randomInt`, 8 karakter) ayrı bir
 ailedir; asla `Math.random` kullanmaz. Erken erişim akışı için
-[PRODUCTION_LAUNCH.md](./PRODUCTION_LAUNCH.md).
+[OPERATIONS.md](./OPERATIONS.md).

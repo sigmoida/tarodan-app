@@ -74,3 +74,93 @@ declare module "i18next" {
 
 **api — @formatjs** — no augmentation; call `formatMessage(getMessages(locale)…)`
 with a `MessageKey`.
+
+---
+
+# Katkı Rehberi
+
+(Eski `docs/I18N.md` — 2026-08-02'de buraya taşındı.)
+
+## Yeni metin ekleme akışı
+
+1. **Anahtarı iki kataloğa da ekle** — `tr.json` ve `en.json` anahtar setleri
+   birebir aynı olmak zorundadır. Türkçe kaynak metindir; İngilizce doğal,
+   profesyonel çeviri olmalıdır. Dinamik değerler ICU biçimindedir:
+   `"{count} aktif ilanınız var"`; çoğul/seçim için ICU plural/select.
+2. **Codegen:** `pnpm --filter @tarodan/i18n codegen` (+ tüketen app'in
+   typecheck'i için `pnpm --filter @tarodan/i18n build`).
+3. **Tüket:**
+   - **web / admin (next-intl):** `const t = useTranslations();` +
+     `t("admin.users.title")` (tam yol, namespace argümanı yok). Server
+     component'te `getTranslations`. Statik obje/kolon katalogları hook
+     çağıramaz → `t`-parametreli builder fonksiyon deseni
+     (`type T = ReturnType<typeof useTranslations<never>>`). zod şemaları →
+     `schema(t)` factory. Dinamik anahtar lookup'larında `as const` ile
+     literal tipleri koruyun.
+   - **mobil (i18next + ICU):** `useTranslation` + aynı anahtarlar.
+   - **API (NestJS):** exception'lar için
+     `throw new NotFoundException(i18nMessage('server.order.notFound', { orderNumber }))`
+     — `AllExceptionsFilter` mesajı isteğin dilinde render eder (yanıtta
+     `i18nKey` de döner). Controller success mesajları: `I18nService` +
+     `@ReqLocale() locale` + `this.i18n.translate(...)`. E-posta/bildirim gibi
+     request'siz kanallar alıcının `User.preferredLanguage` tercihiyle render
+     edilir.
+
+Anahtar adlandırma: önce `common.*` içinde ara ve varsa YENİDEN KULLAN; yeni
+genel etiketse `common.*`'a ekle. Namespace haritası yukarıda.
+
+## Lint guardrail: `@tarodan/no-hardcoded-turkish`
+
+`packages/eslint-plugin` içindeki kural, Türkçe karakter içeren string
+literal / template / JSX metnini işaretler (İngilizce, URL, class adı vb.
+yanlış-pozitif üretmez).
+
+- **admin:** `error` — migrate edilmemiş dilimler `.eslintrc.json`
+  override'ında kapalıdır; o dilimler migrate edilirken listeden çıkarın.
+- **web:** `warn` — kalan statik/yasal içerik temizlendikçe `error`'a
+  çekilecek. Veri dosyaları (il/ilçe listesi, marka verisi) kalıcı istisna.
+- Katalog dışında kalması MEŞRU metin için satır bazlı
+  `// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- <gerekçe>`
+  kullanın — gerekçesiz disable PR review'da reddedilir.
+
+## CI gate'leri
+
+- `typecheck` → `check-catalog.mjs`: (1) tr/en anahtar paritesi,
+  (2) `keys.ts` güncelliği; ikisi de kırmızıda merge'i bloklar.
+- Lint job'ı `no-hardcoded-turkish` kuralını uygular (admin'de error).
+- API unit testleri kataloğu kaynak koddan tüketir; katalog JSON'ları jest'te
+  `apps/api/test/jest-json-default-transform.js` ile sarılır (esModuleInterop
+  kapalı — detay o dosyanın yorumunda).
+
+## Yeni dil ekleme (3. dil hazırlığı, #226)
+
+Desteklenen dillerin tek doğruluk kaynağı `src/locale.ts`'teki `locales`
+dizisidir — tüketiciler `'tr' | 'en'` union'ı yeniden TANIMLAMAZ, `Locale`
+tipini import eder. Yeni dil (örn. `de`) için:
+
+1. `locales` dizisine ekle: `["tr", "en", "de"] as const` — `Locale`,
+   `isLocale`, `resolveLocale`, API'nin `Accept-Language` çözümü ve
+   `/i18n/translations` otomatik genişler.
+2. `src/catalog/de.json` oluştur (tr ile birebir anahtar seti; parity gate'i
+   `check-catalog.mjs` içinde yeni locale'i kapsayacak şekilde güncelle),
+   `codegen` + `build` çalıştır.
+3. `catalog/index.ts`'e import + `messages` objesine ekle.
+4. Dil seçicileri güncelle: admin `LocaleSwitcher` (endonim ekle), web locale
+   routing (`[locale]` segmenti + middleware matcher) ve harici mobil
+   repository'nin i18next resources'ı.
+5. Bilinen tr|en-bağımlı içerik yapıları (katalog DIŞI, yeni dilde giriş
+   ister): web `TrustBadges`, `CategoryNav`/`nav/config.ts`
+   (`CATEGORY_BAR_ITEMS`), `HeaderSearch` (`POPULAR_SEARCHES`),
+   `secure-swap/_lib/data.ts`; harici mobil istemcinin kendi `Locale` tipi de
+   `Record<Locale, ...>`'a genişletilmeli.
+6. E-posta/bildirim: `User.preferredLanguage` serbest string kolonudur, şema
+   değişikliği gerekmez; `isLocale` yeni dili otomatik kabul eder.
+
+## Sık hatalar
+
+- Tek kataloğa anahtar ekleyip diğerini unutmak → parity gate kırmızı.
+- Codegen'i çalıştırmamak → "generated MessageKey union up to date" hatası.
+- `t`'yi modül-düzeyi sabitin içinde çağırmak → hook kuralı ihlali; builder
+  desenini kullanın.
+- Türkçe metni "geçici" hardcode etmek → lint error; anahtar eklemek toplamda
+  daha hızlı.

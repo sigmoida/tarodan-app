@@ -1,7 +1,10 @@
 # Mobil ↔ Web İşlev Paritesi — Uygulama Rehberi
 
 Bu klasör, **web uygulamasındaki (`apps/web`) her kullanıcı işlevinin mobil uygulamada
-(`/Users/kaan/Projects/tarodan-mobile`) da bulunmasını** sağlamak için yazılmıştır.
+da bulunmasını** sağlamak için yazılmıştır. Mobilin kanonik reposu
+**`github.com/sigmoida/tarodan-mobile`** (`main`); `/Users/kaan/Projects/tarodan-mobile`
+lokal kopyası başka bir remote'a (`mki19xci/…`) bakıyor ve gerideydi — güncel durum
+analizi için her zaman GitHub `main` esas alınmalı.
 
 Hedef kitlesi iki taraflıdır: hem mobil geliştirici hem de bu dosyaları girdi olarak alıp
 kod yazacak bir agent. Bu yüzden her dosya "şu ekranı şöyle çiz" demez; **sözleşme +
@@ -28,8 +31,10 @@ Sıra tesadüfi değil: para akışı ve yasal zorunluluk taşıyan alanlar önc
 | 10  | `10-profile-settings.md`        | Profil, adres, IBAN, ayarlar, hesap silme                       |
 | 11  | `11-api-contract.md`            | İstemci sözleşmesi, hata kodları, endpoint kataloğu (üretilen)  |
 | 12  | `12-mobile-platform.md`         | Token saklama, deep link, force-update, i18n, izinler           |
-| 13  | `13-parity-matrix.md`           | Web işlevi → mobildeki durum → öncelik (boşluk tablosu)         |
+| 13  | `13-parity-matrix.md`           | Web işlevi → mobildeki durum → öncelik (**v2, 2026-08-02**)     |
 | 14  | `14-shipping-package-tiers.md`  | **Kargo paket boyutları** — desi kaldırıldı; 03 ve 04'ü ezer    |
+| 15  | `15-api-delta-2026-08-02.md`    | **Değişiklik güncesi** (31 Tem → 2 Ağu) — çelişkide bu kazanır  |
+| 16  | `16-agent-brief.md`             | **Agent brifingi** — ne yapıldı, okuma sırası, ilk 4 iş         |
 
 **Önce `11` ve `12` okunmalı.** Oradaki istemci sözleşmesi (bearer token, hata kodları,
 sayfalama) her domain dosyasında varsayılır ve tekrar edilmez.
@@ -55,7 +60,12 @@ Mobil, web'in `/gateway` BFF proxy'sini **taklit etmez**; NestJS API'ye doğruda
   istemci `X-CSRF-Token` göndermek zorunda değildir.
 - Token yenileme: `POST /auth/refresh` gövdesinde `{ refreshToken }`.
 
-### Bugünkü kırıcı değişiklikler (2026-07-30) — mobilin uyarlaması ZORUNLU
+### Kırıcı değişiklikler (2026-07-30) — mobilin uyarlaması ZORUNLU
+
+> **Güncel delta:** 2026-07-31 sonrası giren değişiklikler (hizmet KDV'si,
+> `pricing.summary`, `PKG-` teslimat numarası, medya `folder` beyaz listesi,
+> `tradeAvailable`, referans önekleri vb.) için `15-api-delta-2026-08-02.md`
+> dosyasına bak — aşağıdaki tabloyla çelişirse **15 kazanır**.
 
 | Değişiklik                                                                   | Mobilde yapılması gereken                                          |
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
