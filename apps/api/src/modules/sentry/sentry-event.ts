@@ -36,3 +36,28 @@ export function resolveSentryRelease(
   const sha = (env.SOURCE_COMMIT ?? env.GIT_COMMIT_SHA)?.trim();
   return sha ? sha.slice(0, 7) : undefined;
 }
+
+/**
+ * Sentry ortam etiketi. `NODE_ENV`'e bağlanamaz: üç Dockerfile da onu sabit
+ * `production` yazar, dolayısıyla staging ile gerçek prod Sentry'de ayırt
+ * edilemez ve staging test hataları prod alarmlarına karışırdı. Etiket kendi
+ * anahtarından gelir; verilmezse eski davranış (NODE_ENV) korunur.
+ */
+export function resolveSentryEnvironment(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  return (
+    env.SENTRY_ENVIRONMENT?.trim() || env.NODE_ENV?.trim() || "development"
+  );
+}
+
+/**
+ * Örnekleme oranı için: ETİKETE değil gerçek çalışma kipine bakar. Staging de
+ * bir production build'idir; etiketi "staging" diye tam örneklemeye geçilirse
+ * iz/profil kotası hızla tükenir.
+ */
+export function isProductionRuntime(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.NODE_ENV === "production";
+}

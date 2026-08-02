@@ -4,20 +4,24 @@
  */
 import * as Sentry from "@sentry/nextjs";
 
-import { sentryRelease } from "./sentry.release";
+import {
+  sentryEnvironment,
+  sentryRelease,
+  sentryTracesSampleRate,
+} from "./sentry.release";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Performance monitoring
-  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.2 : 1.0,
+  tracesSampleRate: sentryTracesSampleRate,
 
   // Session replay (captures user sessions for debugging)
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
 
   // Environment
-  environment: process.env.NODE_ENV,
+  environment: sentryEnvironment,
   release: sentryRelease,
 
   // Filter out noisy errors

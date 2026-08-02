@@ -4,16 +4,20 @@
  */
 import * as Sentry from "@sentry/nextjs";
 
-import { sentryRelease } from "./sentry.release";
+import {
+  sentryEnvironment,
+  sentryRelease,
+  sentryTracesSampleRate,
+} from "./sentry.release";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Performance monitoring
-  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.2 : 1.0,
+  tracesSampleRate: sentryTracesSampleRate,
 
   // Environment
-  environment: process.env.NODE_ENV,
+  environment: sentryEnvironment,
   release: sentryRelease,
 
   // Only enable in production or when DSN is set

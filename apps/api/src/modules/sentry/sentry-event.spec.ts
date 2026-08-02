@@ -1,4 +1,9 @@
-import { applySentryEventPolicy, resolveSentryRelease } from "./sentry-event";
+import {
+  applySentryEventPolicy,
+  isProductionRuntime,
+  resolveSentryEnvironment,
+  resolveSentryRelease,
+} from "./sentry-event";
 import { runWithRequestId } from "../../common/context/request-context";
 
 /**
@@ -70,5 +75,52 @@ describe("resolveSentryRelease", () => {
 
   it("hiçbiri yoksa undefined döner (Sentry kendi tahminine düşer)", () => {
     expect(resolveSentryRelease({})).toBeUndefined();
+  });
+});
+
+/**
+ * Ortam etiketi `NODE_ENV`'e bağlanamaz: her üç Dockerfile da onu sabit
+ * `production` yazar, yani staging ve gerçek prod Sentry'de AYNI görünürdü —
+ * staging'deki test hataları prod alarmlarının arasına karışırdı. Etiket
+ * kendi anahtarından (SENTRY_ENVIRONMENT) gelir.
+ */
+describe("resolveSentryEnvironment", () => {
+  it("SENTRY_ENVIRONMENT ortamı belirler (NODE_ENV production olsa bile)", () => {
+    expect(
+      resolveSentryEnvironment({
+        SENTRY_ENVIRONMENT: "staging",
+        NODE_ENV: "production",
+      }),
+    ).toBe("staging");
+  });
+
+  it("verilmezse NODE_ENV'e düşer (tek ortamlı kurulum bozulmaz)", () => {
+    expect(resolveSentryEnvironment({ NODE_ENV: "production" })).toBe(
+      "production",
+    );
+  });
+
+  it("hiçbiri yoksa development varsayar", () => {
+    expect(resolveSentryEnvironment({})).toBe("development");
+  });
+});
+
+/**
+ * Örnekleme oranı ETİKETE değil gerçek çalışma kipine (NODE_ENV) bakar:
+ * staging de production build'idir ve etiketi "staging" olduğu için tam
+ * örneklemeye düşerse ücretsiz kota hızla tükenirdi.
+ */
+describe("isProductionRuntime", () => {
+  it("staging etiketi tam örneklemeyi AÇMAZ", () => {
+    expect(
+      isProductionRuntime({
+        SENTRY_ENVIRONMENT: "staging",
+        NODE_ENV: "production",
+      }),
+    ).toBe(true);
+  });
+
+  it("yerel geliştirmede false", () => {
+    expect(isProductionRuntime({ NODE_ENV: "development" })).toBe(false);
   });
 });
