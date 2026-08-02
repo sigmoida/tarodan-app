@@ -159,6 +159,20 @@ describe("production reference-data bootstrap", () => {
     expect(source).toContain("ELASTICSEARCH_NODE|ELASTICSEARCH_URL");
   });
 
+  it("keeps the inline DATABASE_URL parser syntactically valid", () => {
+    // Bu betik ÜÇ kaçış katmanından geçiyor: YAML blok skaları → tek tırnaklı
+    // shell dizesi → `node -e`. Bir dönem `/^\\//` yazıyordu; node'a çift ters
+    // bölü ulaşıp regex erken kapanıyor, reset daha guard aşamasında
+    // SyntaxError ile ölüyordu. Hiçbir test görmüyordu çünkü betik yalnız
+    // sunucuda çalışır — burada en azından ayrıştırılabilirliğini doğruluyoruz.
+    const source = readFileSync(resetWorkflowPath, "utf8");
+    const inlineScript = source.match(/node -e '\n([\s\S]*?)\n\s*'\)"/);
+
+    expect(inlineScript).not.toBeNull();
+    // new Function yalnız PARSE eder, çalıştırmaz — process/Buffer/URL gerekmez.
+    expect(() => new Function(inlineScript![1])).not.toThrow();
+  });
+
   it("restarts the admin app it never used to touch", () => {
     const source = readFileSync(resetWorkflowPath, "utf8");
 

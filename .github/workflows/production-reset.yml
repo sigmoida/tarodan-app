@@ -190,7 +190,7 @@ jobs:
                 url.hostname,
                 decodeURIComponent(url.username),
                 decodeURIComponent(url.password),
-                decodeURIComponent(url.pathname.replace(/^\\//, "")),
+                decodeURIComponent(url.pathname.slice(1)),
               ];
               for (const value of values) {
                 process.stdout.write(Buffer.from(value).toString("base64") + "\n");
