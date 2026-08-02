@@ -206,6 +206,32 @@ const nextConfig = {
         destination: '/manufacturers',
         permanent: true,
       },
+      // "İade ve Değişim" (/returns-exchanges) ile "İade Politikası"
+      // (/refund-policy) aynı konuydu; iade + iptal koşullarının tamamı
+      // /refund-policy'de birleşti.
+      {
+        source: '/returns-exchanges',
+        destination: '/refund-policy',
+        permanent: true,
+      },
+      {
+        source: '/en/returns-exchanges',
+        destination: '/en/refund-policy',
+        permanent: true,
+      },
+      // Yardım Merkezi (/help) ile Destek Merkezi (/support) tek sayfada
+      // birleşti — kendine yardım içeriği ve talep açma aynı yolculuğun iki
+      // adımıydı. localePrefix 'as-needed' olduğu için /en varyantı ayrı satır.
+      {
+        source: '/help',
+        destination: '/support',
+        permanent: true,
+      },
+      {
+        source: '/en/help',
+        destination: '/en/support',
+        permanent: true,
+      },
       // /guvenli-takas → /secure-swap (route slug İngilizce'ye çevrildi).
       {
         source: '/guvenli-takas',

@@ -67,7 +67,11 @@ function splitLocale(pathname: string): { locale: string; rest: string } {
  * standalone authed pages; and the guest-only auth pages.
  */
 function isAuthRelevant(path: string): boolean {
-  if (/^\/(profile|seller|products|support)(\/|$)/.test(path)) return true;
+  if (/^\/(profile|seller|products)(\/|$)/.test(path)) return true;
+  // `/support` yardım içeriğini de barındırdığı için (eski /help ile birleşti)
+  // kök sayfa herkese açıktır; giriş gerektiren kısmı sayfa içinde kendi
+  // kartıyla anlatır. Talep DETAYI (`/support/<id>`) korumalı kalır.
+  if (/^\/support\/.+/.test(path)) return true;
   if (
     /^\/(login|register|forgot-password|reset-password|verify-email)(\/|$)/.test(
       path,
