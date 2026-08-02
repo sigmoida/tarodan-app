@@ -7,6 +7,7 @@ import { useTabParam } from "@/hooks/useTabParam";
 import { invoiceTabs } from "./_lib/types";
 import { ElogoInvoicesTab } from "./_components/ElogoInvoicesTab";
 import { SellerInvoicesTab } from "./_components/SellerInvoicesTab";
+import { InvoicesSummary } from "./_components/InvoicesSummary";
 import { useTranslations } from "next-intl";
 
 export default function InvoicesPage() {
@@ -19,6 +20,7 @@ export default function InvoicesPage() {
         title={t("admin.finance.invoices.title")}
         description={t("admin.finance.invoices.subtitle")}
       />
+      <InvoicesSummary />
       <AdminTabs tabs={invoiceTabs(t)} value={tab} onChange={setTab} />
 
       {tab === "seller" ? <SellerInvoicesTab /> : <ElogoInvoicesTab />}

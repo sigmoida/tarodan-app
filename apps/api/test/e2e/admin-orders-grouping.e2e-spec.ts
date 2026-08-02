@@ -64,6 +64,7 @@ describe("Admin orders — group-based pagination (cati)", () => {
     });
     const pkg = await prisma.orderPackage.create({
       data: {
+        packageNumber: `PKG-${uniq}`,
         checkoutGroupId: group.id,
         sellerId: seller.id,
         buyerId: buyer.id,

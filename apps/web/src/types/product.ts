@@ -49,6 +49,9 @@ export interface Product {
   scale?: string;
   year?: number | string;
   condition?: string;
+  /** Niyet VE yetki: satıcının üyeliği takasa uygunsa true (API türetir). */
+  tradeAvailable?: boolean;
+  /** @deprecated eski alan — `tradeAvailable` kullanın. */
   trade_available?: boolean;
   isTradeEnabled?: boolean;
   isPreorder?: boolean;

@@ -18,6 +18,7 @@ import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { OrderService } from "../order/order.service";
 import { PaymentService } from "../payment/payment.service";
 import { NotificationService } from "../notification/notification.service";
+import { sellerNetAmountOf } from "../order/order-net.helper";
 
 /**
  * Admin sipariş işlemleri (+ unbanUser kullanıcı moderasyonu) — AdminAnalyticsService'ten
@@ -185,6 +186,332 @@ export class AdminAnalyticsOrderService {
             carrier: order.shipment.provider,
           }
         : null,
+    };
+  }
+
+  /**
+   * Admin "grup dosyası": sipariş id'sinden grup çatısına çözülen TEK payload.
+   * GET /admin/orders/:id/file — grup başlığı + tek ödeme (iade toplamıyla) +
+   * paket başına satıcı/kargo kırılımı + sipariş başına tam finans (stopaj/KDV
+   * dahil), GERÇEK escrow hold'u, iade talepleri ve komisyon defteri. Grupsuz
+   * (ör. teklif) sipariş tek paketlik sentetik dosya olur.
+   */
+  async getOrderGroupFile(orderId: string) {
+    const anchor = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, checkoutGroupId: true },
+    });
+    if (!anchor) {
+      throw new NotFoundException("Sipariş bulunamadı");
+    }
+
+    const orderInclude = {
+      buyer: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          phone: true,
+          isVerified: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          sellerType: true,
+          isVerified: true,
+        },
+      },
+      product: {
+        select: {
+          id: true,
+          title: true,
+          images: {
+            take: 1,
+            orderBy: { sortOrder: "asc" as const },
+            select: { cardKey: true },
+          },
+        },
+      },
+      package: true,
+      shipment: {
+        select: {
+          id: true,
+          provider: true,
+          status: true,
+          trackingNumber: true,
+          providerTrackingId: true,
+          shippedAt: true,
+          deliveredAt: true,
+        },
+      },
+      refundRequests: { orderBy: { createdAt: "desc" as const } },
+      commissionLedger: true,
+    };
+
+    const isGroup = !!anchor.checkoutGroupId;
+    const [group, orders] = await Promise.all([
+      isGroup
+        ? this.prisma.checkoutGroup.findUnique({
+            where: { id: anchor.checkoutGroupId! },
+            include: { payment: { include: { refundAttempts: true } } },
+          })
+        : Promise.resolve(null),
+      this.prisma.order.findMany({
+        where: isGroup
+          ? { checkoutGroupId: anchor.checkoutGroupId! }
+          : { id: orderId },
+        include: isGroup
+          ? orderInclude
+          : {
+              ...orderInclude,
+              payment: { include: { refundAttempts: true } },
+            },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
+
+    const holds = await this.prisma.paymentHold.findMany({
+      where: { orderId: { in: orders.map((o) => o.id) } },
+    });
+    const holdByOrderId = new Map(holds.map((h: any) => [h.orderId, h]));
+
+    const rawPayment: any = isGroup
+      ? (group as any)?.payment
+      : (orders[0] as any)?.payment;
+    const payment = rawPayment
+      ? {
+          id: rawPayment.id,
+          status: rawPayment.status,
+          amount: Number(rawPayment.amount),
+          provider: rawPayment.provider ?? null,
+          providerPaymentId: rawPayment.providerPaymentId ?? null,
+          paidAt: rawPayment.paidAt ?? null,
+          // Grup ödemesi sepetin TAMAMINI kapsar — UI tek siparişin yanında
+          // gösterirken bunu etiketlemek zorunda.
+          coversWholeGroup: isGroup,
+          refundedTotal: (rawPayment.refundAttempts ?? [])
+            .filter(
+              (a: any) => a.status === "succeeded" || a.status === "finalized",
+            )
+            .reduce((sum: number, a: any) => sum + Number(a.amount), 0),
+        }
+      : null;
+
+    // Misafir alıcı çözümü getOrderById ile aynı kural.
+    const first: any = orders[0];
+    const sa0 = (first?.shippingAddress as any) || {};
+    const isGuestOrder =
+      first?.buyer?.email === "guest@tarodan.system" ||
+      first?.buyer?.displayName === "GUEST_SYSTEM" ||
+      sa0?.isGuestOrder === true;
+    const buyer = first?.buyer
+      ? isGuestOrder
+        ? {
+            ...first.buyer,
+            displayName:
+              sa0?.guestName ||
+              sa0?.fullName ||
+              sa0?.guestEmail ||
+              sa0?.email ||
+              "Misafir",
+            email: sa0?.guestEmail || sa0?.email || first.buyer.email,
+            isGuest: true,
+          }
+        : { ...first.buyer, isGuest: false }
+      : null;
+
+    const num = (v: any) => Number(v ?? 0);
+    const orderFile = (o: any) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      status: o.status,
+      cancellationType: o.cancellationType ?? null,
+      cancelReason: o.cancelReason ?? null,
+      createdAt: o.createdAt,
+      deliveredAt: o.deliveredAt ?? null,
+      completedAt: o.completedAt ?? null,
+      confirmationDeadline: o.confirmationDeadline ?? null,
+      buyerConfirmedAt: o.buyerConfirmedAt ?? null,
+      product: {
+        id: o.product?.id ?? o.productId,
+        title: o.product?.title ?? null,
+        imageUrl: o.product?.images?.[0]
+          ? this.common.resolveProductImageUrl(o.product.images[0].cardKey)
+          : null,
+      },
+      quantity: o.quantity ?? 1,
+      unitPrice: o.unitPrice != null ? Number(o.unitPrice) : null,
+      finance: {
+        subtotal: o.subtotal != null ? Number(o.subtotal) : num(o.totalAmount),
+        discountAmount: num(o.discountAmount),
+        discountCode: o.discountCode ?? null,
+        platformFundedDiscount: num(o.platformFundedDiscount),
+        buyerShippingAmount: num(o.buyerShippingAmount),
+        sellerShippingAmount: num(o.sellerShippingAmount),
+        buyerFeeAmount: num(o.buyerFeeAmount),
+        buyerCommissionAmount: num(o.buyerCommissionAmount),
+        buyerServiceFeeAmount: num(o.buyerServiceFeeAmount),
+        sellerFeeAmount: num(o.sellerFeeAmount),
+        sellerCommissionAmount: num(o.sellerCommissionAmount),
+        sellerPlatformFeeAmount: num(o.sellerPlatformFeeAmount),
+        commissionAmount: num(o.commissionAmount),
+        taxAmount: num(o.taxAmount),
+        withholdingTaxAmount: num(o.withholdingTaxAmount),
+        // Hizmet bedeli KDV'si: alıcı tarafı tahsil edildi, satıcı tarafı kesilir.
+        buyerServiceTaxAmount: num(o.buyerServiceTaxAmount),
+        sellerServiceTaxAmount: num(o.sellerServiceTaxAmount),
+        // Tahsil anındaki oran — ekran kalem bazında KDV'yi bununla türetir.
+        serviceVatRate: num(o.serviceVatRate),
+        totalAmount: num(o.totalAmount),
+        // Bilgilendirici net; kesin ödeme tutarı escrow.amount'tır. Formül ORTAK
+        // helper'dan gelir — bu hesap eskiden burada elle yazılıyordu ve kargo
+        // payını düşmediği için sipariş yanıtındaki netten sapıyordu.
+        sellerNetAmount: sellerNetAmountOf({
+          subtotal:
+            o.subtotal != null ? Number(o.subtotal) : num(o.totalAmount),
+          productTaxAmount: num(o.taxAmount),
+          sellerFeeAmount: num(o.sellerFeeAmount),
+          withholdingTaxAmount: num(o.withholdingTaxAmount),
+          sellerShippingAmount: num(o.sellerShippingAmount),
+          sellerServiceTaxAmount: num(o.sellerServiceTaxAmount),
+        }),
+      },
+      escrow: (() => {
+        const h: any = holdByOrderId.get(o.id);
+        if (!h) return null;
+        return {
+          id: h.id,
+          amount: Number(h.amount),
+          status: h.status,
+          releaseAt: h.releaseAt ?? null,
+          releasedAt: h.releasedAt ?? null,
+          refundedAmount: Number(h.refundedAmount ?? 0),
+          frozenByRefundId: h.frozenByRefundId ?? null,
+        };
+      })(),
+      refundRequests: (o.refundRequests ?? []).map((r: any) => ({
+        id: r.id,
+        refundNumber: r.refundNumber,
+        status: r.status,
+        reason: r.reason,
+        amount: Number(r.amount),
+        refundQuantity: r.refundQuantity ?? 1,
+        createdAt: r.createdAt,
+        refundedAt: r.refundedAt ?? null,
+      })),
+      ledger: o.commissionLedger
+        ? {
+            status: o.commissionLedger.status,
+            sellerCommission: Number(o.commissionLedger.sellerCommission),
+            buyerFee: Number(o.commissionLedger.buyerFee),
+            refundedSellerCommission: Number(
+              o.commissionLedger.refundedSellerCommission ?? 0,
+            ),
+            refundedBuyerFee: Number(o.commissionLedger.refundedBuyerFee ?? 0),
+          }
+        : null,
+    });
+
+    // Paketleme: packageId → satıcı paketi; yoksa satıcıya düş (sentetik dahil).
+    const pkgMap = new Map<string, any[]>();
+    for (const o of orders) {
+      const key = (o as any).packageId ?? `seller:${o.sellerId}`;
+      const arr = pkgMap.get(key);
+      if (arr) arr.push(o);
+      else pkgMap.set(key, [o]);
+    }
+    const packages = [...pkgMap.entries()].map(([key, pkgOrders]) => {
+      const meta: any = pkgOrders.find((o: any) => o.package)?.package ?? null;
+      const sh =
+        pkgOrders
+          .map((o: any) => o.shipment)
+          .find((s: any) => s?.providerTrackingId) ??
+        pkgOrders.map((o: any) => o.shipment).find(Boolean) ??
+        null;
+      const sum = (f: string) =>
+        pkgOrders.reduce((s: number, o: any) => s + num(o[f]), 0);
+      const seller: any = (pkgOrders[0] as any).seller;
+      return {
+        packageId: meta?.id ?? (key.startsWith("seller:") ? null : key),
+        seller: seller
+          ? {
+              id: seller.id,
+              displayName: seller.displayName,
+              email: seller.email ?? null,
+              sellerType: seller.sellerType ?? null,
+              isVerified: seller.isVerified ?? false,
+            }
+          : null,
+        shipping: meta
+          ? {
+              fullShippingAmount: num(meta.fullShippingAmount),
+              buyerShippingAmount: num(meta.buyerShippingAmount),
+              sellerShippingAmount: num(meta.sellerShippingAmount),
+              billableDesi: meta.billableDesi ?? null,
+            }
+          : {
+              // Paket meta yok (sentetik/eski) → sipariş kolonlarından türet.
+              fullShippingAmount:
+                sum("buyerShippingAmount") + sum("sellerShippingAmount"),
+              buyerShippingAmount: sum("buyerShippingAmount"),
+              sellerShippingAmount: sum("sellerShippingAmount"),
+              billableDesi: null,
+            },
+        shipment: sh
+          ? {
+              id: sh.id,
+              provider: sh.provider,
+              status: sh.status,
+              trackingNumber: sh.trackingNumber ?? null,
+              providerTrackingId: sh.providerTrackingId ?? null,
+              shippedAt: sh.shippedAt ?? null,
+              deliveredAt: sh.deliveredAt ?? null,
+            }
+          : null,
+        orders: pkgOrders.map(orderFile),
+      };
+    });
+
+    const sellerIds = new Set(orders.map((o) => o.sellerId));
+    return {
+      // Sepet tek adrese gider — grup dosyasının teslimat adresi ilk siparişten.
+      shippingAddress: (first?.shippingAddress as any) ?? null,
+      group: {
+        kind: isGroup ? ("group" as const) : ("synthetic" as const),
+        id: isGroup ? (group as any).id : orders[0].id,
+        groupNumber: isGroup
+          ? ((group as any).groupNumber ?? (group as any).id)
+          : orders[0].orderNumber,
+        createdAt: isGroup ? (group as any).createdAt : orders[0].createdAt,
+        itemCount: orders.length,
+        packageCount: packages.length,
+        isMultiSeller: sellerIds.size > 1,
+        totals: {
+          subtotal: orders.reduce(
+            (s, o: any) =>
+              s +
+              (o.subtotal != null ? Number(o.subtotal) : num(o.totalAmount)),
+            0,
+          ),
+          shippingCost: orders.reduce(
+            (s, o: any) => s + num(o.buyerShippingAmount),
+            0,
+          ),
+          discountAmount: orders.reduce(
+            (s, o: any) => s + num(o.discountAmount),
+            0,
+          ),
+          totalAmount: isGroup
+            ? Number((group as any).totalAmount)
+            : num((orders[0] as any).totalAmount),
+        },
+      },
+      buyer,
+      payment,
+      packages,
     };
   }
 
@@ -606,6 +933,8 @@ export class AdminAnalyticsOrderService {
         updatedShipment = await tx.shipment.create({
           data: {
             orderId,
+            // Koli bağı — manuel admin girişi de paketi kaybetmez.
+            packageId: fresh.packageId ?? null,
             trackingNumber: dto.trackingNumber,
             providerTrackingId: dto.trackingNumber,
             provider: dto.carrier,

@@ -161,6 +161,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
           min={0}
           label={t("admin.system.testTools.minutesAfterInput")}
           value={minutes}
+          placeholder="15"
           onChange={(e) => setMinutes(Number(e.target.value))}
           className="w-28"
         />
@@ -169,6 +170,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
           min={0}
           label={t("admin.system.testTools.daysBackInput")}
           value={days}
+          placeholder="7"
           onChange={(e) => setDays(Number(e.target.value))}
           className="w-28"
         />

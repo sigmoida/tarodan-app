@@ -4,8 +4,10 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export interface User {
   id: string;
+  adminCode: string;
   email: string;
   displayName: string;
+  avatarUrl?: string;
   phone?: string;
   isSeller: boolean;
   isVerified: boolean;
@@ -26,8 +28,10 @@ export interface User {
 export function mapUsers(raw: any[]): User[] {
   return raw.map((u: any) => ({
     id: u.id,
+    adminCode: u.adminCode,
     email: u.email,
     displayName: u.displayName ?? u.email?.split("@")[0] ?? "-",
+    avatarUrl: u.avatarUrl,
     phone: u.phone,
     isSeller: u.isSeller,
     isVerified: u.isVerified,

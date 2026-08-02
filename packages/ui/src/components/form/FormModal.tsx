@@ -33,6 +33,8 @@ export interface FormModalProps<T extends FieldValues> {
   resetValues?: T;
   submitLabel?: string;
   cancelLabel?: string;
+  closeLabel?: string;
+  size?: ModalProps["size"];
   maxWidth?: ModalProps["maxWidth"];
   /** Optional width/layout override for editor-style split panes. */
   modalClassName?: string;
@@ -62,7 +64,9 @@ export function FormModal<T extends FieldValues>({
   resetValues,
   submitLabel = "Kaydet",
   cancelLabel = "İptal",
-  maxWidth = "max-w-lg",
+  closeLabel = "Kapat",
+  size = "lg",
+  maxWidth,
   modalClassName,
   closeOnBackdrop,
   discardConfirmation = defaultDiscardConfirmation,
@@ -95,18 +99,24 @@ export function FormModal<T extends FieldValues>({
       isOpen={open}
       onClose={close}
       title={title}
+      size={size}
       maxWidth={maxWidth}
       className={modalClassName}
       closeOnBackdrop={closeOnBackdrop}
-    >
-      <Form form={form} onSubmit={onSubmit} className="space-y-4">
-        {children}
+      closeLabel={closeLabel}
+      dismissDisabled={pending}
+      footer={
         <ModalFooter
           onCancel={close}
+          onConfirm={() => void form.handleSubmit(onSubmit)()}
           cancelLabel={cancelLabel}
           confirmLabel={submitLabel}
           isLoading={pending}
         />
+      }
+    >
+      <Form form={form} onSubmit={onSubmit} className="space-y-4">
+        {children}
       </Form>
     </Modal>
   );

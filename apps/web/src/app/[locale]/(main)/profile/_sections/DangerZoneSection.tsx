@@ -7,12 +7,14 @@ import {
   ExclamationTriangleIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { Button, Input, Modal } from "@tarodan/ui";
+import { Button, Input, Modal, ModalFooter } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import SectionCard from "@/components/ui/SectionCard";
 import { useDeleteAccount } from "../_hooks/useDeleteAccount";
 
 /** Account deletion — type-to-confirm modal. */
 export default function DangerZoneSection() {
+  const t = useTranslations();
   const del = useDeleteAccount();
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -24,7 +26,7 @@ export default function DangerZoneSection() {
 
   return (
     <SectionCard
-      title="Tehlikeli Bölge"
+      title={t("settings.dangerZone")}
       className="border-danger-200 bg-danger-50"
       action={
         <Button
@@ -35,52 +37,49 @@ export default function DangerZoneSection() {
           onClick={() => setOpen(true)}
         >
           <TrashIcon className="h-4 w-4" />
-          Hesabı Sil
+          {t("settings.deleteAccount")}
         </Button>
       }
     >
       <p className="text-sm text-danger-700">
-        Hesabınızı ve tüm verilerinizi kalıcı olarak silin. Bu işlem geri
-        alınamaz.
+        {t("settings.deleteAccountDetails")}
       </p>
 
       <Modal
         isOpen={open}
         onClose={close}
-        title="Hesabı Sil?"
-        maxWidth="max-w-md"
+        title={t("settings.deleteAccount")}
+        size="md"
+        closeLabel={t("common.close")}
+        dismissDisabled={del.isPending}
+        footer={
+          <ModalFooter
+            onCancel={close}
+            onConfirm={() => del.mutate()}
+            cancelLabel={t("common.cancel")}
+            confirmLabel={t("collection.yesDelete")}
+            destructive
+            isLoading={del.isPending}
+            disabled={confirmText !== t("settings.deleteAccountKeyword")}
+          />
+        }
       >
         <div className="mb-6 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-danger-100">
             <ExclamationTriangleIcon className="h-8 w-8 text-danger-600" />
           </div>
-          <p className="text-muted">
-            Bu işlem geri alınamaz. Tüm verileriniz, ilanlarınız ve sipariş
-            geçmişiniz kalıcı olarak silinecektir.
-          </p>
+          <p className="text-muted">{t("settings.deleteAccountWarning")}</p>
         </div>
         <label className="mb-2 block text-sm font-medium text-body">
-          Onaylamak için SİL yazın:
+          {t("settings.deleteAccountTypePrompt", {
+            keyword: t("settings.deleteAccountKeyword"),
+          })}
         </label>
         <Input
           value={confirmText}
           onChange={(e) => setConfirmText(e.target.value)}
-          placeholder="SİL"
+          placeholder={t("settings.deleteAccountKeyword")}
         />
-        <div className="mt-6 flex gap-3">
-          <Button variant="secondary" className="flex-1" onClick={close}>
-            İptal
-          </Button>
-          <Button
-            variant="danger"
-            className="flex-1"
-            disabled={confirmText !== "SİL"}
-            isLoading={del.isPending}
-            onClick={() => del.mutate()}
-          >
-            Evet, Sil
-          </Button>
-        </div>
       </Modal>
     </SectionCard>
   );

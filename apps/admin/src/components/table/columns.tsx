@@ -13,6 +13,7 @@ import {
   CellMoney,
   CellMuted,
   CellNumber,
+  CellProduct,
   CellText,
   CellUser,
   type MoneyTone,
@@ -72,6 +73,7 @@ const SORT_TYPE: Partial<Record<keyof typeof DEFAULTS, SortType>> = {
   code: "text",
   link: "text",
   user: "text",
+  product: "text",
   money: "number",
   number: "number",
   date: "date",
@@ -99,23 +101,22 @@ function field<T, V>(
   return [get, resolved];
 }
 
-// minWidth = the column's base px width: both its share of the horizontal-scroll
-// threshold (Σ minWidth) and its proportional growth weight on wide screens. `grow`
-// NO LONGER affects width (the table is driven by `<table>` min-width + `table-fixed`);
-// we keep the field for backward compatibility. To widen/narrow a column, set
-// `minWidth`.
+// minWidth is the column's base width and, for flexible columns, its proportional
+// growth weight. Fixed columns stay at minWidth while flexible columns share the
+// remaining table space. `grow` is retained only for backward compatibility.
 const DEFAULTS = {
-  text: { grow: 3, minWidth: 160, align: "left" },
-  muted: { grow: 2, minWidth: 140, align: "left" },
+  text: { grow: 3, minWidth: 180, align: "left" },
+  muted: { grow: 2, minWidth: 180, align: "left" },
   money: { grow: 1, minWidth: 120, align: "left" },
   number: { grow: 1, minWidth: 100, align: "left" },
-  date: { grow: 1, minWidth: 120, align: "left" },
+  date: { grow: 1, minWidth: 140, align: "left" },
   code: { grow: 2, minWidth: 140, align: "left" },
-  link: { grow: 3, minWidth: 150, align: "left" },
-  user: { grow: 4, minWidth: 190, align: "left" },
+  link: { grow: 3, minWidth: 180, align: "left" },
+  user: { grow: 4, minWidth: 280, align: "left" },
+  product: { grow: 4, minWidth: 300, align: "left" },
   badge: { grow: 1, minWidth: 160, align: "left" },
-  actions: { grow: 1, minWidth: 120, align: "right" },
-  custom: { grow: 2, minWidth: 160, align: "left" },
+  actions: { grow: 1, minWidth: 96, align: "right" },
+  custom: { grow: 2, minWidth: 180, align: "left" },
 } as const;
 
 function base<T>(
@@ -150,6 +151,7 @@ function base<T>(
     meta: {
       align: opts.align ?? d.align,
       minWidth: Math.max(configuredMin, headerMin),
+      fixed: opts.fixed,
       grow: opts.grow ?? d.grow,
       exportHeader: typeof header === "string" ? header : undefined,
       exportValue: opts.exportValue,
@@ -159,10 +161,22 @@ function base<T>(
 }
 
 export const col = {
-  /** Free text (truncate + hover). Pass a field key to make it sortable. */
-  text<T>(header: ReactNode, get: Accessor<T, ReactNode>, opts?: ColOpts) {
+  /**
+   * Free text (truncate + hover). Pass a field key to make it sortable.
+   * `wrap: true` kırpma yerine satır kaydırır — uzun etiketler için.
+   */
+  text<T>(
+    header: ReactNode,
+    get: Accessor<T, ReactNode>,
+    opts?: ColOpts & { wrap?: boolean },
+  ) {
     const [g, o] = field(get, opts);
-    return base<T>("text", header, (r) => <CellText value={g(r)} />, o);
+    return base<T>(
+      "text",
+      header,
+      (r) => <CellText value={g(r)} wrap={opts?.wrap} />,
+      o,
+    );
   },
   /** Secondary/muted text. Pass a field key to make it sortable. */
   muted<T>(header: ReactNode, get: Accessor<T, ReactNode>, opts?: ColOpts) {
@@ -240,10 +254,14 @@ export const col = {
   /** Person/entity (name + optional sub-line). */
   user<T>(
     header: ReactNode,
-    get: (
-      r: T,
-    ) =>
-      | { name?: ReactNode; secondary?: ReactNode; href?: string | null }
+    get: (r: T) =>
+      | {
+          name?: ReactNode;
+          secondary?: ReactNode;
+          tertiary?: ReactNode;
+          avatar?: string | null;
+          href?: string | null;
+        }
       | null
       | undefined,
     opts?: ColOpts,
@@ -254,10 +272,51 @@ export const col = {
       (r) => {
         const v = get(r);
         return (
-          <CellUser name={v?.name} secondary={v?.secondary} href={v?.href} />
+          <CellUser
+            name={v?.name}
+            secondary={v?.secondary}
+            tertiary={v?.tertiary}
+            avatar={v?.avatar}
+            href={v?.href}
+          />
         );
       },
       { exportValue: (r) => toText(get(r as T)?.name), ...opts },
+    );
+  },
+  /** Product (thumbnail + title + optional supporting lines). */
+  product<T>(
+    header: ReactNode,
+    get: (r: T) =>
+      | {
+          title?: ReactNode;
+          secondary?: ReactNode;
+          tertiary?: ReactNode;
+          image?: string | null;
+          imageCount?: number | null;
+          href?: string | null;
+        }
+      | null
+      | undefined,
+    opts?: ColOpts,
+  ) {
+    return base<T>(
+      "product",
+      header,
+      (r) => {
+        const v = get(r);
+        return (
+          <CellProduct
+            title={v?.title}
+            secondary={v?.secondary}
+            tertiary={v?.tertiary}
+            image={v?.image}
+            imageCount={v?.imageCount}
+            href={v?.href}
+          />
+        );
+      },
+      { exportValue: (r) => toText(get(r as T)?.title), ...opts },
     );
   },
   /** Badge (no wrap). `render` returns the badge JSX. */
@@ -280,6 +339,7 @@ export const col = {
       (r) => <CellActions>{render(r)}</CellActions>,
       {
         id: "actions",
+        fixed: true,
         ...opts,
       },
     );
@@ -301,7 +361,7 @@ export const col = {
           <RowActionMenu items={getItems(r)} />
         </CellActions>
       ),
-      { id: "actions", minWidth: 72, ...opts },
+      { id: "actions", minWidth: 72, fixed: true, ...opts },
     );
   },
   /** Escape hatch — free JSX but still with alignment/width meta. */

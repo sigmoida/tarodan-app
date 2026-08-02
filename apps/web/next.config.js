@@ -34,26 +34,20 @@ function getCacheHeaders() {
       source: '/favicon.ico',
       headers: [{ key: 'Cache-Control', value: oneDay }],
     },
-    {
-      source: '/tarodanfavicon.png',
+    // Kabuk varlıkları (favicon/logolar @tarodan/brand'dan üretilir; rozetler +
+    // placeholder repo'da) — hepsi kökte, tek tek 1 haftalık cache alır.
+    ...[
+      '/tarodan-favicon.png',
+      '/tarodan-logo.jpg',
+      '/tarodan-logo-transparent.png',
+      '/product-placeholder.svg',
+      '/app-store-badge.svg',
+      '/google-play-badge.svg',
+      '/secure-payment-badge.svg',
+    ].map((source) => ({
+      source,
       headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
-    {
-      source: '/logo.svg',
-      headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
-    {
-      source: '/tarodan-logo.jpg',
-      headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
-    {
-      source: '/images/:path*',
-      headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
-    {
-      source: '/photos/:path*',
-      headers: [{ key: 'Cache-Control', value: oneWeek }],
-    },
+    })),
   ];
 }
 
@@ -91,6 +85,7 @@ const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
   transpilePackages: [
+    '@tarodan/shared',
     '@tarodan/ui',
     '@tarodan/design-tokens',
     '@tarodan/api-client',
@@ -124,18 +119,6 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'placehold.co',
-      },
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-      },
-      {
-        protocol: 'https',
-        hostname: 'via.placeholder.com',
-      },
-      {
         protocol: 'http',
         hostname: 'localhost',
       },
@@ -145,31 +128,11 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'autopartia.com',
-      },
-      {
-        protocol: 'http',
-        hostname: 'autopartia.com',
-      },
-      {
-        protocol: 'https',
         hostname: 'amzn-tarodan.s3.eu-west-1.amazonaws.com',
       },
       {
         protocol: 'https',
         hostname: 's3.eu-west-1.amazonaws.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'api.dicebear.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'ui-avatars.com',
       },
     ],
     dangerouslyAllowSVG: true,
@@ -186,8 +149,9 @@ const nextConfig = {
     return {
       beforeFiles: [
         {
+          // @tarodan/brand'dan sync-brand-assets.mjs ile üretilir (build artifact).
           source: '/favicon.ico',
-          destination: '/tarodanfavicon.png',
+          destination: '/tarodan-favicon.png',
         },
         {
           source: '/api/payment/callback/:path*',

@@ -4,6 +4,7 @@
 
 import { api, listingsApi, brandsApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
+import type { PackageTierCode } from "./usePackageTiers";
 import {
   EXCLUDED_BRAND_SLUGS,
   EXCLUDED_SCALE_SLUGS,
@@ -122,20 +123,14 @@ export function useCarModels(brandSlug: string | undefined) {
   };
 }
 
-/** Estimated platform fee / net for a price + category. */
+/** Estimated platform fee / net for a price + category + package size. */
 export function useCommissionPreview(
   price: string | number,
   categoryId: string,
-  shippingDesi: string | number = 1,
+  packageTier: PackageTierCode = "small",
 ) {
   const amount = Number(price);
-  const desi = Number(shippingDesi);
-  const enabled =
-    !!price &&
-    !Number.isNaN(amount) &&
-    amount > 0 &&
-    Number.isInteger(desi) &&
-    desi >= 1;
+  const enabled = !!price && !Number.isNaN(amount) && amount > 0;
   const query = useWebList<{
     sellerFeeAmount: number;
     withholdingTaxAmount: number;
@@ -143,13 +138,13 @@ export function useCommissionPreview(
     sellerNetAmount: number;
   }>({
     resource: "listing-form-commission",
-    params: [String(price), categoryId, String(shippingDesi)],
+    params: [String(price), categoryId, packageTier],
     fetcher: async () => {
       const res = await api.get("/orders/commission-preview", {
         params: {
           amount: price,
           categoryId: categoryId || undefined,
-          shippingDesi: desi,
+          packageTier,
         },
       });
       return {

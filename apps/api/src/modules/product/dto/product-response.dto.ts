@@ -40,6 +40,12 @@ export class ProductResponseDto {
   @ApiProperty({ example: "uuid" })
   id: string;
 
+  @ApiProperty({
+    example: "U010001",
+    description: "İnsan-okunur ilan numarası (kalıcı)",
+  })
+  productCode: string;
+
   @ApiProperty({ example: "Vintage Star Wars Action Figure" })
   title: string;
 

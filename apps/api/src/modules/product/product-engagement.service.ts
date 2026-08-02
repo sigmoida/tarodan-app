@@ -219,6 +219,50 @@ export class ProductEngagementService {
   }
 
   /**
+   * Count a marketplace-card click separately from a detail-page view.
+   * Repeated clicks from the same visitor are limited to one per 30 minutes.
+   */
+  async incrementClickCount(
+    productId: string,
+    userId?: string,
+    clientIp?: string,
+    userAgent?: string,
+  ): Promise<{ clickCount: number }> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { sellerId: true, clickCount: true },
+    });
+    if (!product) {
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
+    }
+    if (userId && product.sellerId === userId) {
+      return { clickCount: product.clickCount };
+    }
+    if (this.isBot(userAgent)) {
+      return { clickCount: product.clickCount };
+    }
+
+    const identifier = userId || clientIp || "unknown";
+    try {
+      const { allowed } = await this.cache.checkRateLimit(
+        `clickCount:${productId}:${identifier}`,
+        1,
+        1800,
+      );
+      if (!allowed) return { clickCount: product.clickCount };
+    } catch {
+      // Count the click when Redis is unavailable.
+    }
+
+    const updated = await this.prisma.product.update({
+      where: { id: productId },
+      data: { clickCount: { increment: 1 } },
+      select: { clickCount: true },
+    });
+    return updated;
+  }
+
+  /**
    * Check if user agent indicates a bot
    */
   private isBot(userAgent?: string): boolean {

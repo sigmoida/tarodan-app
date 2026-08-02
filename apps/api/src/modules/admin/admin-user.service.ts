@@ -7,6 +7,10 @@ import {
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { AdminAuditService } from "./admin-audit.service";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { enqueueTradeListingReindex } from "../membership/trade-listing-reindex";
 import { fulltextUserSearch } from "../../common/helpers/fulltext-search";
 import { AdminUserQueryDto } from "./dto";
 import { Prisma, MembershipTierType, SubscriptionStatus } from "@prisma/client";
@@ -31,6 +35,11 @@ export class AdminUserService {
     private readonly audit: AdminAuditService,
     @Optional()
     private readonly storageService: StorageService,
+    // Admin katman değişikliği takas yetkisini değiştirir; arama dokümanı
+    // (sellerCanTrade) ancak reindex'le tazelenir.
+    @Optional()
+    @InjectQueue(QUEUE_NAMES.SEARCH)
+    private readonly searchQueue?: Queue,
   ) {}
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -132,8 +141,11 @@ export class AdminUserService {
 
     const select = {
       id: true,
+      adminCode: true,
+      username: true,
       email: true,
       displayName: true,
+      avatarUrl: true,
       phone: true,
       isSeller: true,
       sellerType: true,
@@ -575,6 +587,7 @@ export class AdminUserService {
       membership,
       updated,
     );
+    await enqueueTradeListingReindex(this.prisma, this.searchQueue, userId);
     return updated;
   }
 
@@ -666,6 +679,8 @@ export class AdminUserService {
       existing,
       updated,
     );
+    // Best-effort: takas bayraklı ilanların arama dokümanı tazelensin.
+    await enqueueTradeListingReindex(this.prisma, this.searchQueue, userId);
     return updated;
   }
 }

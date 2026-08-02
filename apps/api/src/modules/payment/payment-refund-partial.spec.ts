@@ -373,4 +373,67 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       }),
     );
   });
+
+  it("holdRetainedAmount satıcının kargo payını hold'da bırakır (tam iade)", async () => {
+    // Escrow hold TAM kargoyu düştüğü için satıcı kendi payını peşin ödemiş sayılır.
+    // Cayma iadesinde bu pay satıcıya BIRAKILIR: hold tümüyle tüketilmez.
+    const { service, captured } = makeService({
+      paymentAmount: 1121,
+      holdAmount: 861,
+    });
+
+    await service.processRefund(ORDER_ID, 1000, {
+      idempotencyKey: "policy-refund-remorse-retain",
+      refundQuantity: 1,
+      settlement: {
+        closeOrder: true,
+        holdPortion: 1,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount: 39,
+      },
+    });
+
+    // 861 − 39 = 822 tüketilir; hold held kalır (39 satıcıya ödenecek).
+    expect(captured.holdUpdate.data).toEqual(
+      expect.objectContaining({ refundedAmount: 822, frozenByRefundId: null }),
+    );
+    expect(captured.holdUpdate.data.status).toBeUndefined();
+  });
+
+  it("holdRetainedAmount tüketimi YALNIZ aşağı çeker, asla yukarı", async () => {
+    // Kısmi iade oranı zaten bırakılacak tutardan azını tüketiyorsa dokunulmaz.
+    const { service, captured } = makeService({
+      paymentAmount: 1000,
+      holdAmount: 800,
+    });
+
+    await service.processRefund(ORDER_ID, 50, {
+      idempotencyKey: "policy-refund-retain-noop",
+      refundQuantity: 1,
+      settlement: { holdRetainedAmount: 100 },
+    });
+
+    // Oran tüketimi 40 (50/1000 × 800); 800 − 100 = 700 tavanının altında → 40 kalır.
+    expect(captured.holdUpdate.data).toEqual(
+      expect.objectContaining({ refundedAmount: 40 }),
+    );
+  });
+
+  it("bırakılacak tutar hold'u aşarsa hiç tüketim olmaz", async () => {
+    const { service, captured } = makeService({
+      paymentAmount: 200,
+      holdAmount: 30,
+    });
+
+    await service.processRefund(ORDER_ID, 200, {
+      idempotencyKey: "policy-refund-retain-over",
+      refundQuantity: 1,
+      settlement: { closeOrder: true, holdPortion: 1, holdRetainedAmount: 40 },
+    });
+
+    expect(captured.holdUpdate.data).toEqual(
+      expect.objectContaining({ refundedAmount: 0 }),
+    );
+  });
 });

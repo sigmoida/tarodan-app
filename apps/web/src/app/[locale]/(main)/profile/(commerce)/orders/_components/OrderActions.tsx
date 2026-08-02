@@ -21,11 +21,8 @@ export interface OrderActionHandlers {
   role: OrderRole;
   userEmail?: string;
   downloadingId: string | null;
-  cancellingId: string | null;
   onInvoice: (id: string) => void;
   onReorder: (order: Order) => void;
-  onCancel: (order: Order) => void;
-  onShip: (order: Order) => void;
   onReview: (order: Order) => void;
 }
 
@@ -43,11 +40,8 @@ export default function OrderActions({
   role,
   userEmail,
   downloadingId,
-  cancellingId,
   onInvoice,
   onReorder,
-  onCancel,
-  onShip,
   onReview,
 }: OrderActionsProps) {
   const t = useTranslations();
@@ -73,7 +67,6 @@ export default function OrderActions({
     (order.hasProductRating !== true || order.hasSellerRating !== true);
 
   const show = {
-    track: isBuyer && shipped && !cancelled,
     invoiceBuyer:
       isBuyer &&
       ["paid", "preparing", "shipped", "delivered", "completed"].includes(
@@ -81,30 +74,17 @@ export default function OrderActions({
       ),
     reorder: isBuyer && hasProduct && isTerminal,
     refundLink: !!refundId,
-    cancel:
-      !refundId &&
-      isBuyer &&
-      ["paid", "preparing"].includes(order.status) &&
-      !shipped,
     requestRefund:
       !refundId &&
       isBuyer &&
       shipped &&
       !["cancelled", "refunded"].includes(order.status),
-    sellerShip:
-      isSeller &&
-      ["paid", "preparing"].includes(order.status) &&
-      !order.shipment,
     sellerInvoice:
       isSeller && ["paid", "preparing", "shipped"].includes(order.status),
     review: canReview,
   };
 
-  const trackHref = `/track-order?orderNumber=${encodeURIComponent(
-    order.orderNumber,
-  )}&email=${encodeURIComponent(userEmail || "")}`;
   const downloading = downloadingId === order.id;
-  const cancelling = cancellingId === order.id;
 
   // Variant scheme: one filled `primary` CTA per state, `danger` for the
   // destructive action, and a uniform `outline` for every neutral/navigational
@@ -114,20 +94,6 @@ export default function OrderActions({
 
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      <ButtonLink
-        href={`/profile/orders/${order.id}`}
-        variant="outline"
-        size="sm"
-      >
-        {t("common.details")}
-      </ButtonLink>
-
-      {show.track && (
-        <ButtonLink href={trackHref} variant="outline" size="sm">
-          {t("order.trackOrder")}
-        </ButtonLink>
-      )}
-
       {show.invoiceBuyer && (
         <Button
           variant="outline"
@@ -158,39 +124,27 @@ export default function OrderActions({
           {t("order.viewRefundRequest")}
         </ButtonLink>
       ) : (
-        <>
-          {show.cancel && (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => onCancel(order)}
-              disabled={cancelling}
-            >
-              {cancelling ? t("common.cancelling") : t("order.cancelShort")}
-            </Button>
-          )}
-          {show.requestRefund && (
-            <ButtonLink
-              href={`/profile/orders/${order.id}`}
-              variant="outline"
-              size="sm"
-            >
-              {t("order.requestRefund")}
-            </ButtonLink>
-          )}
-        </>
+        show.requestRefund && (
+          <ButtonLink
+            href={`/profile/orders/${order.id}`}
+            variant="outline"
+            size="sm"
+          >
+            {t("order.requestRefund")}
+          </ButtonLink>
+        )
       )}
 
-      {show.sellerShip && (
-        <Button
+      {isSeller && order.status === "preparing" && (
+        <ButtonLink
+          href={`/profile/orders/${order.id}`}
           variant="primary"
           size="sm"
           className="gap-1"
-          onClick={() => onShip(order)}
         >
           <TruckIcon className="h-4 w-4" />
-          {t("order.addShippingInfo")}
-        </Button>
+          {t("order.viewCargoCode")}
+        </ButtonLink>
       )}
 
       {show.sellerInvoice && (

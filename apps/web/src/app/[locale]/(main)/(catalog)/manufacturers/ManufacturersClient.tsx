@@ -29,6 +29,10 @@ function ManufacturersLayout() {
     setExpanded,
   } = useManufacturers();
 
+  // Katalog boşken metrik satırı "0 Üretici · 0 Ülke · 70+ Yıllık Tarih · 0+
+  // Model" yazıyordu: üç sıfır ve aralarında alakasız duran bir sabit. Sayacak
+  // bir şey yoksa satırı hiç çizme.
+  const hasManufacturers = brands.length > 0;
   const stats = [
     { value: brands.length.toString(), label: "Üretici" },
     { value: countries.length.toString(), label: "Ülke" },
@@ -44,14 +48,20 @@ function ManufacturersLayout() {
       />
 
       {/* Metric cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {stats.map((stat) => (
-          <MetricCard key={stat.label} value={stat.value} label={stat.label} />
-        ))}
-      </div>
+      {hasManufacturers && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {stats.map((stat) => (
+            <MetricCard
+              key={stat.label}
+              value={stat.value}
+              label={stat.label}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Search / filters */}
-      <ManufacturersToolbar />
+      {hasManufacturers && <ManufacturersToolbar />}
 
       {/* Accordion brand cards */}
       {filteredBrands.length === 0 ? (
@@ -59,15 +69,26 @@ function ManufacturersLayout() {
           <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-lg bg-surface-alt">
             <MagnifyingGlassIcon className="h-8 w-8 text-subtle" />
           </div>
+          {/*
+            "Sonuç bulunamadı" + boş tırnak ("" aramasıyla eşleşen üretici yok)
+            hiç üretici GİRİLMEMİŞ olma durumunu arama sonucu sanıyordu. İki hal
+            artık ayrı: aramayı temizle butonu yalnız gerçek bir arama varken.
+          */}
           <h3 className="mb-1 text-lg font-bold text-heading">
-            Sonuç Bulunamadı
+            {hasManufacturers
+              ? "Sonuç Bulunamadı"
+              : "Üretici Listesi Hazırlanıyor"}
           </h3>
           <p className="mb-4 text-sm text-muted">
-            &quot;{searchQuery}&quot; aramasıyla eşleşen üretici yok.
+            {hasManufacturers
+              ? `"${searchQuery}" aramasıyla eşleşen üretici yok.`
+              : "Üreticiler eklendikçe burada listelenecek."}
           </p>
-          <Button variant="secondary" onClick={clearFilters}>
-            Filtreleri Temizle
-          </Button>
+          {hasManufacturers && (
+            <Button variant="secondary" onClick={clearFilters}>
+              Filtreleri Temizle
+            </Button>
+          )}
         </div>
       ) : (
         <Accordion

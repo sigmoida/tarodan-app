@@ -10,12 +10,8 @@ import { OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { StorageService } from "../storage/storage.service";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
-import {
-  renderEmailTemplate,
-  substituteEmailVariables,
-  getEmailTemplateSubject,
-} from "../../common/helpers/email-template-renderer";
+import { SmtpProvider } from "../mail/smtp.provider";
+import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { isBusinessMembershipEntitled } from "../membership/membership.util";
 
 /**
@@ -177,21 +173,21 @@ export class SellerInvoiceService {
       };
       const frontendUrl = this.config.get<string>(
         "FRONTEND_URL",
-        "https://tarodan.com",
+        "https://tarodan.com.tr",
       );
       const dbTpl = await this.prisma.emailTemplate
         .findUnique({ where: { key: "seller-invoice" } })
         .catch(() => null);
-      const html = dbTpl?.bodyHtml
-        ? substituteEmailVariables(dbTpl.bodyHtml, data)
-        : renderEmailTemplate("seller-invoice", data, frontendUrl);
-      const subject = dbTpl?.subject
-        ? substituteEmailVariables(dbTpl.subject, data)
-        : getEmailTemplateSubject("seller-invoice", data);
+      const email = renderManagedEmailTemplate(
+        "seller-invoice",
+        { ...data, to: order.buyer.email },
+        dbTpl,
+        frontendUrl,
+      );
       await this.smtp.sendEmail({
         to: order.buyer.email,
-        subject,
-        html,
+        subject: email.subject,
+        html: email.html,
         attachments: [
           { filename: `fatura-${order.orderNumber}.pdf`, content: pdf },
         ],

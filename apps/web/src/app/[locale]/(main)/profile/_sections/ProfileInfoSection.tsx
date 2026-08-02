@@ -3,7 +3,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Input, Modal } from "@tarodan/ui";
+import { Button, Input, Modal, ModalFooter } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import {
   Form,
   FormDatePicker,
@@ -14,6 +15,7 @@ import {
 } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
 import { useAuthStore } from "@/stores/authStore";
+import UsernameField from "../_components/UsernameField";
 import { profileInfoSchema, type ProfileInfoValues } from "../_lib/schemas";
 import {
   useProfileInfo,
@@ -40,6 +42,7 @@ function EmailChangeModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const t = useTranslations();
   const { sendCode, verify } = useEmailChange();
   const [step, setStep] = useState<"enter" | "verify">("enter");
   const [email, setEmail] = useState("");
@@ -54,7 +57,31 @@ function EmailChangeModal({
   }, [open]);
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="E-posta Değiştir">
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      title="E-posta Değiştir"
+      size="md"
+      closeLabel={t("common.close")}
+      dismissDisabled={sendCode.isPending || verify.isPending}
+      footer={
+        <ModalFooter
+          onCancel={step === "enter" ? onClose : () => setStep("enter")}
+          onConfirm={
+            step === "enter"
+              ? () =>
+                  sendCode.mutate(email.trim(), {
+                    onSuccess: () => setStep("verify"),
+                  })
+              : () => verify.mutate(code, { onSuccess: onClose })
+          }
+          cancelLabel={step === "enter" ? t("common.cancel") : t("common.back")}
+          confirmLabel={step === "enter" ? "Kod Gönder" : "Doğrula"}
+          isLoading={sendCode.isPending || verify.isPending}
+          disabled={step === "enter" ? !email.trim() : code.length !== 6}
+        />
+      }
+    >
       {step === "enter" ? (
         <div className="space-y-4">
           <p className="text-sm text-muted">
@@ -69,18 +96,6 @@ function EmailChangeModal({
             placeholder="yeni@ornek.com"
             autoComplete="email"
           />
-          <Button
-            className="w-full"
-            disabled={!email.trim()}
-            isLoading={sendCode.isPending}
-            onClick={() =>
-              sendCode.mutate(email.trim(), {
-                onSuccess: () => setStep("verify"),
-              })
-            }
-          >
-            Kod Gönder
-          </Button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -96,23 +111,6 @@ function EmailChangeModal({
             maxLength={6}
             inputMode="numeric"
           />
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              onClick={() => setStep("enter")}
-            >
-              Geri
-            </Button>
-            <Button
-              className="flex-1"
-              disabled={code.length !== 6}
-              isLoading={verify.isPending}
-              onClick={() => verify.mutate(code, { onSuccess: onClose })}
-            >
-              Doğrula
-            </Button>
-          </div>
         </div>
       )}
     </Modal>
@@ -181,6 +179,8 @@ export default function ProfileInfoSection() {
             placeholder="Adınız"
           />
 
+          <UsernameField />
+
           <div>
             <label className="mb-1.5 block text-sm font-medium text-heading">
               E-posta
@@ -204,7 +204,13 @@ export default function ProfileInfoSection() {
             <FormPhone name="phone" label="Telefon" />
             <FormDatePicker name="birthDate" label="Doğum Tarihi" />
           </div>
-          <FormTextarea name="bio" label="Hakkımda" rows={4} maxLength={500} />
+          <FormTextarea
+            name="bio"
+            label="Hakkımda"
+            placeholder="Kendiniz hakkında birkaç şey yazın..."
+            rows={4}
+            maxLength={500}
+          />
 
           {isBusiness && (
             <div className="space-y-4 rounded-lg border border-border-subtle bg-surface p-4">

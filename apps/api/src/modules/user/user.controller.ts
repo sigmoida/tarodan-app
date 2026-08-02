@@ -32,7 +32,8 @@ import {
   UpdateAddressDto,
   UpsertBankAccountDto,
   UpdateNotificationSettingsDto,
-  CompleteHomeTourDto,
+  CompleteTourDto,
+  ClaimUsernameDto,
 } from "./dto";
 
 @ApiTags("users")
@@ -74,16 +75,28 @@ export class UserController {
     return this.userService.updateProfile(userId, dto);
   }
 
-  @Patch("me/onboarding/home-tour")
+  @Patch("me/username")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Ana sayfa tanıtım turunu tamamla" })
-  @ApiResponse({ status: 200, description: "Tanıtım turu tamamlandı" })
-  async completeHomeTour(
+  @ApiOperation({ summary: "Değiştirilemez kullanıcı adını bir kez belirle" })
+  @ApiResponse({ status: 200, description: "Kullanıcı adı belirlendi" })
+  async claimUsername(
     @CurrentUser("id") userId: string,
-    @Body() dto: CompleteHomeTourDto,
+    @Body() dto: ClaimUsernameDto,
   ) {
-    return this.userService.completeHomeTour(userId, dto.version);
+    return this.userService.claimUsername(userId, dto.username);
+  }
+
+  @Patch("me/onboarding/tour")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Bir tanıtım turunu tamamlandı olarak işaretle" })
+  @ApiResponse({ status: 200, description: "Tanıtım turu tamamlandı" })
+  async completeTour(
+    @CurrentUser("id") userId: string,
+    @Body() dto: CompleteTourDto,
+  ) {
+    return this.userService.completeTour(userId, dto.tour, dto.version);
   }
 
   /**

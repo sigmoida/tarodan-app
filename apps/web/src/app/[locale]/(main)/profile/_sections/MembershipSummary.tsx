@@ -10,19 +10,14 @@ import {
   HeartIcon,
   CameraIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, Spinner, type BadgeVariant } from "@tarodan/ui";
+import { Badge, Button, Spinner } from "@tarodan/ui";
+import MembershipBadge from "@/components/membership/MembershipBadge";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useProfile } from "../_context/ProfileContext";
 import { useUploadAvatar } from "../_hooks/useProfileInfo";
-
-const TIER_VARIANT: Record<string, BadgeVariant> = {
-  business: "warning",
-  premium: "primary",
-  free: "secondary",
-};
 
 /**
  * The account overview card at the top of the profile dashboard: identity + tier
@@ -46,7 +41,7 @@ export default function MembershipSummary() {
 
   const tierType =
     profile?.membership?.tier.type ?? profile?.membershipTier ?? "free";
-  const tierName = profile?.membership?.tier.name ?? "Ücretsiz";
+  const tierName = profile?.membership?.tier.name;
   const stats = profile?.stats;
 
   return (
@@ -100,9 +95,7 @@ export default function MembershipSummary() {
               <h2 className="truncate text-xl font-bold text-heading">
                 {profile?.displayName || "—"}
               </h2>
-              <Badge variant={TIER_VARIANT[tierType] ?? "secondary"} size="sm">
-                {tierName}
-              </Badge>
+              <MembershipBadge tier={tierType} name={tierName} />
               {profile?.isVerified && (
                 <Badge variant="success" size="sm">
                   ✓ Onaylı
@@ -119,7 +112,7 @@ export default function MembershipSummary() {
         </div>
 
         <ButtonLink
-          href="/membership"
+          href="/profile/membership"
           variant="outline"
           size="sm"
           className="shrink-0"

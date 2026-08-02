@@ -45,6 +45,13 @@ import {
   TradeResponseDto,
 } from "./dto";
 import { i18nMessage } from "../i18n";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import {
+  generateReferenceCode,
+  generateUniqueReference,
+} from "../../common/helpers/generate-reference";
+import { calculateServiceTax } from "../order/order-service-tax.helper";
+import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
 
 /**
  * Takas yaşam döngüsü metodları (create/accept/reject/counter/cancel/ship/
@@ -57,6 +64,8 @@ export class TradeLifecycleService {
 
   constructor(
     private readonly prisma: PrismaService,
+    // Vergi politikası siparişlerle ORTAK — takas kendi oranını tutmaz.
+    private readonly taxPolicy: OrderTaxPolicyService,
     private readonly membershipService: MembershipService,
     private readonly notificationService: NotificationService,
     private readonly paymentService: PaymentService,
@@ -79,10 +88,16 @@ export class TradeLifecycleService {
   // ==========================================================================
   // TRADE NUMBER GENERATION
   // ==========================================================================
-  private generateTradeNumber(): string {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `TRD-${timestamp}-${random}`;
+  /**
+   * Takas referansı: TKS-XXXXXXXXXX. Önek "TRD" değildir — o, e-Arşiv fatura
+   * numarasının GİB'e kayıtlı önekiyle çakışır (bkz. code-prefixes.ts).
+   */
+  private generateTradeNumber(): Promise<string> {
+    return generateUniqueReference(
+      REFERENCE_PREFIX.trade,
+      async (code) =>
+        (await this.prisma.trade.count({ where: { tradeNumber: code } })) > 0,
+    );
   }
 
   // ==========================================================================
@@ -112,6 +127,19 @@ export class TradeLifecycleService {
     if (!initiatorCanTrade.allowed) {
       this.logger.warn("Trade create failed: initiator cannot trade");
       throw new BadRequestException(initiatorCanTrade.reason);
+    }
+
+    // ALICI da yetkili olmalı. Eskiden yalnız başlatan denetleniyordu; alıcının
+    // yetkisi ancak KABUL anında bakılıyordu. Üyeliği biten bir satıcının
+    // ilanları "takasa açık" kaldığı için teklif oluşturulabiliyor, alıcı
+    // kabul edemiyor ve teklif yanıt süresi dolana dek askıda kalıyordu.
+    const receiverCanTrade = await this.membershipService.canCreateTrade(
+      dto.receiverId,
+    );
+    if (!receiverCanTrade.allowed) {
+      throw new BadRequestException(
+        i18nMessage("server.trade.receiverCannotTrade"),
+      );
     }
 
     // Validate initiator owns the products (no isTradeEnabled check - user can offer any of their own items)
@@ -210,6 +238,10 @@ export class TradeLifecycleService {
         { required: true },
       );
 
+    // Referans işlem dışında üretilir: çakışma kontrolü transaction'ı
+    // gereksiz yere uzatmasın.
+    const tradeNumber = await this.generateTradeNumber();
+
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
       // CRITICAL: Don't reserve products when trade is pending
@@ -220,7 +252,7 @@ export class TradeLifecycleService {
       // Create trade
       const newTrade = await tx.trade.create({
         data: {
-          tradeNumber: this.generateTradeNumber(),
+          tradeNumber,
           initiatorId,
           receiverId: dto.receiverId,
           status: TradeStatus.pending,
@@ -475,6 +507,22 @@ export class TradeLifecycleService {
         const ratePct = Number(rateRow?.settingValue ?? "5") || 5;
         const commission =
           Math.round(trade.cashAmount.toNumber() * (ratePct / 100) * 100) / 100;
+        // Aracılık komisyonu bir hizmettir → KDV'si hizmeti alan taraftan (nakit
+        // ödeyen) alınır ve ödediği toplama eklenir. Oran siparişlerle AYNI
+        // politikadan gelir; `commission` KDV hariç matrah olarak saklanır.
+        const taxPolicy = await this.taxPolicy.resolve();
+        const { sellerServiceTaxAmount: commissionTaxAmount } =
+          calculateServiceTax(
+            {
+              buyerCommissionAmount: 0,
+              buyerServiceFeeAmount: 0,
+              buyerShippingAmount: 0,
+              sellerCommissionAmount: commission,
+              sellerPlatformFeeAmount: 0,
+              sellerShippingAmount: 0,
+            },
+            this.taxPolicy.effectiveServiceVatRate(taxPolicy),
+          );
         await tx.tradeCashPayment.create({
           data: {
             tradeId,
@@ -485,7 +533,14 @@ export class TradeLifecycleService {
                 : trade.initiatorId,
             amount: trade.cashAmount,
             commission,
-            totalAmount: trade.cashAmount.toNumber() + commission,
+            commissionTaxAmount,
+            totalAmount:
+              Math.round(
+                (trade.cashAmount.toNumber() +
+                  commission +
+                  commissionTaxAmount) *
+                  100,
+              ) / 100,
             provider: "pending",
             status: PaymentStatus.pending,
           },
@@ -654,6 +709,16 @@ export class TradeLifecycleService {
     if (!userCanTrade.allowed) {
       throw new BadRequestException(
         i18nMessage("server.trade.membershipRequiredForCounter"),
+      );
+    }
+
+    // Karşı teklifin muhatabı da yetkili olmalı — aksi halde kabul edemeyeceği
+    // bir teklif üretilir (bkz. createTrade'deki aynı kapı).
+    const originalInitiatorCanTrade =
+      await this.membershipService.canCreateTrade(trade.initiatorId);
+    if (!originalInitiatorCanTrade.allowed) {
+      throw new BadRequestException(
+        i18nMessage("server.trade.receiverCannotTrade"),
       );
     }
 
@@ -885,7 +950,7 @@ export class TradeLifecycleService {
         },
       );
     } catch (error) {
-      this.logger.error(`Failed to send counter trade notification: ${error}`);
+      this.logger.warn(`Failed to send counter trade notification: ${error}`);
     }
 
     return this.tradeQuery.getTradeById(tradeId, userId);
@@ -1084,7 +1149,9 @@ export class TradeLifecycleService {
         );
       }
 
-      const trackingNumber = `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const trackingNumber = generateReferenceCode(
+        REFERENCE_PREFIX.shipmentFallback,
+      );
 
       let confirmationDeadline: Date | null = null;
       if (newStatus === TradeStatus.both_shipped) {

@@ -67,6 +67,8 @@ describe("MembershipSubscriptionService", () => {
       membershipPayment: { create: jest.fn() },
     };
     const prisma = {
+      // Sipariş numarası çakışma kontrolü (generateUniqueReference).
+      order: { count: jest.fn().mockResolvedValue(0) },
       membershipTier: { findUnique: jest.fn() },
       userMembership: {
         findUnique: jest.fn(),

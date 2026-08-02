@@ -9,6 +9,7 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { UserCommonService } from "./user-common.service";
 import { i18nMessage } from "../i18n";
+import { randomUUID } from "crypto";
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -336,10 +337,6 @@ export class UserSocialService {
   }
 
   private generateUUID(): string {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    return randomUUID();
   }
 }

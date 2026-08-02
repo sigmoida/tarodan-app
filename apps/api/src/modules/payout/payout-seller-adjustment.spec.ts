@@ -27,6 +27,7 @@ describe("PayoutService seller adjustment deductions", () => {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       payoutTransfer: {
+        count: jest.fn().mockResolvedValue(0),
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockImplementation(({ data }: any) => {
           created = { id: "payout-1", ...data };
@@ -55,7 +56,10 @@ describe("PayoutService seller adjustment deductions", () => {
       sellerAccountAdjustment: {
         findFirst: jest.fn().mockResolvedValue({ id: "adjustment-1" }),
       },
-      payoutTransfer: { create: jest.fn() },
+      payoutTransfer: {
+        create: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+      },
       $transaction: jest.fn((fn: any) => fn(tx)),
     };
     const service = new PayoutService(

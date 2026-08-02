@@ -179,6 +179,20 @@ export class AdminShippingController {
     return this.tariffs.update(id, dto, adminId);
   }
 
+  @Post("shipping/tariffs/clone-active")
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      "Clone the active tariff (with its package tiers) into a new draft for editing",
+  })
+  async cloneActiveTariff(
+    @CurrentUser("id") adminId: string,
+    @Query("provider") provider?: string,
+  ) {
+    return this.tariffs.cloneActive(adminId, provider);
+  }
+
   @Post("shipping/tariffs/:id/activate")
   @Roles(AdminRole.super_admin)
   @HttpCode(HttpStatus.OK)

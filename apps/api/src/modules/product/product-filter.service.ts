@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
 
 /**
  * ProductFilterService — dinamik filtre/öznitelik metadatası (kategori/marka/ölçek/
@@ -11,9 +11,7 @@ import { PrismaService } from '../../prisma';
 export class ProductFilterService {
   private readonly logger = new Logger(ProductFilterService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-  ) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Get dynamic filters (categories, brands, etc.)
@@ -25,33 +23,35 @@ export class ProductFilterService {
     const categories = await this.prisma.category.findMany({
       where: { isActive: true },
       select: { id: true, name: true, slug: true, parentId: true },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
 
     // 2. Brands (id, name, slug – same format as manufacturers)
     const brands = await this.prisma.brand.findMany({
       where: { isActive: true },
       select: { id: true, name: true, slug: true },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
 
     // 3. Scales (from Attribute group "scale") & Manufacturers (from DB)
     const scaleAttrs = await this.prisma.attribute.findMany({
       where: {
         isActive: true,
-        group: { slug: 'scale', isActive: true },
+        group: { slug: "scale", isActive: true },
       },
       select: { value: true, slug: true, displayValue: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sortOrder: "asc" },
     });
-    const scales = scaleAttrs.length > 0
-      ? scaleAttrs.map((a) => a.displayValue || a.value)
-      : ['1:2', '1:6', '1:8', '1:12', '1:18', '1:24', '1:32', '1:36', '1:43', '1:64', '1:72', '1:76', '1:87', '1:100', '1:144', '1:200'];
+    // Ölçekler yalnız "scale" attribute grubundan gelir. Burada bir zamanlar 16
+    // ölçeklik gömülü bir yedek liste vardı: grup boşken (yeni kurulum) arayüz
+    // hiçbir ürünün taşımadığı ölçek çipleri gösteriyor, tıklayan kullanıcı boş
+    // sonuç alıyordu. Boş filtre listesi doğru cevaptır — admin grubu doldurur.
+    const scales = scaleAttrs.map((a) => a.displayValue || a.value);
 
     const manufacturerRecords = await this.prisma.manufacturer.findMany({
       where: { isActive: true },
       select: { id: true, name: true, slug: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sortOrder: "asc" },
     });
     const manufacturers = manufacturerRecords.map((m) => ({
       id: m.id,
@@ -63,10 +63,10 @@ export class ProductFilterService {
     const materialAttrs = await this.prisma.attribute.findMany({
       where: {
         isActive: true,
-        group: { slug: 'material', isActive: true },
+        group: { slug: "material", isActive: true },
       },
       select: { slug: true, displayValue: true, value: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sortOrder: "asc" },
     });
     const materials = materialAttrs.map((a) => ({
       slug: a.slug,
@@ -77,7 +77,7 @@ export class ProductFilterService {
     const carModels = await this.prisma.carModel.findMany({
       where: { isActive: true },
       select: { id: true, name: true, slug: true, brandId: true },
-      orderBy: [{ brandId: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: [{ brandId: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     });
 
     // 6. Manufacturer-scoped custom attribute groups (e.g. Hot Wheels).
@@ -89,26 +89,44 @@ export class ProductFilterService {
           include: {
             attributes: {
               where: { isActive: true },
-              select: { slug: true, value: true, displayValue: true, color: true },
-              orderBy: { sortOrder: 'asc' },
+              select: {
+                slug: true,
+                value: true,
+                displayValue: true,
+                color: true,
+              },
+              orderBy: { sortOrder: "asc" },
             },
           },
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
         })
       : [];
 
     return {
-      categories: categories.map(c => ({ value: c.id, label: c.name, slug: c.slug, parentId: c.parentId })),
+      categories: categories.map((c) => ({
+        value: c.id,
+        label: c.name,
+        slug: c.slug,
+        parentId: c.parentId,
+      })),
       brands: brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug })),
-      carModels: carModels.map((m) => ({ id: m.id, name: m.name, slug: m.slug, brandId: m.brandId })),
+      carModels: carModels.map((m) => ({
+        id: m.id,
+        name: m.name,
+        slug: m.slug,
+        brandId: m.brandId,
+      })),
       scales,
       manufacturers,
-      materials: materials.length > 0 ? materials : [
-        { slug: 'diecast', label: 'Diecast (Metal)' },
-        { slug: 'resin', label: 'Resin (Reçine)' },
-        { slug: 'composite', label: 'Composite (Kompozit)' },
-        { slug: 'plastic', label: 'Plastic (Plastik)' },
-      ],
+      materials:
+        materials.length > 0
+          ? materials
+          : [
+              { slug: "diecast", label: "Diecast (Metal)" },
+              { slug: "resin", label: "Resin (Reçine)" },
+              { slug: "composite", label: "Composite (Kompozit)" },
+              { slug: "plastic", label: "Plastic (Plastik)" },
+            ],
       customAttributes: customAttributes.map((g) => ({
         slug: g.slug,
         name: g.name,
@@ -141,11 +159,17 @@ export class ProductFilterService {
       include: {
         attributes: {
           where: { isActive: true },
-          select: { slug: true, value: true, displayValue: true, color: true, sortOrder: true },
-          orderBy: { sortOrder: 'asc' },
+          select: {
+            slug: true,
+            value: true,
+            displayValue: true,
+            color: true,
+            sortOrder: true,
+          },
+          orderBy: { sortOrder: "asc" },
         },
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sortOrder: "asc" },
     });
 
     return groups.map((g) => ({

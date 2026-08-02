@@ -15,7 +15,7 @@ import { EmptyStateCard } from "@/components/ui";
 import { useMyCollections } from "./_hooks/useMyCollections";
 import CollectionCard from "../../../(catalog)/collections/_components/CollectionCard";
 import CollectionsToolbar from "./_components/CollectionsToolbar";
-import PremiumRequiredModal from "./_modals/PremiumRequiredModal";
+import PremiumRequiredModal from "@/components/PremiumRequiredModal";
 
 export default function MyCollectionsPage() {
   const t = useTranslations();

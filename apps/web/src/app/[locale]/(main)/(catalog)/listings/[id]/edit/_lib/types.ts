@@ -40,7 +40,7 @@ export interface EditListingFormData {
   isSet: boolean;
   bundleSize: number | undefined;
   quantity: string | number;
-  shippingDesi: string | number;
+  shippingPackageTier: "small" | "medium" | "large";
   images: Array<{ cardKey: string; detailKey: string }>;
   status: string;
 }

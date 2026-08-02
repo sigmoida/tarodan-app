@@ -120,8 +120,10 @@ export default function CommissionPage() {
         }
       />
       <CommissionSummary />
+      {/* Eşleşme kuralı — hesaplama örneği kural dialogundaki canlı
+          önizlemede duruyor, burada tekrar edilmiyor. */}
       <Alert
-        variant="info"
+        variant="default"
         title={t("admin.finance.commission.calculationTitle")}
         icon={<InformationCircleIcon className="h-5 w-5" />}
       >

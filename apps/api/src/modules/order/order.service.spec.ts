@@ -24,14 +24,19 @@ import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
 import { RefundService } from "../refund/refund.service";
 import { OrderStatus, ProductStatus } from "@prisma/client";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
-// resolves without a DB.
+// resolves without a DB. Kademeler zorunlu: önizleme de checkout gibi kademe
+// çözer, kademesiz tarife fail-closed 503'tür.
+const SHIPPING_TARIFF_TIERS = flatPackageTiers(29.99);
 const SHIPPING_TARIFF_MOCK = {
   getActiveOutboundTariff: async () => ({
     outboundPackageFee: 29.99,
     freeShippingEnabled: true,
     freeShippingThreshold: 500,
+    packageTiers: SHIPPING_TARIFF_TIERS,
   }),
   getActiveTariffSnapshot: async () => ({
     tariffId: "tariff-1",
@@ -40,6 +45,7 @@ const SHIPPING_TARIFF_MOCK = {
       outboundPackageFee: 29.99,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
+      packageTiers: SHIPPING_TARIFF_TIERS,
     },
   }),
 };
@@ -139,6 +145,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
       providers: [
         OrderService,
         OrderPricingService,
+        OrderTaxPolicyService,
         { provide: ShippingTariffService, useValue: SHIPPING_TARIFF_MOCK },
         OrderCheckoutService,
         OrderCheckoutCommonService,
@@ -273,7 +280,11 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
   const mockPrisma = {
     user: { findUnique: jest.fn() },
     commissionRule: { findMany: jest.fn().mockResolvedValue([commissionRule]) },
-    platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+    platformSetting: {
+      // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
   };
 
   let service: OrderService;
@@ -287,6 +298,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
       providers: [
         OrderService,
         OrderPricingService,
+        OrderTaxPolicyService,
         { provide: ShippingTariffService, useValue: SHIPPING_TARIFF_MOCK },
         OrderCheckoutService,
         OrderCheckoutCommonService,
@@ -321,7 +333,17 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
     service = module.get(OrderService);
   });
 
-  it("bireysel satıcıda stopaj kesilmez (net = tutar − komisyon)", async () => {
+  /** Politika ayarlarını (PlatformSetting) tek sorgulu okumaya besler. */
+  const withSettings = (settings: Record<string, string>) =>
+    mockPrisma.platformSetting.findMany.mockResolvedValue(
+      Object.entries(settings).map(([settingKey, settingValue]) => ({
+        settingKey,
+        settingValue,
+      })),
+    );
+
+  // Komisyon %10 → satıcı ücreti 100; hizmet KDV'si (%20) = 20; kargo 0.
+  it("bireysel satıcıdan stopaj KESİLMEZ (varsayılan kapsam)", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       sellerType: "individual",
       membership: null,
@@ -333,7 +355,25 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
 
     expect(preview.withholdingTaxAmount).toBe(0);
     expect(preview.sellerFeeAmount).toBe(100);
-    expect(preview.sellerNetAmount).toBe(900);
+    expect(preview.sellerServiceTaxAmount).toBe(20);
+    // 1000 − 100 (ücret) − 20 (hizmet KDV) = 880
+    expect(preview.sellerNetAmount).toBe(880);
+  });
+
+  it("bireysel kapsamı açılırsa stopaj bireyselden de kesilir", async () => {
+    withSettings({ withholding_applies_to_individual: "true" });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      sellerType: "individual",
+      membership: null,
+      businessStatus: null,
+      taxId: null,
+    });
+
+    const preview = await service.getCommissionPreview(1000, sellerId, null);
+
+    expect(preview.withholdingTaxAmount).toBe(10);
+    // 1000 − 100 (ücret) − 10 (stopaj) − 20 (hizmet KDV) = 870
+    expect(preview.sellerNetAmount).toBe(870);
   });
 
   it("kurumsal satıcıda varsayılan %1 stopaj kesilir", async () => {
@@ -347,40 +387,51 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
     const preview = await service.getCommissionPreview(1000, sellerId, null);
 
     expect(preview.withholdingTaxAmount).toBe(10);
-    expect(preview.sellerNetAmount).toBe(890);
+    expect(preview.sellerNetAmount).toBe(870);
   });
 
   it("stopaj oranı PlatformSetting withholding_tax_rate ile değişir", async () => {
+    withSettings({ withholding_tax_rate: "2" });
     mockPrisma.user.findUnique.mockResolvedValue({
       sellerType: "business",
       membership: null,
       businessStatus: "approved",
       taxId: "1234567890",
-    });
-    mockPrisma.platformSetting.findUnique.mockResolvedValue({
-      settingValue: "2",
     });
 
     const preview = await service.getCommissionPreview(1000, sellerId, null);
 
     expect(preview.withholdingTaxAmount).toBe(20);
-    expect(preview.sellerNetAmount).toBe(880);
+    expect(preview.sellerNetAmount).toBe(860);
   });
 
-  it("oran 0 yapılırsa kurumsal satıcıda da stopaj kesilmez", async () => {
+  it("oran 0 yapılırsa stopaj kesilmez (hizmet KDV'si kalır)", async () => {
+    withSettings({ withholding_tax_rate: "0" });
     mockPrisma.user.findUnique.mockResolvedValue({
       sellerType: "business",
       membership: null,
       businessStatus: "approved",
       taxId: "1234567890",
     });
-    mockPrisma.platformSetting.findUnique.mockResolvedValue({
-      settingValue: "0",
-    });
 
     const preview = await service.getCommissionPreview(1000, sellerId, null);
 
     expect(preview.withholdingTaxAmount).toBe(0);
-    expect(preview.sellerNetAmount).toBe(900);
+    expect(preview.sellerNetAmount).toBe(880);
+  });
+
+  it("hizmet KDV'si kapatılırsa önizleme KDV'siz nete döner", async () => {
+    withSettings({ service_vat_enabled: "false" });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      sellerType: "business",
+      membership: null,
+      businessStatus: "approved",
+      taxId: "1234567890",
+    });
+
+    const preview = await service.getCommissionPreview(1000, sellerId, null);
+
+    expect(preview.sellerServiceTaxAmount).toBe(0);
+    expect(preview.sellerNetAmount).toBe(890);
   });
 });

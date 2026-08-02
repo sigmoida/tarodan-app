@@ -75,7 +75,6 @@ export function createSession<TUser>(
     cookies: names,
     apiBaseUrl,
     endpoints,
-    upstreamRefreshCookie,
     ttls,
     indicatorCookie,
   } = config;
@@ -119,7 +118,13 @@ export function createSession<TUser>(
     try {
       res = await fetch(`${apiBaseUrl}${endpoints.refresh}`, {
         method: "POST",
-        headers: { Cookie: `${upstreamRefreshCookie}=${refresh}` },
+        // This is a server-to-server BFF call. Sending the token as an upstream
+        // auth cookie makes the API's browser CSRF guard require a double-submit
+        // header and reject the refresh with 403. Body transport is already
+        // supported for native/BFF clients and remains protected by the signed,
+        // persisted, rotating refresh token itself.
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: refresh }),
         cache: "no-store",
       });
     } catch {
@@ -146,18 +151,45 @@ export function createSession<TUser>(
     return res.status >= 500 ? { status: "transient" } : { status: "dead" };
   }
 
-  // Single-flight: a page firing many /api calls after the access token expired
-  // would otherwise trigger N concurrent refreshes. Since the API ROTATES the
-  // refresh token, only the first would succeed and the rest would 401 → bounce
-  // to /login. Sharing one in-flight refresh spends the rotating token once.
-  let inflight: Promise<RefreshOutcome> | null = null;
+  // Single-flight per refresh token: a page firing many /api calls after expiry
+  // spends its rotating token once. Keying this map is essential: a process can
+  // serve multiple users concurrently and must never share one user's refreshed
+  // credentials with another user.
+  //
+  // A SUCCESSFUL rotation stays cached for a short window instead of being
+  // dropped the moment it settles: requests that left the browser with the OLD
+  // refresh cookie (parallel tabs, or an RSC render that couldn't persist the
+  // cookies it rotated) land here late, and re-hitting the upstream with the
+  // now-revoked token would kill the live session. They get the same new pair.
+  // Failed attempts are never cached so retries stay possible.
+  const ROTATION_RESULT_TTL_MS = 60_000;
+  const inflight = new Map<string, Promise<RefreshOutcome>>();
   const runRefresh = (refresh: string): Promise<RefreshOutcome> => {
-    if (!inflight) {
-      inflight = doRefresh(refresh).finally(() => {
-        inflight = null;
-      });
-    }
-    return inflight;
+    const existing = inflight.get(refresh);
+    if (existing) return existing;
+
+    const drop = () => {
+      if (inflight.get(refresh) === pending) {
+        inflight.delete(refresh);
+      }
+    };
+    const pending: Promise<RefreshOutcome> = doRefresh(refresh).then(
+      (outcome) => {
+        if (outcome.status === "ok") {
+          const timer = setTimeout(drop, ROTATION_RESULT_TTL_MS);
+          (timer as { unref?: () => void }).unref?.();
+        } else {
+          drop();
+        }
+        return outcome;
+      },
+      (err) => {
+        drop();
+        throw err;
+      },
+    );
+    inflight.set(refresh, pending);
+    return pending;
   };
   // Public toolkit method keeps its historical `tokens | null` shape (nothing
   // consumes the transient/dead nuance outside `apiFetch`).
@@ -238,12 +270,13 @@ export function createSession<TUser>(
   };
 
   async function getSession(): Promise<TUser | null> {
-    const { access } = await readTokens();
-    if (!access) return null;
-    const res = await fetch(`${apiBaseUrl}${endpoints.profile}`, {
-      headers: { Authorization: `Bearer ${access}` },
-      cache: "no-store",
-    });
+    // apiFetch üzerinden: süresi dolmuş access REFRESH edilir (rotasyon cache'i
+    // + API grace penceresiyle güvenli). Eski çıplak-fetch hali herhangi bir
+    // 401'de refresh denemeden null dönüyor ve layout guard'ları canlı oturumu
+    // "expired=session" ile login'e atıyordu.
+    const { access, refresh } = await readTokens();
+    if (!access && !refresh) return null;
+    const { res } = await apiFetch(endpoints.profile);
     if (!res.ok) return null;
     const raw = await res.json().catch(() => null);
     return mapUser(raw);

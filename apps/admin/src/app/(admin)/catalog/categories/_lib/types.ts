@@ -5,7 +5,8 @@ export interface Category {
   description?: string;
   parentId?: string;
   parent?: { id: string; name: string };
-  children: Category[];
+  children: Pick<Category, "id" | "name" | "slug">[];
+  sortOrder: number;
   isActive: boolean;
   productCount: number;
   activeProducts: number;

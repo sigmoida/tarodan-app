@@ -1081,12 +1081,10 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
     const seed = await seedBaselineRefs();
     const admin = await createAdminUser("admin-mem061@test.com");
     const prisma = getPrisma();
-    await prisma.platformSetting.create({
-      data: {
-        settingKey: "premium_listing_limit",
-        settingValue: "-1",
-        settingType: "number",
-      },
+    // Sınırsız limit KATMAN satırından gelir — platform ayarı override'ı yok.
+    await prisma.membershipTier.update({
+      where: { type: MembershipTierType.premium },
+      data: { maxTotalListings: -1 },
     });
     const user = await createUser(ctx.module, {
       email: "unlimited@test.com",
@@ -1111,14 +1109,11 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
   });
 
   scenario("MEM-062", async () => {
-    // PlatformSetting free_listing_limit=3 override > seed; free için total=free=3.
+    // Ücretsiz katmanın limiti KATMAN satırından okunur (tek kaynak).
     const prisma = getPrisma();
-    await prisma.platformSetting.create({
-      data: {
-        settingKey: "free_listing_limit",
-        settingValue: "3",
-        settingType: "number",
-      },
+    await prisma.membershipTier.update({
+      where: { type: MembershipTierType.free },
+      data: { maxFreeListings: 3, maxTotalListings: 3 },
     });
     const user = await createUser(ctx.module, { email: "override@test.com" });
     const limits = await get("/api/membership/me/limits", user).expect(200);

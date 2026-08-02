@@ -103,6 +103,7 @@ import {
   AdminChangeMembershipDto,
   SellerApplicationQueryDto,
 } from "./dto";
+import { ReviewSellerDocumentDto } from "../user/dto";
 
 @ApiTags("admin")
 @Controller("admin")
@@ -159,5 +160,36 @@ export class AdminSellerApplicationController {
     @Body("reason") reason: string,
   ) {
     return this.adminService.rejectSellerApplication(adminId, id, reason);
+  }
+
+  @Patch("seller-applications/:id/documents/:documentId")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Belgeyi onayla, reddet veya revizyon iste" })
+  reviewSellerDocument(
+    @Param("id") applicationId: string,
+    @Param("documentId") documentId: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: ReviewSellerDocumentDto,
+  ) {
+    return this.adminService.reviewSellerDocument(
+      adminId,
+      applicationId,
+      documentId,
+      dto.status,
+      dto.note,
+    );
+  }
+
+  @Post("seller-applications/:id/final-approve")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Tüm belgeleri onaylanan kurumsal hesabı aç" })
+  finalApproveSellerApplication(
+    @Param("id") applicationId: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.adminService.finalApproveSellerApplication(
+      adminId,
+      applicationId,
+    );
   }
 }

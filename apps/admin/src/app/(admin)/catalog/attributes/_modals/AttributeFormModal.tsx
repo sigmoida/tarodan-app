@@ -84,10 +84,15 @@ export function AttributeFormModal({
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
     >
-      <FormInput name="value" label={t("admin.catalog.attributes.value")} />
+      <FormInput
+        name="value"
+        label={t("admin.catalog.attributes.value")}
+        placeholder={t("admin.catalog.attributes.valuePlaceholder")}
+      />
       <FormInput
         name="displayValue"
         label={t("admin.catalog.attributes.displayValue")}
+        placeholder={t("admin.catalog.attributes.displayValuePlaceholder")}
       />
       <div className="flex gap-4">
         {showColor && (
@@ -105,6 +110,7 @@ export function AttributeFormModal({
             name="sortOrder"
             label={t("admin.catalog.common.sortOrder")}
             type="number"
+            placeholder="0"
           />
         </div>
       </div>

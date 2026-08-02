@@ -3,14 +3,14 @@
 "use client";
 
 import {
-  XMarkIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ArrowPathIcon,
   PlayIcon,
   PauseIcon,
 } from "@heroicons/react/24/outline";
-import { Button } from "@tarodan/ui";
+import { Button, IconButton } from "@tarodan/ui";
+import MediaDialog from "@/components/MediaDialog";
 import OptimizedImage from "@/components/OptimizedImage";
 import { PLACEHOLDER } from "../_lib/images";
 import { useListingDetail } from "../_context/ListingDetailContext";
@@ -28,45 +28,42 @@ export default function Product360Modal() {
     toggle360Play,
   } = useListingDetail();
 
-  if (!show360Modal || !listing) return null;
+  if (!listing) return null;
 
   return (
-    <div
-      className="fixed inset-0 bg-heading/95 z-50 flex items-center justify-center p-4"
-      onClick={close360View}
-    >
-      <div
-        className="relative max-w-4xl w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center">
-              <ArrowPathIcon
-                className={`w-6 h-6 text-inverted ${is360Playing ? "animate-spin" : ""}`}
-              />
-            </div>
-            <div>
-              <h3 className="text-inverted font-semibold text-lg">
-                {t("product.view360")}
-              </h3>
-              <p className="text-inverted/60 text-sm">
-                {t("product.rotateToSeeAngles")}
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="secondary"
-            onClick={close360View}
-            className="w-10 h-10 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
-          >
-            <XMarkIcon className="w-6 h-6" />
+    <MediaDialog
+      open={show360Modal}
+      onClose={close360View}
+      title={
+        <span className="flex min-w-0 items-center gap-2">
+          <ArrowPathIcon
+            className={`h-5 w-5 shrink-0 text-primary-500 ${
+              is360Playing ? "animate-spin" : ""
+            }`}
+            aria-hidden="true"
+          />
+          <span className="truncate">{t("product.view360")}</span>
+        </span>
+      }
+      closeLabel={t("common.close")}
+      footer={
+        <div className="flex w-full items-center justify-center gap-4">
+          <Button onClick={toggle360Play} className="gap-2">
+            {is360Playing ? (
+              <PauseIcon className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <PlayIcon className="h-5 w-5" aria-hidden="true" />
+            )}
+            {is360Playing ? t("product.pause") : t("product.autoRotate")}
           </Button>
+          <span className="text-sm tabular-nums text-muted">
+            {view360Index + 1} / {images.length}
+          </span>
         </div>
-
-        {/* Main image */}
-        <div className="relative aspect-square bg-heading rounded overflow-hidden mb-4">
+      }
+    >
+      <div className="flex h-full items-center justify-center p-4">
+        <div className="relative aspect-square h-auto max-h-full w-full max-w-4xl overflow-hidden">
           <OptimizedImage
             src={images[view360Index]}
             alt={`${listing.title} - ${view360Index + 1}`}
@@ -76,72 +73,53 @@ export default function Product360Modal() {
             logContext={{ listingId: listing.id, page: "listing-detail-360" }}
           />
 
-          <Button
-            variant="secondary"
+          <IconButton
+            variant="ghost"
+            aria-label={t("common.previous")}
             onClick={() =>
               setView360Index(
                 view360Index > 0 ? view360Index - 1 : images.length - 1,
               )
             }
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
+            className="absolute left-4 top-1/2 h-12 w-12 -translate-y-1/2 bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
           >
-            <ChevronLeftIcon className="w-6 h-6" />
-          </Button>
-          <Button
-            variant="secondary"
+            <ChevronLeftIcon className="h-6 w-6" />
+          </IconButton>
+          <IconButton
+            variant="ghost"
+            aria-label={t("common.next")}
             onClick={() =>
               setView360Index(
                 view360Index < images.length - 1 ? view360Index + 1 : 0,
               )
             }
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-surface-elevated/10 hover:bg-surface-elevated/20 rounded-full flex items-center justify-center text-inverted transition-colors"
+            className="absolute right-4 top-1/2 h-12 w-12 -translate-y-1/2 bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
           >
-            <ChevronRightIcon className="w-6 h-6" />
-          </Button>
+            <ChevronRightIcon className="h-6 w-6" />
+          </IconButton>
 
           {/* Progress dots */}
           <div className="absolute bottom-4 left-4 right-4">
             <div className="flex gap-1">
               {images.map((_, index) => (
                 <Button
-                  variant="secondary"
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   key={index}
                   onClick={() => setView360Index(index)}
-                  className={`h-1.5 flex-1 rounded-sm transition-all ${
+                  aria-label={`${index + 1} / ${images.length}`}
+                  className={`h-1.5 flex-1 rounded-sm p-0 transition-all ${
                     index === view360Index
                       ? "bg-primary-500"
-                      : "bg-surface-elevated/30 hover:bg-surface-elevated/50"
+                      : "bg-border-strong hover:bg-subtle"
                   }`}
                 />
               ))}
             </div>
           </div>
         </div>
-
-        {/* Controls */}
-        <div className="flex items-center justify-center gap-4">
-          <Button
-            variant="secondary"
-            onClick={toggle360Play}
-            className="flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-inverted rounded font-semibold transition-colors"
-          >
-            {is360Playing ? (
-              <>
-                <PauseIcon className="w-5 h-5" />
-                {t("product.pause")}
-              </>
-            ) : (
-              <>
-                <PlayIcon className="w-5 h-5" />
-                {t("product.autoRotate")}
-              </>
-            )}
-          </Button>
-          <div className="text-inverted/60 text-sm">
-            {view360Index + 1} / {images.length}
-          </div>
-        </div>
       </div>
-    </div>
+    </MediaDialog>
   );
 }

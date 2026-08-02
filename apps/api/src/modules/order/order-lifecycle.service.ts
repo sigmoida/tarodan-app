@@ -310,29 +310,16 @@ export class OrderLifecycleService {
         );
       }
 
-      // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı).
-      // Sipariş tamamlandı = komisyon "earned"; tutarlar CommissionLedger snapshot'ından.
-      // Fire-and-forget: sipariş tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
+      // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı,
+      // platform satışı → alıcı). SARMALAYICI üzerinden: tekil issue* çağrıları
+      // `revenueInvoicedAt` işaretini KOYMUYORDU ve tam faturalı sipariş backfill
+      // aday penceresinde yer tutmaya devam ediyordu. Fire-and-forget: sipariş
+      // tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
       void this.elogoInvoicing
-        .issueCommissionInvoice(orderId)
+        .issueOrderRevenueInvoices(orderId)
         .catch((e) =>
           this.logger.warn(
-            `eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`,
-          ),
-        );
-      void this.elogoInvoicing
-        .issueServiceFeeInvoice(orderId)
-        .catch((e) =>
-          this.logger.warn(
-            `eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`,
-          ),
-        );
-      // Platform kendi ürününü sattıysa → alıcıya ürün e-Arşivi (Tarodan=satıcı).
-      void this.elogoInvoicing
-        .issuePlatformSaleInvoice(orderId)
-        .catch((e) =>
-          this.logger.warn(
-            `eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`,
+            `eLogo gelir faturaları tetik hatası ${orderId}: ${e?.message}`,
           ),
         );
     }
@@ -451,6 +438,72 @@ export class OrderLifecycleService {
    * - Can only cancel before shipping
    * - If paid, triggers refund process
    */
+  /**
+   * Grup iptali (R4): iptal SEPET bazındadır. Tüm üyeler iptal edilebilir
+   * olmalı — herhangi bir üye taşıyıcıya geçtiyse grup iptali TAMAMEN kapalıdır
+   * (kısmi iptal yok; kalan kalemler teslim sonrası iade akışını kullanır).
+   * Zaten iptal olmuş üyeler atlanır; kalanlar mevcut tekil iptal akışıyla
+   * (ödeme iadesi dahil) sırayla iptal edilir.
+   */
+  async cancelGroup(groupId: string, userId: string, dto: CancelOrderDto) {
+    const group = await this.prisma.checkoutGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        orders: {
+          select: {
+            id: true,
+            status: true,
+            shipment: { select: { status: true } },
+          },
+        },
+      },
+    });
+    if (!group) {
+      throw new NotFoundException(i18nMessage("server.order.groupNotFound"));
+    }
+    if (group.buyerId !== userId) {
+      throw new ForbiddenException(i18nMessage("server.order.cancelForbidden"));
+    }
+
+    const preHandover: ShipmentStatus[] = [
+      ShipmentStatus.pending,
+      ShipmentStatus.cancelled,
+      ShipmentStatus.failed,
+    ];
+    const cancellable = [
+      OrderStatus.pending_payment,
+      OrderStatus.paid,
+      OrderStatus.preparing,
+    ] as OrderStatus[];
+
+    const remaining = group.orders.filter(
+      (o) => o.status !== OrderStatus.cancelled,
+    );
+    if (remaining.length === 0) {
+      throw new BadRequestException(
+        i18nMessage("server.order.groupAlreadyCancelled"),
+      );
+    }
+    const blocked = remaining.some(
+      (o) =>
+        !cancellable.includes(o.status) ||
+        (o.shipment && !preHandover.includes(o.shipment.status)),
+    );
+    if (blocked) {
+      throw new BadRequestException(
+        i18nMessage("server.order.groupCancelBlockedShipped"),
+      );
+    }
+
+    // Sıralı iptal: her sipariş kendi atomik akışından geçer (stok, kupon,
+    // grup ödemesine kısmi iade). Paralel çalıştırma kilit çakışması yaratır.
+    for (const member of remaining) {
+      await this.cancel(member.id, userId, dto);
+    }
+
+    return this.orderQuery.findCheckoutGroup(groupId, userId);
+  }
+
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
     const preflight = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -908,30 +961,18 @@ export class OrderLifecycleService {
     // releaseAt teslimde handleOrderDelivered ile set edilir, alıcı onayıyla değil.
     // Burada yalnız komisyon "earned" + e-Arşiv tetiklenir (muhasebe).
 
-    // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı, platform satışı → alıcı).
+    // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı,
+    // platform satışı → alıcı). SARMALAYICI üzerinden — tekil issue* çağrıları
+    // `revenueInvoicedAt` işaretini koymuyordu (backfill pencere doygunluğu).
     // Fire-and-forget: tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
     this.logger.log(
       `confirmDelivery: ${orderId} tamamlandı → e-Arşiv tetikleniyor (komisyon+hizmet+platform)`,
     );
     void this.elogoInvoicing
-      .issueCommissionInvoice(orderId)
+      .issueOrderRevenueInvoices(orderId)
       .catch((e) =>
         this.logger.warn(
-          `eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
-    void this.elogoInvoicing
-      .issueServiceFeeInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
-    void this.elogoInvoicing
-      .issuePlatformSaleInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`,
+          `eLogo gelir faturaları tetik hatası ${orderId}: ${e?.message}`,
         ),
       );
 
@@ -950,27 +991,10 @@ export class OrderLifecycleService {
       .catch((e: any) =>
         this.logger.warn(`teslim markEarned hatası ${orderId}: ${e?.message}`),
       );
-    void this.elogoInvoicing
-      .issueCommissionInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo komisyon (teslim) tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
-    void this.elogoInvoicing
-      .issueServiceFeeInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo hizmet bedeli (teslim) tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
-    void this.elogoInvoicing
-      .issuePlatformSaleInvoice(orderId)
-      .catch((e) =>
-        this.logger.warn(
-          `eLogo platform satış (teslim) tetik hatası ${orderId}: ${e?.message}`,
-        ),
-      );
+    // Faturalama + `revenueInvoicedAt` işareti TEK kaynakta (ElogoInvoicingService):
+    // teslim yaşam-döngüsü, teslim tx'inin outbox görevi ve backfill cron'u aynı
+    // metodu çağırır.
+    await this.elogoInvoicing.issueOrderRevenueInvoices(orderId);
   }
 
   /**

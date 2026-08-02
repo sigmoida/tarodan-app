@@ -59,16 +59,11 @@ export function baseListingFields(msg: ListingFieldMessages) {
     isSet: z.boolean(),
     bundleSize: z.string(),
     quantity: z.string(),
-    shippingDesi: z
-      .string()
-      .min(1, msg.required)
-      .refine(
-        (value) =>
-          Number.isInteger(Number(value)) &&
-          Number(value) >= 1 &&
-          Number(value) <= 1000,
-        msg.required,
-      ),
+    // Kargo girdisi paket boyutu; desi arayüzde yok (sunucu kademeden türetir).
+    shippingPackageTier: z.enum(["small", "medium", "large"], {
+      required_error: msg.required,
+      invalid_type_error: msg.required,
+    }),
     price: z
       .string()
       .min(1, msg.required)
@@ -115,6 +110,8 @@ export const emptyBaseListingValues = {
   isSet: false,
   bundleSize: "",
   quantity: "",
-  shippingDesi: "1",
+  // En küçük boyut varsayılan: satıcı çoğunlukla küçük paket gönderir ve seçim
+  // radyo kartlarında zaten görünür durumda olur.
+  shippingPackageTier: "small" as const,
   price: "",
 };

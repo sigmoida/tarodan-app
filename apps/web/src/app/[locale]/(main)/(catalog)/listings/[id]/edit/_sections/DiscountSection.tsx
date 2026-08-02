@@ -1,7 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useFormContext } from "react-hook-form";
 import {
+  ChevronRightIcon,
   TagIcon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -25,6 +27,7 @@ export default function DiscountSection({
   setShowDiscountSection,
   productDiscounts,
 }: DiscountSectionProps) {
+  const t = useTranslations();
   const { watch } = useFormContext();
   const price = (watch("price") as string) || "";
   return (
@@ -37,7 +40,9 @@ export default function DiscountSection({
       >
         <div className="flex items-center gap-3">
           <ReceiptPercentIcon className="w-5 h-5 text-primary-600" />
-          <span className="font-medium text-heading">İndirim & Kampanya</span>
+          <span className="font-medium text-heading">
+            {t("product.discountSectionTitle")}
+          </span>
           {productDiscounts.length > 0 && (
             <Badge variant="primary" size="sm">
               {productDiscounts.length} aktif
@@ -57,11 +62,10 @@ export default function DiscountSection({
           <div className="p-4 bg-primary-50 rounded-lg border border-primary-100">
             <h4 className="font-medium text-heading mb-3 flex items-center gap-2">
               <TagIcon className="w-4 h-4 text-primary-600" />
-              Hızlı İndirim
+              {t("product.quickDiscount")}
             </h4>
             <p className="text-sm text-muted mb-4">
-              Ürününüz için hızlıca indirimli fiyat belirleyin. Bu, ürün
-              sayfasında üstü çizili fiyat olarak görünecektir.
+              {t("product.quickDiscountHint")}
             </p>
 
             <div className="grid md:grid-cols-2 gap-4 mb-4">
@@ -80,7 +84,7 @@ export default function DiscountSection({
               </div>
               <div>
                 <label className="block text-xs font-medium text-body mb-1">
-                  İndirimli Fiyat (₺)
+                  {t("product.discountedPrice")} (₺)
                 </label>
                 <Input
                   type="number"
@@ -88,7 +92,7 @@ export default function DiscountSection({
                   onChange={(e) =>
                     setSaleData({ ...saleData, salePrice: e.target.value })
                   }
-                  placeholder="İndirimli fiyat"
+                  placeholder={t("product.discountedPricePlaceholder")}
                 />
               </div>
             </div>
@@ -96,7 +100,7 @@ export default function DiscountSection({
             <div className="grid md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-body mb-1">
-                  Başlangıç
+                  {t("product.discountStart")}
                 </label>
                 <DatePicker
                   value={saleData.saleStartDate}
@@ -107,7 +111,7 @@ export default function DiscountSection({
               </div>
               <div>
                 <label className="block text-xs font-medium text-body mb-1">
-                  Bitiş
+                  {t("product.discountEnd")}
                 </label>
                 <DatePicker
                   value={saleData.saleEndDate}
@@ -136,8 +140,7 @@ export default function DiscountSection({
             )}
 
             <p className="text-xs text-muted">
-              * Not: Bu özellik yakında aktif olacaktır. Şimdilik ürün fiyatını
-              doğrudan değiştirebilirsiniz.
+              {t("product.discountComingSoonNote")}
             </p>
           </div>
 
@@ -145,7 +148,7 @@ export default function DiscountSection({
           {productDiscounts.length > 0 && (
             <div>
               <h4 className="font-medium text-heading mb-3">
-                Bu Ürüne Uygulanan İndirimler
+                {t("product.appliedDiscounts")}
               </h4>
               <div className="space-y-2">
                 {productDiscounts.map((discount: any) => (
@@ -180,7 +183,8 @@ export default function DiscountSection({
               className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
             >
               <ReceiptPercentIcon className="w-4 h-4" />
-              Tüm İndirimlerimi Yönet →
+              {t("product.manageAllDiscounts")}
+              <ChevronRightIcon className="w-4 h-4" />
             </Link>
           </div>
         </div>

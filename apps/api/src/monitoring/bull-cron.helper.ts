@@ -30,7 +30,13 @@ export async function registerRepeatableCron(
     await queue.add(
       jobName,
       {},
-      { repeat: { cron }, removeOnComplete: 50, removeOnFail: 50 },
+      {
+        // Konteynerlerde TZ set edilmiyor (UTC): tz verilmezse tüm saatler
+        // +3 kayar — "09:00" gönderimleri öğlen, gece bakımı sabah koşardı.
+        repeat: { cron, tz: "Europe/Istanbul" },
+        removeOnComplete: 50,
+        removeOnFail: 50,
+      },
     );
     logger.log(`Bull repeatable kayıtlı: '${jobName}' (${cron}).`);
   } catch (e: any) {

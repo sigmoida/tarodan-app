@@ -26,6 +26,8 @@ import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
 import { RefundService } from "../refund/refund.service";
 import { OrderStatus, ProductStatus } from "@prisma/client";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
 // resolves without a DB.
@@ -34,10 +36,7 @@ const SHIPPING_TARIFF_MOCK = {
     outboundPackageFee: 29.99,
     freeShippingEnabled: true,
     freeShippingThreshold: 500,
-    rates: Array.from({ length: 20 }, (_, index) => ({
-      desi: index + 1,
-      amount: 29.99,
-    })),
+    packageTiers: flatPackageTiers(29.99),
   }),
   getActiveTariffSnapshot: async () => ({
     tariffId: "tariff-1",
@@ -46,10 +45,7 @@ const SHIPPING_TARIFF_MOCK = {
       outboundPackageFee: 29.99,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      rates: Array.from({ length: 20 }, (_, index) => ({
-        desi: index + 1,
-        amount: 29.99,
-      })),
+      packageTiers: flatPackageTiers(29.99),
     },
   }),
 };
@@ -140,8 +136,15 @@ describe("OrderService checkout group (batch checkout)", () => {
       findUnique: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
     },
+    // Koli numarası (PKG-…) da sipariş/sepet numarası gibi çakışma kontrolüyle
+    // üretilir → generateUniqueReference bu sayacı çağırır.
+    orderPackage: { count: jest.fn().mockResolvedValue(0) },
     commissionRule: { findMany: jest.fn().mockResolvedValue([]) },
-    platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+    platformSetting: {
+      // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     analyticsSnapshot: { upsert: jest.fn() },
     $transaction: jest.fn(),
   };
@@ -226,6 +229,7 @@ describe("OrderService checkout group (batch checkout)", () => {
       providers: [
         OrderService,
         OrderPricingService,
+        OrderTaxPolicyService,
         { provide: ShippingTariffService, useValue: SHIPPING_TARIFF_MOCK },
         OrderCheckoutService,
         OrderCheckoutCommonService,
@@ -725,6 +729,125 @@ describe("OrderService checkout group (batch checkout)", () => {
       expect(discountService.reserveUsage).toHaveBeenCalled();
       const orderData = mockTx.order.create.mock.calls[0][0].data;
       expect(orderData.discountAmount).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * FATURA GRUPLAMASI — çok satıcılı sepette kaç fatura kesilir?
+   *
+   * e-Logo gelir faturaları TAMAMEN `orderId` anahtarlıdır
+   * (`issueCommissionInvoice(orderId)`, `issueServiceFeeInvoice(orderId)`,
+   * `dedupeKey: invoice.order_revenue:<orderId>`). Dolayısıyla "kaç fatura"
+   * sorusunun cevabı "kaç Order yaratıldığı"dır — bu testler o sayıyı ve
+   * satıcı dağılımını sabitler.
+   */
+  describe("çok satıcılı sepet → fatura gruplaması", () => {
+    const productC = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb3";
+
+    const threeItemDto = () => {
+      const items = [
+        { productId: productA },
+        { productId: productB },
+        { productId: productC },
+      ];
+      return {
+        items,
+        idempotencyKey,
+        shippingAddressId: addressId,
+        expectedShippingTariffVersion: 1,
+        expectedPricingHash: pricingHashFor(items),
+      };
+    };
+
+    /** A + B → satıcı 1, C → satıcı 2 (kullanıcının 2+1 senaryosu). */
+    const splitTwoAndOne = () => {
+      // Satır kilidi sorgusu istenen ürün sayısı kadar satır dönmeli; varsayılan
+      // mock iki ürüne göre sabit.
+      mockTx.$queryRaw.mockResolvedValue([
+        { id: productA },
+        { id: productB },
+        { id: productC },
+      ]);
+      mockTx.product.findMany.mockResolvedValue([
+        makeProduct(productA),
+        makeProduct(productB),
+        makeProduct(productC, {
+          sellerId: sellerId2,
+          seller: {
+            id: sellerId2,
+            email: "s2@test.com",
+            displayName: "Seller2",
+          },
+        }),
+      ]);
+    };
+
+    it("satıcı başına DEĞİL, ürün başına sipariş yaratır (2+1 → 3 sipariş)", async () => {
+      splitTwoAndOne();
+
+      await service.checkout(buyerId, threeItemDto() as any);
+
+      // Paketler satıcı başına gruplanıyor…
+      expect(mockTx.orderPackage.create).toHaveBeenCalledTimes(2);
+      // …ama siparişler ürün başına açılıyor.
+      expect(mockTx.order.create).toHaveBeenCalledTimes(3);
+    });
+
+    it("her sipariş kendi satıcısının paketine bağlanır", async () => {
+      splitTwoAndOne();
+
+      await service.checkout(buyerId, threeItemDto() as any);
+
+      const orders = mockTx.order.create.mock.calls.map((c: any) => ({
+        seller: c[0].data.sellerId,
+        pkg: c[0].data.packageId,
+      }));
+
+      expect(orders.filter((o: any) => o.seller === sellerId)).toHaveLength(2);
+      expect(orders.filter((o: any) => o.seller === sellerId2)).toHaveLength(1);
+      // Aynı satıcının iki siparişi TEK pakete bağlı.
+      const sellerOnePkgs = new Set(
+        orders.filter((o: any) => o.seller === sellerId).map((o: any) => o.pkg),
+      );
+      expect(sellerOnePkgs.size).toBe(1);
+    });
+
+    it("kargo satıcı başına BİR kez alınır (3 ürün → 2 kargo ücreti)", async () => {
+      splitTwoAndOne();
+
+      await service.checkout(buyerId, threeItemDto() as any);
+
+      const shippings = mockTx.order.create.mock.calls.map(
+        (c: any) => c[0].data.shippingCost,
+      );
+      expect(shippings.filter((s: number) => s > 0)).toHaveLength(2);
+    });
+
+    it("satıcı başına TEK fatura kaynağı üretir (3 sipariş → 2 paket)", async () => {
+      // Komisyon ve hizmet bedeli faturaları artık `packageId` anahtarlı
+      // kesiliyor (ElogoInvoicingService.resolvePackageInvoiceBasis), sipariş
+      // değil. Paket satıcı başına tek olduğu için 2 satıcı → 2 fatura seti:
+      // biri iki kalemli, diğeri tek kalemli.
+      splitTwoAndOne();
+
+      await service.checkout(buyerId, threeItemDto() as any);
+
+      const invoiceSources = new Set(
+        mockTx.order.create.mock.calls.map((c: any) => c[0].data.packageId),
+      );
+      expect(invoiceSources.size).toBe(2);
+
+      const ordersPerPackage = mockTx.order.create.mock.calls.reduce(
+        (acc: Record<string, number>, c: any) => {
+          const pkg = c[0].data.packageId;
+          acc[pkg] = (acc[pkg] ?? 0) + 1;
+          return acc;
+        },
+        {},
+      );
+      // Satıcı 1'in paketi 2 kalem, satıcı 2'nin paketi 1 kalem taşır.
+      expect(ordersPerPackage[`pkg-${sellerId}`]).toBe(2);
+      expect(ordersPerPackage[`pkg-${sellerId2}`]).toBe(1);
     });
   });
 });

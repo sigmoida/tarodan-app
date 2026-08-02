@@ -5,7 +5,7 @@ import { ALLOW_INDEXING } from "@/lib/seo";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://tarodan.com",
+    process.env.NEXT_PUBLIC_APP_URL || "https://tarodan.com.tr",
   ),
   title: "Tarodan - Model Araba Pazarı",
   description:
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "tr_TR",
-    url: "https://tarodan.com",
+    url: "https://tarodan.com.tr",
     siteName: "Tarodan",
     title: "Tarodan - Model Araba Pazarı",
     description:
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
       "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu",
   },
   icons: {
-    icon: "/tarodanfavicon.png",
+    icon: "/tarodan-favicon.png",
   },
 };
 

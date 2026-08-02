@@ -62,6 +62,13 @@ export default function ProductSpecs({
         : t("product.stockFinished");
 
   const infoRows: Array<{ label: string; value: ReactNode }> = [];
+  // İlan numarası: destek/şikayet başvurularında kullanıcıdan bu istenir.
+  if (listing.productCode) {
+    infoRows.push({
+      label: t("product.productCode"),
+      value: listing.productCode,
+    });
+  }
   if (listing.brand) {
     infoRows.push({
       label: t("product.brand"),

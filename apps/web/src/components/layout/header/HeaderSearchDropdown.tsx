@@ -8,28 +8,13 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Chip, IconButton, Spinner } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { isValidImageSrc } from "@/components/OptimizedImage";
 import type { RichAutocompleteResults } from "@/lib/api/products";
+import { useNavCatalog } from "./_hooks/useNavCatalog";
 
-const POPULAR_SEARCHES = {
-  tr: [
-    "Hot Wheels",
-    "Matchbox",
-    "Minichamps",
-    "1:18 ölçek",
-    "Ferrari",
-    "Porsche",
-  ],
-  en: [
-    "Hot Wheels",
-    "Matchbox",
-    "Minichamps",
-    "1:18 scale",
-    "Ferrari",
-    "Porsche",
-  ],
-};
+/** Kaç popüler arama çipi gösterilir (üreticiler + bir ölçek). */
+const POPULAR_MANUFACTURER_COUNT = 5;
 
 interface HeaderSearchDropdownProps {
   debouncedQuery: string;
@@ -61,7 +46,19 @@ export default function HeaderSearchDropdown({
   flatItemsLength,
 }: HeaderSearchDropdownProps) {
   const t = useTranslations();
-  const locale = useLocale();
+
+  // Popüler aramalar sabit marka listesiydi ("Hot Wheels", "Ferrari"…). Arama
+  // kutusuna odaklanan bir ziyaretçinin GÖRDÜĞÜ İLK ŞEY orası; katalogda o
+  // markalar yokken her çip boş sonuca götürüyordu. Artık kataloğun gerçek
+  // üreticilerinden ve ölçeklerinden türüyor (header nav ile aynı önbellek) ve
+  // katalog boşken blok hiç çizilmiyor.
+  const { manufacturers, scales } = useNavCatalog();
+  const popularSearches = [
+    ...manufacturers
+      .slice(0, POPULAR_MANUFACTURER_COUNT)
+      .map((manufacturer) => manufacturer.name),
+    ...scales.slice(0, 1),
+  ];
 
   return (
     <div className="absolute left-0 right-0 mt-1 bg-surface-elevated rounded-lg shadow-2xl border border-border z-[100] overflow-hidden">
@@ -116,20 +113,22 @@ export default function HeaderSearchDropdown({
           )}
 
           {/* Popüler Aramalar */}
-          <div
-            className={`px-4 pb-3 ${recentSearches.length > 0 ? "border-t border-border-subtle pt-2" : "pt-3"}`}
-          >
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">
-              {t("search.popularSearches")}
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {POPULAR_SEARCHES[locale as "tr" | "en"]?.map((s) => (
-                <Chip key={s} type="button" onClick={() => navigateSearch(s)}>
-                  {s}
-                </Chip>
-              ))}
+          {popularSearches.length > 0 && (
+            <div
+              className={`px-4 pb-3 ${recentSearches.length > 0 ? "border-t border-border-subtle pt-2" : "pt-3"}`}
+            >
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">
+                {t("search.popularSearches")}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {popularSearches.map((s) => (
+                  <Chip key={s} type="button" onClick={() => navigateSearch(s)}>
+                    {s}
+                  </Chip>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Tüm ilanları gör */}
           <Link

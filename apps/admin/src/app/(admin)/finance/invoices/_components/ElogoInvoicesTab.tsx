@@ -2,6 +2,7 @@
 
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { elogoColumns } from "../_lib/columns";
 import {
   type Invoice,
@@ -14,6 +15,13 @@ import { useTranslations } from "next-intl";
 
 export function ElogoInvoicesTab() {
   const t = useTranslations();
+  const retry = useAdminMutation(
+    (id: string) => adminApi.retryElogoInvoice(id),
+    {
+      invalidates: ["invoices", "invoices-summary"],
+      successMessage: t("admin.finance.invoices.retried"),
+    },
+  );
   return (
     <ResourceList<Invoice>
       resource="invoices"
@@ -57,7 +65,11 @@ export function ElogoInvoicesTab() {
         <ResourceList.DateRange />
       </ResourceList.Toolbar>
       <ResourceList.Table
-        columns={elogoColumns(t)}
+        columns={elogoColumns(
+          t,
+          (i) => retry.mutate(i.id),
+          retry.isPending ? (retry.variables as string) : undefined,
+        )}
         emptyText={t("admin.finance.invoices.empty")}
       />
       <ResourceList.Pagination />

@@ -84,6 +84,7 @@ export default function PaymentCard({
         preparing: t("order.statusProcessing"),
         shipped: t("order.statusShipped"),
         delivered: t("order.statusDelivered"),
+        awaiting_buyer_confirmation: t("order.statusAwaitingConfirmation"),
         completed: t("order.statusCompleted"),
         cancelled: t("order.statusCancelled"),
         refund_requested: t("order.refundInProgress"),
@@ -147,9 +148,24 @@ export default function PaymentCard({
           </p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
             {isGroup ? (
-              <span className="text-primary-600">
-                {t("payment.itemsCount", { count: groupOrders.length })}
-              </span>
+              <>
+                {payment.orderNumber &&
+                  (payment.orderId ? (
+                    <Link
+                      href={`/profile/orders/${payment.orderId}`}
+                      className="font-mono font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      {payment.orderNumber}
+                    </Link>
+                  ) : (
+                    <span className="font-mono font-medium">
+                      {payment.orderNumber}
+                    </span>
+                  ))}
+                <span className="text-primary-600">
+                  · {t("payment.itemsCount", { count: groupOrders.length })}
+                </span>
+              </>
             ) : payment.orderId ? (
               <Link
                 href={`/profile/orders/${payment.orderId}`}
@@ -282,12 +298,9 @@ export default function PaymentCard({
             >
               <Thumb src={o.image} alt={o.title} />
               <div className="min-w-0 flex-1">
-                <Link
-                  href={`/profile/orders/${o.id}`}
-                  className="block truncate text-sm font-medium text-heading transition-colors hover:text-primary-600"
-                >
+                <p className="truncate text-sm font-medium text-heading">
                   {o.title}
-                </Link>
+                </p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
                   {o.orderNumber && <span>#{o.orderNumber}</span>}
                   {o.sellerName && (
@@ -305,18 +318,9 @@ export default function PaymentCard({
                   />
                 </div>
               </div>
-              <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-                <span className="whitespace-nowrap text-sm font-semibold text-heading">
-                  {formatTL(o.amount)}
-                </span>
-                <Link
-                  href={`/profile/orders/${o.id}`}
-                  className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-primary-600 hover:text-primary-700"
-                >
-                  {t("common.details")}
-                  <ChevronRightIcon className="h-3.5 w-3.5" />
-                </Link>
-              </div>
+              <span className="flex-shrink-0 whitespace-nowrap text-sm font-semibold text-heading">
+                {formatTL(o.amount)}
+              </span>
             </div>
           ))}
         </div>

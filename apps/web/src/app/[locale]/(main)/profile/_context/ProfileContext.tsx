@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import {
+  ordersApi,
   api,
   userApi,
   tradesApi,
@@ -36,6 +37,9 @@ function mapAuthUserToProfile(user: any): UserProfile {
   const tierType = user.membershipTier || "free";
   return {
     id: user.id,
+    adminCode: user.adminCode,
+    username: user.username,
+    usernameClaimedAt: user.usernameClaimed ? new Date().toISOString() : null,
     email: user.email,
     displayName: user.displayName,
     phone: user.phone,
@@ -144,7 +148,8 @@ function useProfileValue() {
       ] = await Promise.all([
         userApi.getProfile().catch(() => null),
         userApi.getStats().catch(() => null),
-        api.get("/orders", { params: { limit: 1 } }).catch(() => null),
+        // Sayaç birimi = liste birimi: sipariş değil GRUP sayısı (alıcı çatısı).
+        ordersApi.getGroups({ role: "buyer", limit: 1 }).catch(() => null),
         userApi.getMyProducts({ limit: 100 }).catch(() => null),
         tradesApi.getAll({ limit: 1 }).catch(() => null),
         collectionsApi.getMyCollections({ limit: 1 }).catch(() => null),

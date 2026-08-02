@@ -6,10 +6,21 @@ import {
 import { createHash } from "crypto";
 import { PrismaService } from "../../prisma";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { Prisma } from "@prisma/client";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { TaxService } from "../tax/tax.service";
-import { CommissionResult } from "./order-pricing.service";
+import { CommissionResult, OrderPricingService } from "./order-pricing.service";
+import {
+  splitShippingByBuyerShare,
+  type OutboundTariffLike,
+} from "../shipping/shipping-tariff.helper";
+import {
+  calculateServiceTax,
+  type ServiceTaxBreakdown,
+} from "./order-service-tax.helper";
+import { buyerTotalOf } from "./order-total.helper";
+import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
 /**
  * Sipariş oluşturma primitifleri (Sürat gönderi fail-fast, kurumsal-satıcı KDV,
@@ -26,7 +37,103 @@ export class OrderCheckoutCommonService {
     private readonly prisma: PrismaService,
     private readonly suratCargoService: SuratCargoService,
     private readonly taxService: TaxService,
+    private readonly orderPricing: OrderPricingService,
+    private readonly taxPolicy: OrderTaxPolicyService,
   ) {}
+
+  /**
+   * Teklif bazlı bir siparişin TÜM bedelleri: komisyon, kargo (alıcı/satıcı payı),
+   * KDV, stopaj ve tahsil edilecek toplam.
+   *
+   * Tek kaynak olması kritik: teklif kabul edilirken sipariş `OfferService` içinde
+   * oluşturuluyor ve orada yalnız komisyon hesaplanıyordu — KDV, stopaj ve kargo
+   * sıfır kalıyordu (kurumsal satıcıda KDV tahsil edilmemesi + kargonun bedava
+   * verilmesi). Klasik `POST /orders` teklif yolu ise aynı hesabı kendi içinde
+   * tekrar yazıyordu. İkisi de artık burayı çağırır.
+   */
+  async resolveOfferOrderPricing(params: {
+    amount: number;
+    sellerId: string;
+    categoryId: string | null;
+    shippingDesi: number;
+    shippingTariff?: OutboundTariffLike;
+  }): Promise<{
+    commission: CommissionResult;
+    fullShippingAmount: number;
+    buyerShippingAmount: number;
+    sellerShippingAmount: number;
+    taxAmount: number;
+    withholdingTaxAmount: number;
+    buyerServiceTaxAmount: number;
+    sellerServiceTaxAmount: number;
+    /** Uygulanan hizmet KDV oranı (%) — siparişe snapshot'lanır. */
+    serviceVatRate: number;
+    totalAmount: number;
+  }> {
+    const { amount, sellerId, categoryId, shippingDesi, shippingTariff } =
+      params;
+
+    const commission = await this.orderPricing.calculateCommission(
+      amount,
+      sellerId,
+      categoryId,
+    );
+    // Kargo kararı (quote/checkout ile ORTAK): kademe → o kademenin payı → bölüşüm.
+    const {
+      fullShipping: fullShippingAmount,
+      buyer: buyerShippingAmount,
+      seller: sellerShippingAmount,
+    } = this.orderPricing.resolveShippingDecision({
+      tariff:
+        shippingTariff ??
+        (await this.orderPricing.resolveShippingTariffSnapshot()).tariff,
+      subtotal: amount,
+      billableDesi: shippingDesi,
+      lineShares: [commission.shippingBuyerShares],
+    });
+    const {
+      taxAmount,
+      withholdingTaxAmount,
+      buyerServiceTaxAmount,
+      sellerServiceTaxAmount,
+      serviceVatRate,
+    } = await this.resolveOrderTaxes({
+      sellerId,
+      categoryId,
+      subtotal: amount,
+      fees: {
+        buyerCommissionAmount: commission.buyerCommissionAmount,
+        buyerServiceFeeAmount: commission.buyerServiceFeeAmount,
+        buyerShippingAmount,
+        sellerCommissionAmount: commission.sellerCommissionAmount,
+        sellerPlatformFeeAmount: commission.sellerPlatformFeeAmount,
+        sellerShippingAmount,
+      },
+    });
+
+    // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + ürün KDV'si +
+    // alıcıya verilen hizmetlerin KDV'si. (Stopaj ve satıcı hizmet KDV'si satıcı
+    // payout'undan kesilir, alıcıya yansıtılmaz.)
+    const totalAmount = buyerTotalOf({
+      subtotal: amount,
+      buyerShippingAmount,
+      buyerFeeAmount: commission.buyerFeeAmount,
+      buyerServiceTaxAmount,
+    });
+
+    return {
+      commission,
+      fullShippingAmount,
+      buyerShippingAmount,
+      sellerShippingAmount,
+      taxAmount,
+      withholdingTaxAmount,
+      buyerServiceTaxAmount,
+      sellerServiceTaxAmount,
+      serviceVatRate,
+      totalAmount,
+    };
+  }
 
   buildSuratIdempotencyKey(parts: string[]): string {
     return createHash("sha256")
@@ -54,6 +161,8 @@ export class OrderCheckoutCommonService {
     commission: CommissionResult;
     taxAmount: number;
     withholdingTaxAmount: number;
+    buyerServiceTaxAmount?: number;
+    sellerServiceTaxAmount?: number;
     totalAmount: number;
   }): Prisma.InputJsonObject {
     return {
@@ -100,58 +209,100 @@ export class OrderCheckoutCommonService {
       tax: {
         amount: params.taxAmount,
         withholdingAmount: params.withholdingTaxAmount,
+        // Hizmet bedeli KDV'si — alıcıya EKLENEN ve satıcıdan KESİLEN taraflar.
+        buyerServiceAmount: params.buyerServiceTaxAmount ?? 0,
+        sellerServiceAmount: params.sellerServiceTaxAmount ?? 0,
       },
     };
   }
 
-  /** E-ticaret stopaj oranı (%) — PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
-  private async getWithholdingTaxRate(): Promise<number> {
-    const row = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "withholding_tax_rate" },
-    });
-    const rate = Number(row?.settingValue ?? "1");
-    return Number.isFinite(rate) && rate >= 0 ? rate : 1;
-  }
-
   /**
-   * KDV + stopaj: yalnızca kurumsal satıcıda (businessStatus=approved + taxId dolu).
-   * KDV ürün fiyatına eklenir (alıcı öder); stopaj (GVK 94/19) KDV hariç ürün bedeli
-   * üzerinden hesaplanır ve satıcı payout'undan kesilir. Bireysel satıcı ikisinde de
-   * kapsam dışıdır (stopaj: 330 Seri No'lu GV Genel Tebliği — mükellef olmayana tevkifat yok).
-   * Matrah kargo ve alıcı hizmet bedelini içermez (komisyonla aynı baz).
+   * Geriye-uyum sarmalayıcı: yalnız ürün KDV'si + stopaj döner (hizmet KDV'si
+   * matrah gerektirdiği için burada hesaplanamaz). Yeni kod `resolveOrderTaxes`
+   * çağırmalı.
    */
   async resolveSellerTaxes(
     sellerId: string,
     categoryId: string | null,
     subtotal: number,
   ): Promise<{ taxAmount: number; withholdingTaxAmount: number }> {
-    const seller = await this.prisma.user.findUnique({
-      where: { id: sellerId },
-      select: { businessStatus: true, taxId: true },
-    });
-    if (seller?.businessStatus !== "approved" || !seller?.taxId) {
-      return { taxAmount: 0, withholdingTaxAmount: 0 };
-    }
-    const resolved = await this.taxService.resolveTaxRate(
-      "TR",
-      null,
+    const { taxAmount, withholdingTaxAmount } = await this.resolveOrderTaxes({
+      sellerId,
       categoryId,
-    );
-    if (!resolved) {
-      this.logger.error(
-        `No active tax rule for taxable seller=${sellerId} category=${categoryId}. Failing closed.`,
-      );
-      throw new ServiceUnavailableException({
-        code: "TAX_CONFIGURATION_MISSING",
-        message:
-          "Vergi mükellefi satıcı için geçerli bir vergi kuralı bulunamadı.",
-      });
-    }
-    const taxAmount = this.taxService.calculateTaxAmount(subtotal, resolved);
-    const withholdingRate = await this.getWithholdingTaxRate();
+      subtotal,
+    });
+    return { taxAmount, withholdingTaxAmount };
+  }
+
+  /**
+   * Bir sipariş satırının TÜM vergileri — tek çağrı, tek politika okuması.
+   *
+   *   taxAmount              ürün KDV'si   → alıcıdan tahsil, satıcıya aktarılır
+   *                                          (ARTIK HEP 0 — ürün KDV'si yok)
+   *   buyerServiceTaxAmount  hizmet KDV'si → alıcının ödediğine EKLENİR
+   *   sellerServiceTaxAmount hizmet KDV'si → satıcı payout'undan KESİLİR
+   *   withholdingTaxAmount   stopaj        → satıcı payout'undan KESİLİR
+   *
+   * `fees` verilmezse hizmet KDV'si hesaplanmaz (yalnız ürün KDV'si + stopaj
+   * isteyen eski çağrılar için).
+   */
+  async resolveOrderTaxes(params: {
+    sellerId: string;
+    categoryId: string | null;
+    subtotal: number;
+    fees?: ServiceTaxBreakdown;
+  }): Promise<{
+    taxAmount: number;
+    withholdingTaxAmount: number;
+    buyerServiceTaxAmount: number;
+    sellerServiceTaxAmount: number;
+    /** Uygulanan hizmet KDV oranı (%) — siparişe snapshot'lanır. */
+    serviceVatRate: number;
+  }> {
+    const { sellerId, categoryId, subtotal, fees } = params;
+    const [policy, seller] = await Promise.all([
+      this.taxPolicy.resolve(),
+      this.prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { businessStatus: true, taxId: true },
+      }),
+    ]);
+    // Vergi mükellefi = onaylı kurumsal hesap + VKN. Stopaj yalnız bu
+    // satıcılarda doğar.
+    const isCorporate =
+      seller?.businessStatus === "approved" && !!seller?.taxId;
+
+    // ── Ürün KDV'si ──────────────────────────────────────────────────────────
+    // YOK. Vitrin fiyatı KDV dahil kabul edilir ve ürün bedelinin beyanı
+    // satıcıya aittir; platform ürün üzerinden KDV tahsil etmez. KDV yalnız
+    // platformun kendi hizmetlerinden (komisyon, kargo payı, hizmet bedeli)
+    // doğar — bkz. order-service-tax.helper.ts.
+    const taxAmount = 0;
+
+    // ── Hizmet KDV'si ────────────────────────────────────────────────────────
+    // Satıcının mükellefiyetinden BAĞIMSIZ: bu KDV platformun kendi hizmetinin
+    // vergisidir, tarafların statüsüne bakmaz.
+    const serviceVatRate = this.taxPolicy.effectiveServiceVatRate(policy);
+    const { buyerServiceTaxAmount, sellerServiceTaxAmount } = fees
+      ? calculateServiceTax(fees, serviceVatRate)
+      : { buyerServiceTaxAmount: 0, sellerServiceTaxAmount: 0 };
+
+    // ── Stopaj (GVK 94/19) ───────────────────────────────────────────────────
+    const withholdingRate = this.taxPolicy.withholdingRateFor(policy, {
+      isCorporate,
+    });
     const withholdingTaxAmount =
       withholdingRate > 0 ? Math.round(subtotal * withholdingRate) / 100 : 0;
-    return { taxAmount, withholdingTaxAmount };
+
+    return {
+      taxAmount,
+      withholdingTaxAmount,
+      buyerServiceTaxAmount,
+      sellerServiceTaxAmount,
+      // Ücret kırılımı verilmediyse KDV hiç hesaplanmamıştır; oranı 0 yazmak
+      // ekranın "KDV uygulanmadı" ile "oran bilinmiyor" ayrımını korur.
+      serviceVatRate: fees ? serviceVatRate : 0,
+    };
   }
 
   /**
@@ -162,9 +313,25 @@ export class OrderCheckoutCommonService {
    */
   async generateOrderNumber(): Promise<string> {
     return generateUniqueReference(
-      "ORD",
+      REFERENCE_PREFIX.order,
       async (code) =>
         (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+    );
+  }
+
+  /**
+   * Koli numarası (ör. "PKG-3QF7N2K9XM") — bir satıcı paketi = bir fiziksel
+   * gönderi. Sürat'a `OzelKargoTakipNo` olarak BU gider ve müşteri kargosunu
+   * bununla sorgular; sipariş numarasından bağımsızdır, çünkü referansı paketin
+   * sipariş kümesinden türetmek küme değişince kayar ve mükerrer gönderi açar.
+   */
+  async generatePackageNumber(): Promise<string> {
+    return generateUniqueReference(
+      REFERENCE_PREFIX.orderPackage,
+      async (code) =>
+        (await this.prisma.orderPackage.count({
+          where: { packageNumber: code },
+        })) > 0,
     );
   }
 

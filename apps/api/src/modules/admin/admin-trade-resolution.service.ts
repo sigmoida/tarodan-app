@@ -19,6 +19,8 @@ import { EventService } from "../events/event.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateReferenceCode } from "../../common/helpers/generate-reference";
 
 /**
  * Takas çözüm & iade/iptal yaşam döngüsü (resolveTrade, markReturnDelivered,
@@ -406,7 +408,7 @@ export class AdminTradeResolutionService {
         const arrivedOwnerId = arrived.shipperId;
         const warehouseAddressId =
           await this.common.resolveWarehouseAddressId(tx);
-        const oid = `TRD-${trade.tradeNumber}-RET-STK`
+        const oid = `${trade.tradeNumber}-RET-STK`
           .replace(/[^a-zA-Z0-9-]/g, "")
           .slice(0, 50);
         const draft = await tx.tradeShipment.create({
@@ -585,12 +587,9 @@ export class AdminTradeResolutionService {
             where: { id: txResult.returnShipmentDraft.id },
             data: {
               carrier: "Tarodan Warehouse",
-              trackingNumber: `TRK${Date.now()
-                .toString(36)
-                .toUpperCase()}${Math.random()
-                .toString(36)
-                .substring(2, 6)
-                .toUpperCase()}`,
+              trackingNumber: generateReferenceCode(
+                REFERENCE_PREFIX.shipmentFallback,
+              ),
               status: ShipmentStatus.label_created,
               shippedAt: new Date(),
             },

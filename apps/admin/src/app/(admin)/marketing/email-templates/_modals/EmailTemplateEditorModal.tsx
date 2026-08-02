@@ -27,6 +27,7 @@ import {
   makeSourceData,
   type EmailTemplateEditorValues,
   type TemplateDetail,
+  type TemplatePreview,
 } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
@@ -69,7 +70,7 @@ export function EmailTemplateEditorModal({
           templateKey,
           sourceData as Record<string, any>,
         )
-      ).data as { subject: string; html: string };
+      ).data as TemplatePreview;
     },
     enabled: Boolean(detailQuery.data),
     staleTime: 5 * 60 * 1000,
@@ -89,7 +90,7 @@ export function EmailTemplateEditorModal({
           samples[templateKey] || {},
           { html, subject: previewSubject },
         )
-      ).data as { subject: string; html: string },
+      ).data as TemplatePreview,
     { showErrorToast: false },
   );
   const mutatePreview = preview.mutate;
@@ -112,8 +113,8 @@ export function EmailTemplateEditorModal({
     seeded.current = true;
     form.reset({
       name: detail.name || templateKey,
-      subject: detail.subject || "",
-      bodyHtml: detail.bodyHtml || sourceQuery.data?.html || "",
+      subject: detail.subject || sourceQuery.data?.subject || "",
+      bodyHtml: detail.bodyHtml || sourceQuery.data?.bodyHtml || "",
       testEmail: form.getValues("testEmail"),
     });
   }, [detailQuery.data, sourceQuery.data, form, templateKey]);
@@ -194,6 +195,8 @@ export function EmailTemplateEditorModal({
       adminApi.sendTestEmail(templateKey, {
         to,
         templateData: samples[templateKey] || {},
+        overrideHtml: bodyHtml,
+        overrideSubject: subject,
       }),
     {
       successMessage: t("admin.marketing.emailTemplates.testQueued"),
@@ -220,8 +223,8 @@ export function EmailTemplateEditorModal({
       onSuccess: () => {
         form.reset({
           name: detailQuery.data?.name || templateKey,
-          subject: "",
-          bodyHtml: sourceQuery.data?.html || "",
+          subject: sourceQuery.data?.subject || "",
+          bodyHtml: sourceQuery.data?.bodyHtml || "",
           testEmail,
         });
         loadPreview();
@@ -241,16 +244,27 @@ export function EmailTemplateEditorModal({
 
   const detail = detailQuery.data;
   const variables = (() => {
+    const discovered = new Set<string>(Object.keys(samples[templateKey] || {}));
+    const source = `${sourceQuery.data?.subject || ""}\n${sourceQuery.data?.bodyHtml || ""}`;
+    for (const match of source.matchAll(/\{\{([\w.]+)\}\}/g)) {
+      discovered.add(match[1]);
+    }
+
     if (detail?.variablesJson) {
       try {
         const parsed = JSON.parse(detail.variablesJson);
-        if (typeof parsed === "object" && parsed !== null)
-          return Object.keys(parsed);
+        if (Array.isArray(parsed)) {
+          for (const value of parsed) {
+            if (typeof value === "string") discovered.add(value);
+          }
+        } else if (typeof parsed === "object" && parsed !== null) {
+          for (const value of Object.keys(parsed)) discovered.add(value);
+        }
       } catch {
-        // Fall back to sample-data keys.
+        // The source and sample variables above still remain available.
       }
     }
-    return Object.keys(samples[templateKey] || {});
+    return Array.from(discovered).sort();
   })();
 
   return (
@@ -262,8 +276,7 @@ export function EmailTemplateEditorModal({
       onSubmit={(values) => save.mutate(values)}
       isSubmitting={save.isPending}
       submitLabel={t("common.save")}
-      maxWidth="max-w-2xl"
-      modalClassName="max-w-6xl"
+      size="wide"
       closeOnBackdrop={false}
     >
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -276,8 +289,8 @@ export function EmailTemplateEditorModal({
         )}
       </div>
 
-      <div className="grid h-[68vh] grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
+      <div className="grid grid-cols-1 gap-4 lg:h-[68vh] lg:grid-cols-2">
+        <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto lg:pr-1">
           {variables.length > 0 && (
             <div className="rounded-lg border border-primary-500/20 bg-primary-500/5 p-3">
               <p className="mb-1.5 text-xs font-medium text-muted">
@@ -302,6 +315,9 @@ export function EmailTemplateEditorModal({
           <FormInput
             name="name"
             label={t("admin.marketing.emailTemplates.displayName")}
+            placeholder={t(
+              "admin.marketing.emailTemplates.displayNamePlaceholder",
+            )}
           />
           <FormInput
             name="subject"
@@ -332,6 +348,9 @@ export function EmailTemplateEditorModal({
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="off"
+              placeholder={t(
+                "admin.marketing.emailTemplates.htmlBodyPlaceholder",
+              )}
               className="min-h-[280px] flex-1 resize-none rounded-lg border border-border bg-heading p-3 font-mono text-xs leading-relaxed text-inverted"
             />
           </div>
@@ -415,6 +434,15 @@ export function EmailTemplateEditorModal({
                       t("admin.marketing.emailTemplates.noSubject")}
                   </span>
                 </p>
+                {preview.data.unresolvedVariables.length > 0 && (
+                  <p className="mt-1 text-xs text-warning-700">
+                    {t("admin.marketing.emailTemplates.unresolvedVariables", {
+                      variables: preview.data.unresolvedVariables
+                        .map((variable) => `{{${variable}}}`)
+                        .join(", "),
+                    })}
+                  </p>
+                )}
               </div>
               <iframe
                 key={preview.data.html.substring(0, 100)}

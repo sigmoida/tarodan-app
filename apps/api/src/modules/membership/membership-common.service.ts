@@ -201,90 +201,7 @@ export class MembershipCommonService {
       pendingPayment = true;
     }
 
-    // Map tier to DTO first
     const tierDto = this.mapTierToDto(effectiveTier);
-
-    // Override listing limits based on tier type if platform setting exists
-    // This must be done BEFORE getUserUsageStats so it uses the correct limit
-    if (effectiveTier.type === MembershipTierType.free) {
-      const freeListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "free_listing_limit" },
-        });
-      if (freeListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          freeListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit) && platformLimit > 0) {
-          tierDto.maxFreeListings = platformLimit;
-          tierDto.maxTotalListings = platformLimit; // For free tier, total = free
-          // Also update the tier object so getUserUsageStats uses the correct value
-          effectiveTier.maxFreeListings = platformLimit;
-          effectiveTier.maxTotalListings = platformLimit;
-        }
-      }
-    } else if (effectiveTier.type === MembershipTierType.basic) {
-      const basicListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "basic_listing_limit" },
-        });
-      if (basicListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          basicListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit)) {
-          if (platformLimit === -1) {
-            tierDto.maxTotalListings = -1;
-            effectiveTier.maxTotalListings = -1;
-          } else if (platformLimit > 0) {
-            tierDto.maxTotalListings = platformLimit;
-            effectiveTier.maxTotalListings = platformLimit;
-          }
-        }
-      }
-    } else if (effectiveTier.type === MembershipTierType.premium) {
-      const premiumListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "premium_listing_limit" },
-        });
-      if (premiumListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          premiumListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit)) {
-          if (platformLimit === -1) {
-            tierDto.maxTotalListings = -1; // Unlimited
-            effectiveTier.maxTotalListings = -1;
-          } else if (platformLimit > 0) {
-            tierDto.maxTotalListings = platformLimit;
-            effectiveTier.maxTotalListings = platformLimit;
-          }
-        }
-      }
-    } else if (effectiveTier.type === MembershipTierType.business) {
-      const businessListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "business_listing_limit" },
-        });
-      if (businessListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          businessListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit)) {
-          if (platformLimit === -1) {
-            tierDto.maxTotalListings = -1; // Unlimited
-            effectiveTier.maxTotalListings = -1;
-          } else if (platformLimit > 0) {
-            tierDto.maxTotalListings = platformLimit;
-            effectiveTier.maxTotalListings = platformLimit;
-          }
-        }
-      }
-    }
 
     // Get usage stats (this will use the overridden maxFreeListings)
     const stats = await this.getUserUsageStats(userId, effectiveTier);
@@ -335,62 +252,11 @@ export class MembershipCommonService {
     // Count featured listings (placeholder - would need featured flag on product)
     const featuredListings = 0;
 
-    // Check platform setting for listing limit override based on tier type
-    let maxFreeListings = tier.maxFreeListings;
-    let maxTotalListings = tier.maxTotalListings;
-
-    if (tier.type === MembershipTierType.free) {
-      const freeListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "free_listing_limit" },
-        });
-      if (freeListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          freeListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit) && platformLimit > 0) {
-          maxFreeListings = platformLimit;
-          maxTotalListings = platformLimit; // For free tier, total = free
-        }
-      }
-    } else if (tier.type === MembershipTierType.premium) {
-      const premiumListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "premium_listing_limit" },
-        });
-      if (premiumListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          premiumListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit)) {
-          if (platformLimit === -1) {
-            maxTotalListings = -1; // Unlimited
-          } else if (platformLimit > 0) {
-            maxTotalListings = platformLimit;
-          }
-        }
-      }
-    } else if (tier.type === MembershipTierType.business) {
-      const businessListingLimitSetting =
-        await this.prisma.platformSetting.findUnique({
-          where: { settingKey: "business_listing_limit" },
-        });
-      if (businessListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(
-          businessListingLimitSetting.settingValue,
-          10,
-        );
-        if (!isNaN(platformLimit)) {
-          if (platformLimit === -1) {
-            maxTotalListings = -1; // Unlimited
-          } else if (platformLimit > 0) {
-            maxTotalListings = platformLimit;
-          }
-        }
-      }
-    }
+    // Limitler DOĞRUDAN katman satırından gelir — tek kaynak MembershipTier.
+    // Buradaki eski platform-ayarı override zinciri kaldırıldı (basic dalı da
+    // yoktu, yani ayar ile davranış zaten çelişiyordu).
+    const maxFreeListings = tier.maxFreeListings;
+    const maxTotalListings = tier.maxTotalListings;
 
     // Calculate remaining
     const usedFreeListings = Math.min(activeListings, maxFreeListings);
@@ -428,7 +294,6 @@ export class MembershipCommonService {
       canTrade: tier.canTrade,
       isAdFree: tier.isAdFree,
       featuredListingSlots: tier.featuredListingSlots,
-      commissionDiscount: parseFloat(tier.commissionDiscount),
       isActive: tier.isActive,
     };
   }

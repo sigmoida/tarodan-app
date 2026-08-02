@@ -7,7 +7,12 @@ import { Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { AppModule } from "./app.module";
 import { AppNestLogger } from "./common/logging/nest-logger";
-import { redactSensitive } from "./common/security/redact-sensitive";
+import {
+  applySentryEventPolicy,
+  isProductionRuntime,
+  resolveSentryEnvironment,
+  resolveSentryRelease,
+} from "./modules/sentry/sentry-event";
 
 /**
  * Initialize Sentry for the worker process (#71). The worker runs as a separate
@@ -22,12 +27,14 @@ function initWorkerSentry(logger: Logger): boolean {
     logger.warn("Sentry DSN not configured — worker error tracking disabled");
     return false;
   }
-  const environment = process.env.NODE_ENV || "development";
   Sentry.init({
     dsn,
-    environment,
-    tracesSampleRate: environment === "production" ? 0.2 : 1.0,
-    beforeSend: (event) => redactSensitive(event) as typeof event,
+    // API ile aynı çözümleme: etiket SENTRY_ENVIRONMENT'tan (staging ile prod
+    // ayrılsın), örnekleme gerçek çalışma kipinden, sürüm commit sha'sından.
+    environment: resolveSentryEnvironment(),
+    release: resolveSentryRelease(),
+    tracesSampleRate: isProductionRuntime() ? 0.2 : 1.0,
+    beforeSend: applySentryEventPolicy,
   });
   logger.log("Sentry initialized (worker)");
   return true;

@@ -1,6 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
 import { ProductStatus } from "@prisma/client";
 import { OrderPricingService } from "./order-pricing.service";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
 describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
   const product = {
@@ -37,15 +39,18 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
             outboundPackageFee: 0,
             freeShippingEnabled: true,
             freeShippingThreshold: 0,
+            packageTiers: flatPackageTiers(0),
           },
         }),
       } as any,
       discountService,
+      testTaxPolicy(),
     );
     jest.spyOn(service, "calculateCommission").mockResolvedValue({
       buyerFeeAmount: 0,
       sellerFeeAmount: 0,
       shippingBuyerShare: 100,
+      shippingBuyerShares: { small: 100, medium: 100, large: 100 },
     } as any);
     return { service, discountService };
   }

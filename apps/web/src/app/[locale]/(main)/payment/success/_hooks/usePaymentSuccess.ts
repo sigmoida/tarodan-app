@@ -124,8 +124,13 @@ export function usePaymentSuccess() {
         return;
       }
 
-      const actualOrderId = paymentData?.orderId || orderIdFromUrl;
+      // Grup ödemesinde payment.orderId NULL — anchor, grubun ilk siparişidir
+      // (grup ekranına order id ile çözülür). Sipariş kimliği yoksa fatura
+      // denemesi hiç başlatılmaz (eskiden spinner sonsuza dek dönüyordu).
+      const actualOrderId =
+        paymentData?.orderId ?? paymentData?.orders?.[0]?.id ?? orderIdFromUrl;
       if (actualOrderId && paymentId) attemptFetchInvoice(actualOrderId, 0);
+      else setInvoiceError(true);
     } catch (error) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to fetch payment:", error);

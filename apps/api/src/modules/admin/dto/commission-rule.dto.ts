@@ -6,8 +6,10 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsArray,
   Min,
   Max,
+  ValidateNested,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
@@ -16,7 +18,25 @@ import {
   CommissionAppliesTo,
   CommissionSellerType,
   CommissionTaxpayerType,
+  ShippingPackageTierCode,
 } from "@prisma/client";
+
+/**
+ * Bir paket boyutunun kargo bölüşümü. Gönderilmeyen boyut, kuralın tek
+ * `shippingBuyerShare` değerine düşer (kolaylık fallback'i).
+ */
+export class CommissionShippingShareDto {
+  @ApiProperty({ enum: ShippingPackageTierCode })
+  @IsEnum(ShippingPackageTierCode)
+  tierCode: ShippingPackageTierCode;
+
+  @ApiProperty({ example: 70, description: "Buyer share (%) for this size" })
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerShare: number;
+}
 
 export class CreateCommissionRuleDto {
   @ApiProperty({
@@ -248,6 +268,17 @@ export class CreateCommissionRuleDto {
   @Max(100)
   shippingBuyerShare?: number;
 
+  @ApiPropertyOptional({
+    type: [CommissionShippingShareDto],
+    description:
+      "Per-package-size shipping split; a size omitted here uses shippingBuyerShare",
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CommissionShippingShareDto)
+  shippingShares?: CommissionShippingShareDto[];
+
   // Legacy fields (optional for backward compatibility)
   @ApiPropertyOptional({
     example: 5.0,
@@ -460,6 +491,17 @@ export class UpdateCommissionRuleDto {
   @Min(0)
   @Max(100)
   shippingBuyerShare?: number;
+
+  @ApiPropertyOptional({
+    type: [CommissionShippingShareDto],
+    description:
+      "Per-package-size shipping split; a size omitted here uses shippingBuyerShare",
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CommissionShippingShareDto)
+  shippingShares?: CommissionShippingShareDto[];
 
   // Legacy fields
   @ApiPropertyOptional({ example: 3.5 })

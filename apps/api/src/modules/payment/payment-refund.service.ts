@@ -15,6 +15,7 @@ import {
   TradeStatus,
   RefundRequestStatus,
   RefundAttemptStatus,
+  SellerAdjustmentType,
 } from "@prisma/client";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
@@ -31,7 +32,9 @@ import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
+  OUTBOX_ORDER_REVENUE_INVOICE,
   type InvoiceRefundReversePayload,
+  type OrderRevenueInvoicePayload,
 } from "../outbox/outbox.types";
 import { LedgerService } from "../ledger/ledger.service";
 import { MONEY_EPSILON } from "./payment.constants";
@@ -68,15 +71,28 @@ export interface RefundSettlementOptions {
   closeOrder?: boolean;
   /** Satıcı hold'unun tüketilecek adet oranı. Nakit iade oranından bağımsızdır. */
   holdPortion?: number;
+  /**
+   * Bu iadeden sonra hold'da satıcıya BIRAKILACAK tutar (kendi kargo payının
+   * tazmini). Escrow hold TAM kargoyu düştüğü için satıcı payını peşin ödemiş
+   * sayılır; kusur alıcıdaysa geri verilir. Tüketimi YALNIZ aşağı çeker.
+   */
+  holdRetainedAmount?: number;
   /** Terslenecek satıcı kesintisinin kesin TL tutarı. */
   sellerFeeRefundAmount?: number;
   /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
   buyerFeeRefundAmount?: number;
-  sellerAdjustment?: {
+  /**
+   * Satıcıya yazılacak borçlar (payout mahsubu). İadenin kargo bacağı iki ayrı
+   * kalem doğurabilir: dönüş kargosu (`return_shipping`) ve satıcı kusurunda
+   * alıcıya geri ödenen gidiş kargosu (`outbound_shipping`). `sourceKey` unique
+   * olduğundan tekrar denemede borç ikilenmez.
+   */
+  sellerAdjustments?: Array<{
     sourceKey: string;
     amount: number;
+    type: SellerAdjustmentType;
     refundRequestId?: string;
-  };
+  }>;
 }
 
 export interface ProcessRefundOptions {
@@ -722,7 +738,13 @@ export class PaymentRefundService {
             try {
               refundResult = await this.paymentProviders
                 .resolve(payment.provider)
-                .createRefund(paytrOid, amountToRefund);
+                // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
+                // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
+                .createRefund(
+                  paytrOid,
+                  amountToRefund,
+                  refundAttempt.attempt.id,
+                );
             } catch (err) {
               const reason = (err as Error).message || "refund request failed";
               if (err instanceof ProviderRefundRejectedException) {
@@ -936,8 +958,16 @@ export class PaymentRefundService {
               ),
               1,
             );
-            const refundedSeller =
-              Math.round(sellerAmount * portion * 100) / 100;
+            let refundedSeller = Math.round(sellerAmount * portion * 100) / 100;
+            // Satıcıya bırakılacak tutar (kargo payı tazmini): tüketimi YALNIZ aşağı
+            // çeker. Oran zaten daha azını tüketiyorsa dokunulmaz; bırakılacak tutar
+            // hold'u aşarsa hiç tüketim olmaz.
+            const retained = opts?.settlement?.holdRetainedAmount;
+            if (retained != null && retained > 0) {
+              const consumable =
+                Math.round(Math.max(0, sellerAmount - retained) * 100) / 100;
+              refundedSeller = Math.min(refundedSeller, consumable);
+            }
             const newRefunded =
               Number(activeHold.refundedAmount ?? 0) + refundedSeller;
             if (newRefunded >= sellerAmount - 0.01) {
@@ -1037,28 +1067,28 @@ export class PaymentRefundService {
                 stockRestoredAt: true,
               },
             });
-            const sellerAdjustment = opts?.settlement?.sellerAdjustment;
-            if (
-              orderRow?.sellerId &&
-              sellerAdjustment &&
-              sellerAdjustment.amount > 0
-            ) {
-              await tx.sellerAccountAdjustment.upsert({
-                where: { sourceKey: sellerAdjustment.sourceKey },
-                create: {
-                  sellerId: orderRow.sellerId,
-                  orderId,
-                  refundRequestId: sellerAdjustment.refundRequestId ?? null,
-                  sourceKey: sellerAdjustment.sourceKey,
-                  type: "return_shipping",
-                  amount: sellerAdjustment.amount,
-                  remainingAmount: sellerAdjustment.amount,
-                  metadata: {
-                    refundAttemptId: freshAttempt.id,
+            const sellerAdjustments = (
+              opts?.settlement?.sellerAdjustments ?? []
+            ).filter((adjustment) => adjustment.amount > 0);
+            if (orderRow?.sellerId) {
+              for (const adjustment of sellerAdjustments) {
+                await tx.sellerAccountAdjustment.upsert({
+                  where: { sourceKey: adjustment.sourceKey },
+                  create: {
+                    sellerId: orderRow.sellerId,
+                    orderId,
+                    refundRequestId: adjustment.refundRequestId ?? null,
+                    sourceKey: adjustment.sourceKey,
+                    type: adjustment.type,
+                    amount: adjustment.amount,
+                    remainingAmount: adjustment.amount,
+                    metadata: {
+                      refundAttemptId: freshAttempt.id,
+                    },
                   },
-                },
-                update: {},
-              });
+                  update: {},
+                });
+              }
             }
             const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
             // MONEY-H4: sipariş cancel + stok geri-yükleme siparişin KÜMÜLATİF iadesine
@@ -1390,7 +1420,12 @@ export class PaymentRefundService {
         try {
           refundResult = (await this.paymentProviders
             .resolve(payment.provider)
-            .createRefund(oid, amount)) as unknown as Record<string, unknown>;
+            // reference_no = attempt id (durum-sorgu mutabakatı için).
+            .createRefund(
+              oid,
+              amount,
+              refundAttempt.attempt.id,
+            )) as unknown as Record<string, unknown>;
         } catch (e: any) {
           const reason = e?.message || "trade refund request failed";
           if (e instanceof ProviderRefundRejectedException) {
@@ -1827,6 +1862,19 @@ export class PaymentRefundService {
 
     // Escrow saatini teslimden başlat — para akışının TEK tetikleyicisi.
     await this.scheduleHoldReleaseOnDelivery(orderId, deliveredAt, tx);
+
+    // Teslim gelir faturalarını AYNI tx'te dayanıklı olarak kuyruğa al. Eskiden
+    // faturalama yalnız 2 dakikalık backfill cron'una bağlıydı; cron'un aday
+    // penceresi doyduğunda veya cron gecikince e-Arşiv'in 7 günlük yasal süresi
+    // kaçırılabiliyordu. Outbox at-least-once + issue* idempotent olduğu için
+    // cron ile birlikte çalışması güvenli.
+    if (this.outbox && tx) {
+      await this.outbox.enqueue(tx, {
+        type: OUTBOX_ORDER_REVENUE_INVOICE,
+        payload: { orderId } satisfies OrderRevenueInvoicePayload,
+        dedupeKey: `${OUTBOX_ORDER_REVENUE_INVOICE}:${orderId}`,
+      });
+    }
 
     const order = await db.order.findUnique({
       where: { id: orderId },

@@ -23,6 +23,7 @@ export interface PremiumCheckMembership {
   tier?: {
     type?: MembershipTierType | string | null;
     isActive?: boolean | null;
+    canTrade?: boolean | null;
   } | null;
 }
 
@@ -73,6 +74,69 @@ export function effectiveMembershipTierType(
   }
 
   return MembershipTierType.free;
+}
+
+/**
+ * Satıcının EFEKTİF takas yetkisi — takas ücretli bir üyelik özelliğidir
+ * (`MembershipTier.canTrade`).
+ *
+ * Ürünün `isTradeEnabled` bayrağı satıcının NİYETİDİR, yetki değildir: üyelik
+ * bitince kullanıcı ücretsize düşer ve yetkisini kaybeder, ama bayrak üründe
+ * kalır. Bu fonksiyon üç katmanın da (takas sınır denetimi, liste filtresi,
+ * arama dokümanı) paylaştığı tek türetmedir.
+ *
+ * `freeTierCanTrade`, ücretsiz katman satırındaki bayraktır: hakkı düşen ya da
+ * hiç üyeliği olmayan kullanıcı efektif olarak ücretsiz katmandadır.
+ */
+export function canTradeFromMembership(
+  membership: PremiumCheckMembership | null | undefined,
+  owner: BusinessEntitlementOwner | null | undefined,
+  freeTierCanTrade: boolean,
+): boolean {
+  // Ücretsiz katmandaki kullanıcı zaten kendi katman satırını taşır.
+  if (membership?.tier?.type === MembershipTierType.free) {
+    return membership.tier.canTrade === true;
+  }
+  if (isPremiumEntitled(membership, owner)) {
+    return membership?.tier?.canTrade === true;
+  }
+  // Hakkı düşmüş ya da üyeliksiz → efektif katman ücretsizdir.
+  return freeTierCanTrade;
+}
+
+/**
+ * `canTradeFromMembership`'in Prisma karşılığı: bir ürünün `seller` ilişkisine
+ * takılacak filtre. Ücretsiz katmanda takas AÇIKSA herkes yetkilidir ve filtre
+ * gerekmez (`undefined`).
+ */
+export function tradeCapableSellerWhere(freeTierCanTrade: boolean) {
+  if (freeTierCanTrade) return undefined;
+  return {
+    membership: {
+      status: {
+        in: [SubscriptionStatus.active, SubscriptionStatus.cancelled],
+      },
+      currentPeriodEnd: { gt: new Date() },
+      tier: {
+        isActive: true,
+        canTrade: true,
+        type: { not: MembershipTierType.free },
+      },
+      // Business katmanı yalnız şirket onayı tamamlandığında hak verir
+      // (isPremiumEntitled ile aynı kural).
+      OR: [
+        { tier: { type: { not: MembershipTierType.business } } },
+        {
+          tier: { type: MembershipTierType.business },
+          user: {
+            businessStatus: BusinessStatus.approved,
+            companyName: { not: null },
+            taxId: { not: null },
+          },
+        },
+      ],
+    },
+  };
 }
 
 export function isBusinessMembershipEntitled(

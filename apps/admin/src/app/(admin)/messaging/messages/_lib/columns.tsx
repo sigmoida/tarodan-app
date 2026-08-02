@@ -1,5 +1,5 @@
 import { Badge } from "@tarodan/ui";
-import { col, type RowActionItem } from "@/components/table";
+import { col, TruncatedText, type RowActionItem } from "@/components/table";
 import { type Message, messageStatusConfig } from "./types";
 import type { useTranslations } from "next-intl";
 
@@ -7,30 +7,23 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export function messageColumns(rowMenu: (m: Message) => RowActionItem[], t: T) {
   return [
-    col.id<Message>(
-      t("admin.messaging.messages.conversationId"),
-      (m) => m.threadId,
-    ),
     col.user<Message>(
       t("admin.messaging.messages.sender"),
       (m) => ({
         name: m.sender.displayName,
         secondary: m.sender.email,
+        href: m.senderId ? `/accounts/users/${m.senderId}` : undefined,
       }),
-      { sortKey: "sender.displayName" },
+      { minWidth: 260, sortKey: "sender.displayName" },
     ),
-    col.id<Message>(t("admin.messaging.messages.senderId"), (m) => m.senderId),
     col.user<Message>(
       t("admin.messaging.messages.receiver"),
       (m) => ({
         name: m.receiver.displayName,
         secondary: m.receiver.email,
+        href: m.receiverId ? `/accounts/users/${m.receiverId}` : undefined,
       }),
-      { sortKey: "receiver.displayName" },
-    ),
-    col.id<Message>(
-      t("admin.messaging.messages.receiverId"),
-      (m) => m.receiverId,
+      { minWidth: 260, sortKey: "receiver.displayName" },
     ),
     col.text<Message>(
       t("common.message"),
@@ -46,11 +39,13 @@ export function messageColumns(rowMenu: (m: Message) => RowActionItem[], t: T) {
       t("admin.messaging.messages.warning"),
       (m) =>
         m.flaggedReason ? (
-          <Badge variant="warning">{m.flaggedReason}</Badge>
+          <Badge variant="warning" className="min-w-0 max-w-full">
+            <TruncatedText className="min-w-0">{m.flaggedReason}</TruncatedText>
+          </Badge>
         ) : (
           <span className="text-muted">—</span>
         ),
-      { sortKey: "flaggedReason", sortType: "text" },
+      { minWidth: 220, sortKey: "flaggedReason", sortType: "text" },
     ),
     col.badge<Message>(
       t("common.status"),

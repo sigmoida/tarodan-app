@@ -10,7 +10,15 @@ import { useTranslations } from "next-intl";
 import { useUpdateOrderStatus } from "../_hooks/useOrderDetail";
 import type { OrderDetail } from "../_lib/types";
 
-export default function SellerActions({ order }: { order: OrderDetail }) {
+export default function SellerActions({
+  order,
+  showCargoRef = true,
+}: {
+  order: OrderDetail;
+  /** Kargo referans kartı PAKET başına bir kez gösterilir (R6) — paketin ilk
+   * siparişi dışında false geçilir; "Hazırlanıyor" aksiyonu sipariş başınadır. */
+  showCargoRef?: boolean;
+}) {
   const t = useTranslations();
   const updateStatus = useUpdateOrderStatus(order.id);
 
@@ -31,10 +39,18 @@ export default function SellerActions({ order }: { order: OrderDetail }) {
     );
   }
 
-  if (order.status === "preparing") {
+  if (order.status === "preparing" && showCargoRef) {
     const cargoCode = order.shipment?.cargoCode ?? null;
     return (
       <SectionCard title={t("order.cargoReference")}>
+        {/* Bu kod hangi koliye ait: aynı alıcının aynı sepetteki diğer ürünleri
+            de bu kolide gider, tek etiketle gönderilir. */}
+        {order.packageNumber && (
+          <p className="mb-3 text-sm text-muted">
+            {t("order.packageNumber")}:{" "}
+            <span className="font-mono text-body">{order.packageNumber}</span>
+          </p>
+        )}
         {cargoCode ? (
           <>
             <p className="text-muted mb-4">

@@ -14,28 +14,29 @@ export default function TradePremiumModal() {
     <Modal
       isOpen={showTradeModal}
       onClose={() => setShowTradeModal(false)}
-      maxWidth="max-w-md"
+      title={t("trade.premiumRequired")}
+      size="md"
+      closeLabel={t("common.close")}
+      footer={
+        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            variant="outline"
+            onClick={() => setShowTradeModal(false)}
+            className="w-full sm:w-auto"
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button asChild className="w-full sm:w-auto">
+            <Link href="/membership">{t("membership.upgrade")}</Link>
+          </Button>
+        </div>
+      }
     >
       <div className="text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-warning-100">
           <ArrowsRightLeftIcon className="h-8 w-8 text-warning-600" />
         </div>
-        <h2 className="mb-2 text-xl font-bold text-heading">
-          {t("trade.premiumRequired")}
-        </h2>
-        <p className="mb-6 text-muted">{t("trade.premiumRequiredDesc")}</p>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button
-            variant="secondary"
-            onClick={() => setShowTradeModal(false)}
-            className="flex-1"
-          >
-            {t("common.cancel")}
-          </Button>
-          <Button asChild className="flex-1">
-            <Link href="/membership">{t("membership.upgrade")}</Link>
-          </Button>
-        </div>
+        <p className="text-muted">{t("trade.premiumRequiredDesc")}</p>
       </div>
     </Modal>
   );

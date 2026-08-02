@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import { BadRequestException } from "@nestjs/common";
 import { RefundService } from "./refund.service";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
 describe("RefundService policy integration", () => {
   const baseOrder = {
@@ -59,7 +60,7 @@ describe("RefundService policy integration", () => {
         id: "tariff-1",
         version: 3,
         provider: "surat",
-        rates: [{ desi: 2, amount: 180 }],
+        packageTiers: flatPackageTiers(180),
       }),
     };
     const payment = { processRefund: jest.fn() };

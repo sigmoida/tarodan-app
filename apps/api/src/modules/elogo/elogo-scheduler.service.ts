@@ -34,15 +34,23 @@ export class ElogoSchedulerService implements OnModuleInit {
   async runRetryPending(log: (msg: string) => void = () => {}) {
     try {
       await this.invoicing.retryPendingInvoices();
-      log(`eLogo retry çalıştı`);
+      // Deneme bütçesi tükenmiş faturalar otomatik kurtarılmaz; görünür olmaları
+      // gerekir (yasal süre işliyor). Admin retry endpoint'i ile kurtarılabilirler.
+      const exhausted = await this.invoicing.reportExhaustedInvoices();
+      log(
+        `eLogo retry çalıştı${exhausted > 0 ? ` · ${exhausted} fatura deneme bütçesi tükenmiş` : ""}`,
+      );
       return {
-        summary: "eLogo retry tamam",
-        stats: {} as Record<string, number>,
+        summary: `eLogo retry tamam${exhausted > 0 ? ` · ${exhausted} tükenmiş` : ""}`,
+        stats: { exhausted } as Record<string, number>,
       };
     } catch (err: any) {
       this.logger.warn(`eLogo retry cron hatası: ${err?.message}`);
       log(`HATA: ${err?.message}`);
-      return { summary: `Hata: ${err?.message}`, stats: { errors: 1 } };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw err;
     }
   }
 }

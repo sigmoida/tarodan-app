@@ -86,7 +86,10 @@ export class TradeSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { errors: 1 } };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 }

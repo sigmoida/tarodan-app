@@ -17,8 +17,8 @@ export interface Order {
   shipmentId?: string | null;
   shipmentTrackingNumber?: string | null;
   internalTrackingNumber?: string | null;
-  buyer: { id: string; displayName: string };
-  seller: { id: string; displayName: string };
+  buyer: { id: string; displayName: string; email?: string; isGuest?: boolean };
+  seller: { id: string; displayName: string; email?: string };
   product?: { id: string; title: string };
   createdAt: string;
   itemCount: number;
@@ -32,6 +32,8 @@ export interface Order {
   offerId?: string | null;
   checkoutGroupId?: string | null;
   packageId?: string | null;
+  /** Koli numarası (PKG-…): kargo etiketindeki ve Sürat'a giden kod. */
+  packageNumber?: string | null;
   groupNumber?: string | null;
   groupItemCount: number;
   productImageUrl?: string | null;
@@ -49,8 +51,9 @@ export interface OrderLineItem {
   internalTrackingNumber?: string | null;
   product?: { id: string; title: string };
   productImageUrl?: string | null;
-  seller: { id: string; displayName: string };
+  seller: { id: string; displayName: string; email?: string };
   packageId?: string | null;
+  packageNumber?: string | null;
   activeRefundRequest?: Order["activeRefundRequest"];
   cancellationType?: string | null;
 }
@@ -58,7 +61,9 @@ export interface OrderLineItem {
 /** A satıcı-paketi (çatı): the line items of one seller within a checkout group. */
 export interface SellerPackage {
   key: string;
-  seller: { id: string; displayName: string };
+  /** Koli numarası (PKG-…) — bir sepette satıcı sayısı kadar koli olur. */
+  packageNumber: string | null;
+  seller: { id: string; displayName: string; email?: string };
   items: OrderLineItem[];
 }
 
@@ -76,13 +81,13 @@ export interface OrderGroupRow {
   checkoutGroupId: string | null;
   /** groupNumber for a group, orderNumber for a standalone order */
   displayNumber: string;
-  buyer: { id: string; displayName: string };
+  buyer: { id: string; displayName: string; email?: string; isGuest?: boolean };
   createdAt: string;
   itemCount: number;
   totalAmount: number;
   commission: number;
   subtotal: number;
-  sellers: { id: string; displayName: string }[];
+  sellers: { id: string; displayName: string; email?: string }[];
   thumbs: string[];
   items: OrderLineItem[];
   packages: SellerPackage[];
@@ -128,6 +133,7 @@ export function mapOrders(raw: any[], t: T): Order[] {
     offerId: o.offerId ?? null,
     checkoutGroupId: o.checkoutGroupId ?? null,
     packageId: o.packageId ?? null,
+    packageNumber: o.packageNumber ?? null,
     groupNumber: o.groupNumber ?? null,
     groupItemCount: Number(o.groupItemCount || 1),
     productImageUrl: o.productImageUrl ?? null,
@@ -150,6 +156,7 @@ function toLineItem(o: Order): OrderLineItem {
     productImageUrl: o.productImageUrl,
     seller: o.seller,
     packageId: o.packageId ?? null,
+    packageNumber: o.packageNumber ?? null,
     activeRefundRequest: o.activeRefundRequest,
     cancellationType: o.cancellationType,
   };
@@ -163,7 +170,12 @@ function buildPackages(items: OrderLineItem[]): SellerPackage[] {
     const key = it.packageId ?? `seller:${it.seller.id}`;
     let pkg = map.get(key);
     if (!pkg) {
-      pkg = { key, seller: it.seller, items: [] };
+      pkg = {
+        key,
+        packageNumber: it.packageNumber ?? null,
+        seller: it.seller,
+        items: [],
+      };
       map.set(key, pkg);
       order.push(key);
     }
@@ -199,7 +211,10 @@ export function useOrderGroups(orders: Order[]): OrderGroupRow[] {
       const head = members[0];
       const items = members.map(toLineItem);
       const packages = buildPackages(items);
-      const sellersMap = new Map<string, { id: string; displayName: string }>();
+      const sellersMap = new Map<
+        string,
+        { id: string; displayName: string; email?: string }
+      >();
       for (const m of members)
         if (m.seller?.id) sellersMap.set(m.seller.id, m.seller);
       const sellers = Array.from(sellersMap.values());

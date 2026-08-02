@@ -106,7 +106,12 @@ export function DataTable<T>({
   // Register columns with the enclosing ResourceList (if any) so its toolbar can
   // offer a CSV export. Safe when standalone — the context is simply absent.
   const resourceList = useContext(ResourceListContext);
-  if (resourceList) resourceList.exportRef.current = columns;
+  if (resourceList) {
+    resourceList.exportRef.current = columns;
+    // Kolonlar bu tabloya basılan satır şekline göre yazılır (örn. grup satırı)
+    // — CSV de aynı veriyi kullanmalı, ham context satırlarını değil.
+    resourceList.exportRowsRef.current = data as any[];
+  }
   const table = useReactTable({
     data,
     columns,
@@ -129,14 +134,22 @@ export function DataTable<T>({
       c.meta &&
       (c.meta.minWidth != null || c.meta.grow != null || c.meta.align != null),
   );
-  // Width basis: each column gets minWidth px; the table's min-width is their
-  // sum. Above that threshold columns grow proportionally; below it the table
-  // stays at min-width and the wrapper falls back to horizontal scroll. (Putting
-  // min-width on `<col>` doesn't work — the browser ignores it; hence on `<table>`.)
+  // Width basis: fixed columns stay at minWidth, flexible columns share remaining
+  // space in proportion to minWidth. Below the total minimum the wrapper scrolls.
   const colMin = (c: (typeof columns)[number]) => c.meta?.minWidth ?? 140;
-  const tableMinWidth = hasSizing
-    ? (selectable ? 44 : 0) + columns.reduce((sum, c) => sum + colMin(c), 0)
-    : 0;
+  const fixedWidth =
+    (selectable ? 44 : 0) +
+    columns.reduce((sum, c) => sum + (c.meta?.fixed ? colMin(c) : 0), 0);
+  const flexibleWidth = columns.reduce(
+    (sum, c) => sum + (c.meta?.fixed ? 0 : colMin(c)),
+    0,
+  );
+  const tableMinWidth = hasSizing ? fixedWidth + flexibleWidth : 0;
+  const widthOf = (c: (typeof columns)[number]) => {
+    if (c.meta?.fixed || flexibleWidth === 0) return `${colMin(c)}px`;
+    const share = colMin(c) / flexibleWidth;
+    return `calc((100% - ${fixedWidth}px) * ${share})`;
+  };
   const alignOf = (align?: CellAlign) =>
     align ? ALIGN_CLASS[align] : undefined;
 
@@ -157,7 +170,7 @@ export function DataTable<T>({
             <colgroup>
               {selectable && <col style={{ width: "44px" }} />}
               {columns.map((c, i) => (
-                <col key={c.id ?? i} style={{ width: `${colMin(c)}px` }} />
+                <col key={c.id ?? i} style={{ width: widthOf(c) }} />
               ))}
             </colgroup>
           )}

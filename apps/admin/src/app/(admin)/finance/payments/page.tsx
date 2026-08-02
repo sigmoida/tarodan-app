@@ -3,14 +3,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Button } from "@tarodan/ui";
 import {
   ArrowPathRoundedSquareIcon,
   ChartBarIcon,
+  ListBulletIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
+import { AdminTabs } from "@/components/AdminTabs";
+import { useTabParam } from "@/hooks/useTabParam";
 import { ResourceList } from "@/components/list";
 import {
   type Payment,
@@ -20,79 +22,101 @@ import {
 } from "./_lib/types";
 import { paymentColumns } from "./_lib/columns";
 import { paymentRowMenu } from "./_lib/rowActions";
+import { StatisticsTab } from "./_components/StatisticsTab";
+import { ReconciliationTab } from "./_components/ReconciliationTab";
 import { useTranslations } from "next-intl";
 
+/**
+ * Ödemeler — tek route, üç sekme (liste · istatistik · iade mutabakatı).
+ * Eskiden istatistik ve mutabakat ayrı sayfalardı; finansal bağlam
+ * dağılıyordu. Eski URL'ler sekme parametresine yönlendirir.
+ */
 export default function PaymentsPage() {
   const t = useTranslations();
   const router = useRouter();
+  const [tab, setTab] = useTabParam("list");
+
+  const tabs = [
+    {
+      key: "list",
+      label: t("admin.finance.payments.tabs.list"),
+      icon: ListBulletIcon,
+    },
+    {
+      key: "statistics",
+      label: t("admin.finance.payments.tabs.statistics"),
+      icon: ChartBarIcon,
+    },
+    {
+      key: "reconciliation",
+      label: t("admin.finance.payments.tabs.reconciliation"),
+      icon: ArrowPathRoundedSquareIcon,
+    },
+  ];
 
   return (
     <AdminPage>
       <PageHeader
         title={t("admin.finance.payments.title")}
         description={t("admin.finance.payments.subtitle")}
-      >
-        <Button
-          variant="secondary"
-          leftIcon={<ArrowPathRoundedSquareIcon className="h-5 w-5" />}
-          onClick={() => router.push("/finance/payments/refund-reconciliation")}
-        >
-          {t("admin.finance.payments.refundReconciliation.action")}
-        </Button>
-        <Button
-          variant="secondary"
-          leftIcon={<ChartBarIcon className="h-5 w-5" />}
-          onClick={() => router.push("/finance/payments/statistics")}
-        >
-          {t("admin.finance.payments.statistics")}
-        </Button>
-      </PageHeader>
+      />
 
-      <ResourceList<Payment>
-        resource="payments"
-        fetcher={(p) =>
-          adminApi.getPayments(p).then((res) => {
-            const root = res.data ?? {};
-            const raw = root.data ?? root.items ?? [];
-            const total = root.meta?.total ?? root.total ?? raw.length;
-            return {
-              ...res,
-              data: { data: mapPayments(raw), meta: { total } },
-            };
-          })
-        }
-        getRowId={(p) => p.id}
-        syncUrl
-        initialFilters={{
-          status: "all",
-          provider: "all",
-          startDate: "",
-          endDate: "",
-        }}
-      >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.FilterSelect
-            name="status"
-            options={paymentStatusFilterOptions(t)}
-            className="sm:w-44"
+      <AdminTabs tabs={tabs} value={tab} onChange={setTab} />
+
+      {tab === "statistics" ? (
+        <StatisticsTab />
+      ) : tab === "reconciliation" ? (
+        <ReconciliationTab />
+      ) : (
+        <ResourceList<Payment>
+          resource="payments"
+          fetcher={(p) =>
+            adminApi.getPayments(p).then((res) => {
+              const root = res.data ?? {};
+              const raw = root.data ?? root.items ?? [];
+              const total = root.meta?.total ?? root.total ?? raw.length;
+              return {
+                ...res,
+                data: { data: mapPayments(raw), meta: { total } },
+              };
+            })
+          }
+          getRowId={(p) => p.id}
+          syncUrl
+          initialFilters={{
+            status: "all",
+            provider: "all",
+            startDate: "",
+            endDate: "",
+          }}
+        >
+          <ResourceList.Toolbar>
+            <ResourceList.Search />
+            <ResourceList.FilterSelect
+              name="status"
+              options={paymentStatusFilterOptions(t)}
+              className="sm:w-44"
+            />
+            <ResourceList.FilterSelect
+              name="provider"
+              options={providerFilterOptions(t)}
+              className="sm:w-36"
+            />
+            <ResourceList.DateRange />
+          </ResourceList.Toolbar>
+          <ResourceList.Table
+            columns={paymentColumns(
+              paymentRowMenu(
+                (p) => router.push(`/finance/payments/${p.id}`),
+                t,
+              ),
+              t,
+            )}
+            emptyText={t("admin.finance.payments.empty")}
           />
-          <ResourceList.FilterSelect
-            name="provider"
-            options={providerFilterOptions(t)}
-            className="sm:w-36"
-          />
-          <ResourceList.DateRange />
-        </ResourceList.Toolbar>
-        <ResourceList.Table
-          columns={paymentColumns(
-            paymentRowMenu((p) => router.push(`/finance/payments/${p.id}`), t),
-            t,
-          )}
-          emptyText={t("admin.finance.payments.empty")}
-        />
-        <ResourceList.Pagination />
-      </ResourceList>
+          <ResourceList.Pagination />
+        </ResourceList>
+      )}
     </AdminPage>
   );
 }

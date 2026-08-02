@@ -124,23 +124,29 @@ export class PaymentCommonService {
    * caller leaves the shipment `pending` with no code, to be retried later.
    */
   /**
-   * Faz 2: Bir siparişin ait olduğu SATICI PAKETİNİN paylaşılan Sürat referansı
-   * (OzelKargoTakipNo). Deterministik = paketin en küçük orderNumber'ı. Paketteki
-   * tüm order-shipment satırları bu ref'i (trackingNumber) ve tek barkodu paylaşır
-   * → satıcı başına TEK fiziksel gönderi. Paketi olmayan (legacy) sipariş kendi
-   * orderNumber'ını kullanır (birebir eski davranış).
+   * Bir siparişin ait olduğu SATICI PAKETİNİN Sürat referansı (OzelKargoTakipNo)
+   * = paketin KENDİ numarası (PKG-…). Paketteki tüm order-shipment satırları bu
+   * ref'i (trackingNumber) ve tek barkodu paylaşır → satıcı başına TEK fiziksel
+   * gönderi; müşteri de kargosunu bu kodla sorgular.
+   *
+   * Eskiden ref paketin en küçük orderNumber'ından TÜRETİLİYORDU. Türetilmiş ref
+   * paketin sipariş kümesi değişince (iptal, packageId taşıması) kayıyordu; 48
+   * saatlik retry penceresinde yeniden hesaplanan farklı ref, Sürat idempotency
+   * cache'ini (anahtar = OzelKargoTakipNo) ıskalayıp MÜKERRER fiziksel gönderi
+   * açabiliyordu. Saklanan numara bu hata sınıfını kapatır.
+   *
+   * Paketi olmayan (legacy/manuel) sipariş kendi orderNumber'ını kullanır.
    */
   private async resolveSuratRef(
     orderNumber: string,
     packageId: string | null | undefined,
   ): Promise<string> {
     if (!packageId) return orderNumber;
-    const pkgOrders = await this.prisma.order.findMany({
-      where: { packageId },
-      select: { orderNumber: true },
+    const pkg = await this.prisma.orderPackage.findUnique({
+      where: { id: packageId },
+      select: { packageNumber: true },
     });
-    const nums = pkgOrders.map((o) => o.orderNumber).filter(Boolean);
-    return nums.length ? [...nums].sort()[0] : orderNumber;
+    return pkg?.packageNumber ?? orderNumber;
   }
 
   async createSuratBarcodeForOrder(
@@ -317,6 +323,9 @@ export class PaymentCommonService {
       await this.prisma.shipment.create({
         data: {
           orderId,
+          // Koli bağı: aynı packageId'yi paylaşan satırlar TEK fiziksel gönderidir
+          // → Sürat koli başına bir kez sorgulanır, webhook kardeşlere yayılır.
+          packageId: order.packageId ?? null,
           provider: "surat",
           status: "pending",
           // trackingNumber = paket OzelKargoTakipNo — poller bununla sorgular;

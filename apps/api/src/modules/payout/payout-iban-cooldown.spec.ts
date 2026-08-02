@@ -56,7 +56,7 @@ describe("PayoutService.processPendingPayouts IBAN cooldown", () => {
 
     const result = await service.processPendingPayouts();
 
-    expect(result).toEqual({ processed: 0, failed: 0 });
+    expect(result).toEqual({ processed: 0, submitted: 0, failed: 0 });
     expect(createPlatformTransfer).not.toHaveBeenCalled();
     expect(persistedStatus).toBe(PayoutStatus.pending);
   });
@@ -118,7 +118,7 @@ describe("PayoutService.processPendingPayouts IBAN cooldown", () => {
 
     const result = await service.processPendingPayouts();
 
-    expect(result).toEqual({ processed: 0, failed: 0 });
+    expect(result).toEqual({ processed: 0, submitted: 0, failed: 0 });
     expect(createPlatformTransfer).not.toHaveBeenCalled();
     expect(persistedStatus).toBe(PayoutStatus.pending);
     expect(updateMany).toHaveBeenCalledWith(

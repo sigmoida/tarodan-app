@@ -13,6 +13,7 @@ import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
 import { OrderModule } from "../order/order.module";
 import { ProductModule } from "../product/product.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -27,7 +28,11 @@ import { ProductModule } from "../product/product.module";
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OfferController],
-  providers: [OfferService, OfferSchedulerService, OfferScheduledProcessor],
+  providers: [
+    OfferService,
+    OfferSchedulerService,
+    ...scheduledProcessors(OfferScheduledProcessor),
+  ],
   exports: [OfferService, OfferSchedulerService],
 })
 export class OfferModule {}

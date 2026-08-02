@@ -2,19 +2,24 @@
  * Search Indexing Worker
  * Handles Elasticsearch indexing via SearchService (async, queue-based)
  */
-import { Processor, Process, OnQueueFailed, OnQueueCompleted } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
-import { SearchService } from '../modules/search/search.service';
+import {
+  Processor,
+  Process,
+  OnQueueFailed,
+  OnQueueCompleted,
+} from "@nestjs/bull";
+import { Logger } from "@nestjs/common";
+import { Job } from "bull";
+import { SearchService } from "../modules/search/search.service";
 
 export interface SearchJobData {
-  type: 'index' | 'update' | 'delete' | 'bulk-index' | 'reindex-all';
-  entityType: 'product' | 'collection';
+  type: "index" | "update" | "delete" | "bulk-index" | "reindex-all";
+  entityType: "product" | "collection";
   entityId?: string;
   entityIds?: string[];
 }
 
-@Processor('search')
+@Processor("search")
 export class SearchWorker {
   private readonly logger = new Logger(SearchWorker.name);
 
@@ -22,34 +27,34 @@ export class SearchWorker {
 
   // ── Product jobs ──
 
-  @Process('index')
+  @Process("index")
   async handleIndex(job: Job<SearchJobData>) {
     const { entityId } = job.data;
-    if (!entityId) throw new Error('entityId is required for indexing');
+    if (!entityId) throw new Error("entityId is required for indexing");
     this.logger.log(`Index job ${job.id}: product ${entityId}`);
     await this.searchService.indexProduct(entityId);
     return { success: true, entityId };
   }
 
-  @Process('update')
+  @Process("update")
   async handleUpdate(job: Job<SearchJobData>) {
     const { entityId } = job.data;
-    if (!entityId) throw new Error('entityId is required for update');
+    if (!entityId) throw new Error("entityId is required for update");
     this.logger.log(`Update job ${job.id}: product ${entityId}`);
     await this.searchService.indexProduct(entityId);
     return { success: true, entityId };
   }
 
-  @Process('delete')
+  @Process("delete")
   async handleDelete(job: Job<SearchJobData>) {
     const { entityId } = job.data;
-    if (!entityId) throw new Error('entityId is required for delete');
+    if (!entityId) throw new Error("entityId is required for delete");
     this.logger.log(`Delete job ${job.id}: product ${entityId}`);
     await this.searchService.removeProduct(entityId);
     return { success: true, entityId };
   }
 
-  @Process('bulk-index')
+  @Process("bulk-index")
   async handleBulkIndex(job: Job<SearchJobData>) {
     const { entityIds } = job.data;
     if (!entityIds?.length) return { success: true, indexed: 0 };
@@ -60,14 +65,19 @@ export class SearchWorker {
         await this.searchService.indexProduct(id);
         indexed++;
       } catch (err) {
-        this.logger.warn(`Failed to index product ${id}: ${(err as Error).message}`);
+        // warn BİLİNÇLİ: periyodik ES↔DB senkronu (search-periodic-sync /
+        // search-hourly-reconcile) eksik dokümanı kendisi tamamlar, tek ürünün
+        // dizinlenememesi alarm gerektirmez.
+        this.logger.warn(
+          `Failed to index product ${id}: ${(err as Error).message}`,
+        );
       }
     }
     this.logger.log(`Bulk indexed ${indexed}/${entityIds.length} products`);
     return { success: true, indexed };
   }
 
-  @Process('reindex-all')
+  @Process("reindex-all")
   async handleReindexAll(job: Job<SearchJobData>) {
     this.logger.log(`Reindex-all job ${job.id}`);
     const total = await this.searchService.reindexAll();
@@ -77,25 +87,27 @@ export class SearchWorker {
 
   // ── Collection jobs ──
 
-  @Process('index-collection')
+  @Process("index-collection")
   async handleIndexCollection(job: Job<SearchJobData>) {
     const { entityId } = job.data;
-    if (!entityId) throw new Error('entityId is required for collection indexing');
+    if (!entityId)
+      throw new Error("entityId is required for collection indexing");
     this.logger.log(`Index collection job ${job.id}: ${entityId}`);
     await this.searchService.indexCollection(entityId);
     return { success: true, entityId };
   }
 
-  @Process('delete-collection')
+  @Process("delete-collection")
   async handleDeleteCollection(job: Job<SearchJobData>) {
     const { entityId } = job.data;
-    if (!entityId) throw new Error('entityId is required for collection delete');
+    if (!entityId)
+      throw new Error("entityId is required for collection delete");
     this.logger.log(`Delete collection job ${job.id}: ${entityId}`);
     await this.searchService.removeCollection(entityId);
     return { success: true, entityId };
   }
 
-  @Process('reindex-all-collections')
+  @Process("reindex-all-collections")
   async handleReindexAllCollections(job: Job<SearchJobData>) {
     this.logger.log(`Reindex-all-collections job ${job.id}`);
     const total = await this.searchService.reindexAllCollections();

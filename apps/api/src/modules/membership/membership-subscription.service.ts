@@ -4,7 +4,12 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Optional,
 } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { enqueueTradeListingReindex } from "./trade-listing-reindex";
 import { PrismaService } from "../../prisma";
 import {
   MembershipTierType,
@@ -32,6 +37,8 @@ import { i18nMessage } from "../i18n";
 import { PaymentProviderEventService } from "../payment/payment-provider-event.service";
 import { createHash } from "node:crypto";
 import { VirtualOrderFulfillmentService } from "../payment/virtual-order-fulfillment.service";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -51,6 +58,12 @@ export class MembershipSubscriptionService {
     private readonly common: MembershipCommonService,
     private readonly providerEvents: PaymentProviderEventService,
     private readonly virtualOrder?: VirtualOrderFulfillmentService,
+    // Takas yetkisi düşünce satıcının ürünlerini yeniden indeksle: arama
+    // dokümanındaki `sellerCanTrade` üyelikten türetilir ve ürün düzenlemesi
+    // olmadan bayatlar. @Optional — mevcut spec harness'ları konumsal kurar.
+    @Optional()
+    @InjectQueue(QUEUE_NAMES.SEARCH)
+    private readonly searchQueue?: Queue,
   ) {}
 
   // ==========================================================================
@@ -514,7 +527,11 @@ export class MembershipSubscriptionService {
     ].join(":");
 
     try {
-      const orderNumber = `MEM-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      const orderNumber = await generateUniqueReference(
+        REFERENCE_PREFIX.membershipOrder,
+        async (code) =>
+          (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+      );
       intent = await this.prisma.$transaction(async (tx) => {
         const order = await tx.order.create({
           data: {
@@ -1323,6 +1340,14 @@ export class MembershipSubscriptionService {
                 `Auto-cancelled ${cancelledPending.count} pending trade offer(s) for downgraded user`,
               );
             }
+
+            // Arama dokümanındaki `sellerCanTrade` bayatlamasın — ortak
+            // tetikleme (aktivasyon ve admin değişikliğiyle aynı yardımcı).
+            await enqueueTradeListingReindex(
+              this.prisma,
+              this.searchQueue,
+              membership.userId,
+            );
           } catch (tradeErr: any) {
             // Takas iptali downgrade'i bloklamasın; üyelik düşürme başarılı sayılır.
             this.logger.warn(

@@ -67,7 +67,11 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
   const topProductsRes = at(6, { data: [] });
   const topSellersRes = at(7, { data: [] });
 
-  const data = dashboardRes.data.data || dashboardRes.data;
+  // Güvenli erişim: `at()` geri düşüşleri (`{ data: null }`) ve boş gövde
+  // dönen uçlar yüzünden `res.data` null olabiliyor. Bu fonksiyon aynı deseni
+  // bazı satırlarda `?.` ile, bazılarında `.` ile yazıyordu — düz olanlar
+  // panoyu komple çökertiyordu (sunucu render'ı düşüp istemciye geçiyordu).
+  const data = dashboardRes.data?.data || dashboardRes.data || {};
 
   // Gross sales and net commission are distinct backend fields (#295); no
   // longer conflated into one `totalRevenue` scalar.
@@ -119,13 +123,13 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     dailyActiveVisitors: Number(visitorsData?.dailyActiveVisitors ?? 0),
   };
 
-  const ordersData = ordersRes.data.data || ordersRes.data || [];
+  const ordersData = ordersRes.data?.data || ordersRes.data || [];
   const recentOrders = Array.isArray(ordersData) ? ordersData : [];
 
   const tradesData = tradesRes.data?.data || tradesRes.data || [];
   const recentTrades = Array.isArray(tradesData) ? tradesData : [];
 
-  const pendingData = pendingRes.data.data || pendingRes.data;
+  const pendingData = pendingRes.data?.data || pendingRes.data;
   const pendingActions: PendingActions | null = pendingData
     ? {
         ...pendingData,
@@ -148,7 +152,7 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
   let ordersByDay = Array(30).fill(0);
 
   if (salesRes.data) {
-    const salesData = salesRes.data.data ?? salesRes.data;
+    const salesData = salesRes.data?.data ?? salesRes.data;
     const dailyArray = Array.isArray(salesData)
       ? salesData
       : (salesData?.data ?? []);

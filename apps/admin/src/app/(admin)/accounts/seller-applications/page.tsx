@@ -10,7 +10,7 @@ import { useTranslations } from "next-intl";
 
 export default function SellerApplicationsPage() {
   const t = useTranslations();
-  const [tab, setTab] = useTabParam("pending");
+  const [tab, setTab] = useTabParam("submitted");
 
   return (
     <AdminPage>

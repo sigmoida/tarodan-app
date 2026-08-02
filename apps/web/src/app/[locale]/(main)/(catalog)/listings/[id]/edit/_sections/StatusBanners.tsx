@@ -34,6 +34,7 @@ export default function StatusBanners({
               <Input
                 type="number"
                 min="1"
+                placeholder="1"
                 value={reactivateQuantity}
                 onChange={(e) => setReactivateQuantity(e.target.value)}
                 className="w-28 border-warning-300 focus:ring-warning-500"

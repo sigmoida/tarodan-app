@@ -8,7 +8,14 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslations } from "next-intl";
-import { Dialog, ModalFooter, Textarea, Input, Label, FormField } from "@tarodan/ui";
+import {
+  Dialog,
+  ModalFooter,
+  Textarea,
+  Input,
+  Label,
+  FormField,
+} from "@tarodan/ui";
 
 export interface PromptOptions {
   title?: string;
@@ -119,7 +126,20 @@ function PromptDialog({
   };
 
   return (
-    <Dialog isOpen onClose={onCancel} title={title}>
+    <Dialog
+      isOpen
+      onClose={onCancel}
+      title={title}
+      footer={
+        <ModalFooter
+          onCancel={onCancel}
+          onConfirm={handleSubmit}
+          cancelLabel={cancelLabel}
+          confirmLabel={confirmLabel}
+          destructive={destructive}
+        />
+      }
+    >
       <div className="space-y-4">
         {description && <p className="text-sm text-body">{description}</p>}
 
@@ -149,14 +169,6 @@ function PromptDialog({
         </FormField>
 
         {error && <div className="text-sm text-danger-600">{error}</div>}
-
-        <ModalFooter
-          onCancel={onCancel}
-          onConfirm={handleSubmit}
-          cancelLabel={cancelLabel}
-          confirmLabel={confirmLabel}
-          destructive={destructive}
-        />
       </div>
     </Dialog>
   );
@@ -166,7 +178,7 @@ function PromptDialog({
 export function usePrompt(): PromptFn {
   const ctx = useContext(PromptContext);
   if (!ctx) {
-  // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- developer-facing hook-misuse error
+    // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- developer-facing hook-misuse error
     throw new Error("usePrompt, PromptProvider içinde kullanılmalı");
   }
   return ctx;

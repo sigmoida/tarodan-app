@@ -59,10 +59,10 @@ export class SearchSyncService {
     } catch (error: any) {
       this.logger.warn("Periodic sync check failed");
       log(`HATA: ${error?.message ?? error}`);
-      return {
-        summary: `Hata: ${error?.message ?? error}`,
-        stats: { errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 

@@ -38,6 +38,10 @@ export interface RefundRequestDetail {
   retainedSellerPlatformFeeAmount?: number | string;
   returnShippingChargeToBuyer?: number | string;
   returnShippingChargeToSeller?: number | string;
+  /** Kusur alıcıdaysa satıcıya GERİ verilen kendi kargo payı (tam iadede). */
+  sellerShippingCompensationAmount?: number | string;
+  /** Alıcıya geri ödenen gidiş kargosunun satıcıya yazılan borcu. */
+  outboundShippingChargeToSeller?: number | string;
   requiresAdminReview?: boolean;
   penaltyReviewRequired?: boolean;
   metadata?: { history?: HistoryEntry[] } | null;

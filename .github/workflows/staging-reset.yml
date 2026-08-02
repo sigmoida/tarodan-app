@@ -6,14 +6,22 @@
 #
 # PROD GUARDS (in the inline script) — any failure aborts before touching data:
 #   1. RESET_CONFIRM=STAGING must be set.
-#   2. The api container's FRONTEND_URL/API_URL must be a *.staging.tarodan.shop
-#      host and must NOT be a bare production domain.
+#   2. The api container's FRONTEND_URL/API_URL must be a staging host
+#      (staging.tarodan.com.tr, or the legacy staging.tarodan.shop) and must NOT
+#      be a bare production domain.
 #   3. Seeding WITH images is refused while S3_ENV_PREFIX=prod (would copy demo
 #      assets into production storage) — set S3_ENV_PREFIX=staging or skip images.
 #
-# Required GitHub environment "staging" secrets:
-#   STAGING_HOST, STAGING_USERNAME, STAGING_SSH_KEY   (SSH into the staging VPS)
+# Required repository secrets:
+#   SERVER_HOST, SERVER_USERNAME, SERVER_PASSWORD     (SSH into the Coolify VPS)
 #   COOLIFY_STAGING_UUIDS                             (api,web,admin UUIDs; api = first)
+#
+# The SSH credentials are the shared SERVER_* pair, not a staging-only set: the
+# staging apps live on the same Coolify host. Which environment gets wiped is
+# decided by COOLIFY_STAGING_UUIDS (container lookup) plus the staging-hostname
+# guard below — never by the SSH endpoint. Earlier revisions expected
+# STAGING_HOST/STAGING_USERNAME/STAGING_SSH_KEY, which were never created, so
+# every manual run died at "missing server host" before reaching the guards.
 # Optional repo/environment variable:
 #   STAGING_WEEKLY_RESET=true  -> enables the Monday-morning scheduled reset.
 name: Staging Reset
@@ -61,7 +69,29 @@ jobs:
         id: uuid
         env:
           UUIDS: ${{ secrets.COOLIFY_STAGING_UUIDS }}
-        run: echo "api=$(echo "$UUIDS" | cut -d, -f1)" >> "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          api="$(printf '%s' "$UUIDS" | cut -d, -f1 | xargs)"
+          [ -n "$api" ] || { echo "::error::COOLIFY_STAGING_UUIDS is empty."; exit 1; }
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+
+      # ssh-action reports a missing secret as a bare "missing server host" with
+      # no hint about which one. Name it here instead.
+      - name: Verify SSH secrets are configured
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USERNAME: ${{ secrets.SERVER_USERNAME }}
+          PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${HOST:-}" ] || missing="$missing SERVER_HOST"
+          [ -n "${USERNAME:-}" ] || missing="$missing SERVER_USERNAME"
+          [ -n "${PASSWORD:-}" ] || missing="$missing SERVER_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            exit 1
+          fi
 
       - name: Reset + seed over SSH (Coolify api container)
         uses: appleboy/ssh-action@v1
@@ -73,9 +103,9 @@ jobs:
           SKIP_BACKUP: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_backup) && '1' || '0' }}
           SEED_SKIP_IMAGES: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_images) && '1' || '0' }}
         with:
-          host: ${{ secrets.STAGING_HOST }}
-          username: ${{ secrets.STAGING_USERNAME }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
           command_timeout: 30m
           envs: RESET_CONFIRM,API_UUID,DRY_RUN,SKIP_BACKUP,SEED_SKIP_IMAGES
           # Staging runs under Coolify: no docker-compose, DB/Redis/ES containers
@@ -102,12 +132,17 @@ jobs:
             API_URL="$(docker exec "$API_CID" printenv API_URL 2>/dev/null || true)"
             S3_ENV_PREFIX="$(docker exec "$API_CID" printenv S3_ENV_PREFIX 2>/dev/null || true)"
             log "FRONTEND_URL=$FRONTEND_URL | API_URL=$API_URL | S3_ENV_PREFIX=${S3_ENV_PREFIX:-<unset>}"
+            # Kanonik alan adı tarodan.com.tr; eski tarodan.shop host'u geçiş
+            # süresince kabul edilir. Üretim parmak izi listesi ise İKİ alan adını
+            # da reddeder — daraltmak, eski alan adı hâlâ canlıyken onu staging
+            # sanma riski doğurur.
             case "$FRONTEND_URL $API_URL" in
-              *staging.tarodan.shop*) : ;;
+              *staging.tarodan.com.tr*|*staging.tarodan.shop*) : ;;
               *) die "api FRONTEND_URL/API_URL is not a staging host — refusing to wipe." ;;
             esac
             case "$FRONTEND_URL" in
-              https://tarodan.shop*|https://www.tarodan.shop*) die "production domain fingerprint on api — refusing." ;;
+              https://tarodan.com.tr*|https://www.tarodan.com.tr*|https://tarodan.shop*|https://www.tarodan.shop*)
+                die "production domain fingerprint on api — refusing." ;;
             esac
             if [ "${SEED_SKIP_IMAGES:-0}" != "1" ] && [ "$S3_ENV_PREFIX" = "prod" ]; then
               die "seed WITH images but S3_ENV_PREFIX=prod would write demo assets into PROD storage. Set S3_ENV_PREFIX=staging or enable skip_images."
@@ -145,8 +180,11 @@ jobs:
             docker exec "$API_CID" sh -c "cd /app && npx prisma migrate reset --force --skip-seed --schema=prisma/schema.prisma && ${SEED_PREFIX}node dist-seed/prisma/seed.js"
 
             # --- Flush Redis via the api container's own ioredis + REDIS_URL ---
-            log "flushing redis..."
-            docker exec "$API_CID" node -e "const R=require('ioredis');const r=new R(process.env.REDIS_URL);r.flushall().then(()=>{console.log('redis flushed');process.exit(0)}).catch(e=>{console.error('flush failed:',e.message);process.exit(0)})" || log "redis flush failed (non-fatal)"
+            # flushdb, never flushall: staging and production run on the same
+            # Coolify host, so a flushall here would wipe every database on a
+            # shared Redis server — including production's cache and queues.
+            log "flushing redis (selected db only)..."
+            docker exec "$API_CID" node -e "const R=require('ioredis');const r=new R(process.env.REDIS_URL);r.flushdb().then(()=>{console.log('redis flushed');process.exit(0)}).catch(e=>{console.error('flush failed:',e.message);process.exit(0)})" || log "redis flush failed (non-fatal)"
 
             # --- Refresh Elasticsearch: restart api so boot sync reconciles ----
             log "restarting api so Elasticsearch reindexes from the fresh DB..."

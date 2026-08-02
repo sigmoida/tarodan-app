@@ -1,59 +1,122 @@
+import { ShippingPackageTierCode } from "@prisma/client";
 import {
   calculatePackageDesi,
   outboundPackageShipping,
-  ShippingDesiRateNotFoundError,
+  resolvePackageTier,
+  shippingAmountForDesi,
+  ShippingPackageTiersNotConfiguredError,
 } from "./shipping-tariff.helper";
 import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 
-describe("desi-based shipping pricing", () => {
-  const desiTariff = {
+/**
+ * Kargo fiyatı artık desi satırlarından değil, satıcının ilanda seçtiği PAKET
+ * BOYUTUNDAN çözülür. Desi yalnız iç muhasebe birimi olarak kalır: paket desisi
+ * satırların toplamıdır (Σ desi × adet) ve toplam hangi kademe aralığına düşerse
+ * o kademenin tutarı uygulanır. Son kademe üst sınırsız olduğundan eksik fiyat
+ * satırı diye bir durum yoktur.
+ */
+describe("package-tier shipping pricing", () => {
+  const tierTariff = {
     outboundPackageFee: 99,
     freeShippingEnabled: false,
     freeShippingThreshold: 0,
-    rates: [
-      { desi: 1, amount: 130 },
-      { desi: 2, amount: 180 },
-      { desi: 3, amount: 230 },
+    packageTiers: [
+      {
+        code: ShippingPackageTierCode.small,
+        minDesi: 0,
+        maxDesi: 2,
+        amount: 100,
+      },
+      {
+        code: ShippingPackageTierCode.medium,
+        minDesi: 2,
+        maxDesi: 5,
+        amount: 130,
+      },
+      {
+        code: ShippingPackageTierCode.large,
+        minDesi: 5,
+        maxDesi: null,
+        amount: 160,
+      },
     ],
   };
 
-  it("uses the admin-defined exact desi amount", () => {
-    expect(outboundPackageShipping(desiTariff, 500, 2).toNumber()).toBe(180);
+  it("tek kalemde seçilen kademenin tutarını uygular", () => {
+    // Küçük paketin temsilci desisi 2 → 100 TL.
+    expect(outboundPackageShipping(tierTariff, 500, 2).toNumber()).toBe(100);
+    expect(outboundPackageShipping(tierTariff, 500, 5).toNumber()).toBe(130);
+    expect(outboundPackageShipping(tierTariff, 500, 10).toNumber()).toBe(160);
   });
 
-  it("keeps the free-shipping threshold authoritative", () => {
-    expect(
-      outboundPackageShipping(
-        {
-          ...desiTariff,
-          freeShippingEnabled: true,
-          freeShippingThreshold: 500,
-        },
-        500,
-        3,
-      ).toNumber(),
-    ).toBe(0);
+  it("çok kalemli paket toplam desiyle bir üst kademeye çıkar", () => {
+    // 2 küçük ürün → 4 desi → Orta 130; 3 küçük → 6 desi → Büyük 160.
+    expect(outboundPackageShipping(tierTariff, 500, 4).toNumber()).toBe(130);
+    expect(outboundPackageShipping(tierTariff, 500, 6).toNumber()).toBe(160);
   });
 
-  it("fails closed when an active desi tariff has no matching row", () => {
-    expect(() => outboundPackageShipping(desiTariff, 500, 4)).toThrow(
-      ShippingDesiRateNotFoundError,
+  it("son kademe üst sınırsızdır: hiçbir desi fiyatsız kalmaz", () => {
+    // 2 büyük ürün → 20 desi; kademe fiyatı düz uygulanır (katlanmaz).
+    expect(outboundPackageShipping(tierTariff, 500, 20).toNumber()).toBe(160);
+    expect(outboundPackageShipping(tierTariff, 500, 4000).toNumber()).toBe(160);
+  });
+
+  it("en küçük kademenin altındaki desi ilk kademeyle ücretlenir", () => {
+    expect(outboundPackageShipping(tierTariff, 500, 1).toNumber()).toBe(100);
+    expect(outboundPackageShipping(tierTariff, 500, 0).toNumber()).toBe(100);
+  });
+
+  it("kademe aralıkları yarı-açıktır: sınır değeri alttaki kademeye düşer", () => {
+    expect(resolvePackageTier(tierTariff, 2).code).toBe(
+      ShippingPackageTierCode.small,
+    );
+    expect(resolvePackageTier(tierTariff, 3).code).toBe(
+      ShippingPackageTierCode.medium,
+    );
+    expect(resolvePackageTier(tierTariff, 5).code).toBe(
+      ShippingPackageTierCode.medium,
+    );
+    expect(resolvePackageTier(tierTariff, 6).code).toBe(
+      ShippingPackageTierCode.large,
     );
   });
 
-  it("fails closed when a legacy tariff has no desi rows", () => {
+  it("kademe sırası tanım sırasından bağımsızdır", () => {
+    const shuffled = {
+      ...tierTariff,
+      packageTiers: [
+        tierTariff.packageTiers[2],
+        tierTariff.packageTiers[0],
+        tierTariff.packageTiers[1],
+      ],
+    };
+    expect(outboundPackageShipping(shuffled, 500, 4).toNumber()).toBe(130);
+    expect(outboundPackageShipping(shuffled, 500, 1).toNumber()).toBe(100);
+  });
+
+  it("ücretsiz kargo eşiği kademenin ÜSTÜNDEDİR", () => {
+    const freeTariff = {
+      ...tierTariff,
+      freeShippingEnabled: true,
+      freeShippingThreshold: 500,
+    };
+    expect(outboundPackageShipping(freeTariff, 500, 10).toNumber()).toBe(0);
+    // Eşiğin altında kademe fiyatı geçerli.
+    expect(outboundPackageShipping(freeTariff, 499, 10).toNumber()).toBe(160);
+  });
+
+  it("kademesiz tarife yapılandırma hatasıdır ve fail-closed davranır", () => {
     expect(() =>
-      outboundPackageShipping(
+      shippingAmountForDesi(
         {
           outboundPackageFee: 75,
           freeShippingEnabled: false,
           freeShippingThreshold: 0,
-          rates: [],
+          packageTiers: [],
         },
-        500,
         1,
       ),
-    ).toThrow(ShippingDesiRateNotFoundError);
+    ).toThrow(ShippingPackageTiersNotConfiguredError);
   });
 
   it("sums product desi multiplied by quantity for one seller package", () => {

@@ -1,6 +1,10 @@
 import { validate } from "class-validator";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
-import { CompleteHomeTourDto } from "./dto/complete-home-tour.dto";
+import { CompleteTourDto } from "./dto/complete-tour.dto";
+import {
+  MAX_ONBOARDING_TOUR_VERSION,
+  ONBOARDING_TOURS,
+} from "./user-preferences.constants";
 import { UserProfileService } from "./user-profile.service";
 
 describe("user preferences", () => {
@@ -64,29 +68,62 @@ describe("user preferences", () => {
     });
   });
 
-  it("accepts only the current home tour version", async () => {
-    const current = Object.assign(new CompleteHomeTourDto(), { version: 1 });
-    const future = Object.assign(new CompleteHomeTourDto(), { version: 2 });
-    const invalid = Object.assign(new CompleteHomeTourDto(), { version: 0 });
+  it("tur sürümünü tanımlı aralıkta doğrular", async () => {
+    const make = (version: number) =>
+      Object.assign(new CompleteTourDto(), { tour: "home", version });
 
-    await expect(validate(current)).resolves.toHaveLength(0);
-    await expect(validate(future)).resolves.not.toHaveLength(0);
-    await expect(validate(invalid)).resolves.not.toHaveLength(0);
+    await expect(validate(make(1))).resolves.toHaveLength(0);
+    // Tanımlı en yüksek sürümün üstü ve sıfır/negatif reddedilir.
+    await expect(
+      validate(make(MAX_ONBOARDING_TOUR_VERSION + 1)),
+    ).resolves.not.toHaveLength(0);
+    await expect(validate(make(0))).resolves.not.toHaveLength(0);
   });
 
-  it("completes the home tour monotonically and idempotently", async () => {
-    prisma.user.updateMany.mockResolvedValue({ count: 1 });
-    prisma.user.findUnique.mockResolvedValue({ homeTourVersion: 1 });
+  /**
+   * Tanıtım turları çoğaldı (ana sayfa + ilan verme). Her tur için ayrı uç/servis
+   * yazmak yerine tur anahtarı üzerinden TEK yol kullanılır; sürüm alanı da o
+   * anahtardan çözülür. Monotonluk (`lt`) korunur: geri sayım ya da tekrar
+   * gösterim olmaz, aynı çağrı iki kez gelse de tek etki eder.
+   */
+  it.each(Object.entries(ONBOARDING_TOURS))(
+    "completes the %s tour monotonically and idempotently",
+    async (tour, config) => {
+      const field = config.field;
+      prisma.user.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.findUnique.mockResolvedValue({ [field]: config.version });
 
-    await expect(service.completeHomeTour("user-1", 1)).resolves.toEqual({
-      homeTourVersion: 1,
+      await expect(
+        service.completeTour("user-1", tour as any, config.version),
+      ).resolves.toEqual({ [field]: config.version });
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "user-1",
+          [field]: { lt: config.version },
+        },
+        data: { [field]: config.version },
+      });
+    },
+  );
+
+  it("rejects an unknown tour key", async () => {
+    await expect(
+      service.completeTour("user-1", "nope" as any, 1),
+    ).rejects.toThrow();
+    expect(prisma.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("DTO yalnız tanımlı tur anahtarlarını kabul eder", async () => {
+    const valid = Object.assign(new CompleteTourDto(), {
+      tour: "home",
+      version: 1,
     });
-    expect(prisma.user.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: "user-1",
-        homeTourVersion: { lt: 1 },
-      },
-      data: { homeTourVersion: 1 },
+    await expect(validate(valid)).resolves.toHaveLength(0);
+
+    const invalid = Object.assign(new CompleteTourDto(), {
+      tour: "unknown",
+      version: 1,
     });
+    await expect(validate(invalid)).resolves.not.toHaveLength(0);
   });
 });

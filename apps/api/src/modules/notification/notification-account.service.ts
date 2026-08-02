@@ -6,11 +6,11 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
-import { SendGridProvider } from "./providers/sendgrid.provider";
-import { SmtpProvider } from "./providers/smtp.provider";
+import { SmtpProvider } from "../mail/smtp.provider";
 import {
-  renderEmailTemplate,
-  getEmailTemplateSubject,
+  escapeEmailHtml,
+  renderManagedEmailTemplate,
+  wrapEmailTemplateLayout,
 } from "../../common/helpers/email-template-renderer";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 
@@ -22,7 +22,6 @@ export class NotificationAccountService {
     private readonly dispatch: NotificationDispatchService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly sendGridProvider: SendGridProvider,
     private readonly smtpProvider: SmtpProvider,
   ) {}
 
@@ -36,7 +35,7 @@ export class NotificationAccountService {
     });
     if (!user) return { success: false, error: "User not found" };
     const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com";
+      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
     await this.dispatch.sendTemplateEmailToAddress(user.email, "welcome", {
       name: user.displayName || "",
       verifyUrl: `${frontendUrl}/listings`,
@@ -47,7 +46,7 @@ export class NotificationAccountService {
   /**
    * Yeni misafir (guest) iletişim formu mesajı geldiğinde destek ekibine bildirim
    * maili gönderir. Hedef adres SUPPORT_NOTIFICATION_EMAIL env'inden, yoksa
-   * uygulama genelinde standart olan destek@tarodan.com'a gider. Provider seçimi
+   * uygulama genelinde standart olan destek@tarodan.com.tr'ye gider. Provider seçimi
    * şifre sıfırlama akışıyla aynı (SendGrid → SMTP fallback). Çağrı fire-and-forget
    * yapılmalı: mail hatası iletişim mesajının kaydını bozmamalı.
    */
@@ -60,47 +59,48 @@ export class NotificationAccountService {
   }) {
     const adminEmail =
       this.configService.get<string>("SUPPORT_NOTIFICATION_EMAIL") ||
-      "destek@tarodan.com";
+      "destek@tarodan.com.tr";
     // Subject bir mail başlığıdır: guest girdisindeki CR/LF header injection'a
     // yol açabilir. Satır sonlarını boşluğa çevirip kırp (defense-in-depth).
     const safeSubject = String(data.subject ?? "")
       .replace(/[\r\n]+/g, " ")
       .trim();
     const subject = `Yeni İletişim Mesajı: ${safeSubject} (${data.referenceNumber})`;
-    const esc = (s: string) =>
-      String(s ?? "").replace(
-        /[<>&]/g,
-        (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] as string,
-      );
-    const html = `
+    const content = `
       <h2>Yeni iletişim formu mesajı</h2>
-      <p><strong>Referans:</strong> ${esc(data.referenceNumber)}</p>
-      <p><strong>Ad:</strong> ${esc(data.name)}</p>
-      <p><strong>E-posta:</strong> ${esc(data.email)}</p>
-      <p><strong>Konu:</strong> ${esc(data.subject)}</p>
+      <p><strong>Referans:</strong> ${escapeEmailHtml(data.referenceNumber)}</p>
+      <p><strong>Ad:</strong> ${escapeEmailHtml(data.name)}</p>
+      <p><strong>E-posta:</strong> ${escapeEmailHtml(data.email)}</p>
+      <p><strong>Konu:</strong> ${escapeEmailHtml(data.subject)}</p>
       <p><strong>Mesaj:</strong></p>
-      <p style="white-space:pre-wrap">${esc(data.message)}</p>
+      <p style="white-space:pre-wrap">${escapeEmailHtml(data.message)}</p>
     `;
+    const frontendUrl =
+      this.configService.get<string>("FRONTEND_URL") ||
+      "https://tarodan.com.tr";
+    const html = wrapEmailTemplateLayout(
+      content,
+      subject,
+      { to: adminEmail },
+      {
+        frontendUrl,
+        logoUrl:
+          this.configService.get<string>("EMAIL_LOGO_URL") ||
+          `${frontendUrl.replace(/\/+$/, "")}/tarodan-logo.jpg`,
+        supportEmail: adminEmail,
+      },
+    );
 
-    let result;
-    if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendEmail({
-        to: adminEmail,
-        subject,
-        html,
-      });
-    } else if (this.smtpProvider.isConfigured()) {
-      result = await this.smtpProvider.sendEmail({
-        to: adminEmail,
-        subject,
-        html,
-      });
-    } else {
-      this.logger.warn(
-        "Guest contact bildirimi için mail sağlayıcı (SendGrid/SMTP) yapılandırılmamış",
-      );
+    if (!this.smtpProvider.isConfigured()) {
+      this.logger.warn("Guest contact bildirimi için SMTP yapılandırılmamış");
       return { success: false, error: "No email provider configured" };
     }
+    const result = await this.smtpProvider.sendEmail({
+      to: adminEmail,
+      subject,
+      html,
+      template: "guest-contact-admin",
+    });
 
     if (result.success) {
       this.logger.log(
@@ -128,46 +128,32 @@ export class NotificationAccountService {
     const frontendUrl =
       this.configService.get("FRONTEND_URL") || "http://localhost:3000";
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
-    const templateData = { name: user.displayName || "", resetUrl };
+    const displayName = user.displayName || "";
+    // displayName: name'in takma adı — legacy admin şablonları {{displayName}} kullanıyor.
+    const templateData = { name: displayName, displayName, resetUrl };
 
     const dbTemplate = await this.prisma.emailTemplate.findUnique({
       where: { key: "password-reset" },
     });
-    let html: string;
-    let subject: string;
-    if (dbTemplate?.bodyHtml) {
-      html = this.dispatch.substituteTemplateVariables(
-        dbTemplate.bodyHtml,
-        templateData,
-      );
-      subject = dbTemplate.subject
-        ? this.dispatch.substituteTemplateVariables(
-            dbTemplate.subject,
-            templateData,
-          )
-        : getEmailTemplateSubject("password-reset", templateData);
-    } else {
-      html = renderEmailTemplate("password-reset", templateData, frontendUrl);
-      subject = getEmailTemplateSubject("password-reset", templateData);
-    }
+    const email = renderManagedEmailTemplate(
+      "password-reset",
+      { ...templateData, to: user.email },
+      dbTemplate,
+      frontendUrl,
+    );
 
     let result;
-    if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendEmail({
-        to: user.email,
-        subject,
-        html,
-      });
-    } else if (this.smtpProvider.isConfigured()) {
+    if (this.smtpProvider.isConfigured()) {
       result = await this.smtpProvider.sendEmail({
         to: user.email,
-        subject,
-        html,
+        subject: email.subject,
+        html: email.html,
+        // EmailLog satırı şablonu bilsin (filtre/denetim için). Bu noktada
+        // yalnız e-posta+ad taşınıyor; kullanıcı kimliği kapsamda değil.
+        template: "password-reset",
       });
     } else {
-      this.logger.warn(
-        "Neither SendGrid nor SMTP is configured for password reset email",
-      );
+      this.logger.warn("SMTP is not configured for password reset email");
       result = { success: false, error: "No email provider configured" };
     }
 
@@ -213,50 +199,26 @@ export class NotificationAccountService {
       expiresIn: "24 saat",
     };
 
-    // Legacy seed data used an underscore while the renderer uses kebab-case.
-    // Accept both so production databases keep using their managed template.
-    const dbTemplate = await this.prisma.emailTemplate.findFirst({
-      where: { key: { in: ["email-verification", "email_verification"] } },
+    const dbTemplate = await this.prisma.emailTemplate.findUnique({
+      where: { key: "email-verification" },
     });
-    let html: string;
-    let subject: string;
-    if (dbTemplate?.bodyHtml) {
-      html = this.dispatch.substituteTemplateVariables(
-        dbTemplate.bodyHtml,
-        templateData,
-      );
-      subject = dbTemplate.subject
-        ? this.dispatch.substituteTemplateVariables(
-            dbTemplate.subject,
-            templateData,
-          )
-        : getEmailTemplateSubject("email-verification", templateData);
-    } else {
-      html = renderEmailTemplate(
-        "email-verification",
-        templateData,
-        frontendUrl,
-      );
-      subject = getEmailTemplateSubject("email-verification", templateData);
-    }
+    const email = renderManagedEmailTemplate(
+      "email-verification",
+      { ...templateData, to: user.email },
+      dbTemplate,
+      frontendUrl,
+    );
 
     let result;
-    if (this.sendGridProvider.isConfigured()) {
-      result = await this.sendGridProvider.sendEmail({
-        to: user.email,
-        subject,
-        html,
-      });
-    } else if (this.smtpProvider.isConfigured()) {
+    if (this.smtpProvider.isConfigured()) {
       result = await this.smtpProvider.sendEmail({
         to: user.email,
-        subject,
-        html,
+        subject: email.subject,
+        html: email.html,
+        template: "email-verification",
       });
     } else {
-      this.logger.warn(
-        "Neither SendGrid nor SMTP is configured for email verification",
-      );
+      this.logger.warn("SMTP is not configured for email verification");
       result = { success: false, error: "No email provider configured" };
     }
 

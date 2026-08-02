@@ -29,9 +29,12 @@ export const HERO_SLIDES: HeroSlide[] = [
   {
     titleKey: "home.slider.hotWheelsTitle",
     subtitleKey: "home.slider.hotWheelsSubtitle",
+    // Belirli bir üreticiye (Hot Wheels) filtreli bağlantı, o üretici katalogda
+    // yokken ziyaretçiyi boş listeye düşürüyordu. Slayt görseli markayı zaten
+    // anlatıyor; bağlantı tüm ilanlara gider.
     cta1: {
       labelKey: "home.slider.exploreHotWheels",
-      href: "/listings?manufacturer=Hot Wheels",
+      href: "/listings",
     },
     cta2: { labelKey: "home.slider.allBrands", href: "/listings" },
     image: heroImageUrl("hero-hot-wheels.png"),

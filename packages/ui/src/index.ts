@@ -5,6 +5,10 @@ export type { IconButtonProps } from "./components/IconButton";
 export { Input, type InputProps } from "./components/Input";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
 export {
+  DateTimePicker,
+  type DateTimePickerProps,
+} from "./components/DateTimePicker";
+export {
   CardNumberInput,
   type CardNumberInputProps,
   ExpiryDateInput,
@@ -53,6 +57,10 @@ export {
   type SearchableSelectProps,
   type SearchableSelectOption,
 } from "./components/SearchableSelect";
+export {
+  SearchableMultiSelect,
+  type SearchableMultiSelectProps,
+} from "./components/SearchableMultiSelect";
 export { foldForSearch, matchesSearch } from "./lib/search";
 export { Toggle, type ToggleProps } from "./components/Toggle";
 export { Checkbox, type CheckboxProps } from "./components/Checkbox";
@@ -67,7 +75,6 @@ export { Label, type LabelProps } from "./components/Label";
 export { FormField, type FormFieldProps } from "./components/FormField";
 export { Logo, type LogoProps } from "./components/Logo";
 export { Chip, type ChipProps } from "./components/Chip";
-export { CheckToggle, type CheckToggleProps } from "./components/CheckToggle";
 export {
   DisclosureButton,
   type DisclosureButtonProps,
@@ -94,7 +101,8 @@ export {
 } from "./components/ProductBadge";
 export { Avatar, type AvatarProps } from "./components/Avatar";
 export { Alert, type AlertProps } from "./components/Alert";
-export { Modal, type ModalProps } from "./components/Modal";
+export { Modal, type ModalProps, type ModalSize } from "./components/Modal";
+export { Drawer, type DrawerProps, type DrawerSide } from "./components/Drawer";
 export {
   Dialog,
   ConfirmDialog,

@@ -156,7 +156,7 @@ export function DiscountFormModal({
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
-      maxWidth="max-w-2xl"
+      size="2xl"
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormInput
@@ -200,7 +200,9 @@ export function DiscountFormModal({
           placeholder={
             type === "bogo"
               ? t("admin.marketing.discounts.freePlaceholder")
-              : ""
+              : type === "percentage"
+                ? "10"
+                : "100"
           }
           helperText={
             type === "bogo"
@@ -294,6 +296,7 @@ export function DiscountFormModal({
           type="number"
           min="1"
           label={t("admin.marketing.discounts.perUserLimit")}
+          placeholder="1"
         />
       </div>
 

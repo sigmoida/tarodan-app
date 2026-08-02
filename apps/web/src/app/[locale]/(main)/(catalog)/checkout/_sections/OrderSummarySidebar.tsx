@@ -5,6 +5,7 @@
 import Image from "next/image";
 import { TagIcon } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/ui";
+import OrderSummaryLines from "@/components/order/OrderSummaryLines";
 import { useCheckout } from "../_context/CheckoutContext";
 import CouponBox from "../../cart/_components/CouponBox";
 
@@ -15,18 +16,7 @@ const fmtTL = (n: number) =>
   });
 
 export default function OrderSummarySidebar() {
-  const {
-    t,
-    checkoutItems,
-    quote,
-    quoteLoading,
-    subtotal,
-    shippingCost,
-    shippingLoading,
-    couponDiscount,
-    appliedCouponCode,
-    grandTotal,
-  } = useCheckout();
+  const { t, checkoutItems } = useCheckout();
 
   return (
     <SectionCard
@@ -78,82 +68,50 @@ export default function OrderSummarySidebar() {
 
       <hr className="my-4" />
 
-      <div className="space-y-3 text-sm">
-        <div className="flex justify-between">
-          <span className="text-muted">{t("checkout.subtotal")}</span>
-          <span className="font-medium">
-            {fmtTL(quote?.pricing?.subtotal ?? subtotal ?? 0)} TL
-          </span>
-        </div>
-
-        <div className="flex justify-between">
-          <span className="text-muted">Kargo (Sürat)</span>
-          <span className="font-medium">
-            {quoteLoading || (shippingLoading && !quote) ? (
-              <span className="text-subtle">Hesaplanıyor...</span>
-            ) : quote?.pricing?.shippingAmount != null ? (
-              `${Number(quote.pricing.shippingAmount).toFixed(2)} TL`
-            ) : shippingCost > 0 ? (
-              `${shippingCost.toFixed(2)} TL`
-            ) : (
-              <span className="text-subtle">Adres seçin</span>
-            )}
-          </span>
-        </div>
-
-        {couponDiscount > 0 && (
-          <div className="flex justify-between text-success-600">
-            <span className="flex items-center gap-1">
-              <TagIcon className="w-3.5 h-3.5 shrink-0" />
-              {appliedCouponCode
-                ? `Kupon (${appliedCouponCode})`
-                : t("checkout.discountLabel")}
-            </span>
-            <span className="font-medium">-{fmtTL(couponDiscount)} TL</span>
-          </div>
-        )}
-
-        {(quote?.pricing?.buyerFeeAmount ?? 0) > 0 && (
-          <div className="flex justify-between items-center">
-            <span className="text-muted flex items-center gap-1">
-              {t("checkout.platformServiceFeeWithRate")}
-              <a
-                href="/platform-service-fee"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-info-600 hover:text-info-700 text-xs underline"
-                title={t("common.learnMore")}
-              >
-                ?
-              </a>
-            </span>
-            <span className="font-medium">
-              {fmtTL(Number(quote!.pricing.buyerFeeAmount))} TL
-            </span>
-          </div>
-        )}
-
-        {(quote?.pricing?.taxAmount ?? 0) > 0 && (
-          <div className="flex justify-between items-center">
-            <span className="text-muted">KDV</span>
-            <span className="font-medium">
-              {fmtTL(Number(quote!.pricing.taxAmount))} TL
-            </span>
-          </div>
-        )}
-
-        <hr />
-        <div className="flex justify-between text-lg">
-          <span className="font-semibold">{t("checkout.total")}</span>
-          <span className="font-bold text-primary-500">
-            {quoteLoading || (shippingLoading && !quote) ? (
-              <span className="text-subtle">...</span>
-            ) : (
-              `${grandTotal.toFixed(2)} TL`
-            )}
-          </span>
-        </div>
-      </div>
+      <SummaryLines />
     </SectionCard>
+  );
+}
+
+/**
+ * Ödeme özeti: ürün ücreti + kargo ücreti + platform bedeli, altta ödenecek
+ * tutar. Satırların toplamı ödenecek tutarı BİREBİR vermek zorunda, bu yüzden
+ * kargo ve platform satırları KDV DAHİL gösterilir — hizmet KDV'si ayrı bir
+ * satır olarak dökülse alıcı için gürültü olur, hiç gösterilmezse satırlar
+ * toplamı tutmaz (quote'un hizmet KDV'sini atladığı dönemdeki hata buydu).
+ *
+ * Kargo ya da platform bedeli 0 olduğunda satır gizlenmez; ₺0,00 gösterilir.
+ */
+function SummaryLines() {
+  const {
+    t,
+    quote,
+    quoteLoading,
+    subtotal,
+    shippingCost,
+    shippingLoading,
+    couponDiscount,
+    appliedCouponCode,
+    grandTotal,
+  } = useCheckout();
+
+  const loading = quoteLoading || (shippingLoading && !quote);
+  // API'nin gönderdiği satırlar OLDUĞU GİBİ basılır — hesap yok, dağıtım yok.
+  const amounts = quote?.pricing?.summary ?? null;
+
+  return (
+    <OrderSummaryLines loading={loading} amounts={amounts}>
+      {couponDiscount > 0 && (
+        <div className="flex justify-between text-success-600">
+          <span className="flex items-center gap-1">
+            <TagIcon className="w-3.5 h-3.5 shrink-0" />
+            {appliedCouponCode
+              ? `${t("checkout.discountLabel")} (${appliedCouponCode})`
+              : t("checkout.discountLabel")}
+          </span>
+          <span className="font-medium">-{fmtTL(couponDiscount)} TL</span>
+        </div>
+      )}
+    </OrderSummaryLines>
   );
 }

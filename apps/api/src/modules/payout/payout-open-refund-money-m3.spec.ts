@@ -33,7 +33,10 @@ describe("PayoutService.createPayoutsForReleasedHolds — MONEY-M3 open-refund g
       refundRequest: { findFirst: jest.fn().mockResolvedValue(openRefund) },
       refundAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
-      payoutTransfer: { create: jest.fn().mockResolvedValue({}) },
+      payoutTransfer: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({}),
+      },
     };
     const service = new PayoutService(
       prisma as any,

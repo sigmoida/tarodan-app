@@ -9,7 +9,6 @@ export interface MembershipTier {
   canTrade: boolean;
   canCreateCollections: boolean;
   featuredListingSlots: number;
-  commissionDiscount: number;
   isAdFree: boolean;
 }
 
@@ -25,6 +24,9 @@ export interface ProfileStats {
 
 export interface UserProfile {
   id: string;
+  adminCode: string;
+  username: string;
+  usernameClaimedAt?: string | null;
   email: string;
   displayName: string;
   phone?: string;

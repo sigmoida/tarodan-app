@@ -52,9 +52,13 @@ export class UpdateMembershipTierDto {
   @Min(0)
   maxFreeListings?: number;
 
+  // -1 = SINIRSIZ (admin UI, web üyelik sayfası ve servis doğrulaması bu
+  // sözleşmeyi paylaşır). @Min(0) burada isteği servise ulaşmadan reddediyor,
+  // dolayısıyla sınırsız tarifeler hiç düzenlenemiyordu. Aralığın geri kalanını
+  // (-1 ya da >= 1) servis denetler.
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(-1)
   maxTotalListings?: number;
 
   @IsOptional()

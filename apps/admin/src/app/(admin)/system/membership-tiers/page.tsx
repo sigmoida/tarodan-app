@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Alert, Button } from "@tarodan/ui";
 import { ResourceList } from "@/components/list";
-import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { TierCard } from "./_components/TierCard";
 import { YearlyDiscountForm } from "./_components/YearlyDiscountForm";
@@ -43,34 +43,41 @@ function MembershipTiersContent() {
     setEditing,
   } = useMembershipTiersPage();
 
-  const header = (
-    <ResourceList.Header
-      title={t("admin.tiers.page.title")}
-      description={t("admin.tiers.page.description")}
-    />
-  );
-
-  if (yearlyDiscountError) {
-    return (
-      <>
-        {header}
-        <QueryErrorCard
-          onRetry={() => void retryYearlyDiscount()}
-          isRetrying={yearlyDiscountRetrying}
-        />
-      </>
-    );
-  }
+  // Yıllık indirim, tarife listesinden AYRI bir uçtan (ve ayrı bir izinden)
+  // gelir. Eskiden bu ikincil sorgunun hatası tüm sayfayı QueryErrorCard'a
+  // çeviriyordu: `membership_tiers` izni olup `settings` olmayan bir rol için
+  // tarife listesi hiç görünmüyordu. Artık liste her durumda render edilir;
+  // yalnız indirimden TÜRETİLEN değerler ve düzenleme devre dışı kalır.
+  const discountReady = yearlyDiscount != null;
 
   return (
     <>
-      {header}
+      <ResourceList.Header
+        title={t("admin.tiers.page.title")}
+        description={t("admin.tiers.page.description")}
+      />
 
       <ResourceList.Toolbar>
         <ResourceList.Search />
       </ResourceList.Toolbar>
 
-      {canEdit && (
+      {yearlyDiscountError && (
+        <Alert variant="warning">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{t("admin.tiers.page.discountLoadError")}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void retryYearlyDiscount()}
+              isLoading={yearlyDiscountRetrying}
+            >
+              {t("admin.shared.suspense.retry")}
+            </Button>
+          </div>
+        </Alert>
+      )}
+
+      {canEdit && discountReady && (
         <YearlyDiscountForm
           value={yearlyDiscount}
           loading={yearlyDiscountLoading}
@@ -91,7 +98,11 @@ function MembershipTiersContent() {
               tier={tier}
               yearlyDiscount={yearlyDiscount}
               yearlyDiscountLoading={yearlyDiscountLoading}
-              onEdit={canEdit ? () => setEditing(tier) : undefined}
+              // Düzenleme, indirim oranı bilinmeden AÇILMAZ: modal yıllık
+              // fiyatı bu orandan hesaplayıp kaydediyor.
+              onEdit={
+                canEdit && discountReady ? () => setEditing(tier) : undefined
+              }
             />
           ))}
         </div>
@@ -99,7 +110,7 @@ function MembershipTiersContent() {
 
       <ResourceList.Pagination />
 
-      {canEdit && editing && (
+      {canEdit && editing && discountReady && (
         <TierFormModal
           key={editing.id}
           open

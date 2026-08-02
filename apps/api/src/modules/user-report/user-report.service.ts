@@ -122,7 +122,14 @@ export class UserReportService {
         where,
         orderBy,
         include: {
-          reporter: { select: { id: true, displayName: true, email: true } },
+          reporter: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
         },
       },
       query,
@@ -146,7 +153,14 @@ export class UserReportService {
     const report = await this.prisma.report.findUnique({
       where: { id: reportId },
       include: {
-        reporter: { select: { id: true, displayName: true, email: true } },
+        reporter: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
       },
     });
 

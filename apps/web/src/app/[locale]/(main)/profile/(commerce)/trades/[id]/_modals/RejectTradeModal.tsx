@@ -1,6 +1,6 @@
 /** @format */
 
-import { Button, Modal, Textarea } from "@tarodan/ui";
+import { Modal, ModalFooter, Textarea } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 
 interface RejectTradeModalProps {
@@ -28,34 +28,29 @@ export default function RejectTradeModal({
       isOpen={open}
       onClose={onClose}
       title={t("trade.rejectTradeTitle")}
-      maxWidth="max-w-md"
+      size="md"
+      closeLabel={t("common.close")}
+      dismissDisabled={isActionLoading}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={onReject}
+          cancelLabel={cancelLabel}
+          confirmLabel={
+            isActionLoading ? t("trade.rejecting") : t("trade.rejectTrade")
+          }
+          destructive
+          isLoading={isActionLoading}
+        />
+      }
     >
       <Textarea
         value={reason}
         onChange={(e) => onReasonChange(e.target.value)}
         placeholder={t("trade.rejectReasonPlaceholder")}
         rows={4}
-        className="mb-4"
+        className="w-full"
       />
-      <div className="flex gap-3">
-        <Button
-          variant="secondary"
-          size="md"
-          className="flex-1"
-          onClick={onClose}
-        >
-          {cancelLabel}
-        </Button>
-        <Button
-          variant="danger"
-          size="md"
-          className="flex-1"
-          onClick={onReject}
-          disabled={isActionLoading}
-        >
-          {isActionLoading ? t("trade.rejecting") : t("trade.rejectTrade")}
-        </Button>
-      </div>
     </Modal>
   );
 }

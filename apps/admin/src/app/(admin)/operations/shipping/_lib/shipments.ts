@@ -8,7 +8,8 @@ import type { OrderShipmentRow, PhysicalShipmentRow } from "./types";
  * tracking yet) the row stands alone, keyed by its own shipment id.
  */
 function parcelKey(r: OrderShipmentRow): string {
-  if (r.order?.packageId) return `pkg:${r.order.packageId}`;
+  const packageId = r.packageId ?? r.order?.packageId;
+  if (packageId) return `pkg:${packageId}`;
   const tracking = r.providerTrackingId || r.trackingNumber;
   if (tracking) return `trk:${r.provider ?? ""}:${tracking}`;
   return `ship:${r.id}`;
@@ -34,23 +35,38 @@ export function toPhysicalShipments(
     if (!parcel) {
       parcel = {
         id: key,
+        packageNumber: r.orderPackage?.packageNumber ?? null,
         provider: r.provider,
         trackingNumber: r.trackingNumber,
         providerTrackingId: r.providerTrackingId,
         trackingUrl: r.trackingUrl,
         status: r.status,
+        updatedAt: r.updatedAt,
         buyer: r.order?.buyer ?? null,
         seller: r.order?.seller ?? null,
         items: [],
       };
       byKey.set(key, parcel);
       order.push(key);
+    } else if (
+      new Date(r.updatedAt).getTime() > new Date(parcel.updatedAt).getTime()
+    ) {
+      parcel.packageNumber =
+        r.orderPackage?.packageNumber ?? parcel.packageNumber;
+      parcel.provider = r.provider;
+      parcel.trackingNumber = r.trackingNumber;
+      parcel.providerTrackingId = r.providerTrackingId;
+      parcel.trackingUrl = r.trackingUrl;
+      parcel.status = r.status;
+      parcel.updatedAt = r.updatedAt;
     }
     if (r.order) {
       parcel.items.push({
         orderId: r.order.id,
         orderNumber: r.order.orderNumber,
+        productId: r.order.product?.id ?? null,
         productTitle: r.order.product?.title ?? null,
+        productImageUrl: r.order.product?.imageUrl ?? null,
         quantity: r.order.quantity ?? 1,
       });
     }

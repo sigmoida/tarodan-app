@@ -16,16 +16,14 @@ COPY turbo.json ./
 # Copy packages (monorepo dependencies)
 COPY packages ./packages
 
+# Repo-root build scripts — the app's `build` runs sync-brand-assets.mjs first
+COPY scripts ./scripts
+
 # Copy app package files
 COPY apps/web/package.json ./apps/web/
 
 # Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
 RUN pnpm install --frozen-lockfile --shamefully-hoist
-
-# Manufacturer logos only — sync-brand-assets.mjs copies them into public/
-# at prebuild. Demo product/collection/hero images live in S3 (seed-assets/),
-# not in the repo or this image.
-COPY photos/logolar ./photos/logolar
 
 # Copy app source
 COPY apps/web ./apps/web
@@ -57,7 +55,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Copy standalone build (outputFileTracingRoot creates monorepo-aware output)
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-# public/ already contains photos/logolar via sync-brand-assets.mjs (prebuild)
+# public/ already contains the brand marks via sync-brand-assets.mjs (prebuild)
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Set ownership

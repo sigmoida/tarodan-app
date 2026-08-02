@@ -34,7 +34,16 @@ export function TicketStatusModal({
       isOpen
       onClose={onClose}
       title={t("admin.messaging.support.updateStatus")}
-      maxWidth="max-w-md"
+      size="md"
+      closeButtonDisabled={update.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => update.mutate()}
+          confirmLabel={t("common.update")}
+          isLoading={update.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <Select
@@ -42,12 +51,6 @@ export function TicketStatusModal({
           value={status}
           onChange={(e) => setStatus(e.target.value)}
           options={ticketStatusChoices(t)}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => update.mutate()}
-          confirmLabel={t("common.update")}
-          isLoading={update.isPending}
         />
       </div>
     </Modal>

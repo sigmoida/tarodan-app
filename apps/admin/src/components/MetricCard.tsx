@@ -80,12 +80,12 @@ export function MetricCard({
         <div className={cn("shrink-0 rounded-lg p-3", t.box)}>
           <Icon className={cn("h-6 w-6", t.icon)} />
         </div>
-        <p
+        <div
           className="min-w-0 truncate text-xl font-bold text-heading"
           title={title}
         >
           {loading ? <Skeleton className="h-7 w-20" /> : value}
-        </p>
+        </div>
       </div>
       {hasBottom && (
         <div className="mt-3 flex flex-wrap items-center justify-start gap-1 border-t border-border pt-3 text-sm">

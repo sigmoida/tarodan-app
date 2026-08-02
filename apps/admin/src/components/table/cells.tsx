@@ -1,8 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
+import {
+  CheckIcon,
+  ClipboardIcon,
+  CubeIcon,
+} from "@heroicons/react/24/outline";
+import { Avatar } from "@tarodan/ui";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, fmtNumber, fmtTry } from "@/lib/format";
 import { TruncatedText } from "./TruncatedText";
@@ -19,15 +25,35 @@ export function Empty() {
   return <span className="text-subtle">—</span>;
 }
 
-/** Free text — single line, clipped, full text on hover when clipped. */
+/**
+ * Free text — single line, clipped, full text on hover when clipped.
+ *
+ * `wrap` bunun TEK istisnası: kırpmak yerine satır kaydırır. Uzun ve tam
+ * okunması gereken alanlar için (ör. iade sebebi) açık tercih olarak verilir;
+ * varsayılan kırpma, satır yüksekliklerinin tabloda sabit kalmasını sağlar.
+ */
 export function CellText({
   value,
   className,
+  wrap,
 }: {
   value?: ReactNode;
   className?: string;
+  wrap?: boolean;
 }) {
   if (value == null || value === "") return <Empty />;
+  if (wrap) {
+    return (
+      <span
+        className={cn(
+          "block whitespace-normal break-words text-body",
+          className,
+        )}
+      >
+        {value}
+      </span>
+    );
+  }
   return (
     <TruncatedText className={cn("text-body", className)}>
       {value}
@@ -154,29 +180,134 @@ export function CellLink({
 export function CellUser({
   name,
   secondary,
+  tertiary,
+  avatar,
   href,
 }: {
   name?: ReactNode;
   secondary?: ReactNode;
+  tertiary?: ReactNode;
+  avatar?: string | null;
   href?: string | null;
 }) {
   if (name == null || name === "") return <Empty />;
-  const nameNode = href ? (
-    <Link href={href} className="block text-primary-600 hover:underline">
-      <TruncatedText>{name}</TruncatedText>
+  const label = typeof name === "string" ? name.trim() : "";
+  const userId = href?.match(/^\/accounts\/users\/([^/?#]+)/)?.[1];
+  const avatarSrc =
+    userId && (!avatar || !/^(?:https?:\/\/|\/|blob:|data:)/i.test(avatar))
+      ? `/gateway/users/${encodeURIComponent(userId)}/avatar`
+      : avatar || undefined;
+  const fallback =
+    label
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "?";
+  const content = (
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar
+        src={avatarSrc}
+        alt={label || undefined}
+        fallback={fallback}
+        size="sm"
+      />
+      <div className="min-w-0">
+        <TruncatedText
+          className={cn(
+            "font-medium text-heading",
+            href && "group-hover:text-primary-600",
+          )}
+        >
+          {name}
+        </TruncatedText>
+        {secondary != null && secondary !== "" && (
+          <TruncatedText className="text-xs text-muted">
+            {secondary}
+          </TruncatedText>
+        )}
+        {tertiary != null && tertiary !== "" && (
+          <div className="mt-0.5 text-xs">{tertiary}</div>
+        )}
+      </div>
+    </div>
+  );
+  return href ? (
+    <Link href={href} className="group block min-w-0">
+      {content}
     </Link>
   ) : (
-    <TruncatedText className="text-body">{name}</TruncatedText>
+    content
   );
-  return (
-    <div className="min-w-0">
-      {nameNode}
-      {secondary != null && secondary !== "" && (
-        <TruncatedText className="text-xs text-muted">
-          {secondary}
+}
+
+/** Product — thumbnail, title and optional supporting lines in one consistent layout. */
+export function CellProduct({
+  title,
+  secondary,
+  tertiary,
+  image,
+  imageCount,
+  href,
+}: {
+  title?: ReactNode;
+  secondary?: ReactNode;
+  tertiary?: ReactNode;
+  image?: string | null;
+  imageCount?: number | null;
+  href?: string | null;
+}) {
+  if (title == null || title === "") return <Empty />;
+  const label = typeof title === "string" ? title : "";
+  const content = (
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="relative h-10 w-10 shrink-0">
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-md bg-surface-alt text-muted">
+          {image ? (
+            <Image
+              src={image}
+              alt={label}
+              fill
+              sizes="40px"
+              unoptimized
+              className="object-cover"
+            />
+          ) : (
+            <CubeIcon className="h-5 w-5" />
+          )}
+        </div>
+        {imageCount != null && imageCount > 1 && (
+          <span className="absolute -bottom-1 -right-1 rounded bg-heading/80 px-1 text-[10px] font-medium text-inverted">
+            {imageCount}
+          </span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <TruncatedText
+          className={cn(
+            "font-medium text-heading",
+            href && "group-hover:text-primary-600",
+          )}
+        >
+          {title}
         </TruncatedText>
-      )}
+        {secondary != null && secondary !== "" && (
+          <TruncatedText className="text-xs text-muted">
+            {secondary}
+          </TruncatedText>
+        )}
+        {tertiary != null && tertiary !== "" && (
+          <div className="mt-0.5 text-xs text-muted">{tertiary}</div>
+        )}
+      </div>
     </div>
+  );
+
+  return href ? (
+    <Link href={href} className="group block min-w-0">
+      {content}
+    </Link>
+  ) : (
+    content
   );
 }
 

@@ -2,7 +2,9 @@ import {
   CommissionAppliesTo,
   CommissionRuleType,
   CommissionSellerType,
+  CommissionTaxpayerType,
 } from "@prisma/client";
+import { BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCommissionService } from "./admin-commission.service";
@@ -146,5 +148,165 @@ describe("AdminCommissionService commission rule priority", () => {
       }),
     );
     expect(result.priority).toBe(10);
+  });
+});
+
+/**
+ * Çakışma denetimi motorla AYNI belirsizlik tanımını kullanmalı: motor satıcı
+ * tarafında SELLER ve BOTH kurallarını, alıcı tarafında BUYER ve BOTH
+ * kurallarını BİRLİKTE değerlendirir; null/ALL/all ise joker eş anlamlılarıdır.
+ * Guard yalnız birebir aynı appliesTo/eksen değerini karşılaştırırsa, aynı
+ * özgüllükte iki kural yan yana yaşar ve seçim DB satır sırasına kalır.
+ */
+describe("AdminCommissionService overlap guard — appliesTo & wildcard aliases", () => {
+  const prisma = {
+    commissionRule: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+  const audit = { createRequiredAuditLog: jest.fn() };
+  const service = new AdminCommissionService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AdminAuditService,
+  );
+
+  const existingBoth = {
+    id: "existing-both",
+    categoryId: "category-1",
+    sellerType: CommissionSellerType.FREE,
+    taxpayerType: CommissionTaxpayerType.all,
+    appliesTo: CommissionAppliesTo.BOTH,
+    minAmount: null,
+    maxAmount: null,
+    isActive: true,
+  };
+
+  const draft = {
+    name: "Draft",
+    categoryId: "category-1",
+    sellerType: CommissionSellerType.FREE,
+    appliesTo: CommissionAppliesTo.SELLER,
+    sellerRate: 5,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    audit.createRequiredAuditLog.mockResolvedValue(undefined);
+    prisma.commissionRule.findMany.mockResolvedValue([existingBoth]);
+    prisma.commissionRule.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({
+        ...data,
+        id: "new-rule",
+        category: null,
+        shippingShares: [],
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      }),
+    );
+  });
+
+  it("rejects a SELLER rule overlapping an existing BOTH rule on the same axes", async () => {
+    await expect(
+      service.createCommissionRule("admin-1", { ...draft }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("rejects a BUYER rule overlapping an existing BOTH rule on the same axes", async () => {
+    await expect(
+      service.createCommissionRule("admin-1", {
+        ...draft,
+        appliesTo: CommissionAppliesTo.BUYER,
+        sellerRate: undefined,
+        buyerRate: 3,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("allows a SELLER rule next to an existing BUYER rule (sides don't meet)", async () => {
+    prisma.commissionRule.findMany.mockResolvedValue([
+      { ...existingBoth, appliesTo: CommissionAppliesTo.BUYER },
+    ]);
+
+    await expect(
+      service.createCommissionRule("admin-1", { ...draft }),
+    ).resolves.toMatchObject({ id: "new-rule" });
+  });
+
+  it("treats sellerType null and ALL as the same wildcard", async () => {
+    prisma.commissionRule.findMany.mockResolvedValue([
+      {
+        ...existingBoth,
+        sellerType: null,
+        appliesTo: CommissionAppliesTo.SELLER,
+      },
+    ]);
+
+    await expect(
+      service.createCommissionRule("admin-1", {
+        ...draft,
+        sellerType: CommissionSellerType.ALL,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("treats taxpayerType null and `all` as the same wildcard", async () => {
+    prisma.commissionRule.findMany.mockResolvedValue([
+      {
+        ...existingBoth,
+        taxpayerType: null,
+        appliesTo: CommissionAppliesTo.SELLER,
+      },
+    ]);
+
+    await expect(
+      service.createCommissionRule("admin-1", {
+        ...draft,
+        taxpayerType: CommissionTaxpayerType.all,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("allows different SPECIFIC taxpayer types side by side", async () => {
+    prisma.commissionRule.findMany.mockResolvedValue([
+      {
+        ...existingBoth,
+        taxpayerType: CommissionTaxpayerType.corporate,
+      },
+    ]);
+
+    await expect(
+      service.createCommissionRule("admin-1", {
+        ...draft,
+        taxpayerType: CommissionTaxpayerType.individual,
+      }),
+    ).resolves.toMatchObject({ id: "new-rule" });
+  });
+
+  it("allows a category-specific rule next to a category wildcard (specificity resolves)", async () => {
+    prisma.commissionRule.findMany.mockResolvedValue([
+      { ...existingBoth, categoryId: null },
+    ]);
+
+    await expect(
+      service.createCommissionRule("admin-1", { ...draft }),
+    ).resolves.toMatchObject({ id: "new-rule" });
+  });
+
+  it("still allows non-overlapping amount ranges on identical axes", async () => {
+    prisma.commissionRule.findMany.mockResolvedValue([
+      { ...existingBoth, minAmount: 0, maxAmount: 1000 },
+    ]);
+
+    await expect(
+      service.createCommissionRule("admin-1", {
+        ...draft,
+        appliesTo: CommissionAppliesTo.BOTH,
+        minAmount: 1000.01,
+        maxAmount: undefined,
+      }),
+    ).resolves.toMatchObject({ id: "new-rule" });
   });
 });

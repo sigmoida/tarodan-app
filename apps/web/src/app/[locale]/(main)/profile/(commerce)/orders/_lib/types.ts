@@ -59,7 +59,7 @@ export interface Order {
   sellerNetAmount?: number;
 }
 
-export type OrderRole = "all" | "buyer" | "seller";
+export type OrderRole = "buyer" | "seller";
 export type OrderStatusFilter = "active" | "cancelled" | "refunds";
 
 /** Yalnız teslim alınmış siparişler değerlendirilebilir. */
@@ -118,75 +118,81 @@ export const hasVisibleShipment = (order: Order): boolean =>
     order.status,
   );
 
-export interface OrderGroup {
-  key: string;
+/** Sunucudan gelen paket görünümü: satıcı + tek kargo ücreti + tek kargo takibi. */
+export interface ServerPackageView {
+  id: string;
+  /**
+   * Koli numarası (PKG-…): sepet numarasından ve sipariş numaralarından
+   * BAĞIMSIZ. Sürat'a `OzelKargoTakipNo` olarak bu gider, kargo etiketinde bu
+   * yazar ve müşteri kargosunu bu kodla sorgular.
+   */
+  packageNumber: string | null;
+  sellerId: string | null;
+  seller: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    isVerified?: boolean;
+  } | null;
+  shippingCost: number;
+  cargo: {
+    trackingNumber: string | null;
+    cargoCode: string | null;
+    provider: string | null;
+    status: string | null;
+    trackingUrl?: string | null;
+    shippedAt?: string | null;
+    deliveredAt?: string | null;
+  } | null;
+  orders: Order[];
+}
+
+/**
+ * Sunucudan gelen grup çatısı satırı (GET /orders/groups ve /orders/:id/group):
+ * alıcı için CheckoutGroup, satıcı için kendi paketi, grupsuz sipariş için
+ * sentetik tek siparişlik grup — hepsi aynı şekil.
+ */
+export interface ServerOrderGroup {
+  kind: "group" | "package" | "synthetic";
+  id: string;
   groupNumber: string;
-  orders: Order[];
-}
-
-/** Bir checkout grubu içinde satıcı paketi (çatı): aynı satıcının order'ları tek pakette. */
-export interface OrderPackageGroup {
-  key: string;
-  seller?: { id: string; displayName: string };
+  totalAmount: number;
+  status: string;
+  createdAt: string;
+  viewerRole: "buyer" | "seller";
+  payment: {
+    id: string;
+    status: string;
+    amount: number;
+    provider?: string | null;
+    paidAt?: string | null;
+  } | null;
+  packages: ServerPackageView[];
   orders: Order[];
 }
 
 /**
- * Grup order'larını SATICI PAKETİNE göre alt-grupla (çatı): aynı satıcının ürünleri tek
- * koli/tek kargo altında toplanır. packageId yoksa (eski veri) satıcıya, o da yoksa order
- * id'sine düşer — böylece her order en azından kendi kovasına düşer.
+ * Taşıyıcının verdiği GERÇEK kargo kodu (Sürat KargoTakipNo). Yoksa null —
+ * kolinin kendi numarası ayrı bir satırda zaten gösterilir, oraya düşmeye gerek
+ * yok (aynı değeri iki kez yazmak "kodlar birbirine karıştı" hissi yaratıyordu).
  */
-export function groupByPackage(orders: Order[]): OrderPackageGroup[] {
-  const entries: OrderPackageGroup[] = [];
-  const indexByKey = new Map<string, number>();
-  for (const order of orders) {
-    const key = order.packageId ?? order.seller?.id ?? order.id;
-    const idx = indexByKey.get(key);
-    if (idx != null) {
-      entries[idx].orders.push(order);
-      continue;
-    }
-    indexByKey.set(key, entries.length);
-    entries.push({ key, seller: order.seller, orders: [order] });
-  }
-  return entries;
-}
+export const visibleCargoCode = (
+  cargo: ServerPackageView["cargo"],
+): string | null => cargo?.cargoCode ?? null;
+
+/** İptal edilebilir sipariş durumları (kargo öncesi). */
+const CANCELLABLE_STATUSES = ["pending_payment", "paid", "preparing"];
 
 /**
- * Sipariş listesini tek kart altında toplayacak şekilde grupla:
- * - ALICI görünümü: aynı checkout'ta alınan ürünler (checkoutGroupId) tek kartta.
- * - SATICI görünümü: aynı satıcının aynı checkout'taki dilimi = satıcı paketi
- *   (packageId, tek koli/tek kargo) tek kartta. Böylece bir alıcı tek checkout'ta
- *   satıcının 2 ürününü aldıysa satıcı 2 ayrı kart değil tek paket görür.
- * Grup anahtarı olmayan (tekil / eski veri) order'lar kendi başına kalır.
+ * Grup iptali (R4): iptal SEPET bazındadır ve yalnız hiçbir üye kargoya
+ * verilmemişken açıktır. Kısmen kargolanmış sepette iptal tamamen kapalıdır.
  */
-export function groupOrders(orders: Order[]): OrderGroup[] {
-  const entries: OrderGroup[] = [];
-  const indexByGroup = new Map<string, number>();
-  for (const order of orders) {
-    const groupKey =
-      order.isSeller === true
-        ? (order.packageId ?? null)
-        : (order.checkoutGroupId ?? null);
-    if (groupKey) {
-      const idx = indexByGroup.get(groupKey);
-      if (idx != null) {
-        entries[idx].orders.push(order);
-        continue;
-      }
-      indexByGroup.set(groupKey, entries.length);
-      entries.push({
-        key: groupKey,
-        groupNumber: order.groupNumber ?? groupKey,
-        orders: [order],
-      });
-    } else {
-      entries.push({
-        key: order.id,
-        groupNumber: order.groupNumber ?? order.orderNumber,
-        orders: [order],
-      });
-    }
-  }
-  return entries;
-}
+export const isGroupCancellable = (group: ServerOrderGroup): boolean =>
+  group.viewerRole === "buyer" &&
+  group.orders.length > 0 &&
+  group.orders.every(
+    (o) =>
+      CANCELLABLE_STATUSES.includes(o.status) &&
+      !hasShipped(o) &&
+      !o.activeRefundRequest,
+  );

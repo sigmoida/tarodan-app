@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
@@ -23,11 +24,16 @@ import {
 } from "../membership/membership.util";
 import { i18nMessage } from "../i18n";
 import {
+  ONBOARDING_TOURS,
+  type OnboardingTourKey,
+} from "./user-preferences.constants";
+import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationSettings,
   UpdateNotificationSettingsDto,
 } from "./dto";
 import { UserCommonService } from "./user-common.service";
+import { isUsernameAllowed, normalizeUsername } from "../auth/username.util";
 
 /**
  * UserProfileService — profil/lookup/hesap grubu: avatar redirect, find*,
@@ -167,7 +173,6 @@ export class UserProfileService {
       canTrade: effectiveTier.canTrade,
       isAdFree: effectiveTier.isAdFree,
       featuredListingSlots: effectiveTier.featuredListingSlots,
-      commissionDiscount: effectiveTier.commissionDiscount,
     };
     const membershipInfo = user.membership
       ? {
@@ -265,8 +270,13 @@ export class UserProfileService {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
-    const isBusinessTier = user.membership?.tier?.type === "business";
-    const isCorporateSeller = data.isCorporateSeller === true;
+    // Şirket kimliği (companyName + taxId) SELF-SERVICE yazılamaz: bu alanlar
+    // yalnız kurumsal onay boru hattı (finalApprove) tarafından damgalanır ve
+    // web guard'ı / vergilendirme yüzeyleri bunlara güvenir. Profilden yalnız
+    // ONAYLI kurumsal hesap güncelleyebilir. Eski `isCorporateSeller` bayrağı
+    // istemcinin gönderdiği çıplak bir alandı — herhangi bir bireysel kullanıcı
+    // kendini "şirket" ilan edip guard'ın üyelik döngüsüne kilitlenebiliyordu.
+    const canEditCompanyFields = user.businessStatus === "approved";
 
     // Check phone uniqueness if being updated
     if (data.phone) {
@@ -299,20 +309,19 @@ export class UserProfileService {
       updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     }
 
-    // Only process business information if user is business tier or isCorporateSeller is true
-    if (isBusinessTier || isCorporateSeller) {
+    // Only approved corporate accounts may touch company identity fields.
+    if (canEditCompanyFields) {
       if (data.companyName !== undefined) {
         updateData.companyName = data.companyName || null;
       }
       if (data.taxId !== undefined) {
         updateData.taxId = data.taxId || null;
       }
-    } else {
-      // For non-business users without corporate seller flag, clear business info if it exists
-      if (data.companyName !== undefined || data.taxId !== undefined) {
-        updateData.companyName = null;
-        updateData.taxId = null;
-      }
+    } else if (data.companyName !== undefined || data.taxId !== undefined) {
+      // Onaysız hesapta gönderilen şirket alanları YOK SAYILIR ve varsa eski
+      // self-declare kalıntısı temizlenir.
+      updateData.companyName = null;
+      updateData.taxId = null;
     }
     // Handle avatar URL (S3 key)
     if (data.avatarUrl !== undefined) {
@@ -339,18 +348,74 @@ export class UserProfileService {
     return this.findByIdWithAddresses(userId);
   }
 
-  async completeHomeTour(userId: string, version: number) {
+  async claimUsername(userId: string, requestedUsername: string) {
+    const username = normalizeUsername(requestedUsername);
+    if (!isUsernameAllowed(username)) {
+      throw new BadRequestException(
+        "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { usernameClaimedAt: true },
+    });
+    if (!user) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+    if (user.usernameClaimedAt) {
+      throw new ConflictException("Kullanıcı adı daha önce belirlenmiş.");
+    }
+
+    try {
+      const result = await this.prisma.user.updateMany({
+        where: { id: userId, usernameClaimedAt: null },
+        data: { username, usernameClaimedAt: new Date() },
+      });
+      if (result.count !== 1) {
+        throw new ConflictException("Kullanıcı adı daha önce belirlenmiş.");
+      }
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("Bu kullanıcı adı daha önce alınmış.");
+      }
+      throw error;
+    }
+
+    return { username, usernameClaimed: true };
+  }
+
+  /**
+   * Bir tanıtım turunu tamamlandı olarak işaretler.
+   *
+   * Sürüm alanı tur anahtarından çözülür (ONBOARDING_TOURS tek kaynak), böylece
+   * her yeni tur için ayrı uç/servis yazmak gerekmez. Güncelleme `lt` ile
+   * MONOTON: aynı çağrı iki kez gelse de tek etki eder ve sürüm asla geri gitmez
+   * (aksi halde tur kullanıcıya tekrar tekrar gösterilirdi).
+   */
+  async completeTour(userId: string, tour: OnboardingTourKey, version: number) {
+    const config = ONBOARDING_TOURS[tour];
+    if (!config) {
+      throw new BadRequestException(
+        i18nMessage("server.user.unknownOnboardingTour"),
+      );
+    }
+    // Sürüm turun kendi güncel sürümüyle sınırlı: istemci ileri bir sürüm
+    // gönderip turu kalıcı olarak susturamaz.
+    const target = Math.min(version, config.version);
+    const field = config.field;
+
     await this.prisma.user.updateMany({
-      where: {
-        id: userId,
-        homeTourVersion: { lt: version },
-      },
-      data: { homeTourVersion: version },
+      where: { id: userId, [field]: { lt: target } },
+      data: { [field]: target },
     });
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { homeTourVersion: true },
+      select: { [field]: true },
     });
     if (!user) {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
@@ -684,7 +749,20 @@ export class UserProfileService {
   /**
    * Get public user profile
    */
-  async getPublicProfile(userId: string, viewerId?: string) {
+  async getPublicProfile(identifier: string, viewerId?: string) {
+    const normalizedIdentifier = normalizeUsername(identifier);
+    const identity = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ id: identifier }, { username: normalizedIdentifier }],
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!identity) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+    const userId = identity.id;
+
     // Sahibin kendi profili mi? Sahip ise sayaçlar "tümünü" gösterir
     // (ilan: draft hariç tüm durumlar, takas: tüm statüler, koleksiyon: özel dahil);
     // başkası bakarken yalnızca herkese görünür/biten kayıtlar sayılır.
@@ -694,6 +772,8 @@ export class UserProfileService {
       where: { id: userId },
       select: {
         id: true,
+        adminCode: true,
+        username: true,
         displayName: true,
         avatarUrl: true,
         bio: true,

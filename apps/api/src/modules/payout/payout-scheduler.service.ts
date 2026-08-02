@@ -45,14 +45,25 @@ export class PayoutSchedulerService implements OnModuleInit {
         );
       }
 
+      // 1b) Kısmi iade nedeniyle void edilmiş payout'ları, iade sonuçlandıysa
+      // geri kuyruğa al — aksi halde satıcı iade dışında kalan hakkını hiç almaz.
+      const requeued = await this.payoutService.requeueRefundVoidedPayouts();
+      if (requeued > 0) {
+        log(`${requeued} iade-void payout yeniden kuyruğa alındı`);
+        this.logger.log(
+          `Requeued ${requeued} refund-voided payout(s) for remaining seller balance`,
+        );
+      }
+
       // 2) Process all pending payouts
       const result = await this.payoutService.processPendingPayouts();
+      // F2: "iletildi" ≠ "tamamlandı" — callback akışında para henüz gitmedi.
       log(
-        `Payout işleme: ${result.processed} tamamlandı · ${result.failed} başarısız`,
+        `Payout işleme: ${result.processed} tamamlandı · ${result.submitted} iletildi (callback bekleniyor) · ${result.failed} başarısız`,
       );
-      if (result.processed > 0 || result.failed > 0) {
+      if (result.processed > 0 || result.submitted > 0 || result.failed > 0) {
         this.logger.log(
-          `Payout processing: ${result.processed} completed, ${result.failed} failed`,
+          `Payout processing: ${result.processed} completed, ${result.submitted} submitted, ${result.failed} failed`,
         );
       }
 
@@ -65,10 +76,11 @@ export class PayoutSchedulerService implements OnModuleInit {
         );
       }
       return {
-        summary: `${result.processed} işlendi · ${result.failed} başarısız${stuck ? ` · ${stuck} takılı` : ""}`,
+        summary: `${result.processed} işlendi${result.submitted ? ` · ${result.submitted} iletildi` : ""} · ${result.failed} başarısız${stuck ? ` · ${stuck} takılı` : ""}`,
         stats: {
           retried,
           processed: result.processed,
+          submitted: result.submitted,
           failed: result.failed,
           stuck,
         },
@@ -76,7 +88,10 @@ export class PayoutSchedulerService implements OnModuleInit {
     } catch (error: any) {
       this.logger.error(`Payout processing error: ${error.message}`);
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { errors: 1 } };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 
@@ -95,7 +110,10 @@ export class PayoutSchedulerService implements OnModuleInit {
     } catch (error: any) {
       this.logger.error(`Returned transfer check error: ${error.message}`);
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { errors: 1 } };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 }

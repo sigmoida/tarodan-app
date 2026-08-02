@@ -102,9 +102,12 @@ import { CartModule } from "./modules/cart";
 import { TaxModule } from "./modules/tax";
 // Static pages (public GET /api/pages/:slug)
 import { PagesModule } from "./modules/pages";
+// Pre-launch early-access invite codes (public POST /api/site-access/verify)
+import { SiteAccessModule } from "./modules/site-access/site-access.module";
 
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ErrorLogInterceptor } from "./common/interceptors/error-log.interceptor";
+import { BlockedIpGuard } from "./common/guards/blocked-ip.guard";
 import { StripSensitiveFieldsInterceptor } from "./common/interceptors/strip-sensitive-fields.interceptor";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
@@ -255,11 +258,18 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     TaxModule,
     // Static pages (public GET /api/pages/:slug)
     PagesModule,
+    SiteAccessModule,
     // Dev/test hook'ları — yalnız NODE_ENV=test'te yüklenir
     ...(process.env.NODE_ENV === "test" ? [DevModule] : []),
   ],
   controllers: [],
   providers: [
+    // Admin'in engellediği IP'ler her şeyden ÖNCE kesilir (bellek cache'li
+    // liste; engel = çözülmemiş ip_block SecurityLog kaydı, kaldırma = resolve).
+    {
+      provide: APP_GUARD,
+      useClass: BlockedIpGuard,
+    },
     // Global Rate-Limit Guard — auth'tan ÖNCE çalışmalı ki brute-force istekleri
     // JWT doğrulamasına bile ulaşmadan 429 ile kesilsin. ThrottlerModule.forRoot
     // tek başına yetmiyordu (guard global kayıtlı değildi → @Throttle dekoratörleri

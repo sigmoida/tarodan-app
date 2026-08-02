@@ -3,7 +3,11 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { PlusIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import {
+  ChevronRightIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+} from "@heroicons/react/24/outline";
 import { Button, Input, Radio, Textarea } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
@@ -246,9 +250,10 @@ export default function AddressStep() {
 
           <Link
             href="/login"
-            className="text-primary-500 hover:underline text-sm"
+            className="inline-flex items-center text-primary-500 hover:underline text-sm"
           >
-            Üye misiniz? Giriş yapın →
+            {t("checkout.alreadyMember")}
+            <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
         </div>
       )}

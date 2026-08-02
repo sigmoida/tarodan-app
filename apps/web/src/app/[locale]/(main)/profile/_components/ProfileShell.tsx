@@ -5,6 +5,8 @@
 import type { ReactNode } from "react";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { ProfileProvider, useProfile } from "../_context/ProfileContext";
+import { PROFILE_PANE_MAX_HEIGHT, PROFILE_STICKY_TOP } from "../_lib/layout";
+import ProfileNavDrawer from "./ProfileNavDrawer";
 import ProfileSidebar from "./ProfileSidebar";
 
 /**
@@ -24,10 +26,15 @@ function ProfileFrame({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
       <aside className="hidden lg:block lg:w-64 lg:flex-shrink-0">
-        <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+        <div
+          className={`lg:sticky lg:overflow-y-auto ${PROFILE_STICKY_TOP} ${PROFILE_PANE_MAX_HEIGHT}`}
+        >
           <ProfileSidebar />
         </div>
       </aside>
+      {/* `lg` altında kenar çubuğu yerine başlıktaki hamburger'dan açılan
+          panel — aynı bileşen, aynı içerik. */}
+      <ProfileNavDrawer />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );

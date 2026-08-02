@@ -185,4 +185,26 @@ describe("OrderTrackingSyncService", () => {
     expect(paymentService.handleOrderDelivered).not.toHaveBeenCalled();
     expect(paymentService.processRefund).not.toHaveBeenCalled();
   });
+
+  it("polls Sürat ONCE per parcel and applies the result to every sibling row", async () => {
+    // Aynı koli (PKG-…) = aynı OzelKargoTakipNo'yu paylaşan 3 sipariş satırı +
+    // ayrı bir koli. Eskiden her satır için ayrı Sürat çağrısı yapılıyordu.
+    const { service, prisma, client, tx } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([
+      shipment({ id: "s1", orderId: "o1", trackingNumber: "PKG-AAA" }),
+      shipment({ id: "s2", orderId: "o2", trackingNumber: "PKG-AAA" }),
+      shipment({ id: "s3", orderId: "o3", trackingNumber: "PKG-AAA" }),
+      shipment({ id: "s4", orderId: "o4", trackingNumber: "PKG-BBB" }),
+    ]);
+
+    const res = await service.syncAllActiveShipments();
+
+    // 4 satır, 2 koli → 2 çağrı (4 değil).
+    expect(client.fetchTrackingInfo).toHaveBeenCalledTimes(2);
+    expect(client.fetchTrackingInfo).toHaveBeenCalledWith("PKG-AAA");
+    expect(client.fetchTrackingInfo).toHaveBeenCalledWith("PKG-BBB");
+    // Ama güncelleme SATIR bazında kalır: iade/escrow muhasebesi sipariş bazlı.
+    expect(tx.shipment.updateMany).toHaveBeenCalledTimes(4);
+    expect(res).toEqual({ synced: 4, failed: 0 });
+  });
 });

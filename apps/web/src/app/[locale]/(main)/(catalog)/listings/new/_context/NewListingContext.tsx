@@ -58,7 +58,7 @@ function useNewListingValue() {
   const manufacturerId = watch("manufacturerId");
   const price = watch("price");
   const categoryId = watch("categoryId");
-  const shippingDesi = watch("shippingDesi");
+  const shippingPackageTier = watch("shippingPackageTier");
 
   const bankAccountQuery = useQuery({
     queryKey: queryKeys.bankAccount.detail(),
@@ -99,7 +99,7 @@ function useNewListingValue() {
   const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
     price,
     categoryId,
-    shippingDesi,
+    shippingPackageTier,
   );
 
   // Auth gate: redirect out if signed out, else refresh the user once.
@@ -175,7 +175,7 @@ function useNewListingValue() {
             ? Number(values.bundleSize)
             : undefined,
         quantity: values.quantity !== "" ? Number(values.quantity) : 1,
-        shippingDesi: Number(values.shippingDesi),
+        shippingPackageTier: values.shippingPackageTier,
         images: values.images.length > 0 ? values.images : undefined,
         attributes:
           customAttributeSlugs.length > 0 ? customAttributeSlugs : undefined,

@@ -5,24 +5,27 @@ import type { useTranslations } from "next-intl";
 type T = ReturnType<typeof useTranslations<never>>;
 
 /**
- * Infer the payout hold reason from a row (payouts don't carry frozenByRefundId):
- * no releaseAt → awaiting delivery; future releaseAt → escrow window; past + held → lock.
+ * Payout hold reason from the ROW'S REAL DATA — the open-refund lock comes from
+ * frozenByRefundId, never inferred. (The old version faked hasOpenRefund from
+ * "releaseAt is overdue", so a merely-late hold showed "Açık iade var" and
+ * contradicted the order group file's escrow card.)
  */
 export function holdReasonForRow(
   args: {
     status: string;
     releaseAt: string | null;
+    frozenByRefundId?: string | null;
   },
   t: T,
 ): EscrowHoldReason | null {
   if (args.status !== "held") return null;
-  const overdue =
-    args.releaseAt != null && new Date(args.releaseAt).getTime() <= Date.now();
   return describeHoldReason(
     {
-      hasOpenRefund: overdue,
+      hasOpenRefund: !!args.frozenByRefundId,
       releaseAt: args.releaseAt,
-      deliveredAt: args.releaseAt ? new Date().toISOString() : null,
+      // releaseAt teslimde yazılır: varlığı "teslim edildi" demektir; gerçek
+      // deliveredAt payload'da olmadığından bu türetme güvenli vekildir.
+      deliveredAt: args.releaseAt,
     },
     t,
   );

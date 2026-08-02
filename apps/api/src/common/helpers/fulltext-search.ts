@@ -1,27 +1,27 @@
-import { PrismaService } from '../../prisma';
+import { PrismaService } from "../../prisma";
 
-const FTS_CONFIG = 'simple';
+const FTS_CONFIG = "simple";
 
 const ALLOWED_TABLES = new Set([
-  'products',
-  'collections',
-  'brands',
-  'categories',
-  'car_models',
-  'manufacturers',
-  'users',
-  'payments',
-  'orders',
-  'discounts',
-  'tags',
-  'attribute_groups',
-  'attributes',
-  'product_ratings',
-  'security_logs',
-  'email_logs',
-  'tax_regions',
-  'error_logs',
-  'ticket_messages',
+  "products",
+  "collections",
+  "brands",
+  "categories",
+  "car_models",
+  "manufacturers",
+  "users",
+  "payments",
+  "orders",
+  "discounts",
+  "tags",
+  "attribute_groups",
+  "attributes",
+  "product_ratings",
+  "security_logs",
+  "email_logs",
+  "tax_regions",
+  "error_logs",
+  "ticket_messages",
 ]);
 
 function assertAllowedTable(table: string): void {
@@ -37,17 +37,17 @@ function assertAllowedTable(table: string): void {
  */
 export function toTsQuery(input: string): string {
   const sanitized = input
-    .replace(/[&|!():*<>'"\\]/g, ' ')
+    .replace(/[&|!():*<>'"\\]/g, " ")
     .trim()
     .split(/\s+/)
     .filter(Boolean);
 
-  if (sanitized.length === 0) return '';
+  if (sanitized.length === 0) return "";
 
   const terms = sanitized.map((word, i) =>
     i === sanitized.length - 1 ? `${word}:*` : word,
   );
-  return terms.join(' & ');
+  return terms.join(" & ");
 }
 
 /**
@@ -87,63 +87,152 @@ export async function fulltextSearch(
 // ─── Convenience wrappers ────────────────────────────────────────────────────
 
 const tsv = (cols: string[]) =>
-  cols
-    .map((c) => `coalesce("${c}", '')`)
-    .join(" || ' ' || ");
+  cols.map((c) => `coalesce("${c}", '')`).join(" || ' ' || ");
 
 const tsvExpr = (cols: string[]) =>
   `to_tsvector('${FTS_CONFIG}', ${tsv(cols)})`;
 
-export const fulltextCollectionSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'collections', tsvExpr(['name', 'description']), q, limit);
+export const fulltextCollectionSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) =>
+  fulltextSearch(p, "collections", tsvExpr(["name", "description"]), q, limit);
 
-export const fulltextBrandSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'brands', tsvExpr(['name']), q, limit);
+export const fulltextBrandSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "brands", tsvExpr(["name"]), q, limit);
 
-export const fulltextCategorySearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'categories', tsvExpr(['name']), q, limit);
+export const fulltextCategorySearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "categories", tsvExpr(["name"]), q, limit);
 
-export const fulltextCarModelSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'car_models', tsvExpr(['name']), q, limit);
+export const fulltextCarModelSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "car_models", tsvExpr(["name"]), q, limit);
 
-export const fulltextManufacturerSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'manufacturers', tsvExpr(['name']), q, limit);
+export const fulltextManufacturerSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "manufacturers", tsvExpr(["name"]), q, limit);
 
-export const fulltextUserDisplayNameSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'users', tsvExpr(['display_name']), q, limit);
+export const fulltextUserDisplayNameSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "users", tsvExpr(["display_name"]), q, limit);
 
-export const fulltextUserSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'users', tsvExpr(['email', 'display_name']), q, limit);
+export const fulltextUserSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) =>
+  fulltextSearch(
+    p,
+    "users",
+    tsvExpr(["email", "display_name", "username", "admin_code"]),
+    q,
+    limit,
+  );
 
-export const fulltextDiscountSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'discounts', tsvExpr(['name', 'code']), q, limit);
+export const fulltextDiscountSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "discounts", tsvExpr(["name", "code"]), q, limit);
 
-export const fulltextPaymentSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'payments', tsvExpr(['provider_payment_id', 'provider_conversation_id']), q, limit);
+export const fulltextPaymentSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) =>
+  fulltextSearch(
+    p,
+    "payments",
+    tsvExpr(["provider_payment_id", "provider_conversation_id"]),
+    q,
+    limit,
+  );
 
-export const fulltextOrderSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'orders', tsvExpr(['order_number']), q, limit);
+export const fulltextOrderSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "orders", tsvExpr(["order_number"]), q, limit);
 
-export const fulltextAttributeGroupSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'attribute_groups', tsvExpr(['name', 'description']), q, limit);
+export const fulltextAttributeGroupSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) =>
+  fulltextSearch(
+    p,
+    "attribute_groups",
+    tsvExpr(["name", "description"]),
+    q,
+    limit,
+  );
 
-export const fulltextAttributeSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'attributes', tsvExpr(['value', 'display_value']), q, limit);
+export const fulltextAttributeSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) =>
+  fulltextSearch(
+    p,
+    "attributes",
+    tsvExpr(["value", "display_value"]),
+    q,
+    limit,
+  );
 
-export const fulltextProductRatingSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'product_ratings', tsvExpr(['title', 'review']), q, limit);
+export const fulltextProductRatingSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) =>
+  fulltextSearch(p, "product_ratings", tsvExpr(["title", "review"]), q, limit);
 
-export const fulltextSecurityLogSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'security_logs', tsvExpr(['email', 'ip_address']), q, limit);
+export const fulltextSecurityLogSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) =>
+  fulltextSearch(
+    p,
+    "security_logs",
+    tsvExpr(["email", "ip_address"]),
+    q,
+    limit,
+  );
 
-export const fulltextEmailLogSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'email_logs', tsvExpr(['to', 'subject']), q, limit);
+export const fulltextEmailLogSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "email_logs", tsvExpr(["to", "subject"]), q, limit);
 
-export const fulltextErrorLogSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'error_logs', tsvExpr(['message']), q, limit);
+export const fulltextErrorLogSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "error_logs", tsvExpr(["message"]), q, limit);
 
-export const fulltextTicketMessageSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'ticket_messages', tsvExpr(['message']), q, limit);
+export const fulltextTicketMessageSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "ticket_messages", tsvExpr(["message"]), q, limit);
 
-export const fulltextTaxRegionSearch = (p: PrismaService, q: string, limit?: number) =>
-  fulltextSearch(p, 'tax_regions', tsvExpr(['name']), q, limit);
+export const fulltextTaxRegionSearch = (
+  p: PrismaService,
+  q: string,
+  limit?: number,
+) => fulltextSearch(p, "tax_regions", tsvExpr(["name"]), q, limit);

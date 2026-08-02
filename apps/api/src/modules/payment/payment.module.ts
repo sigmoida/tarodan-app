@@ -19,6 +19,8 @@ import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
+import { PaytrReportSyncService } from "./paytr-report-sync.service";
+import { PaytrReportMatchingService } from "./paytr-report-matching.service";
 import { PaymentSchedulerService } from "./payment-scheduler.service";
 import { PaymentScheduledProcessor } from "./payment-scheduled.processor";
 import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
@@ -43,6 +45,7 @@ import { CommissionModule } from "../commission/commission.module";
 import { StorageModule } from "../storage/storage.module";
 import { ElogoModule } from "../elogo";
 import { DiscountModule } from "../discount";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -61,6 +64,8 @@ import { DiscountModule } from "../discount";
     ElogoModule,
     DiscountModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    // Üyelik aktivasyonunda satıcının takas ilanları yeniden indekslenir.
+    BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -93,8 +98,10 @@ import { DiscountModule } from "../discount";
     VirtualOrderFulfillmentService,
     PaymentProviderEventService,
     PaymentLifecycleService,
+    PaytrReportSyncService,
+    PaytrReportMatchingService,
     PaymentSchedulerService,
-    PaymentScheduledProcessor,
+    ...scheduledProcessors(PaymentScheduledProcessor),
     PaymentOutboxHandlers,
     RawBodyMiddleware,
   ],

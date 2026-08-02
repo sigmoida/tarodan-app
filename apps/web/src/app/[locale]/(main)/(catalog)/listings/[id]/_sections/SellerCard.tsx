@@ -27,7 +27,7 @@ export default function SellerCard() {
   const rating = seller.rating ?? 0;
   const listingsCount = seller.listings_count || seller.productsCount || 0;
   const name = seller.displayName || seller.username || t("product.seller");
-  const profileHref = `/seller/${seller.id}`;
+  const profileHref = `/u/${seller.username || seller.id}`;
 
   // Non-auth users get the "sign in to view profile" modal instead of a dead link.
   const gateProfile = (e: React.MouseEvent) => {

@@ -25,8 +25,6 @@ export const webAuthConfig: AuthConfig = {
     forgotPassword: "/auth/forgot-password",
     google: "/auth/google",
   },
-  // NestJS user refresh guard reads the refresh token from this cookie.
-  upstreamRefreshCookie: "refresh_token",
   ttls: {
     accessMaxAge: 60 * 15, // 15 min — matches the user JWT access TTL
     refreshMaxAge: 60 * 60 * 24 * 7, // 7 days
@@ -43,6 +41,9 @@ export const webAuthConfig: AuthConfig = {
 /** Server-resolved web user (from `/auth/profile`). Extend as SSR needs more. */
 export interface WebUser {
   id: string;
+  adminCode?: string;
+  username?: string;
+  usernameClaimed?: boolean;
   email: string;
   displayName: string;
   role?: string;
@@ -61,6 +62,11 @@ export function mapWebUser(raw: unknown): WebUser | null {
   if (!u || (!u.id && !u.email)) return null;
   return {
     id: String(u.id ?? ""),
+    adminCode:
+      (u.adminCode as string | undefined) ??
+      (u.admin_code as string | undefined),
+    username: (u.username as string | undefined) ?? undefined,
+    usernameClaimed: Boolean(u.usernameClaimed ?? u.username_claimed ?? false),
     email: String(u.email ?? ""),
     displayName: String(u.displayName ?? u.display_name ?? ""),
     role: (u.role as string | undefined) ?? undefined,

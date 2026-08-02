@@ -61,8 +61,12 @@ export function useLogin() {
       // user from there instead of a SECOND identical round-trip. `membershipTier`
       // is already normalized to 'free' | … | 'business' by the store.
       const currentUser = useAuthStore.getState().user;
+      // Üyelik zorunluluğu yalnız ONAYLI kurumsal hesaba: businessStatus'suz
+      // companyName+taxId (self-declare kalıntısı) buraya düşerse kullanıcı
+      // satın alamayacağı Business tier'a yönlendirilip kilitleniyordu.
       const needsMembership = !!(
         currentUser?.isEmailVerified &&
+        currentUser?.businessStatus === "approved" &&
         currentUser?.companyName &&
         currentUser?.taxId &&
         currentUser.membershipTier !== "business"

@@ -71,6 +71,6 @@ export function usePaymentFail() {
     payment,
     locale,
     isGuestCheckout,
-    handleRetry: () => router.push("/listings"),
+    handleRetry: () => router.push("/profile/orders"),
   };
 }

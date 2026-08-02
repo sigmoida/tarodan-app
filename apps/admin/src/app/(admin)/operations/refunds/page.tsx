@@ -43,8 +43,11 @@ export default function RefundsPage() {
         <ResourceList.Table
           columns={refundColumns(
             t,
-            refundRowMenu(t, (orderId) =>
-              router.push(`/operations/orders/${orderId}`),
+            refundRowMenu(
+              t,
+              (orderId) => router.push(`/operations/orders/${orderId}`),
+              (refundId) =>
+                router.push(`/operations/refund-requests/${refundId}`),
             ),
           )}
           emptyText={t("admin.operations.refunds.empty")}

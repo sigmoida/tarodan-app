@@ -67,6 +67,22 @@ export function PackageCard({
             <Badge variant={pkg.isActive ? "success" : "default"} size="sm">
               {pkg.isActive ? t("common.active") : t("common.inactive")}
             </Badge>
+            <Badge variant="secondary" size="sm">
+              {pkg.audienceMode === "everyone"
+                ? t("admin.marketing.adPackages.audienceEveryone")
+                : pkg.audienceMode === "membership_tiers"
+                  ? t("admin.marketing.adPackages.audienceTierCount", {
+                      count: pkg.targetTierTypes.length,
+                    })
+                  : pkg.audienceMode === "specific_users"
+                    ? t("admin.marketing.adPackages.audienceUserCount", {
+                        count: pkg.targetUsers.length,
+                      })
+                    : t("admin.marketing.adPackages.audienceMixedCount", {
+                        tiers: pkg.targetTierTypes.length,
+                        users: pkg.targetUsers.length,
+                      })}
+            </Badge>
           </div>
           <p className="mt-0.5 font-mono text-xs text-muted">{pkg.slug}</p>
         </div>

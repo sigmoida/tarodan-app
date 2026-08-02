@@ -2,7 +2,7 @@
 
 "use client";
 
-import { ArrowUturnLeftIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { ArrowUturnLeftIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
@@ -20,11 +20,9 @@ import {
 export default function RefundActions({
   order,
   onRequestRefund,
-  onCancel,
 }: {
   order: OrderDetail;
   onRequestRefund: () => void;
-  onCancel: () => void;
 }) {
   const t = useTranslations();
 
@@ -53,36 +51,22 @@ export default function RefundActions({
     );
   }
 
+  // Kargo öncesi iptal GRUP bölümünden yapılır (R4: iptal sepet bazında) —
+  // bu bölüm yalnız kargo sonrası iade talebini sunar.
+  if (!shipped) return null;
+
   return (
-    <SectionCard
-      title={shipped ? t("order.refundTitle") : t("order.cancelOrder")}
-    >
-      <p className="text-sm text-muted mb-4">
-        {shipped
-          ? t("order.refundShippedInfo")
-          : t("order.cancelNotShippedInfo")}
-      </p>
-      {shipped ? (
-        <Button
-          variant="secondary"
-          size="lg"
-          className="w-full flex items-center justify-center gap-2"
-          onClick={onRequestRefund}
-        >
-          <ArrowUturnLeftIcon className="w-5 h-5" />
-          {t("order.requestRefundTitle")}
-        </Button>
-      ) : (
-        <Button
-          variant="danger"
-          size="lg"
-          className="w-full flex items-center justify-center gap-2"
-          onClick={onCancel}
-        >
-          <XCircleIcon className="w-5 h-5" />
-          {t("order.cancelOrder")}
-        </Button>
-      )}
+    <SectionCard title={t("order.refundTitle")}>
+      <p className="text-sm text-muted mb-4">{t("order.refundShippedInfo")}</p>
+      <Button
+        variant="secondary"
+        size="lg"
+        className="w-full flex items-center justify-center gap-2"
+        onClick={onRequestRefund}
+      >
+        <ArrowUturnLeftIcon className="w-5 h-5" />
+        {t("order.requestRefundTitle")}
+      </Button>
     </SectionCard>
   );
 }

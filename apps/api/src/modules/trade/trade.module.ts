@@ -20,6 +20,8 @@ import { PaymentModule } from "../payment/payment.module";
 import { ProductModule } from "../product/product.module";
 import { EventModule } from "../events";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
+import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
 
 @Module({
   imports: [
@@ -37,13 +39,15 @@ import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
   controllers: [TradeController],
   providers: [
     TradeService,
+    // Vergi politikası (hizmet KDV oranı) siparişlerle ORTAK tek kaynaktır.
+    OrderTaxPolicyService,
     TradeShipmentService,
     TradeCommonService,
     TradeQueryService,
     TradeLifecycleService,
     TradeReconciliationService,
     TradeSchedulerService,
-    TradeScheduledProcessor,
+    ...scheduledProcessors(TradeScheduledProcessor),
     TradeCashClearedListener,
   ],
   exports: [TradeService],

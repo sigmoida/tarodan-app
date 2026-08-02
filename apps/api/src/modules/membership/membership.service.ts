@@ -51,6 +51,8 @@ export class MembershipService {
       orderBy: { sortOrder: "asc" },
     });
 
+    // Vaat edilen limit = uygulanan limit: ikisi de doğrudan katman satırından
+    // gelir (üyelik sayfası + checkout kartları bu ucu okur).
     return tiers.map((tier) => this.common.mapTierToDto(tier));
   }
 
@@ -99,63 +101,9 @@ export class MembershipService {
         );
       }
 
-      // getUserUsageStats already handles platform setting override for all tiers
-      // We just need to ensure maxFreeListings and maxTotalListings reflect the platform setting override
-      let maxFreeListings = membership.tier.maxFreeListings;
-      let maxTotalListings = membership.tier.maxTotalListings;
-
-      if (membership.tier.type === MembershipTierType.free) {
-        const freeListingLimitSetting =
-          await this.prisma.platformSetting.findUnique({
-            where: { settingKey: "free_listing_limit" },
-          });
-        if (freeListingLimitSetting?.settingValue) {
-          const platformLimit = parseInt(
-            freeListingLimitSetting.settingValue,
-            10,
-          );
-          if (!isNaN(platformLimit) && platformLimit > 0) {
-            maxFreeListings = platformLimit;
-            maxTotalListings = platformLimit; // For free tier, total = free
-          }
-        }
-      } else if (membership.tier.type === MembershipTierType.premium) {
-        const premiumListingLimitSetting =
-          await this.prisma.platformSetting.findUnique({
-            where: { settingKey: "premium_listing_limit" },
-          });
-        if (premiumListingLimitSetting?.settingValue) {
-          const platformLimit = parseInt(
-            premiumListingLimitSetting.settingValue,
-            10,
-          );
-          if (!isNaN(platformLimit)) {
-            if (platformLimit === -1) {
-              maxTotalListings = -1; // Unlimited
-            } else if (platformLimit > 0) {
-              maxTotalListings = platformLimit;
-            }
-          }
-        }
-      } else if (membership.tier.type === MembershipTierType.business) {
-        const businessListingLimitSetting =
-          await this.prisma.platformSetting.findUnique({
-            where: { settingKey: "business_listing_limit" },
-          });
-        if (businessListingLimitSetting?.settingValue) {
-          const platformLimit = parseInt(
-            businessListingLimitSetting.settingValue,
-            10,
-          );
-          if (!isNaN(platformLimit)) {
-            if (platformLimit === -1) {
-              maxTotalListings = -1; // Unlimited
-            } else if (platformLimit > 0) {
-              maxTotalListings = platformLimit;
-            }
-          }
-        }
-      }
+      // Limitler katman satırından gelir — tek kaynak MembershipTier.
+      const maxFreeListings = membership.tier.maxFreeListings;
+      const maxTotalListings = membership.tier.maxTotalListings;
 
       return {
         canCreateListing:
@@ -166,12 +114,11 @@ export class MembershipService {
         canCreateCollection: membership.tier.canCreateCollections,
         isAdFree: membership.tier.isAdFree, // reklamsız avantajı (admin tier ayarı)
         maxImages: membership.tier.maxImagesPerListing,
-        maxFreeListings: maxFreeListings, // Use platform setting override for free tier
-        maxTotalListings: maxTotalListings, // Use platform setting override for all tiers
+        maxFreeListings,
+        maxTotalListings,
         remainingFreeListings: membership.remainingFreeListings, // Already calculated correctly by getUserUsageStats
         remainingTotalListings: membership.remainingTotalListings, // Already calculated correctly by getUserUsageStats
         remainingFeaturedSlots: membership.remainingFeaturedSlots,
-        commissionDiscount: membership.tier.commissionDiscount,
         tierName: membership.tier.name,
         tierType: membership.tier.type,
       };
@@ -269,7 +216,9 @@ export class MembershipService {
         canTrade: dto.canTrade,
         isAdFree: dto.isAdFree,
         featuredListingSlots: dto.featuredListingSlots,
-        commissionDiscount: dto.commissionDiscount,
+        // commissionDiscount BİLEREK yazılmıyor: komisyon avantajı yalnız
+        // komisyon kurallarının üyelik ekseninden (PREMIUM/BUSINESS) gelir;
+        // bu kolon motor tarafından hiç okunmaz (DB varsayılanı 0 kalır).
         isActive: true,
       },
     });

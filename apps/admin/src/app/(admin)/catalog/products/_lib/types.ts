@@ -17,6 +17,8 @@ export const aiCheckKey = (s?: string | null) =>
 
 export interface Product {
   id: string;
+  /** İnsan-okunur ilan numarası (U010001). */
+  productCode: string;
   title: string;
   price: number;
   originalPrice?: number | null;
@@ -31,12 +33,18 @@ export interface Product {
     | "reserved"
     | "deleted";
   condition: string;
-  seller: { id: string; displayName: string };
+  seller: {
+    id: string;
+    displayName: string;
+    email?: string;
+    avatarUrl?: string;
+  };
   category: { name: string };
   brand?: { name: string } | null;
   description?: string | null;
   relevanceScore?: number | null;
   isTradeEnabled?: boolean;
+  quantity?: number | null;
   imageCount?: number;
   imageUrl?: string;
   createdAt: string;
@@ -50,6 +58,7 @@ const PLACEHOLDER = "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
 export function mapProducts(raw: any[], t: T): Product[] {
   return raw.map((p: any) => ({
     id: p.id,
+    productCode: p.productCode,
     title: p.title,
     price: Number(p.price),
     originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
@@ -66,6 +75,7 @@ export function mapProducts(raw: any[], t: T): Product[] {
     description: p.description ?? null,
     relevanceScore: p.relevanceScore ?? null,
     isTradeEnabled: !!p.isTradeEnabled,
+    quantity: p.quantity != null ? Number(p.quantity) : null,
     imageCount: p._count?.images ?? (p.images?.length || undefined),
     imageUrl: (() => {
       let url = p.imageUrl || p.images?.[0]?.url || p.images?.[0] || "";

@@ -7,6 +7,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { buyerTotalOf } from "./order-total.helper";
 import { i18nMessage } from "../i18n";
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
 import {
@@ -24,7 +25,12 @@ import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
+import {
+  REFERENCE_PREFIX,
+  reprefixReference,
+} from "../../common/helpers/code-prefixes";
 
 /**
  * Grup dışı satın alma akışları: Hızlı Al (createDirectOrder), teklif→sipariş (create)
@@ -359,36 +365,47 @@ export class OrderCheckoutDirectService {
         product.categoryId, // Pass categoryId for priority-based matching
       );
 
-      // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const fullShipping = await this.orderPricing.calculateShippingCost(
-        discountedPrice,
-        shippingTariff.tariff,
-        product.shippingDesi,
-      );
-      // Kargo payı: tek kargo tutarı alıcı/satıcı arasında bölünür (kurala göre).
-      // buyerShare=100 → alıcı tümünü öder (mevcut davranış). Alıcı yalnız kendi
-      // payını öder; kalanı satıcı üstlenir (payout formülü değişmeden buyerShipping
-      // satıcıya akar; satıcı kargoyu öderken sellerShipping kadarını absorbe eder).
-      const buyerShippingAmount =
-        Math.round(
-          fullShipping * (commissionResult.shippingBuyerShare / 100) * 100,
-        ) / 100;
-      const sellerShippingAmount =
-        Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
+      // Kargo kararı (quote ile ORTAK): paket desisi → kademe → o kademenin payı →
+      // alıcı/satıcı bölüşümü. Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
+      const {
+        fullShipping,
+        buyer: buyerShippingAmount,
+        seller: sellerShippingAmount,
+      } = this.orderPricing.resolveShippingDecision({
+        tariff: shippingTariff.tariff,
+        subtotal: discountedPrice,
+        billableDesi: product.shippingDesi,
+        lineShares: [commissionResult.shippingBuyerShares],
+      });
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
-      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
-      const { taxAmount, withholdingTaxAmount } =
-        await this.checkoutCommon.resolveSellerTaxes(
-          product.sellerId,
-          product.categoryId,
-          discountedPrice,
-        );
-      // Buyer fee + KDV eklenir (stopaj alıcı tutarını etkilemez; satıcı payout'undan kesilir)
-      const totalAmount =
-        discountedPrice +
-        shippingCost +
-        commissionResult.buyerFeeAmount +
-        taxAmount;
+      // Vergiler: ürün KDV'si (politikayla kapalı), hizmet KDV'si (iki taraf) ve stopaj.
+      const {
+        taxAmount,
+        withholdingTaxAmount,
+        buyerServiceTaxAmount,
+        sellerServiceTaxAmount,
+        serviceVatRate,
+      } = await this.checkoutCommon.resolveOrderTaxes({
+        sellerId: product.sellerId,
+        categoryId: product.categoryId,
+        subtotal: discountedPrice,
+        fees: {
+          buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+          buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+          buyerShippingAmount,
+          sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+          sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
+          sellerShippingAmount,
+        },
+      });
+      // Alıcı ücretleri + ürün KDV'si + alıcıya verilen hizmetlerin KDV'si eklenir.
+      // (Stopaj ve satıcı hizmet KDV'si alıcı tutarını etkilemez — payout'tan kesilir.)
+      const totalAmount = buyerTotalOf({
+        subtotal: discountedPrice,
+        buyerShippingAmount: shippingCost,
+        buyerFeeAmount: commissionResult.buyerFeeAmount,
+        buyerServiceTaxAmount,
+      });
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -441,7 +458,10 @@ export class OrderCheckoutDirectService {
       // backfill konvansiyonuyla aynı: 'GRP' + orderNumber → uniqueness garantili)
       const singleOrderGroup = await tx.checkoutGroup.create({
         data: {
-          groupNumber: `GRP${orderNumber}`,
+          groupNumber: reprefixReference(
+            orderNumber,
+            REFERENCE_PREFIX.checkoutGroup,
+          ),
           buyerId,
           totalAmount,
           isGuest: false,
@@ -452,6 +472,7 @@ export class OrderCheckoutDirectService {
       // (Faz 2 Shipment.packageId + Faz 3 UI gruplaması her order'ın paketi olduğunu varsayar).
       const singleOrderPackage = await tx.orderPackage.create({
         data: {
+          packageNumber: await this.checkoutCommon.generatePackageNumber(),
           checkoutGroupId: singleOrderGroup.id,
           sellerId: product.sellerId,
           buyerId,
@@ -500,6 +521,9 @@ export class OrderCheckoutDirectService {
           shippingCost,
           taxAmount,
           withholdingTaxAmount,
+          buyerServiceTaxAmount,
+          sellerServiceTaxAmount,
+          serviceVatRate,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -531,6 +555,8 @@ export class OrderCheckoutDirectService {
             commission: commissionResult,
             taxAmount,
             withholdingTaxAmount,
+            buyerServiceTaxAmount,
+            sellerServiceTaxAmount,
             totalAmount,
           }),
           status: OrderStatus.pending_payment,
@@ -742,23 +768,19 @@ export class OrderCheckoutDirectService {
         }
       }
 
-      // Calculate commission with category-based matching (3.3)
-      const commissionResult = await this.orderPricing.calculateCommission(
-        Number(offer.amount),
-        offer.sellerId,
-        offer.product.categoryId, // Pass categoryId for priority-based matching
-      );
-      const offerFullShipping = await this.orderPricing.calculateShippingCost(
-        Number(offer.amount),
-        shippingTariff.tariff,
-        offer.product.shippingDesi,
-      );
-      const offerBuyerShippingAmount =
-        Math.round(
-          offerFullShipping * (commissionResult.shippingBuyerShare / 100) * 100,
-        ) / 100;
-      const offerSellerShippingAmount =
-        Math.round((offerFullShipping - offerBuyerShippingAmount) * 100) / 100;
+      // Bedeller teklif kabul yoluyla AYNI primitiften gelir (tek kaynak): komisyon,
+      // kargo payı, KDV, stopaj ve tahsil edilecek toplam.
+      const offerPricing = await this.checkoutCommon.resolveOfferOrderPricing({
+        amount: Number(offer.amount),
+        sellerId: offer.sellerId,
+        categoryId: offer.product.categoryId,
+        shippingDesi: offer.product.shippingDesi,
+        shippingTariff: shippingTariff.tariff,
+      });
+      const commissionResult = offerPricing.commission;
+      const offerFullShipping = offerPricing.fullShippingAmount;
+      const offerBuyerShippingAmount = offerPricing.buyerShippingAmount;
+      const offerSellerShippingAmount = offerPricing.sellerShippingAmount;
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -771,21 +793,9 @@ export class OrderCheckoutDirectService {
           dto.shippingAddressId,
         ]);
 
-      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
-      const {
-        taxAmount: offerTaxAmount,
-        withholdingTaxAmount: offerWithholdingAmount,
-      } = await this.checkoutCommon.resolveSellerTaxes(
-        offer.sellerId,
-        offer.product.categoryId,
-        Number(offer.amount),
-      );
-      // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
-      const totalAmount =
-        Number(offer.amount) +
-        offerBuyerShippingAmount +
-        commissionResult.buyerFeeAmount +
-        offerTaxAmount;
+      const offerTaxAmount = offerPricing.taxAmount;
+      const offerWithholdingAmount = offerPricing.withholdingTaxAmount;
+      const totalAmount = offerPricing.totalAmount;
       const offerPricingHash = this.orderPricing.computePricingHash([
         {
           productId: offer.productId,
@@ -815,7 +825,10 @@ export class OrderCheckoutDirectService {
       // Tek siparişlik grup (teklif yolu)
       const offerOrderGroup = await tx.checkoutGroup.create({
         data: {
-          groupNumber: `GRP${orderNumber}`,
+          groupNumber: reprefixReference(
+            orderNumber,
+            REFERENCE_PREFIX.checkoutGroup,
+          ),
           buyerId,
           totalAmount,
           isGuest: false,
@@ -825,6 +838,7 @@ export class OrderCheckoutDirectService {
       // Teklif siparişi de normal satışla aynı sürümlü kargo tarifesini kullanır.
       const offerOrderPackage = await tx.orderPackage.create({
         data: {
+          packageNumber: await this.checkoutCommon.generatePackageNumber(),
           checkoutGroupId: offerOrderGroup.id,
           sellerId: offer.sellerId,
           buyerId,
@@ -996,7 +1010,7 @@ export class OrderCheckoutDirectService {
         }
       }
     } catch (error) {
-      this.logger.error("Failed to send product sold notifications:", error);
+      this.logger.warn("Failed to send product sold notifications:", error);
     }
   }
 }

@@ -72,10 +72,18 @@ function ResourceListInner<T>({
   });
   const selection = useSelection(selectable);
   const exportRef = useRef<any[]>([]);
+  const exportRowsRef = useRef<any[]>([]);
 
   return (
     <ResourceListContext.Provider
-      value={{ ...data, getRowId, selection, exportRef, exportName: resource }}
+      value={{
+        ...data,
+        getRowId,
+        selection,
+        exportRef,
+        exportRowsRef,
+        exportName: resource,
+      }}
     >
       <AdminPage>{children}</AdminPage>
     </ResourceListContext.Provider>

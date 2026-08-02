@@ -2,20 +2,25 @@
 export interface OrderShipmentRow {
   id: string;
   provider: string | null;
+  /** Koli (OrderPackage) — aynı koliyi paylaşan satırlar tek gönderidir. */
+  packageId: string | null;
+  /** Koli numarası (PKG-…): kargo etiketindeki ve Sürat'a giden kod. */
+  orderPackage?: { packageNumber: string } | null;
   trackingNumber: string | null;
   /** Real Sürat cargo code (KargoTakipNo). */
   providerTrackingId: string | null;
   trackingUrl: string | null;
   status: string;
+  updatedAt: string;
   order?: {
     id: string;
     orderNumber: string;
     /** Per-seller OrderPackage — siblings sharing it share one physical parcel. */
     packageId: string | null;
     quantity: number;
-    buyer?: { id: string; displayName: string } | null;
-    seller?: { id: string; displayName: string } | null;
-    product?: { id: string; title: string } | null;
+    buyer?: { id: string; displayName: string; email?: string } | null;
+    seller?: { id: string; displayName: string; email?: string } | null;
+    product?: { id: string; title: string; imageUrl?: string | null } | null;
   } | null;
 }
 
@@ -23,7 +28,9 @@ export interface OrderShipmentRow {
 export interface ParcelLineItem {
   orderId: string;
   orderNumber: string;
+  productId: string | null;
   productTitle: string | null;
+  productImageUrl: string | null;
   quantity: number;
 }
 
@@ -36,13 +43,16 @@ export interface ParcelLineItem {
 export interface PhysicalShipmentRow {
   /** Stable dedupe id: `pkg:<id>` | `trk:<provider>:<tracking>` | `ship:<id>`. */
   id: string;
+  /** Koli numarası (PKG-…) — paketsiz eski kayıtlarda null. */
+  packageNumber: string | null;
   provider: string | null;
   trackingNumber: string | null;
   providerTrackingId: string | null;
   trackingUrl: string | null;
   status: string;
-  buyer?: { id: string; displayName: string } | null;
-  seller?: { id: string; displayName: string } | null;
+  updatedAt: string;
+  buyer?: { id: string; displayName: string; email?: string } | null;
+  seller?: { id: string; displayName: string; email?: string } | null;
   items: ParcelLineItem[];
 }
 
@@ -90,7 +100,10 @@ export interface SuratShipmentRow {
   order?: {
     id: string;
     orderNumber: string;
-    buyer?: { id: string; displayName: string } | null;
-    seller?: { id: string; displayName: string } | null;
+    buyer?: { id: string; displayName: string; email?: string } | null;
+    seller?: { id: string; displayName: string; email?: string } | null;
   } | null;
+  /** Aynı barkodu paylaşan (aynı fiziksel koli) diğer siparişler — R6:
+   * paket başına TEK satır; kardeşler etikette gösterilir. */
+  siblingOrderNumbers?: string[];
 }

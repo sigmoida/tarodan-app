@@ -6,11 +6,13 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { buyerTotalOf } from "./order-total.helper";
 import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
 import { OrderStatus, ProductStatus, Prisma } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { EventService } from "../events";
 import { DiscountService } from "../discount";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
@@ -21,7 +23,10 @@ import {
 } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
-import { calculatePackageDesi } from "../shipping/shipping-tariff.helper";
+import {
+  calculatePackageDesi,
+  type ShippingBuyerShareByTier,
+} from "../shipping/shipping-tariff.helper";
 
 /**
  * Toplu checkout (CheckoutGroup) akışı: sepetteki tüm ürünler tek grup + ürün
@@ -494,7 +499,7 @@ export class OrderCheckoutGroupService {
 
           // Grup + sipariş numaraları
           const groupNumber = await generateUniqueReference(
-            "GRP",
+            REFERENCE_PREFIX.checkoutGroup,
             async (code) =>
               (await this.prisma.checkoutGroup.count({
                 where: { groupNumber: code },
@@ -512,6 +517,9 @@ export class OrderCheckoutGroupService {
             sellerShippingAmount: number;
             taxAmount: number;
             withholdingTaxAmount: number;
+            buyerServiceTaxAmount: number;
+            sellerServiceTaxAmount: number;
+            serviceVatRate: number;
             totalAmount: number;
             suratIdempotencyKey: string;
           }> = [];
@@ -550,14 +558,51 @@ export class OrderCheckoutGroupService {
               calculatePackageDesi(packageLines),
             ]),
           );
-          // Satıcı-başına kargo: quote ile ORTAK yardımcı (DRY) → önizleme ve tahsilat
-          // aynı; ikisi ayrı hesaplayınca oluşan az-göster/fazla-tahsil bug'ı kapandı.
-          const sellerShipping =
-            await this.orderPricing.calculateShippingBySeller(
-              sellerLineSubtotals,
-              shippingTariff.tariff,
-              sellerDesi,
+          // Kargo kararı satıcı PAKETİ düzeyinde verilir ve SIRA kritiktir: paketin
+          // desisi kademeyi, kademe de payı belirler. Bu yüzden komisyonlar kargo
+          // bölüşümünden ÖNCE hesaplanır — aksi halde yalnız kargonun yüklendiği İLK
+          // satırın payı uygulanır ve önizlemeyle ayrışır. Karar, quote ile ORTAK
+          // yardımcıdan gelir (DRY): az-göster/fazla-tahsil bug'ı bu yüzden kapandı.
+          const lineCommissions: Array<{
+            discountedPrice: number;
+            commission: Awaited<
+              ReturnType<typeof this.orderPricing.calculateCommission>
+            >;
+          }> = [];
+          const sellerShareLines = new Map<
+            string,
+            ShippingBuyerShareByTier[]
+          >();
+          for (const entry of pricing) {
+            // Negatif-koruma: kupon satır başına eligible-subtotal ile capli olsa da
+            // yuvarlama artığına karşı floor (order.totalAmount asla negatif olamaz).
+            const discountedPrice = Math.max(
+              0,
+              entry.productPrice * entry.quantity - entry.couponDiscount,
             );
+            const commission = await this.orderPricing.calculateCommission(
+              discountedPrice,
+              entry.product.sellerId,
+              entry.product.categoryId,
+            );
+            lineCommissions.push({ discountedPrice, commission });
+            sellerShareLines.set(entry.product.sellerId, [
+              ...(sellerShareLines.get(entry.product.sellerId) ?? []),
+              commission.shippingBuyerShares,
+            ]);
+          }
+          const sellerShippingDecision = new Map(
+            [...sellerLineSubtotals.entries()].map(([sellerId, subtotal]) => [
+              sellerId,
+              this.orderPricing.resolveShippingDecision({
+                tariff: shippingTariff.tariff,
+                subtotal,
+                billableDesi: sellerDesi.get(sellerId) ?? 1,
+                lineShares: sellerShareLines.get(sellerId) ?? [],
+              }),
+            ]),
+          );
+
           const sellerShippingCharged = new Set<string>();
           // Per-seller shipping breakdown captured on the charged line, used to write
           // the OrderPackage with the SAME buyer-share semantics as direct/guest
@@ -567,40 +612,27 @@ export class OrderCheckoutGroupService {
             { full: number; buyer: number; seller: number }
           >();
 
-          for (const entry of pricing) {
+          for (const [entryIndex, entry] of pricing.entries()) {
             // Satır toplamı = birim fiyat * adet - (satıra düşen kupon). Komisyon,
             // kargo ve vergi satır toplamı üzerinden hesaplanır (adet>1 ölçeklenir).
             const lineSubtotal = entry.productPrice * entry.quantity;
-            // Negatif-koruma: kupon satır başına eligible-subtotal ile capli olsa da
-            // yuvarlama artığına karşı floor (order.totalAmount asla negatif olamaz).
-            const discountedPrice = Math.max(
-              0,
-              lineSubtotal - entry.couponDiscount,
-            );
-            const commissionResult =
-              await this.orderPricing.calculateCommission(
-                discountedPrice,
-                entry.product.sellerId,
-                entry.product.categoryId,
-              );
+            const { discountedPrice, commission: commissionResult } =
+              lineCommissions[entryIndex];
             // Satıcı-bazlı kargo ücreti: yalnız satıcının İLK satırına yükle, kardeşlere 0.
             const entrySellerId = entry.product.sellerId;
+            const decision = sellerShippingDecision.get(entrySellerId);
             let fullShipping = 0;
+            let buyerShippingAmount = 0;
+            let sellerShippingAmount = 0;
             let chargedThisLine = false;
             if (!sellerShippingCharged.has(entrySellerId)) {
-              fullShipping = sellerShipping.get(entrySellerId) ?? 0;
+              // Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
+              fullShipping = decision?.fullShipping ?? 0;
+              buyerShippingAmount = decision?.buyer ?? 0;
+              sellerShippingAmount = decision?.seller ?? 0;
               sellerShippingCharged.add(entrySellerId);
               chargedThisLine = true;
             }
-            // Kargo payı: alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
-            const buyerShippingAmount =
-              Math.round(
-                fullShipping *
-                  (commissionResult.shippingBuyerShare / 100) *
-                  100,
-              ) / 100;
-            const sellerShippingAmount =
-              Math.round((fullShipping - buyerShippingAmount) * 100) / 100;
             const shippingCost = buyerShippingAmount; // buyer-charged shipping
             if (chargedThisLine) {
               sellerShippingBreakdown.set(entrySellerId, {
@@ -609,17 +641,37 @@ export class OrderCheckoutGroupService {
                 seller: sellerShippingAmount,
               });
             }
-            const { taxAmount, withholdingTaxAmount } =
-              await this.checkoutCommon.resolveSellerTaxes(
-                entry.product.sellerId,
-                entry.product.categoryId,
-                discountedPrice,
-              );
-            const totalAmount =
-              discountedPrice +
-              shippingCost +
-              commissionResult.buyerFeeAmount +
-              taxAmount;
+            const {
+              taxAmount,
+              withholdingTaxAmount,
+              buyerServiceTaxAmount,
+              sellerServiceTaxAmount,
+              serviceVatRate,
+            } = await this.checkoutCommon.resolveOrderTaxes({
+              sellerId: entry.product.sellerId,
+              categoryId: entry.product.categoryId,
+              subtotal: discountedPrice,
+              // Hizmet KDV matrahları: bu SATIRA düşen ücretler + kargo payı.
+              // Kargo yalnız satıcının ilk satırına yüklendiği için koli başına
+              // tek kez vergilenir.
+              fees: {
+                buyerCommissionAmount: commissionResult.buyerCommissionAmount,
+                buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
+                buyerShippingAmount,
+                sellerCommissionAmount: commissionResult.sellerCommissionAmount,
+                sellerPlatformFeeAmount:
+                  commissionResult.sellerPlatformFeeAmount,
+                sellerShippingAmount,
+              },
+            });
+            // Alıcı: ürün + kargo payı + alıcı ücretleri + ürün KDV'si +
+            // alıcıya verilen hizmetlerin KDV'si.
+            const totalAmount = buyerTotalOf({
+              subtotal: discountedPrice,
+              buyerShippingAmount: shippingCost,
+              buyerFeeAmount: commissionResult.buyerFeeAmount,
+              buyerServiceTaxAmount,
+            });
             const orderNumber = await this.checkoutCommon.generateOrderNumber();
             const suratIdempotencyKey =
               this.checkoutCommon.buildSuratIdempotencyKey([
@@ -637,6 +689,9 @@ export class OrderCheckoutGroupService {
               sellerShippingAmount,
               taxAmount,
               withholdingTaxAmount,
+              buyerServiceTaxAmount,
+              sellerServiceTaxAmount,
+              serviceVatRate,
               totalAmount,
               suratIdempotencyKey,
             });
@@ -661,14 +716,16 @@ export class OrderCheckoutGroupService {
           // shippingCost KANONİK olarak alıcı payıdır (direct/guest ile aynı) + tarife
           // snapshot'ı. Faz 2'de fiziksel Sürat gönderisi de bu paket başına konsolide olacak.
           const packageBySeller = new Map<string, string>();
-          for (const [sellerId, shipping] of sellerShipping) {
+          for (const [sellerId, decision] of sellerShippingDecision) {
             const bd = sellerShippingBreakdown.get(sellerId) ?? {
-              full: shipping,
-              buyer: shipping,
-              seller: 0,
+              full: decision.fullShipping,
+              buyer: decision.buyer,
+              seller: decision.seller,
             };
             const pkg = await tx.orderPackage.create({
               data: {
+                packageNumber:
+                  await this.checkoutCommon.generatePackageNumber(),
                 checkoutGroupId: group.id,
                 sellerId,
                 buyerId,
@@ -771,6 +828,9 @@ export class OrderCheckoutGroupService {
                 shippingCost: input.shippingCost,
                 taxAmount: input.taxAmount,
                 withholdingTaxAmount: input.withholdingTaxAmount,
+                buyerServiceTaxAmount: input.buyerServiceTaxAmount,
+                sellerServiceTaxAmount: input.sellerServiceTaxAmount,
+                serviceVatRate: input.serviceVatRate,
                 commissionAmount: input.commissionResult.commissionAmount,
                 buyerFeeAmount: input.commissionResult.buyerFeeAmount,
                 sellerFeeAmount: input.commissionResult.sellerFeeAmount,
@@ -808,6 +868,8 @@ export class OrderCheckoutGroupService {
                   commission: input.commissionResult,
                   taxAmount: input.taxAmount,
                   withholdingTaxAmount: input.withholdingTaxAmount,
+                  buyerServiceTaxAmount: input.buyerServiceTaxAmount,
+                  sellerServiceTaxAmount: input.sellerServiceTaxAmount,
                   totalAmount: input.totalAmount,
                 }),
                 status: OrderStatus.pending_payment,

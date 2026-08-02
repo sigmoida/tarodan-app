@@ -158,23 +158,53 @@ export class UserStatsService {
         where: { sellerId: userId },
         _sum: { likeCount: true },
       }),
-      // "Siparişlerim" sayacı, listeyle (order.service.ts findUserOrders) tutarlı
-      // olmalı: üyelik/boost sanal siparişleri liste DIŞLADIĞI için sayaç da hariç
-      // tutmalı. Aksi halde şirket üyelik alınca sayaç 1, liste boş görünür.
-      this.prisma.order.count({
-        where: {
-          buyerId: userId,
-          NOT: {
-            OR: [
-              { productId: { startsWith: "membership-" } },
-              { productId: { startsWith: "boost-" } },
-            ],
+      // "Siparişlerim" sayacı, listeyle tutarlı olmalı: liste artık GRUP çatısı
+      // bazında (CheckoutGroup + grupsuz siparişler) — sayaç da aynı birimi sayar.
+      // Üyelik/boost sanal siparişleri liste gibi hariç tutulur.
+      Promise.all([
+        this.prisma.checkoutGroup.count({
+          where: {
+            buyerId: userId,
+            orders: {
+              some: {
+                NOT: {
+                  OR: [
+                    { productId: { startsWith: "membership-" } },
+                    { productId: { startsWith: "boost-" } },
+                  ],
+                },
+              },
+            },
           },
-        },
-      }),
-      this.prisma.order.count({
-        where: { buyerId: userId, status: { in: ["delivered", "completed"] } },
-      }),
+        }),
+        this.prisma.order.count({
+          where: {
+            buyerId: userId,
+            checkoutGroupId: null,
+            NOT: {
+              OR: [
+                { productId: { startsWith: "membership-" } },
+                { productId: { startsWith: "boost-" } },
+              ],
+            },
+          },
+        }),
+      ]).then(([groups, loose]) => groups + loose),
+      Promise.all([
+        this.prisma.checkoutGroup.count({
+          where: {
+            buyerId: userId,
+            orders: { some: { status: { in: ["delivered", "completed"] } } },
+          },
+        }),
+        this.prisma.order.count({
+          where: {
+            buyerId: userId,
+            checkoutGroupId: null,
+            status: { in: ["delivered", "completed"] },
+          },
+        }),
+      ]).then(([groups, loose]) => groups + loose),
       // Harcama yapılan (ödemesi alınmış) alıcı siparişi sayısı
       this.prisma.order.count({
         where: { buyerId: userId, status: { in: [...PAID_STATUSES] } },

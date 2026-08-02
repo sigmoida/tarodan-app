@@ -24,6 +24,8 @@ import { i18nMessage } from "../i18n";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { ShippingPackageTierCode } from "@prisma/client";
+import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import {
   CreateOrderDto,
   OrderQueryDto,
@@ -79,26 +81,23 @@ export class OrderController {
   async getCommissionPreview(
     @Query("amount") amountStr: string,
     @Query("categoryId") categoryId: string | undefined,
-    @Query("shippingDesi") shippingDesiStr: string | undefined,
+    @Query("packageTier") packageTierCode: string | undefined,
     @CurrentUser("id") userId: string,
   ) {
     const amount = parseFloat(amountStr);
     if (Number.isNaN(amount) || amount < 0) {
       throw new BadRequestException(i18nMessage("server.order.invalidAmount"));
     }
-    const shippingDesi =
-      shippingDesiStr == null || shippingDesiStr === ""
-        ? 1
-        : Number(shippingDesiStr);
-    if (
-      !Number.isInteger(shippingDesi) ||
-      shippingDesi < 1 ||
-      shippingDesi > 1000
-    ) {
-      throw new BadRequestException(
-        "Kargo desisi 1 ile 1000 arasında tam sayı olmalıdır",
-      );
+    // Satıcı desi göndermez; paket boyutu gönderir ve desi ondan TÜRETİLİR —
+    // böylece önizleme, checkout'un uyguladığı kademeyle birebir aynı olur.
+    const tierCode =
+      packageTierCode == null || packageTierCode === ""
+        ? ShippingPackageTierCode.small
+        : (packageTierCode as ShippingPackageTierCode);
+    if (!Object.values(ShippingPackageTierCode).includes(tierCode)) {
+      throw new BadRequestException("Geçersiz kargo paket boyutu");
     }
+    const shippingDesi = billableDesiForTier(tierCode);
     return this.orderService.getCommissionPreview(
       amount,
       userId,
@@ -117,13 +116,33 @@ export class OrderController {
   @ApiOperation({ summary: "Batch commission preview for multiple items" })
   async getCommissionPreviewBatch(
     @Body()
-    body: { items: Array<{ amount: number; categoryId?: string | null }> },
+    body: {
+      items: Array<{
+        amount: number;
+        categoryId?: string | null;
+        /** İlanın paket boyutu — verilmezse küçük paket varsayılır. */
+        packageTier?: string | null;
+      }>;
+    },
     @CurrentUser("id") userId: string,
   ) {
     if (!body?.items || !Array.isArray(body.items) || body.items.length > 50) {
       throw new BadRequestException("items array required (max 50)");
     }
-    return this.orderService.getCommissionPreviewBatch(userId, body.items);
+    const tierValues = Object.values(ShippingPackageTierCode) as string[];
+    return this.orderService.getCommissionPreviewBatch(
+      userId,
+      body.items.map((item) => ({
+        amount: item.amount,
+        categoryId: item.categoryId ?? null,
+        // Geçersiz/eksik boyut sessizce yanlış kademeye düşmesin: bilinmeyen
+        // değer küçük pakete indirgenir (tek preview ucuyla aynı varsayılan).
+        packageTier:
+          item.packageTier && tierValues.includes(item.packageTier)
+            ? (item.packageTier as ShippingPackageTierCode)
+            : null,
+      })),
+    );
   }
 
   /**
@@ -336,6 +355,18 @@ export class OrderController {
   }
 
   /**
+   * GET /orders/seller/pending-count — satıcının bekleyen (ödendi/hazırlanıyor)
+   * PAKET sayısı. Satıcı paneli kartı bu birimi kullanır (liste ile aynı).
+   */
+  @Get("seller/pending-count")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Seller pending package count (paid/preparing)" })
+  async getSellerPendingCount(@CurrentUser("id") userId: string) {
+    return this.orderService.getSellerPendingCount(userId);
+  }
+
+  /**
    * GET /orders/groups - Alıcının sipariş grupları (gruplu liste).
    * NOT: ':id' rotasından ÖNCE tanımlı olmalı (yoksa 'groups' :id'e yakalanır).
    */
@@ -349,13 +380,23 @@ export class OrderController {
     @CurrentUser("id") userId: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @Query("role") role?: string,
+    @Query("tab") tab?: string,
   ) {
     const pageNum = Math.max(1, parseInt(page || "1", 10) || 1);
     const limitNum = Math.min(
       50,
       Math.max(1, parseInt(limit || "20", 10) || 20),
     );
-    return this.orderService.findUserCheckoutGroups(userId, pageNum, limitNum);
+    return this.orderService.findUserOrderGroups(userId, {
+      role: role === "seller" ? "seller" : "buyer",
+      tab:
+        tab === "cancelled" || tab === "refunds"
+          ? (tab as "cancelled" | "refunds")
+          : "active",
+      page: pageNum,
+      limit: limitNum,
+    });
   }
 
   /**
@@ -373,6 +414,44 @@ export class OrderController {
     @CurrentUser("id") userId: string,
   ) {
     return this.orderService.findCheckoutGroup(id, userId);
+  }
+
+  /**
+   * POST /orders/groups/:id/cancel — GRUP iptali (R4): sepetin tamamı iptal
+   * edilir; herhangi bir üye kargoya verildiyse iptal tamamen kapalıdır.
+   */
+  @Post("groups/:id/cancel")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Cancel the whole checkout group (cart-based cancel)",
+  })
+  @ApiParam({ name: "id", description: "Checkout group ID" })
+  async cancelGroup(
+    @Param("id") id: string,
+    @CurrentUser("id") userId: string,
+    @Body() dto: CancelOrderDto,
+  ) {
+    return this.orderService.cancelGroup(id, userId, dto);
+  }
+
+  /**
+   * GET /orders/:id/group - Siparişin GRUP ÇATISI görünümü. Gruplu sipariş
+   * grubunu döndürür; grupsuz (ör. teklif) sipariş tek siparişlik sentetik
+   * grup olur. Eski order linkleri/e-postaları bu rota üzerinden çatıya çözülür.
+   */
+  @Get(":id/group")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Resolve an order to its group-umbrella view (synthetic if none)",
+  })
+  @ApiParam({ name: "id", description: "Order ID" })
+  async findGroupViewByOrder(
+    @Param("id") id: string,
+    @CurrentUser("id") userId: string,
+  ) {
+    return this.orderService.findGroupViewByOrder(id, userId);
   }
 
   /**

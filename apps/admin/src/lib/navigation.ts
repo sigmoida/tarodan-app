@@ -15,6 +15,7 @@ import {
   BanknotesIcon,
   DocumentTextIcon,
   TruckIcon,
+  KeyIcon,
   BellAlertIcon,
   CubeIcon,
   BuildingOffice2Icon,
@@ -29,6 +30,7 @@ import {
   BeakerIcon,
   TicketIcon,
   SparklesIcon,
+  PhotoIcon,
 } from "@heroicons/react/24/outline";
 
 /**
@@ -381,6 +383,13 @@ export function getNavGroups(t: T): NavGroup[] {
       href: "/finance",
       items: [
         {
+          name: t("admin.nav.items.financeOverview.name"),
+          href: "/finance/overview",
+          icon: CurrencyDollarIcon,
+          description: t("admin.nav.items.financeOverview.description"),
+          permission: "payments",
+        },
+        {
           name: t("admin.nav.items.payments.name"),
           href: "/finance/payments",
           icon: CreditCardIcon,
@@ -388,6 +397,13 @@ export function getNavGroups(t: T): NavGroup[] {
           keywords: t("admin.nav.items.payments.keywords")
             .split(",")
             .map((k) => k.trim()),
+          permission: "payments",
+        },
+        {
+          name: t("admin.nav.items.pspReconciliation.name"),
+          href: "/finance/psp",
+          icon: ArrowsRightLeftIcon,
+          description: t("admin.nav.items.pspReconciliation.description"),
           permission: "payments",
         },
         {
@@ -455,6 +471,24 @@ export function getNavGroups(t: T): NavGroup[] {
           icon: TruckIcon,
           description: t("admin.shippingTariffs.description"),
           keywords: ["shipping", "tariff"],
+          permission: "settings",
+        },
+        {
+          name: t("admin.nav.items.media.name"),
+          href: "/system/media",
+          icon: PhotoIcon,
+          description: t("admin.nav.items.media.description"),
+          keywords: ["media", "bucket", "s3", "gorsel"],
+          permission: "settings",
+        },
+        {
+          name: t("admin.nav.items.earlyAccess.name"),
+          href: "/system/early-access",
+          icon: KeyIcon,
+          description: t("admin.nav.items.earlyAccess.description"),
+          keywords: t("admin.nav.items.earlyAccess.keywords")
+            .split(",")
+            .map((k) => k.trim()),
           permission: "settings",
         },
         {

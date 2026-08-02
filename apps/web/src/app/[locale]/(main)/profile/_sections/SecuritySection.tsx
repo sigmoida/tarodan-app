@@ -13,11 +13,13 @@ import {
   Button,
   Input,
   Modal,
+  ModalFooter,
   PhoneInput,
   splitPhone,
   getFullPhoneNumber,
   DEFAULT_COUNTRY_CODE,
 } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
 import { useAuthStore } from "@/stores/authStore";
@@ -45,6 +47,7 @@ const RULES = [
 ];
 
 function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useTranslations();
   const { user } = useAuthStore();
   const { sendCode, verify } = usePhoneVerification();
   const [step, setStep] = useState<"enter" | "verify">("enter");
@@ -66,7 +69,31 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   }, [open, user?.phone]);
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="Telefon Doğrulama">
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      title="Telefon Doğrulama"
+      size="md"
+      closeLabel={t("common.close")}
+      dismissDisabled={sendCode.isPending || verify.isPending}
+      footer={
+        <ModalFooter
+          onCancel={step === "enter" ? onClose : () => setStep("enter")}
+          onConfirm={
+            step === "enter"
+              ? () =>
+                  sendCode.mutate(getFullPhoneNumber(countryCode, phone), {
+                    onSuccess: () => setStep("verify"),
+                  })
+              : () => verify.mutate(code, { onSuccess: onClose })
+          }
+          cancelLabel={step === "enter" ? t("common.cancel") : t("common.back")}
+          confirmLabel={step === "enter" ? "Kod Gönder" : "Doğrula"}
+          isLoading={sendCode.isPending || verify.isPending}
+          disabled={step === "enter" ? !phone : code.length !== 6}
+        />
+      }
+    >
       {step === "enter" ? (
         <div className="space-y-4">
           <PhoneInput
@@ -76,18 +103,6 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             phone={phone}
             onPhoneChange={setPhone}
           />
-          <Button
-            className="w-full"
-            disabled={!phone}
-            isLoading={sendCode.isPending}
-            onClick={() =>
-              sendCode.mutate(getFullPhoneNumber(countryCode, phone), {
-                onSuccess: () => setStep("verify"),
-              })
-            }
-          >
-            Kod Gönder
-          </Button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -98,14 +113,6 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             placeholder="123456"
             maxLength={6}
           />
-          <Button
-            className="w-full"
-            disabled={code.length !== 6}
-            isLoading={verify.isPending}
-            onClick={() => verify.mutate(code, { onSuccess: onClose })}
-          >
-            Doğrula
-          </Button>
         </div>
       )}
     </Modal>
@@ -144,12 +151,14 @@ export default function SecuritySection() {
           name="currentPassword"
           type="password"
           label="Mevcut Şifre"
+          placeholder="••••••••"
           autoComplete="current-password"
         />
         <FormInput
           name="newPassword"
           type="password"
           label="Yeni Şifre"
+          placeholder="••••••••"
           autoComplete="new-password"
         />
         <div className="flex flex-wrap gap-2">
@@ -173,6 +182,7 @@ export default function SecuritySection() {
           name="confirmPassword"
           type="password"
           label="Yeni Şifre (Tekrar)"
+          placeholder="••••••••"
           autoComplete="new-password"
         />
       </Form>

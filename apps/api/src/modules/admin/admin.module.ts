@@ -23,9 +23,15 @@ import { AdminReviewController } from "./admin-review.controller";
 import { AdminSellerApplicationController } from "./admin-seller-application.controller";
 import { AdminAdPackageController } from "./admin-ad-package.controller";
 import { AdminService } from "./admin.service";
+import { AdminPspReconciliationService } from "./admin-psp-reconciliation.service";
+import { AdminMediaService } from "./admin-media.service";
+import { AdminMediaController } from "./admin-media.controller";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCommissionService } from "./admin-commission.service";
 import { AdminSettingsService } from "./admin-settings.service";
+import { AdminSiteAccessService } from "./admin-site-access.service";
+import { AdminSiteAccessController } from "./admin-site-access.controller";
+import { SiteAccessModule } from "../site-access/site-access.module";
 import { AdminUserService } from "./admin-user.service";
 import { AdminStaffService } from "./admin-staff.service";
 import { AdminProductService } from "./admin-product.service";
@@ -38,6 +44,7 @@ import { AdminAnalyticsReportService } from "./admin-analytics-report.service";
 import { AdminModerationService } from "./admin-moderation.service";
 import { AdminPaymentService } from "./admin-payment.service";
 import { AdminPayoutService } from "./admin-payout.service";
+import { AdminFinanceService } from "./admin-finance.service";
 import { AdminTradeService } from "./admin-trade.service";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { AdminTradeQueryService } from "./admin-trade-query.service";
@@ -59,6 +66,11 @@ import { AdminReviewService } from "./admin-review.service";
 import { AdminSellerApplicationService } from "./admin-seller-application.service";
 import { AdminAdPackageService } from "./admin-ad-package.service";
 import { ScheduledNotificationScheduler } from "./scheduled-notification.scheduler";
+import { LogRetentionService } from "./log-retention.service";
+import {
+  LogRetentionScheduler,
+  LogRetentionProcessor,
+} from "./log-retention.scheduler";
 import { ScheduledNotificationProcessor } from "./scheduled-notification.processor";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
@@ -81,6 +93,7 @@ import { NotificationModule } from "../notification/notification.module";
 import { OrderModule } from "../order/order.module";
 import { ElogoModule } from "../elogo/elogo.module";
 import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
@@ -104,9 +117,12 @@ import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
     ModerationModule,
     ElogoModule,
     ShippingTariffModule,
+    SiteAccessModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
   ],
   controllers: [
+    AdminMediaController,
     AdminCommissionController,
     AdminUserController,
     AdminProductController,
@@ -129,12 +145,16 @@ import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
     AdminReviewController,
     AdminSellerApplicationController,
     AdminAdPackageController,
+    AdminSiteAccessController,
   ],
   providers: [
     AdminService,
+    AdminPspReconciliationService,
+    AdminMediaService,
     AdminAuditService,
     AdminCommissionService,
     AdminSettingsService,
+    AdminSiteAccessService,
     AdminUserService,
     AdminStaffService,
     AdminProductService,
@@ -147,6 +167,7 @@ import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
     AdminModerationService,
     AdminPaymentService,
     AdminPayoutService,
+    AdminFinanceService,
     AdminTradeService,
     AdminTradeCommonService,
     AdminTradeQueryService,
@@ -168,7 +189,10 @@ import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
     AdminSellerApplicationService,
     AdminAdPackageService,
     ScheduledNotificationScheduler,
-    ScheduledNotificationProcessor,
+    ...scheduledProcessors(ScheduledNotificationProcessor),
+    LogRetentionService,
+    LogRetentionScheduler,
+    ...scheduledProcessors(LogRetentionProcessor),
   ],
   exports: [AdminService],
 })

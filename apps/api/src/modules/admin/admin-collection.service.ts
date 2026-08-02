@@ -135,6 +135,7 @@ export class AdminCollectionService {
             select: {
               id: true,
               displayName: true,
+              email: true,
               avatarUrl: true,
               membership: { select: { tier: { select: { type: true } } } },
             },
@@ -182,7 +183,14 @@ export class AdminCollectionService {
     const collection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
       include: {
-        user: { select: { id: true, displayName: true, avatarUrl: true } },
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
         items: {
           include: {
             product: {
@@ -279,7 +287,14 @@ export class AdminCollectionService {
         coverImageKey: dto.coverImageKey,
       },
       include: {
-        user: { select: { id: true, displayName: true, avatarUrl: true } },
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
       },
     });
 
@@ -336,7 +351,14 @@ export class AdminCollectionService {
       where: { id: collectionId },
       data: updateData,
       include: {
-        user: { select: { id: true, displayName: true, avatarUrl: true } },
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
         _count: { select: { items: true } },
       },
     });

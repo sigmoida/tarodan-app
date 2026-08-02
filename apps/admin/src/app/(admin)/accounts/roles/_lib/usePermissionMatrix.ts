@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useSession } from "@/context/SessionContext";
 import { useConfirm } from "@/provider/ConfirmProvider";
-import { FALLBACK_DEFAULTS } from "./constants";
 import type { PermGroup } from "./types";
 import { usePermissionsQuery } from "./usePermissions";
 
@@ -30,6 +30,9 @@ export function usePermissionMatrix() {
 
   const permissionsQuery = usePermissionsQuery();
   const matrixLoading = permissionsQuery.isLoading;
+  // Matris okunamadıysa DÜZENLEME AÇILMAZ: boş/eksik bir kopyayı kaydetmek
+  // tüm rollerin izinlerini silerdi.
+  const matrixError = permissionsQuery.isError;
 
   // Editable copy — seeded from server data.
   const [permissions, setPermissions] = useState<Record<string, string[]>>({});
@@ -103,7 +106,10 @@ export function usePermissionMatrix() {
   const matrixSaving = saveMatrixMut.isPending;
   const saveMatrix = () => saveMatrixMut.mutate(permissions);
 
-  const enterEdit = () => setEditMode(true);
+  const enterEdit = () => {
+    if (matrixError) return;
+    setEditMode(true);
+  };
 
   const cancelEdit = async () => {
     if (matrixDirty) {
@@ -118,14 +124,25 @@ export function usePermissionMatrix() {
     permissionsQuery.refetch();
   };
 
+  /**
+   * Varsayılanlar SUNUCUDAN okunur. Önyüzde ikinci bir kopya tutulduğunda
+   * kaçınılmaz olarak kayıyordu: kopya `reports`/`invoices` izinlerini
+   * içermediği için "sıfırla" bu izinleri sessizce siliyor, kaydedince
+   * admin/moderator rolleri o sayfaları kaybediyordu.
+   */
   const resetToDefaults = async () => {
     const ok = await confirm({
       description: t("admin.roles.resetConfirm"),
       destructive: true,
     });
     if (!ok) return;
-    setPermissions(FALLBACK_DEFAULTS);
-    setMatrixDirty(true);
+    try {
+      const defaults = (await adminApi.getDefaultRolePermissions()).data ?? {};
+      setPermissions(defaults);
+      setMatrixDirty(true);
+    } catch {
+      toast.error(t("admin.roles.matrixLoadError"));
+    }
   };
 
   const toggleGroupCollapse = (id: string) => {
@@ -144,6 +161,7 @@ export function usePermissionMatrix() {
     isSuperAdmin,
     // data
     matrixLoading,
+    matrixError,
     permissions,
     // edit state
     editMode,

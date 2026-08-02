@@ -20,6 +20,8 @@ export interface Listing {
   orderId?: string;
   rating?: { average: number | null; count: number };
   category?: { id: string; name: string; slug: string };
+  /** Paket boyutu — komisyon/kargo net tahmini ilanın kendi kademesiyle yapılır. */
+  shippingPackageTier?: string | null;
 }
 
 /** Estimated seller net — single source in the shared commission-preview hook. */

@@ -36,18 +36,19 @@ export function applicationRowMenu(
       icon: EyeIcon,
       onClick: () => onToggleExpand(a),
     },
-    a.businessStatus === "pending" && {
-      label: t("common.confirm"),
+    a.status === "submitted" && {
+      label: t("admin.accounts.sellerApplications.preliminaryApprove"),
       icon: CheckCircleIcon,
       onClick: () => onApprove(a),
       isLoading: busyId === a.id,
     },
-    a.businessStatus === "pending" && {
-      label: t("admin.accounts.sellerApplications.reject"),
-      icon: XCircleIcon,
-      onClick: () => onReject(a),
-      destructive: true,
-      isLoading: busyId === a.id,
-    },
+    a.status !== "approved" &&
+      a.status !== "rejected" && {
+        label: t("admin.accounts.sellerApplications.reject"),
+        icon: XCircleIcon,
+        onClick: () => onReject(a),
+        destructive: true,
+        isLoading: busyId === a.id,
+      },
   ];
 }

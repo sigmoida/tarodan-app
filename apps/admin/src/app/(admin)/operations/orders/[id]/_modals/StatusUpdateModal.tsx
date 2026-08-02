@@ -48,6 +48,16 @@ export function StatusUpdateModal({
       isOpen={open}
       onClose={onClose}
       title={t("admin.operations.orders.updateStatus")}
+      closeButtonDisabled={update.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => update.mutate()}
+          confirmLabel={t("common.update")}
+          disabled={targets.length === 0 || !notes.trim()}
+          isLoading={update.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <Select
@@ -74,13 +84,6 @@ export function StatusUpdateModal({
           maxLength={500}
           rows={3}
           disabled={update.isPending}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => update.mutate()}
-          confirmLabel={t("common.update")}
-          disabled={targets.length === 0 || !notes.trim()}
-          isLoading={update.isPending}
         />
       </div>
     </Modal>

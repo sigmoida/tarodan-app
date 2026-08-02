@@ -78,7 +78,8 @@ export function useListingData(id: string, isAuthenticated: boolean) {
   const listing = listingQuery.data ?? null;
   const effectivePrice = listing ? getProductEffectivePrice(listing) : 0;
   const isTradeAvailable =
-    listing?.trade_available || listing?.isTradeEnabled || false;
+    listing?.tradeAvailable ??
+    (listing?.trade_available || listing?.isTradeEnabled || false);
 
   const images = useMemo(() => buildImages(listing?.images), [listing]);
 

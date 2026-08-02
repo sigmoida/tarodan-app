@@ -32,7 +32,7 @@ export function VerifyEmailForm() {
         {t("auth.resendVerificationEmail")}
       </Button>
       {resendSuccess && (
-        <p className="text-center text-sm text-success-600">
+        <p className="text-sm text-success-600">
           {t("auth.emailSentCheckInbox")}
         </p>
       )}

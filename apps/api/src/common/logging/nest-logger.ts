@@ -1,4 +1,5 @@
 import type { LoggerService } from "@nestjs/common";
+import { getRequestId } from "../context/request-context";
 import { getAppLogger } from "./logger";
 
 const QUIET_CONTEXTS = new Set(["RouterExplorer", "RoutesResolver"]);
@@ -53,6 +54,9 @@ export class AppNestLogger implements LoggerService {
     const text =
       message instanceof Error ? message.message : stringify(message);
     const details = params.length > 0 ? params : undefined;
+    // Aynı isteğin tüm satırları tek kimlikle bağlansın; istek bağlamı dışında
+    // (cron/worker) alan hiç eklenmez.
+    const requestId = getRequestId();
 
     if (level === "error") {
       const suppliedError =
@@ -66,11 +70,16 @@ export class AppNestLogger implements LoggerService {
           item.includes("at "),
       );
       if (stack && !suppliedError) error.stack = stack;
-      logger.error(text, { error, details });
+      logger.error(text, { error, details, ...(requestId && { requestId }) });
       return;
     }
 
-    logger[level](text, details ? { details } : undefined);
+    logger[level](
+      text,
+      details || requestId
+        ? { ...(details && { details }), ...(requestId && { requestId }) }
+        : undefined,
+    );
   }
 }
 

@@ -44,7 +44,9 @@ export default function PaymentSuccessClient() {
   if (phase === "auth-loading") return <AuthLoadingScreen />;
   if (phase === "client-loading" || phase === "loading") return <Loading />;
 
-  const orderId = payment?.orderId || orderIdFromUrl;
+  // Grup ödemesinde anchor = grubun ilk siparişi (grup ekranına çözülür).
+  const orderId =
+    payment?.orderId ?? payment?.orders?.[0]?.id ?? orderIdFromUrl;
 
   return (
     <PageShell className="flex items-center justify-center p-4">

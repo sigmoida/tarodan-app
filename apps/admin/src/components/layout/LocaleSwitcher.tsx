@@ -12,7 +12,7 @@ const LOCALE_NAMES: Record<Locale, string> = { tr: "Türkçe", en: "English" };
 const LOCALE_FLAGS: Record<Locale, string> = { tr: "🇹🇷", en: "🇬🇧" };
 
 /**
- * Topbar language switcher. The admin has no locale in the URL, so switching is
+ * Sidebar language switcher. The admin has no locale in the URL, so switching is
  * a `NEXT_LOCALE` cookie write + `router.refresh()`: the request config re-reads
  * the cookie and the server re-renders every RSC (and re-hydrates clients) in the
  * new language. Options are the shared `@tarodan/i18n` locales.
@@ -33,7 +33,7 @@ export function LocaleSwitcher() {
       onChange={(e) => change(e.target.value as Locale)}
       selectSize="sm"
       aria-label={t("language")}
-      className="w-auto"
+      className="w-full"
     >
       {locales.map((l) => (
         <option key={l} value={l}>

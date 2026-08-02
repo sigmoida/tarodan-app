@@ -1,6 +1,12 @@
 export interface GuestOrderDetail {
   id: string;
   orderNumber: string;
+  /** Sepet numarası (GRP-…) — üç kod seviyesinden en üstü. */
+  groupNumber?: string | null;
+  /** Koli numarası (PKG-…) — kargo etiketindeki, Sürat'a giden kod. */
+  packageNumber?: string | null;
+  /** Aynı sepetin diğer sipariş numaraları (paket/grup farkındalığı). */
+  siblingOrderNumbers?: string[];
   status: string;
   totalAmount: number;
   product: { id: string; title: string; image?: string };

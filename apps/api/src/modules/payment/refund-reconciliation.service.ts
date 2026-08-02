@@ -1,4 +1,5 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import {
   PaymentStatus,
@@ -8,6 +9,13 @@ import {
   RefundRequestStatus,
 } from "@prisma/client";
 import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
+
+/** İade sonucu belirsiz kalan attempt'in durum-sorguyla çözülmeden önce bekleyeceği süre. */
+const REFUND_RESOLVE_MIN_AGE_MINUTES = 15;
+/** Tutar eşlemesinde tolerans (kuruş yuvarlamaları). */
+const REFUND_RESOLVE_AMOUNT_TOLERANCE_TL = 0.05;
 
 /**
  * İade odaklı mutabakat süpürmeleri (cron). PaymentReconciliationService facade'i
@@ -20,7 +28,191 @@ export class RefundReconciliationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentRefund: PaymentRefundService,
+    private readonly paymentProviders: PaymentProviderRegistry,
+    private readonly configService: ConfigService,
+    @Optional()
+    private readonly providerEvents?: PaymentProviderEventService,
   ) {}
+
+  /**
+   * Sonucu BELİRSİZ (manual_review) iade denemelerini durum-sorgunun `returns`
+   * listesi + `reference_no` ile otomatik çözer. reference_no'yu iade talebinde
+   * biz göndeririz (= RefundAttempt.id, tiresiz — createRefund normalizasyonu);
+   * PayTR aynı değeri durum-sorgu yanıtında geri verir:
+   *
+   *  - Referansımız listede + tutar tutuyor → iade PayTR'ye ULAŞMIŞ → attempt
+   *    `succeeded`. DB finalizasyonunu mevcut yol tamamlar (claimRefundAttempt
+   *    succeeded → "finalize": PayTR'ye İKİNCİ kez gitmeden bitirir).
+   *  - Listede yok → istek hiç işlenmemiş → attempt `failed`. Mevcut retry yolu
+   *    (claimRefundAttempt failed → prepared) güvenle yeniden gönderir.
+   *  - Referanssız ama AYNI tutarlı bir iade kaydı varsa BELİRSİZ: reference_no
+   *    özelliğinden önceki bir denemenin başarılı iadesi böyle görünür. Failed
+   *    sayıp yeniden göndermek ÇİFT İADE olurdu → dokunulmaz, insana kalır.
+   *
+   * Min-age penceresi: PayTR, timeout'umuzdan SONRA iadeyi işlemiş olabilir;
+   * genç denemeyi hemen "yok" saymak bu yarışta yanlış retry üretir.
+   */
+  async resolveUnknownRefundOutcomes(): Promise<{
+    checked: number;
+    confirmed: number;
+    requeued: number;
+  }> {
+    const enabled = this.configService.get("PAYTR_RECONCILIATION_ENABLED");
+    if (enabled === "false" || enabled === "0") {
+      return { checked: 0, confirmed: 0, requeued: 0 };
+    }
+
+    const cutoff = new Date(
+      Date.now() - REFUND_RESOLVE_MIN_AGE_MINUTES * 60 * 1000,
+    );
+    const attempts = await this.prisma.refundAttempt.findMany({
+      where: {
+        status: RefundAttemptStatus.manual_review,
+        provider: "paytr",
+        updatedAt: { lt: cutoff },
+      },
+      orderBy: { updatedAt: "asc" },
+      take: 25,
+    });
+
+    let checked = 0;
+    let confirmed = 0;
+    let requeued = 0;
+
+    for (const attempt of attempts) {
+      // Sorgulanacak merchant_oid, iade talebindeki oid'in kendisidir
+      // (claim sırasında providerReference'a yazılır). Yoksa çözemeyiz.
+      if (!attempt.providerReference) continue;
+
+      const refNo = attempt.id.replace(/-/g, "");
+      const amount = Number(attempt.amount);
+
+      try {
+        const inquiry = await this.paymentProviders
+          .resolve(attempt.provider)
+          .queryPaymentStatus(attempt.providerReference);
+        checked++;
+        if (!inquiry.ok) continue; // PayTR'ye ulaşamadık — sonraki tur.
+
+        const returns = inquiry.returns ?? [];
+        const match = returns.find((r) => r.referenceNo === refNo);
+
+        if (match) {
+          if (
+            match.amountTl != null &&
+            Math.abs(match.amountTl - amount) >
+              REFUND_RESOLVE_AMOUNT_TOLERANCE_TL
+          ) {
+            this.logger.warn(
+              `Refund resolve: attempt ${attempt.id} referansı eşleşti ama tutar tutmuyor ` +
+                `(PayTR=${match.amountTl}, bizde=${amount}) — insana bırakıldı`,
+            );
+            continue;
+          }
+          // CAS: yalnız hâlâ manual_review ise succeeded'a çek (yarış güvenli).
+          const claim = await this.prisma.refundAttempt.updateMany({
+            where: {
+              id: attempt.id,
+              status: RefundAttemptStatus.manual_review,
+            },
+            data: {
+              status: RefundAttemptStatus.succeeded,
+              providerSucceededAt: new Date(),
+              failureReason: null,
+              providerResponse: {
+                status: "success",
+                source: "status_inquiry_returns",
+                return_amount: match.amountTl,
+                return_date: match.date ?? null,
+                reference_no: match.referenceNo ?? null,
+              },
+            },
+          });
+          if (claim.count === 0) continue;
+          confirmed++;
+          this.logger.log(
+            `Refund resolve: attempt ${attempt.id} PayTR'de DOĞRULANDI (durum-sorgu returns) → succeeded; ` +
+              `finalize mevcut iade yolunda tamamlanacak`,
+          );
+          await this.recordResolveEvent(attempt, inquiry, "confirmed");
+        } else {
+          const ambiguous = returns.some(
+            (r) =>
+              !r.referenceNo &&
+              r.amountTl != null &&
+              Math.abs(r.amountTl - amount) <=
+                REFUND_RESOLVE_AMOUNT_TOLERANCE_TL,
+          );
+          if (ambiguous) {
+            // Referanssız aynı-tutarlı iade: bizim referanssız (özellik öncesi)
+            // denememiz olabilir — failed sayıp yeniden göndermek çift iade riski.
+            this.logger.warn(
+              `Refund resolve: attempt ${attempt.id} için referanssız aynı-tutarlı iade kaydı var — ` +
+                `BELİRSİZ, insana bırakıldı`,
+            );
+            continue;
+          }
+          const claim = await this.prisma.refundAttempt.updateMany({
+            where: {
+              id: attempt.id,
+              status: RefundAttemptStatus.manual_review,
+            },
+            data: {
+              status: RefundAttemptStatus.failed,
+              failureReason:
+                "provider_has_no_refund_record (durum-sorgu returns)",
+            },
+          });
+          if (claim.count === 0) continue;
+          requeued++;
+          this.logger.log(
+            `Refund resolve: attempt ${attempt.id} PayTR'de iade kaydı YOK (durum-sorgu) → failed; ` +
+              `mevcut retry yolu yeniden gönderecek`,
+          );
+          await this.recordResolveEvent(attempt, inquiry, "not_found");
+        }
+      } catch (error: any) {
+        this.logger.error(
+          `Refund resolve: attempt ${attempt.id} çözümlenemedi: ${error?.message}`,
+        );
+      }
+    }
+
+    if (confirmed > 0 || requeued > 0) {
+      this.logger.log(
+        `Refund resolve: ${checked} sorgulandı, ${confirmed} doğrulandı, ${requeued} yeniden kuyruğa alındı`,
+      );
+    }
+    return { checked, confirmed, requeued };
+  }
+
+  /** Çözüm denetim satırı — PSP kesintisiyle birlikte (ücret mutabakatı). Best-effort. */
+  private async recordResolveEvent(
+    attempt: {
+      id: string;
+      paymentId: string;
+      providerReference: string | null;
+    },
+    inquiry: {
+      paymentTotalTl: number;
+      currency: string;
+      providerFeeTl?: number;
+      providerNetTl?: number;
+    },
+    resolution: "confirmed" | "not_found",
+  ): Promise<void> {
+    await this.providerEvents?.record({
+      eventType: "status_inquiry",
+      merchantOid: attempt.providerReference,
+      paymentId: attempt.paymentId,
+      status: "success",
+      currency: inquiry.currency ?? null,
+      totalAmount: inquiry.paymentTotalTl,
+      providerFee: inquiry.providerFeeTl ?? null,
+      providerNet: inquiry.providerNetTl ?? null,
+      raw: { source: "refund_resolve", resolution, attemptId: attempt.id },
+    });
+  }
 
   /**
    * İptal/iade edilmiş ama ödemesi hâlâ `completed` olan siparişleri bulup PayTR iadesini

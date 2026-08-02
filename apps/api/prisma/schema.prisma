@@ -9,6 +9,9 @@ datasource db {
 
 model User {
   id                      String                   @id @default(uuid())
+  adminCode               String                   @unique @default(dbgenerated("generate_user_admin_code('B'::text)")) @map("admin_code")
+  username                String                   @unique @default(dbgenerated("generate_legacy_username()"))
+  usernameClaimedAt       DateTime?                @map("username_claimed_at")
   email                   String                   @unique
   phone                   String?                  @unique
   passwordHash            String?                  @map("password_hash")
@@ -41,6 +44,8 @@ model User {
   acceptsMarketingEmails  Boolean                  @default(false) @map("accepts_marketing_emails")
   preferredLanguage       String?                  @map("preferred_language")
   homeTourVersion         Int                      @default(0) @map("home_tour_version")
+  // İlan verme sayfası tanıtım turu — ana sayfa turundan bağımsız ilerler.
+  listingTourVersion      Int                      @default(0) @map("listing_tour_version")
   notificationSettings    Json?                    @map("notification_settings")
   lastActivityAt          DateTime?                @map("last_activity_at")
   lastLoginAt             DateTime?                @map("last_login_at")
@@ -88,6 +93,8 @@ model User {
   wishlist                Wishlist?
   bankAccount             SellerBankAccount?
   sellerDocuments         SellerDocument[]
+  corporateApplication    CorporateApplication?
+  targetedAdPackages      AdPackageUserTarget[]
   payoutTransfers         PayoutTransfer[]         @relation("SellerPayoutTransfers")
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
   savedCards              SavedCard[]
@@ -96,8 +103,84 @@ model User {
   productBoosts           ProductBoost[]
 
   @@index([email])
+  @@index([adminCode])
+  @@index([username])
   @@index([isSeller])
   @@map("users")
+}
+
+/// Kurumsal hesap, ön başvuru onaylanmadan User oluşturmaz. Başvuru onaylanınca
+/// tek kullanımlık davet ile parola/kullanıcı adı belirlenir; kalan bilgiler ve
+/// belgeler tamamlandıktan sonra kurumsal satıcı nihai olarak aktive edilir.
+model CorporateApplication {
+  id                    String                      @id @default(uuid())
+  userId                String?                     @unique @map("user_id")
+  status                CorporateApplicationStatus  @default(submitted)
+  authorizedFullName    String                      @map("authorized_full_name")
+  companyLegalName      String                      @map("company_legal_name")
+  companyTitle          String                      @map("company_title")
+  companyAddress        String                      @map("company_address")
+  companyEmail          String                      @map("company_email")
+  kepAddress            String?                     @map("kep_address")
+  phone                 String
+  contactPhone          String?                     @map("contact_phone")
+  taxId                 String?                     @map("tax_id")
+  companyType           String?                     @map("company_type")
+  taxOffice             String?                     @map("tax_office")
+  companyCity           String?                     @map("company_city")
+  companyDistrict       String?                     @map("company_district")
+  bankAccountHolder     String?                     @map("bank_account_holder")
+  iban                  String?
+  reviewNote            String?                     @map("review_note")
+  invitationTokenHash   String?                     @unique @map("invitation_token_hash")
+  invitationExpiresAt   DateTime?                   @map("invitation_expires_at")
+  preliminaryApprovedAt DateTime?                   @map("preliminary_approved_at")
+  activatedAt           DateTime?                   @map("activated_at")
+  submittedForReviewAt  DateTime?                   @map("submitted_for_review_at")
+  finalApprovedAt       DateTime?                   @map("final_approved_at")
+  rejectedAt            DateTime?                   @map("rejected_at")
+  createdAt             DateTime                    @default(now()) @map("created_at")
+  updatedAt             DateTime                    @updatedAt @map("updated_at")
+  user                  User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  documents             SellerDocument[]
+  stakeholders          CorporateStakeholder[]
+  events                CorporateApplicationEvent[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([companyEmail])
+  @@index([phone])
+  @@index([taxId])
+  @@map("corporate_applications")
+}
+
+model CorporateStakeholder {
+  id             String                @id @default(uuid())
+  applicationId  String                @map("application_id")
+  fullName       String                @map("full_name")
+  identityType   CorporateIdentityType @map("identity_type")
+  identityNumber String?               @map("identity_number")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  application    CorporateApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  documents      SellerDocument[]
+
+  @@index([applicationId])
+  @@map("corporate_stakeholders")
+}
+
+model CorporateApplicationEvent {
+  id            String               @id @default(uuid())
+  applicationId String               @map("application_id")
+  action        String
+  note          String?
+  actorAdminId  String?              @map("actor_admin_id")
+  actorUserId   String?              @map("actor_user_id")
+  metadata      Json?
+  createdAt     DateTime             @default(now()) @map("created_at")
+  application   CorporateApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt(sort: Desc)])
+  @@map("corporate_application_events")
 }
 
 /// Kullanıcıların gönderdiği içerik şikayetleri (ürün/kullanıcı/koleksiyon/mesaj).
@@ -478,6 +561,10 @@ model Manufacturer {
 
 model Product {
   id                  String             @id @default(uuid())
+  /// İnsan-okunur ilan numarası: "U" + 6 hane sıra no (U010001). Kalıcı,
+  /// kullanıcıya gösterilir (ilan detayı, şikayet formu, destek). Postgres
+  /// tarafında generate_product_code() ile üretilir; uygulama yazmaz.
+  productCode         String             @unique @default(dbgenerated("generate_product_code()")) @map("product_code")
   sellerId            String             @map("seller_id")
   categoryId          String             @map("category_id")
   title               String
@@ -487,6 +574,7 @@ model Product {
   status              ProductStatus      @default(pending)
   isTradeEnabled      Boolean            @default(false) @map("is_trade_enabled")
   viewCount           Int                @default(0) @map("view_count")
+  clickCount          Int                @default(0) @map("click_count")
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
   version             Int                @default(1)
@@ -496,6 +584,10 @@ model Product {
   popularityUpdatedAt DateTime?          @map("popularity_updated_at")
   quantity            Int?               @map("quantity")
   reservedQuantity    Int?               @default(0) @map("reserved_quantity")
+  // Satıcının seçtiği paket boyutu — ilan formundaki TEK kargo girdisi.
+  shippingPackageTier ShippingPackageTierCode @default(small) @map("shipping_package_tier")
+  // Kademeden TÜRETİLİR (kademenin üst sınırı): admin görür, paket desisi
+  // toplanırken (Σ desi × adet) bu değer kullanılır. Satıcı doğrudan girmez.
   shippingDesi        Int                @default(1) @map("shipping_desi")
   slug                String?            @unique
   oldPrice            Decimal?           @map("old_price") @db.Decimal(10, 2)
@@ -577,30 +669,39 @@ model Product {
 }
 
 model ProductBoost {
-  id             String      @id @default(uuid())
-  productId      String      @map("product_id")
-  userId         String      @map("user_id")
+  id                     String      @id @default(uuid())
+  productId              String      @map("product_id")
+  userId                 String      @map("user_id")
   /// Purchased ad package. Nullable for legacy boosts predating the package model.
-  packageId      String?     @map("package_id")
+  packageId              String?     @map("package_id")
   /// Snapshot of the package name at purchase time (survives later package edits).
-  packageName    String?     @map("package_name")
+  packageName            String?     @map("package_name")
   /// Snapshot of the package's `showcaseOnHome` flag — the home-showcase query
   /// keys on the product column set from this, so a later package flip is inert.
-  showcaseOnHome Boolean     @default(false) @map("showcase_on_home")
-  durationDays   Int         @map("duration_days")
-  price          Decimal     @db.Decimal(10, 2)
-  status         BoostStatus @default(pending)
-  autoRenew      Boolean     @default(false) @map("auto_renew")
-  startsAt       DateTime?   @map("starts_at")
-  endsAt         DateTime?   @map("ends_at")
+  showcaseOnHome         Boolean     @default(false) @map("showcase_on_home")
+  durationDays           Int         @map("duration_days")
+  price                  Decimal     @db.Decimal(10, 2)
+  status                 BoostStatus @default(pending)
+  autoRenew              Boolean     @default(false) @map("auto_renew")
+  startsAt               DateTime?   @map("starts_at")
+  endsAt                 DateTime?   @map("ends_at")
   /// Set on activation — the LIFO ordering key for search + home showcase.
-  purchasedAt    DateTime?   @map("purchased_at")
-  orderId        String?     @unique @map("order_id")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
-  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  package        AdPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  purchasedAt            DateTime?   @map("purchased_at")
+  pausedAt               DateTime?   @map("paused_at")
+  pausedRemainingSeconds Int?        @map("paused_remaining_seconds")
+  extendedDays           Int         @default(0) @map("extended_days")
+  baselineViewCount      Int?        @map("baseline_view_count")
+  baselineLikeCount      Int?        @map("baseline_like_count")
+  baselineClickCount     Int?        @map("baseline_click_count")
+  finalViewCount         Int?        @map("final_view_count")
+  finalLikeCount         Int?        @map("final_like_count")
+  finalClickCount        Int?        @map("final_click_count")
+  orderId                String?     @unique @map("order_id")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
+  product                Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package                AdPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
 
   @@index([productId])
   @@index([userId])
@@ -614,18 +715,43 @@ model ProductBoost {
 /// that also appear in the homepage showcase area (Vitrin), on top of the search
 /// priority every active package grants.
 model AdPackage {
-  id             String          @id @default(uuid())
+  id             String                    @id @default(uuid())
   name           String
-  slug           String          @unique
-  showcaseOnHome Boolean         @default(false) @map("showcase_on_home")
-  isActive       Boolean         @default(true) @map("is_active")
-  sortOrder      Int             @default(0) @map("sort_order")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  slug           String                    @unique
+  showcaseOnHome Boolean                   @default(false) @map("showcase_on_home")
+  isActive       Boolean                   @default(true) @map("is_active")
+  sortOrder      Int                       @default(0) @map("sort_order")
+  audienceMode   AdPackageAudienceMode     @default(everyone) @map("audience_mode")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
   tiers          AdPackageTier[]
   boosts         ProductBoost[]
+  targetTiers    AdPackageMembershipTier[]
+  targetUsers    AdPackageUserTarget[]
 
   @@map("ad_packages")
+}
+
+model AdPackageMembershipTier {
+  packageId String             @map("package_id")
+  tierType  MembershipTierType @map("tier_type")
+  package   AdPackage          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, tierType])
+  @@index([tierType])
+  @@map("ad_package_membership_tiers")
+}
+
+model AdPackageUserTarget {
+  packageId String    @map("package_id")
+  userId    String    @map("user_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  package   AdPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, userId])
+  @@index([userId])
+  @@map("ad_package_user_targets")
 }
 
 /// One priced cell of a package's matrix: a duration + a product-price range →
@@ -804,7 +930,10 @@ model TradeCashPayment {
   payerId           String           @map("payer_id")
   recipientId       String           @map("recipient_id")
   amount            Decimal          @db.Decimal(10, 2)
+  // Takas aracılık komisyonu — KDV HARİÇ matrah (siparişteki ücretlerle aynı semantik).
   commission        Decimal          @db.Decimal(10, 2)
+  // Komisyonun KDV'si: hizmeti alan taraf (nakit ödeyen) öder, totalAmount'a dahildir.
+  commissionTaxAmount Decimal        @default(0) @map("commission_tax_amount") @db.Decimal(10, 2)
   totalAmount       Decimal          @map("total_amount") @db.Decimal(10, 2)
   provider          String
   providerPaymentId String?          @map("provider_payment_id")
@@ -1207,6 +1336,11 @@ model CheckoutGroup {
 // kolon (User ilişkisi yok — denormalize, sorgu için yeterli).
 model OrderPackage {
   id                      String         @id @default(uuid())
+  // Koli numarası (PKG-…): paketin KALICI dış referansı. Sürat'a OzelKargoTakipNo
+  // olarak bu gönderilir, müşteri kargosunu bununla sorgular. Eskiden paketin en
+  // küçük orderNumber'ı TÜRETİLİYORDU; türetilmiş referans paketin sipariş kümesi
+  // değişince kayıyor ve idempotency cache'i ıskalayıp MÜKERRER gönderi açıyordu.
+  packageNumber           String         @unique @map("package_number")
   checkoutGroupId         String?        @map("checkout_group_id")
   sellerId                String         @map("seller_id")
   buyerId                 String         @map("buyer_id")
@@ -1230,6 +1364,7 @@ model OrderPackage {
   updatedAt               DateTime       @updatedAt @map("updated_at")
   checkoutGroup           CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id])
   orders                  Order[]
+  shipments               Shipment[]
 
   @@index([checkoutGroupId])
   @@index([sellerId])
@@ -1280,7 +1415,22 @@ model Order {
   // satıcı indirim öncesi tutar üzerinden ödenir. Varsayılan 0 (satıcı-fonlu, eski davranış).
   platformFundedDiscount     Decimal                  @default(0) @map("platform_funded_discount") @db.Decimal(10, 2)
   subtotal                   Decimal?                 @db.Decimal(10, 2)
+  // ÜRÜN bedelinin KDV'si. `product_vat_enabled` ayarıyla yönetilir; varsayılan
+  // KAPALI olduğu için yeni siparişlerde 0'dır (vitrin fiyatı KDV dahil sayılır,
+  // beyanı satıcı yapar). Ayar açılırsa TaxRule/TaxRate altyapısı devreye girer.
   taxAmount                  Decimal                  @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  // HİZMET bedellerinin KDV'si — "hizmeti kim aldıysa KDV'sini o öder".
+  // Alıcı tarafı (alıcı komisyonu + koruma hizmeti + alıcı kargo payı) alıcının
+  // ödediğine EKLENİR; satıcı tarafı (satıcı komisyonu + platform hizmet bedeli +
+  // satıcı kargo payı) satıcı payout'undan KESİLİR. Matrahlar yukarıdaki kolonlarda
+  // durduğu için kalem bazında KDV saklanmaz — iki taraf toplamı yeterlidir.
+  buyerServiceTaxAmount      Decimal                  @default(0) @map("buyer_service_tax_amount") @db.Decimal(10, 2)
+  sellerServiceTaxAmount     Decimal                  @default(0) @map("seller_service_tax_amount") @db.Decimal(10, 2)
+  // Tahsil anındaki hizmet KDV oranı (%). Toplamlar yukarıda duruyor ama ekranlar
+  // "komisyon KDV'si / kargo KDV'si / hizmet bedeli KDV'si" kırılımını gösterebilsin
+  // diye oran da snapshot'lanır: ayar sonradan değişse bile eski sipariş, tahsil
+  // edildiği oranla görüntülenir.
+  serviceVatRate             Decimal                  @default(0) @map("service_vat_rate") @db.Decimal(5, 2)
   // E-ticaret stopajı (GVK 94/19, varsayılan %1): yalnız vergi mükellefi (kurumsal onaylı)
   // satıcıda, KDV hariç ürün bedeli üzerinden. Satıcı payout'undan kesilir; alıcı tutarını etkilemez.
   withholdingTaxAmount       Decimal                  @default(0) @map("withholding_tax_amount") @db.Decimal(10, 2)
@@ -1301,6 +1451,11 @@ model Order {
   buyerConfirmedAt           DateTime?                @map("buyer_confirmed_at")
   buyerConfirmationType      BuyerConfirmationType?   @map("buyer_confirmation_type")
   completedAt                DateTime?                @map("completed_at")
+  // Teslim gelir faturaları (komisyon / hizmet bedeli / platform satışı) kesildi mi?
+  // AÇIK işaret: eskiden backfill cron'u her turda TÜM delivered+completed siparişleri
+  // (take:500, sırasız) tarıyordu; tamamlanan siparişler aday kümesinden hiç çıkmadığı
+  // için 500 sipariş sonrası yeni teslimatlar pencereye giremeyip faturasız kalabiliyordu.
+  revenueInvoicedAt          DateTime?                @map("revenue_invoiced_at")
   invoice                    Invoice?
   buyer                      User                     @relation("BuyerOrders", fields: [buyerId], references: [id])
   offer                      Offer?                   @relation(fields: [offerId], references: [id])
@@ -1321,6 +1476,8 @@ model Order {
   @@index([sellerId])
   @@index([status])
   @@index([status, paymentExpiresAt])
+  // Teslim faturası backfill'inin aday sorgusu (faturasız + en yeni teslimat önce).
+  @@index([status, revenueInvoicedAt, deliveredAt])
   @@index([checkoutGroupId])
   @@index([packageId])
   @@map("orders")
@@ -1433,6 +1590,8 @@ model PaymentHold {
 
   @@unique([paymentId, orderId])
   @@index([paymentId])
+  // Grup dosyası + payouts artık hold'ları orderId ile sorguluyor.
+  @@index([orderId])
   @@map("payment_holds")
 }
 
@@ -1461,21 +1620,31 @@ model SellerBankAccount {
 /// admin presigned URL ile görüntüler. (userId, documentType) tekil → yeniden
 /// yükleme eskisini değiştirir.
 model SellerDocument {
-  id           String               @id @default(uuid())
-  userId       String               @map("user_id")
-  documentType SellerDocumentType   @map("document_type")
-  s3Key        String               @map("s3_key")
-  fileName     String               @map("file_name")
-  mimeType     String               @map("mime_type")
-  size         Int                  @default(0)
-  status       SellerDocumentStatus @default(pending)
-  reviewNote   String?              @map("review_note")
-  uploadedAt   DateTime             @default(now()) @map("uploaded_at")
-  reviewedAt   DateTime?            @map("reviewed_at")
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String                @id @default(uuid())
+  userId        String                @map("user_id")
+  applicationId String?               @map("application_id")
+  stakeholderId String?               @map("stakeholder_id")
+  documentType  SellerDocumentType    @map("document_type")
+  s3Key         String                @map("s3_key")
+  fileName      String                @map("file_name")
+  mimeType      String                @map("mime_type")
+  size          Int                   @default(0)
+  status        SellerDocumentStatus  @default(pending)
+  reviewNote    String?               @map("review_note")
+  uploadedAt    DateTime              @default(now()) @map("uploaded_at")
+  reviewedAt    DateTime?             @map("reviewed_at")
+  reviewedBy    String?               @map("reviewed_by")
+  appealNote    String?               @map("appeal_note")
+  version       Int                   @default(1)
+  isCurrent     Boolean               @default(true) @map("is_current")
+  supersedesId  String?               @map("supersedes_id")
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application   CorporateApplication? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  stakeholder   CorporateStakeholder? @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, documentType])
   @@index([userId])
+  @@index([applicationId, documentType, isCurrent])
+  @@index([stakeholderId])
   @@map("seller_documents")
 }
 
@@ -1484,13 +1653,22 @@ enum SellerDocumentType {
   contract // sözleşme
   signature_circular // imza sirküleri
   activity_certificate // faaliyet belgesi
-  identity // kimlik
+  identity // eski birleşik kimlik belgesi
+  identity_front
+  identity_back
+  passport_front
+  passport_back
+  residence_or_invoice
+  trade_registry_gazette
+  bank_account_info
 }
 
 enum SellerDocumentStatus {
   pending
   approved
   rejected
+  revision_requested
+  appealed
 }
 
 // PayTR CAPI kayıtlı kart (recurring/oto-yenileme için). PAN/CVV ASLA saklanmaz —
@@ -1532,6 +1710,95 @@ enum SavedCardStatus {
   revoked
 }
 
+// PayTR işlem dökümü satırı (rapor/islem-dokumu) — PSP mutabakatının işlem-seviyesi
+// kaynağı. Gece sync'i dünün dökümünü (kayan 3 günlük pencereyle) upsert eder;
+// admin mutabakat ekranı PayTR'ye canlı sorgu atmaz, bu tablodan okur.
+// paymentId/refundAttemptId YUMUŞAK bağ (FK yok — PaymentProviderEvent ile aynı
+// gerekçe): eşleştirme Faz 3'te doldurur, eşleşmeyen satır alarm listesine düşer.
+model PaytrStatementLine {
+  id              String                 @id @default(uuid())
+  merchantOid     String                 @map("merchant_oid")
+  type            PaytrStatementLineType
+  amount          Decimal                @db.Decimal(12, 2)
+  // PayTR'nin bu işlemden kestiği komisyon (kesinti_tutari/orani) ve kalan net.
+  fee             Decimal?               @db.Decimal(12, 2)
+  feeRate         Decimal?               @map("fee_rate") @db.Decimal(6, 3)
+  net             Decimal?               @db.Decimal(12, 2)
+  currency        String                 @default("TL")
+  installment     Int?
+  cardBrand       String?                @map("card_brand")
+  maskedPan       String?                @map("masked_pan")
+  paymentType     String?                @map("payment_type") // KART | EFT
+  // İşlem günü (PayTR "GG.AA.YYYY" verir; gün hassasiyetinde saklanır).
+  transactionDate DateTime               @map("transaction_date")
+  matchStatus     PaytrMatchStatus       @default(unmatched) @map("match_status")
+  paymentId       String?                @map("payment_id")
+  refundAttemptId String?                @map("refund_attempt_id")
+  // psp_fee_accrued ledger kaydı yazıldı mı (idempotens damgası) — Faz 5.
+  ledgerRecordedAt DateTime?             @map("ledger_recorded_at")
+  raw             Json?
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  // Dedup: kayan pencereli sync aynı satırı iki kez yazamaz. PayTR satır kimliği
+  // vermediğinden doğal anahtar (oid+tip+gün+tutar) kullanılır.
+  @@unique([merchantOid, type, transactionDate, amount], name: "statement_line_dedup")
+  @@index([transactionDate])
+  @@index([matchStatus])
+  @@map("paytr_statement_lines")
+}
+
+enum PaytrStatementLineType {
+  sale
+  refund
+}
+
+enum PaytrMatchStatus {
+  unmatched
+  matched
+  amount_mismatch
+}
+
+// PayTR hakediş (rapor/odeme-dokumu): mağaza hesabına aktarılan/aktarılacak günlük
+// toplamlar. isProjection=true satırlar future_payments bloğundan gelir ve her
+// sync'te sil-yaz yenilenir (PayTR projeksiyonu her gün günceller).
+model PaytrSettlement {
+  id           String                @id @default(uuid())
+  datePaid     DateTime              @map("date_paid")
+  currency     String                @default("TL")
+  salesTotal   Decimal               @map("sales_total") @db.Decimal(12, 2)
+  returnTotal  Decimal               @map("return_total") @db.Decimal(12, 2)
+  netTotal     Decimal               @map("net_total") @db.Decimal(12, 2)
+  merchantIban String?               @map("merchant_iban")
+  isProjection Boolean               @default(false) @map("is_projection")
+  raw          Json?
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+  items        PaytrSettlementItem[]
+
+  @@unique([datePaid, currency, isProjection], name: "settlement_day")
+  @@index([datePaid])
+  @@map("paytr_settlements")
+}
+
+// Hakediş kalemi (rapor/odeme-detayi): o günkü hakedişin içindeki sipariş dökümü.
+// Yalnız kalemi olmayan gerçekleşmiş hakediş için bir kez çekilir.
+model PaytrSettlementItem {
+  id           String          @id @default(uuid())
+  settlementId String          @map("settlement_id")
+  merchantOid  String          @map("merchant_oid")
+  amount       Decimal         @db.Decimal(12, 2)
+  currency     String          @default("TL")
+  paymentId    String?         @map("payment_id") // yumuşak bağ — Faz 3 eşleştirmesi doldurur
+  raw          Json?
+  createdAt    DateTime        @default(now()) @map("created_at")
+  settlement   PaytrSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@index([settlementId])
+  @@index([merchantOid])
+  @@map("paytr_settlement_items")
+}
+
 // PSP (PayTR) etkileşim/yanıt kaydı — append-only denetim/gözlemlenebilirlik günlüğü.
 // Her PayTR yanıtı (bildirim callback'i, Direkt API, recurring çekim, durum-sorgu, iade,
 // kart listele/sil) yapısal alanlar + ham zarf ile buraya yazılır. Amaç: muhasebe/mutabakat
@@ -1554,6 +1821,11 @@ model PaymentProviderEvent {
   totalAmount         Decimal?                 @map("total_amount") @db.Decimal(12, 2) // total_amount (çekilen)
   failedReasonCode    String?                  @map("failed_reason_code")
   failedReasonMsg     String?                  @map("failed_reason_msg")
+  // PSP ücret mutabakatı (durum-sorgu kesinti_tutari / net_tutar): PayTR'nin bu
+  // işlemden kestiği komisyon ve kesinti sonrası net. Ledger vs PSP raporu
+  // karşılaştırması bu kolonlardan beslenir.
+  providerFee         Decimal?                 @map("provider_fee") @db.Decimal(12, 2)
+  providerNet         Decimal?                 @map("provider_net") @db.Decimal(12, 2)
   utoken              String?
   testMode            Boolean?                 @map("test_mode")
   hashValid           Boolean?                 @map("hash_valid") // yalnız callback: hash doğrulaması geçti mi
@@ -1599,6 +1871,12 @@ model PayoutTransfer {
   retryCount             Int                           @default(0) @map("retry_count")
   maxRetries             Int                           @default(3) @map("max_retries")
   nextRetryAt            DateTime?                     @map("next_retry_at")
+  // PayTR aşama-1 (talimat kabulü) anı ve o an GERÇEKTEN gönderilen net tutar.
+  // Aşama-2 callback'i saatler/günler sonra gelir; mail + ledger o anki
+  // netAmount'a değil bu snapshot'a bakar (adjustment/iade netAmount'ı değiştirebilir).
+  // submittedAt doluysa payout PayTR'ye iletilmiştir → zombi tespiti bunu takılı saymaz.
+  submittedAt            DateTime?                     @map("submitted_at")
+  submittedAmount        Decimal?                      @map("submitted_amount") @db.Decimal(10, 2)
   processedAt            DateTime?                     @map("processed_at")
   createdAt              DateTime                      @default(now()) @map("created_at")
   updatedAt              DateTime                      @updatedAt @map("updated_at")
@@ -1690,6 +1968,13 @@ model ElogoInvoice {
   recipientUserId           String?            @map("recipient_user_id")
   recipientVknTckn          String?            @map("recipient_vkn_tckn")
   recipientName             String?            @map("recipient_name")
+  // Misafir siparişleri tek sistem kullanıcısını paylaşır; gönderim anında alıcıyı
+  // kullanıcı kaydından çözmek faturayı sistem e-postasına/boş adrese yazıyordu.
+  // Kesim anındaki GERÇEK iletişim bilgisi burada snapshot'lanır.
+  recipientEmail            String?            @map("recipient_email")
+  recipientCity             String?            @map("recipient_city")
+  recipientDistrict         String?            @map("recipient_district")
+  recipientStreet           String?            @map("recipient_street")
   documentType              String             @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
   sendType                  String             @default("ELEKTRONIK") @map("send_type")
   invoiceNumber             String?            @unique @map("invoice_number")
@@ -1745,6 +2030,19 @@ model ElogoDocSequence {
   @@map("elogo_doc_sequences")
 }
 
+/// Tarodan iç belge sayaçları (ör. PDF fatura no: scope = "SPR-202607").
+/// Numara `upsert + increment` ile ATOMİK alınır — "en büyüğü oku +1 yaz"
+/// yaklaşımı eşzamanlı iki belgede aynı numarayı üretip unique index'e
+/// takılıyordu.
+model DocumentSequence {
+  id        String   @id @default(uuid())
+  scope     String   @unique
+  lastValue Int      @default(0) @map("last_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("document_sequences")
+}
+
 /// Kurumsal (şirket) satıcının siparişe elle yüklediği ÜRÜN faturası PDF'i.
 /// Tarodan'ın eLogo gelir e-Arşivlerinden (komisyon/hizmet) AYRI; satıcının kendi
 /// sisteminden kestiği fatura. Sipariş başına TEK (orderId @unique); değiştirilebilir.
@@ -1790,6 +2088,11 @@ enum ElogoInvoiceStatus {
 model Shipment {
   id                  String          @id @default(uuid())
   orderId             String          @unique @map("order_id")
+  // KOLİ bağı: bir OrderPackage = bir fiziksel gönderi, ama kayıt hâlâ sipariş
+  // başınadır (iade/escrow/muhasebe sipariş bazlı). Aynı packageId'yi paylaşan
+  // satırlar AYNI koliyi temsil eder → Sürat tek kez sorgulanır, webhook tüm
+  // kardeşlere yayılır. Nullable: paketsiz (eski/manuel) kayıtlar için.
+  packageId           String?         @map("package_id")
   provider            String
   trackingNumber      String?         @map("tracking_number")
   trackingUrl         String?         @map("tracking_url")
@@ -1819,7 +2122,9 @@ model Shipment {
   updatedAt           DateTime        @updatedAt @map("updated_at")
   events              ShipmentEvent[]
   order               Order           @relation(fields: [orderId], references: [id])
+  orderPackage        OrderPackage?   @relation(fields: [packageId], references: [id])
 
+  @@index([packageId])
   @@map("shipments")
 }
 
@@ -1849,26 +2154,41 @@ model ShippingTariff {
   updatedBy             String?              @map("updated_by")
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime             @updatedAt @map("updated_at")
-  rates                 ShippingTariffRate[]
+  // Satıcının ilanda seçtiği paket boyutları. Tarifeye bağlı olduğu için
+  // versiyonlama + aktif-tarife dokunulmazlığı + sipariş snapshot'ı miras alınır.
+  packageTiers          ShippingPackageTier[]
 
   @@unique([provider, version])
   @@index([provider, status])
   @@map("shipping_tariffs")
 }
 
-model ShippingTariffRate {
-  id        String         @id @default(uuid())
-  tariffId  String         @map("tariff_id")
-  desi      Int
-  amount    Decimal        @db.Decimal(10, 2)
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
-  tariff    ShippingTariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
+/// Satıcıya gösterilen paket boyutu (Küçük/Orta/Büyük). Desi yalnız admin
+/// tarafında görünür: satıcı boyut seçer, fiyat aralıktan çözülür.
+model ShippingPackageTier {
+  id       String                  @id @default(uuid())
+  tariffId String                  @map("tariff_id")
+  code     ShippingPackageTierCode
+  /// Satıcıya gösterilen ad ("Küçük Paket") — admin düzenleyebilir.
+  label    String
+  /// Kapsanan desi aralığı; maxDesi null = üst sınırsız (son kademe).
+  minDesi  Int                     @map("min_desi")
+  maxDesi  Int?                    @map("max_desi")
+  amount   Decimal                 @db.Decimal(10, 2)
+  /// Satıcıya ipucu olarak gösterilen örnek ölçü (cm); yalnız metin, görsel yok.
+  sampleWidth  Int? @map("sample_width")
+  sampleHeight Int? @map("sample_height")
+  sampleLength Int? @map("sample_length")
+  sortOrder    Int  @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tariff       ShippingTariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
 
-  @@unique([tariffId, desi])
+  @@unique([tariffId, code])
   @@index([tariffId])
-  @@map("shipping_tariff_rates")
+  @@map("shipping_package_tiers")
 }
+
 
 model ShipmentEvent {
   id          String   @id @default(uuid())
@@ -1927,6 +2247,12 @@ model RefundRequest {
   retainedSellerPlatformFeeAmount Decimal @default(0) @map("retained_seller_platform_fee_amount") @db.Decimal(10, 2)
   returnShippingChargeToBuyer     Decimal @default(0) @map("return_shipping_charge_to_buyer") @db.Decimal(10, 2)
   returnShippingChargeToSeller    Decimal @default(0) @map("return_shipping_charge_to_seller") @db.Decimal(10, 2)
+  // Escrow hold'dan TAM kargo düşüldüğü için satıcı kendi payını peşin ödemiş sayılır.
+  // Kusur alıcıdaysa / gönderi hiç taşınmadıysa bu pay hold'da satıcıya BIRAKILIR.
+  sellerShippingCompensationAmount Decimal @default(0) @map("seller_shipping_compensation_amount") @db.Decimal(10, 2)
+  // Alıcıya geri ödenen gidiş kargosu: Sürat faturası platformda olduğundan kusur
+  // satıcıdayken satıcıya borç yazılır (payout mahsubu).
+  outboundShippingChargeToSeller   Decimal @default(0) @map("outbound_shipping_charge_to_seller") @db.Decimal(10, 2)
   requiresAdminReview             Boolean @default(false) @map("requires_admin_review")
   penaltyReviewRequired           Boolean @default(false) @map("penalty_review_required")
 
@@ -1994,15 +2320,35 @@ model CommissionRule {
   sellerPlatformFeeMin  Decimal?               @map("seller_platform_fee_min") @db.Decimal(10, 2)
   sellerPlatformFeeMax  Decimal?               @map("seller_platform_fee_max") @db.Decimal(10, 2)
   // Tek kargo tutarının alıcı payı (%). Satıcı payı = 100 - buyerShare. Varsayılan 100 = alıcı öder (mevcut davranış).
+  // Kademe bazlı pay (shippingShares) tanımlanmamışsa bu değer TÜM kademelere uygulanır.
   shippingBuyerShare    Decimal                @default(100) @map("shipping_buyer_share") @db.Decimal(5, 2)
 
   category Category? @relation(fields: [categoryId], references: [id])
+  // Paket boyutu başına ayrı alıcı/satıcı bölüşümü (örn. Küçük 100/0, Büyük 50/50).
+  shippingShares CommissionRuleShippingShare[]
 
   @@index([isActive])
   @@index([categoryId, sellerType, isActive])
   @@index([sellerType, isActive])
   @@index([categoryId, taxpayerType, sellerType, isActive])
   @@map("commission_rules")
+}
+
+/// Bir komisyon kuralının paket boyutu başına kargo bölüşümü. Satır yoksa
+/// kuralın tek `shippingBuyerShare` değeri geçerlidir (kolaylık fallback'i).
+model CommissionRuleShippingShare {
+  id         String                  @id @default(uuid())
+  ruleId     String                  @map("rule_id")
+  tierCode   ShippingPackageTierCode @map("tier_code")
+  /// Alıcının payı (%); satıcı payı = 100 - buyerShare.
+  buyerShare Decimal                 @default(100) @map("buyer_share") @db.Decimal(5, 2)
+  createdAt  DateTime                @default(now()) @map("created_at")
+  updatedAt  DateTime                @updatedAt @map("updated_at")
+  rule       CommissionRule          @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, tierCode])
+  @@index([ruleId])
+  @@map("commission_rule_shipping_shares")
 }
 
 model TaxRegion {
@@ -2107,6 +2453,28 @@ model PlatformSetting {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
+}
+
+// Pre-launch early-access invite codes for the SITE_LOCKED storefront gate.
+// Codes are stored in plaintext on purpose: they only gate pre-launch
+// visibility and admins must be able to re-view/resend them.
+model SiteAccessPin {
+  id         String    @id @default(uuid())
+  code       String    @unique
+  label      String
+  email      String?
+  isActive   Boolean   @default(true) @map("is_active")
+  expiresAt  DateTime? @map("expires_at")
+  maxUses    Int?      @map("max_uses") // null = unlimited
+  usedCount  Int       @default(0) @map("used_count")
+  lastUsedAt DateTime? @map("last_used_at")
+  lastSentAt DateTime? @map("last_sent_at")
+  createdBy  String?   @map("created_by") // AdminUser.id, no FK so history survives staff removal
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("site_access_pins")
 }
 
 model AuditLog {
@@ -2551,6 +2919,7 @@ enum ProductCondition {
 enum BoostStatus {
   pending
   active
+  paused
   expired
   cancelled
   failed
@@ -2619,6 +2988,12 @@ enum PayoutStatus {
 
 enum SellerAdjustmentType {
   return_shipping
+  // Escrow hold'u kargo düşümünü karşılayamayan satırın açığı (grup sepetinde
+  // kargo satıcının ilk satırına yüklenir; küçük tutarlı ilk satır negatife düşebilir).
+  shipping_deficit
+  // Satıcı kusurlu iadede alıcıya geri ödenen GİDİŞ kargosu: Sürat faturası
+  // platformda olduğundan taşıma maliyeti satıcıya döner.
+  outbound_shipping
 }
 
 enum SellerAdjustmentStatus {
@@ -2641,6 +3016,10 @@ enum ShipmentStatus {
 }
 
 enum RefundReason {
+  /// Kargoya verilmiş ama zamanında teslim edilmemiş gönderi. İptal nedeni
+  /// olarak da var (OrderCancellationReason.delivery_delayed); teslim sonrası
+  /// iptal edilemediği için iade tarafında da karşılığı olmalı.
+  delivery_delayed
   changed_mind
   damaged
   wrong_item
@@ -2675,6 +3054,14 @@ enum ShippingTariffStatus {
   archived
 }
 
+/// Satıcının ilanda seçebildiği paket boyutları. Sabit üç kademe; etiketleri
+/// ve desi aralıkları tarifede admin tarafından yönetilir.
+enum ShippingPackageTierCode {
+  small
+  medium
+  large
+}
+
 enum RefundRequestStatus {
   pending_review
   approved
@@ -2705,6 +3092,29 @@ enum BusinessStatus {
   pending
   approved
   rejected
+}
+
+enum CorporateApplicationStatus {
+  submitted
+  preliminary_approved
+  invited
+  activated
+  completing
+  under_review
+  approved
+  rejected
+}
+
+enum CorporateIdentityType {
+  tckn
+  passport
+}
+
+enum AdPackageAudienceMode {
+  everyone
+  membership_tiers
+  specific_users
+  tiers_or_users
 }
 
 enum SellerType {
@@ -2948,6 +3358,7 @@ enum LedgerEventType {
   refund_issued // alıcıya iade
   trade_commission // takas komisyonu
   adjustment // manuel düzeltme (ters kayıt)
+  psp_fee_accrued // PayTR işlem kesintisi (islem-dokumu satırından, gün sonu sync)
 }
 
 enum LedgerAccount {
@@ -2957,6 +3368,8 @@ enum LedgerAccount {
   withholding_tax // stopaj (GVK 94/19 — muhtasar ile beyan)
   payout // dış para çıkışı (satıcıya transfer)
   refund // dış para çıkışı (alıcıya iade)
+  psp_fee // PSP (PayTR) işlem kesintisi — tahsilattan hiç bize ulaşmayan gider
+  seller_debt_recovery // satıcı borcu tahsilatı (kargo açığı/iade kargosu) — escrow'dan platforma
 }
 
 enum LedgerDirection {

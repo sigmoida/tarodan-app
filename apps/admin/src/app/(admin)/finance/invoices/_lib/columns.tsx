@@ -1,6 +1,7 @@
 /** @format */
 
-import { Badge } from "@tarodan/ui";
+import { Badge, Button } from "@tarodan/ui";
+import Link from "next/link";
 import { col } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { InvoicePdfButton } from "../_components/InvoicePdfButton";
@@ -9,7 +10,12 @@ import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-export const elogoColumns = (t: T) => [
+export const elogoColumns = (
+  t: T,
+  // failed belgeler için retry aksiyonu (deneme sayacı sıfırlanır, cron alır).
+  onRetry?: (invoice: Invoice) => void,
+  retryingId?: string,
+) => [
   col.custom<Invoice>(
     t("admin.finance.invoices.invoiceNumber"),
     (i) => (
@@ -105,6 +111,24 @@ export const elogoColumns = (t: T) => [
       ),
     { sortKey: "hasPdf", sortType: "number" },
   ),
+  ...(onRetry
+    ? [
+        col.actions<Invoice>(
+          (i) =>
+            i.status === "failed" ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                isLoading={retryingId === i.id}
+                onClick={() => onRetry(i)}
+              >
+                {t("admin.finance.invoices.retry")}
+              </Button>
+            ) : null,
+          { header: t("common.actions") },
+        ),
+      ]
+    : []),
 ];
 
 export const sellerColumns = (t: T) => [
@@ -112,9 +136,18 @@ export const sellerColumns = (t: T) => [
     t("admin.finance.common.order"),
     (s) => (
       <div className="text-sm">
-        <p className="whitespace-nowrap font-mono font-medium text-heading">
-          {s.orderNumber || "—"}
-        </p>
+        {s.orderId ? (
+          <Link
+            href={`/operations/orders/${s.orderId}`}
+            className="whitespace-nowrap font-mono font-medium text-primary-600 hover:text-primary-700"
+          >
+            #{s.orderNumber}
+          </Link>
+        ) : (
+          <p className="whitespace-nowrap font-mono font-medium text-heading">
+            {s.orderNumber || "—"}
+          </p>
+        )}
         <p className="max-w-[220px] truncate text-xs text-muted">
           {s.fileName}
         </p>
@@ -127,9 +160,13 @@ export const sellerColumns = (t: T) => [
     ),
     { grow: 2, minWidth: 180, sortKey: "orderNumber" },
   ),
-  col.text<SellerInvoice>(
+  col.user<SellerInvoice>(
     t("admin.finance.common.seller"),
-    (s) => s.sellerName,
+    (s) => ({
+      name: s.sellerName,
+      secondary: s.sellerEmail,
+      href: s.sellerId ? `/accounts/users/${s.sellerId}` : undefined,
+    }),
     {
       sortKey: "sellerName",
     },
@@ -139,6 +176,7 @@ export const sellerColumns = (t: T) => [
     (s) => ({
       name: s.buyerName,
       secondary: s.buyerEmail,
+      href: s.buyerId ? `/accounts/users/${s.buyerId}` : undefined,
     }),
     { sortKey: "buyerName" },
   ),

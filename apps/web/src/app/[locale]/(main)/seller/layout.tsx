@@ -23,6 +23,12 @@ export default async function SellerLayout({
 }) {
   const session = await getSession();
   if (!session)
-    redirect({ href: "/login?redirect=/seller", locale: await getLocale() });
+    // "/seller" diye bir rota yok — login sonrası gerçek bir hedefe düş
+    // (e-posta linkleri /seller/orders/:id gibi derin hedefler taşıyabilir;
+    // path'i layout bilemediği için güvenli varsayılan satıcı paneli).
+    redirect({
+      href: "/login?redirect=/seller/dashboard",
+      locale: await getLocale(),
+    });
   return <>{children}</>;
 }

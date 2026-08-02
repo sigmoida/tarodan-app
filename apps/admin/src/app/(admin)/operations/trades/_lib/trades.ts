@@ -8,8 +8,8 @@ export interface Trade {
   id: string;
   tradeNumber: string;
   status: string;
-  initiator: { id: string; displayName: string };
-  receiver: { id: string; displayName: string };
+  initiator: { id: string; displayName: string; email?: string };
+  receiver: { id: string; displayName: string; email?: string };
   cashAmount?: number;
   /** Nakit farkını ödeyen taraf (initiator.id | receiver.id). null = eşit takas. */
   cashPayerId?: string | null;
@@ -18,12 +18,12 @@ export interface Trade {
   cancelReason?: string;
 }
 
-/** Nakit farkını ödeyen tarafın görünen adı (cashPayerId → initiator/receiver). */
-export const cashPayerName = (trade: Trade): string | null => {
+/** Resolve the user paying the cash difference. */
+export const cashPayer = (trade: Trade): Trade["initiator"] | null => {
   if (!trade.cashPayerId) return null;
   return trade.cashPayerId === trade.initiator.id
-    ? trade.initiator.displayName
-    : trade.receiver.displayName;
+    ? trade.initiator
+    : trade.receiver;
 };
 
 // Intermediate/per-side statuses are intentionally hidden (needless detail for admins; they still render correctly in the badge).

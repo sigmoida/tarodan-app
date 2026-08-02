@@ -11,6 +11,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { offersApi } from "@/lib/api";
+import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import { offerSchema, type OfferValues } from "./offerSchema";
 
@@ -28,6 +29,7 @@ export default function OfferModal() {
     showOfferModal,
     setShowOfferModal,
   } = useListingDetail();
+  const modalLabels = useFormModalLabels();
 
   const minOffer = Math.round(effectivePrice * 0.5);
   const form = useZodForm(offerSchema(minOffer, effectivePrice, locale), {
@@ -62,8 +64,8 @@ export default function OfferModal() {
       isSubmitting={create.isPending}
       resetValues={{ amount: "", message: "" }}
       submitLabel={t("product.sendOffer")}
-      cancelLabel={t("common.cancel")}
-      maxWidth="max-w-md"
+      size="md"
+      {...modalLabels}
     >
       <div>
         <label className="block text-sm font-medium text-body mb-2">

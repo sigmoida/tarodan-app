@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import {
   Badge,
@@ -7,7 +6,7 @@ import {
   refundRequestStatusConfig,
   shipmentStatusConfig,
 } from "@tarodan/ui";
-import { col, TruncatedText } from "@/components/table";
+import { col } from "@/components/table";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -16,6 +15,8 @@ export interface RefundRequestRow {
   refundNumber: string;
   status: string;
   amount: number | string;
+  /** Adet bazlı kısmi iade: siparişin kaç adedi iade ediliyor. */
+  refundQuantity?: number;
   reason: string;
   createdAt: string;
   returnStatus?: string | null;
@@ -48,63 +49,53 @@ export const refundRequestColumns = (t: T) => [
     }),
     { sortKey: "order.orderNumber" },
   ),
-  col.custom<RefundRequestRow>(
+  col.product<RefundRequestRow>(
     t("admin.catalog.common.product"),
-    (r) => {
-      const img = r.order.product.images?.[0]?.url;
-      return (
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-alt">
-            {img ? (
-              <Image
-                src={img}
-                alt={r.order.product.title}
-                width={40}
-                height={40}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="text-base">📦</span>
-            )}
-          </div>
-          <TruncatedText className="text-body">
-            {r.order.product.title}
-          </TruncatedText>
-        </div>
-      );
-    },
-    { grow: 3, minWidth: 180, sortKey: "order.product.title" },
+    (r) => ({
+      title: r.order.product.title,
+      image: r.order.product.images?.[0]?.url,
+      href: `/catalog/products/${r.order.product.id}`,
+    }),
+    { sortKey: "order.product.title" },
   ),
   col.user<RefundRequestRow>(
     t("admin.operations.common.buyer"),
     (r) => ({
       name: r.requester?.displayName,
       secondary: r.requester?.email,
+      href: r.requester?.id ? `/accounts/users/${r.requester.id}` : undefined,
     }),
     { sortKey: "requester.displayName" },
-  ),
-  col.id<RefundRequestRow>(
-    t("admin.operations.common.buyerId"),
-    (r) => r.requester?.id,
   ),
   col.user<RefundRequestRow>(
     t("admin.operations.common.seller"),
     (r) => ({
       name: r.order?.seller?.displayName,
       secondary: r.order?.seller?.email,
+      href: r.order?.seller?.id
+        ? `/accounts/users/${r.order.seller.id}`
+        : undefined,
     }),
     { sortKey: "order.seller.displayName" },
   ),
-  col.id<RefundRequestRow>(
-    t("admin.operations.common.sellerId"),
-    (r) => r.order?.seller?.id,
-  ),
   col.money<RefundRequestRow>(t("common.amount"), "amount"),
+  col.text<RefundRequestRow>(
+    t("admin.operations.orders.file.refundQty"),
+    (r) =>
+      r.refundQuantity != null
+        ? t("admin.operations.orders.itemCountUnit", {
+            count: r.refundQuantity,
+          })
+        : null,
+    { minWidth: 90 },
+  ),
   col.text<RefundRequestRow>(
     t("admin.operations.refundRequests.reason"),
     (r) => enumLabel(refundReasonConfig, r.reason, r.reason),
     {
-      grow: 2,
+      // Sebep etiketleri uzun ("Açıklamaya Uygun Değil") ve tam okunmalı.
+      minWidth: 260,
+      wrap: true,
       sortKey: "reason",
       sortType: "text",
     },
@@ -124,6 +115,7 @@ export const refundRequestColumns = (t: T) => [
   col.code<RefundRequestRow>(
     t("admin.operations.common.trackingNumber"),
     (r) => r.returnTrackingNumber ?? undefined,
+    { minWidth: 240 },
   ),
   col.date<RefundRequestRow>(
     t("admin.operations.common.createdAt"),

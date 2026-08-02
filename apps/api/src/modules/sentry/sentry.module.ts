@@ -9,6 +9,12 @@ import { SentryService } from "./sentry.service";
 import { SentryInterceptor } from "./sentry.interceptor";
 import { initAppLogger } from "../../common/logging/logger";
 import { redactSensitive } from "../../common/security/redact-sensitive";
+import {
+  applySentryEventPolicy,
+  isProductionRuntime,
+  resolveSentryEnvironment,
+  resolveSentryRelease,
+} from "./sentry-event";
 
 @Global()
 @Module({
@@ -26,27 +32,25 @@ export class SentryModule implements OnModuleInit {
 
   onModuleInit() {
     const dsn = this.configService.get<string>("SENTRY_DSN");
-    const environment = this.configService.get<string>(
-      "NODE_ENV",
-      "development",
-    );
+    // Etiket SENTRY_ENVIRONMENT'tan, örnekleme gerçek çalışma kipinden:
+    // staging de production build'i olduğu için NODE_ENV ikisinde de aynıdır.
+    const environment = resolveSentryEnvironment();
+    const isProd = isProductionRuntime();
 
     if (dsn) {
       Sentry.init({
         dsn,
         environment,
-        tracesSampleRate: environment === "production" ? 0.2 : 1.0,
-        profilesSampleRate: environment === "production" ? 0.1 : 1.0,
+        // Sürüm etiketi: "bu hata hangi deploy'la geldi" sorusunu cevaplar ve
+        // Sentry'nin regresyon takibini (çözülen issue yeni sürümde tekrar
+        // açılırsa uyarma) çalıştırır.
+        release: resolveSentryRelease(),
+        tracesSampleRate: isProd ? 0.2 : 1.0,
+        profilesSampleRate: isProd ? 0.1 : 1.0,
         // Sentry v8's default Node integrations include inbound and outbound
         // HTTP instrumentation; no deprecated @sentry/tracing shim is needed.
-        // Filter out health check endpoints
-        beforeSend(event) {
-          const request = event.request;
-          if (request?.url?.includes("/health")) {
-            return null;
-          }
-          return redactSensitive(event) as typeof event;
-        },
+        // Sağlık kontrolü filtresi + redaksiyon + korelasyon tag'i: tek kapı.
+        beforeSend: applySentryEventPolicy,
         // Capture user context
         beforeBreadcrumb(breadcrumb) {
           if (

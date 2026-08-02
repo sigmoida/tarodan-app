@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 /**
  * Redirect /orders/track to /track-order (guest order tracking).
@@ -11,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 export default function OrdersTrackRedirectPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations();
 
   useEffect(() => {
     const qs = searchParams.toString();
@@ -19,7 +21,7 @@ export default function OrdersTrackRedirectPage() {
 
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center">
-      <p className="text-muted">Yönlendiriliyor...</p>
+      <p className="text-muted">{t("profile.boost.redirecting")}</p>
     </div>
   );
 }

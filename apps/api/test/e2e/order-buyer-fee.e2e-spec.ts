@@ -9,6 +9,7 @@ import {
   seedBaseline,
   disconnectPrisma,
 } from "../test-utils/db";
+import { testTaxPolicy } from "../../src/modules/order/testing/tax-policy-fixture";
 
 /**
  * Faz 5.2 — calculateCommission BUYER + SELLER ayrı lookup unit testleri.
@@ -36,10 +37,16 @@ describe("OrderService.calculateCommission (BUYER + SELLER ayrı lookup) (E2E)",
         freeShippingThreshold: 500,
       }),
     } as any;
-    const pricing = new OrderPricingService(prisma, taxStub, shippingTariffs, {
-      getEffectiveDisplayPrice: async () => null,
-      getEffectiveDisplayPriceMany: async () => new Map(),
-    } as any);
+    const pricing = new OrderPricingService(
+      prisma,
+      taxStub,
+      shippingTariffs,
+      {
+        getEffectiveDisplayPrice: async () => null,
+        getEffectiveDisplayPriceMany: async () => new Map(),
+      } as any,
+      testTaxPolicy(),
+    );
     return new OrderService(pricing, {} as any, {} as any, {} as any);
   }
 

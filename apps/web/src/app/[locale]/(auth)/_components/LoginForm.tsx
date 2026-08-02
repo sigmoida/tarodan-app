@@ -164,7 +164,7 @@ export function LoginForm() {
                 </Button>
                 <Link
                   href="/verify-email"
-                  className="block w-full py-2 text-center text-sm text-warning-800 underline hover:text-warning-900"
+                  className="block w-full py-2 text-sm text-warning-800 underline hover:text-warning-900"
                 >
                   {t("auth.goToVerificationPage")}
                 </Link>
@@ -177,6 +177,7 @@ export function LoginForm() {
               name="password"
               type="password"
               label={t("auth.password")}
+              placeholder="••••••••"
               autoComplete="current-password"
               autoFocus
             />

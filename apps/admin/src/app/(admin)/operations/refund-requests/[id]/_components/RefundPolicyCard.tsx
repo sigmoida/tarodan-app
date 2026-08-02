@@ -22,7 +22,7 @@ export interface RefundPolicyCardProps {
     returnShippingPayer: ReturnShippingPayer | null;
   };
   order: {
-    subtotal: number | null;
+    totalAmount: number;
     shippingCost: number;
     buyerFeeAmount: number;
     commissionAmount: number;
@@ -70,10 +70,21 @@ export function RefundPolicyCard({
 
   const dirtyPayer = returnShippingPayer !== initial.returnShippingPayer;
 
+  // Ürün kalemi BACKEND ile AYNI formülden (computePartialRefundAmount):
+  // total − kargo − alıcı ücreti = alıcının ürüne FİİLEN ödediği. `subtotal`
+  // kullanılmaz — çoğu kayıtta NULL ve indirim ÖNCESİ fiyatı tuttuğu için
+  // kartta olduğundan yüksek (ya da ₺0) bir önizleme gösteriyordu; admin'in
+  // onayladığı sayı backend'in iade ettiğinden sapabiliyordu.
+  const productPaid = Math.max(
+    0,
+    Number(order.totalAmount) -
+      Number(order.shippingCost) -
+      Number(order.buyerFeeAmount),
+  );
+
   const refundAmount = useMemo(() => {
     let total = 0;
-    if (refundProductAmount && order.subtotal != null)
-      total += Number(order.subtotal);
+    if (refundProductAmount) total += productPaid;
     if (refundShippingFee) total += Number(order.shippingCost);
     if (refundBuyerFee) total += Number(order.buyerFeeAmount);
     // refundSellerCommission is a seller charge — not added to the buyer's refund amount
@@ -82,7 +93,7 @@ export function RefundPolicyCard({
     refundProductAmount,
     refundShippingFee,
     refundBuyerFee,
-    order.subtotal,
+    productPaid,
     order.shippingCost,
     order.buyerFeeAmount,
   ]);
@@ -130,7 +141,7 @@ export function RefundPolicyCard({
       <div className="space-y-2">
         <PolicyRow
           label={t("admin.operations.refundRequests.policy.productAmount", {
-            amount: fmtTry(Number(order.subtotal ?? 0)),
+            amount: fmtTry(productPaid),
           })}
           checked={refundProductAmount}
           onChange={setRefundProductAmount}

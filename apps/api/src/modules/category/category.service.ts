@@ -1,17 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { Category } from '@prisma/client';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { Category } from "@prisma/client";
 
 @Injectable()
 export class CategoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
-  ) { }
+  ) {}
 
   /** Cache key for categories list */
-  private static readonly CATEGORIES_CACHE_KEY = 'categories:all';
+  private static readonly CATEGORIES_CACHE_KEY = "categories:all";
 
   /**
    * Invalidate categories cache (e.g. after seed or admin category change)
@@ -29,11 +29,11 @@ export class CategoryService {
       async () => {
         const categories = await this.prisma.category.findMany({
           where: { isActive: true },
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
           include: {
             _count: {
               select: {
-                products: { where: { status: 'active' } },
+                products: { where: { status: "active" } },
               },
             },
           },
@@ -52,7 +52,9 @@ export class CategoryService {
           }
         });
 
-        return rootCategories.map((root) => this.buildCategoryTree(root, childrenMap));
+        return rootCategories.map((root) =>
+          this.buildCategoryTree(root, childrenMap),
+        );
       },
       { ttl: 300 }, // 5 min cache
     );
@@ -74,14 +76,14 @@ export class CategoryService {
         },
         _count: {
           select: {
-            products: { where: { status: 'active' } },
+            products: { where: { status: "active" } },
           },
         },
       },
     });
 
     if (!category) {
-      throw new NotFoundException('Kategori bulunamadı');
+      throw new NotFoundException("Kategori bulunamadı");
     }
 
     return {
@@ -111,14 +113,14 @@ export class CategoryService {
         },
         _count: {
           select: {
-            products: { where: { status: 'active' } },
+            products: { where: { status: "active" } },
           },
         },
       },
     });
 
     if (!category) {
-      throw new NotFoundException('Kategori bulunamadı');
+      throw new NotFoundException("Kategori bulunamadı");
     }
 
     return {
@@ -147,25 +149,16 @@ export class CategoryService {
       slug: category.slug,
       description: category.description,
       productCount: category._count.products,
-      children: children.map((child) => this.buildCategoryTree(child, childrenMap)),
+      children: children.map((child) =>
+        this.buildCategoryTree(child, childrenMap),
+      ),
     };
   }
   /**
    * Create a new category
    */
   async create(data: any): Promise<Category> {
-    const slug = this.generateSlug(data.name);
-
-    // Check if slug exists
-    const existing = await this.prisma.category.findUnique({
-      where: { slug },
-    });
-
-    if (existing) {
-      // Append random string to make unique
-      const random = Math.random().toString(36).substring(7);
-      return this.create({ ...data, name: `${data.name}-${random}` });
-    }
+    const slug = await this.uniqueSlug(this.generateSlug(data.name));
 
     const category = await this.prisma.category.create({
       data: {
@@ -174,7 +167,7 @@ export class CategoryService {
       },
     });
 
-    this.cache.del('categories:all');
+    this.cache.del("categories:all");
     return category;
   }
 
@@ -187,18 +180,12 @@ export class CategoryService {
     });
 
     if (!category) {
-      throw new NotFoundException('Kategori bulunamadı');
+      throw new NotFoundException("Kategori bulunamadı");
     }
 
     let slug = category.slug;
     if (data.name && data.name !== category.name) {
-      slug = this.generateSlug(data.name);
-      const existing = await this.prisma.category.findUnique({
-        where: { slug },
-      });
-      if (existing && existing.id !== id) {
-        slug = `${slug}-${Math.random().toString(36).substring(7)}`;
-      }
+      slug = await this.uniqueSlug(this.generateSlug(data.name), id);
     }
 
     const updated = await this.prisma.category.update({
@@ -209,7 +196,7 @@ export class CategoryService {
       },
     });
 
-    this.cache.del('categories:all');
+    this.cache.del("categories:all");
     return updated;
   }
 
@@ -225,7 +212,7 @@ export class CategoryService {
     if (productCount > 0) {
       // Soft delete if products exist? Or prevent delete?
       // Prevent delete is safer.
-      throw new Error('Bu kategoriye ait ürünler var, silinemez.');
+      throw new Error("Bu kategoriye ait ürünler var, silinemez.");
     }
 
     // Check children
@@ -234,29 +221,57 @@ export class CategoryService {
     });
 
     if (childCount > 0) {
-      throw new Error('Alt kategorileri olan kategori silinemez.');
+      throw new Error("Alt kategorileri olan kategori silinemez.");
     }
 
     const result = await this.prisma.category.delete({
       where: { id },
     });
 
-    this.cache.del('categories:all');
+    this.cache.del("categories:all");
     return result;
+  }
+
+  /**
+   * Çakışan slug'a artan sayaç ekler: `model-arabalar`, `model-arabalar-2`…
+   * Önceki sürüm rastgele bir sonek üretiyordu; hem `Math.random` kullanıyor
+   * hem de `.substring(7)` bazen boş string döndürüp "slug-" üretiyordu.
+   * Ayrıca create yolunda soneki KATEGORİ ADINA yazıyordu.
+   */
+  private async uniqueSlug(base: string, excludeId?: string): Promise<string> {
+    let candidate = base;
+    for (let counter = 2; ; counter++) {
+      const existing = await this.prisma.category.findUnique({
+        where: { slug: candidate },
+        select: { id: true },
+      });
+      if (!existing || existing.id === excludeId) return candidate;
+      candidate = `${base}-${counter}`;
+    }
   }
 
   private generateSlug(text: string): string {
     const trMap: Record<string, string> = {
-      'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-      'Ç': 'c', 'Ğ': 'g', 'İ': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u'
+      ç: "c",
+      ğ: "g",
+      ı: "i",
+      ö: "o",
+      ş: "s",
+      ü: "u",
+      Ç: "c",
+      Ğ: "g",
+      İ: "i",
+      Ö: "o",
+      Ş: "s",
+      Ü: "u",
     };
 
     return text
-      .split('')
-      .map(char => trMap[char] || char)
-      .join('')
+      .split("")
+      .map((char) => trMap[char] || char)
+      .join("")
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '');
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
   }
 }

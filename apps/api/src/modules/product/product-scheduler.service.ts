@@ -253,10 +253,10 @@ export class ProductSchedulerService implements OnModuleInit {
     } catch (error: any) {
       this.logger.error(`Error updating scores: ${error.message}`, error.stack);
       log(`HATA: ${error.message}`);
-      return {
-        summary: `Hata: ${error.message}`,
-        stats: { updated: 0, errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 
@@ -303,7 +303,15 @@ export class ProductSchedulerService implements OnModuleInit {
           id: true,
           userId: true,
           autoRenew: true,
-          product: { select: { title: true, sellerId: true } },
+          product: {
+            select: {
+              title: true,
+              sellerId: true,
+              viewCount: true,
+              likeCount: true,
+              clickCount: true,
+            },
+          },
         },
       });
 
@@ -372,6 +380,16 @@ export class ProductSchedulerService implements OnModuleInit {
       // Otomatik yenileme açık + premium satıcı → yenileme hatırlatma bildirimi
       // (Gerçek recurring çekim yok; üyelik auto-renew gibi hatırlatma gönderilir.)
       for (const b of expiringBoosts) {
+        if (b.product) {
+          await this.prisma.productBoost.update({
+            where: { id: b.id },
+            data: {
+              finalViewCount: b.product.viewCount,
+              finalLikeCount: b.product.likeCount,
+              finalClickCount: b.product.clickCount,
+            },
+          });
+        }
         if (b.autoRenew && b.product && premiumSet.has(b.product.sellerId)) {
           await this.notificationService
             .createInAppNotification(b.userId, NotificationType.BOOST_EXPIRED, {
@@ -406,10 +424,10 @@ export class ProductSchedulerService implements OnModuleInit {
     } catch (error: any) {
       this.logger.error(`Error expiring boosts: ${error.message}`, error.stack);
       log(`HATA: ${error.message}`);
-      return {
-        summary: `Hata: ${error.message}`,
-        stats: { downgraded: 0, errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 
@@ -462,7 +480,7 @@ export class ProductSchedulerService implements OnModuleInit {
 
       // "İlanınız sona erdi" e-postaları (ilan başına, satıcıya). İlan 60 günü
       // doldurduğu ilk gün expire olup active'den çıktığı için mükerrer gitmez.
-      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com";
+      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
       for (const listing of toExpire) {
         try {
           await this.notificationService.sendTemplateEmailToUser(
@@ -494,10 +512,10 @@ export class ProductSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return {
-        summary: `Hata: ${error.message}`,
-        stats: { expired: 0, errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 
@@ -585,7 +603,7 @@ export class ProductSchedulerService implements OnModuleInit {
       log(`${expiringListings.length} ilan 7 gün içinde sona eriyor`);
 
       // "İlanınızın süresi doluyor" e-postası (ilan başına, satıcıya).
-      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com";
+      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
       for (const listing of expiringListings) {
         const expirationDate = new Date(listing.createdAt);
         expirationDate.setDate(
@@ -625,10 +643,10 @@ export class ProductSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return {
-        summary: `Hata: ${error.message}`,
-        stats: { sellers: 0, listings: 0, errors: 1 },
-      };
+      // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
+      // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
+      // "başarılı" görünür ve hata yalnız log satırında kalır).
+      throw error;
     }
   }
 

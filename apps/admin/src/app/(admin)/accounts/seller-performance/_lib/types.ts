@@ -5,8 +5,10 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Seller {
   id: string;
+  adminCode: string;
   displayName: string;
   email: string;
+  avatarUrl?: string;
   sellerType: string | null;
   isVerified: boolean;
   isBanned: boolean;

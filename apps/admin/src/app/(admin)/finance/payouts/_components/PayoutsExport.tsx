@@ -35,7 +35,7 @@ export function PayoutsExport() {
 
   return (
     <Button
-      variant="secondary"
+      variant="outline"
       leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
       isLoading={busy}
       onClick={onExport}

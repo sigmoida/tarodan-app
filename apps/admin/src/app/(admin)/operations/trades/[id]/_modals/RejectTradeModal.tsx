@@ -38,6 +38,17 @@ export function RejectTradeModal({
       isOpen={open}
       onClose={() => !reject.isPending && onClose()}
       title={t("admin.operations.trades.rejectTitle")}
+      closeButtonDisabled={reject.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => reject.mutate()}
+          confirmLabel={t("admin.operations.trades.reject")}
+          destructive
+          isLoading={reject.isPending}
+          disabled={tooShort}
+        />
+      }
     >
       <div className="space-y-4">
         <p className="text-sm text-body">
@@ -66,14 +77,6 @@ export function RejectTradeModal({
             })}
           </p>
         </div>
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => reject.mutate()}
-          confirmLabel={t("admin.operations.trades.reject")}
-          destructive
-          isLoading={reject.isPending}
-          disabled={tooShort}
-        />
       </div>
     </Modal>
   );

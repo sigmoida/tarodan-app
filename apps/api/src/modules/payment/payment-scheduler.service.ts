@@ -2,10 +2,16 @@ import { Injectable, Logger, Optional, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
+import {
+  createCronStepRunner,
+  type CronStepRunner,
+} from "../../monitoring/cron-step-runner";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PaymentService } from "./payment.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { EventService } from "../events/event.service";
+import { PaytrReportSyncService } from "./paytr-report-sync.service";
+import { PaytrReportMatchingService } from "./paytr-report-matching.service";
 import { PayoutService } from "../payout/payout.service";
 
 /**
@@ -20,6 +26,8 @@ export class PaymentSchedulerService implements OnModuleInit {
     private readonly paymentService: PaymentService,
     private readonly productLockService: ProductLockService,
     private readonly eventService: EventService,
+    private readonly paytrReportSync: PaytrReportSyncService,
+    private readonly paytrReportMatching: PaytrReportMatchingService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     @Optional() private readonly payoutService?: PayoutService,
   ) {}
@@ -43,6 +51,63 @@ export class PaymentSchedulerService implements OnModuleInit {
       "*/30 * * * *",
       this.logger,
     );
+    // PSP mutabakat senkronu (PAYTR_REPORT_SYNC_ENABLED=true iken gerçek istek atar):
+    // gece dünün işlem dökümü + hakediş özet/detayları yerel tablolara alınır.
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "paytr-statement-sync",
+      "0 5 * * *",
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "paytr-settlement-sync",
+      "30 5 * * *",
+      this.logger,
+    );
+  }
+
+  /** Gerçek iş — Bull processor 'paytr-statement-sync' buradan çağırır. */
+  async runSyncPaytrStatement(log: (msg: string) => void = () => {}) {
+    const result = await this.paytrReportSync.syncTransactionStatement();
+    log(
+      `PayTR işlem dökümü: ${result.fetched} satır alındı, ${result.upserted} upsert`,
+    );
+    // Faz 3: sync'in hemen ardından eşleştirme + ters yön taraması (yerel DB,
+    // PayTR'ye istek atmaz; tablo boşken doğal no-op).
+    const match = await this.paytrReportMatching.matchStatementLines();
+    log(
+      `PayTR mutabakat: ${match.matched} eşleşti · ${match.mismatched} tutar farkı · ` +
+        `${match.unmatched} karşılıksız · ${match.missingInPaytr} dökümde olmayan ödeme`,
+    );
+    // Faz 5: eşleşen satışların PayTR kesintisi deftere (psp_fee) yazılır.
+    const fees = await this.paytrReportMatching.accruePspFees();
+    if (fees.recorded > 0 || fees.failed > 0) {
+      log(
+        `PayTR kesintisi deftere: ${fees.recorded} kayıt${fees.failed ? ` · ${fees.failed} hata` : ""}`,
+      );
+    }
+    return {
+      summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · ⚠ ${match.mismatched + match.missingInPaytr} fark` : ""}`,
+      stats: { ...result, ...match },
+    };
+  }
+
+  /** Gerçek iş — Bull processor 'paytr-settlement-sync' buradan çağırır. */
+  async runSyncPaytrSettlements(log: (msg: string) => void = () => {}) {
+    const result = await this.paytrReportSync.syncSettlements();
+    log(
+      `PayTR hakediş: ${result.settlements} hakediş, ${result.itemsFetchedFor} detay çekildi`,
+    );
+    // Faz 3: hakediş iç tutarlılığı + kalem→Payment bağları.
+    const verify = await this.paytrReportMatching.verifySettlements();
+    log(
+      `PayTR hakediş doğrulama: ${verify.checked} denetlendi · ${verify.mismatches} fark`,
+    );
+    return {
+      summary: `${result.settlements} hakediş${verify.mismatches > 0 ? ` · ⚠ ${verify.mismatches} fark` : ""}`,
+      stats: { ...result, ...verify },
+    };
   }
 
   /**
@@ -59,20 +124,26 @@ export class PaymentSchedulerService implements OnModuleInit {
   // İzleme: runHandleExpiredPayments her adımı bu log'a yazar (Bull "Kayıtlar").
   // Bull processor'ı tek tek (concurrency 1) işlediği için instance alanı güvenli.
   private stepLog: (msg: string) => void = () => {};
+  /**
+   * Aktif turun adım koşucusu. Adım izolasyonu korunur ama tur sonunda başarısız
+   * adım varsa hata fırlatılır — aksi halde her PayTR çağrısının patladığı bir tur
+   * bile "başarılı" görünür ve Bull retry'ı / Sentry Cron alarmı hiç tetiklenmez.
+   */
+  private steps: CronStepRunner = createCronStepRunner({ logger: this.logger });
+
+  private beginRun(log: (msg: string) => void): CronStepRunner {
+    this.stepLog = log;
+    this.steps = createCronStepRunner({ logger: this.logger, log });
+    return this.steps;
+  }
 
   private async runStep(name: string, fn: () => Promise<void>): Promise<void> {
-    try {
-      await fn();
-      this.stepLog(`✓ ${name}`);
-    } catch (error: any) {
-      this.logger.error(`Step "${name}" failed: ${error.message}`, error.stack);
-      this.stepLog(`✗ ${name}: ${error.message}`);
-    }
+    await this.steps.step(name, fn);
   }
 
   /** Gerçek iş — Bull processor 'payment-expired' buradan çağırır. */
   async runHandleExpiredPayments(log: (msg: string) => void = () => {}) {
-    this.stepLog = log;
+    const steps = this.beginRun(log);
     this.logger.log("Checking for expired reservations and payments...");
 
     await this.runStep("reconcilePendingPaytrPayments", async () => {
@@ -148,6 +219,20 @@ export class PaymentSchedulerService implements OnModuleInit {
       }
     });
 
+    // Sonucu belirsiz (manual_review) iadeleri durum-sorgu `returns` +
+    // reference_no ile otomatik çöz: PayTR'ye ulaşmışsa succeeded (finalize
+    // mevcut yolda), ulaşmamışsa failed (mevcut retry yolu yeniden gönderir).
+    // reconcileStuckRefundMarkers'tan SONRA, processRefundedOrders'tan ÖNCE:
+    // çözülen attempt'i aynı turda finalize/retry yakalayabilsin.
+    await this.runStep("resolveUnknownRefundOutcomes", async () => {
+      const resolved = await this.paymentService.resolveUnknownRefundOutcomes();
+      if (resolved.confirmed > 0 || resolved.requeued > 0) {
+        this.logger.warn(
+          `Refund resolve: ${resolved.confirmed} PayTR'de doğrulandı, ${resolved.requeued} yeniden kuyruğa alındı (${resolved.checked} sorgulandı)`,
+        );
+      }
+    });
+
     // K3: Alıcının iptal ettiği (status=refunded) ama henüz iade edilmemiş siparişleri
     // bul ve iadeyi tetikle. OrderService.cancel yalnız status'u refunded yapıyordu;
     // bu adım gerçek PayTR iadesini + hold iptalini güvenilir şekilde tamamlar.
@@ -206,6 +291,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     });
 
     this.stepLog = () => {};
+    steps.assertAllStepsSucceeded();
     return { summary: "Süre dolumu bakım turu tamamlandı (9 adım)", stats: {} };
   }
 
@@ -214,7 +300,7 @@ export class PaymentSchedulerService implements OnModuleInit {
    */
   /** Gerçek iş — Bull processor 'payment-release-holds' buradan çağırır. */
   async runHandleReleaseHoldsDue(log: (msg: string) => void = () => {}) {
-    this.stepLog = log;
+    const steps = this.beginRun(log);
     this.logger.log("Checking for payment holds due for release...");
 
     let releasedHolds = 0;
@@ -252,6 +338,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     }
 
     this.stepLog = () => {};
+    steps.assertAllStepsSucceeded();
     return {
       summary: `${releasedHolds} hold serbest · ${payoutsCreated} payout oluşturuldu`,
       stats: { releasedHolds, tradeCash, payoutsCreated },
@@ -291,7 +378,8 @@ export class PaymentSchedulerService implements OnModuleInit {
         error.stack,
       );
       log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { errors: 1 } };
+      // Yut MA: Bull job'ı "failed" olsun ki retry + Sentry Cron alarmı çalışsın.
+      throw error;
     }
   }
 }

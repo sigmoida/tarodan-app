@@ -2,8 +2,6 @@ import { api } from "./client";
 
 // Orders
 export const ordersApi = {
-  getAll: (params?: Record<string, any>) => api.get("/orders", { params }),
-  getOne: (id: string | number) => api.get(`/orders/${id}`),
   /** The buyer's own submitted review for an order (read-only view). */
   getMyReview: (id: string) =>
     api.get<{
@@ -135,15 +133,26 @@ export const ordersApi = {
     expectedShippingTariffVersion: number;
     expectedPricingHash?: string;
   }) => api.post("/orders/checkout/guest", data),
-  /** Alıcının sipariş grupları (gruplu liste) */
-  getGroups: (params?: Record<string, any>) =>
-    api.get("/orders/groups", { params }),
+  /** Birleşik grup listesi: alıcı=CheckoutGroup çatısı, satıcı=kendi paketi. */
+  getGroups: (params?: {
+    role?: "buyer" | "seller";
+    tab?: "active" | "cancelled" | "refunds";
+    page?: number;
+    limit?: number;
+  }) => api.get("/orders/groups", { params }),
   /** Tek sipariş grubu detayı */
   getGroup: (id: string) => api.get(`/orders/groups/${id}`),
+  /** Sipariş id'sinden grup çatısı (grupsuz sipariş = sentetik tek siparişlik grup). */
+  getGroupView: (orderId: string) => api.get(`/orders/${orderId}/group`),
   cancel: (
     id: string | number,
     body: { reasonCode?: OrderCancellationReason; reason?: string },
   ) => api.post(`/orders/${id}/cancel`, body),
+  /** GRUP iptali: sepetin tamamı (kısmi iptal yok; kargolanmış üye varsa 400). */
+  cancelGroup: (
+    groupId: string,
+    body: { reasonCode?: OrderCancellationReason; reason?: string },
+  ) => api.post(`/orders/groups/${groupId}/cancel`, body),
   confirm: (id: string | number) => api.post(`/orders/${id}/confirm`),
   setShippingAddress: (
     id: string | number,
@@ -167,11 +176,15 @@ export const ordersApi = {
   getCommissionPreview: (params: {
     amount: number;
     categoryId?: string;
-    shippingDesi?: number;
+    packageTier?: string;
   }) => api.get("/orders/commission-preview", { params }),
   /** Batch commission preview for multiple items (e.g. ilanlarım list). */
   getCommissionPreviewBatch: (
-    items: Array<{ amount: number; categoryId?: string | null }>,
+    items: Array<{
+      amount: number;
+      categoryId?: string | null;
+      packageTier?: string | null;
+    }>,
   ) => api.post("/orders/commission-preview-batch", { items }),
 };
 
@@ -180,6 +193,7 @@ export type RefundReason =
   | "damaged"
   | "wrong_item"
   | "not_as_described"
+  | "delivery_delayed"
   | "missing_parts"
   | "counterfeit"
   | "defective"

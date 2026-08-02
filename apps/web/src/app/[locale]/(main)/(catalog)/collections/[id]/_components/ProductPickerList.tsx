@@ -3,6 +3,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner } from "@tarodan/ui";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { PRODUCT_PLACEHOLDER } from "../_lib/add-item";
@@ -16,8 +17,6 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
     selectedProductIds,
     setSelectedProductIds,
     toggleProduct,
-    handleAddProducts,
-    adding,
     close,
   } = s;
 
@@ -32,10 +31,11 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
       </p>
       <Link
         href="/listings/new"
-        className="text-sm font-medium text-primary-500 hover:text-primary-600"
+        className="inline-flex items-center text-sm font-medium text-primary-500 hover:text-primary-600"
         onClick={close}
       >
-        {t("collection.createNewListing")} →
+        {t("collection.createNewListing")}
+        <ChevronRightIcon className="ml-1 h-4 w-4" />
       </Link>
     </div>
   ) : (
@@ -48,7 +48,7 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
         </p>
         {selectedProductIds.length > 0 && (
           <Button
-            variant="secondary"
+            variant="outline"
             onClick={() => setSelectedProductIds([])}
             className="text-xs font-medium text-primary-600 hover:text-primary-700"
           >
@@ -57,7 +57,7 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
         )}
       </div>
 
-      <div className="mb-4 max-h-[45vh] space-y-1.5 overflow-y-auto">
+      <div className="space-y-1.5">
         {products.map((product) => {
           const img0 = product.images?.[0];
           const imageUrl = img0
@@ -122,30 +122,6 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
             </Button>
           );
         })}
-      </div>
-
-      <div className="flex gap-3 border-t border-border pt-3">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="flex-1"
-          onClick={close}
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          className="flex-1"
-          onClick={handleAddProducts}
-          disabled={selectedProductIds.length === 0 || adding}
-        >
-          {adding
-            ? `${t("common.adding")} (${selectedProductIds.length})`
-            : selectedProductIds.length > 0
-              ? `${selectedProductIds.length} ${t("collection.addProduct")}`
-              : t("common.add")}
-        </Button>
       </div>
     </>
   );

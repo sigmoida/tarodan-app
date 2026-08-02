@@ -30,7 +30,9 @@ export function TierCard({
   onEdit,
 }: {
   tier: MembershipTier;
-  yearlyDiscount: number;
+  /** null = indirim oranı okunamadı; türetilen yıllık fiyat "—" gösterilir
+   *  (uydurulmuş bir orandan hesaplanmış rakam GÖSTERİLMEZ). */
+  yearlyDiscount: number | null;
   yearlyDiscountLoading?: boolean;
   onEdit?: () => void;
 }) {
@@ -74,7 +76,11 @@ export function TierCard({
               label={t("admin.tiers.card.yearly")}
               value={
                 <AsyncValue loading={yearlyDiscountLoading} width="8ch">
-                  {fmtTry(computedYearly(tier.monthlyPrice, yearlyDiscount))}
+                  {fmtTry(
+                    yearlyDiscount == null
+                      ? null
+                      : computedYearly(tier.monthlyPrice, yearlyDiscount),
+                  )}
                 </AsyncValue>
               }
             />

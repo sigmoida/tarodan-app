@@ -72,6 +72,10 @@ export class AdminAnalyticsService {
     return this.order.getOrderById(orderId);
   }
 
+  async getOrderGroupFile(orderId: string) {
+    return this.order.getOrderGroupFile(orderId);
+  }
+
   async updateOrderStatus(
     adminId: string,
     orderId: string,

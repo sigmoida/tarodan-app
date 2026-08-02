@@ -13,9 +13,18 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
-import { MembershipTierType } from "@prisma/client";
+import { CommissionAppliesTo, MembershipTierType } from "@prisma/client";
+import { isCatchAllCommissionRule } from "../order/order-commission.helper";
+import { SHIPPING_PACKAGE_TIER_ORDER } from "../shipping/shipping-package-tier";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
+
+/**
+ * Bu sayıda DLQ (`dead`) outbox satırı biriktiğinde instance hazır-değil sayılır:
+ * otomatik kurtarılamayan para yan-etkileri var ve trafiği kesmek, sessizce
+ * devam etmekten iyidir.
+ */
+const OUTBOX_DEAD_READINESS_THRESHOLD = 20;
 
 export interface ServiceHealth {
   status: "healthy" | "unhealthy" | "degraded";
@@ -155,18 +164,40 @@ export class HealthService {
     );
   }
 
+  /**
+   * Outbox sağlığı. Bayat `processing` satırı bir ALARM'dır, trafiği kesme
+   * gerekçesi DEĞİLDİR: drain turu onu zaten `pending`'e geri alır, oysa /ready'yi
+   * düşürmek Traefik'in TÜM replikaları yükten çekmesine yol açıyordu — tek bir
+   * çökme sitewide 503'e dönüşüyor ve yeniden başlatmak bile düzeltmiyordu.
+   * Hazır-DEĞİL yalnızca kurtarılamayan birikme (DLQ eşiği) için verilir.
+   */
   private async checkOutbox(): Promise<boolean> {
     if (process.env.NODE_ENV !== "production") return true;
 
     try {
       const staleProcessingBefore = new Date(Date.now() - 5 * 60_000);
-      const staleProcessingCount = await this.prisma.outboxEvent.count({
-        where: {
-          status: "processing",
-          updatedAt: { lt: staleProcessingBefore },
-        },
-      });
-      return staleProcessingCount === 0;
+      const [staleProcessingCount, deadCount] = await Promise.all([
+        this.prisma.outboxEvent.count({
+          where: {
+            status: "processing",
+            updatedAt: { lt: staleProcessingBefore },
+          },
+        }),
+        this.prisma.outboxEvent.count({ where: { status: "dead" } }),
+      ]);
+
+      if (staleProcessingCount > 0) {
+        this.logger.error(
+          `OUTBOX_STALE_PROCESSING count=${staleProcessingCount} — kesintiye uğramış claim'ler bir sonraki drain turunda kurtarılacak`,
+        );
+      }
+      if (deadCount >= OUTBOX_DEAD_READINESS_THRESHOLD) {
+        this.logger.error(
+          `OUTBOX_DEAD_BACKLOG count=${deadCount} — otomatik kurtarılamayan yan-etkiler; manuel inceleme gerekir`,
+        );
+        return false;
+      }
+      return true;
     } catch (error) {
       this.logger.error("Outbox readiness check failed", error);
       return false;
@@ -179,7 +210,7 @@ export class HealthService {
     try {
       const [
         membershipTierCount,
-        commissionRuleCount,
+        wildcardCommissionRules,
         taxRuleCount,
         shippingTariff,
         platformSeller,
@@ -197,11 +228,24 @@ export class HealthService {
             isActive: true,
           },
         }),
-        this.prisma.commissionRule.count({ where: { isActive: true } }),
+        // Yalnız SAYI yetmez: kategoriye özel kurallardan oluşan bir konfigürasyon
+        // "hazır" görünürken kapsam dışı her kategori checkout'ta fail-closed 503
+        // verir. Wildcard adaylarını çekip catch-all testini uygula (tek kaynak).
+        this.prisma.commissionRule.findMany({
+          where: {
+            isActive: true,
+            categoryId: null,
+            minAmount: null,
+            maxAmount: null,
+            appliesTo: CommissionAppliesTo.BOTH,
+          },
+        }),
         this.prisma.taxRule.count({ where: { isActive: true } }),
+        // Kademesiz aktif tarife "hazır" görünür ama checkout hiçbir desi için
+        // fiyat çözemez (fail-closed 503) → kademeleri de doğrula.
         this.prisma.shippingTariff.findFirst({
           where: { provider: "surat", status: "active" },
-          select: { id: true },
+          select: { id: true, packageTiers: { select: { code: true } } },
         }),
         this.prisma.user.findUnique({
           where: { email: "platform@tarodan.com" },
@@ -209,11 +253,32 @@ export class HealthService {
         }),
       ]);
 
+      const hasCatchAllCommissionRule = wildcardCommissionRules.some((rule) =>
+        isCatchAllCommissionRule(rule),
+      );
+      const hasCompleteShippingTiers =
+        !!shippingTariff &&
+        SHIPPING_PACKAGE_TIER_ORDER.every((code) =>
+          shippingTariff.packageTiers.some((tier) => tier.code === code),
+        );
+      if (shippingTariff && !hasCompleteShippingTiers) {
+        this.logger.error(
+          "BUSINESS_CONFIG_MISSING: the active shipping tariff has incomplete package tiers. " +
+            "Checkout cannot resolve a shipping price and will fail with 503.",
+        );
+      }
+      if (!hasCatchAllCommissionRule) {
+        this.logger.error(
+          "BUSINESS_CONFIG_MISSING: no active catch-all commission rule (appliesTo=BOTH, all axes wildcard). " +
+            "Orders whose category/amount matches no rule will fail checkout with 503.",
+        );
+      }
+
       return (
         membershipTierCount === 4 &&
-        commissionRuleCount > 0 &&
+        hasCatchAllCommissionRule &&
         taxRuleCount > 0 &&
-        !!shippingTariff &&
+        hasCompleteShippingTiers &&
         !!platformSeller
       );
     } catch (error) {

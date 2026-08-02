@@ -29,6 +29,37 @@ async function assertEmpty(baseUrl: string, path: string): Promise<void> {
   }
 }
 
+/**
+ * Boş katalog kanıtlamak yetmiyor: reset sonrası aktif tarifenin kademe
+ * fiyatları migration'ın türettiği tek düze değerde kalabiliyor (üçü de aynı) ve
+ * /health/ready buna "hazır" diyor — kimse uyarmadan büyük paket küçük paket
+ * fiyatına kargolanıyor. Tutarları log'a basıyoruz ki reset çıktısına bakan
+ * operatör admin panelinde ne ayarlaması gerektiğini görsün. Bu bir ASSERT
+ * DEĞİL: düz tarife meşru bir iş kararı olabilir, o yüzden yalnız uyarır.
+ */
+async function reportPackageTiersForReview(baseUrl: string): Promise<void> {
+  const payload = (await getJson(baseUrl, "/shipping/package-tiers")) as {
+    tariffVersion?: number;
+    tiers?: { code?: string; amount?: number }[];
+  };
+  const tiers = Array.isArray(payload.tiers) ? payload.tiers : [];
+  if (tiers.length === 0) return;
+
+  const summary = tiers
+    .map((tier) => `${tier.code ?? "?"}=${tier.amount ?? "?"}`)
+    .join(" · ");
+  console.log(
+    `Shipping tariff v${payload.tariffVersion ?? "?"} package tiers: ${summary}`,
+  );
+
+  const amounts = new Set(tiers.map((tier) => Number(tier.amount)));
+  if (amounts.size === 1) {
+    console.warn(
+      "REVIEW: every package tier costs the same. Set the real small/medium/large prices and sample dimensions in admin > System > Shipping Tariffs before unlocking the storefront.",
+    );
+  }
+}
+
 async function main(): Promise<void> {
   if (process.env.APP_ENV !== "production") {
     throw new Error(
@@ -53,6 +84,7 @@ async function main(): Promise<void> {
   await assertEmpty(baseUrl, "/search/products?page=1&pageSize=1");
 
   console.log("Production API is ready and public catalog is empty.");
+  await reportPackageTiersForReview(baseUrl);
 }
 
 main().catch((error) => {

@@ -372,6 +372,19 @@ export class AdminTaxController {
     return this.adminService.getElogoInvoices(query);
   }
 
+  @Post("invoices/:id/retry")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({
+    summary:
+      "Deneme bütçesi tükenmiş faturayı yeniden gönder (sayaç sıfırlanır, numara/ETTN korunur)",
+  })
+  async retryElogoInvoice(@Param("id", ParseUUIDPipe) id: string) {
+    // Sağlayıcı arızası bittikten sonra kurtarma yolu: eskiden admin API salt
+    // okunurdu ve tükenmiş faturayı yalnız DB'ye elle dokunarak kurtarmak mümkündü.
+    await this.elogoInvoicing.resetInvoiceAttempts(id);
+    return { success: true };
+  }
+
   @Get("invoices/:id/pdf")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Fatura PDF (S3 presigned URL veya canlı stream)" })

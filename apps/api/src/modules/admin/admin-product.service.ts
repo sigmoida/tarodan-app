@@ -11,6 +11,7 @@ import { notifyWebRevalidate } from "../../common/revalidate";
 import { AdminAuditService } from "./admin-audit.service";
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
+import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import {
   AdminProductQueryDto,
   UpdateProductDto,
@@ -94,6 +95,8 @@ export class AdminProductService {
       const productIds = await fulltextProductSearch(this.prisma, search);
       where.OR = [
         { id: { in: productIds } },
+        // İlan numarası (U010001) — destek/şikayet akışlarında doğrudan aranır.
+        { productCode: { contains: search.trim(), mode: "insensitive" } },
         { seller: { displayName: { contains: search, mode: "insensitive" } } },
         { seller: { email: { contains: search, mode: "insensitive" } } },
         { category: { name: { contains: search, mode: "insensitive" } } },
@@ -132,7 +135,14 @@ export class AdminProductService {
       {
         where,
         include: {
-          seller: { select: { id: true, displayName: true, email: true } },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
           category: { select: { id: true, name: true } },
           brand: { select: { name: true } },
           images: { take: 1, orderBy: { sortOrder: "asc" } },
@@ -218,6 +228,7 @@ export class AdminProductService {
     // Create CSV header
     const headers = [
       "ID",
+      "İlan No",
       "Başlık",
       "Fiyat",
       "Durum",
@@ -231,6 +242,7 @@ export class AdminProductService {
     // Create CSV rows
     const rows = products.map((p) => [
       p.id,
+      p.productCode,
       `"${(p.title || "").replace(/"/g, '""')}"`,
       Number(p.price).toFixed(2),
       p.status,
@@ -323,8 +335,12 @@ export class AdminProductService {
     if (dto.quantity !== undefined) {
       data.quantity = dto.quantity;
     }
-    if (dto.shippingDesi !== undefined) {
-      data.shippingDesi = dto.shippingDesi;
+    // Paket boyutu düzeltmesi (moderasyon): satıcı yanlış boyut seçtiğinde farkı
+    // platform üstleniyor, bu yüzden admin düzeltebilir. Desi kademeden TÜRETİLİR —
+    // ikisi ayrışırsa paket desisi toplamı yanlış kademeye düşer.
+    if (dto.shippingPackageTier !== undefined) {
+      data.shippingPackageTier = dto.shippingPackageTier;
+      data.shippingDesi = billableDesiForTier(dto.shippingPackageTier);
     }
     // Açıkça seçilen status admin'in override'ı olarak öncelikli — aksi halde
     // düzenleme formu quantity'yi de gönderdiğinden status her zaman miktardan

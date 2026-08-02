@@ -6,9 +6,10 @@ import { useTranslations } from "next-intl";
 
 /**
  * Small PIN island (#398). POSTs the code to `/api/unlock`; the server
- * verifies it against `SITE_UNLOCK_PIN` and sets the httpOnly `site_unlock`
- * cookie on success. This is a normal form POST so `/api/unlock` owns the
- * redirect response; the browser follows it with the freshly set cookie.
+ * verifies it (admin-managed invite codes via the API, or the emergency env
+ * fallback) and sets the signed httpOnly `site_unlock` cookie on success.
+ * This is a normal form POST so `/api/unlock` owns the redirect response;
+ * the browser follows it with the freshly set cookie.
  */
 export default function PinForm() {
   const t = useTranslations();
@@ -44,7 +45,8 @@ export default function PinForm() {
           id="site-unlock-pin"
           name="pin"
           type="password"
-          inputMode="numeric"
+          inputMode="text"
+          autoCapitalize="characters"
           autoComplete="off"
           maxLength={128}
           placeholder={t("utility.comingSoon.pin.placeholder")}

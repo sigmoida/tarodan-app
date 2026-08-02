@@ -24,11 +24,10 @@ export function CronsCard() {
       adminApi.post("/admin/test-tools/run-cron", { key }).then((r) => r.data),
     {
       errorMessage: t("admin.system.testTools.cronError"),
+      // Tetikleme artık asenkron: yanıt sonucu değil kuyruk fişini döner.
       onSuccess: (data) =>
         toast.success(
-          t("admin.system.testTools.cronSuccess", {
-            result: JSON.stringify(data.result),
-          }),
+          t("admin.system.testTools.cronQueued", { jobId: data.jobId }),
         ),
     },
   );

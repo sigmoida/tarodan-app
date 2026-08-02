@@ -20,6 +20,10 @@ export interface RecordProviderEventInput {
   totalAmount?: number | null;
   failedReasonCode?: string | null;
   failedReasonMsg?: string | null;
+  /** PSP kesintisi (durum-sorgu kesinti_tutari) — ücret mutabakatı. */
+  providerFee?: number | null;
+  /** Kesinti sonrası net (durum-sorgu net_tutar). */
+  providerNet?: number | null;
   utoken?: string | null;
   testMode?: boolean | null;
   hashValid?: boolean | null;
@@ -68,6 +72,14 @@ export class PaymentProviderEventService {
               : null,
           failedReasonCode: input.failedReasonCode ?? null,
           failedReasonMsg: input.failedReasonMsg ?? null,
+          providerFee:
+            input.providerFee != null && Number.isFinite(input.providerFee)
+              ? new Prisma.Decimal(input.providerFee)
+              : null,
+          providerNet:
+            input.providerNet != null && Number.isFinite(input.providerNet)
+              ? new Prisma.Decimal(input.providerNet)
+              : null,
           utoken: input.utoken ?? null,
           testMode: input.testMode ?? null,
           hashValid: input.hashValid ?? null,

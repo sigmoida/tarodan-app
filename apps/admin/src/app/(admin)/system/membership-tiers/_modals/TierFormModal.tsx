@@ -34,7 +34,9 @@ export function TierFormModal({
 }) {
   const t = useTranslations();
   const isFree = tier.type === "free";
-  const form = useZodForm(tierSchema(t), { defaultValues: tierToForm(tier) });
+  const form = useZodForm(tierSchema(t, isFree), {
+    defaultValues: tierToForm(tier),
+  });
   const monthly = parseFloat(form.watch("monthlyPrice")) || 0;
   const yearly = computedYearly(monthly, yearlyDiscount);
 
@@ -64,20 +66,26 @@ export function TierFormModal({
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
       submitLabel={t("common.update")}
-      maxWidth="max-w-2xl"
+      size="2xl"
     >
       <div className="grid grid-cols-2 gap-4">
-        <FormInput name="name" label={t("admin.tiers.field.name")} />
+        <FormInput
+          name="name"
+          label={t("admin.tiers.field.name")}
+          placeholder={t("admin.tiers.field.namePlaceholder")}
+        />
         <FormInput
           name="sortOrder"
           label={t("admin.tiers.field.sortOrder")}
           type="number"
+          placeholder="0"
         />
       </div>
 
       <FormTextarea
         name="description"
         label={t("common.description")}
+        placeholder={t("admin.tiers.field.descriptionPlaceholder")}
         rows={2}
       />
 
@@ -89,6 +97,7 @@ export function TierFormModal({
             type="number"
             step="0.01"
             min="0"
+            placeholder="99.90"
           />
           <div>
             <span className="mb-1 block text-sm text-muted">
@@ -116,18 +125,21 @@ export function TierFormModal({
           name="maxFreeListings"
           label={t("admin.tiers.field.maxFreeListings")}
           type="number"
+          placeholder="5"
         />
         <FormInput
           name="maxTotalListings"
           label={t("admin.tiers.field.maxTotalListings")}
           type="number"
           min="-1"
+          placeholder="-1"
           helperText={t("admin.tiers.field.maxTotalListingsHelper")}
         />
         <FormInput
           name="maxImagesPerListing"
           label={t("admin.tiers.field.maxImagesPerListing")}
           type="number"
+          placeholder="10"
         />
       </div>
 

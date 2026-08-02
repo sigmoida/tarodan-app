@@ -94,6 +94,17 @@ export class PaymentInitiationService {
       throw new NotFoundException(i18nMessage("server.payment.orderNotFound"));
     }
 
+    // Grup üyesi sipariş TEKİL ödenemez — sepet tek çekimdir. orderId ile gelen
+    // istek gruba yönlendirilir; grup yolu erişim/durum/tutar doğrulamalarını
+    // kendisi yapar. (Aksi halde aynı grubun ürünleri ayrı ayrı ödenebiliyordu.)
+    if (order.checkoutGroupId) {
+      return this.initiateGroupPayment(
+        userId,
+        { ...dto, checkoutGroupId: order.checkoutGroupId },
+        req,
+      );
+    }
+
     // Check if this is a guest order
     const shippingAddress = order.shippingAddress as any;
     const isGuestOrder = shippingAddress?.isGuestOrder === true;
@@ -607,6 +618,23 @@ export class PaymentInitiationService {
       }
     }
 
+    // Grup üyesi sipariş TEKİL çekilemez — sepet tek ödemedir. orderId hedefi
+    // dal seçiminden önce gruba çözümlenir (initiatePaymentUnified'daki guard'ın
+    // aynısı; eski ödeme satırları/eski istemciler tek ürün tutarı çekemesin).
+    if (dto.orderId && !dto.checkoutGroupId) {
+      const target = await this.prisma.order.findUnique({
+        where: { id: dto.orderId },
+        select: { checkoutGroupId: true },
+      });
+      if (target?.checkoutGroupId) {
+        dto = {
+          ...dto,
+          orderId: undefined,
+          checkoutGroupId: target.checkoutGroupId,
+        };
+      }
+    }
+
     let payment: any;
     let buyer: PayTRBuyer;
     let basketItems: Array<{
@@ -620,7 +648,7 @@ export class PaymentInitiationService {
     let amount: number;
     let successQueryParams: string;
 
-    if (dto.orderId) {
+    if (dto.orderId && !dto.checkoutGroupId) {
       const order = await this.prisma.order.findUnique({
         where: { id: dto.orderId },
         include: { buyer: true, seller: true, product: true },

@@ -14,6 +14,8 @@ import { EventService } from "../events/event.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateReferenceCode } from "../../common/helpers/generate-reference";
 
 /**
  * Safe-trade (depo escrow) admin akışının depo-tarafı: depo teslim alma
@@ -77,10 +79,9 @@ export class AdminTradeWarehouseService {
       !this.suratCargoService ||
       !this.suratCargoService.isIntegrationEnabled()
     ) {
-      const fallbackTracking = `TRK${Date.now().toString(36).toUpperCase()}${Math.random()
-        .toString(36)
-        .substring(2, 6)
-        .toUpperCase()}`;
+      const fallbackTracking = generateReferenceCode(
+        REFERENCE_PREFIX.shipmentFallback,
+      );
       return {
         carrier: "Tarodan Warehouse",
         trackingNumber: fallbackTracking,
@@ -170,8 +171,9 @@ export class AdminTradeWarehouseService {
       return false;
     }
 
-    // OID: orijinal formatla birebir aynı türetim (TRD- çift öneki DAHİL —
-    // format değişirse idempotency anahtarı kayar, mükerrer gönderi riski doğar).
+    // OID: gönderi OLUŞTURULURKEN kullanılan formatla BİREBİR aynı türetim —
+    // format burada ve üretim tarafında birlikte değişmezse idempotency
+    // anahtarı kayar ve mükerrer gönderi riski doğar.
     let oid = ship.trackingNumber;
     if (!oid) {
       const returnLegCount = await this.prisma.tradeShipment.count({
@@ -183,7 +185,8 @@ export class AdminTradeWarehouseService {
             ? "RET-INI"
             : "RET-REC"
           : "RET-STK";
-      oid = `TRD-${ship.trade.tradeNumber}-${suffix}`
+      // tradeNumber zaten "TKS-..." önekini taşır; ikinci bir önek eklenmez.
+      oid = `${ship.trade.tradeNumber}-${suffix}`
         .replace(/[^a-zA-Z0-9-]/g, "")
         .slice(0, 50);
     }
@@ -432,19 +435,16 @@ export class AdminTradeWarehouseService {
         await this.common.resolveWarehouseAddressId(tx);
 
       const genTrackingNumber = () =>
-        `TRK${Date.now().toString(36).toUpperCase()}${Math.random()
-          .toString(36)
-          .substring(2, 6)
-          .toUpperCase()}`;
+        generateReferenceCode(REFERENCE_PREFIX.shipmentFallback);
 
       const now = new Date();
 
       // Submit each warehouse-to-recipient leg to Sürat as a real shipment.
       // If integration is disabled, falls back to internal tracking number.
-      const initiatorOid = `TRD-${trade.tradeNumber}-INI`
+      const initiatorOid = `${trade.tradeNumber}-INI`
         .replace(/[^a-zA-Z0-9-]/g, "")
         .slice(0, 50);
-      const receiverOid = `TRD-${trade.tradeNumber}-REC`
+      const receiverOid = `${trade.tradeNumber}-REC`
         .replace(/[^a-zA-Z0-9-]/g, "")
         .slice(0, 50);
 
@@ -744,10 +744,10 @@ export class AdminTradeWarehouseService {
         await this.common.resolveWarehouseAddressId(tx);
       const now = new Date();
 
-      const initiatorReturnOid = `TRD-${trade.tradeNumber}-RET-INI`
+      const initiatorReturnOid = `${trade.tradeNumber}-RET-INI`
         .replace(/[^a-zA-Z0-9-]/g, "")
         .slice(0, 50);
-      const receiverReturnOid = `TRD-${trade.tradeNumber}-RET-REC`
+      const receiverReturnOid = `${trade.tradeNumber}-RET-REC`
         .replace(/[^a-zA-Z0-9-]/g, "")
         .slice(0, 50);
 

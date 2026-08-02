@@ -25,6 +25,12 @@ export interface ProductFilterParams {
   manufacturerId?: string;
   carModelId?: string;
   tradeOnly?: boolean;
+  /**
+   * `tradeOnly` filtresine satıcı yetkisi de eklenir. Ücretsiz katmanda takas
+   * AÇIKSA (admin öyle ayarladıysa) herkes yetkilidir ve ek şart gerekmez —
+   * o durumda çağıran `undefined` geçer. Bkz. `tradeCapableSellerWhere`.
+   */
+  tradeCapableSeller?: Prisma.UserWhereInput;
   boostedOnly?: boolean;
   /** Home showcase (Vitrin) — only products with an active `showcaseOnHome` boost. */
   homeShowcase?: boolean;
@@ -83,6 +89,7 @@ export function buildProductWhere(
     manufacturerId,
     carModelId,
     tradeOnly,
+    tradeCapableSeller,
     boostedOnly,
     homeShowcase,
     preOrder,
@@ -157,7 +164,13 @@ export function buildProductWhere(
 
   // ── Enum/boolean filters (indexed columns) ──
   if (condition) where.condition = condition as any;
-  if (tradeOnly) where.isTradeEnabled = true;
+  if (tradeOnly) {
+    // Bayrak satıcının NİYETİ; yetki üyelikten gelir. Üyeliği biten satıcının
+    // ilanları bayrağı korur, o yüzden yetki de aranmalı — aksi halde pazaryeri
+    // sahibinin kabul edemeyeceği ilanları "takasa açık" diye listeliyor.
+    where.isTradeEnabled = true;
+    if (tradeCapableSeller) where.seller = tradeCapableSeller;
+  }
   if (boostedOnly) where.boostedUntil = { gt: new Date() };
   if (homeShowcase) where.homeShowcaseUntil = { gt: new Date() };
   if (preOrder) where.isPreorder = true;

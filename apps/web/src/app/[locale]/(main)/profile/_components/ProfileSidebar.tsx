@@ -25,10 +25,13 @@ import {
   BuildingStorefrontIcon,
   ShieldCheckIcon,
   ArrowRightOnRectangleIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
+import { membershipNavLabel } from "@/lib/membership";
 import { useLocale, useTranslations } from "next-intl";
+import { useAuthStore } from "@/stores/authStore";
 import { useProfile } from "../_context/ProfileContext";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -53,7 +56,15 @@ interface NavSection {
  * · account); `Profil` and `Güvenlik` are standalone (uncategorized) rows. Live
  * active-state highlighting + the badges the profile overview already loads.
  */
-export default function ProfileSidebar() {
+export default function ProfileSidebar({
+  /** Çekmecede kart çerçevesi istenmez — panelin kendi kenarı zaten var. */
+  className,
+  /** Bir bağlantıya gidildiğinde çağrılır (çekmeceyi kapatmak için). */
+  onNavigate,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+} = {}) {
   const t = useTranslations();
   const pathname = usePathname();
   const {
@@ -63,6 +74,10 @@ export default function ProfileSidebar() {
     unreadMessagesCount,
     handleLogout,
   } = useProfile();
+  // Kurumsal akıştaki hesap: businessStatus atanmış (pending/approved/rejected).
+  const isCorporateAccount = useAuthStore(
+    (s) => s.user?.businessStatus != null,
+  );
 
   const sections: NavSection[] = [
     {
@@ -71,6 +86,13 @@ export default function ProfileSidebar() {
           icon: UserCircleIcon,
           label: t("profile.myProfile"),
           href: "/profile",
+        },
+        {
+          // Ödeme Yöntemleri de kart ikonu kullanıyordu; ayırt edilebilsin diye
+          // üyeliğe kendi ikonu verildi.
+          icon: SparklesIcon,
+          label: membershipNavLabel(profile?.membershipTier),
+          href: "/profile/membership",
         },
       ],
     },
@@ -167,16 +189,23 @@ export default function ProfileSidebar() {
         },
       ],
     },
-    {
-      title: "Hesap",
-      links: [
-        {
-          icon: BuildingStorefrontIcon,
-          label: "İşletme",
-          href: "/profile/business",
-        },
-      ],
-    },
+    // İşletme sayfası yalnız kurumsal akıştaki hesaplara ait (başvuru
+    // tamamlama + panel). Bireysel kullanıcı bağlantıyı hiç görmez; adresi
+    // elle yazarsa sayfa profile geri yönlendirir.
+    ...(isCorporateAccount
+      ? [
+          {
+            title: "Hesap",
+            links: [
+              {
+                icon: BuildingStorefrontIcon,
+                label: "İşletme",
+                href: "/profile/business",
+              },
+            ],
+          },
+        ]
+      : []),
     {
       links: [
         { icon: ShieldCheckIcon, label: "Güvenlik", href: "/profile/security" },
@@ -190,7 +219,11 @@ export default function ProfileSidebar() {
       : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <nav className="flex flex-col rounded-lg border border-border-subtle bg-surface-elevated overflow-hidden">
+    <nav
+      className={`flex flex-col overflow-hidden bg-surface-elevated ${
+        className ?? "rounded-lg border border-border-subtle"
+      }`}
+    >
       {/* Identity header */}
       <div className="flex items-center gap-3 px-4 py-4">
         <UserAvatar
@@ -204,6 +237,11 @@ export default function ProfileSidebar() {
             {profile?.displayName || t("nav.account")}
           </p>
           <p className="text-xs text-muted truncate">{profile?.email}</p>
+          {profile?.adminCode && (
+            <p className="mt-0.5 text-2xs font-medium text-subtle">
+              {profile.adminCode}
+            </p>
+          )}
         </div>
       </div>
 
@@ -227,6 +265,7 @@ export default function ProfileSidebar() {
                   <li key={href}>
                     <Link
                       href={href}
+                      onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
                       className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
                         active

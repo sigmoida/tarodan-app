@@ -6,7 +6,9 @@ import {
   CommissionTaxpayerType,
   MembershipTierType,
   SellerType,
+  ShippingPackageTierCode,
 } from "@prisma/client";
+import type { ShippingBuyerShareByTier } from "../shipping/shipping-tariff.helper";
 
 type CommissionNumericValue = number | string | { toString(): string };
 
@@ -44,7 +46,18 @@ export interface CommissionRuleForCalculation {
   sellerPlatformFeeMax?: CommissionNumericValue | null;
   /** Buyer share (%) of the single shipping cost; seller share = 100 - this. */
   shippingBuyerShare?: CommissionNumericValue | null;
+  /**
+   * Paket boyutu başına kargo bölüşümü. Satır bulunmayan kademe, tek
+   * `shippingBuyerShare` değerine geri düşer (kolaylık fallback'i).
+   */
+  shippingShares?: Array<{
+    tierCode: ShippingPackageTierCode;
+    buyerShare: CommissionNumericValue;
+  }> | null;
 }
+
+// Kademe-payı haritası kargo alanına ait; tek kaynak shipping helper'dadır.
+export type { ShippingBuyerShareByTier };
 
 export interface CommissionCalculationResult {
   /** buyerCommission + buyerServiceFee (what the buyer pays on top). */
@@ -58,10 +71,23 @@ export interface CommissionCalculationResult {
   buyerServiceFeeAmount: number;
   sellerCommissionAmount: number;
   sellerPlatformFeeAmount: number;
-  /** 0–100; buyer's share of the shipping cost (default 100 = buyer pays all). */
+  /**
+   * 0–100; buyer's share of the shipping cost (default 100 = buyer pays all).
+   * Paketin kademesi bilinmediğinde kullanılan geriye-uyum değeri: ilk kademenin
+   * payı. Kademe çözüldükten sonra `shippingBuyerShares` okunmalıdır.
+   */
   shippingBuyerShare: number;
+  /** Paket boyutu başına alıcı payı — çağıran, paketin kademesine göre seçer. */
+  shippingBuyerShares: ShippingBuyerShareByTier;
   ruleId: string | null;
   ruleName: string | null;
+  /**
+   * Hangi tarafın kuralı eşleşti? `ruleId` bunların birleşimidir (seller ?? buyer),
+   * bu yüzden tek başına "satıcı komisyonu yapılandırılmış mı" sorusunu YANITLAMAZ.
+   * Fail-closed guard'lar bu alanlara bakmalıdır.
+   */
+  sellerRuleId: string | null;
+  buyerRuleId: string | null;
   ruleType?: CommissionRuleType;
   appliedRate?: number;
   wasMinApplied?: boolean;
@@ -83,6 +109,68 @@ export interface CommissionMatchContext {
 
 const numericValue = (value: CommissionNumericValue | null | undefined) =>
   value == null ? null : Number(value);
+
+const DEFAULT_SHIPPING_BUYER_SHARE = 100;
+const SHIPPING_TIER_CODES = Object.values(ShippingPackageTierCode);
+const clampShare = (share: number) => Math.min(100, Math.max(0, share));
+
+/**
+ * Bir kuralın paket boyutu başına alıcı kargo payları. Kademe satırı bulunmayan
+ * boyut kuralın tek `shippingBuyerShare` değerini kullanır; o da yoksa 100
+ * (alıcı tüm kargoyu öder — mevcut davranış korunur).
+ */
+function resolveShippingBuyerShares(
+  rule: CommissionRuleForCalculation | null | undefined,
+): ShippingBuyerShareByTier {
+  const fallbackRaw = numericValue(rule?.shippingBuyerShare);
+  const fallback =
+    fallbackRaw == null
+      ? DEFAULT_SHIPPING_BUYER_SHARE
+      : clampShare(fallbackRaw);
+  const byTier = new Map(
+    (rule?.shippingShares ?? []).map((share) => [
+      share.tierCode,
+      clampShare(Number(share.buyerShare)),
+    ]),
+  );
+  return Object.fromEntries(
+    SHIPPING_TIER_CODES.map((code) => [code, byTier.get(code) ?? fallback]),
+  ) as ShippingBuyerShareByTier;
+}
+
+/**
+ * "Catch-all" kural: her eksende wildcard, tutar aralığı sınırsız ve HER İKİ
+ * tarafa (BOTH) uygulanan kural. En az bir aktif catch-all kuralın varlığı
+ * dağıtım önkoşuludur: aksi halde eşleşmeyen her kategori/tutar checkout'ta
+ * fail-closed 503 verir (veya yalnız alıcı tarafı eşleşir ve satıcı komisyonu
+ * sessizce 0 olur). Tanım tek kaynaktan gelir — health check ve silme guard'ı
+ * bu fonksiyonu kullanır.
+ */
+export function isCatchAllCommissionRule(
+  rule: Pick<
+    CommissionRuleForCalculation,
+    | "categoryId"
+    | "sellerType"
+    | "taxpayerType"
+    | "minAmount"
+    | "maxAmount"
+    | "appliesTo"
+  >,
+): boolean {
+  const wildcardSeller =
+    rule.sellerType == null || rule.sellerType === CommissionSellerType.ALL;
+  const wildcardTaxpayer =
+    rule.taxpayerType == null ||
+    rule.taxpayerType === CommissionTaxpayerType.all;
+  return (
+    rule.categoryId == null &&
+    wildcardSeller &&
+    wildcardTaxpayer &&
+    rule.minAmount == null &&
+    rule.maxAmount == null &&
+    rule.appliesTo === CommissionAppliesTo.BOTH
+  );
+}
 
 /** Whether `amount` falls in the rule's [minAmount, maxAmount] range (null = unbounded). */
 function amountInRange(
@@ -275,11 +363,16 @@ export function calculateCommissionFromRules(
   const sellerFeeAmount =
     Math.round((sellerCommissionAmount + sellerPlatformFeeAmount) * 100) / 100;
   const primary = sellerMatch ?? buyerMatch;
-  const shareRaw = numericValue(
-    sellerMatch?.shippingBuyerShare ?? buyerMatch?.shippingBuyerShare,
-  );
+  // Kargo payı satıcı tarafı kuralından gelir (kargoyu o sübvanse eder); yoksa
+  // alıcı tarafı kuralından. Kademe satırı olmayan boyut, kuralın tek payına düşer.
+  const shareSource =
+    sellerMatch?.shippingBuyerShare != null ||
+    sellerMatch?.shippingShares?.length
+      ? sellerMatch
+      : (buyerMatch ?? sellerMatch);
+  const shippingBuyerShares = resolveShippingBuyerShares(shareSource);
   const shippingBuyerShare =
-    shareRaw == null ? 100 : Math.min(100, Math.max(0, shareRaw));
+    shippingBuyerShares[SHIPPING_TIER_CODES[0]] ?? DEFAULT_SHIPPING_BUYER_SHARE;
 
   return {
     buyerFeeAmount,
@@ -291,8 +384,11 @@ export function calculateCommissionFromRules(
     sellerCommissionAmount,
     sellerPlatformFeeAmount,
     shippingBuyerShare,
+    shippingBuyerShares,
     ruleId: primary?.id ?? null,
     ruleName: primary?.name ?? null,
+    sellerRuleId: sellerMatch?.id ?? null,
+    buyerRuleId: buyerMatch?.id ?? null,
     ruleType: primary?.ruleType,
     appliedRate:
       numericValue(

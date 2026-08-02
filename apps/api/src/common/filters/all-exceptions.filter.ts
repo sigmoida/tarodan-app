@@ -14,6 +14,7 @@ import {
   type MessageKey,
   type MessageValues,
 } from "@tarodan/i18n";
+import { getRequestId } from "../context/request-context";
 import { I18nService } from "../../modules/i18n/i18n.service";
 import { isLocalizedMessage } from "../../modules/i18n/localized-message";
 import { resolveRequestLocale } from "../../modules/i18n/locale.util";
@@ -99,11 +100,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
+    // Sansürlenmiş yanıtta istemciye kalan TEK iz korelasyon kimliğidir:
+    // kullanıcı destek talebinde bu kodu söyler, operatör aynı kimlikle konsol
+    // satırlarını ve error_logs kaydını bulur. Kasıtlı 4xx gövdeleri (yukarıda
+    // erken dönenler) değişmez — mevcut sözleşme korunur.
+    const requestId = getRequestId();
     response.status(status).json({
       statusCode: status,
       message: this.i18n.translate(key, locale, params),
       error: STATUS_CODES[status] ?? "Error",
       i18nKey: key,
+      ...(requestId && { requestId }),
     });
   }
 

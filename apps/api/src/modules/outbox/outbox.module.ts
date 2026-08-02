@@ -5,6 +5,7 @@ import { OutboxService } from "./outbox.service";
 import { OutboxHandlerRegistry } from "./outbox-handler.registry";
 import { OutboxDrainerService } from "./outbox-drainer.service";
 import { OutboxScheduledProcessor } from "./outbox-scheduled.processor";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 /**
  * OutboxModule (Faz 5) — güvenilir yan-etki altyapısı. @Global: OutboxService +
@@ -19,7 +20,7 @@ import { OutboxScheduledProcessor } from "./outbox-scheduled.processor";
     OutboxService,
     OutboxHandlerRegistry,
     OutboxDrainerService,
-    OutboxScheduledProcessor,
+    ...scheduledProcessors(OutboxScheduledProcessor),
   ],
   exports: [OutboxService, OutboxHandlerRegistry],
 })

@@ -14,10 +14,13 @@ import {
   Prisma,
   RefundReason,
   RefundRequestStatus,
+  SellerAdjustmentType,
   ShipmentStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { PaymentService } from "../payment/payment.service";
 import { RefundPendingReconciliationException } from "../payment-providers/refund-errors";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
@@ -54,6 +57,8 @@ type RefundFinancialPersistenceData = Pick<
   | "retainedSellerPlatformFeeAmount"
   | "returnShippingChargeToBuyer"
   | "returnShippingChargeToSeller"
+  | "sellerShippingCompensationAmount"
+  | "outboundShippingChargeToSeller"
   | "requiresAdminReview"
   | "penaltyReviewRequired"
   | "refundProductAmount"
@@ -261,17 +266,8 @@ export class RefundService {
       );
     }
 
-    const activeStatuses: RefundRequestStatus[] = [
-      RefundRequestStatus.pending_review,
-      RefundRequestStatus.approved,
-      RefundRequestStatus.wait_for_delivery,
-      RefundRequestStatus.return_shipment_open,
-      RefundRequestStatus.return_in_transit,
-      RefundRequestStatus.return_delivered,
-      RefundRequestStatus.disputed,
-    ];
     const hasActive = order.refundRequests.some((r) =>
-      activeStatuses.includes(r.status),
+      ACTIVE_REFUND_REQUEST_STATUSES.includes(r.status),
     );
     if (hasActive) {
       throw new BadRequestException(i18nMessage("server.refund.alreadyActive"));
@@ -289,6 +285,9 @@ export class RefundService {
       phase === "preparing" || phase === "paid"
         ? resolveCancellationPolicy(
             dto.reason === RefundReason.changed_mind ? "changed_mind" : "other",
+            // Bu dal yalnız `paid`/`preparing` fazında çalışır: paket henüz
+            // taşıyıcıya verilmemiştir, dolayısıyla taşıma maliyeti doğmamıştır.
+            { hasShipped: false },
           )
         : resolveReturnPolicy(dto.reason);
 
@@ -387,23 +386,16 @@ export class RefundService {
         i18nMessage("server.refund.completedPaymentNotFound"),
       );
     }
-    const activeStatuses: RefundRequestStatus[] = [
-      RefundRequestStatus.pending_review,
-      RefundRequestStatus.approved,
-      RefundRequestStatus.wait_for_delivery,
-      RefundRequestStatus.return_shipment_open,
-      RefundRequestStatus.return_in_transit,
-      RefundRequestStatus.return_delivered,
-      RefundRequestStatus.disputed,
-    ];
     const hasActive = order.refundRequests.some((request) =>
-      activeStatuses.includes(request.status),
+      ACTIVE_REFUND_REQUEST_STATUSES.includes(request.status),
     );
     if (hasActive) {
       throw new BadRequestException(i18nMessage("server.refund.alreadyActive"));
     }
 
-    const policy = resolveCancellationPolicy(reasonCode);
+    // Kargoya teslim edilmiş sipariş yukarıda reddedildi (iade talebine
+    // yönlendirilir), bu yüzden burada taşıma maliyeti hiç doğmamıştır.
+    const policy = resolveCancellationPolicy(reasonCode, { hasShipped: false });
     const financial = await this.buildFinancialPolicySnapshot(
       order,
       policy,
@@ -412,24 +404,34 @@ export class RefundService {
       false,
     );
     const refundNumber = await this.generateRefundNumber();
-    const created = await this.prisma.refundRequest.create({
-      data: {
-        refundNumber,
-        orderId: order.id,
-        requesterId,
-        reason:
-          reasonCode === OrderCancellationReason.delivery_delayed
-            ? RefundReason.other
-            : RefundReason.changed_mind,
-        description: description?.trim() || null,
-        amount: financial.financials.buyerRefundAmount,
-        refundQuantity: order.quantity ?? 1,
-        status: policy.requiresAdminReview
-          ? RefundRequestStatus.pending_review
-          : RefundRequestStatus.approved,
-        ...this.refundFinancialData(policy, financial),
-      },
-    });
+    let created;
+    try {
+      created = await this.prisma.refundRequest.create({
+        data: {
+          refundNumber,
+          orderId: order.id,
+          requesterId,
+          reason:
+            reasonCode === OrderCancellationReason.delivery_delayed
+              ? RefundReason.other
+              : RefundReason.changed_mind,
+          description: description?.trim() || null,
+          amount: financial.financials.buyerRefundAmount,
+          refundQuantity: order.quantity ?? 1,
+          status: policy.requiresAdminReview
+            ? RefundRequestStatus.pending_review
+            : RefundRequestStatus.approved,
+          ...this.refundFinancialData(policy, financial),
+        },
+      });
+    } catch (error) {
+      if (this.isDuplicateActiveRefund(error)) {
+        throw new BadRequestException(
+          i18nMessage("server.refund.alreadyActive"),
+        );
+      }
+      throw error;
+    }
     await this.freezeHoldForRefund(order.id, created.id);
     await this.prisma.order.update({
       where: { id: order.id },
@@ -464,6 +466,7 @@ export class RefundService {
             sellerFeeRefundAmount: financial.financials.sellerFeeRefundAmount,
             buyerFeeRefundAmount:
               financial.financials.buyerProtectionRefundAmount,
+            ...this.shippingSettlement(created.id, financial.financials),
           },
         },
       );
@@ -582,14 +585,17 @@ export class RefundService {
             ),
             sellerFeeRefundAmount: Number(rr.refundedSellerFeeAmount),
             buyerFeeRefundAmount: Number(rr.refundedBuyerProtectionAmount),
-            sellerAdjustment:
-              Number(rr.returnShippingChargeToSeller) > 0
-                ? {
-                    sourceKey: `refund-return-shipping:${rr.id}`,
-                    amount: Number(rr.returnShippingChargeToSeller),
-                    refundRequestId: rr.id,
-                  }
-                : undefined,
+            ...this.shippingSettlement(rr.id, {
+              sellerShippingCompensationAmount: Number(
+                rr.sellerShippingCompensationAmount,
+              ),
+              outboundShippingChargeToSeller: Number(
+                rr.outboundShippingChargeToSeller,
+              ),
+              returnShippingChargeToSeller: Number(
+                rr.returnShippingChargeToSeller,
+              ),
+            }),
           },
         },
       );
@@ -996,6 +1002,17 @@ export class RefundService {
             ),
             sellerFeeRefundAmount: Number(rr.refundedSellerFeeAmount),
             buyerFeeRefundAmount: Number(rr.refundedBuyerProtectionAmount),
+            ...this.shippingSettlement(rr.id, {
+              sellerShippingCompensationAmount: Number(
+                rr.sellerShippingCompensationAmount,
+              ),
+              outboundShippingChargeToSeller: Number(
+                rr.outboundShippingChargeToSeller,
+              ),
+              returnShippingChargeToSeller: Number(
+                rr.returnShippingChargeToSeller,
+              ),
+            }),
           },
         }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
       );
@@ -1383,9 +1400,22 @@ export class RefundService {
    * Random by design so it leaks no sequence/count information. The
    * `refund_number` column's @unique constraint is the final collision guard.
    */
+  /**
+   * Kısmi tekil indeks (`refund_requests_order_id_active_key`) ihlalini, uygulama
+   * guard'ının verdiği AYNI anlamlı hataya çevirir. Guard read-then-create olduğu
+   * için eşzamanlı iki gönderimde ikinci istek buraya düşer; indeks olmasaydı iki
+   * aktif talep + iki Sürat iade kargosu oluşurdu.
+   */
+  private isDuplicateActiveRefund(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    );
+  }
+
   private async generateRefundNumber(): Promise<string> {
     return generateUniqueReference(
-      "RFD",
+      REFERENCE_PREFIX.refundRequest,
       async (code) =>
         (await this.prisma.refundRequest.count({
           where: { refundNumber: code },
@@ -1459,6 +1489,7 @@ export class RefundService {
       sellerFeeAmount?: Prisma.Decimal;
       sellerCommissionAmount?: Prisma.Decimal;
       sellerPlatformFeeAmount?: Prisma.Decimal;
+      sellerShippingAmount?: Prisma.Decimal;
       package?: {
         shippingTariffId: string | null;
         shippingTariffVersion: number | null;
@@ -1511,6 +1542,7 @@ export class RefundService {
       sellerCommissionAmount: Number(order.sellerCommissionAmount ?? 0),
       sellerPlatformFeeAmount: Number(order.sellerPlatformFeeAmount ?? 0),
       returnShippingAmount,
+      sellerShippingAmount: Number(order.sellerShippingAmount ?? 0),
       orderQuantity: order.quantity ?? 1,
       refundQuantity,
     });
@@ -1526,6 +1558,49 @@ export class RefundService {
         returnTariff: tariffSnapshot,
         createdAt: new Date().toISOString(),
       } as unknown as Prisma.InputJsonValue,
+    };
+  }
+
+  /**
+   * İadenin KARGO bacağının settlement karşılığı — üç iade yolunun TEK kaynağı.
+   *
+   * Escrow hold TAM kargoyu düştüğü için satıcı kendi payını peşin ödemiş sayılır:
+   * kusur alıcıdaysa (ya da gönderi hiç taşınmadıysa) bu pay hold'da satıcıya
+   * bırakılır. Ters yönde, satıcı kusurunda alıcıya geri ödenen gidiş kargosu ve
+   * dönüş kargosu satıcıya borç yazılır (Sürat faturası platforma gelir).
+   */
+  private shippingSettlement(
+    refundRequestId: string,
+    financials: {
+      sellerShippingCompensationAmount: number;
+      outboundShippingChargeToSeller: number;
+      returnShippingChargeToSeller: number;
+    },
+  ): {
+    holdRetainedAmount: number;
+    sellerAdjustments: Array<{
+      sourceKey: string;
+      amount: number;
+      type: SellerAdjustmentType;
+      refundRequestId: string;
+    }>;
+  } {
+    return {
+      holdRetainedAmount: financials.sellerShippingCompensationAmount,
+      sellerAdjustments: [
+        {
+          sourceKey: `refund-return-shipping:${refundRequestId}`,
+          amount: financials.returnShippingChargeToSeller,
+          type: SellerAdjustmentType.return_shipping,
+          refundRequestId,
+        },
+        {
+          sourceKey: `refund-outbound-shipping:${refundRequestId}`,
+          amount: financials.outboundShippingChargeToSeller,
+          type: SellerAdjustmentType.outbound_shipping,
+          refundRequestId,
+        },
+      ].filter((adjustment) => adjustment.amount > 0),
     };
   }
 
@@ -1547,6 +1622,9 @@ export class RefundService {
         financials.sellerPlatformFeeRetainedAmount,
       returnShippingChargeToBuyer: financials.returnShippingChargeToBuyer,
       returnShippingChargeToSeller: financials.returnShippingChargeToSeller,
+      sellerShippingCompensationAmount:
+        financials.sellerShippingCompensationAmount,
+      outboundShippingChargeToSeller: financials.outboundShippingChargeToSeller,
       requiresAdminReview: policy.requiresAdminReview,
       penaltyReviewRequired: policy.penaltyReviewRequired,
       refundProductAmount: true,
@@ -1600,6 +1678,7 @@ export class RefundService {
       sellerFeeAmount?: Prisma.Decimal;
       sellerCommissionAmount?: Prisma.Decimal;
       sellerPlatformFeeAmount?: Prisma.Decimal;
+      sellerShippingAmount?: Prisma.Decimal;
       package?: {
         shippingTariffId: string | null;
         shippingTariffVersion: number | null;
@@ -1621,22 +1700,32 @@ export class RefundService {
     );
     const amount = financial.financials.buyerRefundAmount;
 
-    const created = await this.prisma.refundRequest.create({
-      data: {
-        refundNumber,
-        orderId: order.id,
-        requesterId,
-        reason: dto.reason,
-        description: dto.description ?? null,
-        evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
-        amount,
-        refundQuantity,
-        status: policy.requiresAdminReview
-          ? RefundRequestStatus.pending_review
-          : RefundRequestStatus.approved,
-        ...this.refundFinancialData(policy, financial),
-      },
-    });
+    let created;
+    try {
+      created = await this.prisma.refundRequest.create({
+        data: {
+          refundNumber,
+          orderId: order.id,
+          requesterId,
+          reason: dto.reason,
+          description: dto.description ?? null,
+          evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
+          amount,
+          refundQuantity,
+          status: policy.requiresAdminReview
+            ? RefundRequestStatus.pending_review
+            : RefundRequestStatus.approved,
+          ...this.refundFinancialData(policy, financial),
+        },
+      });
+    } catch (error) {
+      if (this.isDuplicateActiveRefund(error)) {
+        throw new BadRequestException(
+          i18nMessage("server.refund.alreadyActive"),
+        );
+      }
+      throw error;
+    }
 
     if (policy.requiresAdminReview) {
       await this.freezeHoldForRefund(order.id, created.id);
@@ -1663,6 +1752,7 @@ export class RefundService {
           sellerFeeRefundAmount: financial.financials.sellerFeeRefundAmount,
           buyerFeeRefundAmount:
             financial.financials.buyerProtectionRefundAmount,
+          ...this.shippingSettlement(created.id, financial.financials),
         },
       });
     } catch (err) {
@@ -1745,6 +1835,7 @@ export class RefundService {
       sellerFeeAmount?: Prisma.Decimal;
       sellerCommissionAmount?: Prisma.Decimal;
       sellerPlatformFeeAmount?: Prisma.Decimal;
+      sellerShippingAmount?: Prisma.Decimal;
       package?: {
         shippingTariffId: string | null;
         shippingTariffVersion: number | null;
@@ -1767,24 +1858,34 @@ export class RefundService {
     const amount = financial.financials.buyerRefundAmount;
     const requiresReview = policy.requiresAdminReview;
 
-    const created = await this.prisma.refundRequest.create({
-      data: {
-        refundNumber,
-        orderId: order.id,
-        requesterId,
-        reason: dto.reason,
-        description: dto.description ?? null,
-        evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
-        amount,
-        refundQuantity,
-        status: requiresReview
-          ? RefundRequestStatus.pending_review
-          : RefundRequestStatus.wait_for_delivery,
-        decidedBy: requiresReview ? null : "system",
-        decidedAt: requiresReview ? null : new Date(),
-        ...this.refundFinancialData(policy, financial),
-      },
-    });
+    let created;
+    try {
+      created = await this.prisma.refundRequest.create({
+        data: {
+          refundNumber,
+          orderId: order.id,
+          requesterId,
+          reason: dto.reason,
+          description: dto.description ?? null,
+          evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
+          amount,
+          refundQuantity,
+          status: requiresReview
+            ? RefundRequestStatus.pending_review
+            : RefundRequestStatus.wait_for_delivery,
+          decidedBy: requiresReview ? null : "system",
+          decidedAt: requiresReview ? null : new Date(),
+          ...this.refundFinancialData(policy, financial),
+        },
+      });
+    } catch (error) {
+      if (this.isDuplicateActiveRefund(error)) {
+        throw new BadRequestException(
+          i18nMessage("server.refund.alreadyActive"),
+        );
+      }
+      throw error;
+    }
 
     // İade açıldı → satıcı hold'unu kilitle (payout bu iade kapanana kadar bloke).
     await this.freezeHoldForRefund(order.id, created.id);

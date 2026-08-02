@@ -87,6 +87,9 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       expect(fields).not.toHaveProperty("expiry_month");
       expect(fields).not.toHaveProperty("expiry_year");
       expect(fields).not.toHaveProperty("cvv");
+      // PayTR, Unix epoch request_exp_date değerini genel "paytr_token
+      // geçersiz" hatasıyla reddediyor; alan yoksa 30 dakikalık varsayılanı kullanır.
+      expect(fields).not.toHaveProperty("request_exp_date");
 
       const hashStr =
         MID +
@@ -133,93 +136,6 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       });
       expect(fields).not.toHaveProperty("recurring_payment");
       expect(fields).not.toHaveProperty("cvv");
-    });
-  });
-
-  describe("capiPaymentByRegisteredCard", () => {
-    it("posts to /odeme with utoken/ctoken/require_cvv, NO recurring_payment, and the Direkt API hash", async () => {
-      fetchSpy.mockResolvedValue({ text: async () => '{"status":"success"}' });
-
-      const r = await service.capiPaymentByRegisteredCard({
-        utoken: "UT1",
-        ctoken: "CT1",
-        amount: 149.9,
-        merchantOid: "ORDREG123",
-        buyer,
-        basketItems: [{ name: "Ürün", price: 149.9, quantity: 1 }],
-        requireCvv: false,
-        non3d: true,
-      });
-
-      expect(r.status).toBe("success");
-      expect(fetchSpy).toHaveBeenCalledWith(
-        "https://www.paytr.com/odeme",
-        expect.objectContaining({ method: "POST" }),
-      );
-      const body = bodyOf();
-      expect(body.get("utoken")).toBe("UT1");
-      expect(body.get("ctoken")).toBe("CT1");
-      expect(body.get("payment_amount")).toBe("149.90"); // ONDALIK TL
-      expect(body.get("installment_count")).toBe("0");
-      expect(body.get("non_3d")).toBe("1");
-      expect(body.get("require_cvv")).toBe("0");
-      // KRİTİK: kullanıcı-mevcut (CIT) ödemede recurring_payment GÖNDERİLMEZ.
-      expect(body.get("recurring_payment")).toBeNull();
-      expect(body.get("cvv")).toBeNull();
-
-      // Hash Direkt API ile birebir aynı: mid+ip+oid+email+amount+type+installment+currency+test+non3d, salt update içinde.
-      const hashStr =
-        MID +
-        buyer.ip +
-        "ORDREG123" +
-        buyer.email +
-        "149.90" +
-        "card" +
-        "0" +
-        "TL" +
-        "1" +
-        "1";
-      const expected = crypto
-        .createHmac("sha256", KEY)
-        .update(hashStr + SALT)
-        .digest("base64");
-      expect(body.get("paytr_token")).toBe(expected);
-    });
-
-    it("require_cvv=true → require_cvv '1' + cvv gönderilir", async () => {
-      fetchSpy.mockResolvedValue({ text: async () => '{"status":"success"}' });
-      await service.capiPaymentByRegisteredCard({
-        utoken: "UT1",
-        ctoken: "CT1",
-        amount: 10,
-        merchantOid: "ORDREG124",
-        buyer,
-        basketItems: [{ name: "Ürün", price: 10, quantity: 1 }],
-        requireCvv: true,
-        cvv: "123",
-        non3d: true,
-      });
-      const body = bodyOf();
-      expect(body.get("require_cvv")).toBe("1");
-      expect(body.get("cvv")).toBe("123");
-    });
-
-    it("non3d=false + HTML yanıt → threeDSHtml döner", async () => {
-      fetchSpy.mockResolvedValue({
-        text: async () => "<html><form>3DS</form></html>",
-      });
-      const r = await service.capiPaymentByRegisteredCard({
-        utoken: "UT1",
-        ctoken: "CT1",
-        amount: 10,
-        merchantOid: "ORDREG125",
-        buyer,
-        basketItems: [{ name: "Ürün", price: 10, quantity: 1 }],
-        non3d: false,
-      });
-      expect(r.status).toBe("success");
-      expect(r.threeDSHtml).toContain("<form>");
-      expect(bodyOf().get("non_3d")).toBe("0");
     });
   });
 

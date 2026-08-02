@@ -9,9 +9,9 @@ import { ClockIcon } from "@heroicons/react/24/outline";
 import {
   Alert,
   Badge,
-  Button,
   Checkbox,
   Modal,
+  ModalFooter,
   Radio,
   Spinner,
 } from "@tarodan/ui";
@@ -164,7 +164,23 @@ export default function BoostModal({
       isOpen={open}
       onClose={onClose}
       title={t("profile.boost.title")}
-      maxWidth="max-w-lg"
+      size="lg"
+      closeLabel={t("common.close")}
+      dismissDisabled={boost.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={handleConfirm}
+          cancelLabel={t("common.cancel")}
+          confirmLabel={
+            hasActiveBoost
+              ? t("profile.boost.extendAndPay")
+              : t("profile.boost.featureAndPay")
+          }
+          isLoading={boost.isPending}
+          disabled={loadingOptions || !enabled || selected == null}
+        />
+      }
     >
       <p className="text-sm text-muted mb-1 font-medium text-heading line-clamp-2">
         {listingTitle}
@@ -286,30 +302,6 @@ export default function BoostModal({
           {t("profile.boost.autoRenewLabel")}
         </label>
       )}
-
-      <div className="mt-5 flex gap-2 pt-4 border-t border-border">
-        <Button
-          variant="secondary"
-          className="flex-1"
-          onClick={onClose}
-          disabled={boost.isPending}
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button
-          className="flex-1"
-          onClick={handleConfirm}
-          disabled={
-            boost.isPending || loadingOptions || !enabled || selected == null
-          }
-        >
-          {boost.isPending
-            ? t("profile.boost.redirecting")
-            : hasActiveBoost
-              ? t("profile.boost.extendAndPay")
-              : t("profile.boost.featureAndPay")}
-        </Button>
-      </div>
     </Modal>
   );
 }

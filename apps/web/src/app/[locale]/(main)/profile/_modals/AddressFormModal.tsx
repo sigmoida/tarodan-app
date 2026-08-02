@@ -11,6 +11,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
+import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { addressSchema, type AddressValues } from "../_lib/schemas";
 import { useSaveAddress, type Address } from "../_hooks/useAddresses";
 
@@ -39,6 +40,7 @@ export default function AddressFormModal({
   address,
 }: AddressFormModalProps) {
   const save = useSaveAddress();
+  const modalLabels = useFormModalLabels();
   const form = useZodForm(addressSchema, { defaultValues: EMPTY });
   const { register, setValue, watch, formState } = form;
 
@@ -61,11 +63,17 @@ export default function AddressFormModal({
       isSubmitting={save.isPending}
       resetValues={address ? { ...EMPTY, ...address } : EMPTY}
       submitLabel={address ? "Güncelle" : "Kaydet"}
+      size="lg"
+      {...modalLabels}
     >
       <FormInput name="title" label="Adres Başlığı" placeholder="Ev, İş, vb." />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <FormInput name="fullName" label="Ad Soyad" />
+        <FormInput
+          name="fullName"
+          label="Ad Soyad"
+          placeholder="Adınız Soyadınız"
+        />
         <FormPhone name="phone" label="Telefon" />
       </div>
 
@@ -96,8 +104,17 @@ export default function AddressFormModal({
         )}
       </div>
 
-      <FormTextarea name="address" label="Adres" rows={3} />
-      <FormInput name="zipCode" label="Posta Kodu (opsiyonel)" />
+      <FormTextarea
+        name="address"
+        label="Adres"
+        placeholder="Mahalle, sokak, bina ve daire bilgileri"
+        rows={3}
+      />
+      <FormInput
+        name="zipCode"
+        label="Posta Kodu (opsiyonel)"
+        placeholder="Örn: 34000"
+      />
       <FormCheckbox name="isDefault" label="Varsayılan adres olarak ayarla" />
     </FormModal>
   );

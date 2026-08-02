@@ -27,6 +27,7 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AdminService } from "./admin.service";
+import { AdminPspReconciliationService } from "./admin-psp-reconciliation.service";
 import { AdvertisementService } from "../advertisement/advertisement.service";
 import { MediaService } from "../media/media.service";
 import {
@@ -114,7 +115,10 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminPaymentController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly pspReconciliation: AdminPspReconciliationService,
+  ) {}
 
   // ==================== PAYMENT MANAGEMENT ====================
 
@@ -212,7 +216,122 @@ export class AdminPaymentController {
     return this.adminService.forceCancelPayment(adminId, id, body.reason);
   }
 
+  // ==================== FINANCE OVERVIEW ====================
+
+  @Get("finance/overview")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Finance overview: money-flow funnel (collected → escrow → transferred → platform revenue) + health counters",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Finance overview" })
+  async getFinanceOverview() {
+    return this.adminService.getFinanceOverview();
+  }
+
+  // ==================== PSP (PAYTR) RECONCILIATION ====================
+
+  @Get("finance/psp/reconciliation")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "PSP reconciliation day cards: PayTR statement vs our records, diffs + match counts",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Day cards" })
+  async getPspReconciliation(@Query("days") days?: string) {
+    const parsed = days ? Number.parseInt(days, 10) : 7;
+    return this.pspReconciliation.getReconciliationSummary(
+      Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 31) : 7,
+    );
+  }
+
+  @Get("finance/psp/statement-lines")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "PayTR statement lines (default: problem rows — unmatched/amount_mismatch)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Statement lines" })
+  async getPspStatementLines(
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.pspReconciliation.getStatementLines({
+      status,
+      page: page ? Number.parseInt(page, 10) : undefined,
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get("finance/psp/settlements")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "PayTR settlements (realized + future_payments projections)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Settlements" })
+  async getPspSettlements() {
+    return this.pspReconciliation.getSettlements();
+  }
+
+  @Get("invoices/summary")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "eLogo invoice summary strip (month issued, pending, failed, exhausted)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Invoice summary" })
+  async getInvoicesSummary() {
+    return this.adminService.getInvoicesSummary();
+  }
+
   // ==================== SELLER PAYOUTS ====================
+
+  @Get("payouts/transfers")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "List real bank payout transfers (PayoutTransfer rows)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Payout transfers" })
+  async getPayoutTransfers(
+    @Query("status") status?: string,
+    @Query("search") search?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.adminService.getPayoutTransfers({
+      status,
+      search,
+      dateFrom,
+      dateTo,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
+
+  @Get("payouts/adjustments")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "List seller account adjustments (debts deducted from payouts)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Seller adjustments" })
+  async getPayoutAdjustments(
+    @Query("status") status?: string,
+    @Query("type") type?: string,
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.adminService.getPayoutAdjustments({
+      status,
+      type,
+      search,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
 
   @Get("payouts/summary")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)

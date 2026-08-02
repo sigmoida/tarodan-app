@@ -41,6 +41,7 @@ export function TradeRateCard() {
           step={0.5}
           label={t("admin.finance.common.ratePercent")}
           value={rate}
+          placeholder="5"
           onChange={(e) => setRate(e.target.value)}
           className="w-32"
         />

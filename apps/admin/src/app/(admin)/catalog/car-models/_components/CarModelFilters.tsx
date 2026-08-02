@@ -23,7 +23,7 @@ export function CarModelFilters() {
       bare
       value={brandId}
       onChange={(e) => setBrandId(e.target.value)}
-      className="w-full sm:w-56"
+      className="w-56 min-w-32 max-w-56 shrink overflow-hidden whitespace-nowrap [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
     >
       <option value="">{t("admin.catalog.carModels.allBrandsFilter")}</option>
       {brands.map((b) => (

@@ -8,13 +8,13 @@
  *
  * Turkish character support via system font fallbacks or embedded fonts.
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs';
-import * as path from 'path';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import * as PDFDocument from 'pdfkit';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as fs from "fs";
+import * as path from "path";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import * as PDFDocument from "pdfkit";
 
 export interface InvoiceData {
   invoiceNumber: string;
@@ -71,18 +71,18 @@ export interface InvoiceData {
 export class InvoicePdfService {
   private readonly logger = new Logger(InvoicePdfService.name);
   private readonly companyInfo = {
-    name: 'Tarodan Marketplace',
-    address: 'İstanbul, Türkiye',
-    taxId: '0000000000',
-    email: 'info@tarodan.com',
-    phone: '+90 212 000 0000',
+    name: "Tarodan Marketplace",
+    address: "İstanbul, Türkiye",
+    taxId: "0000000000",
+    email: "info@tarodan.com.tr",
+    phone: "+90 212 000 0000",
   };
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly storageService: StorageService,
-  ) { }
+  ) {}
 
   /**
    * Resolve a Turkish-capable Unicode TrueType font for the invoice PDF.
@@ -95,49 +95,62 @@ export class InvoicePdfService {
    * Priority: bundled DejaVu → INVOICE_FONT_PATH env → platform system fonts → null (Helvetica).
    * @param weight 'regular' | 'bold'
    */
-  private getInvoiceFontPath(weight: 'regular' | 'bold' = 'regular'): string | null {
-    const bundledName = weight === 'bold' ? 'DejaVuSans-Bold.ttf' : 'DejaVuSans.ttf';
+  private getInvoiceFontPath(
+    weight: "regular" | "bold" = "regular",
+  ): string | null {
+    const bundledName =
+      weight === "bold" ? "DejaVuSans-Bold.ttf" : "DejaVuSans.ttf";
     // Cover both dev and built layouts (code runs from dist/src/..., assets land under dist/...).
     const bundledCandidates = [
-      path.join(__dirname, '../assets/fonts', bundledName),
-      path.join(__dirname, '../../assets/fonts', bundledName),
-      path.join(__dirname, '../../../assets/fonts', bundledName),
-      path.join(__dirname, '../../../../assets/fonts', bundledName),
-      path.join(process.cwd(), 'dist/src/assets/fonts', bundledName),
-      path.join(process.cwd(), 'dist/assets/fonts', bundledName),
-      path.join(process.cwd(), 'src/assets/fonts', bundledName),
-      path.join(process.cwd(), 'assets/fonts', bundledName),
+      path.join(__dirname, "../assets/fonts", bundledName),
+      path.join(__dirname, "../../assets/fonts", bundledName),
+      path.join(__dirname, "../../../assets/fonts", bundledName),
+      path.join(__dirname, "../../../../assets/fonts", bundledName),
+      path.join(process.cwd(), "dist/src/assets/fonts", bundledName),
+      path.join(process.cwd(), "dist/assets/fonts", bundledName),
+      path.join(process.cwd(), "src/assets/fonts", bundledName),
+      path.join(process.cwd(), "assets/fonts", bundledName),
     ];
     for (const p of bundledCandidates) {
       if (fs.existsSync(p)) return p;
     }
 
     // Optional explicit override (regular weight).
-    const envPath = this.configService.get('INVOICE_FONT_PATH');
-    if (weight === 'regular' && envPath && typeof envPath === 'string' && fs.existsSync(envPath)) return envPath;
+    const envPath = this.configService.get("INVOICE_FONT_PATH");
+    if (
+      weight === "regular" &&
+      envPath &&
+      typeof envPath === "string" &&
+      fs.existsSync(envPath)
+    )
+      return envPath;
 
     // System font fallbacks (Arial & DejaVu both support Turkish).
     const platform = process.platform;
     const candidates: string[] = [];
-    if (platform === 'win32') {
+    if (platform === "win32") {
       candidates.push(
-        weight === 'bold' ? 'C:\\Windows\\Fonts\\arialbd.ttf' : 'C:\\Windows\\Fonts\\arial.ttf',
-        'C:\\Windows\\Fonts\\arial.ttf',
+        weight === "bold"
+          ? "C:\\Windows\\Fonts\\arialbd.ttf"
+          : "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
       );
-    } else if (platform === 'darwin') {
+    } else if (platform === "darwin") {
       candidates.push(
-        weight === 'bold' ? '/Library/Fonts/Arial Bold.ttf' : '/System/Library/Fonts/Supplemental/Arial.ttf',
-        '/System/Library/Fonts/Supplemental/Arial.ttf',
-        '/Library/Fonts/Arial.ttf',
+        weight === "bold"
+          ? "/Library/Fonts/Arial Bold.ttf"
+          : "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/Library/Fonts/Arial.ttf",
       );
     } else {
       candidates.push(
-        weight === 'bold'
-          ? '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
-          : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/truetype/msttcorefonts/arial.ttf',
-        '/usr/share/fonts/TTF/Arial.ttf',
+        weight === "bold"
+          ? "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+          : "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/arial.ttf",
+        "/usr/share/fonts/TTF/Arial.ttf",
       );
     }
     for (const p of candidates) {
@@ -150,43 +163,47 @@ export class InvoicePdfService {
    * Resolve invoice pdfUrl - if it's an S3 key, generate presigned URL
    * If it's already an http(s) URL, return as-is
    */
-  async resolveInvoicePdfUrl(pdfUrl: string | null | undefined): Promise<string | null> {
+  async resolveInvoicePdfUrl(
+    pdfUrl: string | null | undefined,
+  ): Promise<string | null> {
     if (!pdfUrl) return null;
     // Already a full URL - return as-is
-    if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) return pdfUrl;
+    if (pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://"))
+      return pdfUrl;
     // S3 key - resolve to presigned URL
     try {
-      return await this.storageService.getPresignedDownloadUrl('documents', pdfUrl, 3600 * 24); // 24 hours
+      return await this.storageService.getPresignedDownloadUrl(
+        "documents",
+        pdfUrl,
+        3600 * 24,
+      ); // 24 hours
     } catch (e: any) {
-      this.logger.warn(`Failed to resolve invoice PDF presigned URL for key: ${pdfUrl} - ${e.message}`);
+      this.logger.warn(
+        `Failed to resolve invoice PDF presigned URL for key: ${pdfUrl} - ${e.message}`,
+      );
       return null;
     }
   }
 
   /**
-   * Generate unique invoice number
+   * Aylık sıralı belge numarası: SPR-YYYYMM-NNNNNN.
+   *
+   * Sayaç `document_sequences` üzerinde upsert + increment ile ATOMİK alınır;
+   * "o ayın en büyük numarasını oku +1 yaz" yaklaşımı eşzamanlı iki faturada
+   * aynı numarayı üretip unique index'e takılıyordu.
    */
   async generateInvoiceNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
+    const now = new Date();
+    const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const scope = `SPR-${period}`;
 
-    // Get last invoice number for this month
-    const lastInvoice = await this.prisma.invoice.findFirst({
-      where: {
-        invoiceNumber: {
-          startsWith: `TRD-${year}${month}`,
-        },
-      },
-      orderBy: { invoiceNumber: 'desc' },
+    const row = await this.prisma.documentSequence.upsert({
+      where: { scope },
+      create: { scope, lastValue: 1 },
+      update: { lastValue: { increment: 1 } },
     });
 
-    let sequence = 1;
-    if (lastInvoice) {
-      const lastSequence = parseInt(lastInvoice.invoiceNumber.split('-')[2], 10);
-      sequence = lastSequence + 1;
-    }
-
-    return `TRD-${year}${month}-${String(sequence).padStart(6, '0')}`;
+    return `${scope}-${String(row.lastValue).padStart(6, "0")}`;
   }
 
   /**
@@ -194,10 +211,13 @@ export class InvoicePdfService {
    */
   generateInvoiceHtml(data: InvoiceData): string {
     const formatCurrency = (amount: number) =>
-      new Intl.NumberFormat('tr-TR', { style: 'currency', currency: data.currency }).format(amount);
+      new Intl.NumberFormat("tr-TR", {
+        style: "currency",
+        currency: data.currency,
+      }).format(amount);
 
     const formatDate = (date: Date) =>
-      new Intl.DateTimeFormat('tr-TR', { dateStyle: 'long' }).format(date);
+      new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(date);
 
     return `
 <!DOCTYPE html>
@@ -205,7 +225,7 @@ export class InvoicePdfService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fatura ${data.invoiceNumber}</title>
+  <title>Sipariş Özeti ${data.invoiceNumber}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; background: #f5f5f5; }
@@ -243,7 +263,7 @@ export class InvoicePdfService {
     <div class="header">
       <div class="logo">Taro<span>dan</span></div>
       <div class="invoice-info">
-        <h1>FATURA</h1>
+        <h1>SİPARİŞ ÖZETİ</h1>
         <div class="invoice-number">${data.invoiceNumber}</div>
         <p style="margin-top: 10px;">Tarih: ${formatDate(data.invoiceDate)}</p>
         <p>Sipariş No: ${data.orderNumber}</p>
@@ -255,17 +275,17 @@ export class InvoicePdfService {
         <h3>Satıcı</h3>
         <p class="name">${data.seller.name}</p>
         <p>${data.seller.email}</p>
-        ${data.seller.phone ? `<p>${data.seller.phone}</p>` : ''}
-        ${data.seller.address ? `<p>${data.seller.address}</p>` : ''}
-        ${data.seller.taxId ? `<p>Vergi No: ${data.seller.taxId}</p>` : ''}
+        ${data.seller.phone ? `<p>${data.seller.phone}</p>` : ""}
+        ${data.seller.address ? `<p>${data.seller.address}</p>` : ""}
+        ${data.seller.taxId ? `<p>Vergi No: ${data.seller.taxId}</p>` : ""}
       </div>
       <div class="party">
         <h3>Alıcı</h3>
         <p class="name">${data.buyer.name}</p>
         <p>${data.buyer.email}</p>
-        ${data.buyer.phone ? `<p>${data.buyer.phone}</p>` : ''}
-        ${data.buyer.address ? `<p>${data.buyer.address}</p>` : ''}
-        ${data.buyer.taxId ? `<p>Vergi No: ${data.buyer.taxId}</p>` : ''}
+        ${data.buyer.phone ? `<p>${data.buyer.phone}</p>` : ""}
+        ${data.buyer.address ? `<p>${data.buyer.address}</p>` : ""}
+        ${data.buyer.taxId ? `<p>Vergi No: ${data.buyer.taxId}</p>` : ""}
       </div>
     </div>
 
@@ -280,14 +300,18 @@ export class InvoicePdfService {
           </tr>
         </thead>
         <tbody>
-          ${data.items.map(item => `
+          ${data.items
+            .map(
+              (item) => `
             <tr>
               <td>${item.description}</td>
               <td style="text-align: center;">${item.quantity}</td>
               <td class="amount">${formatCurrency(item.unitPrice)}</td>
               <td class="amount">${formatCurrency(item.total)}</td>
             </tr>
-          `).join('')}
+          `,
+            )
+            .join("")}
         </tbody>
       </table>
     </div>
@@ -298,24 +322,36 @@ export class InvoicePdfService {
           <td>Ara Toplam:</td>
           <td>${formatCurrency(data.subtotal)}</td>
         </tr>
-        ${data.shippingCost > 0 ? `
+        ${
+          data.shippingCost > 0
+            ? `
           <tr>
             <td>Kargo:</td>
             <td>${formatCurrency(data.shippingCost)}</td>
           </tr>
-        ` : ''}
-        ${data.commission > 0 ? `
+        `
+            : ""
+        }
+        ${
+          data.commission > 0
+            ? `
           <tr>
             <td>Platform ücreti:</td>
             <td>${formatCurrency(data.commission)}</td>
           </tr>
-        ` : ''}
-        ${data.taxAmount > 0 ? `
+        `
+            : ""
+        }
+        ${
+          data.taxAmount > 0
+            ? `
           <tr>
             <td>KDV (%${data.taxRate}):</td>
             <td>${formatCurrency(data.taxAmount)}</td>
           </tr>
-        ` : ''}
+        `
+            : ""
+        }
         <tr class="total-row">
           <td>Genel Toplam:</td>
           <td>${formatCurrency(data.total)}</td>
@@ -326,14 +362,14 @@ export class InvoicePdfService {
     <div class="payment-info">
       <h4>Ödeme Bilgileri</h4>
       <p>Ödeme Yöntemi: ${data.paymentMethod}</p>
-      ${data.paymentDate ? `<p>Ödeme Tarihi: ${formatDate(data.paymentDate)}</p>` : ''}
+      ${data.paymentDate ? `<p>Ödeme Tarihi: ${formatDate(data.paymentDate)}</p>` : ""}
       <p style="margin-top: 10px;"><span class="badge">✓ Ödendi</span></p>
     </div>
 
     <div class="footer">
       <p><strong>${this.companyInfo.name}</strong></p>
       <p>${this.companyInfo.address} | ${this.companyInfo.email} | ${this.companyInfo.phone}</p>
-      <p style="margin-top: 10px;">Bu fatura elektronik olarak oluşturulmuştur.</p>
+      <p style="margin-top: 10px;">Bu belge bilgilendirme amaçlı sipariş özetidir; mali belge (fatura) niteliği taşımaz.</p>
     </div>
   </div>
 </body>
@@ -347,117 +383,208 @@ export class InvoicePdfService {
   async generatePdfFromData(data: InvoiceData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
-        const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        const doc = new PDFDocument({ margin: 50, size: "A4" });
         const buffers: Buffer[] = [];
 
-        doc.on('data', (chunk) => buffers.push(chunk));
-        doc.on('end', () => resolve(Buffer.concat(buffers)));
-        doc.on('error', (err) => reject(err));
+        doc.on("data", (chunk) => buffers.push(chunk));
+        doc.on("end", () => resolve(Buffer.concat(buffers)));
+        doc.on("error", (err) => reject(err));
 
         // Register a Unicode TrueType font so Turkish characters (İ, ı, ş, ğ, ç, ö, ü) render correctly.
         // Without this, PDFKit's default Helvetica (Latin-1 only) mangles İ/ı/ş/ğ — the cause of the
         // garbled, "dummy"-looking invoices. Bundled DejaVu Sans works on every platform.
-        const regularPath = this.getInvoiceFontPath('regular');
-        const boldPath = this.getInvoiceFontPath('bold');
-        let fontRegular = 'Helvetica';
-        let fontBold = 'Helvetica-Bold';
+        const regularPath = this.getInvoiceFontPath("regular");
+        const boldPath = this.getInvoiceFontPath("bold");
+        let fontRegular = "Helvetica";
+        let fontBold = "Helvetica-Bold";
         if (regularPath) {
           try {
-            doc.registerFont('body', regularPath);
-            doc.registerFont('body-bold', boldPath || regularPath);
-            fontRegular = 'body';
-            fontBold = 'body-bold';
+            doc.registerFont("body", regularPath);
+            doc.registerFont("body-bold", boldPath || regularPath);
+            fontRegular = "body";
+            fontBold = "body-bold";
           } catch (e: any) {
-            this.logger.warn(`Failed to register invoice font (${regularPath}): ${e?.message}. Falling back to Helvetica.`);
+            this.logger.warn(
+              `Failed to register invoice font (${regularPath}): ${e?.message}. Falling back to Helvetica.`,
+            );
           }
         } else {
-          this.logger.warn('No Unicode invoice font found — Turkish characters may not render. Bundle DejaVu Sans or set INVOICE_FONT_PATH.');
+          this.logger.warn(
+            "No Unicode invoice font found — Turkish characters may not render. Bundle DejaVu Sans or set INVOICE_FONT_PATH.",
+          );
         }
         doc.font(fontRegular);
 
         // Header
-        doc.font(fontBold).fillColor('#1d3557').fontSize(24).text('TARODAN', { align: 'left' });
-        doc.font(fontRegular).fontSize(10).fillColor('#666666').text('İkinci El Model Araba Pazarı', { align: 'left' });
+        doc
+          .font(fontBold)
+          .fillColor("#1d3557")
+          .fontSize(24)
+          .text("TARODAN", { align: "left" });
+        doc
+          .font(fontRegular)
+          .fontSize(10)
+          .fillColor("#666666")
+          .text("İkinci El Model Araba Pazarı", { align: "left" });
 
         doc.moveDown();
-        doc.font(fontBold).fillColor('#000000').fontSize(20).text('FATURA', { align: 'right' });
-        doc.font(fontRegular).fontSize(10).text(`Fatura No: ${data.invoiceNumber}`, { align: 'right' });
-        doc.text(`Tarih: ${data.invoiceDate.toLocaleDateString('tr-TR')}`, { align: 'right' });
+        doc
+          .font(fontBold)
+          .fillColor("#000000")
+          .fontSize(20)
+          .text("SİPARİŞ ÖZETİ", { align: "right" });
+        doc
+          .font(fontRegular)
+          .fontSize(10)
+          .text(`Belge No: ${data.invoiceNumber}`, { align: "right" });
+        doc.text(`Tarih: ${data.invoiceDate.toLocaleDateString("tr-TR")}`, {
+          align: "right",
+        });
 
         doc.moveDown();
         const yBeforeInfo = doc.y;
 
         // Seller Block
-        doc.font(fontBold).fontSize(12).fillColor('#1d3557').text('SATICI BİLGİLERİ', 50, yBeforeInfo);
-        doc.font(fontRegular).fontSize(10).fillColor('#333333');
+        doc
+          .font(fontBold)
+          .fontSize(12)
+          .fillColor("#1d3557")
+          .text("SATICI BİLGİLERİ", 50, yBeforeInfo);
+        doc.font(fontRegular).fontSize(10).fillColor("#333333");
         doc.text(data.seller.name);
         doc.text(data.seller.email);
         if (data.seller.taxId) doc.text(`Vergi No: ${data.seller.taxId}`);
         if (data.seller.address) doc.text(data.seller.address, { width: 200 });
 
         // Buyer Block
-        doc.font(fontBold).fontSize(12).fillColor('#1d3557').text('ALICI BİLGİLERİ', 300, yBeforeInfo);
-        doc.font(fontRegular).fontSize(10).fillColor('#333333');
+        doc
+          .font(fontBold)
+          .fontSize(12)
+          .fillColor("#1d3557")
+          .text("ALICI BİLGİLERİ", 300, yBeforeInfo);
+        doc.font(fontRegular).fontSize(10).fillColor("#333333");
         doc.text(data.buyer.name, 300);
         doc.text(data.buyer.email, 300);
-        if (data.buyer.address) doc.text(data.buyer.address, 300, doc.y, { width: 200 });
+        if (data.buyer.address)
+          doc.text(data.buyer.address, 300, doc.y, { width: 200 });
 
         doc.moveDown(4);
 
         // Table Header
         const tableTop = doc.y;
-        doc.rect(50, tableTop, 500, 20).fill('#f8f9fa');
-        doc.font(fontBold).fillColor('#1d3557').fontSize(10);
-        doc.text('Açıklama', 60, tableTop + 6);
-        doc.text('Adet', 350, tableTop + 6, { width: 50, align: 'center' });
-        doc.text('Birim Fiyat', 400, tableTop + 6, { width: 70, align: 'right' });
-        doc.text('Toplam', 480, tableTop + 6, { width: 60, align: 'right' });
+        doc.rect(50, tableTop, 500, 20).fill("#f8f9fa");
+        doc.font(fontBold).fillColor("#1d3557").fontSize(10);
+        doc.text("Açıklama", 60, tableTop + 6);
+        doc.text("Adet", 350, tableTop + 6, { width: 50, align: "center" });
+        doc.text("Birim Fiyat", 400, tableTop + 6, {
+          width: 70,
+          align: "right",
+        });
+        doc.text("Toplam", 480, tableTop + 6, { width: 60, align: "right" });
 
         // Table Items
         let currentY = tableTop + 25;
         doc.font(fontRegular);
         data.items.forEach((item) => {
-          doc.fillColor('#333333');
+          doc.fillColor("#333333");
           doc.text(item.description, 60, currentY, { width: 280 });
-          doc.text(item.quantity.toString(), 350, currentY, { width: 50, align: 'center' });
-          doc.text(`${item.unitPrice.toLocaleString('tr-TR')} TL`, 400, currentY, { width: 70, align: 'right' });
-          doc.text(`${item.total.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+          doc.text(item.quantity.toString(), 350, currentY, {
+            width: 50,
+            align: "center",
+          });
+          doc.text(
+            `${item.unitPrice.toLocaleString("tr-TR")} TL`,
+            400,
+            currentY,
+            { width: 70, align: "right" },
+          );
+          doc.text(`${item.total.toLocaleString("tr-TR")} TL`, 480, currentY, {
+            width: 60,
+            align: "right",
+          });
           currentY += 20;
         });
 
         // Totals
         const totalGap = 15;
         currentY += 20;
-        doc.fontSize(10).fillColor('#666666');
+        doc.fontSize(10).fillColor("#666666");
 
-        doc.text('Ara Toplam:', 380, currentY, { width: 100, align: 'right' });
-        doc.text(`${data.subtotal.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+        doc.text("Ara Toplam:", 380, currentY, { width: 100, align: "right" });
+        doc.text(`${data.subtotal.toLocaleString("tr-TR")} TL`, 480, currentY, {
+          width: 60,
+          align: "right",
+        });
 
         currentY += totalGap;
-        doc.text(`KDV (%${data.taxRate}):`, 380, currentY, { width: 100, align: 'right' });
-        doc.text(`${data.taxAmount.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+        doc.text(`KDV (%${data.taxRate}):`, 380, currentY, {
+          width: 100,
+          align: "right",
+        });
+        doc.text(
+          `${data.taxAmount.toLocaleString("tr-TR")} TL`,
+          480,
+          currentY,
+          { width: 60, align: "right" },
+        );
 
         if (data.shippingCost > 0) {
           currentY += totalGap;
-          doc.text('Kargo Ücreti:', 380, currentY, { width: 100, align: 'right' });
-          doc.text(`${data.shippingCost.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+          doc.text("Kargo Ücreti:", 380, currentY, {
+            width: 100,
+            align: "right",
+          });
+          doc.text(
+            `${data.shippingCost.toLocaleString("tr-TR")} TL`,
+            480,
+            currentY,
+            { width: 60, align: "right" },
+          );
         }
         if (data.commission > 0) {
           currentY += totalGap;
-          doc.text('Platform ücreti:', 380, currentY, { width: 100, align: 'right' });
-          doc.text(`${data.commission.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+          doc.text("Platform ücreti:", 380, currentY, {
+            width: 100,
+            align: "right",
+          });
+          doc.text(
+            `${data.commission.toLocaleString("tr-TR")} TL`,
+            480,
+            currentY,
+            { width: 60, align: "right" },
+          );
         }
 
         currentY += 25;
-        doc.font(fontBold).fontSize(14).fillColor('#1d3557').text('GENEL TOPLAM:', 300, currentY, { width: 180, align: 'right' });
-        doc.text(`${data.total.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
+        doc
+          .font(fontBold)
+          .fontSize(14)
+          .fillColor("#1d3557")
+          .text("GENEL TOPLAM:", 300, currentY, { width: 180, align: "right" });
+        doc.text(`${data.total.toLocaleString("tr-TR")} TL`, 480, currentY, {
+          width: 60,
+          align: "right",
+        });
 
         // Footer
         const footerY = 750;
-        doc.font(fontRegular).fontSize(8).fillColor('#999999');
-        doc.text('Bu fatura elektronik olarak oluşturulmuştur ve mali değeri vardır.', 50, footerY, { align: 'center', width: 500 });
-        doc.text('Tarodan - Model Araba Alım Satım ve Takas Platformu', 50, footerY + 12, { align: 'center', width: 500 });
-        doc.text('https://tarodan.com', 50, footerY + 24, { align: 'center', width: 500 });
+        doc.font(fontRegular).fontSize(8).fillColor("#999999");
+        doc.text(
+          "Bu belge bilgilendirme amaçlı sipariş özetidir; mali belge (fatura) niteliği taşımaz.",
+          50,
+          footerY,
+          { align: "center", width: 500 },
+        );
+        doc.text(
+          "Tarodan - Model Araba Alım Satım ve Takas Platformu",
+          50,
+          footerY + 12,
+          { align: "center", width: 500 },
+        );
+        doc.text("https://tarodan.com.tr", 50, footerY + 24, {
+          align: "center",
+          width: 500,
+        });
 
         doc.end();
       } catch (error) {
@@ -471,6 +598,6 @@ export class InvoicePdfService {
    */
   private async htmlToPdf(html: string): Promise<Buffer> {
     // This is now redundant but kept to avoid breaking types if any external calls exist
-    return Buffer.from(html, 'utf-8');
+    return Buffer.from(html, "utf-8");
   }
 }

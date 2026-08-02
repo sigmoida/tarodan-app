@@ -6,9 +6,16 @@ import {
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { PayoutTransactionsQueryDto, PayoutExportQueryDto } from "./dto";
-import { Prisma, PaymentHoldStatus, TradeStatus } from "@prisma/client";
+import {
+  Prisma,
+  PaymentHoldStatus,
+  PayoutStatus,
+  TradeStatus,
+} from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
+import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
 
 /**
  * Satıcı ödemeleri (escrow özet/işlem/plan/CSV, manuel release, transfer retry) —
@@ -29,51 +36,306 @@ export class AdminPayoutService {
    * Payout summary: total pending (held), total released, counts, next release dates
    */
   async getPayoutsSummary() {
-    const [heldAgg, releasedAgg, heldCount, releasedCount, nextReleases] =
-      await Promise.all([
-        this.prisma.paymentHold.aggregate({
-          where: { status: PaymentHoldStatus.held },
-          _sum: { amount: true },
-        }),
-        this.prisma.paymentHold.aggregate({
-          where: { status: PaymentHoldStatus.released },
-          _sum: { amount: true },
-        }),
-        this.prisma.paymentHold.count({
-          where: { status: PaymentHoldStatus.held },
-        }),
-        this.prisma.paymentHold.count({
-          where: { status: PaymentHoldStatus.released },
-        }),
-        this.prisma.paymentHold.findMany({
-          where: { status: PaymentHoldStatus.held, releaseAt: { not: null } },
-          orderBy: { releaseAt: "asc" },
-          take: 5,
-          select: {
-            id: true,
-            orderId: true,
-            amount: true,
-            releaseAt: true,
-            sellerId: true,
-          },
-        }),
-      ]);
+    // Escrow gerçeği DÖRT ayrı sayıdır ve karıştırılmamalıdır:
+    //   held               → escrow'da bekleyen (henüz serbest değil)
+    //   released-awaiting  → serbest ama banka transferi HENÜZ tamamlanmamış
+    //   transferred        → satıcının hesabına gerçekten geçen NET tutar
+    //   failed transfers   → başarısız/iade dönen transferler (müdahale ister)
+    // Eski özet "released toplamı"nı "Ödenen" diye sunuyordu — para bankaya
+    // gitmemiş olabilirdi.
+    const [
+      heldAgg,
+      releasedAgg,
+      awaitingAgg,
+      heldCount,
+      releasedCount,
+      transferredAgg,
+      failedTransferCount,
+      nextReleases,
+    ] = await Promise.all([
+      this.prisma.paymentHold.aggregate({
+        where: { status: PaymentHoldStatus.held },
+        _sum: { amount: true },
+      }),
+      this.prisma.paymentHold.aggregate({
+        where: { status: PaymentHoldStatus.released },
+        _sum: { amount: true },
+      }),
+      // Released ama tamamlanmış transferi olmayan hold'lar.
+      this.prisma.paymentHold.aggregate({
+        where: {
+          status: PaymentHoldStatus.released,
+          OR: [
+            { payoutTransfer: null },
+            { payoutTransfer: { status: { not: PayoutStatus.completed } } },
+          ],
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.paymentHold.count({
+        where: { status: PaymentHoldStatus.held },
+      }),
+      this.prisma.paymentHold.count({
+        where: { status: PaymentHoldStatus.released },
+      }),
+      this.prisma.payoutTransfer.aggregate({
+        where: { status: PayoutStatus.completed },
+        _sum: { netAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.payoutTransfer.count({
+        where: {
+          status: { in: [PayoutStatus.failed, PayoutStatus.returned] },
+        },
+      }),
+      this.prisma.paymentHold.findMany({
+        where: { status: PaymentHoldStatus.held, releaseAt: { not: null } },
+        orderBy: { releaseAt: "asc" },
+        take: 5,
+        select: {
+          id: true,
+          orderId: true,
+          amount: true,
+          releaseAt: true,
+          sellerId: true,
+        },
+      }),
+    ]);
 
-    const totalPending = Number(heldAgg._sum.amount ?? 0);
-    const totalReleased = Number(releasedAgg._sum.amount ?? 0);
+    // "Yaklaşan Ödemeler" kartı kesik UUID değil sipariş numarası göstersin.
+    const nextReleaseOrders = await this.prisma.order.findMany({
+      where: { id: { in: nextReleases.map((r) => r.orderId) } },
+      select: { id: true, orderNumber: true },
+    });
+    const nextReleaseOrderMap = new Map(
+      nextReleaseOrders.map((o) => [o.id, o.orderNumber]),
+    );
+    const nextReleaseRows = nextReleases.map((r) => ({
+      id: r.id,
+      orderId: r.orderId,
+      orderNumber: nextReleaseOrderMap.get(r.orderId) ?? null,
+      amount: Number(r.amount),
+      releaseAt: r.releaseAt,
+      sellerId: r.sellerId,
+    }));
+
+    const round2 = (n: number) => Math.round(n * 100) / 100;
 
     return {
-      totalPending: Math.round(totalPending * 100) / 100,
-      totalReleased: Math.round(totalReleased * 100) / 100,
+      totalPending: round2(Number(heldAgg._sum.amount ?? 0)),
+      totalReleased: round2(Number(releasedAgg._sum.amount ?? 0)),
+      releasedAwaitingTransfer: round2(Number(awaitingAgg._sum.amount ?? 0)),
+      transferredTotal: round2(Number(transferredAgg._sum.netAmount ?? 0)),
+      transferredCount: transferredAgg._count.id,
+      failedTransferCount,
       countHeld: heldCount,
       countReleased: releasedCount,
-      nextReleases: nextReleases.map((r) => ({
-        id: r.id,
-        orderId: r.orderId,
-        amount: Number(r.amount),
-        releaseAt: r.releaseAt,
-        sellerId: r.sellerId,
+      nextReleases: nextReleaseRows,
+    };
+  }
+
+  /**
+   * Gerçek banka TRANSFERLERİ (PayoutTransfer) — hold listesinden AYRI yüzey.
+   * Başarısız/iade dönen transferler burada görünür ve retry'lanır; eskiden
+   * yalnız `payouts/failed` ucu vardı ve hiçbir UI ona bağlanmamıştı.
+   */
+  async getPayoutTransfers(query: {
+    status?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where: Prisma.PayoutTransferWhereInput = {};
+    if (query.status && query.status !== "all") {
+      where.status = query.status as PayoutStatus;
+    }
+    if (query.dateFrom || query.dateTo) {
+      where.createdAt = {};
+      if (query.dateFrom) where.createdAt.gte = new Date(query.dateFrom);
+      if (query.dateTo) where.createdAt.lte = new Date(query.dateTo);
+    }
+    if (query.search) {
+      const searchOr: Prisma.PayoutTransferWhereInput[] = [
+        {
+          seller: {
+            OR: [
+              { displayName: { contains: query.search, mode: "insensitive" } },
+              { email: { contains: query.search, mode: "insensitive" } },
+            ],
+          },
+        },
+      ];
+      const matchingOrders = await this.prisma.order.findMany({
+        where: { orderNumber: { contains: query.search, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (matchingOrders.length > 0) {
+        searchOr.push({
+          paymentHold: {
+            orderId: { in: matchingOrders.map((o) => o.id) },
+          },
+        });
+      }
+      where.OR = searchOr;
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.payoutTransfer.findMany({
+        where,
+        include: {
+          seller: { select: { id: true, displayName: true, email: true } },
+          // PaymentHold'da Order ilişkisi yok (yalnız orderId) — numara aşağıda
+          // toplu çözülür.
+          paymentHold: { select: { orderId: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.payoutTransfer.count({ where }),
+    ]);
+
+    const transferOrderIds = [
+      ...new Set(
+        items
+          .map((t) => t.paymentHold?.orderId)
+          .filter((v): v is string => !!v),
+      ),
+    ];
+    const transferOrders = transferOrderIds.length
+      ? await this.prisma.order.findMany({
+          where: { id: { in: transferOrderIds } },
+          select: { id: true, orderNumber: true },
+        })
+      : [];
+    const orderNumberById = new Map(
+      transferOrders.map((o) => [o.id, o.orderNumber] as const),
+    );
+
+    return {
+      items: items.map((t) => ({
+        id: t.id,
+        orderId: t.paymentHold?.orderId ?? null,
+        orderNumber: t.paymentHold?.orderId
+          ? (orderNumberById.get(t.paymentHold.orderId) ?? null)
+          : null,
+        tradeCashPaymentId: t.tradeCashPaymentId,
+        seller: t.seller,
+        amount: Number(t.amount),
+        netAmount: Number(t.netAmount),
+        adjustmentDeduction: Number(t.adjustmentDeduction),
+        // KVKK: IBAN yalnız son 4 hane.
+        ibanLast4: (t.transferIban ?? "").replace(/\s/g, "").slice(-4),
+        status: t.status,
+        failureReason: t.failureReason,
+        retryCount: t.retryCount,
+        processedAt: t.processedAt,
+        createdAt: t.createdAt,
       })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Satıcı BORÇ mahsupları (SellerAccountAdjustment): dönüş kargosu borcu,
+   * gidiş kargosu borcu, kargo açığı. Payout'tan kesilecek/kesilen tutarların
+   * yüzeyi — eskiden hiç görünmüyordu.
+   */
+  async getPayoutAdjustments(query: {
+    status?: string;
+    type?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where: Prisma.SellerAccountAdjustmentWhereInput = {};
+    if (query.status && query.status !== "all") {
+      where.status =
+        query.status as Prisma.SellerAccountAdjustmentWhereInput["status"];
+    }
+    if (query.type && query.type !== "all") {
+      where.type =
+        query.type as Prisma.SellerAccountAdjustmentWhereInput["type"];
+    }
+    if (query.search) {
+      // Model'de User ilişkisi yok (yalnız sellerId) — aramayı id listesine çevir.
+      const sellers = await this.prisma.user.findMany({
+        where: {
+          OR: [
+            { displayName: { contains: query.search, mode: "insensitive" } },
+            { email: { contains: query.search, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true },
+        take: 200,
+      });
+      where.sellerId = { in: sellers.map((s) => s.id) };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.sellerAccountAdjustment.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.sellerAccountAdjustment.count({ where }),
+    ]);
+
+    // İlişkisiz scalar id'ler: satıcı + sipariş bilgisi toplu çözülür.
+    const sellerIds = [...new Set(items.map((a) => a.sellerId))];
+    const orderIds = [
+      ...new Set(items.map((a) => a.orderId).filter((v): v is string => !!v)),
+    ];
+    const [sellers, orders] = await Promise.all([
+      sellerIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: sellerIds } },
+            select: { id: true, displayName: true, email: true },
+          })
+        : [],
+      orderIds.length
+        ? this.prisma.order.findMany({
+            where: { id: { in: orderIds } },
+            select: { id: true, orderNumber: true },
+          })
+        : [],
+    ]);
+    const sellerById = new Map(sellers.map((s) => [s.id, s] as const));
+    const orderById = new Map(orders.map((o) => [o.id, o] as const));
+
+    return {
+      items: items.map((a) => ({
+        id: a.id,
+        seller: sellerById.get(a.sellerId) ?? {
+          id: a.sellerId,
+          displayName: null,
+          email: null,
+        },
+        orderId: a.orderId,
+        orderNumber: a.orderId
+          ? (orderById.get(a.orderId)?.orderNumber ?? null)
+          : null,
+        type: a.type,
+        amount: Number(a.amount),
+        remainingAmount: Number(a.remainingAmount),
+        status: a.status,
+        settledAt: a.settledAt,
+        createdAt: a.createdAt,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 
@@ -155,6 +417,10 @@ export class AdminPayoutService {
         sellerName: h.seller.displayName ?? h.seller.email,
         sellerEmail: h.seller.email,
         amount: Number(h.amount),
+        // Kısmi iadede tüketilen pay — net ödenecek = amount - refundedAmount.
+        refundedAmount: Number(h.refundedAmount ?? 0),
+        // GERÇEK iade kilidi — UI neden rozetini bununla üretir (uydurma yok).
+        frozenByRefundId: h.frozenByRefundId ?? null,
         status: h.status,
         releaseAt: h.releaseAt,
         releasedAt: h.releasedAt,
@@ -182,17 +448,20 @@ export class AdminPayoutService {
     };
     if (sellerId) where.sellerId = sellerId;
     if (search) {
-      where.OR = [
+      // Grup ödemesinde payment.order NULL — sipariş numarası hold.orderId
+      // üzerinden aranır (transactions ile aynı desen).
+      const searchOr: Prisma.PaymentHoldWhereInput[] = [
         { seller: { displayName: { contains: search, mode: "insensitive" } } },
         { seller: { email: { contains: search, mode: "insensitive" } } },
-        {
-          payment: {
-            order: {
-              orderNumber: { contains: search, mode: "insensitive" },
-            },
-          },
-        },
       ];
+      const matchingOrders = await this.prisma.order.findMany({
+        where: { orderNumber: { contains: search, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (matchingOrders.length > 0) {
+        searchOr.push({ orderId: { in: matchingOrders.map((o) => o.id) } });
+      }
+      where.OR = searchOr;
     }
 
     const orderBy = resolveOrderBy<Prisma.PaymentHoldOrderByWithRelationInput>(
@@ -214,11 +483,20 @@ export class AdminPayoutService {
         where,
         include: {
           seller: { select: { id: true, displayName: true, email: true } },
-          payment: { select: { order: { select: { orderNumber: true } } } },
         },
         orderBy,
       },
       query,
+    );
+
+    // Grup ödemesinde payment.order NULL'dur — sipariş numarası hold.orderId
+    // üzerinden çözülür (eskiden her sepet hold'u "-" görünüyordu).
+    const scheduleOrders = await this.prisma.order.findMany({
+      where: { id: { in: result.data.map((h) => h.orderId) } },
+      select: { id: true, orderNumber: true },
+    });
+    const scheduleOrderMap = new Map(
+      scheduleOrders.map((o) => [o.id, o.orderNumber]),
     );
 
     return {
@@ -226,10 +504,13 @@ export class AdminPayoutService {
       data: result.data.map((h) => ({
         id: h.id,
         orderId: h.orderId,
-        orderNumber: h.payment.order?.orderNumber ?? "-",
+        orderNumber: scheduleOrderMap.get(h.orderId) ?? "-",
         sellerId: h.sellerId,
         sellerName: h.seller.displayName ?? h.seller.email,
+        sellerEmail: h.seller.email,
         amount: Number(h.amount),
+        refundedAmount: Number(h.refundedAmount ?? 0),
+        frozenByRefundId: h.frozenByRefundId ?? null,
         releaseAt: h.releaseAt,
         createdAt: h.createdAt,
       })),
@@ -399,8 +680,15 @@ export class AdminPayoutService {
     // çoğunlukla IBAN sorunundandır; satıcı IBAN'ı düzeltince cron işleme anında GÜNCEL
     // IBAN'ı okur (Y5) ve doğru hesaba gönderir.
     const isReturned = transfer.status === "returned";
+    // PayTR iade edilen bir transId'yi tekrar kabul etmez; yeni referans üret.
     const newTransId = isReturned
-      ? `ORD${transfer.id.replace(/-/g, "").slice(0, 16)}R${Date.now()}`
+      ? await generateUniqueReference(
+          REFERENCE_PREFIX.payoutTransfer,
+          async (code) =>
+            (await this.prisma.payoutTransfer.count({
+              where: { transId: code },
+            })) > 0,
+        )
       : undefined;
     await this.prisma.payoutTransfer.update({
       where: { id: transferId },

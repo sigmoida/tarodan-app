@@ -3,25 +3,21 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import {
-  StatusBadge,
-  orderStatusConfig,
-  Badge,
-  ThumbnailStack,
-} from "@tarodan/ui";
+import { StatusBadge, orderStatusConfig } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useLocale, useTranslations } from "next-intl";
 import { formatDate } from "@/lib/format";
+import { Button } from "@tarodan/ui";
 import {
   formatTL,
   getOrderPrimary,
-  getVisibleTrackingCode,
-  groupByPackage,
-  hasVisibleShipment,
+  isGroupCancellable,
   orderAmount,
   sellerNetOf,
+  visibleCargoCode,
   type Order,
-  type OrderGroup,
+  type ServerOrderGroup,
 } from "../_lib/types";
 import { getDisplayStatus } from "../_lib/status";
 import OrderActions, { type OrderActionHandlers } from "./OrderActions";
@@ -31,9 +27,7 @@ const PLACEHOLDER =
 
 /**
  * One product line inside the umbrella: image + title + qty×price + per-item
- * status + amount + the shared per-order actions. `showOrderNumber` is on for
- * multi carts (to tell items apart); off for a single order (the umbrella header
- * already carries the order number).
+ * status + amount + the shared per-order actions.
  */
 function OrderLine({
   order,
@@ -111,97 +105,74 @@ function OrderLine({
 }
 
 interface OrderGroupCardProps {
-  group: OrderGroup;
+  group: ServerOrderGroup;
   actions: OrderActionHandlers;
+  /** Grup iptali (R4): iptal SEPET bazındadır — kartta tek buton. */
+  onCancelGroup: (group: ServerOrderGroup) => void;
 }
 
 /**
- * The single "çatı" (umbrella) card for BOTH single and multi orders. The header
- * adapts to the item count; the product line(s) are ALWAYS shown beneath it — 1
- * for a single order, N for a cart — grouped per seller-package ("çatı") when the
- * cart spans multiple sellers. No accordion collapse: details are always visible.
+ * The single "çatı" (umbrella) card for BOTH single and multi orders — now fed
+ * by the server group row: packages carry the per-parcel shipping fee + shared
+ * cargo, `payment` is the ONE charge of the whole cart (buyer view only).
  */
 export default function OrderGroupCard({
   group,
   actions,
+  onCancelGroup,
 }: OrderGroupCardProps) {
   const t = useTranslations();
-  const isMulti = group.orders.length > 1;
-  const total = group.orders.reduce((sum, o) => sum + orderAmount(o), 0);
-  const date = group.orders[0]?.createdAt;
-  const packages = groupByPackage(group.orders);
-  const multiPackage = packages.length > 1;
+  const date = group.createdAt;
+  const multiPackage = group.packages.length > 1;
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated">
-      {/* Umbrella header — count-aware */}
+      {/* Umbrella header — tek ve çok ürünlü sepette aynı düzen */}
       <div className="p-6">
-        {isMulti ? (
-          <>
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="font-mono text-sm text-muted">
-                  {group.groupNumber}
-                </p>
-                <p className="text-sm text-subtle">{formatDate(date)}</p>
-              </div>
-              <Badge variant="outline" size="sm">
-                {group.orders.length} {t("collection.items")}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-4">
-              <ThumbnailStack
-                items={group.orders}
-                getKey={(o) => o.id}
-                max={4}
-                size="lg"
-                renderItem={(o) => {
-                  const { image } = getOrderPrimary(o);
-                  return (
-                    <OptimizedImage
-                      src={image || PLACEHOLDER}
-                      alt=""
-                      fill
-                      className="object-cover"
-                      fallbackSrc={PLACEHOLDER}
-                      logContext={{ orderId: o.id, page: "orders-group" }}
-                    />
-                  );
-                }}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-heading">
-                  {t("order.cartOfItems", { count: group.orders.length })}
-                </p>
-                <p className="text-sm text-muted">
-                  {t("order.shipsPerSellerPackage")}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted">{t("common.total")}</p>
-                <p className="text-lg font-semibold text-primary-500">
-                  {formatTL(total)}
-                </p>
-              </div>
-            </div>
-          </>
-        ) : (
+        <div className="flex items-start justify-between gap-3">
           <div>
+            {/* Başlık YALNIZ sepet numarasıdır: sipariş numarası her satırda,
+                kargo numarası paket altında zaten yazıyor. */}
             <p className="font-mono text-sm text-muted">{group.groupNumber}</p>
             <p className="text-sm text-subtle">{formatDate(date)}</p>
           </div>
-        )}
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-xs text-muted">{t("common.total")}</p>
+              <p className="text-lg font-semibold text-primary-500">
+                {formatTL(group.totalAmount)}
+              </p>
+            </div>
+            {isGroupCancellable(group) && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => onCancelGroup(group)}
+              >
+                {group.orders.length > 1
+                  ? t("order.cancelGroupTitle")
+                  : t("order.cancelShort")}
+              </Button>
+            )}
+            <ButtonLink
+              href={`/profile/orders/${group.orders[0]?.id}`}
+              variant="outline"
+              size="sm"
+            >
+              {t("common.details")}
+            </ButtonLink>
+          </div>
+        </div>
       </div>
 
       {/* Body — product line(s) grouped per seller-package ("çatı"). Same seller =
-          one parcel = ONE tracking number, so it is shown once per package (not
-          repeated on each line). */}
+          one parcel = ONE tracking + ONE shipping fee, shown once per package. */}
       <div className="space-y-4 border-t border-border-subtle p-4 sm:p-6">
-        {packages.map((pkg) => {
-          const shipped = pkg.orders.find((o) => hasVisibleShipment(o));
+        {group.packages.map((pkg) => {
+          const cargoCode = visibleCargoCode(pkg.cargo);
           return (
             <div
-              key={pkg.key}
+              key={pkg.id}
               className={
                 multiPackage ? "ml-3 border-l-2 border-primary-300 pl-4" : ""
               }
@@ -218,16 +189,43 @@ export default function OrderGroupCard({
                   <OrderLine key={order.id} order={order} actions={actions} />
                 ))}
               </div>
-              {shipped && (
-                <div className="mt-3 rounded-lg bg-surface-alt p-3 text-sm">
-                  <p>
-                    <span className="text-muted">
-                      {t("order.trackingNumber")}:
-                    </span>{" "}
-                    <span className="font-mono">
-                      {getVisibleTrackingCode(shipped)}
-                    </span>
-                  </p>
+              {/* Kargo bedeli burada GÖSTERİLMEZ: kart tutarı zaten sepetin
+                  ödenen toplamıdır, kalem kalem döküm detay sayfasındadır. */}
+              {(pkg.packageNumber || cargoCode) && (
+                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-surface-alt p-3 text-sm">
+                  {/* Teslimat no: bu kutudaki ürünler TEK kolide gider. Sürat'a
+                      giden ve kargo etiketinde yazan kod budur. */}
+                  {pkg.packageNumber && (
+                    <p>
+                      <span className="text-muted">
+                        {t("order.packageNumber")}:
+                      </span>{" "}
+                      <span className="font-mono">{pkg.packageNumber}</span>
+                    </p>
+                  )}
+                  {/* Taşıyıcının kendi kodu — Sürat barkodu oluştuğunda dolar. */}
+                  {cargoCode && (
+                    <p>
+                      <span className="text-muted">
+                        {t("order.trackingNumber")}:
+                      </span>{" "}
+                      <span className="font-mono">{cargoCode}</span>
+                    </p>
+                  )}
+                  {/* Takip TESLİMAT başına tektir — sorgu anahtarı da bu koddur. */}
+                  {(pkg.packageNumber || cargoCode) &&
+                    group.viewerRole === "buyer" && (
+                      <ButtonLink
+                        href={`/track-order?orderNumber=${encodeURIComponent(
+                          pkg.packageNumber ?? pkg.orders[0]?.orderNumber ?? "",
+                        )}&email=${encodeURIComponent(actions.userEmail || "")}`}
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto"
+                      >
+                        {t("order.trackOrder")}
+                      </ButtonLink>
+                    )}
                 </div>
               )}
             </div>

@@ -37,6 +37,12 @@ export default function BusinessMembershipGuard({
       return;
     }
 
+    // Üyelik zorunluluğu YALNIZ onaylı kurumsal hesaba uygulanır. businessStatus
+    // yokken companyName+taxId dolu bir hesap (eski self-declare kalıntısı) bu
+    // dala düşerse /membership döngüsüne kilitleniyordu: Business tier satın
+    // alması da onaysız olduğu için 403 ile reddediliyordu.
+    if (user.businessStatus !== "approved") return;
+
     // Approved ama business üyeliği yoksa üyelik sayfasına yönlendir
     const isBusinessTier = user.membershipTier === "business";
     const allowedPaths = ["/membership"];

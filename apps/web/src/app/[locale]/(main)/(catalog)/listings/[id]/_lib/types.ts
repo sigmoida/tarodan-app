@@ -10,6 +10,8 @@ export interface ProductImage {
 
 export interface Listing {
   id: string;
+  /** İnsan-okunur ilan numarası (U010001) — kalıcı, destek/şikayet referansı. */
+  productCode?: string | null;
   title: string;
   description: string;
   price: number;
@@ -37,6 +39,9 @@ export interface Listing {
   isBoxed?: boolean | null;
   year?: number;
   condition?: string;
+  /** Niyet VE yetki: satıcının üyeliği takasa uygunsa true (API türetir). */
+  tradeAvailable?: boolean;
+  /** @deprecated eski alan — `tradeAvailable` kullanın. */
   trade_available?: boolean;
   isTradeEnabled?: boolean;
   quantity?: number | null;

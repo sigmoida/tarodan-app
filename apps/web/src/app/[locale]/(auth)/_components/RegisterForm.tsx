@@ -19,6 +19,7 @@ import { GoogleSignInButton } from "./GoogleSignInButton";
 import { useRegister } from "../_hooks/useRegister";
 import { AuthCard } from "./AuthCard";
 import { PasswordChecklist } from "./PasswordChecklist";
+import { RegisterAccountTabs } from "./RegisterAccountTabs";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -38,6 +39,7 @@ export function RegisterForm() {
   const form = useZodForm(registerSchema(locale), {
     defaultValues: {
       displayName: "",
+      username: "",
       email: "",
       phone: "",
       birthDate: "",
@@ -51,6 +53,7 @@ export function RegisterForm() {
   const onSubmit = (v: RegisterValues) =>
     submit({
       displayName: v.displayName,
+      username: v.username,
       email: v.email,
       phone: v.phone ?? "",
       birthDate: v.birthDate,
@@ -138,23 +141,26 @@ export function RegisterForm() {
           >
             {t("common.login")}
           </Link>
-          <span className="mt-3 block border-t border-border pt-3">
-            <Link
-              href="/register/business"
-              className="font-medium text-body hover:text-primary-600"
-            >
-              {t("auth.openBusinessAccount")}
-            </Link>
-          </span>
         </>
       }
     >
+      <div className="mb-5">
+        <RegisterAccountTabs active="individual" />
+      </div>
       <Form form={form} onSubmit={onSubmit} className="space-y-4">
         <FormInput
           name="displayName"
           label={`${t("checkout.fullName")} *`}
           placeholder={t("auth.fullNamePlaceholder")}
           autoComplete="name"
+        />
+
+        <FormInput
+          name="username"
+          label={`${t("auth.username")} *`}
+          placeholder={t("auth.usernamePlaceholder")}
+          autoComplete="username"
+          helperText={t("auth.usernameImmutableHint")}
         />
 
         <FormInput

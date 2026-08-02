@@ -4,34 +4,41 @@ import { col, type RowActionItem } from "@/components/table";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
+/**
+ * RefundRequest bazlı iade geçmişi satırı (R5: iade sipariş bazındadır).
+ * Eski satır Payment bazlıydı — grup modelinde kısmi iadeler listede hiç
+ * görünmüyor, görünenler de order=null ile boş kalıyordu.
+ */
 export interface Refund {
   id: string;
+  refundNumber: string;
+  orderId: string;
+  orderNumber: string | null;
   amount: number;
-  status: string;
+  /** İadeyle geri çevrilen satıcı kesintisi (orijinal komisyon değil). */
+  refundedSellerFee: number;
+  reason: string | null;
   refundedAt: string;
-  order: {
-    id: string;
-    orderNumber: string;
-    commissionAmount?: number;
-    reason?: string | null;
-    buyer: { id: string; displayName: string; email: string };
-    seller: { id: string; displayName: string; email: string };
-    product: { id: string; title: string };
-  } | null;
+  createdAt: string;
+  buyer: { id: string; displayName: string; email: string } | null;
+  seller: { id: string; displayName: string; email: string } | null;
+  product: { id: string; title: string } | null;
 }
 
 export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
   return [
-    col.id<Refund>(t("admin.operations.refunds.colId"), "id", {
-      grow: 1,
-    }),
+    col.code<Refund>(
+      t("admin.operations.refunds.refundNumber"),
+      (r) => r.refundNumber,
+      { sortKey: "refundNumber" },
+    ),
     col.link<Refund>(
       t("admin.operations.common.order"),
       (r) =>
-        r.order
+        r.orderNumber
           ? {
-              href: `/operations/orders/${r.order.id}`,
-              label: r.order.orderNumber,
+              href: `/operations/orders/${r.orderId}`,
+              label: `#${r.orderNumber}`,
             }
           : null,
       { sortKey: "order.orderNumber" },
@@ -40,48 +47,46 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
       tone: "negative",
     }),
     col.money<Refund>(
-      t("admin.operations.orders.commission"),
-      (r) => r.order?.commissionAmount,
+      t("admin.operations.refunds.refundedFee"),
+      (r) => r.refundedSellerFee,
     ),
     col.text<Refund>(t("admin.operations.refundRequests.reason"), (r) =>
-      r.order?.reason
-        ? enumLabel(refundReasonConfig, r.order.reason, r.order.reason)
-        : null,
+      r.reason ? enumLabel(refundReasonConfig, r.reason, r.reason) : null,
     ),
     col.user<Refund>(
       t("admin.operations.common.buyer"),
       (r) =>
-        r.order?.buyer
+        r.buyer
           ? {
-              name: r.order.buyer.displayName,
-              href: `/accounts/users/${r.order.buyer.id}`,
+              name: r.buyer.displayName,
+              secondary: r.buyer.email,
+              href: `/accounts/users/${r.buyer.id}`,
             }
           : null,
       { sortKey: "order.buyer.displayName" },
     ),
-    col.id<Refund>(
-      t("admin.operations.common.buyerId"),
-      (r) => r.order?.buyer?.id,
-    ),
     col.user<Refund>(
       t("admin.operations.common.seller"),
       (r) =>
-        r.order?.seller
+        r.seller
           ? {
-              name: r.order.seller.displayName,
-              href: `/accounts/users/${r.order.seller.id}`,
+              name: r.seller.displayName,
+              secondary: r.seller.email,
+              href: `/accounts/users/${r.seller.id}`,
             }
           : null,
       { sortKey: "order.seller.displayName" },
     ),
-    col.id<Refund>(
-      t("admin.operations.common.sellerId"),
-      (r) => r.order?.seller?.id,
-    ),
-    col.text<Refund>(
+    col.product<Refund>(
       t("admin.catalog.common.product"),
-      (r) => r.order?.product?.title,
-      { grow: 2, sortKey: "order.product.title" },
+      (r) =>
+        r.product
+          ? {
+              title: r.product.title,
+              href: `/catalog/products/${r.product.id}`,
+            }
+          : null,
+      { minWidth: 320, sortKey: "order.product.title" },
     ),
     col.date<Refund>(
       t("admin.operations.refunds.refundedAt"),

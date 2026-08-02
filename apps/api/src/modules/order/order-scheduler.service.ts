@@ -38,10 +38,13 @@ export class OrderSchedulerService implements OnModuleInit {
       "*/10 * * * *",
       this.logger,
     );
+    // 10 dk: sık koşan işlerin en ağırı (fatura üretimi + eLogo + takas
+    // komisyonu taramaları). Teslim-sonrası faturalamanın dakika hassasiyeti
+    // yok; iş idempotent taramadır, kaçan tick'i sonraki telafi eder.
     await registerRepeatableCron(
       this.scheduledQueue,
       "process-delivered-orders",
-      "*/2 * * * *",
+      "*/10 * * * *",
       this.logger,
     );
   }
@@ -128,6 +131,63 @@ export class OrderSchedulerService implements OnModuleInit {
    * Tüm teslim yollarını (webhook + worker) yakalar; idempotent.
    * Gerçek iş — Bull processor 'process-delivered-orders' buradan çağırır.
    */
+  /**
+   * Faturalama sağlığı alarmları.
+   *
+   * 1) Uzun süre `shipped`'te takılı siparişler: kargo poll'u teslimatı hiç
+   *    raporlamazsa sipariş asla `delivered` olmaz ve faturalama filtresine hiç
+   *    girmez → gerçekten teslim edilmiş sipariş faturasız kalır (eskiden bunu
+   *    gösteren hiçbir sinyal yoktu; tek kurtarma admin'in elle işaretlemesiydi).
+   * 2) Teslim edilmiş olup yasal süre (e-Arşiv 7 gün) içinde faturalanamayanlar.
+   */
+  async reportInvoiceStaleness(): Promise<{
+    stuckShipped: number;
+    uninvoicedDelivered: number;
+  }> {
+    const stuckDays =
+      Number(
+        this.configService.get<string>("SHIPPED_STALE_ALERT_DAYS") ?? "10",
+      ) || 10;
+    const invoiceDeadlineDays =
+      Number(this.configService.get<string>("INVOICE_DEADLINE_DAYS") ?? "5") ||
+      5;
+
+    const [stuckShipped, uninvoicedDelivered] = await Promise.all([
+      this.prisma.order.count({
+        where: {
+          status: OrderStatus.shipped,
+          updatedAt: {
+            lt: new Date(Date.now() - stuckDays * 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          status: { in: [OrderStatus.delivered, OrderStatus.completed] },
+          commissionLedger: { isNot: null },
+          revenueInvoicedAt: null,
+          deliveredAt: {
+            lt: new Date(
+              Date.now() - invoiceDeadlineDays * 24 * 60 * 60 * 1000,
+            ),
+          },
+        },
+      }),
+    ]);
+
+    if (stuckShipped > 0) {
+      this.logger.error(
+        `ORDERS_STUCK_SHIPPED count=${stuckShipped} — ${stuckDays} günden uzun süre kargoda; teslimat poll'lanmadıysa fatura hiç kesilmez`,
+      );
+    }
+    if (uninvoicedDelivered > 0) {
+      this.logger.error(
+        `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadlineDays} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`,
+      );
+    }
+    return { stuckShipped, uninvoicedDelivered };
+  }
+
   async runProcessDeliveredOrders(log: (msg: string) => void = () => {}) {
     // 1) Faturası kesilmemiş teslim EDİLMİŞ veya TAMAMLANMIŞ siparişler → teslim faturalarını kes.
     // NOT: deliveredAt bazı teslim yollarında NULL kalabiliyor + sipariş hızla `completed`'e
@@ -140,7 +200,14 @@ export class OrderSchedulerService implements OnModuleInit {
       where: {
         status: { in: [OrderStatus.delivered, OrderStatus.completed] },
         commissionLedger: { isNot: null },
+        // AÇIK işaret: faturası kesilmiş siparişler aday kümesinden ÇIKAR. Eskiden
+        // filtre yoktu; tamamlanan siparişler kümede kaldığı için sırasız take:500
+        // penceresi 500 sipariş sonrası YENİ teslimatları dışarıda bırakabiliyordu
+        // (fatura 14 gün gecikiyor veya hiç kesilmiyor).
+        revenueInvoicedAt: null,
       },
+      // En yeni teslimat önce: 7 günlük e-Arşiv penceresi olan siparişler beklemez.
+      orderBy: [{ deliveredAt: "desc" }, { updatedAt: "desc" }],
       select: {
         id: true,
         commissionLedger: {
@@ -177,6 +244,19 @@ export class OrderSchedulerService implements OnModuleInit {
         if (
           expectedTypes.every((type) => invoicedKeys.has(`${o.id}:${type}`))
         ) {
+          // Faturaları tam ama işareti eksik (tekil tetiklerle kesilmiş) sipariş:
+          // işaretlemeden atlanırsa aday penceresinde sonsuza dek yer tutar ve
+          // işaretin çözdüğü take:500 doygunluğu geri gelir. İşaretle ve çık.
+          await this.prisma.order
+            .update({
+              where: { id: o.id },
+              data: { revenueInvoicedAt: new Date() },
+            })
+            .catch((e: any) =>
+              this.logger.warn(
+                `revenueInvoicedAt backfill işareti yazılamadı ${o.id}: ${e?.message}`,
+              ),
+            );
           continue;
         }
         try {
@@ -237,6 +317,9 @@ export class OrderSchedulerService implements OnModuleInit {
         },
       },
       select: { id: true },
+      // Sipariş tarafıyla aynı gerekçe: tamamlanan takaslar aday kümesinden hiç
+      // çıkmadığı için sırasız pencere yeni takasları dışarıda bırakabiliyordu.
+      orderBy: { updatedAt: "desc" },
       take: 200,
     });
     let tradeInvoiced = 0;
@@ -265,8 +348,11 @@ export class OrderSchedulerService implements OnModuleInit {
       }
     }
 
+    // Faturalama sağlığı: takılı kargo + süresi geçmiş faturasız teslimat alarmları.
+    const staleness = await this.reportInvoiceStaleness();
+
     this.logger.log(
-      `processDeliveredOrders: teslim=${delivered.length} yeniFatura=${invoiced} tamamlanan=${completed} takasFatura=${tradeInvoiced} (returnWindow=${returnWindowDays}g)`,
+      `processDeliveredOrders: teslim=${delivered.length} yeniFatura=${invoiced} tamamlanan=${completed} takasFatura=${tradeInvoiced} takılıKargo=${staleness.stuckShipped} faturasız=${staleness.uninvoicedDelivered} (returnWindow=${returnWindowDays}g)`,
     );
     log(
       `${delivered.length} teslim · ${invoiced} yeni fatura · ${completed} tamamlandı · ${tradeInvoiced} takas faturası`,

@@ -5,7 +5,7 @@
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { NavigationMenuLink } from "@tarodan/ui";
-import { groupManufacturers, type ManufacturerRef } from "./config";
+import { groupManufacturers, navHref, type ManufacturerRef } from "./config";
 import NavPanel from "./NavPanel";
 
 interface VehicleType {
@@ -35,7 +35,7 @@ export default function CategoriesPanel({
             {vehicleTypes.map((type) => (
               <NavigationMenuLink asChild key={type.slug}>
                 <Link
-                  href={`/listings?category=${encodeURIComponent(type.slug)}`}
+                  href={navHref.vehicleType(type.slug)}
                   className="text-sm text-muted hover:text-primary-600 transition-colors py-1"
                 >
                   {type.label}
@@ -61,7 +61,7 @@ export default function CategoriesPanel({
                     <span key={item.id} className="inline-flex">
                       <NavigationMenuLink asChild>
                         <Link
-                          href={`/listings?manufacturer=${encodeURIComponent(item.name)}&manufacturerId=${encodeURIComponent(item.id)}`}
+                          href={navHref.manufacturer(item)}
                           className="text-sm text-muted hover:text-primary-600 transition-colors"
                         >
                           {item.name}
@@ -77,7 +77,7 @@ export default function CategoriesPanel({
             ))}
             <NavigationMenuLink asChild>
               <Link
-                href="/manufacturers"
+                href={navHref.allManufacturers}
                 className="text-xs text-primary-500 font-semibold hover:text-primary-600 transition-colors inline-block mt-1"
               >
                 {t("nav.allManufacturers")}

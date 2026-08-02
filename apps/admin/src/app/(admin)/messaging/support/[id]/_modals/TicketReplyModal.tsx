@@ -32,7 +32,17 @@ export function TicketReplyModal({
       isOpen
       onClose={onClose}
       title={t("admin.messaging.support.reply")}
-      maxWidth="max-w-lg"
+      size="lg"
+      closeButtonDisabled={reply.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => reply.mutate()}
+          confirmLabel={t("common.send")}
+          isLoading={reply.isPending}
+          disabled={!content.trim()}
+        />
+      }
     >
       <div className="space-y-4">
         <Textarea
@@ -46,13 +56,6 @@ export function TicketReplyModal({
           checked={isInternal}
           onChange={(e) => setIsInternal(e.target.checked)}
           label={t("admin.messaging.support.internalNoteHelper")}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => reply.mutate()}
-          confirmLabel={t("common.send")}
-          isLoading={reply.isPending}
-          disabled={!content.trim()}
         />
       </div>
     </Modal>

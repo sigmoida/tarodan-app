@@ -60,6 +60,21 @@ export class ShippingController {
   }
 
   /**
+   * GET /shipping/package-tiers — satıcının ilanda seçeceği paket boyutları.
+   *
+   * Aktif tarifeden okunur; satıcıya etiket, tutar ve örnek ölçü döner. Desi
+   * aralığı YANİ iç muhasebe birimi de gönderilir çünkü ilan formu seçime göre
+   * net kazanç önizlemesi ister — ama arayüz onu göstermez (yalnız admin görür).
+   */
+  @Get("package-tiers")
+  @Public()
+  @ApiOperation({ summary: "List the active tariff's seller package tiers" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Package tiers" })
+  async getPackageTiers() {
+    return this.shippingService.getPackageTiers();
+  }
+
+  /**
    * GET /shipping/rates - Get shipping rate by city (for checkout)
    * Query: city, carrier (surat), weight (kg, default 0.5)
    */

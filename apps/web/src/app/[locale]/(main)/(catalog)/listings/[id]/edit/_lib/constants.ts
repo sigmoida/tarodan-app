@@ -28,7 +28,7 @@ export const createInitialFormData = (): EditListingFormData => ({
   isSet: false,
   bundleSize: undefined,
   quantity: "",
-  shippingDesi: 1,
+  shippingPackageTier: "small",
   images: [],
   status: "active",
 });

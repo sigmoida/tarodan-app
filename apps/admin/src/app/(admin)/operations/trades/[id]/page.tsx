@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { Button, StatusBadge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
-import { fmtTry } from "@/lib/format";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { DetailPage } from "@/components/detail/DetailPage";
@@ -21,6 +20,7 @@ import { RefundFailurePanel } from "./_sections/RefundFailurePanel";
 import { StuckPanel } from "./_sections/StuckPanel";
 import { ReviewPanel } from "./_sections/ReviewPanel";
 import { TradeInfoCards } from "./_sections/TradeInfoCards";
+import { TradeBalanceCard } from "./_sections/TradeBalanceCard";
 import { TradePartyCard } from "./_components/TradePartyCard";
 import { ShipmentLegCard } from "./_components/ShipmentLegCard";
 import { ApproveTradeModal } from "./_modals/ApproveTradeModal";
@@ -146,29 +146,7 @@ export default function TradeDetailPage() {
               onReject={() => setShowReject(true)}
             />
 
-            {trade.cashAmount && trade.cashAmount > 0 && (
-              <div className="rounded-xl bg-surface-elevated p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-heading">
-                    {t("admin.operations.trades.cashDifference")}
-                  </span>
-                  <span className="text-lg font-semibold text-primary-600">
-                    +{fmtTry(trade.cashAmount)}
-                  </span>
-                </div>
-                {/* Farkı kim öder — cashPayerId'den çözülen taraf. */}
-                {trade.cashPayerId && (
-                  <p className="mt-2 text-sm text-muted">
-                    {t("admin.operations.trades.paidBy")}:{" "}
-                    <span className="font-medium text-body">
-                      {trade.cashPayerId === trade.initiator.id
-                        ? trade.initiator.displayName
-                        : trade.receiver.displayName}
-                    </span>
-                  </p>
-                )}
-              </div>
-            )}
+            <TradeBalanceCard trade={trade} />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <TradePartyCard

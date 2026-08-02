@@ -15,7 +15,6 @@ export function reportColumns({ t }: { t: T }) {
   const reasonLabels = reportReasonLabels(t);
   const statusConfig = reportStatusConfig(t);
   return [
-    col.id<Report>(t("admin.reports.columns.requestId"), (r) => r.id),
     col.text<Report>(
       t("admin.reports.columns.type"),
       (r) => typeLabels[r.type] ?? r.type,
@@ -34,22 +33,37 @@ export function reportColumns({ t }: { t: T }) {
         sortType: "text",
       },
     ),
-    col.muted<Report>(t("common.description"), (r) => r.description || null, {
-      grow: 3,
-      minWidth: 220,
-      sortKey: "description",
-      sortType: "text",
-    }),
+    col.custom<Report>(
+      t("common.description"),
+      (r) =>
+        r.description ? (
+          <p className="whitespace-normal break-words text-sm leading-5 text-muted">
+            {r.description}
+          </p>
+        ) : (
+          <span className="text-subtle">—</span>
+        ),
+      {
+        grow: 3,
+        minWidth: 320,
+        sortKey: "description",
+        sortType: "text",
+        exportValue: (r) => r.description ?? "",
+      },
+    ),
     col.user<Report>(
       t("admin.reports.columns.reporter"),
       (r) =>
         r.reporter
-          ? { name: r.reporter.displayName, secondary: r.reporter.email }
+          ? {
+              name: r.reporter.displayName,
+              secondary: r.reporter.email,
+              avatar: r.reporter.avatarUrl,
+              href: `/accounts/users/${r.reporter.id}`,
+            }
           : null,
-      { sortKey: "reporter.displayName" },
+      { minWidth: 260, sortKey: "reporter.displayName" },
     ),
-    col.id<Report>(t("admin.reports.columns.userId"), (r) => r.reporter?.id),
-    col.id<Report>(t("admin.reports.columns.targetId"), "targetId"),
     col.date<Report>(t("common.date"), "createdAt"),
     col.badge<Report>(
       t("common.status"),

@@ -21,7 +21,10 @@ import {
 export function useSettingsPage() {
   const t = useTranslations();
   const [tab, setTab] = useTabParam("listing");
-  const activeTab = tab as SettingsTab;
+  // "warehouse" has its own card/form; the numeric form falls back to a valid
+  // tab so `fieldsByTab`/`tabTitle` indexing stays safe while it's hidden.
+  const isWarehouseTab = tab === "warehouse";
+  const activeTab = (isWarehouseTab ? "listing" : tab) as SettingsTab;
   const fieldsByTab = tabFields(t);
 
   const query = useQuery({
@@ -59,6 +62,7 @@ export function useSettingsPage() {
     tab,
     setTab,
     activeTab,
+    isWarehouseTab,
     tabs: settingsTabs(t),
     title: tabTitle(t)[activeTab],
     fields: fieldsByTab[activeTab],

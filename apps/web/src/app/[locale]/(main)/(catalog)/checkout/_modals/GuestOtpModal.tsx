@@ -3,7 +3,7 @@
 "use client";
 
 import toast from "react-hot-toast";
-import { Button, Input, Modal } from "@tarodan/ui";
+import { Button, Input, Modal, ModalFooter } from "@tarodan/ui";
 import { useCheckout } from "../_context/CheckoutContext";
 
 export default function GuestOtpModal() {
@@ -30,7 +30,20 @@ export default function GuestOtpModal() {
       isOpen={guestOtpModalOpen && !isAuthenticated}
       onClose={() => setGuestOtpModalOpen(false)}
       title={t("checkout.guestEmailVerifyTitle")}
-      maxWidth="max-w-md"
+      size="md"
+      closeLabel={t("common.close")}
+      footer={
+        <ModalFooter
+          onCancel={() => setGuestOtpModalOpen(false)}
+          onConfirm={confirmGuestOtpModal}
+          cancelLabel={t("checkout.guestEmailModalCancel")}
+          confirmLabel={t("checkout.guestEmailModalConfirm")}
+          disabled={
+            sendingForThisEmail ||
+            !/^\d{6}$/.test(guestEmailVerificationCode.replace(/\D/g, ""))
+          }
+        />
+      }
     >
       <div className="space-y-4">
         <p className="text-sm text-muted">
@@ -70,7 +83,7 @@ export default function GuestOtpModal() {
         />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
-            variant="secondary"
+            variant="outline"
             type="button"
             disabled={guestOtpSending || !guestEmail.trim()}
             onClick={async () => {
@@ -84,18 +97,6 @@ export default function GuestOtpModal() {
             }}
           >
             {guestOtpSending ? "…" : t("checkout.guestEmailSendCode")}
-          </Button>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-border-subtle pt-2">
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={() => setGuestOtpModalOpen(false)}
-          >
-            {t("checkout.guestEmailModalCancel")}
-          </Button>
-          <Button type="button" onClick={confirmGuestOtpModal}>
-            {t("checkout.guestEmailModalConfirm")}
           </Button>
         </div>
       </div>

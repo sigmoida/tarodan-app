@@ -43,10 +43,12 @@ export function useSellerProfile() {
   const sellerQuery = useQuery({
     queryKey: queryKeys.seller.profile(sellerId),
     queryFn: async (): Promise<Seller | null> => {
-      const [profileRes, ratingStatsRes] = await Promise.all([
-        api.get(`/users/${sellerId}/profile`).catch(() => null),
-        ratingsApi.getUserStats(sellerId).catch(() => null),
-      ]);
+      const profileRes = await api
+        .get(`/users/${sellerId}/profile`)
+        .catch(() => null);
+      const ratingStatsRes = profileRes?.data?.id
+        ? await ratingsApi.getUserStats(profileRes.data.id).catch(() => null)
+        : null;
       const statsData = ratingStatsRes?.data;
       if (profileRes?.data) {
         return {
@@ -92,16 +94,17 @@ export function useSellerProfile() {
     meta: { page: "seller-profile" },
   });
   const seller = sellerQuery.data ?? null;
+  const resolvedSellerId = seller?.id;
 
   // Fire storefront view tracking once per seller visit (backend handles
   // self-view + bot + rate-limit guards; errors are ignored — non-critical).
   useEffect(() => {
-    if (!sellerId || !seller || viewCountedRef.current) return;
-    if (user?.id === sellerId) return;
+    if (!resolvedSellerId || !seller || viewCountedRef.current) return;
+    if (user?.id === resolvedSellerId) return;
     viewCountedRef.current = true;
     (async () => {
       try {
-        const res = await api.post(`/users/${sellerId}/view`);
+        const res = await api.post(`/users/${resolvedSellerId}/view`);
         const newCount = res.data?.storeViewCount;
         if (newCount !== undefined) {
           queryClient.setQueryData(
@@ -114,61 +117,66 @@ export function useSellerProfile() {
         // ignore
       }
     })();
-  }, [sellerId, seller, user?.id, queryClient]);
+  }, [sellerId, resolvedSellerId, seller, user?.id, queryClient]);
 
   const productsQuery = useQuery({
-    queryKey: queryKeys.seller.products(sellerId),
+    queryKey: queryKeys.seller.products(resolvedSellerId ?? sellerId),
     queryFn: async (): Promise<Product[]> => {
-      const response = await listingsApi.getAll({ sellerId, limit: 50 });
+      const response = await listingsApi.getAll({
+        sellerId: resolvedSellerId,
+        limit: 50,
+      });
       return response.data?.data || response.data?.products || [];
     },
-    enabled: !!sellerId,
+    enabled: !!resolvedSellerId,
     meta: { page: "seller-products" },
   });
   const products = productsQuery.data ?? [];
 
   const followQuery = useQuery({
-    queryKey: queryKeys.seller.follow(sellerId),
+    queryKey: queryKeys.seller.follow(resolvedSellerId ?? sellerId),
     queryFn: async () => {
-      const response = await api.get(`/users/${sellerId}/follow`);
+      const response = await api.get(`/users/${resolvedSellerId}/follow`);
       return response.data.following as boolean;
     },
-    enabled: !!sellerId && !!isAuthenticated && user?.id !== sellerId,
+    enabled:
+      !!resolvedSellerId && !!isAuthenticated && user?.id !== resolvedSellerId,
     meta: { page: "seller-follow" },
   });
   const isFollowing = followQuery.data ?? false;
 
   const reviewsQuery = useQuery({
-    queryKey: queryKeys.seller.reviews(sellerId),
+    queryKey: queryKeys.seller.reviews(resolvedSellerId ?? sellerId),
     queryFn: async (): Promise<UserRating[]> => {
-      const response = await ratingsApi.getUserRatings(sellerId);
+      const response = await ratingsApi.getUserRatings(resolvedSellerId!);
       return response.data?.ratings || response.data?.data || [];
     },
-    enabled: !!sellerId,
+    enabled: !!resolvedSellerId,
     meta: { page: "seller-reviews" },
   });
 
   const collectionsQuery = useQuery({
-    queryKey: queryKeys.seller.collections(sellerId),
+    queryKey: queryKeys.seller.collections(resolvedSellerId ?? sellerId),
     queryFn: async (): Promise<SellerCollection[]> => {
-      const response = await collectionsApi.getUserCollections(sellerId, {
-        pageSize: 50,
-      });
+      const response = await collectionsApi.getUserCollections(
+        resolvedSellerId!,
+        { pageSize: 50 },
+      );
       return (
         response.data?.collections || response.data?.data?.collections || []
       );
     },
-    enabled: !!sellerId,
+    enabled: !!resolvedSellerId,
     meta: { page: "seller-collections" },
   });
 
   const ratingStatsQuery = useQuery({
-    queryKey: queryKeys.seller.ratingStats(sellerId),
+    queryKey: queryKeys.seller.ratingStats(resolvedSellerId ?? sellerId),
     queryFn: async (): Promise<RatingStats | null> => {
-      const res = await ratingsApi.getUserStats(sellerId);
+      const res = await ratingsApi.getUserStats(resolvedSellerId!);
       return res.data;
     },
-    enabled: !!sellerId,
+    enabled: !!resolvedSellerId,
     meta: { page: "seller-rating-stats" },
   });
 
@@ -178,16 +186,16 @@ export function useSellerProfile() {
     setFollowPending(true);
     try {
       if (isFollowing) {
-        await api.delete(`/users/${sellerId}/follow`);
+        await api.delete(`/users/${resolvedSellerId}/follow`);
         toast.success(t("seller.unfollowed"));
       } else {
-        await api.post(`/users/${sellerId}/follow`);
+        await api.post(`/users/${resolvedSellerId}/follow`);
         toast.success(t("seller.followed"));
       }
       // Keep the button disabled until the follow state has actually refetched.
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: queryKeys.seller.follow(sellerId),
+          queryKey: queryKeys.seller.follow(resolvedSellerId ?? sellerId),
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.seller.profile(sellerId),
@@ -202,7 +210,7 @@ export function useSellerProfile() {
 
   const handleMessage = () => {
     if (!requireAuth({ message: t("auth.authRequiredMessage") })) return;
-    window.location.href = `/profile/messages?user=${sellerId}`;
+    window.location.href = `/profile/messages?user=${resolvedSellerId}`;
   };
 
   const handleReport = () => {
@@ -236,7 +244,7 @@ export function useSellerProfile() {
     collections: collectionsQuery.data ?? [],
     collectionsLoading: collectionsQuery.isLoading,
     ratingStats: ratingStatsQuery.data ?? null,
-    isOwnProfile: user?.id === sellerId,
+    isOwnProfile: user?.id === resolvedSellerId,
     membershipDuration,
     showReportModal,
     setShowReportModal,

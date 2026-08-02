@@ -77,17 +77,14 @@ export interface PayTRCallbackData {
   installment_count?: string;
 }
 
-export interface PayTRRefundRequest {
-  merchantOid: string;
-  returnAmount: number; // in kuruş
-}
-
 export interface PayTRRefundResponse {
   status: "success" | "error";
   err_no?: string;
   err_msg?: string;
   merchant_oid?: string;
   return_amount?: number;
+  /** İstekte gönderildiyse PayTR aynen geri döner (durum-sorgu eşlemesi için). */
+  reference_no?: string;
 }
 
 /** PayTR durum-sorgu: başarılı yanıt (status === 'success') */
@@ -103,12 +100,68 @@ export type PayTRStatusInquirySuccess = {
   paymentType?: string;
   /** Taksit sayısı (0/1 = tek çekim). */
   installmentCount?: number;
+  /** PayTR'nin bu işlemden kestiği komisyon (TL) — `kesinti_tutari`. PSP ücret mutabakatı için. */
+  providerFeeTl?: number;
+  /** Kesinti sonrası kalan tutar (TL) — `net_tutar`. */
+  providerNetTl?: number;
+  /**
+   * İade hareketleri (`returns`). `referenceNo`, iade talebinde gönderdiğimiz
+   * `reference_no`'dur (= RefundAttempt.id, tiresiz) — sonucu belirsiz iade
+   * denemelerinin otomatik çözümü bu eşlemeye dayanır. PayTR göndermediyse
+   * alan undefined kalır (boş string değil): "referanssız iade" ayrımı bozulmasın.
+   */
+  returns?: Array<{
+    amountTl: number | null;
+    referenceNo?: string;
+    date?: string;
+    type?: string;
+  }>;
   /** Ham PayTR durum-sorgu zarfı (denetim/mutabakat). PAN/CVV içermez. */
   raw?: Record<string, unknown>;
 };
 
 export type PayTRStatusInquiryResult =
   PayTRStatusInquirySuccess | { ok: false; errNo?: string; errMsg?: string };
+
+/** İşlem dökümü (rapor/islem-dokumu) satırı — PSP mutabakatının işlem-seviyesi kaynağı. */
+export interface PaytrStatementEntry {
+  type: "sale" | "refund"; // islem_tipi S | I
+  merchantOid: string;
+  amountTl: number;
+  /** PayTR'nin kestiği komisyon (kesinti_tutari) — iade satırında olmayabilir. */
+  feeTl: number | null;
+  feeRatePct: number | null;
+  netTl: number | null;
+  currency: string;
+  installment: number | null;
+  cardBrand?: string;
+  maskedPan?: string;
+  paymentType?: string; // KART | EFT
+  /** İşlem günü, ISO (YYYY-MM-DD). PayTR "GG.AA.YYYY" verir, normalize edilir. */
+  transactionDate: string;
+  raw: Record<string, unknown>;
+}
+
+/** Ödeme özeti (rapor/odeme-dokumu) satırı: gerçekleşen ya da (projection) gelecek hakediş. */
+export interface PaytrSettlementSummaryEntry {
+  datePaid: string; // YYYY-MM-DD
+  currency: string;
+  salesTl: number;
+  returnsTl: number;
+  netTl: number;
+  merchantIban?: string;
+  /** future_payments bloğundan gelen "aktarılacak" satırı. */
+  projection: boolean;
+  raw: Record<string, unknown>;
+}
+
+/** Ödeme detayı (rapor/odeme-detayi) kalemi: hakediş günündeki sipariş dökümü. */
+export interface PaytrSettlementDetailEntry {
+  merchantOid: string;
+  amountTl: number;
+  currency: string;
+  raw: Record<string, unknown>;
+}
 
 /** PAYTR_TEST_MODE: true / 1 / yes → test */
 export function parsePaytrTestMode(raw: string | undefined): boolean {
@@ -297,6 +350,28 @@ export class PayTRService implements IPaymentProvider {
           ? Number.parseInt(String(installmentRaw), 10)
           : undefined;
 
+      // PSP kesintisi (virgüllü gelebilir: "2,35") — ücret mutabakatı için.
+      const providerFeeTl = PayTRService.parsePaytrMoneyString(
+        data.kesinti_tutari != null ? String(data.kesinti_tutari) : undefined,
+      );
+      const providerNetTl = PayTRService.parsePaytrMoneyString(
+        data.net_tutar != null ? String(data.net_tutar) : undefined,
+      );
+
+      // İade listesi — reference_no eşlemesi için normalize edilir.
+      const returnsRaw = Array.isArray(data.returns) ? data.returns : [];
+      const returns = returnsRaw.map((r: any) => ({
+        amountTl: PayTRService.parsePaytrMoneyString(
+          r?.return_amount != null ? String(r.return_amount) : undefined,
+        ),
+        referenceNo:
+          r?.reference_no != null && String(r.reference_no) !== ""
+            ? String(r.reference_no)
+            : undefined,
+        date: r?.return_date != null ? String(r.return_date) : undefined,
+        type: r?.return_type != null ? String(r.return_type) : undefined,
+      }));
+
       return {
         ok: true,
         paymentTotalTl,
@@ -307,6 +382,9 @@ export class PayTRService implements IPaymentProvider {
         installmentCount: Number.isFinite(installmentCount as number)
           ? installmentCount
           : undefined,
+        providerFeeTl: providerFeeTl ?? undefined,
+        providerNetTl: providerNetTl ?? undefined,
+        returns,
         raw: data,
       };
     } catch (error: any) {
@@ -408,6 +486,7 @@ export class PayTRService implements IPaymentProvider {
   async createRefund(
     merchantOid: string,
     amount: number, // in TL
+    referenceNo?: string,
   ): Promise<PayTRRefundResponse> {
     const oid = merchantOid.includes("-")
       ? merchantOid.replace(/-/g, "")
@@ -418,7 +497,7 @@ export class PayTRService implements IPaymentProvider {
     // ile aynı /odeme birim kuralı). Hash de aynı string ile üretilir.
     const returnAmount = amount.toFixed(2); // ONDALIK TL
 
-    // Build hash for refund
+    // Build hash for refund — reference_no doküman gereği token'a KATILMAZ.
     const hashStr = `${this.merchantId}${oid}${returnAmount}${this.merchantSalt}`;
     const paytrToken = this.generateHash(hashStr);
 
@@ -428,6 +507,12 @@ export class PayTRService implements IPaymentProvider {
       return_amount: returnAmount,
       paytr_token: paytrToken,
     });
+    // Opsiyonel takip referansı (durum-sorgu yanıtında geri döner). PayTR
+    // alfanümerik/max 64 ister; UUID tireleri vb. temizlenir.
+    const cleanRef = (referenceNo ?? "")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .slice(0, 64);
+    if (cleanRef) formData.set("reference_no", cleanRef);
 
     try {
       const response = await fetch("https://www.paytr.com/odeme/iade", {
@@ -474,8 +559,9 @@ export class PayTRService implements IPaymentProvider {
   async createPartialRefund(
     merchantOid: string,
     amount: number, // in TL
+    referenceNo?: string,
   ): Promise<PayTRRefundResponse> {
-    return this.createRefund(merchantOid, amount);
+    return this.createRefund(merchantOid, amount, referenceNo);
   }
 
   // ==========================================================================
@@ -714,6 +800,8 @@ export class PayTRService implements IPaymentProvider {
       ]),
     );
 
+    // request_exp_date bilinçli gönderilmiyor: PayTR Direct API, Unix epoch
+    // değerini geçersiz token olarak reddediyor; alan yoksa 30 dakika kullanıyor.
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
       user_ip: buyer.ip,
@@ -734,8 +822,6 @@ export class PayTRService implements IPaymentProvider {
       user_basket: userBasket,
       debug_on: this.testMode ? "1" : "0",
       client_lang: "tr",
-      // Hazırlanan formun fiyat/oid bilgisi uzun süre sonra kullanılamasın.
-      request_exp_date: String(Math.floor(Date.now() / 1000) + 30 * 60),
     });
 
     if (options?.savedCard) {
@@ -765,170 +851,6 @@ export class PayTRService implements IPaymentProvider {
   // UYARI: Kart saklama PAYTR_CARD_STORAGE_ENABLED; kullanıcısız Non3D çekim
   // ayrıca PAYTR_RECURRING_ENABLED ile açılır. İki PayTR yetkisini karıştırmayın.
   // ==========================================================================
-
-  /**
-   * Kayıtlı kartla ÖDEME (Payment By Registered Card) — kullanıcı MEVCUT (CIT).
-   * Recurring'den farkı: `recurring_payment` GÖNDERİLMEZ (bu merchant-initiated bir
-   * tekrarlayan çekim değil, kullanıcının o an başlattığı işlemdir) ve `require_cvv`/
-   * `cvv` desteklenir. Hash Direkt API ile BİREBİR aynıdır (mid + ip + oid + email +
-   * amount + payment_type + installment + currency + test_mode + non_3d, salt update
-   * içinde). payment_amount ONDALIK TL. non3d=false → 3DS HTML döner (Direct API
-   * gibi, kullanıcıya gösterilir); non3d=true → JSON status (success|failed|wait_callback),
-   * kesin sonuç ayrıca Bildirim URL'ine düşer. Kaynak: PayTR "kayıtlı karttan ödeme" dok.
-   */
-  async capiPaymentByRegisteredCard(params: {
-    utoken: string;
-    ctoken: string;
-    amount: number; // TL
-    merchantOid: string;
-    buyer: PayTRBuyer;
-    basketItems: PayTRBasketItem[];
-    requireCvv?: boolean;
-    cvv?: string;
-    installmentCount?: number;
-    /** Varsayılan true → mevcut senkron Non3D davranışını korur. */
-    non3d?: boolean;
-    successQueryParams?: string;
-  }): Promise<{
-    status: "success" | "failed" | "wait_callback";
-    reason?: string;
-    tryAgain?: boolean;
-    /** Yalnız non3d=false'ta dolu — 3DS banka formu HTML'i. */
-    threeDSHtml?: string;
-    /** Ham PayTR yanıtı (gözlemlenebilirlik/mutabakat). PAN/CVV içermez. */
-    raw?: Record<string, unknown>;
-  }> {
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
-      throw new BadRequestException(
-        i18nMessage("server.payment.notConfigured"),
-      );
-    }
-    const paymentAmount = params.amount.toFixed(2); // ONDALIK TL
-    const paymentType = "card";
-    const installmentCount = String(
-      params.installmentCount && params.installmentCount > 1
-        ? params.installmentCount
-        : 0,
-    );
-    const currency = "TL";
-    const testModeStr = this.testMode ? "1" : "0";
-    const non3d = params.non3d === false ? "0" : "1";
-
-    const successBase = `${this.configService.get("FRONTEND_URL")}/payment/success`;
-    const merchantOkUrl = params.successQueryParams
-      ? `${successBase}?${params.successQueryParams}`
-      : successBase;
-    const merchantFailUrl = `${this.configService.get("FRONTEND_URL")}/payment/fail`;
-
-    // hashStr = mid + ip + oid + email + amount + payment_type + installment + currency + test_mode + non_3d
-    const hashStr =
-      this.merchantId +
-      params.buyer.ip +
-      params.merchantOid +
-      params.buyer.email +
-      paymentAmount +
-      paymentType +
-      installmentCount +
-      currency +
-      testModeStr +
-      non3d;
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(hashStr + this.merchantSalt)
-      .digest("base64");
-
-    const userBasket = JSON.stringify(
-      params.basketItems.map((i) => [
-        i.name,
-        Number(i.price).toFixed(2),
-        i.quantity,
-      ]),
-    );
-
-    const form = new URLSearchParams({
-      merchant_id: this.merchantId,
-      user_ip: params.buyer.ip,
-      merchant_oid: params.merchantOid,
-      email: params.buyer.email,
-      payment_type: paymentType,
-      payment_amount: paymentAmount,
-      installment_count: installmentCount,
-      currency,
-      test_mode: testModeStr,
-      non_3d: non3d,
-      merchant_ok_url: merchantOkUrl,
-      merchant_fail_url: merchantFailUrl,
-      user_name: `${params.buyer.name} ${params.buyer.surname}`.trim(),
-      user_address: params.buyer.address,
-      user_phone: params.buyer.phone,
-      user_basket: userBasket,
-      debug_on: this.testMode ? "1" : "0",
-      client_lang: "tr",
-      utoken: params.utoken,
-      ctoken: params.ctoken,
-      // Doküman: kayıtlı karttan ödemede require_cvv zorunlu alandır (1/0).
-      require_cvv: params.requireCvv ? "1" : "0",
-      paytr_token: paytrToken,
-    });
-    if (params.cvv) form.set("cvv", params.cvv);
-
-    let rawText: string;
-    try {
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: form.toString(),
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
-      rawText = await response.text();
-    } catch (error: any) {
-      this.logger.error(
-        `PayTR kayıtlı-kart ödeme hata oid=${params.merchantOid}: ${error?.message}`,
-      );
-      return {
-        status: "failed",
-        reason: error?.message || "bağlantı hatası",
-        tryAgain: true,
-      };
-    }
-
-    const trimmed = (rawText || "").trim();
-    // 3DS akışı (non3d=false): banka formunu içeren HTML → istemciye göster.
-    if (non3d === "0") {
-      const lower = trimmed.slice(0, 500).toLowerCase();
-      if (
-        lower.includes("<html") ||
-        lower.includes("<!doctype") ||
-        lower.includes("<form")
-      ) {
-        return { status: "success", threeDSHtml: rawText };
-      }
-    }
-    // Non3D / hata: JSON yanıt (status ∈ success | failed | wait_callback).
-    const data = this.parsePaytrJson<{
-      status?: string;
-      reason?: string;
-      err_msg?: string;
-      try_again?: boolean;
-      [k: string]: unknown;
-    }>(trimmed);
-    if (!data || !data.status) {
-      this.logger.error(
-        `PayTR kayıtlı-kart ödeme boş/geçersiz yanıt oid=${params.merchantOid}: ${trimmed.slice(0, 200)}`,
-      );
-      return {
-        status: "failed",
-        reason: "PayTR geçersiz/boş yanıt",
-        tryAgain: true,
-      };
-    }
-    return {
-      status: data.status as "success" | "failed" | "wait_callback",
-      reason: data.reason || data.err_msg,
-      tryAgain: data.try_again,
-      raw: data,
-    };
-  }
 
   /**
    * Kayıtlı kartla KULLANICISIZ tekrarlayan ödeme (RECURRING).
@@ -1268,6 +1190,217 @@ export class PayTRService implements IPaymentProvider {
         `PayTR platform transfer başarısız: ${error.message}`,
       );
     }
+  }
+
+  // ==========================================================================
+  // RAPOR SERVİSLERİ — PSP mutabakat katmanının veri kaynakları.
+  // İşlem dökümü: hangi işlemler oldu + PayTR ne kesti (maks 3 günlük aralık).
+  // Ödeme özeti/detayı: hesaba ne zaman ne aktarıldı/aktarılacak (hakediş).
+  // ==========================================================================
+
+  /** "GG.AA.YYYY[ ...]" → "YYYY-MM-DD"; ISO gelirse dokunmaz. */
+  private static normalizeReportDate(value: unknown): string {
+    const s = String(value ?? "")
+      .trim()
+      .split(" ")[0];
+    const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : s;
+  }
+
+  private static reportMoney(value: unknown): number | null {
+    return PayTRService.parsePaytrMoneyString(
+      value != null && value !== "" ? String(value) : undefined,
+    );
+  }
+
+  /** Rapor uçlarının ortak POST + zarf işleme kalıbı. failed = kayıt yok → null. */
+  private async postReport(
+    url: string,
+    form: Record<string, string>,
+  ): Promise<Record<string, unknown> | null> {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(form).toString(),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
+      });
+      const rawText = await response.text();
+      const data = this.parsePaytrJson<Record<string, unknown>>(rawText);
+      if (!data) {
+        throw new BadRequestException(
+          `PayTR rapor geçersiz/boş yanıt (${url})`,
+        );
+      }
+      const status = String(data.status ?? "");
+      // "failed" = aralıkta kayıt yok — hata değil, boş sonuç.
+      if (status === "failed") return null;
+      if (status !== "success") {
+        throw new BadRequestException(
+          String(data.err_msg ?? `PayTR rapor hatası (${url})`),
+        );
+      }
+      return data;
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.error(
+        `PayTR rapor isteği başarısız (${url}): ${error?.message}`,
+      );
+      throw new BadRequestException(
+        `PayTR rapor isteği başarısız: ${error?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Satış + iade işlem dökümü. Tarihler "YYYY-MM-DD hh:mm:ss", aralık en fazla 3 gün.
+   * Hash = merchant_id + start_date + end_date + merchant_salt.
+   */
+  async getTransactionStatement(params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PaytrStatementEntry[]> {
+    const paytrToken = this.generateHash(
+      this.merchantId + params.startDate + params.endDate + this.merchantSalt,
+    );
+    const data = await this.postReport(
+      "https://www.paytr.com/rapor/islem-dokumu",
+      {
+        merchant_id: this.merchantId,
+        start_date: params.startDate,
+        end_date: params.endDate,
+        paytr_token: paytrToken,
+      },
+    );
+    if (!data) return [];
+    const rows = Array.isArray(data.data) ? data.data : [];
+    return rows.map((r: any) => ({
+      type:
+        String(r?.islem_tipi ?? "").toUpperCase() === "I" ? "refund" : "sale",
+      merchantOid: String(r?.siparis_no ?? ""),
+      amountTl: PayTRService.reportMoney(r?.islem_tutari) ?? 0,
+      feeTl: PayTRService.reportMoney(r?.kesinti_tutari),
+      feeRatePct: PayTRService.reportMoney(r?.kesinti_orani),
+      netTl: PayTRService.reportMoney(r?.net_tutar),
+      currency: String(r?.para_birimi ?? "TL"),
+      installment:
+        r?.taksit != null && r.taksit !== ""
+          ? Number.parseInt(String(r.taksit), 10)
+          : null,
+      cardBrand: r?.kart_marka != null ? String(r.kart_marka) : undefined,
+      maskedPan: r?.kart_no != null ? String(r.kart_no) : undefined,
+      paymentType: r?.odeme_tipi != null ? String(r.odeme_tipi) : undefined,
+      transactionDate: PayTRService.normalizeReportDate(r?.islem_tarihi),
+      raw: r as Record<string, unknown>,
+    }));
+  }
+
+  /**
+   * Ödeme özeti (hakediş): gerçekleşen aktarımlar + future_payments projeksiyonları.
+   * Tarihler "YYYY-MM-DD", aralık en fazla 31 gün. Hash = mid + start + end + salt.
+   */
+  async getSettlementSummary(params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PaytrSettlementSummaryEntry[]> {
+    const paytrToken = this.generateHash(
+      this.merchantId + params.startDate + params.endDate + this.merchantSalt,
+    );
+    const data = await this.postReport(
+      "https://www.paytr.com/rapor/odeme-dokumu",
+      {
+        merchant_id: this.merchantId,
+        start_date: params.startDate,
+        end_date: params.endDate,
+        paytr_token: paytrToken,
+      },
+    );
+    if (!data) return [];
+
+    // Alan adları varyasyonlu gelebilir (sales/sale_amounts vb.) — toleranslı oku.
+    const mapEntry = (
+      r: any,
+      projection: boolean,
+    ): PaytrSettlementSummaryEntry => ({
+      datePaid: PayTRService.normalizeReportDate(r?.date_paid ?? r?.date),
+      currency: String(r?.currency ?? "TL"),
+      salesTl:
+        PayTRService.reportMoney(
+          r?.sales ?? r?.sale_amounts ?? r?.sale_amount,
+        ) ?? 0,
+      returnsTl:
+        PayTRService.reportMoney(
+          r?.return ?? r?.return_amounts ?? r?.return_amount,
+        ) ?? 0,
+      netTl:
+        PayTRService.reportMoney(r?.net ?? r?.net_amounts ?? r?.net_amount) ??
+        0,
+      merchantIban:
+        r?.merchant_iban != null ? String(r.merchant_iban) : undefined,
+      projection,
+      raw: r as Record<string, unknown>,
+    });
+
+    const realizedRaw = Array.isArray(data.data)
+      ? data.data
+      : data.date_paid != null
+        ? [data]
+        : [];
+    const futureRaw = Array.isArray(data.future_payments)
+      ? data.future_payments
+      : [];
+    return [
+      ...realizedRaw.map((r: any) => mapEntry(r, false)),
+      ...futureRaw.map((r: any) => mapEntry(r, true)),
+    ];
+  }
+
+  /**
+   * Ödeme detayı: hakediş günündeki sipariş dökümü. Hash = mid + date + salt.
+   */
+  async getSettlementDetail(params: {
+    date: string; // YYYY-MM-DD
+  }): Promise<PaytrSettlementDetailEntry[]> {
+    const paytrToken = this.generateHash(
+      this.merchantId + params.date + this.merchantSalt,
+    );
+    const data = await this.postReport(
+      "https://www.paytr.com/rapor/odeme-detayi/",
+      {
+        merchant_id: this.merchantId,
+        date: params.date,
+        paytr_token: paytrToken,
+      },
+    );
+    if (!data) return [];
+    const rows = Array.isArray(data.data) ? data.data : [];
+    return rows.map((r: any) => ({
+      merchantOid: String(r?.merchant_oid ?? ""),
+      amountTl: PayTRService.reportMoney(r?.payment ?? r?.amount) ?? 0,
+      currency: String(r?.currency ?? "TL"),
+      raw: r as Record<string, unknown>,
+    }));
+  }
+
+  /**
+   * Aşama-2: platform transfer SONUCU callback'inin hash doğrulaması.
+   * Doküman: hash = base64(HMAC-SHA256(trans_ids + merchant_salt, merchant_key)).
+   *
+   * DİKKAT: `transIds` HAM gövde string'idir — JSON parse edilip yeniden
+   * serialize edilirse boşluk/kaçış farkından hash tutmaz. Doğrulama ham
+   * string üzerinden yapılır; parse işi çağırana aittir.
+   */
+  verifyTransferCallback(params: { transIds: string; hash: string }): boolean {
+    if (!params.transIds || !params.hash) return false;
+    const expected = crypto
+      .createHmac("sha256", this.merchantKey)
+      .update(params.transIds + this.merchantSalt)
+      .digest("base64");
+    const expectedBuf = Buffer.from(expected);
+    const receivedBuf = Buffer.from(params.hash);
+    // timingSafeEqual uzunluk farkında throw eder — kısa/sahte hash 500 üretmesin.
+    if (expectedBuf.length !== receivedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
   }
 
   /**

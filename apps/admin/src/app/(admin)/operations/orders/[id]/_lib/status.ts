@@ -1,7 +1,13 @@
 import type { useTranslations } from "next-intl";
-import type { OrderDetail } from "../types";
 
 type T = ReturnType<typeof useTranslations<never>>;
+
+/** Başlık rozetinin ihtiyacı olan asgari alanlar (grup dosyası satırları dahil). */
+export interface OrderStatusSource {
+  status: string;
+  cancellationType?: string | null;
+  activeRefundRequest?: unknown;
+}
 
 const statusMeta: Record<string, { key: string; color: string; bg: string }> = {
   pending_payment: {
@@ -68,7 +74,10 @@ export interface OrderStatusView {
  * The order's headline status — priority: active refund > cancellation > raw
  * status. Mirrors the list badge logic.
  */
-export function getOrderStatusInfo(order: OrderDetail, t: T): OrderStatusView {
+export function getOrderStatusInfo(
+  order: OrderStatusSource,
+  t: T,
+): OrderStatusView {
   const hasActiveRefund =
     !!order.activeRefundRequest || order.status === "refund_requested";
   const isCancelledOrder =
@@ -96,20 +105,6 @@ export function getOrderStatusInfo(order: OrderDetail, t: T): OrderStatusView {
   return { ...info, hasActiveRefund, isCancelledOrder };
 }
 
-const POST_SHIPPING = [
-  "shipped",
-  "delivered",
-  "awaiting_buyer_confirmation",
-  "completed",
-  "refund_requested",
-  "refunded",
-];
-
-/** Post-shipping: cancellation disabled, refund flow applies. */
-export function isPostShipping(status: string): boolean {
-  return POST_SHIPPING.includes(status);
-}
-
 const ADMIN_MANUAL_STATUS_TARGETS: Record<string, readonly string[]> = {
   paid: ["preparing"],
   shipped: ["delivered"],
@@ -121,24 +116,4 @@ export function getAdminManualStatusTargets(status: string): readonly string[] {
 
 export function canManuallyUpdateOrderStatus(status: string): boolean {
   return getAdminManualStatusTargets(status).length > 0;
-}
-
-const SHIPPED_STATUSES = [
-  "shipped",
-  "delivered",
-  "awaiting_buyer_confirmation",
-  "completed",
-];
-
-/** Whether a real shipment exists: trackingNumber set + shipped stage + not cancelled. */
-export function hasRealShipment(
-  order: OrderDetail,
-  isCancelledOrder: boolean,
-): boolean {
-  return (
-    !!order.shipment &&
-    !!order.shipment.trackingNumber &&
-    SHIPPED_STATUSES.includes(order.status) &&
-    !isCancelledOrder
-  );
 }

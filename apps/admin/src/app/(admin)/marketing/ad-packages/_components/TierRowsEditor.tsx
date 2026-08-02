@@ -57,6 +57,7 @@ export function TierRowsEditor() {
                 type="number"
                 min="1"
                 label={t("admin.marketing.adPackages.durationDays")}
+                placeholder="7"
               />
               <FormInput
                 name={`tiers.${index}.minAmount`}
@@ -64,6 +65,7 @@ export function TierRowsEditor() {
                 min="0"
                 step="0.01"
                 label={t("admin.marketing.adPackages.minAmount")}
+                placeholder="0"
               />
               <FormInput
                 name={`tiers.${index}.maxAmount`}
@@ -79,6 +81,7 @@ export function TierRowsEditor() {
                 min="0"
                 step="0.01"
                 label={t("admin.marketing.adPackages.price")}
+                placeholder="49.90"
               />
               <FormInput
                 name={`tiers.${index}.campaignPrice`}
@@ -86,6 +89,7 @@ export function TierRowsEditor() {
                 min="0"
                 step="0.01"
                 label={t("admin.marketing.adPackages.campaignPrice")}
+                placeholder="39.90"
               />
               <FormDatePicker
                 name={`tiers.${index}.campaignStartsAt`}

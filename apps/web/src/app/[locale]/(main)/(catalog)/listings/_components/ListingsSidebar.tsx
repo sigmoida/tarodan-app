@@ -1,14 +1,23 @@
 "use client";
 
-import { XMarkIcon } from "@heroicons/react/24/outline";
-import { Button } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useCallback } from "react";
+import { useTranslations } from "next-intl";
+import MobileDrawer from "@/components/layout/MobileDrawer";
 import SidebarFilters from "./SidebarFilters";
 import { useListings } from "../_context/ListingsContext";
 
 /**
- * Desktop sidebar card + the mobile drawer overlay. A plain static column — the
- * filter sections collapse via the shared Accordion, so no sticky positioning.
+ * Desktop sidebar card + the mobile drawer. A plain static column — the filter
+ * sections collapse via the shared Accordion, so no sticky positioning.
+ *
+ * Mobil panel, gezinme çekmeceleriyle AYNI `MobileDrawer` gövdesini kullanır:
+ * marka başlığı, masaüstüne büyüyünce kapanma ve Radix'in odak tuzağı / Escape
+ * / kaydırma kilidi. Eskiden burada elle yazılmış bir overlay vardı; bunların
+ * hiçbiri yoktu ve panel açıkken arkadaki liste kaydırılabiliyordu.
+ *
+ * Açık durumu paylaşılan gezinme store'undan DEĞİL sayfa bağlamından gelir:
+ * `/listings` sayfasında hamburger da var; ikisi tek durumu paylaşsaydı bir
+ * dokunuş her iki paneli birden açardı.
  */
 export default function ListingsSidebar() {
   const t = useTranslations();
@@ -21,51 +30,36 @@ export default function ListingsSidebar() {
     clearFilters,
   } = useListings();
 
+  const closeMobileSidebar = useCallback(
+    () => setShowMobileSidebar(false),
+    [setShowMobileSidebar],
+  );
+
+  const filters = (
+    <SidebarFilters
+      filters={filtersForSidebar}
+      onFilterChange={handleFiltersChange}
+      activeFilterCount={activeFilterCount}
+      onClearFilters={clearFilters}
+    />
+  );
+
   return (
     <>
       {/* Sidebar Filters (Desktop) */}
       <div className="hidden lg:block w-56 flex-shrink-0">
         <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
-          <SidebarFilters
-            filters={filtersForSidebar}
-            onFilterChange={handleFiltersChange}
-            activeFilterCount={activeFilterCount}
-            onClearFilters={clearFilters}
-          />
+          {filters}
         </div>
       </div>
 
-      {/* Mobile Sidebar Overlay */}
-      {showMobileSidebar && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-heading/50"
-            onClick={() => setShowMobileSidebar(false)}
-          />
-          <div className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-surface-elevated shadow-xl flex flex-col overflow-y-auto">
-            <div className="flex-shrink-0 flex items-center justify-between p-4 bg-surface-elevated border-b border-border-subtle z-10">
-              <span className="font-semibold text-heading">
-                {t("product.filters")}
-              </span>
-              <Button
-                variant="secondary"
-                onClick={() => setShowMobileSidebar(false)}
-                className="p-2 hover:bg-surface-alt rounded"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </Button>
-            </div>
-            <div className="p-4">
-              <SidebarFilters
-                filters={filtersForSidebar}
-                onFilterChange={handleFiltersChange}
-                activeFilterCount={activeFilterCount}
-                onClearFilters={clearFilters}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <MobileDrawer
+        isOpen={showMobileSidebar}
+        onClose={closeMobileSidebar}
+        title={t("product.filters")}
+      >
+        <div className="p-4">{filters}</div>
+      </MobileDrawer>
     </>
   );
 }

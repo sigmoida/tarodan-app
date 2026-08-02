@@ -6,7 +6,7 @@ import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { yearlyDiscountSchema } from "../_lib/schema";
+import { yearlyDiscountSchema, YEARLY_DISCOUNT_MAX } from "../_lib/schema";
 
 /**
  * Yearly discount % editor. Seeded from the server value via RHF's `values`
@@ -67,8 +67,9 @@ export function YearlyDiscountForm({
           type="number"
           step="0.1"
           min="0"
-          max="100"
+          max={YEARLY_DISCOUNT_MAX}
           label={t("admin.tiers.yearlyDiscount.label")}
+          placeholder="10"
           className="w-48"
         />
         <Button type="submit" isLoading={save.isPending}>

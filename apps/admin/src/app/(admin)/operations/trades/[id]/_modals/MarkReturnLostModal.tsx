@@ -50,6 +50,16 @@ export function MarkReturnLostModal({
       isOpen={open}
       onClose={() => !markLost.isPending && onClose()}
       title={t("admin.operations.trades.markLostTitle")}
+      closeButtonDisabled={markLost.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          confirmLabel={t("admin.operations.trades.markLost")}
+          destructive
+          isLoading={markLost.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <p className="text-sm text-body">
@@ -67,13 +77,6 @@ export function MarkReturnLostModal({
             disabled={markLost.isPending}
           />
         </div>
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={submit}
-          confirmLabel={t("admin.operations.trades.markLost")}
-          destructive
-          isLoading={markLost.isPending}
-        />
       </div>
     </Modal>
   );

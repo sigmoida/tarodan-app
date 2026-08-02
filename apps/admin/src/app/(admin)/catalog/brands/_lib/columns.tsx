@@ -1,6 +1,6 @@
 import Image from "next/image";
-import { ChevronRightIcon, TruckIcon } from "@heroicons/react/24/outline";
-import { Badge, Button } from "@tarodan/ui";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
+import { Badge, IconButton } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { col, TruncatedText } from "@/components/table";
 import { brandRowMenu, type BrandRowActions } from "./rowActions";
@@ -11,6 +11,34 @@ type T = ReturnType<typeof useTranslations<never>>;
 export function brandColumns(t: T, actions: BrandRowActions) {
   const { onToggleExpand, expandedId } = actions;
   return [
+    col.custom<Brand>(
+      "",
+      (b) => {
+        const open = expandedId === b.id;
+        return (
+          <IconButton
+            variant="ghost"
+            size="sm"
+            onClick={() => onToggleExpand(b.id)}
+            aria-expanded={open}
+            aria-label={t("admin.catalog.common.models")}
+            title={t("admin.catalog.common.models")}
+            className="text-muted hover:text-primary-600"
+          >
+            <ChevronRightIcon
+              className={`h-4 w-4 transition-transform ${open ? "rotate-90 text-primary-600" : ""}`}
+            />
+          </IconButton>
+        );
+      },
+      {
+        id: "expand",
+        minWidth: 72,
+        fixed: true,
+        align: "center",
+        sortable: false,
+      },
+    ),
     col.custom<Brand>(
       t("admin.catalog.common.brand"),
       (b) => (
@@ -43,27 +71,6 @@ export function brandColumns(t: T, actions: BrandRowActions) {
     col.badge<Brand>(t("common.status"), (b) => <Badge active={b.isActive} />, {
       sortKey: "isActive",
     }),
-    col.custom<Brand>(
-      t("admin.catalog.common.models"),
-      (b) => {
-        const open = expandedId === b.id;
-        return (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onToggleExpand(b.id)}
-            className={`inline-flex items-center gap-2 whitespace-nowrap ${open ? "text-primary-700" : "text-primary-600"}`}
-          >
-            <ChevronRightIcon
-              className={`h-4 w-4 transition-transform ${open ? "rotate-90" : ""}`}
-            />
-            <TruckIcon className="h-4 w-4" />
-            {t("admin.catalog.common.models")}
-          </Button>
-        );
-      },
-      { minWidth: 140 },
-    ),
     col.rowMenu<Brand>(brandRowMenu(actions)),
   ];
 }

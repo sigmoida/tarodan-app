@@ -11,6 +11,7 @@ import {
   UseGuards,
   BadRequestException,
   Request,
+  Res,
 } from "@nestjs/common";
 import { FileInterceptor, FilesInterceptor } from "@nestjs/platform-express";
 import { UPLOAD_MULTER_OPTIONS } from "../../common/upload/multer-options";
@@ -20,6 +21,7 @@ import { MembershipService } from "../membership/membership.service";
 import { StorageService, isPublicBucket } from "../storage/storage.service";
 import { MediaAccessService } from "../storage/media-access.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { resolveUploadTarget } from "./upload-target";
 
 @Controller("media")
 @UseGuards(JwtAuthGuard)
@@ -45,6 +47,10 @@ export class MediaController {
       throw new BadRequestException("No file provided");
     }
 
+    // Faz 0: klasör SÖZLEŞMESİ sunucuda — `folder` yalnız amaç etiketi,
+    // bucket + gerçek klasörü whitelist kurar (istemci klasör açamaz).
+    const target = resolveUploadTarget(folder, req.user.id);
+
     // Yüklenen her görseli AI ile denetle (uygunsuz/NSFW → engelle)
     await this.moderationAi.assertImageClean(file, {
       entityType: "upload",
@@ -53,7 +59,8 @@ export class MediaController {
     });
 
     const options: UploadOptions = {
-      folder: folder || "uploads",
+      bucket: target.bucket,
+      folder: target.folder,
       generateThumbnail: thumbnail === "true",
     };
 
@@ -64,7 +71,25 @@ export class MediaController {
       }
     }
 
-    return this.mediaService.upload(file, options, req.user.id);
+    const result = await this.mediaService.upload(file, options, req.user.id);
+    // Private hedef (messages): istemciye public S3 URL'si DEĞİL, kalıcı
+    // yetkili servis ucu döner — Message.content'e bu gömülür.
+    if (target.private && result.mediaFileId) {
+      result.url = this.mediaService.buildMessageAttachmentUrl(
+        result.mediaFileId,
+      );
+    }
+    return result;
+  }
+
+  /**
+   * Faz 0: private mesaj ekini presigned URL'e yönlendirir. JWT zorunlu
+   * (sınıf guard'ı); yalnız `messages` kökündeki dosyalar çözülür.
+   */
+  @Get("message-attachment/:id")
+  async messageAttachment(@Param("id") id: string, @Res() res: any) {
+    const url = await this.mediaService.getMessageAttachmentPresignedUrl(id);
+    return res.redirect(url);
   }
 
   @Post("upload/multiple")
@@ -79,12 +104,28 @@ export class MediaController {
       throw new BadRequestException("No files provided");
     }
 
+    const target = resolveUploadTarget(folder, req.user.id);
     const options: UploadOptions = {
-      folder: folder || "uploads",
+      bucket: target.bucket,
+      folder: target.folder,
       generateThumbnail: thumbnail === "true",
     };
 
-    return this.mediaService.uploadMultiple(files, options, req.user.id);
+    const results = await this.mediaService.uploadMultiple(
+      files,
+      options,
+      req.user.id,
+    );
+    if (target.private) {
+      for (const result of results) {
+        if (result.mediaFileId) {
+          result.url = this.mediaService.buildMessageAttachmentUrl(
+            result.mediaFileId,
+          );
+        }
+      }
+    }
+    return results;
   }
 
   @Post("upload/product")

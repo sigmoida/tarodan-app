@@ -1,5 +1,7 @@
 import { OrderPricingService } from "./order-pricing.service";
 import { ProductStatus } from "@prisma/client";
+import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
 /**
  * Checkout quote kargosu artık SATICI-BAŞINA (create ile ortak calculateShippingBySeller).
@@ -34,6 +36,8 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
   const makeSvc = () => {
     const prisma = {
       platformSetting: {
+        // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(({ where }: any) => {
           if (where.settingKey === "shipping_base_cost")
             return Promise.resolve({ settingValue: String(BASE) });
@@ -57,10 +61,7 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         outboundPackageFee: BASE,
         freeShippingEnabled: true,
         freeShippingThreshold: THRESHOLD,
-        rates: [
-          { desi: 1, amount: BASE },
-          { desi: 2, amount: BASE },
-        ],
+        packageTiers: flatPackageTiers(BASE),
       }),
       getActiveTariffSnapshot: async () => ({
         tariffId: "tariff-1",
@@ -69,17 +70,20 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
           outboundPackageFee: BASE,
           freeShippingEnabled: true,
           freeShippingThreshold: THRESHOLD,
-          rates: [
-            { desi: 1, amount: BASE },
-            { desi: 2, amount: BASE },
-          ],
+          packageTiers: flatPackageTiers(BASE),
         },
       }),
     } as any;
-    const svc = new OrderPricingService(prisma, taxService, shippingTariffs, {
-      getEffectiveDisplayPrice: async () => null,
-      getEffectiveDisplayPriceMany: async () => new Map(),
-    } as any);
+    const svc = new OrderPricingService(
+      prisma,
+      taxService,
+      shippingTariffs,
+      {
+        getEffectiveDisplayPrice: async () => null,
+        getEffectiveDisplayPriceMany: async () => new Map(),
+      } as any,
+      testTaxPolicy(),
+    );
     // Komisyonu izole et — bu spec yalnız kargoyu ölçer.
     jest
       .spyOn(svc, "calculateCommission")
@@ -110,7 +114,9 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     });
     expect(q.shippingBySeller).toHaveLength(2);
     expect(q.shippingAmount).toBe(BASE * 2); // BUG öncesi bu BASE idi (az-göster)
-    expect(q.totalAmount).toBe(200 + BASE * 2); // subtotal + 2 kargo
+    // subtotal + 2 kargo + kargo payının hizmet KDV'si (%20). Quote eskiden
+    // hizmet KDV'sini hiç eklemiyordu ve tahsil edilenden düşük gösteriyordu.
+    expect(q.totalAmount).toBe(200 + BASE * 2 + BASE * 2 * 0.2);
   });
 
   it("ÇOK satıcı: BİRLEŞİK toplam eşiği geçse de her satıcı eşik altıysa kargo ÜCRETSİZ OLMAZ", async () => {
@@ -130,5 +136,51 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     });
     expect(q.shippingBySeller).toHaveLength(1);
     expect(q.shippingAmount).toBe(0);
+  });
+
+  describe("pricing.summary — ekranın bastığı satırlar", () => {
+    /**
+     * Sepet ve checkout artık kendi kırılımını ÜRETMEZ; `pricing.summary`'yi
+     * olduğu gibi basar. Bu yüzden dört alanın toplamı `total`'a KURUŞU
+     * KURUŞUNA eşit olmak zorunda — aksi halde ekranda satırlar toplamı
+     * vermez. Ekranlar KDV'yi kendileri dağıttığında kargonun KDV'si ücret
+     * satırına yığılıyordu: aynı sepet iki ekranda farklı kırılım gösteriyordu.
+     */
+    it("üç satırın toplamı ödenecek tutarı birebir verir", async () => {
+      const q = await makeSvc().getCheckoutQuote({
+        items: [{ productId: "a1" }, { productId: "b1" }],
+      });
+      const s = q.pricing.summary;
+
+      expect(
+        Math.round(
+          (s.productAmount + s.shippingAmount + s.serviceFeeAmount) * 100,
+        ) / 100,
+      ).toBe(s.total);
+      expect(s.total).toBe(q.pricing.totalAmount);
+    });
+
+    it("kargo satırı tarifeden gelen SABİT tutardır, KDV eklenmez", async () => {
+      const q = await makeSvc().getCheckoutQuote({
+        items: [{ productId: "a1" }],
+      });
+      const s = q.pricing.summary;
+
+      expect(s.shippingAmount).toBe(q.pricing.shippingAmount);
+    });
+
+    it("hizmet KDV'sinin TAMAMI hizmet bedeli satırına yazılır", async () => {
+      const q = await makeSvc().getCheckoutQuote({
+        items: [{ productId: "a1" }],
+      });
+      const s = q.pricing.summary;
+
+      // Kargonun KDV'si de bu satırdadır — alıcı için kargo sabit bir kalem.
+      expect(s.serviceFeeAmount).toBe(
+        Math.round(
+          (q.pricing.buyerFeeAmount + q.pricing.buyerServiceTaxAmount) * 100,
+        ) / 100,
+      );
+    });
   });
 });

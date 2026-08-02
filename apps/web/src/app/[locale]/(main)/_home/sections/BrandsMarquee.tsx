@@ -36,6 +36,11 @@ export default function BrandsMarquee({
 }: {
   items: BrandMarqueeItem[];
 }) {
+  // Every other home rail returns null when it has nothing to show. Without this
+  // an empty catalog rendered a full-bleed masked band under the hero — a blank
+  // gap that reads as a broken page rather than as "no brands yet".
+  if (items.length === 0) return null;
+
   return (
     // Full-bleed: break out of the (main) content container to span the whole
     // viewport width, regardless of the max-w-screen-xl cap.

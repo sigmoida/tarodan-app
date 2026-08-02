@@ -2,7 +2,15 @@
 
 "use client";
 
-import { Modal, Tabs, TabsList, TabsTrigger, TabsContent } from "@tarodan/ui";
+import { useState } from "react";
+import {
+  Modal,
+  ModalFooter,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@tarodan/ui";
 import { useAddItem } from "../_hooks/useAddItem";
 import ProductPickerList from "../_components/ProductPickerList";
 import CustomItemForm from "../_components/CustomItemForm";
@@ -10,6 +18,9 @@ import CustomItemForm from "../_components/CustomItemForm";
 export default function AddItemModal() {
   const s = useAddItem();
   const { t, collection, showAddModal, activeTab, setActiveTab, close } = s;
+  const [customPending, setCustomPending] = useState(false);
+  const customFormId = "collection-custom-item-form";
+  const pending = s.adding || customPending;
 
   if (!collection) return null;
 
@@ -18,11 +29,39 @@ export default function AddItemModal() {
       isOpen={showAddModal}
       onClose={close}
       title={t("collection.addProductToCollection")}
-      maxWidth="max-w-md"
+      size="md"
+      closeLabel={t("common.close")}
+      dismissDisabled={pending}
+      footer={
+        activeTab === "products" ? (
+          <ModalFooter
+            onCancel={close}
+            onConfirm={s.handleAddProducts}
+            cancelLabel={t("common.cancel")}
+            confirmLabel={
+              s.selectedProductIds.length > 0
+                ? `${s.selectedProductIds.length} ${t("collection.addProduct")}`
+                : t("common.add")
+            }
+            isLoading={s.adding}
+            disabled={s.selectedProductIds.length === 0}
+          />
+        ) : (
+          <ModalFooter
+            onCancel={close}
+            cancelLabel={t("common.cancel")}
+            confirmLabel={t("common.add")}
+            confirmForm={customFormId}
+            isLoading={customPending}
+          />
+        )
+      }
     >
       <Tabs
         value={activeTab}
-        onValueChange={(v) => setActiveTab(v as "products" | "custom")}
+        onValueChange={(v) => {
+          if (!pending) setActiveTab(v as "products" | "custom");
+        }}
       >
         <TabsList className="w-full">
           <TabsTrigger value="products" className="flex-1">
@@ -37,7 +76,11 @@ export default function AddItemModal() {
           <ProductPickerList s={s} />
         </TabsContent>
         <TabsContent value="custom">
-          <CustomItemForm onClose={close} />
+          <CustomItemForm
+            formId={customFormId}
+            onClose={close}
+            onPendingChange={setCustomPending}
+          />
         </TabsContent>
       </Tabs>
     </Modal>

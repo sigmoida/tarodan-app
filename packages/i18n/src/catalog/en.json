@@ -12,6 +12,12 @@
     "error": "Error",
     "success": "Success",
     "close": "Close",
+    "unsavedChanges": "Unsaved changes",
+    "unsavedChangesDescription": "Your changes will be lost. Do you want to close the form?",
+    "discardChanges": "Discard Changes",
+    "continueEditing": "Continue Editing",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
     "back": "Back",
     "next": "Next",
     "previous": "Previous",
@@ -164,6 +170,10 @@
     "password": "Password",
     "confirmPassword": "Confirm Password",
     "displayName": "Username",
+    "username": "Profile Username",
+    "usernamePlaceholder": "example.user",
+    "usernameRules": "Use 3-30 lowercase letters, numbers, dots, or underscores.",
+    "usernameImmutableHint": "Used in your profile URL and cannot be changed later.",
     "phone": "Phone",
     "birthDate": "Birth Date",
     "forgotPassword": "Forgot Password?",
@@ -214,7 +224,7 @@
     "goToLogin": "Go to Login",
     "resendVerificationEmail": "Resend Verification Email",
     "joinCommunity": "Join the collectors community",
-    "openBusinessAccount": "Open Business Account",
+    "openBusinessAccount": "Corporate Account Application",
     "fullNamePlaceholder": "Your Full Name",
     "emailPlaceholder": "example@email.com",
     "termsAgreeRich": "I have read and accept the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
@@ -265,8 +275,31 @@
     "step2FindEmail": "Find the email from Tarodan",
     "step3ClickLink": "Click the verification link",
     "step4Login": "Sign in to your account",
-    "businessAccountTitle": "Business Account Registration",
-    "businessAccountDesc": "Create your business account",
+    "businessAccountTitle": "Corporate Account Application",
+    "businessAccountDesc": "Submit your contact and company details for initial review",
+    "individualApplication": "Individual Application",
+    "corporateApplication": "Corporate Application",
+    "authorizedFullName": "Authorized Person",
+    "authorizedFullNamePlaceholder": "Authorized person's full name",
+    "companyLegalName": "Full Legal Company Name",
+    "companyLegalNamePlaceholder": "e.g. Tarodan Technology Incorporated",
+    "companyTitle": "Company Title",
+    "companyTitlePlaceholder": "e.g. Tarodan Technology Inc.",
+    "companyAddress": "Company Address",
+    "companyAddressPlaceholder": "Street, building, district, and city",
+    "companyEmail": "Company Email",
+    "companyEmailPlaceholder": "corporate@company.com",
+    "kepAddress": "Registered Email Address",
+    "kepAddressPlaceholder": "company@registered-mail.example",
+    "companyPhone": "Phone Number",
+    "contactPhone": "Contact Number",
+    "submitCorporateApplication": "Submit Corporate Application",
+    "corporateApplicationReceived": "Application Received",
+    "corporateApplicationReceivedDescription": "Your application has been sent for admin review.",
+    "corporateApplicationNextStep": "After preliminary approval, we will send a single-use account creation link to this address. You will set your password through that link.",
+    "createCorporateAccount": "Create Corporate Account",
+    "corporateAccountCreated": "Your corporate account was created. You can now sign in.",
+    "corporateInvitationInvalid": "This corporate invitation is invalid, already used, or expired.",
     "notABusiness": "Not a business?",
     "registerAsIndividual": "Register as Individual",
     "companyName": "Company Name",
@@ -512,6 +545,7 @@
     "sponsoredRegion": "Sponsored",
     "model": "Model",
     "modelCode": "Model code",
+    "productCode": "Listing No",
     "color": "Color",
     "boxedCondition": "Box condition",
     "boxed": "Boxed",
@@ -523,8 +557,6 @@
     "pricing": "Pricing",
     "priceLabel": "Price (₺) *",
     "stockQuantity": "Stock quantity",
-    "shippingDesi": "Package desi",
-    "shippingDesiHelper": "Enter the desi of the product when packaged for shipment.",
     "estimatedPerSale": "Estimated (per sale)",
     "calculating": "Calculating...",
     "platformDeduction": "Platform deduction",
@@ -532,6 +564,8 @@
     "listPriceLine": "List price",
     "commissionLine": "Commission",
     "shippingLine": "Shipping fee",
+    "sellerShippingShare": "Your shipping share (deducted)",
+    "shippingPaidByBuyer": "You won't pay shipping — the buyer covers it",
     "productDetails": "Product Details",
     "categoryRequired": "Category *",
     "selectCategory": "Select category",
@@ -597,7 +631,22 @@
     "soldOn": "Sold: {date}",
     "buyerHandle": "Buyer: @{name}",
     "orderDetail": "Order Details",
-    "relist": "Relist"
+    "relist": "Relist",
+    "packageSize": "Shipping package size",
+    "packageSizeHelper": "Pick the smallest package your item fits in. Shipping is priced from this choice.",
+    "packageSizeUnavailable": "Package sizes could not be loaded right now. Please try again later.",
+    "sampleDimensions": "Sample size: {dimensions}",
+    "manageAllDiscounts": "Manage All My Discounts",
+    "discountSectionTitle": "Discount & Campaign",
+    "quickDiscount": "Quick Discount",
+    "quickDiscountHint": "Quickly set a discounted price for your product. It will appear as a strikethrough price on the product page.",
+    "discountedPricePlaceholder": "Discounted price",
+    "discountStart": "Start",
+    "discountEnd": "End",
+    "discountComingSoonNote": "* Note: This feature will be enabled soon. For now you can change the product price directly.",
+    "appliedDiscounts": "Discounts Applied to This Product",
+    "shippingFee": "Shipping fee",
+    "sellerEarning": "Your earnings"
   },
   "cart": {
     "myCart": "My Cart",
@@ -720,7 +769,7 @@
     "enterShippingAddress": "Please enter your delivery address",
     "payWithPaytr": "Pay with PayTR",
     "discountLabel": "Discount",
-    "platformServiceFeeWithRate": "Platform Service Fee (3%)",
+    "platformServiceFeeWithRate": "Platform Service Fee ({rate}%)",
     "securePaymentCreditCard": "Secure payment with credit card",
     "paytrRedirectNotice": "Click 'Continue' to proceed. Your card details will be entered securely on the PayTR payment page.",
     "addressTitlePlaceholder": "Address Title (e.g. Home, Work)",
@@ -739,12 +788,20 @@
     "completeDeliveryAddress": "Please complete the delivery address",
     "shippingCalculatedAtCheckout": "Calculated at checkout",
     "loginFasterCheckout": "Sign in for faster checkout",
-    "cartSavedAfterLogin": "Your cart will be saved after login."
+    "cartSavedAfterLogin": "Your cart will be saved after login.",
+    "platformServiceFee": "Platform Service Fee",
+    "productFee": "Product price",
+    "shippingFee": "Shipping fee",
+    "platformFee": "Platform fee",
+    "buyerPayable": "Amount due",
+    "vatIncluded": "VAT included",
+    "serviceFee": "Service fee"
   },
   "order": {
     "myOrders": "My Orders",
     "orderNumber": "Order Number",
     "groupNumber": "Group No",
+    "packageNumber": "Delivery No",
     "orderDate": "Order Date",
     "orderStatus": "Status",
     "orderDetails": "Order Details",
@@ -834,7 +891,7 @@
     "trackDescription": "Enter your order number and email to view its status and tracking.",
     "loadingDetails": "Loading order details...",
     "trackInstructions": "Enter your order number and the email address you used when placing the order to view status and tracking.",
-    "orderNumberHint": "You can find the order number in the confirmation email we sent after your purchase.",
+    "orderNumberHint": "You can enter the order number (ORD-…), the cart number (GRP-…) or the delivery number on the shipping label (PKG-…). All of them are in the confirmation email we sent after your purchase.",
     "shipmentPreparing": "The seller is preparing the package. Tracking details will appear once it's handed over to the cargo branch.",
     "shipmentCancelled": "This shipment has been cancelled.",
     "trackShipment": "Track Shipment",
@@ -896,7 +953,7 @@
     "cargoCodeInstructions": "Hand this cargo number to the Sürat Kargo branch when dropping off your package. Your shipment is registered in Sürat's system under this number.",
     "cargoCodeCopied": "Cargo number copied",
     "cargoCodePending": "Your cargo number is being generated. It will appear here in a few minutes. We will notify you when it is ready.",
-    "cargoOneParcelPerOrder": "Have more than one order? Prepare a SEPARATE parcel for each order and hand each one in with its own cargo code — do not combine multiple orders into one parcel; otherwise your other orders will appear unshipped.",
+    "cargoOneParcelPerOrder": "This cargo code represents one SELLER PACKAGE: put all its items in a SINGLE parcel and hand it over with this code. Do not mix orders that have a different cargo code into the same parcel.",
     "cargoFeeCoveredNotice": "Shipping is paid by Tarodan; the branch will not charge you. The branch may measure the package on drop-off.",
     "refundWindowPassed": "The 14-day refund window has passed; a refund can no longer be requested for this order.",
     "cancelOrderConfirm": "Cancel this order? Your payment will be refunded.",
@@ -930,7 +987,27 @@
     "refundReasonOther": "Other",
     "statusPendingPayment": "Pending Payment",
     "statusRefundRequested": "Refund Requested",
-    "track": "Track"
+    "track": "Track",
+    "orderGroupTitle": "Order #{number}",
+    "groupPaymentTitle": "Payment",
+    "groupPaymentCovers": "This payment covers all {count} orders in the cart.",
+    "groupPaymentLink": "View in payment history",
+    "paidAtLabel": "Paid on",
+    "emptyCancelled": "You have no cancelled orders.",
+    "emptyRefunds": "You have no refund requests.",
+    "emptySales": "You have no sales yet.",
+    "viewCargoCode": "View Cargo Code",
+    "confirmDelivery": "I Received It",
+    "confirmDeliveryTitle": "Confirm Delivery",
+    "confirmDeliveryDescription": "You confirm that you received this order. After confirmation the order is completed and the seller payout is scheduled.",
+    "confirmDeliveryFailed": "Delivery confirmation failed",
+    "deliveryConfirmed": "Delivery confirmed",
+    "groupPaymentNotice": "All orders in this cart are charged in a single payment; items cannot be paid separately.",
+    "statusAwaitingConfirmation": "Awaiting Confirmation",
+    "cancelGroupTitle": "Cancel Cart",
+    "cancelGroupAllNotice": "This cancels all {count} orders in the cart; the payment is refunded in full. Partial cancellation is not available.",
+    "cartSiblings": "This cart has other orders too:",
+    "refundReasonDeliveryDelayed": "Delivery was late"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -1367,7 +1444,9 @@
     "collection": "Collection",
     "removeProduct": "Remove product",
     "collectionsCount": "{count} collections",
-    "startBuildingToday": "Start building your collection today"
+    "startBuildingToday": "Start building your collection today",
+    "membershipRequired": "Membership Upgrade Required",
+    "membershipRequiredDesc": "Creating collections is available with Basic and higher membership tiers."
   },
   "notification": {
     "notifications": "Notifications",
@@ -1397,6 +1476,11 @@
   "profile": {
     "profile": "Profile",
     "myProfile": "My Profile",
+    "chooseUsername": "Choose Username",
+    "usernameSetupTitle": "Choose your profile username",
+    "usernameSetupDescription": "This name will be used in your profile URL and cannot be changed after saving.",
+    "usernameSaved": "Your username has been saved.",
+    "usernameAlreadySet": "Your username has already been set.",
     "accountSettings": "Account Settings",
     "editProfile": "Edit Profile",
     "settings": "Settings",
@@ -1446,6 +1530,79 @@
     "cannotDeleteAccount": "Cannot delete account",
     "deleteAccountFailed": "Failed to delete account",
     "preferencesTitle": "Preferences",
+    "corporateCompletion": {
+      "title": "Corporate Account Application",
+      "statusReview": "Under Final Review",
+      "statusCompletion": "Complete Information and Documents",
+      "tabs": {
+        "details": "Company Information",
+        "stakeholders": "Authorized People / Partners",
+        "documents": "Documents"
+      },
+      "fields": {
+        "companyType": "Company Type",
+        "taxId": "Tax ID Number",
+        "taxOffice": "Tax Office",
+        "companyCity": "City",
+        "companyDistrict": "District",
+        "bankAccountHolder": "Bank Account Holder",
+        "iban": "Company IBAN",
+        "fullName": "Full Name",
+        "identityType": "Identity Type",
+        "identityNumber": "Identity / Passport Number"
+      },
+      "placeholders": {
+        "companyType": "e.g. Corporation",
+        "taxId": "10-digit tax identification number",
+        "taxOffice": "e.g. Kadıköy Tax Office",
+        "companyCity": "e.g. Istanbul",
+        "companyDistrict": "e.g. Kadıköy",
+        "bankAccountHolder": "Registered company account holder",
+        "iban": "26-character IBAN starting with TR",
+        "fullName": "Authorized person or partner's full name",
+        "identityNumber": "National ID or passport number"
+      },
+      "identity": {
+        "nationalId": "National ID",
+        "passport": "Passport",
+        "front": "Front",
+        "back": "Back"
+      },
+      "documents": {
+        "taxPlate": "Tax Certificate",
+        "residenceOrInvoice": "Proof of Address / Utility Bill",
+        "signatureCircular": "Signature Circular",
+        "tradeRegistryGazette": "Trade Registry Gazette",
+        "activityCertificate": "Certificate of Activity",
+        "bankAccountInfo": "Company Bank Account Information",
+        "contract": "Tarodan Agreement"
+      },
+      "documentStatus": {
+        "pending": "Under Review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "revision_requested": "New Upload Required",
+        "appealed": "Appeal Under Review",
+        "missing": "Not uploaded yet"
+      },
+      "saveDetails": "Save Information",
+      "addStakeholder": "Add Person",
+      "appeal": "Appeal",
+      "appealPrompt": "Explain your appeal",
+      "replace": "Replace",
+      "upload": "Upload",
+      "submit": "Submit for Final Review",
+      "detailsSaved": "Company information saved",
+      "stakeholderAdded": "Company owner / partner added",
+      "documentUploaded": "Document uploaded",
+      "applicationSubmitted": "Application submitted for final review",
+      "appealSubmitted": "Document appeal submitted",
+      "saveFailed": "Could not save company information",
+      "stakeholderAddFailed": "Could not add person",
+      "uploadFailed": "Could not upload document",
+      "submitFailed": "Could not submit application",
+      "appealFailed": "Could not submit document appeal"
+    },
     "boost": {
       "title": "Feature Listing",
       "intro": "Show this listing at the top of search, category and the home showcase for the package and duration you choose.",
@@ -1717,7 +1874,21 @@
     "back": "Back",
     "next": "Next ({current}/{total})",
     "finish": "Finish",
-    "skip": "Skip"
+    "skip": "Skip",
+    "listing": {
+      "welcomeTitle": "Let's create your listing",
+      "welcomeContent": "We'll go through the form in five steps, with a quick note on what each one needs.",
+      "basicsTitle": "Title and description",
+      "basicsContent": "Name the item and state its condition clearly. The title is what buyers see first in search.",
+      "detailsTitle": "Product details",
+      "detailsContent": "Category, brand, model and scale are what make your item show up in the right searches.",
+      "pricingTitle": "Price and package size",
+      "pricingContent": "Set your price and pick the smallest package your item fits in. Your take-home appears right below.",
+      "imagesTitle": "Photos",
+      "imagesContent": "The first photo becomes the cover. Well-lit shots from several angles sell faster.",
+      "submitTitle": "Publish the listing",
+      "submitContent": "Publish when everything looks right. You can keep editing the listing afterwards."
+    }
   },
   "address": {
     "myAddresses": "My Addresses",
@@ -1764,9 +1935,13 @@
     "title": "Contact Us",
     "subtitle": "We're here to help",
     "name": "Name",
+    "namePlaceholder": "Your full name",
     "email": "Email",
+    "emailPlaceholder": "example@email.com",
     "subject": "Subject",
+    "subjectPlaceholder": "What is your message about?",
     "message": "Message",
+    "messagePlaceholder": "How can we help?",
     "send": "Send Message",
     "sending": "Sending...",
     "success": "Your message has been sent. We'll get back to you soon.",
@@ -1785,8 +1960,13 @@
     "profileVisibility": "Profile Visibility",
     "showEmail": "Show Email",
     "showPhone": "Show Phone",
+    "dangerZone": "Danger Zone",
     "deleteAccount": "Delete Account",
     "deleteAccountConfirm": "Are you sure you want to delete your account? This action cannot be undone.",
+    "deleteAccountDetails": "Permanently delete your account and all of its data. This action cannot be undone.",
+    "deleteAccountWarning": "All your data, listings, and order history will be permanently deleted.",
+    "deleteAccountTypePrompt": "Type {keyword} to confirm:",
+    "deleteAccountKeyword": "DELETE",
     "accountDeleted": "Your account has been deleted",
     "settingUpdated": "Setting updated",
     "settingUpdateFailed": "Failed to update setting",
@@ -1930,7 +2110,14 @@
         "contract": "Contract",
         "signature_circular": "Signature Circular",
         "activity_certificate": "Activity Certificate",
-        "identity": "ID Document"
+        "identity": "ID Document",
+        "identity_front": "National ID Front",
+        "identity_back": "National ID Back",
+        "passport_front": "Passport Front",
+        "passport_back": "Passport Back",
+        "residence_or_invoice": "Residence Certificate / Utility Bill",
+        "trade_registry_gazette": "Trade Registry Gazette",
+        "bank_account_info": "Company Bank Account Information"
       },
       "notUploaded": "Not uploaded",
       "upload": "Upload",
@@ -1938,14 +2125,18 @@
       "statusPending": "Under review",
       "statusApproved": "Approved",
       "statusRejected": "Rejected",
+      "statusRevisionRequested": "Revision requested",
+      "statusAppealed": "Appealed",
       "uploadSuccess": "Document uploaded",
       "uploadFailed": "Failed to upload document",
       "ibanTitle": "Corporate IBAN",
       "accountHolder": "Account Holder",
+      "accountHolderPlaceholder": "Full registered company name",
       "accountHolderRequired": "Account holder required",
       "iban": "IBAN",
       "ibanInvalid": "Enter a valid IBAN",
       "taxIdOptional": "Tax ID (optional)",
+      "taxIdPlaceholder": "10-digit tax identification number",
       "saveIban": "Save IBAN",
       "ibanSaved": "IBAN saved",
       "ibanSaveFailed": "Failed to save IBAN",
@@ -2192,7 +2383,7 @@
       "email": "Email",
       "phone": "Phone",
       "address": "Address",
-      "emailValue": "destek@tarodan.com",
+      "emailValue": "destek@tarodan.com.tr",
       "phoneValue": "+90 212 XXX XX XX",
       "addressValue": "Istanbul, Turkey"
     }
@@ -2494,12 +2685,23 @@
         }
       },
       "sellerApplications": {
-        "title": "Business Seller Applications",
-        "description": "Review and approve business account requests",
+        "title": "Corporate Seller Applications",
+        "description": "Manage preliminary applications, document reviews and corporate account activations",
         "tabs": {
-          "pending": "Pending",
+          "submitted": "Preliminary Review",
+          "invited": "Invitation Sent",
+          "completing": "Completing",
+          "underReview": "Document Review",
           "approved": "Approved",
           "rejected": "Rejected"
+        },
+        "status": {
+          "submitted": "Awaiting preliminary review",
+          "preliminaryApproved": "Preliminary approval granted",
+          "invited": "Invitation sent",
+          "activated": "Account created",
+          "completing": "Information being completed",
+          "underReview": "In final review"
         },
         "company": "Company",
         "contact": "Contact",
@@ -2507,34 +2709,53 @@
         "showDetails": "Show Details",
         "hideDetails": "Hide Details",
         "reject": "Reject",
-        "approveSuccess": "Application approved",
-        "approveError": "An error occurred while approving",
+        "preliminaryApprove": "Grant Preliminary Approval",
+        "approveSuccess": "Preliminary approval granted and invitation email sent",
+        "approveError": "An error occurred during preliminary approval",
         "rejectSuccess": "Application rejected",
         "rejectError": "An error occurred while rejecting",
-        "approveConfirm": "Are you sure you want to approve the application from \"{company}\"? The account will be marked as an active seller.",
+        "approveConfirm": "Grant preliminary approval to \"{company}\"? The contact will receive an account creation link valid for 72 hours.",
         "rejectTitle": "Reject Application",
         "rejectPrompt": "Rejection reason (sent to the user):",
         "rejectPlaceholder": "Please explain the rejection reason...",
         "companyInformation": "Company Information",
         "companyName": "Company Name",
+        "companyFullName": "Full Company Name",
+        "companyTitle": "Company Title",
+        "companyAddress": "Company Address",
+        "authorizedPerson": "Authorized Person",
+        "kepAddress": "Registered Electronic Mail Address",
+        "contactPhone": "Contact Phone",
         "taxNumber": "Tax Number",
         "communication": "Contact Information",
         "empty": "No applications found",
         "documents": "Documents",
-        "bankAccount": "Bank Account",
-        "noDocuments": "No documents uploaded yet",
         "view": "View",
         "notUploaded": "Not uploaded",
         "iban": "IBAN",
         "accountHolder": "Account Holder",
-        "tcKimlikNo": "National ID",
-        "verified": "Verified",
-        "unverified": "Not verified",
         "companyType": "Company Type",
         "taxOffice": "Tax Office",
         "city": "City",
         "district": "District",
-        "loadError": "Failed to load details"
+        "stakeholders": "Company Owners / Partners",
+        "noStakeholders": "No stakeholder information added yet",
+        "documentStatus": {
+          "revision": "Revision requested",
+          "appealed": "Appealed"
+        },
+        "appeal": "User appeal",
+        "requestRevision": "Request Again",
+        "rejectDocument": "Reject Document",
+        "documentDecisionPrompt": "Your explanation will be shown to the user and sent by email.",
+        "documentDecisionPlaceholder": "Explain the missing or incorrect information...",
+        "documentReviewSuccess": "Document decision saved",
+        "documentReviewError": "Document decision could not be saved",
+        "finalApprove": "Open Corporate Account",
+        "finalApproveConfirm": "Approve all documents and open the corporate seller account for \"{company}\"?",
+        "finalApproveSuccess": "Corporate seller account opened",
+        "finalApproveError": "Corporate account could not be opened",
+        "loadError": "Failed to load application details"
       },
       "sellerPerformance": {
         "title": "Seller Performance",
@@ -2691,6 +2912,14 @@
         "ipOrEmail": "IP / Email",
         "resolved": "Resolved",
         "resolve": "Resolve",
+        "blockIp": "Block IP",
+        "blockIpSuccess": "IP blocked — resolve the ip_block entry to lift it",
+        "blockIpPromptTitle": "Block {ip}",
+        "blockIpPromptDescription": "All requests from this IP will be rejected (except the admin panel). Resolve the resulting ip_block entry to lift the block.",
+        "blockIpPromptLabel": "Reason (optional)",
+        "resolvePromptTitle": "Resolve event",
+        "resolvePromptLabel": "Resolution note (optional)",
+        "resolvePromptPlaceholder": "What was done, why it is resolved…",
         "resolveSuccess": "Issue resolved",
         "recipient": "Recipient",
         "subject": "Subject",
@@ -2733,6 +2962,7 @@
           "userUnban": "User Unbanned",
           "productApprove": "Product Approved",
           "productReject": "Product Rejected",
+          "productDeleteHard": "Product hard delete",
           "productDelete": "Product Deleted",
           "orderUpdate": "Order Updated",
           "paymentRefund": "Payment Refunded",
@@ -2779,6 +3009,7 @@
         },
         "stats": {
           "unresolvedCritical": "Unresolved Critical",
+          "failureRate": "Failure rate",
           "deliveryRate": "Delivery Rate",
           "bounceRate": "Bounce Rate"
         },
@@ -2786,6 +3017,7 @@
           "httpStatus": "HTTP Status",
           "errorType": "Error Type",
           "userId": "User ID",
+          "requestId": "Request ID",
           "ipAddress": "IP Address",
           "errorChain": "Error Chain",
           "response": "Response Details",
@@ -2804,9 +3036,9 @@
         "realCustomerData": "real customer data",
         "prodWarningAfter": "Every action is written to the audit log. Proceed carefully.",
         "cronsTitle": "Cron Jobs",
-        "cronsDescription": "Manually trigger scheduled jobs (safe: this only runs work earlier than scheduled).",
+        "cronsDescription": "Trigger scheduled jobs manually — the job is enqueued and runs on the worker through the same path as a scheduled run. Bulk-send jobs are deliberately excluded.",
         "cronError": "Cron job could not be run",
-        "cronSuccess": "Completed: {result}",
+        "cronQueued": "Queued (job #{jobId}) — result appears in the Bull history",
         "run": "Run",
         "timeAdjustTitle": "Time Adjustment",
         "timeAdjustDescription": "Find one record and move its relevant date backward or forward. Then trigger the related cron job to verify the behavior.",
@@ -2853,6 +3085,29 @@
           "trade": "trade ID",
           "userEmail": "user email"
         }
+      },
+      "media": {
+        "title": "Media",
+        "subtitle": "Read-only view of bucket folders and file ownership",
+        "up": "Up",
+        "root": "Root",
+        "empty": "No files in this folder.",
+        "preview": "Preview",
+        "file": "File",
+        "sizeCol": "Size",
+        "date": "Date",
+        "usage": "Usage",
+        "private": "Private",
+        "orphan": "Orphan",
+        "copyUrl": "Copy URL",
+        "urlCopied": "URL copied",
+        "usageType": {
+          "product": "Product",
+          "collection": "Collection",
+          "brand": "Brand",
+          "avatar": "Avatar",
+          "upload": "Upload"
+        }
       }
     },
     "catalog": {
@@ -2892,7 +3147,11 @@
         "created": "Category created",
         "editTitle": "Edit Category",
         "nameLabel": "Category Name",
-        "nameRequired": "Category name is required"
+        "namePlaceholder": "e.g. Model Cars",
+        "descriptionPlaceholder": "Short description of the category...",
+        "nameRequired": "Category name is required",
+        "parentLabel": "Parent Category",
+        "noParent": "No parent (root category)"
       },
       "attributes": {
         "title": "Product Attributes",
@@ -2919,8 +3178,12 @@
         "editValue": "Edit Value",
         "newValue": "New Value",
         "nameField": "Name",
+        "groupNamePlaceholder": "e.g. Color",
+        "descriptionPlaceholder": "Short description of the attribute group...",
         "value": "Value",
+        "valuePlaceholder": "e.g. red",
         "displayValue": "Display Value",
+        "displayValuePlaceholder": "e.g. Red",
         "color": "Color",
         "required": "Required",
         "groupNameRequired": "Name is required",
@@ -3020,6 +3283,8 @@
         "created": "Collection created",
         "editTitle": "Edit Collection",
         "nameLabel": "Collection Name",
+        "namePlaceholder": "e.g. Classic Cars",
+        "descriptionPlaceholder": "Short description of the collection...",
         "nameRequired": "Collection name is required",
         "coverImageUrl": "Cover Image URL"
       },
@@ -3070,9 +3335,6 @@
         "viewCount": "Views",
         "createdAt": "Created",
         "stock": "Stock",
-        "shippingDesi": "Package desi",
-        "shippingDesiHelper": "Override the seller-provided desi here when necessary.",
-        "shippingDesiUpdated": "Package desi updated",
         "notSpecified": "Not specified",
         "rejectionReasonLabel": "Rejection Reason:",
         "aiImageCheck": "AI Image Check",
@@ -3095,7 +3357,10 @@
         "aiPassed": "Clean",
         "statusReserved": "Reserved",
         "statusSold": "Sold",
-        "statusDeleted": "Removed"
+        "statusDeleted": "Removed",
+        "packageTier": "Shipping package size",
+        "packageTierHelper": "The size the seller picked. A wrong size shifts the shipping difference onto the platform; corrections are audited. Current desi: {desi}.",
+        "packageTierUpdated": "Package size updated"
       }
     },
     "marketing": {
@@ -3126,6 +3391,9 @@
         "startDate": "Start Date",
         "endDate": "End Date",
         "altText": "Alt Text (Accessibility)",
+        "titlePlaceholder": "e.g. Summer Collection Campaign",
+        "altTextPlaceholder": "Briefly describe the image",
+        "linkUrlPlaceholder": "https://tarodan.com.tr/campaign",
         "image": "Ad Image",
         "removeImage": "Remove Image",
         "iabCompliant": "IAB Compliant",
@@ -3276,15 +3544,18 @@
         "resetConfirm": "The custom template will be deleted and replaced with the default system template. Are you sure?",
         "availableVariables": "Available variables",
         "displayName": "Display Name",
+        "displayNamePlaceholder": "e.g. Order Confirmation",
         "emailSubject": "Email Subject",
         "subjectPlaceholder": "You can use variables: {{orderNumber}}",
         "htmlBody": "HTML Body",
+        "htmlBodyPlaceholder": "Enter the email body as HTML...",
         "characterCount": "{count} characters",
         "emptyUsesDefault": "Empty (uses the default)",
         "testEmail": "Test email",
         "sendTest": "Send test",
         "preview": "Preview",
         "previewFailed": "Failed to load preview.",
+        "unresolvedVariables": "Variables missing from the sample data: {variables}",
         "noSubject": "(no subject)",
         "emailPreview": "Email preview",
         "validation": {
@@ -3340,7 +3611,9 @@
         "bodyPlaceholder": "Notification text shown to users",
         "deliveryChannel": "Delivery Channel",
         "audience": "Audience",
-        "userIdsLabel": "User IDs (comma-separated)",
+        "userSearchPlaceholder": "Search by username, name or email",
+        "userSearchEmpty": "No matching users",
+        "userSearchHint": "Type at least 2 characters to search",
         "sellerStatus": "Seller Status",
         "allOption": "All",
         "onlySellers": "Sellers Only",
@@ -3359,22 +3632,20 @@
         "ready": "Ready to send",
         "missingFields": "Some fields are missing",
         "tabs": {
-          "send": "Send Notification",
           "scheduled": "Scheduled",
           "history": "History"
         },
         "channel": {
           "mobileApp": "Mobile app",
           "email": "Email",
-          "emailInbox": "Email inbox",
-          "sms": "Text message"
+          "emailInbox": "Email inbox"
         },
         "target": {
           "allUsers": "All Users",
           "everyone": "Everyone registered on the platform",
           "segmentDescription": "Seller/buyer and membership type",
           "specificUsers": "Specific Users",
-          "idList": "Target with an ID list"
+          "idList": "Search by username and pick"
         },
         "status": {
           "sent": "Sent",
@@ -3388,6 +3659,7 @@
           "bodyMax": "Content can be at most 240 characters",
           "channelRequired": "Select at least one channel",
           "userIdRequired": "Enter at least one user ID",
+          "scheduleFuture": "The send time must be in the future",
           "scheduleRequired": "Delivery date and time are required"
         }
       },
@@ -3474,6 +3746,24 @@
         "sortOrder": "Sort Order",
         "showcaseOnHomeLabel": "Show on home page",
         "showcaseOnHomeHelper": "If checked, products that buy this package appear in the home showcase",
+        "audience": "Audience",
+        "audienceHelper": "The package is shown only to selected membership tiers, users, or either group.",
+        "audienceMode": "Who should see this package?",
+        "audienceEveryone": "All users",
+        "audienceTiers": "Selected membership tiers",
+        "audienceUsers": "Specific users",
+        "audienceTiersOrUsers": "Selected tiers or users",
+        "membershipTiers": "Membership tiers",
+        "specificUsers": "User targets",
+        "userSearchPlaceholder": "Search admin code, username, name, or email",
+        "noUsersFound": "No matching users found",
+        "tierFree": "Free",
+        "tierBasic": "Basic",
+        "tierPremium": "Premium",
+        "tierBusiness": "Business",
+        "audienceTierCount": "{count} tiers",
+        "audienceUserCount": "{count} users",
+        "audienceMixedCount": "{tiers} tiers + {users} users",
         "tiers": "Price Tiers",
         "tiersHelper": "Each row sets the package price for a duration and product price range",
         "addTier": "Add Row",
@@ -3498,7 +3788,10 @@
           "nameRequired": "Package name is required",
           "slugRequired": "Slug is required",
           "durationMin": "Duration must be at least 1 day",
-          "priceMin": "Price must be 0 or more"
+          "priceMin": "Price must be 0 or more",
+          "tierTargetRequired": "Select at least one membership tier",
+          "userTargetRequired": "Select at least one user",
+          "audienceTargetRequired": "Select at least one membership tier or user"
         }
       },
       "boostPurchases": {
@@ -3514,12 +3807,39 @@
         "daysValue": "{days} days",
         "purchasedAt": "Purchased",
         "period": "Period",
+        "performance": "Views / Favorites / Clicks",
+        "performanceTitle": "Boost Performance",
+        "performanceHelper": "Values captured when the purchase was activated are compared with current or final values.",
+        "before": "Before",
+        "current": "Current / Final",
+        "gain": "Gain",
+        "metricsPending": "Measurement starts after payment approval.",
+        "views": "Views",
+        "favorites": "Favorites",
+        "clicks": "Clicks",
+        "remaining": "Remaining",
+        "remainingDaysHours": "{days} days {hours} hours",
+        "remainingHours": "{hours} hours",
+        "totalDuration": "Total Duration",
+        "totalDaysValue": "{days} days (+{extended} extension days)",
+        "bestBoost": "Best Performing",
+        "pause": "Pause",
+        "resume": "Resume",
+        "paused": "Package paused",
+        "resumed": "Package resumed",
+        "extended": "Package duration extended",
+        "extendTitle": "Extend Duration",
+        "extendHelper": "Added days are appended to the active period or paused remaining time.",
+        "extend": "Add Time",
+        "days": "Days",
+        "notFound": "Boost purchase not found",
         "showcaseBadge": "Showcase",
         "allPackages": "All Packages",
         "allStatuses": "All Statuses",
         "status": {
           "pending": "Pending",
           "active": "Active",
+          "paused": "Paused",
           "expired": "Expired",
           "cancelled": "Cancelled",
           "failed": "Failed"
@@ -3555,6 +3875,7 @@
         "deleteRule": "Delete Rule",
         "deleteRuleDescription": "Are you sure you want to delete this commission rule? This action cannot be undone.",
         "ruleName": "Rule Name",
+        "ruleNamePlaceholder": "e.g. Default individual seller commission",
         "ruleActive": "Rule active",
         "ruleCreated": "Commission rule created",
         "ruleUpdated": "Commission rule updated",
@@ -3590,8 +3911,8 @@
         "examplePrice": "Example Product Price (₺)",
         "calculating": "Calculating...",
         "previewFailed": "The commission preview could not be calculated.",
-        "calculationTitle": "Commission Calculation",
-        "calculationDescription": "Commission rules are evaluated in match order. The first matching rule is applied to an order. Match order: Category + Seller Type > Category + All > Seller Type > Default (All + All). Only one rule can be created for the same category and seller type combination.",
+        "calculationTitle": "Rule Matching Priority",
+        "calculationDescription": "Among all rules that match an order, the MOST specific one wins. Specificity score: category match +4, taxpayer type (individual/corporate) +2, seller type (membership) +1, bounded amount range +0.5. On a tie the higher `priority` wins. Seller and buyer rules are matched SEPARATELY. A category may have several rules; overlapping ranges are rejected on save.",
         "defaultMissingTitle": "No default commission rule is defined",
         "defaultMissingDescription": "Orders without a matching rule will be created with zero commission. The payment flow is unaffected. You can add a default rule with “Category: All” and “Seller Type: All”.",
         "sellerTypes": {
@@ -3617,10 +3938,6 @@
         "minTl": "Floor (₺)",
         "maxTl": "Cap (₺)",
         "sellerPlatformFee": "Seller Platform Service Fee",
-        "shippingBuyerShareLabel": "Buyer Shipping Share (%)",
-        "shippingShareHelper": "Buyer percentage of the single shipping cost; the seller bears the rest.",
-        "exampleShippingDesi": "Shipping tariff",
-        "shippingDesiAmount": "{desi} desi · {amount}",
         "noActiveShippingTariff": "No active shipping tariff",
         "activeShippingTariff": "{name} v{version} · selected shipping amount {amount}",
         "exampleVat": "Example VAT (%)",
@@ -3633,7 +3950,80 @@
         "commissionVat": "Commission VAT",
         "withholding": "Withholding",
         "corporateOnlyNote": "VAT and withholding apply only to corporate sellers (0 for individuals).",
-        "previewTaxNote": "VAT/withholding are example values; actual rates come from Finance -> Tax."
+        "previewTaxNote": "VAT/withholding are example values; actual rates come from Finance -> Tax.",
+        "examplePackageTier": "Sample package size",
+        "shippingSharesTitle": "Shipping Split",
+        "shippingSharesHelper": "Enter the buyer's percentage; the seller covers the rest. Both sides update live on each row.",
+        "tierSmall": "Small parcel (buyer %)",
+        "tierMedium": "Medium parcel (buyer %)",
+        "tierLarge": "Large parcel (buyer %)",
+        "defaultShareLabel": "Default (all sizes)",
+        "tierOverridesTitle": "Per-package-size overrides",
+        "tierOverridesHint": "A size left empty uses the default share.",
+        "usesDefaultShare": "default",
+        "noLowerBound": "No lower bound",
+        "noUpperBound": "No upper bound",
+        "noFloor": "No floor",
+        "noCap": "No cap",
+        "ratePlaceholder": "e.g. 8",
+        "formula": {
+          "title": "How it is calculated",
+          "subtitle": "How an order's money is split: fees, VAT and withholding.",
+          "vatRuleTitle": "VAT rule",
+          "vatRule": "VAT on every service given to the buyer is charged to the buyer; VAT on every service given to the seller is charged to the seller. The rate and on/off switch live in System → Settings (service_vat_rate, service_vat_enabled). The product price itself carries no VAT (product_vat_enabled is off).",
+          "buyerTitle": "What the buyer pays",
+          "buyerResult": "Buyer pays",
+          "sellerTitle": "What the seller receives",
+          "sellerResult": "Seller receives",
+          "productPrice": "Product price",
+          "buyerShipping": "Buyer shipping share",
+          "buyerCommission": "Buyer commission",
+          "buyerServiceFee": "Buyer protection fee",
+          "buyerVat": "Buyer service VAT",
+          "sellerCommission": "Seller commission",
+          "sellerPlatformFee": "Platform service fee",
+          "sellerShipping": "Seller shipping share",
+          "sellerVat": "Seller service VAT",
+          "withholding": "Withholding",
+          "buyerNote": "Withholding and the seller-side VAT do not affect what the buyer pays; they are deducted from the seller payout.",
+          "sellerNote": "Withholding is deducted from individual sellers too. The shipping share is only what the rule assigns to the seller.",
+          "exampleTitle": "Example: 500 ₺ product (250–999 ₺ tier, shipping 50/50, VAT 20%)",
+          "exampleItem": "Item",
+          "exampleBase": "Base",
+          "exampleVat": "VAT",
+          "exampleBuyerCommission": "Buyer commission (4%)",
+          "exampleBuyerServiceFee": "Buyer protection fee (5%)",
+          "exampleBuyerShipping": "Buyer shipping share",
+          "exampleSellerCommission": "Seller commission (6%)",
+          "exampleSellerPlatformFee": "Platform service fee (5%)",
+          "exampleSellerShipping": "Seller shipping share",
+          "exampleBuyerPays": "Buyer pays",
+          "exampleSellerGets": "Seller receives",
+          "examplePlatform": "Collected by Tarodan",
+          "exampleNote": "Seller payout is 500 − 55 (fees) − 50 (shipping share) − 21 (VAT) − 5 (withholding) = 369 ₺. The amount collected by Tarodan includes VAT and withholding; neither is revenue."
+        },
+        "productPrice": "Product price",
+        "buyerSide": "Buyer side",
+        "sellerSide": "Seller side",
+        "lineAmount": "Amount",
+        "lineVat": "VAT",
+        "buyerVatTotal": "Buyer VAT total",
+        "buyerAddedTotal": "Added for buyer",
+        "sellerVatTotal": "Seller VAT total",
+        "sellerDeductionTotal": "Seller deduction total",
+        "platformSplitTitle": "Where the money goes",
+        "platformRevenue": "Kept by Tarodan",
+        "platformTakeRate": "Tarodan share (of product price)",
+        "platformTax": "Tax (VAT + withholding)",
+        "platformShipping": "Shipping (to carrier)",
+        "emptyLineNote": "Lines the rule does not define are shown as 0.",
+        "gmv": "Product volume (GMV)",
+        "taxToState": "Tax (VAT + withholding)",
+        "shippingToCarrier": "Shipping (to carrier)",
+        "takeRateFooter": "{rate}% of product volume",
+        "feeBoundsHint": "The percentage fee is clamped to this TL range. E.g. 6% with a 10 ₺ floor charges 10 ₺ instead of 6 ₺ on a 100 ₺ item. Empty = no clamping.",
+        "amountRangeHint": "WHICH price range this rule applies to. Not part of the calculation — it only decides rule selection. Empty = unbounded.",
+        "amountRangeTitle": "Applicable amount range"
       },
       "invoices": {
         "title": "Invoices",
@@ -3675,7 +4065,14 @@
         "documentTypes": {
           "archive": "e-Archive",
           "invoice": "e-Invoice"
-        }
+        },
+        "monthIssued": "Issued This Month",
+        "pendingShort": "Pending",
+        "failedShort": "Failed",
+        "exhaustedShort": "Retry Exhausted",
+        "retry": "Retry",
+        "retried": "Invoice re-queued",
+        "documentCount": "{count} documents"
       },
       "payments": {
         "title": "Payment Management",
@@ -3694,7 +4091,7 @@
           "weekly": "Weekly",
           "monthly": "Monthly"
         },
-        "totalRevenue": "Total Revenue",
+        "totalRevenue": "Collected (GMV)",
         "totalPayments": "Total Payments",
         "successRate": "Success Rate",
         "averageAmount": "Average Amount",
@@ -3747,7 +4144,9 @@
           "providerSucceeded": "Refund completed at PayTR",
           "providerNotProcessed": "Refund was not processed at PayTR",
           "providerRefundId": "PayTR Refund Reference",
+          "providerRefundIdPlaceholder": "Enter the PayTR refund reference",
           "note": "Reconciliation Note",
+          "notePlaceholder": "Describe the reconciliation result and verification source",
           "confirm": "Save Reconciliation",
           "resolved": "Refund reconciliation saved"
         },
@@ -3757,6 +4156,70 @@
           "completed": "Completed",
           "failed": "Failed",
           "refunded": "Refunded"
+        },
+        "tabs": {
+          "list": "Payments",
+          "statistics": "Statistics",
+          "reconciliation": "Refund Reconciliation"
+        },
+        "cartInfo": "Cart Details",
+        "refundedTotal": "Refunded",
+        "manualRefundGroupHint": "Cart payments are refunded per order — use the related order's refund request."
+      },
+      "psp": {
+        "title": "PayTR Reconciliation",
+        "subtitle": "Day-by-day comparison of PayTR reports against system records",
+        "tabs": {
+          "summary": "Day Summaries",
+          "lines": "Statement Lines",
+          "settlements": "Settlements"
+        },
+        "summary": {
+          "empty": "No PayTR report data yet. Day cards appear here once the nightly sync (PAYTR_REPORT_SYNC_ENABLED) runs.",
+          "notCovered": "No statement",
+          "clean": "Clean",
+          "problems": "{count} issues",
+          "ours": "Ours",
+          "sales": "Sales",
+          "refunds": "Refunds",
+          "fee": "PayTR fee",
+          "net": "Net",
+          "matched": "{count} matched",
+          "mismatched": "{count} amount mismatch",
+          "unmatched": "{count} unmatched",
+          "missing": "{count} missing in statement"
+        },
+        "lines": {
+          "description": "The default view shows problem rows: PayTR movements with no counterpart in the system or with a diverging amount.",
+          "empty": "No rows for this filter.",
+          "date": "Transaction day",
+          "type": "Type",
+          "amount": "Amount",
+          "fee": "Fee",
+          "matchStatus": "Match",
+          "reference": "Record",
+          "sale": "Sale",
+          "refund": "Refund",
+          "status": {
+            "matched": "Matched",
+            "unmatched": "Unmatched",
+            "amount_mismatch": "Amount mismatch"
+          },
+          "filter": {
+            "problem": "Problem rows",
+            "all": "All",
+            "matched": "Matched",
+            "unmatched": "Unmatched",
+            "amountMismatch": "Amount mismatch"
+          }
+        },
+        "settlements": {
+          "empty": "No settlement records yet.",
+          "datePaid": "Payout day",
+          "state": "State",
+          "items": "Items",
+          "realized": "Transferred",
+          "projection": "Upcoming"
         }
       },
       "payouts": {
@@ -3788,6 +4251,27 @@
           "held": "Held",
           "released": "Released",
           "cancelled": "Cancelled"
+        },
+        "escrowTab": "Escrow (Holds)",
+        "transfersTab": "Transfers",
+        "adjustmentsTab": "Debt Deductions",
+        "releasedAwaiting": "Released — Awaiting Transfer",
+        "transferredTotal": "Transferred (Net)",
+        "failedTransfers": "Failed Transfers",
+        "retryTransfer": "Retry",
+        "transferRetried": "Transfer re-queued",
+        "ibanLast4": "IBAN (last 4)",
+        "netAmount": "Net Amount",
+        "deduction": "Deduction",
+        "remaining": "Remaining",
+        "adjustmentType": {
+          "return_shipping": "Return shipping",
+          "shipping_deficit": "Shipping deficit",
+          "outbound_shipping": "Outbound shipping"
+        },
+        "adjustmentStatus": {
+          "open": "Open",
+          "settled": "Settled"
         }
       },
       "tax": {
@@ -3842,6 +4326,29 @@
           "rateRange": "Rate must be between 0 and 100",
           "selectCategory": "Select a category"
         }
+      },
+      "overview": {
+        "title": "Finance Overview",
+        "subtitle": "The money flow at a glance (this month)",
+        "funnel": {
+          "collected": "Collected (GMV)",
+          "collectedHint": "{count} completed payments",
+          "escrowHeld": "Held in Escrow",
+          "escrowHeldHint": "{count} active holds",
+          "transferred": "Paid to Sellers (Net)",
+          "transferredHint": "{count} completed transfers",
+          "platformRevenue": "Platform Revenue (Net)",
+          "platformRevenueHint": "Commission + service fees − refunds"
+        },
+        "health": {
+          "title": "Needs Attention",
+          "failedTransfers": "Failed / returned transfers",
+          "overdueHolds": "Overdue holds",
+          "uninvoicedDelivered": "Uninvoiced deliveries",
+          "exhaustedInvoices": "Invoices out of retry budget",
+          "openAdjustments": "Open seller debts",
+          "allClear": "All clear — nothing needs intervention"
+        }
       }
     },
     "operations": {
@@ -3852,6 +4359,7 @@
         "createdAt": "Created",
         "notSpecified": "Not specified",
         "trackingNumber": "Tracking No",
+        "packageNumber": "Delivery No",
         "delivered": "Delivered",
         "noteOptional": "Note (Optional)",
         "recipient": "Recipient",
@@ -3873,7 +4381,7 @@
         "loadError": "Failed to load orders",
         "empty": "No orders yet",
         "emptyFiltered": "No orders match the filter",
-        "totalCount": "{count} orders total",
+        "totalCount": "{count} order groups in total",
         "filteringByProduct": "Filtering by product",
         "filteringByProductNamed": "Filtering by product: {title}",
         "orderNumber": "Order No",
@@ -3889,6 +4397,7 @@
         "sellerId": "Seller ID",
         "cargoStatus": "Shipping Status",
         "commission": "Commission",
+        "productCount": "Product Count",
         "itemCountUnit": "{count} items",
         "cartItems": "{count}-item cart",
         "expandCart": "Expand cart",
@@ -3907,6 +4416,7 @@
         "statusChangeReason": "Manual Operation Reason",
         "statusChangeReasonPlaceholder": "Record the verification source and reason for this status change",
         "addTracking": "Add Shipment Tracking",
+        "trackingNumberPlaceholder": "Enter the shipment tracking number",
         "trackingReasonPlaceholder": "Record the source of the tracking data and reason for the manual operation",
         "markShipped": "Mark as Shipped",
         "trackingAdded": "Shipment tracking saved",
@@ -3994,7 +4504,61 @@
           "tracking": "Shipment Tracking",
           "error": "Failed to generate invoice"
         },
-        "shipmentProduct": "Product in this shipment"
+        "shipmentProduct": "Product in this shipment",
+        "file": {
+          "coversGroup": "This payment covers all {count} orders in the cart.",
+          "refundedTotal": "Refunded",
+          "shippingSplitTitle": "Shipping split",
+          "shippingFull": "Full cost",
+          "shippingBuyer": "Buyer share",
+          "shippingSeller": "Seller share",
+          "billableDesi": "Billable desi",
+          "quantity": "Quantity",
+          "unitPrice": "Unit price",
+          "vat": "VAT",
+          "buyerServiceVat": "Buyer service VAT:",
+          "sellerServiceVat": "Seller service VAT:",
+          "withholding": "Withholding (e-commerce)",
+          "escrowAmount": "Hold amount",
+          "escrowStatus": "Hold status",
+          "escrowRelease": "Release at",
+          "escrowReleased": "Released at",
+          "escrowRefunded": "Consumed by refunds",
+          "escrowFrozen": "Locked by an open refund request",
+          "escrowNone": "No escrow hold for this order yet (created when payment completes).",
+          "openPayouts": "Open in Seller Payouts",
+          "refundsTitle": "Refund Requests",
+          "refundQty": "{count} pcs",
+          "openRefund": "Open request",
+          "ledgerTitle": "Commission ledger",
+          "ledgerStatus": {
+            "pending": "Pending",
+            "earned": "Earned",
+            "refunded": "Refunded",
+            "waived": "Waived"
+          },
+          "deliveredAt": "Delivered",
+          "confirmationDeadline": "Confirmation window ends",
+          "guestBuyer": "Guest buyer",
+          "sellerSide": "Seller side",
+          "buyerSide": "Buyer side",
+          "lineAmount": "Amount",
+          "lineVat": "VAT",
+          "sellerVatTotal": "Seller VAT total",
+          "buyerVatTotal": "Buyer VAT total",
+          "sellerDeductionTotal": "Seller deduction total",
+          "buyerAddedTotal": "Added for buyer",
+          "platformRevenue": "Kept by Tarodan",
+          "platformTakeRate": "Tarodan share",
+          "platformTax": "Tax (VAT + withholding)",
+          "platformShipping": "Shipping (to carrier)",
+          "moneySplit": "Where the money went",
+          "sellerCommission": "Seller commission",
+          "sellerPlatformFee": "Platform service fee",
+          "buyerCommission": "Buyer commission",
+          "buyerServiceFee": "Buyer protection fee",
+          "productPrice": "Product price"
+        }
       },
       "trades": {
         "title": "Trades",
@@ -4107,7 +4671,19 @@
         "shippedAt": "Shipped: {date}",
         "deliveredAt": "Delivered: {date}",
         "lost": "Lost",
-        "shipmentProducts": "Products in this shipment"
+        "shipmentProducts": "Products in this shipment",
+        "balance": {
+          "title": "Difference Breakdown",
+          "offeredTotal": "Offered items total",
+          "counterTotal": "Counter items total",
+          "productDiff": "Product value difference",
+          "inFavorOf": "in favor of {name}",
+          "cashAgreed": "Agreed cash difference",
+          "commission": "Trade commission",
+          "chargedTotal": "Total charged (difference + commission)",
+          "paymentStatus": "Payment status",
+          "equalTrade": "Equal trade — no cash difference."
+        }
       },
       "refundRequests": {
         "title": "Refund Tracking",
@@ -4119,6 +4695,7 @@
         "reviewApproved": "Refund request approved",
         "reviewRejected": "Refund request rejected",
         "reviewNote": "Review note (required for rejection)",
+        "reviewNotePlaceholder": "Describe the review result and reasoning",
         "approveButton": "Approve Request",
         "rejectButton": "Reject Request",
         "policyUpdated": "Refund policy updated",
@@ -4268,7 +4845,14 @@
         "requestId": "Request ID",
         "returnProviderRaw": "Return shipping provider (raw)",
         "providerRefundId": "Provider Refund ID",
-        "rawHistory": "Raw activity history"
+        "rawHistory": "Raw activity history",
+        "returnChargeBuyer": "Return shipping (deducted from buyer)",
+        "buyerRefundTotal": "Total refunded to buyer",
+        "sellerImpactTitle": "Seller impact",
+        "sellerImpactHint": "These lines are not part of the buyer refund; they hit the seller's payout deductions / escrow.",
+        "chargeReturnToSeller": "Return shipping debt (to seller)",
+        "chargeOutboundToSeller": "Outbound shipping debt (to seller)",
+        "sellerShippingCompensation": "Shipping share compensation (back to seller)"
       },
       "refunds": {
         "title": "Refund History",
@@ -4276,7 +4860,9 @@
         "loadError": "Failed to load refund history",
         "empty": "No refunds found",
         "colId": "ID",
-        "refundedAt": "Refund Date"
+        "refundedAt": "Refund Date",
+        "refundNumber": "Refund No",
+        "refundedFee": "Reversed Fee"
       },
       "shipping": {
         "title": "Shipping Operations",
@@ -4322,7 +4908,19 @@
         "orders": {
           "loadError": "Failed to load shipments",
           "empty": "No shipments found",
-          "unit": "shipments"
+          "unit": "shipments",
+          "shipment": "Shipment",
+          "products": "Products",
+          "carrierAndTracking": "Carrier & Tracking",
+          "packageSummary": "{orders} orders · {products} products",
+          "productSummary": "{products} products · {quantity} units",
+          "contentsTitle": "Package Contents",
+          "showContents": "Show package contents",
+          "hideContents": "Hide package contents",
+          "carrierPending": "Carrier pending",
+          "carrierSurat": "Sürat Kargo",
+          "trackingPending": "Tracking number pending",
+          "unknownProduct": "Product information unavailable"
         },
         "returns": {
           "loadError": "Failed to load return shipments",
@@ -4558,6 +5156,64 @@
         "resolution": "Response / Resolution"
       }
     },
+    "earlyAccess": {
+      "title": "Early Access",
+      "description": "Create, distribute and manage pre-launch invite PIN codes",
+      "searchPlaceholder": "Search label, email or code...",
+      "createButton": "New PIN",
+      "empty": "No access codes yet",
+      "columns": {
+        "label": "Label",
+        "email": "Email",
+        "code": "Code",
+        "usage": "Usage",
+        "lastUsedAt": "Last Used",
+        "expiresAt": "Expires"
+      },
+      "status": {
+        "active": "Active",
+        "revoked": "Revoked",
+        "expired": "Expired",
+        "exhausted": "Limit Reached"
+      },
+      "filters": {
+        "all": "All Statuses",
+        "active": "Active",
+        "revoked": "Revoked",
+        "expired": "Expired"
+      },
+      "actions": {
+        "sendInvite": "Send Invite Email",
+        "resendInvite": "Resend Invite",
+        "copyCode": "Copy Code",
+        "revoke": "Revoke",
+        "activate": "Reactivate"
+      },
+      "modal": {
+        "createTitle": "New Access PIN",
+        "editTitle": "Edit Access PIN",
+        "label": "Label",
+        "labelPlaceholder": "e.g. Jane Doe",
+        "labelRequired": "Label is required",
+        "email": "Email (optional)",
+        "emailInvalid": "Enter a valid email",
+        "expiresAt": "Expiry Date (optional)",
+        "maxUses": "Usage Limit (optional)",
+        "maxUsesHint": "Leave empty for unlimited",
+        "sendEmailNow": "Send the invite email now"
+      },
+      "toasts": {
+        "created": "Access code created",
+        "updated": "Access code updated",
+        "deleted": "Access code deleted",
+        "inviteSent": "Invite email sent",
+        "codeCopied": "Code copied to clipboard"
+      },
+      "confirm": {
+        "deleteTitle": "Delete Access Code",
+        "deleteMessage": "This access code will be permanently deleted. This cannot be undone. (Prefer 'Revoke' if you just want to disable it.)"
+      }
+    },
     "settings": {
       "page": {
         "title": "System Settings",
@@ -4570,8 +5226,6 @@
       "saveButton": "Save Settings",
       "saved": "Settings saved",
       "search": {
-        "title": "Search Index (Elasticsearch)",
-        "description": "Rebuilds the product search index from scratch, applying price and boost changes to existing products. Usually run once after a deploy.",
         "reindexButton": "Reindex",
         "confirmTitle": "Reindex search",
         "confirmDescription": "The entire product search index will be dropped and rebuilt. This may take a few minutes. Continue?",
@@ -4580,30 +5234,29 @@
       "tabs": {
         "listing": "Listing",
         "trade": "Trade",
-        "message": "Message"
+        "message": "Message",
+        "warehouse": "Warehouse"
       },
       "tabTitle": {
         "listing": "Listing Settings",
         "trade": "Trade Settings",
         "message": "Message Settings"
       },
+      "warehouse": {
+        "title": "Warehouse Address",
+        "helper": "Central warehouse address where safe-trade shipments are collected. Trade warehouse operations cannot run until it is configured.",
+        "saved": "Warehouse address saved",
+        "fields": {
+          "title": "Address Title",
+          "fullName": "Contact / Company Name",
+          "phone": "Phone",
+          "city": "City",
+          "district": "District",
+          "address": "Street Address",
+          "zipCode": "Postal Code"
+        }
+      },
       "fields": {
-        "freeListingLimit": {
-          "label": "Free Listing Limit",
-          "helper": "Listing limit for free members"
-        },
-        "basicListingLimit": {
-          "label": "Basic Listing Limit",
-          "helper": "Listing limit for basic members (-1 = unlimited)"
-        },
-        "premiumListingLimit": {
-          "label": "Premium Listing Limit",
-          "helper": "Listing limit for premium members (-1 = unlimited)"
-        },
-        "businessListingLimit": {
-          "label": "Business Listing Limit",
-          "helper": "Listing limit for business members (-1 = unlimited)"
-        },
         "minProductPrice": {
           "label": "Minimum Product Price (₺)",
           "helper": "Minimum price for new listings (existing listings unaffected)"
@@ -4647,17 +5300,9 @@
       "empty": "No tariffs yet.",
       "providerVersion": "Provider / Version",
       "packageFee": "Package fee",
-      "ratesTitle": "Desi rates",
-      "ratesHelper": "Enter the exact shipping amount for each desi. Checkout rejects a desi with no configured rate.",
-      "desiLabel": "Desi",
       "amountLabel": "Amount (TRY)",
-      "addRate": "Add Row",
-      "removeRate": "Remove row",
-      "rateRequired": "At least one desi rate is required",
       "invalidDesi": "Desi must be an integer between 1 and 20000",
       "invalidAmount": "Enter a valid amount",
-      "duplicateDesi": "Each desi can only be entered once",
-      "legacyPackageFee": "Legacy flat fee: {amount}",
       "freeShipping": "Free shipping",
       "freeOver": "over {amount}",
       "freeDisabled": "Off",
@@ -4668,6 +5313,7 @@
       "editTitle": "Edit Tariff",
       "newTitle": "New Tariff (Draft)",
       "nameLabel": "Tariff name",
+      "namePlaceholder": "e.g. Surat Shipping Standard 2026",
       "nameRequired": "Tariff name is required",
       "outboundFeeLabel": "Package shipping fee (TRY)",
       "thresholdLabel": "Free-shipping threshold (TRY)",
@@ -4680,13 +5326,36 @@
       "created": "Draft tariff created",
       "statusDraft": "Draft",
       "statusActive": "Active",
-      "statusArchived": "Archived"
+      "statusArchived": "Archived",
+      "tiersTitle": "Package sizes",
+      "tiersHelper": "Sellers only pick a size when listing; the desi range and amount are set here. Ranges must start at 0, run without gaps, and the last size must stay unbounded.",
+      "tierLabel": "Name shown to sellers",
+      "tierLabelPlaceholder": "e.g. Small Parcel",
+      "tierLabelRequired": "Size name is required",
+      "minDesiLabel": "Min desi",
+      "maxDesiLabel": "Max desi",
+      "unboundedHelper": "Leave empty for unbounded",
+      "sampleWidthLabel": "Sample width (cm)",
+      "sampleHeightLabel": "Sample height (cm)",
+      "sampleLengthLabel": "Sample depth (cm)",
+      "allTiersRequired": "All three package sizes must be defined",
+      "firstTierMustStartAtZero": "The first size must start at 0 desi",
+      "lastTierMustBeUnbounded": "The last size must be unbounded (leave empty)",
+      "invalidTierRange": "Max desi must be greater than min desi",
+      "tierRangesMustBeContiguous": "Ranges must be contiguous: this size must start where the previous one ends",
+      "cloneActive": "Clone active tariff",
+      "cloned": "Active tariff cloned into a new draft",
+      "tierRange": "{range}",
+      "tierSmallName": "Small Parcel",
+      "tierMediumName": "Medium Parcel",
+      "tierLargeName": "Large Parcel"
     },
     "tiers": {
       "page": {
         "title": "Membership Tiers",
         "description": "Manage membership tiers and their prices",
-        "empty": "No membership tiers yet"
+        "empty": "No membership tiers yet",
+        "discountLoadError": "The yearly discount rate could not be loaded. Yearly prices are unavailable and tier editing is temporarily disabled."
       },
       "yearlyDiscount": {
         "title": "Yearly Discount Rate",
@@ -4696,8 +5365,14 @@
       },
       "validation": {
         "required": "Required",
-        "discountRange": "Enter a value between 0 and 100",
-        "nameRequired": "Name is required"
+        "discountRange": "Enter a value between 0 and 90",
+        "nameRequired": "Name is required",
+        "nameMax": "Name can be at most 100 characters",
+        "descriptionMax": "Description can be at most 500 characters",
+        "freePriceZero": "The free tier's price must be 0",
+        "paidPricePositive": "A paid tier's price must be greater than 0",
+        "nonNegativeInt": "Enter a whole number of 0 or more",
+        "totalListingsRange": "Enter -1 (unlimited) or at least 1"
       },
       "modal": {
         "editTitle": "Edit Membership Tier — {name}",
@@ -4705,6 +5380,8 @@
       },
       "field": {
         "name": "Name",
+        "namePlaceholder": "e.g. Premium",
+        "descriptionPlaceholder": "Describe the membership tier benefits...",
         "sortOrder": "Sort Order",
         "monthlyPrice": "Monthly Price (₺)",
         "yearlyPrice": "Yearly Price (₺)",
@@ -4737,11 +5414,13 @@
         "title": "AI Moderation",
         "description": "Shared AI moderation for all entities (product · user · collection · image · text) — thresholds, image testing, and a unified event log",
         "disabledWarning": "AI moderation service is disabled (AI_MODERATION_ENABLED=false). Threshold settings and image testing are unavailable; past log entries are still listed.",
+        "configLoadError": "The AI configuration could not be loaded. Editing is disabled because the current thresholds are unknown.",
         "logTitle": "Moderation Log",
         "logDescription": "Content blocked / flagged by AI across all entities"
       },
       "thresholds": {
         "saved": "Thresholds saved",
+        "unavailable": "Current thresholds could not be loaded; editing is disabled.",
         "title": "AI Thresholds",
         "relevanceLabel": "Acceptance threshold (relevance %)",
         "relevanceHelper": "If a product image's relevance score is above this percentage, it's auto-accepted; below it, it goes to admin review.",
@@ -4758,7 +5437,8 @@
         "orLabel": "or",
         "chooseFile": "choose a file from your computer",
         "scores": "Relevance: {relevance}% · Inappropriateness: {nsfw}%",
-        "labels": "Labels:"
+        "labels": "Labels:",
+        "fileTooLarge": "File is too large (max {limit} KB). Pick a smaller image or test with a URL."
       },
       "badge": {
         "flagged": "Suspected inappropriate",
@@ -5041,6 +5721,10 @@
           "label": "Reviews",
           "description": "View, approve, and reject user reviews."
         },
+        "reports": {
+          "label": "User Reports",
+          "description": "View and resolve reports filed by users."
+        },
         "staff": {
           "label": "Role Management",
           "description": "Create admin accounts, assign roles, and edit the permission matrix."
@@ -5089,6 +5773,14 @@
           "label": "Tax Settings",
           "description": "Manage VAT zones, tax rates, and rules."
         },
+        "invoices": {
+          "label": "Invoices",
+          "description": "View the e-invoice list and download invoice PDFs."
+        },
+        "paymentSettings": {
+          "label": "Payment Settings",
+          "description": "The payment/PSP configuration section of system settings."
+        },
         "aiModeration": {
           "label": "AI Moderation",
           "description": "AI moderation events, scores, and threshold settings."
@@ -5103,7 +5795,11 @@
         },
         "logs": {
           "label": "Logs",
-          "description": "System error logs, security events, email logs, and audit trail."
+          "description": "System error logs, security events, and email logs."
+        },
+        "auditLogs": {
+          "label": "Audit Trail",
+          "description": "Audit tab: records of which admin changed what and when."
         }
       },
       "form": {
@@ -5259,10 +5955,18 @@
           "name": "Pages",
           "description": "Create and edit content pages"
         },
+        "financeOverview": {
+          "name": "Finance Overview",
+          "description": "Money-flow funnel and financial records needing attention."
+        },
         "payments": {
           "name": "Payments",
           "description": "View and manage payment transactions",
           "keywords": "payment,hold"
+        },
+        "pspReconciliation": {
+          "name": "PayTR Reconciliation",
+          "description": "Comparison of PayTR reports against system records, plus settlements."
         },
         "commission": {
           "name": "Commission",
@@ -5291,6 +5995,11 @@
           "description": "Manage membership plans and benefits",
           "keywords": "membership,tier,plan"
         },
+        "earlyAccess": {
+          "name": "Early Access",
+          "description": "Manage pre-launch invite PIN codes",
+          "keywords": "pin,invite,early access,access code,lock"
+        },
         "settings": {
           "name": "System Settings",
           "description": "Configure general platform settings"
@@ -5314,6 +6023,10 @@
           "name": "Boost Purchases",
           "description": "Track purchased boost packages and their buyers",
           "keywords": "purchase,boost,package,showcase"
+        },
+        "media": {
+          "name": "Media",
+          "description": "Bucket folders, files and ownership tracking."
         }
       }
     },
@@ -5511,9 +6224,6 @@
         "backToLogin": "← Back to login",
         "sentMessage": "If <strong>{email}</strong> is registered with us, a password reset link has been sent to that address. Check your inbox (and spam folder).",
         "pageDescription": "Reset your account password"
-      },
-      "layout": {
-        "copyright": "© 2026 Tarodan Marketplace. All rights reserved."
       },
       "validation": {
         "emailRequired": "Email is required",
@@ -5960,6 +6670,7 @@
       "itemAlreadyInActiveTrade": "One of the products you offered is already part of an active trade. Cancel the existing trade first or wait for it to be resolved.",
       "membershipExpiredForAccept": "Your membership appears to have expired. Renew your Basic or higher membership to accept a trade.",
       "membershipRequiredForCounter": "A Basic or higher membership is required to send a counter-offer. Please renew your membership.",
+      "receiverCannotTrade": "The other party's membership does not allow trading; a trade offer cannot be sent for this listing right now.",
       "noShipmentToConfirm": "No shipment found to confirm",
       "noShippingAddress": "Add a delivery address for the trade. You can add an address via Profile → My Addresses.",
       "notAuthorizedForAction": "You are not authorized to perform this trade action",
@@ -6046,7 +6757,9 @@
       "statusChangeSystemOnly": "This status change is performed by the system",
       "statusTransitionNotAllowed": "Order status cannot be changed from {from} to {to}",
       "updateForbidden": "You are not authorized to update this order",
-      "viewForbidden": "You are not authorized to view this order"
+      "viewForbidden": "You are not authorized to view this order",
+      "groupAlreadyCancelled": "All orders in this cart are already cancelled.",
+      "groupCancelBlockedShipped": "At least one order in this cart has been handed to the carrier — cart cancellation is closed. You can request a refund after delivery."
     },
     "payment": {
       "cancelPaymentForbidden": "You do not have permission to cancel this payment",
@@ -6122,6 +6835,7 @@
       "alreadyLiked": "You have already liked this product",
       "bannedCannotCreate": "Your account is banned. You cannot add new products.",
       "bannedCannotEdit": "Your account is banned. You cannot edit products.",
+      "businessApprovalRequired": "You cannot list products until your business account is approved. You will be notified once your application is reviewed.",
       "boostActiveOnly": "Only active (published) listings can be boosted",
       "boostOwnOnly": "You can only boost your own listing",
       "boostPriceUndefined": "No valid price is defined for this duration",
@@ -6208,7 +6922,8 @@
       "phoneAlreadyInUse": "This phone number is already in use",
       "unfollowed": "Unfollowed",
       "userBlocked": "{displayName} has been blocked",
-      "userUnblocked": "Block removed"
+      "userUnblocked": "Block removed",
+      "unknownOnboardingTour": "Unknown onboarding tour"
     },
     "membership": {
       "alreadyCancelled": "Membership has already been cancelled",

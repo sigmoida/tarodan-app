@@ -35,7 +35,10 @@ export default function HomeProductCard({
   const imageUrl = getImageUrl(firstImage, index, product.title);
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
-  const isTrade = Boolean(product.trade_available || product.isTradeEnabled);
+  const isTrade = Boolean(
+    product.tradeAvailable ??
+    (product.trade_available || product.isTradeEnabled),
+  );
 
   return (
     <div

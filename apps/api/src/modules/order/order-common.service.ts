@@ -4,6 +4,7 @@ import { CacheService } from "../cache/cache.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { OrderStatus, OfferStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
+import { sellerNetAmountOf } from "./order-net.helper";
 
 /**
  * Sipariş modülü ortak yardımcıları (sipariş yanıtı formatlama + ürün cache
@@ -31,7 +32,8 @@ export class OrderCommonService {
       await this.cache.delPattern("products:list:*");
       this.logger.log(`Product cache invalidated for ${productId}`);
     } catch (error) {
-      this.logger.error(`Failed to invalidate product cache: ${error}`);
+      // Önbellek bayatlar, TTL dolunca kendini toparlar: alarm değil uyarı.
+      this.logger.warn(`Failed to invalidate product cache: ${error}`);
     }
   }
 
@@ -177,21 +179,26 @@ export class OrderCommonService {
     const withholdingTaxAmount = Number(order.withholdingTaxAmount ?? 0);
     // Satıcının üstlendiği kargo payı (kargo payı kuralı; buyerShare=100 → 0).
     const sellerShippingAmount = Number(order.sellerShippingAmount ?? 0);
-    // Ürün tutarı KDV HARİÇ gösterilir; KDV ayrı satır olarak surface edilir.
-    // (totalAmount = subtotal + kargo + buyerFee + KDV — bkz. createCheckoutQuote)
-    const subtotal = totalAmount - shippingCost - buyerFeeAmount - taxAmount;
-    // Net kazanç: KDV satıcı payout'una (escrow hold) dahildir; satıcının üstlendiği
-    // kargo payı (sellerShipping) gerçek bir maliyet olduğundan net'ten düşülür →
-    // subtotal + KDV − sellerFee − stopaj − sellerShipping. Admin kesinti önizlemesiyle
-    // aynı tanım; buyerShare=100 iken sellerShipping=0 → mevcut davranış korunur.
-    const sellerNetAmount = Math.max(
-      0,
-      subtotal +
-        taxAmount -
-        sellerFeeAmount -
-        withholdingTaxAmount -
-        sellerShippingAmount,
-    );
+    // Hizmet bedeli KDV'si: alıcı tarafı toplamın İÇİNDE (tahsil edildi),
+    // satıcı tarafı payout'tan düşülür.
+    const buyerServiceTaxAmount = Number(order.buyerServiceTaxAmount ?? 0);
+    const sellerServiceTaxAmount = Number(order.sellerServiceTaxAmount ?? 0);
+    // Ürün tutarı KDV HARİÇ gösterilir; KDV'ler ayrı satır olarak surface edilir.
+    // (totalAmount = subtotal + kargo + buyerFee + ürün KDV + alıcı hizmet KDV)
+    const subtotal =
+      totalAmount -
+      shippingCost -
+      buyerFeeAmount -
+      taxAmount -
+      buyerServiceTaxAmount;
+    const sellerNetAmount = sellerNetAmountOf({
+      subtotal,
+      productTaxAmount: taxAmount,
+      sellerFeeAmount,
+      withholdingTaxAmount,
+      sellerShippingAmount,
+      sellerServiceTaxAmount,
+    });
 
     const pricing = {
       subtotal,
@@ -201,6 +208,9 @@ export class OrderCommonService {
       commissionAmount,
       taxAmount,
       withholdingTaxAmount,
+      // Hizmet bedeli KDV'si — UI fiyat dökümünde ayrı satır olarak gösterilir.
+      buyerServiceTaxAmount,
+      sellerServiceTaxAmount,
       totalAmount,
       sellerNetAmount,
     };
@@ -222,6 +232,10 @@ export class OrderCommonService {
       // Kargo pakete bir kez yüklenir → kardeş order'ın shippingCost'u 0 olabilir; UI bunu
       // "ücretsiz" değil "pakete dahil" göstermek için packageId'ye bakar.
       packageId: order.packageId ?? null,
+      // Koli numarası (PKG-…): Sürat'a iletilen ve kargo etiketinde yazan kod.
+      // Sepet numarasından da sipariş numarasından da BAĞIMSIZDIR — üç seviye
+      // (GRP · PKG · ORD) hiçbir zaman aynı değeri taşımaz.
+      packageNumber: order.package?.packageNumber ?? null,
       amount: totalAmount,
       totalAmount,
       commissionAmount,

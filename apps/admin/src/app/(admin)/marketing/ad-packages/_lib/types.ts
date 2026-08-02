@@ -22,8 +22,22 @@ export interface AdPackage {
   showcaseOnHome: boolean;
   isActive: boolean;
   sortOrder: number;
+  audienceMode:
+    "everyone" | "membership_tiers" | "specific_users" | "tiers_or_users";
+  targetTierTypes: MembershipTierType[];
+  targetUsers: AudienceUser[];
   createdAt: string;
   tiers: AdPackageTier[];
+}
+
+export type MembershipTierType = "free" | "basic" | "premium" | "business";
+
+export interface AudienceUser {
+  id: string;
+  adminCode: string;
+  username: string;
+  displayName: string;
+  email: string;
 }
 
 /** Distinct durations present in a package's tiers, ascending. */
@@ -52,18 +66,70 @@ const tierRowSchema = (t: T) =>
   });
 
 export const packageSchema = (t: T) =>
-  z.object({
-    name: z
-      .string()
-      .min(1, t("admin.marketing.adPackages.validation.nameRequired")),
-    slug: z
-      .string()
-      .min(1, t("admin.marketing.adPackages.validation.slugRequired")),
-    showcaseOnHome: z.boolean().default(false),
-    isActive: z.boolean().default(true),
-    sortOrder: z.string().default("0"),
-    tiers: z.array(tierRowSchema(t)).default([]),
-  });
+  z
+    .object({
+      name: z
+        .string()
+        .min(1, t("admin.marketing.adPackages.validation.nameRequired")),
+      slug: z
+        .string()
+        .min(1, t("admin.marketing.adPackages.validation.slugRequired")),
+      showcaseOnHome: z.boolean().default(false),
+      isActive: z.boolean().default(true),
+      sortOrder: z.string().default("0"),
+      audienceMode: z
+        .enum([
+          "everyone",
+          "membership_tiers",
+          "specific_users",
+          "tiers_or_users",
+        ])
+        .default("everyone"),
+      targetTierTypes: z
+        .array(z.enum(["free", "basic", "premium", "business"]))
+        .default([]),
+      targetUserIds: z.array(z.string().uuid()).default([]),
+      tiers: z.array(tierRowSchema(t)).default([]),
+    })
+    .superRefine((value, context) => {
+      if (
+        value.audienceMode === "membership_tiers" &&
+        value.targetTierTypes.length === 0
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["targetTierTypes"],
+          message: t(
+            "admin.marketing.adPackages.validation.tierTargetRequired",
+          ),
+        });
+      }
+      if (
+        value.audienceMode === "specific_users" &&
+        value.targetUserIds.length === 0
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["targetUserIds"],
+          message: t(
+            "admin.marketing.adPackages.validation.userTargetRequired",
+          ),
+        });
+      }
+      if (
+        value.audienceMode === "tiers_or_users" &&
+        value.targetTierTypes.length === 0 &&
+        value.targetUserIds.length === 0
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["targetTierTypes"],
+          message: t(
+            "admin.marketing.adPackages.validation.audienceTargetRequired",
+          ),
+        });
+      }
+    });
 
 export type PackageFormValues = z.infer<ReturnType<typeof packageSchema>>;
 export type TierRowValues = PackageFormValues["tiers"][number];
@@ -89,6 +155,9 @@ export function packageToForm(pkg?: AdPackage): PackageFormValues {
       showcaseOnHome: false,
       isActive: true,
       sortOrder: "0",
+      audienceMode: "everyone",
+      targetTierTypes: [],
+      targetUserIds: [],
       tiers: [{ ...emptyTierRow }],
     };
   }
@@ -98,6 +167,9 @@ export function packageToForm(pkg?: AdPackage): PackageFormValues {
     showcaseOnHome: pkg.showcaseOnHome,
     isActive: pkg.isActive,
     sortOrder: String(pkg.sortOrder ?? 0),
+    audienceMode: pkg.audienceMode ?? "everyone",
+    targetTierTypes: pkg.targetTierTypes ?? [],
+    targetUserIds: pkg.targetUsers?.map((user) => user.id) ?? [],
     tiers: pkg.tiers.map((tier) => ({
       durationDays: String(tier.durationDays),
       minAmount: String(tier.minAmount),
@@ -120,6 +192,16 @@ export function packageFormToPayload(v: PackageFormValues) {
     showcaseOnHome: v.showcaseOnHome,
     isActive: v.isActive,
     sortOrder: Number(v.sortOrder) || 0,
+    audienceMode: v.audienceMode,
+    targetTierTypes:
+      v.audienceMode === "membership_tiers" ||
+      v.audienceMode === "tiers_or_users"
+        ? v.targetTierTypes
+        : [],
+    targetUserIds:
+      v.audienceMode === "specific_users" || v.audienceMode === "tiers_or_users"
+        ? v.targetUserIds
+        : [],
     tiers: v.tiers.map((row) => ({
       durationDays: parseInt(row.durationDays, 10) || 1,
       minAmount: parseFloat(row.minAmount) || 0,

@@ -1,6 +1,6 @@
 import { Badge } from "@tarodan/ui";
 import { col, type RowActionItem } from "@/components/table";
-import { type Application, businessStatusConfig } from "./types";
+import { type Application, applicationStatusConfig } from "./types";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -12,25 +12,24 @@ export function applicationColumns(
   return [
     col.user<Application>(
       t("admin.accounts.sellerApplications.company"),
-      (a) => ({ name: a.companyName, secondary: a.email }),
+      (a) => ({
+        name: a.companyTitle,
+        secondary: a.companyEmail,
+        href: a.userId ? `/accounts/users/${a.userId}` : undefined,
+      }),
       {
-        sortKey: "companyName",
+        sortKey: "companyTitle",
         sortType: "text",
       },
     ),
     col.muted<Application>(
       t("admin.accounts.sellerApplications.contact"),
-      "displayName",
+      "authorizedFullName",
     ),
     col.badge<Application>(
       t("common.status"),
-      (a) => (
-        <Badge
-          status={a.businessStatus ?? "pending"}
-          config={businessStatusConfig(t)}
-        />
-      ),
-      { sortKey: "businessStatus", sortType: "text" },
+      (a) => <Badge status={a.status} config={applicationStatusConfig(t)} />,
+      { sortKey: "status", sortType: "text" },
     ),
     col.date<Application>(
       t("admin.accounts.sellerApplications.applicationDate"),

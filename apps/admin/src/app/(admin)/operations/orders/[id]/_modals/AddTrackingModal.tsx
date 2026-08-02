@@ -39,6 +39,16 @@ export function AddTrackingModal({
       isOpen={open}
       onClose={onClose}
       title={t("admin.operations.orders.addTracking")}
+      closeButtonDisabled={submit.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => submit.mutate()}
+          confirmLabel={t("admin.operations.orders.markShipped")}
+          disabled={!trackingNumber.trim() || !notes.trim()}
+          isLoading={submit.isPending}
+        />
+      }
     >
       <div className="space-y-4">
         <Select
@@ -53,6 +63,7 @@ export function AddTrackingModal({
         <Input
           label={t("admin.operations.common.trackingNumber")}
           value={trackingNumber}
+          placeholder={t("admin.operations.orders.trackingNumberPlaceholder")}
           onChange={(event) => setTrackingNumber(event.target.value)}
           maxLength={100}
           disabled={submit.isPending}
@@ -65,13 +76,6 @@ export function AddTrackingModal({
           maxLength={500}
           rows={3}
           disabled={submit.isPending}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => submit.mutate()}
-          confirmLabel={t("admin.operations.orders.markShipped")}
-          disabled={!trackingNumber.trim() || !notes.trim()}
-          isLoading={submit.isPending}
         />
       </div>
     </Modal>

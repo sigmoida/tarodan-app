@@ -6,12 +6,21 @@ import type { useTranslations } from "next-intl";
 type T = ReturnType<typeof useTranslations<never>>;
 
 export const sellerColumns = (t: T) => [
+  col.code<Seller>(t("admin.users.userId"), (s) => s.adminCode, {
+    minWidth: 130,
+    sortKey: "adminCode",
+    sortType: "text",
+  }),
   col.user<Seller>(
-    t("admin.accounts.sellerPerformance.seller"),
-    (s) => ({ name: s.displayName, secondary: s.email }),
-    { sortKey: "displayName" },
+    t("admin.users.columnUser"),
+    (s) => ({
+      name: s.displayName,
+      secondary: s.email,
+      avatar: s.avatarUrl,
+      href: `/accounts/users/${s.id}`,
+    }),
+    { minWidth: 300, sortKey: "displayName" },
   ),
-  col.id<Seller>(t("admin.operations.common.sellerId"), (s) => s.id),
   col.badge<Seller>(
     t("admin.accounts.sellerPerformance.membership"),
     (s) => (

@@ -17,8 +17,16 @@ export function staffColumns(
 ) {
   const roleMeta = getRoleMeta(t);
   return [
-    col.text<StaffItem>(t("common.user"), "name"),
-    col.muted<StaffItem>(t("common.email"), "email"),
+    col.user<StaffItem>(
+      t("common.user"),
+      (s) => ({
+        name: s.name,
+        secondary: s.email,
+        avatar: s.avatarUrl,
+        href: `/accounts/users/${s.userId}`,
+      }),
+      { minWidth: 280, sortKey: "user.displayName", sortType: "text" },
+    ),
     col.badge<StaffItem>(
       t("admin.roles.columns.role"),
       (s) => (

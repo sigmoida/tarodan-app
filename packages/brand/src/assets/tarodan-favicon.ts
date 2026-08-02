@@ -1,0 +1,5 @@
+// Tarodan favicon (48x48 palette PNG) — @tarodan/brand'ın sahip olduğu kanonik
+// kopya. sync-brand-assets.mjs bunu her iki uygulamanın public/ dizinine
+// tarodan-favicon.png olarak üretir; app'ler kendi kopyasını TUTMAZ.
+export const tarodanFaviconDataUri =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAAP1BMVEX/////3sj/5NL+lVH+cRf//Pr+dR3+bxP+cBT//v3/07b+fiv/697/7+T+i0D+oGT/soD/9u//vpP+qXH/yKQ4Zn1LAAAACXBIWXMAAAsTAAALEwEAmpwYAAABsklEQVR42u1Vy3LDIAwUIF4GG4z9/99aCSexATed3jrT6JQMWmmRdjHYXwZ8AH8c4GxQ1uIPAOcQ3RHogi7GonsDcG29oCGmvgk0JKxd8iSeIb0HmAK1vQegxU1CGwRZt6PUAEC7ULrXl2CI9iDCpQec+WqlU2bRtACQm7EjgPI1ndL5Kl93qIyyae79BDgz13yZwutMEXznv0kubqBUgDvshnfx2EMCoXhwE81q6BBWpl9oFe4kmel32KmQ90sPyMxXYr9Xk1eoVEsPmLzXsLVbdRj2OcbIXGUPiFwnuK4B0kAR+Sz2AJ7RGqy7062kedwC9Aio44p3lARfWh1ybYihW2hIfuoBhVQEO6u/0zjanfW09QDleUwiG0pf1JOao1srFtgahk0L0kFMtOiQdUaDNVgWmiuVUa3LQ2bbDGd/o6bqidmMWrKsOkySHSD36YiZ02l86twoXPxplKj1GscRH50uCrg4zuXqL2hsxwZa7vxQLcH8O8dBpJvht+9SKLq6LM41oijK2Hb90C6pusUnHqtBgwfVNy8fb5kGdVlcb5DhbSUdmUKaOmz6+QL9Y8AXhCM9FODkmlYAAAAASUVORK5CYII=";

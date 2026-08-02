@@ -3,7 +3,7 @@
 "use client";
 
 import { Badge, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { Period } from "../_lib/types";
 
 export default function PeriodToggle({
@@ -25,8 +25,9 @@ export default function PeriodToggle({
           <TabsTrigger value="yearly">
             <span className="flex items-center gap-2">
               {t("membership.yearly")}
+              {/* Nötr rozet: ekranda tek vurgu rengi seçili plan kenarlığı. */}
               {discountPct > 0 && (
-                <Badge variant="success" size="sm">
+                <Badge variant="default" size="sm">
                   %{discountPct} {t("membership.savePercent")}
                 </Badge>
               )}

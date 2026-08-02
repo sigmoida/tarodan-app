@@ -133,6 +133,8 @@ export default function PaymentHistoryPage() {
         confirmLabel={
           confirm?.type === "cancel" ? t("common.cancel") : t("payment.retry")
         }
+        cancelLabel={t("common.back")}
+        closeLabel={t("common.close")}
       />
     </PageShell>
   );

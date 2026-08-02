@@ -19,11 +19,13 @@ export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations();
   return {
     metadataBase: new URL(
-      process.env.NEXT_PUBLIC_APP_URL || "https://admin.tarodan.com",
+      process.env.NEXT_PUBLIC_APP_URL || "https://admin.tarodan.com.tr",
     ),
     title: APP_NAME,
     description: t("admin.nav.defaultDescription"),
     robots: { index: false, follow: false },
+    // @tarodan/brand'dan sync-brand-assets.mjs ile üretilir (build artifact).
+    icons: { icon: "/tarodan-favicon.png" },
   };
 }
 
@@ -32,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * cookie) and the shared message catalog, then hand both to
  * `NextIntlClientProvider` so every client component can call `useTranslations`.
  * `<html lang>` reflects the active locale. Locale switching is a cookie write +
- * refresh (the admin has no URL routing) — see `LocaleSwitcher` in the topbar.
+ * refresh (the admin has no URL routing) — see `LocaleSwitcher` in the sidebar.
  */
 export default async function RootLayout({
   children,

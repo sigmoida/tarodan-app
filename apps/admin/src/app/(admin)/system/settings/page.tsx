@@ -9,11 +9,23 @@ import { PageLoading } from "@/components/PageLoading";
 import { AdminTabs } from "@/components/AdminTabs";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { useSettingsPage } from "./_lib/useSettingsPage";
-import { SearchIndexCard } from "./_components/SearchIndexCard";
+import { SearchReindexButton } from "./_components/SearchReindexButton";
+import { WarehouseAddressCard } from "./_components/WarehouseAddressCard";
 
 export default function SettingsPage() {
-  const { t, tab, setTab, activeTab, tabs, title, fields, query, form, save } =
-    useSettingsPage();
+  const {
+    t,
+    tab,
+    setTab,
+    activeTab,
+    isWarehouseTab,
+    tabs,
+    title,
+    fields,
+    query,
+    form,
+    save,
+  } = useSettingsPage();
 
   if (query.isError) {
     return (
@@ -33,41 +45,46 @@ export default function SettingsPage() {
       <PageHeader
         title={t("admin.settings.page.title")}
         description={t("admin.settings.page.description")}
-      />
+      >
+        <SearchReindexButton />
+      </PageHeader>
 
       <AdminTabs tabs={tabs} value={tab} onChange={setTab} />
 
-      <Form
-        form={form}
-        onSubmit={(values) => save.mutate({ tab: activeTab, values })}
-        className="space-y-6"
-      >
-        <SectionCard title={title}>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {fields.map((f) => (
-              <FormInput
-                key={f.key}
-                name={f.key}
-                type="number"
-                label={f.label}
-                helperText={f.helper}
-                min={f.min}
-                step={f.step}
-              />
-            ))}
-          </div>
-        </SectionCard>
+      {isWarehouseTab ? (
+        <WarehouseAddressCard />
+      ) : (
+        <>
+          <Form
+            form={form}
+            onSubmit={(values) => save.mutate({ tab: activeTab, values })}
+            className="space-y-6"
+          >
+            <SectionCard title={title}>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {fields.map((f) => (
+                  <FormInput
+                    key={f.key}
+                    name={f.key}
+                    type="number"
+                    label={f.label}
+                    helperText={f.helper}
+                    min={f.min}
+                    step={f.step}
+                    placeholder="0"
+                  />
+                ))}
+              </div>
+            </SectionCard>
 
-        <div className="flex justify-end">
-          <Button type="submit" isLoading={save.isPending}>
-            {t("admin.settings.saveButton")}
-          </Button>
-        </div>
-      </Form>
-
-      <div className="mt-6">
-        <SearchIndexCard />
-      </div>
+            <div className="flex justify-end">
+              <Button type="submit" isLoading={save.isPending}>
+                {t("admin.settings.saveButton")}
+              </Button>
+            </div>
+          </Form>
+        </>
+      )}
     </AdminPage>
   );
 }

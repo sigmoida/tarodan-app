@@ -21,6 +21,7 @@ import {
 import ManufacturerAttributesSection from "./_sections/ManufacturerAttributesSection";
 import SubmitBar from "./_sections/SubmitBar";
 import { LimitBanner, BankGate } from "./_sections/ListingBanners";
+import NewListingTour from "./_components/NewListingTour";
 
 function NewListingLayout() {
   const t = useTranslations();
@@ -69,39 +70,53 @@ function NewListingLayout() {
       <LimitBanner />
       <BankGate />
 
+      {/* Tur yalnız form gerçekten render edildiğinde çalışabilir: IBAN kapısı
+          kapalıysa hedefler DOM'da yok. */}
+      <NewListingTour ready={hasBankAccount} />
+
       {hasBankAccount && (
         <Form form={form} onSubmit={onSubmit} className="space-y-4">
-          <TitleDescriptionCard />
-          <ProductDetailsCard
-            locale={locale}
-            conditions={CONDITIONS}
-            flatCategories={flatCategories}
-            brands={brands}
-            brandsLoading={brandsLoading}
-            models={models}
-            modelsLoading={modelsLoading}
-            scaleList={scaleList}
-            materialList={materialList}
-            manufacturerList={manufacturerList}
-            yearOptions={yearOptions}
-          />
+          <div data-tour="listing-basics">
+            <TitleDescriptionCard />
+          </div>
+          <div data-tour="listing-details">
+            <ProductDetailsCard
+              locale={locale}
+              conditions={CONDITIONS}
+              flatCategories={flatCategories}
+              brands={brands}
+              brandsLoading={brandsLoading}
+              models={models}
+              modelsLoading={modelsLoading}
+              scaleList={scaleList}
+              materialList={materialList}
+              manufacturerList={manufacturerList}
+              yearOptions={yearOptions}
+            />
+          </div>
           <ManufacturerAttributesSection />
           <OptionsCard locale={locale} canTrade={!!limits?.canTrade} />
-          <PricingCard
-            locale={locale}
-            commissionPreview={commissionPreview}
-            commissionPreviewLoading={commissionPreviewLoading}
-            quantityPlaceholder="1"
-            quantityHelper={t("product.quantityDefaultHint")}
-          />
-          <ImagesCard
-            maxImages={limits?.maxImagesPerListing || 3}
-            imagePreviewUrls={imagePreviewUrls}
-            uploadingImages={uploadingImages}
-            handleFileUpload={handleFileUpload}
-            removeImage={removeImage}
-          />
-          <SubmitBar />
+          <div data-tour="listing-pricing">
+            <PricingCard
+              locale={locale}
+              commissionPreview={commissionPreview}
+              commissionPreviewLoading={commissionPreviewLoading}
+              quantityPlaceholder="1"
+              quantityHelper={t("product.quantityDefaultHint")}
+            />
+          </div>
+          <div data-tour="listing-images">
+            <ImagesCard
+              maxImages={limits?.maxImagesPerListing || 3}
+              imagePreviewUrls={imagePreviewUrls}
+              uploadingImages={uploadingImages}
+              handleFileUpload={handleFileUpload}
+              removeImage={removeImage}
+            />
+          </div>
+          <div data-tour="listing-submit">
+            <SubmitBar />
+          </div>
         </Form>
       )}
     </PageShell>

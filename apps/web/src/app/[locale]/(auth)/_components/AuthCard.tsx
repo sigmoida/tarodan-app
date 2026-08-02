@@ -26,7 +26,8 @@ export function AuthCard({
   backHref?: string;
   backLabel?: React.ReactNode;
   children: React.ReactNode;
-  /** Optional footer row (secondary links), centered below the content. */
+  /** Optional footer row (secondary links) below the content, left-aligned
+   *  with the form and the layout's logo / copyright. */
   footer?: React.ReactNode;
 }) {
   return (
@@ -50,9 +51,7 @@ export function AuthCard({
 
       {children}
 
-      {footer && (
-        <div className="mt-6 text-center text-sm text-muted">{footer}</div>
-      )}
+      {footer && <div className="mt-6 text-sm text-muted">{footer}</div>}
     </div>
   );
 }

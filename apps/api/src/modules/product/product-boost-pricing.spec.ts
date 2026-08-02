@@ -47,6 +47,11 @@ describe("ProductBoostService — ad-package pricing", () => {
 
   beforeEach(() => {
     prisma = {
+      userMembership: {
+        findUnique: jest.fn().mockResolvedValue({
+          tier: { type: "free" },
+        }),
+      },
       adPackage: { findFirst: jest.fn().mockResolvedValue(EKO) },
       adPackageTier: {
         findFirst: jest.fn(({ where }: any) =>
@@ -65,7 +70,12 @@ describe("ProductBoostService — ad-package pricing", () => {
   });
 
   const resolve = (dur: number, productPrice: number) =>
-    (service as any).resolvePackagePrice("pkg-eko", dur, productPrice);
+    (service as any).resolvePackagePrice(
+      "pkg-eko",
+      dur,
+      productPrice,
+      "user-1",
+    );
 
   it("picks the tier by the product's price range", async () => {
     expect((await resolve(7, 500)).price).toBe(150); // 200-999
@@ -86,6 +96,34 @@ describe("ProductBoostService — ad-package pricing", () => {
   it("throws when the package is missing/inactive", async () => {
     prisma.adPackage.findFirst.mockResolvedValueOnce(null);
     await expect(resolve(7, 500)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  describe("audience targeting", () => {
+    const where = () =>
+      (service as any).eligibleAudienceWhere("user-1", "premium");
+
+    it("keeps each audience mode scoped to its own target relation", () => {
+      expect(where()).toEqual({
+        OR: [
+          { audienceMode: "everyone" },
+          {
+            audienceMode: "membership_tiers",
+            targetTiers: { some: { tierType: "premium" } },
+          },
+          {
+            audienceMode: "specific_users",
+            targetUsers: { some: { userId: "user-1" } },
+          },
+          {
+            audienceMode: "tiers_or_users",
+            OR: [
+              { targetTiers: { some: { tierType: "premium" } } },
+              { targetUsers: { some: { userId: "user-1" } } },
+            ],
+          },
+        ],
+      });
+    });
   });
 
   describe("campaign price window", () => {

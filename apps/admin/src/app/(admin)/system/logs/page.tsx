@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from "react";
 import { adminApi } from "@/lib/api";
+import { useSession } from "@/context/SessionContext";
+import { usePrompt } from "@/provider/PromptProvider";
 import { ResourceList, useResourceList } from "@/components/list";
 import { MetricCard } from "@/components/MetricCard";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -75,13 +77,53 @@ function LogsTable({ tab }: { tab: LogTab }) {
   const t = useTranslations();
   const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
+  const prompt = usePrompt();
+  const { user } = useSession();
   const resolve = useAdminMutation(
-    (id: string) => adminApi.resolveSecurityIssue(id),
+    ({ id, notes }: { id: string; notes?: string }) =>
+      adminApi.resolveSecurityIssue(id, notes),
     {
       invalidates: ["logs:security"],
       successMessage: t("admin.system.logs.resolveSuccess"),
     },
   );
+  const blockIp = useAdminMutation(
+    ({ ipAddress, reason }: { ipAddress: string; reason?: string }) =>
+      adminApi.blockIP({ ipAddress, reason }),
+    {
+      invalidates: ["logs:security"],
+      successMessage: t("admin.system.logs.blockIpSuccess"),
+    },
+  );
+
+  // Çözme notu API'de hep vardı ama UI hiç göndermiyordu — gerekçe kayboluyordu.
+  const onResolve = async (row: SecurityLog) => {
+    const notes = await prompt({
+      title: t("admin.system.logs.resolvePromptTitle"),
+      label: t("admin.system.logs.resolvePromptLabel"),
+      placeholder: t("admin.system.logs.resolvePromptPlaceholder"),
+      required: false,
+      confirmLabel: t("admin.system.logs.resolve"),
+    });
+    if (notes === null) return; // vazgeçti
+    resolve.mutate({ id: row.id, notes: notes || undefined });
+  };
+
+  const onBlockIp = async (row: SecurityLog) => {
+    if (!row.ipAddress) return;
+    const reason = await prompt({
+      title: t("admin.system.logs.blockIpPromptTitle", {
+        ip: row.ipAddress,
+      }),
+      description: t("admin.system.logs.blockIpPromptDescription"),
+      label: t("admin.system.logs.blockIpPromptLabel"),
+      required: false,
+      destructive: true,
+      confirmLabel: t("admin.system.logs.blockIp"),
+    });
+    if (reason === null) return;
+    blockIp.mutate({ ipAddress: row.ipAddress, reason: reason || undefined });
+  };
 
   if (tab === "errors") {
     return (
@@ -107,9 +149,14 @@ function LogsTable({ tab }: { tab: LogTab }) {
     return (
       <ResourceList.Table<SecurityLog>
         columns={buildSecurityColumns(
-          (id) => resolve.mutate(id),
+          onResolve,
           t,
-          resolve.isPending ? resolve.variables : undefined,
+          resolve.isPending ? resolve.variables?.id : undefined,
+          {
+            // Uç @Roles(super_admin); buton da yalnız ona görünür.
+            canBlockIp: user.role === "super_admin",
+            onBlockIp,
+          },
         )}
         emptyText={emptyText(t).security}
       />

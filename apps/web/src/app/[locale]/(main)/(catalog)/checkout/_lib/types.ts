@@ -37,9 +37,22 @@ export interface CheckoutQuote {
     subtotal: number;
     shippingAmount: number;
     buyerFeeAmount: number;
+    /** Etkin oran (%) — etikette gösterilir; sabit değil, kural setinden gelir. */
+    buyerFeeRate: number;
     sellerFeeAmount: number;
     commissionAmount: number;
     taxAmount: number;
+    /** Alıcıdan tahsil edilen hizmet KDV'si (komisyon + kargo payı + hizmet bedeli). */
+    buyerServiceTaxAmount: number;
+    /** Uygulanan hizmet KDV oranı (%) — satır bazında KDV bunun üzerinden türetilir. */
+    serviceVatRate: number;
+    /** Ekranın bastığı özet satırları, KDV DAHİL — üçünün toplamı `total`. */
+    summary: {
+      productAmount: number;
+      shippingAmount: number;
+      serviceFeeAmount: number;
+      total: number;
+    };
     totalAmount: number;
     sellerNetAmount: number;
   };

@@ -14,7 +14,7 @@ export const ALLOW_INDEXING = process.env.NEXT_PUBLIC_ALLOW_INDEXING === "true";
 
 /** Canonical public origin (no trailing slash). Used for sitemap + robots host. */
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_APP_URL || "https://tarodan.com"
+  process.env.NEXT_PUBLIC_APP_URL || "https://tarodan.com.tr"
 ).replace(/\/$/, "");
 
 /**

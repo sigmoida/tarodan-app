@@ -35,6 +35,20 @@ export interface RevenueInvoiceIssuePayload {
   kind: "membership" | "boost";
 }
 
+/**
+ * Teslim edilen fiziksel siparişin gelir faturaları (komisyon / hizmet bedeli /
+ * platform satışı). Teslim tx'iyle ATOMİK yazılır: kargo poll'u teslimatı
+ * işaretlediği anda fatura görevi de kalıcı olur. Eskiden faturalama YALNIZ
+ * 2 dakikalık backfill cron'una bağlıydı; cron'un aday penceresi doyduğunda veya
+ * cron gecikince e-Arşiv'in 7 günlük süresi kaçırılabiliyordu. İdempotent
+ * (issue* çağrıları `(type, sourceId)` unique'i üzerinden no-op olur).
+ */
+export const OUTBOX_ORDER_REVENUE_INVOICE = "invoice.order_revenue";
+
+export interface OrderRevenueInvoicePayload {
+  orderId: string;
+}
+
 /** Takas nakit iadesi sonrası eLogo komisyon e-Arşiv ters kaydı. İdempotent. */
 export const OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE =
   "invoice.trade_cash_refund_reverse";

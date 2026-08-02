@@ -73,3 +73,4 @@ export * from "./refund-request.dto";
 export * from "./role-permissions.dto";
 export * from "./shipping-tariff.dto";
 export * from "./refund-attempt.dto";
+export * from "./site-access-pin.dto";

@@ -50,7 +50,8 @@ export function mergeManufacturers(
       id: m.id,
       name: m.name,
       slug: m.slug,
-      logoUrl: m.logo || fromData?.logoUrl || "",
+      // Faz 1: logo yalnız API'den (S3) — statik fallback logoları kaldırıldı.
+      logoUrl: m.logo || "",
       country: m.country || fromData?.country || "",
       countryFlag:
         countryToFlag(m.country || "") || fromData?.countryFlag || "🌐",

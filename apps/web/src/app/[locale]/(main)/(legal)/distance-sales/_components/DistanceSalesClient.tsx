@@ -32,7 +32,7 @@ export default async function DistanceSalesClient() {
               </tr>
               <tr>
                 <td className="border p-2 font-semibold">E-posta</td>
-                <td className="border p-2">info@tarodan.com</td>
+                <td className="border p-2">info@tarodan.com.tr</td>
               </tr>
               <tr>
                 <td className="border p-2 font-semibold">Mersis No</td>
@@ -157,7 +157,7 @@ export default async function DistanceSalesClient() {
             yöntemlerden biriyle bildirebilir:
           </p>
           <ul>
-            <li>E-posta: iade@tarodan.com</li>
+            <li>E-posta: iade@tarodan.com.tr</li>
             <li>Platform içi iade talebi formu</li>
             <li>Posta: [Şirket Adresi]</li>
           </ul>
@@ -240,7 +240,7 @@ export default async function DistanceSalesClient() {
 
           <h2>MADDE 6 - GENEL HÜKÜMLER</h2>
           <p>
-            6.1. ALICI, www.tarodan.com internet sitesinde sözleşme konusu
+            6.1. ALICI, www.tarodan.com.tr internet sitesinde sözleşme konusu
             ürünün temel nitelikleri, satış fiyatı ve ödeme şekli ile teslimata
             ilişkin ön bilgileri okuyup bilgi sahibi olduğunu ve elektronik
             ortamda gerekli teyidi verdiğini beyan eder.

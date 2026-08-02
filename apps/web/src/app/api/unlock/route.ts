@@ -1,9 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SITE_UNLOCK_COOKIE, safeEqual, siteUnlockToken } from "@/lib/siteLock";
+import { SITE_UNLOCK_COOKIE, safeEqual } from "@/lib/siteLock";
 import {
   UnlockRateLimiter,
   resolvePublicOrigin,
 } from "@/lib/siteLockPolicy.mjs";
+import {
+  UNLOCK_COOKIE_MAX_AGE_SECONDS,
+  signUnlockCookie,
+} from "@/lib/siteUnlockCookie.mjs";
+import { getServerApiOrigin } from "@/lib/api/origin";
 
 const unlockLimiter = new UnlockRateLimiter({
   maxAttempts: 5,
@@ -11,17 +16,18 @@ const unlockLimiter = new UnlockRateLimiter({
 });
 
 /**
- * PIN-unlock endpoint for the pre-launch storefront gate (#398).
+ * Access-code unlock endpoint for the pre-launch storefront gate (#398).
  *
- * The submitted PIN is compared to `SITE_UNLOCK_PIN` on the server; on match
- * we set an httpOnly `site_unlock` cookie whose value is a SHA-256 digest of
- * the PIN (not the PIN itself) so the client bundle and the browser never see
- * the raw secret. The matching middleware recomputes the same digest and
- * bypasses the gate when the cookie matches.
+ * Codes are admin-managed invite pins verified against the API
+ * (`POST /api/site-access/verify`); `SITE_UNLOCK_PIN` remains an optional
+ * API-independent emergency fallback. On success we set an httpOnly
+ * `site_unlock` cookie signed with `SITE_UNLOCK_SECRET` — the middleware
+ * verifies it locally, so revoking a pin stops NEW unlocks while existing
+ * cookies live out their 10-day TTL.
  */
 export async function POST(request: NextRequest) {
-  const expected = process.env.SITE_UNLOCK_PIN;
-  if (!expected) {
+  const secret = process.env.SITE_UNLOCK_SECRET;
+  if (!secret) {
     return unlockErrorRedirect(request, "error");
   }
   const clientKey = unlockClientKey(request);
@@ -47,35 +53,83 @@ export async function POST(request: NextRequest) {
     if (typeof value === "string") pin = value;
   }
 
-  if (!pin || !safeEqual(pin, expected)) {
-    unlockLimiter.recordFailure(clientKey);
-    const failedLimit = unlockLimiter.status(clientKey);
-    if (failedLimit.blocked) {
-      return unlockErrorRedirect(
-        request,
-        "rate-limited",
-        failedLimit.retryAfterSeconds,
-      );
-    }
-    return unlockErrorRedirect(request, "invalid");
+  if (!pin) {
+    return recordFailedAttempt(request, clientKey);
   }
 
+  const fallbackPin = process.env.SITE_UNLOCK_PIN;
+  if (fallbackPin && safeEqual(pin, fallbackPin)) {
+    return unlockSuccessResponse(request, clientKey, secret);
+  }
+
+  let verified = false;
+  try {
+    const response = await fetch(
+      `${getServerApiOrigin()}/api/site-access/verify`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          // Forward the visitor IP so the API's throttler sees the real
+          // client instead of the web server's egress address.
+          "x-forwarded-for": clientKey,
+        },
+        body: JSON.stringify({ code: pin }),
+        cache: "no-store",
+      },
+    );
+    if (response.ok) {
+      verified = true;
+    } else if (response.status !== 401) {
+      // API unhealthy — surface a neutral error, don't burn an attempt.
+      return unlockErrorRedirect(request, "error");
+    }
+  } catch {
+    return unlockErrorRedirect(request, "error");
+  }
+
+  if (!verified) {
+    return recordFailedAttempt(request, clientKey);
+  }
+  return unlockSuccessResponse(request, clientKey, secret);
+}
+
+async function unlockSuccessResponse(
+  request: NextRequest,
+  clientKey: string,
+  secret: string,
+) {
   unlockLimiter.clear(clientKey);
+  const expEpochSeconds =
+    Math.floor(Date.now() / 1000) + UNLOCK_COOKIE_MAX_AGE_SECONDS;
   const response = NextResponse.redirect(publicUrl(request, "/"), 303);
   response.cookies.set({
     name: SITE_UNLOCK_COOKIE,
-    value: await siteUnlockToken(expected),
+    value: await signUnlockCookie(secret, expEpochSeconds),
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: UNLOCK_COOKIE_MAX_AGE_SECONDS,
     priority: "high",
   });
   return response;
 }
 
-/** Return a visible form error without exposing the submitted PIN or secret. */
+function recordFailedAttempt(request: NextRequest, clientKey: string) {
+  unlockLimiter.recordFailure(clientKey);
+  const failedLimit = unlockLimiter.status(clientKey);
+  if (failedLimit.blocked) {
+    return unlockErrorRedirect(
+      request,
+      "rate-limited",
+      failedLimit.retryAfterSeconds,
+    );
+  }
+  return unlockErrorRedirect(request, "invalid");
+}
+
+/** Return a visible form error without exposing the submitted code. */
 function unlockErrorRedirect(
   request: NextRequest,
   error: "invalid" | "error" | "rate-limited",

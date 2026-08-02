@@ -250,11 +250,11 @@ export default function SupportClient() {
           yanıt veriyoruz.
         </p>
         <a
-          href="mailto:destek@tarodan.com"
+          href="mailto:destek@tarodan.com.tr"
           className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700"
         >
           <EnvelopeIcon className="h-5 w-5" />
-          destek@tarodan.com
+          destek@tarodan.com.tr
         </a>
       </SectionCard>
     </DocPage>

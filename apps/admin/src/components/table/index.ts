@@ -20,6 +20,7 @@ export {
   CellId,
   CellLink,
   CellUser,
+  CellProduct,
   CellBadge,
   CellActions,
 } from "./cells";

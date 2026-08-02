@@ -39,35 +39,20 @@ export function collectionColumns(t: T, actions: CollectionRowActions) {
         </div>
       ),
       {
-        grow: 3,
-        minWidth: 220,
+        minWidth: 440,
         sortKey: "name",
         sortType: "text",
       },
     ),
-    col.custom<Collection>(
+    col.user<Collection>(
       t("admin.catalog.collections.owner"),
-      (c) => {
-        const tier = c.owner?.membershipTier;
-        return (
-          <div className="flex min-w-0 items-center gap-2">
-            <TruncatedText className="text-body">
-              {c.owner?.displayName}
-            </TruncatedText>
-            {(tier === "premium" || tier === "business") && (
-              <Badge
-                size="sm"
-                variant={tier === "business" ? "info" : "warning"}
-              >
-                {tier === "business"
-                  ? t("admin.catalog.collections.tierBusiness")
-                  : t("admin.catalog.collections.tierPremium")}
-              </Badge>
-            )}
-          </div>
-        );
-      },
-      { sortKey: "owner.displayName" },
+      (c) => ({
+        name: c.owner.displayName,
+        secondary: c.owner.email,
+        avatar: c.owner.avatarUrl,
+        href: `/accounts/users/${c.owner.id}`,
+      }),
+      { minWidth: 360, sortKey: "owner.displayName", sortType: "text" },
     ),
     col.number<Collection>(
       t("admin.catalog.common.product"),

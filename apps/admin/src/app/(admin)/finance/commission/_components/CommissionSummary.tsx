@@ -5,6 +5,9 @@ import {
   BanknotesIcon,
   UserIcon,
   BuildingStorefrontIcon,
+  ChartBarIcon,
+  ReceiptPercentIcon,
+  TruckIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
@@ -28,6 +31,13 @@ export function CommissionSummary() {
     );
   }
 
+  // Tahsil edilenin ne kadarı gerçekten Tarodan'da kalıyor: vergi devlete,
+  // kargo taşıyıcıya gidiyor. Tek başına "toplam komisyon" bu ayrımı vermiyordu.
+  const takeRate =
+    data && data.totalSubtotal > 0
+      ? Math.round((data.totalCommission / data.totalSubtotal) * 10000) / 100
+      : 0;
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <MetricCard
@@ -38,7 +48,9 @@ export function CommissionSummary() {
         loading={isLoading}
         footer={
           <span className="text-muted">
-            {t("admin.finance.commission.completedOrders")}
+            {data
+              ? t("admin.finance.commission.takeRateFooter", { rate: takeRate })
+              : t("admin.finance.commission.completedOrders")}
           </span>
         }
       />
@@ -54,6 +66,27 @@ export function CommissionSummary() {
         tone="primary"
         label={t("admin.finance.commission.sellerCommission")}
         value={data ? fmtTry(data.totalSellerFee ?? 0) : null}
+        loading={isLoading}
+      />
+      <MetricCard
+        icon={ChartBarIcon}
+        tone="info"
+        label={t("admin.finance.commission.gmv")}
+        value={data ? fmtTry(data.totalSubtotal ?? 0) : null}
+        loading={isLoading}
+      />
+      <MetricCard
+        icon={ReceiptPercentIcon}
+        tone="warning"
+        label={t("admin.finance.commission.taxToState")}
+        value={data ? fmtTry(data.totalTax ?? 0) : null}
+        loading={isLoading}
+      />
+      <MetricCard
+        icon={TruckIcon}
+        tone="primary"
+        label={t("admin.finance.commission.shippingToCarrier")}
+        value={data ? fmtTry(data.totalShipping ?? 0) : null}
         loading={isLoading}
       />
     </div>

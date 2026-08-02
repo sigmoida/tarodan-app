@@ -30,7 +30,18 @@ export function ForceCancelPaymentModal({
       isOpen
       onClose={onClose}
       title={t("admin.finance.payments.forceCancel")}
-      maxWidth="max-w-md"
+      size="md"
+      closeButtonDisabled={cancel.isPending}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => cancel.mutate()}
+          confirmLabel={t("admin.finance.payments.forceCancelConfirm")}
+          destructive
+          isLoading={cancel.isPending}
+          disabled={!reason.trim()}
+        />
+      }
     >
       <div className="space-y-4">
         <p className="text-muted">
@@ -42,13 +53,6 @@ export function ForceCancelPaymentModal({
           onChange={(e) => setReason(e.target.value)}
           rows={3}
           placeholder={t("admin.finance.payments.cancelReasonPlaceholder")}
-        />
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => cancel.mutate()}
-          confirmLabel={t("admin.finance.payments.forceCancelConfirm")}
-          isLoading={cancel.isPending}
-          disabled={!reason.trim()}
         />
       </div>
     </Modal>

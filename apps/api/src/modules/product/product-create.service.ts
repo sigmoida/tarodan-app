@@ -21,6 +21,8 @@ import { computeRelevanceScore } from "./helpers/relevance-score";
 import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
 import { ProductStatsService } from "./product-stats.service";
+import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
+import { sellerAutoEnableData } from "./helpers/seller-auto-enable.helper";
 
 /**
  * ProductCreateService — ilan oluşturma. Üyelik ilan/görsel limiti, AI görsel+metin
@@ -73,6 +75,19 @@ export class ProductCreateService {
       );
     }
 
+    // Kurumsal akışta satış NİHAİ onaydan sonra başlar. Web guard'ı yalnız
+    // yönlendirme yapar; kapı olmadan pending/rejected kurumsal hesap API'den
+    // ilan açıp KDV'siz "bireysel" gibi satabiliyordu. Bireysel kullanıcıda
+    // businessStatus null'dur ve etkilenmez.
+    if (
+      seller.businessStatus === "pending" ||
+      seller.businessStatus === "rejected"
+    ) {
+      throw new ForbiddenException(
+        i18nMessage("server.product.businessApprovalRequired"),
+      );
+    }
+
     // ========================================================================
     // MEMBERSHIP LISTING LIMIT CHECK
     // ========================================================================
@@ -100,6 +115,16 @@ export class ProductCreateService {
           maxImages: limits.maxImages,
           sentCount: dto.images.length,
         }),
+      );
+    }
+
+    // Takasa açma, güncellemedeki kapıyla AYNI kaynaktan (efektif tier'ın
+    // canTrade bayrağı) denetlenir. Önyüz kutuyu gizlese de DTO alanı istemci
+    // elindedir — kapısız bırakmak takas hakkı olmayan kullanıcıya API'den
+    // takaslı ilan açtırıyordu.
+    if (dto.isTradeEnabled === true && !limits.canTrade) {
+      throw new BadRequestException(
+        i18nMessage("server.product.tradeRequiresPremium"),
       );
     }
 
@@ -136,14 +161,12 @@ export class ProductCreateService {
       });
     }
 
-    // Auto-enable seller mode when user creates their first listing
+    // Auto-enable seller mode when user creates their first listing.
+    // Mevcut sellerType korunur (bkz. sellerAutoEnableData).
     if (!seller.isSeller) {
       await this.prisma.user.update({
         where: { id: sellerId },
-        data: {
-          isSeller: true,
-          sellerType: "individual", // Default to individual seller
-        },
+        data: sellerAutoEnableData(seller),
       });
     }
 
@@ -251,7 +274,7 @@ export class ProductCreateService {
           condition: dto.condition,
           status: ProductStatus.pending, // Needs admin approval
           quantity: dto.quantity !== undefined ? dto.quantity : 1, // default 1 adet; sınırsız (null) yalnızca açıkça istenince
-          shippingDesi: dto.shippingDesi ?? 1,
+          ...productShippingTierData(dto.shippingPackageTier),
           isTradeEnabled: dto.isTradeEnabled || false,
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,

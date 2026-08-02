@@ -10,6 +10,7 @@ import { AdminAnalyticsService } from "./admin-analytics.service";
 import { AdminModerationService } from "./admin-moderation.service";
 import { AdminPaymentService } from "./admin-payment.service";
 import { AdminPayoutService } from "./admin-payout.service";
+import { AdminFinanceService } from "./admin-finance.service";
 import { AdminTradeService } from "./admin-trade.service";
 import { AdminRefundService } from "./admin-refund.service";
 import { AdminMessagingService } from "./admin-messaging.service";
@@ -29,6 +30,7 @@ import {
   PreviewCommissionDto,
   UpdateCommissionRuleDto,
   UpdatePlatformSettingDto,
+  UpdateWarehouseAddressDto,
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
@@ -109,6 +111,7 @@ export class AdminService {
     private readonly moderationService: AdminModerationService,
     private readonly adminPaymentService: AdminPaymentService,
     private readonly payoutService: AdminPayoutService,
+    private readonly financeService: AdminFinanceService,
     private readonly tradeService: AdminTradeService,
     private readonly adminRefundService: AdminRefundService,
     private readonly adminMessagingService: AdminMessagingService,
@@ -282,6 +285,17 @@ export class AdminService {
     return this.settingsService.updatePlatformSetting(adminId, dto);
   }
 
+  async getWarehouseAddress() {
+    return this.settingsService.getWarehouseAddress();
+  }
+
+  async updateWarehouseAddress(
+    adminId: string,
+    dto: UpdateWarehouseAddressDto,
+  ) {
+    return this.settingsService.updateWarehouseAddress(adminId, dto);
+  }
+
   // ==================== USER MANAGEMENT ====================
   // Taşındı: admin-user.service.ts — imzalar aynen korunuyor (facade delege).
 
@@ -328,6 +342,10 @@ export class AdminService {
 
   async getRolePermissions(): Promise<Record<string, string[]>> {
     return this.staffService.getRolePermissions();
+  }
+
+  async getDefaultRolePermissions(): Promise<Record<string, string[]>> {
+    return this.staffService.getDefaultRolePermissions();
   }
 
   async setRolePermissions(
@@ -462,6 +480,10 @@ export class AdminService {
 
   async getOrderById(orderId: string) {
     return this.analyticsService.getOrderById(orderId);
+  }
+
+  async getOrderGroupFile(orderId: string) {
+    return this.analyticsService.getOrderGroupFile(orderId);
   }
 
   async updateOrderStatus(
@@ -719,6 +741,35 @@ export class AdminService {
 
   async getPayoutsSummary() {
     return this.payoutService.getPayoutsSummary();
+  }
+
+  async getFinanceOverview() {
+    return this.financeService.getFinanceOverview();
+  }
+
+  async getInvoicesSummary() {
+    return this.financeService.getInvoicesSummary();
+  }
+
+  async getPayoutTransfers(query: {
+    status?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.payoutService.getPayoutTransfers(query);
+  }
+
+  async getPayoutAdjustments(query: {
+    status?: string;
+    type?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.payoutService.getPayoutAdjustments(query);
   }
 
   async getPayoutsTransactions(query: PayoutTransactionsQueryDto) {
@@ -1756,6 +1807,29 @@ export class AdminService {
       adminId,
       userId,
       reason,
+    );
+  }
+
+  async reviewSellerDocument(
+    adminId: string,
+    applicationId: string,
+    documentId: string,
+    status: import("@prisma/client").SellerDocumentStatus,
+    note?: string,
+  ) {
+    return this.sellerApplicationService.reviewSellerDocument(
+      adminId,
+      applicationId,
+      documentId,
+      status,
+      note,
+    );
+  }
+
+  async finalApproveSellerApplication(adminId: string, applicationId: string) {
+    return this.sellerApplicationService.finalApproveSellerApplication(
+      adminId,
+      applicationId,
     );
   }
 

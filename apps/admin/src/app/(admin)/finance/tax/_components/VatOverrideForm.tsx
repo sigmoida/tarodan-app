@@ -86,6 +86,7 @@ export function VatOverrideForm({ config }: { config?: VatConfig }) {
           max={100}
           step={0.01}
           label={t("admin.finance.tax.vatRatePercent")}
+          placeholder="20"
           className="w-32"
         />
         <Button type="submit" isLoading={addOverride.isPending}>

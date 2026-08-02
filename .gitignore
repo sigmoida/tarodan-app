@@ -52,12 +52,14 @@ docs/IMAGE_GENERATION_PROMPTS.md
 docs/MVP_IMAGE_PLAN.md
 scripts/generate-images.mjs
 
-# Üretilen web asset'leri: sync-brand-assets.mjs photos/logolar'ı kopyalar (kaynak repo kökünde)
-apps/web/public/photos/
 
 # @tarodan/brand tarafından üretilen marka logoları (sync:brand / predev / prebuild)
 apps/web/public/tarodan-logo.jpg
 apps/web/public/tarodan-logo-transparent.png
+apps/admin/public/tarodan-logo.jpg
+apps/admin/public/tarodan-logo-transparent.png
+apps/web/public/tarodan-favicon.png
+apps/admin/public/tarodan-favicon.png
 .claude/
 
 # PayTR Direkt API vendor PDF/örnek klasörü — lokal referans, repoya girmez
@@ -72,3 +74,6 @@ PayTR IFrame API/
 
 # Claude Code skills lockfile (local)
 skills-lock.json
+
+# Conductor (local workspace settings) — repoya girmez
+.conductor/

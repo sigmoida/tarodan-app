@@ -13,6 +13,7 @@ import { PrismaService } from "../../prisma";
 import {
   calculateCommissionFromRules,
   CommissionRuleForCalculation,
+  isCatchAllCommissionRule,
 } from "../order/order-commission.helper";
 import { AdminAuditService } from "./admin-audit.service";
 import {
@@ -37,7 +38,10 @@ export class AdminCommissionService {
    */
   async getCommissionRules() {
     const rules = await this.prisma.commissionRule.findMany({
-      include: { category: { select: { id: true, name: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        shippingShares: true,
+      },
       orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
     });
 
@@ -104,41 +108,73 @@ export class AdminCommissionService {
   }
 
   /**
-   * v2 çoklu-kural: aynı (kategori × satıcı tipi × vergi tipi × appliesTo)
-   * ekseninde tutar aralıkları çakışmamalı. Böylece bir kategoriye birden çok
-   * kural (farklı kademe/aralık) eklenebilir ama eşleşme belirsizleşmez.
+   * v2 çoklu-kural: MOTORUN belirsizlik tanımıyla aynı denetim. Motor iki tarafı
+   * ayrı eşleştirir (satıcı tarafı SELLER∪BOTH, alıcı tarafı BUYER∪BOTH) ve
+   * null/ALL/all değerlerini joker sayar. Dolayısıyla iki kural ancak şu dördü
+   * birden sağlanırsa belirsizlik üretir ve reddedilmelidir:
+   *   1. normalize eksenleri AYNI (kategori değeri; satıcı tipi joker≡joker ya
+   *      da aynı özel değer; vergi tipi için aynısı),
+   *   2. appliesTo tarafları KESİŞİYOR (SELLER↔BOTH, BUYER↔BOTH, BOTH↔hepsi),
+   *   3. tutar aralıkları çakışıyor,
+   *   4. ikisi de aktif.
+   * Farklı özgüllükteki kurallar (örn. kategorili × kategori jokeri) motor
+   * tarafından skorla ayrıştığı için serbesttir. Eksen filtreleri BİLEREK
+   * JS'te: Prisma `where` eşitliği null≡ALL eş anlamlılığını göremez.
    */
   private async assertNoRangeOverlap(params: {
     categoryId: string | null;
-    sellerType: CommissionSellerType;
-    taxpayerType: CommissionTaxpayerType;
+    sellerType: CommissionSellerType | null;
+    taxpayerType: CommissionTaxpayerType | null;
     appliesTo: CommissionAppliesTo;
     minAmount: number | null;
     maxAmount: number | null;
     excludeId?: string;
   }) {
+    const normalizeSeller = (v: CommissionSellerType | null) =>
+      v == null || v === CommissionSellerType.ALL ? null : v;
+    const normalizeTaxpayer = (v: CommissionTaxpayerType | null) =>
+      v == null || v === CommissionTaxpayerType.all ? null : v;
+    const sides = (v: CommissionAppliesTo): CommissionAppliesTo[] =>
+      v === CommissionAppliesTo.BOTH
+        ? [CommissionAppliesTo.SELLER, CommissionAppliesTo.BUYER]
+        : [v];
+    const sidesIntersect = (a: CommissionAppliesTo, b: CommissionAppliesTo) =>
+      sides(a).some((side) => sides(b).includes(side));
+
     const siblings = await this.prisma.commissionRule.findMany({
       where: {
-        categoryId: params.categoryId,
-        sellerType: params.sellerType,
-        taxpayerType: params.taxpayerType,
-        appliesTo: params.appliesTo,
         isActive: true,
         ...(params.excludeId ? { id: { not: params.excludeId } } : {}),
       },
-      select: { id: true, minAmount: true, maxAmount: true },
+      select: {
+        id: true,
+        categoryId: true,
+        sellerType: true,
+        taxpayerType: true,
+        appliesTo: true,
+        minAmount: true,
+        maxAmount: true,
+      },
     });
-    const clash = siblings.find((s) =>
-      this.rangesOverlap(
-        params.minAmount,
-        params.maxAmount,
-        s.minAmount != null ? Number(s.minAmount) : null,
-        s.maxAmount != null ? Number(s.maxAmount) : null,
-      ),
+
+    const clash = siblings.find(
+      (s) =>
+        s.categoryId === params.categoryId &&
+        normalizeSeller(s.sellerType) === normalizeSeller(params.sellerType) &&
+        normalizeTaxpayer(s.taxpayerType) ===
+          normalizeTaxpayer(params.taxpayerType) &&
+        sidesIntersect(s.appliesTo, params.appliesTo) &&
+        this.rangesOverlap(
+          params.minAmount,
+          params.maxAmount,
+          s.minAmount != null ? Number(s.minAmount) : null,
+          s.maxAmount != null ? Number(s.maxAmount) : null,
+        ),
     );
     if (clash) {
       throw new BadRequestException(
-        "Aynı kategori / satıcı tipi / vergi tipi için tutar aralığı çakışan aktif bir kural zaten var.",
+        "Aynı kategori / satıcı tipi / vergi tipi ekseninde, uygulanan tarafı ve tutar aralığı çakışan aktif bir kural zaten var. " +
+          "Hangi kuralın uygulanacağı belirsizleşeceği için önce mevcut kuralı düzenleyin veya aralıkları ayırın.",
       );
     }
   }
@@ -172,6 +208,24 @@ export class AdminCommissionService {
     return data;
   }
 
+  /**
+   * Kademe paylarının yazılabilir hâli. Alan gönderilmediyse `undefined` döner ve
+   * mevcut satırlara DOKUNULMAZ; gönderildiyse tam liste ile değiştirilir (kısmi
+   * gönderim sessizce yarım yapılandırma bırakmasın).
+   */
+  private shippingSharesData(
+    dto: CreateCommissionRuleDto | UpdateCommissionRuleDto,
+  ) {
+    if (dto.shippingShares === undefined) return undefined;
+    return {
+      deleteMany: {},
+      create: dto.shippingShares.map((share) => ({
+        tierCode: share.tierCode,
+        buyerShare: share.buyerShare,
+      })),
+    };
+  }
+
   private serializeRule(rule: any) {
     const num = (v: any) => (v != null ? Number(v) : null);
     return {
@@ -203,6 +257,13 @@ export class AdminCommissionService {
       sellerPlatformFeeMin: num(rule.sellerPlatformFeeMin),
       sellerPlatformFeeMax: num(rule.sellerPlatformFeeMax),
       shippingBuyerShare: num(rule.shippingBuyerShare),
+      // Paket boyutu başına pay: admin formu bunları okur; satır yoksa tek pay geçerli.
+      shippingShares: (rule.shippingShares ?? []).map(
+        (share: { tierCode: string; buyerShare: unknown }) => ({
+          tierCode: share.tierCode,
+          buyerShare: Number(share.buyerShare),
+        }),
+      ),
       priority: rule.priority,
       isActive: rule.isActive,
       createdAt: rule.createdAt,
@@ -270,12 +331,16 @@ export class AdminCommissionService {
         priority: dto.priority ?? 0,
         isActive: dto.isActive ?? true,
         ...this.v2RuleData(dto),
+        shippingShares: this.shippingSharesData(dto),
         // Legacy (backward compatibility)
         percentage: dto.percentage ?? (dto.sellerRate || 0),
         ruleType: dto.type || "default",
         minAmount: dto.minAmount,
       },
-      include: { category: { select: { id: true, name: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        shippingShares: true,
+      },
     });
 
     await this.audit.createRequiredAuditLog(
@@ -365,6 +430,22 @@ export class AdminCommissionService {
       excludeId: existing.id,
     });
 
+    // Son aktif catch-all kural pasife alınamaz veya catch-all kapsamından
+    // çıkarılamaz (kategori/tutar/appliesTo daraltarak da olsa).
+    const staysCatchAll =
+      (dto.isActive === undefined ? existing.isActive : dto.isActive) &&
+      isCatchAllCommissionRule({
+        categoryId: finalCategoryId,
+        sellerType: finalSellerType as CommissionSellerType,
+        taxpayerType: finalTaxpayerType,
+        minAmount: finalMinAmount ?? null,
+        maxAmount: finalMaxAmount ?? null,
+        appliesTo: appliesTo as CommissionAppliesTo,
+      });
+    if (existing.isActive && !staysCatchAll) {
+      await this.assertCatchAllRuleSurvives(existing);
+    }
+
     // Prepare update data
     const updateData: any = {};
     if (dto.name !== undefined) updateData.name = dto.name;
@@ -384,6 +465,8 @@ export class AdminCommissionService {
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
     // v2 fields (taxpayerType, maxAmount, 4 rate sets, shippingBuyerShare)
     Object.assign(updateData, this.v2RuleData(dto));
+    const shippingShares = this.shippingSharesData(dto);
+    if (shippingShares) updateData.shippingShares = shippingShares;
     // Legacy fields
     if (dto.percentage !== undefined) updateData.percentage = dto.percentage;
     if (dto.type !== undefined) updateData.ruleType = dto.type;
@@ -392,7 +475,10 @@ export class AdminCommissionService {
     const rule = await this.prisma.commissionRule.update({
       where: { id: ruleId },
       data: updateData,
-      include: { category: { select: { id: true, name: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        shippingShares: true,
+      },
     });
 
     await this.audit.createRequiredAuditLog(
@@ -408,6 +494,39 @@ export class AdminCommissionService {
   }
 
   /**
+   * En az bir AKTİF catch-all kuralın kalmasını garanti eder. Catch-all yoksa
+   * eşleşmeyen her kategori/tutar kombinasyonu checkout'ta fail-closed 503
+   * verir — yani sepet ödenemez hale gelir. Bu yüzden son catch-all kuralın
+   * silinmesi/pasife alınması engellenir.
+   */
+  private async assertCatchAllRuleSurvives(
+    rule: Parameters<typeof isCatchAllCommissionRule>[0] & { id: string },
+  ): Promise<void> {
+    if (!isCatchAllCommissionRule(rule)) return;
+
+    const otherActiveCatchAll = (
+      await this.prisma.commissionRule.findMany({
+        where: {
+          isActive: true,
+          id: { not: rule.id },
+          categoryId: null,
+          minAmount: null,
+          maxAmount: null,
+          appliesTo: CommissionAppliesTo.BOTH,
+        },
+      })
+    ).some((candidate) => isCatchAllCommissionRule(candidate));
+
+    if (!otherActiveCatchAll) {
+      throw new BadRequestException(
+        "Son aktif genel (catch-all) komisyon kuralı kaldırılamaz veya pasife alınamaz — " +
+          "aksi halde eşleşen kuralı olmayan siparişler ödeme adımında hata verir. " +
+          "Önce yerine geçecek yeni bir genel kural tanımlayın.",
+      );
+    }
+  }
+
+  /**
    * Delete commission rule
    */
   async deleteCommissionRule(adminId: string, ruleId: string) {
@@ -417,6 +536,10 @@ export class AdminCommissionService {
 
     if (!existing) {
       throw new NotFoundException("Komisyon kuralı bulunamadı");
+    }
+
+    if (existing.isActive) {
+      await this.assertCatchAllRuleSurvives(existing);
     }
 
     await this.prisma.commissionRule.delete({

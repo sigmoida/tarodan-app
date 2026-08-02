@@ -14,6 +14,7 @@ export const authApi = {
     api.post("/auth/forgot-password", { email }),
   register: (data: {
     displayName: string;
+    username: string;
     email: string;
     password: string;
     phone?: string;

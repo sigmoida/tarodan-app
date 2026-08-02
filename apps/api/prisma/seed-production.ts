@@ -5,10 +5,12 @@ import {
   MembershipTierType,
   PrismaClient,
   SellerType,
+  ShippingPackageTierCode,
   ShippingTariffStatus,
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
+import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/shipping-package-tier";
 
 const prisma = new PrismaClient();
 
@@ -90,6 +92,10 @@ async function seedMembershipTiers(): Promise<void> {
 }
 
 async function seedCommissionRule(): Promise<void> {
+  // appliesTo BOTH olmalı: isCatchAllCommissionRule (ve ona dayanan health check +
+  // checkout fail-closed guard'ı) yalnız her iki tarafa uygulanan jokeri catch-all
+  // sayar. SELLER olarak bırakıldığında checkBusinessConfig "catch-all kural yok"
+  // diyerek uyarıyordu.
   await prisma.commissionRule.upsert({
     where: { id: "production-default-commission" },
     create: {
@@ -97,15 +103,24 @@ async function seedCommissionRule(): Promise<void> {
       name: "Default marketplace commission",
       ruleType: CommissionRuleType.default,
       sellerType: CommissionSellerType.ALL,
-      appliesTo: CommissionAppliesTo.SELLER,
+      appliesTo: CommissionAppliesTo.BOTH,
       sellerRate: 5,
       sellerCommissionRate: 5,
       percentage: 0.05,
       shippingBuyerShare: 100,
       priority: 0,
       isActive: true,
+      // Paket boyutu başına kargo bölüşümü: küçük paketi alıcı öder, paket
+      // büyüdükçe satıcı payı artar. Tutarlar tarifede, paylar burada.
+      shippingShares: {
+        create: [
+          { tierCode: ShippingPackageTierCode.small, buyerShare: 100 },
+          { tierCode: ShippingPackageTierCode.medium, buyerShare: 70 },
+          { tierCode: ShippingPackageTierCode.large, buyerShare: 50 },
+        ],
+      },
     },
-    update: {},
+    update: { appliesTo: CommissionAppliesTo.BOTH },
   });
 }
 
@@ -171,6 +186,21 @@ async function seedPlatformSeller(): Promise<void> {
   });
 }
 
+/**
+ * Kargo tarifesi + paket kademeleri READINESS SÖZLEŞMESİDİR: /health/ready aktif
+ * bir surat tarifesi ve small/medium/large kademelerinin varlığını arar.
+ *
+ * Fiyat BURADAN GELMEZ. `20260727200000_shipping_tariffs` migration'ı zaten
+ * aktif bir v1 tarifesi, `20260730180000_add_shipping_package_tiers` da üç
+ * kademeyi tarifenin paket ücretinden türeterek yaratır — yani taze bir
+ * veritabanında bu upsert her zaman `update` dalına düşer. Buraya "daha güzel"
+ * varsayılan fiyatlar yazmak onları sessizce ölü koda çevirir (bir dönem öyleydi:
+ * 100/130/160 yazıyordu, canlıda hiç uygulanmıyordu). O yüzden create dalı da
+ * migration ile AYNI sonucu üretir ve iki yol tek bir gerçeği anlatır:
+ * **kademe fiyatları ve örnek ölçüler admin panelinden girilir.**
+ */
+const LAUNCH_TARIFF_PACKAGE_FEE = 29.99;
+
 async function seedShippingTariff(): Promise<void> {
   await prisma.shippingTariff.upsert({
     where: {
@@ -185,20 +215,25 @@ async function seedShippingTariff(): Promise<void> {
       status: ShippingTariffStatus.active,
       version: 1,
       currency: "TRY",
-      outboundPackageFee: 29.99,
+      outboundPackageFee: LAUNCH_TARIFF_PACKAGE_FEE,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      returnPackageFee: 29.99,
-      tradeLegFee: 29.99,
+      returnPackageFee: LAUNCH_TARIFF_PACKAGE_FEE,
+      tradeLegFee: LAUNCH_TARIFF_PACKAGE_FEE,
       effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
-      rates: {
-        create: [
-          { desi: 1, amount: 130 },
-          { desi: 2, amount: 180 },
-          { desi: 3, amount: 230 },
-        ],
+      packageTiers: {
+        create: SHIPPING_PACKAGE_TIER_DEFAULTS.map((tier) => ({
+          code: tier.code,
+          label: tier.label,
+          minDesi: tier.minDesi,
+          maxDesi: tier.maxDesi,
+          amount: LAUNCH_TARIFF_PACKAGE_FEE,
+          sortOrder: tier.sortOrder,
+        })),
       },
     },
+    // Operatörün admin panelinde girdiği fiyatları her container açılışında
+    // ezmemek için update dalı bilinçli olarak boştur (bu seed her boot'ta koşar).
     update: {},
   });
 }

@@ -9,7 +9,7 @@ import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Container } from "@/components/layout/Container";
-import { useBuyerFee } from "./_hooks/useBuyerFee";
+import { useCartQuote } from "./_hooks/useCartQuote";
 import type { CartLineItem } from "./_lib/types";
 import CartItemCard from "./_components/CartItemCard";
 import CartSummary from "./_components/CartSummary";
@@ -31,11 +31,15 @@ export default function CartClient() {
     updateQuantity,
     totalDiscount,
     appliedDiscounts,
+    appliedCouponCode,
     canCheckout,
   } = useCart();
   const t = useTranslations();
 
-  const buyerFee = useBuyerFee(items.filter((item) => item.isAvailable));
+  const quote = useCartQuote(
+    items.filter((item) => item.isAvailable),
+    appliedCouponCode,
+  );
 
   // `isLoading` starts false in the store, so on a hard reload the very first
   // render has no items AND isn't "loading" yet → the empty state would flash
@@ -111,8 +115,8 @@ export default function CartClient() {
         : handleOfflineRemove(line.productId),
   }));
 
-  // Shipping is shown at checkout, not here.
-  const grandTotal = Math.max(0, subtotal - (totalDiscount ?? 0)) + buyerFee;
+  // Toplam quote'tan gelir — sepet kendi aritmetiğini YAPMAZ. Quote henüz
+  // dönmediyse (ya da sepet boşsa) ürün toplamı gösterilir.
 
   return (
     <PageShell>
@@ -138,8 +142,7 @@ export default function CartClient() {
           <CartSummary
             subtotal={subtotal}
             appliedDiscounts={appliedDiscounts}
-            buyerFee={buyerFee}
-            grandTotal={grandTotal}
+            quote={quote}
             isAuthenticated={isAuthenticated}
             canCheckout={canCheckout}
           />

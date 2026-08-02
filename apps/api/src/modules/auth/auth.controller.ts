@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Query,
   Req,
   UseGuards,
   HttpCode,
@@ -25,9 +26,11 @@ import { I18nService, ReqLocale } from "../i18n";
 import {
   RegisterDto,
   BusinessRegisterDto,
+  CorporateInvitationDto,
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
+  RegisterResponseDto,
   TwoFactorChallengeDto,
   TokensDto,
   ForgotPasswordDto,
@@ -70,15 +73,16 @@ export class AuthController {
   @ApiOperation({ summary: "Yeni kullanıcı kaydı" })
   @ApiResponse({
     status: 201,
-    description: "Kayıt başarılı",
-    type: AuthResponseDto,
+    description:
+      "Kayıt başarılı (oturum açılmaz — e-posta doğrulaması beklenir)",
+    type: RegisterResponseDto,
   })
   @ApiResponse({ status: 400, description: "Geçersiz veri" })
   @ApiResponse({ status: 409, description: "Email zaten kayıtlı" })
   async register(
     @Body() dto: RegisterDto,
     @ReqLocale() locale: Locale,
-  ): Promise<AuthResponseDto> {
+  ): Promise<RegisterResponseDto> {
     const result = await this.authService.register(dto);
     return {
       ...result,
@@ -93,11 +97,17 @@ export class AuthController {
   @Post("register/business")
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @ApiOperation({ summary: "Yeni şirket hesabı kaydı" })
+  @ApiOperation({ summary: "Yeni kurumsal hesap ön başvurusu" })
   @ApiResponse({
     status: 201,
     description: "Şirket hesabı kaydı başarılı",
-    type: AuthResponseDto,
+    schema: {
+      properties: {
+        applicationId: { type: "string" },
+        status: { type: "string" },
+        email: { type: "string" },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: "Geçersiz veri" })
   @ApiResponse({
@@ -107,7 +117,7 @@ export class AuthController {
   async registerBusiness(
     @Body() dto: BusinessRegisterDto,
     @ReqLocale() locale: Locale,
-  ): Promise<AuthResponseDto> {
+  ) {
     const result = await this.authService.registerBusiness(dto);
     return {
       ...result,
@@ -116,6 +126,22 @@ export class AuthController {
         locale,
       ),
     };
+  }
+
+  @Get("corporate-invitation")
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({ summary: "Kurumsal hesap davetini doğrula" })
+  async getCorporateInvitation(@Query("token") token: string) {
+    return this.authService.getCorporateInvitation(token);
+  }
+
+  @Post("corporate-invitation/activate")
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: "Kurumsal hesabın ilk şifresini belirle" })
+  async activateCorporateInvitation(@Body() dto: CorporateInvitationDto) {
+    return this.authService.activateCorporateInvitation(dto);
   }
 
   /**
@@ -160,6 +186,18 @@ export class AuthController {
     @Body() dto: CheckEmailDto,
   ): Promise<{ exists: boolean; hasPassword: boolean }> {
     return this.authService.checkEmail(dto.email);
+  }
+
+  @Get("username-availability")
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @ApiOperation({ summary: "Kullanıcı adı uygunluk kontrolü" })
+  async usernameAvailability(
+    @Query("username") username: string,
+  ): Promise<{ available: boolean }> {
+    return {
+      available: await this.authService.isUsernameAvailable(username ?? ""),
+    };
   }
 
   @Post("google")

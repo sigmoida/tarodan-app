@@ -55,8 +55,20 @@ export const deviceLabels = (t: T): Record<string, string> => ({
   all: t("common.all"),
 });
 
+/**
+ * Filtre listelerinde "hepsi" seçeneğinin değeri BOŞ dizedir, `"all"` değil.
+ *
+ * `deviceLabels` içinde gerçek bir `all` cihaz hedefi var ("tüm cihazlarda
+ * gösterilsin"). Filtrenin kendi "hepsi" seçeneği de `"all"` değerini
+ * kullandığında iki sonuç doğuyordu: aynı `value` ile iki seçenek (React
+ * tekrarlanan anahtar uyarısı) ve daha kötüsü, gerçekten "tüm cihazlar"
+ * hedefli reklamları SÜZMENİN yolu kalmıyordu — o değer "filtre yok" anlamına
+ * geliyordu.
+ */
+export const FILTER_ALL = "";
+
 export const positionFilterOptions = (t: T) => [
-  { value: "all", label: t("admin.marketing.ads.allPositions") },
+  { value: FILTER_ALL, label: t("admin.marketing.ads.allPositions") },
   ...Object.entries(positionLabels(t)).map(([value, label]) => ({
     value,
     label,
@@ -64,7 +76,7 @@ export const positionFilterOptions = (t: T) => [
 ];
 
 export const deviceFilterOptions = (t: T) => [
-  { value: "all", label: t("admin.marketing.ads.allDevices") },
+  { value: FILTER_ALL, label: t("admin.marketing.ads.allDevices") },
   ...Object.entries(deviceLabels(t)).map(([value, label]) => ({
     value,
     label,

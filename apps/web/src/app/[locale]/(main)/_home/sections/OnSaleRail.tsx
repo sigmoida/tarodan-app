@@ -5,6 +5,12 @@ import HomeSection from "./HomeSection";
 import ProductRail from "./ProductRail";
 
 export default async function OnSaleRail({ items }: { items: Product[] }) {
+  // Kardeş raylarla (FeaturedRail, TradeRail, Spotlights) aynı davranış: gösterecek
+  // bir şey yoksa bölüm hiç çizilmez. Boş katalogda anasayfa üst üste iki
+  // neredeyse aynı boş kart gösteriyordu ("indirimde ürün yok" + "ilan yok");
+  // ilan davetini PopularRail zaten yapıyor.
+  if (items.length === 0) return null;
+
   const t = await getTranslations();
   const viewAllLabel = t("home.viewAll");
 

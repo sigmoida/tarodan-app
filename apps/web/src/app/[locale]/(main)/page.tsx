@@ -5,7 +5,6 @@ import { localizedCanonical, localizedPath } from "@/lib/seo";
 import { getServerApiOrigin } from "@/lib/api/origin";
 import type { Product } from "@/types/product";
 import HomeContent from "./_home/_components/HomeContent";
-import { BRANDS } from "./_home/lib/constants";
 import type {
   BrandMarqueeItem,
   FeaturedBusiness,
@@ -141,26 +140,15 @@ export default async function HomePage({
     fetchTopCollections(),
   ]);
 
+  // Faz 1: marka şeridi tamamen API'den — logolar S3'ten mutlak URL olarak
+  // gelir (manufacturer.logo key → getPublicAssetUrl). Statik fallback listesi
+  // ve repo içi logo dosyaları kaldırıldı.
   const manufacturerItems = settledValue(manufacturers, []);
-  const apiNames = new Set(
-    manufacturerItems.map((item) => item.name?.toLowerCase() ?? ""),
-  );
-  const marqueeItems: BrandMarqueeItem[] = [
-    ...manufacturerItems.map((item) => {
-      const fallback = BRANDS.find(
-        (brand) =>
-          brand.name.toLowerCase() === (item.name?.toLowerCase() ?? ""),
-      );
-      return {
-        name: item.name,
-        logoUrl: item.logo || fallback?.logoUrl || "",
-        desc: item.description || fallback?.desc || "",
-      };
-    }),
-    ...BRANDS.filter((brand) => !apiNames.has(brand.name.toLowerCase())).map(
-      ({ name, logoUrl, desc }) => ({ name, logoUrl, desc }),
-    ),
-  ];
+  const marqueeItems: BrandMarqueeItem[] = manufacturerItems.map((item) => ({
+    name: item.name,
+    logoUrl: item.logo || "",
+    desc: item.description || "",
+  }));
 
   const data: HomePageData = {
     featured: settledValue(featured, []),
@@ -170,7 +158,7 @@ export default async function HomePage({
     topCollections: settledValue(topCollections, []),
     featuredCollector: settledValue(featuredCollector, null),
     featuredBusiness: settledValue(featuredBusiness, null),
-    marqueeItems: marqueeItems.length > 0 ? marqueeItems : BRANDS,
+    marqueeItems,
   };
 
   return <HomeContent data={data} locale={locale} />;

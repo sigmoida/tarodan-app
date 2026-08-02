@@ -53,7 +53,7 @@ export function ProductFilters() {
           setBrandId(e.target.value);
           setCarModelId("");
         }}
-        className="w-full sm:w-44"
+        className="w-44 min-w-32 max-w-56 shrink overflow-hidden whitespace-nowrap [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
       >
         <option value="">{t("admin.catalog.brands.allBrands")}</option>
         {brands.map((b) => (
@@ -66,7 +66,7 @@ export function ProductFilters() {
         bare
         value={carModelId}
         onChange={(e) => setCarModelId(e.target.value)}
-        className="w-full sm:w-44"
+        className="w-44 min-w-32 max-w-56 shrink overflow-hidden whitespace-nowrap [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
         disabled={!brandId && modelsForBrand.length === 0}
       >
         <option value="">{t("admin.catalog.common.allModels")}</option>

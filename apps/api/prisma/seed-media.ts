@@ -224,8 +224,37 @@ async function main(): Promise<void> {
     avatarCount += 1;
   });
 
+  // Faz 1: üretici (manufacturer) logoları — seed-assets/brands/{slug}.{ext}
+  // → {env}/brands/… kopyalanır ve manufacturer.logo'ya S3 KEY yazılır.
+  // Mevcut (admin'in atadığı) S3 logosu EZİLMEZ: yalnız logo'su null ya da
+  // eski repo yolu ("/…") olan kayıtlar güncellenir.
+  let brandLogoCount = 0;
+  const brandSourceKeys = [...sourceKeys].filter((key) =>
+    key.startsWith(`${SEED_ASSETS_PREFIX}/brands/`),
+  );
+  await mapWithConcurrency(brandSourceKeys, 6, async (sourceKey) => {
+    const filename = sourceKey.slice(`${SEED_ASSETS_PREFIX}/brands/`.length);
+    const slug = filename.replace(/\.[^.]+$/, "");
+    if (!slug) return;
+    const manufacturer = await prisma.manufacturer.findUnique({
+      where: { slug },
+      select: { id: true, logo: true },
+    });
+    if (!manufacturer) return;
+    if (manufacturer.logo && !manufacturer.logo.startsWith("/")) return;
+    const copied = await storage.copyFile(sourceKey, {
+      bucket: "brands",
+      filename,
+    });
+    await prisma.manufacturer.update({
+      where: { id: manufacturer.id },
+      data: { logo: copied.key },
+    });
+    brandLogoCount += 1;
+  });
+
   console.log(
-    `Seed media sync complete: ${productImageCount} product images, ${collectionCount} collections, ${avatarCount} avatars added.`,
+    `Seed media sync complete: ${productImageCount} product images, ${collectionCount} collections, ${avatarCount} avatars, ${brandLogoCount} brand logos added.`,
   );
 }
 

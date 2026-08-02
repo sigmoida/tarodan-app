@@ -40,7 +40,8 @@ export interface SearchableSelectProps {
   "aria-label"?: string;
 }
 
-function Chevron({ open }: { open: boolean }) {
+/** Shared with SearchableMultiSelect — keep the two dropdowns visually identical. */
+export function Chevron({ open }: { open: boolean }) {
   return (
     <svg
       className={cn(
@@ -58,7 +59,8 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function CheckMark() {
+/** Shared with SearchableMultiSelect. */
+export function CheckMark() {
   return (
     <svg
       className="h-4 w-4 flex-shrink-0 text-primary-600"

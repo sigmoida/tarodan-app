@@ -96,9 +96,13 @@ export function buildErrorColumns(toggle: Toggle, t: T) {
 }
 
 export function buildSecurityColumns(
-  onResolve: (id: string) => void,
+  onResolve: (row: SecurityLog) => void,
   t: T,
   resolvingId?: string,
+  opts?: {
+    canBlockIp?: boolean;
+    onBlockIp?: (row: SecurityLog) => void;
+  },
 ) {
   return [
     col.custom<SecurityLog>(
@@ -143,7 +147,7 @@ export function buildSecurityColumns(
       { sortKey: "resolved", sortType: "number" },
     ),
     col.date<SecurityLog>(t("common.date"), "createdAt"),
-    col.rowMenu<SecurityLog>(securityRowMenu(onResolve, t, resolvingId)),
+    col.rowMenu<SecurityLog>(securityRowMenu(onResolve, t, resolvingId, opts)),
   ];
 }
 

@@ -3,18 +3,22 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
+import * as crypto from "crypto";
 import { PrismaService } from "../../prisma";
 import { EventService } from "../events/event.service";
 import { NotificationService } from "../notification/notification.service";
-import {
-  NotificationType,
-  NotificationChannel,
-} from "../notification/dto/notification.dto";
 import { AdminAuditService } from "./admin-audit.service";
 import { StorageService } from "../storage/storage.service";
 import { RatingStatus, SellerApplicationQueryDto } from "./dto";
-import { OrderStatus, Prisma, BusinessStatus } from "@prisma/client";
-import { paginate, resolveOrderBy } from "../../common/list";
+import {
+  OrderStatus,
+  Prisma,
+  CorporateApplicationStatus,
+  SellerDocumentType,
+  SellerDocumentStatus,
+} from "@prisma/client";
+import { paginate } from "../../common/list";
+import { promoteUserCodeToCorporate } from "../../common/helpers/code-prefixes";
 import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
 
 /**
@@ -37,45 +41,43 @@ export class AdminSellerApplicationService {
    * Full application detail for review: company info, bank/IBAN, and the uploaded
    * documents with short-lived presigned URLs (private `documents` bucket).
    */
-  async getSellerApplicationDetail(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        displayName: true,
-        email: true,
-        phone: true,
-        companyName: true,
-        taxId: true,
-        companyType: true,
-        taxOffice: true,
-        companyCity: true,
-        companyDistrict: true,
-        businessStatus: true,
-        isSeller: true,
-        createdAt: true,
-        bankAccount: {
+  async getSellerApplicationDetail(applicationId: string) {
+    const application = await this.prisma.corporateApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        user: {
           select: {
-            accountHolder: true,
-            iban: true,
-            tcKimlikNo: true,
-            taxId: true,
-            isVerified: true,
+            id: true,
+            adminCode: true,
+            username: true,
+            businessStatus: true,
+            isSeller: true,
           },
         },
-        sellerDocuments: true,
+        documents: {
+          where: { isCurrent: true },
+          orderBy: { uploadedAt: "desc" },
+        },
+        stakeholders: { include: { documents: true } },
+        events: { orderBy: { createdAt: "desc" } },
       },
     });
-    if (!user || !user.companyName) {
+    if (!application) {
       throw new NotFoundException("Başvuru bulunamadı");
     }
 
     const documents = await Promise.all(
-      (user.sellerDocuments ?? []).map(async (d) => ({
+      application.documents.map(async (d) => ({
+        id: d.id,
         documentType: d.documentType,
         fileName: d.fileName,
         mimeType: d.mimeType,
         status: d.status,
+        reviewNote: d.reviewNote,
+        appealNote: d.appealNote,
+        stakeholderId: d.stakeholderId,
+        version: d.version,
+        reviewedAt: d.reviewedAt,
         uploadedAt: d.uploadedAt,
         url: await this.storage.getPresignedDownloadUrl(
           "documents",
@@ -85,7 +87,7 @@ export class AdminSellerApplicationService {
       })),
     );
 
-    const { sellerDocuments, ...rest } = user;
+    const { documents: _documents, ...rest } = application;
     return { ...rest, documents };
   }
 
@@ -93,47 +95,62 @@ export class AdminSellerApplicationService {
 
   async getSellerApplications(query: SellerApplicationQueryDto) {
     const search = query.search?.trim();
-    const status = query.status as BusinessStatus | undefined;
+    const status = query.status as CorporateApplicationStatus | undefined;
+    const sortableFields = new Set<
+      keyof Prisma.CorporateApplicationOrderByWithRelationInput
+    >([
+      "authorizedFullName",
+      "companyEmail",
+      "companyLegalName",
+      "companyTitle",
+      "status",
+      "createdAt",
+    ]);
+    const sortBy = sortableFields.has(
+      query.sortBy as keyof Prisma.CorporateApplicationOrderByWithRelationInput,
+    )
+      ? (query.sortBy as keyof Prisma.CorporateApplicationOrderByWithRelationInput)
+      : "createdAt";
+    const sortOrder = query.sortOrder === "asc" ? "asc" : "desc";
 
-    const where: Prisma.UserWhereInput = {
-      companyName: { not: null },
-      businessStatus: status ?? undefined,
+    const where: Prisma.CorporateApplicationWhereInput = {
+      status: status ?? undefined,
     };
 
     if (search) {
       const normalized = search.toLowerCase();
       where.OR = [
-        { displayName: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-        { companyName: { contains: search, mode: "insensitive" } },
+        { authorizedFullName: { contains: search, mode: "insensitive" } },
+        { companyEmail: { contains: search, mode: "insensitive" } },
+        { companyLegalName: { contains: search, mode: "insensitive" } },
+        { companyTitle: { contains: search, mode: "insensitive" } },
         { taxId: { contains: search, mode: "insensitive" } },
       ];
-      if (Object.values(BusinessStatus).includes(normalized as BusinessStatus))
-        where.OR.push({ businessStatus: normalized as BusinessStatus });
+      if (
+        Object.values(CorporateApplicationStatus).includes(
+          normalized as CorporateApplicationStatus,
+        )
+      )
+        where.OR.push({
+          status: normalized as CorporateApplicationStatus,
+        });
     }
 
-    const orderBy = resolveOrderBy<Prisma.UserOrderByWithRelationInput>(
-      "User",
-      query,
-      {
-        defaultSort: { createdAt: "desc" },
-      },
-    );
-
     return paginate(
-      this.prisma.user,
+      this.prisma.corporateApplication,
       {
         where,
-        orderBy,
+        orderBy: { [sortBy]: sortOrder },
         select: {
           id: true,
-          displayName: true,
-          email: true,
+          authorizedFullName: true,
+          companyEmail: true,
           phone: true,
-          companyName: true,
+          companyLegalName: true,
+          companyTitle: true,
           taxId: true,
-          businessStatus: true,
-          isSeller: true,
+          status: true,
+          userId: true,
           createdAt: true,
         },
       },
@@ -141,100 +158,316 @@ export class AdminSellerApplicationService {
     );
   }
 
-  async approveSellerApplication(adminId: string, userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException("Kullanıcı bulunamadı");
-    if (!user.companyName)
-      throw new BadRequestException("Bu kullanıcı kurumsal hesap değil");
-    if (user.businessStatus === BusinessStatus.approved)
+  async approveSellerApplication(adminId: string, applicationId: string) {
+    const application = await this.prisma.corporateApplication.findUnique({
+      where: { id: applicationId },
+    });
+    if (!application) throw new NotFoundException("Başvuru bulunamadı");
+    if (application.status !== "submitted")
       throw new BadRequestException("Bu başvuru zaten onaylanmış");
 
-    const previous = {
-      businessStatus: user.businessStatus,
-      isSeller: user.isSeller,
-    };
-    await this.prisma.user.update({
-      where: { id: userId },
+    const invitationToken = crypto.randomBytes(32).toString("hex");
+    const invitationTokenHash = crypto
+      .createHash("sha256")
+      .update(invitationToken)
+      .digest("hex");
+    const invitationExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+    const frontendUrl =
+      process.env.FRONTEND_URL ||
+      process.env.APP_URL ||
+      "https://tarodan.com.tr";
+    const invitationUrl = `${frontendUrl}/corporate/invite?token=${invitationToken}`;
+
+    await this.prisma.corporateApplication.update({
+      where: { id: applicationId },
       data: {
-        businessStatus: BusinessStatus.approved,
-        isSeller: true,
-        sellerType: "individual",
+        status: "invited",
+        preliminaryApprovedAt: new Date(),
+        invitationTokenHash,
+        invitationExpiresAt,
+        reviewNote: null,
+        events: {
+          create: {
+            action: "preliminary_approved",
+            actorAdminId: adminId,
+          },
+        },
       },
     });
     await this.audit.createAuditLog(
       adminId,
       "seller_application_approve",
-      "User",
-      userId,
-      previous,
-      { businessStatus: "approved", isSeller: true },
+      "CorporateApplication",
+      applicationId,
+      { status: application.status },
+      { status: "invited", invitationExpiresAt },
     );
 
-    // In-app + push bildirimi
-    await this.notificationService.send({
-      userId,
-      type: NotificationType.SELLER_APPLICATION_APPROVED,
-      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
-      data: {},
-    });
-    // E-posta template sistemi üzerinden (admin panelinden özelleştirilebilir)
-    await this.eventService.queueEmail({
-      to: user.email,
-      subject: "",
-      template: "seller-application-approved",
-      templateData: {
-        name: user.displayName || user.email,
-        companyName: user.companyName || "",
+    await this.notificationService.sendTemplateEmailToAddress(
+      application.companyEmail,
+      "seller-application-approved",
+      {
+        name: application.authorizedFullName,
+        companyName: application.companyTitle,
+        invitationUrl,
+        invitationExpiresHours: 72,
       },
-    });
-    return { success: true };
+    );
+    return {
+      success: true,
+      status: "invited",
+      invitationExpiresAt,
+    };
   }
 
   async rejectSellerApplication(
     adminId: string,
-    userId: string,
+    applicationId: string,
     reason: string,
   ) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException("Kullanıcı bulunamadı");
-    if (!user.companyName)
-      throw new BadRequestException("Bu kullanıcı kurumsal hesap değil");
-    if (user.businessStatus === BusinessStatus.rejected)
+    if (!reason?.trim()) {
+      throw new BadRequestException("Red nedeni zorunludur");
+    }
+    const application = await this.prisma.corporateApplication.findUnique({
+      where: { id: applicationId },
+    });
+    if (!application) throw new NotFoundException("Başvuru bulunamadı");
+    if (application.status === "rejected")
       throw new BadRequestException("Bu başvuru zaten reddedilmiş");
 
-    const previous = { businessStatus: user.businessStatus };
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { businessStatus: BusinessStatus.rejected, isSeller: false },
-    });
+    await this.prisma.$transaction([
+      this.prisma.corporateApplication.update({
+        where: { id: applicationId },
+        data: {
+          status: "rejected",
+          reviewNote: reason.trim(),
+          rejectedAt: new Date(),
+          invitationTokenHash: null,
+          invitationExpiresAt: null,
+          events: {
+            create: {
+              action: "application_rejected",
+              note: reason.trim(),
+              actorAdminId: adminId,
+            },
+          },
+        },
+      }),
+      // Aktivasyon SONRASI red: kullanıcı satırı da "rejected" olmalı. Eskiden
+      // yalnız başvuru işaretleniyordu; user.businessStatus "pending"de kalıyor,
+      // web guard'ı kullanıcıyı sonsuza dek /business-pending'e ("başvurunuz
+      // inceleniyor") kilitliyor ve /business-rejected ekranı hiç görünmüyordu.
+      ...(application.userId
+        ? [
+            this.prisma.user.update({
+              where: { id: application.userId },
+              data: { businessStatus: "rejected" as const },
+            }),
+          ]
+        : []),
+    ]);
     await this.audit.createAuditLog(
       adminId,
       "seller_application_reject",
-      "User",
-      userId,
-      previous,
-      { businessStatus: "rejected", reason },
+      "CorporateApplication",
+      applicationId,
+      { status: application.status },
+      { status: "rejected", reason },
     );
 
-    // In-app + push bildirimi
-    await this.notificationService.send({
-      userId,
-      type: NotificationType.SELLER_APPLICATION_REJECTED,
-      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
-      data: { reason: reason ? ` Neden: ${reason}` : "" },
+    await this.notificationService.sendTemplateEmailToAddress(
+      application.companyEmail,
+      "seller-application-rejected",
+      {
+        name: application.authorizedFullName,
+        companyName: application.companyTitle,
+        reason: reason.trim(),
+      },
+    );
+    return { success: true };
+  }
+
+  async reviewSellerDocument(
+    adminId: string,
+    applicationId: string,
+    documentId: string,
+    status: SellerDocumentStatus,
+    note?: string,
+  ) {
+    if (!["approved", "rejected", "revision_requested"].includes(status)) {
+      throw new BadRequestException("Geçersiz belge kararı");
+    }
+    if (status !== "approved" && !note?.trim()) {
+      throw new BadRequestException("Red veya revizyon açıklaması zorunludur");
+    }
+    const document = await this.prisma.sellerDocument.findFirst({
+      where: {
+        id: documentId,
+        applicationId,
+        isCurrent: true,
+      },
+      include: { application: true },
     });
-    // E-posta template sistemi üzerinden (admin panelinden özelleştirilebilir)
-    await this.eventService.queueEmail({
-      to: user.email,
-      subject: "",
-      template: "seller-application-rejected",
-      templateData: {
-        name: user.displayName || user.email,
-        companyName: user.companyName || "",
-        reason: reason || "",
+    if (!document?.application) {
+      throw new NotFoundException("Belge bulunamadı");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.sellerDocument.update({
+        where: { id: document.id },
+        data: {
+          status,
+          reviewNote: note?.trim() || null,
+          reviewedBy: adminId,
+          reviewedAt: new Date(),
+          appealNote: null,
+        },
+      }),
+      this.prisma.corporateApplicationEvent.create({
+        data: {
+          applicationId,
+          action: `document_${status}`,
+          note: note?.trim(),
+          actorAdminId: adminId,
+          metadata: {
+            documentId,
+            documentType: document.documentType,
+          },
+        },
+      }),
+    ]);
+
+    if (status !== "approved") {
+      await this.notificationService.sendTemplateEmailToAddress(
+        document.application.companyEmail,
+        "seller-document-revision",
+        {
+          name: document.application.authorizedFullName,
+          documentType: document.documentType,
+          reason: note,
+        },
+      );
+    }
+    return { success: true, status };
+  }
+
+  async finalApproveSellerApplication(adminId: string, applicationId: string) {
+    const application = await this.prisma.corporateApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        documents: { where: { isCurrent: true } },
+        stakeholders: {
+          include: {
+            documents: { where: { isCurrent: true } },
+          },
+        },
+        user: true,
       },
     });
-    return { success: true };
+    if (!application?.user) {
+      throw new NotFoundException("Aktifleştirilmiş kurumsal hesap bulunamadı");
+    }
+    if (application.status !== "under_review") {
+      throw new BadRequestException(
+        "Başvuru henüz nihai incelemeye gönderilmemiş",
+      );
+    }
+    const unresolved = application.documents.filter(
+      (document) => document.status !== "approved",
+    );
+    const requiredCompanyDocuments = [
+      "tax_plate",
+      "contract",
+      "signature_circular",
+      "activity_certificate",
+      "residence_or_invoice",
+      "trade_registry_gazette",
+      "bank_account_info",
+    ] as const;
+    const currentCompanyTypes = new Set(
+      application.documents
+        .filter((document) => !document.stakeholderId)
+        .map((document) => document.documentType),
+    );
+    const missingRequired = requiredCompanyDocuments.filter(
+      (type) => !currentCompanyTypes.has(type),
+    );
+    const stakeholdersWithoutApprovedIdentity = application.stakeholders.filter(
+      (stakeholder) => {
+        const approvedTypes = new Set(
+          stakeholder.documents
+            .filter((document) => document.status === "approved")
+            .map((document) => document.documentType),
+        );
+        const prefix =
+          stakeholder.identityType === "tckn" ? "identity" : "passport";
+        return (
+          !approvedTypes.has(`${prefix}_front` as SellerDocumentType) ||
+          !approvedTypes.has(`${prefix}_back` as SellerDocumentType)
+        );
+      },
+    );
+    if (
+      unresolved.length ||
+      missingRequired.length ||
+      !application.stakeholders.length ||
+      stakeholdersWithoutApprovedIdentity.length
+    ) {
+      throw new BadRequestException(
+        "Tüm güncel belgeler onaylanmadan hesap aktifleştirilemez",
+      );
+    }
+
+    const corporateCode = promoteUserCodeToCorporate(
+      application.user.adminCode,
+    );
+
+    await this.prisma.$transaction([
+      this.prisma.corporateApplication.update({
+        where: { id: applicationId },
+        data: {
+          status: "approved",
+          finalApprovedAt: new Date(),
+          events: {
+            create: {
+              action: "final_approved",
+              actorAdminId: adminId,
+            },
+          },
+        },
+      }),
+      this.prisma.user.update({
+        where: { id: application.user.id },
+        data: {
+          isSeller: true,
+          sellerType: "verified",
+          businessStatus: "approved",
+          companyName: application.companyLegalName,
+          taxId: application.taxId,
+          companyType: application.companyType,
+          // Hesap tipi bireyselden kurumsala geçtiği için kodun öneki de
+          // güncellenir; numara (kalıcı kimlik) korunur: B010023 → K010023.
+          ...(corporateCode ? { adminCode: corporateCode } : {}),
+        },
+      }),
+    ]);
+    await this.audit.createAuditLog(
+      adminId,
+      "seller_application_final_approve",
+      "CorporateApplication",
+      applicationId,
+      { status: application.status },
+      { status: "approved", userId: application.user.id },
+    );
+    await this.notificationService.sendTemplateEmailToAddress(
+      application.companyEmail,
+      "seller-application-approved",
+      {
+        name: application.authorizedFullName,
+        companyName: application.companyTitle,
+      },
+    );
+    return { success: true, status: "approved" };
   }
 
   /**
@@ -378,7 +611,7 @@ export class AdminSellerApplicationService {
     }
     const shippingTariff = await this.prisma.shippingTariff.findUnique({
       where: { id: order.package.shippingTariffId },
-      include: { rates: true },
+      include: { packageTiers: true },
     });
     if (!shippingTariff) {
       throw new BadRequestException(

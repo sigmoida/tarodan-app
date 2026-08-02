@@ -13,22 +13,21 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
   return [
-    col.custom<User>(
+    col.code<User>(t("admin.users.userId"), (u) => u.adminCode, {
+      minWidth: 130,
+      sortKey: "adminCode",
+      sortType: "text",
+    }),
+    col.user<User>(
       t("admin.users.columnUser"),
-      (u) => (
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 font-medium text-primary-600">
-            {u.displayName?.charAt(0) ?? "?"}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate font-medium text-heading">{u.displayName}</p>
-            <p className="truncate text-sm text-muted">{u.email}</p>
-          </div>
-        </div>
-      ),
-      { grow: 3, minWidth: 220, sortKey: "displayName", sortType: "text" },
+      (u) => ({
+        name: u.displayName,
+        secondary: u.email,
+        avatar: u.avatarUrl,
+        href: `/accounts/users/${u.id}`,
+      }),
+      { minWidth: 520, sortKey: "displayName", sortType: "text" },
     ),
-    col.id<User>(t("admin.users.userId"), (u) => u.id),
     col.custom<User>(
       t("common.status"),
       (u) => (
@@ -75,7 +74,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
             config={subscriptionStatusConfig}
           />
         ) : (
-          <span className="text-muted">—</span>
+          <Badge variant="default">{t("admin.users.membershipFree")}</Badge>
         ),
       {
         grow: 1,
@@ -147,7 +146,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
               minute: "2-digit",
             })
           : t("admin.users.neverLoggedIn"),
-      { sortKey: "lastLoginAt", sortType: "date" },
+      { minWidth: 180, sortKey: "lastLoginAt", sortType: "date" },
     ),
     col.rowMenu<User>(rowMenu),
   ];

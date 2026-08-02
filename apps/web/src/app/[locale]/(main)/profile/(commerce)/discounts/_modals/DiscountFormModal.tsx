@@ -13,6 +13,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { getProductEffectivePrice } from "@/lib/productPrice";
+import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { useSaveDiscount } from "../_hooks/useDiscounts";
 import {
   emptyDiscountForm,
@@ -58,6 +59,7 @@ export default function DiscountFormModal({
   products,
 }: DiscountFormModalProps) {
   const save = useSaveDiscount();
+  const modalLabels = useFormModalLabels();
   const form = useZodForm(discountSchema, {
     defaultValues: emptyDiscountForm(),
   });
@@ -96,7 +98,8 @@ export default function DiscountFormModal({
       isSubmitting={save.isPending}
       resetValues={editing ? fromDiscount(editing) : emptyDiscountForm()}
       submitLabel={editing ? "Güncelle" : "Oluştur"}
-      maxWidth="max-w-2xl"
+      size="2xl"
+      {...modalLabels}
     >
       <FormInput
         name="name"
@@ -121,6 +124,7 @@ export default function DiscountFormModal({
           min="0"
           max={type === "percentage" ? 100 : 10000}
           step={type === "percentage" ? 1 : 0.01}
+          placeholder={type === "percentage" ? "10" : "100"}
           value={value}
           onChange={(e) =>
             setValue("value", parseFloat(e.target.value) || 0, {
@@ -246,6 +250,7 @@ export default function DiscountFormModal({
           label="Kullanıcı Başı Limit"
           type="number"
           min="1"
+          placeholder="1"
         />
       </div>
 

@@ -2,27 +2,18 @@
 
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/DataTable";
 import { useResourceList } from "@/components/list";
 import { mapProducts } from "../_lib/types";
-import { productColumns, type ProductRowActions } from "../_lib/columns";
+import { productColumns } from "../_lib/columns";
 
 /** Maps the raw product rows from context and renders the shared DataTable. */
-export function ProductsTable(actions: Omit<ProductRowActions, "onView">) {
+export function ProductsTable() {
   const t = useTranslations();
-  const router = useRouter();
   const { rows, isLoading, filters, search, sort, setSort } =
     useResourceList<any>();
   const products = useMemo(() => mapProducts(rows, t), [rows, t]);
-  const columns = useMemo(
-    () =>
-      productColumns(t, {
-        ...actions,
-        onView: (p) => router.push(`/catalog/products/${p.id}`),
-      }),
-    [t, actions, router],
-  );
+  const columns = useMemo(() => productColumns(t), [t]);
 
   const filtered =
     search || filters.status !== "all" || filters.brandId || filters.carModelId;

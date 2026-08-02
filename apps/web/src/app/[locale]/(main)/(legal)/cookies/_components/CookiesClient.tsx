@@ -189,7 +189,7 @@ export default async function CookiesClient() {
           <p>Çerez politikamız hakkında sorularınız için:</p>
           <ul>
             <li>
-              <strong>E-posta:</strong> destek@tarodan.com
+              <strong>E-posta:</strong> destek@tarodan.com.tr
             </li>
             <li>
               <strong>Telefon:</strong> 0850 XXX XX XX

@@ -170,6 +170,9 @@ export class PspReconciliationService {
           currency: capturedInquiry.currency ?? null,
           amount: ourAmount,
           totalAmount: capturedInquiry.paymentTotalTl,
+          // PSP ücret mutabakatı: PayTR'nin işlem kesintisi denetim satırına yazılır.
+          providerFee: capturedInquiry.providerFeeTl ?? null,
+          providerNet: capturedInquiry.providerNetTl ?? null,
           raw: {
             source: "reconcile",
             completed: did,
@@ -273,6 +276,9 @@ export class PspReconciliationService {
           currency: capturedInquiry.currency ?? null,
           amount: ourAmount,
           totalAmount: capturedInquiry.paymentTotalTl,
+          // PSP ücret mutabakatı: PayTR'nin işlem kesintisi denetim satırına yazılır.
+          providerFee: capturedInquiry.providerFeeTl ?? null,
+          providerNet: capturedInquiry.providerNetTl ?? null,
           raw: {
             source: "orphan_detect",
             paymentDate: capturedInquiry.paymentDate ?? null,

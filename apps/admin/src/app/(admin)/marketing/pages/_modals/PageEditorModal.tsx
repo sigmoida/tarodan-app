@@ -173,8 +173,7 @@ export function PageEditorModal({
       onSubmit={(values) => save.mutate(values)}
       isSubmitting={save.isPending}
       submitLabel={t("common.save")}
-      maxWidth="max-w-2xl"
-      modalClassName="max-w-6xl"
+      size="wide"
       closeOnBackdrop={false}
     >
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -187,8 +186,8 @@ export function PageEditorModal({
         )}
       </div>
 
-      <div className="grid h-[68vh] grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
+      <div className="grid grid-cols-1 gap-4 lg:h-[68vh] lg:grid-cols-2">
+        <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto lg:pr-1">
           <FormInput
             name="title"
             label={t("admin.marketing.pages.pageTitle")}

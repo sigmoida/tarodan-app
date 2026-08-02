@@ -34,30 +34,24 @@ import type { Product, ProductImage } from "@/types/product";
  * (remove, add-to-cart, SOLD badges) rendered OUTSIDE the card's `<Link>`.
  */
 
-const CARD_PLACEHOLDERS = [
-  "https://placehold.co/400x400/fff3e0/e65100?text=Hot+Wheels",
-  "https://placehold.co/400x400/e3f2fd/1565c0?text=Diecast+Model",
-  "https://placehold.co/400x400/fce4ec/c62828?text=Koleksiyon",
-  "https://placehold.co/400x400/e8f5e9/2e7d32?text=Model+Araba",
-  "https://placehold.co/400x400/f3e5f5/6a1b9a?text=Premium",
-  "https://placehold.co/400x400/fff8e1/f57f17?text=Rare+Model",
-];
+/**
+ * Görselsiz ilan için YEREL placeholder (`_home/lib/helpers.ts` ile aynı dosya).
+ * Burada bir zamanlar harici placehold.co URL'lerinden oluşan bir liste vardı ve
+ * üzerlerinde "Hot Wheels", "Premium", "Rare Model" yazıyordu: her görselsiz
+ * ilan hem üçüncü parti bir servise istek atıyor hem de taşımadığı bir marka
+ * iddiasını taşıyordu.
+ */
+const PRODUCT_PLACEHOLDER = "/product-placeholder.svg";
 
-function cardImageUrl(
-  image: ProductImage | string | undefined,
-  index: number,
-  title: string,
-): string {
-  const placeholder = CARD_PLACEHOLDERS[index % CARD_PLACEHOLDERS.length];
+function cardImageUrl(image: ProductImage | string | undefined): string {
   const url =
     typeof image === "string"
       ? image
       : (image?.cardUrl ?? image?.detailUrl ?? image?.url);
+  // picsum.photos eski demo verisinin izidir; gerçek görsel her zaman API'nin
+  // verdiği mutlak S3/CDN URL'idir.
   if (url && !url.includes("picsum.photos")) return url;
-  if (url && url.includes("picsum.photos") && title) {
-    return `https://placehold.co/800x600/1a1a2e/eee?text=${encodeURIComponent(title.substring(0, 25).trim())}`;
-  }
-  return placeholder;
+  return PRODUCT_PLACEHOLDER;
 }
 
 const fmtTL = (n: number) =>
@@ -69,7 +63,7 @@ const fmtTL = (n: number) =>
 export interface ProductCardProps {
   product: Product;
   layout?: "grid" | "list";
-  /** Position in its list — drives placeholder rotation and eager loading. */
+  /** Position in its list — drives eager loading of the first cards. */
   index?: number;
   priority?: boolean;
   /**
@@ -95,15 +89,17 @@ export interface ProductCardProps {
 function CardLink({
   href,
   className,
+  onClick,
   children,
 }: {
   href: string | null;
   className?: string;
+  onClick?: () => void;
   children: React.ReactNode;
 }) {
   if (!href) return <div className={className}>{children}</div>;
   return (
-    <Link href={href} className={className}>
+    <Link href={href} className={className} onClick={onClick}>
       {children}
     </Link>
   );
@@ -123,16 +119,30 @@ export default function ProductCard({
   const t = useTranslations();
 
   const linkHref = href === undefined ? `/listings/${product.id}` : href;
+  const trackClick =
+    href === undefined
+      ? () => {
+          void fetch(`/gateway/products/${product.id}/click`, {
+            method: "POST",
+            keepalive: true,
+          }).catch(() => undefined);
+        }
+      : undefined;
 
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
   const effectivePrice = getProductEffectivePrice(product);
   const originalPrice = getProductOriginalPriceForDisplay(product);
-  const isTrade = Boolean(product.trade_available || product.isTradeEnabled);
+  // `tradeAvailable` API'nin türettiği efektif değerdir (satıcının üyeliği
+  // takas hakkını kaybettiyse false). Yoksa eski alanlara düşülür.
+  const isTrade = Boolean(
+    product.tradeAvailable ??
+    (product.trade_available || product.isTradeEnabled),
+  );
   const firstImage = Array.isArray(product.images)
     ? product.images[0]
     : undefined;
-  const imageUrl = cardImageUrl(firstImage, index, product.title);
+  const imageUrl = cardImageUrl(firstImage);
   const hasRating =
     product.rating &&
     product.rating.average !== null &&
@@ -153,7 +163,7 @@ export default function ProductCard({
   if (layout === "list") {
     return (
       <div className="relative">
-        <CardLink href={linkHref}>
+        <CardLink href={linkHref} onClick={trackClick}>
           <div className="bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex items-center gap-4 p-3">
             <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
               <OptimizedImage
@@ -161,9 +171,7 @@ export default function ProductCard({
                 alt={product.title}
                 fill
                 className={`object-cover${outOfStock ? " opacity-50" : ""}`}
-                fallbackSrc={
-                  CARD_PLACEHOLDERS[index % CARD_PLACEHOLDERS.length]
-                }
+                fallbackSrc={PRODUCT_PLACEHOLDER}
                 logContext={{ listingId: product.id, page: "product-card" }}
                 priority={priority}
               />
@@ -226,14 +234,18 @@ export default function ProductCard({
 
   return (
     <div className="relative group h-full flex flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
-      <CardLink href={linkHref} className="flex flex-1 flex-col">
+      <CardLink
+        href={linkHref}
+        className="flex flex-1 flex-col"
+        onClick={trackClick}
+      >
         <div className="relative aspect-square bg-surface-alt">
           <OptimizedImage
             src={imageUrl}
             alt={product.title}
             fill
             className={`object-cover group-hover:scale-[1.03] transition-transform duration-300${outOfStock ? " opacity-50" : ""}`}
-            fallbackSrc={CARD_PLACEHOLDERS[index % CARD_PLACEHOLDERS.length]}
+            fallbackSrc={PRODUCT_PLACEHOLDER}
             logContext={{ listingId: product.id, page: "product-card" }}
             priority={priority}
           />

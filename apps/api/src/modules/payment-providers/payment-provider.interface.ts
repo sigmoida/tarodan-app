@@ -4,6 +4,9 @@ import type {
   PayTRCallbackData,
   PayTRRefundResponse,
   PayTRStatusInquiryResult,
+  PaytrStatementEntry,
+  PaytrSettlementSummaryEntry,
+  PaytrSettlementDetailEntry,
 } from "./paytr.service";
 
 /**
@@ -42,6 +45,8 @@ export interface IPaymentProvider {
   createRefund(
     merchantOid: string,
     amount: number,
+    /** Opsiyonel takip referansı — PayTR durum-sorgu yanıtında geri döner. */
+    referenceNo?: string,
   ): Promise<PayTRRefundResponse>;
 
   createDirectPaymentForm(
@@ -82,27 +87,6 @@ export interface IPaymentProvider {
     raw?: Record<string, unknown>;
   }>;
 
-  /** Kayıtlı kartla kullanıcı-mevcut (CIT) ödeme — recurring DEĞİL. */
-  capiPaymentByRegisteredCard(params: {
-    utoken: string;
-    ctoken: string;
-    amount: number;
-    merchantOid: string;
-    buyer: PayTRBuyer;
-    basketItems: PayTRBasketItem[];
-    requireCvv?: boolean;
-    cvv?: string;
-    installmentCount?: number;
-    non3d?: boolean;
-    successQueryParams?: string;
-  }): Promise<{
-    status: "success" | "failed" | "wait_callback";
-    reason?: string;
-    tryAgain?: boolean;
-    threeDSHtml?: string;
-    raw?: Record<string, unknown>;
-  }>;
-
   capiListCards(utoken: string): Promise<
     Array<{
       ctoken: string;
@@ -136,6 +120,26 @@ export interface IPaymentProvider {
     startDate: string;
     endDate: string;
   }): Promise<any>;
+
+  /** Aşama-2 (platform transfer sonucu) callback hash doğrulaması — ham trans_ids string'i ile. */
+  verifyTransferCallback(params: { transIds: string; hash: string }): boolean;
+
+  /** Satış+iade işlem dökümü (maks 3 gün) — PSP mutabakatı. */
+  getTransactionStatement(params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PaytrStatementEntry[]>;
+
+  /** Hakediş özeti: gerçekleşen + projeksiyon (maks 31 gün). */
+  getSettlementSummary(params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PaytrSettlementSummaryEntry[]>;
+
+  /** Hakediş günü sipariş dökümü. */
+  getSettlementDetail(params: {
+    date: string;
+  }): Promise<PaytrSettlementDetailEntry[]>;
 }
 
 /** Canonical provider keys (matches `Payment.provider`). */

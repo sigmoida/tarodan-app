@@ -6,6 +6,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
+  ChevronRightIcon,
   TruckIcon,
   MapPinIcon,
   MagnifyingGlassIcon,
@@ -132,6 +133,36 @@ export default function TrackOrderClient() {
                   },
                 )}
               </p>
+              {/* Üç kod seviyesi: sepet (GRP) · koli (PKG) · sipariş (ORD).
+                  Müşteri hangisini girdiyse diğerlerini de burada görür. */}
+              {(order.groupNumber || order.packageNumber) && (
+                <p className="text-sm text-muted mt-2 flex flex-wrap gap-x-4">
+                  {order.groupNumber && (
+                    <span>
+                      {t("order.groupNumber")}:{" "}
+                      <span className="font-mono">{order.groupNumber}</span>
+                    </span>
+                  )}
+                  {order.packageNumber && (
+                    <span>
+                      {t("order.packageNumber")}:{" "}
+                      <span className="font-mono">{order.packageNumber}</span>
+                    </span>
+                  )}
+                </p>
+              )}
+              {order.siblingOrderNumbers &&
+                order.siblingOrderNumbers.length > 0 && (
+                  <p className="text-sm text-muted mt-2">
+                    {t("order.cartSiblings")}{" "}
+                    {order.siblingOrderNumbers.map((num, i) => (
+                      <span key={num} className="font-mono">
+                        {i > 0 && ", "}
+                        {num}
+                      </span>
+                    ))}
+                  </p>
+                )}
             </div>
             <StatusBadge
               status={order.status}
@@ -259,9 +290,10 @@ export default function TrackOrderClient() {
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary-500 hover:underline"
+                          className="inline-flex items-center text-primary-500 hover:underline"
                         >
-                          {t("order.trackShipment")} →
+                          {t("order.trackShipment")}
+                          <ChevronRightIcon className="ml-1 h-4 w-4" />
                         </a>
                       )}
                     </div>

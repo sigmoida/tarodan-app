@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { ShippingPackageTierCode } from "@prisma/client";
 import {
   CreateOrderDto,
   OrderQueryDto,
@@ -102,6 +103,10 @@ export class OrderService {
     sellerShippingAmount: number;
     shippingAmount: number;
     sellerNetAmount: number;
+    /** Satıcıya verilen hizmetlerin KDV'si — payout'tan kesilir. */
+    sellerServiceTaxAmount: number;
+    /** Alıcıya verilen hizmetlerin KDV'si — alıcının ödediğine eklenir. */
+    buyerServiceTaxAmount: number;
     shippingDesi: number;
   }> {
     return this.orderPricing.getCommissionPreview(
@@ -114,7 +119,11 @@ export class OrderService {
 
   async getCommissionPreviewBatch(
     sellerId: string,
-    items: Array<{ amount: number; categoryId?: string | null }>,
+    items: Array<{
+      amount: number;
+      categoryId?: string | null;
+      packageTier?: ShippingPackageTierCode | null;
+    }>,
   ): Promise<{
     results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }>;
   }> {
@@ -199,8 +208,28 @@ export class OrderService {
     return this.orderQuery.findUserCheckoutGroups(userId, page, limit);
   }
 
+  async findUserOrderGroups(
+    userId: string,
+    params: {
+      role?: "buyer" | "seller";
+      tab?: "active" | "cancelled" | "refunds";
+      page?: number;
+      limit?: number;
+    } = {},
+  ) {
+    return this.orderQuery.findUserOrderGroups(userId, params);
+  }
+
   async findCheckoutGroup(groupId: string, userId: string) {
     return this.orderQuery.findCheckoutGroup(groupId, userId);
+  }
+
+  async findGroupViewByOrder(orderId: string, userId: string) {
+    return this.orderQuery.findGroupViewByOrder(orderId, userId);
+  }
+
+  async getSellerPendingCount(sellerId: string) {
+    return this.orderQuery.getSellerPendingCount(sellerId);
   }
 
   // Taşındı: order-lifecycle.service.ts — imzalar aynen korunuyor (facade delege).
@@ -262,6 +291,10 @@ export class OrderService {
       hours,
       reason,
     );
+  }
+
+  async cancelGroup(groupId: string, userId: string, dto: CancelOrderDto) {
+    return this.orderLifecycle.cancelGroup(groupId, userId, dto);
   }
 
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {

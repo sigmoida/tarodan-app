@@ -5,6 +5,7 @@ import { OrderService } from "./order.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCheckoutService } from "./order-checkout.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderTaxPolicyService } from "./order-tax-policy.service";
 import { OrderCheckoutDirectService } from "./order-checkout-direct.service";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import { OrderGuestCheckoutService } from "./order-guest-checkout.service";
@@ -15,7 +16,7 @@ import { OrderSchedulerService } from "./order-scheduler.service";
 import { OrderScheduledProcessor } from "./order-scheduled.processor";
 import { SellerInvoiceController } from "./seller-invoice.controller";
 import { SellerInvoiceService } from "./seller-invoice.service";
-import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { MailModule } from "../mail/mail.module";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { EventModule } from "../events";
@@ -29,9 +30,11 @@ import { TaxModule } from "../tax/tax.module";
 import { ElogoModule } from "../elogo";
 import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 import { RefundModule } from "../refund/refund.module";
+import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
   imports: [
+    MailModule,
     PrismaModule,
     EventModule,
     NotificationModule,
@@ -52,6 +55,8 @@ import { RefundModule } from "../refund/refund.module";
     OrderPricingService,
     OrderCheckoutService,
     OrderCheckoutCommonService,
+    // Vergi politikası (ürün KDV / hizmet KDV / stopaj kapsamı) — tek kaynak.
+    OrderTaxPolicyService,
     OrderCheckoutDirectService,
     OrderCheckoutGroupService,
     OrderGuestCheckoutService,
@@ -59,10 +64,11 @@ import { RefundModule } from "../refund/refund.module";
     OrderQueryService,
     OrderLifecycleService,
     OrderSchedulerService,
-    OrderScheduledProcessor,
+    ...scheduledProcessors(OrderScheduledProcessor),
     SellerInvoiceService,
-    SmtpProvider,
   ],
-  exports: [OrderService],
+  // OrderCheckoutCommonService: teklif/sipariş bedel primitifleri (OfferService
+  // teklif kabulünde aynı hesabı kullanır — tek kaynak).
+  exports: [OrderService, OrderCheckoutCommonService, OrderTaxPolicyService],
 })
 export class OrderModule {}

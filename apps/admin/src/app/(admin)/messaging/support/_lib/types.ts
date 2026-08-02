@@ -18,6 +18,7 @@ export interface SupportTicket {
   status: string;
   creatorId: string;
   creatorName: string;
+  creatorEmail?: string;
   createdAt: string;
   updatedAt: string;
 }
