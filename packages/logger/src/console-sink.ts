@@ -32,12 +32,17 @@ export class ConsoleSink implements Sink {
       console.log(JSON.stringify(entry));
       return;
     }
+    // requestId neredeyse her istek satırında var: uuid'li bir obje eki her
+    // satırı kirletirdi. Kısa önek satıra gömülür; tam kimlik JSON kipinde ve
+    // error_logs'ta durur, gözle takipte ilk 8 karakter yeterlidir.
+    const { requestId, ...rest } = entry.context ?? {};
+    const reqTag =
+      typeof requestId === "string" ? ` req=${requestId.slice(0, 8)}` : "";
     const prefix = `${clock(entry.timestamp)} ${
       LABEL[entry.level] ?? entry.level
     } [${entry.name}]`;
-    const args: unknown[] = [`${prefix} ${entry.message}`];
-    if (entry.context && Object.keys(entry.context).length)
-      args.push(entry.context);
+    const args: unknown[] = [`${prefix} ${entry.message}${reqTag}`];
+    if (Object.keys(rest).length) args.push(rest);
     if (entry.level === "error") console.error(...args);
     else if (entry.level === "warn") console.warn(...args);
     else console.log(...args);
