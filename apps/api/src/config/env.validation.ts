@@ -118,6 +118,7 @@ const envSchema = z
     AWS_REGION: z.string().optional(),
     S3_BUCKET: z.string().optional(),
     S3_ENV_PREFIX: z.string().optional(),
+    ELASTICSEARCH_INDEX_PREFIX: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
   })
   .strip()
@@ -218,6 +219,30 @@ const envSchema = z
         path: ["S3_ENV_PREFIX"],
         message:
           "S3_ENV_PREFIX must be 'prod' for a production deployment; staging media must stay isolated",
+      });
+    }
+
+    // Arama indeksi de medya kadar ortam-izole olmak zorunda. Ad, verilmediğinde
+    // APP_ENV'den türer ve doğru olur (search-common.service.ts). Özel bir önek
+    // vermek MEŞRUDUR — preview dağıtımları staging APP_ENV'iyle koşup kendi
+    // indekslerini ister (`Preview One` → `preview-one-products`). Yasak olan tek
+    // şey KARŞI ortamın adını almaktır.
+    //
+    // 2026-08-02'de yaşandı: staging'e ELASTICSEARCH_INDEX_PREFIX=production
+    // yazılmıştı. Canlı vitrinin araması staging'in demo ürünlerini gösterdi ve
+    // reset her temizlediğinde staging beş dakika içinde geri doldurdu. Gerçek
+    // katalogla olsaydı daha kötüsü olurdu: iki dağıtımın saatlik reconcile
+    // cron'u aynı indekste birbirinin dokümanlarını yetim sayıp siler. Hiçbir
+    // sağlık kontrolü bunu görmüyor — o yüzden açılışta durduruyoruz.
+    const esIndexPrefix = (env.ELASTICSEARCH_INDEX_PREFIX ?? "")
+      .trim()
+      .toLowerCase();
+    const foreignPrefix = isStagingDeployment ? "production" : "staging";
+    if (esIndexPrefix === foreignPrefix) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ELASTICSEARCH_INDEX_PREFIX"],
+        message: `ELASTICSEARCH_INDEX_PREFIX must not be '${foreignPrefix}' on a ${env.APP_ENV} deployment; the two environments would share one search index`,
       });
     }
 

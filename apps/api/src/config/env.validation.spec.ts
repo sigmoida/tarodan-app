@@ -302,6 +302,41 @@ describe("validateEnv", () => {
     expect(() => validateEnv({ ...stagingBase })).not.toThrow();
   });
 
+  it("refuses a search index prefix that belongs to the other deployment", () => {
+    // Bu tam olarak 2026-08-02'de yaşanan yapılandırma: staging'e production
+    // öneki verilmişti, iki ortam tek indekste buluştu ve canlı arama staging'in
+    // demo ürünlerini gösterdi. Medya için S3_ENV_PREFIX guard'ı vardı, arama
+    // indeksi için yoktu.
+    expect(() =>
+      validateEnv({
+        ...stagingBase,
+        ELASTICSEARCH_INDEX_PREFIX: "production",
+      }),
+    ).toThrow(/ELASTICSEARCH_INDEX_PREFIX/);
+    expect(() =>
+      validateEnv({ ...prodBase, ELASTICSEARCH_INDEX_PREFIX: "staging" }),
+    ).toThrow(/ELASTICSEARCH_INDEX_PREFIX/);
+  });
+
+  it("still allows an absent, matching or preview-specific index prefix", () => {
+    // Boş bırakmak DOĞRU kullanımdır: ad APP_ENV'den türer, çakışamaz.
+    expect(() => validateEnv({ ...prodBase })).not.toThrow();
+    expect(() =>
+      validateEnv({ ...prodBase, ELASTICSEARCH_INDEX_PREFIX: "production" }),
+    ).not.toThrow();
+    expect(() =>
+      validateEnv({ ...stagingBase, ELASTICSEARCH_INDEX_PREFIX: "staging" }),
+    ).not.toThrow();
+    // Preview dağıtımları staging APP_ENV'iyle koşup kendi indekslerini alır —
+    // guard bunu engellememelidir (search-index-isolation.spec.ts).
+    expect(() =>
+      validateEnv({
+        ...stagingBase,
+        ELASTICSEARCH_INDEX_PREFIX: "Preview One",
+      }),
+    ).not.toThrow();
+  });
+
   it("rejects the staging S3 prefix in production", () => {
     expect(() =>
       validateEnv({ ...prodBase, S3_ENV_PREFIX: "staging" }),

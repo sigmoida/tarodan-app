@@ -19,7 +19,12 @@
   hedeflendiğini SSH değil, `COOLIFY_STAGING_UUIDS`/`COOLIFY_PROD_UUIDS` +
   script içi parmak izi guard'ları belirler.
 - Arama indeksleri `APP_ENV`'den otomatik izole edilir
-  (`production-products`, `production-collections`).
+  (`production-products`, `production-collections`). **`ELASTICSEARCH_INDEX_PREFIX`'i
+  elle vermek zorunda değilsin** — verirsen karşı ortamın adını ASLA yazma.
+  2026-08-02'de staging'e `production` yazılmıştı: iki ortam tek indekste buluştu,
+  canlı vitrinin araması staging'in demo ürünlerini gösterdi ve reset her
+  temizlediğinde staging beş dakika içinde geri doldurdu. Artık API açılışta
+  reddediyor; preview dağıtımlarının kendi öneki (`preview-…`) serbest.
 - Web kilidi: `SITE_LOCKED=true` → tüm public rotalar `/coming-soon`.
   `SITE_UNLOCK_SECRET` (≥32 karakter) unlock cookie'lerini imzalar — rotate
   etmek verilmiş tüm cookie'leri anında geçersiz kılar; `SITE_UNLOCK_PIN`
