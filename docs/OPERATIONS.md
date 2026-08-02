@@ -125,19 +125,19 @@ verilmezse admin app restart edilmez ve cache'i temizlenmez).
 Reset workflow'unun API container'ında aradığı değerler (biri tutmazsa hiçbir
 şeye dokunmadan reddeder):
 
-| Değişken                                                                               | Beklenen                                       | Not                                                                                      |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `NODE_ENV` / `APP_ENV`                                                                 | `production`                                   |                                                                                          |
-| `PROCESS_ROLE`                                                                         | `all` veya `web`                               |                                                                                          |
-| `FRONTEND_URL`                                                                         | `https://tarodan.shop` (veya `www`)            |                                                                                          |
-| `API_URL`                                                                              | `https://api.tarodan.shop` — **`/api` EKLEME** | Uygulama `/api`'yi kendisi ekler; sonuna yazılırsa mesaj eki URL'leri `…/api/api/…` olur |
-| `S3_ENV_PREFIX`                                                                        | `prod`                                         |                                                                                          |
-| `PAYMENT_BYPASS` / `PAYOUTS_DISABLED`                                                  | `false` (harfi harfine)                        |                                                                                          |
-| `PAYTR_TEST_MODE`                                                                      | `false` veya `0`                               |                                                                                          |
-| `ELASTICSEARCH_INDEX_PREFIX`                                                           | boş veya `production`                          |                                                                                          |
-| `REDIS_URL`, `REDIS_HOST`                                                              | dolu                                           | Cache ve **kuyruk** Redis'i ayrı; ikisi de temizlenir                                    |
-| `ELASTICSEARCH_NODE` (veya `_URL`), `ELASTICSEARCH_USERNAME`, `ELASTICSEARCH_PASSWORD` | dolu                                           | Uygulama bunları default'lar, runtime reset ZORUNLU kılar                                |
-| web `SITE_LOCKED`                                                                      | `true`                                         | ayrıca `SITE_UNLOCK_SECRET` ≥32 karakter                                                 |
+| Değişken                                                                               | Beklenen                                         | Not                                                                                      |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `NODE_ENV` / `APP_ENV`                                                                 | `production`                                     |                                                                                          |
+| `PROCESS_ROLE`                                                                         | `all` veya `web`                                 |                                                                                          |
+| `FRONTEND_URL`                                                                         | `https://tarodan.com.tr` (veya `www`)            |                                                                                          |
+| `API_URL`                                                                              | `https://api.tarodan.com.tr` — **`/api` EKLEME** | Uygulama `/api`'yi kendisi ekler; sonuna yazılırsa mesaj eki URL'leri `…/api/api/…` olur |
+| `S3_ENV_PREFIX`                                                                        | `prod`                                           |                                                                                          |
+| `PAYMENT_BYPASS` / `PAYOUTS_DISABLED`                                                  | `false` (harfi harfine)                          |                                                                                          |
+| `PAYTR_TEST_MODE`                                                                      | `false` veya `0`                                 |                                                                                          |
+| `ELASTICSEARCH_INDEX_PREFIX`                                                           | boş veya `production`                            |                                                                                          |
+| `REDIS_URL`, `REDIS_HOST`                                                              | dolu                                             | Cache ve **kuyruk** Redis'i ayrı; ikisi de temizlenir                                    |
+| `ELASTICSEARCH_NODE` (veya `_URL`), `ELASTICSEARCH_USERNAME`, `ELASTICSEARCH_PASSWORD` | dolu                                             | Uygulama bunları default'lar, runtime reset ZORUNLU kılar                                |
+| web `SITE_LOCKED`                                                                      | `true`                                           | ayrıca `SITE_UNLOCK_SECRET` ≥32 karakter                                                 |
 
 Son beş satır özellikle önemli: bunlar yalnız **veritabanı silindikten sonra**
 çalışan runtime reset adımının ihtiyacı olduğu için, eksiklikleri eskiden yarı

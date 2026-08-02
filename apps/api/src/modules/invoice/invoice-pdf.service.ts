@@ -581,7 +581,7 @@ export class InvoicePdfService {
           footerY + 12,
           { align: "center", width: 500 },
         );
-        doc.text("https://tarodan.com", 50, footerY + 24, {
+        doc.text("https://tarodan.com.tr", 50, footerY + 24, {
           align: "center",
           width: 500,
         });

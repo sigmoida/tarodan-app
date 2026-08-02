@@ -10,6 +10,7 @@ import { setupBullBoard } from "./bull-board.setup";
 import { requestIdMiddleware } from "./common/context/request-context";
 import { AppNestLogger } from "./common/logging/nest-logger";
 import { getProcessRole } from "./process-role";
+import { resolveCorsOrigins } from "./config/cors-origins";
 
 /**
  * Hard guard: PAYMENT_BYPASS allows completing payments without going through
@@ -70,19 +71,10 @@ async function bootstrap() {
     // non-production host (e.g. staging) never reflects an arbitrary origin
     // together with credentials. Native mobile clients send no Origin header
     // and are unaffected. Set CORS_ORIGINS (comma-separated) per deployed
-    // environment; local dev falls back to the localhost apps.
-    const corsOrigins = process.env.CORS_ORIGINS?.split(",")
-      .map((o) => o.trim())
-      .filter(Boolean);
+    // environment; local dev falls back to the localhost apps. The Socket.IO
+    // gateway resolves the same list, so both stay on one source.
     app.enableCors({
-      origin:
-        corsOrigins && corsOrigins.length > 0
-          ? corsOrigins
-          : [
-              "http://localhost:3000",
-              "http://localhost:3001",
-              "http://localhost:3002",
-            ],
+      origin: resolveCorsOrigins(),
       credentials: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       // Tarayıcı/Axios bazen Cache-Control, Pragma vb. ekliyor; hepsine izin ver ki CORS preflight geçsin

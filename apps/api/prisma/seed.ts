@@ -5103,7 +5103,7 @@ async function main() {
       title: "Gizlilik Politikası",
       content: `<h1>Gizlilik Politikası</h1>
 <p><strong>Son güncelleme:</strong> Haziran 2026</p>
-<p>Tarodan olarak kişisel verilerinizin güvenliğine önem veriyoruz. Bu Gizlilik Politikası, tarodan.shop adresini ziyaret ettiğinizde hangi verileri topladığımızı, nasıl kullandığımızı ve koruduğumuzu açıklamaktadır.</p>
+<p>Tarodan olarak kişisel verilerinizin güvenliğine önem veriyoruz. Bu Gizlilik Politikası, tarodan.com.tr adresini ziyaret ettiğinizde hangi verileri topladığımızı, nasıl kullandığımızı ve koruduğumuzu açıklamaktadır.</p>
 <h2>1. Toplanan Veriler</h2>
 <ul>
   <li><strong>Kimlik verileri:</strong> Ad, soyad, e-posta adresi, telefon numarası, doğum tarihi.</li>
@@ -5133,7 +5133,7 @@ async function main() {
       title: "Kullanım Koşulları",
       content: `<h1>Kullanım Koşulları</h1>
 <p><strong>Son güncelleme:</strong> Haziran 2026</p>
-<p>Bu Kullanım Koşulları, tarodan.shop platformunu kullanan tüm kullanıcılar için geçerlidir. Platforma erişerek bu koşulları kabul etmiş sayılırsınız.</p>
+<p>Bu Kullanım Koşulları, tarodan.com.tr platformunu kullanan tüm kullanıcılar için geçerlidir. Platforma erişerek bu koşulları kabul etmiş sayılırsınız.</p>
 <h2>1. Hizmet Tanımı</h2>
 <p>Tarodan, diecast ve koleksiyon model araba alım-satım ve takas işlemlerini kolaylaştıran bir çevrimiçi pazar yeridir.</p>
 <h2>2. Üyelik Koşulları</h2>

@@ -160,7 +160,7 @@ jobs:
             [ "$APP_ENV_VALUE" = "production" ] || die "APP_ENV is not production."
             case "$PROCESS_ROLE_VALUE" in all|web) : ;; *) die "API PROCESS_ROLE must be all or web." ;; esac
             case "$FRONTEND_URL_VALUE" in
-              https://tarodan.shop|https://www.tarodan.shop) : ;;
+              https://tarodan.com.tr|https://www.tarodan.com.tr) : ;;
               *) die "FRONTEND_URL is not an exact production storefront URL." ;;
             esac
             # API_URL is an ORIGIN. The application appends "/api" itself when it
@@ -168,7 +168,7 @@ jobs:
             # (paytr.service.ts, media.service.ts), so a value ending in "/api"
             # silently produces ".../api/api/..." links. Refuse that shape here.
             case "$API_URL_VALUE" in
-              https://tarodan.shop|https://www.tarodan.shop|https://api.tarodan.shop) : ;;
+              https://tarodan.com.tr|https://www.tarodan.com.tr|https://api.tarodan.com.tr) : ;;
               *) die "API_URL must be a production origin with no /api suffix (the app appends it)." ;;
             esac
             case "$FRONTEND_URL_VALUE $API_URL_VALUE" in

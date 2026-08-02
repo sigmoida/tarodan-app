@@ -61,12 +61,12 @@ describe("validateEnv", () => {
   const stagingBase = {
     ...prodBase,
     APP_ENV: "staging",
-    FRONTEND_URL: "https://staging.tarodan.shop",
-    API_URL: "https://staging.tarodan.shop/api",
+    FRONTEND_URL: "https://staging.tarodan.com.tr",
+    API_URL: "https://staging.tarodan.com.tr/api",
     S3_ENV_PREFIX: "staging",
     PAYTR_TEST_MODE: "1",
     PAYTR_CALLBACK_URL:
-      "https://staging.tarodan.shop/api/payments/callback/paytr",
+      "https://staging.tarodan.com.tr/api/payments/callback/paytr",
     PAYOUTS_DISABLED: "true",
     SURAT_KARGO_TEST_MODE: "true",
   };
@@ -93,6 +93,23 @@ describe("validateEnv", () => {
     expect(() => validateEnv({ ...prodBase, APP_ENV: "staging" })).toThrow(
       /APP_ENV/,
     );
+  });
+
+  it("still recognises the legacy staging host while the domain moves", () => {
+    // tarodan.com.tr kanonik; ama .shop host'u yayındayken onu "staging değil"
+    // saymak staging'i production sanmak demektir — geçiş boyunca ikisi de
+    // staging'dir.
+    const legacyStaging = {
+      ...stagingBase,
+      FRONTEND_URL: "https://staging.tarodan.shop",
+      API_URL: "https://staging.tarodan.shop/api",
+      PAYTR_CALLBACK_URL:
+        "https://staging.tarodan.shop/api/payments/callback/paytr",
+    };
+    expect(() => validateEnv(legacyStaging)).not.toThrow();
+    expect(() =>
+      validateEnv({ ...legacyStaging, APP_ENV: "production" }),
+    ).toThrow(/APP_ENV/);
   });
 
   it("rejects live PayTR or payouts in staging", () => {

@@ -173,12 +173,19 @@ const envSchema = z
       env.API_URL,
       env.PAYTR_CALLBACK_URL,
     ].filter((value): value is string => Boolean(value));
+    // Kanonik alan adı tarodan.com.tr. Eski tarodan.shop staging host'u geçiş
+    // boyunca hâlâ staging SAYILIR: buradaki tek iş prod ile staging'i
+    // birbirinden ayırmak, o yüzden iki alan adını da tanımak yanlış eşleşmeyi
+    // engeller — dar tutmak staging'i "prod" sanmaya yol açardı.
+    const STAGING_HOSTS = [
+      "staging.tarodan.com.tr",
+      "staging.tarodan.shop",
+    ] as const;
     const isStagingUrl = (value: string) => {
       try {
         const hostname = new URL(value).hostname;
-        return (
-          hostname === "staging.tarodan.shop" ||
-          hostname.endsWith(".staging.tarodan.shop")
+        return STAGING_HOSTS.some(
+          (host) => hostname === host || hostname.endsWith(`.${host}`),
         );
       } catch {
         return false;

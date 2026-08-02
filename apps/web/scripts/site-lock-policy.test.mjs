@@ -23,8 +23,8 @@ test("rewrites locked pages to the internal locale route", () => {
 
 test("builds redirects from the configured public application origin", () => {
   assert.equal(
-    resolvePublicOrigin("https://www.tarodan.com/path", "http://0.0.0.0:3000"),
-    "https://www.tarodan.com",
+    resolvePublicOrigin("https://www.tarodan.com.tr/path", "http://0.0.0.0:3000"),
+    "https://www.tarodan.com.tr",
   );
 });
 

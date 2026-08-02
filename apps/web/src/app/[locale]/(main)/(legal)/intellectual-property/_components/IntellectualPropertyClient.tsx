@@ -66,7 +66,7 @@ export default function IntellectualPropertyClient() {
             </li>
           </ul>
           <p>
-            <strong>Bildirim adresi:</strong> legal@tarodan.com (konu: Telif
+            <strong>Bildirim adresi:</strong> legal@tarodan.com.tr (konu: Telif
             Hakkı İhlali). Geçerli ve eksiksiz bildirimler değerlendirilir;
             uygunsa içerik kaldırılır ve (yasalara uygun şekilde) karşı tarafa
             bildirim yapılabilir.
@@ -77,8 +77,8 @@ export default function IntellectualPropertyClient() {
             Ürün ilanlarında marka isimleri, orijinal ürünü tanımlama amacıyla
             makul ölçüde kullanılabilir. Ticari marka sahiplerinin haklarına
             saygı gösterilmesi gerekir; taklit, yanıltıcı kullanım veya marka
-            ihlali kabul edilmez. Marka ihlali iddiaları için legal@tarodan.com
-            adresine bildirim yapılabilir.
+            ihlali kabul edilmez. Marka ihlali iddiaları için
+            legal@tarodan.com.tr adresine bildirim yapılabilir.
           </p>
 
           <h2>6. Tekrarlayan İhlalciler</h2>
@@ -88,7 +88,7 @@ export default function IntellectualPropertyClient() {
           </p>
 
           <h2>7. İletişim</h2>
-          <p>Fikri mülkiyet ve ihlal bildirimleri: legal@tarodan.com</p>
+          <p>Fikri mülkiyet ve ihlal bildirimleri: legal@tarodan.com.tr</p>
         </div>
       </SectionCard>
 

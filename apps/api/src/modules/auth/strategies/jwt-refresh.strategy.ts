@@ -11,7 +11,7 @@ import { SecurityService } from "../../security/security.service";
 
 /** İsteğin taşıdığı refresh token'ı çıkarır: önce httpOnly cookie, yoksa body `refreshToken`
  *  (mobil/eski istemciler). Aynı tarayıcıda hem kullanıcı hem admin cookie'si bulunabilir
- *  (prod'da .tarodan.shop paylaşımlı); bu yüzden hangi cookie'nin önce okunacağını ROTAYA göre
+ *  (prod'da .tarodan.com.tr paylaşımlı); bu yüzden hangi cookie'nin önce okunacağını ROTAYA göre
  *  seçeriz: /auth/admin/refresh → admin cookie öncelikli, diğer hâllerde kullanıcı cookie öncelikli. */
 function extractRefreshToken(req: Request): string | null {
   const url = req.originalUrl || req.url || "";

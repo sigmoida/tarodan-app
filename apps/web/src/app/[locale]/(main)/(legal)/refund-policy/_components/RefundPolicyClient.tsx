@@ -31,7 +31,7 @@ export default function RefundPolicyClient() {
             <strong>14 gün</strong> içinde herhangi bir gerekçe göstermeksizin
             ve cezai şart ödemeksizin sözleşmeden cayma hakkına sahiptir. Cayma
             hakkının kullanılması için bu süre içinde platform üzerinden veya
-            kvkk@tarodan.com adresine yazılı bildirim yapılması gerekir.
+            kvkk@tarodan.com.tr adresine yazılı bildirim yapılması gerekir.
           </p>
 
           <h2>3. İade Koşulları</h2>

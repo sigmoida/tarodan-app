@@ -17,6 +17,7 @@ import { Logger, UseGuards } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
+import { resolveCorsOrigins } from "../../config/cors-origins";
 import { JwtPayload } from "../auth/interfaces";
 import { SecurityService } from "../security/security.service";
 
@@ -33,13 +34,10 @@ interface AuthenticatedSocket extends Socket {
 }
 
 @WebSocketGateway({
+  // HTTP tarafıyla AYNI allowlist (`CORS_ORIGINS`). Buradaki liste eskiden
+  // gömülüydü ve alan adı taşındığında geride kalıyordu.
   cors: {
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:3002",
-      "https://tarodan.com",
-      "https://admin.tarodan.com",
-    ],
+    origin: resolveCorsOrigins(),
     credentials: true,
   },
   namespace: "/",

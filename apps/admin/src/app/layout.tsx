@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations();
   return {
     metadataBase: new URL(
-      process.env.NEXT_PUBLIC_APP_URL || "https://admin.tarodan.com",
+      process.env.NEXT_PUBLIC_APP_URL || "https://admin.tarodan.com.tr",
     ),
     title: APP_NAME,
     description: t("admin.nav.defaultDescription"),

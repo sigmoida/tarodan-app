@@ -152,8 +152,8 @@ describe("production reference-data bootstrap", () => {
     const source = readFileSync(resetWorkflowPath, "utf8");
 
     // The app appends /api itself; a suffixed value yields /api/api/... links.
-    expect(source).toContain("https://api.tarodan.shop)");
-    expect(source).not.toContain("https://api.tarodan.shop/api");
+    expect(source).toContain("https://api.tarodan.com.tr)");
+    expect(source).not.toContain("https://api.tarodan.com.tr/api");
     // These are only required by the runtime reset, which runs after the wipe.
     expect(source).toContain("REDIS_URL REDIS_HOST");
     expect(source).toContain("ELASTICSEARCH_NODE|ELASTICSEARCH_URL");

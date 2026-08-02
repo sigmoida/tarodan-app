@@ -173,7 +173,9 @@ export class AdminSellerApplicationService {
       .digest("hex");
     const invitationExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
     const frontendUrl =
-      process.env.FRONTEND_URL || process.env.APP_URL || "https://tarodan.shop";
+      process.env.FRONTEND_URL ||
+      process.env.APP_URL ||
+      "https://tarodan.com.tr";
     const invitationUrl = `${frontendUrl}/corporate/invite?token=${invitationToken}`;
 
     await this.prisma.corporateApplication.update({
