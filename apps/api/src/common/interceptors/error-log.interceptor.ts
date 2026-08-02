@@ -8,6 +8,7 @@ import {
 import { Observable, throwError } from "rxjs";
 import { catchError } from "rxjs/operators";
 import { PrismaService } from "../../prisma/prisma.service";
+import { getRequestId } from "../context/request-context";
 
 const SENSITIVE_BODY_KEYS = new Set([
   "password",
@@ -72,11 +73,9 @@ export class ErrorLogInterceptor implements NestInterceptor {
 
     if (status < 400) return;
 
-    // Resolve human-readable severity
-    let severity: string;
-    if (status >= 500) severity = "error";
-    else if (status === 401 || status === 403) severity = "warning";
-    else severity = "warning";
+    // Yalnız iki seviye üretilir: 5xx sunucu arızası (error), her 4xx istemci
+    // hatasıdır (warning). /system/logs hata sekmesi de bu ikisini gösterir.
+    const severity = status >= 500 ? "error" : "warning";
 
     // Build cause chain so nested errors are visible
     const causes: string[] = [];
@@ -110,6 +109,9 @@ export class ErrorLogInterceptor implements NestInterceptor {
           source: "api",
           endpoint: `${method} ${url}`,
           userId: user?.id ?? user?.sub,
+          // Kolon şemada vardı ama hiç yazılmıyordu: bu satırı aynı isteğin
+          // konsol/Sentry izlerine ve kullanıcıya dönen 500 gövdesine bağlar.
+          requestId: getRequestId(),
           metadata: {
             status,
             name: error.name,

@@ -52,6 +52,15 @@ export function ErrorDetail({ log }: { log: ErrorLog }) {
             mono
           />
         )}
+        {/* Korelasyon kimliği: aynı isteğin konsol satırları bu kodla grep'lenir
+            ve kullanıcı 500 ekranında aynı kodu görür. */}
+        {log.requestId && (
+          <Field
+            label={t("admin.system.logs.details.requestId")}
+            value={log.requestId}
+            mono
+          />
+        )}
         {m?.ip && (
           <Field
             label={t("admin.system.logs.details.ipAddress")}

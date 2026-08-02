@@ -7,6 +7,7 @@ import { AppModule } from "./app.module";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { json, urlencoded } from "express";
 import { setupBullBoard } from "./bull-board.setup";
+import { requestIdMiddleware } from "./common/context/request-context";
 import { AppNestLogger } from "./common/logging/nest-logger";
 import { getProcessRole } from "./process-role";
 
@@ -44,6 +45,10 @@ async function bootstrap() {
     // al; yoksa rate-limit (ThrottlerGuard) tüm kullanıcıları tek proxy IP'sinde
     // toplayıp birbirini kilitler. İlk hop'a güven.
     app.set("trust proxy", 1);
+
+    // Korelasyon kimliği EN ERKEN kurulur: sonraki tüm middleware/guard/servis
+    // logları ve hata kayıtları aynı kimliği taşısın (AsyncLocalStorage).
+    app.use(requestIdMiddleware);
 
     // Custom Body Parsers (e.g. PayTR form-urlencoded callbacks).
     // Limit 50mb → 1mb: JSON/urlencoded gövdeler (API çağrıları + PayTR callback)

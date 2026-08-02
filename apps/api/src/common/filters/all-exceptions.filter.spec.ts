@@ -8,6 +8,7 @@ import { Prisma } from "@prisma/client";
 import { AllExceptionsFilter } from "./all-exceptions.filter";
 import { I18nService } from "../../modules/i18n/i18n.service";
 import { i18nMessage } from "../../modules/i18n/localized-message";
+import { runWithRequestId } from "../context/request-context";
 
 /**
  * Deterministic proof for issue #70 (+ #224 localization): the filter
@@ -149,5 +150,27 @@ describe("AllExceptionsFilter", () => {
       "accept-language": "en",
     });
     expect(body.message).toBe("Server error");
+  });
+
+  /**
+   * Sansürlenmiş 500'de istemciye tek bir iz kalır: korelasyon kimliği.
+   * Kullanıcı destek talebinde bu kodu söyler, operatör aynı kimlikle konsol
+   * satırlarını ve error_logs kaydını bulur — içeriden hiçbir detay sızmadan.
+   */
+  it("sanitize edilmiş 500 gövdesine korelasyon kimliğini ekler", () => {
+    const { body } = runWithRequestId("req-abc", () => run(new Error("boom")));
+    expect(body.requestId).toBe("req-abc");
+  });
+
+  it("kimlik yokken (bağlam dışı) alan hiç eklenmez", () => {
+    const { body } = run(new Error("boom"));
+    expect(body).not.toHaveProperty("requestId");
+  });
+
+  it("kasıtlı 4xx gövdesi DEĞİŞMEZ (mevcut sözleşme korunur)", () => {
+    const { body } = runWithRequestId("req-abc", () =>
+      run(new ForbiddenException("nope")),
+    );
+    expect(body).not.toHaveProperty("requestId");
   });
 });
