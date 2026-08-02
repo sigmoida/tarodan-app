@@ -1,6 +1,10 @@
 /** @format */
 
 import type { SVGProps } from "react";
+// Subpath import on purpose: this component renders inside Server Components
+// (the status pages), and the `@tarodan/ui` barrel would drag every client
+// primitive into that chain — see apps/web/CLAUDE.md §3.
+import { cn } from "@tarodan/ui/utils";
 
 type SocialIcon = (props: SVGProps<SVGSVGElement>) => React.ReactNode;
 
@@ -28,7 +32,8 @@ function TikTokIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-const SOCIAL = [
+/** Tarodan'ın sosyal medya hesapları — tek kaynak (footer + durum sayfaları). */
+export const SOCIAL_ACCOUNTS = [
   {
     name: "Instagram",
     href: "https://www.instagram.com/tarodan.com.tr/",
@@ -44,18 +49,33 @@ const SOCIAL = [
     href: "https://www.tiktok.com/@tarodan.com.tr",
     icon: TikTokIcon,
   },
-] satisfies Array<{
-  name: string;
-  href: string;
-  icon: SocialIcon;
-}>;
+] satisfies Array<{ name: string; href: string; icon: SocialIcon }>;
 
-export default function SocialLinks({ title }: { title?: string }) {
+const SIZES = {
+  sm: { box: "h-9 w-9", icon: "h-5 w-5", gap: "gap-1" },
+  md: { box: "h-11 w-11", icon: "h-6 w-6", gap: "gap-5" },
+};
+
+export default function SocialLinks({
+  title,
+  size = "md",
+  className,
+}: {
+  title?: string;
+  size?: keyof typeof SIZES;
+  className?: string;
+}) {
+  const s = SIZES[size];
+
   return (
     <div>
-      {title && <p className="mb-2 text-sm font-medium text-body">{title}</p>}
-      <div className="flex items-center justify-center gap-5">
-        {SOCIAL.map((social) => {
+      {title && (
+        <p className="mb-2 text-center text-sm font-medium text-body">
+          {title}
+        </p>
+      )}
+      <div className={cn("flex items-center justify-center", s.gap, className)}>
+        {SOCIAL_ACCOUNTS.map((social) => {
           const Icon = social.icon;
           return (
             <a
@@ -65,9 +85,12 @@ export default function SocialLinks({ title }: { title?: string }) {
               title={social.name}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-11 w-11 items-center justify-center text-heading transition-colors hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              className={cn(
+                "flex items-center justify-center rounded-lg text-heading transition-colors hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                s.box,
+              )}
             >
-              <Icon className="h-6 w-6" />
+              <Icon className={s.icon} />
             </a>
           );
         })}

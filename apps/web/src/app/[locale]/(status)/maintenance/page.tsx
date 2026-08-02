@@ -3,7 +3,7 @@
 import { WrenchScrewdriverIcon } from "@heroicons/react/24/outline";
 import { useLocale, useTranslations } from "next-intl";
 import StatusScreen from "../_components/StatusScreen";
-import SocialLinks from "../_components/SocialLinks";
+import SocialLinks from "@/components/ui/SocialLinks";
 
 export default function MaintenancePage() {
   const t = useTranslations();
