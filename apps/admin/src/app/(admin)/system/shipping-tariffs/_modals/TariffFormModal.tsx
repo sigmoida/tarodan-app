@@ -95,24 +95,6 @@ export function TariffFormModal({
         name="freeShippingEnabled"
         label={t("admin.shippingTariffs.freeEnabledLabel")}
       />
-      <div className="grid grid-cols-2 gap-4">
-        <FormInput
-          name="returnPackageFee"
-          label={t("admin.shippingTariffs.returnFeeLabel")}
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="100"
-        />
-        <FormInput
-          name="tradeLegFee"
-          label={t("admin.shippingTariffs.tradeFeeLabel")}
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="100"
-        />
-      </div>
     </FormModal>
   );
 }

@@ -58,7 +58,6 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     } as any;
     const shippingTariffs = {
       getActiveOutboundTariff: async () => ({
-        outboundPackageFee: BASE,
         freeShippingEnabled: true,
         freeShippingThreshold: THRESHOLD,
         packageTiers: flatPackageTiers(BASE),
@@ -67,7 +66,6 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         tariffId: "tariff-1",
         tariffVersion: 1,
         tariff: {
-          outboundPackageFee: BASE,
           freeShippingEnabled: true,
           freeShippingThreshold: THRESHOLD,
           packageTiers: flatPackageTiers(BASE),

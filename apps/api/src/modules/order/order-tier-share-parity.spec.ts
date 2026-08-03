@@ -14,7 +14,6 @@ import { packageTiers } from "../shipping/testing/tariff-fixture";
  */
 describe("shipping decision parity across checkout paths", () => {
   const tariff = {
-    outboundPackageFee: 0,
     freeShippingEnabled: false,
     freeShippingThreshold: 0,
     packageTiers: packageTiers(100, 130, 160),

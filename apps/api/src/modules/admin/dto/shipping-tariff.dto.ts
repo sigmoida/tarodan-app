@@ -81,10 +81,6 @@ export class CreateShippingTariffDto {
   @MaxLength(120)
   name: string;
 
-  @IsNumber()
-  @Min(0)
-  outboundPackageFee: number;
-
   @IsOptional()
   @IsBoolean()
   freeShippingEnabled?: boolean;
@@ -92,16 +88,6 @@ export class CreateShippingTariffDto {
   @IsNumber()
   @Min(0)
   freeShippingThreshold: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  returnPackageFee?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  tradeLegFee?: number;
 
   @IsOptional()
   @IsDateString()
@@ -122,11 +108,6 @@ export class UpdateShippingTariffDto {
   name?: string;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  outboundPackageFee?: number;
-
-  @IsOptional()
   @IsBoolean()
   freeShippingEnabled?: boolean;
 
@@ -134,16 +115,6 @@ export class UpdateShippingTariffDto {
   @IsNumber()
   @Min(0)
   freeShippingThreshold?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  returnPackageFee?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  tradeLegFee?: number;
 
   @IsOptional()
   @IsDateString()

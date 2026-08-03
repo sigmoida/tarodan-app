@@ -33,7 +33,6 @@ import { OrderTaxPolicyService } from "./order-tax-policy.service";
 // resolves without a DB.
 const SHIPPING_TARIFF_MOCK = {
   getActiveOutboundTariff: async () => ({
-    outboundPackageFee: 29.99,
     freeShippingEnabled: true,
     freeShippingThreshold: 500,
     packageTiers: flatPackageTiers(29.99),
@@ -42,7 +41,6 @@ const SHIPPING_TARIFF_MOCK = {
     tariffId: "tariff-1",
     tariffVersion: 1,
     tariff: {
-      outboundPackageFee: 29.99,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
       packageTiers: flatPackageTiers(29.99),

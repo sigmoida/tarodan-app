@@ -222,11 +222,8 @@ export async function seedBaseline(): Promise<{
       status: "active",
       version: 1,
       currency: "TRY",
-      outboundPackageFee: 29.99,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      returnPackageFee: 29.99,
-      tradeLegFee: 29.99,
       effectiveFrom: new Date(0),
       // Kademeler olmadan hiçbir fiyatlama yolu desiyi tutara çeviremez
       // (checkout ve TAKAS ücretlendirmesi fail-closed davranır). Üretim

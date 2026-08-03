@@ -19,7 +19,6 @@ export interface PackageTierLike {
 
 export interface OutboundTariffLike {
   provider?: string;
-  outboundPackageFee: DecimalLike;
   freeShippingEnabled: boolean;
   freeShippingThreshold: DecimalLike;
   packageTiers?: PackageTierLike[];

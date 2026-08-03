@@ -33,7 +33,6 @@ import { OrderTaxPolicyService } from "./order-tax-policy.service";
 const SHIPPING_TARIFF_TIERS = flatPackageTiers(29.99);
 const SHIPPING_TARIFF_MOCK = {
   getActiveOutboundTariff: async () => ({
-    outboundPackageFee: 29.99,
     freeShippingEnabled: true,
     freeShippingThreshold: 500,
     packageTiers: SHIPPING_TARIFF_TIERS,
@@ -42,7 +41,6 @@ const SHIPPING_TARIFF_MOCK = {
     tariffId: "tariff-1",
     tariffVersion: 1,
     tariff: {
-      outboundPackageFee: 29.99,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
       packageTiers: SHIPPING_TARIFF_TIERS,

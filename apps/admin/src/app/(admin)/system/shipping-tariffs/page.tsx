@@ -137,10 +137,6 @@ export default function ShippingTariffsPage() {
                       : t("admin.shippingTariffs.freeDisabled")
                   }
                 />
-                <Row
-                  label={t("admin.shippingTariffs.returnTrade")}
-                  value={`${fmtTry(Number(tariff.returnPackageFee))} · ${fmtTry(Number(tariff.tradeLegFee))}`}
-                />
               </dl>
               {tariff.status === "draft" && (
                 <div className="mt-4 flex gap-2">

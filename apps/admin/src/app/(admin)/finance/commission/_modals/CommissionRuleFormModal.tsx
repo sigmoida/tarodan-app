@@ -46,7 +46,6 @@ interface ShippingTariffSummary {
   provider: string;
   version: number;
   status: "draft" | "active" | "archived";
-  outboundPackageFee: number | string;
   packageTiers?: Array<{
     code: PackageTierCode;
     label: string;
@@ -319,9 +318,9 @@ function BreakdownPreview() {
   const selectedTier = tiers.find((tier) => tier.code === tierCode) ?? tiers[0];
 
   const amount = parseFloat(price) || 0;
-  const shipping = selectedTier
-    ? Number(selectedTier.amount)
-    : Number(activeTariff?.outboundPackageFee ?? 0);
+  // Kademe yoksa kargo fiyatlanamaz (checkout da fail-closed davranır): önizleme
+  // uydurma bir taban ücret göstermek yerine 0 kargoyla hesaplar.
+  const shipping = selectedTier ? Number(selectedTier.amount) : 0;
   const vatRate = parseFloat(vat) || 0;
   const whRate = parseFloat(withholding) || 0;
 

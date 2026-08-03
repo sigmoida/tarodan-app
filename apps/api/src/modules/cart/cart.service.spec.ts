@@ -57,7 +57,6 @@ describe("CartService.addItem — idempotent re-add", () => {
           provide: ShippingTariffService,
           useValue: {
             getActiveOutboundTariff: async () => ({
-              outboundPackageFee: 29.99,
               freeShippingEnabled: true,
               freeShippingThreshold: 500,
               packageTiers: flatPackageTiers(29.99),
@@ -190,7 +189,6 @@ describe("CartService.calculateCart — unavailable items", () => {
       mockDiscountService,
       {
         getActiveOutboundTariff: async () => ({
-          outboundPackageFee: 29.99,
           freeShippingEnabled: true,
           freeShippingThreshold: 500,
           packageTiers: flatPackageTiers(29.99),

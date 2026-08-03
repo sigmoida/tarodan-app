@@ -36,7 +36,6 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
           tariffId: "tariff-1",
           tariffVersion: 1,
           tariff: {
-            outboundPackageFee: 0,
             freeShippingEnabled: true,
             freeShippingThreshold: 0,
             packageTiers: flatPackageTiers(0),

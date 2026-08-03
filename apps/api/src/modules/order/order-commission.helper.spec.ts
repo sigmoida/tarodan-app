@@ -107,7 +107,6 @@ describe("commission rule matching by membership tier", () => {
     {} as TaxService,
     {
       getActiveOutboundTariff: async () => ({
-        outboundPackageFee: 29.99,
         freeShippingEnabled: true,
         freeShippingThreshold: 500,
       }),

@@ -23,7 +23,6 @@ describe("OrderPricingService listing commission preview", () => {
     getActiveOutboundTariff: jest.fn().mockResolvedValue({
       id: "tariff-1",
       version: 3,
-      outboundPackageFee: 100,
       freeShippingEnabled: false,
       freeShippingThreshold: null,
       packageTiers: packageTiers(100, 180, 260),

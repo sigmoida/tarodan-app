@@ -30,11 +30,8 @@ export interface ShippingTariff {
   status: ShippingTariffStatus;
   version: number;
   currency: string;
-  outboundPackageFee: number | string;
   freeShippingEnabled: boolean;
   freeShippingThreshold: number | string;
-  returnPackageFee: number | string;
-  tradeLegFee: number | string;
   effectiveFrom: string;
   createdAt: string;
   packageTiers: ShippingPackageTier[];
@@ -79,8 +76,6 @@ export const tariffSchema = (t: T) =>
     name: z.string().min(1, t("admin.shippingTariffs.nameRequired")),
     freeShippingEnabled: z.boolean().default(true),
     freeShippingThreshold: z.string().optional().default("0"),
-    returnPackageFee: z.string().optional().default("0"),
-    tradeLegFee: z.string().optional().default("0"),
     packageTiers: z
       .array(
         z.object({
@@ -166,8 +161,6 @@ export function tariffToForm(t: T, tariff?: ShippingTariff): TariffFormValues {
     name: tariff?.name ?? "",
     freeShippingEnabled: tariff?.freeShippingEnabled ?? true,
     freeShippingThreshold: num(tariff?.freeShippingThreshold),
-    returnPackageFee: num(tariff?.returnPackageFee),
-    tradeLegFee: num(tariff?.tradeLegFee),
     packageTiers: PACKAGE_TIER_CODES.map((code) => {
       const tier = byCode.get(code);
       const defaults = TIER_DEFAULTS[code];
@@ -201,12 +194,8 @@ export function tariffFormToPayload(v: TariffFormValues) {
   }));
   return {
     name: v.name.trim(),
-    // Legacy alan: kademe fiyatları devraldı; en küçük boyutun tutarı taban kalır.
-    outboundPackageFee: packageTiers[0]?.amount ?? 0,
     freeShippingEnabled: v.freeShippingEnabled,
     freeShippingThreshold: flt(v.freeShippingThreshold),
-    returnPackageFee: flt(v.returnPackageFee),
-    tradeLegFee: flt(v.tradeLegFee),
     packageTiers,
   };
 }

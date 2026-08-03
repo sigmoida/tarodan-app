@@ -16,7 +16,6 @@ import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
  */
 describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
   const tariff = {
-    outboundPackageFee: 50,
     freeShippingEnabled: false,
     freeShippingThreshold: 0,
     packageTiers: flatPackageTiers(50),

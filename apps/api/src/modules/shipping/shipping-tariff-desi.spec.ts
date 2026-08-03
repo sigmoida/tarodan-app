@@ -17,7 +17,6 @@ import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
  */
 describe("package-tier shipping pricing", () => {
   const tierTariff = {
-    outboundPackageFee: 99,
     freeShippingEnabled: false,
     freeShippingThreshold: 0,
     packageTiers: [
@@ -109,7 +108,6 @@ describe("package-tier shipping pricing", () => {
     expect(() =>
       shippingAmountForDesi(
         {
-          outboundPackageFee: 75,
           freeShippingEnabled: false,
           freeShippingThreshold: 0,
           packageTiers: [],

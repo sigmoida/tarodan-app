@@ -215,11 +215,8 @@ async function seedShippingTariff(): Promise<void> {
       status: ShippingTariffStatus.active,
       version: 1,
       currency: "TRY",
-      outboundPackageFee: LAUNCH_TARIFF_PACKAGE_FEE,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      returnPackageFee: LAUNCH_TARIFF_PACKAGE_FEE,
-      tradeLegFee: LAUNCH_TARIFF_PACKAGE_FEE,
       effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
       packageTiers: {
         create: SHIPPING_PACKAGE_TIER_DEFAULTS.map((tier) => ({

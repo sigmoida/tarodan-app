@@ -32,7 +32,6 @@ describe("OrderService.calculateCommission (BUYER + SELLER ayrı lookup) (E2E)",
     } as any; // taxService (no-tax stub)
     const shippingTariffs = {
       getActiveOutboundTariff: async () => ({
-        outboundPackageFee: 29.99,
         freeShippingEnabled: true,
         freeShippingThreshold: 500,
       }),
