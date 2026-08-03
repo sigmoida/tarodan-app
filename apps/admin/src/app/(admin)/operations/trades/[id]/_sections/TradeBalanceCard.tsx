@@ -4,7 +4,7 @@ import { enumLabel, paymentStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
-import type { TradeDetail, TradeItem } from "../types";
+import type { TradeCashPayment, TradeDetail, TradeItem } from "../types";
 
 const itemsTotal = (items: TradeItem[]) =>
   items.reduce((sum, item) => sum + Number(item.product?.price ?? 0), 0);
@@ -45,10 +45,67 @@ function SideLines({
   );
 }
 
+/** Tutarı 0 olan kalem gösterilmez — v1/v2 satırları aynı bileşenle çizilir. */
+function PaymentLine({ label, amount }: { label: string; amount: number }) {
+  if (!(amount > 0)) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 text-sm">
+      <span className="text-muted">{label}</span>
+      <span className="tabular-nums">{fmtTry(amount)}</span>
+    </div>
+  );
+}
+
+/**
+ * Bir tarafın ödeme satırı. v2'de her takasta iki tane vardır (kafa kafaya
+ * takasta bile): hizmet bedeli + 2 bacaklık kargo + varsa nakit fark.
+ */
+function PaymentRow({
+  payment,
+  payerName,
+}: {
+  payment: TradeCashPayment;
+  payerName: string;
+}) {
+  const t = useTranslations();
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-heading">{payerName}</span>
+        <span className="text-sm">
+          {enumLabel(paymentStatusConfig, payment.status, payment.status)}
+        </span>
+      </div>
+      <PaymentLine
+        label={t("trade.serviceFee")}
+        amount={Number(payment.tradeFeeAmount ?? 0)}
+      />
+      <PaymentLine
+        label={t("trade.shippingFee")}
+        amount={Number(payment.shippingAmount ?? 0)}
+      />
+      <PaymentLine
+        label={t("trade.cashDifferenceLine")}
+        amount={Number(payment.amount ?? 0)}
+      />
+      <PaymentLine
+        label={t("admin.operations.trades.balance.commission")}
+        amount={Number(payment.commission ?? 0)}
+      />
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border-subtle pt-1 text-sm font-medium">
+        <span>{t("admin.operations.trades.balance.chargedTotal")}</span>
+        <span className="tabular-nums">
+          {fmtTry(Number(payment.totalAmount))}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Takas farkının kalem kalem dökümü: iki tarafın ürün kalemleri + ara
- * toplamları, ürün değeri farkı (kimin lehine), anlaşılan nakit fark (ödeyen),
- * escrow'daki nakit ödemenin komisyonu ve tahsil edilen toplam.
+ * toplamları, ürün değeri farkı (kimin lehine), anlaşılan nakit fark (ödeyen)
+ * ve TARAF BAŞINA tahsil edilen ödeme satırları.
  */
 export function TradeBalanceCard({ trade }: { trade: TradeDetail }) {
   const t = useTranslations();
@@ -68,7 +125,16 @@ export function TradeBalanceCard({ trade }: { trade: TradeDetail }) {
       ? trade.initiator.displayName
       : trade.receiver.displayName
     : null;
-  const cash = trade.cashPayment;
+  // v2: taraf başına satır; v1: takas başına tek satır (aynı bileşenle çizilir).
+  const payments = trade.cashPayments?.length
+    ? trade.cashPayments
+    : trade.cashPayment
+      ? [trade.cashPayment]
+      : [];
+  const nameOf = (userId: string) =>
+    userId === trade.initiator.id
+      ? trade.initiator.displayName
+      : trade.receiver.displayName;
 
   return (
     <SectionCard title={t("admin.operations.trades.balance.title")}>
@@ -106,57 +172,46 @@ export function TradeBalanceCard({ trade }: { trade: TradeDetail }) {
         </div>
 
         {trade.cashAmount && trade.cashAmount > 0 ? (
-          <>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-muted">
-                {t("admin.operations.trades.balance.cashAgreed")}
-                {payerName && (
-                  <>
-                    {" "}
-                    · {t("admin.operations.trades.paidBy")}:{" "}
-                    <span className="font-medium text-body">{payerName}</span>
-                  </>
-                )}
-              </span>
-              <span className="font-semibold text-primary-600 tabular-nums">
-                +{fmtTry(trade.cashAmount)}
-              </span>
-            </div>
-            {cash && (
-              <>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-muted">
-                    {t("admin.operations.trades.balance.commission")}
-                  </span>
-                  <span className="tabular-nums">
-                    {fmtTry(Number(cash.commission))}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2 font-medium">
-                  <span>
-                    {t("admin.operations.trades.balance.chargedTotal")}
-                  </span>
-                  <span className="tabular-nums">
-                    {fmtTry(Number(cash.totalAmount))}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-muted">
-                    {t("admin.operations.trades.balance.paymentStatus")}
-                  </span>
-                  <span>
-                    {enumLabel(paymentStatusConfig, cash.status, cash.status)}
-                  </span>
-                </div>
-              </>
-            )}
-          </>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted">
+              {t("admin.operations.trades.balance.cashAgreed")}
+              {payerName && (
+                <>
+                  {" "}
+                  · {t("admin.operations.trades.paidBy")}:{" "}
+                  <span className="font-medium text-body">{payerName}</span>
+                </>
+              )}
+            </span>
+            <span className="font-semibold text-primary-600 tabular-nums">
+              +{fmtTry(trade.cashAmount)}
+            </span>
+          </div>
         ) : (
           <p className="text-muted">
             {t("admin.operations.trades.balance.equalTrade")}
           </p>
         )}
       </div>
+
+      {/* Ödeme satırları: v2'de kafa kafaya takasta bile İKİ taraf öder, bu
+          yüzden nakit farkı olmasa da bu blok gösterilir. */}
+      {payments.length > 0 && (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="mb-2 text-sm font-medium text-heading">
+            {t("admin.operations.trades.balance.paymentsTitle")}
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {payments.map((payment) => (
+              <PaymentRow
+                key={payment.id ?? payment.payerId}
+                payment={payment}
+                payerName={nameOf(payment.payerId)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </SectionCard>
   );
 }

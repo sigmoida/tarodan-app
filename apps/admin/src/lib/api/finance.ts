@@ -34,9 +34,6 @@ export const financeApi = {
     api.patch(`/admin/commission-rules/${id}`, data),
   deleteCommissionRule: (id: string) =>
     api.delete(`/admin/commission-rules/${id}`),
-  getTradeCommissionRate: () => api.get("/admin/trade-commission-rate"),
-  setTradeCommissionRate: (rate: number) =>
-    api.patch("/admin/trade-commission-rate", { rate }),
 
   // Payments
   getPayments: (params?: {

@@ -104,7 +104,6 @@ function extractSegment(url: string): string {
 export const ROLE_ONLY_ADMIN_SEGMENTS = new Set<string>([
   "invoices",
   "seller-invoices",
-  "trade-commission-rate",
 ]);
 
 /**

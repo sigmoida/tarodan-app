@@ -259,17 +259,6 @@ export class AdminService {
     return this.commissionService.deleteCommissionRule(adminId, ruleId);
   }
 
-  // ==================== TAKAS KOMİSYONU (ayarlanabilir oran) ====================
-  // Taşındı: admin-commission.service.ts — imzalar aynen korunuyor (facade delege).
-
-  async getTradeCommissionRate() {
-    return this.commissionService.getTradeCommissionRate();
-  }
-
-  async setTradeCommissionRate(adminId: string, rate: number) {
-    return this.commissionService.setTradeCommissionRate(adminId, rate);
-  }
-
   // ==================== PLATFORM SETTINGS ====================
   // Taşındı: admin-settings.service.ts — imzalar aynen korunuyor (facade delege).
 

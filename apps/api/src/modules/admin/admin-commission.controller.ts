@@ -115,23 +115,6 @@ export class AdminCommissionController {
 
   // ==================== COMMISSION RULES ====================
 
-  @Get("trade-commission-rate")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Takas nakit farkı komisyon oranı (%)" })
-  async getTradeCommissionRate() {
-    return this.adminService.getTradeCommissionRate();
-  }
-
-  @Patch("trade-commission-rate")
-  @Roles(AdminRole.super_admin)
-  @ApiOperation({ summary: "Takas komisyon oranını güncelle" })
-  async setTradeCommissionRate(
-    @CurrentUser("id") adminId: string,
-    @Body() body: { rate: number },
-  ) {
-    return this.adminService.setTradeCommissionRate(adminId, Number(body.rate));
-  }
-
   @Get("commission-rules")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Get all commission rules" })

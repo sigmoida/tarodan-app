@@ -3924,9 +3924,6 @@
         "totalCommission": "Toplam Komisyon",
         "totalCollected": "Toplam Tahsil Edilen Komisyon",
         "completedOrders": "Tamamlanan siparişler",
-        "tradeCommission": "Takas Komisyonu",
-        "tradeRateUpdated": "Takas komisyon oranı güncellendi",
-        "tradeDescription": "Takasta nakit farkı ödeyen taraftan alınan komisyon oranı. Faturası, ürünler <strong>depoya ulaşınca</strong> kesilir (ödeme anında değil) — iptal edilirse fatura oluşmaz.",
         "previewCalculator": "Önizleme Hesaplayıcı",
         "previewDescription": "Aktif kurallar, ödeme adımındaki gibi satıcı ve alıcı için ayrı ayrı eşleştirilir.",
         "exampleCategory": "Örnek Ürün Kategorisi",
@@ -4059,7 +4056,8 @@
         "tradeFeesTitle": "Takas hizmet bedelleri",
         "tradeFeesHelper": "Bu kurala düşen ürün TAKASA girdiğinde alınan sabit bedeller. KDV DAHİL girin — üzerine hesap yapılmaz. Boş bırakılan kalem 0'dır.",
         "tradeFeeSeller": "Ürünü veren taraf (₺)",
-        "tradeFeeBuyer": "Ürünü alan taraf (₺)"
+        "tradeFeeBuyer": "Ürünü alan taraf (₺)",
+        "tradeFeeColumn": "Takas ücreti (veren / alan)"
       },
       "invoices": {
         "title": "Faturalar",
@@ -4378,7 +4376,9 @@
           "pspFee": "PayTR kesintisi",
           "pspFeeHint": "Dönem içinde sağlayıcı ekstresinden deftere yazılan gerçek kesinti",
           "netAfterPsp": "Tarodan hak edişi",
-          "netAfterPspHint": "Komisyon geliri eksi PayTR kesintisi"
+          "netAfterPspHint": "Komisyon geliri eksi PayTR kesintisi",
+          "tradeFee": "Takas hizmet bedeli",
+          "tradeFeeHint": "KDV hariç gelir · tahsil edilen {collected}"
         },
         "health": {
           "title": "Dikkat Gerektirenler",
@@ -4731,7 +4731,8 @@
           "commission": "Takas komisyonu",
           "chargedTotal": "Tahsil edilen toplam (fark + komisyon)",
           "paymentStatus": "Ödeme durumu",
-          "equalTrade": "Eşit takas — nakit fark yok."
+          "equalTrade": "Eşit takas — nakit fark yok.",
+          "paymentsTitle": "Taraf ödemeleri"
         }
       },
       "refundRequests": {

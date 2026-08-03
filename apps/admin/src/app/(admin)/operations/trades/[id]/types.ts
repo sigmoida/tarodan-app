@@ -28,6 +28,25 @@ export interface TradeItem {
   };
 }
 
+export interface TradeCashPayment {
+  id?: string;
+  payerId: string;
+  /** Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. */
+  recipientId?: string | null;
+  /** Nakit fark. */
+  amount: number;
+  /** v2: takas hizmet bedeli (KDV dahil). */
+  tradeFeeAmount?: number;
+  /** v2: bu tarafın 2 bacaklık kargo bedeli. */
+  shippingAmount?: number;
+  /** LEGACY (v1): aracılık komisyonu. */
+  commission: number;
+  totalAmount: number;
+  status: string;
+  paidAt?: string | null;
+  refundedAt?: string | null;
+}
+
 export interface TradeDetail {
   id: string;
   tradeNumber?: string;
@@ -35,16 +54,13 @@ export interface TradeDetail {
   cashAmount?: number;
   /** Nakit farkını ödeyen taraf (initiator.id | receiver.id). null = eşit takas. */
   cashPayerId?: string | null;
-  /** Escrow nakit ödeme kaydı (accept'te oluşur): komisyon + toplam dahil. */
-  cashPayment?: {
-    payerId: string;
-    recipientId: string;
-    amount: number;
-    commission: number;
-    totalAmount: number;
-    status: string;
-    paidAt?: string | null;
-  } | null;
+  /**
+   * Escrow ödeme satırları (accept'te oluşur). v2'de TARAF BAŞINA bir satır
+   * vardır: hizmet bedeli + 2 bacaklık kargo + varsa nakit fark.
+   */
+  cashPayments?: TradeCashPayment[];
+  /** LEGACY (v1): takas başına tek satır. */
+  cashPayment?: TradeCashPayment | null;
   initiator: { id: string; displayName: string; email: string };
   receiver: { id: string; displayName: string; email: string };
   initiatorItems: TradeItem[];

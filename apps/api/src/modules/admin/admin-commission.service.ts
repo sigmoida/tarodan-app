@@ -577,43 +577,4 @@ export class AdminCommissionService {
 
     return { success: true };
   }
-
-  // ==================== TAKAS KOMİSYONU (ayarlanabilir oran) ====================
-
-  /** Takas nakit farkı komisyon oranı (%). PlatformSetting 'trade_commission_rate', varsayılan %5. */
-  async getTradeCommissionRate(): Promise<{ rate: number }> {
-    const row = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "trade_commission_rate" },
-    });
-    return { rate: Number(row?.settingValue ?? "5") || 5 };
-  }
-
-  async setTradeCommissionRate(
-    adminId: string,
-    rate: number,
-  ): Promise<{ rate: number }> {
-    if (!(rate >= 0 && rate <= 100)) {
-      throw new BadRequestException("Oran 0 ile 100 arasında olmalı");
-    }
-    await this.prisma.platformSetting.upsert({
-      where: { settingKey: "trade_commission_rate" },
-      create: {
-        settingKey: "trade_commission_rate",
-        settingValue: String(rate),
-        settingType: "number",
-        description: "Takas nakit farkı komisyon oranı (%)",
-        updatedBy: adminId,
-      },
-      update: { settingValue: String(rate), updatedBy: adminId },
-    });
-    await this.audit.createRequiredAuditLog(
-      adminId,
-      "trade_commission_rate_update",
-      "PlatformSetting",
-      "trade_commission_rate",
-      null,
-      { rate },
-    );
-    return { rate };
-  }
 }

@@ -3924,9 +3924,6 @@
         "totalCommission": "Total Commission",
         "totalCollected": "Total Commission Collected",
         "completedOrders": "Completed orders",
-        "tradeCommission": "Trade Commission",
-        "tradeRateUpdated": "Trade commission rate updated",
-        "tradeDescription": "The commission rate charged to the party paying the cash difference in a trade. Its invoice is issued <strong>when the products reach the warehouse</strong> (not at payment time) — no invoice is created if the trade is cancelled.",
         "previewCalculator": "Preview Calculator",
         "previewDescription": "Active rules are matched separately for the seller and buyer, just as they are at checkout.",
         "exampleCategory": "Example Product Category",
@@ -4059,7 +4056,8 @@
         "tradeFeesTitle": "Trade service fees",
         "tradeFeesHelper": "Flat fees charged when a product under this rule enters a TRADE. Enter them VAT included — nothing is added on top. An empty field means zero.",
         "tradeFeeSeller": "Party giving the product (₺)",
-        "tradeFeeBuyer": "Party receiving the product (₺)"
+        "tradeFeeBuyer": "Party receiving the product (₺)",
+        "tradeFeeColumn": "Trade fee (giver / taker)"
       },
       "invoices": {
         "title": "Invoices",
@@ -4378,7 +4376,9 @@
           "pspFee": "PayTR fees",
           "pspFeeHint": "Actual fees booked from the provider statement in this period",
           "netAfterPsp": "Tarodan net revenue",
-          "netAfterPspHint": "Commission revenue minus PayTR fees"
+          "netAfterPspHint": "Commission revenue minus PayTR fees",
+          "tradeFee": "Trade service fee",
+          "tradeFeeHint": "Net of VAT · {collected} collected"
         },
         "health": {
           "title": "Needs Attention",
@@ -4731,7 +4731,8 @@
           "commission": "Trade commission",
           "chargedTotal": "Total charged (difference + commission)",
           "paymentStatus": "Payment status",
-          "equalTrade": "Equal trade — no cash difference."
+          "equalTrade": "Equal trade — no cash difference.",
+          "paymentsTitle": "Party payments"
         }
       },
       "refundRequests": {

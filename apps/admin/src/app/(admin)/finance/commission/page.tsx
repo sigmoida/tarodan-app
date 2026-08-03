@@ -15,7 +15,6 @@ import { ResourceList, useResourceList } from "@/components/list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { CommissionSummary } from "./_components/CommissionSummary";
-import { TradeRateCard } from "./_components/TradeRateCard";
 import { CommissionTable } from "./_components/CommissionTable";
 import { CommissionRuleFormModal } from "./_modals/CommissionRuleFormModal";
 import { type CommissionRule, isDefaultRule } from "./_lib/types";
@@ -129,7 +128,6 @@ export default function CommissionPage() {
       >
         {t("admin.finance.commission.calculationDescription")}
       </Alert>
-      <TradeRateCard />
       <ResourceList.Toolbar>
         <ResourceList.Search />
       </ResourceList.Toolbar>

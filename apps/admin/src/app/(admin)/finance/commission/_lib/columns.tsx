@@ -1,5 +1,6 @@
 import { Badge } from "@tarodan/ui";
 import { col } from "@/components/table";
+import { fmtTry } from "@/lib/format";
 import { commissionRowMenu } from "./rowActions";
 import {
   type CommissionRule,
@@ -12,6 +13,14 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 const rate = (v: number | null | undefined) =>
   v != null ? `%${v.toFixed(2)}` : "—";
+
+/** Takas sabit ücretleri: "veren / alan" (ikisi de boşsa "—"). */
+const tradeFeePair = (r: CommissionRule) => {
+  const seller = r.tradeFeeSellerAmount ?? 0;
+  const buyer = r.tradeFeeBuyerAmount ?? 0;
+  if (!seller && !buyer) return "—";
+  return `${fmtTry(seller)} / ${fmtTry(buyer)}`;
+};
 
 /** Tiered amount range, e.g. "0 – 1000", "1000+", or "—". */
 const tier = (r: CommissionRule) => {
@@ -76,6 +85,13 @@ export function commissionColumns(
         </span>
       ),
       { align: "right", sortKey: "buyerRate", sortType: "number" },
+    ),
+    // Takas ücretleri ORAN değil, KDV dahil sabit tutardır: satıcı/alıcı ayrı
+    // girilir ama listede tek kolonda "veren / alan" olarak özetlenir.
+    col.custom<CommissionRule>(
+      t("admin.finance.commission.tradeFeeColumn"),
+      (r) => <span className="tabular-nums text-body">{tradeFeePair(r)}</span>,
+      { align: "right", sortKey: "tradeFeeSellerAmount", sortType: "number" },
     ),
     col.badge<CommissionRule>(
       t("common.status"),

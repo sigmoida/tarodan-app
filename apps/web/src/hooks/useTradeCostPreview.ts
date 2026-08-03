@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { tradesApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 
 /** Bir tarafın önizleme dökümü (kullanıcı kimliği yok — teklif henüz yok). */
 export interface TradeQuotePreviewParty {
@@ -68,7 +69,7 @@ export function useTradeCostPreview({
   const hasSelection = myProductIds.length > 0 || theirProductIds.length > 0;
 
   const query = useQuery({
-    queryKey: ["trade-cost-preview", debounced],
+    queryKey: queryKeys.trades.costPreview(debounced),
     queryFn: async (): Promise<TradeQuotePreview> => {
       const [mine, theirs, cash, payer] = JSON.parse(debounced) as [
         string[],
