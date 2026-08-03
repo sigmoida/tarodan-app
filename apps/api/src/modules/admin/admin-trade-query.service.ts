@@ -147,7 +147,7 @@ export class AdminTradeQueryService {
             },
           },
           shipments: true,
-          cashPayment: true,
+          cashPayments: true,
           dispute: true,
         },
         orderBy,
@@ -308,7 +308,7 @@ export class AdminTradeQueryService {
             events: { orderBy: { eventTime: "asc" } },
           },
         },
-        cashPayment: true,
+        cashPayments: true,
         dispute: true,
       },
     });

@@ -1628,7 +1628,7 @@ export class PaymentRefundService {
         .catch(() => {});
       if (result.refunded) {
         try {
-          const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
             where: { tradeId },
             select: { payerId: true },
           });
@@ -1668,7 +1668,7 @@ export class PaymentRefundService {
           ),
         );
       try {
-        const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+        const cashPayment = await this.prisma.tradeCashPayment.findFirst({
           where: { tradeId },
           select: { payerId: true },
         });

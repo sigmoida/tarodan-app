@@ -1713,7 +1713,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       expect(res.body.paymentId).toBeTruthy();
       expect(ctx.paytr.directPaymentCalls.length).toBe(1);
       const prisma = getPrisma();
-      const cp = await prisma.tradeCashPayment.findUnique({
+      const cp = await prisma.tradeCashPayment.findFirst({
         where: { tradeId },
       });
       // PayTR'a giden tutar cashPayment.totalAmount'tır (cashAmount + %5 komisyon = 105, 100 DEĞİL).
@@ -1748,7 +1748,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         cashAmount: 100,
       });
       const prisma = getPrisma();
-      const cp = await prisma.tradeCashPayment.findUnique({
+      const cp = await prisma.tradeCashPayment.findFirst({
         where: { tradeId },
       });
       await request(server())
@@ -1770,7 +1770,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         )
         .expect(200);
 
-      const paid = await prisma.tradeCashPayment.findUnique({
+      const paid = await prisma.tradeCashPayment.findFirst({
         where: { tradeId },
       });
       expect(paid?.status).toBe(PaymentStatus.completed);
@@ -1812,7 +1812,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         cashAmount: 50,
       });
       const prisma = getPrisma();
-      const cp = await prisma.tradeCashPayment.findUnique({
+      const cp = await prisma.tradeCashPayment.findFirst({
         where: { tradeId },
       });
       await request(server())

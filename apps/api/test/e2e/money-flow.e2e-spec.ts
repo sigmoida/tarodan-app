@@ -1,29 +1,29 @@
-import * as request from 'supertest';
+import * as request from "supertest";
 import {
   PaymentStatus,
   PaymentHoldStatus,
   PrismaClient,
   TradeStatus,
   ShipmentStatus,
-} from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+} from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
+} from "../test-utils/db";
 import {
   createUser,
   createAdminUser,
   authHeader,
-} from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { signCallback } from '../mocks/paytr.mock';
-import { PaymentService } from '../../src/modules/payment/payment.service';
-import { PayoutService } from '../../src/modules/payout/payout.service';
-import { TradeService } from '../../src/modules/trade/trade.service';
+} from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { signCallback } from "../mocks/paytr.mock";
+import { PaymentService } from "../../src/modules/payment/payment.service";
+import { PayoutService } from "../../src/modules/payout/payout.service";
+import { TradeService } from "../../src/modules/trade/trade.service";
 
 /**
  * Wait for the post-accept fire-and-forget inbound dispatch to settle.
@@ -36,12 +36,12 @@ async function waitForInboundShipments(
 ) {
   const deadline = Date.now() + timeoutMs;
   let rows = await prisma.tradeShipment.findMany({
-    where: { tradeId, leg: 'to_warehouse' },
+    where: { tradeId, leg: "to_warehouse" },
   });
   while (rows.length < expected && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 50));
     rows = await prisma.tradeShipment.findMany({
-      where: { tradeId, leg: 'to_warehouse' },
+      where: { tradeId, leg: "to_warehouse" },
     });
   }
   return rows;
@@ -50,12 +50,12 @@ async function waitForInboundShipments(
 async function configureWarehouseAddress(addressId: string): Promise<void> {
   const prisma = getPrisma();
   await prisma.platformSetting.upsert({
-    where: { settingKey: 'warehouse_address_id' },
+    where: { settingKey: "warehouse_address_id" },
     update: { settingValue: addressId },
     create: {
-      settingKey: 'warehouse_address_id',
+      settingKey: "warehouse_address_id",
       settingValue: addressId,
-      settingType: 'string',
+      settingType: "string",
     },
   });
 }
@@ -66,7 +66,7 @@ async function configureWarehouseAddress(addressId: string): Promise<void> {
  * Payment / PaymentHold / TradeCashPayment rows match the expected state.
  */
 
-describe('Money Flow Timeline (E2E)', () => {
+describe("Money Flow Timeline (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -85,10 +85,13 @@ describe('Money Flow Timeline (E2E)', () => {
     ctx.paytr.reset();
   });
 
-  describe('Order: pay → hold → confirm → release after window', () => {
-    it('PaymentHold is held during fulfillment, released only after the cron fires past releaseAt', async () => {
+  describe("Order: pay → hold → confirm → release after window", () => {
+    it("PaymentHold is held during fulfillment, released only after the cron fires past releaseAt", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -99,14 +102,14 @@ describe('Money Flow Timeline (E2E)', () => {
 
       // Buy + initiate + callback
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
       const prisma = getPrisma();
@@ -115,11 +118,11 @@ describe('Money Flow Timeline (E2E)', () => {
       });
       const cb = signCallback({
         merchantOid: payment!.providerConversationId!,
-        status: 'success',
+        status: "success",
         totalAmount: Math.round(Number(payment!.amount) * 100),
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(cb);
 
       // T0: hold exists, status held, releaseAt set in the future
@@ -136,7 +139,7 @@ describe('Money Flow Timeline (E2E)', () => {
       // T+release: confirm delivery (manual delivered transition for test brevity)
       await prisma.order.update({
         where: { id: buyRes.body.orderId },
-        data: { status: 'delivered', version: { increment: 1 } },
+        data: { status: "delivered", version: { increment: 1 } },
       });
       await request(ctx.app.getHttpServer())
         .post(`/api/orders/${buyRes.body.orderId}/confirm`)
@@ -167,7 +170,8 @@ describe('Money Flow Timeline (E2E)', () => {
 
       // Verify: PayoutTransfer can be created for the released hold
       const payoutService = ctx.app.get(PayoutService);
-      const payoutsCreated = await payoutService.createPayoutsForReleasedHolds();
+      const payoutsCreated =
+        await payoutService.createPayoutsForReleasedHolds();
       expect(payoutsCreated).toBeGreaterThanOrEqual(1);
 
       const payout = await prisma.payoutTransfer.findFirst({
@@ -179,18 +183,30 @@ describe('Money Flow Timeline (E2E)', () => {
     });
   });
 
-  describe('Trade cash: escrowed during fulfilment, recipient paid only after both confirm + window', () => {
-    it('completes a cash trade and only releases TradeCashPayment after holdReleaseAt passes', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+  describe("Trade cash: escrowed during fulfilment, recipient paid only after both confirm + window", () => {
+    it("completes a cash trade and only releases TradeCashPayment after holdReleaseAt passes", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
 
       await createAddress({ userId: initiator.id });
       await createAddress({ userId: receiver.id });
-      const initiatorShip = await createAddress({ userId: initiator.id, isDefault: false });
-      const receiverShip = await createAddress({ userId: receiver.id, isDefault: false });
+      const initiatorShip = await createAddress({
+        userId: initiator.id,
+        isDefault: false,
+      });
+      const receiverShip = await createAddress({
+        userId: receiver.id,
+        isDefault: false,
+      });
 
       const ip = await createProduct({
         sellerId: initiator.id,
@@ -208,7 +224,7 @@ describe('Money Flow Timeline (E2E)', () => {
       });
 
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -227,13 +243,15 @@ describe('Money Flow Timeline (E2E)', () => {
         .expect(201);
 
       const prisma = getPrisma();
-      let cashPayment = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      let cashPayment = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       expect(cashPayment?.status).toBe(PaymentStatus.pending);
       expect(cashPayment?.holdReleaseAt).toBeNull();
 
       // Initiate + callback success
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate-trade-cash')
+        .post("/api/payments/initiate-trade-cash")
         .set(authHeader(initiator))
         .send({ tradeId })
         .expect(201);
@@ -241,18 +259,20 @@ describe('Money Flow Timeline (E2E)', () => {
         where: { tradeCashPaymentId: cashPayment!.id },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(
           signCallback({
             merchantOid: payment!.providerConversationId!,
-            status: 'success',
+            status: "success",
             totalAmount: Math.round(Number(payment!.amount) * 100),
           }),
         )
         .expect(200);
 
       // Cash escrowed: completed but not released
-      cashPayment = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      cashPayment = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       expect(cashPayment?.status).toBe(PaymentStatus.completed);
       expect(cashPayment?.holdReleaseAt).toBeNull();
       expect(cashPayment?.releasedAt).toBeNull();
@@ -276,7 +296,7 @@ describe('Money Flow Timeline (E2E)', () => {
         .send({})
         .expect(200);
       const fromWarehouse = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'from_warehouse' },
+        where: { tradeId, leg: "from_warehouse" },
       });
       for (const s of fromWarehouse) {
         await prisma.tradeShipment.update({
@@ -295,11 +315,15 @@ describe('Money Flow Timeline (E2E)', () => {
         .send({})
         .expect(201);
 
-      const tradeAfter = await prisma.trade.findUnique({ where: { id: tradeId } });
+      const tradeAfter = await prisma.trade.findUnique({
+        where: { id: tradeId },
+      });
       expect(tradeAfter?.status).toBe(TradeStatus.completed);
 
       // After completion: holdReleaseAt set in the future, releasedAt still null
-      cashPayment = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      cashPayment = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       expect(cashPayment?.holdReleaseAt).toBeTruthy();
       expect(cashPayment?.releasedAt).toBeNull();
 
@@ -312,12 +336,15 @@ describe('Money Flow Timeline (E2E)', () => {
       const result = await paymentService.releaseHoldsDue();
       expect(result.tradeCashReleased).toBeGreaterThanOrEqual(1);
 
-      cashPayment = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      cashPayment = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       expect(cashPayment?.releasedAt).toBeTruthy();
 
       // Verify: PayoutTransfer can be created for the released trade cash
       const payoutService = ctx.app.get(PayoutService);
-      const payoutsCreated = await payoutService.createPayoutsForReleasedHolds();
+      const payoutsCreated =
+        await payoutService.createPayoutsForReleasedHolds();
       expect(payoutsCreated).toBeGreaterThanOrEqual(1);
 
       const payout = await prisma.payoutTransfer.findFirst({
@@ -328,10 +355,16 @@ describe('Money Flow Timeline (E2E)', () => {
     });
   });
 
-  describe('Trade cash refund on cancellation', () => {
-    it('refundTradeCashPaymentIfCompleted issues a PayTR refund and stamps refundedAt', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+  describe("Trade cash refund on cancellation", () => {
+    it("refundTradeCashPaymentIfCompleted issues a PayTR refund and stamps refundedAt", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -349,7 +382,7 @@ describe('Money Flow Timeline (E2E)', () => {
         isTradeEnabled: true,
       });
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -366,12 +399,12 @@ describe('Money Flow Timeline (E2E)', () => {
         .expect(201);
 
       const prisma = getPrisma();
-      const cp = await prisma.tradeCashPayment.findUnique({
+      const cp = await prisma.tradeCashPayment.findFirst({
         where: { tradeId: created.body.id },
       });
 
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate-trade-cash')
+        .post("/api/payments/initiate-trade-cash")
         .set(authHeader(initiator))
         .send({ tradeId: created.body.id })
         .expect(201);
@@ -379,18 +412,20 @@ describe('Money Flow Timeline (E2E)', () => {
         where: { tradeCashPaymentId: cp!.id },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(
           signCallback({
             merchantOid: payment!.providerConversationId!,
-            status: 'success',
+            status: "success",
             totalAmount: Math.round(Number(payment!.amount) * 100),
           }),
         )
         .expect(200);
 
       const paymentService = ctx.app.get(PaymentService);
-      const result = await paymentService.refundTradeCashPaymentIfCompleted(created.body.id);
+      const result = await paymentService.refundTradeCashPaymentIfCompleted(
+        created.body.id,
+      );
       expect(result.refunded).toBe(true);
 
       const cpAfter = await prisma.tradeCashPayment.findUnique({
@@ -403,9 +438,15 @@ describe('Money Flow Timeline (E2E)', () => {
       expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('G3: süre aşımı auto-cancel ödenmiş nakit takası iptal eder VE nakit iadesini tetikler', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+    it("G3: süre aşımı auto-cancel ödenmiş nakit takası iptal eder VE nakit iadesini tetikler", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -423,7 +464,7 @@ describe('Money Flow Timeline (E2E)', () => {
         isTradeEnabled: true,
       });
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -439,11 +480,11 @@ describe('Money Flow Timeline (E2E)', () => {
         .expect(201);
 
       const prisma = getPrisma();
-      const cp = await prisma.tradeCashPayment.findUnique({
+      const cp = await prisma.tradeCashPayment.findFirst({
         where: { tradeId: created.body.id },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate-trade-cash')
+        .post("/api/payments/initiate-trade-cash")
         .set(authHeader(initiator))
         .send({ tradeId: created.body.id })
         .expect(201);
@@ -451,18 +492,20 @@ describe('Money Flow Timeline (E2E)', () => {
         where: { tradeCashPaymentId: cp!.id },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
+        .post("/api/payments/callback/paytr")
         .send(
           signCallback({
             merchantOid: payment!.providerConversationId!,
-            status: 'success',
+            status: "success",
             totalAmount: Math.round(Number(payment!.amount) * 100),
           }),
         )
         .expect(200);
 
       // Ödeme sonrası takas shipping_to_warehouse'a geçer; henüz depoya ulaşmadı.
-      const paid = await prisma.trade.findUnique({ where: { id: created.body.id } });
+      const paid = await prisma.trade.findUnique({
+        where: { id: created.body.id },
+      });
       expect(paid!.status).toBe(TradeStatus.shipping_to_warehouse);
 
       // Süreyi geçmişe çek, depoya varış yok → auto-cancel uygun
@@ -477,19 +520,26 @@ describe('Money Flow Timeline (E2E)', () => {
       const tradeService = ctx.app.get(TradeService);
       await tradeService.autoCancelExpiredTrades();
 
-      const cancelled = await prisma.trade.findUnique({ where: { id: created.body.id } });
+      const cancelled = await prisma.trade.findUnique({
+        where: { id: created.body.id },
+      });
       expect(cancelled!.status).toBe(TradeStatus.cancelled);
 
-      const cpAfter = await prisma.tradeCashPayment.findUnique({ where: { id: cp!.id } });
+      const cpAfter = await prisma.tradeCashPayment.findUnique({
+        where: { id: cp!.id },
+      });
       expect(cpAfter!.refundedAt).toBeTruthy();
       expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
     });
   });
 
-  describe('Order refund restores product stock', () => {
-    it('processRefund cancels order, cancels hold, and re-stocks the product', async () => {
+  describe("Order refund restores product stock", () => {
+    it("processRefund cancels order, cancels hold, and re-stocks the product", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -501,26 +551,32 @@ describe('Money Flow Timeline (E2E)', () => {
 
       // Buy + pay
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const payment = await prisma.payment.findFirst({
+        where: { orderId: buyRes.body.orderId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Verify product stock decremented
-      const productAfterPay = await prisma.product.findUnique({ where: { id: product.id } });
+      const productAfterPay = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
       expect(productAfterPay?.quantity).toBe(0);
 
       // Refund
@@ -528,11 +584,15 @@ describe('Money Flow Timeline (E2E)', () => {
       await paymentService.processRefund(buyRes.body.orderId);
 
       // Order should be cancelled
-      const orderAfter = await prisma.order.findUnique({ where: { id: buyRes.body.orderId } });
-      expect(orderAfter?.status).toBe('cancelled');
+      const orderAfter = await prisma.order.findUnique({
+        where: { id: buyRes.body.orderId },
+      });
+      expect(orderAfter?.status).toBe("cancelled");
 
       // Hold should be cancelled
-      const holdAfter = await prisma.paymentHold.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const holdAfter = await prisma.paymentHold.findFirst({
+        where: { orderId: buyRes.body.orderId },
+      });
       expect(holdAfter?.status).toBe(PaymentHoldStatus.cancelled);
 
       // PayTR refund was called
@@ -540,17 +600,29 @@ describe('Money Flow Timeline (E2E)', () => {
     });
   });
 
-  describe('Trade cash refund after admin warehouse rejection', () => {
-    it('admin reject triggers PayTR refund for completed cash payment', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+  describe("Trade cash refund after admin warehouse rejection", () => {
+    it("admin reject triggers PayTR refund for completed cash payment", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
       await createAddress({ userId: initiator.id });
       await createAddress({ userId: receiver.id });
-      const initiatorShip = await createAddress({ userId: initiator.id, isDefault: false });
-      const receiverShip = await createAddress({ userId: receiver.id, isDefault: false });
+      const initiatorShip = await createAddress({
+        userId: initiator.id,
+        isDefault: false,
+      });
+      const receiverShip = await createAddress({
+        userId: receiver.id,
+        isDefault: false,
+      });
 
       const ip = await createProduct({
         sellerId: initiator.id,
@@ -569,7 +641,7 @@ describe('Money Flow Timeline (E2E)', () => {
 
       // Create trade with cash, accept, pay
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -587,20 +659,26 @@ describe('Money Flow Timeline (E2E)', () => {
         .expect(201);
 
       const prisma = getPrisma();
-      const cp = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      const cp = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate-trade-cash')
+        .post("/api/payments/initiate-trade-cash")
         .set(authHeader(initiator))
         .send({ tradeId })
         .expect(201);
-      const payment = await prisma.payment.findFirst({ where: { tradeCashPaymentId: cp!.id } });
+      const payment = await prisma.payment.findFirst({
+        where: { tradeCashPaymentId: cp!.id },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }))
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        )
         .expect(200);
 
       // Inbound shipments auto-created post-cash-payment; poll for them.
@@ -620,11 +698,13 @@ describe('Money Flow Timeline (E2E)', () => {
       await request(ctx.app.getHttpServer())
         .post(`/api/admin/trades/${tradeId}/reject`)
         .set(authHeader(admin))
-        .send({ reason: 'Ürün hasarlı' })
+        .send({ reason: "Ürün hasarlı" })
         .expect(200);
 
       // Cash payment should be refunded
-      const cpAfter = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      const cpAfter = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       expect(cpAfter?.refundedAt).toBeTruthy();
       expect(cpAfter?.releasedAt).toBeNull();
 
@@ -632,15 +712,23 @@ describe('Money Flow Timeline (E2E)', () => {
       expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
 
       // Trade should be returning or cancelled
-      const tradeAfter = await prisma.trade.findUnique({ where: { id: tradeId } });
-      expect(['returning', 'cancelled']).toContain(tradeAfter?.status);
+      const tradeAfter = await prisma.trade.findUnique({
+        where: { id: tradeId },
+      });
+      expect(["returning", "cancelled"]).toContain(tradeAfter?.status);
     });
   });
 
-  describe('Trade cash refund blocks future PayoutTransfer', () => {
-    it('no PayoutTransfer is created after refund', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+  describe("Trade cash refund blocks future PayoutTransfer", () => {
+    it("no PayoutTransfer is created after refund", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -659,7 +747,7 @@ describe('Money Flow Timeline (E2E)', () => {
       });
 
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -676,20 +764,26 @@ describe('Money Flow Timeline (E2E)', () => {
         .expect(201);
 
       const prisma = getPrisma();
-      const cp = await prisma.tradeCashPayment.findUnique({ where: { tradeId: created.body.id } });
+      const cp = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId: created.body.id },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate-trade-cash')
+        .post("/api/payments/initiate-trade-cash")
         .set(authHeader(initiator))
         .send({ tradeId: created.body.id })
         .expect(201);
-      const payment = await prisma.payment.findFirst({ where: { tradeCashPaymentId: cp!.id } });
+      const payment = await prisma.payment.findFirst({
+        where: { tradeCashPaymentId: cp!.id },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }))
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        )
         .expect(200);
 
       // Refund the cash payment
@@ -698,7 +792,8 @@ describe('Money Flow Timeline (E2E)', () => {
 
       // Try to create payouts — should create 0 (refunded, not released)
       const payoutService = ctx.app.get(PayoutService);
-      const payoutsCreated = await payoutService.createPayoutsForReleasedHolds();
+      const payoutsCreated =
+        await payoutService.createPayoutsForReleasedHolds();
       expect(payoutsCreated).toBe(0);
 
       // No PayoutTransfer should exist for this trade

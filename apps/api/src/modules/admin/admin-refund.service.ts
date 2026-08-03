@@ -14,6 +14,7 @@ import { EventService } from "../events/event.service";
 import { RefundService } from "../refund/refund.service";
 import { RefundRequestQueryDto } from "./dto";
 import { paginate, resolveOrderBy } from "../../common/list";
+import { primaryCashPayment } from "../trade/trade.constants";
 
 /**
  * İade talepleri admin operasyonları (liste/detay, force-finalize) +
@@ -377,8 +378,8 @@ export class AdminRefundService {
         status: true,
         refundFailureReason: true,
         refundFailureAt: true,
-        cashPayment: {
-          select: { id: true, status: true },
+        cashPayments: {
+          select: { id: true, status: true, payerId: true },
         },
       },
     });
@@ -386,10 +387,8 @@ export class AdminRefundService {
       throw new NotFoundException("Takas bulunamadı");
     }
 
-    if (
-      !trade.cashPayment ||
-      trade.cashPayment.status !== PaymentStatus.completed
-    ) {
+    const cashPayment = primaryCashPayment(trade.cashPayments);
+    if (!cashPayment || cashPayment.status !== PaymentStatus.completed) {
       throw new BadRequestException(
         "İade edilebilecek tamamlanmış bir nakit ödeme yok",
       );
@@ -411,11 +410,6 @@ export class AdminRefundService {
         "Bu takasta kayıtlı bir iade hatası yok; yeniden deneme gerekmiyor",
       );
     }
-
-    const cashPayment = await this.prisma.tradeCashPayment.findUnique({
-      where: { tradeId },
-      select: { payerId: true },
-    });
 
     try {
       const result =

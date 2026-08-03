@@ -24,3 +24,23 @@ export const ACTIVE_TRADE_STATUSES: TradeStatus[] = [
  */
 export const TRADE_PRICING_V1 = "v1";
 export const TRADE_PRICING_V2 = "v2";
+
+/**
+ * Takasın "birincil" ödeme satırı — nakit farkını taşıyan satır, yoksa ilki.
+ *
+ * v1'de takas başına tek satır vardı ve tüm ekranlar/servisler `trade.cashPayment`
+ * okuyordu. v2'de taraf başına satır var; tek satır bekleyen ESKİ yollar (v1
+ * takaslar, legacy DTO alanı, GraphQL tipi) bu yardımcıdan geçer. Yeni yollar
+ * satırların TAMAMINI okur — "iki ödeme de tamam mı" sorusu ancak öyle sorulabilir.
+ */
+export function primaryCashPayment<T>(
+  payments: T[] | null | undefined,
+): T | null {
+  if (!payments || payments.length === 0) return null;
+  // Fark taşıyan satır "birincil"dir; hiçbiri fark taşımıyorsa (v2 kafa kafaya
+  // takas) ilk satır döner.
+  return (
+    payments.find((p) => Number((p as { amount?: unknown }).amount) > 0) ??
+    payments[0]
+  );
+}

@@ -4,6 +4,7 @@ import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
 import { computeTradeCanCancel } from "./trade.state-machine";
 import { TradeResponseDto } from "./dto";
+import { primaryCashPayment } from "./trade.constants";
 
 /**
  * Takas modülü ortak yardımcıları (yanıt DTO formatlama + ürün cache
@@ -162,6 +163,8 @@ export class TradeCommonService {
       .map(applyShipmentPrivacy)
       .filter((s): s is any => s !== null);
 
+    const cashPayment: any = primaryCashPayment(trade.cashPayments);
+
     return {
       id: trade.id,
       tradeNumber: trade.tradeNumber,
@@ -249,16 +252,18 @@ export class TradeCommonService {
         shippedAt: shipment.shippedAt || undefined,
         deliveredAt: shipment.deliveredAt || undefined,
       })),
-      cashPayment: trade.cashPayment
+      // v1 tekil alan korunur (istemciler kırılmaz): fark taşıyan satır.
+      // v2 çok-satırlı döküm ayrı alanda taşınır.
+      cashPayment: cashPayment
         ? {
-            id: trade.cashPayment.id,
-            payerId: trade.cashPayment.payerId,
-            recipientId: trade.cashPayment.recipientId,
-            amount: parseFloat(trade.cashPayment.amount),
-            commission: parseFloat(trade.cashPayment.commission),
-            totalAmount: parseFloat(trade.cashPayment.totalAmount),
-            status: trade.cashPayment.status,
-            paidAt: trade.cashPayment.paidAt,
+            id: cashPayment.id,
+            payerId: cashPayment.payerId,
+            recipientId: cashPayment.recipientId,
+            amount: parseFloat(cashPayment.amount),
+            commission: parseFloat(cashPayment.commission),
+            totalAmount: parseFloat(cashPayment.totalAmount),
+            status: cashPayment.status,
+            paidAt: cashPayment.paidAt,
           }
         : undefined,
       dispute: trade.dispute

@@ -1391,7 +1391,7 @@ export class TradeLifecycleService {
           });
         }
 
-        const cashPayment = await tx.tradeCashPayment.findUnique({
+        const cashPayment = await tx.tradeCashPayment.findFirst({
           where: { tradeId },
         });
         if (cashPayment && cashPayment.status === PaymentStatus.completed) {
@@ -1403,7 +1403,7 @@ export class TradeLifecycleService {
           const holdReleaseAt = new Date();
           holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
 
-          await tx.tradeCashPayment.update({
+          await tx.tradeCashPayment.updateMany({
             where: { tradeId },
             data: { holdReleaseAt },
           });

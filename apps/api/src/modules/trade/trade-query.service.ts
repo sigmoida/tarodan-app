@@ -54,7 +54,7 @@ export class TradeQueryService {
           },
         },
         shipments: true,
-        cashPayment: true,
+        cashPayments: true,
         dispute: true,
       },
     });
@@ -161,7 +161,7 @@ export class TradeQueryService {
             },
           },
           shipments: true,
-          cashPayment: true,
+          cashPayments: true,
           dispute: true,
         },
         orderBy,

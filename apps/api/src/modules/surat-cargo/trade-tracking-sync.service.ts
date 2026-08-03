@@ -374,7 +374,7 @@ export class TradeTrackingSyncService {
     // Post-commit, non-blocking, idempotent (cut() type+sourceId tekil).
     if (!transitioned) return;
     try {
-      const tcp = await this.prisma.tradeCashPayment.findUnique({
+      const tcp = await this.prisma.tradeCashPayment.findFirst({
         where: { tradeId },
         select: { id: true, status: true },
       });

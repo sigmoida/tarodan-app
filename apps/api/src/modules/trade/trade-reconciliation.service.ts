@@ -473,7 +473,7 @@ export class TradeReconciliationService {
           }
 
           // Set escrow hold for cash payment
-          const cashPayment = await tx.tradeCashPayment.findUnique({
+          const cashPayment = await tx.tradeCashPayment.findFirst({
             where: { tradeId: trade.id },
           });
           if (cashPayment && cashPayment.status === PaymentStatus.completed) {
@@ -484,7 +484,7 @@ export class TradeReconciliationService {
             const holdReleaseAt = new Date();
             holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
 
-            await tx.tradeCashPayment.update({
+            await tx.tradeCashPayment.updateMany({
               where: { tradeId: trade.id },
               data: { holdReleaseAt },
             });

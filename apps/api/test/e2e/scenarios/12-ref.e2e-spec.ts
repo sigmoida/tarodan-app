@@ -1810,7 +1810,7 @@ describe("12 — İade & İptal (REF)", () => {
           .reservedQuantity,
       ).toBe(1);
 
-      const cashBefore = await prisma.tradeCashPayment.findUnique({
+      const cashBefore = await prisma.tradeCashPayment.findFirst({
         where: { tradeId },
       });
       await request(server())
@@ -1831,7 +1831,7 @@ describe("12 — İade & İptal (REF)", () => {
           }),
         )
         .expect(200);
-      const cashAfterPay = await prisma.tradeCashPayment.findUnique({
+      const cashAfterPay = await prisma.tradeCashPayment.findFirst({
         where: { tradeId },
       });
       expect(cashAfterPay!.releasedAt).toBeNull();
@@ -1848,7 +1848,7 @@ describe("12 — İade & İptal (REF)", () => {
         cashAfterPay!.totalAmount ?? payment!.amount,
       );
       expect(ctx.paytr.refundCalls[0].refundAmount).toBe(expectedAmount);
-      const cashAfterCancel = await prisma.tradeCashPayment.findUnique({
+      const cashAfterCancel = await prisma.tradeCashPayment.findFirst({
         where: { tradeId },
       });
       expect(cashAfterCancel!.refundedAt).not.toBeNull();

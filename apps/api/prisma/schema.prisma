@@ -849,7 +849,9 @@ model Trade {
   createdAt                 DateTime          @default(now()) @map("created_at")
   updatedAt                 DateTime          @updatedAt @map("updated_at")
   version                   Int               @default(1)
-  cashPayment               TradeCashPayment?
+  /// v1'de en fazla BİR satır (yalnız farkı ödeyen taraf); v2'de taraf başına
+  /// bir satır. Depo süreci ancak TÜM satırlar `completed` olunca başlar.
+  cashPayments              TradeCashPayment[]
   dispute                   TradeDispute?
   items                     TradeItem[]       @relation("TradeItems")
   messages                  TradeMessage[]
@@ -936,10 +938,7 @@ model TradeShipmentEvent {
 /// süreci ancak ikisi de `completed` olunca başlayacak (PR2).
 model TradeCashPayment {
   id                String           @id @default(uuid())
-  // PR2: iki taraflı ödemede benzersizlik (tradeId, payerId) çiftine taşınacak
-  // ve `Trade.cashPayment` 1:N olacak. Kolonlar burada hazır; kardinalite
-  // değişimi iki satırı GERÇEKTEN oluşturan akışla birlikte gelir.
-  tradeId           String           @unique @map("trade_id")
+  tradeId           String           @map("trade_id")
   payerId           String           @map("payer_id")
   /// Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. Hizmet bedeli ve
   /// kargo platformda kalır, alıcısı yoktur.
@@ -970,6 +969,9 @@ model TradeCashPayment {
   payment           Payment?
   payoutTransfers   PayoutTransfer[] @relation("TradeCashPayoutTransfers")
 
+  /// Taraf başına TEK ödeme satırı (v2'de aynı takasta iki taraf, iki satır).
+  @@unique([tradeId, payerId])
+  @@index([tradeId])
   @@map("trade_cash_payments")
 }
 

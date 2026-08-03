@@ -1,4 +1,4 @@
-import * as request from 'supertest';
+import * as request from "supertest";
 import {
   PaymentStatus,
   PaymentHoldStatus,
@@ -7,24 +7,24 @@ import {
   TradeStatus,
   ShipmentStatus,
   OrderStatus,
-} from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+} from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
+} from "../test-utils/db";
 import {
   createUser,
   createAdminUser,
   authHeader,
-} from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { signCallback } from '../mocks/paytr.mock';
-import { PaymentService } from '../../src/modules/payment/payment.service';
-import { PayoutService } from '../../src/modules/payout/payout.service';
+} from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { signCallback } from "../mocks/paytr.mock";
+import { PaymentService } from "../../src/modules/payment/payment.service";
+import { PayoutService } from "../../src/modules/payout/payout.service";
 
 /**
  * Wait for the post-accept fire-and-forget inbound dispatch to settle.
@@ -37,12 +37,12 @@ async function waitForInboundShipments(
 ) {
   const deadline = Date.now() + timeoutMs;
   let rows = await prisma.tradeShipment.findMany({
-    where: { tradeId, leg: 'to_warehouse' },
+    where: { tradeId, leg: "to_warehouse" },
   });
   while (rows.length < expected && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 50));
     rows = await prisma.tradeShipment.findMany({
-      where: { tradeId, leg: 'to_warehouse' },
+      where: { tradeId, leg: "to_warehouse" },
     });
   }
   return rows;
@@ -51,12 +51,12 @@ async function waitForInboundShipments(
 async function configureWarehouseAddress(addressId: string): Promise<void> {
   const prisma = getPrisma();
   await prisma.platformSetting.upsert({
-    where: { settingKey: 'warehouse_address_id' },
+    where: { settingKey: "warehouse_address_id" },
     update: { settingValue: addressId },
     create: {
-      settingKey: 'warehouse_address_id',
+      settingKey: "warehouse_address_id",
       settingValue: addressId,
-      settingType: 'string',
+      settingType: "string",
     },
   });
 }
@@ -65,7 +65,7 @@ async function configureWarehouseAddress(addressId: string): Promise<void> {
  * Payout tests verify that released holds produce PayoutTransfer records
  * and that the PayTR Platform Transfer API is called correctly.
  */
-describe('Payout Flow (E2E)', () => {
+describe("Payout Flow (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -84,10 +84,13 @@ describe('Payout Flow (E2E)', () => {
     ctx.paytr.reset();
   });
 
-  describe('Order hold → release → PayoutTransfer', () => {
-    it('creates a PayoutTransfer with correct amounts after hold release when seller has IBAN', async () => {
+  describe("Order hold → release → PayoutTransfer", () => {
+    it("creates a PayoutTransfer with correct amounts after hold release when seller has IBAN", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -102,34 +105,36 @@ describe('Payout Flow (E2E)', () => {
       await prisma.sellerBankAccount.create({
         data: {
           userId: seller.id,
-          accountHolder: 'Mehmet Yılmaz',
-          iban: 'TR330006100519786457841326',
+          accountHolder: "Mehmet Yılmaz",
+          iban: "TR330006100519786457841326",
         },
       });
 
       // Buy + pay
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
 
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
       const payment = await prisma.payment.findFirst({
         where: { orderId: buyRes.body.orderId },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Hold exists
       const hold = await prisma.paymentHold.findFirst({
@@ -163,8 +168,8 @@ describe('Payout Flow (E2E)', () => {
       expect(payout).toBeTruthy();
       expect(payout?.status).toBe(PayoutStatus.pending);
       expect(payout?.sellerId).toBe(seller.id);
-      expect(payout?.transferIban).toBe('TR330006100519786457841326');
-      expect(payout?.transferName).toBe('Mehmet Yılmaz');
+      expect(payout?.transferIban).toBe("TR330006100519786457841326");
+      expect(payout?.transferName).toBe("Mehmet Yılmaz");
       expect(Number(payout?.netAmount)).toBeGreaterThan(0);
 
       // Process the payout — calls mock PayTR
@@ -174,7 +179,9 @@ describe('Payout Flow (E2E)', () => {
 
       // Verify PayTR was called
       expect(ctx.paytr.transferCalls.length).toBeGreaterThanOrEqual(1);
-      expect(ctx.paytr.transferCalls[0].transferIban).toBe('TR330006100519786457841326');
+      expect(ctx.paytr.transferCalls[0].transferIban).toBe(
+        "TR330006100519786457841326",
+      );
 
       // Verify PayoutTransfer is now completed
       const payoutAfter = await prisma.payoutTransfer.findUnique({
@@ -184,9 +191,12 @@ describe('Payout Flow (E2E)', () => {
       expect(payoutAfter?.processedAt).toBeTruthy();
     });
 
-    it('creates a failed PayoutTransfer when seller has no IBAN', async () => {
+    it("creates a failed PayoutTransfer when seller has no IBAN", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       // Seller does NOT add bank account
       const product = await createProduct({
         sellerId: seller.id,
@@ -200,25 +210,27 @@ describe('Payout Flow (E2E)', () => {
 
       // Buy + pay + callback
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
       const payment = await prisma.payment.findFirst({
         where: { orderId: buyRes.body.orderId },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
       await prisma.order.update({
@@ -245,15 +257,18 @@ describe('Payout Flow (E2E)', () => {
       });
       expect(payout).toBeTruthy();
       expect(payout?.status).toBe(PayoutStatus.failed);
-      expect(payout?.failureReason).toBe('no_bank_account');
-      expect(payout?.transferIban).toBe('');
+      expect(payout?.failureReason).toBe("no_bank_account");
+      expect(payout?.transferIban).toBe("");
     });
   });
 
-  describe('PayTR transfer failure → retry', () => {
-    it('retries a failed transfer up to 3 times with exponential backoff, then permanently fails', async () => {
+  describe("PayTR transfer failure → retry", () => {
+    it("retries a failed transfer up to 3 times with exponential backoff, then permanently fails", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -266,32 +281,34 @@ describe('Payout Flow (E2E)', () => {
       await prisma.sellerBankAccount.create({
         data: {
           userId: seller.id,
-          accountHolder: 'Test Seller',
-          iban: 'TR330006100519786457841326',
+          accountHolder: "Test Seller",
+          iban: "TR330006100519786457841326",
         },
       });
 
       // Buy + pay
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
       const payment = await prisma.payment.findFirst({
         where: { orderId: buyRes.body.orderId },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Y1: escrow yalnız sevk sonrası release olur — siparişi delivered yap.
       await prisma.order.update({
@@ -358,17 +375,29 @@ describe('Payout Flow (E2E)', () => {
     });
   });
 
-  describe('Trade cash payout', () => {
-    it('creates PayoutTransfer for trade cash recipient after hold release', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+  describe("Trade cash payout", () => {
+    it("creates PayoutTransfer for trade cash recipient after hold release", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
       await createAddress({ userId: initiator.id });
       await createAddress({ userId: receiver.id });
-      const initiatorShip = await createAddress({ userId: initiator.id, isDefault: false });
-      const receiverShip = await createAddress({ userId: receiver.id, isDefault: false });
+      const initiatorShip = await createAddress({
+        userId: initiator.id,
+        isDefault: false,
+      });
+      const receiverShip = await createAddress({
+        userId: receiver.id,
+        isDefault: false,
+      });
 
       const prisma = getPrisma();
 
@@ -376,8 +405,8 @@ describe('Payout Flow (E2E)', () => {
       await prisma.sellerBankAccount.create({
         data: {
           userId: receiver.id,
-          accountHolder: 'Receiver Bank',
-          iban: 'TR780001000999988887777666',
+          accountHolder: "Receiver Bank",
+          iban: "TR780001000999988887777666",
         },
       });
 
@@ -398,7 +427,7 @@ describe('Payout Flow (E2E)', () => {
 
       // Create trade with cash difference
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -416,9 +445,11 @@ describe('Payout Flow (E2E)', () => {
         .send({})
         .expect(201);
 
-      const cp = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      const cp = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate-trade-cash')
+        .post("/api/payments/initiate-trade-cash")
         .set(authHeader(initiator))
         .send({ tradeId })
         .expect(201);
@@ -426,12 +457,14 @@ describe('Payout Flow (E2E)', () => {
         where: { tradeCashPaymentId: cp!.id },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }))
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        )
         .expect(200);
 
       // Walk trade to completion. Inbound shipments auto-created
@@ -453,7 +486,7 @@ describe('Payout Flow (E2E)', () => {
         .expect(200);
 
       const fromWarehouse = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'from_warehouse' },
+        where: { tradeId, leg: "from_warehouse" },
       });
       for (const s of fromWarehouse) {
         await prisma.tradeShipment.update({
@@ -473,7 +506,9 @@ describe('Payout Flow (E2E)', () => {
         .expect(201);
 
       // Trade completed, holdReleaseAt set
-      const cpAfter = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      const cpAfter = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       expect(cpAfter?.holdReleaseAt).toBeTruthy();
 
       // Force release + create payouts
@@ -493,7 +528,7 @@ describe('Payout Flow (E2E)', () => {
       });
       expect(payout).toBeTruthy();
       expect(payout?.sellerId).toBe(receiver.id);
-      expect(payout?.transferIban).toBe('TR780001000999988887777666');
+      expect(payout?.transferIban).toBe("TR780001000999988887777666");
       expect(payout?.status).toBe(PayoutStatus.pending);
 
       // Process payout

@@ -25,6 +25,7 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { i18nMessage } from "../i18n";
+import { primaryCashPayment } from "../trade/trade.constants";
 
 @Injectable()
 export class PaymentInitiationService {
@@ -856,7 +857,7 @@ export class PaymentInitiationService {
       const trade = await this.prisma.trade.findUnique({
         where: { id: dto.tradeId },
         include: {
-          cashPayment: true,
+          cashPayments: true,
           initiator: {
             select: { id: true, displayName: true, email: true, phone: true },
           },
@@ -888,7 +889,7 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.onlyDesignatedPayerCanInitiate"),
         );
       }
-      const cashPayment = trade.cashPayment;
+      const cashPayment = primaryCashPayment(trade.cashPayments);
       if (!cashPayment)
         throw new BadRequestException(
           i18nMessage("server.payment.cashPaymentRecordNotFound"),
@@ -1031,7 +1032,7 @@ export class PaymentInitiationService {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
-        cashPayment: true,
+        cashPayments: true,
         initiator: {
           select: { id: true, displayName: true, email: true, phone: true },
         },
@@ -1065,7 +1066,7 @@ export class PaymentInitiationService {
       );
     }
 
-    const cashPayment = trade.cashPayment;
+    const cashPayment = primaryCashPayment(trade.cashPayments);
     if (!cashPayment) {
       throw new BadRequestException(
         i18nMessage("server.payment.cashPaymentRecordNotFound"),

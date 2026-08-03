@@ -618,7 +618,7 @@ export class AdminPayoutService {
    * Release trade cash payment hold (admin manual release for trade escrow)
    */
   async releaseTradePaymentHold(adminId: string, tradeId: string) {
-    const tcp = await this.prisma.tradeCashPayment.findUnique({
+    const tcp = await this.prisma.tradeCashPayment.findFirst({
       where: { tradeId },
     });
     if (!tcp) throw new NotFoundException("Trade cash payment bulunamadı");
@@ -641,7 +641,9 @@ export class AdminPayoutService {
       );
     }
 
-    await this.prisma.tradeCashPayment.update({
+    // v2: takasta taraf başına ödeme satırı var → hold serbest bırakma TÜM
+    // satırlara uygulanır (v1'de zaten tek satırdı).
+    await this.prisma.tradeCashPayment.updateMany({
       where: { tradeId },
       data: { releasedAt: new Date() },
     });

@@ -21,6 +21,7 @@ import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
+import { primaryCashPayment } from "../trade/trade.constants";
 
 /**
  * Takas çözüm & iade/iptal yaşam döngüsü (resolveTrade, markReturnDelivered,
@@ -367,7 +368,7 @@ export class AdminTradeResolutionService {
 
       const trade = await tx.trade.findUnique({
         where: { id: tradeId },
-        include: { cashPayment: true },
+        include: { cashPayments: true },
       });
       if (!trade) {
         throw new NotFoundException("Takas bulunamadı");
@@ -506,8 +507,9 @@ export class AdminTradeResolutionService {
         },
         returnShipmentDraft,
         shouldRefund:
-          !!trade.cashPayment &&
-          trade.cashPayment.status === PaymentStatus.completed,
+          !!primaryCashPayment(trade.cashPayments) &&
+          primaryCashPayment(trade.cashPayments).status ===
+            PaymentStatus.completed,
         warehouseAddressId: returnShipmentDraft
           ? await this.common.resolveWarehouseAddressId(tx)
           : null,
