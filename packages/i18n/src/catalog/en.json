@@ -671,7 +671,10 @@
     "excludedFromTotal": "Not included in the payable total",
     "decreaseQuantity": "Decrease quantity",
     "increaseQuantity": "Increase quantity",
-    "lineTotal": "Line total"
+    "lineTotal": "Line total",
+    "selectItem": "Select item",
+    "selectAll": "Select all",
+    "selectItemsToCheckout": "Select at least one item to continue"
   },
   "favorites": {
     "myFavorites": "My Favorites",

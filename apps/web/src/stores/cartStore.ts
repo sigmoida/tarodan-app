@@ -27,6 +27,24 @@ interface CartStoreState {
   itemCount: number;
   setItemCount: (count: number) => void;
 
+  /**
+   * Ödemeye taşınmayacak satırlar. Seçilenler DEĞİL, seçim DIŞI bırakılanlar
+   * tutulur: sepete yeni eklenen ürün hiçbir yeri güncellemeden seçili gelir
+   * (kullanıcının beklentisi bu), sadece bilerek çıkardıkları hatırlanır.
+   */
+  excludedProductIds: string[];
+  toggleProductSelected: (productId: string) => void;
+  /** Toplu seç/kaldır (ör. "tümünü seç" kutusu). */
+  setProductsSelected: (productIds: string[], selected: boolean) => void;
+  /**
+   * "Hemen Al" kapsamı. Kalıcı seçimi BOZMADAN tek ürünle ödemeye geçmeyi
+   * sağlar: kullanıcı vazgeçip sepete dönerse eski seçimi olduğu gibi durur.
+   * Kalıcıdır — ödeme sayfası yenilendiğinde kapsam kaybolup sepetin tamamı
+   * tahsil edilmemeli.
+   */
+  buyNowProductId: string | null;
+  setBuyNowProductId: (productId: string | null) => void;
+
   addToOfflineCart: (item: Omit<OfflineCartItem, "id" | "quantity">) => void;
   /** Misafir sepetinde bir satırın adedini stok tavanına kırparak ayarlar (stepper). */
   updateOfflineQuantity: (productId: string, quantity: number) => void;
@@ -40,9 +58,31 @@ export const useCartStore = create<CartStoreState>()(
       offlineItems: [],
       offlineCouponCode: null,
       itemCount: 0,
+      excludedProductIds: [],
+      buyNowProductId: null,
 
       setOfflineCouponCode: (code) => set({ offlineCouponCode: code }),
       setItemCount: (count) => set({ itemCount: count }),
+
+      toggleProductSelected: (productId) => {
+        const excluded = get().excludedProductIds;
+        set({
+          excludedProductIds: excluded.includes(productId)
+            ? excluded.filter((id) => id !== productId)
+            : [...excluded, productId],
+        });
+      },
+
+      setProductsSelected: (productIds, selected) => {
+        const excluded = get().excludedProductIds;
+        set({
+          excludedProductIds: selected
+            ? excluded.filter((id) => !productIds.includes(id))
+            : [...new Set([...excluded, ...productIds])],
+        });
+      },
+
+      setBuyNowProductId: (productId) => set({ buyNowProductId: productId }),
 
       addToOfflineCart: (item) => {
         const offlineItems = get().offlineItems;
@@ -93,7 +133,12 @@ export const useCartStore = create<CartStoreState>()(
       },
 
       clearOfflineCart: () =>
-        set({ offlineItems: [], offlineCouponCode: null }),
+        set({
+          offlineItems: [],
+          offlineCouponCode: null,
+          excludedProductIds: [],
+          buyNowProductId: null,
+        }),
     }),
     {
       name: "cart-storage",
@@ -103,6 +148,8 @@ export const useCartStore = create<CartStoreState>()(
         offlineItems: state.offlineItems,
         offlineCouponCode: state.offlineCouponCode,
         itemCount: state.itemCount,
+        excludedProductIds: state.excludedProductIds,
+        buyNowProductId: state.buyNowProductId,
       }),
     },
   ),

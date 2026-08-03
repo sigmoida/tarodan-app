@@ -5,7 +5,7 @@
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { TrashIcon } from "@heroicons/react/24/outline";
-import { Badge, IconButton, QuantityStepper } from "@tarodan/ui";
+import { Badge, Checkbox, IconButton, QuantityStepper } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import type { CartLineItem } from "../_lib/types";
@@ -33,6 +33,16 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
     <SectionCard
       className={`p-4 flex gap-4 ${!item.isAvailable ? "!bg-surface-alt" : ""}`}
     >
+      {/* Satın alınamayan satırda kutu YOK: seçilemeyen bir kutuyu göstermek
+          "neden işaretlenmiyor" sorusu doğuruyor; rozet zaten sebebi söylüyor. */}
+      {item.isAvailable && (
+        <Checkbox
+          checked={item.isSelected}
+          onChange={item.onSelectedChange}
+          aria-label={t("cart.selectItem")}
+          className="mt-1 self-start"
+        />
+      )}
       <Link href={href}>
         <div
           className={`w-28 h-28 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0 ${!item.isAvailable ? "grayscale opacity-50" : ""}`}

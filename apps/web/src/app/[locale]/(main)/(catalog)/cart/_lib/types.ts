@@ -21,4 +21,7 @@ export interface CartLineItem {
   /** Stepper adet değişimi (auth: backend, misafir: offline store). */
   onQuantityChange: (quantity: number) => void;
   onRemove: () => void;
+  /** Ödemeye taşınacak mı — satın alınamaz satırlarda daima false. */
+  isSelected: boolean;
+  onSelectedChange: () => void;
 }

@@ -671,7 +671,10 @@
     "excludedFromTotal": "Ödenecek toplama dahil değildir",
     "decreaseQuantity": "Adedi azalt",
     "increaseQuantity": "Adedi arttır",
-    "lineTotal": "Satır toplamı"
+    "lineTotal": "Satır toplamı",
+    "selectItem": "Ürünü seç",
+    "selectAll": "Tümünü seç",
+    "selectItemsToCheckout": "Ödemeye geçmek için en az bir ürün seçin"
   },
   "favorites": {
     "myFavorites": "Favorilerim",
