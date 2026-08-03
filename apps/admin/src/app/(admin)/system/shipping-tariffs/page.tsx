@@ -3,20 +3,15 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Button } from "@tarodan/ui";
+import { Button } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { extractList } from "@/lib/extract";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtTry } from "@/lib/format";
+import { TariffCard } from "./_components/TariffCard";
 import { TariffFormModal } from "./_modals/TariffFormModal";
-import {
-  type ShippingTariff,
-  type ShippingTariffStatus,
-  STATUS_VARIANT,
-  tierRangeLabel,
-} from "./_lib/types";
+import { type ShippingTariff } from "./_lib/types";
 
 /**
  * Shipping tariffs admin — the typed, versioned replacement for editing shipping
@@ -51,13 +46,6 @@ export default function ShippingTariffsPage() {
 
   const tariffs = query.data ?? [];
 
-  const statusLabel = (s: ShippingTariffStatus) =>
-    s === "active"
-      ? t("admin.shippingTariffs.statusActive")
-      : s === "draft"
-        ? t("admin.shippingTariffs.statusDraft")
-        : t("admin.shippingTariffs.statusArchived");
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -65,11 +53,11 @@ export default function ShippingTariffsPage() {
           <h1 className="text-2xl font-bold text-heading">
             {t("admin.shippingTariffs.title")}
           </h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 max-w-3xl text-sm text-muted">
             {t("admin.shippingTariffs.description")}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           {tariffs.some((tariff) => tariff.status === "active") && (
             <Button
               variant="secondary"
@@ -100,65 +88,15 @@ export default function ShippingTariffsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {tariffs.map((tariff) => (
-            <SectionCard key={tariff.id}>
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <span className="font-semibold text-heading">
-                  {tariff.name}
-                </span>
-                <Badge variant={STATUS_VARIANT[tariff.status]} size="sm">
-                  {statusLabel(tariff.status)}
-                </Badge>
-              </div>
-              <dl className="space-y-1 text-sm text-body">
-                <Row
-                  label={t("admin.shippingTariffs.providerVersion")}
-                  value={`${tariff.provider} · v${tariff.version}`}
-                />
-                <Row
-                  label={t("admin.shippingTariffs.tiersTitle")}
-                  value={
-                    tariff.packageTiers?.length
-                      ? tariff.packageTiers
-                          .map(
-                            (tier) =>
-                              `${tier.label} (${tierRangeLabel(tier)}): ${fmtTry(Number(tier.amount))}`,
-                          )
-                          .join(" · ")
-                      : "—"
-                  }
-                />
-                <Row
-                  label={t("admin.shippingTariffs.freeShipping")}
-                  value={
-                    tariff.freeShippingEnabled
-                      ? t("admin.shippingTariffs.freeOver", {
-                          amount: fmtTry(Number(tariff.freeShippingThreshold)),
-                        })
-                      : t("admin.shippingTariffs.freeDisabled")
-                  }
-                />
-              </dl>
-              {tariff.status === "draft" && (
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setModal({ tariff })}
-                  >
-                    {t("admin.shippingTariffs.edit")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    isLoading={
-                      activate.isPending && activate.variables === tariff.id
-                    }
-                    onClick={() => activate.mutate(tariff.id)}
-                  >
-                    {t("admin.shippingTariffs.activate")}
-                  </Button>
-                </div>
-              )}
-            </SectionCard>
+            <TariffCard
+              key={tariff.id}
+              tariff={tariff}
+              onEdit={() => setModal({ tariff })}
+              onActivate={() => activate.mutate(tariff.id)}
+              isActivating={
+                activate.isPending && activate.variables === tariff.id
+              }
+            />
           ))}
         </div>
       )}
@@ -171,15 +109,6 @@ export default function ShippingTariffsPage() {
           tariff={modal.tariff}
         />
       )}
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <dt className="text-muted">{label}</dt>
-      <dd className="break-words text-right font-medium text-body">{value}</dd>
     </div>
   );
 }

@@ -34,6 +34,8 @@ export interface ShippingTariff {
   freeShippingThreshold: number | string;
   effectiveFrom: string;
   createdAt: string;
+  /** Son yazma anı — taslakta düzenleme, aktif/arşivde durum geçişi. */
+  updatedAt: string;
   packageTiers: ShippingPackageTier[];
 }
 
@@ -200,12 +202,12 @@ export function tariffFormToPayload(v: TariffFormValues) {
   };
 }
 
-/** i18n key per status — the page renders t(STATUS_KEY[status]). */
-export const STATUS_KEY: Record<ShippingTariffStatus, string> = {
+/** i18n key per status — the card renders t(STATUS_KEY[status]). */
+export const STATUS_KEY = {
   draft: "admin.shippingTariffs.statusDraft",
   active: "admin.shippingTariffs.statusActive",
   archived: "admin.shippingTariffs.statusArchived",
-};
+} as const satisfies Record<ShippingTariffStatus, string>;
 
 export const STATUS_VARIANT: Record<
   ShippingTariffStatus,

@@ -5354,8 +5354,6 @@
       "new": "New Tariff",
       "loading": "Loading…",
       "empty": "No tariffs yet.",
-      "providerVersion": "Provider / Version",
-      "packageFee": "Package fee",
       "amountLabel": "Amount (TRY)",
       "invalidDesi": "Desi must be an integer between 1 and 20000",
       "invalidAmount": "Enter a valid amount",
@@ -5397,10 +5395,11 @@
       "tierRangesMustBeContiguous": "Ranges must be contiguous: this size must start where the previous one ends",
       "cloneActive": "Clone active tariff",
       "cloned": "Active tariff cloned into a new draft",
-      "tierRange": "{range}",
       "tierSmallName": "Small Parcel",
       "tierMediumName": "Medium Parcel",
-      "tierLargeName": "Large Parcel"
+      "tierLargeName": "Large Parcel",
+      "noTiers": "No package sizes defined",
+      "lastUpdated": "Last updated"
     },
     "tiers": {
       "page": {

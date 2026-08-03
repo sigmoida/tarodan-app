@@ -5354,8 +5354,6 @@
       "new": "Yeni Tarife",
       "loading": "Yükleniyor…",
       "empty": "Henüz tarife yok.",
-      "providerVersion": "Sağlayıcı / Sürüm",
-      "packageFee": "Paket ücreti",
       "amountLabel": "Tutar (₺)",
       "invalidDesi": "Desi 1 ile 20000 arasında tam sayı olmalı",
       "invalidAmount": "Geçerli bir tutar girin",
@@ -5397,10 +5395,11 @@
       "tierRangesMustBeContiguous": "Aralıklar boşluksuz ilerlemeli: bu boyut öncekinin bittiği desiden başlamalı",
       "cloneActive": "Aktif tariften kopyala",
       "cloned": "Aktif tarife yeni taslağa kopyalandı",
-      "tierRange": "{range}",
       "tierSmallName": "Küçük Paket",
       "tierMediumName": "Orta Paket",
-      "tierLargeName": "Büyük Paket"
+      "tierLargeName": "Büyük Paket",
+      "noTiers": "Paket boyutu tanımlı değil",
+      "lastUpdated": "Son güncelleme"
     },
     "tiers": {
       "page": {
