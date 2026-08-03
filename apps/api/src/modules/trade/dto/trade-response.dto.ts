@@ -42,8 +42,15 @@ export class TradeEscrowShipmentResponseDto {
 export class TradeCashPaymentResponseDto {
   id: string;
   payerId: string;
-  recipientId: string;
+  /** Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. */
+  recipientId: string | null;
+  /** Nakit fark (v2'de yalnız farkı ödeyen tarafta > 0). */
   amount: number;
+  /** v2: takas hizmet bedeli (KDV DAHİL). */
+  tradeFeeAmount: number;
+  /** v2: bu tarafın 2 bacaklık kargo bedeli. */
+  shippingAmount: number;
+  /** LEGACY (v1): aracılık komisyonu. */
   commission: number;
   totalAmount: number;
   status: PaymentStatus;
@@ -89,6 +96,15 @@ export class TradeResponseDto {
   receiverShipment?: TradeShipmentResponseDto;
   shipments?: TradeEscrowShipmentResponseDto[];
 
+  /**
+   * v2: TARAF BAŞINA bir ödeme satırı. Ekranlar iki tarafın kalemlerini de
+   * gösterdiği için tamamı döner; istemci kendi satırını `payerId` ile bulur.
+   */
+  cashPayments: TradeCashPaymentResponseDto[];
+  /**
+   * LEGACY: farkı taşıyan (yoksa ilk) satır. v1 istemcileri (mobil) bu alandan
+   * okuduğu için korunur; yeni ekranlar `cashPayments`i kullanır.
+   */
   cashPayment?: TradeCashPaymentResponseDto;
   dispute?: TradeDisputeResponseDto;
 

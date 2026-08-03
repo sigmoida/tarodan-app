@@ -163,7 +163,22 @@ export class TradeCommonService {
       .map(applyShipmentPrivacy)
       .filter((s): s is any => s !== null);
 
-    const cashPayment: any = primaryCashPayment(trade.cashPayments);
+    // v2'de her tarafın kendi ödeme satırı vardır; ekranlar ikisini de gösterir.
+    // Tek satıra indirgemek (primaryCashPayment) yalnız LEGACY alan için kalır.
+    const mapCashPayment = (p: any) => ({
+      id: p.id,
+      payerId: p.payerId,
+      recipientId: p.recipientId ?? null,
+      amount: parseFloat(p.amount),
+      tradeFeeAmount: parseFloat(p.tradeFeeAmount ?? 0),
+      shippingAmount: parseFloat(p.shippingAmount ?? 0),
+      commission: parseFloat(p.commission),
+      totalAmount: parseFloat(p.totalAmount),
+      status: p.status,
+      paidAt: p.paidAt,
+    });
+    const cashPayments = (trade.cashPayments ?? []).map(mapCashPayment);
+    const cashPayment: any = primaryCashPayment(cashPayments);
 
     return {
       id: trade.id,
@@ -254,18 +269,8 @@ export class TradeCommonService {
       })),
       // v1 tekil alan korunur (istemciler kırılmaz): fark taşıyan satır.
       // v2 çok-satırlı döküm ayrı alanda taşınır.
-      cashPayment: cashPayment
-        ? {
-            id: cashPayment.id,
-            payerId: cashPayment.payerId,
-            recipientId: cashPayment.recipientId,
-            amount: parseFloat(cashPayment.amount),
-            commission: parseFloat(cashPayment.commission),
-            totalAmount: parseFloat(cashPayment.totalAmount),
-            status: cashPayment.status,
-            paidAt: cashPayment.paidAt,
-          }
-        : undefined,
+      cashPayments,
+      cashPayment: cashPayment ?? undefined,
       dispute: trade.dispute
         ? {
             id: trade.dispute.id,
