@@ -26,13 +26,17 @@ function PreviewColumn({
   party: TradeQuotePreviewParty;
 }) {
   const t = useTranslations();
+  // Hizmet bedeli ve kargo YAPISAL kalemlerdir: 0 olsalar da gösterilirler —
+  // aksi halde "bu takasta ücret alınmıyor" ile "ücret hesaplanamadı" ayırt
+  // edilemiyordu (kuralda ücret tanımlıysa satır zaten dolu gelir). Nakit fark
+  // gerçekten koşulludur; her takasta yoktur.
   const lines = (
     [
-      [t("trade.serviceFee"), party.serviceFee],
-      [t("trade.shippingFee"), party.shipping],
-      [t("trade.cashDifferenceLine"), party.cashDifference],
+      [t("trade.serviceFee"), party.serviceFee, true],
+      [t("trade.shippingFee"), party.shipping, true],
+      [t("trade.cashDifferenceLine"), party.cashDifference, false],
     ] as const
-  ).filter(([, amount]) => amount > 0);
+  ).filter(([, amount, always]) => always || amount > 0);
 
   return (
     <div className="rounded-lg border border-border bg-surface p-4">

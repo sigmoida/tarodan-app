@@ -73,7 +73,12 @@ export default function PaymentPageClient() {
       <div className="mx-auto grid w-full gap-4 lg:grid-cols-[1fr_1.4fr] lg:items-start">
         {/* Sol: tutar + yardım + vazgeç (alt alta) */}
         <div className="space-y-4">
-          <AmountSummaryCard amount={payment.amount} />
+          <AmountSummaryCard
+            amount={payment.amount}
+            // Kalemler yalnız takas ödemesinde döner (grup/sipariş ödemesinin
+            // kendi özeti sepet ekranındadır).
+            pricing={payment.tradeId ? payment.pricing : null}
+          />
 
           <div className="rounded-xl border border-info-200 bg-info-50 p-4">
             <p className="text-sm text-info-800">

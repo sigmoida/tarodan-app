@@ -24,9 +24,24 @@ interface TradePaymentsCardProps {
   cashPaymentLoading: boolean;
 }
 
-/** Bir kalem satırı — tutar 0 ise hiç gösterilmez (boş satır gürültüsü yok). */
-function AmountLine({ label, amount }: { label: string; amount: number }) {
-  if (!(amount > 0)) return null;
+/**
+ * Bir kalem satırı.
+ *
+ * `always` verilen kalemler (hizmet bedeli, kargo) YAPISALDIR: 0 olsalar da
+ * gösterilirler — aksi halde "bu takasta ücret alınmıyor" ile "ücret
+ * hesaplanamadı" ayırt edilemiyordu. Koşullu kalemler (nakit fark, v1
+ * komisyonu) 0'da gizlenir; her takasta bulunmaları beklenmez.
+ */
+function AmountLine({
+  label,
+  amount,
+  always = false,
+}: {
+  label: string;
+  amount: number;
+  always?: boolean;
+}) {
+  if (!always && !(amount > 0)) return null;
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-muted">{label}</span>
@@ -89,8 +104,16 @@ function PaymentPanel({ panel }: { panel: TradePaymentPanel }) {
       </div>
 
       <div className="space-y-1.5">
-        <AmountLine label={t("trade.serviceFee")} amount={panel.serviceFee} />
-        <AmountLine label={t("trade.shippingFee")} amount={panel.shipping} />
+        <AmountLine
+          label={t("trade.serviceFee")}
+          amount={panel.serviceFee}
+          always
+        />
+        <AmountLine
+          label={t("trade.shippingFee")}
+          amount={panel.shipping}
+          always
+        />
         <AmountLine
           label={t("trade.cashDifferenceLine")}
           amount={panel.cashDifference}
