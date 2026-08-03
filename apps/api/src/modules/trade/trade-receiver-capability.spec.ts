@@ -35,7 +35,7 @@ describe("TradeLifecycleService.createTrade — alıcı yetkisi kapısı", () =>
       trade: { create: jest.fn() },
     };
     // ctor: prisma, taxPolicy, membershipService, notification, payment,
-    //       productLock, tradeShipment, tradeCommon, tradeQuery
+    //       productLock, tradeShipment, tradeCommon, tradeQuery, tradeQuote
     const service = new TradeLifecycleService(
       prisma as any,
       {} as any,
@@ -46,6 +46,7 @@ describe("TradeLifecycleService.createTrade — alıcı yetkisi kapısı", () =>
       {} as any,
       {} as any,
       {} as any,
+      { quoteForTrade: jest.fn().mockResolvedValue(null) } as any,
     );
     return { service, prisma, canCreateTrade };
   };

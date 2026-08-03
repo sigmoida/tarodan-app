@@ -25,8 +25,10 @@ import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
 } from "../product/helpers/product-status.helper";
-import { ACTIVE_TRADE_STATUSES } from "./trade.constants";
+import { ACTIVE_TRADE_STATUSES, TRADE_PRICING_V2 } from "./trade.constants";
 import { TRADE_VALID_TRANSITIONS } from "./trade.state-machine";
+import { TradeQuoteService } from "./trade-quote.service";
+import { buildTradeCashPaymentRows } from "./trade-payment-rows.helper";
 import { PaymentService } from "../payment/payment.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { TradeShipmentService } from "./trade-shipment.service";
@@ -73,6 +75,7 @@ export class TradeLifecycleService {
     private readonly tradeShipment: TradeShipmentService,
     private readonly tradeCommon: TradeCommonService,
     private readonly tradeQuery: TradeQueryService,
+    private readonly tradeQuote: TradeQuoteService,
   ) {}
 
   // ==========================================================================
@@ -261,6 +264,9 @@ export class TradeLifecycleService {
           initiatorMessage: dto.message,
           initiatorAddressId,
           responseDeadline,
+          // Yeni takaslar v2 fiyatlamasıyla açılır: iki taraf da sabit hizmet
+          // bedeli + 2 bacak kargo öder. Devam eden v1 takaslar etkilenmez.
+          pricingVersion: TRADE_PRICING_V2,
         },
         include: {
           initiator: { select: { id: true, displayName: true } },
@@ -469,8 +475,11 @@ export class TradeLifecycleService {
       // Safe-trade status routing:
       //   - cash trade  -> awaiting_payment (cash must be paid before shipping)
       //   - non-cash    -> shipping_to_warehouse (both ship to Tarodan warehouse)
+      // v2: iki taraf da ödeyeceği için kafa kafaya takas da ödeme bekler.
+      // v1: yalnız nakit farkı olan takas ödeme bekler (eski davranış korunur).
+      const isV2 = trade.pricingVersion === TRADE_PRICING_V2;
       const nextStatus =
-        trade.cashPayerId && trade.cashAmount
+        isV2 || (trade.cashPayerId && trade.cashAmount)
           ? TradeStatus.awaiting_payment
           : TradeStatus.shipping_to_warehouse;
       acceptedNextStatus = nextStatus;
@@ -482,7 +491,7 @@ export class TradeLifecycleService {
           receiverMessage: dto.message,
           receiverAddressId,
           acceptedAt: now,
-          paymentDeadline: trade.cashPayerId ? paymentDeadline : null,
+          paymentDeadline: isV2 || trade.cashPayerId ? paymentDeadline : null,
           // shippingDeadline only set when shipping begins (either immediately
           // for non-cash, or after successful payment for cash trades)
           shippingDeadline:
@@ -498,18 +507,28 @@ export class TradeLifecycleService {
       // oluşturmuyoruz; aksi halde inbound fonksiyon "zaten var" deyip Sürat'a
       // göndermeyi atlıyordu (her iki tarafın etiketi yine oluşur, BUG B korunur).
 
-      if (trade.cashAmount && trade.cashPayerId) {
-        // Takas komisyon oranı admin'den ayarlanabilir (PlatformSetting 'trade_commission_rate', varsayılan %5).
-        // Kabul anında snapshot alınır (tcp.commission); oran sonradan değişse bile bu takas etkilenmez.
+      if (isV2) {
+        // v2: iki taraf da öder. Tutarlar teklif servisinden gelir ve BURADA
+        // snapshot'lanır — kural/tarife sonradan değişse bile kabul edilmiş
+        // takasın fiyatı sabittir (siparişteki komisyon snapshot'ıyla aynı ilke).
+        // Ekranların gösterdiği teklif ile tahsil edilen tutar aynı kaynaktan
+        // gelir, bu yüzden ayrışamaz.
+        const quote = await this.tradeQuote.quoteForTrade(tradeId);
+        if (quote) {
+          await tx.tradeCashPayment.createMany({
+            data: buildTradeCashPaymentRows(tradeId, quote),
+          });
+        }
+      } else if (trade.cashAmount && trade.cashPayerId) {
+        // v1 (LEGACY): yalnız farkı ödeyen taraftan, farkın yüzdesi kadar
+        // aracılık komisyonu. Devam eden takaslar bu yolla biter; yeni takaslar
+        // v2 damgalı olduğu için buraya HİÇ girmez.
         const rateRow = await tx.platformSetting.findUnique({
           where: { settingKey: "trade_commission_rate" },
         });
         const ratePct = Number(rateRow?.settingValue ?? "5") || 5;
         const commission =
           Math.round(trade.cashAmount.toNumber() * (ratePct / 100) * 100) / 100;
-        // Aracılık komisyonu bir hizmettir → KDV'si hizmeti alan taraftan (nakit
-        // ödeyen) alınır ve ödediği toplama eklenir. Oran siparişlerle AYNI
-        // politikadan gelir; `commission` KDV hariç matrah olarak saklanır.
         const taxPolicy = await this.taxPolicy.resolve();
         const { sellerServiceTaxAmount: commissionTaxAmount } =
           calculateServiceTax(

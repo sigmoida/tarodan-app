@@ -27,6 +27,7 @@ import {
   OUTBOX_ORDER_FULFILLMENT,
   OUTBOX_REVENUE_INVOICE_ISSUE,
 } from "../outbox/outbox.types";
+import { isTradeFullyPaid } from "../trade/trade-payment-rows.helper";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -847,24 +848,44 @@ export class PaymentFulfillmentService {
         },
       });
 
-      // Safe-trade geçişi: awaiting_payment -> shipping_to_warehouse
+      // Safe-trade geçişi: awaiting_payment -> shipping_to_warehouse.
+      //
+      // v2'de takasın İKİ ödemesi vardır ve depo süreci ancak İKİSİ de
+      // tamamlanınca başlar: tek taraf ödediğinde ürünler kargoya çıkmaz.
+      // İki callback aynı anda gelebileceği için sayım bu tx İÇİNDE yapılır ve
+      // geçiş `version` guard'ıyla yazılır — yarışan ikinci callback'in update'i
+      // 0 satır etkiler, ikinci kez sevkiyat tetiklenmez.
       const trade = await tx.trade.findUnique({ where: { id: tcp.tradeId } });
+      const siblingPayments = await tx.tradeCashPayment.findMany({
+        where: { tradeId: tcp.tradeId },
+        select: { status: true },
+      });
+      const fullyPaid = isTradeFullyPaid(siblingPayments);
       let tradeTransitioned = false;
       let shippingDeadline: Date | null = null;
 
-      if (trade && trade.status === TradeStatus.awaiting_payment) {
+      if (trade && trade.status === TradeStatus.awaiting_payment && fullyPaid) {
         const now = new Date();
         shippingDeadline = new Date(now);
         shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
 
-        await tx.trade.update({
-          where: { id: trade.id, version: trade.version },
+        const moved = await tx.trade.updateMany({
+          where: {
+            id: trade.id,
+            version: trade.version,
+            status: TradeStatus.awaiting_payment,
+          },
           data: {
             status: TradeStatus.shipping_to_warehouse,
             shippingDeadline,
             version: { increment: 1 },
           },
         });
+        // Yarışı KAYBEDEN callback burada 0 satır günceller ve sevkiyatı
+        // tetiklemez (aksi halde etiketler iki kez oluşurdu).
+        if (moved.count === 0) {
+          return { didComplete: true, tradeTransitioned: false } as const;
+        }
 
         // Etiketler + Sürat sevkiyatı tx SONRASI tek kaynaktan
         // (TradeService.createInboundTradeShipments) yapılır — aşağıda çağrılıyor.
