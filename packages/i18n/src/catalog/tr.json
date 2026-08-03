@@ -799,7 +799,13 @@
     "platformFee": "Platform bedeli",
     "buyerPayable": "Ödenecek tutar",
     "vatIncluded": "KDV dahil",
-    "serviceFee": "Hizmet Bedeli"
+    "serviceFee": "Hizmet Bedeli",
+    "payNow": "Ödeme Yap",
+    "distanceSalesConsent": "<contract>Mesafeli Satış Sözleşmesi</contract>'ni okudum, onaylıyorum.",
+    "distanceSalesRequired": "Devam etmek için mesafeli satış sözleşmesini onaylayın",
+    "buyNowNotice": "Yalnız seçtiğiniz ürün ödenecek; sepetinizdeki diğer ürünler yerinde kalır.",
+    "noItemsSelected": "Ödenecek ürün seçilmedi. Sepetinize dönüp ürün seçin.",
+    "cardSection": "Ödeme Bilgileri"
   },
   "order": {
     "myOrders": "Siparişlerim",

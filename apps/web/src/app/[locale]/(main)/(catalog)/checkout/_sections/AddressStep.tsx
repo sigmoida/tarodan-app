@@ -43,8 +43,6 @@ export default function AddressStep() {
     setGuestPhone,
     guestPhoneCountryCode,
     setGuestPhoneCountryCode,
-    addressStepValid,
-    handleAddressStepContinue,
     handleAddAddress,
   } = useCheckout();
 
@@ -339,16 +337,6 @@ export default function AddressStep() {
             />
           </div>
         )}
-      </div>
-
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          onClick={() => void handleAddressStepContinue()}
-          disabled={!addressStepValid}
-        >
-          Devam Et
-        </Button>
       </div>
     </SectionCard>
   );

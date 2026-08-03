@@ -25,24 +25,31 @@ function directives(policy) {
   );
 }
 
-test("recognises the payment route with and without a locale prefix", () => {
+test("recognises every card-entry route, with and without a locale prefix", () => {
   for (const path of [
     "/payment/abc",
     "/payment/abc/",
     "/en/payment/abc",
     "/tr/payment/abc",
+    // Tek sayfalık checkout: kart alanları BURADA toplanıyor.
+    "/cart/payment",
+    "/cart/payment/",
+    "/en/cart/payment",
+    "/tr/cart/payment",
   ]) {
     assert.equal(isPaymentPath(path), true, path);
   }
 });
 
-test("does not mistake neighbouring routes for the payment page", () => {
+test("does not mistake neighbouring routes for a card-entry page", () => {
   for (const path of [
     "/",
     "/payments",
     "/profile/payment-methods",
     "/en/checkout",
     "/paymentsomething",
+    "/cart",
+    "/cart/payment-options",
   ]) {
     assert.equal(isPaymentPath(path), false, path);
   }

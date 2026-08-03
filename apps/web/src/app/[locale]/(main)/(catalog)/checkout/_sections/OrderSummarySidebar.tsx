@@ -3,7 +3,8 @@
 "use client";
 
 import Image from "next/image";
-import { TagIcon } from "@heroicons/react/24/outline";
+import { LockClosedIcon, TagIcon } from "@heroicons/react/24/outline";
+import { Button, Checkbox } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import OrderSummaryLines from "@/components/order/OrderSummaryLines";
 import { useCheckout } from "../_context/CheckoutContext";
@@ -69,7 +70,63 @@ export default function OrderSummarySidebar() {
       <hr className="my-4" />
 
       <SummaryLines />
+
+      <PayAction />
     </SectionCard>
+  );
+}
+
+/**
+ * Onay + ödeme — tutarın hemen altında. Mesafeli satış sözleşmesi onaylanmadan
+ * düğme çalışmaz; onay siparişle birlikte sunucuya yazılır (zaman + sürüm
+ * damgasını sunucu basar).
+ */
+function PayAction() {
+  const {
+    t,
+    grandTotal,
+    isLoading,
+    card,
+    distanceSalesAccepted,
+    setDistanceSalesAccepted,
+    handlePay,
+  } = useCheckout();
+
+  const busy = isLoading || card.processing;
+
+  return (
+    <div className="mt-5 space-y-3 border-t border-border-subtle pt-5">
+      <Checkbox
+        checked={distanceSalesAccepted}
+        onChange={(e) => setDistanceSalesAccepted(e.target.checked)}
+        label={t.rich("checkout.distanceSalesConsent", {
+          contract: (chunks) => (
+            <a
+              href="/distance-sales"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary-600 underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {chunks}
+            </a>
+          ),
+        })}
+      />
+
+      <Button
+        onClick={() => void handlePay()}
+        disabled={busy || !distanceSalesAccepted}
+        isLoading={busy}
+        size="lg"
+        className="w-full"
+      >
+        <span className="flex items-center justify-center gap-2">
+          <LockClosedIcon className="h-5 w-5" />
+          {t("checkout.payNow")} ({fmtTL(grandTotal)} TL)
+        </span>
+      </Button>
+    </div>
   );
 }
 

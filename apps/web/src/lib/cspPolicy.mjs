@@ -31,13 +31,22 @@ const IMAGE_ORIGINS = [
 ];
 
 /**
- * `/payment/<id>` — locale önekli (`/en/payment/1`) ve öneksiz biçimi de kapsar.
- * Middleware locale'i zaten ayırır; tarayıcı tarafı (Sentry init, route guard)
- * ise ham `location.pathname` görür — tek yardımcı ikisine de hizmet etsin.
+ * Kart alanlarının TOPLANDIĞI sayfalar — locale önekli (`/en/…`) ve öneksiz
+ * biçimi de kapsar. Middleware locale'i zaten ayırır; tarayıcı tarafı (Sentry
+ * init, route guard) ise ham `location.pathname` görür — tek yardımcı ikisine
+ * de hizmet etsin.
+ *
+ * İKİ rota vardır ve ikisi de kart girdisi alır:
+ *   * `/cart/payment` — tek sayfalık checkout (asıl akış: adres + kart + öde)
+ *   * `/payment/<id>` — yarım kalmış bir ödemeye dönüş
+ * PCI DSS 6.4.3/11.6.1 kapsamı sayfanın adına değil, kart alanı içermesine
+ * bağlıdır; checkout kart formunu devraldığında burası da genişletilmelidir.
  */
 export function isPaymentPath(pathname) {
   if (typeof pathname !== "string") return false;
-  return /^(?:\/[a-z]{2})?\/payment(?:\/|$)/.test(pathname);
+  return /^(?:\/[a-z]{2})?\/(?:payment(?:\/|$)|cart\/payment(?:\/|$))/.test(
+    pathname,
+  );
 }
 
 /** Ödeme sayfasında zorla, kalan sitede yalnız raporla. */
