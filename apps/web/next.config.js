@@ -114,6 +114,15 @@ const nextConfig = {
     return [
       { source: '/(.*)', headers: SECURITY_HEADERS },
       ...getCacheHeaders(),
+      // iOS Universal Links. Apple fetches this file itself and rejects it
+      // SILENTLY unless it is served as JSON — no error, the association just
+      // never works. The filename has no extension (Apple requires exactly
+      // `apple-app-site-association`), so Next cannot infer the type from it.
+      // `assetlinks.json` needs no rule: its extension already resolves.
+      {
+        source: '/.well-known/apple-app-site-association',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+      },
     ];
   },
   images: {
