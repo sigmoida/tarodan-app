@@ -23,6 +23,7 @@ import {
 } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { distanceSalesConsent } from "./distance-sales-contract";
 import {
   calculatePackageDesi,
   type ShippingBuyerShareByTier,
@@ -709,6 +710,9 @@ export class OrderCheckoutGroupService {
               idempotencyKey: dto.idempotencyKey,
               totalAmount: groupTotalAmount,
               isGuest,
+              // Onay damgası SUNUCUDA basılır: istemci yalnız "kabul ettim" der,
+              // zamanı ve sözleşme sürümünü söyleyemez.
+              ...distanceSalesConsent(dto.distanceSalesAccepted),
             },
           });
 

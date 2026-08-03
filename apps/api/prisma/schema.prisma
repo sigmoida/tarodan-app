@@ -1341,6 +1341,13 @@ model CheckoutGroup {
   idempotencyKey String?        @unique @map("idempotency_key")
   totalAmount    Decimal        @map("total_amount") @db.Decimal(10, 2)
   isGuest        Boolean        @default(false) @map("is_guest")
+  // Mesafeli satış sözleşmesi onayı. Alıcının ödeme ekranında verdiği kabul,
+  // ihtilafta kanıt olarak istendiği için ZAMANI ve o an yürürlükteki sözleşme
+  // SÜRÜMÜYLE saklanır; sözleşme sonradan güncellense de hangi metnin kabul
+  // edildiği belli kalır. Kabul göndermeyen istemcilerde (eski mobil sürümler)
+  // null'dır — alan doğrulama değil, kayıttır.
+  distanceSalesAcceptedAt DateTime? @map("distance_sales_accepted_at")
+  distanceSalesVersion    String?   @map("distance_sales_version")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
   buyer          User           @relation("BuyerCheckoutGroups", fields: [buyerId], references: [id])
