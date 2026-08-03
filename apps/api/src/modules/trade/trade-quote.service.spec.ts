@@ -177,3 +177,106 @@ describe("TradeQuoteService.quoteForTrade", () => {
     expect(quote.receiver.shipping).toBe(60); // 1 desi → küçük (30) × 2
   });
 });
+
+/**
+ * KARŞI TEKLİF ÖNİZLEMESİ — kullanıcı teklifi kurarken maliyeti görebilmeli.
+ * Kaydedilmiş takasla AYNI motor kullanılır (önizleme ile tahsilat ayrışmaz);
+ * tek fark ürün değerinin güncel ilan fiyatından okunmasıdır.
+ */
+describe("TradeQuoteService.previewQuote", () => {
+  const makeService = (
+    products: any[] = [
+      { id: "p-a", categoryId: "cat-1", shippingDesi: 1, price: 500 },
+      { id: "p-b", categoryId: "cat-1", shippingDesi: 1, price: 500 },
+    ],
+  ) => {
+    const prisma = {
+      product: { findMany: jest.fn().mockResolvedValue(products) },
+      commissionRule: jest.fn() as any,
+    };
+    prisma.commissionRule = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: "r1",
+          categoryId: null,
+          sellerType: null,
+          taxpayerType: null,
+          minAmount: null,
+          maxAmount: null,
+          priority: 0,
+          tradeFeeSellerAmount: 20,
+          tradeFeeBuyerAmount: 15,
+        },
+      ]),
+    };
+    const shipping = {
+      getActiveOutboundTariff: jest.fn().mockResolvedValue({
+        packageTiers: [
+          {
+            code: ShippingPackageTierCode.small,
+            minDesi: 0,
+            maxDesi: 5,
+            amount: 30,
+          },
+        ],
+      }),
+    };
+    return { service: new TradeQuoteService(prisma as any, shipping as any) };
+  };
+
+  it("kaydedilmemiş teklifi iki taraf için fiyatlar", async () => {
+    const { service } = makeService();
+
+    const quote = await service.previewQuote({
+      initiatorItems: [{ productId: "p-a", quantity: 1 }],
+      receiverItems: [{ productId: "p-b", quantity: 1 }],
+    });
+
+    expect(quote.initiator).toMatchObject({
+      serviceFee: 35,
+      shipping: 60,
+      total: 95,
+    });
+    expect(quote.receiver.total).toBe(95);
+  });
+
+  it("nakit farkını belirtilen tarafa yükler", async () => {
+    const { service } = makeService();
+
+    const quote = await service.previewQuote({
+      initiatorItems: [{ productId: "p-a" }],
+      receiverItems: [{ productId: "p-b" }],
+      cashAmount: 200,
+      cashPayer: "receiver",
+    });
+
+    expect(quote.receiver.total).toBe(295);
+    expect(quote.initiator.total).toBe(95);
+  });
+
+  it("erişilemeyen ürünü atlar (önizleme patlamaz)", async () => {
+    const { service } = makeService([
+      { id: "p-a", categoryId: "cat-1", shippingDesi: 1, price: 500 },
+    ]);
+
+    const quote = await service.previewQuote({
+      initiatorItems: [{ productId: "p-a" }],
+      receiverItems: [{ productId: "silinmis" }],
+    });
+
+    expect(quote.receiver.shipping).toBe(0);
+    expect(quote.initiator.shipping).toBe(60);
+  });
+
+  it("ürün yokken sorgu atmaz ve sıfır fiyat döner", async () => {
+    const { service } = makeService();
+
+    const quote = await service.previewQuote({
+      initiatorItems: [],
+      receiverItems: [],
+    });
+
+    expect(quote.initiator.total).toBe(0);
+    expect(quote.receiver.total).toBe(0);
+  });
+});

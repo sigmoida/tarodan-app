@@ -26,6 +26,7 @@ import {
   ResolveTradeDisputeDto,
   TradeResponseDto,
   TradeListResponseDto,
+  TradeQuotePreviewDto,
 } from "./dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
@@ -132,6 +133,23 @@ export class TradeController {
    * satırları da aynı servisten üretilir, böylece önizleme ile tahsilat ayrışmaz.
    * v1 takasta `null` döner (eski gösterim geçerlidir).
    */
+  /**
+   * Kaydedilmemiş teklifin ödeme dökümü (karşı teklif düzenleyicisi).
+   * POST /trades/payment-quote/preview
+   *
+   * Kabul edilmiş takasla aynı motoru kullanır; kullanıcı ürün ekleyip
+   * çıkardıkça "bu teklif bana kaça mal olur" sorusunu canlı yanıtlar.
+   * Takasa bağlı olmadığı için :id ROTASINDAN ÖNCE tanımlıdır.
+   */
+  @Post("payment-quote/preview")
+  async previewPaymentQuote(
+    @Request() req: any,
+    @Body() dto: TradeQuotePreviewDto,
+  ) {
+    this.getUserId(req);
+    return this.tradeQuote.previewQuote(dto);
+  }
+
   @Get(":id/payment-quote")
   async getPaymentQuote(
     @Request() req: any,

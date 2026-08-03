@@ -10,6 +10,7 @@ import { i18nMessage } from "../i18n";
 import {
   buildTradePricing,
   type TradePartyPricing,
+  type TradePricing,
   type TradePricingItem,
   type TradeSide,
 } from "./trade-pricing.helper";
@@ -36,6 +37,14 @@ export interface TradeQuote {
   tradeId: string;
   initiator: TradePartyQuote;
   receiver: TradePartyQuote;
+}
+
+/** Henüz kaydedilmemiş bir teklifin (karşı teklif düzenleyicisi) fiyatı. */
+export interface TradeQuotePreviewInput {
+  initiatorItems: Array<{ productId: string; quantity?: number }>;
+  receiverItems: Array<{ productId: string; quantity?: number }>;
+  cashAmount?: number | null;
+  cashPayer?: TradeSide | null;
 }
 
 @Injectable()
@@ -124,5 +133,79 @@ export class TradeQuoteService {
         side: "receiver",
       },
     };
+  }
+
+  /**
+   * Kaydedilmemiş bir teklifin fiyatı — karşı teklif düzenleyicisi kullanıcı
+   * ürün ekleyip çıkardıkça maliyeti gösterebilsin diye. Kabul edilmiş takasla
+   * AYNI motoru kullanır; tek fark ürün değerinin `valueAtTrade` yerine güncel
+   * ilan fiyatı olmasıdır (teklif henüz snapshot almadı).
+   */
+  async previewQuote(input: TradeQuotePreviewInput): Promise<TradePricing> {
+    const rows = [
+      ...input.initiatorItems.map((i) => ({
+        ...i,
+        side: "initiator" as const,
+      })),
+      ...input.receiverItems.map((i) => ({ ...i, side: "receiver" as const })),
+    ];
+    const productIds = [...new Set(rows.map((r) => r.productId))];
+
+    const [products, rules, tariff] = await Promise.all([
+      productIds.length
+        ? this.prisma.product.findMany({
+            where: { id: { in: productIds } },
+            select: {
+              id: true,
+              categoryId: true,
+              shippingDesi: true,
+              price: true,
+            },
+          })
+        : Promise.resolve([]),
+      this.prisma.commissionRule.findMany({ where: { isActive: true } }),
+      this.shippingTariff.getActiveOutboundTariff(),
+    ]);
+    const byId = new Map(products.map((p) => [p.id, p]));
+
+    const items: TradePricingItem[] = rows.flatMap((row) => {
+      const product = byId.get(row.productId);
+      // Silinmiş/erişilemeyen ürün önizlemede sessizce atlanır; fiyat eksik
+      // görünür ama ekran patlamaz (kabul yolunda ürün doğrulaması zaten var).
+      if (!product) return [];
+      return [
+        {
+          productId: product.id,
+          side: row.side,
+          categoryId: product.categoryId ?? null,
+          value: Number(product.price ?? 0),
+          quantity: row.quantity && row.quantity > 0 ? row.quantity : 1,
+          shippingDesi: product.shippingDesi ?? 1,
+        },
+      ];
+    });
+
+    try {
+      return buildTradePricing({
+        items,
+        rules: rules as never,
+        tariff,
+        cash:
+          input.cashAmount && input.cashAmount > 0
+            ? {
+                amount: Number(input.cashAmount),
+                payerSide:
+                  input.cashPayer === "receiver" ? "receiver" : "initiator",
+              }
+            : null,
+      });
+    } catch (error) {
+      if (error instanceof ShippingPackageTiersNotConfiguredError) {
+        throw new ServiceUnavailableException(
+          i18nMessage("server.shipping.noActiveTariff", { provider: "surat" }),
+        );
+      }
+      throw error;
+    }
   }
 }
