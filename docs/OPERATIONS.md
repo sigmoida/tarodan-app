@@ -218,6 +218,7 @@ silinmez; eski nesneler zararsız yetim olarak kalır (kurtarma yolu).
 | Pasif duran kural          | `Platform Hizmet Bedeli (Alıcı)` %3, `is_active=false`                        | alıcı bedeli alınacaksa aktive et                                 |
 | Kargo kademeleri           | migration'dan **üçü de 29,99 ₺**, örnek ölçüler boş                           | System → Shipping Tariffs (reset log'u "REVIEW" satırıyla uyarır) |
 | Kargo payı (kademe başına) | küçük 100/0, orta 70/30, büyük 50/50 (alıcı/satıcı)                           | Finance → Commission                                              |
+| Takas hizmet bedeli        | kurallarda **tanımsız (0 ₺)** — girilene kadar takas ücretsiz işler           | Finance → Commission (kural dialogu, KDV **dahil** sabit tutar)   |
 | Üyelik                     | free 0 ₺ (**takas kapalı**), basic 49,99, premium 99,99, business 249,99 ₺/ay | Membership Tiers                                                  |
 | Vergi                      | KDV %20, hizmet KDV'si açık, stopaj %1 (yalnız kurumsal)                      | System → Settings                                                 |
 | Serbest kargo eşiği        | 500 ₺                                                                         | System → Shipping Tariffs                                         |

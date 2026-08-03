@@ -209,7 +209,56 @@ ama tutarı tutan dönüş **belirsiz** bırakılır (insan kararı).
 
 ---
 
-## 8. Ledger ve mutabakat
+## 8. Takas ödemeleri (v2)
+
+`modules/trade/trade-pricing.helper.ts` (fiyat motoru), `trade-quote.service.ts`
+(teklif/önizleme), `trade-payment-rows.helper.ts` (kabulde yazılan satırlar),
+`trade-refund-policy.ts` (iade matrisi).
+
+Eski model bir **aracılık komisyonuydu**: yalnız nakit farkı varsa, yalnız farkı
+ödeyen taraftan farkın yüzdesi alınırdı — kafa kafaya takasta platform hiç gelir
+elde etmezken dört kargo bacağının maliyetini üstlenirdi. v2'de **her iki taraf
+kendi ödemesini yapar**:
+
+```
+takas hizmet bedeli + (2 × kargo) + (fark ödeyense fark)
+```
+
+- **Hizmet bedeli** komisyon kuralından ürün başına okunur ve TOPLANIR: bir taraf
+  kendi verdiği ürünlerin `tradeFeeSellerAmount`'ını + karşıdan aldıklarının
+  `tradeFeeBuyerAmount`'ını öder. Tutarlar admin'in girdiği **KDV DAHİL**
+  sabitlerdir — üzerine oran ya da KDV hesabı YAPILMAZ (sipariş ücretlerinden
+  bilinçli fark). Ekranda tek satır gösterilir.
+- **Kargo** taraf başına 2 bacaktır (kullanıcı→depo, depo→karşı kullanıcı);
+  kademe tarafın ürünlerinin birleşik desisinden çözülür. Kademe tanımı yoksa
+  fiyatlama **fail-closed** 503 verir (sessizce 0 yazmaz).
+- Fiyat **kabulde snapshot'lanır** (`TradeCashPayment` satırlarına yazılır);
+  kural ya da tarife sonradan değişse bile takas kabul edildiği fiyatla biter.
+
+**İki ödeme kapısı** — `payment-fulfillment.service.ts`: her satır kendi PayTR
+ödemesiyle tahsil edilir; takas ancak İKİ satır da `completed` olduğunda
+`awaiting_payment → shipping_to_warehouse`a geçer. Geçiş `version` guard'lı
+`updateMany` ile yazılır, böylece eşzamanlı iki callback sevkiyatı iki kez
+tetiklemez.
+
+**İade matrisi** — kargoya verilmeden iptal = TAM iade; ürünler kargoya
+verildikten sonra (`firstWarehouseArrivalAt` ya da herhangi bir `shippedAt`)
+**kargo bedeli iade edilmez**, hizmet bedeli ve fark iade edilir. `completed`
+terminaldir; sonrası yalnız dispute.
+
+**Para nereye gider** — fark karşı tarafa (escrow → payout), hizmet bedeli ve
+kargo platformda kalır. Payout yalnız fark taşıyan satır için üretilir. Defterde
+fark `seller_escrow`, ücret `platform_commission`, kargo `shipping_income`
+(gelir değil, taşıyıcıya geçiş kalemi) hesabına düşer. Fatura taraf başına
+kesilir: v2 satırı `trade_service_fee` (KDV **dahil**, içinden ayrıştırılır),
+v1 satırı `trade_commission` (KDV hariç matrah).
+
+**v1 takaslar** eski kuralla biter: ayrım tek yerde, `Trade.pricingVersion`
+alanındadır.
+
+---
+
+## 9. Ledger ve mutabakat
 
 `modules/ledger/ledger.service.ts` append-only çift kayıt defteridir:
 Σborç == Σalacak değilse kayıt reddedilir. `payment_captured`, `refund_issued`,
@@ -227,7 +276,7 @@ RefundAttempt'e eşlenir (±0.05 TL toleransla `matched`/`amount_mismatch`/
 doğrulanır; PSP ücretleri ledger'a damgalanır. `ledger-reconciliation.service.ts`
 (her gün 04:00, salt-okuma) beş invariantı denetler ve para taşımaz, alarm basar.
 
-## 9. Para cron'ları
+## 10. Para cron'ları
 
 Tek kaynak `apps/api/src/workers/cron-catalog.ts` (Bull `scheduled` kuyruğu,
 Europe/Istanbul):
