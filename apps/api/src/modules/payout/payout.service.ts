@@ -329,11 +329,17 @@ export class PayoutService {
     }
 
     // 2) TradeCashPayment released but no PayoutTransfer yet
+    //
+    // v2: her takasta İKİ ödeme satırı vardır ama karşı tarafa geçen tek kalem nakit
+    // farktır — hizmet bedeli ve kargo platformda kalır. Farkı olmayan tarafın
+    // satırında `recipientId` NULL'dur; onu buraya almak alıcısız transfer üretirdi.
     const releasedTradeCash = await this.prisma.tradeCashPayment.findMany({
       where: {
         status: PaymentStatus.completed,
         releasedAt: { not: null },
         payoutTransfers: { none: {} },
+        recipientId: { not: null },
+        amount: { gt: 0 },
       },
       include: {
         trade: true,
@@ -360,7 +366,9 @@ export class PayoutService {
         });
         if (activeRefundAttempt) continue;
       }
+      // Sorgu zaten NULL alıcıları eliyor; bu yalnız tip daraltması (defansif).
       const recipientId = tcp.recipientId;
+      if (!recipientId) continue;
       const recipient = await this.prisma.user.findUnique({
         where: { id: recipientId },
         include: { bankAccount: true },
