@@ -5,6 +5,7 @@ import {
   MembershipTierType,
 } from "@prisma/client";
 import { HealthService } from "./health.service";
+import { AdminTradeCommonService } from "../admin/admin-trade-common.service";
 
 /**
  * BLOCKER: readiness "iş yapılandırması" kontrolü yalnızca `commissionRule`
@@ -33,6 +34,11 @@ describe("HealthService — business config requires an active catch-all commiss
       { code: "medium" },
       { code: "large" },
     ],
+    warehouse: {
+      settingValue?: string | null;
+      addressExists?: boolean;
+      fallbackAdminAddress?: boolean;
+    } = { settingValue: "addr-1", addressExists: true },
   ) => {
     const prisma = {
       membershipTier: { count: jest.fn().mockResolvedValue(4) },
@@ -49,11 +55,39 @@ describe("HealthService — business config requires an active catch-all commiss
           .mockResolvedValue(packageTiers ? { id: "t1", packageTiers } : null),
       },
       user: { findUnique: jest.fn().mockResolvedValue({ id: "platform" }) },
+      // Depo çözümü: AdminTradeCommonService.resolveWarehouseAddressId GERÇEK
+      // implementasyonuyla koşar (tek kaynak) — mock yalnız veri katmanıdır.
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            warehouse.settingValue !== undefined &&
+              warehouse.settingValue !== null
+              ? { settingValue: warehouse.settingValue }
+              : null,
+          ),
+      },
+      address: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            warehouse.addressExists ? { id: warehouse.settingValue } : null,
+          ),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(
+            warehouse.fallbackAdminAddress ? { id: "admin-addr" } : null,
+          ),
+      },
+      adminUser: {
+        findFirst: jest.fn().mockResolvedValue({ userId: "admin-1" }),
+      },
     };
     const service = new HealthService(
       prisma as any,
       { get: () => undefined } as any,
       {} as any,
+      new AdminTradeCommonService(),
     );
     return { service, prisma };
   };
@@ -109,5 +143,48 @@ describe("HealthService — business config requires an active catch-all commiss
     prisma.membershipTier.count.mockResolvedValue(3);
     void MembershipTierType.free;
     await expect(callCheck(service)).resolves.toBe(false);
+  });
+
+  /**
+   * Depo adresi güvenli-takas escrow'unun ÖNKOŞULUDUR: yapılandırılmamışken
+   * admin'in ilk takas onayı 400 verir — ve runbook'un kendisi de "/health/ready
+   * bunu kontrol etmez" diye uyarıyordu. Kontrol, takas onayının kullandığı
+   * AYNI çözümleme mantığıyla (AdminTradeCommonService — tek kaynak) yapılır:
+   * `warehouse_address_id` ayarı geçerli bir adrese işaret etmeli, yoksa aktif
+   * bir admin kullanıcısının adresi fallback olarak bulunmalıdır.
+   */
+  describe("depo adresi (güvenli takas önkoşulu)", () => {
+    it("ayar geçerli bir adrese işaret ediyorsa hazırdır", async () => {
+      const { service } = makeService([catchAll()], undefined, {
+        settingValue: "addr-1",
+        addressExists: true,
+      });
+      await expect(callCheck(service)).resolves.toBe(true);
+    });
+
+    it("ayar yok ama aktif admin'in adresi varsa hazırdır (takas onayı da aynı fallback'i kullanır)", async () => {
+      const { service } = makeService([catchAll()], undefined, {
+        settingValue: null,
+        fallbackAdminAddress: true,
+      });
+      await expect(callCheck(service)).resolves.toBe(true);
+    });
+
+    it("ne ayar ne fallback varsa hazır DEĞİLDİR (ilk takas onayı 400 verirdi)", async () => {
+      const { service } = makeService([catchAll()], undefined, {
+        settingValue: null,
+        fallbackAdminAddress: false,
+      });
+      await expect(callCheck(service)).resolves.toBe(false);
+    });
+
+    it("ayar SİLİNMİŞ bir adrese işaret ediyor ve fallback yoksa hazır DEĞİLDİR", async () => {
+      const { service } = makeService([catchAll()], undefined, {
+        settingValue: "addr-dead",
+        addressExists: false,
+        fallbackAdminAddress: false,
+      });
+      await expect(callCheck(service)).resolves.toBe(false);
+    });
   });
 });

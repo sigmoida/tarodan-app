@@ -200,7 +200,9 @@ silinmez; eski nesneler zararsız yetim olarak kalır (kurtarma yolu).
 4. **Settings** — Listing sekmesini bir kez **kaydet**: min/max ürün fiyatı
    kaydedilene kadar hiç uygulanmaz (arayüzdeki 10/100000 yalnız placeholder).
    **Warehouse** sekmesini doldur (güvenli takas depo operasyonunun önkoşulu;
-   boşken ilk takas onayı 400 verir ve `/health/ready` bunu kontrol etmez).
+   boşken ilk takas onayı 400 verir; `/health/ready` de depo adresi
+   çözülemiyorsa hazır-değil döner — takas onayıyla aynı çözümleme:
+   `warehouse_address_id` ayarı veya aktif bir admin'in adresi).
 5. **E-posta şablonları** — opsiyonel; kod varsayılanları hazır.
 6. **Staff** — ek admin hesapları (geçici şifre ekranda gösterilir, SMTP
    gerekmez); süper-admin'de 2FA aç.

@@ -16,6 +16,7 @@ import { CacheService } from "../cache/cache.service";
 import { CommissionAppliesTo, MembershipTierType } from "@prisma/client";
 import { isCatchAllCommissionRule } from "../order/order-commission.helper";
 import { SHIPPING_PACKAGE_TIER_ORDER } from "../shipping/shipping-package-tier";
+import { AdminTradeCommonService } from "../admin/admin-trade-common.service";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
 
@@ -63,6 +64,9 @@ export class HealthService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly cacheService: CacheService,
+    // Depo adresi readiness'ı, takas onayının kullandığı çözümlemeyle AYNI
+    // olmalı (tek kaynak) — leaf servis, health module'de de provide edilir.
+    private readonly tradeCommon: AdminTradeCommonService,
   ) {}
 
   /**
@@ -253,6 +257,15 @@ export class HealthService {
         }),
       ]);
 
+      // Depo adresi: güvenli-takas escrow'unun önkoşulu. Yapılandırılmamışken
+      // admin'in İLK takas onayı 400 verir — runbook (docs/OPERATIONS.md Adım 5)
+      // eskiden "/health/ready bunu kontrol etmez" diye uyarmak zorunda kalıyordu.
+      // Takas onayıyla AYNI çözümleyici kullanılır; throw = yapılandırılmamış.
+      const hasWarehouseAddress = await this.tradeCommon
+        .resolveWarehouseAddressId(this.prisma)
+        .then(() => true)
+        .catch(() => false);
+
       const hasCatchAllCommissionRule = wildcardCommissionRules.some((rule) =>
         isCatchAllCommissionRule(rule),
       );
@@ -273,13 +286,21 @@ export class HealthService {
             "Orders whose category/amount matches no rule will fail checkout with 503.",
         );
       }
+      if (!hasWarehouseAddress) {
+        this.logger.error(
+          "BUSINESS_CONFIG_MISSING: no resolvable warehouse address " +
+            "(`warehouse_address_id` setting or an active admin's address). " +
+            "The first safe-trade approval will fail with 400.",
+        );
+      }
 
       return (
         membershipTierCount === 4 &&
         hasCatchAllCommissionRule &&
         taxRuleCount > 0 &&
         hasCompleteShippingTiers &&
-        !!platformSeller
+        !!platformSeller &&
+        hasWarehouseAddress
       );
     } catch (error) {
       this.logger.error("Business configuration readiness check failed", error);

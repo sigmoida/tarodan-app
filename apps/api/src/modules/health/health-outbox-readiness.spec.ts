@@ -29,6 +29,7 @@ describe("HealthService — outbox readiness", () => {
       prisma as any,
       { get: () => undefined } as any,
       {} as any,
+      {} as any,
     );
     (service as any).logger = logger;
     return { service, logger, prisma };

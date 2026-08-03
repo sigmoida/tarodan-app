@@ -5,7 +5,12 @@ import { ServiceUnavailableException } from "@nestjs/common";
 
 describe("Health readiness contract", () => {
   it("includes worker, outbox and business configuration readiness", async () => {
-    const service = new HealthService({} as any, {} as any, {} as any);
+    const service = new HealthService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
     jest.spyOn(service as any, "checkPostgresql").mockResolvedValue({
       status: "healthy",
     });
@@ -34,7 +39,12 @@ describe("Health readiness contract", () => {
   });
 
   it("returns a service-unavailable error with failed readiness checks", async () => {
-    const service = new HealthService({} as any, {} as any, {} as any);
+    const service = new HealthService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
     jest.spyOn(service as any, "checkPostgresql").mockResolvedValue({
       status: "unhealthy",
     });
