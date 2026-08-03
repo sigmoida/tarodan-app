@@ -1,0 +1,217 @@
+/** @format */
+
+import {
+  CheckCircleIcon,
+  ClockIcon,
+  ShieldCheckIcon,
+  TruckIcon,
+} from "@heroicons/react/24/outline";
+import { Badge, Button } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { formatTL } from "@/lib/format";
+import type { Trade, TradeQuote } from "../_lib/types";
+import {
+  buildTradePaymentPanels,
+  tradePaymentProgress,
+  type TradePaymentPanel,
+} from "../_lib/tradePayments";
+
+interface TradePaymentsCardProps {
+  trade: Trade;
+  quote: TradeQuote | null;
+  userId?: string;
+  onPay: () => void;
+  cashPaymentLoading: boolean;
+}
+
+/** Bir kalem satırı — tutar 0 ise hiç gösterilmez (boş satır gürültüsü yok). */
+function AmountLine({ label, amount }: { label: string; amount: number }) {
+  if (!(amount > 0)) return null;
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-muted">{label}</span>
+      <span className="text-body font-medium">{formatTL(amount)}</span>
+    </div>
+  );
+}
+
+function PaymentStatusBadge({ status }: { status: string | null }) {
+  const t = useTranslations();
+  if (status === "completed") {
+    return (
+      <Badge
+        variant="success"
+        size="sm"
+        className="rounded-full"
+        icon={<CheckCircleIcon className="w-3.5 h-3.5" />}
+      >
+        {t("trade.paymentPaid")}
+      </Badge>
+    );
+  }
+  if (status === "refunded") {
+    return (
+      <Badge variant="secondary" size="sm" className="rounded-full">
+        {t("trade.paymentRefunded")}
+      </Badge>
+    );
+  }
+  if (!status) return null;
+  return (
+    <Badge
+      variant="warning"
+      size="sm"
+      className="rounded-full"
+      icon={<ClockIcon className="w-3.5 h-3.5" />}
+    >
+      {t("trade.paymentPending")}
+    </Badge>
+  );
+}
+
+function PaymentPanel({ panel }: { panel: TradePaymentPanel }) {
+  const t = useTranslations();
+  return (
+    <div
+      className={`rounded-lg border p-4 ${
+        panel.isViewer
+          ? "border-primary-200 bg-surface"
+          : "border-border bg-surface-elevated/60"
+      }`}
+    >
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold text-heading">
+          {panel.isViewer
+            ? t("trade.yourPayment")
+            : t("trade.theirPayment", { name: panel.name })}
+        </p>
+        <PaymentStatusBadge status={panel.status} />
+      </div>
+
+      <div className="space-y-1.5">
+        <AmountLine label={t("trade.serviceFee")} amount={panel.serviceFee} />
+        <AmountLine label={t("trade.shippingFee")} amount={panel.shipping} />
+        <AmountLine
+          label={t("trade.cashDifferenceLine")}
+          amount={panel.cashDifference}
+        />
+        {/* v1 takaslar komisyonla biter; kalem yalnız onlarda görünür. */}
+        <AmountLine
+          label={t("trade.commissionLine")}
+          amount={panel.commission}
+        />
+      </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+        <span className="text-sm font-semibold text-heading">
+          {t("trade.paymentTotal")}
+        </span>
+        <span className="text-lg font-bold text-primary-600">
+          {formatTL(panel.total)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Takasın ödeme kalemleri — İKİ taraf için de.
+ *
+ * Eski kart yalnız nakit farkını ve onu ödeyen tarafı gösteriyordu. Artık her
+ * iki taraf hizmet bedeli + 2 bacaklık kargo (+ varsa fark) ödüyor ve süreç iki
+ * ödeme tamamlanmadan başlamıyor; ekranın da bunu göstermesi gerekiyor.
+ */
+export default function TradePaymentsCard({
+  trade,
+  quote,
+  userId,
+  onPay,
+  cashPaymentLoading,
+}: TradePaymentsCardProps) {
+  const t = useTranslations();
+  const panels = buildTradePaymentPanels(trade, quote, userId);
+  if (panels.length === 0) return null;
+
+  const progress = tradePaymentProgress(trade);
+  const viewerPanel = panels.find((panel) => panel.isViewer) ?? null;
+  const canPay =
+    !!viewerPanel &&
+    viewerPanel.status === "pending" &&
+    (trade.status === "accepted" || trade.status === "awaiting_payment");
+  const waitingForCounterparty =
+    !!viewerPanel &&
+    viewerPanel.status === "completed" &&
+    !progress.allPaid &&
+    trade.status === "awaiting_payment";
+
+  return (
+    <div className="card mb-6 border-border bg-surface-alt p-6">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold text-heading">
+            {t("trade.paymentsTitle")}
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">{t("trade.paymentsDesc")}</p>
+        </div>
+        {progress.total > 0 && (
+          <Badge
+            variant={progress.allPaid ? "success" : "warning"}
+            size="sm"
+            className="rounded-full"
+          >
+            {t("trade.paymentsProgress", {
+              paid: progress.paid,
+              total: progress.total,
+            })}
+          </Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {panels.map((panel) => (
+          <PaymentPanel key={panel.userId} panel={panel} />
+        ))}
+      </div>
+
+      {waitingForCounterparty && (
+        <div className="mt-4 flex items-center gap-3 rounded-lg bg-surface-elevated/70 px-4 py-3">
+          <ClockIcon className="w-5 h-5 text-success-700" />
+          <p className="text-sm text-body">
+            {t("trade.waitingCounterpartyPayment")}
+          </p>
+        </div>
+      )}
+
+      {canPay && (
+        <div className="mt-5 space-y-4 border-t border-border pt-5">
+          <div className="-mx-1 rounded-lg border border-border bg-surface px-5 py-3">
+            <h3 className="text-base font-semibold text-heading">
+              {t("payment.completeYourPayment")}
+            </h3>
+            <p className="mt-0.5 text-sm text-muted">
+              {t("trade.bothMustPay")}
+            </p>
+          </div>
+
+          <Button
+            variant="primary"
+            size="lg"
+            className="flex w-full items-center justify-center gap-2 text-base"
+            onClick={onPay}
+            disabled={cashPaymentLoading}
+          >
+            <ShieldCheckIcon className="w-5 h-5" />
+            {cashPaymentLoading
+              ? t("checkout.processing")
+              : `${t("payment.pay")} – ${formatTL(viewerPanel.total)}`}
+          </Button>
+        </div>
+      )}
+
+      <p className="mt-4 flex items-start gap-2 text-xs text-subtle">
+        <TruckIcon className="mt-0.5 w-4 h-4 flex-shrink-0" />
+        {t("trade.shippingNotRefundable")}
+      </p>
+    </div>
+  );
+}

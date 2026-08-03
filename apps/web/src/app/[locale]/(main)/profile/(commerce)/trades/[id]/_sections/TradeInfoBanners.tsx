@@ -9,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Alert } from "@tarodan/ui";
 import type { Trade } from "../_lib/types";
+import { paymentRowsOf } from "../_lib/tradePayments";
 
 /**
  * The stacked informational status banners: the safe-trade notice (pending /
@@ -66,7 +67,9 @@ export default function TradeInfoBanners({
             </p>
           )}
           <p className="text-warning-800">{t("trade.returningBannerDesc")}</p>
-          {(trade.cashRefundedAt || trade.cashPayment?.refundedAt) && (
+          {/* v2'de iki satır var: herhangi biri iade edildiyse bilgilendir. */}
+          {(trade.cashRefundedAt ||
+            paymentRowsOf(trade).some((row) => row.refundedAt)) && (
             <p className="mt-2 font-medium text-success-700">
               {t("trade.cashRefunded")}
             </p>

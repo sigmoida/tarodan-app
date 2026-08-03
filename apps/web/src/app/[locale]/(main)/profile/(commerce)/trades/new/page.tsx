@@ -24,6 +24,8 @@ import {
 import { getSellerId, getTradeProductImage } from "./_lib/types";
 import TradeProductPicker from "./_components/TradeProductPicker";
 import TradeSummary from "./_components/TradeSummary";
+import TradeCostPreview from "@/components/trade/TradeCostPreview";
+import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
 
 function NewTradeContent() {
   const router = useRouter();
@@ -65,6 +67,18 @@ function NewTradeContent() {
 
   const selectedProducts = products.filter((p) => selectedIds.includes(p.id));
   const cash = parseFloat(cashAmount) || 0;
+
+  const {
+    preview: costPreview,
+    previewLoading: costPreviewLoading,
+    previewFailed: costPreviewFailed,
+  } = useTradeCostPreview({
+    myProductIds: selectedIds,
+    theirProductIds: target ? [target.id] : [],
+    cashAmount,
+    cashPayer,
+    enabled,
+  });
 
   const toggle = (id: string) =>
     setSelectedIds((prev) =>
@@ -233,6 +247,16 @@ function NewTradeContent() {
         cashAmount={cash}
         cashPayer={cashPayer}
       />
+
+      {/* Takasın bedeli seçilen ürünlere bağlıdır (ürün başına hizmet bedeli +
+          desiye göre kargo) — kullanıcı teklifi göndermeden önce görmeli. */}
+      <div className="mt-6">
+        <TradeCostPreview
+          preview={costPreview}
+          loading={costPreviewLoading}
+          failed={costPreviewFailed}
+        />
+      </div>
 
       <SectionCard title="Teslimat Adresiniz">
         <TradeAddressPicker onChange={setAddressId} />

@@ -5,6 +5,7 @@
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
 import { useTradeQuery } from "./useTradeQuery";
+import { useTradeQuote } from "./useTradeQuote";
 import { useTradeShipments } from "./useTradeShipments";
 import { useTradeCountdown } from "./useTradeCountdown";
 import { useTradeGating } from "./useTradeGating";
@@ -24,6 +25,9 @@ export function useTradeDetail() {
   const locale = useLocale();
 
   const { trade, isLoading, invalidateTrade, tradeId } = useTradeQuery();
+
+  // Ödeme satırları kabulde yazılır; öncesinde fiyat teklifi ekranı besler.
+  const { quote, quoteLoading } = useTradeQuote(trade);
 
   const {
     myToWarehouseShipment,
@@ -45,6 +49,7 @@ export function useTradeDetail() {
     showCancelDisabled,
     cashPaymentPending,
     isCashPayer,
+    paymentProgress,
     needToShip,
     statusMeta,
   } = useTradeGating(trade, user, locale);
@@ -71,6 +76,9 @@ export function useTradeDetail() {
   } = useTradeActions({ trade, invalidateTrade, needToShip });
 
   const {
+    costPreview,
+    costPreviewLoading,
+    costPreviewFailed,
     isCounterMode,
     isLoadingCounterData,
     counterProducts,
@@ -93,6 +101,8 @@ export function useTradeDetail() {
 
   return {
     trade,
+    quote,
+    quoteLoading,
     isLoading,
     tradeId,
     user,
@@ -110,6 +120,7 @@ export function useTradeDetail() {
     showCancelDisabled,
     cashPaymentPending,
     isCashPayer,
+    paymentProgress,
     needToShip,
     // shipments
     myToWarehouseShipment,
@@ -140,6 +151,9 @@ export function useTradeDetail() {
     handleCancel,
     handleOpenCounterModal,
     // counter mode
+    costPreview,
+    costPreviewLoading,
+    costPreviewFailed,
     isCounterMode,
     isLoadingCounterData,
     counterProducts,

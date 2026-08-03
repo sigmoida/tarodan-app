@@ -5,6 +5,7 @@
 import type { useAuthStore } from "@/stores/authStore";
 import { getTradeStatusMeta } from "../_lib/types";
 import type { Trade } from "../_lib/types";
+import { tradePaymentProgress, viewerPaymentRow } from "../_lib/tradePayments";
 
 type TradeUser = ReturnType<typeof useAuthStore.getState>["user"];
 
@@ -21,11 +22,14 @@ export function useTradeGating(
 ) {
   const TRADE_STATUS_META = getTradeStatusMeta(locale);
 
+  // v2'de iki taraf da öder: "ödeme bekliyor" artık farkı ödeyenin değil, HERHANGİ
+  // bir satırın tamamlanmamış olmasıdır — ürünler iki ödeme bitmeden çıkmaz.
+  const paymentProgress = tradePaymentProgress(trade);
   const cashPaymentPending =
-    trade?.cashAmount &&
-    trade.cashAmount > 0 &&
-    trade?.cashPayment?.status !== "completed";
-  const isCashPayer = !!(trade && user && trade.cashPayerId === user.id);
+    paymentProgress.total > 0 && !paymentProgress.allPaid;
+  const myPayment = viewerPaymentRow(trade, user?.id);
+  /** Ödeme sırası İZLEYENDE mi — buton bu bayrağa bakar. */
+  const isCashPayer = myPayment ? myPayment.status !== "completed" : false;
 
   const needToShip =
     trade &&
@@ -89,6 +93,7 @@ export function useTradeGating(
     showCancelDisabled,
     cashPaymentPending,
     isCashPayer,
+    paymentProgress,
     needToShip,
     statusMeta,
   };

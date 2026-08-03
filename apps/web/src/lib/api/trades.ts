@@ -39,4 +39,13 @@ export const tradesApi = {
   ) => api.post(`/trades/${id}/dispute`, data),
   initiateCashPayment: (id: string | number) =>
     api.post(`/trades/${id}/cash-payment/initiate`),
+  /** Kabul edilmiş/edilecek takasın taraf başına ödeme dökümü (v2; v1'de null). */
+  paymentQuote: (id: string | number) => api.get(`/trades/${id}/payment-quote`),
+  /** Kaydedilmemiş teklifin maliyeti — karşı teklif düzenleyicisi için. */
+  previewPaymentQuote: (data: {
+    initiatorItems: Array<{ productId: string; quantity: number }>;
+    receiverItems: Array<{ productId: string; quantity: number }>;
+    cashAmount?: number;
+    cashPayer?: "initiator" | "receiver";
+  }) => api.post("/trades/payment-quote/preview", data),
 };

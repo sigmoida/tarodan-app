@@ -138,6 +138,8 @@ export const queryKeys = {
   trades: {
     all: () => ["trades"] as const,
     detail: (id: string) => ["trade", id] as const,
+    /** Taraf başına ödeme dökümü (v2) — takas detayından ayrı sorgu. */
+    paymentQuote: (id: string) => ["trade-payment-quote", id] as const,
     pendingCount: () => ["trades-pending-count"] as const,
   },
   payments: {

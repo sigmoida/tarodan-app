@@ -23,6 +23,45 @@ export interface TradeShipment {
   deliveredAt?: string | null;
 }
 
+/** A single party's payment row on a trade (v2: one per side). */
+export interface TradeCashPayment {
+  id: string;
+  payerId: string;
+  /** Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. */
+  recipientId?: string | null;
+  /** Nakit fark. */
+  amount: number;
+  /** v2: takas hizmet bedeli (KDV dahil). */
+  tradeFeeAmount?: number;
+  /** v2: bu tarafın 2 bacaklık kargo bedeli. */
+  shippingAmount?: number;
+  /** LEGACY (v1): aracılık komisyonu. */
+  commission: number;
+  totalAmount: number;
+  status: string;
+  paidAt?: string;
+  refundedAt?: string;
+}
+
+/** Bir tarafın ödeme dökümü — `GET /trades/:id/payment-quote`. */
+export interface TradeQuoteParty {
+  userId: string;
+  side: "initiator" | "receiver";
+  serviceFee: number;
+  shipping: number;
+  cashDifference: number;
+  total: number;
+}
+
+export interface TradeQuote {
+  tradeId: string;
+  initiator: TradeQuoteParty;
+  receiver: TradeQuoteParty;
+}
+
+/** Kaydedilmemiş teklifin fiyatı — teklif ve karşı teklif ekranları paylaşır. */
+export type { TradeQuotePreview } from "@/hooks/useTradeCostPreview";
+
 /**
  * The full trade-detail payload. Superset of the list route's `Trade` — the
  * detail endpoint returns the whole escrow state machine (shipments, cash
@@ -61,17 +100,10 @@ export interface Trade {
     deliveredAt?: string;
   };
   shipments?: TradeShipment[];
-  cashPayment?: {
-    id: string;
-    payerId: string;
-    recipientId: string;
-    amount: number;
-    commission: number;
-    totalAmount: number;
-    status: string;
-    paidAt?: string;
-    refundedAt?: string;
-  };
+  /** v2: TARAF BAŞINA bir ödeme satırı (kafa kafaya takasta da iki satır). */
+  cashPayments?: TradeCashPayment[];
+  /** LEGACY: farkı taşıyan satır — eski istemciler için korunur. */
+  cashPayment?: TradeCashPayment;
   cashRefundedAt?: string;
   createdAt: string;
   acceptedAt?: string;

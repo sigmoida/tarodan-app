@@ -13,7 +13,7 @@ import CompletedTradeSummary from "./_sections/CompletedTradeSummary";
 import TradeCountdown from "./_sections/TradeCountdown";
 import TradeInfoBanners from "./_sections/TradeInfoBanners";
 import TradeItemsComparison from "./_sections/TradeItemsComparison";
-import CashDifferenceCard from "./_sections/CashDifferenceCard";
+import TradePaymentsCard from "./_sections/TradePaymentsCard";
 import ShipInfoForm from "./_sections/ShipInfoForm";
 import WarehouseShipmentCard from "./_sections/WarehouseShipmentCard";
 import RecipientsShipmentCard from "./_sections/RecipientsShipmentCard";
@@ -27,6 +27,7 @@ export default function TradeDetailPage() {
   const vm = useTradeDetail();
   const {
     trade,
+    quote,
     isLoading,
     tradeId,
     user,
@@ -144,7 +145,12 @@ export default function TradeDetailPage() {
 
       <TradeProgressTimeline trade={trade} />
 
-      <CompletedTradeSummary trade={trade} locale={locale} t={t} />
+      <CompletedTradeSummary
+        trade={trade}
+        locale={locale}
+        t={t}
+        userId={user?.id}
+      />
 
       <TradeCountdown countdown={countdown} />
 
@@ -157,8 +163,9 @@ export default function TradeDetailPage() {
         tradeId={tradeId}
       />
 
-      <CashDifferenceCard
+      <TradePaymentsCard
         trade={trade}
+        quote={quote}
         userId={user?.id}
         onPay={handleCashPayment}
         cashPaymentLoading={cashPaymentLoading}
