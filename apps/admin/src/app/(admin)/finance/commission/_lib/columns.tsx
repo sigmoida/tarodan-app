@@ -41,7 +41,11 @@ export function commissionColumns(
   t: T,
 ) {
   return [
-    col.text<CommissionRule>(t("admin.finance.commission.ruleName"), "name"),
+    // Kural adları uzun olabiliyor: kırpmak yerine geniş + wrap.
+    col.text<CommissionRule>(t("admin.finance.commission.ruleName"), "name", {
+      wrap: true,
+      minWidth: 280,
+    }),
     col.muted<CommissionRule>(
       t("common.category"),
       (r) => r.categoryName || t("common.all"),
@@ -75,7 +79,7 @@ export function commissionColumns(
           {rate(r.sellerCommissionRate ?? r.sellerRate)}
         </span>
       ),
-      { align: "right", sortKey: "sellerRate", sortType: "number" },
+      { sortKey: "sellerRate", sortType: "number" },
     ),
     col.custom<CommissionRule>(
       t("admin.finance.commission.buyerServiceFee"),
@@ -84,14 +88,14 @@ export function commissionColumns(
           {rate(r.buyerServiceFeeRate ?? r.buyerRate)}
         </span>
       ),
-      { align: "right", sortKey: "buyerRate", sortType: "number" },
+      { sortKey: "buyerRate", sortType: "number" },
     ),
     // Takas ücretleri ORAN değil, KDV dahil sabit tutardır: satıcı/alıcı ayrı
     // girilir ama listede tek kolonda "veren / alan" olarak özetlenir.
     col.custom<CommissionRule>(
       t("admin.finance.commission.tradeFeeColumn"),
       (r) => <span className="tabular-nums text-body">{tradeFeePair(r)}</span>,
-      { align: "right", sortKey: "tradeFeeSellerAmount", sortType: "number" },
+      { sortKey: "tradeFeeSellerAmount", sortType: "number" },
     ),
     col.badge<CommissionRule>(
       t("common.status"),
