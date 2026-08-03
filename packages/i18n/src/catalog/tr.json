@@ -4033,7 +4033,11 @@
         "netRevenue": "Tarodan hak edişi",
         "netTakeRate": "Net pay (ürün fiyatına oranla)",
         "pspRateNote": "PayTR kesintisi, Sistem → Ayarlar → Finans'taki orandan TAHMİNİ hesaplanır; gerçek tutar sağlayıcı ekstresinden gelir.",
-        "serviceVatOut": "Hizmet KDV'si (devlete)"
+        "serviceVatOut": "Hizmet KDV'si (devlete)",
+        "tradeFeesTitle": "Takas hizmet bedelleri",
+        "tradeFeesHelper": "Bu kurala düşen ürün TAKASA girdiğinde alınan sabit bedeller. KDV DAHİL girin — üzerine hesap yapılmaz. Boş bırakılan kalem 0'dır.",
+        "tradeFeeSeller": "Ürünü veren taraf (₺)",
+        "tradeFeeBuyer": "Ürünü alan taraf (₺)"
       },
       "invoices": {
         "title": "Faturalar",

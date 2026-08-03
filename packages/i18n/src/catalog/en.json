@@ -4033,7 +4033,11 @@
         "netRevenue": "Tarodan net revenue",
         "netTakeRate": "Net take rate (of item price)",
         "pspRateNote": "The PayTR fee is ESTIMATED from the rate in System → Settings → Finance; the real amount comes from the provider statement.",
-        "serviceVatOut": "Service VAT (to the state)"
+        "serviceVatOut": "Service VAT (to the state)",
+        "tradeFeesTitle": "Trade service fees",
+        "tradeFeesHelper": "Flat fees charged when a product under this rule enters a TRADE. Enter them VAT included — nothing is added on top. An empty field means zero.",
+        "tradeFeeSeller": "Party giving the product (₺)",
+        "tradeFeeBuyer": "Party receiving the product (₺)"
       },
       "invoices": {
         "title": "Invoices",

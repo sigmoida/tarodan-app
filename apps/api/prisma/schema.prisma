@@ -811,7 +811,14 @@ model Trade {
   status                    TradeStatus       @default(pending)
   cashAmount                Decimal?          @map("cash_amount") @db.Decimal(10, 2)
   cashPayerId               String?           @map("cash_payer_id")
+  // LEGACY (v1): farkın yüzdesi olarak alınan aracılık komisyonu. v2'de komisyon
+  // yoktur; iki taraf da sabit hizmet bedeli + kargo öder.
   cashCommission            Decimal?          @map("cash_commission") @db.Decimal(10, 2)
+  // Fiyatlama sürümü — takas KABUL edildiğinde hangi modelin uygulandığını
+  // sabitler. `v1`: tek taraflı komisyonlu fark ödemesi (mevcut takaslar).
+  // `v2`: iki taraflı sabit hizmet bedeli + 2× kargo. Devam eden takaslar
+  // açıldıkları modelle biter; ekranlar ve iade yolları bu alana bakar.
+  pricingVersion            String            @default("v1") @map("pricing_version")
   initiatorMessage          String?           @map("initiator_message")
   receiverMessage           String?           @map("receiver_message")
   // Tarafların TAKAS için seçtiği teslimat adresi. Depo→kullanıcı (çıkış)
@@ -924,15 +931,29 @@ model TradeShipmentEvent {
   @@map("trade_shipment_events")
 }
 
+/// Takas ödemesi. v1: takas başına EN FAZLA BİR satır (yalnız farkı ödeyen
+/// taraf). v2'de HER İKİ taraf ödeyecek → takas başına iki satır olacak ve depo
+/// süreci ancak ikisi de `completed` olunca başlayacak (PR2).
 model TradeCashPayment {
   id                String           @id @default(uuid())
+  // PR2: iki taraflı ödemede benzersizlik (tradeId, payerId) çiftine taşınacak
+  // ve `Trade.cashPayment` 1:N olacak. Kolonlar burada hazır; kardinalite
+  // değişimi iki satırı GERÇEKTEN oluşturan akışla birlikte gelir.
   tradeId           String           @unique @map("trade_id")
   payerId           String           @map("payer_id")
-  recipientId       String           @map("recipient_id")
+  /// Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. Hizmet bedeli ve
+  /// kargo platformda kalır, alıcısı yoktur.
+  recipientId       String?          @map("recipient_id")
+  /// Nakit fark (v2'de yalnız fark ödeyen tarafın satırında > 0).
   amount            Decimal          @db.Decimal(10, 2)
-  // Takas aracılık komisyonu — KDV HARİÇ matrah (siparişteki ücretlerle aynı semantik).
-  commission        Decimal          @db.Decimal(10, 2)
-  // Komisyonun KDV'si: hizmeti alan taraf (nakit ödeyen) öder, totalAmount'a dahildir.
+  /// v2: takas hizmet bedeli — kural sabitlerinin toplamı (KDV DAHİL).
+  tradeFeeAmount    Decimal          @default(0) @map("trade_fee_amount") @db.Decimal(10, 2)
+  /// v2: bu tarafın 2 bacaklık kargo bedeli. İPTALDE İADE EDİLMEZ (ürün kargoya
+  /// verildikten sonra); kargoya verilmeden önceki iptalde tam iade edilir.
+  shippingAmount    Decimal          @default(0) @map("shipping_amount") @db.Decimal(10, 2)
+  /// LEGACY (v1): aracılık komisyonu — KDV HARİÇ matrah. v2'de 0'dır.
+  commission        Decimal          @default(0) @db.Decimal(10, 2)
+  /// LEGACY (v1): komisyonun KDV'si. v2'de 0 (ücretler KDV dahil sabittir).
   commissionTaxAmount Decimal        @default(0) @map("commission_tax_amount") @db.Decimal(10, 2)
   totalAmount       Decimal          @map("total_amount") @db.Decimal(10, 2)
   provider          String
@@ -2322,6 +2343,13 @@ model CommissionRule {
   // Tek kargo tutarının alıcı payı (%). Satıcı payı = 100 - buyerShare. Varsayılan 100 = alıcı öder (mevcut davranış).
   // Kademe bazlı pay (shippingShares) tanımlanmamışsa bu değer TÜM kademelere uygulanır.
   shippingBuyerShare    Decimal                @default(100) @map("shipping_buyer_share") @db.Decimal(5, 2)
+  // TAKAS sabit hizmet bedelleri (₺, KDV DAHİL — oran/KDV hesabı YOK; sipariş
+  // ücretlerinden bilinçli fark). Bu kurala düşen bir ürün takasa girdiğinde:
+  // ürünü VEREN taraf `tradeFeeSellerAmount`, ALAN taraf `tradeFeeBuyerAmount`
+  // öder. Null = o kalem 0. Takas eşleşmesinde satıcı tipi/mükellefiyet
+  // eksenleri joker geçilir (takasta alıcı/satıcı hesabı yoktur).
+  tradeFeeSellerAmount  Decimal?               @map("trade_fee_seller_amount") @db.Decimal(10, 2)
+  tradeFeeBuyerAmount   Decimal?               @map("trade_fee_buyer_amount") @db.Decimal(10, 2)
 
   category Category? @relation(fields: [categoryId], references: [id])
   // Paket boyutu başına ayrı alıcı/satıcı bölüşümü (örn. Küçük 100/0, Büyük 50/50).

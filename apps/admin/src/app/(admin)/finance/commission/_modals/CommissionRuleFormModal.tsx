@@ -806,6 +806,38 @@ export function CommissionRuleFormModal({
 
         <ShippingSplitSection />
 
+        {/* TAKAS sabit bedelleri: oran DEĞİL, KDV DAHİL tutar. Takasta taraflar
+            alıcı/satıcı hesabı değildir; ürünü veren "satıcı", alan "alıcı"
+            ücretini öder ve iki taraf da kendi toplamını öder. */}
+        <div className="space-y-3 rounded-lg border border-border p-4">
+          <div>
+            <h3 className="text-sm font-medium text-heading">
+              {t("admin.finance.commission.tradeFeesTitle")}
+            </h3>
+            <p className="text-xs text-muted">
+              {t("admin.finance.commission.tradeFeesHelper")}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormInput
+              name="tradeFeeSellerAmount"
+              label={t("admin.finance.commission.tradeFeeSeller")}
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0"
+            />
+            <FormInput
+              name="tradeFeeBuyerAmount"
+              label={t("admin.finance.commission.tradeFeeBuyer")}
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0"
+            />
+          </div>
+        </div>
+
         <BreakdownPreview />
         <FormCheckbox
           name="isActive"

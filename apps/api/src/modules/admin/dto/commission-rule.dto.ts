@@ -257,6 +257,28 @@ export class CreateCommissionRuleDto {
   sellerPlatformFeeMax?: number;
 
   @ApiPropertyOptional({
+    example: 25,
+    description:
+      "Trade service fee (TRY, VAT INCLUDED) charged to the party GIVING a product in this rule",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  tradeFeeSellerAmount?: number;
+
+  @ApiPropertyOptional({
+    example: 15,
+    description:
+      "Trade service fee (TRY, VAT INCLUDED) charged to the party RECEIVING a product in this rule",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  tradeFeeBuyerAmount?: number;
+
+  @ApiPropertyOptional({
     example: 100,
     description:
       "Buyer share (%) of the single shipping cost (seller = 100 - this)",
@@ -483,6 +505,20 @@ export class UpdateCommissionRuleDto {
   @Type(() => Number)
   @Min(0)
   sellerPlatformFeeMax?: number;
+
+  @ApiPropertyOptional({ example: 25 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  tradeFeeSellerAmount?: number;
+
+  @ApiPropertyOptional({ example: 15 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  tradeFeeBuyerAmount?: number;
 
   @ApiPropertyOptional({ example: 100 })
   @IsOptional()

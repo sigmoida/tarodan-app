@@ -205,6 +205,12 @@ export class AdminCommissionService {
     if (dto.maxAmount !== undefined) data.maxAmount = dto.maxAmount;
     if (dto.shippingBuyerShare !== undefined)
       data.shippingBuyerShare = dto.shippingBuyerShare;
+    // Takas sabit ücretleri (KDV dahil): kuralın oran alanlarından bağımsızdır,
+    // yalnız takas fiyatlaması okur.
+    if (dto.tradeFeeSellerAmount !== undefined)
+      data.tradeFeeSellerAmount = dto.tradeFeeSellerAmount;
+    if (dto.tradeFeeBuyerAmount !== undefined)
+      data.tradeFeeBuyerAmount = dto.tradeFeeBuyerAmount;
     return data;
   }
 
@@ -269,6 +275,8 @@ export class AdminCommissionService {
       sellerPlatformFeeMin: num(rule.sellerPlatformFeeMin),
       sellerPlatformFeeMax: num(rule.sellerPlatformFeeMax),
       shippingBuyerShare: num(rule.shippingBuyerShare),
+      tradeFeeSellerAmount: num(rule.tradeFeeSellerAmount),
+      tradeFeeBuyerAmount: num(rule.tradeFeeBuyerAmount),
       // Paket boyutu başına pay: admin formu bunları okur; satır yoksa tek pay geçerli.
       shippingShares: (rule.shippingShares ?? []).map(
         (share: { tierCode: string; buyerShare: unknown }) => ({

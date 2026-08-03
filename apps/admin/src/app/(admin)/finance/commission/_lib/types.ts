@@ -46,6 +46,9 @@ export interface CommissionRule {
   sellerPlatformFeeMin?: number | null;
   sellerPlatformFeeMax?: number | null;
   shippingBuyerShare?: number | null;
+  /** Takas sabit hizmet bedelleri (₺, KDV DAHİL) — ürünü veren / alan taraf. */
+  tradeFeeSellerAmount?: number | null;
+  tradeFeeBuyerAmount?: number | null;
   /** Paket boyutu başına kargo bölüşümü; satır yoksa shippingBuyerShare geçerlidir. */
   shippingShares?: Array<{
     tierCode: PackageTierCode;
@@ -166,6 +169,8 @@ export const commissionSchema = (t: T) =>
       sellerPlatformFeeMin: rateField,
       sellerPlatformFeeMax: rateField,
       shippingBuyerShare: z.string().optional().default("100"),
+      tradeFeeSellerAmount: z.string().optional().default(""),
+      tradeFeeBuyerAmount: z.string().optional().default(""),
       // Paket boyutu başına alıcı payı (%). Boş bırakılan boyut tek paya düşer.
       shippingShareSmall: shareField,
       shippingShareMedium: shareField,
@@ -234,6 +239,8 @@ export const emptyCommissionForm: CommissionFormValues = {
   sellerPlatformFeeMin: "",
   sellerPlatformFeeMax: "",
   shippingBuyerShare: "100",
+  tradeFeeSellerAmount: "",
+  tradeFeeBuyerAmount: "",
   shippingShareSmall: "",
   shippingShareMedium: "",
   shippingShareLarge: "",
@@ -266,6 +273,8 @@ export function ruleToForm(rule: CommissionRule): CommissionFormValues {
     sellerPlatformFeeMin: s(rule.sellerPlatformFeeMin),
     sellerPlatformFeeMax: s(rule.sellerPlatformFeeMax),
     shippingBuyerShare: s(rule.shippingBuyerShare ?? 100),
+    tradeFeeSellerAmount: s(rule.tradeFeeSellerAmount),
+    tradeFeeBuyerAmount: s(rule.tradeFeeBuyerAmount),
     shippingShareSmall: tierShare(rule, "small"),
     shippingShareMedium: tierShare(rule, "medium"),
     shippingShareLarge: tierShare(rule, "large"),
@@ -300,6 +309,8 @@ export function commissionFormToPayload(v: CommissionFormValues) {
     sellerPlatformFeeMin: num(v.sellerPlatformFeeMin),
     sellerPlatformFeeMax: num(v.sellerPlatformFeeMax),
     shippingBuyerShare: num(v.shippingBuyerShare),
+    tradeFeeSellerAmount: num(v.tradeFeeSellerAmount),
+    tradeFeeBuyerAmount: num(v.tradeFeeBuyerAmount),
     // Yalnız DOLDURULAN boyutlar gönderilir; boş kalan boyut tek paya düşer.
     shippingShares: PACKAGE_TIER_CODES.map((code) => ({
       tierCode: code,
