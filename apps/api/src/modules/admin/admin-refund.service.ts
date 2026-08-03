@@ -387,12 +387,21 @@ export class AdminRefundService {
       throw new NotFoundException("Takas bulunamadı");
     }
 
-    const cashPayment = primaryCashPayment(trade.cashPayments);
-    if (!cashPayment || cashPayment.status !== PaymentStatus.completed) {
+    // v2'de taraf başına satır var; HERHANGİ biri tahsil edilmişse iade denenebilir.
+    // primaryCashPayment (fark taşıyan satır) burada yanlış kapıydı: yalnız farkı
+    // taşımayan taraf ödemişken iade patlarsa admin retry'ı 400'e takılıyordu.
+    const completedPayments = trade.cashPayments.filter(
+      (p) => p.status === PaymentStatus.completed,
+    );
+    if (completedPayments.length === 0) {
       throw new BadRequestException(
         "İade edilebilecek tamamlanmış bir nakit ödeme yok",
       );
     }
+    // Bildirim hedefi: fark taşıyan satırın sahibi (v1 davranışıyla aynı), o
+    // ödemediyse tahsil edilmiş ilk satırın sahibi.
+    const notifyPayerId =
+      primaryCashPayment(completedPayments)?.payerId ?? null;
 
     const eligibleStatuses: TradeStatus[] = [
       TradeStatus.returning,
@@ -432,7 +441,7 @@ export class AdminRefundService {
       try {
         await this.eventService.emitTradeRefundCompleted({
           tradeId,
-          cashPayerId: cashPayment?.payerId ?? null,
+          cashPayerId: notifyPayerId,
         });
       } catch (emitErr) {
         this.logger.error(
@@ -477,7 +486,7 @@ export class AdminRefundService {
       try {
         await this.eventService.emitTradeRefundFailed({
           tradeId,
-          cashPayerId: cashPayment?.payerId ?? null,
+          cashPayerId: notifyPayerId,
           reason: message,
         });
       } catch (emitErr) {
