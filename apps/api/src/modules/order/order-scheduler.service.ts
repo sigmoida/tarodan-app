@@ -300,9 +300,10 @@ export class OrderSchedulerService implements OnModuleInit {
       }
     }
 
-    // 3) TAKAS KOMİSYONU: ürünler DEPOYA varmış (at_warehouse+) + nakit ödemesi tamamlanmış
-    // takasların komisyon e-Arşivi faturasızsa kes. Tüm at_warehouse yollarını (admin
+    // 3) TAKAS HİZMET BEDELİ: ürünler DEPOYA varmış (at_warehouse+) + ödemesi tamamlanmış
+    // takas satırlarının e-Arşivi faturasızsa kes. Tüm at_warehouse yollarını (admin
     // mark-warehouse-received + Sürat sync) yakalar; idempotent (sourceId=tradeCashPayment.id).
+    // v2'de TARAF BAŞINA bir satır vardır → her satır kendi faturasını doğurur.
     const paidWarehouseTcps = await this.prisma.tradeCashPayment.findMany({
       where: {
         status: PaymentStatus.completed,
@@ -329,7 +330,8 @@ export class OrderSchedulerService implements OnModuleInit {
           await this.prisma.elogoInvoice.findMany({
             where: {
               sourceId: { in: paidWarehouseTcps.map((c) => c.id) },
-              type: "trade_commission" as any,
+              // v1 komisyon / v2 hizmet bedeli — ikisi de bu satırın faturasıdır.
+              type: { in: ["trade_commission", "trade_service_fee"] as any },
             },
             select: { sourceId: true },
           })
@@ -338,11 +340,11 @@ export class OrderSchedulerService implements OnModuleInit {
       for (const c of paidWarehouseTcps) {
         if (invoicedTcp.has(c.id)) continue;
         try {
-          await this.elogoInvoicing.issueTradeCashCommissionInvoice(c.id);
+          await this.elogoInvoicing.issueTradeCashFeeInvoice(c.id);
           tradeInvoiced++;
         } catch (e: any) {
           this.logger.warn(
-            `processDeliveredOrders takas komisyonu hatası ${c.id}: ${e?.message}`,
+            `processDeliveredOrders takas faturası hatası ${c.id}: ${e?.message}`,
           );
         }
       }

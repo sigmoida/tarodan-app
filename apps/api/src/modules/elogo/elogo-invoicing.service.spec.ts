@@ -515,17 +515,69 @@ describe("ElogoInvoicingService", () => {
     expect(prisma.invoices[0].refundAdjustedAt).toEqual(finalizedAt);
   });
 
-  it("takas komisyonu: ödeyene e-Arşiv keser (TradeCashPayment.commission)", async () => {
+  it("takas v1: komisyon faturası matrah üzerinden kesilir (KDV üstüne eklenir)", async () => {
     const prisma = makePrisma({
-      tradeCash: { tcp1: { payerId: "p1", commission: 60 } },
+      tradeCash: { tcp1: { payerId: "p1", commission: 60, tradeFeeAmount: 0 } },
       users: { p1: { displayName: "Ödeyen", taxId: null } },
     });
     const elogo = makeElogo();
     const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
 
-    await svc.issueTradeCashCommissionInvoice("tcp1");
+    await svc.issueTradeCashFeeInvoice("tcp1");
     expect(elogo.sendDocument).toHaveBeenCalledTimes(1);
     expect(prisma.invoices[0].type).toBe("trade_commission");
+    expect(Number(prisma.invoices[0].netAmount)).toBeCloseTo(60, 2);
+    expect(Number(prisma.invoices[0].total)).toBeCloseTo(72, 2);
+  });
+
+  it("takas v2: hizmet bedeli KDV DAHİL kesilir (tutarın İÇİNDEN ayrıştırılır)", async () => {
+    // Admin kurala KDV dahil 60 TL girdi; taraftan tahsil edilen de 60 TL'dir.
+    // Fatura 72 TL çıkarsa tahsilatla fatura ayrışır — v1'in KDV yönü buraya taşınamaz.
+    const prisma = makePrisma({
+      tradeCash: { tcp1: { payerId: "p1", commission: 0, tradeFeeAmount: 60 } },
+      users: { p1: { displayName: "Ödeyen", taxId: null } },
+    });
+    const elogo = makeElogo();
+    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+
+    await svc.issueTradeCashFeeInvoice("tcp1");
+    expect(prisma.invoices[0].type).toBe("trade_service_fee");
+    expect(Number(prisma.invoices[0].netAmount)).toBeCloseTo(50, 2);
+    expect(Number(prisma.invoices[0].taxAmount)).toBeCloseTo(10, 2);
+    expect(Number(prisma.invoices[0].total)).toBeCloseTo(60, 2);
+  });
+
+  it("takas: ücretsiz satır için fatura KESMEZ", async () => {
+    const prisma = makePrisma({
+      tradeCash: { tcp1: { payerId: "p1", commission: 0, tradeFeeAmount: 0 } },
+      users: { p1: { displayName: "Ödeyen", taxId: null } },
+    });
+    const elogo = makeElogo();
+    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+
+    await svc.issueTradeCashFeeInvoice("tcp1");
+    expect(elogo.sendDocument).not.toHaveBeenCalled();
+  });
+
+  it("takas iadesi: v2 hizmet bedeli faturasını da iptal eder", async () => {
+    const prisma = makePrisma();
+    prisma.invoices.push({
+      id: "t2",
+      type: "trade_service_fee",
+      sourceId: "tcp2",
+      documentType: "EARCHIVE",
+      status: "sent",
+      ettn: "te2",
+      invoiceNumber: "TRD2026000000010",
+      elogoRefId: "10",
+      issuedAt: new Date(),
+    });
+    const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+
+    await svc.handleTradeCashRefund("tcp2");
+    expect(elogo.cancelEArchiveInvoice).toHaveBeenCalledWith("te2", "10");
+    expect(prisma.invoices[0].status).toBe("cancelled");
   });
 
   it("takas iadesi: takas komisyon faturasını iptal eder", async () => {

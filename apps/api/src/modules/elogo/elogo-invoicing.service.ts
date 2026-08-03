@@ -48,6 +48,7 @@ type RevenueType =
   | "membership"
   | "boost"
   | "trade_commission"
+  | "trade_service_fee"
   | "platform_sale";
 
 type ResolvedRefundAdjustment = InvoiceRefundReversePayload & {
@@ -63,6 +64,7 @@ const LINE_DESCRIPTION: Record<string, string> = {
   membership: "Üyelik / abonelik bedeli",
   boost: "İlan öne çıkarma (boost) bedeli",
   trade_commission: "Takas aracılık hizmet (komisyon) bedeli",
+  trade_service_fee: "Takas hizmet bedeli",
   platform_sale: "Ürün/hizmet bedeli",
   return_invoice: "İade faturası",
 };
@@ -641,21 +643,42 @@ export class ElogoInvoicingService {
     await this.cut("boost", boostId, boost.userId, Number(boost.price), desc);
   }
 
-  /** Takas nakit komisyon faturası → ÖDEYENE (TradeCashPayment.commission; payer taşır). */
-  async issueTradeCashCommissionInvoice(
-    tradeCashPaymentId: string,
-  ): Promise<void> {
+  /**
+   * Takas ödeme satırının hizmet faturası → ÖDEYENE. Fatura TÜRÜ satırın kendi
+   * verisinden gelir, sürüm bayrağından değil:
+   *
+   *  - v2 satırı `tradeFeeAmount` taşır → `trade_service_fee` (KDV DAHİL tutar,
+   *    içinden ayrıştırılır)
+   *  - v1 satırı `commission` taşır → `trade_commission` (KDV HARİÇ matrah, üstüne eklenir)
+   *
+   * Böylece iki sürüm aynı çağrı yolunu paylaşır ve v1 takasları eski kuralla biter.
+   * v2'de İKİ satır vardır → taraf başına bir fatura (sourceId satır id'si, idempotent).
+   */
+  async issueTradeCashFeeInvoice(tradeCashPaymentId: string): Promise<void> {
     const tcp = await this.prisma.tradeCashPayment.findUnique({
       where: { id: tradeCashPaymentId },
-      select: { payerId: true, commission: true },
+      select: { payerId: true, commission: true, tradeFeeAmount: true },
     });
     if (!tcp) return;
-    await this.cut(
-      "trade_commission",
-      tradeCashPaymentId,
-      tcp.payerId,
-      Number(tcp.commission),
-    );
+    const tradeFee = Number(tcp.tradeFeeAmount ?? 0);
+    if (tradeFee > 0) {
+      await this.cut(
+        "trade_service_fee",
+        tradeCashPaymentId,
+        tcp.payerId,
+        tradeFee,
+      );
+      return;
+    }
+    const commission = Number(tcp.commission ?? 0);
+    if (commission > 0) {
+      await this.cut(
+        "trade_commission",
+        tradeCashPaymentId,
+        tcp.payerId,
+        commission,
+      );
+    }
   }
 
   /**
@@ -698,10 +721,15 @@ export class ElogoInvoicingService {
     await this.reverseByKeys(await this.relatedInvoiceKeys(orderId), resolved);
   }
 
-  /** İade: takas nakit komisyon faturasını iptal/iade et. */
+  /**
+   * İade: takas satırının hizmet faturasını iptal/iade et. Hangi türün kesildiği
+   * satırın sürümüne bağlı olduğundan (v1 komisyon / v2 hizmet bedeli) İKİSİ de
+   * denenir — `reverseByKeys` var olmayan anahtarı sessizce atlar.
+   */
   async handleTradeCashRefund(tradeCashPaymentId: string): Promise<void> {
     await this.reverseByKeys([
       { type: "trade_commission", sourceId: tradeCashPaymentId },
+      { type: "trade_service_fee", sourceId: tradeCashPaymentId },
     ]);
   }
 

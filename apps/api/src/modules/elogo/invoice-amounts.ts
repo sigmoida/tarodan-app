@@ -31,9 +31,12 @@ export const AMOUNT_BASIS_BY_TYPE: Record<
   platform_sale: "gross",
   membership: "gross",
   boost: "gross",
-  // Takas nakit komisyonu da matrah saklar: KDV'si `commission_tax_amount`
+  // Takas nakit komisyonu (v1 — LEGACY) matrah saklar: KDV'si `commission_tax_amount`
   // kolonunda ayrı durur ve ödeyenin toplamına eklenir.
   trade_commission: "net",
+  // Takas hizmet bedeli (v2): admin kurala KDV DAHİL tutarı girer ve taraftan bu
+  // tutar tahsil edilir — üstüne KDV EKLENMEZ, içinden ayrıştırılır.
+  trade_service_fee: "gross",
   // İade faturası kaynak faturanın tutarını terslediği için onun matrahını izler;
   // pratikte `repriceUnsentInvoice`/refund yolu kendi kaynağından hesaplar.
   return_invoice: "gross",

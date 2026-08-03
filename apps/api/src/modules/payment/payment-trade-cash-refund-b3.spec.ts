@@ -165,9 +165,7 @@ describe("PaymentService trade cash refund idempotency", () => {
             handleOrderRefund: jest.fn().mockResolvedValue(undefined),
             issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined),
             handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
-            issueTradeCashCommissionInvoice: jest
-              .fn()
-              .mockResolvedValue(undefined),
+            issueTradeCashFeeInvoice: jest.fn().mockResolvedValue(undefined),
             retryPendingInvoices: jest.fn().mockResolvedValue(undefined),
           },
         },

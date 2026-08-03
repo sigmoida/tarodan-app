@@ -2095,6 +2095,8 @@ enum ElogoInvoiceType {
   membership
   boost
   trade_commission
+  /// Takas v2 hizmet bedeli — KDV DAHİL sabit tutar (v1 komisyonundan farklı KDV yönü).
+  trade_service_fee
   platform_sale
   return_invoice
 }
