@@ -33,11 +33,12 @@ export class FulfillmentFinalizer {
       opts.transactionId || payment.providerPaymentId || payment.id;
 
     // 1) Ledger capture (best-effort; defter hatası ödemeyi bozmaz — reconciliation yakalar).
-    // #8 İDEMPOTENCY: ledger.record her çağrıda yeni entryGroup yazar (idempotent DEĞİL).
-    // finalize iki kez koşabildiği için (anlık yol + outbox backstop / drainer retry) önce
-    // bu sipariş için `payment_captured` grubu VAR MI diye bak — varsa yakalamayı ATLA
-    // (çift capture defter read-model'ini bozar). Kargo/order.paid adımları kendi
-    // idempotency'lerine sahip; yalnız ledger'ın açık koruması burada.
+    // #8 İDEMPOTENCY: finalize iki kez koşabilir (anlık yol + outbox backstop / drainer
+    // retry). İki katmanlı koruma: (a) bu sipariş için `payment_captured` grubu VAR MI
+    // diye bak — ucuz hızlı-yol; (b) asıl garanti DB'de: recordCapture `capture:order:<id>`
+    // anahtarını damgalar, (idempotency_key, line_no) UNIQUE ikinci yazımı P2002 ile
+    // düşürür. (a) tek başına yarışa açıktır: eşzamanlı iki finalize da boş okur.
+    // Kargo/order.paid adımları kendi idempotency'lerine sahiptir.
     try {
       const already = await this.prisma.ledgerEntry.findFirst({
         where: {
@@ -66,9 +67,16 @@ export class FulfillmentFinalizer {
         });
       }
     } catch (e: any) {
-      this.logger.warn(
-        `Ledger capture kaydı başarısız (order ${order.id}): ${e?.message}`,
-      );
+      // P2002 = eşzamanlı finalize'ın yazdığı grup; koruma ÇALIŞTI, hata değil.
+      if (e?.code === "P2002") {
+        this.logger.log(
+          `Ledger capture yarışı (order ${order.id}) — çift kayıt DB'de engellendi`,
+        );
+      } else {
+        this.logger.warn(
+          `Ledger capture kaydı başarısız (order ${order.id}): ${e?.message}`,
+        );
+      }
     }
 
     const currentOrder = await this.prisma.order.findUnique({

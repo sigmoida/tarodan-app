@@ -9,6 +9,7 @@ import {
   LedgerAccount,
   PaytrMatchStatus,
   PaytrStatementLineType,
+  LedgerEventType,
 } from "@prisma/client";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
@@ -28,6 +29,8 @@ export interface ReconciliationReport {
   pspFeeLedgerTotal: number;
   /** 2+ gündür damgalanmamış (deftere yazılamamış) eşleşmiş fee'li satır sayısı. */
   pspFeeAccrualLag: number;
+  /** Payout'u tamamlanmış ama escrow'u kapanmamış sipariş sayısı (düşmüş kayıt). */
+  escrowResidueOrders: number;
   driftAlarms: string[];
 }
 
@@ -87,6 +90,8 @@ export class LedgerReconciliationService implements OnModuleInit {
         amount: true,
         account: true,
         orderId: true,
+        // 6. invaryant: settle olmuş siparişleri ayıklamak için.
+        eventType: true,
       },
     });
     const groupNet = new Map<string, number>();
@@ -194,6 +199,49 @@ export class LedgerReconciliationService implements OnModuleInit {
       this.logger.error(`RECONCILE ALARM: ${msg}`);
     }
 
+    // 6) ESCROW KALINTISI — payout'u TAMAMLANMIŞ siparişte escrow net'i 0 olmalı:
+    //    capture'ın seller_escrow debit'i settle + kesinti + iade kredileriyle kapanır.
+    //    Kapanmıyorsa bir kayıt DÜŞMÜŞTÜR (tipik vaka: adjustment/settle yazımı
+    //    başarısız) ve escrow sonsuza dek açık kalır — grup dengesi bunu göremez,
+    //    çünkü her grup kendi içinde dengelidir.
+    //
+    //    Sipariş satırları TÜM zamanlar için çekilir: capture pencere dışında kalmış
+    //    olabilir; yalnız pencereye bakmak sağlıklı siparişleri kalıntı sanardı.
+    const settledOrderIds = [
+      ...new Set(
+        entries
+          .filter(
+            (e) =>
+              e.eventType === LedgerEventType.payout_completed && e.orderId,
+          )
+          .map((e) => e.orderId as string),
+      ),
+    ];
+    let escrowResidueOrders = 0;
+    if (settledOrderIds.length > 0) {
+      const settledRows = await this.prisma.ledgerEntry.findMany({
+        where: { orderId: { in: settledOrderIds } },
+        select: {
+          account: true,
+          direction: true,
+          amount: true,
+          orderId: true,
+          sellerId: true,
+        },
+      });
+      const settledBalances =
+        LedgerBalanceService.deriveOrderBalances(settledRows);
+      for (const orderId of settledOrderIds) {
+        const balance = settledBalances.get(orderId);
+        if (balance && Math.abs(balance.escrowNet) > EPSILON) {
+          escrowResidueOrders++;
+          const msg = `LEDGER_ESCROW_RESIDUE order=${orderId} escrowNet=${balance.escrowNet.toFixed(2)}`;
+          driftAlarms.push(msg);
+          this.logger.error(`RECONCILE ALARM: ${msg}`);
+        }
+      }
+    }
+
     const report: ReconciliationReport = {
       ledgerGroupsChecked: groupNet.size,
       unbalancedGroups,
@@ -202,10 +250,11 @@ export class LedgerReconciliationService implements OnModuleInit {
       pspFeeStampedTotal: Math.round(pspFeeStampedTotal * 100) / 100,
       pspFeeLedgerTotal: Math.round(pspFeeLedgerTotal * 100) / 100,
       pspFeeAccrualLag,
+      escrowResidueOrders,
       driftAlarms,
     };
     log(
-      `Reconcile: ${groupNet.size} defter grubu · ${unbalancedGroups} dengesiz · ${overRefundedPayments} ödeme-fazla-iade · ${overRefundedOrders} sipariş-fazla-iade · psp-fee ${report.pspFeeStampedTotal}/${report.pspFeeLedgerTotal}${pspFeeAccrualLag ? ` · ${pspFeeAccrualLag} tahakkuk gecikmesi` : ""}`,
+      `Reconcile: ${groupNet.size} defter grubu · ${unbalancedGroups} dengesiz · ${overRefundedPayments} ödeme-fazla-iade · ${overRefundedOrders} sipariş-fazla-iade · psp-fee ${report.pspFeeStampedTotal}/${report.pspFeeLedgerTotal}${pspFeeAccrualLag ? ` · ${pspFeeAccrualLag} tahakkuk gecikmesi` : ""}${escrowResidueOrders ? ` · ${escrowResidueOrders} escrow kalıntısı` : ""}`,
     );
     if (driftAlarms.length === 0) {
       this.logger.log(

@@ -77,6 +77,107 @@ describe("LedgerService", () => {
     ).rejects.toThrow(/pozitif/);
   });
 
+  /**
+   * İDEMPOTENCY: aynı iş olayı iki kez işlenirse (outbox backstop, callback tekrarı,
+   * cron retry) defter ÇİFT grup yazmamalı. Koruma DB'de: (idempotency_key, line_no)
+   * UNIQUE — ikinci yazım P2002 ile düşer. Satırlar tek `createMany` ile yazıldığı
+   * için grup ya tamamen yazılır ya hiç (yarım grup imkânsız).
+   */
+  describe("idempotency", () => {
+    it("her satıra anahtarı ve sıra numarasını damgalar", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      await svc.record(tx, {
+        eventType: LedgerEventType.adjustment,
+        idempotencyKey: "adjustment:payout:p1",
+        entries: [
+          {
+            account: LedgerAccount.seller_debt_recovery,
+            direction: LedgerDirection.debit,
+            amount: 30,
+          },
+          {
+            account: LedgerAccount.seller_escrow,
+            direction: LedgerDirection.credit,
+            amount: 30,
+          },
+        ],
+      });
+      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      expect(rows.map((r: any) => r.idempotencyKey)).toEqual([
+        "adjustment:payout:p1",
+        "adjustment:payout:p1",
+      ]);
+      // line_no grup içinde benzersiz → unique index hesap/yön varsayımı YAPMAZ
+      expect(rows.map((r: any) => r.lineNo)).toEqual([0, 1]);
+    });
+
+    it("anahtar verilmezse null damgalar (eski çağrılar yazılmaya devam eder)", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      await svc.record(tx, {
+        eventType: LedgerEventType.adjustment,
+        entries: [
+          {
+            account: LedgerAccount.seller_debt_recovery,
+            direction: LedgerDirection.debit,
+            amount: 5,
+          },
+          {
+            account: LedgerAccount.seller_escrow,
+            direction: LedgerDirection.credit,
+            amount: 5,
+          },
+        ],
+      });
+      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      expect(rows.every((r: any) => r.idempotencyKey === null)).toBe(true);
+    });
+
+    it("recordCapture anahtarı siparişten türetir (sipariş başına TEK capture)", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      await svc.recordCapture(tx, {
+        orderId: "order-1",
+        paymentId: "payment-1",
+        gross: 100,
+        sellerNet: 90,
+        commission: 10,
+      });
+      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      expect(rows[0].idempotencyKey).toBe("capture:order:order-1");
+    });
+
+    it("recordTradeCashCapture anahtarı takas nakit ödemesinden türetir", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      await svc.recordTradeCashCapture(tx, {
+        tradeId: "t1",
+        tradeCashPaymentId: "tcp-1",
+        totalAmount: 90,
+        netAmount: 78,
+        commission: 12,
+      });
+      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      expect(rows[0].idempotencyKey).toBe("capture:trade-cash:tcp-1");
+    });
+
+    it("recordRefund anahtarı iade denemesinden türetir (deneme başına TEK ters kayıt)", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      await svc.recordRefund(tx, {
+        orderId: "order-1",
+        refundAttemptId: "attempt-1",
+        orderTotal: 100,
+        commission: 15,
+        withholdingTax: 3,
+        refundAmount: 100,
+      });
+      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      expect(rows[0].idempotencyKey).toBe("refund:attempt:attempt-1");
+    });
+  });
+
   it("recordCapture stopajı dengeler (gross = sellerNet + commission + stopaj)", async () => {
     const svc = new LedgerService({} as any);
     const tx = makeTx();

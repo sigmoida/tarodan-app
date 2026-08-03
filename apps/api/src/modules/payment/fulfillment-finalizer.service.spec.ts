@@ -88,6 +88,28 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
     );
   });
 
+  /**
+   * Yarış: existence-check'i iki finalize AYNI ANDA geçebilir (ikisi de boş okur).
+   * Asıl koruma artık DB'deki (idempotency_key, line_no) UNIQUE — ikinci yazım
+   * P2002 alır. Bu bir HATA değil, korumanın çalışmasıdır: akış kesilmemeli ve
+   * kalan adımlar (order.paid + kargo) normal koşmalı.
+   */
+  it("eşzamanlı finalize'da P2002'yi yutar ve kalan adımları çalıştırır", async () => {
+    const { svc, ledger, eventService, paymentCommon } = make(false);
+    ledger.recordCapture.mockRejectedValue(
+      Object.assign(new Error("Unique constraint failed"), { code: "P2002" }),
+    );
+
+    await expect(
+      svc.finalizePaidOrder(order, payment, {}),
+    ).resolves.toBeUndefined();
+
+    expect(eventService.emitOrderPaid).toHaveBeenCalledTimes(1);
+    expect(paymentCommon.ensureSuratShipmentForOrder).toHaveBeenCalledWith(
+      "o1",
+    );
+  });
+
   it("iptal edilmiş siparişte bildirim ve kargo yan etkilerini çalıştırmaz", async () => {
     const { svc, prisma, eventService, paymentCommon } = make(false);
     prisma.order.findUnique.mockResolvedValue({

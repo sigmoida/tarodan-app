@@ -3341,7 +3341,14 @@ model LedgerEntry {
   memo         String?
   metadata     Json?
   createdAt    DateTime        @default(now()) @map("created_at")
+  // İDEMPOTENCY: iş olayı başına deterministik anahtar (ör. "capture:order:<id>").
+  // Grup satırları AYNI anahtarı, farklı `lineNo`'yu taşır → (key, lineNo) UNIQUE
+  // aynı olayın ikinci kez yazılmasını DB seviyesinde durdurur. NULL = eski/anahtarsız
+  // kayıt (Postgres NULL'ları benzersiz saymaz, çoklu NULL serbest).
+  idempotencyKey String?       @map("idempotency_key")
+  lineNo         Int           @default(0) @map("line_no")
 
+  @@unique([idempotencyKey, lineNo])
   @@index([entryGroupId])
   @@index([account, createdAt])
   @@index([eventType, createdAt])

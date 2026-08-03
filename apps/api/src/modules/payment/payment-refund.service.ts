@@ -1010,35 +1010,37 @@ export class PaymentRefundService {
             await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
           }
 
-          // Faz 6.2 (ledger): `refund_issued` oransal ters kayıt (best-effort — defter
-          // hatası iadeyi bozmaz). orderRefundThreshold = sipariş tutarı (T); komisyon/stopaj
-          // sipariş satırından okunur; LedgerService oranı ve yuvarlamayı yönetir.
-          try {
-            const ledgerOrder = await tx.order.findUnique({
-              where: { id: orderId },
-              select: {
-                sellerId: true,
-                buyerId: true,
-                commissionAmount: true,
-                withholdingTaxAmount: true,
-              },
+          // Faz 6.2 (ledger): `refund_issued` oransal ters kayıt. orderRefundThreshold =
+          // sipariş tutarı (T); komisyon/stopaj sipariş satırından okunur; LedgerService
+          // oranı ve yuvarlamayı yönetir. `refundAttemptId` idempotency anahtarını besler
+          // → aynı deneme yeniden işlenirse ikinci ters kayıt DB'de düşer.
+          //
+          // FAIL-LOUD (best-effort DEĞİL): bu yazım iade TX'İNİN İÇİNDE. Hata yutulursa
+          // para geri dönmüş ama defter ters kaydı eksik kalıyordu — sessiz muhasebe
+          // açığı. Fırlatmak tüm iadeyi geri alır: ya ikisi ya hiçbiri. (Post-commit
+          // yollarda — capture, payout tamamlama — best-effort kalıbı KORUNUR: orada
+          // para zaten commit'li olduğundan fırlatmanın geri alacağı bir şey yoktur.)
+          const ledgerOrder = await tx.order.findUnique({
+            where: { id: orderId },
+            select: {
+              sellerId: true,
+              buyerId: true,
+              commissionAmount: true,
+              withholdingTaxAmount: true,
+            },
+          });
+          if (ledgerOrder) {
+            await this.ledger?.recordRefund(tx, {
+              orderId,
+              paymentId: payment.id,
+              refundAttemptId: freshAttempt.id,
+              sellerId: ledgerOrder.sellerId,
+              buyerId: ledgerOrder.buyerId,
+              orderTotal: orderRefundThreshold,
+              commission: Number(ledgerOrder.commissionAmount ?? 0),
+              withholdingTax: Number(ledgerOrder.withholdingTaxAmount ?? 0),
+              refundAmount: amountToRefund,
             });
-            if (ledgerOrder) {
-              await this.ledger?.recordRefund(tx, {
-                orderId,
-                paymentId: payment.id,
-                sellerId: ledgerOrder.sellerId,
-                buyerId: ledgerOrder.buyerId,
-                orderTotal: orderRefundThreshold,
-                commission: Number(ledgerOrder.commissionAmount ?? 0),
-                withholdingTax: Number(ledgerOrder.withholdingTaxAmount ?? 0),
-                refundAmount: amountToRefund,
-              });
-            }
-          } catch (e: any) {
-            this.logger.warn(
-              `Ledger refund kaydı başarısız (order ${orderId}): ${e?.message}`,
-            );
           }
 
           // Her başarılı refund attempt kendi eLogo düzeltme olayını üretir. Kısmi

@@ -112,6 +112,8 @@ describe("PayoutService adjustment ledger (F1)", () => {
       orderId: "order-1",
       holdId: "hold-1",
     });
+    // İdempotency: payout başına TEK kesinti kaydı (hold ↔ payout 1:1).
+    expect(input.idempotencyKey).toBe("adjustment:payout:payout-1");
   });
 
   it("records the FULL deduction when the debt consumes the whole payout (escrow açık kalmasın)", async () => {
@@ -137,13 +139,18 @@ describe("PayoutService adjustment ledger (F1)", () => {
     expect(ledger.record).not.toHaveBeenCalled();
   });
 
-  it("keeps the payout when the ledger write fails (best-effort)", async () => {
-    const { service, getCreated } = makeHarness({
-      debt: 30,
-      ledgerThrows: true,
-    });
+  /**
+   * FAIL-LOUD (eskiden best-effort): bu yazım payout TX'İNİN İÇİNDE ve escrow'u
+   * kapatan TEK kayıt. Hata yutulunca payout oluşuyor, kesinti deftere hiç
+   * yazılmıyor ve escrow'da kesinti kadar kalıntı SONSUZA DEK açık kalıyordu —
+   * üstelik hiçbir invaryant bunu yakalamıyordu. Aynı tx'te olduğu için fırlatmak
+   * payout'u geri alır: bir sonraki tur temiz defterle yeniden dener.
+   */
+  it("rolls back the payout when the ledger write fails (escrow kalıntısı bırakma)", async () => {
+    const { service } = makeHarness({ debt: 30, ledgerThrows: true });
 
-    expect(await service.createPayoutsForReleasedHolds()).toBe(1);
-    expect(getCreated()).toMatchObject({ netAmount: 70 });
+    await expect(service.createPayoutsForReleasedHolds()).rejects.toThrow(
+      "ledger down",
+    );
   });
 });

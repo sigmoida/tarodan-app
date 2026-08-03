@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import * as crypto from "crypto";
 import {
   Prisma,
@@ -25,6 +25,16 @@ export interface LedgerEntryInput {
 export interface LedgerRecordInput {
   eventType: LedgerEventType;
   currency?: string;
+  /**
+   * İş olayı başına DETERMİNİSTİK anahtar (ör. `capture:order:<id>`). Grubun tüm
+   * satırlarına damgalanır; (idempotencyKey, lineNo) UNIQUE olduğu için aynı olayın
+   * ikinci yazımı DB'de P2002 ile düşer. Verilmezse koruma YOKTUR (eski davranış).
+   *
+   * UYARI: çağrı bir transaction İÇİNDEYSE P2002 tüm transaction'ı düşürür (Postgres
+   * hatalı statement sonrası tx'i abort eder). Bu istenen davranıştır — çift yazım
+   * girişimi zaten çift işlenen bir para olayının belirtisidir.
+   */
+  idempotencyKey?: string | null;
   entries: LedgerEntryInput[];
   refs?: {
     paymentId?: string | null;
@@ -44,7 +54,11 @@ const BALANCE_EPSILON = 0.005;
 /**
  * LedgerService (Faz 6) — DEĞİŞMEZ çift-taraflı defter. `record` DENGELİ bir satır
  * grubu yazar (Σdebit == Σcredit; değilse FIRLATIR — dengesiz kayıt kabul edilmez).
- * Append-only: güncelleme/silme yok. Bir para tx'inin parçası olarak `tx` ile çağrılır.
+ * Bir para tx'inin parçası olarak `tx` ile çağrılır.
+ *
+ * Append-only YALNIZ kod disiplini değil: `ledger_entries` üzerinde UPDATE/DELETE
+ * DB tetikleyicisiyle reddedilir (düzeltme = ters kayıt). Çift yazıma karşı da DB
+ * koruması vardır — bkz. `idempotencyKey`.
  *
  * NOT (Faz 6 kapsamı): defter şu an denetim/gözlemlenebilirlik + drift reconciliation
  * (6.5) için popüle edilir; bakiyeleri BURADAN türetip Payment/Hold'u kaynak olmaktan
@@ -52,8 +66,6 @@ const BALANCE_EPSILON = 0.005;
  */
 @Injectable()
 export class LedgerService {
-  private readonly logger = new Logger(LedgerService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   async record(
@@ -84,8 +96,13 @@ export class LedgerService {
     const currency = input.currency ?? "TRY";
     const refs = input.refs ?? {};
 
+    // Tek `createMany` → grup ya tamamen yazılır ya hiç. `lineNo` grup içi sıra
+    // numarasıdır; unique index'in ikinci ayağı olduğundan hesap/yön hakkında
+    // hiçbir varsayım yapmadan çift yazımı engeller.
     await tx.ledgerEntry.createMany({
-      data: input.entries.map((e) => ({
+      data: input.entries.map((e, lineNo) => ({
+        idempotencyKey: input.idempotencyKey ?? null,
+        lineNo,
         entryGroupId,
         eventType: input.eventType,
         account: e.account,
@@ -155,6 +172,13 @@ export class LedgerService {
     return this.record(tx, {
       eventType: LedgerEventType.payment_captured,
       currency: input.currency,
+      // Sipariş başına TEK capture: finalize iki kez koşsa da (anlık yol + outbox
+      // backstop) ikinci yazım DB'de düşer.
+      idempotencyKey: input.orderId
+        ? `capture:order:${input.orderId}`
+        : input.paymentId
+          ? `capture:payment:${input.paymentId}`
+          : null,
       entries,
       refs: {
         paymentId: input.paymentId,
@@ -211,6 +235,9 @@ export class LedgerService {
     return this.record(tx, {
       eventType: LedgerEventType.payment_captured,
       currency: input.currency,
+      idempotencyKey: input.tradeCashPaymentId
+        ? `capture:trade-cash:${input.tradeCashPaymentId}`
+        : null,
       entries,
       refs: {
         tradeId: input.tradeId,
@@ -233,6 +260,8 @@ export class LedgerService {
       paymentId?: string | null;
       buyerId?: string | null;
       sellerId?: string | null;
+      /** İade denemesi kimliği — idempotency anahtarının kaynağı (deneme başına TEK ters kayıt). */
+      refundAttemptId?: string | null;
       orderTotal: number;
       commission: number;
       withholdingTax: number;
@@ -283,6 +312,9 @@ export class LedgerService {
     return this.record(tx, {
       eventType: LedgerEventType.refund_issued,
       currency: input.currency,
+      idempotencyKey: input.refundAttemptId
+        ? `refund:attempt:${input.refundAttemptId}`
+        : null,
       entries,
       refs: {
         paymentId: input.paymentId,
