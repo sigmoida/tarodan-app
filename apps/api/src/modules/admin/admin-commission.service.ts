@@ -209,21 +209,33 @@ export class AdminCommissionService {
   }
 
   /**
-   * Kademe paylarının yazılabilir hâli. Alan gönderilmediyse `undefined` döner ve
-   * mevcut satırlara DOKUNULMAZ; gönderildiyse tam liste ile değiştirilir (kısmi
-   * gönderim sessizce yarım yapılandırma bırakmasın).
+   * Yazılacak kademe payı satırları. Alan gönderilmediyse `undefined` döner ve
+   * mevcut satırlara DOKUNULMAZ (kısmi gönderim sessizce yarım yapılandırma
+   * bırakmasın diye gönderildiğinde tam liste yazılır).
    */
-  private shippingSharesData(
+  private shippingShareRows(
     dto: CreateCommissionRuleDto | UpdateCommissionRuleDto,
   ) {
     if (dto.shippingShares === undefined) return undefined;
-    return {
-      deleteMany: {},
-      create: dto.shippingShares.map((share) => ({
-        tierCode: share.tierCode,
-        buyerShare: share.buyerShare,
-      })),
-    };
+    return dto.shippingShares.map((share) => ({
+      tierCode: share.tierCode,
+      buyerShare: share.buyerShare,
+    }));
+  }
+
+  /**
+   * Create yolunda nested `deleteMany` GEÇERSİZDİR (Prisma yalnız update'te
+   * kabul eder) ve silinecek satır da yoktur — sadece `create` gönderilir.
+   */
+  private shippingSharesCreateData(dto: CreateCommissionRuleDto) {
+    const create = this.shippingShareRows(dto);
+    return create ? { create } : undefined;
+  }
+
+  /** Update yolunda mevcut satırlar silinip tam liste yeniden yazılır. */
+  private shippingSharesUpdateData(dto: UpdateCommissionRuleDto) {
+    const create = this.shippingShareRows(dto);
+    return create ? { deleteMany: {}, create } : undefined;
   }
 
   private serializeRule(rule: any) {
@@ -331,7 +343,7 @@ export class AdminCommissionService {
         priority: dto.priority ?? 0,
         isActive: dto.isActive ?? true,
         ...this.v2RuleData(dto),
-        shippingShares: this.shippingSharesData(dto),
+        shippingShares: this.shippingSharesCreateData(dto),
         // Legacy (backward compatibility)
         percentage: dto.percentage ?? (dto.sellerRate || 0),
         ruleType: dto.type || "default",
@@ -465,7 +477,7 @@ export class AdminCommissionService {
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
     // v2 fields (taxpayerType, maxAmount, 4 rate sets, shippingBuyerShare)
     Object.assign(updateData, this.v2RuleData(dto));
-    const shippingShares = this.shippingSharesData(dto);
+    const shippingShares = this.shippingSharesUpdateData(dto);
     if (shippingShares) updateData.shippingShares = shippingShares;
     // Legacy fields
     if (dto.percentage !== undefined) updateData.percentage = dto.percentage;

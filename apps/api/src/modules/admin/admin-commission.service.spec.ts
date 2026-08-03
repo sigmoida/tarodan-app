@@ -3,6 +3,7 @@ import {
   CommissionRuleType,
   CommissionSellerType,
   CommissionTaxpayerType,
+  ShippingPackageTierCode,
 } from "@prisma/client";
 import { BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
@@ -308,5 +309,103 @@ describe("AdminCommissionService overlap guard — appliesTo & wildcard aliases"
         maxAmount: undefined,
       }),
     ).resolves.toMatchObject({ id: "new-rule" });
+  });
+});
+
+/**
+ * Nested `deleteMany` yalnızca UPDATE'te geçerlidir; create payload'ında Prisma
+ * bunu `PrismaClientValidationError` ile reddeder (kural oluşturma 500 verirdi).
+ * Silinecek satır da yoktur — create yalnız `create` göndermeli.
+ */
+describe("AdminCommissionService shippingShares nested write shape", () => {
+  const prisma = {
+    commissionRule: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+  const audit = { createRequiredAuditLog: jest.fn() };
+  const service = new AdminCommissionService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AdminAuditService,
+  );
+
+  const shippingShares = [
+    { tierCode: ShippingPackageTierCode.small, buyerShare: 50 },
+  ];
+
+  const catchAll = {
+    id: "catch-all",
+    name: "Catch all",
+    categoryId: null,
+    sellerType: null,
+    taxpayerType: null,
+    appliesTo: CommissionAppliesTo.BOTH,
+    minAmount: null,
+    maxAmount: null,
+    isActive: true,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    audit.createRequiredAuditLog.mockResolvedValue(undefined);
+    prisma.commissionRule.findMany.mockResolvedValue([catchAll]);
+    const echo = ({ data }: any) =>
+      Promise.resolve({
+        ...data,
+        id: "rule-1",
+        category: null,
+        shippingShares: [],
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+    prisma.commissionRule.create.mockImplementation(echo);
+    prisma.commissionRule.update.mockImplementation(echo);
+    prisma.commissionRule.findUnique.mockResolvedValue({
+      ...catchAll,
+      id: "rule-1",
+      categoryId: "category-1",
+      sellerType: CommissionSellerType.BUSINESS,
+      taxpayerType: CommissionTaxpayerType.corporate,
+    });
+  });
+
+  it("sends only `create` (never `deleteMany`) when creating a rule", async () => {
+    await service.createCommissionRule("admin-1", {
+      name: "250-999 TL ARASI",
+      categoryId: "category-1",
+      sellerType: CommissionSellerType.BUSINESS,
+      taxpayerType: CommissionTaxpayerType.corporate,
+      appliesTo: CommissionAppliesTo.BOTH,
+      sellerCommissionRate: 6,
+      minAmount: 250,
+      maxAmount: 999,
+      shippingShares,
+    });
+
+    const { data } = prisma.commissionRule.create.mock.calls[0][0];
+    expect(data.shippingShares).toEqual({ create: shippingShares });
+    expect(data.shippingShares).not.toHaveProperty("deleteMany");
+  });
+
+  it("replaces the full list with `deleteMany` + `create` when updating", async () => {
+    await service.updateCommissionRule("admin-1", "rule-1", {
+      shippingShares,
+    });
+
+    const { data } = prisma.commissionRule.update.mock.calls[0][0];
+    expect(data.shippingShares).toEqual({
+      deleteMany: {},
+      create: shippingShares,
+    });
+  });
+
+  it("leaves existing rows untouched when the field is omitted", async () => {
+    await service.updateCommissionRule("admin-1", "rule-1", { priority: 3 });
+
+    const { data } = prisma.commissionRule.update.mock.calls[0][0];
+    expect(data).not.toHaveProperty("shippingShares");
   });
 });
