@@ -635,7 +635,6 @@
     "packageSize": "Kargo paket boyutu",
     "packageSizeHelper": "Ürününüzün sığacağı en küçük paketi seçin. Kargo bedeli bu seçime göre hesaplanır.",
     "packageSizeUnavailable": "Paket boyutları şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin.",
-    "sampleDimensions": "Örnek ölçü: {dimensions}",
     "manageAllDiscounts": "Tüm İndirimlerimi Yönet",
     "discountSectionTitle": "İndirim & Kampanya",
     "quickDiscount": "Hızlı İndirim",
@@ -646,7 +645,9 @@
     "discountComingSoonNote": "* Not: Bu özellik yakında aktif olacaktır. Şimdilik ürün fiyatını doğrudan değiştirebilirsiniz.",
     "appliedDiscounts": "Bu Ürüne Uygulanan İndirimler",
     "shippingFee": "Kargo ücreti",
-    "sellerEarning": "Hak edişiniz"
+    "sellerEarning": "Hak edişiniz",
+    "packageFeeLabel": "Paket ücreti",
+    "sampleDimensionsLabel": "Örnek ölçü (en × boy × yükseklik)"
   },
   "cart": {
     "myCart": "Sepetim",

@@ -635,7 +635,6 @@
     "packageSize": "Shipping package size",
     "packageSizeHelper": "Pick the smallest package your item fits in. Shipping is priced from this choice.",
     "packageSizeUnavailable": "Package sizes could not be loaded right now. Please try again later.",
-    "sampleDimensions": "Sample size: {dimensions}",
     "manageAllDiscounts": "Manage All My Discounts",
     "discountSectionTitle": "Discount & Campaign",
     "quickDiscount": "Quick Discount",
@@ -646,7 +645,9 @@
     "discountComingSoonNote": "* Note: This feature will be enabled soon. For now you can change the product price directly.",
     "appliedDiscounts": "Discounts Applied to This Product",
     "shippingFee": "Shipping fee",
-    "sellerEarning": "Your earnings"
+    "sellerEarning": "Your earnings",
+    "packageFeeLabel": "Package fee",
+    "sampleDimensionsLabel": "Sample size (W × L × H)"
   },
   "cart": {
     "myCart": "My Cart",
