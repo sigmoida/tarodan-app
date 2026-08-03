@@ -11,8 +11,8 @@ import {
   ExpiryDateInput,
   CvvInput,
 } from "@tarodan/ui";
-import { detectBrand } from "../_lib/card";
-import type { NewCardValues } from "../_lib/schema";
+import { detectBrand } from "./card";
+import type { NewCardValues } from "./schema";
 import CardPreview from "./CardPreview";
 import { BrandEmblem } from "./CardVisuals";
 

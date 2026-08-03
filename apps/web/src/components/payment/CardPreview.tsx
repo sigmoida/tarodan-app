@@ -10,7 +10,7 @@ import {
   formatCardNumber,
   parseExp,
   type CardBrand,
-} from "../_lib/card";
+} from "./card";
 import { BrandEmblem, CardChip, ContactlessIcon } from "./CardVisuals";
 
 interface CardPreviewProps {

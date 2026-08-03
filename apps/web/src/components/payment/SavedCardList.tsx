@@ -9,7 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Radio, CvvInput } from "@tarodan/ui";
 import type { SavedCard } from "@/lib/api";
-import { NEW_CARD, brandFromLabel } from "../_lib/card";
+import { NEW_CARD, brandFromLabel } from "./card";
 import { BrandBadge, MastercardMark } from "./CardVisuals";
 
 interface SavedCardListProps {

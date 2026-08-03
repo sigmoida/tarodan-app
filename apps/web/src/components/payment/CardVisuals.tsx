@@ -1,6 +1,6 @@
 /** @format */
 
-import { BRAND_LABEL, type CardBrand } from "../_lib/card";
+import { BRAND_LABEL, type CardBrand } from "./card";
 
 /** Card brand pill (pure CSS, no external logo deps). */
 export function BrandBadge({

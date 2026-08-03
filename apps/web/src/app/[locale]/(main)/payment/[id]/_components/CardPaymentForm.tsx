@@ -2,44 +2,36 @@
 
 "use client";
 
-import {
-  ShieldCheckIcon,
-  LockClosedIcon,
-  CheckCircleIcon,
-} from "@heroicons/react/24/outline";
-import { Badge, Button, Spinner } from "@tarodan/ui";
-import { SectionCard } from "@/components/ui";
-import { useCardPayment } from "../_hooks/useCardPayment";
-import { NEW_CARD } from "../_lib/card";
-import SavedCardList from "./SavedCardList";
-import NewCardFields from "./NewCardFields";
+import { useCallback } from "react";
+import { LockClosedIcon } from "@heroicons/react/24/outline";
+import { Button } from "@tarodan/ui";
+import CardPaymentSection from "@/components/payment/CardPaymentSection";
+import { useCardPayment, type PaymentTarget } from "@/hooks/useCardPayment";
 
 interface CardPaymentFormProps {
-  target: { orderId?: string; checkoutGroupId?: string; tradeId?: string };
+  target: PaymentTarget;
   paymentId: string;
   amount?: number;
   cardStorageEnabled?: boolean;
 }
 
+/**
+ * Ödeme sayfasının kart formu: sipariş ve ödeme kaydı ZATEN vardır, bu yüzden
+ * hedef çözücü hazır id'leri döndürür. Tek sayfalık checkout aynı bölümü
+ * kullanır ama orada çözücü siparişi o an oluşturur.
+ */
 export default function CardPaymentForm({
   target,
   paymentId,
   amount,
   cardStorageEnabled = false,
 }: CardPaymentFormProps) {
-  const {
-    form,
-    cards,
-    loadingCards,
-    selected,
-    setSelected,
-    savedCvv,
-    setSavedCvv,
-    saveCard,
-    setSaveCard,
-    processing,
-    submit,
-  } = useCardPayment({ target, paymentId, cardStorageEnabled });
+  const resolvePayment = useCallback(
+    async () => ({ paymentId, target }),
+    [paymentId, target],
+  );
+  const card = useCardPayment({ cardStorageEnabled, resolvePayment });
+  const { processing, loadingCards, submit } = card;
 
   const amountLabel =
     amount != null
@@ -47,48 +39,7 @@ export default function CardPaymentForm({
       : null;
 
   return (
-    <SectionCard
-      title="Kart ile Öde"
-      action={
-        <Badge
-          variant="success"
-          icon={<LockClosedIcon className="h-3.5 w-3.5" />}
-        >
-          Güvenli
-        </Badge>
-      }
-    >
-      <p className="-mt-3 mb-4 text-sm text-muted">
-        PayTR güvenli ödeme altyapısı
-      </p>
-
-      {loadingCards ? (
-        <div className="flex items-center justify-center gap-2 py-8 text-muted">
-          <Spinner size="sm" /> Kartlar yükleniyor…
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {cards.length > 0 && (
-            <SavedCardList
-              cards={cards}
-              selected={selected}
-              onSelect={setSelected}
-              savedCvv={savedCvv}
-              onSavedCvvChange={setSavedCvv}
-            />
-          )}
-
-          {selected === NEW_CARD && (
-            <NewCardFields
-              form={form}
-              cardStorageEnabled={cardStorageEnabled}
-              saveCard={saveCard}
-              onSaveCardChange={setSaveCard}
-            />
-          )}
-        </div>
-      )}
-
+    <CardPaymentSection card={card}>
       <Button
         onClick={submit}
         disabled={processing || loadingCards}
@@ -105,20 +56,6 @@ export default function CardPaymentForm({
           </span>
         )}
       </Button>
-
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted">
-        <span className="inline-flex items-center gap-1.5">
-          <ShieldCheckIcon className="h-4 w-4 text-success-500" /> 256-bit SSL
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <CheckCircleIcon className="h-4 w-4 text-success-500" /> PayTR
-          güvencesi
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <LockClosedIcon className="h-4 w-4 text-success-500" /> Kart verileri
-          PayTR korumasında
-        </span>
-      </div>
-    </SectionCard>
+    </CardPaymentSection>
   );
 }

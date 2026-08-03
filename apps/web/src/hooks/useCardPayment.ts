@@ -7,19 +7,33 @@ import toast from "react-hot-toast";
 import { useZodForm } from "@tarodan/ui/form";
 import { CVV_REGEX } from "@tarodan/ui";
 import { paymentsApi, membershipApi, type SavedCard } from "@/lib/api";
-import { NEW_CARD } from "../_lib/card";
-import { newCardSchema, emptyNewCard } from "../_lib/schema";
+import { NEW_CARD } from "@/components/payment/card";
+import { newCardSchema, emptyNewCard } from "@/components/payment/schema";
 
-interface Target {
+export interface PaymentTarget {
   orderId?: string;
   checkoutGroupId?: string;
   tradeId?: string;
 }
 
-interface UseCardPaymentArgs {
-  target: Target;
+export interface ResolvedPayment {
   paymentId: string;
+  target: PaymentTarget;
+}
+
+interface UseCardPaymentArgs {
   cardStorageEnabled: boolean;
+  /**
+   * Ödenecek kaydı submit ANINDA çözer.
+   *
+   * Ödeme sayfasında kayıt zaten vardır ve hazır id'ler döner; tek sayfalık
+   * checkout'ta ise sipariş + ödeme TAM BURADA oluşturulur. Bu sıralama
+   * bilinçlidir: kart alanları önce doğrulanır, sipariş ancak geçerli bir kartla
+   * yaratılır — aksi halde her yazım hatası ödemesiz bir sipariş bırakırdı.
+   *
+   * `null` döndürmek "iptal" demektir (hata mesajı çözücünün sorumluluğunda).
+   */
+  resolvePayment: () => Promise<ResolvedPayment | null>;
 }
 
 /**
@@ -28,9 +42,8 @@ interface UseCardPaymentArgs {
  * posts those fields together with the server-signed form directly to PayTR.
  */
 export function useCardPayment({
-  target,
-  paymentId,
   cardStorageEnabled,
+  resolvePayment,
 }: UseCardPaymentArgs) {
   const form = useZodForm(newCardSchema, { defaultValues: emptyNewCard });
 
@@ -75,17 +88,14 @@ export function useCardPayment({
   const submit = async () => {
     if (processing) return;
 
-    let body: Parameters<typeof paymentsApi.prepareDirectForm>[0];
+    // 1) Kart alanları — sipariş oluşturmadan ÖNCE doğrulanır.
+    let cardBody: { saveCard?: boolean; savedCardId?: string };
     let cardFields: Record<string, string> = {};
     if (selected === NEW_CARD) {
       const valid = await form.trigger();
       if (!valid) return; // inline errors
       const v = form.getValues();
-      body = {
-        ...target,
-        paymentId,
-        saveCard: cardStorageEnabled && saveCard,
-      };
+      cardBody = { saveCard: cardStorageEnabled && saveCard };
       cardFields = {
         cc_owner: v.holder.trim(),
         card_number: v.number.replace(/\D/g, ""),
@@ -98,16 +108,23 @@ export function useCardPayment({
         toast.error("Bu kart için CVV girin");
         return;
       }
-      body = {
-        ...target,
-        paymentId,
-        savedCardId: selected,
-      };
+      cardBody = { savedCardId: selected };
       if (selectedCard?.requireCvv) cardFields = { cvv: savedCvv };
     }
 
     setProcessing(true);
     try {
+      // 2) Ödenecek kayıt: hazırsa okunur, değilse (checkout) burada oluşur.
+      const resolved = await resolvePayment();
+      if (!resolved) {
+        setProcessing(false);
+        return;
+      }
+      const body: Parameters<typeof paymentsApi.prepareDirectForm>[0] = {
+        ...resolved.target,
+        paymentId: resolved.paymentId,
+        ...cardBody,
+      };
       const res = await paymentsApi.prepareDirectForm(body);
       const data = res.data;
       const action = new URL(data.action);
