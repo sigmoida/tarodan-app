@@ -19,7 +19,7 @@ import { paymentsApi } from "@/lib/api";
 import { useCart } from "@/hooks/useCart";
 import { useCartStore } from "@/stores/cartStore";
 import { useCheckoutScope } from "@/hooks/useCartSelection";
-import { useCardPayment } from "@/hooks/useCardPayment";
+import { useCardPayment, type ResolvedPayment } from "@/hooks/useCardPayment";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
 import type { Locale } from "@tarodan/i18n";
@@ -46,12 +46,12 @@ function useCheckoutValue() {
     canCheckout,
     isLoading: cartIsLoading,
     couponDiscount: cartCouponDiscount,
-    removeFromCart,
     removeFromOfflineCart,
+    refetch: refetchCart,
     appliedCouponCode,
   } = useCart();
   const setBuyNowProductId = useCartStore((s) => s.setBuyNowProductId);
-  const { user, isAuthenticated, token: authToken } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const t = useTranslations();
   const locale = useLocale() as Locale;
 
@@ -64,6 +64,23 @@ function useCheckoutValue() {
   // cart flips `canCheckout` to false and the guard below would replace the
   // in-flight payment navigation with a redirect back to /cart.
   const checkoutSubmittedRef = useRef(false);
+  /**
+   * Gönderim anındaki görünümün fotoğrafı. Sipariş oluşunca sepet satırları
+   * sunucuda silinir; canlı türetimlere bırakılsa ekran "sepet boş" moduna
+   * düşer, ürün listesi boşalır ve düğme 0 TL gösterir — PayTR gönderimi
+   * başarısız olup kullanıcı sayfada kaldığında tam da bu görünürdü.
+   */
+  const [submittedView, setSubmittedView] = useState<{
+    items: CheckoutItem[];
+    total: number;
+  } | null>(null);
+  /**
+   * Oluşmuş sipariş + ödeme kaydı. PayTR form hazırlığı düşerse tekrar
+   * "Ödeme Yap" AYNI kaydı kullanır: sipariş yeniden oluşturulmaz (sepet zaten
+   * boşaldı, handleCheckout "sepet boş" derdi) ve alıcı ödenmemiş bir siparişle
+   * baş başa kalmaz.
+   */
+  const resolvedPaymentRef = useRef<ResolvedPayment | null>(null);
   /** Misafir OTP modalı doğrulanınca çağrılacak güncel "Ödeme Yap" eylemi. */
   const payRef = useRef<(() => Promise<void>) | null>(null);
 
@@ -204,18 +221,26 @@ function useCheckoutValue() {
     },
   });
 
-  // Ödenen satırlar sepetten düşer, seçilmeyenler kalır: kısmi ödeme sonrası
-  // sepeti tümden boşaltmak kullanıcının seçmediği ürünleri de siliyordu.
+  /**
+   * Ödenen satırları sepetten düşürür; seçilmeyenler kalır.
+   *
+   * ÜYE sepetinde satırları SUNUCU siler (checkout transaction'ının içinde,
+   * yalnız sipariş edilen ürünler). İstemcinin burada tekrar silmeye çalışması
+   * 404 "Ürün sepette bulunamadı" veriyordu — ve sipariş çoktan oluşmuşken
+   * ödemeyi iptal ediyordu. Bu yüzden üyede tek iş sepeti tazelemek.
+   *
+   * Misafirin sepeti yalnız tarayıcıda yaşar (sunucuda karşılığı yok), onu
+   * burada temizleriz.
+   */
   const clearPurchasedLines = useCallback(async () => {
     for (const line of scopedLines) {
-      if (line.source === "authenticated") {
-        await removeFromCart(line.productId);
-      } else {
+      if (line.source !== "authenticated") {
         removeFromOfflineCart(line.productId);
       }
     }
     setBuyNowProductId(null);
-  }, [scopedLines, removeFromCart, removeFromOfflineCart, setBuyNowProductId]);
+    await refetchCart();
+  }, [scopedLines, removeFromOfflineCart, setBuyNowProductId, refetchCart]);
 
   // Payment orchestration slice (idempotency key + handleCheckout)
   const { handleCheckout } = useCheckoutSubmit({
@@ -239,12 +264,13 @@ function useCheckoutValue() {
     setIsLoading,
     router,
     paymentProvider,
-    authToken,
     appliedCouponCode,
     clearPurchasedLines,
     distanceSalesAccepted,
     onCheckoutSubmitted: () => {
       checkoutSubmittedRef.current = true;
+      // Sepet silinmeden ÖNCEKİ kapsam ve tutar — retry penceresinin görünümü.
+      setSubmittedView({ items: checkoutItems, total: grandTotal });
     },
     // Tariff version the quote was priced with — server returns 409 PRICING_CHANGED
     // if it moved before order-create, so the buyer confirms the new amount.
@@ -278,10 +304,17 @@ function useCheckoutValue() {
 
   // Kart formu ve ödeme aynı sayfada: kart alanları doğrulandıktan SONRA
   // `handleCheckout` siparişi oluşturur ve paymentId'yi döndürür; kart bilgisi
-  // oradan doğrudan PayTR'ye gider (bkz. useCardPayment).
+  // oradan doğrudan PayTR'ye gider (bkz. useCardPayment). Çözülen kayıt
+  // saklanır ki PayTR form hazırlığı düşerse retry aynı ödemeyi sürdürsün.
+  const resolvePayment = async (): Promise<ResolvedPayment | null> => {
+    if (resolvedPaymentRef.current) return resolvedPaymentRef.current;
+    const resolved = await handleCheckout();
+    if (resolved) resolvedPaymentRef.current = resolved;
+    return resolved;
+  };
   const card = useCardPayment({
     cardStorageEnabled,
-    resolvePayment: handleCheckout,
+    resolvePayment,
   });
 
   // Default-select an address once the list first settles (default > last), or
@@ -395,15 +428,21 @@ function useCheckoutValue() {
    * (kapsam, sözleşme, adres), sonra kart doğrulaması, sipariş EN SON oluşur.
    */
   const handlePay = async () => {
-    if (checkoutItems.length === 0) {
-      toast.error(t("checkout.noItemsSelected"));
-      return;
+    // Önceki denemede sipariş oluştu ama PayTR gönderimi düştüyse ön kontroller
+    // ATLANIR: kapsam sepetten silindiği için "ürün yok" görünür, sözleşme
+    // onayı ise siparişle birlikte zaten kaydedildi. Tek eksik, kartın PayTR'ye
+    // ulaşması — retry doğrudan oraya gider.
+    if (!resolvedPaymentRef.current) {
+      if (checkoutItems.length === 0) {
+        toast.error(t("checkout.noItemsSelected"));
+        return;
+      }
+      if (!distanceSalesAccepted) {
+        toast.error(t("checkout.distanceSalesRequired"));
+        return;
+      }
+      if (!(await validateBeforePay())) return;
     }
-    if (!distanceSalesAccepted) {
-      toast.error(t("checkout.distanceSalesRequired"));
-      return;
-    }
-    if (!(await validateBeforePay())) return;
     await card.submit();
   };
 
@@ -418,22 +457,24 @@ function useCheckoutValue() {
     isAuthenticated,
     user,
     checkoutGuardPending:
-      cartIsLoading || !canCheckout || checkoutItems.length === 0,
+      !submittedView &&
+      (cartIsLoading || !canCheckout || checkoutItems.length === 0),
     isLoading,
     isBuyNow,
     // sözleşme + kart
     distanceSalesAccepted,
     setDistanceSalesAccepted,
     card,
-    // items / pricing
-    checkoutItems,
+    // items / pricing — sipariş oluştuktan sonra gönderim anındaki fotoğraf:
+    // sepet satırları silindi, canlı türetim boş liste ve 0 TL gösterirdi.
+    checkoutItems: submittedView?.items ?? checkoutItems,
     subtotal,
     quote,
     quoteLoading,
     shippingCost,
     shippingLoading,
     couponDiscount,
-    grandTotal,
+    grandTotal: submittedView?.total ?? grandTotal,
     appliedCouponCode,
     // addresses
     addresses,

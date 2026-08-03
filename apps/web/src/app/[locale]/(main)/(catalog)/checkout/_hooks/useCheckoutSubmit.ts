@@ -41,7 +41,6 @@ export function useCheckoutSubmit({
   setIsLoading,
   router,
   paymentProvider,
-  authToken,
   appliedCouponCode,
   clearPurchasedLines,
   distanceSalesAccepted,
@@ -70,7 +69,6 @@ export function useCheckoutSubmit({
   setIsLoading: Dispatch<SetStateAction<boolean>>;
   router: { push: (href: string) => void };
   paymentProvider: "paytr";
-  authToken: string | null;
   /** Applied cart coupon (from useCart); forwarded to the group order payload. */
   appliedCouponCode: string | null;
   /** Ödenen satırları sepetten düşürür — seçilmeyenler yerinde kalır. */
@@ -560,7 +558,14 @@ export function useCheckoutSubmit({
 
             // Guard against the cart-empty redirect before touching the cart.
             onCheckoutSubmitted();
-            await clearPurchasedLines();
+            // Sipariş ve ödeme kaydı BU NOKTADA var. Sepeti toparlamak bir
+            // görüntü işidir: burada patlayan bir çağrı ödemeyi iptal
+            // ettirmemeli, yoksa alıcı ödenmemiş bir siparişle kalır.
+            try {
+              await clearPurchasedLines();
+            } catch {
+              /* sepet sonraki okumada zaten sunucudaki haliyle tazelenir */
+            }
             invalidateOrderCaches();
 
             // Kart alanları ZATEN bu sayfada dolu: paymentId çağırana döner ve
