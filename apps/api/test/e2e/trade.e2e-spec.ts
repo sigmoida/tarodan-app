@@ -29,6 +29,40 @@ import { TradeSchedulerService } from "../../src/modules/trade/trade-scheduler.s
  * duplicate rows (the (tradeId, shipperId, leg) idempotency check sits
  * inside the tx, so two concurrent runs each see "no existing rows").
  */
+/**
+ * v2: takas kabul edilince HER İKİ taraf öder ve depo süreci ancak ikisi de
+ * tamamlanınca başlar. Testler bu yüzden tarafları tek tek ödetir; yardımcı,
+ * verilen kullanıcının kendi ödeme satırını PayTR callback'iyle tamamlar.
+ */
+async function payTradeSide(
+  ctx: E2ETestApp,
+  tradeId: string,
+  user: { id: string; accessToken: string },
+): Promise<void> {
+  const prisma = getPrisma();
+  await request(ctx.app.getHttpServer())
+    .post("/api/payments/initiate-trade-cash")
+    .set(authHeader(user))
+    .send({ tradeId })
+    .expect(201);
+
+  const row = await prisma.tradeCashPayment.findFirst({
+    where: { tradeId, payerId: user.id },
+  });
+  const payment = await prisma.payment.findFirst({
+    where: { tradeCashPaymentId: row!.id },
+  });
+  const cb = signCallback({
+    merchantOid: payment!.providerConversationId!,
+    status: "success",
+    totalAmount: Math.round(Number(payment!.amount) * 100),
+  });
+  await request(ctx.app.getHttpServer())
+    .post("/api/payments/callback/paytr")
+    .send(cb)
+    .expect(200);
+}
+
 async function waitForInboundShipments(
   prisma: PrismaClient,
   tradeId: string,
@@ -238,7 +272,8 @@ describe("Trade Flow (Safe-Trade Warehouse Escrow) (E2E)", () => {
         .expect(201);
       const tradeId: string = created.body.id;
 
-      // 2) Receiver accepts → no cash, goes straight to shipping_to_warehouse
+      // 2) Receiver accepts. v2: fark OLMASA da iki taraf hizmet bedeli +
+      // kargo öder → takas ödeme bekler, doğrudan kargoya geçmez.
       await request(ctx.app.getHttpServer())
         .post(`/api/trades/${tradeId}/accept`)
         .set(authHeader(receiver))
@@ -249,9 +284,30 @@ describe("Trade Flow (Safe-Trade Warehouse Escrow) (E2E)", () => {
       const tradeAfterAccept = await prisma.trade.findUnique({
         where: { id: tradeId },
       });
-      expect(tradeAfterAccept?.status).toBe(TradeStatus.shipping_to_warehouse);
+      expect(tradeAfterAccept?.status).toBe(TradeStatus.awaiting_payment);
       expect(tradeAfterAccept?.acceptedAt).toBeTruthy();
-      expect(tradeAfterAccept?.shippingDeadline).toBeTruthy();
+
+      // Kabulde taraf başına birer ödeme satırı açılır.
+      const rows = await prisma.tradeCashPayment.findMany({
+        where: { tradeId },
+        orderBy: { payerId: "asc" },
+      });
+      expect(rows).toHaveLength(2);
+
+      // Tek taraf ödeyince süreç BAŞLAMAZ.
+      await payTradeSide(ctx, tradeId, initiator);
+      const halfPaid = await prisma.trade.findUnique({
+        where: { id: tradeId },
+      });
+      expect(halfPaid?.status).toBe(TradeStatus.awaiting_payment);
+
+      // İkinci ödeme gelince kargoya çıkar.
+      await payTradeSide(ctx, tradeId, receiver);
+      const bothPaid = await prisma.trade.findUnique({
+        where: { id: tradeId },
+      });
+      expect(bothPaid?.status).toBe(TradeStatus.shipping_to_warehouse);
+      expect(bothPaid?.shippingDeadline).toBeTruthy();
 
       // Stock reservations should now exist on both products
       const ip = await prisma.product.findUnique({
@@ -401,46 +457,37 @@ describe("Trade Flow (Safe-Trade Warehouse Escrow) (E2E)", () => {
       });
       expect(tradeAwaiting?.status).toBe(TradeStatus.awaiting_payment);
 
-      const cashPaymentBefore = await prisma.tradeCashPayment.findFirst({
+      // v2: kabulde taraf başına birer satır açılır. Nakit farkı YALNIZ onu
+      // ödeyen tarafın satırındadır; karşı taraf yine hizmet bedeli + kargo öder.
+      const rows = await prisma.tradeCashPayment.findMany({
         where: { tradeId },
       });
-      expect(cashPaymentBefore).toBeTruthy();
-      expect(cashPaymentBefore?.payerId).toBe(initiator.id);
-      expect(cashPaymentBefore?.recipientId).toBe(receiver.id);
-      expect(cashPaymentBefore?.status).toBe(PaymentStatus.pending);
-      expect(cashPaymentBefore?.releasedAt).toBeNull();
-      expect(cashPaymentBefore?.holdReleaseAt).toBeNull();
+      expect(rows).toHaveLength(2);
+      const payerRow = rows.find((r) => Number(r.amount) > 0);
+      const otherRow = rows.find((r) => Number(r.amount) === 0);
+      expect(payerRow?.payerId).toBe(initiator.id);
+      expect(payerRow?.recipientId).toBe(receiver.id);
+      // Ücret + kargo platformda kalır → alıcısı yoktur.
+      expect(otherRow?.payerId).toBe(receiver.id);
+      expect(otherRow?.recipientId).toBeNull();
+      expect(rows.every((r) => r.status === PaymentStatus.pending)).toBe(true);
+      expect(rows.every((r) => r.releasedAt === null)).toBe(true);
 
-      // 3) Initiate trade-cash payment
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/initiate-trade-cash")
-        .set(authHeader(initiator))
-        .send({ tradeId })
-        .expect(201);
-      const payment = await prisma.payment.findFirst({
-        where: { tradeCashPaymentId: cashPaymentBefore!.id },
+      // 3) Farkı ödeyen taraf öder → süreç HENÜZ başlamaz (karşı taraf bekleniyor).
+      await payTradeSide(ctx, tradeId, initiator);
+      const halfPaid = await prisma.trade.findUnique({
+        where: { id: tradeId },
       });
-      expect(payment?.status).toBe(PaymentStatus.pending);
-      expect(payment?.providerConversationId).toBeTruthy();
+      expect(halfPaid?.status).toBe(TradeStatus.awaiting_payment);
 
-      // 4) PayTR callback success → trade flips to shipping_to_warehouse, cash escrowed
-      const totalKurus = Math.round(Number(payment!.amount) * 100);
-      const cb = signCallback({
-        merchantOid: payment!.providerConversationId!,
-        status: "success",
-        totalAmount: totalKurus,
-      });
-      await request(ctx.app.getHttpServer())
-        .post("/api/payments/callback/paytr")
-        .send(cb)
-        .expect(200);
-
+      // 4) Karşı taraf da ödeyince kargoya çıkar; nakit escrow'da bekler.
+      await payTradeSide(ctx, tradeId, receiver);
       const tradeAfterPay = await prisma.trade.findUnique({
         where: { id: tradeId },
       });
       expect(tradeAfterPay?.status).toBe(TradeStatus.shipping_to_warehouse);
       const cashPaymentAfterPay = await prisma.tradeCashPayment.findFirst({
-        where: { tradeId },
+        where: { tradeId, payerId: initiator.id },
       });
       expect(cashPaymentAfterPay?.status).toBe(PaymentStatus.completed);
       // Money is escrowed: not released to recipient yet
@@ -563,12 +610,13 @@ describe("Trade Flow (Safe-Trade Warehouse Escrow) (E2E)", () => {
         .send({})
         .expect(201);
 
-      // Inbound shipments are now auto-created on accept. Poll until the
-      // fire-and-forget dispatch settles. (The unused fromAddress fixtures
-      // stay in case future fixtures need explicit non-default addresses.)
+      // v2: depoya giriş gönderileri İKİ ödeme tamamlandıktan sonra oluşur —
+      // kabul artık takası doğrudan kargoya almaz.
       void initiatorShip;
       void receiverShip;
       const prisma = getPrisma();
+      await payTradeSide(ctx, tradeId, initiator);
+      await payTradeSide(ctx, tradeId, receiver);
       const incoming = await waitForInboundShipments(prisma, tradeId);
       expect(incoming).toHaveLength(2);
       for (const s of incoming) {

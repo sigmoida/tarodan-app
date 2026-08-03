@@ -44,6 +44,7 @@ import {
   ProviderRefundRejectedException,
   RefundPendingReconciliationException,
 } from "../payment-providers/refund-errors";
+import { refundableAmountFor } from "../trade/trade-refund-policy";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -1302,12 +1303,23 @@ export class PaymentRefundService {
    * Takas nakit ödemesi PayTR ile tamamlanmışken iptal: PayTR iade API + payment / trade_cash_payment güncelleme.
    * Tamamlanmış PayTR trade ödemesi yoksa no-op (refunded: false).
    */
+  /**
+   * Takasın TÜM tamamlanmış ödemelerini iade eder.
+   *
+   * v2'de taraf başına bir ödeme vardır; iptal her ikisini de iade etmelidir.
+   * İade edilecek tutar satır bazında `refundableAmountFor` ile bulunur: ürün
+   * kargoya verildikten sonra KARGO bedeli iade DIŞIDIR (platform o maliyeti
+   * gerçekten ödemiştir), öncesinde tam iade yapılır.
+   *
+   * v1 takaslarda tek satır vardır ve kargo kalemi 0 olduğundan davranış
+   * değişmez (tam iade).
+   */
   async refundTradeCashPaymentIfCompleted(tradeId: string): Promise<{
     refunded: boolean;
     paymentId?: string;
     skippedReason?: string;
   }> {
-    const payment = await this.prisma.payment.findFirst({
+    const payments = await this.prisma.payment.findMany({
       where: {
         tradeCashPayment: {
           tradeId,
@@ -1319,12 +1331,78 @@ export class PaymentRefundService {
         provider: PaymentProvider.paytr,
       },
       include: { tradeCashPayment: true },
+      orderBy: { createdAt: "asc" },
     });
 
-    if (!payment) {
+    if (payments.length === 0) {
       return { refunded: false, skippedReason: "no_completed_paytr_payment" };
     }
 
+    const handedToCargo = await this.tradeHandedToCargo(tradeId);
+
+    let refundedPaymentId: string | undefined;
+    let skippedReason: string | undefined;
+    for (const payment of payments) {
+      const amount = refundableAmountFor(
+        {
+          totalAmount: payment.tradeCashPayment?.totalAmount ?? payment.amount,
+          shippingAmount: payment.tradeCashPayment?.shippingAmount ?? 0,
+        },
+        { handedToCargo },
+      );
+      if (amount <= 0) {
+        // Ödenenin tamamı kargoya gitmiş (iade edilecek bakiye yok).
+        skippedReason = "shipping_not_refundable";
+        continue;
+      }
+      const result = await this.refundOneTradeCashPayment(
+        payment,
+        tradeId,
+        amount,
+      );
+      if (result.refunded) {
+        refundedPaymentId = refundedPaymentId ?? result.paymentId;
+      } else {
+        skippedReason = result.skippedReason ?? skippedReason;
+      }
+    }
+
+    return refundedPaymentId
+      ? { refunded: true, paymentId: refundedPaymentId }
+      : {
+          refunded: false,
+          skippedReason: skippedReason ?? "nothing_refundable",
+        };
+  }
+
+  /**
+   * Takasın herhangi bir bacağı kargoya verildi mi — iade matrisinin eşiği.
+   * Kullanıcı iptal kilidiyle AYNI ölçüt (`computeTradeCanCancel`): gönderi
+   * `shippedAt` aldıysa ya da depoya varış damgalandıysa kargo tüketilmiştir.
+   */
+  private async tradeHandedToCargo(tradeId: string): Promise<boolean> {
+    const [trade, shippedCount] = await Promise.all([
+      this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: { firstWarehouseArrivalAt: true },
+      }),
+      this.prisma.tradeShipment.count({
+        where: { tradeId, shippedAt: { not: null } },
+      }),
+    ]);
+    return !!trade?.firstWarehouseArrivalAt || shippedCount > 0;
+  }
+
+  /** Tek bir takas ödemesinin PayTR iadesi (tutar çağırandan gelir). */
+  private async refundOneTradeCashPayment(
+    payment: any,
+    tradeId: string,
+    amount: number,
+  ): Promise<{
+    refunded: boolean;
+    paymentId?: string;
+    skippedReason?: string;
+  }> {
     // Defensive guard: eğer ilişkili tradeCashPayment bırakılmış veya iade edilmişse atla
     if (
       payment.tradeCashPayment?.releasedAt ||
@@ -1344,12 +1422,6 @@ export class PaymentRefundService {
     // `TRADE{no}T{...}`) → yanlış/eşleşmeyen oid'le PayTR çağrısı. Kaldırıldı; gerçek
     // yolda (bypass değil) oid yoksa reddedilir (aşağıda).
     const oid = payment.providerConversationId?.trim() ?? "";
-    // Always refund the full charged amount (product + commission). PayTR was
-    // charged the totalAmount at capture time; partial commission retention
-    // would leave the payer short when the admin reject is no-fault.
-    const amount = Number(
-      payment.tradeCashPayment?.totalAmount ?? payment.amount,
-    );
 
     const existingMeta = (payment.metadata as Record<string, unknown>) || {};
     if (!oid) {

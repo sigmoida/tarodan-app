@@ -228,6 +228,37 @@ export async function seedBaseline(): Promise<{
       returnPackageFee: 29.99,
       tradeLegFee: 29.99,
       effectiveFrom: new Date(0),
+      // Kademeler olmadan hiçbir fiyatlama yolu desiyi tutara çeviremez
+      // (checkout ve TAKAS ücretlendirmesi fail-closed davranır). Üretim
+      // migration'ındaki üç kademe birebir yansıtılır.
+      packageTiers: {
+        create: [
+          {
+            code: "small",
+            label: "Küçük Paket",
+            minDesi: 0,
+            maxDesi: 2,
+            amount: 29.99,
+            sortOrder: 0,
+          },
+          {
+            code: "medium",
+            label: "Orta Paket",
+            minDesi: 2,
+            maxDesi: 5,
+            amount: 39.99,
+            sortOrder: 1,
+          },
+          {
+            code: "large",
+            label: "Büyük Paket",
+            minDesi: 5,
+            maxDesi: null,
+            amount: 59.99,
+            sortOrder: 2,
+          },
+        ],
+      },
     },
   });
 

@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import { ShippingPackageTiersNotConfiguredError } from "../shipping/shipping-tariff.helper";
 import { i18nMessage } from "../i18n";
 import {
   buildTradePricing,
@@ -77,21 +82,34 @@ export class TradeQuoteService {
       shippingDesi: item.product?.shippingDesi ?? 1,
     }));
 
-    const pricing = buildTradePricing({
-      items,
-      rules: rules as never,
-      tariff,
-      cash:
-        trade.cashAmount && trade.cashPayerId
-          ? {
-              amount: Number(trade.cashAmount),
-              payerSide:
-                trade.cashPayerId === trade.initiatorId
-                  ? "initiator"
-                  : "receiver",
-            }
-          : null,
-    });
+    // Kademe tanımı yoksa takas kargosu fiyatlanamaz. Sessizce 0 yazmak yerine
+    // FAIL-CLOSED: checkout'un tarifesiz davranışıyla aynı (503 + net mesaj),
+    // aksi halde taraflardan eksik tahsilat yapılır.
+    let pricing: ReturnType<typeof buildTradePricing>;
+    try {
+      pricing = buildTradePricing({
+        items,
+        rules: rules as never,
+        tariff,
+        cash:
+          trade.cashAmount && trade.cashPayerId
+            ? {
+                amount: Number(trade.cashAmount),
+                payerSide:
+                  trade.cashPayerId === trade.initiatorId
+                    ? "initiator"
+                    : "receiver",
+              }
+            : null,
+      });
+    } catch (error) {
+      if (error instanceof ShippingPackageTiersNotConfiguredError) {
+        throw new ServiceUnavailableException(
+          i18nMessage("server.shipping.noActiveTariff", { provider: "surat" }),
+        );
+      }
+      throw error;
+    }
 
     return {
       tradeId: trade.id,
