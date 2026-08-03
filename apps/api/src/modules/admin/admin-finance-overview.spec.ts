@@ -52,8 +52,24 @@ describe("AdminFinanceService.getFinanceOverview", () => {
           _count: { id: 5 },
         }),
       },
+      // Takas hizmet bedeli: KDV DAHİL 120 tahsil edildi (%20 → matrah 100).
+      tradeCashPayment: {
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _sum: { tradeFeeAmount: 120 } }),
+      },
     };
-    return { service: new AdminFinanceService(prisma as any), prisma };
+    const taxPolicy = {
+      resolve: jest
+        .fn()
+        .mockResolvedValue({ serviceVatEnabled: true, serviceVatRate: 20 }),
+      effectiveServiceVatRate: (p: any) =>
+        p.serviceVatEnabled ? p.serviceVatRate : 0,
+    };
+    return {
+      service: new AdminFinanceService(prisma as any, taxPolicy as any),
+      prisma,
+    };
   };
 
   it("huni + sağlık alanlarını tek yanıtta toplar", async () => {
@@ -68,11 +84,13 @@ describe("AdminFinanceService.getFinanceOverview", () => {
       escrowHeldCount: 7,
       transferredTotal: 2500,
       transferredCount: 9,
-      // Ledger formülü: (400−50)+(120−20)
-      platformRevenueNet: 450,
-      // PSP kesintisi komisyon gelirinin İÇİNDEN çıkar: hak ediş 450 − 30.
+      // Ledger formülü (400−50)+(120−20)=450 + takas ücreti matrahı 100.
+      platformRevenueNet: 550,
+      tradeFeeRevenueNet: 100,
+      tradeFeeCollected: 120,
+      // PSP kesintisi gelirin İÇİNDEN çıkar: hak ediş 550 − 30.
       pspFeeTotal: 30,
-      platformNetAfterPsp: 420,
+      platformNetAfterPsp: 520,
     });
     expect(result.health).toEqual({
       failedTransfers: 3,
@@ -112,14 +130,48 @@ describe("AdminFinanceService.getFinanceOverview", () => {
     );
   });
 
-  it("defterde PSP satırı yoksa hak ediş komisyon gelirine eşittir", async () => {
+  it("defterde PSP satırı yoksa hak ediş gelire eşittir", async () => {
     const { service, prisma } = makeService();
     prisma.ledgerEntry.aggregate.mockResolvedValue({ _sum: { amount: null } });
 
     const result = await service.getFinanceOverview();
 
     expect(result.funnel.pspFeeTotal).toBe(0);
-    expect(result.funnel.platformNetAfterPsp).toBe(450);
+    expect(result.funnel.platformNetAfterPsp).toBe(550);
+  });
+
+  /**
+   * Takas geliri `commissionLedger`'da HİÇ görünmez (o tablo sipariş bazlıdır).
+   * Buradan gelmezse platform geliri takasların TAMAMI kadar eksik raporlanır.
+   */
+  it("takas hizmet bedelini yalnız ödemesi tamamlanmış satırlardan toplar", async () => {
+    const { service, prisma } = makeService();
+
+    await service.getFinanceOverview();
+
+    expect(prisma.tradeCashPayment.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: "completed" }),
+        _sum: { tradeFeeAmount: true },
+      }),
+    );
+  });
+
+  it("hizmet KDV'si kapalıysa ücretin tamamı gelir yazılır", async () => {
+    const prisma = (makeService() as any).prisma;
+    const taxPolicy = {
+      resolve: jest
+        .fn()
+        .mockResolvedValue({ serviceVatEnabled: false, serviceVatRate: 20 }),
+      effectiveServiceVatRate: (p: any) =>
+        p.serviceVatEnabled ? p.serviceVatRate : 0,
+    };
+    const service = new AdminFinanceService(prisma as any, taxPolicy as any);
+
+    const result = await service.getFinanceOverview();
+
+    expect(result.funnel.tradeFeeRevenueNet).toBe(120);
+    expect(result.funnel.platformRevenueNet).toBe(570);
   });
 
   it("transfer toplamı yalnız completed transferlerin NET tutarıdır", async () => {
