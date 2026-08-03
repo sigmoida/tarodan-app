@@ -166,6 +166,50 @@ describe("13 — Takas (TRD)", () => {
   const post = (path: string, user: { accessToken: string }) =>
     request(server()).post(path).set(authHeader(user));
 
+  /**
+   * Bir tarafın takas ödemesini tahsil et (initiate + başarılı PayTR callback).
+   *
+   * v2'de kabul, takası `awaiting_payment`ta bırakır: hizmet bedeli + 2 bacaklık
+   * kargo (+ varsa fark) HER İKİ taraftan ayrı ayrı tahsil edilir.
+   */
+  async function payTradeSide(
+    tradeId: string,
+    user: { id: string; accessToken: string },
+  ): Promise<void> {
+    const prisma = getPrisma();
+    await post("/api/payments/initiate-trade-cash", user)
+      .send({ tradeId })
+      .expect(201);
+    const row = await prisma.tradeCashPayment.findFirst({
+      where: { tradeId, payerId: user.id },
+    });
+    const payment = await prisma.payment.findFirst({
+      where: { tradeCashPaymentId: row!.id },
+    });
+    await request(server())
+      .post("/api/payments/callback/paytr")
+      .send(
+        signCallback({
+          merchantOid: payment!.providerConversationId!,
+          status: "success",
+          totalAmount: Math.round(Number(payment!.amount) * 100),
+        }),
+      )
+      .expect(200);
+  }
+
+  /**
+   * Takası ödeme kapısından geçir: iki taraf da ödedikten SONRA ürünler kargoya
+   * çıkar (`shipping_to_warehouse`). Kafa kafaya takasta da iki ödeme vardır.
+   */
+  async function payBothSides(
+    f: BilateralFixture,
+    tradeId: string,
+  ): Promise<void> {
+    await payTradeSide(tradeId, f.initiator);
+    await payTradeSide(tradeId, f.receiver);
+  }
+
   // ════════════════════════════ CREATE (POST /api/trades) ════════════════════════════
 
   scenario("TRD-001", async () => {
@@ -520,32 +564,31 @@ describe("13 — Takas (TRD)", () => {
   // ════════════════════════════ ACCEPT ════════════════════════════
 
   scenario("TRD-013", async () => {
-    // Receiver kabul anında premium olmayınca 400.
-    const initiator = await createUser(ctx.module, {
-      isSeller: true,
-      premium: true,
-    });
-    const receiver = await createUser(ctx.module, { isSeller: true }); // premium DEĞİL
-    await createAddress({ userId: initiator.id });
-    await createAddress({ userId: receiver.id });
-    const ip = await createProduct({
-      sellerId: initiator.id,
+    // Alıcının takas yetkisi İKİ noktada denetlenir: yetkisiz alıcıya teklif
+    // KURULAMAZ, kurulduktan sonra üyeliği biterse kabul de edemez.
+    const prisma = getPrisma();
+    const f = await setupBilateral();
+    const freeReceiver = await createUser(ctx.module, { isSeller: true });
+    const freeProduct = await createProduct({
+      sellerId: freeReceiver.id,
       categoryId: baseline.categoryId,
       isTradeEnabled: true,
     });
-    const rp = await createProduct({
-      sellerId: receiver.id,
-      categoryId: baseline.categoryId,
-      isTradeEnabled: true,
-    });
-    const created = await post("/api/trades", initiator)
+    const blocked = await post("/api/trades", f.initiator)
       .send({
-        receiverId: receiver.id,
-        initiatorItems: [{ productId: ip.id, quantity: 1 }],
-        receiverItems: [{ productId: rp.id, quantity: 1 }],
+        receiverId: freeReceiver.id,
+        initiatorItems: [{ productId: f.initiatorProduct.id, quantity: 1 }],
+        receiverItems: [{ productId: freeProduct.id, quantity: 1 }],
       })
-      .expect(201);
-    const res = await post(`/api/trades/${created.body.id}/accept`, receiver)
+      .expect(400);
+    expect(blocked.body.message).toBeTruthy();
+
+    // Premium alıcıya teklif kurulur; üyelik sonradan biterse kabul reddedilir.
+    const tradeId = await createPendingTrade(f);
+    await prisma.userMembership.deleteMany({
+      where: { userId: f.receiver.id },
+    });
+    const res = await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(400);
     expect(res.body.message).toContain("Üyeliğinizin süresi dolmuş görünüyor");
@@ -641,17 +684,33 @@ describe("13 — Takas (TRD)", () => {
     expect(trade?.status).toBe(TradeStatus.awaiting_payment);
     expect(trade?.paymentDeadline).toBeTruthy();
 
-    const cash = await prisma.tradeCashPayment.findFirst({
+    // v2: kabul İKİ satır yazar (taraf başına bir tane). Fark yalnız onu ödeyen
+    // tarafın satırındadır; hizmet bedeli + 2 bacaklık kargo iki tarafta da olur
+    // ve KOMİSYON alınmaz.
+    const rows = await prisma.tradeCashPayment.findMany({
       where: { tradeId },
     });
-    expect(cash?.payerId).toBe(f.initiator.id);
-    expect(cash?.recipientId).toBe(f.receiver.id);
-    expect(Number(cash?.amount)).toBe(100);
-    expect(Number(cash?.commission)).toBe(5); // 100 * 0.05
-    expect(Number(cash?.totalAmount)).toBe(105);
-    expect(cash?.status).toBe(PaymentStatus.pending);
-    expect(cash?.releasedAt).toBeNull();
-    expect(cash?.holdReleaseAt).toBeNull();
+    expect(rows).toHaveLength(2);
+    const payerRow = rows.find((r) => r.payerId === f.initiator.id)!;
+    const otherRow = rows.find((r) => r.payerId === f.receiver.id)!;
+
+    expect(payerRow.recipientId).toBe(f.receiver.id);
+    expect(Number(payerRow.amount)).toBe(100);
+    expect(Number(payerRow.commission)).toBe(0);
+    expect(Number(payerRow.shippingAmount)).toBeGreaterThan(0);
+    expect(Number(payerRow.totalAmount)).toBe(
+      100 + Number(payerRow.tradeFeeAmount) + Number(payerRow.shippingAmount),
+    );
+    expect(payerRow.status).toBe(PaymentStatus.pending);
+    expect(payerRow.releasedAt).toBeNull();
+    expect(payerRow.holdReleaseAt).toBeNull();
+
+    // Farkı ödemeyen tarafın satırında alıcı YOKTUR (ücret + kargo platformda kalır).
+    expect(otherRow.recipientId).toBeNull();
+    expect(Number(otherRow.amount)).toBe(0);
+    expect(Number(otherRow.totalAmount)).toBe(
+      Number(otherRow.tradeFeeAmount) + Number(otherRow.shippingAmount),
+    );
 
     // Henüz to_warehouse kargo YOK
     const inbound = await prisma.tradeShipment.findMany({
@@ -669,73 +728,73 @@ describe("13 — Takas (TRD)", () => {
       .expect(201);
 
     const prisma = getPrisma();
-    const cashBefore = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
-    });
 
-    await post("/api/payments/initiate-trade-cash", f.initiator)
-      .send({ tradeId })
-      .expect(201);
-    const payment = await prisma.payment.findFirst({
-      where: { tradeCashPaymentId: cashBefore!.id },
-    });
-    expect(payment?.providerConversationId).toBeTruthy();
+    // Tek taraflı ödeme ürünleri kargoya ÇIKARMAZ: ödemeyen taraf bedel ödemeden
+    // malı gönderilmiş olurdu.
+    await payTradeSide(tradeId, f.initiator);
+    const halfPaid = await prisma.trade.findUnique({ where: { id: tradeId } });
+    expect(halfPaid?.status).toBe(TradeStatus.awaiting_payment);
 
-    await request(server())
-      .post("/api/payments/callback/paytr")
-      .send(
-        signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: "success",
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }),
-      )
-      .expect(200);
-
+    await payTradeSide(tradeId, f.receiver);
     const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
     expect(trade?.status).toBe(TradeStatus.shipping_to_warehouse);
-    const cashAfter = await prisma.tradeCashPayment.findFirst({
+    const cashAfter = await prisma.tradeCashPayment.findMany({
       where: { tradeId },
     });
-    expect(cashAfter?.status).toBe(PaymentStatus.completed);
-    expect(cashAfter?.releasedAt).toBeNull(); // escrow
-    expect(cashAfter?.holdReleaseAt).toBeNull();
+    expect(cashAfter).toHaveLength(2);
+    for (const row of cashAfter) {
+      expect(row.status).toBe(PaymentStatus.completed);
+      expect(row.releasedAt).toBeNull(); // escrow
+      expect(row.holdReleaseAt).toBeNull();
+    }
 
     const inbound = await waitForInboundShipments(prisma, tradeId);
     expect(inbound).toHaveLength(2);
   });
 
   scenario("TRD-019", async () => {
-    // Nakit ödemeyi yalnız belirlenmiş ödeyen (initiator) başlatabilir. Receiver → 403.
+    // v2: ödemeyi başlatan "farkı ödeyen taraf" değil, SATIRIN SAHİBİDİR — iki
+    // taraf da kendi satırını öder. Takasın tarafı olmayan üçüncü kişi ise ne
+    // satır bulur ne de ödeyebilir.
     const f = await setupBilateral();
     const tradeId = await createPendingTrade(f, { cashAmount: 100 });
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
 
-    const res = await post("/api/payments/initiate-trade-cash", f.receiver)
+    // Karşı taraf da kendi satırını ödeyebilir (v1'de 403 alırdı).
+    await post("/api/payments/initiate-trade-cash", f.receiver)
       .send({ tradeId })
-      .expect(403);
-    expect(res.body.message).toContain(
-      "Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir",
-    );
+      .expect(201);
+
+    const outsider = await createUser(ctx.module, {
+      isSeller: true,
+      premium: true,
+    });
+    const res = await post("/api/payments/initiate-trade-cash", outsider)
+      .send({ tradeId })
+      .expect(400);
+    expect(res.body.message).toContain("ödeme kaydı");
   });
 
   scenario("TRD-020", async () => {
-    // Nakit içermeyen takasta ödeme başlatılamaz.
+    // v2: nakit farkı OLMAYAN takasta da ödeme vardır (hizmet bedeli + kargo);
+    // ödeme ancak takas KABUL edilmeden başlatılamaz.
     const f = await setupBilateral();
     const tradeId = await createPendingTrade(f); // nakitsiz
+    const early = await post("/api/payments/initiate-trade-cash", f.initiator)
+      .send({ tradeId })
+      .expect(400);
+    expect(early.body.message).toContain(
+      "Takas henüz kabul edilmedi veya uygun durumda değil",
+    );
+
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
-    // Kabul edildi → shipping_to_warehouse (payable değil): statü uygun değil mesajı.
-    const res = await post("/api/payments/initiate-trade-cash", f.initiator)
+    await post("/api/payments/initiate-trade-cash", f.initiator)
       .send({ tradeId })
-      .expect(400);
-    expect([
-      "Bu takasta ekstra ödeme bulunmuyor",
-      "Takas henüz kabul edilmedi veya uygun durumda değil",
-    ]).toContain(res.body.message);
+      .expect(201);
   });
 
   scenario("TRD-021", async () => {
@@ -804,6 +863,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
@@ -1008,30 +1070,15 @@ describe("13 — Takas (TRD)", () => {
   });
 
   scenario("TRD-032", async () => {
-    // Counter için premium gerekli. Receiver premium değilse 400 (premium mesajı).
-    const initiator = await createUser(ctx.module, {
-      isSeller: true,
-      premium: true,
-    });
-    const receiver = await createUser(ctx.module, { isSeller: true }); // free
-    await createAddress({ userId: initiator.id });
-    const ip = await createProduct({
-      sellerId: initiator.id,
-      categoryId: baseline.categoryId,
-      isTradeEnabled: true,
-    });
-    const rp = await createProduct({
-      sellerId: receiver.id,
-      categoryId: baseline.categoryId,
-      isTradeEnabled: true,
-    });
-    const created = await post("/api/trades", initiator)
-      .send({
-        receiverId: receiver.id,
-        initiatorItems: [{ productId: ip.id, quantity: 1 }],
-        receiverItems: [{ productId: rp.id, quantity: 1 }],
-      })
-      .expect(201);
+    // Counter için premium gerekli. Teklif premium alıcıya kurulur (yetkisiz
+    // alıcıya zaten kurulamaz); üyelik bittikten sonra karşı teklif reddedilir.
+    const prisma = getPrisma();
+    const f = await setupBilateral();
+    const created = { body: { id: await createPendingTrade(f) } };
+    const receiver = f.receiver;
+    const ip = f.initiatorProduct;
+    const rp = f.receiverProduct;
+    await prisma.userMembership.deleteMany({ where: { userId: receiver.id } });
     const res = await post(`/api/trades/${created.body.id}/counter`, receiver)
       .send({
         initiatorItems: [{ productId: rp.id, quantity: 1 }],
@@ -1075,6 +1122,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
@@ -1136,6 +1186,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
     const shipAddr = await createAddress({
       userId: f.initiator.id,
       isDefault: false,
@@ -1161,6 +1214,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
@@ -1185,6 +1241,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
@@ -1239,6 +1298,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
@@ -1270,6 +1332,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
@@ -1297,6 +1362,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
@@ -1327,6 +1395,7 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    await payBothSides(f, tradeId);
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
     for (const s of toWarehouse) {
       await post(`/api/admin/trades/${tradeId}/mark-warehouse-received`, admin)
@@ -1661,42 +1730,26 @@ describe("13 — Takas (TRD)", () => {
       .expect(201);
 
     const prisma = getPrisma();
-    const cashBefore = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
-    });
-    await post("/api/payments/initiate-trade-cash", f.initiator)
-      .send({ tradeId })
-      .expect(201);
-    const payment = await prisma.payment.findFirst({
-      where: { tradeCashPaymentId: cashBefore!.id },
-    });
-    await request(server())
-      .post("/api/payments/callback/paytr")
-      .send(
-        signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: "success",
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }),
-      )
-      .expect(200);
+    // v2: taraf başına satır var; ödeyen tarafın satırı payerId ile bulunur.
+    await payTradeSide(tradeId, f.initiator);
     expect(ctx.paytr.refundCalls).toHaveLength(0);
 
     const cashAfterPay = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
+      where: { tradeId, payerId: f.initiator.id },
     });
     await post(`/api/trades/${tradeId}/cancel`, f.initiator)
       .send({ reason: "vazgeçtik" })
       .expect(201);
 
-    // 1 refund çağrısı, tutar = totalAmount (ürün + komisyon = 105)
+    // Ürünler kargoya VERİLMEDEN iptal → ödeyen tarafa TAM iade (kargo dahil).
+    // Ödemeyen tarafın satırı tahsil edilmediği için iade de doğurmaz.
     expect(ctx.paytr.refundCalls).toHaveLength(1);
     expect(ctx.paytr.refundCalls[0].refundAmount).toBe(
       Number(cashAfterPay!.totalAmount),
     );
 
     const cashAfterCancel = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
+      where: { tradeId, payerId: f.initiator.id },
     });
     expect(cashAfterCancel?.refundedAt).not.toBeNull();
 
@@ -1812,15 +1865,15 @@ describe("13 — Takas (TRD)", () => {
   });
 
   scenario("TRD-061", async () => {
-    // pending izinli geçişler: accept(nakitsiz→shipping_to_warehouse),
-    // accept(nakitli→awaiting_payment), reject→rejected, cancel→cancelled.
+    // pending izinli geçişler: accept→awaiting_payment (v2'de nakit farkı OLMASA
+    // da iki taraf hizmet bedeli + kargo öder), reject→rejected, cancel→cancelled.
     const prisma = getPrisma();
 
     const a = await setupBilateral();
     const ta = await createPendingTrade(a);
     await post(`/api/trades/${ta}/accept`, a.receiver).send({}).expect(201);
     expect((await prisma.trade.findUnique({ where: { id: ta } }))?.status).toBe(
-      TradeStatus.shipping_to_warehouse,
+      TradeStatus.awaiting_payment,
     );
 
     const b = await setupBilateral();
@@ -1867,29 +1920,15 @@ describe("13 — Takas (TRD)", () => {
       TradeStatus.cancelled,
     );
 
-    // 2) Ödeme başarısı → shipping_to_warehouse
+    // 2) TEK ödeme yetmez; iki ödeme de tamamlanınca shipping_to_warehouse
     const b = await setupBilateral();
     const tb = await createPendingTrade(b, { cashAmount: 100 });
     await post(`/api/trades/${tb}/accept`, b.receiver).send({}).expect(201);
-    const cashBefore = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId: tb },
-    });
-    await post("/api/payments/initiate-trade-cash", b.initiator)
-      .send({ tradeId: tb })
-      .expect(201);
-    const payment = await prisma.payment.findFirst({
-      where: { tradeCashPaymentId: cashBefore!.id },
-    });
-    await request(server())
-      .post("/api/payments/callback/paytr")
-      .send(
-        signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: "success",
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }),
-      )
-      .expect(200);
+    await payTradeSide(tb, b.initiator);
+    expect((await prisma.trade.findUnique({ where: { id: tb } }))?.status).toBe(
+      TradeStatus.awaiting_payment,
+    );
+    await payTradeSide(tb, b.receiver);
     expect((await prisma.trade.findUnique({ where: { id: tb } }))?.status).toBe(
       TradeStatus.shipping_to_warehouse,
     );
@@ -1922,6 +1961,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
@@ -1974,6 +2016,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     await waitForInboundShipments(prisma, tradeId);
@@ -2037,6 +2082,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     await waitForInboundShipments(prisma, tradeId);
@@ -2445,18 +2493,29 @@ describe("13 — Takas (TRD)", () => {
   // ════════════════════════════ PARA / VERGİ ════════════════════════════
 
   scenario("TRD-085", async () => {
-    // %5 komisyon + totalAmount (Decimal 10,2).
+    // v2 fiyatı: hizmet bedeli (ürün başına sabit, KDV DAHİL) + 2 bacaklık kargo
+    // + varsa fark. Komisyon alınmaz.
+    const prisma = getPrisma();
+    await prisma.commissionRule.update({
+      where: { id: "default-rule" },
+      data: { tradeFeeSellerAmount: 20, tradeFeeBuyerAmount: 15 },
+    });
     const f = await setupBilateral();
     const tradeId = await createPendingTrade(f, { cashAmount: 100 });
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
-    const prisma = getPrisma();
-    const cash = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
-    });
-    expect(Number(cash?.commission)).toBe(5);
-    expect(Number(cash?.totalAmount)).toBe(105);
+
+    const rows = await prisma.tradeCashPayment.findMany({ where: { tradeId } });
+    const payer = rows.find((r) => r.payerId === f.initiator.id)!;
+    const other = rows.find((r) => r.payerId === f.receiver.id)!;
+    // Her taraf KENDİ ürününün "veren" ücretini + karşıdan aldığının "alan"
+    // ücretini öder: 20 + 15 = 35. Kargo: 1 desi → küçük kademe 29,99 × 2 bacak.
+    expect(Number(payer.tradeFeeAmount)).toBe(35);
+    expect(Number(payer.shippingAmount)).toBeCloseTo(59.98, 2);
+    expect(Number(payer.commission)).toBe(0);
+    expect(Number(payer.totalAmount)).toBeCloseTo(194.98, 2); // 100 + 35 + 59.98
+    expect(Number(other.totalAmount)).toBeCloseTo(94.98, 2); // 35 + 59.98
   });
 
   scenario("TRD-086", async () => {
@@ -2468,8 +2527,9 @@ describe("13 — Takas (TRD)", () => {
       .expect(201);
 
     const prisma = getPrisma();
+    // Tahsil edilen, ödeyen tarafın KENDİ satırının toplamıdır.
     const cashBefore = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
+      where: { tradeId, payerId: f.initiator.id },
     });
     await post("/api/payments/initiate-trade-cash", f.initiator)
       .send({ tradeId })
@@ -2478,7 +2538,9 @@ describe("13 — Takas (TRD)", () => {
       where: { tradeCashPaymentId: cashBefore!.id },
     });
     const expectedKurus = Math.round(Number(payment!.amount) * 100);
-    expect(expectedKurus).toBe(10500); // 105 * 100
+    expect(expectedKurus).toBe(
+      Math.round(Number(cashBefore!.totalAmount) * 100),
+    );
 
     // Doğru kuruşla callback → success
     await request(server())
@@ -2492,13 +2554,13 @@ describe("13 — Takas (TRD)", () => {
       )
       .expect(200);
     const cashAfter = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
+      where: { tradeId, payerId: f.initiator.id },
     });
     expect(cashAfter?.status).toBe(PaymentStatus.completed);
   });
 
   scenario("TRD-087", async () => {
-    // Ondalıklı cashAmount yuvarlaması: amount=99.99, commission≈5.00.
+    // Ondalıklı fark + kuruşlu kargo kademesi: toplam kuruş hassasiyetinde durur.
     const f = await setupBilateral({ initiatorPrice: 100, receiverPrice: 100 });
     const tradeId = await createPendingTrade(f, { cashAmount: 99.99 });
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
@@ -2506,13 +2568,13 @@ describe("13 — Takas (TRD)", () => {
       .expect(201);
     const prisma = getPrisma();
     const cash = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
+      where: { tradeId, payerId: f.initiator.id },
     });
     expect(Number(cash?.amount)).toBeCloseTo(99.99, 2);
-    // 99.99 * 0.05 = 4.9995 → Decimal(10,2) yuvarlama ≈ 5.00
-    expect(Number(cash?.commission)).toBeCloseTo(5.0, 2);
     expect(Number(cash?.totalAmount)).toBeCloseTo(
-      Number(cash?.amount) + Number(cash?.commission),
+      Number(cash?.amount) +
+        Number(cash?.tradeFeeAmount) +
+        Number(cash?.shippingAmount),
       2,
     );
   });
@@ -2526,31 +2588,22 @@ describe("13 — Takas (TRD)", () => {
       .expect(201);
 
     const prisma = getPrisma();
-    const cashBefore = await prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
+    await payTradeSide(tradeId, f.initiator);
+    const paid = await prisma.tradeCashPayment.findFirst({
+      where: { tradeId, payerId: f.initiator.id },
     });
-    await post("/api/payments/initiate-trade-cash", f.initiator)
-      .send({ tradeId })
-      .expect(201);
-    const payment = await prisma.payment.findFirst({
-      where: { tradeCashPaymentId: cashBefore!.id },
-    });
-    await request(server())
-      .post("/api/payments/callback/paytr")
-      .send(
-        signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: "success",
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }),
-      )
-      .expect(200);
 
     await post(`/api/trades/${tradeId}/cancel`, f.initiator)
       .send({ reason: "iptal" })
       .expect(201);
+    // Kargoya verilmeden iptal → tahsil edilenin TAMAMI (fark + ücret + kargo)
+    // iade edilir; yalnız farkın iadesi eksik iade olurdu.
     expect(ctx.paytr.refundCalls).toHaveLength(1);
-    expect(ctx.paytr.refundCalls[0].refundAmount).toBe(105); // totalAmount, amount değil
+    expect(ctx.paytr.refundCalls[0].refundAmount).toBeCloseTo(
+      Number(paid!.totalAmount),
+      2,
+    );
+    expect(Number(paid!.totalAmount)).toBeGreaterThan(Number(paid!.amount));
   });
 
   scenario("TRD-089", async () => {
@@ -2608,8 +2661,9 @@ describe("13 — Takas (TRD)", () => {
       .set("Accept-Language", "en-US")
       .send({})
       .expect(201);
-    expect(accepted.body.status).toBe("shipping_to_warehouse");
-    expect(accepted.body.status).toBe(TradeStatus.shipping_to_warehouse);
+    // v2: kabul takası ödeme beklemeye alır (iki taraf da öder).
+    expect(accepted.body.status).toBe("awaiting_payment");
+    expect(accepted.body.status).toBe(TradeStatus.awaiting_payment);
 
     // Detay uçta da enum İngilizce (çevrilmemiş)
     const detail = await request(server())
@@ -2617,7 +2671,7 @@ describe("13 — Takas (TRD)", () => {
       .set(authHeader(f.initiator))
       .set("Accept-Language", "en-US")
       .expect(200);
-    expect(detail.body.status).toBe("shipping_to_warehouse");
+    expect(detail.body.status).toBe("awaiting_payment");
   });
 
   scenario("TRD-091", async () => {
@@ -2661,7 +2715,9 @@ describe("13 — Takas (TRD)", () => {
     const tradeId = await createPendingTrade(f);
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
-      .expect(201); // shipping_to_warehouse
+      .expect(201);
+    // v2: "kargoda" grubuna ancak iki ödeme tamamlanınca girilir.
+    await payBothSides(f, tradeId);
 
     const shipping = await request(server())
       .get("/api/trades?statusGroup=shipping")
@@ -2705,6 +2761,9 @@ describe("13 — Takas (TRD)", () => {
     await post(`/api/trades/${tradeId}/accept`, f.receiver)
       .send({})
       .expect(201);
+    // v2: süreç iki ödeme tamamlanmadan başlamaz — ürünler ancak
+    // ondan sonra kargoya çıkar.
+    await payBothSides(f, tradeId);
 
     const prisma = getPrisma();
     const toWarehouse = await waitForInboundShipments(prisma, tradeId);
@@ -2808,7 +2867,8 @@ describe("13 — Takas (TRD)", () => {
   });
 
   scenario("TRD-097", async () => {
-    // Nakit ödeme başlatma payer-dışı güvenliği. Receiver 403; 3. taraf 403/404.
+    // v2: takasın TARAFI olmayan hiç kimse ödeme başlatamaz (satırı yoktur).
+    // Tarafların ikisi de kendi satırını öder — bu artık bir yetki hatası değil.
     const f = await setupBilateral();
     const kaan = await createUser(ctx.module, { premium: true });
     const tradeId = await createPendingTrade(f, { cashAmount: 100 });
@@ -2816,16 +2876,18 @@ describe("13 — Takas (TRD)", () => {
       .send({})
       .expect(201);
 
-    // Receiver (ödeyen değil) → 403
-    await post("/api/payments/initiate-trade-cash", f.receiver)
-      .send({ tradeId })
-      .expect(403);
-    // 3. taraf → 403/404
     const strangerRes = await post(
       "/api/payments/initiate-trade-cash",
       kaan,
     ).send({ tradeId });
-    expect([403, 404]).toContain(strangerRes.status);
+    expect([400, 403, 404]).toContain(strangerRes.status);
+
+    // Yabancının denemesi hiçbir ödeme kaydı doğurmamalı.
+    const prisma = getPrisma();
+    const strangerRow = await prisma.tradeCashPayment.findFirst({
+      where: { tradeId, payerId: kaan.id },
+    });
+    expect(strangerRow).toBeNull();
   });
 
   scenario("TRD-098", async () => {
