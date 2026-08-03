@@ -41,13 +41,16 @@ describe("AdminFinanceService.getFinanceOverview", () => {
       },
       order: { count: jest.fn().mockResolvedValue(4) }, // faturasız teslimat
       elogoInvoice: { count: jest.fn().mockResolvedValue(1) }, // tükenen
+      // Dönemin GERÇEK PSP kesintisi: defterdeki psp_fee debit toplamı
+      // (PayTR ekstresinden eşleştirilip yazılır) — tahmini oran DEĞİL.
+      ledgerEntry: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 30 } }),
+      },
       sellerAccountAdjustment: {
-        aggregate: jest
-          .fn()
-          .mockResolvedValue({
-            _sum: { remainingAmount: 340 },
-            _count: { id: 5 },
-          }),
+        aggregate: jest.fn().mockResolvedValue({
+          _sum: { remainingAmount: 340 },
+          _count: { id: 5 },
+        }),
       },
     };
     return { service: new AdminFinanceService(prisma as any), prisma };
@@ -67,6 +70,9 @@ describe("AdminFinanceService.getFinanceOverview", () => {
       transferredCount: 9,
       // Ledger formülü: (400−50)+(120−20)
       platformRevenueNet: 450,
+      // PSP kesintisi komisyon gelirinin İÇİNDEN çıkar: hak ediş 450 − 30.
+      pspFeeTotal: 30,
+      platformNetAfterPsp: 420,
     });
     expect(result.health).toEqual({
       failedTransfers: 3,
@@ -88,6 +94,32 @@ describe("AdminFinanceService.getFinanceOverview", () => {
         where: expect.objectContaining({ status: "completed" }),
       }),
     );
+  });
+
+  it("PSP kesintisini defterdeki psp_fee DEBIT satırlarından toplar", async () => {
+    const { service, prisma } = makeService();
+
+    await service.getFinanceOverview();
+
+    expect(prisma.ledgerEntry.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          account: "psp_fee",
+          direction: "debit",
+        }),
+        _sum: { amount: true },
+      }),
+    );
+  });
+
+  it("defterde PSP satırı yoksa hak ediş komisyon gelirine eşittir", async () => {
+    const { service, prisma } = makeService();
+    prisma.ledgerEntry.aggregate.mockResolvedValue({ _sum: { amount: null } });
+
+    const result = await service.getFinanceOverview();
+
+    expect(result.funnel.pspFeeTotal).toBe(0);
+    expect(result.funnel.platformNetAfterPsp).toBe(450);
   });
 
   it("transfer toplamı yalnız completed transferlerin NET tutarıdır", async () => {

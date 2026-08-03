@@ -19,6 +19,7 @@ import { adminKeys } from "@/lib/query/keys";
 import { extractList } from "@/lib/extract";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
+import { usePspFeeRate } from "@/hooks/usePspFeeRate";
 import { extractErrorMessage } from "@/lib/error";
 import { fmtTry } from "@/lib/format";
 import {
@@ -297,6 +298,9 @@ function BreakdownPreview() {
   const t = useTranslations();
   const { watch } = useFormContext<CommissionFormValues>();
   const v = watch();
+  // PSP oranı ayardan gelir (KDV/stopaj gibi elle denenmez): şelalenin PayTR
+  // satırı, sipariş dosyasındakiyle aynı orandan hesaplansın.
+  const pspFeeRate = usePspFeeRate();
   const [price, setPrice] = useState("1000");
   const [tierCode, setTierCode] = useState<PackageTierCode>("small");
   const [vat, setVat] = useState("20");
@@ -376,6 +380,7 @@ function BreakdownPreview() {
     buyerShippingAmount: buyerShipping,
     withholdingTaxAmount: stopaj,
     serviceVatRate: vatRate,
+    pspFeeRate,
   });
 
   /**
@@ -569,22 +574,51 @@ function BreakdownPreview() {
         <div className="text-xs uppercase tracking-wide text-muted">
           {t("admin.finance.commission.platformSplitTitle")}
         </div>
+        {/* Şelale: elde kalan brütten maliyetler sırayla düşülür → net hak ediş. */}
         <Row
-          label={t("admin.finance.commission.platformRevenue")}
-          value={breakdown.platform.revenue}
+          label={t("admin.finance.commission.grossRetained")}
+          value={breakdown.platform.grossRetained}
           tone="text-heading font-medium"
         />
         <Row
-          label={t("admin.finance.commission.platformTax")}
-          value={breakdown.platform.tax}
+          label={t("admin.finance.commission.platformShipping")}
+          value={-breakdown.platform.shipping}
         />
         <Row
-          label={t("admin.finance.commission.platformShipping")}
-          value={breakdown.platform.shipping}
+          label={t("admin.finance.commission.afterShipping")}
+          value={breakdown.platform.afterShipping}
+        />
+        <Row
+          label={t("admin.finance.commission.withholding")}
+          value={-breakdown.seller.withholding}
+        />
+        <Row
+          label={t("admin.finance.commission.afterWithholding")}
+          value={breakdown.platform.afterWithholding}
+        />
+        <Row
+          label={t("admin.finance.commission.serviceVatOut")}
+          value={-(breakdown.seller.vatTotal + breakdown.buyer.vatTotal)}
+        />
+        <Row
+          label={t("admin.finance.commission.afterVat")}
+          value={breakdown.platform.afterVat}
+        />
+        <Row
+          label={t("admin.finance.commission.pspFee")}
+          value={-breakdown.platform.pspFee}
+        />
+        <TotalRow
+          label={t("admin.finance.commission.netRevenue")}
+          value={breakdown.platform.netRevenue}
+          tone="text-primary-700"
+          strong
         />
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 text-xs text-muted">
-          <span>{t("admin.finance.commission.platformTakeRate")}</span>
-          <span className="tabular-nums">%{breakdown.platform.takeRate}</span>
+          <span>{t("admin.finance.commission.netTakeRate")}</span>
+          <span className="tabular-nums">
+            %{breakdown.platform.netTakeRate}
+          </span>
           <span className="w-20" />
         </div>
       </div>
@@ -593,6 +627,9 @@ function BreakdownPreview() {
       </p>
       <p className="text-xs text-muted">
         {t("admin.finance.commission.previewTaxNote")}
+      </p>
+      <p className="text-xs text-muted">
+        {t("admin.finance.commission.pspRateNote")}
       </p>
     </div>
   );

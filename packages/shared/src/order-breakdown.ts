@@ -56,6 +56,13 @@ export interface OrderBreakdownInput {
   serviceVatRate?: number | null;
   /** Ürün KDV'si; `product_vat_enabled` kapalıyken 0. */
   productTaxAmount?: number | null;
+  /**
+   * PSP (PayTR) kesinti oranı (%) — `psp_fee_rate` platform ayarı. 0/boş →
+   * PSP satırı 0 döner. TAHMİNDİR: gerçek kesinti PayTR ekstresinden gelir
+   * (defterde `psp_fee` hesabı), burada yalnız hak edişi gerçekçi göstermek
+   * için oranla hesaplanır.
+   */
+  pspFeeRate?: number | null;
 }
 
 export interface OrderBreakdownSide {
@@ -86,8 +93,24 @@ export interface OrderPlatformBreakdown {
   tax: number;
   /** Kargoya giden (iki tarafın payı toplamı). */
   shipping: number;
-  /** Ürün bedeline oranla Tarodan'ın payı (%). */
+  /** Ürün bedeline oranla Tarodan'ın BRÜT payı (%). */
   takeRate: number;
+
+  // ── Hak ediş şelalesi: elde kalan brütten maliyetler sırayla düşülür ──
+  /** Yatan tutar: alıcının ödediği − satıcının aldığı. */
+  grossRetained: number;
+  /** Kargo taşıyıcıya gittikten sonra kalan. */
+  afterShipping: number;
+  /** Stopaj devlete gittikten sonra kalan. */
+  afterWithholding: number;
+  /** Hizmet KDV'si devlete gittikten sonra kalan — `revenue` ile aynı tutardır. */
+  afterVat: number;
+  /** PSP (PayTR) kesintisi — TAHMİNİ (oran × stopaj sonrası tutar). */
+  pspFee: number;
+  /** Tarodan'ın NET hak edişi: `afterVat` − `pspFee`. */
+  netRevenue: number;
+  /** Ürün bedeline oranla NET pay (%). */
+  netTakeRate: number;
 }
 
 export interface OrderBreakdown {
@@ -188,6 +211,28 @@ export function buildOrderBreakdown(
     buyerServiceFee,
   ]);
 
+  // Hak ediş şelalesi. Brüt = alıcının ödediği − satıcının aldığı; ürün KDV'si
+  // satıcıya AKTARILDIĞI için bu farkta kendiliğinden sadeleşir.
+  //
+  // Maliyetler sırayla düşülür ve şelale mevcut `revenue` rakamına iner
+  // (afterVat === revenue): hesap değişmiyor, yalnız o rakama giden yol
+  // görünür oluyor. PSP kesintisi bunun ALTINDA, ayrı bir maliyettir.
+  const shipping = sum([sellerShipping, buyerShipping]);
+  const vatTotal = sum([sellerVatTotal, buyerVatTotal]);
+  const grossRetained = round2(buyerAddedTotal + sellerDeductionTotal);
+  const afterShipping = round2(grossRetained - shipping);
+  const afterWithholding = round2(afterShipping - withholding);
+  const afterVat = round2(afterWithholding - vatTotal);
+  // Taban iş kararıdır: kargo ve stopaj çıktıktan SONRAKİ tutar. (PayTR gerçekte
+  // tahsil edilen toplamdan keser; gerçek tutar ekstre eşleşmesinden defterdeki
+  // `psp_fee` hesabına yazılır — buradaki satır tahmindir.)
+  const pspRate =
+    Number.isFinite(input.pspFeeRate) && (input.pspFeeRate as number) > 0
+      ? (input.pspFeeRate as number)
+      : 0;
+  const pspFee = round2(afterWithholding * (pspRate / 100));
+  const netRevenue = round2(afterVat - pspFee);
+
   return {
     subtotal,
     productTax,
@@ -207,9 +252,16 @@ export function buildOrderBreakdown(
     platform: {
       revenue,
       // Ürün KDV'si satıcıya aktarıldığı için platformun vergi yükü değildir.
-      tax: sum([sellerVatTotal, buyerVatTotal, withholding]),
-      shipping: sum([sellerShipping, buyerShipping]),
+      tax: sum([vatTotal, withholding]),
+      shipping,
       takeRate: subtotal > 0 ? round2((revenue / subtotal) * 100) : 0,
+      grossRetained,
+      afterShipping,
+      afterWithholding,
+      afterVat,
+      pspFee,
+      netRevenue,
+      netTakeRate: subtotal > 0 ? round2((netRevenue / subtotal) * 100) : 0,
     },
   };
 }

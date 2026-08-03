@@ -8,10 +8,11 @@ export function settingsToMap(raw: unknown): Record<string, string> {
   if (Array.isArray(raw)) {
     for (const s of raw as Array<Record<string, unknown>>) {
       const key = (s.settingKey ?? s.key) as string | undefined;
-      if (key != null) map[key] = String(s.settingValue ?? s.value ?? '');
+      if (key != null) map[key] = String(s.settingValue ?? s.value ?? "");
     }
-  } else if (raw && typeof raw === 'object') {
-    for (const [key, value] of Object.entries(raw)) map[key] = String(value ?? '');
+  } else if (raw && typeof raw === "object") {
+    for (const [key, value] of Object.entries(raw))
+      map[key] = String(value ?? "");
   }
   return map;
 }
@@ -19,4 +20,17 @@ export function settingsToMap(raw: unknown): Record<string, string> {
 /** Reads a single setting key (`undefined` if absent). */
 export function readSetting(raw: unknown, key: string): string | undefined {
   return settingsToMap(raw)[key];
+}
+
+/** `psp_fee_rate` ayarı yokken kullanılan PayTR standart oranı (%). */
+export const DEFAULT_PSP_FEE_RATE = 3;
+
+/**
+ * PSP (PayTR) kesinti oranı (%) — hak ediş ekranlarındaki tahmini maliyet.
+ * Ayar sayfası da, kırılım ekranları da bunu okur (tek kaynak); bozuk/eksik
+ * değer varsayılana düşer, ekran NaN göstermez.
+ */
+export function readPspFeeRate(raw: unknown): number {
+  const value = Number(readSetting(raw, "psp_fee_rate"));
+  return Number.isFinite(value) && value >= 0 ? value : DEFAULT_PSP_FEE_RATE;
 }

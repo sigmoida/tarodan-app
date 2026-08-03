@@ -53,7 +53,7 @@ export default function FinanceOverviewPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Link href="/finance/payments" className="block">
               <MetricCard
                 icon={CreditCardIcon}
@@ -116,6 +116,32 @@ export default function FinanceOverviewPage() {
                 }
               />
             </Link>
+            {/* Komisyon geliri hak edişin KENDİSİ değil: PSP kesintisi içinden
+                çıkar. İki kart, "kalan" ile "hak ediş" farkını görünür kılar. */}
+            <MetricCard
+              icon={CreditCardIcon}
+              tone="warning"
+              label={t("admin.finance.overview.funnel.pspFee")}
+              value={funnel ? fmtTry(funnel.pspFeeTotal) : "—"}
+              loading={isLoading}
+              footer={
+                <span className="text-muted">
+                  {t("admin.finance.overview.funnel.pspFeeHint")}
+                </span>
+              }
+            />
+            <MetricCard
+              icon={BanknotesIcon}
+              tone="success"
+              label={t("admin.finance.overview.funnel.netAfterPsp")}
+              value={funnel ? fmtTry(funnel.platformNetAfterPsp) : "—"}
+              loading={isLoading}
+              footer={
+                <span className="text-muted">
+                  {t("admin.finance.overview.funnel.netAfterPspHint")}
+                </span>
+              }
+            />
           </div>
 
           {data && <HealthStrip health={data.health} />}

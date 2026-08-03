@@ -20,6 +20,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { DataList, Field } from "@/components/detail/DataList";
 import { fmtDate, fmtDateTime, fmtTry } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
+import { usePspFeeRate } from "@/hooks/usePspFeeRate";
 import {
   canManuallyUpdateOrderStatus,
   getOrderStatusInfo,
@@ -311,6 +312,9 @@ const LINE_LABEL = {
  */
 function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
   const t = useTranslations();
+  // PSP kesintisi TAHMİNİDİR: güncel ayardan hesaplanır (siparişte snapshot'lanan
+  // bir alan değil). Gerçek tutar PayTR ekstresinden deftere yazılır.
+  const pspFeeRate = usePspFeeRate();
   const b = buildOrderBreakdown({
     subtotal: f.subtotal,
     sellerCommissionAmount: f.sellerCommissionAmount,
@@ -321,6 +325,7 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
     buyerShippingAmount: f.buyerShippingAmount,
     withholdingTaxAmount: f.withholdingTaxAmount,
     serviceVatRate: f.serviceVatRate,
+    pspFeeRate,
   });
 
   const Line = ({
@@ -438,23 +443,52 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
 
       <div className="lg:col-span-2">
         <Head title={t("admin.operations.orders.file.moneySplit")} />
+        {/* Şelale: elde kalan brütten maliyetler sırayla düşülür → net hak ediş. */}
         <Line
-          label={t("admin.operations.orders.file.platformRevenue")}
-          amount={b.platform.revenue}
-        />
-        <Line
-          label={t("admin.operations.orders.file.platformTax")}
-          amount={b.platform.tax}
+          label={t("admin.operations.orders.file.grossRetained")}
+          amount={b.platform.grossRetained}
         />
         <Line
           label={t("admin.operations.orders.file.platformShipping")}
-          amount={b.platform.shipping}
+          amount={-b.platform.shipping}
+        />
+        <Line
+          label={t("admin.operations.orders.file.afterShipping")}
+          amount={b.platform.afterShipping}
+        />
+        <Line
+          label={t("admin.operations.orders.file.withholding")}
+          amount={-b.seller.withholding}
+        />
+        <Line
+          label={t("admin.operations.orders.file.afterWithholding")}
+          amount={b.platform.afterWithholding}
+        />
+        <Line
+          label={t("admin.operations.orders.file.serviceVatOut")}
+          amount={-(b.seller.vatTotal + b.buyer.vatTotal)}
+        />
+        <Line
+          label={t("admin.operations.orders.file.afterVat")}
+          amount={b.platform.afterVat}
+        />
+        <Line
+          label={t("admin.operations.orders.file.pspFee")}
+          amount={-b.platform.pspFee}
+        />
+        <Total
+          label={t("admin.operations.orders.file.netRevenue")}
+          amount={b.platform.netRevenue}
+          tone="text-primary-600"
         />
         <div className="grid grid-cols-[1fr_auto_5rem] gap-x-3 pt-1 text-xs text-subtle">
-          <span>{t("admin.operations.orders.file.platformTakeRate")}</span>
-          <span className="tabular-nums">%{b.platform.takeRate}</span>
+          <span>{t("admin.operations.orders.file.netTakeRate")}</span>
+          <span className="tabular-nums">%{b.platform.netTakeRate}</span>
           <span />
         </div>
+        <p className="pt-2 text-xs text-subtle">
+          {t("admin.operations.orders.file.pspRateNote")}
+        </p>
       </div>
     </div>
   );

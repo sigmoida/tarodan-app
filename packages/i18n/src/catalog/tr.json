@@ -4024,7 +4024,16 @@
         "takeRateFooter": "Ürün cirosunun %{rate}'i",
         "feeBoundsHint": "Yüzdeyle bulunan ücret bu TL aralığına kırpılır. Örn. %6 taban 10 ₺ ise 100 ₺'lik üründe 6 yerine 10 ₺ alınır. Boş = kırpma yok.",
         "amountRangeHint": "Bu kuralın HANGİ fiyat aralığındaki ürünlere uygulanacağı. Hesaba girmez, yalnız kural seçimini belirler. Boş = sınırsız.",
-        "amountRangeTitle": "Uygulanacak tutar aralığı"
+        "amountRangeTitle": "Uygulanacak tutar aralığı",
+        "grossRetained": "Yatan tutar (elde kalan)",
+        "afterShipping": "Kargo hariç",
+        "afterWithholding": "Stopaj hariç",
+        "afterVat": "KDV hariç",
+        "pspFee": "PayTR kesintisi (tahmini)",
+        "netRevenue": "Tarodan hak edişi",
+        "netTakeRate": "Net pay (ürün fiyatına oranla)",
+        "pspRateNote": "PayTR kesintisi, Sistem → Ayarlar → Finans'taki orandan TAHMİNİ hesaplanır; gerçek tutar sağlayıcı ekstresinden gelir.",
+        "serviceVatOut": "Hizmet KDV'si (devlete)"
       },
       "invoices": {
         "title": "Faturalar",
@@ -4339,7 +4348,11 @@
           "transferred": "Satıcıya Ödenen (Net)",
           "transferredHint": "{count} tamamlanan transfer",
           "platformRevenue": "Platform Geliri (Net)",
-          "platformRevenueHint": "Komisyon + hizmet bedeli − iadeler"
+          "platformRevenueHint": "Komisyon + hizmet bedeli − iadeler",
+          "pspFee": "PayTR kesintisi",
+          "pspFeeHint": "Dönem içinde sağlayıcı ekstresinden deftere yazılan gerçek kesinti",
+          "netAfterPsp": "Tarodan hak edişi",
+          "netAfterPspHint": "Komisyon geliri eksi PayTR kesintisi"
         },
         "health": {
           "title": "Dikkat Gerektirenler",
@@ -4558,7 +4571,16 @@
           "sellerPlatformFee": "Platform hizmet bedeli",
           "buyerCommission": "Alıcı komisyonu",
           "buyerServiceFee": "Alıcı koruma hizmeti",
-          "productPrice": "Ürün bedeli"
+          "productPrice": "Ürün bedeli",
+          "grossRetained": "Yatan tutar (elde kalan)",
+          "afterShipping": "Kargo hariç",
+          "afterWithholding": "Stopaj hariç",
+          "afterVat": "KDV hariç",
+          "pspFee": "PayTR kesintisi (tahmini)",
+          "netRevenue": "Tarodan hak edişi",
+          "netTakeRate": "Net pay (ürün fiyatına oranla)",
+          "pspRateNote": "PayTR kesintisi, Sistem → Ayarlar → Finans'taki orandan TAHMİNİ hesaplanır; gerçek tutar sağlayıcı ekstresinden gelir.",
+          "serviceVatOut": "Hizmet KDV'si (devlete)"
         }
       },
       "trades": {
@@ -5236,12 +5258,14 @@
         "listing": "İlan",
         "trade": "Takas",
         "message": "Mesaj",
-        "warehouse": "Depo"
+        "warehouse": "Depo",
+        "finance": "Finans"
       },
       "tabTitle": {
         "listing": "İlan Ayarları",
         "trade": "Takas Ayarları",
-        "message": "Mesaj Ayarları"
+        "message": "Mesaj Ayarları",
+        "finance": "Finans Ayarları"
       },
       "warehouse": {
         "title": "Depo Adresi",
@@ -5285,6 +5309,10 @@
         "maxMessageLength": {
           "label": "Maksimum Mesaj Uzunluğu",
           "helper": "Bir mesajın maksimum karakter uzunluğu"
+        },
+        "pspFeeRate": {
+          "label": "PayTR Kesinti Oranı (%)",
+          "helper": "Ödeme sağlayıcısının işlem başına kestiği oran; hak ediş ekranlarında tahmini PSP maliyeti bu orandan hesaplanır"
         }
       },
       "validation": {

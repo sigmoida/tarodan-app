@@ -4024,7 +4024,16 @@
         "takeRateFooter": "{rate}% of product volume",
         "feeBoundsHint": "The percentage fee is clamped to this TL range. E.g. 6% with a 10 ₺ floor charges 10 ₺ instead of 6 ₺ on a 100 ₺ item. Empty = no clamping.",
         "amountRangeHint": "WHICH price range this rule applies to. Not part of the calculation — it only decides rule selection. Empty = unbounded.",
-        "amountRangeTitle": "Applicable amount range"
+        "amountRangeTitle": "Applicable amount range",
+        "grossRetained": "Retained gross",
+        "afterShipping": "After shipping",
+        "afterWithholding": "After withholding",
+        "afterVat": "After VAT",
+        "pspFee": "PayTR fee (estimated)",
+        "netRevenue": "Tarodan net revenue",
+        "netTakeRate": "Net take rate (of item price)",
+        "pspRateNote": "The PayTR fee is ESTIMATED from the rate in System → Settings → Finance; the real amount comes from the provider statement.",
+        "serviceVatOut": "Service VAT (to the state)"
       },
       "invoices": {
         "title": "Invoices",
@@ -4339,7 +4348,11 @@
           "transferred": "Paid to Sellers (Net)",
           "transferredHint": "{count} completed transfers",
           "platformRevenue": "Platform Revenue (Net)",
-          "platformRevenueHint": "Commission + service fees − refunds"
+          "platformRevenueHint": "Commission + service fees − refunds",
+          "pspFee": "PayTR fees",
+          "pspFeeHint": "Actual fees booked from the provider statement in this period",
+          "netAfterPsp": "Tarodan net revenue",
+          "netAfterPspHint": "Commission revenue minus PayTR fees"
         },
         "health": {
           "title": "Needs Attention",
@@ -4558,7 +4571,16 @@
           "sellerPlatformFee": "Platform service fee",
           "buyerCommission": "Buyer commission",
           "buyerServiceFee": "Buyer protection fee",
-          "productPrice": "Product price"
+          "productPrice": "Product price",
+          "grossRetained": "Retained gross",
+          "afterShipping": "After shipping",
+          "afterWithholding": "After withholding",
+          "afterVat": "After VAT",
+          "pspFee": "PayTR fee (estimated)",
+          "netRevenue": "Tarodan net revenue",
+          "netTakeRate": "Net take rate (of item price)",
+          "pspRateNote": "The PayTR fee is ESTIMATED from the rate in System → Settings → Finance; the real amount comes from the provider statement.",
+          "serviceVatOut": "Service VAT (to the state)"
         }
       },
       "trades": {
@@ -5236,12 +5258,14 @@
         "listing": "Listing",
         "trade": "Trade",
         "message": "Message",
-        "warehouse": "Warehouse"
+        "warehouse": "Warehouse",
+        "finance": "Finance"
       },
       "tabTitle": {
         "listing": "Listing Settings",
         "trade": "Trade Settings",
-        "message": "Message Settings"
+        "message": "Message Settings",
+        "finance": "Finance settings"
       },
       "warehouse": {
         "title": "Warehouse Address",
@@ -5285,6 +5309,10 @@
         "maxMessageLength": {
           "label": "Maximum Message Length",
           "helper": "Maximum character length of a message"
+        },
+        "pspFeeRate": {
+          "label": "PayTR fee rate (%)",
+          "helper": "Rate the payment provider deducts per transaction; the estimated PSP cost on payout screens is derived from it"
         }
       },
       "validation": {

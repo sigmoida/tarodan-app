@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import {
   CommissionLedgerStatus,
+  LedgerAccount,
+  LedgerDirection,
   OrderStatus,
   PaymentHoldStatus,
   PaymentStatus,
@@ -52,6 +54,7 @@ export class AdminFinanceService {
       uninvoicedDelivered,
       exhaustedInvoices,
       openAdjustments,
+      pspFees,
     ] = await Promise.all([
       // Tahsilat (dönem): tamamlanan ödemelerin brüt toplamı = ciro. Platform
       // geliri DEĞİLDİR — o ledger'dan gelir (aşağıda).
@@ -120,6 +123,18 @@ export class AdminFinanceService {
         _sum: { remainingAmount: true },
         _count: { id: true },
       }),
+      // PSP (PayTR) kesintisi (dönem): defterdeki `psp_fee` DEBIT toplamı.
+      // GERÇEK tutardır — PayTR ekstresi eşleştirilirken yazılır (tahmini oran
+      // yalnız sipariş/kural ekranlarında kullanılır). Komisyon gelirinin
+      // İÇİNDEN çıkar: hak ediş = ledger net gelir − PSP kesintisi.
+      this.prisma.ledgerEntry.aggregate({
+        where: {
+          account: LedgerAccount.psp_fee,
+          direction: LedgerDirection.debit,
+          createdAt,
+        },
+        _sum: { amount: true },
+      }),
     ]);
 
     const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -134,6 +149,10 @@ export class AdminFinanceService {
         transferredTotal: round2(Number(transferred._sum.netAmount ?? 0)),
         transferredCount: transferred._count.id,
         platformRevenueNet: round2(ledgerNetRevenue(ledgerSums._sum)),
+        pspFeeTotal: round2(Number(pspFees._sum.amount ?? 0)),
+        platformNetAfterPsp: round2(
+          ledgerNetRevenue(ledgerSums._sum) - Number(pspFees._sum.amount ?? 0),
+        ),
       },
       health: {
         failedTransfers,

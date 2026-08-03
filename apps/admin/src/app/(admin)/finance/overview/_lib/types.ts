@@ -10,6 +10,10 @@ export interface FinanceOverview {
     transferredTotal: number;
     transferredCount: number;
     platformRevenueNet: number;
+    /** Dönemin GERÇEK PSP kesintisi (defterdeki psp_fee debit toplamı). */
+    pspFeeTotal: number;
+    /** Komisyon geliri − PSP kesintisi. */
+    platformNetAfterPsp: number;
   };
   health: {
     failedTransfers: number;
