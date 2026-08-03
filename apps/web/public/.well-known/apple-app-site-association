@@ -1,0 +1,181 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "P2628CQK26.com.tarodan.app"
+        ],
+        "components": [
+          {
+            "/": "/checkout*",
+            "exclude": true,
+            "comment": "odeme web'de kalsin"
+          },
+          {
+            "/": "/en/checkout*",
+            "exclude": true,
+            "comment": "odeme web'de kalsin"
+          },
+          {
+            "/": "/payment/*",
+            "exclude": true,
+            "comment": "PayTR 3DS turu tarayicida baslar tarayicida biter"
+          },
+          {
+            "/": "/en/payment/*",
+            "exclude": true,
+            "comment": "PayTR 3DS turu tarayicida baslar tarayicida biter"
+          },
+          {
+            "/": "/admin/*",
+            "exclude": true,
+            "comment": "yonetim paneli uygulamada yok"
+          },
+          {
+            "/": "/en/admin/*",
+            "exclude": true,
+            "comment": "yonetim paneli uygulamada yok"
+          },
+          {
+            "/": "/api/*",
+            "exclude": true,
+            "comment": "API yuzeyi"
+          },
+          {
+            "/": "/en/api/*",
+            "exclude": true,
+            "comment": "API yuzeyi"
+          },
+          {
+            "/": "/verify-email",
+            "comment": "e-posta dogrulama linki -> (auth)/verify-email"
+          },
+          {
+            "/": "/en/verify-email",
+            "comment": "e-posta dogrulama linki -> (auth)/verify-email"
+          },
+          {
+            "/": "/reset-password",
+            "comment": "sifre sifirlama linki -> (auth)/reset-password"
+          },
+          {
+            "/": "/en/reset-password",
+            "comment": "sifre sifirlama linki -> (auth)/reset-password"
+          },
+          {
+            "/": "/forgot-password",
+            "comment": "sifremi unuttum -> (auth)/forgot-password"
+          },
+          {
+            "/": "/en/forgot-password",
+            "comment": "sifremi unuttum -> (auth)/forgot-password"
+          },
+          {
+            "/": "/corporate/invite",
+            "comment": "kurumsal davet -> (auth)/corporate-invite"
+          },
+          {
+            "/": "/en/corporate/invite",
+            "comment": "kurumsal davet -> (auth)/corporate-invite"
+          },
+          {
+            "/": "/listings/*",
+            "comment": "urun detayi -> product/[id]; /listings/:id/edit -> listing/[id]/edit"
+          },
+          {
+            "/": "/en/listings/*",
+            "comment": "urun detayi -> product/[id]; /listings/:id/edit -> listing/[id]/edit"
+          },
+          {
+            "/": "/collections/*",
+            "comment": "koleksiyon -> collections/[id]"
+          },
+          {
+            "/": "/en/collections/*",
+            "comment": "koleksiyon -> collections/[id]"
+          },
+          {
+            "/": "/trades/*",
+            "comment": "web cogul -> mobil trade/[id]"
+          },
+          {
+            "/": "/en/trades/*",
+            "comment": "web cogul -> mobil trade/[id]"
+          },
+          {
+            "/": "/track-order",
+            "comment": "misafir takip -> order-track"
+          },
+          {
+            "/": "/en/track-order",
+            "comment": "misafir takip -> order-track"
+          },
+          {
+            "/": "/messages",
+            "comment": "mesajlar; ?thread= -> messages/[threadId]"
+          },
+          {
+            "/": "/en/messages",
+            "comment": "mesajlar; ?thread= -> messages/[threadId]"
+          },
+          {
+            "/": "/offers",
+            "comment": "teklifler -> offers"
+          },
+          {
+            "/": "/en/offers",
+            "comment": "teklifler -> offers"
+          },
+          {
+            "/": "/profile/orders/*",
+            "comment": "siparis detayi -> orders/[id]"
+          },
+          {
+            "/": "/en/profile/orders/*",
+            "comment": "siparis detayi -> orders/[id]"
+          },
+          {
+            "/": "/profile/refund-requests/*",
+            "comment": "iade detayi -> refund-requests/[id]"
+          },
+          {
+            "/": "/en/profile/refund-requests/*",
+            "comment": "iade detayi -> refund-requests/[id]"
+          },
+          {
+            "/": "/profile/trades/*",
+            "comment": "takas detayi -> trade/[id]"
+          },
+          {
+            "/": "/en/profile/trades/*",
+            "comment": "takas detayi -> trade/[id]"
+          },
+          {
+            "/": "/profile/listings",
+            "comment": "ilanlarim -> settings/my-listings"
+          },
+          {
+            "/": "/en/profile/listings",
+            "comment": "ilanlarim -> settings/my-listings"
+          },
+          {
+            "/": "/profile/earnings",
+            "comment": "kazanclar -> settings/payments"
+          },
+          {
+            "/": "/en/profile/earnings",
+            "comment": "kazanclar -> settings/payments"
+          },
+          {
+            "/": "/profile",
+            "comment": "profil -> (tabs)/profile"
+          },
+          {
+            "/": "/en/profile",
+            "comment": "profil -> (tabs)/profile"
+          }
+        ]
+      }
+    ]
+  }
+}
