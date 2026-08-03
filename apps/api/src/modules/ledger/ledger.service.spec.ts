@@ -156,7 +156,6 @@ describe("LedgerService", () => {
         tradeCashPaymentId: "tcp-1",
         totalAmount: 90,
         netAmount: 78,
-        commission: 12,
       });
       const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
       expect(rows[0].idempotencyKey).toBe("capture:trade-cash:tcp-1");
@@ -285,25 +284,40 @@ describe("LedgerService", () => {
   });
 
   describe("recordTradeCashCapture", () => {
-    it("takas komisyonu platform_commission'a düşer; total = net + komisyon DENGELİ", async () => {
+    const byAccount = (tx: any) =>
+      Object.fromEntries(
+        tx.ledgerEntry.createMany.mock.calls[0][0].data.map((r: any) => [
+          r.account,
+          [r.direction, Number(r.amount)],
+        ]),
+      );
+    /** Grup dengesi: debit toplamı = credit toplamı (reconcile invaryantı #1). */
+    const signedNet = (tx: any) =>
+      tx.ledgerEntry.createMany.mock.calls[0][0].data.reduce(
+        (sum: number, r: any) =>
+          sum +
+          (r.direction === LedgerDirection.debit
+            ? Number(r.amount)
+            : -Number(r.amount)),
+        0,
+      );
+
+    it("v1 takas komisyonu KDV'siyle birlikte platform_commission'a düşer (grup DENGELİ)", async () => {
       const svc = new LedgerService({} as any);
       const tx = makeTx();
-      // payer 90 öder → recipient net 78 + platform komisyon 12
+      // v1: total 100.4 = fark 78 + komisyon 12 + komisyon KDV 2.4. Eski kod yalnız
+      // komisyonu yazıyor, KDV'yi düşürüyordu → grup KDV kadar dengesizdi.
       await svc.recordTradeCashCapture(tx, {
         tradeId: "t1",
         payerId: "payer-1",
         recipientId: "rcp-1",
-        totalAmount: 90,
+        totalAmount: 92.4,
         netAmount: 78,
-        commission: 12,
       });
-      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
-      const byAcc = Object.fromEntries(
-        rows.map((r: any) => [r.account, [r.direction, Number(r.amount)]]),
-      );
+      const byAcc = byAccount(tx);
       expect(byAcc[LedgerAccount.buyer_payment]).toEqual([
         LedgerDirection.credit,
-        90,
+        92.4,
       ]);
       expect(byAcc[LedgerAccount.seller_escrow]).toEqual([
         LedgerDirection.debit,
@@ -311,22 +325,138 @@ describe("LedgerService", () => {
       ]);
       expect(byAcc[LedgerAccount.platform_commission]).toEqual([
         LedgerDirection.debit,
-        12,
+        14.4,
       ]);
-      // tradeId ref yazıldı
-      expect(rows[0].tradeId).toBe("t1");
+      expect(signedNet(tx)).toBeCloseTo(0, 2);
+      expect(tx.ledgerEntry.createMany.mock.calls[0][0].data[0].tradeId).toBe(
+        "t1",
+      );
     });
 
-    it("total/net <= 0 → null", async () => {
+    it("v2: hizmet bedeli gelire, kargo shipping_income'a, fark escrow'a gider", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      // taraf 295 öder = 200 fark + 35 hizmet bedeli + 60 kargo (2 bacak)
+      await svc.recordTradeCashCapture(tx, {
+        tradeId: "t1",
+        payerId: "payer-1",
+        recipientId: "rcp-1",
+        totalAmount: 295,
+        netAmount: 200,
+        shipping: 60,
+      });
+      const byAcc = byAccount(tx);
+      expect(byAcc[LedgerAccount.seller_escrow]).toEqual([
+        LedgerDirection.debit,
+        200,
+      ]);
+      expect(byAcc[LedgerAccount.shipping_income]).toEqual([
+        LedgerDirection.debit,
+        60,
+      ]);
+      expect(byAcc[LedgerAccount.platform_commission]).toEqual([
+        LedgerDirection.debit,
+        35,
+      ]);
+      expect(signedNet(tx)).toBeCloseTo(0, 2);
+    });
+
+    it("v2: farkı olmayan taraf da deftere yazılır (ücret + kargo gerçek para)", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      // Eski koşul netAmount > 0 arıyordu: fark ödemeyen tarafın 95 TL'si hiç
+      // deftere girmiyordu — tahsilat defterde görünmeyen para olurdu.
+      const group = await svc.recordTradeCashCapture(tx, {
+        tradeId: "t1",
+        payerId: "payer-2",
+        recipientId: null,
+        totalAmount: 95,
+        netAmount: 0,
+        shipping: 60,
+      });
+      expect(group).not.toBeNull();
+      const byAcc = byAccount(tx);
+      expect(byAcc[LedgerAccount.seller_escrow]).toBeUndefined();
+      expect(byAcc[LedgerAccount.platform_commission]).toEqual([
+        LedgerDirection.debit,
+        35,
+      ]);
+      expect(signedNet(tx)).toBeCloseTo(0, 2);
+    });
+
+    it("tahsilat yoksa (total <= 0) kayıt yazmaz", async () => {
       const svc = new LedgerService({} as any);
       const tx = makeTx();
       expect(
+        await svc.recordTradeCashCapture(tx, { totalAmount: 0, netAmount: 0 }),
+      ).toBeNull();
+      expect(tx.ledgerEntry.createMany).not.toHaveBeenCalled();
+    });
+
+    it("iade kargoya verilmeden yapıldıysa üç kalemi de geri alır", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      await svc.recordTradeCashRefund(tx, {
+        tradeId: "t1",
+        refundAttemptId: "att-1",
+        refundAmount: 295,
+        escrowReversal: 200,
+        shippingReversal: 60,
+      });
+      const byAcc = byAccount(tx);
+      expect(byAcc[LedgerAccount.refund]).toEqual([LedgerDirection.debit, 295]);
+      expect(byAcc[LedgerAccount.seller_escrow]).toEqual([
+        LedgerDirection.credit,
+        200,
+      ]);
+      expect(byAcc[LedgerAccount.shipping_income]).toEqual([
+        LedgerDirection.credit,
+        60,
+      ]);
+      expect(byAcc[LedgerAccount.platform_commission]).toEqual([
+        LedgerDirection.credit,
+        35,
+      ]);
+      expect(signedNet(tx)).toBeCloseTo(0, 2);
+    });
+
+    it("kargoya verildikten sonraki iadede kargo hesabı AÇIK kalır", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      // 295'in 60'ı kargoya gitti → yalnız 235 iade edilir, shipping_income ters
+      // kayıt ALMAZ (para gerçekten taşıyıcıya ödendi).
+      await svc.recordTradeCashRefund(tx, {
+        tradeId: "t1",
+        refundAttemptId: "att-2",
+        refundAmount: 235,
+        escrowReversal: 200,
+        shippingReversal: 0,
+      });
+      const byAcc = byAccount(tx);
+      expect(byAcc[LedgerAccount.shipping_income]).toBeUndefined();
+      expect(byAcc[LedgerAccount.platform_commission]).toEqual([
+        LedgerDirection.credit,
+        35,
+      ]);
+      expect(signedNet(tx)).toBeCloseTo(0, 2);
+      expect(
+        tx.ledgerEntry.createMany.mock.calls[0][0].data[0].idempotencyKey,
+      ).toBe("refund:trade-cash:att-2");
+    });
+
+    it("kalemler toplamı tahsilatı AŞIYORSA hiç yazmaz (dengesiz grup basmaz)", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      // Bozuk veri: fark + kargo, tahsil edilenden büyük. Dengesiz bir grup basmak
+      // yerine hiç yazmamak doğrudur — reconcile alarmı gürültüye boğulmaz.
+      expect(
         await svc.recordTradeCashCapture(tx, {
-          totalAmount: 0,
-          netAmount: 0,
-          commission: 0,
+          totalAmount: 100,
+          netAmount: 90,
+          shipping: 60,
         }),
       ).toBeNull();
+      expect(tx.ledgerEntry.createMany).not.toHaveBeenCalled();
     });
   });
 });

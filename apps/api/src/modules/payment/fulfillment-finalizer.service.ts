@@ -164,9 +164,9 @@ export class FulfillmentFinalizer {
   }
 
   /**
-   * Faz 6.4: Takas nakit-farkı yakalamasını birleşik gelir defterine yaz (takas komisyonu
-   * da `platform_commission` hesabına düşsün). POST-COMMIT best-effort — defter hatası
-   * ödemeyi bozmaz; reconciliation açığı yakalar.
+   * Faz 6.4: Takas ödemesini birleşik gelir defterine yaz — hizmet bedeli
+   * `platform_commission`, kargo `shipping_income`, nakit fark `seller_escrow`.
+   * POST-COMMIT best-effort — defter hatası ödemeyi bozmaz; reconciliation açığı yakalar.
    */
   async recordTradeCashCapture(tradeCashPaymentId: string): Promise<void> {
     if (!this.ledger) return;
@@ -178,7 +178,7 @@ export class FulfillmentFinalizer {
           payerId: true,
           recipientId: true,
           amount: true,
-          commission: true,
+          shippingAmount: true,
           totalAmount: true,
         },
       });
@@ -190,7 +190,7 @@ export class FulfillmentFinalizer {
         recipientId: tcp.recipientId,
         totalAmount: Number(tcp.totalAmount),
         netAmount: Number(tcp.amount),
-        commission: Number(tcp.commission),
+        shipping: Number(tcp.shippingAmount),
       });
     } catch (e: any) {
       this.logger.warn(

@@ -51,6 +51,9 @@ export interface LedgerRecordInput {
 /** Denge toleransı (kuruş yuvarlaması). */
 const BALANCE_EPSILON = 0.005;
 
+const round2 = (n: number): number =>
+  Math.round((n + Number.EPSILON) * 100) / 100;
+
 /**
  * LedgerService (Faz 6) — DEĞİŞMEZ çift-taraflı defter. `record` DENGELİ bir satır
  * grubu yazar (Σdebit == Σcredit; değilse FIRLATIR — dengesiz kayıt kabul edilmez).
@@ -191,11 +194,20 @@ export class LedgerService {
   }
 
   /**
-   * Takas nakit-farkı yakalaması (Faz 6.4 — birleşik gelir defteri): ödeyenin (payer)
-   * ödediği totalAmount = alıcının (recipient) net'i + platform komisyonu. Böylece TAKAS
-   * komisyonu da sipariş komisyonuyla AYNI `platform_commission` hesabına düşer → gelir
-   * tek yerden sorgulanır. Escrow (seller_escrow) trade payout'unda (payout_completed)
-   * kapanır → sipariş akışıyla aynı escrow yaşam döngüsü.
+   * Takas ödemesi yakalaması (Faz 6.4 — birleşik gelir defteri). Bir TARAFIN ödediği
+   * `totalAmount` üç yere dağılır:
+   *
+   *   - `netAmount` → karşı tarafın nakit farkı (seller_escrow; trade payout'unda kapanır)
+   *   - `shipping`  → tahsil edilen kargo (shipping_income; gelir DEĞİL, taşıyıcıya geçer)
+   *   - KALAN       → platform geliri (platform_commission) — v2'de takas hizmet bedeli,
+   *                   v1'de aracılık komisyonu + onun KDV'si
+   *
+   * Platform payı çağırandan alınmaz, tahsilattan TÜRETİLİR: tek kaynak `totalAmount`tır,
+   * böylece grup tanım gereği dengelidir. (Eski hâli komisyonu ayrı parametre olarak
+   * alıyor ve v1'in `commissionTaxAmount`'ını hiç yazmıyordu → her v1 takası KDV kadar
+   * dengesiz bir grup bırakıyordu.)
+   *
+   * Nakit farkı OLMAYAN taraf da yazılır: ücret + kargo gerçekten tahsil edilmiş paradır.
    */
   async recordTradeCashCapture(
     tx: Prisma.TransactionClient,
@@ -204,32 +216,51 @@ export class LedgerService {
       tradeCashPaymentId?: string | null;
       payerId?: string | null;
       recipientId?: string | null;
+      /** Bu taraftan tahsil edilen brüt. */
       totalAmount: number;
+      /** Karşı tarafa gidecek nakit fark (yoksa 0). */
       netAmount: number;
-      commission: number;
+      /** Bu tarafın kargo bedeli (v1 satırlarında 0). */
+      shipping?: number;
       currency?: string;
     },
   ): Promise<string | null> {
-    if (!(input.totalAmount > 0) || !(input.netAmount > 0)) return null;
+    const total = round2(Number(input.totalAmount) || 0);
+    const escrow = round2(Math.max(0, Number(input.netAmount) || 0));
+    const shipping = round2(Math.max(0, Number(input.shipping) || 0));
+    if (!(total > 0)) return null;
+    const platform = round2(total - escrow - shipping);
+    // Kalemler tahsilatı aşıyorsa veri bozuktur; dengesiz grup basmak yerine hiç yazma.
+    if (platform < -0.005) return null;
+
     const entries: LedgerEntryInput[] = [
       {
         account: LedgerAccount.buyer_payment,
         direction: LedgerDirection.credit,
-        amount: input.totalAmount,
+        amount: total,
         buyerId: input.payerId,
       },
-      {
+    ];
+    if (escrow > 0) {
+      entries.push({
         account: LedgerAccount.seller_escrow,
         direction: LedgerDirection.debit,
-        amount: input.netAmount,
+        amount: escrow,
         sellerId: input.recipientId,
-      },
-    ];
-    if (input.commission > 0) {
+      });
+    }
+    if (shipping > 0) {
+      entries.push({
+        account: LedgerAccount.shipping_income,
+        direction: LedgerDirection.debit,
+        amount: shipping,
+      });
+    }
+    if (platform > 0) {
       entries.push({
         account: LedgerAccount.platform_commission,
         direction: LedgerDirection.debit,
-        amount: input.commission,
+        amount: platform,
       });
     }
     return this.record(tx, {
@@ -237,6 +268,84 @@ export class LedgerService {
       currency: input.currency,
       idempotencyKey: input.tradeCashPaymentId
         ? `capture:trade-cash:${input.tradeCashPaymentId}`
+        : null,
+      entries,
+      refs: {
+        tradeId: input.tradeId,
+        sellerId: input.recipientId,
+        buyerId: input.payerId,
+      },
+    });
+  }
+
+  /**
+   * Takas ödemesinin iadesi: dış çıkış (refund) = capture'ın ters kaydı.
+   *
+   * Kargoya verildikten SONRAKİ iptalde kargo bedeli iade edilmez (bkz.
+   * `trade-refund-policy.ts`); o durumda `shippingReversal` 0 gelir ve
+   * `shipping_income` açık kalır — para gerçekten taşıyıcıya gitmiştir.
+   * Platform payı yine tahsilattan TÜREtilir: iade tutarı eksi escrow eksi kargo.
+   */
+  async recordTradeCashRefund(
+    tx: Prisma.TransactionClient,
+    input: {
+      tradeId?: string | null;
+      tradeCashPaymentId?: string | null;
+      /** İade denemesi — idempotency anahtarının kaynağı. */
+      refundAttemptId?: string | null;
+      payerId?: string | null;
+      recipientId?: string | null;
+      /** Gerçekten iade edilen tutar. */
+      refundAmount: number;
+      /** Geri alınan nakit fark (escrow). */
+      escrowReversal: number;
+      /** Geri alınan kargo bedeli — kargoya verildikten sonra 0. */
+      shippingReversal: number;
+      currency?: string;
+    },
+  ): Promise<string | null> {
+    const refund = round2(Number(input.refundAmount) || 0);
+    const escrow = round2(Math.max(0, Number(input.escrowReversal) || 0));
+    const shipping = round2(Math.max(0, Number(input.shippingReversal) || 0));
+    if (!(refund > 0)) return null;
+    const platform = round2(refund - escrow - shipping);
+    if (platform < -0.005) return null;
+
+    const entries: LedgerEntryInput[] = [
+      {
+        account: LedgerAccount.refund,
+        direction: LedgerDirection.debit,
+        amount: refund,
+        buyerId: input.payerId,
+      },
+    ];
+    if (escrow > 0) {
+      entries.push({
+        account: LedgerAccount.seller_escrow,
+        direction: LedgerDirection.credit,
+        amount: escrow,
+        sellerId: input.recipientId,
+      });
+    }
+    if (shipping > 0) {
+      entries.push({
+        account: LedgerAccount.shipping_income,
+        direction: LedgerDirection.credit,
+        amount: shipping,
+      });
+    }
+    if (platform > 0) {
+      entries.push({
+        account: LedgerAccount.platform_commission,
+        direction: LedgerDirection.credit,
+        amount: platform,
+      });
+    }
+    return this.record(tx, {
+      eventType: LedgerEventType.refund_issued,
+      currency: input.currency,
+      idempotencyKey: input.refundAttemptId
+        ? `refund:trade-cash:${input.refundAttemptId}`
         : null,
       entries,
       refs: {
@@ -273,7 +382,6 @@ export class LedgerService {
     const refund = Number(input.refundAmount);
     if (!(total > 0) || !(refund > 0)) return null;
     const ratio = Math.min(refund / total, 1);
-    const round2 = (n: number) => Math.round(n * 100) / 100;
 
     const commissionPortion = round2(input.commission * ratio);
     const withholdingPortion = round2(input.withholdingTax * ratio);

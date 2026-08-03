@@ -1660,6 +1660,36 @@ export class PaymentRefundService {
       `Trade cash refunded via PayTR tradeId=${tradeId} paymentId=${payment.id}`,
     );
 
+    // Defter ters kaydı: POST-COMMIT best-effort (capture ile aynı felsefe). İade
+    // tx'inin İÇİNDE yazmak, defter hatasında para hareketini geri alırdı; burada
+    // hata yalnız loglanır ve reconcile açığı yakalar. Kargo bacağı yalnız GERÇEKTEN
+    // iade edildiyse ters kayıt alır (tek otorite: refundableAmountFor).
+    if (this.ledger) {
+      const tcp = payment.tradeCashPayment;
+      const shippingAmount = Number(tcp?.shippingAmount ?? 0);
+      const netAmount = Number(tcp?.amount ?? 0);
+      try {
+        await this.ledger.recordTradeCashRefund(this.prisma, {
+          tradeId,
+          tradeCashPaymentId: payment.tradeCashPaymentId,
+          refundAttemptId: refundAttempt.attempt.id,
+          payerId: tcp?.payerId,
+          recipientId: tcp?.recipientId,
+          refundAmount: amount,
+          escrowReversal: Math.min(netAmount, amount),
+          // İade tutarı kargoyu kapsıyorsa (tam iade) kargo da geri alınır.
+          shippingReversal:
+            amount >= Number(tcp?.totalAmount ?? 0) - 0.005
+              ? shippingAmount
+              : 0,
+        });
+      } catch (e: any) {
+        this.logger.warn(
+          `Ledger takas iade kaydı başarısız (tcp ${payment.tradeCashPaymentId}): ${e?.message}`,
+        );
+      }
+    }
+
     // Takas komisyon e-Arşivini iptal et / iade faturası kes (post-commit, non-blocking).
     if (payment.tradeCashPaymentId) {
       void this.elogoInvoicing
