@@ -103,7 +103,9 @@ export interface OrderPlatformBreakdown {
   afterShipping: number;
   /** Stopaj devlete gittikten sonra kalan. */
   afterWithholding: number;
-  /** Hizmet KDV'si devlete gittikten sonra kalan — `revenue` ile aynı tutardır. */
+  /** Devlete giden KDV — `afterWithholding` × oran (şelalenin tek KDV satırı). */
+  vatOut: number;
+  /** KDV devlete gittikten sonra kalan: `afterWithholding` − `vatOut`. */
   afterVat: number;
   /** PSP (PayTR) kesintisi — TAHMİNİ (oran × stopaj sonrası tutar). */
   pspFee: number;
@@ -214,15 +216,18 @@ export function buildOrderBreakdown(
   // Hak ediş şelalesi. Brüt = alıcının ödediği − satıcının aldığı; ürün KDV'si
   // satıcıya AKTARILDIĞI için bu farkta kendiliğinden sadeleşir.
   //
-  // Maliyetler sırayla düşülür ve şelale mevcut `revenue` rakamına iner
-  // (afterVat === revenue): hesap değişmiyor, yalnız o rakama giden yol
-  // görünür oluyor. PSP kesintisi bunun ALTINDA, ayrı bir maliyettir.
+  // Maliyetler sırayla düşülür: kargo → stopaj → KDV → PSP. KDV ve PSP satırları
+  // KALAN tutar üzerinden hesaplanır (ikisi de `afterWithholding` tabanlı) —
+  // kalem bazında tahsil edilen KDV toplamı (`platform.tax`) DEĞİL: kargonun
+  // KDV'si bir satır yukarıda kargoyla birlikte zaten çıkmıştır, onu burada
+  // yeniden düşmek şelaleyi olduğundan düşük gösterirdi.
   const shipping = sum([sellerShipping, buyerShipping]);
   const vatTotal = sum([sellerVatTotal, buyerVatTotal]);
   const grossRetained = round2(buyerAddedTotal + sellerDeductionTotal);
   const afterShipping = round2(grossRetained - shipping);
   const afterWithholding = round2(afterShipping - withholding);
-  const afterVat = round2(afterWithholding - vatTotal);
+  const vatOut = round2(afterWithholding * (rate / 100));
+  const afterVat = round2(afterWithholding - vatOut);
   // Taban iş kararıdır: kargo ve stopaj çıktıktan SONRAKİ tutar. (PayTR gerçekte
   // tahsil edilen toplamdan keser; gerçek tutar ekstre eşleşmesinden defterdeki
   // `psp_fee` hesabına yazılır — buradaki satır tahmindir.)
@@ -258,6 +263,7 @@ export function buildOrderBreakdown(
       grossRetained,
       afterShipping,
       afterWithholding,
+      vatOut,
       afterVat,
       pspFee,
       netRevenue,

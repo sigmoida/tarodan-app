@@ -466,7 +466,7 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
         />
         <Line
           label={t("admin.operations.orders.file.serviceVatOut")}
-          amount={-(b.seller.vatTotal + b.buyer.vatTotal)}
+          amount={-b.platform.vatOut}
         />
         <Line
           label={t("admin.operations.orders.file.afterVat")}

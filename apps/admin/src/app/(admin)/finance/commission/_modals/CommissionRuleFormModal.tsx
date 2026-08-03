@@ -598,7 +598,7 @@ function BreakdownPreview() {
         />
         <Row
           label={t("admin.finance.commission.serviceVatOut")}
-          value={-(breakdown.seller.vatTotal + breakdown.buyer.vatTotal)}
+          value={-breakdown.platform.vatOut}
         />
         <Row
           label={t("admin.finance.commission.afterVat")}

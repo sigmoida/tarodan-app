@@ -217,9 +217,11 @@ describe("buildOrderBreakdown", () => {
    *
    *   Yatan tutar → kargo hariç → stopaj hariç → KDV hariç → PayTR → net
    *
-   * Hesabın kendisi DEĞİŞMEZ: `afterVat` her zaman mevcut `revenue` rakamına
-   * eşit çıkar (aşağıda sabitleniyor) — şelale yalnız o rakama giden yolu
-   * gösterir. PSP kesintisi ise TAHMİNDİR: oran admin ayarından gelir.
+   * KDV ve PSP satırları KALAN tutardan (stopaj sonrası) hesaplanır. KDV için
+   * kalem kalem tahsil edilen toplamı kullanmak yanlıştı: o toplamın içinde
+   * KARGONUN KDV'si de var ve kargo bir satır yukarıda zaten düşülmüş oluyor →
+   * aynı maliyet iki kez inerek hak edişi olduğundan düşük gösteriyordu.
+   * Tahsil edilen KDV'nin kendisi `platform.tax` alanında durmaya devam eder.
    */
   describe("Tarodan hak edişi şelalesi", () => {
     it("brütü alıcı-satıcı farkından türetir", () => {
@@ -230,14 +232,24 @@ describe("buildOrderBreakdown", () => {
       expect(b.platform.grossRetained).toBe(370);
     });
 
-    it("maliyetleri sırayla düşer ve mevcut gelir rakamına iner", () => {
+    it("maliyetleri sırayla düşer; KDV KALAN tutardan hesaplanır", () => {
       const b = buildOrderBreakdown(REFERENCE);
 
       expect(b.platform.afterShipping).toBe(270); // 370 − 100 kargo
       expect(b.platform.afterWithholding).toBe(260); // − 10 stopaj
-      expect(b.platform.afterVat).toBe(200); // − 60 KDV (32 + 28)
-      // Şelalenin dibi, bugüne kadar gösterilen "Tarodan'a kalan" ile AYNI.
-      expect(b.platform.afterVat).toBe(b.platform.revenue);
+      expect(b.platform.vatOut).toBe(52); // 260 × %20
+      expect(b.platform.afterVat).toBe(208); // 260 − 52
+    });
+
+    it("KDV satırı, tahsil edilen KDV toplamı DEĞİLDİR", () => {
+      const b = buildOrderBreakdown(REFERENCE);
+
+      // Tahsil edilen 60 (32 + 28); bunun 20'si KARGONUN KDV'sidir ve kargo bir
+      // satır yukarıda zaten düşülmüştür. 60'ı burada düşmek aynı maliyeti iki
+      // kez indirir → hak ediş 8 TL eksik görünürdü.
+      expect(b.seller.vatTotal + b.buyer.vatTotal).toBe(60);
+      expect(b.platform.vatOut).toBe(52);
+      expect(b.platform.tax).toBe(70); // beyan tarafı değişmedi (60 + 10 stopaj)
     });
 
     it("PSP kesintisini stopaj sonrası, KDV öncesi tutardan tahmin eder", () => {
@@ -246,21 +258,21 @@ describe("buildOrderBreakdown", () => {
       // PayTR tahsil edilen tutardan keser; ekranda gösterilen taban iş
       // kararıdır: kargo ve stopaj çıktıktan sonraki tutar (260 × %3).
       expect(b.platform.pspFee).toBe(7.8);
-      expect(b.platform.netRevenue).toBe(192.2); // 200 − 7.8
+      expect(b.platform.netRevenue).toBe(200.2); // 208 − 7.8
     });
 
-    it("oran verilmezse PSP satırı 0'dır ve net = brüt gelir", () => {
+    it("oran verilmezse PSP satırı 0'dır ve net = KDV sonrası tutar", () => {
       const b = buildOrderBreakdown(REFERENCE);
 
       expect(b.platform.pspFee).toBe(0);
-      expect(b.platform.netRevenue).toBe(b.platform.revenue);
+      expect(b.platform.netRevenue).toBe(b.platform.afterVat);
     });
 
     it("net oranı ürün bedeline göre verir (brüt oranın yanında)", () => {
       const b = buildOrderBreakdown({ ...REFERENCE, pspFeeRate: 3 });
 
       expect(b.platform.takeRate).toBe(20); // 200 / 1000 — mevcut alan korunur
-      expect(b.platform.netTakeRate).toBe(19.22); // 192.2 / 1000
+      expect(b.platform.netTakeRate).toBe(20.02); // 200.2 / 1000
     });
 
     it("kullanıcı senaryosu: alıcı 1200 / satıcı 858", () => {
@@ -285,9 +297,38 @@ describe("buildOrderBreakdown", () => {
       expect(b.platform.grossRetained).toBe(342);
       expect(b.platform.afterShipping).toBe(242);
       expect(b.platform.afterWithholding).toBe(232);
-      expect(b.platform.afterVat).toBe(176.67);
+      expect(b.platform.vatOut).toBe(46.4); // 232 × %20
+      expect(b.platform.afterVat).toBe(185.6);
       expect(b.platform.pspFee).toBe(6.96); // 232 × %3
-      expect(b.platform.netRevenue).toBe(169.71);
+      expect(b.platform.netRevenue).toBe(178.64);
+    });
+
+    it("100 TL senaryosu: alıcı 128,80 / satıcı 67,80", () => {
+      // Ürün 100; kargo 30 yarı yarıya, satıcı 6 + 5, alıcı 4 + 5 ücret,
+      // stopaj 1, hizmet KDV'si %20, PSP %3.
+      const b = buildOrderBreakdown({
+        subtotal: 100,
+        sellerCommissionAmount: 6,
+        sellerPlatformFeeAmount: 5,
+        sellerShippingAmount: 15,
+        buyerCommissionAmount: 4,
+        buyerServiceFeeAmount: 5,
+        buyerShippingAmount: 15,
+        withholdingTaxAmount: 1,
+        serviceVatRate: 20,
+        pspFeeRate: 3,
+      });
+
+      expect(b.buyer.payable).toBe(128.8);
+      expect(b.seller.net).toBe(67.8);
+
+      expect(b.platform.grossRetained).toBe(61);
+      expect(b.platform.afterShipping).toBe(31);
+      expect(b.platform.afterWithholding).toBe(30);
+      expect(b.platform.vatOut).toBe(6); // 30 × %20
+      expect(b.platform.afterVat).toBe(24);
+      expect(b.platform.pspFee).toBe(0.9); // 30 × %3
+      expect(b.platform.netRevenue).toBe(23.1);
     });
 
     it("kargo/stopaj/KDV yokken şelale düz iner", () => {
