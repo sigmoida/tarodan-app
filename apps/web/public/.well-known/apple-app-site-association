@@ -19,12 +19,12 @@
           {
             "/": "/payment/*",
             "exclude": true,
-            "comment": "PayTR 3DS turu tarayicida baslar tarayicida biter"
+            "comment": "PayTR 3DS turu tarayicida baslar tarayicida biter; hangi semadan gelirse gelsin gezinme YOK"
           },
           {
             "/": "/en/payment/*",
             "exclude": true,
-            "comment": "PayTR 3DS turu tarayicida baslar tarayicida biter"
+            "comment": "PayTR 3DS turu tarayicida baslar tarayicida biter; hangi semadan gelirse gelsin gezinme YOK"
           },
           {
             "/": "/admin/*",
