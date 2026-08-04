@@ -106,6 +106,17 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
     return tariff?.version ?? 1;
   }
 
+  async function activeCommissionExpectation() {
+    const set = await getPrisma().commissionRuleSet.findFirstOrThrow({
+      where: { status: "ACTIVE" },
+      select: { id: true, version: true },
+    });
+    return {
+      expectedCommissionRuleSetId: set.id,
+      expectedCommissionRuleSetVersion: set.version,
+    };
+  }
+
   /** Alıcı + satıcı + ürün + alıcı adresi (varsayılan fiyat 300, adet 1). */
   async function makeBuyerSellerProduct(
     opts: { price?: number; quantity?: number; sellerPremium?: boolean } = {},
@@ -940,6 +951,7 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
         .send({
           productId: product.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           email,
           emailVerificationCode: code,
           phone: "+905551234567",
@@ -1012,6 +1024,7 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
         .send({
           productId: product.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           email,
           emailVerificationCode: "000000",
           phone: "+905551234567",
@@ -1057,6 +1070,7 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
         .send({
           productId: product.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           email,
           emailVerificationCode: code,
           phone: "+905551234567",
@@ -3069,6 +3083,7 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
           productId: ownProduct.id,
           shippingAddressId: sellerAddress.id,
           expectedShippingTariffVersion,
+          ...(await activeCommissionExpectation()),
         });
       expect(trRes.status).toBe(403);
       const enRes = await request(server())
@@ -3079,6 +3094,7 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
           productId: ownProduct.id,
           shippingAddressId: sellerAddress.id,
           expectedShippingTariffVersion,
+          ...(await activeCommissionExpectation()),
         });
       expect(enRes.status).toBe(403);
 

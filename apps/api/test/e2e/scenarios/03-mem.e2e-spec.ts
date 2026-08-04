@@ -20,8 +20,6 @@ import {
   PaymentStatus,
   MembershipTierType,
   AdminRole,
-  CommissionRuleType,
-  CommissionAppliesTo,
   CommissionSellerType,
 } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
@@ -48,6 +46,7 @@ import { OrderService } from "../../../src/modules/order/order.service";
 
 describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
   let ctx: E2ETestApp;
+  let baseline: { categoryId: string; brandId: string; manufacturerId: string };
   const server = () => ctx.app.getHttpServer();
 
   beforeAll(async () => {
@@ -61,7 +60,7 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
 
   beforeEach(async () => {
     await truncateAll();
-    await seedBaseline();
+    baseline = await seedBaseline();
     ctx.paytr.reset();
     jest.restoreAllMocks();
     await seedTiers();
@@ -1438,7 +1437,7 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
     });
     await attachMembership(user.id, MembershipTierType.premium);
     const res = await get(
-      "/api/orders/commission-preview?amount=1000",
+      `/api/orders/commission-preview?amount=1000&categoryId=${baseline.categoryId}`,
       user,
     ).expect(200);
     // PREMIUM kuralı %5 → 50; FREE %8 → 80. Premium < Free (daha düşük komisyon).
@@ -1454,11 +1453,11 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
     });
     await attachMembership(user.id, MembershipTierType.business);
     const res = await get(
-      "/api/orders/commission-preview?amount=1000",
+      `/api/orders/commission-preview?amount=1000&categoryId=${baseline.categoryId}`,
       user,
     ).expect(200);
-    // business → mapSellerTypeForCommission=PREMIUM (BUSINESS DEĞİL) → %5 → 50.
-    expect(res.body.sellerFeeAmount).toBe(50);
+    // Kurumsal satıcı yalnız BUSINESS kuralına düşer.
+    expect(res.body.sellerFeeAmount).toBe(20);
   });
 
   scenario("MEM-112", async () => {
@@ -1469,11 +1468,11 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
     });
     await attachMembership(user.id, MembershipTierType.basic);
     const res = await get(
-      "/api/orders/commission-preview?amount=1000",
+      `/api/orders/commission-preview?amount=1000&categoryId=${baseline.categoryId}`,
       user,
     ).expect(200);
-    // basic → mapSellerTypeForCommission=FREE → %8 → 80 (basic commissionDiscount yansımaz).
-    expect(res.body.sellerFeeAmount).toBe(80);
+    // BASIC ayrı ve kesin bir satıcı tipidir.
+    expect(res.body.sellerFeeAmount).toBe(40);
   });
 
   scenario("MEM-113", async () => {
@@ -1483,13 +1482,12 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
       where: { email: "platform@tarodan.com", sellerType: "platform" },
     });
     // Platform satıcıya HTTP token üretemiyoruz; servisten doğrudan komisyon hesapla.
-    // mapSellerTypeForCommission private; calculateCommission public ve platform
-    // sellerType=platform → BUSINESS kuralı (%2).
+    // Strict resolver platform satıcıyı BUSINESS kuralına bağlar (%2).
     const orderService = ctx.app.get(OrderService);
     const result = await orderService.calculateCommission(
       1000,
       platform!.id,
-      null,
+      baseline.categoryId,
     );
     expect(result.sellerFeeAmount).toBe(20); // BUSINESS %2 → 20
   });
@@ -1999,41 +1997,25 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
     return { user, tier: tier!, m, card };
   }
 
-  /** FREE/PREMIUM/BUSINESS seller komisyon kuralları (categoryId=null, appliesTo=SELLER). */
+  /** Baseline kategorideki kesin satıcı tipi kurallarını günceller. */
   async function seedCommissionRules(): Promise<void> {
     const prisma = getPrisma();
-    // NOT: sellerRate/percentage Decimal(5,4) → max 9.9999. Oranlar buna uyacak (≤ %9.9999).
-    // sellerRate yüzde (5.0000 = %5); percentage kesirli karşılığı (0.0500). Konvansiyon:
-    // order-buyer-fee.e2e-spec.ts. calculateCommission: fee = amount * sellerRate/100.
-    const rule = (
-      name: string,
-      sellerType: any,
-      ratePct: string,
-      pct: string,
-    ) =>
-      prisma.commissionRule.create({
-        data: {
-          name,
-          ruleType: CommissionRuleType.seller_type,
-          sellerType,
-          appliesTo: CommissionAppliesTo.SELLER,
-          sellerRate: new Prisma.Decimal(ratePct),
-          percentage: new Prisma.Decimal(pct),
-          isActive: true,
-        },
-      });
-    await rule("FREE seller", CommissionSellerType.FREE, "8.0000", "0.0800"); // %8 → 1000*8% = 80
-    await rule(
-      "PREMIUM seller",
-      CommissionSellerType.PREMIUM,
-      "5.0000",
-      "0.0500",
-    ); // %5 → 50
-    await rule(
-      "BUSINESS seller",
-      CommissionSellerType.BUSINESS,
-      "2.0000",
-      "0.0200",
-    ); // %2 → 20
+    const rates: Record<CommissionSellerType, number> = {
+      [CommissionSellerType.FREE]: 8,
+      [CommissionSellerType.BASIC]: 4,
+      [CommissionSellerType.PREMIUM]: 5,
+      [CommissionSellerType.BUSINESS]: 2,
+    };
+    await Promise.all(
+      Object.entries(rates).map(([sellerType, rate]) =>
+        prisma.commissionRule.update({
+          where: { id: `default-rule-${sellerType}` },
+          data: {
+            categoryId: baseline.categoryId,
+            sellerCommissionRate: new Prisma.Decimal(rate),
+          },
+        }),
+      ),
+    );
   }
 });

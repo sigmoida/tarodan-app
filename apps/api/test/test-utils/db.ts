@@ -98,7 +98,9 @@ const TABLES_TO_TRUNCATE = [
   // Reference data (also truncated so seedBaseline can re-insert deterministically)
   "attributes",
   "attribute_groups",
+  "commission_rule_shipping_shares",
   "commission_rules",
+  "commission_rule_sets",
   "tax_rules",
   "tax_rates",
   "tax_regions",
@@ -259,23 +261,34 @@ export async function seedBaseline(): Promise<{
     },
   });
 
-  // Checkout fails closed without a matching commission rule. Mirror the
-  // production seed's catch-all rule so ordinary order fixtures reach the
-  // domain behavior they intend to test.
-  await prisma.commissionRule.create({
+  const commissionSet = await prisma.commissionRuleSet.create({
     data: {
-      id: "default-rule",
-      name: "Test Default Commission",
-      ruleType: "default",
-      sellerType: "ALL",
-      appliesTo: "SELLER",
-      sellerRate: 5,
-      sellerCommissionRate: 5,
-      percentage: 0.05,
-      priority: 0,
-      isActive: true,
+      id: "test-commission-set-v1",
+      name: "Test strict commission",
+      version: 1,
+      status: "ACTIVE",
+      publishedAt: new Date(),
+      publishedBy: "test",
     },
   });
+  for (const sellerType of ["FREE", "BASIC", "PREMIUM", "BUSINESS"] as const) {
+    await prisma.commissionRule.create({
+      data: {
+        id: `default-rule-${sellerType}`,
+        ruleSetId: commissionSet.id,
+        name: `Test Default Commission ${sellerType}`,
+        categoryId: category.id,
+        sellerType,
+        minAmount: 0,
+        maxAmount: null,
+        buyerCommissionRate: 0,
+        buyerServiceFeeRate: 0,
+        sellerCommissionRate: 5,
+        sellerPlatformFeeRate: 0,
+        shippingBuyerShare: 100,
+      },
+    });
+  }
 
   return {
     categoryId: category.id,

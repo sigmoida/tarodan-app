@@ -28,6 +28,8 @@ async function buyAndPay(
       productId,
       shippingAddressId,
       expectedShippingTariffVersion: quote.body.shippingTariffVersion,
+      expectedCommissionRuleSetId: quote.body.commissionRuleSetId,
+      expectedCommissionRuleSetVersion: quote.body.commissionRuleSetVersion,
       expectedPricingHash: quote.body.pricingHash,
     })
     .expect(201);

@@ -2494,10 +2494,10 @@ describe("13 — Takas (TRD)", () => {
 
   scenario("TRD-085", async () => {
     // v2 fiyatı: hizmet bedeli (ürün başına sabit, KDV DAHİL) + 2 bacaklık kargo
-    // + varsa fark. Komisyon alınmaz.
+    // + varsa fark. Sabit takas bedeli ürünün strict komisyon kuralından gelir.
     const prisma = getPrisma();
-    await prisma.commissionRule.update({
-      where: { id: "default-rule" },
+    await prisma.commissionRule.updateMany({
+      where: { categoryId: baseline.categoryId },
       data: { tradeFeeSellerAmount: 20, tradeFeeBuyerAmount: 15 },
     });
     const f = await setupBilateral();

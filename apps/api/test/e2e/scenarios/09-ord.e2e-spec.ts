@@ -22,9 +22,6 @@ import {
   OfferStatus,
   PaymentStatus,
   PaymentHoldStatus,
-  CommissionAppliesTo,
-  CommissionSellerType,
-  CommissionRuleType,
   CommissionLedgerStatus,
 } from "@prisma/client";
 import { createE2ETestApp, E2ETestApp } from "../../test-utils/create-app";
@@ -116,6 +113,30 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
       select: { version: true },
     });
     return tariff?.version ?? 1;
+  }
+
+  async function activeCommissionExpectation() {
+    const set = await getPrisma().commissionRuleSet.findFirstOrThrow({
+      where: { status: "ACTIVE" },
+      select: { id: true, version: true },
+    });
+    return {
+      expectedCommissionRuleSetId: set.id,
+      expectedCommissionRuleSetVersion: set.version,
+    };
+  }
+
+  /** Baseline kategori + FREE satıcı için tek kesin kuralı günceller. */
+  async function updateFreeCommission(data: {
+    sellerCommissionRate?: number;
+    buyerServiceFeeRate?: number;
+    buyerServiceFeeMin?: number | null;
+    buyerServiceFeeMax?: number | null;
+  }) {
+    return getPrisma().commissionRule.update({
+      where: { id: "default-rule-FREE" },
+      data,
+    });
   }
 
   /** Sipariş için en son payment satırı (DB). */
@@ -374,6 +395,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         .send({
           productId: product.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           shippingAddress: {
             fullName: "Ali",
             city: "İstanbul",
@@ -538,6 +560,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(201);
       expect(res.body.checkoutGroupId).toBeTruthy();
@@ -576,6 +599,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain("en fazla 20 ürün");
@@ -597,6 +621,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain("en fazla 20 adet");
@@ -619,6 +644,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain("yeterli stok yok");
@@ -654,6 +680,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         .send({
           productId: product.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           email,
           emailVerificationCode: code,
           phone: "+905551234567",
@@ -700,6 +727,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         .send({
           productId: product.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           email: "guest2@external.com",
           emailVerificationCode: "12ab",
           phone: "+905551234567",
@@ -731,6 +759,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           items: [{ productId: product.id }],
           idempotencyKey: randomUUID(),
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           email: `guest-coupon-${Date.now()}@external.com`,
           emailVerificationCode: "123456",
           phone: "+905551234567",
@@ -1445,19 +1474,11 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
     scenario("ORD-104", async () => {
       // Yalnız SELLER %5 kuralı → sellerFee=50, buyerFee=0
       const seller = await createUser(ctx.module, { isSeller: true });
-      await getPrisma().commissionRule.create({
-        data: {
-          name: "seller-5",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.SELLER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          sellerRate: 5,
-          isActive: true,
-        },
-      });
+      await updateFreeCommission({ sellerCommissionRate: 5 });
       const res = await request(server())
-        .get("/api/orders/commission-preview?amount=1000")
+        .get(
+          `/api/orders/commission-preview?amount=1000&categoryId=${baseline.categoryId}`,
+        )
         .set(authHeader(seller))
         .expect(200);
       expect(res.body.sellerFeeAmount).toBe(50);
@@ -1473,17 +1494,9 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         categoryId: baseline.categoryId,
         price: 1000,
       });
-      await getPrisma().commissionRule.deleteMany();
-      await getPrisma().commissionRule.create({
-        data: {
-          name: "buyer-3",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.BUYER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          buyerRate: 3,
-          isActive: true,
-        },
+      await updateFreeCommission({
+        sellerCommissionRate: 0,
+        buyerServiceFeeRate: 3,
       });
       const res = await request(server())
         .post("/api/orders/quote")
@@ -1494,33 +1507,16 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
     });
 
     scenario("ORD-106", async () => {
-      // SELLER + BUYER ayrı kurallar → sellerFee=50, buyerFee=30, commission=80
+      // Tek kural iki tarafın kalemlerini birlikte belirler.
       const seller = await createUser(ctx.module, { isSeller: true });
-      const prisma = getPrisma();
-      await prisma.commissionRule.create({
-        data: {
-          name: "s5",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.SELLER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          sellerRate: 5,
-          isActive: true,
-        },
-      });
-      await prisma.commissionRule.create({
-        data: {
-          name: "b3",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.BUYER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          buyerRate: 3,
-          isActive: true,
-        },
+      await updateFreeCommission({
+        sellerCommissionRate: 5,
+        buyerServiceFeeRate: 3,
       });
       const res = await request(server())
-        .get("/api/orders/commission-preview?amount=1000")
+        .get(
+          `/api/orders/commission-preview?amount=1000&categoryId=${baseline.categoryId}`,
+        )
         .set(authHeader(seller))
         .expect(200);
       expect(res.body.sellerFeeAmount).toBe(50);
@@ -1536,17 +1532,9 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         categoryId: baseline.categoryId,
         price: 100,
       });
-      await getPrisma().commissionRule.create({
-        data: {
-          name: "b3min5",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.BUYER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          buyerRate: 3,
-          buyerMin: 5,
-          isActive: true,
-        },
+      await updateFreeCommission({
+        buyerServiceFeeRate: 3,
+        buyerServiceFeeMin: 5,
       });
       const res = await request(server())
         .post("/api/orders/quote")
@@ -1563,17 +1551,9 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         categoryId: baseline.categoryId,
         price: 10000,
       });
-      await getPrisma().commissionRule.create({
-        data: {
-          name: "b3max50",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.BUYER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          buyerRate: 3,
-          buyerMax: 50,
-          isActive: true,
-        },
+      await updateFreeCommission({
+        buyerServiceFeeRate: 3,
+        buyerServiceFeeMax: 50,
       });
       const res = await request(server())
         .post("/api/orders/quote")
@@ -1587,29 +1567,24 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
       const seller = await createUser(ctx.module, { isSeller: true });
       await getPrisma().commissionRule.deleteMany();
       const res = await request(server())
-        .get("/api/orders/commission-preview?amount=1000")
+        .get(
+          `/api/orders/commission-preview?amount=1000&categoryId=${baseline.categoryId}`,
+        )
         .set(authHeader(seller))
         .expect(503);
       expect(res.body.i18nKey).toBe("server.commission.noRuleConfigured");
     });
 
     scenario("ORD-110", async () => {
-      // isActive=false kural görmezden gelinir ve aktif fallback yoksa fail-closed.
+      // Kesin kural silinirse aktif set bulunsa bile fail-closed.
       const seller = await createUser(ctx.module, { isSeller: true });
-      await getPrisma().commissionRule.deleteMany();
-      await getPrisma().commissionRule.create({
-        data: {
-          name: "inactive",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.SELLER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          sellerRate: 5,
-          isActive: false,
-        },
+      await getPrisma().commissionRule.delete({
+        where: { id: "default-rule-FREE" },
       });
       const res = await request(server())
-        .get("/api/orders/commission-preview?amount=1000")
+        .get(
+          `/api/orders/commission-preview?amount=1000&categoryId=${baseline.categoryId}`,
+        )
         .set(authHeader(seller))
         .expect(503);
       expect(res.body.i18nKey).toBe("server.commission.noRuleConfigured");
@@ -1646,7 +1621,36 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
       const seller = await createUser(ctx.module, { isSeller: true });
       await getPrisma().user.update({
         where: { id: seller.id },
-        data: { businessStatus: "approved" as any, taxId: "1234567890" },
+        data: {
+          businessStatus: "approved" as any,
+          companyName: "Test İşletme",
+          taxId: "1234567890",
+        },
+      });
+      const businessTier = await getPrisma().membershipTier.create({
+        data: {
+          type: "business",
+          name: "ORD Business",
+          monthlyPrice: 100,
+          yearlyPrice: 1000,
+          maxFreeListings: 1000,
+          maxTotalListings: 1000,
+          maxImagesPerListing: 30,
+          canCreateCollections: true,
+          canTrade: true,
+          isAdFree: true,
+          isActive: true,
+        },
+      });
+      await getPrisma().userMembership.create({
+        data: {
+          userId: seller.id,
+          tierId: businessTier.id,
+          status: "active",
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+          autoRenew: false,
+        },
       });
       const product = await createProduct({
         sellerId: seller.id,
@@ -1686,19 +1690,11 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
     scenario("ORD-114", async () => {
       // commission-preview: sellerFee + sellerNet = amount
       const seller = await createUser(ctx.module, { isSeller: true });
-      await getPrisma().commissionRule.create({
-        data: {
-          name: "s10",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.SELLER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          sellerRate: 10,
-          isActive: true,
-        },
-      });
+      await updateFreeCommission({ sellerCommissionRate: 10 });
       const res = await request(server())
-        .get("/api/orders/commission-preview?amount=500")
+        .get(
+          `/api/orders/commission-preview?amount=500&categoryId=${baseline.categoryId}`,
+        )
         .set(authHeader(seller))
         .expect(200);
       expect(res.body.sellerFeeAmount + res.body.sellerNetAmount).toBeCloseTo(
@@ -1742,21 +1738,16 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
     scenario("ORD-118", async () => {
       // batch: sıra korunur + her birinde sellerFee + sellerNet = amount
       const seller = await createUser(ctx.module, { isSeller: true });
-      await getPrisma().commissionRule.create({
-        data: {
-          name: "s5b",
-          ruleType: CommissionRuleType.default,
-          appliesTo: CommissionAppliesTo.SELLER,
-          sellerType: CommissionSellerType.ALL,
-          percentage: 0,
-          sellerRate: 5,
-          isActive: true,
-        },
-      });
+      await updateFreeCommission({ sellerCommissionRate: 5 });
       const res = await request(server())
         .post("/api/orders/commission-preview-batch")
         .set(authHeader(seller))
-        .send({ items: [{ amount: 100 }, { amount: 250 }, { amount: 500 }] })
+        .send({
+          items: [100, 250, 500].map((amount) => ({
+            amount,
+            categoryId: baseline.categoryId,
+          })),
+        })
         .expect(201);
       const results = res.body.results;
       expect(results).toHaveLength(3);
@@ -2041,6 +2032,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(201);
       const res = await request(server())
@@ -2069,6 +2061,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(201);
       for (const o of co.body.orders) {
@@ -2104,6 +2097,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(201);
       const stranger = await createUser(ctx.module);
@@ -2179,6 +2173,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           phone: "+905551234567",
           guestName: "Takip Test",
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           shippingAddress: {
             fullName: "Takip Test",
             phone: "+905551234567",
@@ -2338,6 +2333,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: key,
           shippingAddressId: addr.id,
           expectedShippingTariffVersion,
+          ...(await activeCommissionExpectation()),
         })
         .expect(201);
       const second = await request(server())
@@ -2348,6 +2344,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: key,
           shippingAddressId: addr.id,
           expectedShippingTariffVersion,
+          ...(await activeCommissionExpectation()),
         })
         .expect(201);
       expect(second.body.checkoutGroupId).toBe(first.body.checkoutGroupId);
@@ -2379,6 +2376,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: key,
           shippingAddressId: denizAddr.id,
           expectedShippingTariffVersion,
+          ...(await activeCommissionExpectation()),
         })
         .expect(201);
       const res = await request(server())
@@ -2389,6 +2387,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: key,
           shippingAddressId: cerenAddr.id,
           expectedShippingTariffVersion,
+          ...(await activeCommissionExpectation()),
         })
         .expect(403);
       expect(JSON.stringify(res.body)).toContain("Bu işlem size ait değil");
@@ -2419,6 +2418,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         phone: "+905551234567",
         guestName: "Misafir",
         expectedShippingTariffVersion: await activeShippingTariffVersion(),
+        ...(await activeCommissionExpectation()),
         shippingAddress: {
           fullName: "Misafir",
           phone: "+905551234567",
@@ -2460,6 +2460,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           idempotencyKey: randomUUID(),
           shippingAddressId: addr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(201);
       expect(co.body.checkoutGroupId).toBeTruthy();
@@ -2691,6 +2692,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           phone: "+905551234567",
           guestName: "Enum Test",
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
           shippingAddress: {
             fullName: "Enum",
             phone: "+905551234567",
@@ -2726,6 +2728,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           shippingAddressId: kaanAddr.id,
           billingAddressId: otherAddr.id,
           expectedShippingTariffVersion: await activeShippingTariffVersion(),
+          ...(await activeCommissionExpectation()),
         })
         .expect(400);
       expect(JSON.stringify(res.body)).toContain("Geçersiz fatura adresi");

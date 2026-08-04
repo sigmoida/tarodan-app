@@ -278,9 +278,15 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
       .set(authHeader(admin))
       .send({
         name: "Bypass",
-        sellerType: "ALL",
-        appliesTo: "SELLER",
-        sellerRate: 5,
+        categoryId: baseline.categoryId,
+        sellerType: "FREE",
+        minAmount: 0,
+        buyerCommissionRate: 0,
+        buyerServiceFeeRate: 0,
+        sellerCommissionRate: 5,
+        sellerPlatformFeeRate: 0,
+        tradeFeeSellerAmount: 0,
+        tradeFeeBuyerAmount: 0,
       })
       .expect(403);
     expect(String(res.body.message)).toContain("super_admin");
@@ -290,18 +296,28 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
     const superAdmin = await createAdminUser(ctx.module, {
       role: AdminRole.super_admin,
     });
+    await request(server())
+      .post("/api/admin/commission-rule-sets/draft")
+      .set(authHeader(superAdmin))
+      .send({ name: "ADM-016 taslağı" })
+      .expect(201);
     const res = await request(server())
       .post("/api/admin/commission-rules")
       .set(authHeader(superAdmin))
       .send({
         name: "Varsayılan %5",
-        sellerType: "ALL",
-        appliesTo: "SELLER",
-        sellerRate: 5,
-        isActive: true,
+        categoryId: baseline.categoryId,
+        sellerType: "FREE",
+        minAmount: 0,
+        buyerCommissionRate: 0,
+        buyerServiceFeeRate: 0,
+        sellerCommissionRate: 5,
+        sellerPlatformFeeRate: 0,
+        tradeFeeSellerAmount: 0,
+        tradeFeeBuyerAmount: 0,
       });
-    // Auth katmanı geçer: 401/403 DEĞİL (DTO validation'a bağlı 201 veya 400).
-    expect([200, 201, 400]).toContain(res.status);
+    // Auth katmanı geçer; klonlanan tam aralıkla çakışırsa 409 beklenebilir.
+    expect([200, 201, 400, 409]).toContain(res.status);
     expect(res.status).not.toBe(403);
     expect(res.status).not.toBe(401);
   });
@@ -315,15 +331,17 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
       email: "del-cr-admin@tarodan.com",
       role: AdminRole.admin,
     });
+    await request(server())
+      .post("/api/admin/commission-rule-sets/draft")
+      .set(authHeader(superAdmin))
+      .send({ name: "Silme testi taslağı" })
+      .expect(201);
     const prisma = getPrisma();
-    const rule = await prisma.commissionRule.create({
-      data: {
-        name: "Silinecek",
-        ruleType: "default",
-        percentage: 0.05,
-        appliesTo: "SELLER",
-        sellerRate: 0.05,
-        isActive: true,
+    const rule = await prisma.commissionRule.findFirstOrThrow({
+      where: {
+        categoryId: baseline.categoryId,
+        sellerType: "FREE",
+        ruleSet: { status: "DRAFT" },
       },
     });
     // admin → 403.

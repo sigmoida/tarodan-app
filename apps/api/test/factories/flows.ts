@@ -41,6 +41,8 @@ export function buyNow(
           productId,
           ...(shippingAddressId ? { shippingAddressId } : {}),
           expectedShippingTariffVersion: tariff?.version ?? 1,
+          expectedCommissionRuleSetId: quote.body.commissionRuleSetId,
+          expectedCommissionRuleSetVersion: quote.body.commissionRuleSetVersion,
           ...(quote.status === 201 && quote.body.pricingHash
             ? { expectedPricingHash: quote.body.pricingHash }
             : {}),
