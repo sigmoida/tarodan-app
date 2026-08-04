@@ -42,6 +42,7 @@ import {
   reprefixReference,
 } from "../src/common/helpers/code-prefixes";
 import { generateReferenceCode } from "../src/common/helpers/generate-reference";
+import { publicProductRatingWhere } from "../src/common/helpers/public-rating";
 import {
   billableDesiForTier,
   tierCodeForDesi,
@@ -4662,6 +4663,10 @@ async function main() {
             "Ürün açıklamaya uygun, paketleme çok iyi yapılmış. Satıcıya teşekkürler.",
           isVerifiedPurchase: true,
           helpfulCount: Math.floor(Math.random() * 20),
+          // Post-moderasyon akışıyla aynı (RatingService.createProductRating):
+          // yorum anında yayınlanır; default pending bırakılırsa kartlardaki
+          // sayaç ile onaylı yorum listesi birbirini tutmaz.
+          status: RatingStatus.approved,
         },
       });
     } catch (e) {
@@ -4669,9 +4674,12 @@ async function main() {
     }
   }
 
-  // Update Product.averageRating and Product.ratingCount for all products with ratings
+  // Update Product.averageRating and Product.ratingCount for all products with ratings.
+  // Cache kolonları YALNIZ onaylı yorumları yansıtmalı — runtime'daki
+  // RatingService.updateProductRatingStats ile aynı kural.
   const productsWithRatings = await prisma.productRating.groupBy({
     by: ["productId"],
+    where: publicProductRatingWhere(),
     _avg: { score: true },
     _count: true,
   });

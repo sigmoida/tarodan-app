@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 import { i18nMessage } from "../i18n";
+import { publicUserRatingWhere } from "../../common/helpers/public-rating";
 import {
   effectiveMembershipTierType,
   isBusinessMembershipEntitled,
@@ -232,7 +233,7 @@ export class UserStatsService {
       }),
       this.prisma.collection.count({ where: { userId } }),
       this.prisma.rating.aggregate({
-        where: { receiverId: userId, status: "approved" },
+        where: publicUserRatingWhere({ receiverId: userId }),
         _avg: { score: true },
         _count: true,
       }),

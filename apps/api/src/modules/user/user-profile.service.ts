@@ -18,6 +18,7 @@ import {
 } from "@prisma/client";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { computeTrustScore } from "./helpers/trust-score";
+import { publicUserRatingWhere } from "../../common/helpers/public-rating";
 import {
   effectiveMembershipTierType,
   isPremiumEntitled,
@@ -123,7 +124,7 @@ export class UserProfileService {
     // Güven Skoru için ek istatistikler (puan, satış, takas)
     const [ratingAgg, salesCount, tradesCount] = await Promise.all([
       this.prisma.rating.aggregate({
-        where: { receiverId: id, status: "approved" },
+        where: publicUserRatingWhere({ receiverId: id }),
         _avg: { score: true },
         _count: true,
       }),
@@ -832,7 +833,7 @@ export class UserProfileService {
         },
       }),
       this.prisma.rating.aggregate({
-        where: { receiverId: userId, status: "approved" },
+        where: publicUserRatingWhere({ receiverId: userId }),
         _avg: { score: true },
         _count: true,
       }),

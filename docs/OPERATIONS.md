@@ -46,6 +46,24 @@
 Demo seed (`prisma/seed.ts`, `*@demo.com`, `Admin123!`) production yollarında
 asla çalışmaz; `release-production-bootstrap.spec.ts` bunu sözleşmeyle korur.
 
+### Bir kerelik: yorum sayacı backfill'i sonrası reindex
+
+`20260804090000_backfill_approved_only_product_rating_stats` migration'ı
+`products.average_rating` / `rating_count` kolonlarını yalnız **approved**
+yorumlardan yeniden hesaplar (onaysız yorum kartta sayılıyordu). SQL doğrudan
+yazdığı için Prisma middleware'i tetiklenmez → **Elasticsearch dokümanlarında
+eski sayaç kalır** ve "puana göre sırala" bayat sonuç verir. Deploy'dan sonra
+bir kez çalıştır:
+
+```
+curl -X POST https://<api-host>/api/search/admin/reindex   # admin token gerekir
+```
+
+**Beklemek çözmez:** 5 dk'lık delta ve saatlik reconcile yalnız _eksik_ ve
+_yetim_ dokümanları eşitler (`deltaSync` = ID kümesi farkı); ID'si zaten
+indekste olan bir ürünün alanlarını tazelemezler. Ürün bir sonraki kez
+düzenlenene kadar bayat kalır — bu yüzden tam reindex zorunlu adımdır.
+
 ---
 
 ## 2. Staging reset ve seed-assets modeli

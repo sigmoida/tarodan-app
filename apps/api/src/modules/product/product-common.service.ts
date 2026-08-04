@@ -9,6 +9,10 @@ import {
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductStatus } from "@prisma/client";
 import { getAvailableQuantity } from "./helpers/product-availability.helper";
+import {
+  publicProductRatingWhere,
+  publicUserRatingWhere,
+} from "../../common/helpers/public-rating";
 
 /**
  * ProductCommonService — ürün alt servislerinin paylaştığı yardımcılar (leaf; yalnız
@@ -83,7 +87,7 @@ export class ProductCommonService {
         }),
         this.prisma.rating.groupBy({
           by: ["receiverId"],
-          where: { receiverId: { in: sellerIds }, status: "approved" },
+          where: publicUserRatingWhere({ receiverId: { in: sellerIds } }),
           _avg: { score: true },
           _count: true,
         }),
@@ -141,7 +145,7 @@ export class ProductCommonService {
     if (needRatingAgg.length) {
       const rows = await this.prisma.productRating.groupBy({
         by: ["productId"],
-        where: { productId: { in: needRatingAgg }, status: "approved" },
+        where: publicProductRatingWhere({ productId: { in: needRatingAgg } }),
         _avg: { score: true },
         _count: true,
       });

@@ -4,6 +4,7 @@ import { StorageService } from "../storage/storage.service";
 import { CacheService } from "../cache/cache.service";
 import { UserCommonService } from "./user-common.service";
 import { isBusinessMembershipEntitled } from "../membership/membership.util";
+import { publicUserRatingWhere } from "../../common/helpers/public-rating";
 
 /**
  * Anasayfa öne çıkarma bölümlerinin (haftanın koleksiyoneri / haftanın şirketi /
@@ -639,9 +640,11 @@ export class UserDiscoveryService {
     // Get top 6 products
     const products = productsWithScores.slice(0, 6).map((item) => item.product);
 
-    // Get ratings
+    // Get ratings — yalnız yayınlanmış puanlar (getTopSellers/getPublicProfile
+    // ile aynı kural); filtresiz sayım ana sayfadaki öne çıkan işletme kartına
+    // onaysız puan sızdırıyordu.
     const ratings = await this.prisma.rating.aggregate({
-      where: { receiverId: userId },
+      where: publicUserRatingWhere({ receiverId: userId }),
       _avg: { score: true },
       _count: true,
     });
@@ -754,7 +757,7 @@ export class UserDiscoveryService {
             where: { sellerId: seller.id, status: "completed" },
           }),
           this.prisma.rating.aggregate({
-            where: { receiverId: seller.id, status: "approved" },
+            where: publicUserRatingWhere({ receiverId: seller.id }),
             _avg: { score: true },
             _count: true,
           }),

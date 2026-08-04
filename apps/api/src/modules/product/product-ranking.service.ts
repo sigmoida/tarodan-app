@@ -3,6 +3,7 @@ import { PrismaService } from "../../prisma";
 import { isPremiumEntitled } from "../membership/membership.util";
 import { computeQualityScore } from "./helpers/quality-score";
 import { computeRelevanceScore } from "./helpers/relevance-score";
+import { publicUserRatingWhere } from "../../common/helpers/public-rating";
 
 /**
  * ProductRankingService — İlan Kalite Skoru + rankTier + relevanceScore yeniden
@@ -39,7 +40,7 @@ export class ProductRankingService {
     // Satıcının onaylı ortalama güven puanı (0..5)
     let sellerRating: number | null = null;
     const ratingStats = await this.prisma.rating.aggregate({
-      where: { receiverId: product.sellerId, status: "approved" },
+      where: publicUserRatingWhere({ receiverId: product.sellerId }),
       _avg: { score: true },
       _count: true,
     });
