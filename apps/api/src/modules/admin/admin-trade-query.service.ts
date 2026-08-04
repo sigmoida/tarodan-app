@@ -4,6 +4,8 @@ import { StorageService } from "../storage/storage.service";
 import { Prisma } from "@prisma/client";
 import { AdminTradeQueryDto, TradeShipmentQueryDto } from "./dto";
 import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
+import { TradeQuoteService } from "../trade/trade-quote.service";
+import { TRADE_PRICING_V2 } from "../trade/trade.constants";
 
 /**
  * Takas yönetimi salt-okunur sorguları (admin liste/detay) — AdminTradeService'ten
@@ -17,6 +19,8 @@ export class AdminTradeQueryService {
     private readonly prisma: PrismaService,
     @Optional()
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly tradeQuoteService?: TradeQuoteService,
   ) {}
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -317,6 +321,13 @@ export class AdminTradeQueryService {
       throw new NotFoundException("Takas bulunamadı");
     }
 
+    const paymentQuote =
+      trade.pricingVersion === TRADE_PRICING_V2 &&
+      trade.cashPayments.length === 0 &&
+      this.tradeQuoteService
+        ? await this.tradeQuoteService.quoteForTrade(trade.id)
+        : null;
+
     // Resolve product image S3 keys (cardKey) into usable URLs. The frontend
     // renders `item.product.images[0].url`, but ProductImage stores cardKey/detailKey
     // (no `url` column), so without this mapping the photos would not show.
@@ -331,6 +342,6 @@ export class AdminTradeQueryService {
       }
     }
 
-    return trade;
+    return { ...trade, paymentQuote };
   }
 }

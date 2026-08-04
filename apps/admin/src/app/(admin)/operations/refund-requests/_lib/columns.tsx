@@ -80,7 +80,7 @@ export const refundRequestColumns = (t: T) => [
   ),
   col.money<RefundRequestRow>(t("common.amount"), "amount"),
   col.text<RefundRequestRow>(
-    t("admin.operations.orders.file.refundQty"),
+    t("admin.operations.refundRequests.refundQuantity"),
     (r) =>
       r.refundQuantity != null
         ? t("admin.operations.orders.itemCountUnit", {

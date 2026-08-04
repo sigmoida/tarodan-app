@@ -7,99 +7,68 @@ import { fmtTry } from "@/lib/format";
 import type { TradeCashPayment, TradeDetail, TradeItem } from "../types";
 
 const itemsTotal = (items: TradeItem[]) =>
-  items.reduce((sum, item) => sum + Number(item.product?.price ?? 0), 0);
+  items.reduce(
+    (sum, item) => sum + Number(item.valueAtTrade ?? item.product?.price ?? 0),
+    0,
+  );
 
-/** Bir tarafın ürün kalemleri + ara toplamı. */
-function SideLines({
-  label,
-  totalLabel,
-  items,
+type MoneyCell = { label: string; amount: number };
+
+function MoneySide({ value }: { value?: MoneyCell }) {
+  return value ? (
+    <>
+      <span className="whitespace-nowrap text-muted">{value.label}</span>
+      <span className="whitespace-nowrap text-right tabular-nums">
+        {fmtTry(value.amount)}
+      </span>
+    </>
+  ) : (
+    <>
+      <span aria-hidden />
+      <span aria-hidden />
+    </>
+  );
+}
+
+function PairedMoneyLine({
+  left,
+  right,
+  total = false,
 }: {
-  label: string;
-  totalLabel: string;
-  items: TradeItem[];
+  left?: MoneyCell;
+  right?: MoneyCell;
+  total?: boolean;
 }) {
   return (
-    <div>
-      <p className="mb-1 text-sm font-medium text-heading">{label}</p>
-      <div className="space-y-0.5">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between gap-2 text-sm"
-          >
-            <span className="min-w-0 truncate text-muted">
-              {item.product?.title}
-            </span>
-            <span className="shrink-0 tabular-nums">
-              {fmtTry(Number(item.product?.price ?? 0))}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border-subtle pt-1 text-sm font-medium">
-        <span>{totalLabel}</span>
-        <span className="tabular-nums">{fmtTry(itemsTotal(items))}</span>
-      </div>
+    <div
+      className={`grid grid-cols-[minmax(max-content,1fr)_7rem_minmax(max-content,1fr)_7rem] items-baseline gap-x-4 py-0.5 text-sm ${
+        total ? "mt-1 border-t border-border-subtle pt-1 font-medium" : ""
+      }`}
+    >
+      <MoneySide value={left} />
+      <MoneySide value={right} />
     </div>
   );
 }
 
-/** Tutarı 0 olan kalem gösterilmez — v1/v2 satırları aynı bileşenle çizilir. */
-function PaymentLine({ label, amount }: { label: string; amount: number }) {
-  if (!(amount > 0)) return null;
-  return (
-    <div className="flex items-center justify-between gap-2 text-sm">
-      <span className="text-muted">{label}</span>
-      <span className="tabular-nums">{fmtTry(amount)}</span>
-    </div>
-  );
-}
+type PartyCosts = {
+  commission: number;
+  shipping: number;
+  cashDifference: number;
+  total: number;
+  status?: string;
+};
 
-/**
- * Bir tarafın ödeme satırı. v2'de her takasta iki tane vardır (kafa kafaya
- * takasta bile): hizmet bedeli + 2 bacaklık kargo + varsa nakit fark.
- */
-function PaymentRow({
-  payment,
-  payerName,
-}: {
-  payment: TradeCashPayment;
-  payerName: string;
-}) {
-  const t = useTranslations();
-  return (
-    <div className="rounded-lg border border-border p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-heading">{payerName}</span>
-        <span className="text-sm">
-          {enumLabel(paymentStatusConfig, payment.status, payment.status)}
-        </span>
-      </div>
-      <PaymentLine
-        label={t("trade.serviceFee")}
-        amount={Number(payment.tradeFeeAmount ?? 0)}
-      />
-      <PaymentLine
-        label={t("trade.shippingFee")}
-        amount={Number(payment.shippingAmount ?? 0)}
-      />
-      <PaymentLine
-        label={t("trade.cashDifferenceLine")}
-        amount={Number(payment.amount ?? 0)}
-      />
-      <PaymentLine
-        label={t("admin.operations.trades.balance.commission")}
-        amount={Number(payment.commission ?? 0)}
-      />
-      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border-subtle pt-1 text-sm font-medium">
-        <span>{t("admin.operations.trades.balance.chargedTotal")}</span>
-        <span className="tabular-nums">
-          {fmtTry(Number(payment.totalAmount))}
-        </span>
-      </div>
-    </div>
-  );
+function costsFromPayment(payment?: TradeCashPayment): PartyCosts | undefined {
+  if (!payment) return undefined;
+  return {
+    commission:
+      Number(payment.tradeFeeAmount ?? 0) + Number(payment.commission ?? 0),
+    shipping: Number(payment.shippingAmount ?? 0),
+    cashDifference: Number(payment.amount ?? 0),
+    total: Number(payment.totalAmount ?? 0),
+    status: payment.status,
+  };
 }
 
 /**
@@ -125,30 +94,87 @@ export function TradeBalanceCard({ trade }: { trade: TradeDetail }) {
       ? trade.initiator.displayName
       : trade.receiver.displayName
     : null;
-  // v2: taraf başına satır; v1: takas başına tek satır (aynı bileşenle çizilir).
+  // Tahsilat oluştuysa snapshot satırları, henüz kabul edilmediyse canlı fiyat
+  // teklifi gösterilir. Böylece bekleyen takasta da komisyon ve kargo görünür.
   const payments = trade.cashPayments?.length
     ? trade.cashPayments
     : trade.cashPayment
       ? [trade.cashPayment]
       : [];
-  const nameOf = (userId: string) =>
-    userId === trade.initiator.id
-      ? trade.initiator.displayName
-      : trade.receiver.displayName;
+  const initiatorCosts =
+    costsFromPayment(
+      payments.find((payment) => payment.payerId === trade.initiator.id),
+    ) ??
+    (trade.paymentQuote
+      ? {
+          commission: trade.paymentQuote.initiator.serviceFee,
+          shipping: trade.paymentQuote.initiator.shipping,
+          cashDifference: trade.paymentQuote.initiator.cashDifference,
+          total: trade.paymentQuote.initiator.total,
+        }
+      : undefined);
+  const receiverCosts =
+    costsFromPayment(
+      payments.find((payment) => payment.payerId === trade.receiver.id),
+    ) ??
+    (trade.paymentQuote
+      ? {
+          commission: trade.paymentQuote.receiver.serviceFee,
+          shipping: trade.paymentQuote.receiver.shipping,
+          cashDifference: trade.paymentQuote.receiver.cashDifference,
+          total: trade.paymentQuote.receiver.total,
+        }
+      : undefined);
+  const productRowCount = Math.max(
+    trade.initiatorItems.length,
+    trade.receiverItems.length,
+  );
 
   return (
     <SectionCard title={t("admin.operations.trades.balance.title")}>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <SideLines
-          label={t("admin.operations.trades.balance.offeredTotal")}
-          totalLabel={t("common.total")}
-          items={trade.initiatorItems}
-        />
-        <SideLines
-          label={t("admin.operations.trades.balance.counterTotal")}
-          totalLabel={t("common.total")}
-          items={trade.receiverItems}
-        />
+      <div className="overflow-x-auto">
+        <div className="min-w-[700px]">
+          <div className="grid grid-cols-[minmax(max-content,1fr)_7rem_minmax(max-content,1fr)_7rem] gap-x-4 text-sm font-medium text-heading">
+            <span>{t("admin.operations.trades.balance.offeredTotal")}</span>
+            <span />
+            <span>{t("admin.operations.trades.balance.counterTotal")}</span>
+            <span />
+          </div>
+          {Array.from({ length: productRowCount }, (_, index) => {
+            const offered = trade.initiatorItems[index];
+            const counter = trade.receiverItems[index];
+            return (
+              <PairedMoneyLine
+                key={`${offered?.id ?? "blank"}-${counter?.id ?? "blank"}`}
+                left={
+                  offered
+                    ? {
+                        label: offered.product?.title,
+                        amount: Number(
+                          offered.valueAtTrade ?? offered.product?.price ?? 0,
+                        ),
+                      }
+                    : undefined
+                }
+                right={
+                  counter
+                    ? {
+                        label: counter.product?.title,
+                        amount: Number(
+                          counter.valueAtTrade ?? counter.product?.price ?? 0,
+                        ),
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
+          <PairedMoneyLine
+            total
+            left={{ label: t("common.total"), amount: offeredTotal }}
+            right={{ label: t("common.total"), amount: counterTotal }}
+          />
+        </div>
       </div>
 
       <div className="mt-4 space-y-1.5 border-t border-border pt-4 text-sm">
@@ -194,21 +220,113 @@ export function TradeBalanceCard({ trade }: { trade: TradeDetail }) {
         )}
       </div>
 
-      {/* Ödeme satırları: v2'de kafa kafaya takasta bile İKİ taraf öder, bu
-          yüzden nakit farkı olmasa da bu blok gösterilir. */}
-      {payments.length > 0 && (
+      {(initiatorCosts || receiverCosts) && (
         <div className="mt-4 border-t border-border pt-4">
           <p className="mb-2 text-sm font-medium text-heading">
             {t("admin.operations.trades.balance.paymentsTitle")}
           </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {payments.map((payment) => (
-              <PaymentRow
-                key={payment.id ?? payment.payerId}
-                payment={payment}
-                payerName={nameOf(payment.payerId)}
+          <div className="overflow-x-auto">
+            <div className="min-w-[700px]">
+              <div className="grid grid-cols-[minmax(max-content,1fr)_7rem_minmax(max-content,1fr)_7rem] gap-x-4 text-sm font-medium text-heading">
+                <span>{trade.initiator.displayName}</span>
+                <span className="text-right text-muted">
+                  {initiatorCosts?.status
+                    ? enumLabel(
+                        paymentStatusConfig,
+                        initiatorCosts.status,
+                        initiatorCosts.status,
+                      )
+                    : ""}
+                </span>
+                <span>{trade.receiver.displayName}</span>
+                <span className="text-right text-muted">
+                  {receiverCosts?.status
+                    ? enumLabel(
+                        paymentStatusConfig,
+                        receiverCosts.status,
+                        receiverCosts.status,
+                      )
+                    : ""}
+                </span>
+              </div>
+              <PairedMoneyLine
+                left={
+                  initiatorCosts
+                    ? {
+                        label: t("admin.operations.trades.balance.commission"),
+                        amount: initiatorCosts.commission,
+                      }
+                    : undefined
+                }
+                right={
+                  receiverCosts
+                    ? {
+                        label: t("admin.operations.trades.balance.commission"),
+                        amount: receiverCosts.commission,
+                      }
+                    : undefined
+                }
               />
-            ))}
+              <PairedMoneyLine
+                left={
+                  initiatorCosts
+                    ? {
+                        label: t("trade.shippingFee"),
+                        amount: initiatorCosts.shipping,
+                      }
+                    : undefined
+                }
+                right={
+                  receiverCosts
+                    ? {
+                        label: t("trade.shippingFee"),
+                        amount: receiverCosts.shipping,
+                      }
+                    : undefined
+                }
+              />
+              <PairedMoneyLine
+                left={
+                  initiatorCosts?.cashDifference
+                    ? {
+                        label: t("trade.cashDifferenceLine"),
+                        amount: initiatorCosts.cashDifference,
+                      }
+                    : undefined
+                }
+                right={
+                  receiverCosts?.cashDifference
+                    ? {
+                        label: t("trade.cashDifferenceLine"),
+                        amount: receiverCosts.cashDifference,
+                      }
+                    : undefined
+                }
+              />
+              <PairedMoneyLine
+                total
+                left={
+                  initiatorCosts
+                    ? {
+                        label: t(
+                          "admin.operations.trades.balance.chargedTotal",
+                        ),
+                        amount: initiatorCosts.total,
+                      }
+                    : undefined
+                }
+                right={
+                  receiverCosts
+                    ? {
+                        label: t(
+                          "admin.operations.trades.balance.chargedTotal",
+                        ),
+                        amount: receiverCosts.total,
+                      }
+                    : undefined
+                }
+              />
+            </div>
           </div>
         </div>
       )}

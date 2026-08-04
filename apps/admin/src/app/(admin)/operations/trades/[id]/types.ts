@@ -20,6 +20,7 @@ export interface TradeShipment {
 
 export interface TradeItem {
   id: string;
+  valueAtTrade?: number;
   product: {
     id: string;
     title: string;
@@ -47,6 +48,15 @@ export interface TradeCashPayment {
   refundedAt?: string | null;
 }
 
+export interface TradePaymentQuoteParty {
+  userId: string;
+  side: "initiator" | "receiver";
+  serviceFee: number;
+  shipping: number;
+  cashDifference: number;
+  total: number;
+}
+
 export interface TradeDetail {
   id: string;
   tradeNumber?: string;
@@ -61,6 +71,11 @@ export interface TradeDetail {
   cashPayments?: TradeCashPayment[];
   /** LEGACY (v1): takas başına tek satır. */
   cashPayment?: TradeCashPayment | null;
+  paymentQuote?: {
+    tradeId: string;
+    initiator: TradePaymentQuoteParty;
+    receiver: TradePaymentQuoteParty;
+  } | null;
   initiator: { id: string; displayName: string; email: string };
   receiver: { id: string; displayName: string; email: string };
   initiatorItems: TradeItem[];
