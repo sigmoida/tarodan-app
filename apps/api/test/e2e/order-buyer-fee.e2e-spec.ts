@@ -8,6 +8,7 @@ import {
   truncateAll,
 } from "../test-utils/db";
 import { testTaxPolicy } from "../../src/modules/order/testing/tax-policy-fixture";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-config";
 
 describe("strict order commission (E2E)", () => {
   let prisma: PrismaService;
@@ -114,7 +115,7 @@ describe("strict order commission (E2E)", () => {
       data: [
         {
           id: "low",
-          ruleSetId: "test-commission-set-v1",
+          ruleSetId: SEED_COMMISSION_RULE_SET_IDS.test,
           name: "Low",
           categoryId,
           sellerType: "FREE",
@@ -124,7 +125,7 @@ describe("strict order commission (E2E)", () => {
         },
         {
           id: "high",
-          ruleSetId: "test-commission-set-v1",
+          ruleSetId: SEED_COMMISSION_RULE_SET_IDS.test,
           name: "High",
           categoryId,
           sellerType: "FREE",

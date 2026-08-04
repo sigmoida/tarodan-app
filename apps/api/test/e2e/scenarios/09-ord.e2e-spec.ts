@@ -23,6 +23,7 @@ import {
   PaymentStatus,
   PaymentHoldStatus,
   CommissionLedgerStatus,
+  ProductKind,
 } from "@prisma/client";
 import { createE2ETestApp, E2ETestApp } from "../../test-utils/create-app";
 import {
@@ -1966,9 +1967,8 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
       const realId = (await buyNow(buyer, product.id, addr.id).expect(201)).body
         .orderId;
       const prisma = getPrisma();
-      // Sanal membership siparişi enjekte et. Order.productId GERÇEK bir Product FK'sıdır
-      // (schema: product Product @relation) → önce id'si 'membership-' ile başlayan gerçek
-      // bir placeholder Product yaratılmalı (listeden hariç tutma bu prefix'e göre). Ayrıca
+      // Sanal membership siparişi enjekte et. Order.productId GERÇEK bir Product FK'sıdır;
+      // bu yüzden ödeme-only türünde bir placeholder Product yaratılmalı. Ayrıca
       // Order.commissionAmount ve paymentExpiresAt zorunlu-defaultsuz alanlardır → verilmeli.
       const membershipProductId = `membership-${randomUUID()}`;
       await prisma.product.create({
@@ -1980,6 +1980,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
           description: "virtual",
           price: 50,
           condition: "new" as any,
+          kind: ProductKind.membership,
           status: "inactive" as any,
           quantity: 0,
           reservedQuantity: 0,

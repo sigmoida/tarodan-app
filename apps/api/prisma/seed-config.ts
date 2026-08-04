@@ -1,5 +1,16 @@
 import { CommissionSellerType, ShippingPackageTierCode } from "@prisma/client";
 
+/**
+ * Seeded rule-set ids still obey the schema/API UUID-v4 contract. Keeping them
+ * deterministic preserves idempotent upserts without weakening checkout DTO
+ * validation to accept arbitrary strings.
+ */
+export const SEED_COMMISSION_RULE_SET_IDS = {
+  local: "8d9fe2c4-a82e-4fc2-8b6d-5a4d1e9f1001",
+  production: "8d9fe2c4-a82e-4fc2-8b6d-5a4d1e9f1002",
+  test: "8d9fe2c4-a82e-4fc2-8b6d-5a4d1e9f1003",
+} as const;
+
 export type SeedCommissionProfile = {
   key: string;
   label: string;

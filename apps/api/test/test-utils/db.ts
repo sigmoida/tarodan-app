@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { drainE2EBackgroundTasks } from "./background-tasks";
 import Redis from "ioredis";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-config";
 
 let prismaSingleton: PrismaClient | null = null;
 
@@ -263,7 +264,7 @@ export async function seedBaseline(): Promise<{
 
   const commissionSet = await prisma.commissionRuleSet.create({
     data: {
-      id: "test-commission-set-v1",
+      id: SEED_COMMISSION_RULE_SET_IDS.test,
       name: "Test strict commission",
       version: 1,
       status: "ACTIVE",

@@ -1,10 +1,19 @@
 import { CommissionSellerType } from "@prisma/client";
 import {
   SEED_COMMISSION_PROFILES,
+  SEED_COMMISSION_RULE_SET_IDS,
   SEED_SHIPPING_TIERS,
 } from "../../prisma/seed-config";
+import { isUUID } from "class-validator";
 
 describe("comprehensive seed pricing config", () => {
+  it("uses deterministic UUID-v4 ids for every seeded commission set", () => {
+    expect(Object.values(SEED_COMMISSION_RULE_SET_IDS)).toHaveLength(3);
+    for (const id of Object.values(SEED_COMMISSION_RULE_SET_IDS)) {
+      expect(isUUID(id, "4")).toBe(true);
+    }
+  });
+
   it("defines ten strict commission profiles with gapless seller-type ranges", () => {
     expect(SEED_COMMISSION_PROFILES).toHaveLength(10);
 

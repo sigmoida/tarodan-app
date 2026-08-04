@@ -34,6 +34,7 @@ import {
   CommissionSellerType,
   Prisma,
 } from "@prisma/client";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../../prisma/seed-config";
 import { ConfigService } from "@nestjs/config";
 import { createE2ETestApp, E2ETestApp } from "../../test-utils/create-app";
 import {
@@ -158,7 +159,7 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
       where: { id },
       create: {
         id,
-        ruleSetId: "test-commission-set-v1",
+        ruleSetId: SEED_COMMISSION_RULE_SET_IDS.test,
         name: opts.name,
         categoryId: opts.categoryId ?? baseline.categoryId,
         sellerType: opts.sellerType,

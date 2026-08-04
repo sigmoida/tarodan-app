@@ -5,6 +5,7 @@ import {
   OrderStatus,
   Prisma,
   PrismaClient,
+  ProductKind,
 } from "@prisma/client";
 import {
   REFERENCE_PREFIX,
@@ -184,12 +185,6 @@ export function buildSeedOrderFinancialState(input: SeedOrderFinancialInput): {
   };
 }
 
-function isPhysicalProductId(productId: string): boolean {
-  return (
-    !productId.startsWith("membership-") && !productId.startsWith("boost-")
-  );
-}
-
 export async function normalizeSeedCommerce(
   prisma: PrismaClient,
 ): Promise<{ orders: number; groups: number; packages: number }> {
@@ -224,12 +219,12 @@ export async function normalizeSeedCommerce(
     include: {
       checkoutGroup: true,
       payment: true,
-      product: { select: { shippingDesi: true } },
+      product: { select: { kind: true, shippingDesi: true } },
     },
     orderBy: { createdAt: "asc" },
   });
-  const physicalOrders = initialOrders.filter((order) =>
-    isPhysicalProductId(order.productId),
+  const physicalOrders = initialOrders.filter(
+    (order) => order.product.kind === ProductKind.listing,
   );
   let createdGroups = 0;
 

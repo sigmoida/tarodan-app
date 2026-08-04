@@ -9,7 +9,10 @@ import {
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/shipping-package-tier";
-import { SEED_COMMISSION_PROFILES } from "./seed-config";
+import {
+  SEED_COMMISSION_PROFILES,
+  SEED_COMMISSION_RULE_SET_IDS,
+} from "./seed-config";
 
 const prisma = new PrismaClient();
 
@@ -101,9 +104,9 @@ async function seedCommissionRule(): Promise<void> {
     return;
   }
   const set = await prisma.commissionRuleSet.upsert({
-    where: { id: "production-commission-set-v1" },
+    where: { id: SEED_COMMISSION_RULE_SET_IDS.production },
     create: {
-      id: "production-commission-set-v1",
+      id: SEED_COMMISSION_RULE_SET_IDS.production,
       name: "Production strict commission v1",
       version: 1,
       status: CommissionRuleSetStatus.ACTIVE,

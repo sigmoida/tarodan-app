@@ -53,7 +53,11 @@ import {
   billableDesiForTier,
   tierCodeForDesi,
 } from "../src/modules/shipping/shipping-package-tier";
-import { SEED_COMMISSION_PROFILES, SEED_SHIPPING_TIERS } from "./seed-config";
+import {
+  SEED_COMMISSION_PROFILES,
+  SEED_COMMISSION_RULE_SET_IDS,
+  SEED_SHIPPING_TIERS,
+} from "./seed-config";
 import { findMatchingCommissionRule } from "../src/modules/order/order-commission.helper";
 const prisma = new PrismaClient();
 
@@ -1132,10 +1136,10 @@ async function main() {
   console.log("Creating commission rules...");
 
   const commissionRuleSet = await prisma.commissionRuleSet.upsert({
-    where: { id: "local-commission-set-v1" },
+    where: { id: SEED_COMMISSION_RULE_SET_IDS.local },
     update: {},
     create: {
-      id: "local-commission-set-v1",
+      id: SEED_COMMISSION_RULE_SET_IDS.local,
       name: "Yerel Tam Kapsam v1",
       version: 1,
       status: CommissionRuleSetStatus.ACTIVE,
@@ -7100,78 +7104,112 @@ async function main() {
   const stateProductDefs: Array<{
     key: string;
     status: ProductStatus;
-    img: string;
+    source: (typeof productData)[number];
+    title: string;
     rejected?: boolean;
     sellerId: string;
   }> = [
     {
       key: "rejected-1",
       status: ProductStatus.rejected,
-      img: productData[0].img,
+      source: productData[0],
+      title: "Hot Wheels Ferrari 275 GTB - Kutulu Model",
       rejected: true,
       sellerId: users[3].id,
     },
     {
       key: "rejected-2",
       status: ProductStatus.rejected,
-      img: productData[1].img,
+      source: productData[1],
+      title: "Matchbox 007 Aston Martin DB5 - Gümüş",
       rejected: true,
       sellerId: users[4].id,
     },
     {
       key: "suspended-1",
       status: ProductStatus.suspended,
-      img: productData[2].img,
+      source: productData[2],
+      title: "Tamiya 1950s Vintage Classic - İki Renkli",
       sellerId: users[5].id,
     },
     {
       key: "suspended-2",
       status: ProductStatus.suspended,
-      img: productData[3].img,
+      source: productData[3],
+      title: "AUTOart Mercedes 300SL Gullwing 1:18 - Vitrinlik",
       sellerId: users[3].id,
     },
     {
       key: "pending-1",
       status: ProductStatus.pending,
-      img: productData[4].img,
+      source: productData[4],
+      title: "Kyosho Porsche 356 Speedster 1:18 - Fildişi",
       sellerId: users[4].id,
     },
     {
       key: "reserved-1",
       status: ProductStatus.reserved,
-      img: productData[5].img,
+      source: productData[5],
+      title: "Maisto 1963 Corvette Stingray 1:24 - Kırmızı",
       sellerId: users[5].id,
     },
     {
       key: "sold-1",
       status: ProductStatus.sold,
-      img: productData[6].img,
+      source: productData[6],
+      title: "Bburago Alfa Romeo Giulia GTA 1:24 - Bordo",
       sellerId: users[3].id,
     },
     {
       key: "inactive-1",
       status: ProductStatus.inactive,
-      img: productData[7].img,
+      source: productData[7],
+      title: "Greenlight 1960 Ford Thunderbird - Nane Yeşili",
       sellerId: users[4].id,
     },
   ];
 
+  const stateProductsByKey = new Map<string, any>();
   let stateProductCount = 0;
   for (const sd of stateProductDefs) {
-    const slug = `durum-${sd.key}-${seedAssetBase(sd.img)}`;
+    const source = sd.source;
+    const slug = `durum-${sd.key}-${seedAssetBase(source.img)}`;
+    const category =
+      categories.find((candidate) => candidate.slug === source.cat) ??
+      categories[0];
+    const brand = source.brandSlug
+      ? brands.find((candidate) => candidate.slug === source.brandSlug)
+      : null;
+    const model = source.modelSlug
+      ? carModels.find((candidate) => candidate.slug === source.modelSlug)
+      : null;
+    const manufacturer = source.mfgSlug
+      ? manufacturers.find((candidate) => candidate.slug === source.mfgSlug)
+      : null;
+    const stateProductData = {
+      sellerId: sd.sellerId,
+      categoryId: category.id,
+      brandId: brand?.id ?? null,
+      carModelId: model?.id ?? null,
+      manufacturerId: manufacturer?.id ?? null,
+      title: sd.title,
+      description: source.desc,
+      condition: source.cond,
+      status: sd.status,
+      quantity: sd.status === ProductStatus.sold ? 0 : 1,
+      reservedQuantity: sd.status === ProductStatus.reserved ? 1 : 0,
+      isSet: source.isSet ?? false,
+      isLimited: source.isLimited ?? false,
+      isPreorder: source.isPreorder ?? false,
+      releaseDate: new Date(source.year, 0, 1),
+    };
     const product = await prisma.product.upsert({
       where: { slug },
-      update: { status: sd.status },
+      update: stateProductData,
       create: {
-        sellerId: sd.sellerId,
-        categoryId: arabaCat.id,
-        title: `[Durum: ${sd.key}] ${seedAssetBase(sd.img)}`,
+        ...stateProductData,
         slug,
-        description: `Durum örneği ürünü (${sd.status}).`,
-        price: randomPrice(150, 900),
-        condition: ProductCondition.good,
-        status: sd.status,
-        quantity: 1,
+        price: randomPrice(source.min, source.max),
         ...(sd.rejected
           ? {
               aiCheckStatus: "flag",
@@ -7183,6 +7221,7 @@ async function main() {
         createdAt: daysAgoDate(20),
       },
     });
+    stateProductsByKey.set(sd.key, product);
     if (storageService) {
       const existingImgs = await prisma.productImage.count({
         where: { productId: product.id },
@@ -7190,7 +7229,7 @@ async function main() {
       for (let sortOrder = existingImgs; sortOrder < 3; sortOrder += 1) {
         const { cardKey, detailKey } = await copySeedProductImages(
           storageService,
-          sd.img,
+          source.img,
           product.id,
         );
         await prisma.productImage.create({
@@ -7220,6 +7259,119 @@ async function main() {
       }
     }
     stateProductCount++;
+  }
+
+  // Durum kartları salt enum örneği değildir: sold/reserved ürünleri gerçek
+  // işlem kayıtlarına bağla ki İlanlarım ekranındaki aksiyonlar production
+  // sözleşmesiyle aynı veriyi kullansın.
+  {
+    const soldListing = stateProductsByKey.get("sold-1");
+    if (soldListing) {
+      const createdAt = daysAgoDate(20);
+      const deliveredAt = new Date(createdAt.getTime() + 3 * 86400000);
+      const completedAt = new Date(createdAt.getTime() + 6 * 86400000);
+      const subtotal = Number(soldListing.price);
+      const order = await prisma.order.create({
+        data: {
+          orderNumber: generateOrderNumber(),
+          buyerId: buyerDeniz.id,
+          sellerId: soldListing.sellerId,
+          productId: soldListing.id,
+          quantity: 1,
+          unitPrice: subtotal,
+          subtotal,
+          totalAmount: subtotal + 100,
+          shippingCost: 100,
+          commissionAmount: 0,
+          status: OrderStatus.completed,
+          paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+          deliveredAt,
+          buyerConfirmedAt: completedAt,
+          completedAt,
+          shippingAddress: denizShip,
+          createdAt,
+        },
+      });
+      const payment = await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          provider: "paytr",
+          providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+          amount: subtotal + 100,
+          currency: "TRY",
+          status: PaymentStatus.completed,
+          paidAt: new Date(createdAt.getTime() + 3600000),
+        },
+      });
+      await prisma.paymentHold.create({
+        data: {
+          paymentId: payment.id,
+          orderId: order.id,
+          sellerId: soldListing.sellerId,
+          amount: subtotal,
+          status: PaymentHoldStatus.released,
+          releaseAt: completedAt,
+          releasedAt: completedAt,
+        },
+      });
+      await prisma.shipment.create({
+        data: {
+          orderId: order.id,
+          provider: "surat",
+          trackingNumber: order.orderNumber,
+          trackingUrl: `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${order.orderNumber}`,
+          status: ShipmentStatus.delivered,
+          shippedAt: new Date(createdAt.getTime() + 86400000),
+          deliveredAt,
+          createdAt,
+        },
+      });
+    }
+
+    const reservedListing = stateProductsByKey.get("reserved-1");
+    const tradeCounterpart = corpProducts[0];
+    if (reservedListing && tradeCounterpart) {
+      const createdAt = daysAgoDate(1);
+      const trade = await prisma.trade.create({
+        data: {
+          tradeNumber: generateTradeNumber(),
+          initiatorId: reservedListing.sellerId,
+          receiverId: tradeCounterpart.sellerId,
+          status: TradeStatus.accepted,
+          initiatorMessage:
+            "Corvette modelimi Mercedes 300SL modeliyle takas etmek istiyorum.",
+          responseDeadline: new Date(now.getTime() + 3 * 86400000),
+          acceptedAt: createdAt,
+          createdAt,
+        },
+      });
+      await prisma.tradeItem.createMany({
+        data: [
+          {
+            tradeId: trade.id,
+            productId: reservedListing.id,
+            side: "initiator",
+            quantity: 1,
+            valueAtTrade: reservedListing.price,
+          },
+          {
+            tradeId: trade.id,
+            productId: tradeCounterpart.id,
+            side: "receiver",
+            quantity: 1,
+            valueAtTrade: tradeCounterpart.price,
+          },
+        ],
+      });
+      await prisma.product.update({
+        where: { id: tradeCounterpart.id },
+        data: {
+          quantity: 5,
+          reservedQuantity: 1,
+          status: ProductStatus.active,
+        },
+      });
+    }
   }
 
   // ProductBoost: bir aktif + bir süresi geçmiş boost (iki aktif ürün üzerinde).
