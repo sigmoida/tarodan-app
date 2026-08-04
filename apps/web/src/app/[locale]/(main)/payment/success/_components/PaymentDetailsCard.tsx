@@ -3,7 +3,7 @@
 "use client";
 
 import { DocumentArrowDownIcon } from "@heroicons/react/24/outline";
-import { Badge, Button, Spinner } from "@tarodan/ui";
+import { Badge, Button } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/ui";
 
@@ -50,14 +50,6 @@ export default function PaymentDetailsCard({
           })}{" "}
           TL
         </Row>
-        <Row label={`${t("checkout.paymentMethod")}:`}>PayTR</Row>
-        {payment.providerTransactionId && (
-          <Row label={`${t("payment.transactionIdLabel")}:`}>
-            <span className="font-mono text-xs">
-              {payment.providerTransactionId}
-            </span>
-          </Row>
-        )}
         <div className="flex justify-between">
           <span className="text-muted">{t("common.status")}:</span>
           <Badge variant={isCompleted ? "success" : "warning"}>
@@ -82,8 +74,7 @@ export default function PaymentDetailsCard({
             : t("payment.downloadInvoice")}
         </Button>
       ) : !invoiceError ? (
-        <div className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle bg-surface px-4 py-3 text-sm font-medium text-subtle">
-          <Spinner size="sm" />
+        <div className="mt-4 w-full rounded-lg border border-dashed border-border-subtle bg-surface px-4 py-3 text-center text-sm font-medium text-subtle">
           {t("payment.preparingInvoice")}
         </div>
       ) : null}

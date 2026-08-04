@@ -2,12 +2,10 @@
 
 "use client";
 
-import { Link } from "@/i18n/navigation";
 import {
   CheckCircleIcon,
   ClockIcon,
-  TruckIcon,
-  ArrowRightIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
@@ -89,61 +87,40 @@ export default function PaymentSuccessClient() {
           )}
 
           {payment?.createdAt && (
-            <div className="mb-6 rounded-lg border border-info-200 bg-info-50 p-4">
-              <div className="mb-1 flex items-center justify-center gap-2 font-semibold text-info-900">
-                <TruckIcon className="h-5 w-5 text-info-600" />
+            <div className="mb-6 rounded-lg border border-border p-4">
+              <p className="mb-1 font-semibold text-heading">
                 {t("payment.estimatedDelivery")}
-              </div>
-              <p className="font-medium text-info-700">
+              </p>
+              <p className="font-medium text-body">
                 {getEstimatedDelivery(payment.createdAt, locale)}
               </p>
-              <p className="mt-2 text-xs text-info-600">
+              <p className="mt-2 text-xs text-subtle">
                 {t("payment.deliveryDisclaimer")}
               </p>
             </div>
           )}
 
-          <div className="mb-6 rounded-lg border border-info-200 bg-info-50 p-4 text-left text-sm text-info-800">
-            <strong>{t("payment.informationLabel")}:</strong>{" "}
-            {isAuthenticated ? (
-              <>
-                {t("payment.orderEmailSent")}
-                <Link href="/profile/orders" className="font-medium underline">
-                  {t("order.myOrders")}
-                </Link>
-                .
-              </>
-            ) : (
-              <>
-                {t("payment.orderEmailSent")}
-                <Link href="/track-order" className="font-medium underline">
-                  {t("order.trackOrder")}
-                </Link>
-                .
-              </>
-            )}
-          </div>
-
-          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+          {/* Butonlar kartın tam genişliğini paylaşır; ikincil eylem solda. */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <ButtonLink variant="secondary" href="/listings" className="flex-1">
+              {t("cart.continueShopping")}
+            </ButtonLink>
             {isAuthenticated ? (
               <ButtonLink
                 href={
                   orderId ? `/profile/orders/${orderId}` : "/profile/orders"
                 }
-                className="gap-2"
+                className="flex-1 gap-2"
               >
                 {t("payment.viewMyOrder")}
-                <ArrowRightIcon className="h-5 w-5" />
+                <ChevronRightIcon className="h-5 w-5" />
               </ButtonLink>
             ) : (
-              <ButtonLink href="/track-order" className="gap-2">
+              <ButtonLink href="/track-order" className="flex-1 gap-2">
                 {t("payment.trackMyOrder")}
-                <ArrowRightIcon className="h-5 w-5" />
+                <ChevronRightIcon className="h-5 w-5" />
               </ButtonLink>
             )}
-            <ButtonLink variant="secondary" href="/listings">
-              {t("cart.continueShopping")}
-            </ButtonLink>
           </div>
         </SectionCard>
       </div>
