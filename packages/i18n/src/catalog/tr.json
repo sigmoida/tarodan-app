@@ -1330,7 +1330,8 @@
     "prefilledInquiry": "Merhaba, \"{title}\" ilanı hakkında bilgi almak istiyorum.\n\n",
     "tooLong": "Mesaj {max} karakteri aşamaz. Mevcut: {current}",
     "stillSend": "{warning} Yine de göndermek istiyor musunuz?",
-    "contactInfoWarning": "Mesajınızda kişisel iletişim bilgisi tespit edildi. Platform dışı iletişim güvenliğiniz için önerilmez."
+    "contactInfoWarning": "Mesajınızda kişisel iletişim bilgisi tespit edildi. Platform dışı iletişim güvenliğiniz için önerilmez.",
+    "lengthLimitReached": "Mesaj en fazla {max} karakter olabilir; sınıra ulaştınız."
   },
   "membership": {
     "title": "Üyelik Planları",

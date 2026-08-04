@@ -22,8 +22,8 @@ import {
   tradesApi,
   collectionsApi,
   wishlistApi,
-  messagesApi,
 } from "@/lib/api";
+import { useUnreadMessageCount } from "@/hooks/useHeaderBadgeCounts";
 import { getTierDefault } from "../_lib/tiers";
 import type { PendingCounts, UserProfile } from "../_lib/types";
 
@@ -105,19 +105,10 @@ function useProfileValue() {
     meta: { page: "profile-wishlist-count" },
   });
 
-  const unreadMessagesQuery = useQuery({
-    queryKey: queryKeys.profile.unreadMessages(),
-    queryFn: async () => {
-      const res = await messagesApi.getThreads();
-      const threads = res.data?.data || res.data?.threads || [];
-      return (Array.isArray(threads) ? threads : []).reduce(
-        (sum: number, thread: any) => sum + (thread.unreadCount || 0),
-        0,
-      );
-    },
-    enabled,
-    meta: { page: "profile-unread-messages" },
-  });
+  // Rozetlerle AYNI kaynaktan okunur: ayrı bir anahtar, mesaj okunduğunda
+  // header rozeti düşerken profil menüsündeki sayının bayat kalmasına yol
+  // açıyordu.
+  const unreadMessagesQuery = useUnreadMessageCount(enabled);
 
   // The profile overview aggregate — one query for the 8 upstream calls, with
   // window-focus/mount refetch (replaces the old manual effects). The authStore

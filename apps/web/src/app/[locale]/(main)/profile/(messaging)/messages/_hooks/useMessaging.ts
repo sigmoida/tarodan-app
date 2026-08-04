@@ -17,6 +17,8 @@ import {
 } from "../_lib/messages";
 
 const INITIAL_THREADS = 6;
+/** Sunucunun izin verdiği en büyük sayfa (ThreadQueryDto `@Max(50)`). */
+const THREAD_PAGE_SIZE = 50;
 
 type Draft = { text: string; urls: string[] };
 const EMPTY_DRAFT: Draft = { text: "", urls: [] };
@@ -84,7 +86,12 @@ export function useMessaging(enabled: boolean) {
   const threadsQuery = useQuery({
     queryKey: queryKeys.messages.threads(),
     queryFn: async (): Promise<MessageThread[]> => {
-      const response = await messagesApi.getThreads();
+      // Sunucu varsayılanı 20 sohbet döner ve ekranda "tümünü göster" bağlantısı
+      // bunun ötesine geçemiyordu: 20'den fazla sohbeti olan kullanıcı eski
+      // sohbetlerine hiç ulaşamıyor, "N tane daha" sayısı da eksik çıkıyordu.
+      const response = await messagesApi.getThreads({
+        pageSize: THREAD_PAGE_SIZE,
+      });
       const rawThreads = response.data.data || response.data.threads || [];
       const userLabel = t("common.user");
       const productLabel = t("order.product");
@@ -149,10 +156,40 @@ export function useMessaging(enabled: boolean) {
     activeThreadId: selectedThread?.id,
   });
 
+  /**
+   * Sohbeti açmak mesajları sunucuda OKUNDU yapar (getThreadMessages).
+   *
+   * Rozetin düşmesi için sunucudan cevap beklenmez: açılan sohbetin okunmamış
+   * sayısı önce yerelde sıfırlanır ve toplam sayaçtan düşülür, sonra iki sorgu
+   * da tazelenerek sunucuyla mutabık kalınır. Eskiden yalnız thread listesi
+   * tazeleniyordu; header rozeti ile profil menüsündeki sayı 5 dakikalık
+   * yoklamaya kadar bayat kalıyordu.
+   */
   useEffect(() => {
-    if (selectedThread?.id && messagesQuery.isSuccess) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.messages.threads() });
+    const threadId = selectedThread?.id;
+    if (!threadId || !messagesQuery.isSuccess) return;
+
+    let clearedCount = 0;
+    queryClient.setQueryData<MessageThread[]>(
+      queryKeys.messages.threads(),
+      (old) =>
+        old?.map((thread) => {
+          if (thread.id !== threadId || !thread.unreadCount) return thread;
+          clearedCount = thread.unreadCount;
+          return { ...thread, unreadCount: 0 };
+        }),
+    );
+    if (clearedCount > 0) {
+      queryClient.setQueryData<number>(
+        queryKeys.messages.unreadCount(),
+        (total) => Math.max(0, (total ?? 0) - clearedCount),
+      );
     }
+
+    queryClient.invalidateQueries({ queryKey: queryKeys.messages.threads() });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.messages.unreadCount(),
+    });
   }, [selectedThread?.id, messagesQuery.isSuccess, queryClient]);
 
   const scrollChatToBottom = () => {
@@ -452,6 +489,9 @@ export function useMessaging(enabled: boolean) {
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.messages.threads(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.messages.unreadCount(),
         }),
       ]);
 

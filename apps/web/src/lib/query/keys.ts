@@ -87,7 +87,6 @@ export const queryKeys = {
   profile: {
     /** The profile overview aggregate (stats + membership + pending counts). */
     overview: () => ["profile", "overview"] as const,
-    unreadMessages: () => ["profile-unread-messages"] as const,
   },
   membership: {
     /** All membership tiers with their prices (single source: DB MembershipTier). */

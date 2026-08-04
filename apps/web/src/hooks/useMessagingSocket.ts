@@ -50,11 +50,24 @@ export function useMessagingSocket({
       // Önizleme listesini tazele (thread-scoped UX; global tazeleme
       // RealtimeProvider'daki thread:updated dinleyicisi tarafından yapılır)
       queryClient.invalidateQueries({ queryKey: queryKeys.messages.threads() });
+      // Gelen mesaj okunmamış sayısını değiştirir; rozet aynı anda düzelmeli.
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.messages.unreadCount(),
+      });
     };
     const onMessageRead = (p: MessageReadEvent) => {
       if (p.threadId === activeRef.current) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.messages.thread(p.threadId),
+        });
+      }
+      // Okuyan BEN isem (ör. mesajı başka bir sekmede açtım) rozetler düşmeli.
+      if (p.readerId === currentUserId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.messages.threads(),
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.messages.unreadCount(),
         });
       }
     };
@@ -77,6 +90,9 @@ export function useMessagingSocket({
         });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.messages.threads() });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.messages.unreadCount(),
+      });
     };
 
     socket.on("message:new", onMessageNew);

@@ -250,25 +250,19 @@ export class MessagingService {
       },
     });
 
-    // Send notification to receiver about new message
     if (status === MessageStatus.sent) {
+      // Get short preview of message (first 50 chars)
+      const messagePreview =
+        dto.content.length > 50
+          ? dto.content.substring(0, 50) + "..."
+          : dto.content;
+
+      // CANLI TESLİMAT ÖNCE ve bildirimden BAĞIMSIZ.
+      //
+      // İkisi tek try/catch içindeydi ve bildirim önce çalışıyordu: bildirim
+      // servisi hata verdiğinde emit hiç çalışmıyor, alıcının açık sohbeti
+      // sessiz kalıyor ve okunmamış rozeti ancak yoklamayla düzeliyordu.
       try {
-        // Get short preview of message (first 50 chars)
-        const messagePreview =
-          dto.content.length > 50
-            ? dto.content.substring(0, 50) + "..."
-            : dto.content;
-
-        await this.notificationService.createInAppNotification(
-          receiverId,
-          NotificationType.NEW_MESSAGE,
-          {
-            threadId,
-            senderName: message.sender?.displayName || "Bir kullanıcı",
-            messagePreview,
-          },
-        );
-
         const unreadCount = await this.getUnreadMessageCount(receiverId);
         this.realtime.emitNewMessage(
           threadId,
@@ -279,6 +273,20 @@ export class MessagingService {
             lastMessagePreview: messagePreview,
             lastMessageAt: new Date().toISOString(),
             unreadCount,
+          },
+        );
+      } catch (error) {
+        this.logger.error("Failed to emit new message event:", error);
+      }
+
+      try {
+        await this.notificationService.createInAppNotification(
+          receiverId,
+          NotificationType.NEW_MESSAGE,
+          {
+            threadId,
+            senderName: message.sender?.displayName || "Bir kullanıcı",
+            messagePreview,
           },
         );
       } catch (error) {
