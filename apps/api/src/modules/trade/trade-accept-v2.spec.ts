@@ -76,7 +76,7 @@ describe("buildTradeCashPaymentRows", () => {
     expect(initiator.recipientId).toBeNull();
   });
 
-  it("v2'de komisyon alınmaz (legacy alanlar sıfırdır)", () => {
+  it("v2 sabit ücreti tradeFeeAmount'ta tutar; legacy yüzde alanları sıfırdır", () => {
     const rows = buildTradeCashPaymentRows("trade-1", quote);
 
     expect(rows.every((r) => r.commission === 0)).toBe(true);

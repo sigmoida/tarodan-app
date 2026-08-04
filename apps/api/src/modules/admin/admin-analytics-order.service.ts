@@ -19,6 +19,8 @@ import { OrderService } from "../order/order.service";
 import { PaymentService } from "../payment/payment.service";
 import { NotificationService } from "../notification/notification.service";
 import { sellerNetAmountOf } from "../order/order-net.helper";
+import { storedProductBaseOf } from "../order/order-charged-base.helper";
+import { readCommissionRuleSnapshot } from "../order/order-commission-snapshot";
 
 /**
  * Admin sipariş işlemleri (+ unbanUser kullanıcı moderasyonu) — AdminAnalyticsService'ten
@@ -100,10 +102,7 @@ export class AdminAnalyticsOrderService {
     const commissionAmount = Number(order.commissionAmount);
     const buyerFeeAmount = Number(order.buyerFeeAmount ?? 0);
     const sellerFeeAmount = Number(order.sellerFeeAmount ?? 0);
-    const subtotal =
-      order.subtotal != null
-        ? Number(order.subtotal)
-        : totalAmount - shippingCost - buyerFeeAmount;
+    const subtotal = storedProductBaseOf(order);
     const sellerNetAmount = subtotal - sellerFeeAmount;
 
     // Misafir siparişinde alıcıyı gerçek misafir ad/e-postasıyla göster
@@ -345,7 +344,7 @@ export class AdminAnalyticsOrderService {
       quantity: o.quantity ?? 1,
       unitPrice: o.unitPrice != null ? Number(o.unitPrice) : null,
       finance: {
-        subtotal: o.subtotal != null ? Number(o.subtotal) : num(o.totalAmount),
+        subtotal: storedProductBaseOf(o),
         discountAmount: num(o.discountAmount),
         discountCode: o.discountCode ?? null,
         platformFundedDiscount: num(o.platformFundedDiscount),
@@ -370,8 +369,7 @@ export class AdminAnalyticsOrderService {
         // helper'dan gelir — bu hesap eskiden burada elle yazılıyordu ve kargo
         // payını düşmediği için sipariş yanıtındaki netten sapıyordu.
         sellerNetAmount: sellerNetAmountOf({
-          subtotal:
-            o.subtotal != null ? Number(o.subtotal) : num(o.totalAmount),
+          subtotal: storedProductBaseOf(o),
           productTaxAmount: num(o.taxAmount),
           sellerFeeAmount: num(o.sellerFeeAmount),
           withholdingTaxAmount: num(o.withholdingTaxAmount),
@@ -402,6 +400,10 @@ export class AdminAnalyticsOrderService {
         createdAt: r.createdAt,
         refundedAt: r.refundedAt ?? null,
       })),
+      // Hangi komisyon kuralına düştüğü checkout anında snapshot'lanır; canlı
+      // kural setinden yeniden eşleştirilmez (eşleşme eksenlerinin hepsi sipariş
+      // sonrası değişebilir).
+      commissionRule: readCommissionRuleSnapshot(o.financialSnapshot),
       ledger: o.commissionLedger
         ? {
             status: o.commissionLedger.status,
@@ -490,12 +492,7 @@ export class AdminAnalyticsOrderService {
         packageCount: packages.length,
         isMultiSeller: sellerIds.size > 1,
         totals: {
-          subtotal: orders.reduce(
-            (s, o: any) =>
-              s +
-              (o.subtotal != null ? Number(o.subtotal) : num(o.totalAmount)),
-            0,
-          ),
+          subtotal: orders.reduce((s, o: any) => s + storedProductBaseOf(o), 0),
           shippingCost: orders.reduce(
             (s, o: any) => s + num(o.buyerShippingAmount),
             0,
@@ -634,8 +631,7 @@ export class AdminAnalyticsOrderService {
         imageUrl: img ? this.common.resolveProductImageUrl(img.cardKey) : null,
         quantity: o.quantity,
         unitPrice: o.unitPrice != null ? Number(o.unitPrice) : null,
-        subtotal:
-          o.subtotal != null ? Number(o.subtotal) : Number(o.totalAmount),
+        subtotal: storedProductBaseOf(o),
         totalAmount: Number(o.totalAmount),
         status: o.status,
         shipmentStatus: o.shipment?.status ?? null,

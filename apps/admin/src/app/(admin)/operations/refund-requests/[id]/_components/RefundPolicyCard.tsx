@@ -71,10 +71,9 @@ export function RefundPolicyCard({
   const dirtyPayer = returnShippingPayer !== initial.returnShippingPayer;
 
   // Ürün kalemi BACKEND ile AYNI formülden (computePartialRefundAmount):
-  // total − kargo − alıcı ücreti = alıcının ürüne FİİLEN ödediği. `subtotal`
-  // kullanılmaz — çoğu kayıtta NULL ve indirim ÖNCESİ fiyatı tuttuğu için
-  // kartta olduğundan yüksek (ya da ₺0) bir önizleme gösteriyordu; admin'in
-  // onayladığı sayı backend'in iade ettiğinden sapabiliyordu.
+  // total − kargo − alıcı ücreti. Önizleme, iade edilecek tutarı gösterir;
+  // bu yüzden kaynak backend'in formülüdür, `subtotal` kolonu değil — ikisi
+  // ayrıştığında admin'in onayladığı sayı gerçekte iade edilenden sapıyordu.
   const productPaid = Math.max(
     0,
     Number(order.totalAmount) -

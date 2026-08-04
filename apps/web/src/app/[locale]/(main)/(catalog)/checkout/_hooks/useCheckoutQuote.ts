@@ -36,6 +36,8 @@ export function useCheckoutQuote(
           pricing: res.data.pricing,
           couponDiscount: res.data.couponDiscount ?? 0,
           shippingTariffVersion: res.data.shippingTariffVersion ?? null,
+          commissionRuleSetId: res.data.commissionRuleSetId ?? null,
+          commissionRuleSetVersion: res.data.commissionRuleSetVersion ?? null,
           pricingHash: res.data.pricingHash,
         };
       return (res.data ?? null) as CheckoutQuote | null;

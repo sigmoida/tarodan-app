@@ -12,6 +12,9 @@ import { noVatTaxPolicy, testTaxPolicy } from "./testing/tax-policy-fixture";
  */
 describe("OrderPricingService listing commission preview", () => {
   const prisma = {
+    commissionRuleSet: {
+      findFirst: jest.fn().mockResolvedValue({ id: "set-1" }),
+    },
     user: {
       findUnique: jest.fn().mockResolvedValue({
         businessStatus: null,

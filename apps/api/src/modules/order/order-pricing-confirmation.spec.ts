@@ -51,6 +51,16 @@ describe("OrderPricingService checkout confirmation", () => {
       expect(
         errors.some((error) => error.property === "expectedPricingHash"),
       ).toBe(true);
+      expect(
+        errors.some(
+          (error) => error.property === "expectedCommissionRuleSetId",
+        ),
+      ).toBe(true);
+      expect(
+        errors.some(
+          (error) => error.property === "expectedCommissionRuleSetVersion",
+        ),
+      ).toBe(true);
     },
   );
 });

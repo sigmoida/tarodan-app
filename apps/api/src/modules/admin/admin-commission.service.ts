@@ -1,31 +1,26 @@
 import {
+  BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
-  BadRequestException,
 } from "@nestjs/common";
-import {
-  CommissionRuleType,
-  CommissionSellerType,
-  CommissionAppliesTo,
-  CommissionTaxpayerType,
-} from "@prisma/client";
+import { CommissionRuleSetStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
   calculateCommissionFromRules,
-  CommissionRuleForCalculation,
-  isCatchAllCommissionRule,
+  CommissionRuleMatchError,
+  validateStrictCommissionCoverage,
 } from "../order/order-commission.helper";
 import { AdminAuditService } from "./admin-audit.service";
 import {
   CreateCommissionRuleDto,
+  CreateCommissionRuleSetDto,
   PreviewCommissionDto,
   UpdateCommissionRuleDto,
 } from "./dto";
 
-/**
- * Komisyon kuralları yönetimi — AdminService'in COMMISSION RULES bölümünden
- * birebir taşındı. AdminService aynı imzalarla buraya delege eder.
- */
+type DbClient = Prisma.TransactionClient | PrismaService;
+
 @Injectable()
 export class AdminCommissionService {
   constructor(
@@ -33,157 +28,364 @@ export class AdminCommissionService {
     private readonly audit: AdminAuditService,
   ) {}
 
-  /**
-   * Get all commission rules
-   */
-  async getCommissionRules() {
+  private serializeRule(rule: any) {
+    const numberOrNull = (value: unknown) =>
+      value == null ? null : Number(value);
+    return {
+      id: rule.id,
+      ruleSetId: rule.ruleSetId,
+      name: rule.name,
+      categoryId: rule.categoryId,
+      categoryName: rule.category?.name ?? null,
+      sellerType: rule.sellerType,
+      minAmount: Number(rule.minAmount),
+      maxAmount: numberOrNull(rule.maxAmount),
+      buyerCommissionRate: Number(rule.buyerCommissionRate),
+      buyerCommissionMin: numberOrNull(rule.buyerCommissionMin),
+      buyerCommissionMax: numberOrNull(rule.buyerCommissionMax),
+      buyerServiceFeeRate: Number(rule.buyerServiceFeeRate),
+      buyerServiceFeeMin: numberOrNull(rule.buyerServiceFeeMin),
+      buyerServiceFeeMax: numberOrNull(rule.buyerServiceFeeMax),
+      sellerCommissionRate: Number(rule.sellerCommissionRate),
+      sellerCommissionMin: numberOrNull(rule.sellerCommissionMin),
+      sellerCommissionMax: numberOrNull(rule.sellerCommissionMax),
+      sellerPlatformFeeRate: Number(rule.sellerPlatformFeeRate),
+      sellerPlatformFeeMin: numberOrNull(rule.sellerPlatformFeeMin),
+      sellerPlatformFeeMax: numberOrNull(rule.sellerPlatformFeeMax),
+      tradeFeeSellerAmount: Number(rule.tradeFeeSellerAmount),
+      tradeFeeBuyerAmount: Number(rule.tradeFeeBuyerAmount),
+      shippingBuyerShare: Number(rule.shippingBuyerShare),
+      shippingShares: (rule.shippingShares ?? []).map((share: any) => ({
+        tierCode: share.tierCode,
+        buyerShare: Number(share.buyerShare),
+      })),
+      ruleSet: rule.ruleSet
+        ? {
+            id: rule.ruleSet.id,
+            name: rule.ruleSet.name,
+            version: rule.ruleSet.version,
+            status: rule.ruleSet.status,
+          }
+        : undefined,
+      createdAt: rule.createdAt,
+      updatedAt: rule.updatedAt,
+    };
+  }
+
+  async getCommissionRuleSets() {
+    return this.prisma.commissionRuleSet.findMany({
+      include: { _count: { select: { rules: true } } },
+      orderBy: { version: "desc" },
+    });
+  }
+
+  /** Admin grid works on the sole draft; without a draft it shows active rules. */
+  async getCommissionRules(ruleSetId?: string) {
+    const selectedSet = ruleSetId
+      ? await this.prisma.commissionRuleSet.findUnique({
+          where: { id: ruleSetId },
+        })
+      : ((await this.prisma.commissionRuleSet.findFirst({
+          where: { status: CommissionRuleSetStatus.DRAFT },
+          orderBy: { version: "desc" },
+        })) ??
+        (await this.prisma.commissionRuleSet.findFirst({
+          where: { status: CommissionRuleSetStatus.ACTIVE },
+        })));
+
+    if (!selectedSet) return [];
     const rules = await this.prisma.commissionRule.findMany({
+      where: { ruleSetId: selectedSet.id },
       include: {
         category: { select: { id: true, name: true } },
         shippingShares: true,
+        ruleSet: true,
       },
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      orderBy: [
+        { category: { name: "asc" } },
+        { sellerType: "asc" },
+        { minAmount: "asc" },
+      ],
     });
-
-    return rules.map((r) => this.serializeRule(r));
+    return rules.map((rule) => this.serializeRule(rule));
   }
 
-  /**
-   * @deprecated Legacy single-rate preview — NOT wired to any UI (the admin rule
-   * form uses the client-side `BreakdownPreview`, which reflects the full v2
-   * rates/taxpayer/amount/shipping). This builds the draft from only the old
-   * `sellerRate/buyerRate` fields and calls the engine via the legacy positional
-   * overload, so it would reproduce the old preview != checkout drift. Do not
-   * re-wire it; either delete it or upgrade it to the v2 draft before reuse.
-   */
-  async previewCommission(dto: PreviewCommissionDto) {
-    const activeRules = await this.prisma.commissionRule.findMany({
-      where: { isActive: true },
+  async createDraftRuleSet(adminId: string, dto: CreateCommissionRuleSetDto) {
+    const existingDraft = await this.prisma.commissionRuleSet.findFirst({
+      where: { status: CommissionRuleSetStatus.DRAFT },
+      include: { _count: { select: { rules: true } } },
     });
-    const rules: CommissionRuleForCalculation[] = activeRules.filter(
-      (rule) => rule.id !== dto.ruleId,
-    );
+    if (existingDraft) return existingDraft;
 
-    if (dto.isActive !== false) {
-      rules.unshift({
-        id: dto.ruleId ?? "commission-preview-draft",
-        name: "Taslak komisyon kuralı",
-        ruleType: CommissionRuleType.default,
-        categoryId: dto.categoryId?.trim() || null,
-        sellerType: dto.sellerType,
-        appliesTo: dto.appliesTo,
-        sellerRate: dto.sellerRate,
-        buyerRate: dto.buyerRate,
-        sellerMin: dto.sellerMin,
-        sellerMax: dto.sellerMax,
-        buyerMin: dto.buyerMin,
-        buyerMax: dto.buyerMax,
+    const created = await this.prisma.$transaction(async (tx) => {
+      const [latest, active] = await Promise.all([
+        tx.commissionRuleSet.aggregate({ _max: { version: true } }),
+        tx.commissionRuleSet.findFirst({
+          where: { status: CommissionRuleSetStatus.ACTIVE },
+          include: { rules: { include: { shippingShares: true } } },
+        }),
+      ]);
+      const version = (latest._max.version ?? 0) + 1;
+      const draft = await tx.commissionRuleSet.create({
+        data: {
+          name: dto.name?.trim() || `Komisyon Seti v${version}`,
+          version,
+          status: CommissionRuleSetStatus.DRAFT,
+        },
       });
-    }
 
-    return calculateCommissionFromRules(
-      dto.amount,
-      rules,
-      dto.previewCategoryId?.trim() || null,
-      dto.previewSellerType,
-    );
-  }
-
-  /**
-   * Create commission rule
-   * Requirement: Commission configuration via admin (project.md)
-   */
-  /** Ranges overlap if aLo <= bHi && bLo <= aHi (null bounds = ±infinity). */
-  private rangesOverlap(
-    aMin: number | null,
-    aMax: number | null,
-    bMin: number | null,
-    bMax: number | null,
-  ): boolean {
-    const aLo = aMin ?? -Infinity;
-    const aHi = aMax ?? Infinity;
-    const bLo = bMin ?? -Infinity;
-    const bHi = bMax ?? Infinity;
-    return aLo <= bHi && bLo <= aHi;
-  }
-
-  /**
-   * v2 çoklu-kural: MOTORUN belirsizlik tanımıyla aynı denetim. Motor iki tarafı
-   * ayrı eşleştirir (satıcı tarafı SELLER∪BOTH, alıcı tarafı BUYER∪BOTH) ve
-   * null/ALL/all değerlerini joker sayar. Dolayısıyla iki kural ancak şu dördü
-   * birden sağlanırsa belirsizlik üretir ve reddedilmelidir:
-   *   1. normalize eksenleri AYNI (kategori değeri; satıcı tipi joker≡joker ya
-   *      da aynı özel değer; vergi tipi için aynısı),
-   *   2. appliesTo tarafları KESİŞİYOR (SELLER↔BOTH, BUYER↔BOTH, BOTH↔hepsi),
-   *   3. tutar aralıkları çakışıyor,
-   *   4. ikisi de aktif.
-   * Farklı özgüllükteki kurallar (örn. kategorili × kategori jokeri) motor
-   * tarafından skorla ayrıştığı için serbesttir. Eksen filtreleri BİLEREK
-   * JS'te: Prisma `where` eşitliği null≡ALL eş anlamlılığını göremez.
-   */
-  private async assertNoRangeOverlap(params: {
-    categoryId: string | null;
-    sellerType: CommissionSellerType | null;
-    taxpayerType: CommissionTaxpayerType | null;
-    appliesTo: CommissionAppliesTo;
-    minAmount: number | null;
-    maxAmount: number | null;
-    excludeId?: string;
-  }) {
-    const normalizeSeller = (v: CommissionSellerType | null) =>
-      v == null || v === CommissionSellerType.ALL ? null : v;
-    const normalizeTaxpayer = (v: CommissionTaxpayerType | null) =>
-      v == null || v === CommissionTaxpayerType.all ? null : v;
-    const sides = (v: CommissionAppliesTo): CommissionAppliesTo[] =>
-      v === CommissionAppliesTo.BOTH
-        ? [CommissionAppliesTo.SELLER, CommissionAppliesTo.BUYER]
-        : [v];
-    const sidesIntersect = (a: CommissionAppliesTo, b: CommissionAppliesTo) =>
-      sides(a).some((side) => sides(b).includes(side));
-
-    const siblings = await this.prisma.commissionRule.findMany({
-      where: {
-        isActive: true,
-        ...(params.excludeId ? { id: { not: params.excludeId } } : {}),
-      },
-      select: {
-        id: true,
-        categoryId: true,
-        sellerType: true,
-        taxpayerType: true,
-        appliesTo: true,
-        minAmount: true,
-        maxAmount: true,
-      },
+      for (const source of active?.rules ?? []) {
+        await tx.commissionRule.create({
+          data: {
+            ruleSetId: draft.id,
+            name: source.name,
+            categoryId: source.categoryId,
+            sellerType: source.sellerType,
+            minAmount: source.minAmount,
+            maxAmount: source.maxAmount,
+            buyerCommissionRate: source.buyerCommissionRate,
+            buyerCommissionMin: source.buyerCommissionMin,
+            buyerCommissionMax: source.buyerCommissionMax,
+            buyerServiceFeeRate: source.buyerServiceFeeRate,
+            buyerServiceFeeMin: source.buyerServiceFeeMin,
+            buyerServiceFeeMax: source.buyerServiceFeeMax,
+            sellerCommissionRate: source.sellerCommissionRate,
+            sellerCommissionMin: source.sellerCommissionMin,
+            sellerCommissionMax: source.sellerCommissionMax,
+            sellerPlatformFeeRate: source.sellerPlatformFeeRate,
+            sellerPlatformFeeMin: source.sellerPlatformFeeMin,
+            sellerPlatformFeeMax: source.sellerPlatformFeeMax,
+            tradeFeeSellerAmount: source.tradeFeeSellerAmount,
+            tradeFeeBuyerAmount: source.tradeFeeBuyerAmount,
+            shippingBuyerShare: source.shippingBuyerShare,
+            shippingShares: {
+              create: source.shippingShares.map((share) => ({
+                tierCode: share.tierCode,
+                buyerShare: share.buyerShare,
+              })),
+            },
+          },
+        });
+      }
+      return draft;
     });
 
-    const clash = siblings.find(
-      (s) =>
-        s.categoryId === params.categoryId &&
-        normalizeSeller(s.sellerType) === normalizeSeller(params.sellerType) &&
-        normalizeTaxpayer(s.taxpayerType) ===
-          normalizeTaxpayer(params.taxpayerType) &&
-        sidesIntersect(s.appliesTo, params.appliesTo) &&
-        this.rangesOverlap(
-          params.minAmount,
-          params.maxAmount,
-          s.minAmount != null ? Number(s.minAmount) : null,
-          s.maxAmount != null ? Number(s.maxAmount) : null,
-        ),
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "commission_rule_set_draft_create",
+      "CommissionRuleSet",
+      created.id,
+      null,
+      created,
     );
-    if (clash) {
+    return created;
+  }
+
+  private async requireDraftSet(ruleSetId?: string) {
+    const set = ruleSetId
+      ? await this.prisma.commissionRuleSet.findUnique({
+          where: { id: ruleSetId },
+        })
+      : await this.prisma.commissionRuleSet.findFirst({
+          where: { status: CommissionRuleSetStatus.DRAFT },
+          orderBy: { version: "desc" },
+        });
+    if (!set) {
       throw new BadRequestException(
-        "Aynı kategori / satıcı tipi / vergi tipi ekseninde, uygulanan tarafı ve tutar aralığı çakışan aktif bir kural zaten var. " +
-          "Hangi kuralın uygulanacağı belirsizleşeceği için önce mevcut kuralı düzenleyin veya aralıkları ayırın.",
+        "Önce aktif setten bir komisyon taslağı oluşturun.",
+      );
+    }
+    if (set.status !== CommissionRuleSetStatus.DRAFT) {
+      throw new BadRequestException(
+        "Yayınlanmış komisyon setleri değiştirilemez; yeni bir taslak oluşturun.",
+      );
+    }
+    return set;
+  }
+
+  private validateRuleValues(input: {
+    minAmount: number;
+    maxAmount?: number | null;
+    shippingShares?: Array<{ tierCode: string }>;
+    buyerCommissionMin?: unknown;
+    buyerCommissionMax?: unknown;
+    buyerServiceFeeMin?: unknown;
+    buyerServiceFeeMax?: unknown;
+    sellerCommissionMin?: unknown;
+    sellerCommissionMax?: unknown;
+    sellerPlatformFeeMin?: unknown;
+    sellerPlatformFeeMax?: unknown;
+    buyerCommissionRate?: unknown;
+    buyerServiceFeeRate?: unknown;
+    sellerCommissionRate?: unknown;
+    sellerPlatformFeeRate?: unknown;
+  }) {
+    if (input.maxAmount != null && input.maxAmount <= input.minAmount) {
+      throw new BadRequestException(
+        "Fiyat üst sınırı alt sınırdan büyük olmalıdır. Üst sınır aralığa dahil değildir.",
+      );
+    }
+    const feePairs = [
+      [input.buyerCommissionMin, input.buyerCommissionMax],
+      [input.buyerServiceFeeMin, input.buyerServiceFeeMax],
+      [input.sellerCommissionMin, input.sellerCommissionMax],
+      [input.sellerPlatformFeeMin, input.sellerPlatformFeeMax],
+    ];
+    if (
+      feePairs.some(
+        ([min, max]) => min != null && max != null && Number(max) < Number(min),
+      )
+    ) {
+      throw new BadRequestException(
+        "Ücret tavanı ilgili ücret tabanından küçük olamaz.",
+      );
+    }
+    const feeRatesAndBounds = [
+      [
+        input.buyerCommissionRate,
+        input.buyerCommissionMin,
+        input.buyerCommissionMax,
+      ],
+      [
+        input.buyerServiceFeeRate,
+        input.buyerServiceFeeMin,
+        input.buyerServiceFeeMax,
+      ],
+      [
+        input.sellerCommissionRate,
+        input.sellerCommissionMin,
+        input.sellerCommissionMax,
+      ],
+      [
+        input.sellerPlatformFeeRate,
+        input.sellerPlatformFeeMin,
+        input.sellerPlatformFeeMax,
+      ],
+    ];
+    if (
+      feeRatesAndBounds.some(
+        ([rate, min, max]) =>
+          Number(rate) === 0 &&
+          ((min != null && Number(min) > 0) ||
+            (max != null && Number(max) > 0)),
+      )
+    ) {
+      throw new BadRequestException(
+        "Oran %0 iken pozitif ücret tabanı veya tavanı tanımlanamaz.",
+      );
+    }
+    const tierCodes = (input.shippingShares ?? []).map((share) =>
+      String(share.tierCode),
+    );
+    if (new Set(tierCodes).size !== tierCodes.length) {
+      throw new BadRequestException(
+        "Aynı kargo paket boyutu bir kuralda birden fazla kez tanımlanamaz.",
       );
     }
   }
 
-  /** v2 kesinti oranları/limitleri — create ve update ortak eşlemesi. */
-  private v2RuleData(
-    dto: CreateCommissionRuleDto | UpdateCommissionRuleDto,
-  ): Record<string, unknown> {
-    const keys = [
+  private isOverlapConstraint(error: unknown): boolean {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+      return String(error).includes("commission_rules_no_overlap");
+    }
+    const details = `${error.message} ${JSON.stringify(error.meta ?? {})}`;
+    return (
+      error.code === "P2002" ||
+      (error.code === "P2004" &&
+        details.includes("commission_rules_no_overlap"))
+    );
+  }
+
+  async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {
+    const set = await this.requireDraftSet(dto.ruleSetId);
+    this.validateRuleValues(dto);
+    try {
+      const rule = await this.prisma.commissionRule.create({
+        data: {
+          ruleSetId: set.id,
+          name: dto.name.trim(),
+          categoryId: dto.categoryId,
+          sellerType: dto.sellerType,
+          minAmount: dto.minAmount,
+          maxAmount: dto.maxAmount ?? null,
+          buyerCommissionRate: dto.buyerCommissionRate,
+          buyerCommissionMin: dto.buyerCommissionMin ?? null,
+          buyerCommissionMax: dto.buyerCommissionMax ?? null,
+          buyerServiceFeeRate: dto.buyerServiceFeeRate,
+          buyerServiceFeeMin: dto.buyerServiceFeeMin ?? null,
+          buyerServiceFeeMax: dto.buyerServiceFeeMax ?? null,
+          sellerCommissionRate: dto.sellerCommissionRate,
+          sellerCommissionMin: dto.sellerCommissionMin ?? null,
+          sellerCommissionMax: dto.sellerCommissionMax ?? null,
+          sellerPlatformFeeRate: dto.sellerPlatformFeeRate,
+          sellerPlatformFeeMin: dto.sellerPlatformFeeMin ?? null,
+          sellerPlatformFeeMax: dto.sellerPlatformFeeMax ?? null,
+          tradeFeeSellerAmount: dto.tradeFeeSellerAmount,
+          tradeFeeBuyerAmount: dto.tradeFeeBuyerAmount,
+          shippingBuyerShare: dto.shippingBuyerShare ?? 100,
+          shippingShares: dto.shippingShares
+            ? { create: dto.shippingShares }
+            : undefined,
+        },
+        include: {
+          category: { select: { id: true, name: true } },
+          shippingShares: true,
+          ruleSet: true,
+        },
+      });
+      await this.audit.createRequiredAuditLog(
+        adminId,
+        "commission_rule_create",
+        "CommissionRule",
+        rule.id,
+        null,
+        rule,
+      );
+      return this.serializeRule(rule);
+    } catch (error) {
+      if (this.isOverlapConstraint(error)) {
+        throw new ConflictException(
+          "Bu kategori ve satıcı tipi için fiyat aralığı mevcut bir taslak kuralla çakışıyor.",
+        );
+      }
+      throw error;
+    }
+  }
+
+  async updateCommissionRule(
+    adminId: string,
+    ruleId: string,
+    dto: UpdateCommissionRuleDto,
+  ) {
+    const existing = await this.prisma.commissionRule.findUnique({
+      where: { id: ruleId },
+      include: { ruleSet: true, shippingShares: true },
+    });
+    if (!existing) throw new NotFoundException("Komisyon kuralı bulunamadı");
+    await this.requireDraftSet(existing.ruleSetId);
+
+    const final = {
+      ...existing,
+      ...dto,
+      minAmount:
+        dto.minAmount !== undefined
+          ? dto.minAmount
+          : Number(existing.minAmount),
+      maxAmount:
+        dto.maxAmount !== undefined
+          ? dto.maxAmount
+          : existing.maxAmount == null
+            ? null
+            : Number(existing.maxAmount),
+    };
+    this.validateRuleValues(final as any);
+
+    const scalarKeys = [
+      "name",
+      "categoryId",
+      "sellerType",
+      "minAmount",
+      "maxAmount",
       "buyerCommissionRate",
       "buyerCommissionMin",
       "buyerCommissionMax",
@@ -196,376 +398,55 @@ export class AdminCommissionService {
       "sellerPlatformFeeRate",
       "sellerPlatformFeeMin",
       "sellerPlatformFeeMax",
+      "tradeFeeSellerAmount",
+      "tradeFeeBuyerAmount",
+      "shippingBuyerShare",
     ] as const;
     const data: Record<string, unknown> = {};
-    for (const k of keys) {
-      if ((dto as any)[k] !== undefined) data[k] = (dto as any)[k];
+    for (const key of scalarKeys) {
+      if (dto[key] !== undefined) data[key] = dto[key];
     }
-    if (dto.taxpayerType !== undefined) data.taxpayerType = dto.taxpayerType;
-    if (dto.maxAmount !== undefined) data.maxAmount = dto.maxAmount;
-    if (dto.shippingBuyerShare !== undefined)
-      data.shippingBuyerShare = dto.shippingBuyerShare;
-    // Takas sabit ücretleri (KDV dahil): kuralın oran alanlarından bağımsızdır,
-    // yalnız takas fiyatlaması okur.
-    if (dto.tradeFeeSellerAmount !== undefined)
-      data.tradeFeeSellerAmount = dto.tradeFeeSellerAmount;
-    if (dto.tradeFeeBuyerAmount !== undefined)
-      data.tradeFeeBuyerAmount = dto.tradeFeeBuyerAmount;
-    return data;
-  }
-
-  /**
-   * Yazılacak kademe payı satırları. Alan gönderilmediyse `undefined` döner ve
-   * mevcut satırlara DOKUNULMAZ (kısmi gönderim sessizce yarım yapılandırma
-   * bırakmasın diye gönderildiğinde tam liste yazılır).
-   */
-  private shippingShareRows(
-    dto: CreateCommissionRuleDto | UpdateCommissionRuleDto,
-  ) {
-    if (dto.shippingShares === undefined) return undefined;
-    return dto.shippingShares.map((share) => ({
-      tierCode: share.tierCode,
-      buyerShare: share.buyerShare,
-    }));
-  }
-
-  /**
-   * Create yolunda nested `deleteMany` GEÇERSİZDİR (Prisma yalnız update'te
-   * kabul eder) ve silinecek satır da yoktur — sadece `create` gönderilir.
-   */
-  private shippingSharesCreateData(dto: CreateCommissionRuleDto) {
-    const create = this.shippingShareRows(dto);
-    return create ? { create } : undefined;
-  }
-
-  /** Update yolunda mevcut satırlar silinip tam liste yeniden yazılır. */
-  private shippingSharesUpdateData(dto: UpdateCommissionRuleDto) {
-    const create = this.shippingShareRows(dto);
-    return create ? { deleteMany: {}, create } : undefined;
-  }
-
-  private serializeRule(rule: any) {
-    const num = (v: any) => (v != null ? Number(v) : null);
-    return {
-      id: rule.id,
-      name: rule.name,
-      categoryId: rule.categoryId,
-      categoryName: rule.category?.name || null,
-      sellerType: rule.sellerType,
-      appliesTo: rule.appliesTo,
-      taxpayerType: rule.taxpayerType,
-      minAmount: num(rule.minAmount),
-      maxAmount: num(rule.maxAmount),
-      sellerRate: num(rule.sellerRate),
-      buyerRate: num(rule.buyerRate),
-      sellerMin: num(rule.sellerMin),
-      sellerMax: num(rule.sellerMax),
-      buyerMin: num(rule.buyerMin),
-      buyerMax: num(rule.buyerMax),
-      buyerCommissionRate: num(rule.buyerCommissionRate),
-      buyerCommissionMin: num(rule.buyerCommissionMin),
-      buyerCommissionMax: num(rule.buyerCommissionMax),
-      buyerServiceFeeRate: num(rule.buyerServiceFeeRate),
-      buyerServiceFeeMin: num(rule.buyerServiceFeeMin),
-      buyerServiceFeeMax: num(rule.buyerServiceFeeMax),
-      sellerCommissionRate: num(rule.sellerCommissionRate),
-      sellerCommissionMin: num(rule.sellerCommissionMin),
-      sellerCommissionMax: num(rule.sellerCommissionMax),
-      sellerPlatformFeeRate: num(rule.sellerPlatformFeeRate),
-      sellerPlatformFeeMin: num(rule.sellerPlatformFeeMin),
-      sellerPlatformFeeMax: num(rule.sellerPlatformFeeMax),
-      shippingBuyerShare: num(rule.shippingBuyerShare),
-      tradeFeeSellerAmount: num(rule.tradeFeeSellerAmount),
-      tradeFeeBuyerAmount: num(rule.tradeFeeBuyerAmount),
-      // Paket boyutu başına pay: admin formu bunları okur; satır yoksa tek pay geçerli.
-      shippingShares: (rule.shippingShares ?? []).map(
-        (share: { tierCode: string; buyerShare: unknown }) => ({
-          tierCode: share.tierCode,
-          buyerShare: Number(share.buyerShare),
-        }),
-      ),
-      priority: rule.priority,
-      isActive: rule.isActive,
-      createdAt: rule.createdAt,
-      updatedAt: rule.updatedAt,
-      // Legacy
-      percentage: num(rule.percentage),
-      type: rule.ruleType,
-    };
-  }
-
-  async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {
-    // En az bir kesinti oranı verilmeli (legacy veya v2).
-    const anyRate = [
-      dto.sellerRate,
-      dto.buyerRate,
-      dto.buyerCommissionRate,
-      dto.buyerServiceFeeRate,
-      dto.sellerCommissionRate,
-      dto.sellerPlatformFeeRate,
-    ].some((r) => r != null);
-    if (!anyRate) {
-      throw new BadRequestException("En az bir kesinti oranı girmelisiniz.");
+    if (dto.shippingShares !== undefined) {
+      data.shippingShares = { deleteMany: {}, create: dto.shippingShares };
     }
 
-    // min <= max sanity (legacy floors/caps + amount range)
-    const pairs: Array<[number | undefined, number | undefined, string]> = [
-      [dto.sellerMin, dto.sellerMax, "sellerMin/sellerMax"],
-      [dto.buyerMin, dto.buyerMax, "buyerMin/buyerMax"],
-      [dto.minAmount, dto.maxAmount, "minAmount/maxAmount"],
-    ];
-    for (const [min, max, label] of pairs) {
-      if (min != null && max != null && min > max) {
-        throw new BadRequestException(
-          `${label}: alt sınır üst sınırdan büyük olamaz`,
+    try {
+      const rule = await this.prisma.commissionRule.update({
+        where: { id: ruleId },
+        data,
+        include: {
+          category: { select: { id: true, name: true } },
+          shippingShares: true,
+          ruleSet: true,
+        },
+      });
+      await this.audit.createRequiredAuditLog(
+        adminId,
+        "commission_rule_update",
+        "CommissionRule",
+        rule.id,
+        existing,
+        rule,
+      );
+      return this.serializeRule(rule);
+    } catch (error) {
+      if (this.isOverlapConstraint(error)) {
+        throw new ConflictException(
+          "Bu değişiklik fiyat aralığını başka bir taslak kuralla çakıştırıyor.",
         );
       }
-    }
-
-    const categoryId =
-      dto.categoryId && dto.categoryId.trim() !== "" ? dto.categoryId : null;
-    const taxpayerType = dto.taxpayerType ?? CommissionTaxpayerType.all;
-
-    await this.assertNoRangeOverlap({
-      categoryId,
-      sellerType: dto.sellerType,
-      taxpayerType,
-      appliesTo: dto.appliesTo,
-      minAmount: dto.minAmount ?? null,
-      maxAmount: dto.maxAmount ?? null,
-    });
-
-    const rule = await this.prisma.commissionRule.create({
-      data: {
-        name: dto.name,
-        categoryId,
-        sellerType: dto.sellerType,
-        appliesTo: dto.appliesTo,
-        taxpayerType,
-        sellerRate: dto.sellerRate ?? null,
-        buyerRate: dto.buyerRate ?? null,
-        sellerMin: dto.sellerMin ?? null,
-        sellerMax: dto.sellerMax ?? null,
-        buyerMin: dto.buyerMin ?? null,
-        buyerMax: dto.buyerMax ?? null,
-        priority: dto.priority ?? 0,
-        isActive: dto.isActive ?? true,
-        ...this.v2RuleData(dto),
-        shippingShares: this.shippingSharesCreateData(dto),
-        // Legacy (backward compatibility)
-        percentage: dto.percentage ?? (dto.sellerRate || 0),
-        ruleType: dto.type || "default",
-        minAmount: dto.minAmount,
-      },
-      include: {
-        category: { select: { id: true, name: true } },
-        shippingShares: true,
-      },
-    });
-
-    await this.audit.createRequiredAuditLog(
-      adminId,
-      "commission_rule_create",
-      "CommissionRule",
-      rule.id,
-      null,
-      rule,
-    );
-
-    return this.serializeRule(rule);
-  }
-
-  /**
-   * Update commission rule
-   */
-  async updateCommissionRule(
-    adminId: string,
-    ruleId: string,
-    dto: UpdateCommissionRuleDto,
-  ) {
-    const existing = await this.prisma.commissionRule.findUnique({
-      where: { id: ruleId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException("Komisyon kuralı bulunamadı");
-    }
-
-    // Determine final appliesTo value (v2: rate requirements are lenient — a rule
-    // may carry legacy OR v2 rates; the engine falls back appropriately).
-    const appliesTo = dto.appliesTo ?? existing.appliesTo ?? "SELLER";
-
-    // Validate min <= max
-    const sellerMin =
-      dto.sellerMin !== undefined ? dto.sellerMin : existing.sellerMin;
-    const sellerMax =
-      dto.sellerMax !== undefined ? dto.sellerMax : existing.sellerMax;
-    if (sellerMin != null && sellerMax != null && sellerMin > sellerMax) {
-      throw new BadRequestException(
-        "sellerMin cannot be greater than sellerMax",
-      );
-    }
-
-    const buyerMin =
-      dto.buyerMin !== undefined ? dto.buyerMin : existing.buyerMin;
-    const buyerMax =
-      dto.buyerMax !== undefined ? dto.buyerMax : existing.buyerMax;
-    if (buyerMin != null && buyerMax != null && buyerMin > buyerMax) {
-      throw new BadRequestException("buyerMin cannot be greater than buyerMax");
-    }
-
-    // Determine final categoryId and sellerType
-    const finalCategoryId =
-      dto.categoryId !== undefined
-        ? dto.categoryId && dto.categoryId.trim() !== ""
-          ? dto.categoryId
-          : null
-        : existing.categoryId;
-    const finalSellerType =
-      dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
-    const finalTaxpayerType =
-      dto.taxpayerType !== undefined ? dto.taxpayerType : existing.taxpayerType;
-    const finalMinAmount =
-      dto.minAmount !== undefined
-        ? dto.minAmount
-        : existing.minAmount != null
-          ? Number(existing.minAmount)
-          : null;
-    const finalMaxAmount =
-      dto.maxAmount !== undefined
-        ? dto.maxAmount
-        : existing.maxAmount != null
-          ? Number(existing.maxAmount)
-          : null;
-
-    // v2: aynı (kategori × satıcı tipi × vergi tipi × appliesTo) ekseninde tutar
-    // aralıkları çakışmamalı (çoklu kural serbest ama belirsizlik yasak).
-    await this.assertNoRangeOverlap({
-      categoryId: finalCategoryId,
-      sellerType: finalSellerType as CommissionSellerType,
-      taxpayerType: finalTaxpayerType,
-      appliesTo: appliesTo as CommissionAppliesTo,
-      minAmount: finalMinAmount ?? null,
-      maxAmount: finalMaxAmount ?? null,
-      excludeId: existing.id,
-    });
-
-    // Son aktif catch-all kural pasife alınamaz veya catch-all kapsamından
-    // çıkarılamaz (kategori/tutar/appliesTo daraltarak da olsa).
-    const staysCatchAll =
-      (dto.isActive === undefined ? existing.isActive : dto.isActive) &&
-      isCatchAllCommissionRule({
-        categoryId: finalCategoryId,
-        sellerType: finalSellerType as CommissionSellerType,
-        taxpayerType: finalTaxpayerType,
-        minAmount: finalMinAmount ?? null,
-        maxAmount: finalMaxAmount ?? null,
-        appliesTo: appliesTo as CommissionAppliesTo,
-      });
-    if (existing.isActive && !staysCatchAll) {
-      await this.assertCatchAllRuleSurvives(existing);
-    }
-
-    // Prepare update data
-    const updateData: any = {};
-    if (dto.name !== undefined) updateData.name = dto.name;
-    if (dto.categoryId !== undefined) {
-      updateData.categoryId =
-        dto.categoryId && dto.categoryId.trim() !== "" ? dto.categoryId : null;
-    }
-    if (dto.sellerType !== undefined) updateData.sellerType = dto.sellerType;
-    if (dto.appliesTo !== undefined) updateData.appliesTo = dto.appliesTo;
-    if (dto.sellerRate !== undefined) updateData.sellerRate = dto.sellerRate;
-    if (dto.buyerRate !== undefined) updateData.buyerRate = dto.buyerRate;
-    if (dto.sellerMin !== undefined) updateData.sellerMin = dto.sellerMin;
-    if (dto.sellerMax !== undefined) updateData.sellerMax = dto.sellerMax;
-    if (dto.buyerMin !== undefined) updateData.buyerMin = dto.buyerMin;
-    if (dto.buyerMax !== undefined) updateData.buyerMax = dto.buyerMax;
-    if (dto.priority !== undefined) updateData.priority = dto.priority;
-    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
-    // v2 fields (taxpayerType, maxAmount, 4 rate sets, shippingBuyerShare)
-    Object.assign(updateData, this.v2RuleData(dto));
-    const shippingShares = this.shippingSharesUpdateData(dto);
-    if (shippingShares) updateData.shippingShares = shippingShares;
-    // Legacy fields
-    if (dto.percentage !== undefined) updateData.percentage = dto.percentage;
-    if (dto.type !== undefined) updateData.ruleType = dto.type;
-    if (dto.minAmount !== undefined) updateData.minAmount = dto.minAmount;
-
-    const rule = await this.prisma.commissionRule.update({
-      where: { id: ruleId },
-      data: updateData,
-      include: {
-        category: { select: { id: true, name: true } },
-        shippingShares: true,
-      },
-    });
-
-    await this.audit.createRequiredAuditLog(
-      adminId,
-      "commission_rule_update",
-      "CommissionRule",
-      rule.id,
-      existing,
-      rule,
-    );
-
-    return this.serializeRule(rule);
-  }
-
-  /**
-   * En az bir AKTİF catch-all kuralın kalmasını garanti eder. Catch-all yoksa
-   * eşleşmeyen her kategori/tutar kombinasyonu checkout'ta fail-closed 503
-   * verir — yani sepet ödenemez hale gelir. Bu yüzden son catch-all kuralın
-   * silinmesi/pasife alınması engellenir.
-   */
-  private async assertCatchAllRuleSurvives(
-    rule: Parameters<typeof isCatchAllCommissionRule>[0] & { id: string },
-  ): Promise<void> {
-    if (!isCatchAllCommissionRule(rule)) return;
-
-    const otherActiveCatchAll = (
-      await this.prisma.commissionRule.findMany({
-        where: {
-          isActive: true,
-          id: { not: rule.id },
-          categoryId: null,
-          minAmount: null,
-          maxAmount: null,
-          appliesTo: CommissionAppliesTo.BOTH,
-        },
-      })
-    ).some((candidate) => isCatchAllCommissionRule(candidate));
-
-    if (!otherActiveCatchAll) {
-      throw new BadRequestException(
-        "Son aktif genel (catch-all) komisyon kuralı kaldırılamaz veya pasife alınamaz — " +
-          "aksi halde eşleşen kuralı olmayan siparişler ödeme adımında hata verir. " +
-          "Önce yerine geçecek yeni bir genel kural tanımlayın.",
-      );
+      throw error;
     }
   }
 
-  /**
-   * Delete commission rule
-   */
   async deleteCommissionRule(adminId: string, ruleId: string) {
     const existing = await this.prisma.commissionRule.findUnique({
       where: { id: ruleId },
+      include: { ruleSet: true },
     });
-
-    if (!existing) {
-      throw new NotFoundException("Komisyon kuralı bulunamadı");
-    }
-
-    if (existing.isActive) {
-      await this.assertCatchAllRuleSurvives(existing);
-    }
-
-    await this.prisma.commissionRule.delete({
-      where: { id: ruleId },
-    });
-
+    if (!existing) throw new NotFoundException("Komisyon kuralı bulunamadı");
+    await this.requireDraftSet(existing.ruleSetId);
+    await this.prisma.commissionRule.delete({ where: { id: ruleId } });
     await this.audit.createRequiredAuditLog(
       adminId,
       "commission_rule_delete",
@@ -574,7 +455,117 @@ export class AdminCommissionService {
       existing,
       null,
     );
-
     return { success: true };
+  }
+
+  private async validateCoverage(client: DbClient, ruleSetId: string) {
+    const [categories, rules] = await Promise.all([
+      client.category.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      client.commissionRule.findMany({
+        where: { ruleSetId },
+        select: {
+          id: true,
+          categoryId: true,
+          sellerType: true,
+          minAmount: true,
+          maxAmount: true,
+        },
+      }),
+    ]);
+
+    return validateStrictCommissionCoverage(ruleSetId, categories, rules);
+  }
+
+  async validateCommissionRuleSet(ruleSetId: string) {
+    const set = await this.prisma.commissionRuleSet.findUnique({
+      where: { id: ruleSetId },
+    });
+    if (!set) throw new NotFoundException("Komisyon seti bulunamadı");
+    return this.validateCoverage(this.prisma, ruleSetId);
+  }
+
+  async publishCommissionRuleSet(adminId: string, ruleSetId: string) {
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const set = await tx.commissionRuleSet.findUnique({
+          where: { id: ruleSetId },
+        });
+        if (!set) throw new NotFoundException("Komisyon seti bulunamadı");
+        if (set.status !== CommissionRuleSetStatus.DRAFT) {
+          throw new BadRequestException("Yalnız taslak set yayınlanabilir.");
+        }
+
+        const validation = await this.validateCoverage(tx, ruleSetId);
+        if (!validation.valid) {
+          throw new BadRequestException({
+            message:
+              "Komisyon setinde eksik veya kesintili fiyat aralıkları var; yayınlanamadı.",
+            validation,
+          });
+        }
+
+        await tx.commissionRuleSet.updateMany({
+          where: { status: CommissionRuleSetStatus.ACTIVE },
+          data: { status: CommissionRuleSetStatus.ARCHIVED },
+        });
+        const published = await tx.commissionRuleSet.update({
+          where: { id: ruleSetId },
+          data: {
+            status: CommissionRuleSetStatus.ACTIVE,
+            publishedAt: new Date(),
+            publishedBy: adminId,
+          },
+        });
+        return { published, validation };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "commission_rule_set_publish",
+      "CommissionRuleSet",
+      ruleSetId,
+      null,
+      result,
+    );
+    return result;
+  }
+
+  async previewCommission(dto: PreviewCommissionDto) {
+    const set = dto.ruleSetId
+      ? await this.prisma.commissionRuleSet.findUnique({
+          where: { id: dto.ruleSetId },
+        })
+      : await this.prisma.commissionRuleSet.findFirst({
+          where: { status: CommissionRuleSetStatus.ACTIVE },
+        });
+    if (!set) throw new BadRequestException("Komisyon seti bulunamadı");
+    const rules = await this.prisma.commissionRule.findMany({
+      where: {
+        ruleSetId: set.id,
+        categoryId: dto.categoryId,
+        sellerType: dto.sellerType,
+        minAmount: { lte: dto.amount },
+        OR: [{ maxAmount: null }, { maxAmount: { gt: dto.amount } }],
+      },
+      include: { shippingShares: true },
+    });
+    try {
+      return calculateCommissionFromRules(dto.amount, rules, dto);
+    } catch (error) {
+      if (error instanceof CommissionRuleMatchError) {
+        throw new ConflictException({
+          message: error.message,
+          matchCount: error.matchCount,
+          matchingRuleIds: error.matchingRuleIds,
+        });
+      }
+      throw error;
+    }
   }
 }

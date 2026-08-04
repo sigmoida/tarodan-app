@@ -5,6 +5,7 @@ import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { OrderStatus, OfferStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { sellerNetAmountOf } from "./order-net.helper";
+import { storedProductBaseOf } from "./order-charged-base.helper";
 
 /**
  * Sipariş modülü ortak yardımcıları (sipariş yanıtı formatlama + ürün cache
@@ -183,14 +184,10 @@ export class OrderCommonService {
     // satıcı tarafı payout'tan düşülür.
     const buyerServiceTaxAmount = Number(order.buyerServiceTaxAmount ?? 0);
     const sellerServiceTaxAmount = Number(order.sellerServiceTaxAmount ?? 0);
-    // Ürün tutarı KDV HARİÇ gösterilir; KDV'ler ayrı satır olarak surface edilir.
-    // (totalAmount = subtotal + kargo + buyerFee + ürün KDV + alıcı hizmet KDV)
-    const subtotal =
-      totalAmount -
-      shippingCost -
-      buyerFeeAmount -
-      taxAmount -
-      buyerServiceTaxAmount;
+    // Ürün tabanı ORTAK helper'dan: yazılı `subtotal` varsa odur, yoksa alıcı
+    // toplamının tanımı tersten okunur. Burada elle türetildiğinde web ile admin
+    // aynı sipariş için farklı "ürün bedeli" gösterebiliyordu.
+    const subtotal = storedProductBaseOf(order);
     const sellerNetAmount = sellerNetAmountOf({
       subtotal,
       productTaxAmount: taxAmount,

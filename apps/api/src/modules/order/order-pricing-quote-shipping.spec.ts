@@ -51,6 +51,9 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
           Promise.resolve(products[where.id] ?? null),
         ),
       },
+      commissionRuleSet: {
+        findFirst: jest.fn().mockResolvedValue({ id: "set-1", version: 7 }),
+      },
     } as any;
     const taxService = {
       resolveTaxRate: jest.fn(),
@@ -96,6 +99,8 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     expect(q.shippingBySeller).toHaveLength(1);
     expect(q.shippingAmount).toBe(BASE);
     expect(q.items[0].sellerId).toBe("seller-A");
+    expect(q.commissionRuleSetId).toBe("set-1");
+    expect(q.commissionRuleSetVersion).toBe(7);
   });
 
   it("tek satıcı ÇOK ürün (birleşik 200 < eşik) → yine TEK kargo (konsolidasyon)", async () => {

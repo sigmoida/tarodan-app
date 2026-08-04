@@ -1,112 +1,62 @@
-import { Badge } from "@tarodan/ui";
 import { col } from "@/components/table";
-import { fmtTry } from "@/lib/format";
 import { commissionRowMenu } from "./rowActions";
-import {
-  type CommissionRule,
-  sellerTypeLabel,
-  taxpayerTypeLabel,
-} from "./types";
+import { type CommissionRule, sellerTypeLabel } from "./types";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-const rate = (v: number | null | undefined) =>
-  v != null ? `%${v.toFixed(2)}` : "—";
-
-/** Takas sabit ücretleri: "veren / alan" (ikisi de boşsa "—"). */
-const tradeFeePair = (r: CommissionRule) => {
-  const seller = r.tradeFeeSellerAmount ?? 0;
-  const buyer = r.tradeFeeBuyerAmount ?? 0;
-  if (!seller && !buyer) return "—";
-  return `${fmtTry(seller)} / ${fmtTry(buyer)}`;
-};
-
-/** Tiered amount range, e.g. "0 – 1000", "1000+", or "—". */
-const tier = (r: CommissionRule) => {
-  if (r.minAmount == null && r.maxAmount == null) return "—";
-  if (r.maxAmount == null) return `${r.minAmount ?? 0}+`;
-  return `${r.minAmount ?? 0} – ${r.maxAmount}`;
-};
-
-export interface CommissionColumnProps {
-  onEdit: (r: CommissionRule) => void;
-  onDelete: (r: CommissionRule) => void;
-  onToggle: (r: CommissionRule) => void;
-  togglingId?: string;
-}
+const rate = (value: number) => `%${value.toFixed(2)}`;
+const range = (rule: CommissionRule) =>
+  rule.maxAmount == null
+    ? `[${rule.minAmount}, ∞)`
+    : `[${rule.minAmount}, ${rule.maxAmount})`;
 
 export function commissionColumns(
-  { onEdit, onDelete, onToggle, togglingId }: CommissionColumnProps,
+  {
+    onEdit,
+    onDelete,
+  }: {
+    onEdit: (rule: CommissionRule) => void;
+    onDelete: (rule: CommissionRule) => void;
+  },
   t: T,
 ) {
   return [
-    // Kural adları uzun olabiliyor: kırpmak yerine geniş + wrap.
     col.text<CommissionRule>(t("admin.finance.commission.ruleName"), "name", {
       wrap: true,
-      minWidth: 280,
+      minWidth: 240,
     }),
     col.muted<CommissionRule>(
       t("common.category"),
-      (r) => r.categoryName || t("common.all"),
-      {
-        sortKey: "categoryName",
-        sortType: "text",
-      },
+      (rule) => rule.categoryName,
+      { sortKey: "categoryName", sortType: "text" },
     ),
     col.muted<CommissionRule>(
       t("admin.finance.commission.sellerType"),
-      (r) => sellerTypeLabel(r.sellerType, t),
-      {
-        sortKey: "sellerType",
-        sortType: "text",
-      },
-    ),
-    col.muted<CommissionRule>(
-      t("admin.finance.commission.taxpayerType"),
-      (r) => taxpayerTypeLabel(r.taxpayerType, t),
-      { sortKey: "taxpayerType", sortType: "text" },
+      (rule) => sellerTypeLabel(rule.sellerType, t),
+      { sortKey: "sellerType", sortType: "text" },
     ),
     col.muted<CommissionRule>(
       t("admin.finance.commission.minAmountLabel"),
-      (r) => tier(r),
+      range,
       { sortKey: "minAmount", sortType: "number" },
     ),
-    col.custom<CommissionRule>(
+    col.muted<CommissionRule>(
       t("admin.finance.commission.sellerCommission"),
-      (r) => (
-        <span className="font-semibold tabular-nums text-primary-700">
-          {rate(r.sellerCommissionRate ?? r.sellerRate)}
-        </span>
-      ),
-      { sortKey: "sellerRate", sortType: "number" },
+      (rule) => rate(rule.sellerCommissionRate),
+      { sortKey: "sellerCommissionRate", sortType: "number" },
     ),
-    col.custom<CommissionRule>(
+    col.muted<CommissionRule>(
       t("admin.finance.commission.buyerServiceFee"),
-      (r) => (
-        <span className="font-semibold tabular-nums text-primary-700">
-          {rate(r.buyerServiceFeeRate ?? r.buyerRate)}
-        </span>
-      ),
-      { sortKey: "buyerRate", sortType: "number" },
+      (rule) => rate(rule.buyerServiceFeeRate),
+      { sortKey: "buyerServiceFeeRate", sortType: "number" },
     ),
-    // Takas ücretleri ORAN değil, KDV dahil sabit tutardır: satıcı/alıcı ayrı
-    // girilir ama listede tek kolonda "veren / alan" olarak özetlenir.
-    col.custom<CommissionRule>(
+    col.muted<CommissionRule>(
       t("admin.finance.commission.tradeFeeColumn"),
-      (r) => <span className="tabular-nums text-body">{tradeFeePair(r)}</span>,
+      (rule) =>
+        `${rule.tradeFeeSellerAmount.toFixed(2)} / ${rule.tradeFeeBuyerAmount.toFixed(2)} ₺`,
       { sortKey: "tradeFeeSellerAmount", sortType: "number" },
     ),
-    col.badge<CommissionRule>(
-      t("common.status"),
-      (r) => <Badge active={r.isActive} />,
-      {
-        sortKey: "isActive",
-        sortType: "number",
-      },
-    ),
-    col.rowMenu<CommissionRule>(
-      commissionRowMenu({ onEdit, onDelete, onToggle, togglingId }),
-    ),
+    col.rowMenu<CommissionRule>(commissionRowMenu({ onEdit, onDelete })),
   ];
 }

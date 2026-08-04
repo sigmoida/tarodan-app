@@ -33,6 +33,16 @@ export interface BusinessEntitlementOwner {
   taxId?: string | null;
 }
 
+export function hasApprovedCorporateIdentity(
+  owner: BusinessEntitlementOwner | null | undefined,
+): boolean {
+  return (
+    owner?.businessStatus === BusinessStatus.approved &&
+    !!owner.companyName?.trim() &&
+    !!owner.taxId?.trim()
+  );
+}
+
 export function isPremiumEntitled(
   membership: PremiumCheckMembership | null | undefined,
   owner?: BusinessEntitlementOwner | null,
@@ -51,11 +61,7 @@ export function isPremiumEntitled(
 
   if (membership.tier.type === MembershipTierType.business) {
     if (!owner) return false;
-    return (
-      owner.businessStatus === BusinessStatus.approved &&
-      !!owner.companyName?.trim() &&
-      !!owner.taxId?.trim()
-    );
+    return hasApprovedCorporateIdentity(owner);
   }
 
   return true;
@@ -146,5 +152,20 @@ export function isBusinessMembershipEntitled(
   return (
     membership?.tier?.type === MembershipTierType.business &&
     isPremiumEntitled(membership, owner)
+  );
+}
+
+/**
+ * Onaylı kurumsal kimlik BUSINESS hakkı olmadan bireysel satıcıya dönüşmez.
+ * Süre dolduğu anda satış yetkisi askıya alınır; geçerli BUSINESS üyeliği
+ * yenilendiğinde ayrıca veri taşımaya gerek kalmadan kendiliğinden açılır.
+ */
+export function isCorporateSellingSuspended(
+  membership: PremiumCheckMembership | null | undefined,
+  owner: BusinessEntitlementOwner | null | undefined,
+): boolean {
+  return (
+    hasApprovedCorporateIdentity(owner) &&
+    !isBusinessMembershipEntitled(membership, owner)
   );
 }

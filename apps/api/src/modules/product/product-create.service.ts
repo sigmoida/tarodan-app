@@ -9,7 +9,10 @@ import { i18nMessage } from "../i18n";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { MembershipService } from "../membership/membership.service";
-import { isPremiumEntitled } from "../membership/membership.util";
+import {
+  isCorporateSellingSuspended,
+  isPremiumEntitled,
+} from "../membership/membership.util";
 import { StorageService } from "../storage/storage.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
@@ -63,6 +66,11 @@ export class ProductCreateService {
     // Verify seller status - auto-enable if not already a seller
     const seller = await this.prisma.user.findUnique({
       where: { id: sellerId },
+      include: {
+        membership: {
+          include: { tier: true },
+        },
+      },
     });
 
     if (!seller) {
@@ -86,6 +94,12 @@ export class ProductCreateService {
     ) {
       throw new ForbiddenException(
         i18nMessage("server.product.businessApprovalRequired"),
+      );
+    }
+
+    if (isCorporateSellingSuspended(seller.membership, seller)) {
+      throw new ForbiddenException(
+        i18nMessage("server.product.corporateSalesSuspended"),
       );
     }
 

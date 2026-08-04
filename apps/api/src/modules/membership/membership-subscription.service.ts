@@ -19,7 +19,6 @@ import {
   PaymentStatus,
   SavedCardStatus,
   TradeStatus,
-  CommissionTaxpayerType,
   type MembershipTier,
   Prisma,
 } from "@prisma/client";
@@ -32,7 +31,6 @@ import { PaymentProviderRegistry } from "../payment-providers/payment-provider.r
 import { ConfigService } from "@nestjs/config";
 import { MembershipCommonService } from "./membership-common.service";
 import { isPremiumEntitled } from "./membership.util";
-import { resolveTaxpayerType } from "../order/order-commission.helper";
 import { i18nMessage } from "../i18n";
 import { PaymentProviderEventService } from "../payment/payment-provider-event.service";
 import { createHash } from "node:crypto";
@@ -89,30 +87,27 @@ export class MembershipSubscriptionService {
       );
     }
 
-    // Business tier: only APPROVED corporate accounts. companyName + taxId are
-    // client-writable via the profile endpoint, so their mere presence is not proof
-    // of a corporate seller — the approval gate is businessStatus === "approved"
-    // (the SAME corporate test used by pricing/VAT/commission via resolveTaxpayerType).
-    // Otherwise a user could self-assign company details and reach Business unreviewed.
+    // Üyelik/kimlik eksenleri birbirini dışlar: BUSINESS yalnız kurumsal;
+    // FREE/BASIC/PREMIUM yalnız bireysel hesap içindir.
+    const commissionIdentity = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { companyName: true, taxId: true, businessStatus: true },
+    });
+    const isApprovedCorporate =
+      !!commissionIdentity &&
+      !!commissionIdentity.companyName?.trim() &&
+      commissionIdentity.businessStatus === "approved" &&
+      !!commissionIdentity.taxId?.trim();
     if (dto.tierType === MembershipTierType.business) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { companyName: true, taxId: true, businessStatus: true },
-      });
-
-      const isApprovedCorporate =
-        !!user &&
-        !!user.companyName &&
-        resolveTaxpayerType({
-          businessStatus: user.businessStatus,
-          taxId: user.taxId,
-        }) === CommissionTaxpayerType.corporate;
-
       if (!isApprovedCorporate) {
         throw new ForbiddenException(
           i18nMessage("server.membership.businessTierRequiresCompany"),
         );
       }
+    } else if (isApprovedCorporate) {
+      throw new ForbiddenException(
+        i18nMessage("server.membership.businessTierRequiresCompany"),
+      );
     }
 
     const existingMembership = await this.prisma.userMembership.findUnique({

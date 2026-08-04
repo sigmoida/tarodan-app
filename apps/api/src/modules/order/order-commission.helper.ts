@@ -1,9 +1,6 @@
 import { Logger } from "@nestjs/common";
 import {
-  CommissionAppliesTo,
-  CommissionRuleType,
   CommissionSellerType,
-  CommissionTaxpayerType,
   MembershipTierType,
   SellerType,
   ShippingPackageTierCode,
@@ -12,123 +9,188 @@ import type { ShippingBuyerShareByTier } from "../shipping/shipping-tariff.helpe
 
 type CommissionNumericValue = number | string | { toString(): string };
 
-export interface CommissionRuleForCalculation {
+/** Strict kategori/satıcı/fiyat eşleşmesinin ihtiyaç duyduğu ortak alanlar. */
+export interface CommissionRuleMatchable {
   id: string;
+  ruleSetId: string;
   name: string;
-  ruleType?: CommissionRuleType;
-  categoryId: string | null;
-  sellerType: CommissionSellerType | null;
-  appliesTo: CommissionAppliesTo;
-  /** v2 axis: individual/corporate (null → treated as `all`). */
-  taxpayerType?: CommissionTaxpayerType | null;
-  /** v2 tiered matching: product/line amount range [minAmount, maxAmount] (null = unbounded). */
-  minAmount?: CommissionNumericValue | null;
+  categoryId: string;
+  sellerType: CommissionSellerType;
+  minAmount: CommissionNumericValue;
   maxAmount?: CommissionNumericValue | null;
-  // ── legacy single rates (kept; back-filled into the v2 rates by migration) ──
-  sellerRate?: CommissionNumericValue | null;
-  buyerRate?: CommissionNumericValue | null;
-  sellerMin?: CommissionNumericValue | null;
-  sellerMax?: CommissionNumericValue | null;
-  buyerMin?: CommissionNumericValue | null;
-  buyerMax?: CommissionNumericValue | null;
-  // ── v2 four explicit rates + TL floor/cap ──
-  buyerCommissionRate?: CommissionNumericValue | null;
+}
+
+/** Satış ve takas fiyatlamasının paylaştığı tek-kural sözleşmesi. */
+export interface CommissionRuleForCalculation extends CommissionRuleMatchable {
+  buyerCommissionRate: CommissionNumericValue;
   buyerCommissionMin?: CommissionNumericValue | null;
   buyerCommissionMax?: CommissionNumericValue | null;
-  buyerServiceFeeRate?: CommissionNumericValue | null;
+  buyerServiceFeeRate: CommissionNumericValue;
   buyerServiceFeeMin?: CommissionNumericValue | null;
   buyerServiceFeeMax?: CommissionNumericValue | null;
-  sellerCommissionRate?: CommissionNumericValue | null;
+  sellerCommissionRate: CommissionNumericValue;
   sellerCommissionMin?: CommissionNumericValue | null;
   sellerCommissionMax?: CommissionNumericValue | null;
-  sellerPlatformFeeRate?: CommissionNumericValue | null;
+  sellerPlatformFeeRate: CommissionNumericValue;
   sellerPlatformFeeMin?: CommissionNumericValue | null;
   sellerPlatformFeeMax?: CommissionNumericValue | null;
-  /** Buyer share (%) of the single shipping cost; seller share = 100 - this. */
-  shippingBuyerShare?: CommissionNumericValue | null;
-  /**
-   * Paket boyutu başına kargo bölüşümü. Satır bulunmayan kademe, tek
-   * `shippingBuyerShare` değerine geri düşer (kolaylık fallback'i).
-   */
+  shippingBuyerShare: CommissionNumericValue;
   shippingShares?: Array<{
     tierCode: ShippingPackageTierCode;
     buyerShare: CommissionNumericValue;
   }> | null;
 }
 
-// Kademe-payı haritası kargo alanına ait; tek kaynak shipping helper'dadır.
 export type { ShippingBuyerShareByTier };
 
 export interface CommissionCalculationResult {
-  /** buyerCommission + buyerServiceFee (what the buyer pays on top). */
   buyerFeeAmount: number;
-  /** sellerCommission + sellerPlatformFee (deducted from the seller payout). */
   sellerFeeAmount: number;
-  /** buyerFeeAmount + sellerFeeAmount. */
   commissionAmount: number;
-  // v2 breakdown
   buyerCommissionAmount: number;
   buyerServiceFeeAmount: number;
   sellerCommissionAmount: number;
   sellerPlatformFeeAmount: number;
-  /**
-   * 0–100; buyer's share of the shipping cost (default 100 = buyer pays all).
-   * Paketin kademesi bilinmediğinde kullanılan geriye-uyum değeri: ilk kademenin
-   * payı. Kademe çözüldükten sonra `shippingBuyerShares` okunmalıdır.
-   */
   shippingBuyerShare: number;
-  /** Paket boyutu başına alıcı payı — çağıran, paketin kademesine göre seçer. */
   shippingBuyerShares: ShippingBuyerShareByTier;
-  ruleId: string | null;
-  ruleName: string | null;
-  /**
-   * Hangi tarafın kuralı eşleşti? `ruleId` bunların birleşimidir (seller ?? buyer),
-   * bu yüzden tek başına "satıcı komisyonu yapılandırılmış mı" sorusunu YANITLAMAZ.
-   * Fail-closed guard'lar bu alanlara bakmalıdır.
-   */
-  sellerRuleId: string | null;
-  buyerRuleId: string | null;
-  ruleType?: CommissionRuleType;
-  appliedRate?: number;
-  wasMinApplied?: boolean;
-  wasMaxApplied?: boolean;
-  /** Effective paid tier used while selecting the commission rule. */
+  ruleSetId: string;
+  ruleId: string;
+  ruleName: string;
+  matchedCategoryId: string;
+  matchedSellerType: CommissionSellerType;
+  matchedAmount: number;
+  /** Geçiş süresince eski tüketiciler için; ikisi de aynı tek kuraldır. */
+  sellerRuleId: string;
+  buyerRuleId: string;
+  appliedRate: number;
+  wasMinApplied: boolean;
+  wasMaxApplied: boolean;
   effectiveMembershipTier?: MembershipTierType | null;
-  /** Taxpayer classification used while selecting commission/tax policy. */
-  taxpayerType?: CommissionTaxpayerType;
+  /** Vergi motorunun gözlem amaçlı sınıflandırması; eşleşme girdisi değildir. */
+  taxpayerType?: string | null;
 }
 
 export interface CommissionMatchContext {
-  categoryId?: string | null;
+  categoryId: string;
   sellerType: CommissionSellerType;
-  /** Buyer/corporate axis; defaults to `all` when unknown. */
-  taxpayerType?: CommissionTaxpayerType;
-  /** Product/line amount for tiered [min,max] gating; omit to skip the gate. */
-  amount?: number;
+  amount: number;
+}
+
+export class CommissionRuleMatchError extends Error {
+  constructor(
+    readonly matchCount: number,
+    readonly context: CommissionMatchContext,
+    readonly matchingRuleIds: string[],
+  ) {
+    super(
+      `Expected exactly one commission rule, found ${matchCount} ` +
+        `(category=${context.categoryId} sellerType=${context.sellerType} amount=${context.amount})`,
+    );
+    this.name = "CommissionRuleMatchError";
+  }
+}
+
+export class CommissionSellerConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CommissionSellerConfigurationError";
+  }
+}
+
+export class CorporateSellingSuspendedError extends Error {
+  constructor() {
+    super("Corporate seller has no entitled BUSINESS membership");
+    this.name = "CorporateSellingSuspendedError";
+  }
 }
 
 const numericValue = (value: CommissionNumericValue | null | undefined) =>
   value == null ? null : Number(value);
 
+export const STRICT_COMMISSION_SELLER_TYPES = [
+  CommissionSellerType.FREE,
+  CommissionSellerType.BASIC,
+  CommissionSellerType.PREMIUM,
+  CommissionSellerType.BUSINESS,
+] as const;
+
+export function validateStrictCommissionCoverage(
+  ruleSetId: string,
+  categories: Array<{ id: string; name: string }>,
+  rules: Array<
+    Pick<
+      CommissionRuleMatchable,
+      "categoryId" | "sellerType" | "minAmount" | "maxAmount"
+    >
+  >,
+) {
+  const errors: Array<{
+    categoryId: string;
+    categoryName: string;
+    sellerType: CommissionSellerType;
+    message: string;
+  }> = [];
+  for (const category of categories) {
+    for (const sellerType of STRICT_COMMISSION_SELLER_TYPES) {
+      const bands = rules
+        .filter(
+          (rule) =>
+            rule.categoryId === category.id && rule.sellerType === sellerType,
+        )
+        .sort((a, b) => Number(a.minAmount) - Number(b.minAmount));
+      const push = (message: string) =>
+        errors.push({
+          categoryId: category.id,
+          categoryName: category.name,
+          sellerType,
+          message,
+        });
+
+      if (bands.length === 0) {
+        push("Hiç fiyat aralığı tanımlanmamış.");
+        continue;
+      }
+      if (Number(bands[0].minAmount) !== 0) {
+        push("İlk fiyat aralığı 0 TL'den başlamalı.");
+      }
+      for (let index = 1; index < bands.length; index += 1) {
+        const previousMax = bands[index - 1].maxAmount;
+        const currentMin = Number(bands[index].minAmount);
+        if (previousMax == null) {
+          push("Sonsuz üst sınırlı kuraldan sonra başka aralık olamaz.");
+          break;
+        }
+        if (Number(previousMax) !== currentMin) {
+          push(
+            `${Number(previousMax)} TL ile ${currentMin} TL arasında boşluk var.`,
+          );
+        }
+      }
+      if (bands[bands.length - 1].maxAmount != null) {
+        push("Son fiyat aralığının üst sınırı boş (sonsuz) olmalı.");
+      }
+    }
+  }
+  return {
+    valid: errors.length === 0,
+    ruleSetId,
+    activeCategoryCount: categories.length,
+    requiredAxisCount:
+      categories.length * STRICT_COMMISSION_SELLER_TYPES.length,
+    errors,
+  };
+}
+
 const DEFAULT_SHIPPING_BUYER_SHARE = 100;
 const SHIPPING_TIER_CODES = Object.values(ShippingPackageTierCode);
 const clampShare = (share: number) => Math.min(100, Math.max(0, share));
 
-/**
- * Bir kuralın paket boyutu başına alıcı kargo payları. Kademe satırı bulunmayan
- * boyut kuralın tek `shippingBuyerShare` değerini kullanır; o da yoksa 100
- * (alıcı tüm kargoyu öder — mevcut davranış korunur).
- */
 function resolveShippingBuyerShares(
-  rule: CommissionRuleForCalculation | null | undefined,
+  rule: CommissionRuleForCalculation,
 ): ShippingBuyerShareByTier {
-  const fallbackRaw = numericValue(rule?.shippingBuyerShare);
-  const fallback =
-    fallbackRaw == null
-      ? DEFAULT_SHIPPING_BUYER_SHARE
-      : clampShare(fallbackRaw);
+  const fallback = clampShare(Number(rule.shippingBuyerShare));
   const byTier = new Map(
-    (rule?.shippingShares ?? []).map((share) => [
+    (rule.shippingShares ?? []).map((share) => [
       share.tierCode,
       clampShare(Number(share.buyerShare)),
     ]),
@@ -138,239 +200,128 @@ function resolveShippingBuyerShares(
   ) as ShippingBuyerShareByTier;
 }
 
-/**
- * "Catch-all" kural: her eksende wildcard, tutar aralığı sınırsız ve HER İKİ
- * tarafa (BOTH) uygulanan kural. En az bir aktif catch-all kuralın varlığı
- * dağıtım önkoşuludur: aksi halde eşleşmeyen her kategori/tutar checkout'ta
- * fail-closed 503 verir (veya yalnız alıcı tarafı eşleşir ve satıcı komisyonu
- * sessizce 0 olur). Tanım tek kaynaktan gelir — health check ve silme guard'ı
- * bu fonksiyonu kullanır.
- */
-export function isCatchAllCommissionRule(
-  rule: Pick<
-    CommissionRuleForCalculation,
-    | "categoryId"
-    | "sellerType"
-    | "taxpayerType"
-    | "minAmount"
-    | "maxAmount"
-    | "appliesTo"
-  >,
+/** Fiyat aralığı yarı-açıktır: min dahil, max hariç. */
+export function amountInCommissionRange(
+  rule: Pick<CommissionRuleMatchable, "minAmount" | "maxAmount">,
+  amount: number,
 ): boolean {
-  const wildcardSeller =
-    rule.sellerType == null || rule.sellerType === CommissionSellerType.ALL;
-  const wildcardTaxpayer =
-    rule.taxpayerType == null ||
-    rule.taxpayerType === CommissionTaxpayerType.all;
-  return (
-    rule.categoryId == null &&
-    wildcardSeller &&
-    wildcardTaxpayer &&
-    rule.minAmount == null &&
-    rule.maxAmount == null &&
-    rule.appliesTo === CommissionAppliesTo.BOTH
+  const min = Number(rule.minAmount);
+  const max = numericValue(rule.maxAmount);
+  return amount >= min && (max == null || amount < max);
+}
+
+/** Bareme girecek birim fiyatı para hassasiyetine indirger. */
+export function roundCommissionMatchAmount(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
+export function findMatchingCommissionRules<T extends CommissionRuleMatchable>(
+  rules: T[],
+  ctx: CommissionMatchContext,
+): T[] {
+  return rules.filter(
+    (rule) =>
+      rule.categoryId === ctx.categoryId &&
+      rule.sellerType === ctx.sellerType &&
+      amountInCommissionRange(rule, ctx.amount),
   );
 }
 
-/** Whether `amount` falls in the rule's [minAmount, maxAmount] range (null = unbounded). */
-function amountInRange(
-  rule: Pick<CommissionRuleForCalculation, "minAmount" | "maxAmount">,
-  amount: number | undefined,
-): boolean {
-  if (amount == null) return true; // no amount context → don't gate
-  const min = numericValue(rule.minAmount);
-  const max = numericValue(rule.maxAmount);
-  if (min != null && amount < min) return false;
-  if (max != null && amount > max) return false;
-  return true;
-}
-
-/**
- * Find the best-matching commission rule by specificity score, gated by the
- * amount range. Axes (most→least specific): category (4) > taxpayerType (2) >
- * sellerType (1); `null`/`all`/`ALL` act as wildcards. Ties break by higher
- * `priority`. This generalizes the old category→sellerType precedence: with
- * taxpayerType defaulting to `all` and no amount bounds it reduces to the
- * previous behavior.
- */
-export function findMatchingCommissionRule<
-  T extends Pick<
-    CommissionRuleForCalculation,
-    "categoryId" | "sellerType" | "taxpayerType" | "minAmount" | "maxAmount"
-  > & { priority?: number },
->(rules: T[], ctx: CommissionMatchContext, logger?: Logger): T | null {
-  const taxpayer = ctx.taxpayerType ?? CommissionTaxpayerType.all;
-
-  const candidates = rules
-    .filter((r) => {
-      // category: specific must equal; null = wildcard
-      if (r.categoryId != null && r.categoryId !== ctx.categoryId) return false;
-      // sellerType: specific must equal; null/ALL = wildcard
-      if (
-        r.sellerType != null &&
-        r.sellerType !== CommissionSellerType.ALL &&
-        r.sellerType !== ctx.sellerType
-      )
-        return false;
-      // taxpayerType: specific must equal; null/all = wildcard
-      if (
-        r.taxpayerType != null &&
-        r.taxpayerType !== CommissionTaxpayerType.all &&
-        r.taxpayerType !== taxpayer
-      )
-        return false;
-      return amountInRange(r, ctx.amount);
-    })
-    .map((r) => {
-      let score = 0;
-      if (r.categoryId != null && r.categoryId === ctx.categoryId) score += 4;
-      if (
-        r.taxpayerType != null &&
-        r.taxpayerType !== CommissionTaxpayerType.all
-      )
-        score += 2;
-      if (r.sellerType != null && r.sellerType !== CommissionSellerType.ALL)
-        score += 1;
-      // Prefer bounded ranges over unbounded when both match (tighter tier wins).
-      if (r.minAmount != null || r.maxAmount != null) score += 0.5;
-      return { rule: r, score };
-    })
-    .sort(
-      (a, b) =>
-        b.score - a.score || (b.rule.priority ?? 0) - (a.rule.priority ?? 0),
+/** Priority, wildcard ve fallback yoktur; tam olarak bir kural zorunludur. */
+export function findMatchingCommissionRule<T extends CommissionRuleMatchable>(
+  rules: T[],
+  ctx: CommissionMatchContext,
+  logger?: Logger,
+): T {
+  const matches = findMatchingCommissionRules(rules, ctx);
+  if (matches.length !== 1) {
+    logger?.error(
+      `Strict commission match failed count=${matches.length} category=${ctx.categoryId} ` +
+        `sellerType=${ctx.sellerType} amount=${ctx.amount} rules=${matches
+          .map((rule) => rule.id)
+          .join(",")}`,
     );
-
-  const best = candidates[0]?.rule ?? null;
-  if (best) {
-    logger?.debug(
-      `Matched commission rule score=${candidates[0].score} category=${ctx.categoryId} sellerType=${ctx.sellerType} taxpayer=${taxpayer}`,
+    throw new CommissionRuleMatchError(
+      matches.length,
+      ctx,
+      matches.map((rule) => rule.id),
     );
   }
-  return best;
+  return matches[0];
 }
 
-/** Clamp amount between min and max (TL floor/cap), rounded to 2 decimals. */
 export function clampCommissionAmount(
   raw: number,
   min: number | null,
   max: number | null,
 ): number {
-  let val = raw;
-  if (min != null && val < min) val = min;
-  if (max != null && val > max) val = max;
-  return Math.round(val * 100) / 100;
+  let value = raw;
+  if (min != null && value < min) value = min;
+  if (max != null && value > max) value = max;
+  return Math.round(value * 100) / 100;
 }
 
-/** rate% of amount, clamped by [min,max]; 0 when the rate is absent. */
 function feeFor(
   amount: number,
-  rate: CommissionNumericValue | null | undefined,
+  rate: CommissionNumericValue,
   min: CommissionNumericValue | null | undefined,
   max: CommissionNumericValue | null | undefined,
 ): number {
-  const r = numericValue(rate);
-  if (r == null || r === 0) return 0;
+  const numericRate = Number(rate);
+  if (numericRate === 0) return 0;
   return clampCommissionAmount(
-    amount * (r / 100),
+    amount * (numericRate / 100),
     numericValue(min),
     numericValue(max),
   );
 }
 
-/**
- * Compute the full deduction breakdown for an order line from the matched rules.
- *
- * Buyer side (appliesTo ∈ {BUYER, BOTH}) supplies buyerCommission + buyerServiceFee;
- * seller side (appliesTo ∈ {SELLER, BOTH}) supplies sellerCommission + sellerPlatformFee.
- * A v2 rule with appliesTo=BOTH provides all four; legacy split rules still work
- * (buyerServiceFee/sellerCommission were back-filled from the old buyer/seller rates).
- * Shipping split (`shippingBuyerShare`) comes from the seller-side rule, else buyer-side.
- */
 export function calculateCommissionFromRules(
   amount: number,
   rules: CommissionRuleForCalculation[],
-  ctxOrCategoryId:
-    CommissionMatchContext | (string | null | undefined) = undefined,
-  legacySellerType?: CommissionSellerType,
+  context: Omit<CommissionMatchContext, "amount"> & { amount?: number },
   logger?: Logger,
 ): CommissionCalculationResult {
-  // Back-compat overload: (amount, rules, categoryId, sellerType, logger)
-  const ctx: CommissionMatchContext =
-    ctxOrCategoryId != null && typeof ctxOrCategoryId === "object"
-      ? ctxOrCategoryId
-      : {
-          categoryId: ctxOrCategoryId as string | null | undefined,
-          sellerType: legacySellerType ?? CommissionSellerType.ALL,
-          amount,
-        };
-  const matchCtx: CommissionMatchContext = { amount, ...ctx };
+  const matchContext: CommissionMatchContext = {
+    ...context,
+    amount: roundCommissionMatchAmount(context.amount ?? amount),
+  };
+  const rule = findMatchingCommissionRule(rules, matchContext, logger);
 
-  const sellerMatch = findMatchingCommissionRule(
-    rules.filter(
-      (r) =>
-        r.appliesTo === CommissionAppliesTo.SELLER ||
-        r.appliesTo === CommissionAppliesTo.BOTH,
-    ),
-    matchCtx,
-    logger,
+  const buyerCommissionAmount = feeFor(
+    amount,
+    rule.buyerCommissionRate,
+    rule.buyerCommissionMin,
+    rule.buyerCommissionMax,
   );
-  const buyerMatch = findMatchingCommissionRule(
-    rules.filter(
-      (r) =>
-        r.appliesTo === CommissionAppliesTo.BUYER ||
-        r.appliesTo === CommissionAppliesTo.BOTH,
-    ),
-    matchCtx,
-    logger,
+  const buyerServiceFeeAmount = feeFor(
+    amount,
+    rule.buyerServiceFeeRate,
+    rule.buyerServiceFeeMin,
+    rule.buyerServiceFeeMax,
   );
-
-  const sellerCommissionAmount = sellerMatch
-    ? feeFor(
-        amount,
-        // v2 rate if set, else legacy sellerRate
-        sellerMatch.sellerCommissionRate ?? sellerMatch.sellerRate,
-        sellerMatch.sellerCommissionMin ?? sellerMatch.sellerMin,
-        sellerMatch.sellerCommissionMax ?? sellerMatch.sellerMax,
-      )
-    : 0;
-  const sellerPlatformFeeAmount = sellerMatch
-    ? feeFor(
-        amount,
-        sellerMatch.sellerPlatformFeeRate,
-        sellerMatch.sellerPlatformFeeMin,
-        sellerMatch.sellerPlatformFeeMax,
-      )
-    : 0;
-  const buyerServiceFeeAmount = buyerMatch
-    ? feeFor(
-        amount,
-        buyerMatch.buyerServiceFeeRate ?? buyerMatch.buyerRate,
-        buyerMatch.buyerServiceFeeMin ?? buyerMatch.buyerMin,
-        buyerMatch.buyerServiceFeeMax ?? buyerMatch.buyerMax,
-      )
-    : 0;
-  const buyerCommissionAmount = buyerMatch
-    ? feeFor(
-        amount,
-        buyerMatch.buyerCommissionRate,
-        buyerMatch.buyerCommissionMin,
-        buyerMatch.buyerCommissionMax,
-      )
-    : 0;
+  const sellerCommissionAmount = feeFor(
+    amount,
+    rule.sellerCommissionRate,
+    rule.sellerCommissionMin,
+    rule.sellerCommissionMax,
+  );
+  const sellerPlatformFeeAmount = feeFor(
+    amount,
+    rule.sellerPlatformFeeRate,
+    rule.sellerPlatformFeeMin,
+    rule.sellerPlatformFeeMax,
+  );
 
   const buyerFeeAmount =
     Math.round((buyerCommissionAmount + buyerServiceFeeAmount) * 100) / 100;
   const sellerFeeAmount =
     Math.round((sellerCommissionAmount + sellerPlatformFeeAmount) * 100) / 100;
-  const primary = sellerMatch ?? buyerMatch;
-  // Kargo payı satıcı tarafı kuralından gelir (kargoyu o sübvanse eder); yoksa
-  // alıcı tarafı kuralından. Kademe satırı olmayan boyut, kuralın tek payına düşer.
-  const shareSource =
-    sellerMatch?.shippingBuyerShare != null ||
-    sellerMatch?.shippingShares?.length
-      ? sellerMatch
-      : (buyerMatch ?? sellerMatch);
-  const shippingBuyerShares = resolveShippingBuyerShares(shareSource);
+  const shippingBuyerShares = resolveShippingBuyerShares(rule);
+  const rawPrimarySellerCommission =
+    amount * (Number(rule.sellerCommissionRate) / 100);
+  const primarySellerMin = numericValue(rule.sellerCommissionMin);
+  const primarySellerMax = numericValue(rule.sellerCommissionMax);
   const shippingBuyerShare =
     shippingBuyerShares[SHIPPING_TIER_CODES[0]] ?? DEFAULT_SHIPPING_BUYER_SHARE;
 
@@ -385,59 +336,81 @@ export function calculateCommissionFromRules(
     sellerPlatformFeeAmount,
     shippingBuyerShare,
     shippingBuyerShares,
-    ruleId: primary?.id ?? null,
-    ruleName: primary?.name ?? null,
-    sellerRuleId: sellerMatch?.id ?? null,
-    buyerRuleId: buyerMatch?.id ?? null,
-    ruleType: primary?.ruleType,
-    appliedRate:
-      numericValue(
-        sellerMatch?.sellerCommissionRate ?? sellerMatch?.sellerRate,
-      ) ??
-      numericValue(buyerMatch?.buyerServiceFeeRate ?? buyerMatch?.buyerRate) ??
-      0,
+    ruleSetId: rule.ruleSetId,
+    ruleId: rule.id,
+    ruleName: rule.name,
+    matchedCategoryId: matchContext.categoryId,
+    matchedSellerType: matchContext.sellerType,
+    matchedAmount: matchContext.amount,
+    sellerRuleId: rule.id,
+    buyerRuleId: rule.id,
+    appliedRate: Number(rule.sellerCommissionRate),
+    wasMinApplied:
+      primarySellerMin != null && rawPrimarySellerCommission < primarySellerMin,
+    wasMaxApplied:
+      primarySellerMax != null && rawPrimarySellerCommission > primarySellerMax,
   };
 }
 
 /**
- * Map seller attributes to the commission rule buckets.
- * Paid membership takes precedence over the account-level seller type:
- * - business membership -> BUSINESS
- * - premium membership -> PREMIUM
- * - platform seller without a paid membership -> BUSINESS
- * - free/basic membership or individual/verified seller -> FREE
+ * Üyelik ve kurumsallık birlikte tek, geçerli komisyon satıcı tipine çevrilir.
+ * Kurumsal hesapların bireysel tier ile veya bireysel hesabın BUSINESS tier ile
+ * fiyatlanması sessizce kabul edilmez.
  */
-export function mapSellerTypeForCommission(
-  userSellerType: SellerType | null,
-  membershipTier: MembershipTierType | null,
-): CommissionSellerType {
-  if (membershipTier === MembershipTierType.business) {
+export function resolveCommissionSellerType(input: {
+  userSellerType: SellerType | null;
+  membershipTier: MembershipTierType;
+  configuredMembershipTier?: MembershipTierType | null;
+  businessStatus?: string | null;
+  companyName?: string | null;
+  taxId?: string | null;
+}): CommissionSellerType {
+  const isPlatform = input.userSellerType === SellerType.platform;
+  const isCorporate =
+    input.businessStatus === "approved" &&
+    !!input.companyName?.trim() &&
+    !!input.taxId?.trim();
+
+  if (isPlatform) return CommissionSellerType.BUSINESS;
+
+  if (input.configuredMembershipTier === MembershipTierType.business) {
+    if (!isCorporate) {
+      throw new CommissionSellerConfigurationError(
+        "BUSINESS membership requires an approved corporate seller identity",
+      );
+    }
+    if (input.membershipTier !== MembershipTierType.business) {
+      throw new CorporateSellingSuspendedError();
+    }
+  }
+
+  if (
+    isCorporate &&
+    input.configuredMembershipTier !== MembershipTierType.business
+  ) {
+    throw new CommissionSellerConfigurationError(
+      "Approved corporate seller must be configured with BUSINESS membership",
+    );
+  }
+
+  if (input.membershipTier === MembershipTierType.business) {
+    if (!isCorporate) {
+      throw new CommissionSellerConfigurationError(
+        "BUSINESS commission tier requires an approved corporate seller",
+      );
+    }
     return CommissionSellerType.BUSINESS;
   }
 
-  if (membershipTier === MembershipTierType.premium) {
+  if (isCorporate) {
+    throw new CorporateSellingSuspendedError();
+  }
+
+  if (input.membershipTier === MembershipTierType.basic) {
+    return CommissionSellerType.BASIC;
+  }
+  if (input.membershipTier === MembershipTierType.premium) {
     return CommissionSellerType.PREMIUM;
   }
-
-  // Platform sellers -> BUSINESS
-  if (userSellerType === SellerType.platform) {
-    return CommissionSellerType.BUSINESS;
-  }
-
-  // Individual/Verified -> FREE
   return CommissionSellerType.FREE;
-}
-
-/**
- * Corporate (kurumsal) taxpayer test — the SAME rule used for VAT/withholding
- * eligibility (businessStatus approved + a tax id present). Drives the
- * `taxpayerType` matching axis.
- */
-export function resolveTaxpayerType(seller: {
-  businessStatus?: string | null;
-  taxId?: string | null;
-}): CommissionTaxpayerType {
-  return seller?.businessStatus === "approved" && seller?.taxId
-    ? CommissionTaxpayerType.corporate
-    : CommissionTaxpayerType.individual;
 }

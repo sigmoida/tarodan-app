@@ -139,7 +139,7 @@ export const FAQ: Record<Lang, TradeFaq[]> = {
   tr: [
     {
       q: "Takas ücretsiz mi?",
-      a: "Evet, takas işlemi için herhangi bir komisyon alınmaz. Sadece kargo ücretini siz karşılarsınız.",
+      a: "Takas işlemlerinde ürünün komisyon kuralına göre sabit bir takas hizmet bedeli alınır. Kargo ayrıca, ilanda seçilen paket boyutuna göre hesaplanır.",
     },
     {
       q: "Takas teklifi nasıl gönderilir?",
@@ -157,7 +157,7 @@ export const FAQ: Record<Lang, TradeFaq[]> = {
   en: [
     {
       q: "Is trading free?",
-      a: "Yes, there is no commission for trade transactions. You only pay for shipping.",
+      a: "Trades have a flat service fee determined by the product's commission rule. Shipping is calculated separately from the package size selected for the listing.",
     },
     {
       q: "How do I send a trade offer?",

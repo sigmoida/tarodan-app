@@ -24,7 +24,7 @@ export interface TradeCashPaymentRow {
   shippingAmount: number;
   /** PayTR'den tahsil edilecek toplam. */
   totalAmount: number;
-  /** LEGACY (v1) — v2'de komisyon alınmaz. */
+  /** LEGACY (v1) yüzde komisyon alanı; v2 sabit ücret `tradeFeeAmount` içindedir. */
   commission: number;
   commissionTaxAmount: number;
   provider: string;

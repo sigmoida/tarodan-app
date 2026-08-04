@@ -1,304 +1,167 @@
 import {
-  BusinessStatus,
-  CommissionAppliesTo,
-  CommissionRuleType,
   CommissionSellerType,
   MembershipTierType,
   SellerType,
+  ShippingPackageTierCode,
 } from "@prisma/client";
-import { PrismaService } from "../../prisma";
-import { TaxService } from "../tax/tax.service";
-import { OrderPricingService } from "./order-pricing.service";
 import {
   calculateCommissionFromRules,
-  mapSellerTypeForCommission,
+  CommissionRuleForCalculation,
+  CommissionRuleMatchError,
+  CommissionSellerConfigurationError,
+  CorporateSellingSuspendedError,
+  findMatchingCommissionRule,
+  resolveCommissionSellerType,
 } from "./order-commission.helper";
-import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
-describe("mapSellerTypeForCommission", () => {
-  it.each([
-    [MembershipTierType.free, CommissionSellerType.FREE],
-    [MembershipTierType.basic, CommissionSellerType.FREE],
-    [MembershipTierType.premium, CommissionSellerType.PREMIUM],
-    [MembershipTierType.business, CommissionSellerType.BUSINESS],
-  ])("maps the %s membership tier to %s", (membershipTier, expected) => {
-    expect(
-      mapSellerTypeForCommission(SellerType.individual, membershipTier),
-    ).toBe(expected);
-  });
-
-  it.each([SellerType.individual, SellerType.verified])(
-    "maps a %s seller without membership to FREE",
-    (sellerType) => {
-      expect(mapSellerTypeForCommission(sellerType, null)).toBe(
-        CommissionSellerType.FREE,
-      );
-    },
-  );
-
-  it("maps a platform seller without paid membership to BUSINESS", () => {
-    expect(mapSellerTypeForCommission(SellerType.platform, null)).toBe(
-      CommissionSellerType.BUSINESS,
-    );
-  });
-
-  it("gives paid membership precedence over platform seller type", () => {
-    expect(
-      mapSellerTypeForCommission(
-        SellerType.platform,
-        MembershipTierType.premium,
-      ),
-    ).toBe(CommissionSellerType.PREMIUM);
-  });
+const rule = (
+  overrides: Partial<CommissionRuleForCalculation> = {},
+): CommissionRuleForCalculation => ({
+  id: "rule-1",
+  ruleSetId: "set-1",
+  name: "Exact rule",
+  categoryId: "cat-1",
+  sellerType: CommissionSellerType.FREE,
+  minAmount: 0,
+  maxAmount: null,
+  buyerCommissionRate: 1,
+  buyerServiceFeeRate: 2,
+  sellerCommissionRate: 10,
+  sellerPlatformFeeRate: 3,
+  shippingBuyerShare: 100,
+  ...overrides,
 });
 
-describe("commission rule matching by membership tier", () => {
-  const commissionRules = [
-    {
-      id: "free-rule",
-      name: "Free commission",
-      ruleType: CommissionRuleType.seller_type,
-      categoryId: null,
+describe("strict commission matching", () => {
+  it("uses half-open ranges at an exact boundary", () => {
+    const lower = rule({ id: "lower", maxAmount: 5000 });
+    const upper = rule({ id: "upper", minAmount: 5000 });
+    expect(
+      findMatchingCommissionRule([lower, upper], {
+        categoryId: "cat-1",
+        sellerType: CommissionSellerType.FREE,
+        amount: 4999.99,
+      }).id,
+    ).toBe("lower");
+    expect(
+      findMatchingCommissionRule([lower, upper], {
+        categoryId: "cat-1",
+        sellerType: CommissionSellerType.FREE,
+        amount: 5000,
+      }).id,
+    ).toBe("upper");
+  });
+
+  it("fails closed for zero or multiple exact matches", () => {
+    const context = {
+      categoryId: "cat-1",
       sellerType: CommissionSellerType.FREE,
-      appliesTo: CommissionAppliesTo.SELLER,
-      sellerRate: 5,
-      sellerMin: null,
-      sellerMax: null,
-      buyerRate: null,
-      buyerMin: null,
-      buyerMax: null,
-    },
-    {
-      id: "premium-rule",
-      name: "Premium commission",
-      ruleType: CommissionRuleType.seller_type,
-      categoryId: null,
-      sellerType: CommissionSellerType.PREMIUM,
-      appliesTo: CommissionAppliesTo.SELLER,
-      sellerRate: 10,
-      sellerMin: null,
-      sellerMax: null,
-      buyerRate: null,
-      buyerMin: null,
-      buyerMax: null,
-    },
-    {
-      id: "business-rule",
-      name: "Business commission",
-      ruleType: CommissionRuleType.seller_type,
-      categoryId: null,
-      sellerType: CommissionSellerType.BUSINESS,
-      appliesTo: CommissionAppliesTo.SELLER,
-      sellerRate: 15,
-      sellerMin: null,
-      sellerMax: null,
-      buyerRate: null,
-      buyerMin: null,
-      buyerMax: null,
-    },
-  ];
-
-  const prisma = {
-    user: { findUnique: jest.fn() },
-    commissionRule: { findMany: jest.fn().mockResolvedValue(commissionRules) },
-  };
-  const service = new OrderPricingService(
-    prisma as unknown as PrismaService,
-    {} as TaxService,
-    {
-      getActiveOutboundTariff: async () => ({
-        freeShippingEnabled: true,
-        freeShippingThreshold: 500,
-      }),
-    } as any,
-    {
-      getEffectiveDisplayPrice: async () => null,
-      getEffectiveDisplayPriceMany: async () => new Map(),
-    } as any,
-    testTaxPolicy(),
-  );
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    prisma.commissionRule.findMany.mockResolvedValue(commissionRules);
+      amount: 100,
+    };
+    expect(() => findMatchingCommissionRule([], context)).toThrow(
+      CommissionRuleMatchError,
+    );
+    expect(() =>
+      findMatchingCommissionRule([rule(), rule({ id: "rule-2" })], context),
+    ).toThrow(CommissionRuleMatchError);
   });
 
-  it.each([
-    [MembershipTierType.free, "free-rule", 5],
-    [MembershipTierType.basic, "free-rule", 5],
-    [MembershipTierType.premium, "premium-rule", 10],
-    [MembershipTierType.business, "business-rule", 15],
-  ])(
-    "charges a %s seller using the matching rule",
-    async (membershipTier, expectedRuleId, expectedFee) => {
-      prisma.user.findUnique.mockResolvedValue({
-        sellerType: SellerType.individual,
-        businessStatus:
-          membershipTier === MembershipTierType.business
-            ? BusinessStatus.approved
-            : null,
-        companyName:
-          membershipTier === MembershipTierType.business ? "Acme A.S." : null,
-        taxId:
-          membershipTier === MembershipTierType.business ? "1234567890" : null,
-        // Paid-tier commission requires an ENTITLED membership (active + in-period);
-        // a raw past_due/expired tier no longer unlocks premium/business commission.
-        membership: {
-          tier: { type: membershipTier },
-          status: "active",
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        },
-      });
-
-      const result = await service.calculateCommission(100, "seller-id");
-
-      expect(result).toMatchObject({
-        ruleId: expectedRuleId,
-        sellerFeeAmount: expectedFee,
-        buyerFeeAmount: 0,
-        commissionAmount: expectedFee,
-      });
-    },
-  );
-
-  it("does not grant the business commission rule before KYC approval", async () => {
-    prisma.user.findUnique.mockResolvedValue({
-      sellerType: SellerType.individual,
-      businessStatus: BusinessStatus.pending,
-      companyName: "Acme A.S.",
-      taxId: "1234567890",
-      membership: {
-        tier: { type: MembershipTierType.business, isActive: true },
-        status: "active",
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  it("takes buyer, seller and shipping properties from one rule", () => {
+    const result = calculateCommissionFromRules(
+      1000,
+      [
+        rule({
+          shippingBuyerShare: 80,
+          shippingShares: [
+            { tierCode: ShippingPackageTierCode.large, buyerShare: 40 },
+          ],
+        }),
+      ],
+      {
+        categoryId: "cat-1",
+        sellerType: CommissionSellerType.FREE,
       },
-    });
+    );
+    expect(result.ruleId).toBe("rule-1");
+    expect(result.sellerRuleId).toBe("rule-1");
+    expect(result.buyerRuleId).toBe("rule-1");
+    expect(result.buyerFeeAmount).toBe(30);
+    expect(result.sellerFeeAmount).toBe(130);
+    expect(result.shippingBuyerShares.large).toBe(40);
+    expect(result.shippingBuyerShares.small).toBe(80);
+  });
 
-    const result = await service.calculateCommission(100, "seller-id");
+  it("accepts an explicit all-zero rule", () => {
+    const result = calculateCommissionFromRules(
+      1000,
+      [
+        rule({
+          buyerCommissionRate: 0,
+          buyerServiceFeeRate: 0,
+          sellerCommissionRate: 0,
+          sellerPlatformFeeRate: 0,
+        }),
+      ],
+      {
+        categoryId: "cat-1",
+        sellerType: CommissionSellerType.FREE,
+      },
+    );
+    expect(result.commissionAmount).toBe(0);
+    expect(result.ruleId).toBe("rule-1");
+  });
 
-    expect(result).toMatchObject({
-      ruleId: "free-rule",
-      sellerFeeAmount: 5,
-      commissionAmount: 5,
-    });
+  it("rounds a divided unit price to cents before selecting the band", () => {
+    const result = calculateCommissionFromRules(
+      100,
+      [
+        rule({ id: "lower", maxAmount: 33.33 }),
+        rule({ id: "upper", minAmount: 33.33 }),
+      ],
+      {
+        categoryId: "cat-1",
+        sellerType: CommissionSellerType.FREE,
+        amount: 100 / 3,
+      },
+    );
+    expect(result.ruleId).toBe("upper");
+    expect(result.matchedAmount).toBe(33.33);
   });
 });
 
-describe("calculateCommissionFromRules", () => {
-  const rule = (
-    id: string,
-    sellerType: CommissionSellerType,
-    appliesTo: CommissionAppliesTo,
-    rates: { sellerRate?: number; buyerRate?: number },
-    categoryId: string | null = null,
-  ) => ({
-    id,
-    name: id,
-    ruleType: CommissionRuleType.seller_type,
-    categoryId,
-    sellerType,
-    appliesTo,
-    sellerRate: rates.sellerRate ?? null,
-    buyerRate: rates.buyerRate ?? null,
-    sellerMin: null,
-    sellerMax: null,
-    buyerMin: null,
-    buyerMax: null,
+describe("commission seller type", () => {
+  it("keeps BASIC distinct from FREE", () => {
+    expect(
+      resolveCommissionSellerType({
+        userSellerType: SellerType.individual,
+        membershipTier: MembershipTierType.basic,
+      }),
+    ).toBe(CommissionSellerType.BASIC);
   });
 
-  it("layers the global buyer fee onto a category seller rule", () => {
-    const result = calculateCommissionFromRules(
-      1000,
-      [
-        rule(
-          "category-seller",
-          CommissionSellerType.BUSINESS,
-          CommissionAppliesTo.SELLER,
-          { sellerRate: 8 },
-          "category-1",
-        ),
-        rule(
-          "global-buyer",
-          CommissionSellerType.ALL,
-          CommissionAppliesTo.BUYER,
-          { buyerRate: 3 },
-        ),
-      ],
-      "category-1",
-      CommissionSellerType.BUSINESS,
-    );
-
-    expect(result).toMatchObject({
-      sellerFeeAmount: 80,
-      buyerFeeAmount: 30,
-      commissionAmount: 110,
-      ruleId: "category-seller",
-    });
+  it("rejects corporate plus non-business membership", () => {
+    expect(() =>
+      resolveCommissionSellerType({
+        userSellerType: SellerType.verified,
+        configuredMembershipTier: MembershipTierType.business,
+        membershipTier: MembershipTierType.free,
+        businessStatus: "approved",
+        companyName: "ACME",
+        taxId: "123",
+      }),
+    ).toThrow(CorporateSellingSuspendedError);
   });
 
-  it("uses a more-specific BOTH rule for both sides", () => {
-    const result = calculateCommissionFromRules(
-      1000,
-      [
-        rule(
-          "exact-both",
-          CommissionSellerType.PREMIUM,
-          CommissionAppliesTo.BOTH,
-          { sellerRate: 6, buyerRate: 2 },
-          "category-1",
-        ),
-        rule(
-          "global-seller",
-          CommissionSellerType.ALL,
-          CommissionAppliesTo.SELLER,
-          { sellerRate: 5 },
-        ),
-        rule(
-          "global-buyer",
-          CommissionSellerType.ALL,
-          CommissionAppliesTo.BUYER,
-          { buyerRate: 3 },
-        ),
-      ],
-      "category-1",
-      CommissionSellerType.PREMIUM,
-    );
-
-    expect(result).toMatchObject({
-      sellerFeeAmount: 60,
-      buyerFeeAmount: 20,
-      commissionAmount: 80,
-      ruleId: "exact-both",
-    });
-  });
-
-  it("resolves seller and buyer specificity independently", () => {
-    const result = calculateCommissionFromRules(
-      1000,
-      [
-        rule(
-          "type-seller",
-          CommissionSellerType.FREE,
-          CommissionAppliesTo.SELLER,
-          { sellerRate: 5 },
-        ),
-        rule(
-          "category-buyer",
-          CommissionSellerType.ALL,
-          CommissionAppliesTo.BUYER,
-          { buyerRate: 4 },
-          "category-1",
-        ),
-      ],
-      "category-1",
-      CommissionSellerType.FREE,
-    );
-
-    expect(result).toMatchObject({
-      sellerFeeAmount: 50,
-      buyerFeeAmount: 40,
-      commissionAmount: 90,
-      ruleId: "type-seller",
-    });
+  it("does not silently downgrade an invalid configured BUSINESS membership to FREE", () => {
+    expect(() =>
+      resolveCommissionSellerType({
+        userSellerType: SellerType.verified,
+        configuredMembershipTier: MembershipTierType.business,
+        membershipTier: MembershipTierType.free,
+        companyName: "Eksik İşletme",
+        businessStatus: null,
+        taxId: null,
+      }),
+    ).toThrow(CommissionSellerConfigurationError);
   });
 });

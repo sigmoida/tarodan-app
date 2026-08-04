@@ -58,6 +58,9 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
         ),
     };
     const orderPricing = {
+      resolveCommissionRuleSetSnapshot: jest
+        .fn()
+        .mockResolvedValue({ id: "set-1", version: 1 }),
       calculateCommission: jest.fn().mockResolvedValue({
         buyerFeeAmount: 10,
         sellerFeeAmount: 20,
@@ -168,6 +171,7 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
       1000,
       "s1",
       "c1",
+      "set-1",
     );
     expect(orderPricing.resolveShippingDecision).toHaveBeenCalledWith(
       expect.objectContaining({ tariff, subtotal: 1000, billableDesi: 1 }),

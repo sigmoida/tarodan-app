@@ -61,6 +61,7 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   messages: ["messages"],
   "support-tickets": ["support"],
   "commission-rules": ["commission"],
+  "commission-rule-sets": ["commission"],
   commission: ["commission"],
   payouts: ["payouts"],
   tax: ["tax"],

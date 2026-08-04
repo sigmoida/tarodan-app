@@ -275,6 +275,9 @@ function useCheckoutValue() {
     // Tariff version the quote was priced with — server returns 409 PRICING_CHANGED
     // if it moved before order-create, so the buyer confirms the new amount.
     expectedShippingTariffVersion: quote?.shippingTariffVersion ?? undefined,
+    expectedCommissionRuleSetId: quote?.commissionRuleSetId ?? undefined,
+    expectedCommissionRuleSetVersion:
+      quote?.commissionRuleSetVersion ?? undefined,
     // Unit-price hash the quote was priced with — same 409 guard for product
     // price / campaign changes between quote and pay (F1.3).
     expectedPricingHash: quote?.pricingHash ?? undefined,

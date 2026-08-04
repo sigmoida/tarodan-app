@@ -10,13 +10,16 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
     title: "Test product",
     price: 100,
     sellerId: "seller-1",
-    categoryId: null,
+    categoryId: "category-1",
     status: ProductStatus.active,
     seller: { businessStatus: "pending", taxId: null },
   };
 
   function makeService(validation: Record<string, unknown>) {
     const prisma = {
+      commissionRuleSet: {
+        findFirst: jest.fn().mockResolvedValue({ id: "set-1" }),
+      },
       product: {
         findUnique: jest.fn().mockResolvedValue(product),
       },

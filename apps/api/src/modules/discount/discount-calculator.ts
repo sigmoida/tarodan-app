@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { DiscountScope, DiscountType, ProductStatus } from '@prisma/client';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { DiscountScope, DiscountType, ProductStatus } from "@prisma/client";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 
 // Configuration constants
 const FREE_SHIPPING_THRESHOLD = 500;
@@ -117,14 +118,17 @@ export class DiscountCalculator {
         continue;
       }
 
-      const priceA = Number(product.price);
-      const isOnSale = this.isProductOnSale(product, now);
-      const originalPrice = isOnSale && product.oldPrice != null
-        ? Number(product.oldPrice)
-        : priceA;
+      // İndirim penceresi ORTAK kuraldan: pencere dışındaysa satış fiyatı
+      // indirim öncesi fiyattır (sepet, vitrin ve tahsilat aynı sayıyı görür).
+      const sale = resolveSalePrice(product, now);
+      const priceA = sale.price;
+      const isOnSale = sale.isOnSale;
+      const originalPrice = sale.oldPrice ?? priceA;
       const finalPrice = priceA;
       const lineTotal = finalPrice * inputItem.quantity;
-      const productDiscount = isOnSale ? (originalPrice - priceA) * inputItem.quantity : 0;
+      const productDiscount = isOnSale
+        ? (originalPrice - priceA) * inputItem.quantity
+        : 0;
 
       const isAvailable = product.status === ProductStatus.active;
       if (!isAvailable) {
@@ -135,7 +139,7 @@ export class DiscountCalculator {
         productId: product.id,
         productTitle: product.title,
         sellerId: product.sellerId,
-        sellerName: product.seller?.displayName || 'Satıcı',
+        sellerName: product.seller?.displayName || "Satıcı",
         quantity: inputItem.quantity,
         originalPrice,
         salePrice: isOnSale ? priceA : null,
@@ -148,8 +152,8 @@ export class DiscountCalculator {
       // Track product-level discount
       if (productDiscount > 0) {
         calculatedItem.appliedDiscounts.push({
-          discountId: 'product-sale',
-          discountName: 'Ürün İndirimi',
+          discountId: "product-sale",
+          discountName: "Ürün İndirimi",
           type: DiscountType.fixed_amount,
           value: productDiscount / inputItem.quantity,
           scope: DiscountScope.product,
@@ -203,7 +207,7 @@ export class DiscountCalculator {
     const maxDiscount = originalSubtotal * MAX_DISCOUNT_PERCENT;
     if (result.totalDiscount > maxDiscount) {
       result.totalDiscount = maxDiscount;
-      result.warnings.push('Maksimum indirim limitine ulaşıldı (%50)');
+      result.warnings.push("Maksimum indirim limitine ulaşıldı (%50)");
     }
 
     // Step 7: Calculate shipping
@@ -226,7 +230,9 @@ export class DiscountCalculator {
   /** A + oldPrice: indirimde mi (oldPrice dolu + tarih geçerli) */
   private isProductOnSale(product: any, now: Date): boolean {
     if (product.oldPrice == null) return false;
-    const saleStart = product.saleStartDate ? new Date(product.saleStartDate) : null;
+    const saleStart = product.saleStartDate
+      ? new Date(product.saleStartDate)
+      : null;
     const saleEnd = product.saleEndDate ? new Date(product.saleEndDate) : null;
     if (saleStart && now < saleStart) return false;
     if (saleEnd && now > saleEnd) return false;
@@ -270,7 +276,7 @@ export class DiscountCalculator {
           endDate: { gte: now },
           scope: DiscountScope.seller,
         },
-        orderBy: { priority: 'asc' },
+        orderBy: { priority: "asc" },
       });
 
       for (const discount of sellerDiscounts) {
@@ -351,15 +357,15 @@ export class DiscountCalculator {
     });
 
     if (!discount) {
-      return { discountAmount: 0, warning: 'Kupon kodu bulunamadı' };
+      return { discountAmount: 0, warning: "Kupon kodu bulunamadı" };
     }
 
     if (!discount.isActive) {
-      return { discountAmount: 0, warning: 'Bu kupon artık aktif değil' };
+      return { discountAmount: 0, warning: "Bu kupon artık aktif değil" };
     }
 
     if (now < discount.startDate || now > discount.endDate) {
-      return { discountAmount: 0, warning: 'Kuponun süresi doldu' };
+      return { discountAmount: 0, warning: "Kuponun süresi doldu" };
     }
 
     // Check total usage limit
@@ -367,7 +373,7 @@ export class DiscountCalculator {
       discount.usageLimitTotal &&
       discount.usedCount >= discount.usageLimitTotal
     ) {
-      return { discountAmount: 0, warning: 'Kupon kullanım limitine ulaştı' };
+      return { discountAmount: 0, warning: "Kupon kullanım limitine ulaştı" };
     }
 
     // Check per-user limit
@@ -376,7 +382,7 @@ export class DiscountCalculator {
         where: { discountId: discount.id, userId },
       });
       if (userUsageCount >= discount.usageLimitPerUser) {
-        return { discountAmount: 0, warning: 'Bu kuponu zaten kullandınız' };
+        return { discountAmount: 0, warning: "Bu kuponu zaten kullandınız" };
       }
     }
 
@@ -391,8 +397,7 @@ export class DiscountCalculator {
       switch (discount.scope) {
         case DiscountScope.global:
           isEligible =
-            discount.sellerId === null ||
-            discount.sellerId === item.sellerId;
+            discount.sellerId === null || discount.sellerId === item.sellerId;
           break;
         case DiscountScope.seller:
           isEligible = discount.sellerId === item.sellerId;
@@ -415,7 +420,7 @@ export class DiscountCalculator {
     if (eligibleAmount === 0) {
       return {
         discountAmount: 0,
-        warning: 'Bu kupon sepetinizdeki ürünlere uygulanamaz',
+        warning: "Bu kupon sepetinizdeki ürünlere uygulanamaz",
       };
     }
 
@@ -485,7 +490,7 @@ export class DiscountCalculator {
         endDate: { gte: now },
         scope: { in: [DiscountScope.global, DiscountScope.category] },
       },
-      orderBy: { priority: 'asc' },
+      orderBy: { priority: "asc" },
     });
 
     for (const campaign of campaigns) {
@@ -545,18 +550,17 @@ export class DiscountCalculator {
     });
 
     if (!product) {
-      throw new Error('Product not found');
+      throw new Error("Product not found");
     }
 
-    const now = new Date();
-    const effectivePrice = Number(product.price);
-    const isOnSale = this.isProductOnSale(product, now);
-    const originalPrice = isOnSale && product.oldPrice != null
-      ? Number(product.oldPrice)
-      : effectivePrice;
-    const discountPercent = isOnSale && originalPrice > effectivePrice
-      ? Math.round(((originalPrice - effectivePrice) / originalPrice) * 100)
-      : null;
+    const sale = resolveSalePrice(product, new Date());
+    const effectivePrice = sale.price;
+    const isOnSale = sale.isOnSale;
+    const originalPrice = sale.oldPrice ?? effectivePrice;
+    const discountPercent =
+      isOnSale && originalPrice > effectivePrice
+        ? Math.round(((originalPrice - effectivePrice) / originalPrice) * 100)
+        : null;
 
     return {
       originalPrice,

@@ -686,6 +686,59 @@ describe("ElogoInvoicingService", () => {
     expect(prisma.invoices[0].recipientUserId).toBe("b1");
   });
 
+  /**
+   * İNDİRİMLİ platform satışında belge, tahsil edilen tutara kesilir.
+   *
+   * Belge toplamı kalemlerden türer ve ürün kalemi `order.subtotal`'dan kurulur.
+   * O kolon indirim ÖNCESİ liste fiyatını tutarken (520,22 tahsil edilen ürün
+   * için 634,41 yazılıyken) alıcıya ödediğinden ~114 TL fazlaya e-Arşiv
+   * kesiliyordu. Kolon artık tahsil edilen tabanı tutuyor; bu test o bağı kilitler.
+   */
+  it("platform satışı faturası tahsil edilen tutara eşittir (indirimli üründe de)", async () => {
+    const prisma = makePrisma({
+      orders: {
+        o1: {
+          sellerId: "plat",
+          buyerId: "b1",
+          // 520,22 (indirimli ürün) + 50 kargo + 52,02 alıcı ücreti + 20,40 KDV
+          totalAmount: 642.64,
+          subtotal: 520.22,
+          quantity: 1,
+          buyerShippingAmount: 50,
+          buyerFeeAmount: 52.02,
+          product: { title: "Motorsport Efsaneleri Seti", categoryId: null },
+        },
+      },
+      users: {
+        plat: { displayName: "Tarodan Official Store", sellerType: "platform" },
+        b1: { displayName: "Alıcı", taxId: null },
+      },
+    });
+    const elogo = makeElogo();
+    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+
+    await svc.issuePlatformSaleInvoice("o1");
+
+    const doc = prisma.invoices[0];
+    expect(Number(doc.total)).toBeCloseTo(642.64, 2);
+    expect(Number(doc.netAmount) + Number(doc.taxAmount)).toBeCloseTo(
+      642.64,
+      2,
+    );
+
+    // Ürün satırı adıyla ve tahsil edilen bedeliyle durur (KDV dahil 520,22).
+    const [productLine] = doc.lineItems as Array<{
+      name: string;
+      net: number;
+      vatRate: number;
+    }>;
+    expect(productLine.name).toBe("Motorsport Efsaneleri Seti");
+    expect(productLine.net * (1 + productLine.vatRate / 100)).toBeCloseTo(
+      520.22,
+      2,
+    );
+  });
+
   it("eLogo kapalıysa göndermez ama retry için pending kayıt bırakır", async () => {
     const prisma = makePrisma({
       orders: { o1: { sellerId: "s1" } },

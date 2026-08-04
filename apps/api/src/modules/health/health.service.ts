@@ -13,12 +13,12 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
-import { CommissionAppliesTo, MembershipTierType } from "@prisma/client";
-import { isCatchAllCommissionRule } from "../order/order-commission.helper";
+import { CommissionRuleSetStatus, MembershipTierType } from "@prisma/client";
 import { SHIPPING_PACKAGE_TIER_ORDER } from "../shipping/shipping-package-tier";
 import { AdminTradeCommonService } from "../admin/admin-trade-common.service";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
+import { validateStrictCommissionCoverage } from "../order/order-commission.helper";
 
 /**
  * Bu sayıda DLQ (`dead`) outbox satırı biriktiğinde instance hazır-değil sayılır:
@@ -214,10 +214,11 @@ export class HealthService {
     try {
       const [
         membershipTierCount,
-        wildcardCommissionRules,
+        activeCommissionRuleSet,
         taxRuleCount,
         shippingTariff,
         platformSeller,
+        activeCategories,
       ] = await Promise.all([
         this.prisma.membershipTier.count({
           where: {
@@ -232,16 +233,18 @@ export class HealthService {
             isActive: true,
           },
         }),
-        // Yalnız SAYI yetmez: kategoriye özel kurallardan oluşan bir konfigürasyon
-        // "hazır" görünürken kapsam dışı her kategori checkout'ta fail-closed 503
-        // verir. Wildcard adaylarını çekip catch-all testini uygula (tek kaynak).
-        this.prisma.commissionRule.findMany({
-          where: {
-            isActive: true,
-            categoryId: null,
-            minAmount: null,
-            maxAmount: null,
-            appliesTo: CommissionAppliesTo.BOTH,
+        this.prisma.commissionRuleSet.findFirst({
+          where: { status: CommissionRuleSetStatus.ACTIVE },
+          select: {
+            id: true,
+            rules: {
+              select: {
+                categoryId: true,
+                sellerType: true,
+                minAmount: true,
+                maxAmount: true,
+              },
+            },
           },
         }),
         this.prisma.taxRule.count({ where: { isActive: true } }),
@@ -255,6 +258,10 @@ export class HealthService {
           where: { email: "platform@tarodan.com" },
           select: { id: true },
         }),
+        this.prisma.category.findMany({
+          where: { isActive: true },
+          select: { id: true, name: true },
+        }),
       ]);
 
       // Depo adresi: güvenli-takas escrow'unun önkoşulu. Yapılandırılmamışken
@@ -266,9 +273,14 @@ export class HealthService {
         .then(() => true)
         .catch(() => false);
 
-      const hasCatchAllCommissionRule = wildcardCommissionRules.some((rule) =>
-        isCatchAllCommissionRule(rule),
-      );
+      const commissionCoverage = activeCommissionRuleSet
+        ? validateStrictCommissionCoverage(
+            activeCommissionRuleSet.id,
+            activeCategories,
+            activeCommissionRuleSet.rules,
+          )
+        : null;
+      const hasActiveCommissionRuleSet = commissionCoverage?.valid === true;
       const hasCompleteShippingTiers =
         !!shippingTariff &&
         SHIPPING_PACKAGE_TIER_ORDER.every((code) =>
@@ -280,10 +292,10 @@ export class HealthService {
             "Checkout cannot resolve a shipping price and will fail with 503.",
         );
       }
-      if (!hasCatchAllCommissionRule) {
+      if (!hasActiveCommissionRuleSet) {
         this.logger.error(
-          "BUSINESS_CONFIG_MISSING: no active catch-all commission rule (appliesTo=BOTH, all axes wildcard). " +
-            "Orders whose category/amount matches no rule will fail checkout with 503.",
+          "BUSINESS_CONFIG_MISSING: published commission coverage is absent or incomplete. " +
+            `errors=${commissionCoverage?.errors.length ?? "no-active-set"}.`,
         );
       }
       if (!hasWarehouseAddress) {
@@ -296,7 +308,7 @@ export class HealthService {
 
       return (
         membershipTierCount === 4 &&
-        hasCatchAllCommissionRule &&
+        hasActiveCommissionRuleSet &&
         taxRuleCount > 0 &&
         hasCompleteShippingTiers &&
         !!platformSeller &&

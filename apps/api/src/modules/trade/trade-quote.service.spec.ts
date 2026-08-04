@@ -1,5 +1,12 @@
 import { NotFoundException } from "@nestjs/common";
-import { ShippingPackageTierCode, TradeStatus } from "@prisma/client";
+import {
+  CommissionSellerType,
+  MembershipTierType,
+  SellerType,
+  ShippingPackageTierCode,
+  SubscriptionStatus,
+  TradeStatus,
+} from "@prisma/client";
 import { TradeQuoteService } from "./trade-quote.service";
 
 /**
@@ -11,6 +18,17 @@ import { TradeQuoteService } from "./trade-quote.service";
  * `pricingVersion` ayrımı tek yerdedir.
  */
 describe("TradeQuoteService.quoteForTrade", () => {
+  const seller = {
+    sellerType: SellerType.individual,
+    businessStatus: null,
+    companyName: null,
+    taxId: null,
+    membership: {
+      status: SubscriptionStatus.active,
+      currentPeriodEnd: new Date("2099-01-01"),
+      tier: { type: MembershipTierType.free, isActive: true },
+    },
+  };
   const tariff = {
     packageTiers: [
       {
@@ -48,14 +66,14 @@ describe("TradeQuoteService.quoteForTrade", () => {
         side: "initiator",
         quantity: 1,
         valueAtTrade: 500,
-        product: { categoryId: "cat-1", shippingDesi: 1 },
+        product: { categoryId: "cat-1", shippingDesi: 1, seller },
       },
       {
         productId: "p-b",
         side: "receiver",
         quantity: 1,
         valueAtTrade: 500,
-        product: { categoryId: "cat-1", shippingDesi: 1 },
+        product: { categoryId: "cat-1", shippingDesi: 1, seller },
       },
     ],
     ...over,
@@ -66,12 +84,12 @@ describe("TradeQuoteService.quoteForTrade", () => {
     rules: any[] = [
       {
         id: "r1",
-        categoryId: null,
-        sellerType: null,
-        taxpayerType: null,
-        minAmount: null,
+        ruleSetId: "set-1",
+        name: "Free 0+",
+        categoryId: "cat-1",
+        sellerType: CommissionSellerType.FREE,
+        minAmount: 0,
         maxAmount: null,
-        priority: 0,
         tradeFeeSellerAmount: 20,
         tradeFeeBuyerAmount: 15,
       },
@@ -79,7 +97,9 @@ describe("TradeQuoteService.quoteForTrade", () => {
   ) => {
     const prisma = {
       trade: { findUnique: jest.fn().mockResolvedValue(trade) },
-      commissionRule: { findMany: jest.fn().mockResolvedValue(rules) },
+      commissionRuleSet: {
+        findFirst: jest.fn().mockResolvedValue({ id: "set-1", rules }),
+      },
     };
     const shipping = {
       getActiveOutboundTariff: jest.fn().mockResolvedValue(tariff),
@@ -124,13 +144,16 @@ describe("TradeQuoteService.quoteForTrade", () => {
     expect(quote.initiator.total).toBe(95);
   });
 
-  it("yalnız AKTİF kuralları kullanır", async () => {
+  it("yalnız AKTİF komisyon setinin kurallarını kullanır", async () => {
     const { service, prisma } = makeService();
 
     await service.quoteForTrade("trade-1");
 
-    expect(prisma.commissionRule.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { isActive: true } }),
+    expect(prisma.commissionRuleSet.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: "ACTIVE" },
+        include: { rules: true },
+      }),
     );
   });
 
@@ -158,14 +181,14 @@ describe("TradeQuoteService.quoteForTrade", () => {
             side: "initiator",
             quantity: 2,
             valueAtTrade: 500,
-            product: { categoryId: "cat-1", shippingDesi: 3 },
+            product: { categoryId: "cat-1", shippingDesi: 3, seller },
           },
           {
             productId: "p-b",
             side: "receiver",
             quantity: 1,
             valueAtTrade: 500,
-            product: { categoryId: "cat-1", shippingDesi: 1 },
+            product: { categoryId: "cat-1", shippingDesi: 1, seller },
           },
         ],
       }),
@@ -184,30 +207,55 @@ describe("TradeQuoteService.quoteForTrade", () => {
  * tek fark ürün değerinin güncel ilan fiyatından okunmasıdır.
  */
 describe("TradeQuoteService.previewQuote", () => {
+  const seller = {
+    sellerType: SellerType.individual,
+    businessStatus: null,
+    companyName: null,
+    taxId: null,
+    membership: {
+      status: SubscriptionStatus.active,
+      currentPeriodEnd: new Date("2099-01-01"),
+      tier: { type: MembershipTierType.free, isActive: true },
+    },
+  };
   const makeService = (
     products: any[] = [
-      { id: "p-a", categoryId: "cat-1", shippingDesi: 1, price: 500 },
-      { id: "p-b", categoryId: "cat-1", shippingDesi: 1, price: 500 },
+      {
+        id: "p-a",
+        categoryId: "cat-1",
+        shippingDesi: 1,
+        price: 500,
+        seller,
+      },
+      {
+        id: "p-b",
+        categoryId: "cat-1",
+        shippingDesi: 1,
+        price: 500,
+        seller,
+      },
     ],
   ) => {
     const prisma = {
       product: { findMany: jest.fn().mockResolvedValue(products) },
-      commissionRule: jest.fn() as any,
-    };
-    prisma.commissionRule = {
-      findMany: jest.fn().mockResolvedValue([
-        {
-          id: "r1",
-          categoryId: null,
-          sellerType: null,
-          taxpayerType: null,
-          minAmount: null,
-          maxAmount: null,
-          priority: 0,
-          tradeFeeSellerAmount: 20,
-          tradeFeeBuyerAmount: 15,
-        },
-      ]),
+      commissionRuleSet: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "set-1",
+          rules: [
+            {
+              id: "r1",
+              ruleSetId: "set-1",
+              name: "Free 0+",
+              categoryId: "cat-1",
+              sellerType: CommissionSellerType.FREE,
+              minAmount: 0,
+              maxAmount: null,
+              tradeFeeSellerAmount: 20,
+              tradeFeeBuyerAmount: 15,
+            },
+          ],
+        }),
+      },
     };
     const shipping = {
       getActiveOutboundTariff: jest.fn().mockResolvedValue({
@@ -254,18 +302,23 @@ describe("TradeQuoteService.previewQuote", () => {
     expect(quote.initiator.total).toBe(95);
   });
 
-  it("erişilemeyen ürünü atlar (önizleme patlamaz)", async () => {
+  it("erişilemeyen ürün için eksik fiyat göstermek yerine 404 verir", async () => {
     const { service } = makeService([
-      { id: "p-a", categoryId: "cat-1", shippingDesi: 1, price: 500 },
+      {
+        id: "p-a",
+        categoryId: "cat-1",
+        shippingDesi: 1,
+        price: 500,
+        seller,
+      },
     ]);
 
-    const quote = await service.previewQuote({
-      initiatorItems: [{ productId: "p-a" }],
-      receiverItems: [{ productId: "silinmis" }],
-    });
-
-    expect(quote.receiver.shipping).toBe(0);
-    expect(quote.initiator.shipping).toBe(60);
+    await expect(
+      service.previewQuote({
+        initiatorItems: [{ productId: "p-a" }],
+        receiverItems: [{ productId: "silinmis" }],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("ürün yokken sorgu atmaz ve sıfır fiyat döner", async () => {

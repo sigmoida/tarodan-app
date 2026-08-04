@@ -622,14 +622,18 @@ export class AdminUserService {
     if (!tier.isActive) {
       throw new BadRequestException("Bu üyelik kademesi aktif değil");
     }
-    if (
-      tierType === MembershipTierType.business &&
-      (user.businessStatus !== "approved" ||
-        !user.companyName?.trim() ||
-        !user.taxId?.trim())
-    ) {
+    const isApprovedCorporate =
+      user.businessStatus === "approved" &&
+      !!user.companyName?.trim() &&
+      !!user.taxId?.trim();
+    if (tierType === MembershipTierType.business && !isApprovedCorporate) {
       throw new BadRequestException(
         "Business üyelik yalnız KYC onaylı şirket hesabına atanabilir",
+      );
+    }
+    if (tierType !== MembershipTierType.business && isApprovedCorporate) {
+      throw new BadRequestException(
+        "KYC onaylı şirket hesabına yalnız Business üyelik atanabilir",
       );
     }
 

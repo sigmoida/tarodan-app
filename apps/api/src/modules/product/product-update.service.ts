@@ -21,6 +21,7 @@ import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
 import { MembershipService } from "../membership/membership.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
+import { isCorporateSellingSuspended } from "../membership/membership.util";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -82,12 +83,36 @@ export class ProductUpdateService {
     // Check if user is banned
     const seller = await this.prisma.user.findUnique({
       where: { id: sellerId },
-      select: { isBanned: true },
+      select: {
+        isBanned: true,
+        businessStatus: true,
+        companyName: true,
+        taxId: true,
+        membership: {
+          select: {
+            status: true,
+            currentPeriodEnd: true,
+            tier: { select: { type: true, isActive: true } },
+          },
+        },
+      },
     });
 
     if (seller?.isBanned) {
       throw new ForbiddenException(
         i18nMessage("server.product.bannedCannotEdit"),
+      );
+    }
+
+    // Askıdaki kurumsal satıcı ilanını pasife alabilir; satışta tutan veya
+    // yeniden satışa çıkaran tüm diğer değişiklikler BUSINESS yenilenene dek kapalıdır.
+    if (
+      seller &&
+      isCorporateSellingSuspended(seller.membership, seller) &&
+      dto.status !== ProductStatus.inactive
+    ) {
+      throw new ForbiddenException(
+        i18nMessage("server.product.corporateSalesSuspended"),
       );
     }
 

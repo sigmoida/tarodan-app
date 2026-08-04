@@ -1,10 +1,12 @@
-import { CommissionSellerType, CommissionTaxpayerType } from "@prisma/client";
-import { findMatchingCommissionRule } from "../order/order-commission.helper";
 import {
   calculatePackageDesi,
   resolvePackageTier,
   type OutboundTariffLike,
 } from "../shipping/shipping-tariff.helper";
+import {
+  findMatchingCommissionRule,
+  type CommissionRuleMatchable,
+} from "../order/order-commission.helper";
 
 /** Takas yalnız kademeleri kullanır: ücretsiz-kargo eşiği takasta uygulanmaz. */
 type TradeTariff = Pick<OutboundTariffLike, "packageTiers">;
@@ -20,15 +22,13 @@ type TradeTariff = Pick<OutboundTariffLike, "packageTiers">;
  *
  *   takas hizmet bedeli + (2 × kargo) + (fark ödeyense fark)
  *
- * ÜCRET: ürün başına komisyon kuralından okunur ve TOPLANIR. Bir taraf, KENDİ
- * verdiği ürünlerin "satıcı" ücretini + KARŞIDAN aldığı ürünlerin "alıcı"
- * ücretini öder. Tutarlar admin'in girdiği KDV DAHİL sabitlerdir: burada oran
- * ya da KDV hesabı YAPILMAZ (sipariş ücretlerinden bilinçli fark — bkz.
- * `order-breakdown.ts`, orada matrah + KDV ayrıdır).
+ * ÜCRET: her ürün kategori + ürün sahibinin satıcı tipi + takas değeriyle tek
+ * CommissionRule'a düşer. Bir taraf, kendi verdiği ürünlerin takas satıcı
+ * bedelini ve karşıdan aldığı ürünlerin takas alıcı bedelini öder.
  *
- * KARGO: taraf başına 2 bacak (kullanıcı→depo, depo→karşı kullanıcı). Kademe,
- * tarafın ürünlerinin BİRLEŞİK desisinden çözülür — siparişlerdeki paket
- * mantığının aynısı (`calculatePackageDesi` + `resolvePackageTier`).
+ * KARGO: komisyon kuralının kargo payları takasta kullanılmaz. Taraf başına iki
+ * bacak (kullanıcı→depo, depo→karşı kullanıcı) aktif paket tarifesinden alınır.
+ * Kademe, tarafın ürünlerinin birleşik desisinden çözülür.
  *
  * EKRANDA hizmet bedeli TEK satır gösterilir; `feeLines` yalnız denetim/döküm
  * içindir.
@@ -36,26 +36,19 @@ type TradeTariff = Pick<OutboundTariffLike, "packageTiers">;
 
 export type TradeSide = "initiator" | "receiver";
 
-/** Kuralın takas için okunan alanları (eşleşme eksenleri + iki sabit ücret). */
-export interface TradeFeeRule {
-  id: string;
-  categoryId: string | null;
-  sellerType: CommissionSellerType | null;
-  taxpayerType: CommissionTaxpayerType | null;
-  minAmount?: number | string | { toString(): string } | null;
-  maxAmount?: number | string | { toString(): string } | null;
-  appliesTo?: unknown;
-  priority?: number;
+/** Normal komisyon kuralının takasta kullanılan iki sabit ücret alanı. */
+export interface TradeCommissionRule extends CommissionRuleMatchable {
   /** Ürünü takasta VEREN tarafın ödediği sabit (₺, KDV dahil). */
-  tradeFeeSellerAmount?: number | string | { toString(): string } | null;
+  tradeFeeSellerAmount: number | string | { toString(): string };
   /** Ürünü takasta ALAN tarafın ödediği sabit (₺, KDV dahil). */
-  tradeFeeBuyerAmount?: number | string | { toString(): string } | null;
+  tradeFeeBuyerAmount: number | string | { toString(): string };
 }
 
 export interface TradePricingItem {
   productId: string;
   side: TradeSide;
   categoryId: string | null;
+  sellerType: CommissionRuleMatchable["sellerType"];
   /** Ürünün takastaki değeri — kuralın tutar aralığı bununla eşleşir. */
   value: number;
   quantity: number;
@@ -82,7 +75,7 @@ export interface TradePartyPricing {
 
 export interface TradePricingInput {
   items: TradePricingItem[];
-  rules: TradeFeeRule[];
+  rules: TradeCommissionRule[];
   tariff: TradeTariff;
   cash?: { amount: number; payerSide: TradeSide } | null;
 }
@@ -98,33 +91,29 @@ export const TRADE_SHIPPING_LEGS = 2;
 const round2 = (value: number): number =>
   Math.round((value + Number.EPSILON) * 100) / 100;
 
-const amountOf = (
-  value: number | string | { toString(): string } | null | undefined,
-): number => {
-  if (value == null) return 0;
+const amountOf = (value: number | string | { toString(): string }): number => {
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`Invalid trade fee amount: ${String(value)}`);
+  }
+  return parsed;
 };
 
 const other = (side: TradeSide): TradeSide =>
   side === "initiator" ? "receiver" : "initiator";
 
 /**
- * Bir ürüne uygulanacak kural. Eksenler siparişlerle AYNI motordan çözülür
- * (kategori özgüllüğü, tutar aralığı, priority); fark: takasta taraflar
- * alıcı/satıcı HESABI değildir, bu yüzden satıcı tipi ve mükellefiyet eksenleri
- * joker geçilir — yalnız bu eksenlerde joker olan kurallar eşleşir.
+ * Satışla aynı strict eşleşme kullanılır; wildcard, priority veya fallback yoktur.
  */
 function matchRule(
-  rules: TradeFeeRule[],
+  rules: TradeCommissionRule[],
   item: TradePricingItem,
-): TradeFeeRule | null {
-  return findMatchingCommissionRule(rules as never, {
-    categoryId: item.categoryId,
-    sellerType: CommissionSellerType.ALL,
-    taxpayerType: CommissionTaxpayerType.all,
+): TradeCommissionRule {
+  return findMatchingCommissionRule(rules, {
+    categoryId: item.categoryId ?? "",
+    sellerType: item.sellerType,
     amount: item.value,
-  }) as TradeFeeRule | null;
+  });
 }
 
 /** Tarafın 2 bacaklık kargo bedeli — ürünlerinin birleşik desisinden. */
@@ -149,12 +138,12 @@ function partyPricing(
     ...ownItems.map((i) => ({
       productId: i.productId,
       role: "seller" as const,
-      amount: amountOf(matchRule(input.rules, i)?.tradeFeeSellerAmount),
+      amount: amountOf(matchRule(input.rules, i).tradeFeeSellerAmount),
     })),
     ...incomingItems.map((i) => ({
       productId: i.productId,
       role: "buyer" as const,
-      amount: amountOf(matchRule(input.rules, i)?.tradeFeeBuyerAmount),
+      amount: amountOf(matchRule(input.rules, i).tradeFeeBuyerAmount),
     })),
   ];
 

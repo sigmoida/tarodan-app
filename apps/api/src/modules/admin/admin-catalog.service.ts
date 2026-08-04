@@ -15,7 +15,12 @@ import {
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
 } from "../../common/helpers/fulltext-search";
-import { Prisma, Brand } from "@prisma/client";
+import {
+  Brand,
+  CommissionRuleSetStatus,
+  CommissionSellerType,
+  Prisma,
+} from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import {
   AdminAttributeGroupQueryDto,
@@ -43,6 +48,52 @@ export class AdminCatalogService {
     @Optional()
     private readonly storageService: StorageService,
   ) {}
+
+  private async assertCategoryHasPublishedCommissionCoverage(
+    categoryId: string,
+  ) {
+    const activeSet = await this.prisma.commissionRuleSet.findFirst({
+      where: { status: CommissionRuleSetStatus.ACTIVE },
+      select: {
+        rules: {
+          where: { categoryId },
+          select: { sellerType: true, minAmount: true, maxAmount: true },
+        },
+      },
+    });
+    const sellerTypes = [
+      CommissionSellerType.FREE,
+      CommissionSellerType.BASIC,
+      CommissionSellerType.PREMIUM,
+      CommissionSellerType.BUSINESS,
+    ];
+    const complete =
+      !!activeSet &&
+      sellerTypes.every((sellerType) => {
+        const bands = activeSet.rules
+          .filter((rule) => rule.sellerType === sellerType)
+          .sort((a, b) => Number(a.minAmount) - Number(b.minAmount));
+        if (
+          bands.length === 0 ||
+          Number(bands[0].minAmount) !== 0 ||
+          bands[bands.length - 1].maxAmount != null
+        ) {
+          return false;
+        }
+        return bands
+          .slice(1)
+          .every(
+            (band, index) =>
+              bands[index].maxAmount != null &&
+              Number(bands[index].maxAmount) === Number(band.minAmount),
+          );
+      });
+    if (!complete) {
+      throw new BadRequestException(
+        "Kategori aktifleştirilemez: aktif komisyon setinde FREE, BASIC, PREMIUM ve BUSINESS için 0 TL'den sonsuza kadar eksiksiz fiyat aralığı yayınlanmalıdır.",
+      );
+    }
+  }
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
@@ -184,6 +235,11 @@ export class AdminCatalogService {
       isActive?: boolean;
     },
   ) {
+    if (dto.isActive === true) {
+      throw new BadRequestException(
+        "Yeni kategori önce pasif oluşturulmalı, komisyon kuralları yayınlandıktan sonra aktifleştirilmelidir.",
+      );
+    }
     // Check if parent exists
     if (dto.parentId) {
       const parent = await this.prisma.category.findUnique({
@@ -218,7 +274,10 @@ export class AdminCatalogService {
         description: dto.description || null,
         parentId: dto.parentId || null, // Empty string becomes null (root category)
         sortOrder: dto.sortOrder || 0,
-        isActive: dto.isActive !== undefined ? dto.isActive : true,
+        // Yeni kategori önce komisyon taslağına eklenip yayınlanmalıdır. ID ancak
+        // create sonrası oluştuğu için doğrudan aktif yaratmak kapsama invariantını
+        // bozar; aktivasyon update yolundaki guard'dan geçer.
+        isActive: false,
       },
     });
 
@@ -256,6 +315,10 @@ export class AdminCatalogService {
 
     if (!category) {
       throw new NotFoundException("Kategori bulunamadı");
+    }
+
+    if (dto.isActive === true && !category.isActive) {
+      await this.assertCategoryHasPublishedCommissionCoverage(categoryId);
     }
 
     // Check circular reference if parentId is being changed

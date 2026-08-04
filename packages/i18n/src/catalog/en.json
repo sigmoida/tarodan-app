@@ -3186,7 +3186,8 @@
         "descriptionPlaceholder": "Short description of the category",
         "nameRequired": "Category name is required",
         "parentLabel": "Parent Category",
-        "noParent": "No parent (root category)"
+        "noParent": "No parent (root category)",
+        "commissionCoverageHint": "New categories are created inactive. Publish FREE, BASIC, PREMIUM, and BUSINESS commission ranges before activating the category."
       },
       "attributes": {
         "title": "Product Attributes",
@@ -3943,12 +3944,13 @@
         "examplePrice": "Example Product Price (₺)",
         "calculating": "Calculating",
         "previewFailed": "The commission preview could not be calculated.",
-        "calculationTitle": "Rule Matching Priority",
-        "calculationDescription": "Among all rules that match an order, the MOST specific one wins. Specificity score: category match +4, taxpayer type (individual/corporate) +2, seller type (membership) +1, bounded amount range +0.5. On a tie the higher `priority` wins. Seller and buyer rules are matched SEPARATELY. A category may have several rules; overlapping ranges are rejected on save.",
-        "defaultMissingTitle": "No default commission rule is defined",
-        "defaultMissingDescription": "Orders without a matching rule will be created with zero commission. The payment flow is unaffected. You can add a default rule with “Category: All” and “Seller Type: All”.",
+        "calculationTitle": "Exact Rule Matching",
+        "calculationDescription": "Exactly one rule must match the category, seller type, and half-open price range. There is no priority, wildcard, or silent default.",
+        "defaultMissingTitle": "Commission coverage is incomplete",
+        "defaultMissingDescription": "A set with gaps or overlaps cannot be published; checkout fails closed unless exactly one rule matches.",
         "sellerTypes": {
           "free": "Free",
+          "basic": "Basic",
           "premium": "Premium",
           "business": "Business"
         },
@@ -3957,8 +3959,37 @@
           "sellerRateRequired": "Seller rate is required",
           "buyerRateRequired": "Buyer rate is required",
           "maxBelowMin": "Maximum cannot be less than minimum",
-          "atLeastOneRate": "Enter at least one deduction rate."
+          "atLeastOneRate": "Enter at least one deduction rate.",
+          "strictRange": "The upper bound must be greater than the lower bound (upper bound is exclusive).",
+          "rateRange": "The rate must be between 0 and 100.",
+          "zeroRateBounds": "Floors and caps cannot be used when the rate is 0%."
         },
+        "amountRangeStrictHint": "The lower bound is inclusive and the upper bound is exclusive. Leave the final upper bound empty.",
+        "shippingSplitTitle": "Shipping split",
+        "defaultBuyerShare": "Default buyer share %",
+        "packageSmall": "Small package %",
+        "packageMedium": "Medium package %",
+        "packageLarge": "Large package %",
+        "resolverTitle": "Resolve actual rule",
+        "draftVersion": "Draft v{version}",
+        "activeSet": "Active set",
+        "resolverHint": "Runs the backend matching engine against {set}.",
+        "resolveRule": "Resolve rule",
+        "resolverSuccess": "Rule: {ruleId} · Set: {ruleSetId} · Seller fee: {sellerFee} TRY · Buyer fee: {buyerFee} TRY",
+        "resolverNoMatchTitle": "Exactly one rule was not found",
+        "resolverNoMatchDescription": "This category, seller type and price has a gap or configuration error in the draft.",
+        "draftEditingTitle": "Editing draft v{version}",
+        "publishedReadonlyTitle": "Published set is read-only",
+        "draftEditingDescription": "The draft is not used by checkout. Publish it after coverage is complete.",
+        "publishedReadonlyDescription": "Create a draft from the active set to make changes.",
+        "coverageIssuesTitle": "{count} coverage issues",
+        "moreCoverageIssues": "… and {count} more issues",
+        "coverageCompleteTitle": "Coverage is complete",
+        "coverageCompleteDescription": "All {axes} category/seller type axes across {categories} categories are covered by exactly one rule from 0 to infinity.",
+        "draftCreated": "Commission draft created",
+        "setPublished": "Commission set published",
+        "createDraft": "Create draft",
+        "publishDraft": "Publish draft",
         "taxpayerType": "Taxpayer Type",
         "taxpayer": {
           "individual": "Individual",
@@ -4066,10 +4097,11 @@
         "pspRateNote": "The PayTR fee is ESTIMATED from the rate in System → Settings → Finance; the real amount comes from the provider statement.",
         "serviceVatOut": "Service VAT (to the state)",
         "tradeFeesTitle": "Trade service fees",
-        "tradeFeesHelper": "Flat fees charged when a product under this rule enters a TRADE. Enter them VAT included — nothing is added on top. An empty field means zero.",
+        "tradeFeesHelper": "Flat fees charged to the parties giving and receiving a product under this rule. Enter VAT-inclusive amounts, or 0 to disable the fee. Shipping is calculated independently.",
         "tradeFeeSeller": "Party giving the product (₺)",
         "tradeFeeBuyer": "Party receiving the product (₺)",
-        "tradeFeeColumn": "Trade fee (giver / taker)"
+        "tradeFeeColumn": "Trade fee (giver / taker)",
+        "ruleNotFound": "Commission rule not found (it may have been deleted)."
       },
       "invoices": {
         "title": "Invoices",
@@ -4618,7 +4650,9 @@
           "netRevenue": "Tarodan net revenue",
           "netTakeRate": "Net take rate (of item price)",
           "pspRateNote": "The PayTR fee is ESTIMATED from the rate in System → Settings → Finance; the real amount comes from the provider statement.",
-          "serviceVatOut": "Service VAT (to the state)"
+          "serviceVatOut": "Service VAT (to the state)",
+          "commissionRule": "Commission rule",
+          "commissionRuleUnnamed": "Unnamed rule"
         }
       },
       "trades": {
@@ -6899,6 +6933,7 @@
       "bannedCannotCreate": "Your account is banned. You cannot add new products.",
       "bannedCannotEdit": "Your account is banned. You cannot edit products.",
       "businessApprovalRequired": "You cannot list products until your business account is approved. You will be notified once your application is reviewed.",
+      "corporateSalesSuspended": "Your selling capability is suspended because your corporate membership is not active. Renew your Business membership to list products for sale.",
       "boostActiveOnly": "Only active (published) listings can be boosted",
       "boostOwnOnly": "You can only boost your own listing",
       "boostPriceUndefined": "No valid price is defined for this duration",
@@ -7018,7 +7053,9 @@
       "tariffNegativeAmount": "Tariff amounts cannot be negative"
     },
     "commission": {
-      "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later."
+      "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later.",
+      "sellerSalesSuspended": "This product cannot be purchased because the seller's corporate membership is not active.",
+      "pricingChanged": "Commission terms have changed. Please refresh your cart and confirm the new amount."
     }
   }
 }

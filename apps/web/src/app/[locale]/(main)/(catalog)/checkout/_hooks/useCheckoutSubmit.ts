@@ -46,6 +46,8 @@ export function useCheckoutSubmit({
   distanceSalesAccepted,
   onCheckoutSubmitted,
   expectedShippingTariffVersion,
+  expectedCommissionRuleSetId,
+  expectedCommissionRuleSetVersion,
   expectedPricingHash,
 }: {
   checkoutItems: CheckoutItem[];
@@ -79,6 +81,9 @@ export function useCheckoutSubmit({
   onCheckoutSubmitted: () => void;
   /** Active shipping-tariff version from the quote; enables the 409 PRICING_CHANGED guard. */
   expectedShippingTariffVersion?: number | null;
+  /** Active commission set from the quote; both fields must still match at submit. */
+  expectedCommissionRuleSetId?: string | null;
+  expectedCommissionRuleSetVersion?: number | null;
   /** Unit-price hash from the quote; 409 PRICING_CHANGED if a price/campaign moved. */
   expectedPricingHash?: string | null;
 }) {
@@ -116,6 +121,13 @@ export function useCheckoutSubmit({
     }
     if (typeof expectedShippingTariffVersion !== "number") {
       toast.error(t("server.shipping.pricingChanged"));
+      return null;
+    }
+    if (
+      !expectedCommissionRuleSetId ||
+      typeof expectedCommissionRuleSetVersion !== "number"
+    ) {
+      toast.error(t("server.commission.pricingChanged"));
       return null;
     }
 
@@ -301,12 +313,16 @@ export function useCheckoutSubmit({
               };
               couponCode?: string;
               expectedShippingTariffVersion: number;
+              expectedCommissionRuleSetId: string;
+              expectedCommissionRuleSetVersion: number;
               expectedPricingHash?: string;
               distanceSalesAccepted?: boolean;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
               expectedShippingTariffVersion,
+              expectedCommissionRuleSetId,
+              expectedCommissionRuleSetVersion,
               distanceSalesAccepted,
             };
 
@@ -430,6 +446,8 @@ export function useCheckoutSubmit({
                 zipCode?: string;
               };
               expectedShippingTariffVersion: number;
+              expectedCommissionRuleSetId: string;
+              expectedCommissionRuleSetVersion: number;
               couponCode?: string;
               expectedPricingHash?: string;
               distanceSalesAccepted?: boolean;
@@ -448,6 +466,8 @@ export function useCheckoutSubmit({
                 phone: formattedAddrPhone,
               },
               expectedShippingTariffVersion,
+              expectedCommissionRuleSetId,
+              expectedCommissionRuleSetVersion,
             };
             if (
               !billingSameAsShipping &&

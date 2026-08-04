@@ -9,6 +9,7 @@ import {
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductStatus } from "@prisma/client";
 import { getAvailableQuantity } from "./helpers/product-availability.helper";
+import { resolveSalePrice } from "./helpers/product-sale-window";
 import {
   publicProductRatingWhere,
   publicUserRatingWhere,
@@ -175,7 +176,8 @@ export class ProductCommonService {
           productId: p.id,
           sellerId,
           categoryId,
-          currentDisplayPrice: Number(p.price),
+          // Kampanya, indirim penceresi UYGULANMIŞ fiyatın üstüne biner.
+          currentDisplayPrice: resolveSalePrice(p).price,
         };
       })
       .filter(Boolean) as {
@@ -236,30 +238,27 @@ export class ProductCommonService {
       ratingCount = pr?.count ?? 0;
     }
 
-    // A + oldPrice: price (A) = her zaman güncel satış fiyatı; oldPrice = indirim öncesi (çizili)
+    // İndirim penceresi ORTAK kuraldan (`resolveSalePrice`): pencere dışındaysa
+    // satış fiyatı indirim ÖNCESİ fiyattır. Eskiden burada yalnız çizili fiyat
+    // düşürülüyordu — vitrin indirimsiz görünürken tahsilat indirimli kalıyordu.
     const now = new Date();
-    const priceA = Number(product.price);
-    const oldPriceDb =
-      product.oldPrice != null ? Number(product.oldPrice) : null;
+    const sale = resolveSalePrice(product, now);
+    const priceA = sale.price;
     const saleStartDate = product.saleStartDate
       ? new Date(product.saleStartDate)
       : null;
     const saleEndDate = product.saleEndDate
       ? new Date(product.saleEndDate)
       : null;
-    const saleDatesValid =
-      (saleStartDate == null || now >= saleStartDate) &&
-      (saleEndDate == null || now <= saleEndDate);
-    const isProductSale = oldPriceDb != null && saleDatesValid;
 
     // Kampanya indirimi (satıcı/ürün/kategori/global): ürün kartında gösterilecek fiyata yansıt
     const sellerId = product.sellerId ?? product.seller?.id;
     const categoryId = product.categoryId ?? product.category?.id;
     let displayPrice = priceA;
-    let displayOldPrice: number | null = isProductSale ? oldPriceDb : null;
+    let displayOldPrice: number | null = sale.oldPrice;
     let discountPercent: number | null =
-      isProductSale && oldPriceDb && oldPriceDb > priceA
-        ? Math.round(((oldPriceDb - priceA) / oldPriceDb) * 100)
+      sale.isOnSale && sale.oldPrice
+        ? Math.round(((sale.oldPrice - priceA) / sale.oldPrice) * 100)
         : null;
 
     if (sellerId && categoryId) {

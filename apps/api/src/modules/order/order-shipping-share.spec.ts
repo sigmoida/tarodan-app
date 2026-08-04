@@ -191,6 +191,9 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
 
   const makeSvc = () => {
     const prisma = {
+      commissionRuleSet: {
+        findFirst: jest.fn().mockResolvedValue({ id: "set-1" }),
+      },
       platformSetting: {
         // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
         findMany: jest.fn().mockResolvedValue([]),

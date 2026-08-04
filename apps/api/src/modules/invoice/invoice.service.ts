@@ -26,6 +26,7 @@ import { NotificationType, NotificationChannel } from "../notification/dto";
 import { TaxService } from "../tax";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { InvoicePdfService, InvoiceData } from "./invoice-pdf.service";
+import { storedProductBaseOf } from "../order/order-charged-base.helper";
 
 @Injectable()
 export class InvoiceService {
@@ -92,16 +93,10 @@ export class InvoiceService {
       ? `${shippingAddr.addressLine1 || ""}, ${shippingAddr.district || ""}, ${shippingAddr.city || ""}`
       : "Türkiye";
 
-    // Ürün mal bedeli: subtotal yoksa totalAmount - shippingCost - buyerFee - taxAmount ile türet
+    // Ürün mal bedeli ORTAK helper'dan — alıcı hizmet KDV'sini de düşer; burada
+    // elle türetildiğinde o kalem unutuluyor ve mal bedeli olduğundan yüksek çıkıyordu.
     const taxAmount = Number(order.taxAmount || 0);
-    const buyerFeeAmount = Number(order.buyerFeeAmount || 0);
-    const subtotal =
-      order.subtotal != null
-        ? Number(order.subtotal)
-        : Number(order.totalAmount) -
-          Number(order.shippingCost || 0) -
-          buyerFeeAmount -
-          taxAmount;
+    const subtotal = storedProductBaseOf(order);
 
     // Gösterim için vergi oranı: taxAmount > 0 ise oranı çek, yoksa 0 göster
     let taxRate = 0;

@@ -3186,7 +3186,8 @@
         "descriptionPlaceholder": "Kategori hakkında kısa açıklama",
         "nameRequired": "Kategori adı zorunlu",
         "parentLabel": "Üst Kategori",
-        "noParent": "Üst kategori yok (ana kategori)"
+        "noParent": "Üst kategori yok (ana kategori)",
+        "commissionCoverageHint": "Yeni kategori pasif oluşturulur. FREE, BASIC, PREMIUM ve BUSINESS komisyon aralıklarını yayınladıktan sonra kategoriyi aktifleştirebilirsiniz."
       },
       "attributes": {
         "title": "Ürün Özellikleri",
@@ -3943,12 +3944,13 @@
         "examplePrice": "Örnek Ürün Fiyatı (₺)",
         "calculating": "Hesaplanıyor",
         "previewFailed": "Komisyon önizlemesi hesaplanamadı.",
-        "calculationTitle": "Kural Eşleşme Önceliği",
-        "calculationDescription": "Bir sipariş için TÜM eşleşen kurallar arasından en ÖZEL olan seçilir. Özgüllük puanı: kategori eşleşmesi +4, mükellef tipi (bireysel/kurumsal) +2, satıcı tipi (üyelik) +1, sınırlı tutar aralığı +0,5. Puanlar eşitse `priority` değeri büyük olan kazanır. Satıcı ve alıcı kuralları AYRI eşleştirilir. Aynı kategoriye birden çok kural tanımlanabilir; çakışan aralıklar kaydederken engellenir.",
-        "defaultMissingTitle": "Varsayılan komisyon kuralı tanımlı değil",
-        "defaultMissingDescription": "Eşleşen kural olmayan siparişler 0 komisyon ile oluşturulacaktır. Ödeme akışı etkilenmez. İsterseniz “Kategori: Tümü” ve “Satıcı Tipi: Tümü” ile bir varsayılan kural ekleyebilirsiniz.",
+        "calculationTitle": "Kesin Kural Eşleşmesi",
+        "calculationDescription": "Kategori, satıcı tipi ve yarı açık fiyat aralığına göre tam olarak bir kural eşleşmelidir. Öncelik, joker veya sessiz varsayılan yoktur.",
+        "defaultMissingTitle": "Komisyon kapsaması eksik",
+        "defaultMissingDescription": "Eksik veya çakışan kapsamla set yayınlanamaz; checkout tam olarak bir kural bulamazsa kapalı davranır.",
         "sellerTypes": {
           "free": "Ücretsiz",
+          "basic": "Basic",
           "premium": "Premium",
           "business": "İşletme"
         },
@@ -3957,8 +3959,37 @@
           "sellerRateRequired": "Satıcı oranı gerekli",
           "buyerRateRequired": "Alıcı oranı gerekli",
           "maxBelowMin": "Maksimum, minimumdan küçük olamaz",
-          "atLeastOneRate": "En az bir kesinti oranı girmelisiniz."
+          "atLeastOneRate": "En az bir kesinti oranı girmelisiniz.",
+          "strictRange": "Üst sınır alt sınırdan büyük olmalıdır (üst sınır hariçtir).",
+          "rateRange": "Oran 0 ile 100 arasında olmalıdır.",
+          "zeroRateBounds": "Oran %0 iken taban ve tavan kullanılamaz."
         },
+        "amountRangeStrictHint": "Alt sınır dahildir, üst sınır hariçtir. Son bandın üst sınırını boş bırakın.",
+        "shippingSplitTitle": "Kargo paylaşımı",
+        "defaultBuyerShare": "Varsayılan alıcı payı %",
+        "packageSmall": "Küçük paket %",
+        "packageMedium": "Orta paket %",
+        "packageLarge": "Büyük paket %",
+        "resolverTitle": "Gerçek kural çözümleme",
+        "draftVersion": "Taslak v{version}",
+        "activeSet": "Aktif set",
+        "resolverHint": "{set} üzerinde backend eşleştirme motorunu çalıştırır.",
+        "resolveRule": "Kuralı bul",
+        "resolverSuccess": "Kural: {ruleId} · Set: {ruleSetId} · Satıcı kesintisi: {sellerFee} TL · Alıcı bedeli: {buyerFee} TL",
+        "resolverNoMatchTitle": "Tam olarak bir kural bulunamadı",
+        "resolverNoMatchDescription": "Taslakta bu kategori, satıcı tipi ve fiyat için boşluk veya yapılandırma hatası var.",
+        "draftEditingTitle": "Taslak v{version} düzenleniyor",
+        "publishedReadonlyTitle": "Yayınlanmış set salt okunur",
+        "draftEditingDescription": "Taslak checkout tarafından kullanılmaz. Tam kapsama doğrulandıktan sonra yayınlayın.",
+        "publishedReadonlyDescription": "Değişiklik yapmak için aktif setten yeni bir taslak oluşturun.",
+        "coverageIssuesTitle": "{count} kapsama sorunu var",
+        "moreCoverageIssues": "… ve {count} sorun daha",
+        "coverageCompleteTitle": "Kapsama eksiksiz",
+        "coverageCompleteDescription": "{categories} kategori ve {axes} kategori/satıcı tipi ekseninin tamamı 0 TL'den sonsuza kadar tek kuralla kapsanıyor.",
+        "draftCreated": "Komisyon taslağı oluşturuldu",
+        "setPublished": "Komisyon seti yayınlandı",
+        "createDraft": "Taslak oluştur",
+        "publishDraft": "Taslağı yayınla",
         "taxpayerType": "Vergi Tipi",
         "taxpayer": {
           "individual": "Bireysel",
@@ -4066,10 +4097,11 @@
         "pspRateNote": "PayTR kesintisi, Sistem → Ayarlar → Finans'taki orandan TAHMİNİ hesaplanır; gerçek tutar sağlayıcı ekstresinden gelir.",
         "serviceVatOut": "Hizmet KDV'si (devlete)",
         "tradeFeesTitle": "Takas hizmet bedelleri",
-        "tradeFeesHelper": "Bu kurala düşen ürün TAKASA girdiğinde alınan sabit bedeller. KDV DAHİL girin — üzerine hesap yapılmaz. Boş bırakılan kalem 0'dır.",
+        "tradeFeesHelper": "Bu kurala düşen ürün takasa girdiğinde ürünü veren ve alan taraftan alınan sabit bedellerdir. KDV dahil tutarı girin; ücret alınmayacaksa 0 yazın. Kargo bu alanlardan bağımsız hesaplanır.",
         "tradeFeeSeller": "Ürünü veren taraf (₺)",
         "tradeFeeBuyer": "Ürünü alan taraf (₺)",
-        "tradeFeeColumn": "Takas ücreti (veren / alan)"
+        "tradeFeeColumn": "Takas ücreti (veren / alan)",
+        "ruleNotFound": "Komisyon kuralı bulunamadı (silinmiş olabilir)."
       },
       "invoices": {
         "title": "Faturalar",
@@ -4618,7 +4650,9 @@
           "netRevenue": "Tarodan hak edişi",
           "netTakeRate": "Net pay (ürün fiyatına oranla)",
           "pspRateNote": "PayTR kesintisi, Sistem → Ayarlar → Finans'taki orandan TAHMİNİ hesaplanır; gerçek tutar sağlayıcı ekstresinden gelir.",
-          "serviceVatOut": "Hizmet KDV'si (devlete)"
+          "serviceVatOut": "Hizmet KDV'si (devlete)",
+          "commissionRule": "Komisyon kuralı",
+          "commissionRuleUnnamed": "Adsız kural"
         }
       },
       "trades": {
@@ -6899,6 +6933,7 @@
       "bannedCannotCreate": "Hesabınız banlanmış. Yeni ürün ekleyemezsiniz.",
       "bannedCannotEdit": "Hesabınız banlanmış. Ürün düzenleyemezsiniz.",
       "businessApprovalRequired": "Kurumsal hesabınız onaylanmadan ilan veremezsiniz. Başvurunuz sonuçlandığında bilgilendirileceksiniz.",
+      "corporateSalesSuspended": "Kurumsal üyeliğiniz geçerli olmadığı için satış yetkiniz askıya alındı. İlanlarınızı satışa açmak için İşletme üyeliğinizi yenileyin.",
       "boostActiveOnly": "Sadece aktif (yayında) ilanlar öne çıkarılabilir",
       "boostOwnOnly": "Sadece kendi ilanınızı öne çıkarabilirsiniz",
       "boostPriceUndefined": "Bu süre için geçerli bir fiyat tanımlı değil",
@@ -7018,7 +7053,9 @@
       "tariffNegativeAmount": "Tarife tutarları negatif olamaz"
     },
     "commission": {
-      "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin."
+      "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin.",
+      "sellerSalesSuspended": "Satıcının kurumsal üyeliği geçerli olmadığı için bu ürün şu anda satın alınamıyor.",
+      "pricingChanged": "Komisyon koşulları güncellendi. Lütfen sepeti yenileyip yeni tutarı onaylayın."
     }
   }
 }

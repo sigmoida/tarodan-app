@@ -27,6 +27,7 @@ import { AdminReviewService } from "./admin-review.service";
 import { AdminSellerApplicationService } from "./admin-seller-application.service";
 import {
   CreateCommissionRuleDto,
+  CreateCommissionRuleSetDto,
   PreviewCommissionDto,
   UpdateCommissionRuleDto,
   UpdatePlatformSettingDto,
@@ -235,8 +236,27 @@ export class AdminService {
   // ==================== COMMISSION RULES ====================
   // Taşındı: admin-commission.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getCommissionRules() {
-    return this.commissionService.getCommissionRules();
+  async getCommissionRules(ruleSetId?: string) {
+    return this.commissionService.getCommissionRules(ruleSetId);
+  }
+
+  async getCommissionRuleSets() {
+    return this.commissionService.getCommissionRuleSets();
+  }
+
+  async createDraftCommissionRuleSet(
+    adminId: string,
+    dto: CreateCommissionRuleSetDto,
+  ) {
+    return this.commissionService.createDraftRuleSet(adminId, dto);
+  }
+
+  async validateCommissionRuleSet(ruleSetId: string) {
+    return this.commissionService.validateCommissionRuleSet(ruleSetId);
+  }
+
+  async publishCommissionRuleSet(adminId: string, ruleSetId: string) {
+    return this.commissionService.publishCommissionRuleSet(adminId, ruleSetId);
   }
 
   async previewCommission(dto: PreviewCommissionDto) {

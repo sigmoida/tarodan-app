@@ -27,7 +27,17 @@ export const financeApi = {
   // Commission
   getCommissionRevenue: (params?: { fromDate?: string; toDate?: string }) =>
     api.get("/admin/commission/revenue", { params }),
-  getCommissionRules: () => api.get("/admin/commission-rules"),
+  getCommissionRules: (ruleSetId?: string) =>
+    api.get("/admin/commission-rules", { params: { ruleSetId } }),
+  getCommissionRuleSets: () => api.get("/admin/commission-rule-sets"),
+  createCommissionRuleSetDraft: (name?: string) =>
+    api.post("/admin/commission-rule-sets/draft", { name }),
+  validateCommissionRuleSet: (id: string) =>
+    api.get(`/admin/commission-rule-sets/${id}/validate`),
+  publishCommissionRuleSet: (id: string) =>
+    api.post(`/admin/commission-rule-sets/${id}/publish`),
+  previewCommissionRule: (data: any) =>
+    api.post("/admin/commission-rules/preview", data),
   createCommissionRule: (data: any) =>
     api.post("/admin/commission-rules", data),
   updateCommissionRule: (id: string, data: any) =>

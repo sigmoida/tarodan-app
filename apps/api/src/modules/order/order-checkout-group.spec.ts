@@ -50,21 +50,18 @@ const SHIPPING_TARIFF_MOCK = {
 
 const DEFAULT_COMMISSION_RULE = {
   id: "default-commission-rule",
+  ruleSetId: "set-1",
   name: "Default seller commission",
-  ruleType: "default",
-  categoryId: null,
-  sellerType: "ALL",
-  taxpayerType: "all",
-  minAmount: null,
+  categoryId: "category-1",
+  sellerType: "FREE",
+  minAmount: 0,
   maxAmount: null,
-  priority: 0,
-  appliesTo: "SELLER",
-  sellerRate: 10,
-  sellerMin: null,
-  sellerMax: null,
-  buyerRate: null,
-  buyerMin: null,
-  buyerMax: null,
+  buyerCommissionRate: 0,
+  buyerServiceFeeRate: 0,
+  sellerCommissionRate: 10,
+  sellerPlatformFeeRate: 0,
+  shippingBuyerShare: 100,
+  shippingShares: [],
 };
 
 /**
@@ -88,6 +85,8 @@ describe("OrderService checkout group (batch checkout)", () => {
       productId: string;
       quantity?: number;
       shippingDesi?: number;
+      /** Tahsil edilecek birim fiyat — indirimli üründe liste fiyatı değil. */
+      unitPrice?: number;
     }>,
   ) =>
     createHash("sha256")
@@ -95,7 +94,7 @@ describe("OrderService checkout group (batch checkout)", () => {
         items
           .map(
             (item) =>
-              `${item.productId}:100.00:${item.quantity ?? 1}:${item.shippingDesi ?? 1}`,
+              `${item.productId}:${(item.unitPrice ?? 100).toFixed(2)}:${item.quantity ?? 1}:${item.shippingDesi ?? 1}`,
           )
           .sort()
           .join("|"),
@@ -111,7 +110,7 @@ describe("OrderService checkout group (batch checkout)", () => {
     title: `Ürün ${id.slice(-1)}`,
     status: ProductStatus.active,
     sellerId,
-    categoryId: null,
+    categoryId: "category-1",
     price: 100,
     oldPrice: null,
     saleStartDate: null,
@@ -128,7 +127,7 @@ describe("OrderService checkout group (batch checkout)", () => {
   let discountService: any;
 
   const mockPrisma: any = {
-    user: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn(), findFirst: jest.fn() },
     order: { count: jest.fn().mockResolvedValue(0) },
     checkoutGroup: {
       findUnique: jest.fn(),
@@ -137,6 +136,9 @@ describe("OrderService checkout group (batch checkout)", () => {
     // Koli numarası (PKG-…) da sipariş/sepet numarası gibi çakışma kontrolüyle
     // üretilir → generateUniqueReference bu sayacı çağırır.
     orderPackage: { count: jest.fn().mockResolvedValue(0) },
+    commissionRuleSet: {
+      findFirst: jest.fn().mockResolvedValue({ id: "set-1", version: 1 }),
+    },
     commissionRule: { findMany: jest.fn().mockResolvedValue([]) },
     platformSetting: {
       // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
@@ -158,6 +160,8 @@ describe("OrderService checkout group (batch checkout)", () => {
         findMany: jest
           .fn()
           .mockResolvedValue([makeProduct(productA), makeProduct(productB)]),
+        // Tekil misafir alımı ürünü findUnique ile okur.
+        findUnique: jest.fn().mockResolvedValue(makeProduct(productA)),
         update: jest.fn(),
       },
       order: {
@@ -203,6 +207,17 @@ describe("OrderService checkout group (batch checkout)", () => {
       cartItem: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      // Tekil misafir alımı sistem misafir kullanıcısını arar/yaratır.
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "guest-user",
+          email: "guest@tarodan.system",
+        }),
+        create: jest.fn().mockResolvedValue({
+          id: "guest-user",
+          email: "guest@tarodan.system",
+        }),
+      },
     };
 
     mockPrisma.user.findUnique.mockResolvedValue({
@@ -213,6 +228,8 @@ describe("OrderService checkout group (batch checkout)", () => {
       sellerType: "individual",
       membership: null,
     });
+    // Misafir akışı e-postanın KAYITLI OLMADIĞINI doğrular.
+    mockPrisma.user.findFirst.mockResolvedValue(null);
     mockPrisma.checkoutGroup.findUnique.mockResolvedValue(null);
     mockPrisma.order.count.mockResolvedValue(0);
     mockPrisma.checkoutGroup.count.mockResolvedValue(0);
@@ -277,6 +294,7 @@ describe("OrderService checkout group (batch checkout)", () => {
             getEffectiveDisplayPriceMany: jest
               .fn()
               .mockResolvedValue(new Map()),
+            getEffectiveDisplayPrice: jest.fn().mockResolvedValue(null),
           },
         },
         { provide: DiscountCalculator, useValue: {} },
@@ -312,6 +330,8 @@ describe("OrderService checkout group (batch checkout)", () => {
       idempotencyKey,
       shippingAddressId: addressId,
       expectedShippingTariffVersion: 1,
+      expectedCommissionRuleSetId: "set-1",
+      expectedCommissionRuleSetVersion: 1,
       expectedPricingHash: pricingHashFor(items),
     };
   };
@@ -450,6 +470,8 @@ describe("OrderService checkout group (batch checkout)", () => {
         idempotencyKey,
         shippingAddressId: addressId,
         expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
       } as any),
     ).rejects.toThrow(/maksimum 20 adet/i);
 
@@ -572,6 +594,8 @@ describe("OrderService checkout group (batch checkout)", () => {
       idempotencyKey,
       shippingAddressId: addressId,
       expectedShippingTariffVersion: 1,
+      expectedCommissionRuleSetId: "set-1",
+      expectedCommissionRuleSetVersion: 1,
       expectedPricingHash: pricingHashFor([{ productId: productA }]),
     };
     const result: any = await service.checkout(buyerId, dto as any);
@@ -596,6 +620,89 @@ describe("OrderService checkout group (batch checkout)", () => {
       } as any),
     ).rejects.toThrow(BadRequestException);
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  /**
+   * İndirimli üründe siparişin ürün tabanı TAHSİL EDİLEN tutardır.
+   *
+   * Eskiden `subtotal`'a indirim ÖNCESİ liste fiyatı yazılıyordu: alıcı 70
+   * öderken sipariş 100 kaydediyordu. Admin sipariş dosyası alıcı toplamını ve
+   * satıcı netini o 100'den kuruyor, platform satışı e-Arşiv faturası da
+   * kalemlerini oradan çıkarıyordu — belge tahsil edilenden fazlaya kesiliyordu.
+   */
+  it("indirimli üründe subtotal, liste fiyatını değil tahsil edilen tabanı tutar", async () => {
+    mockTx.$queryRaw.mockResolvedValue([{ id: productA }]);
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct(productA, { price: 70, oldPrice: 100 }),
+    ]);
+
+    await service.checkout(buyerId, {
+      items: [{ productId: productA }],
+      idempotencyKey,
+      shippingAddressId: addressId,
+      expectedShippingTariffVersion: 1,
+      expectedCommissionRuleSetId: "set-1",
+      expectedCommissionRuleSetVersion: 1,
+      expectedPricingHash: pricingHashFor([
+        { productId: productA, unitPrice: 70 },
+      ]),
+    } as any);
+
+    const data = mockTx.order.create.mock.calls[0][0].data;
+    expect(Number(data.unitPrice)).toBe(70);
+    expect(Number(data.subtotal)).toBe(70);
+
+    // Alıcı toplamı aynı tabandan türer: taban + alıcıya eklenenler.
+    expect(Number(data.totalAmount)).toBeCloseTo(
+      70 +
+        Number(data.buyerShippingAmount) +
+        Number(data.buyerFeeAmount) +
+        Number(data.buyerServiceTaxAmount),
+      2,
+    );
+
+    // Liste fiyatı kaybolmaz — indirim alanlarında durur.
+    expect(Number(data.discountAmount)).toBe(30);
+    expect(data.discountBreakdown.originalPrice).toBe(100);
+    expect((data.financialSnapshot as any).pricing.originalUnitPrice).toBe(100);
+  });
+
+  /**
+   * İndirim penceresi TAHSİLATI da bağlar.
+   *
+   * `saleEndDate` yalnız gösterimi etkiliyordu: pencere kapandığında vitrinde
+   * çizili fiyat ve rozet kayboluyor ama ürün indirimli fiyattan satılmaya
+   * devam ediyordu. Fiyatı geri alan bir iş yok — tek dönüş yolu satıcının
+   * ilanı elle güncellemesiydi.
+   */
+  it("indirim penceresi bittiyse indirim ÖNCESİ fiyattan tahsil edilir", async () => {
+    mockTx.$queryRaw.mockResolvedValue([{ id: productA }]);
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct(productA, {
+        price: 70,
+        oldPrice: 100,
+        saleStartDate: new Date("2020-01-01"),
+        saleEndDate: new Date("2020-02-01"), // çoktan bitti
+      }),
+    ]);
+
+    await service.checkout(buyerId, {
+      items: [{ productId: productA }],
+      idempotencyKey,
+      shippingAddressId: addressId,
+      expectedShippingTariffVersion: 1,
+      expectedCommissionRuleSetId: "set-1",
+      expectedCommissionRuleSetVersion: 1,
+      // Quote da aynı kuralı uygular → hash indirim öncesi fiyattan kurulur.
+      expectedPricingHash: pricingHashFor([
+        { productId: productA, unitPrice: 100 },
+      ]),
+    } as any);
+
+    const data = mockTx.order.create.mock.calls[0][0].data;
+    expect(Number(data.unitPrice)).toBe(100);
+    expect(Number(data.subtotal)).toBe(100);
+    expect(Number(data.discountAmount)).toBe(0);
   });
 
   // ── Misafir GRUP checkout (POST /orders/checkout/guest → checkoutGuest) ──────────
@@ -636,6 +743,8 @@ describe("OrderService checkout group (batch checkout)", () => {
           address: "Test cad. 1",
         },
         expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
         expectedPricingHash: pricingHashFor(items),
       };
     };
@@ -647,6 +756,49 @@ describe("OrderService checkout group (batch checkout)", () => {
         makeProduct(productA, { quantity: 100 }),
       ]);
       primeGuestOtp();
+    });
+
+    /**
+     * TEKİL misafir alımı (POST /orders/guest-checkout → guestCheckout) da
+     * kampanyayı uygulamalı.
+     *
+     * Bu yol fiyatı ham kolondan okuyordu (`salePrice ?? price`) ve indirim
+     * motorunu HİÇ sormuyordu: code'suz bir kampanya aktifken ürün kartı 80
+     * gösterirken misafirden 100 tahsil ediliyordu. Üye ve misafir GRUP yolları
+     * bunu F1.4'te çözmüştü, tekil misafir yolu dışarıda kalmıştı.
+     */
+    it("tekil misafir alımında kampanya fiyatı tahsil edilir", async () => {
+      mockTx.product.findUnique.mockResolvedValue(
+        makeProduct(productA, { quantity: 100 }),
+      );
+      // code=null kampanya: kartta görünen efektif fiyat 80.
+      discountService.getEffectiveDisplayPrice.mockResolvedValue(80);
+
+      await service.guestCheckout({
+        productId: productA,
+        idempotencyKey,
+        email: guestEmail,
+        emailVerificationCode: guestCode,
+        phone: "+905551234567",
+        guestName: "Guest User",
+        shippingAddress: {
+          fullName: "Guest User",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+        },
+        expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
+        expectedPricingHash: pricingHashFor([
+          { productId: productA, unitPrice: 80 },
+        ]),
+      } as any);
+
+      const data = mockTx.order.create.mock.calls[0][0].data;
+      expect(Number(data.unitPrice)).toBe(80);
+      expect(Number(data.subtotal)).toBe(80);
     });
 
     it("quantity=3 → order.quantity=3, subtotal=fiyat*3, rezervasyon +3 (1 değil)", async () => {
@@ -751,6 +903,8 @@ describe("OrderService checkout group (batch checkout)", () => {
         idempotencyKey,
         shippingAddressId: addressId,
         expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
         expectedPricingHash: pricingHashFor(items),
       };
     };

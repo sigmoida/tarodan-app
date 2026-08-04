@@ -127,6 +127,15 @@ export class CheckoutDto {
   @Min(1)
   expectedShippingTariffVersion: number;
 
+  @ApiProperty({ description: "Checkout quote komisyon seti ID'si" })
+  @IsUUID("4")
+  expectedCommissionRuleSetId: string;
+
+  @ApiProperty({ description: "Checkout quote komisyon seti sürümü" })
+  @IsInt()
+  @Min(1)
+  expectedCommissionRuleSetVersion: number;
+
   @ApiProperty({
     description:
       "Checkout quote birim-fiyat hash'i. Ürün fiyatı/kampanya değiştiyse 409 PRICING_CHANGED.",

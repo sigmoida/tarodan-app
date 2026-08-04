@@ -117,6 +117,14 @@ export class CheckoutQuoteResponseDto {
   })
   shippingTariffVersion: number;
 
+  @ApiProperty({ description: "Published commission set used by this quote" })
+  commissionRuleSetId: string;
+
+  @ApiProperty({
+    description: "Published commission set version used by this quote",
+  })
+  commissionRuleSetVersion: number;
+
   @ApiProperty({ type: [CheckoutQuoteItemResponseDto] })
   items: CheckoutQuoteItemResponseDto[];
 

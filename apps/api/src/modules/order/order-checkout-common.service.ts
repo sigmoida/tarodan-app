@@ -57,6 +57,7 @@ export class OrderCheckoutCommonService {
     categoryId: string | null;
     shippingDesi: number;
     shippingTariff?: OutboundTariffLike;
+    commissionRuleSetId?: string;
   }): Promise<{
     commission: CommissionResult;
     fullShippingAmount: number;
@@ -70,13 +71,23 @@ export class OrderCheckoutCommonService {
     serviceVatRate: number;
     totalAmount: number;
   }> {
-    const { amount, sellerId, categoryId, shippingDesi, shippingTariff } =
-      params;
+    const {
+      amount,
+      sellerId,
+      categoryId,
+      shippingDesi,
+      shippingTariff,
+      commissionRuleSetId,
+    } = params;
 
+    const pinnedCommissionRuleSetId =
+      commissionRuleSetId ??
+      (await this.orderPricing.resolveCommissionRuleSetSnapshot()).id;
     const commission = await this.orderPricing.calculateCommission(
       amount,
       sellerId,
       categoryId,
+      pinnedCommissionRuleSetId,
     );
     // Kargo kararı (quote/checkout ile ORTAK): kademe → o kademenin payı → bölüşüm.
     const {
@@ -166,7 +177,7 @@ export class OrderCheckoutCommonService {
     totalAmount: number;
   }): Prisma.InputJsonObject {
     return {
-      version: 1,
+      version: 2,
       confirmedAt: new Date().toISOString(),
       pricing: {
         hash: params.pricingHash,
@@ -191,11 +202,12 @@ export class OrderCheckoutCommonService {
         sellerAmount: params.shipping.sellerAmount,
       },
       commission: {
+        ruleSetId: params.commission.ruleSetId,
         ruleId: params.commission.ruleId,
         ruleName: params.commission.ruleName,
-        ruleType: params.commission.ruleType
-          ? String(params.commission.ruleType)
-          : null,
+        matchedCategoryId: params.commission.matchedCategoryId,
+        matchedSellerType: params.commission.matchedSellerType,
+        matchedAmount: params.commission.matchedAmount,
         effectiveMembershipTier:
           params.commission.effectiveMembershipTier ?? null,
         taxpayerType: params.commission.taxpayerType ?? null,

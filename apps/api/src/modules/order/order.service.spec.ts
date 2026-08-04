@@ -257,25 +257,44 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
 
   const commissionRule = {
     id: "rule-1",
+    ruleSetId: "set-1",
     name: "Varsayılan",
-    ruleType: "default",
-    appliesTo: "BOTH",
-    sellerRate: 10,
-    sellerMin: null,
-    sellerMax: null,
-    buyerRate: 3,
-    buyerMin: null,
-    buyerMax: null,
-    categoryId: null,
-    sellerType: null,
-    priority: 0,
-    isActive: true,
-    category: null,
+    categoryId: "category-1",
+    sellerType: "FREE",
+    minAmount: 0,
+    maxAmount: null,
+    buyerCommissionRate: 0,
+    buyerCommissionMin: null,
+    buyerCommissionMax: null,
+    buyerServiceFeeRate: 3,
+    buyerServiceFeeMin: null,
+    buyerServiceFeeMax: null,
+    sellerCommissionRate: 10,
+    sellerCommissionMin: null,
+    sellerCommissionMax: null,
+    sellerPlatformFeeRate: 0,
+    sellerPlatformFeeMin: null,
+    sellerPlatformFeeMax: null,
+    shippingBuyerShare: 100,
+    shippingShares: [],
   };
 
   const mockPrisma = {
     user: { findUnique: jest.fn() },
-    commissionRule: { findMany: jest.fn().mockResolvedValue([commissionRule]) },
+    commissionRuleSet: {
+      findFirst: jest.fn().mockResolvedValue({ id: "set-1" }),
+    },
+    commissionRule: {
+      findMany: jest.fn().mockImplementation(({ where }: any) =>
+        Promise.resolve([
+          {
+            ...commissionRule,
+            categoryId: where.categoryId,
+            sellerType: where.sellerType,
+          },
+        ]),
+      ),
+    },
     platformSetting: {
       // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
       findMany: jest.fn().mockResolvedValue([]),
@@ -287,7 +306,15 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    mockPrisma.commissionRule.findMany.mockResolvedValue([commissionRule]);
+    mockPrisma.commissionRule.findMany.mockImplementation(({ where }: any) =>
+      Promise.resolve([
+        {
+          ...commissionRule,
+          categoryId: where.categoryId,
+          sellerType: where.sellerType,
+        },
+      ]),
+    );
     mockPrisma.platformSetting.findUnique.mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -347,7 +374,11 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
       taxId: null,
     });
 
-    const preview = await service.getCommissionPreview(1000, sellerId, null);
+    const preview = await service.getCommissionPreview(
+      1000,
+      sellerId,
+      "category-1",
+    );
 
     expect(preview.withholdingTaxAmount).toBe(0);
     expect(preview.sellerFeeAmount).toBe(100);
@@ -365,7 +396,11 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
       taxId: null,
     });
 
-    const preview = await service.getCommissionPreview(1000, sellerId, null);
+    const preview = await service.getCommissionPreview(
+      1000,
+      sellerId,
+      "category-1",
+    );
 
     expect(preview.withholdingTaxAmount).toBe(10);
     // 1000 − 100 (ücret) − 10 (stopaj) − 20 (hizmet KDV) = 870
@@ -380,7 +415,11 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
       taxId: "1234567890",
     });
 
-    const preview = await service.getCommissionPreview(1000, sellerId, null);
+    const preview = await service.getCommissionPreview(
+      1000,
+      sellerId,
+      "category-1",
+    );
 
     expect(preview.withholdingTaxAmount).toBe(10);
     expect(preview.sellerNetAmount).toBe(870);
@@ -395,7 +434,11 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
       taxId: "1234567890",
     });
 
-    const preview = await service.getCommissionPreview(1000, sellerId, null);
+    const preview = await service.getCommissionPreview(
+      1000,
+      sellerId,
+      "category-1",
+    );
 
     expect(preview.withholdingTaxAmount).toBe(20);
     expect(preview.sellerNetAmount).toBe(860);
@@ -410,7 +453,11 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
       taxId: "1234567890",
     });
 
-    const preview = await service.getCommissionPreview(1000, sellerId, null);
+    const preview = await service.getCommissionPreview(
+      1000,
+      sellerId,
+      "category-1",
+    );
 
     expect(preview.withholdingTaxAmount).toBe(0);
     expect(preview.sellerNetAmount).toBe(880);
@@ -425,7 +472,11 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
       taxId: "1234567890",
     });
 
-    const preview = await service.getCommissionPreview(1000, sellerId, null);
+    const preview = await service.getCommissionPreview(
+      1000,
+      sellerId,
+      "category-1",
+    );
 
     expect(preview.sellerServiceTaxAmount).toBe(0);
     expect(preview.sellerNetAmount).toBe(890);
