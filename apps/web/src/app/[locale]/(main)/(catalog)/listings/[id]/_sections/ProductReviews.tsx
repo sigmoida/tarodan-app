@@ -76,7 +76,6 @@ export default function ProductReviews() {
                       className={`flex items-center gap-2 w-full text-left px-2 py-0.5 rounded transition-colors ${isActive ? "bg-warning-100" : "hover:bg-surface-alt"}`}
                     >
                       <span className="text-sm font-medium w-3">{star}</span>
-                      <StarIcon className="w-4 h-4 text-warning-400 fill-warning-400 flex-shrink-0" />
                       <div className="flex-1 h-2 bg-border-subtle rounded-full overflow-hidden">
                         <div
                           className="h-full bg-warning-400 rounded-full transition-all"

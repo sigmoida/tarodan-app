@@ -1,13 +1,7 @@
 "use client";
 
 import toast from "react-hot-toast";
-import {
-  ArrowsRightLeftIcon,
-  BoltIcon,
-  FolderPlusIcon,
-  PencilIcon,
-  ShoppingCartIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { Button, QuantityStepper } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useListingDetail } from "../_context/ListingDetailContext";
@@ -58,18 +52,16 @@ export default function ProductInfo() {
           <>
             <ButtonLink
               href={`/listings/${listing.id}/edit`}
-              className="w-full flex gap-2 py-4 text-lg"
+              className="w-full py-4 text-lg"
             >
-              <PencilIcon className="w-6 h-6" />
               {t("common.edit")}
             </ButtonLink>
             {limits?.canCreateCollections && (
               <Button
                 variant="secondary"
                 onClick={handleOpenCollectionModal}
-                className="w-full flex gap-2"
+                className="w-full"
               >
-                <FolderPlusIcon className="w-5 h-5" />
                 {t("collection.addToCollection")}
               </Button>
             )}
@@ -98,7 +90,6 @@ export default function ProductInfo() {
                 !hasStock
               }
               isLoading={isAddingToCart}
-              leftIcon={<BoltIcon className="w-5 h-5" />}
               className="flex-1"
             >
               {listing.status === "sold"
@@ -141,7 +132,6 @@ export default function ProductInfo() {
                   router.push(`/profile/trades/new?listing=${listing.id}`);
                 }}
                 disabled={listing.status !== "active"}
-                leftIcon={<ArrowsRightLeftIcon className="w-5 h-5" />}
                 className="w-full"
               >
                 {t("product.trade")}
@@ -151,7 +141,6 @@ export default function ProductInfo() {
               variant="secondary"
               onClick={handleMakeOffer}
               disabled={listing.status !== "active"}
-              leftIcon={<BoltIcon className="w-5 h-5" />}
               className="w-full"
             >
               {t("product.makeOffer")}
@@ -163,7 +152,6 @@ export default function ProductInfo() {
                 isAddingToCart || cartLoading || listing.status !== "active"
               }
               isLoading={isAddingToCart}
-              leftIcon={<ShoppingCartIcon className="w-5 h-5" />}
               className="w-full"
             >
               {isAddingToCart

@@ -99,15 +99,13 @@ export default function SellerCard() {
             <ButtonLink
               variant="secondary"
               href={`/profile/messages?user=${seller.id}&listing=${listing?.id}`}
-              className="flex-1 gap-1.5"
+              className="flex-1"
             >
-              <ChatBubbleLeftRightIcon className="w-4 h-4" />
               {t("product.sendMessage")}
             </ButtonLink>
           ) : (
             <Button
               variant="secondary"
-              leftIcon={<ChatBubbleLeftRightIcon className="w-4 h-4" />}
               onClick={() =>
                 requireAuth({
                   title: t("product.sendMessageToSeller"),
