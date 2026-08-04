@@ -38,8 +38,6 @@ export type ListingAction =
   | "delete"
   | "revise"
   | "relist"
-  | "order-detail"
-  | "trade-detail"
   | "reservation-status"
   | "support"
   | "create-listing";
@@ -47,8 +45,6 @@ export type ListingAction =
 /** Ürün durumuna göre kartta sunulabilecek işlemlerin tek kaynağı. */
 export function getListingActions(listing: {
   status: string;
-  relatedOrder?: unknown;
-  relatedTrade?: unknown;
 }): ListingAction[] {
   switch (listing.status) {
     case "active":
@@ -60,11 +56,9 @@ export function getListingActions(listing: {
     case "inactive":
       return ["relist", "delete"];
     case "reserved":
-      if (listing.relatedOrder) return ["order-detail"];
-      if (listing.relatedTrade) return ["trade-detail"];
       return ["reservation-status"];
     case "sold":
-      return listing.relatedOrder ? ["order-detail", "relist"] : ["relist"];
+      return ["relist"];
     case "suspended":
       return ["support", "delete"];
     case "deleted":

@@ -15,13 +15,7 @@ import {
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
 } from "../../common/helpers/fulltext-search";
-import {
-  Brand,
-  CommissionRuleSetStatus,
-  CommissionSellerType,
-  Prisma,
-  ProductKind,
-} from "@prisma/client";
+import { Brand, Prisma, ProductKind } from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import {
   AdminAttributeGroupQueryDto,
@@ -31,6 +25,12 @@ import {
   AdminCategoryQueryDto,
   AdminManufacturerQueryDto,
 } from "./dto";
+import {
+  assertCategoryHasPublishedCommissionCoverage,
+  assertNoActiveCategoryDescendants,
+  assertValidCategoryParent,
+  CATEGORIES_CACHE_KEY,
+} from "../category/category-integrity.helper";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -50,50 +50,8 @@ export class AdminCatalogService {
     private readonly storageService: StorageService,
   ) {}
 
-  private async assertCategoryHasPublishedCommissionCoverage(
-    categoryId: string,
-  ) {
-    const activeSet = await this.prisma.commissionRuleSet.findFirst({
-      where: { status: CommissionRuleSetStatus.ACTIVE },
-      select: {
-        rules: {
-          where: { categoryId },
-          select: { sellerType: true, minAmount: true, maxAmount: true },
-        },
-      },
-    });
-    const sellerTypes = [
-      CommissionSellerType.FREE,
-      CommissionSellerType.BASIC,
-      CommissionSellerType.PREMIUM,
-      CommissionSellerType.BUSINESS,
-    ];
-    const complete =
-      !!activeSet &&
-      sellerTypes.every((sellerType) => {
-        const bands = activeSet.rules
-          .filter((rule) => rule.sellerType === sellerType)
-          .sort((a, b) => Number(a.minAmount) - Number(b.minAmount));
-        if (
-          bands.length === 0 ||
-          Number(bands[0].minAmount) !== 0 ||
-          bands[bands.length - 1].maxAmount != null
-        ) {
-          return false;
-        }
-        return bands
-          .slice(1)
-          .every(
-            (band, index) =>
-              bands[index].maxAmount != null &&
-              Number(bands[index].maxAmount) === Number(band.minAmount),
-          );
-      });
-    if (!complete) {
-      throw new BadRequestException(
-        "Kategori aktifleştirilemez: aktif komisyon setinde FREE, BASIC, PREMIUM ve BUSINESS için 0 TL'den sonsuza kadar eksiksiz fiyat aralığı yayınlanmalıdır.",
-      );
-    }
+  private async invalidateCategoriesCache(): Promise<void> {
+    await this.cache.del(CATEGORIES_CACHE_KEY);
   }
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -286,6 +244,8 @@ export class AdminCatalogService {
       },
     });
 
+    await this.invalidateCategoriesCache();
+
     // Create audit log
     await this.audit.createAuditLog(
       adminId,
@@ -322,30 +282,28 @@ export class AdminCatalogService {
       throw new NotFoundException("Kategori bulunamadı");
     }
 
-    if (dto.isActive === true && !category.isActive) {
-      await this.assertCategoryHasPublishedCommissionCoverage(categoryId);
+    const nextParentId =
+      dto.parentId !== undefined ? dto.parentId || null : category.parentId;
+    const nextIsActive = dto.isActive ?? category.isActive;
+
+    if (nextParentId && (dto.parentId !== undefined || dto.isActive === true)) {
+      await assertValidCategoryParent(
+        this.prisma,
+        categoryId,
+        nextParentId,
+        nextIsActive,
+      );
     }
 
-    // Check circular reference if parentId is being changed
-    if (dto.parentId && dto.parentId !== category.parentId) {
-      // Check if new parent is a child of this category
-      const isChild = category.children.some(
-        (child) => child.id === dto.parentId,
+    if (dto.isActive === false && category.isActive) {
+      await assertNoActiveCategoryDescendants(this.prisma, categoryId);
+    }
+
+    if (dto.isActive === true && !category.isActive) {
+      await assertCategoryHasPublishedCommissionCoverage(
+        this.prisma,
+        categoryId,
       );
-      if (isChild) {
-        throw new BadRequestException(
-          "Kategori kendi alt kategorisini üst kategori olarak seçemez",
-        );
-      }
-
-      // Check if new parent exists
-      const newParent = await this.prisma.category.findUnique({
-        where: { id: dto.parentId },
-      });
-
-      if (!newParent) {
-        throw new NotFoundException("Üst kategori bulunamadı");
-      }
     }
 
     // Generate new slug if name changed
@@ -383,6 +341,8 @@ export class AdminCatalogService {
         isActive: dto.isActive,
       },
     });
+
+    await this.invalidateCategoriesCache();
 
     // Create audit log
     await this.audit.createAuditLog(
@@ -432,6 +392,8 @@ export class AdminCatalogService {
     await this.prisma.category.delete({
       where: { id: categoryId },
     });
+
+    await this.invalidateCategoriesCache();
 
     // Create audit log
     await this.audit.createAuditLog(

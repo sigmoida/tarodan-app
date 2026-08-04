@@ -10,12 +10,7 @@ import { CacheService } from "../cache/cache.service";
 import { SearchService } from "../search/search.service";
 import { DiscountService } from "../discount/discount.service";
 import { ProductQueryDto } from "./dto";
-import {
-  OrderStatus,
-  ProductStatus,
-  Prisma,
-  TradeStatus,
-} from "@prisma/client";
+import { ProductStatus, Prisma } from "@prisma/client";
 import { buildProductWhere } from "./helpers/build-product-where";
 import { catalogProductWhere } from "./helpers/catalog-product-where";
 import { fulltextProductSearch } from "./helpers/fulltext-search";
@@ -27,33 +22,6 @@ import {
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductCommonService } from "./product-common.service";
 import { buildProductEditProjection } from "./product-edit-projection";
-
-const SELLER_LISTING_ORDER_STATUSES: OrderStatus[] = [
-  OrderStatus.pending_payment,
-  OrderStatus.paid,
-  OrderStatus.preparing,
-  OrderStatus.shipped,
-  OrderStatus.delivered,
-  OrderStatus.awaiting_buyer_confirmation,
-  OrderStatus.completed,
-  OrderStatus.refund_requested,
-];
-
-const SELLER_LISTING_TRADE_STATUSES: TradeStatus[] = [
-  TradeStatus.pending,
-  TradeStatus.accepted,
-  TradeStatus.initiator_shipped,
-  TradeStatus.receiver_shipped,
-  TradeStatus.both_shipped,
-  TradeStatus.initiator_received,
-  TradeStatus.receiver_received,
-  TradeStatus.awaiting_payment,
-  TradeStatus.shipping_to_warehouse,
-  TradeStatus.at_warehouse,
-  TradeStatus.admin_reviewing,
-  TradeStatus.shipping_to_recipients,
-  TradeStatus.returning,
-];
 
 /**
  * ProductQueryService — ürün okuma/listeleme (findAll ES/PG akışı, popüler, tekil
@@ -919,47 +887,6 @@ export class ProductQueryService {
             slug: true,
           },
         },
-        // Bu bağlam yalnız satıcının kendi ürün ekranında döner. Genel ürün
-        // DTO'suna eklenmez; alıcı ve işlem kimlikleri herkese açılmaz.
-        orders: {
-          where: { status: { in: SELLER_LISTING_ORDER_STATUSES } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: {
-            id: true,
-            orderNumber: true,
-            status: true,
-            quantity: true,
-            unitPrice: true,
-            subtotal: true,
-            createdAt: true,
-            deliveredAt: true,
-            completedAt: true,
-            buyer: { select: { id: true, displayName: true } },
-          },
-        },
-        tradeItemsOffered: {
-          where: {
-            trade: { status: { in: SELLER_LISTING_TRADE_STATUSES } },
-          },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: {
-            trade: {
-              select: {
-                id: true,
-                tradeNumber: true,
-                status: true,
-                createdAt: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            offers: { where: { status: "pending" } },
-          },
-        },
       },
     });
 
@@ -976,31 +903,8 @@ export class ProductQueryService {
       TERMINAL_STATUSES.includes(p.status);
     products.sort((a, b) => Number(isTerminal(a)) - Number(isTerminal(b)));
 
-    const formattedBase = await this.common.formatProductResponseMany(products);
-    const formattedProducts = formattedBase.map((f, i) => {
-      const product = products[i];
-      const relatedOrder = product.orders[0];
-      const relatedTrade = product.tradeItemsOffered[0]?.trade;
-
-      return {
-        ...f,
-        pendingOffersCount: product._count.offers,
-        relatedOrder: relatedOrder
-          ? {
-              ...relatedOrder,
-              unitPrice:
-                relatedOrder.unitPrice == null
-                  ? null
-                  : Number(relatedOrder.unitPrice),
-              subtotal:
-                relatedOrder.subtotal == null
-                  ? null
-                  : Number(relatedOrder.subtotal),
-            }
-          : null,
-        relatedTrade: relatedTrade ?? null,
-      };
-    });
+    const formattedProducts =
+      await this.common.formatProductResponseMany(products);
 
     return {
       data: formattedProducts,

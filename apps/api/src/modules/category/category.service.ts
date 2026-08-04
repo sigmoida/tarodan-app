@@ -1,9 +1,19 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { Category } from "@prisma/client";
 import { saleCapableSellerWhere } from "../membership/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import {
+  assertCategoryHasPublishedCommissionCoverage,
+  assertNoActiveCategoryDescendants,
+  assertValidCategoryParent,
+  CATEGORIES_CACHE_KEY,
+} from "./category-integrity.helper";
 
 @Injectable()
 export class CategoryService {
@@ -12,14 +22,11 @@ export class CategoryService {
     private readonly cache: CacheService,
   ) {}
 
-  /** Cache key for categories list */
-  private static readonly CATEGORIES_CACHE_KEY = "categories:all";
-
   /**
    * Invalidate categories cache (e.g. after seed or admin category change)
    */
   async invalidateCache(): Promise<void> {
-    await this.cache.del(CategoryService.CATEGORIES_CACHE_KEY);
+    await this.cache.del(CATEGORIES_CACHE_KEY);
   }
 
   /**
@@ -27,7 +34,7 @@ export class CategoryService {
    */
   async findAll() {
     return this.cache.getOrSet(
-      CategoryService.CATEGORIES_CACHE_KEY,
+      CATEGORIES_CACHE_KEY,
       async () => {
         const categories = await this.prisma.category.findMany({
           where: { isActive: true },
@@ -48,7 +55,10 @@ export class CategoryService {
         });
 
         // Build hierarchy
-        const rootCategories = categories.filter((c) => !c.parentId);
+        const activeCategoryIds = new Set(categories.map((c) => c.id));
+        const rootCategories = categories.filter(
+          (c) => !c.parentId || !activeCategoryIds.has(c.parentId),
+        );
         const childrenMap = new Map<string, typeof categories>();
 
         categories.forEach((c) => {
@@ -178,16 +188,30 @@ export class CategoryService {
    * Create a new category
    */
   async create(data: any): Promise<Category> {
+    if (data.isActive === true) {
+      throw new BadRequestException(
+        "Yeni kategori önce pasif oluşturulmalı, komisyon kuralları yayınlandıktan sonra aktifleştirilmelidir.",
+      );
+    }
+    if (data.parentId) {
+      await assertValidCategoryParent(
+        this.prisma,
+        "new-category",
+        data.parentId,
+        false,
+      );
+    }
     const slug = await this.uniqueSlug(this.generateSlug(data.name));
 
     const category = await this.prisma.category.create({
       data: {
         ...data,
         slug,
+        isActive: false,
       },
     });
 
-    this.cache.del("categories:all");
+    await this.invalidateCache();
     return category;
   }
 
@@ -203,6 +227,27 @@ export class CategoryService {
       throw new NotFoundException("Kategori bulunamadı");
     }
 
+    const nextParentId =
+      data.parentId !== undefined ? data.parentId || null : category.parentId;
+    const nextIsActive = data.isActive ?? category.isActive;
+    if (
+      nextParentId &&
+      (data.parentId !== undefined || data.isActive === true)
+    ) {
+      await assertValidCategoryParent(
+        this.prisma,
+        id,
+        nextParentId,
+        nextIsActive,
+      );
+    }
+    if (data.isActive === false && category.isActive) {
+      await assertNoActiveCategoryDescendants(this.prisma, id);
+    }
+    if (data.isActive === true && !category.isActive) {
+      await assertCategoryHasPublishedCommissionCoverage(this.prisma, id);
+    }
+
     let slug = category.slug;
     if (data.name && data.name !== category.name) {
       slug = await this.uniqueSlug(this.generateSlug(data.name), id);
@@ -216,7 +261,7 @@ export class CategoryService {
       },
     });
 
-    this.cache.del("categories:all");
+    await this.invalidateCache();
     return updated;
   }
 
@@ -248,7 +293,7 @@ export class CategoryService {
       where: { id },
     });
 
-    this.cache.del("categories:all");
+    await this.invalidateCache();
     return result;
   }
 

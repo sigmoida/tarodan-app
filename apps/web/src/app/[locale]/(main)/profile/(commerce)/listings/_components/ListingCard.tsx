@@ -8,9 +8,6 @@ import {
   PencilIcon,
   TrashIcon,
   EyeIcon,
-  TruckIcon,
-  UserIcon,
-  CurrencyDollarIcon,
   CalendarDaysIcon,
   RocketLaunchIcon,
   PauseCircleIcon,
@@ -65,16 +62,6 @@ export default function ListingCard({
   const viewable = VIEWABLE.includes(listing.status);
   const onSale = isProductOnSaleDisplay(listing);
   const actions = getListingActions(listing);
-  const relatedOrder = listing.relatedOrder;
-  const soldAt =
-    relatedOrder?.completedAt ??
-    relatedOrder?.deliveredAt ??
-    relatedOrder?.createdAt;
-  const soldPrice =
-    relatedOrder?.subtotal ??
-    (relatedOrder?.unitPrice != null
-      ? relatedOrder.unitPrice * relatedOrder.quantity
-      : null);
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
@@ -126,19 +113,21 @@ export default function ListingCard({
         )}
 
         <div className="mb-3">
-          {onSale && (
-            <div className="mb-0.5 flex items-center gap-2">
-              <span className="text-sm text-subtle line-through">
-                {formatTL(getProductOriginalPriceForDisplay(listing))}
-              </span>
-              <Badge variant="danger" size="sm">
-                {t("product.discount")}
-              </Badge>
-            </div>
-          )}
-          <p className="text-xl font-bold text-primary-500">
-            {formatTL(getProductEffectivePrice(listing))}
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xl font-bold text-primary-500">
+              {formatTL(getProductEffectivePrice(listing))}
+            </p>
+            {onSale && (
+              <div className="flex shrink-0 items-center justify-end gap-2">
+                <span className="text-sm text-subtle line-through">
+                  {formatTL(getProductOriginalPriceForDisplay(listing))}
+                </span>
+                <Badge variant="danger" size="sm">
+                  {t("product.discount")}
+                </Badge>
+              </div>
+            )}
+          </div>
           {listing.status !== "sold" && estimatedNet != null && (
             <p className="mt-0.5 text-xs text-success-600">
               {t("product.estimatedNet", {
@@ -175,33 +164,6 @@ export default function ListingCard({
             )}
           </div>
         </div>
-
-        {listing.status === "sold" && relatedOrder && (
-          <div className="mb-3 space-y-1.5 rounded-lg border border-border bg-surface-alt p-3 text-sm">
-            {soldAt && (
-              <div className="flex items-center gap-2 text-muted">
-                <CalendarDaysIcon className="h-4 w-4 text-primary-500" />
-                <span>{t("product.soldOn", { date: formatDate(soldAt) })}</span>
-              </div>
-            )}
-            {relatedOrder.buyer && (
-              <div className="flex items-center gap-2 text-muted">
-                <UserIcon className="h-4 w-4 text-primary-500" />
-                <span>
-                  {t("product.buyerHandle", {
-                    name: relatedOrder.buyer.displayName,
-                  })}
-                </span>
-              </div>
-            )}
-            {soldPrice != null && (
-              <div className="flex items-center gap-2 font-medium text-body">
-                <CurrencyDollarIcon className="h-4 w-4 text-success-600" />
-                <span>{formatTL(soldPrice)}</span>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Actions — above the card's stretched link */}
         <div className="relative z-10 mt-auto flex flex-wrap gap-2 pt-1">
@@ -291,30 +253,6 @@ export default function ListingCard({
                     {t("product.relist")}
                   </ButtonLink>
                 );
-              case "order-detail":
-                return relatedOrder ? (
-                  <ButtonLink
-                    key={action}
-                    href={`/profile/orders/${relatedOrder.id}`}
-                    size="sm"
-                    className={className}
-                  >
-                    <TruckIcon className="h-4 w-4" />
-                    {t("product.orderDetail")}
-                  </ButtonLink>
-                ) : null;
-              case "trade-detail":
-                return listing.relatedTrade ? (
-                  <ButtonLink
-                    key={action}
-                    href={`/profile/trades/${listing.relatedTrade.id}`}
-                    size="sm"
-                    className={className}
-                  >
-                    <ArrowPathIcon className="h-4 w-4" />
-                    {t("product.tradeDetail")}
-                  </ButtonLink>
-                ) : null;
               case "reservation-status":
                 return (
                   <Button
