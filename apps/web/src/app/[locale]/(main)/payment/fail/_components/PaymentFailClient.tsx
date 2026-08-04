@@ -14,6 +14,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { SectionCard, ButtonLink } from "@/components/ui";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { usePaymentFail } from "../_hooks/usePaymentFail";
+import { formatTL } from "@/lib/format";
 
 const REASON_KEYS = [
   "payment.reasonInsufficientBalance",
@@ -60,11 +61,7 @@ export default function PaymentFailClient() {
                     {t("payment.amountLabel")}:
                   </span>
                   <span className="font-semibold">
-                    {payment.amount?.toLocaleString("tr-TR", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    TL
+                    {formatTL(payment.amount)} TL
                   </span>
                 </div>
                 <div className="flex justify-between">

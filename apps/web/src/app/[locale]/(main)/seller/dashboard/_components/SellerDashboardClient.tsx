@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard, MetricCard } from "@/components/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { useSellerDashboard } from "../_hooks/useSellerDashboard";
+import { formatTL } from "@/lib/format";
 
 const QUICK_ACTIONS = [
   {
@@ -75,7 +76,7 @@ export default function SellerDashboardClient() {
                 <MetricCard
                   icon={CurrencyDollarIcon}
                   label={t("sellerDashboard.totalRevenue")}
-                  value={`${totalRevenue.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL`}
+                  value={formatTL(totalRevenue)}
                   accent="text-success-600"
                 />
                 <MetricCard

@@ -9,6 +9,7 @@ import { CheckIcon } from "@heroicons/react/24/solid";
 import { Radio, cn } from "@tarodan/ui";
 import { FormInput } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/ui";
+import { formatTL } from "@/lib/format";
 import {
   usePackageTiers,
   sampleDimensionsLabel,
@@ -29,11 +30,10 @@ interface PricingCardProps {
   quantityHelper: string;
 }
 
-const fmt = (n: number) =>
-  `₺${n.toLocaleString("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+// Para biçimi TEK yerden gelir (`lib/format`): ekranlar kendi
+// `toLocaleString` çağrılarını yazdığında aynı ürün bir kartta "468 ₺",
+// detayda "468,19 TL" görünüyor ve kart biçimi kuruşu YUVARLIYORDU.
+const fmt = formatTL;
 
 /** "Fiyatlandırma" — price + stock quantity + commission preview. Shared. */
 export default function PricingCard({

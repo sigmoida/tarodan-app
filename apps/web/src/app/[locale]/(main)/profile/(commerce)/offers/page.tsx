@@ -23,6 +23,7 @@ import type { Offer, OfferTab } from "./_lib/types";
 import OfferCard from "./_components/OfferCard";
 import CounterOfferModal from "./_modals/CounterOfferModal";
 import { MetricCard } from "@/components/ui";
+import { formatTL } from "@/lib/format";
 
 function OffersPageContent() {
   const searchParams = useSearchParams();
@@ -118,7 +119,7 @@ function OffersPageContent() {
         <MetricCard
           icon={TagIcon}
           label="Toplam Değer"
-          value={`₺${metrics.value.toLocaleString("tr-TR")}`}
+          value={formatTL(metrics.value)}
           accent="text-primary-600"
         />
       </div>

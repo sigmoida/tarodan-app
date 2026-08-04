@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
 import { useTrackOrder } from "./_hooks/useTrackOrder";
 import { trackOrderSchema } from "./_lib/schema";
+import { formatTL } from "@/lib/format";
 
 /** Etiket + değer satırı — kargo ve adres bloklarında tekrar eden desen. */
 function Row({
@@ -187,11 +188,7 @@ export default function TrackOrderClient() {
                   {order.product?.title}
                 </Link>
                 <p className="mt-1 font-semibold text-heading">
-                  {Number(order.totalAmount).toLocaleString("tr-TR", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  TL
+                  {formatTL(Number(order.totalAmount))} TL
                 </p>
               </div>
             </div>

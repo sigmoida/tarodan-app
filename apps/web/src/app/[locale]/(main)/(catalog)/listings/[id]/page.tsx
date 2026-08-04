@@ -7,6 +7,7 @@ import ListingDetailClient from "./ListingDetailClient";
 import ProductStaticInfo from "./_sections/ProductStaticInfo";
 import ProductStaticSpecs from "./_sections/ProductStaticSpecs";
 import type { Listing } from "./_lib/types";
+import { formatTL } from "@/lib/format";
 
 const API_BASE = getServerApiOrigin();
 
@@ -49,9 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!product?.title) return { title: "İlan Bulunamadı | Tarodan" };
 
   const priceNum = Number(product.price);
-  const priceText = Number.isFinite(priceNum)
-    ? ` - ₺${priceNum.toLocaleString("tr-TR")}`
-    : "";
+  const priceText = Number.isFinite(priceNum) ? ` - ${formatTL(priceNum)}` : "";
   const title = `${product.title}${priceText} | Tarodan`;
   const description =
     product.description?.slice(0, 160) || `${product.title} Tarodan'da satışta`;

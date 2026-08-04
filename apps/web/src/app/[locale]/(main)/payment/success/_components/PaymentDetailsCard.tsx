@@ -5,6 +5,7 @@
 import { Badge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/ui";
+import { formatTL } from "@/lib/format";
 
 interface PaymentDetailsCardProps {
   payment: any;
@@ -40,11 +41,7 @@ export default function PaymentDetailsCard({
     <SectionCard title={t("payment.detailsTitle")} className="text-left">
       <div className="space-y-2 text-sm">
         <Row label={`${t("payment.amountLabel")}:`}>
-          {payment.amount?.toLocaleString("tr-TR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}{" "}
-          TL
+          {formatTL(payment.amount)} TL
         </Row>
         <div className="flex justify-between">
           <span className="text-muted">{t("common.status")}:</span>

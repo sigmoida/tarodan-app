@@ -8,6 +8,7 @@ import { Button, Spinner } from "@tarodan/ui";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { PRODUCT_PLACEHOLDER } from "../_lib/add-item";
 import type { UseAddItem } from "../_hooks/useAddItem";
+import { formatTL } from "@/lib/format";
 
 export default function ProductPickerList({ s }: { s: UseAddItem }) {
   const {
@@ -112,11 +113,7 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
                   {product.title}
                 </p>
                 <p className="text-xs font-semibold text-primary-600">
-                  {getProductEffectivePrice(product).toLocaleString("tr-TR", {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  })}{" "}
-                  ₺
+                  {formatTL(getProductEffectivePrice(product))}
                 </p>
               </div>
             </Button>

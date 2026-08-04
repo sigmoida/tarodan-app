@@ -8,6 +8,7 @@ import { Input, Modal, ModalFooter } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { useCounterOffer } from "../_hooks/useOffers";
 import type { Offer } from "../_lib/types";
+import { formatTL } from "@/lib/format";
 
 interface CounterOfferModalProps {
   open: boolean;
@@ -33,7 +34,7 @@ export default function CounterOfferModal({
 
   if (!offer) return null;
   const base = Number(offer.amount);
-  const baseLabel = `₺${base.toLocaleString("tr-TR")}`;
+  const baseLabel = formatTL(base);
 
   const submit = () => {
     const value = parseFloat(amount.replace(",", "."));

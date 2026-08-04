@@ -46,10 +46,7 @@ export default function AmountSummaryCard({
         <div>
           <p className="text-sm text-muted">Ödenecek tutar</p>
           <p className="mt-1 text-3xl font-bold tracking-tight text-heading tabular-nums sm:text-4xl">
-            {amount?.toLocaleString("tr-TR", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}{" "}
+            {formatTL(amount)}{" "}
             <span className="text-2xl font-semibold text-muted">TL</span>
           </p>
         </div>

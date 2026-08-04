@@ -14,6 +14,7 @@ import { offersApi } from "@/lib/api";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import { offerSchema, type OfferValues } from "./offerSchema";
+import { formatTL } from "@/lib/format";
 
 /**
  * Make-offer dialog — owns its RHF+zod form and the create-offer mutation, framed
@@ -72,10 +73,10 @@ export default function OfferModal() {
           {t("product.productPrice")}
         </label>
         <div className="text-lg font-semibold text-heading">
-          {effectivePrice.toLocaleString("tr-TR")} TL
+          {formatTL(effectivePrice)}
         </div>
         <p className="text-xs text-muted mt-1">
-          {t("offer.minimumOffer")}: {minOffer.toLocaleString("tr-TR")} TL (%50)
+          {t("offer.minimumOffer")}: {formatTL(minOffer)} (%50)
         </p>
       </div>
 

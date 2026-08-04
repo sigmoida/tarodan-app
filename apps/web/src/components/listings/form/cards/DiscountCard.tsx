@@ -10,6 +10,7 @@ import {
   ReceiptPercentIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button, DatePicker, Input } from "@tarodan/ui";
+import { formatTL } from "@/lib/format";
 
 /**
  * İlan indirimi — yeni ilan ve düzenleme formlarının ORTAK bölümü.
@@ -146,8 +147,8 @@ export default function DiscountCard({
                   indirim
                 </span>
                 <span className="text-muted">
-                  ({Number(saleData.originalPrice).toLocaleString("tr-TR")} ₺ →{" "}
-                  {Number(saleData.salePrice).toLocaleString("tr-TR")} ₺)
+                  ({formatTL(Number(saleData.originalPrice))} →{" "}
+                  {formatTL(Number(saleData.salePrice))})
                 </span>
               </div>
             )}

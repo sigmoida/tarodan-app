@@ -12,6 +12,7 @@ import { useTranslations } from "next-intl";
 import { isValidImageSrc } from "@/components/OptimizedImage";
 import type { RichAutocompleteResults } from "@/lib/api/products";
 import { useNavCatalog } from "./_hooks/useNavCatalog";
+import { formatTL } from "@/lib/format";
 
 /** Kaç popüler arama çipi gösterilir (üreticiler + bir ölçek). */
 const POPULAR_MANUFACTURER_COUNT = 5;
@@ -196,11 +197,7 @@ export default function HeaderSearchDropdown({
                             {product.title}
                           </p>
                           <p className="text-xs text-primary-600 font-semibold">
-                            {product.price.toLocaleString("tr-TR", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            TL
+                            {formatTL(product.price)} TL
                           </p>
                         </div>
                         <span className="text-2xs text-subtle font-medium px-2 py-0.5 bg-surface-alt rounded-full flex-shrink-0">

@@ -19,6 +19,7 @@ import {
   isProductOutOfStock,
 } from "@/lib/productPrice";
 import type { Product, ProductImage } from "@/types/product";
+import { formatTL } from "@/lib/format";
 
 /**
  * The single product/listing card for the whole marketplace (grid + list). It is
@@ -54,11 +55,10 @@ function cardImageUrl(image: ProductImage | string | undefined): string {
   return PRODUCT_PLACEHOLDER;
 }
 
-const fmtTL = (n: number) =>
-  n.toLocaleString("tr-TR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }) + " ₺";
+// Para biçimi TEK yerden gelir (`lib/format`): ekranlar kendi
+// `toLocaleString` çağrılarını yazdığında aynı ürün bir kartta "468 ₺",
+// detayda "468,19 TL" görünüyor ve kart biçimi kuruşu YUVARLIYORDU.
+const fmtTL = formatTL;
 
 export interface ProductCardProps {
   product: Product;

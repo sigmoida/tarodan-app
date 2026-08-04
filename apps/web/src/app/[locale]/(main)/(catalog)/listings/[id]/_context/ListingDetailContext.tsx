@@ -31,6 +31,7 @@ import { useAuthGate } from "@/hooks/useAuthGate";
 import { getCardImageUrl } from "../_lib/images";
 import { useListingData } from "../_hooks/useListingData";
 import { useProductGallery } from "../_hooks/useProductGallery";
+import { formatTL } from "@/lib/format";
 
 function useListingDetailValue() {
   const params = useParams();
@@ -327,10 +328,7 @@ function useListingDetailValue() {
       listing?.title || "Check this out on Tarodan!",
     );
     const text = encodeURIComponent(
-      `${listing?.title} - ${effectivePrice.toLocaleString("tr-TR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })} TL`,
+      `${listing?.title} - ${formatTL(effectivePrice)}`,
     );
     let shareUrl = "";
     switch (platform) {
