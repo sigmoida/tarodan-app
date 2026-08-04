@@ -287,6 +287,7 @@ export function getEmailTemplateSubject(
     "invoice-seller": `Satış Faturası - ${data?.invoiceNumber || ""}`,
     "elogo-invoice": `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ""}`,
     "seller-invoice": `Satıcı Faturanız - Sipariş #${data?.orderNumber || ""}`,
+    "seller-invoice-reminder": `Fatura Bekleniyor - Sipariş #${data?.orderNumber || ""}`,
     "order-cancelled-buyer": `Siparişiniz İptal Edildi - ${data?.orderNumber || ""}`,
     "order-cancelled-seller": `Sipariş İptal Edildi - ${data?.orderNumber || ""}`,
     "refund-requested-seller": `İade Talebi - ${data?.orderNumber || ""}`,
@@ -1155,6 +1156,31 @@ export function renderEmailTemplate(
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Faturanız ektedir. Siparişlerim sayfasından da görüntüleyebilirsiniz.</p>`)}
     `,
       "Satıcı Faturanız Hazır",
+    ),
+
+    // Kurumsal satıcıya: teslim edilen siparişin ÜRÜN faturası hâlâ yüklenmedi.
+    // Fatura kesmek satıcının yasal yükümlülüğü; platform yalnız hatırlatır.
+    "seller-invoice-reminder": wrapEmail(
+      `
+      ${titleBlock("Fatura Bekleniyor", "⏳")}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        Teslim edilen aşağıdaki siparişinize ait <strong>ürün faturası</strong> henüz yüklenmedi.
+        Faturayı kendi sisteminizde düzenleyip PDF'ini sipariş detayından yükleyebilirsiniz;
+        yükledikten sonra alıcıya otomatik olarak iletilir.
+      </p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+        </table>
+      `)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Ürün faturasını düzenlemek satıcının yasal yükümlülüğüdür. Tarodan'ın kestiği komisyon/hizmet bedeli faturaları bunun yerine geçmez.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Faturayı Yükle", `${frontendUrl}/profile/orders`)}
+      </div>
+    `,
+      "Fatura Bekleniyor",
     ),
 
     "order-cancelled-buyer": wrapEmail(

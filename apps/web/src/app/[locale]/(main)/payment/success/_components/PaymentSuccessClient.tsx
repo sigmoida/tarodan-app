@@ -30,10 +30,6 @@ export default function PaymentSuccessClient() {
     phase,
     isCompleted,
     payment,
-    invoice,
-    invoiceError,
-    downloading,
-    handleDownloadInvoice,
     isAuthenticated,
     orderIdFromUrl,
     locale,
@@ -75,14 +71,7 @@ export default function PaymentSuccessClient() {
 
           {payment && (
             <div className="mb-6">
-              <PaymentDetailsCard
-                payment={payment}
-                isCompleted={isCompleted}
-                invoice={invoice}
-                invoiceError={invoiceError}
-                downloading={downloading}
-                onDownload={handleDownloadInvoice}
-              />
+              <PaymentDetailsCard payment={payment} isCompleted={isCompleted} />
             </div>
           )}
 

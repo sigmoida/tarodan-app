@@ -9,6 +9,7 @@ import { ElogoScheduledProcessor } from "./elogo-scheduled.processor";
 import { ElogoInvoiceController } from "./elogo-invoice.controller";
 import { StorageModule } from "../storage/storage.module";
 import { TaxModule } from "../tax/tax.module";
+import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
 import { MailModule } from "../mail/mail.module";
 import {
   ElogoSoapClient,
@@ -47,6 +48,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ElogoService,
     ElogoInvoicingService,
     ElogoSchedulerService,
+    // Hizmet KDV'sinin TEK kaynağı `PlatformSetting` satırlarıdır; checkout da
+    // aynı servisi okur. OrderModule'ü import etmek döngü yaratacağı için
+    // (order → elogo) yalnızca Prisma'ya bağlı olan bu servis burada sağlanır.
+    OrderTaxPolicyService,
     ...scheduledProcessors(ElogoScheduledProcessor),
   ],
   controllers: [ElogoInvoiceController],

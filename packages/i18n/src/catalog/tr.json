@@ -2074,9 +2074,6 @@
     "amountLabel": "Ödeme Tutarı",
     "transactionIdLabel": "İşlem No",
     "statusAwaitingConfirmation": "Onay bekleniyor",
-    "downloading": "İndiriliyor",
-    "downloadInvoice": "Faturayı İndir (PDF)",
-    "preparingInvoice": "Fatura Hazırlanıyor",
     "completedTitle": "Ödeme Başarıyla Tamamlandı!",
     "confirmingTitle": "Ödemeniz Doğrulanıyor",
     "completedDesc": "Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı.",
@@ -2103,7 +2100,11 @@
     "reasonBankRejected": "Banka tarafından işlem reddedildi",
     "reasonConnectionProblem": "İnternet bağlantı problemi",
     "itemsRefunded": "{count} iade",
-    "itemsCancelled": "{count} iptal"
+    "itemsCancelled": "{count} iptal",
+    "invoiceByEmail": "Faturanız hazırlandığında e-posta ile gönderilir; Siparişlerim sayfasından da indirebilirsiniz.",
+    "individualSellerNoInvoice": "Bu satıcı bireysel satıcıdır; ürün için fatura düzenlenmez. Tarodan'ın hizmet bedeli faturası e-posta ile iletilir.",
+    "sellerInvoicePending": "Satıcı ürün faturasını henüz yüklemedi. Yüklendiğinde e-posta ile bilgilendirileceksiniz.",
+    "downloading": "İndiriliyor..."
   },
   "seller": {
     "sellerProfile": "Satıcı Profili",

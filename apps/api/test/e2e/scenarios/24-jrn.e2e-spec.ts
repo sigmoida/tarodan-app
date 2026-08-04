@@ -353,6 +353,8 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
       orderService,
       config as any,
       {} as any,
+      // Satıcı ürün faturası taraması bu senaryonun konusu değil.
+      { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
       {} as any,
     );
   }

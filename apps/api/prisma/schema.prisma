@@ -1486,6 +1486,11 @@ model Order {
   // (take:500, sırasız) tarıyordu; tamamlanan siparişler aday kümesinden hiç çıkmadığı
   // için 500 sipariş sonrası yeni teslimatlar pencereye giremeyip faturasız kalabiliyordu.
   revenueInvoicedAt          DateTime?                @map("revenue_invoiced_at")
+  /// Kurumsal satıcıya "ürün faturasını yükle" hatırlatmasının gönderildiği an.
+  /// Ürün faturası SATICININ yasal yükümlülüğüdür ve elle yüklenir; hiçbir şey
+  /// takip etmediği için yüklenmeyen faturalar sessizce kayboluyordu. Tek atışlık
+  /// işaret: hatırlatma sipariş başına bir kez gider.
+  sellerInvoiceReminderAt    DateTime?                @map("seller_invoice_reminder_at")
   invoice                    Invoice?
   buyer                      User                     @relation("BuyerOrders", fields: [buyerId], references: [id])
   offer                      Offer?                   @relation(fields: [offerId], references: [id])
@@ -2028,6 +2033,11 @@ model ElogoInvoice {
   /// Fatura kaleminin açıklaması — kesim anında snapshot'lanır (ör. boost için
   /// paket adını içerir). Boşsa tipin varsayılan etiketi (LINE_DESCRIPTION) kullanılır.
   lineDescription           String?            @map("line_description")
+  /// ÇOK KALEMLİ belgenin satırları (ürün + kargo + hizmet bedeli), kesim anında
+  /// snapshot'lanır: `[{ name, quantity, net, unitPrice, vatRate }]`. Yalnız ürün
+  /// faturasında (platform satışı) dolar; hizmet faturaları tek kalemdir ve burası
+  /// NULL kalır. Fiyat/oran/ürün adı sonradan değişse bile retry aynı belgeyi üretir.
+  lineItems                 Json?              @map("line_items")
   /// eLogo'dan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
   pdfUrl                    String?            @map("pdf_url")
   /// PDF alıcıya kendi SMTP'mizden e-postalandığı an.

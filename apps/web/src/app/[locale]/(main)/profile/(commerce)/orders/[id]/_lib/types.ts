@@ -119,6 +119,12 @@ export interface SellerInvoiceStatus {
   canUpload: boolean;
   isSeller: boolean;
   isBuyer: boolean;
+  /**
+   * Satıcı ÜRÜN faturası düzenler mi (vergi mükellefi mi)? Bireysel satıcıda
+   * ürün faturası hiç gelmez; kurumsalda gelir ama gecikebilir. Alıcıya
+   * "beklenecek mi" bunu ayırt etmeden söylenemiyordu.
+   */
+  sellerIssuesInvoice: boolean;
 }
 
 /** eLogo e-Arşiv (gerçek yasal fatura). */

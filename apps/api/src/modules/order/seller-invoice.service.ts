@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { OrderStatus } from "@prisma/client";
+import { BusinessStatus, OrderStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { StorageService } from "../storage/storage.service";
@@ -202,11 +202,141 @@ export class SellerInvoiceService {
     }
   }
 
+  /**
+   * Teslim edilmiş ama satıcı ürün faturası HÂLÂ yüklenmemiş siparişler:
+   * sayılır (alarm) ve satıcıya sipariş başına TEK hatırlatma gönderilir.
+   *
+   * Kapsam mükellefiyet testiyle belirlenir (onaylı işletme + vergi no) —
+   * üyelikle DEĞİL: fatura kesme yükümlülüğü mükelleflikten doğar, satıcı
+   * üyeliğini düşürse bile geçmiş siparişin faturası kesilmek zorundadır.
+   *
+   * İşaret yalnız e-posta GERÇEKTEN gittiyse konur; aksi halde sonraki tur
+   * yeniden dener.
+   */
+  async remindMissing(opts: {
+    deadlineDays: number;
+    batch?: number;
+    now?: Date;
+  }): Promise<{ missing: number; reminded: number }> {
+    const now = opts.now ?? new Date();
+    const deliveredBefore = new Date(
+      now.getTime() - opts.deadlineDays * 24 * 60 * 60 * 1000,
+    );
+    const scope: Prisma.OrderWhereInput = {
+      status: {
+        in: [
+          OrderStatus.delivered,
+          OrderStatus.awaiting_buyer_confirmation,
+          OrderStatus.completed,
+        ],
+      },
+      deliveredAt: { lt: deliveredBefore },
+      sellerUploadedInvoice: { is: null },
+      seller: {
+        businessStatus: BusinessStatus.approved,
+        taxId: { not: null },
+      },
+    };
+
+    const missing = await this.prisma.order.count({ where: scope });
+    if (missing === 0) return { missing: 0, reminded: 0 };
+
+    const pending = await this.prisma.order.findMany({
+      where: { ...scope, sellerInvoiceReminderAt: null },
+      orderBy: { deliveredAt: "asc" },
+      take: opts.batch ?? 100,
+      select: {
+        id: true,
+        orderNumber: true,
+        deliveredAt: true,
+        product: { select: { title: true } },
+        seller: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+            companyName: true,
+          },
+        },
+      },
+    });
+
+    let reminded = 0;
+    for (const order of pending) {
+      const sent = await this.emailSellerReminder(order);
+      if (!sent) continue;
+      await this.prisma.order
+        .update({
+          where: { id: order.id },
+          data: { sellerInvoiceReminderAt: now },
+        })
+        .catch((e: any) =>
+          this.logger.warn(
+            `satıcı fatura hatırlatma işareti yazılamadı ${order.id}: ${e?.message}`,
+          ),
+        );
+      reminded++;
+    }
+    return { missing, reminded };
+  }
+
+  /** Hatırlatma maili. Gönderilemezse `false` — çağıran işareti KOYMAZ. */
+  private async emailSellerReminder(order: {
+    orderNumber: string;
+    deliveredAt?: Date | null;
+    product?: { title: string | null } | null;
+    seller?: {
+      email: string | null;
+      displayName: string | null;
+      companyName: string | null;
+    } | null;
+  }): Promise<boolean> {
+    if (!order.seller?.email) return false;
+    try {
+      const frontendUrl = this.config.get<string>(
+        "FRONTEND_URL",
+        "https://tarodan.com.tr",
+      );
+      const dbTpl = await this.prisma.emailTemplate
+        .findUnique({ where: { key: "seller-invoice-reminder" } })
+        .catch(() => null);
+      const email = renderManagedEmailTemplate(
+        "seller-invoice-reminder",
+        {
+          to: order.seller.email,
+          sellerName:
+            order.seller.companyName || order.seller.displayName || "Satıcı",
+          orderNumber: order.orderNumber,
+          productTitle: order.product?.title || "",
+          deliveredAt: order.deliveredAt?.toISOString() ?? null,
+        },
+        dbTpl,
+        frontendUrl,
+      );
+      await this.smtp.sendEmail({
+        to: order.seller.email,
+        subject: email.subject,
+        html: email.html,
+      } as any);
+      return true;
+    } catch (e: any) {
+      this.logger.warn(
+        `satıcı fatura hatırlatma maili hatası (order ${order.orderNumber}): ${e?.message}`,
+      );
+      return false;
+    }
+  }
+
   /** Sipariş detayı için: fatura var mı + geçerli kullanıcı yükleyebilir mi. */
   async getForOrder(orderId: string, userId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { sellerId: true, buyerId: true, status: true },
+      select: {
+        sellerId: true,
+        buyerId: true,
+        status: true,
+        seller: { select: { businessStatus: true, taxId: true } },
+      },
     });
     if (!order)
       throw new NotFoundException(i18nMessage("server.order.notFound"));
@@ -235,6 +365,16 @@ export class SellerInvoiceService {
       canUpload,
       isSeller,
       isBuyer: order.buyerId === userId,
+      /**
+       * Bu satıcı ÜRÜN faturası düzenler mi (mükellef mi)?
+       *
+       * Alıcı için "fatura yok" iki farklı şey demek: bireysel satıcıda ürün
+       * faturası HİÇ gelmez, kurumsalda ise gelecektir ama gecikebilir. Ekran
+       * ikisini ayırt edemeden alıcı ne bekleyeceğini bilemiyordu.
+       */
+      sellerIssuesInvoice:
+        order.seller?.businessStatus === BusinessStatus.approved &&
+        !!order.seller?.taxId,
     };
   }
 

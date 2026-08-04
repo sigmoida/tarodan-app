@@ -5,14 +5,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
-import { paymentsApi, api } from "@/lib/api";
+import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
-
-interface InvoiceDetails {
-  id: string;
-  invoiceNumber: string;
-}
 
 const urlHasGuest = () =>
   typeof window !== "undefined" &&
@@ -20,8 +15,15 @@ const urlHasGuest = () =>
 
 type Phase = "client-loading" | "auth-loading" | "loading" | "ready";
 
-/** Owns the payment-success lifecycle: verify retries, status fetch, invoice
- *  fetch/download, and the guest/membership/trade redirects. */
+/**
+ * Owns the payment-success lifecycle: verify retries, status fetch and the
+ * guest/membership/trade redirects.
+ *
+ * Deliberately does NOT chase an invoice. A physical order is invoiced on
+ * DELIVERY, so polling right after payment can never succeed — the screen just
+ * spun and then showed an error. The invoice reaches the buyer by email when it
+ * is issued, and stays available under Orders.
+ */
 export function usePaymentSuccess() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -36,10 +38,7 @@ export function usePaymentSuccess() {
     searchParams.get("orderId") || searchParams.get("orderid");
 
   const [payment, setPayment] = useState<any>(null);
-  const [invoice, setInvoice] = useState<InvoiceDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [downloading, setDownloading] = useState(false);
-  const [invoiceError, setInvoiceError] = useState(false);
   // Auth store hydration differs SSR/client → defer auth-dependent UI until mount.
   const [clientReady, setClientReady] = useState(false);
 
@@ -66,28 +65,6 @@ export function usePaymentSuccess() {
     isGuestCheckout,
     isMembershipPayment,
   ]);
-
-  const attemptFetchInvoice = async (orderId: string, retryCount: number) => {
-    try {
-      if (!isAuthenticated) {
-        if (retryCount >= 1) setInvoiceError(true);
-        return;
-      }
-      const invoiceRes = await api.get(`/elogo/invoices/by-order/${orderId}`);
-      if (invoiceRes.data?.id) {
-        setInvoice(invoiceRes.data);
-        setInvoiceError(false);
-        return;
-      }
-      throw new Error("invoice-not-ready");
-    } catch {
-      if (retryCount < 5) {
-        setTimeout(() => attemptFetchInvoice(orderId, retryCount + 1), 2000);
-      } else {
-        setInvoiceError(true);
-      }
-    }
-  };
 
   const fetchPayment = async () => {
     try {
@@ -123,34 +100,11 @@ export function usePaymentSuccess() {
         router.replace(`/profile/trades/${paymentData.tradeId}?paid=1`);
         return;
       }
-
-      // Grup ödemesinde payment.orderId NULL — anchor, grubun ilk siparişidir
-      // (grup ekranına order id ile çözülür). Sipariş kimliği yoksa fatura
-      // denemesi hiç başlatılmaz (eskiden spinner sonsuza dek dönüyordu).
-      const actualOrderId =
-        paymentData?.orderId ?? paymentData?.orders?.[0]?.id ?? orderIdFromUrl;
-      if (actualOrderId && paymentId) attemptFetchInvoice(actualOrderId, 0);
-      else setInvoiceError(true);
     } catch (error) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to fetch payment:", error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleDownloadInvoice = async () => {
-    if (!invoice?.id) return;
-    setDownloading(true);
-    try {
-      const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
-      const url = (res.data as any)?.url;
-      if (url) window.open(url, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to download invoice:", error);
-    } finally {
-      setDownloading(false);
     }
   };
 
@@ -167,10 +121,6 @@ export function usePaymentSuccess() {
     phase,
     isCompleted: payment?.status === "completed",
     payment,
-    invoice,
-    invoiceError,
-    downloading,
-    handleDownloadInvoice,
     isAuthenticated,
     orderIdFromUrl,
     t,

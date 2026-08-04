@@ -11,10 +11,13 @@ import { OrderSchedulerService } from "./order-scheduler.service";
  * (e-Arşiv 7 gün).
  */
 describe("OrderSchedulerService — invoice staleness alarms", () => {
-  const makeService = (counts: {
-    stuckShipped: number;
-    uninvoiced: number;
-  }) => {
+  const makeService = (
+    counts: { stuckShipped: number; uninvoiced: number },
+    sellerInvoices: { missing: number; reminded: number } = {
+      missing: 0,
+      reminded: 0,
+    },
+  ) => {
     const prisma = {
       order: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -40,6 +43,7 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
       } as any,
       { get: () => undefined } as any,
       { issueTradeCashFeeInvoice: jest.fn() } as any,
+      { remindMissing: async () => sellerInvoices } as any,
       {} as any,
     );
     (service as any).logger = logger;
@@ -79,8 +83,28 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
 
     const result = await service.reportInvoiceStaleness();
 
-    expect(result).toEqual({ stuckShipped: 0, uninvoicedDelivered: 0 });
+    expect(result).toEqual({
+      stuckShipped: 0,
+      uninvoicedDelivered: 0,
+      missingSellerInvoices: 0,
+    });
     expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  // Tarodan'ın kendi e-Arşivleri için alarm vardı; ürün faturasını KESEN taraf
+  // satıcı olduğunda hiçbir sinyal yoktu — yüklenmeyen fatura sessizce kayboluyordu.
+  it("kurumsal satıcının yüklemediği ürün faturaları alarm verir", async () => {
+    const { service, logger } = makeService(
+      { stuckShipped: 0, uninvoiced: 0 },
+      { missing: 3, reminded: 2 },
+    );
+
+    const result = await service.reportInvoiceStaleness();
+
+    expect(result.missingSellerInvoices).toBe(3);
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("SELLER_INVOICE_MISSING count=3 reminded=2"),
+    );
   });
 
   it("staleness raporu teslim turu ile birlikte çalışır", async () => {

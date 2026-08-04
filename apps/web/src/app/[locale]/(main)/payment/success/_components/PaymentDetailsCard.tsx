@@ -2,18 +2,13 @@
 
 "use client";
 
-import { DocumentArrowDownIcon } from "@heroicons/react/24/outline";
-import { Badge, Button } from "@tarodan/ui";
+import { Badge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/ui";
 
 interface PaymentDetailsCardProps {
   payment: any;
   isCompleted: boolean;
-  invoice: { id: string } | null;
-  invoiceError: boolean;
-  downloading: boolean;
-  onDownload: () => void;
 }
 
 function Row({
@@ -31,13 +26,14 @@ function Row({
   );
 }
 
+/**
+ * Ödemenin özeti. Fatura BURADA aranmaz: fiziksel sipariş teslimde faturalanır,
+ * yani ödemeden hemen sonra bakmak hiçbir zaman sonuç vermiyordu. Fatura kesilince
+ * alıcıya e-posta ile gider ve Siparişlerim'de durur.
+ */
 export default function PaymentDetailsCard({
   payment,
   isCompleted,
-  invoice,
-  invoiceError,
-  downloading,
-  onDownload,
 }: PaymentDetailsCardProps) {
   const t = useTranslations();
   return (
@@ -60,24 +56,7 @@ export default function PaymentDetailsCard({
         </div>
       </div>
 
-      {invoice ? (
-        <Button
-          variant="secondary"
-          onClick={onDownload}
-          disabled={downloading}
-          isLoading={downloading}
-          className="mt-4 w-full"
-          leftIcon={<DocumentArrowDownIcon className="h-5 w-5" />}
-        >
-          {downloading
-            ? t("payment.downloading")
-            : t("payment.downloadInvoice")}
-        </Button>
-      ) : !invoiceError ? (
-        <div className="mt-4 w-full rounded-lg border border-dashed border-border-subtle bg-surface px-4 py-3 text-center text-sm font-medium text-subtle">
-          {t("payment.preparingInvoice")}
-        </div>
-      ) : null}
+      <p className="mt-4 text-sm text-muted">{t("payment.invoiceByEmail")}</p>
     </SectionCard>
   );
 }

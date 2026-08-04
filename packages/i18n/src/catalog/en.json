@@ -2074,9 +2074,6 @@
     "amountLabel": "Payment Amount",
     "transactionIdLabel": "Transaction ID",
     "statusAwaitingConfirmation": "Awaiting confirmation",
-    "downloading": "Downloading",
-    "downloadInvoice": "Download Invoice (PDF)",
-    "preparingInvoice": "Preparing Invoice",
     "completedTitle": "Payment Completed Successfully!",
     "confirmingTitle": "Your Payment Is Being Confirmed",
     "completedDesc": "Your payment has been received and your order is being prepared.",
@@ -2103,7 +2100,11 @@
     "reasonBankRejected": "Transaction rejected by bank",
     "reasonConnectionProblem": "Internet connection problem",
     "itemsRefunded": "{count} refunded",
-    "itemsCancelled": "{count} cancelled"
+    "itemsCancelled": "{count} cancelled",
+    "invoiceByEmail": "Your invoice is emailed to you once it is issued; you can also download it from Orders.",
+    "individualSellerNoInvoice": "This is an individual seller, so no product invoice is issued. Tarodan's service fee invoice is sent to you by email.",
+    "sellerInvoicePending": "The seller has not uploaded the product invoice yet. You will be notified by email once they do.",
+    "downloading": "Downloading..."
   },
   "seller": {
     "sellerProfile": "Seller Profile",

@@ -28,6 +28,20 @@ import {
   type ElogoInvoiceType,
 } from "@prisma/client";
 import { invoiceAmountsFor } from "./invoice-amounts";
+import {
+  invoiceIssueDate,
+  invoiceIssueTime,
+  invoiceIssueYear,
+} from "./invoice-datetime";
+import { VAT_SOURCE_BY_TYPE } from "./invoice-vat-rate";
+import { formatElogoInvoiceNumber } from "./elogo-document-number";
+import {
+  buildPlatformSaleLines,
+  invoiceTotalsFromLines,
+  readInvoiceLineItems,
+  type InvoiceLineItem,
+} from "./invoice-lines";
+import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 
@@ -55,6 +69,18 @@ type ResolvedRefundAdjustment = InvoiceRefundReversePayload & {
   finalizedAt: Date;
 };
 
+/** `cut()` çağrısının türe göre değişen bağlamı. */
+interface CutOptions {
+  /** Kesim anında snapshot'lanan kalem açıklaması; boşsa LINE_DESCRIPTION[type]. */
+  lineDescription?: string;
+  /** Misafir siparişinin gerçek alıcı kimliği (paylaşılan sistem kullanıcısı yerine). */
+  guestRecipient?: GuestInvoiceRecipient | null;
+  /** Ürün satışında KDV oranını belirleyen kategori. */
+  categoryId?: string | null;
+  /** Çok kalemli belge (ürün + kargo + hizmet bedeli). Boşsa tek kalem kesilir. */
+  lineItems?: InvoiceLineItem[];
+}
+
 const MAX_SEND_ATTEMPTS = ELOGO_MAX_SEND_ATTEMPTS;
 const SEND_LEASE_MS = 10 * 60 * 1000;
 
@@ -80,6 +106,11 @@ export class ElogoInvoicingService {
     @Optional() private readonly taxService?: TaxService,
     @Optional() private readonly storage?: StorageService,
     @Optional() private readonly smtp?: SmtpProvider,
+    /**
+     * Hizmet KDV'sinin TEK kaynağı — checkout tahsilatı da bunu okur. Fatura
+     * ayrı bir kaynaktan okuduğu sürece tahsilat ile beyan ayrışabiliyordu.
+     */
+    @Optional() private readonly taxPolicy?: OrderTaxPolicyService,
   ) {}
 
   // ───────────────────────── config ─────────────────────────
@@ -90,13 +121,39 @@ export class ElogoInvoicingService {
     return Number(this.cfg("ELOGO_VAT_RATE", "20")) || 20;
   }
   /**
-   * Kesim anındaki KDV oranı: önce admin'in vergi config'i (TaxRegion/TaxRate, TR
-   * varsayılan kuralı), yoksa ELOGO_VAT_RATE env (varsayılan 20). Kayıt snapshot'ı
-   * (ElogoInvoice.vatRate) sonraki retry/iade adımlarında aynen kullanılır.
+   * Kesim anındaki KDV oranı. Kaynağı faturanın TÜRÜ belirler — bkz.
+   * `invoice-vat-rate.ts`:
+   *
+   *  - hizmet bedelleri → checkout'un okuduğu `service_vat_rate` ayarı (kapalıysa 0)
+   *  - platform ürün satışı → ürünün KATEGORİ oranı
+   *  - diğerleri → bölgenin varsayılan oranı, yoksa `ELOGO_VAT_RATE`
+   *
+   * Kayıt snapshot'ı (`ElogoInvoice.vatRate`) sonraki retry/iade adımlarında aynen
+   * kullanılır; oran sonradan değişse bile kesilmiş belge etkilenmez.
    */
-  private async resolveVatRate(): Promise<number> {
+  private async resolveVatRate(
+    type: ElogoInvoiceType,
+    categoryId?: string | null,
+  ): Promise<number> {
+    const source = VAT_SOURCE_BY_TYPE[type] ?? "standard";
+
+    if (source === "service" && this.taxPolicy) {
+      try {
+        const policy = await this.taxPolicy.resolve();
+        // KDV kapalıysa oran 0'dır; env'e DÜŞÜLMEZ, aksi halde tahsil edilmeyen
+        // bir KDV faturaya yazılırdı.
+        return this.taxPolicy.effectiveServiceVatRate(policy);
+      } catch {
+        // ayar okunamadı — aşağıdaki genel çözüme düş
+      }
+    }
+
     try {
-      const resolved = await this.taxService?.resolveTaxRate("TR");
+      const resolved = await this.taxService?.resolveTaxRate(
+        "TR",
+        null,
+        source === "category" ? (categoryId ?? null) : null,
+      );
       if (resolved && resolved.rate > 0) return resolved.rate;
     } catch {
       // config çözülemedi — env fallback
@@ -137,11 +194,15 @@ export class ElogoInvoicingService {
   ): { net: number; tax: number; total: number } {
     return invoiceAmountsFor(type, amount, vatRate);
   }
+  /**
+   * Belge tarihi/saati/numara yılı TEK takvimden okunur (Türkiye) — bkz.
+   * `invoice-datetime.ts`. Süreç saat diliminden bağımsızdır.
+   */
   private ymd(d: Date): string {
-    return d.toISOString().slice(0, 10);
+    return invoiceIssueDate(d);
   }
   private hms(d: Date): string {
-    return d.toTimeString().slice(0, 8);
+    return invoiceIssueTime(d);
   }
 
   /** Gap-free belge numarası: PREFIX + yıl + 9 hane (ElogoDocSequence atomik artırım). */
@@ -161,8 +222,7 @@ export class ElogoInvoicingService {
       create: { prefix, year, lastValue: 1 },
       update: { lastValue: { increment: 1 } },
     });
-    const last = row.lastValue;
-    return `${prefix}${year}${String(last).padStart(9, "0")}`;
+    return formatElogoInvoiceNumber(prefix, year, row.lastValue);
   }
 
   /** Alıcı (User) → UBL party + belge tipi (e-Fatura mükellefse EINVOICE). */
@@ -415,34 +475,13 @@ export class ElogoInvoicingService {
     });
     if (!pkg || pkg.orders.length === 0) return null;
 
-    const ledgers = await this.prisma.commissionLedger.findMany({
-      where: { orderId: { in: pkg.orders.map((o) => o.id) } },
-      select: {
-        sellerCommission: true,
-        refundedSellerCommission: true,
-        buyerFee: true,
-        refundedBuyerFee: true,
-      },
-    });
-
-    const sum = (values: number[]) =>
-      Math.round(values.reduce((a, b) => a + b, 0) * 100) / 100;
+    const totals = await this.resolveFeeLedgerTotals(packageId);
 
     return {
       sellerId: pkg.sellerId,
       buyerId: pkg.buyerId,
-      netCommission: sum(
-        ledgers.map(
-          (l) =>
-            Number(l.sellerCommission) -
-            Number(l.refundedSellerCommission ?? 0),
-        ),
-      ),
-      netBuyerFee: sum(
-        ledgers.map(
-          (l) => Number(l.buyerFee) - Number(l.refundedBuyerFee ?? 0),
-        ),
-      ),
+      netCommission: totals?.netSellerCommission ?? 0,
+      netBuyerFee: totals?.netBuyerFee ?? 0,
       hasSellerCommission: pkg.orders.some(
         (o) => Number(o.sellerCommissionAmount ?? 0) > 0,
       ),
@@ -457,6 +496,62 @@ export class ElogoInvoicingService {
       ),
       // Misafir alıcı bilgisi paketteki siparişlerde aynıdır.
       shippingAddress: pkg.orders[0].shippingAddress,
+    };
+  }
+
+  /**
+   * Komisyon/hizmet bedeli faturasının ledger toplamları — hem iade ÖNCESİ brüt
+   * matrah hem iade DÜŞÜLMÜŞ net matrah.
+   *
+   * `sourceId` normalde PAKET id'sidir; paket anahtarına geçilmeden önce kesilmiş
+   * kayıtlarda SİPARİŞ id'si olabilir. İki nesil de buradan çözülür, böylece
+   * çağıranlar anahtarın hangi nesil olduğunu bilmek zorunda kalmaz.
+   */
+  private async resolveFeeLedgerTotals(sourceId: string): Promise<{
+    sellerCommission: number;
+    netSellerCommission: number;
+    buyerFee: number;
+    netBuyerFee: number;
+  } | null> {
+    const pkg = await this.prisma.orderPackage
+      .findUnique({
+        where: { id: sourceId },
+        select: { orders: { select: { id: true } } },
+      })
+      .catch(() => null);
+    const orderIds = pkg?.orders.length
+      ? pkg.orders.map((o) => o.id)
+      : [sourceId];
+
+    const ledgers = await this.prisma.commissionLedger.findMany({
+      where: { orderId: { in: orderIds } },
+      select: {
+        sellerCommission: true,
+        refundedSellerCommission: true,
+        buyerFee: true,
+        refundedBuyerFee: true,
+      },
+    });
+    if (ledgers.length === 0) return null;
+
+    const sum = (values: number[]) =>
+      Math.round(values.reduce((a, b) => a + b, 0) * 100) / 100;
+
+    return {
+      sellerCommission: sum(ledgers.map((l) => Number(l.sellerCommission))),
+      netSellerCommission: sum(
+        ledgers.map(
+          (l) =>
+            Number(l.sellerCommission) -
+            Number(l.refundedSellerCommission ?? 0),
+        ),
+      ),
+      buyerFee: sum(ledgers.map((l) => Number(l.buyerFee))),
+      netBuyerFee: sum(
+        ledgers.map(
+          (l) => Number(l.buyerFee) - Number(l.refundedBuyerFee ?? 0),
+        ),
+      ),
     };
   }
 
@@ -479,7 +574,7 @@ export class ElogoInvoicingService {
       packageId,
       basis.sellerId,
       basis.netCommission,
-      desc,
+      { lineDescription: desc },
     );
   }
 
@@ -498,19 +593,19 @@ export class ElogoInvoicingService {
         : basis.hasBuyerCommission
           ? "Alıcı komisyonu"
           : undefined;
-    await this.cut(
-      "service_fee",
-      packageId,
-      basis.buyerId,
-      basis.netBuyerFee,
-      desc,
-      resolveGuestInvoiceRecipient(basis.shippingAddress),
-    );
+    await this.cut("service_fee", packageId, basis.buyerId, basis.netBuyerFee, {
+      lineDescription: desc,
+      guestRecipient: resolveGuestInvoiceRecipient(basis.shippingAddress),
+    });
   }
 
   /**
    * Platform (Tarodan Official Store) KENDİ ürününü sattığında → ALICIYA ürün e-Arşivi.
    * Tarodan satıcıdır; tam ürün tutarı (order.totalAmount) faturalanır. Yalnız platform satışında.
+   *
+   * Bu, alıcının ÜRÜN için aldığı tek yasal belgedir; bu yüzden tek satırlık bir
+   * "hizmet bedeli" olarak değil, kalem kalem kesilir: ürün (adı, adedi, KATEGORİ
+   * KDV'siyle) + kargo + hizmet bedeli.
    */
   async issuePlatformSaleInvoice(orderId: string): Promise<void> {
     const order = await this.prisma.order.findUnique({
@@ -521,6 +616,11 @@ export class ElogoInvoicingService {
         totalAmount: true,
         checkoutGroupId: true,
         shippingAddress: true,
+        quantity: true,
+        subtotal: true,
+        buyerShippingAmount: true,
+        buyerFeeAmount: true,
+        product: { select: { title: true, categoryId: true } },
       },
     });
     if (!order) return;
@@ -540,18 +640,35 @@ export class ElogoInvoicingService {
     const refundedOrders =
       ((payment?.metadata as Record<string, unknown> | null)?.refundedOrders as
         Record<string, number> | undefined) ?? {};
+    const orderTotal = Number(order.totalAmount);
     const netSaleAmount = Math.max(
       0,
-      Number(order.totalAmount) - Number(refundedOrders[orderId] ?? 0),
+      orderTotal - Number(refundedOrders[orderId] ?? 0),
     );
-    await this.cut(
-      "platform_sale",
-      orderId,
-      order.buyerId,
-      netSaleAmount,
-      undefined,
-      resolveGuestInvoiceRecipient(order.shippingAddress),
-    );
+
+    const categoryId = order.product?.categoryId ?? null;
+    const [productVatRate, serviceVatRate] = await Promise.all([
+      this.resolveVatRate("platform_sale", categoryId),
+      this.resolveVatRate("service_fee"),
+    ]);
+    // Kısmi iadede tüm kalemler aynı oranda küçülür; belge her zaman gerçekte
+    // elde kalan tutarı gösterir.
+    const lineItems = buildPlatformSaleLines({
+      productName: order.product?.title ?? "",
+      quantity: Number(order.quantity ?? 1),
+      productGross: Number(order.subtotal ?? 0),
+      shippingNet: Number(order.buyerShippingAmount ?? 0),
+      buyerFeeNet: Number(order.buyerFeeAmount ?? 0),
+      productVatRate,
+      serviceVatRate,
+      ratio: orderTotal > 0 ? netSaleAmount / orderTotal : 0,
+    });
+
+    await this.cut("platform_sale", orderId, order.buyerId, netSaleAmount, {
+      guestRecipient: resolveGuestInvoiceRecipient(order.shippingAddress),
+      categoryId,
+      lineItems,
+    });
   }
 
   private async isPlatformSeller(sellerId: string): Promise<boolean> {
@@ -640,7 +757,9 @@ export class ElogoInvoicingService {
     const desc = boost.packageName
       ? `${LINE_DESCRIPTION.boost} — ${boost.packageName}`
       : LINE_DESCRIPTION.boost;
-    await this.cut("boost", boostId, boost.userId, Number(boost.price), desc);
+    await this.cut("boost", boostId, boost.userId, Number(boost.price), {
+      lineDescription: desc,
+    });
   }
 
   /**
@@ -733,11 +852,30 @@ export class ElogoInvoicingService {
     ]);
   }
 
-  /** Bir siparişe bağlı tüm gelir faturası anahtarları (orderId / boostId / membershipPaymentId). */
+  /**
+   * Bir siparişe bağlı tüm gelir faturası anahtarları
+   * (packageId / orderId / boostId / membershipPaymentId).
+   *
+   * Komisyon ve hizmet bedeli PAKET anahtarlıdır; iade bu yüzden siparişin
+   * paketini de sormak zorunda. Sipariş anahtarlı varyantlar, paket anahtarına
+   * geçilmeden önce kesilmiş kayıtlar için korunur — `reverseByKeys` var olmayan
+   * anahtarı sessizce atlar, dolayısıyla iki nesli birlikte aramak güvenlidir.
+   */
   private async relatedInvoiceKeys(
     orderId: string,
   ): Promise<Array<{ type: string; sourceId: string }>> {
+    const order = await this.prisma.order
+      .findUnique({ where: { id: orderId }, select: { packageId: true } })
+      .catch(() => null);
+    const packageId = order?.packageId ?? null;
+
     const keys: Array<{ type: string; sourceId: string }> = [
+      ...(packageId
+        ? [
+            { type: "commission", sourceId: packageId },
+            { type: "service_fee", sourceId: packageId },
+          ]
+        : []),
       { type: "commission", sourceId: orderId },
       { type: "service_fee", sourceId: orderId },
       { type: "platform_sale", sourceId: orderId },
@@ -850,26 +988,14 @@ export class ElogoInvoicingService {
   /** İade sonrası ilgili faturanın bugün itibarıyla kesilmesi gereken net brüt tutar. */
   private async resolveCurrentInvoiceGross(inv: ElogoInvoice): Promise<number> {
     if (inv.type === "commission" || inv.type === "service_fee") {
-      const ledger = await this.prisma.commissionLedger.findUnique({
-        where: { orderId: inv.sourceId },
-        select: {
-          sellerCommission: true,
-          refundedSellerCommission: true,
-          buyerFee: true,
-          refundedBuyerFee: true,
-        },
-      });
-      if (!ledger) return 0;
-      return inv.type === "commission"
-        ? Math.max(
-            0,
-            Number(ledger.sellerCommission) -
-              Number(ledger.refundedSellerCommission ?? 0),
-          )
-        : Math.max(
-            0,
-            Number(ledger.buyerFee) - Number(ledger.refundedBuyerFee ?? 0),
-          );
+      const totals = await this.resolveFeeLedgerTotals(inv.sourceId);
+      if (!totals) return 0;
+      return Math.max(
+        0,
+        inv.type === "commission"
+          ? totals.netSellerCommission
+          : totals.netBuyerFee,
+      );
     }
 
     if (inv.type === "platform_sale" || inv.type === "membership") {
@@ -1048,11 +1174,18 @@ export class ElogoInvoicingService {
       issuedAt: true,
       lineDescription: true,
     } as const;
-    // 1) Sipariş/üyelik e-Arşivleri: sourceId = orderId (komisyon/hizmet/platform satış/üyelik).
-    //    (Üyelik alımı MEM- order üzerinden kesilir; sourceId=orderId.)
+    // 1) Sipariş/üyelik e-Arşivleri. Komisyon ve hizmet bedeli PAKET anahtarlıdır
+    //    (satıcı başına tek fatura); platform satışı ve üyelik sipariş anahtarlı.
+    //    Siparişin paketi de aranmazsa aynı pakette iki ürün alan alıcı faturasına
+    //    hiçbir siparişten ulaşamaz.
+    const order = await this.prisma.order
+      .findUnique({ where: { id: orderId }, select: { packageId: true } })
+      .catch(() => null);
+    const sourceIds = order?.packageId ? [orderId, order.packageId] : [orderId];
+
     let inv = await this.prisma.elogoInvoice.findFirst({
       where: {
-        sourceId: orderId,
+        sourceId: { in: sourceIds },
         recipientUserId: userId,
         type: {
           in: ["commission", "service_fee", "platform_sale", "membership"],
@@ -1163,11 +1296,9 @@ export class ElogoInvoicingService {
     sourceId: string,
     recipientUserId: string,
     grossAmount: number,
-    /** Kesim anında snapshot'lanan kalem açıklaması; boşsa LINE_DESCRIPTION[type]. */
-    lineDescription?: string,
-    /** Misafir siparişinin gerçek alıcı kimliği (paylaşılan sistem kullanıcısı yerine). */
-    guestRecipient?: GuestInvoiceRecipient | null,
+    opts: CutOptions = {},
   ): Promise<void> {
+    const { lineDescription, guestRecipient, categoryId, lineItems } = opts;
     try {
       const providerEnabled = this.elogo.isEnabled();
       if (!providerEnabled) {
@@ -1197,8 +1328,13 @@ export class ElogoInvoicingService {
         guestRecipient,
       );
       const now = new Date();
-      const vatRate = await this.resolveVatRate();
-      const amounts = this.invoiceAmounts(type, grossAmount, vatRate);
+      // Kalem listesi varsa belge ÇOK ORANLI olabilir; toplamlar satırlardan
+      // gelir ve `vatRate` yalnız geriye-uyumluluk için (tek oranlı özet) tutulur.
+      const hasLines = !!lineItems?.length;
+      const vatRate = await this.resolveVatRate(type, categoryId);
+      const amounts = hasLines
+        ? invoiceTotalsFromLines(lineItems!)
+        : this.invoiceAmounts(type, grossAmount, vatRate);
 
       // Sequence artışı ve unique(type,sourceId) aynı SERIALIZABLE transaction'da:
       // yarışın kaybedeni numara tüketmez; kazanan kayıt tek ETTN ile gönderilir.
@@ -1210,7 +1346,7 @@ export class ElogoInvoicingService {
           if (raced) return raced;
           const invoiceNumber = await this.allocateInvoiceNumberInTransaction(
             tx,
-            now.getFullYear(),
+            invoiceIssueYear(now),
           );
           return tx.elogoInvoice.create({
             data: {
@@ -1236,6 +1372,9 @@ export class ElogoInvoicingService {
               vatRate,
               status: "pending",
               lineDescription: lineDescription?.trim() || null,
+              lineItems: hasLines
+                ? (lineItems as unknown as Prisma.InputJsonValue)
+                : Prisma.DbNull,
               createdAt: now,
             },
           });
@@ -1430,6 +1569,10 @@ export class ElogoInvoicingService {
       };
     }
 
+    // Kalem snapshot'ı varsa (ürün faturası) belge kalem kalem üretilir; yoksa
+    // tek satırlı hizmet faturası. Snapshot kesim anında donduğu için retry
+    // aynı belgeyi yeniden üretir.
+    const snapshotLines = readInvoiceLineItems(inv.lineItems);
     const buildXml = (invoiceNumber: string) =>
       buildInvoiceXml({
         profileId: isEInvoice ? "TEMELFATURA" : "EARSIVFATURA",
@@ -1444,7 +1587,15 @@ export class ElogoInvoicingService {
         note: desc,
         supplier: this.supplierParty(),
         customer: party,
-        lines: [{ name: desc, quantity: 1, unitPrice: net, vatRate: rate }],
+        lines: snapshotLines.length
+          ? snapshotLines.map((l) => ({
+              name: l.name,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              lineExtension: l.net,
+              vatRate: l.vatRate,
+            }))
+          : [{ name: desc, quantity: 1, unitPrice: net, vatRate: rate }],
         ...(billingRef ? { billingReference: billingRef } : {}),
       });
 
@@ -1562,7 +1713,7 @@ export class ElogoInvoicingService {
           const skip = attempt + 1;
           for (let s = 0; s < skip; s++) {
             currentNumber = await this.allocateInvoiceNumber(
-              issueMoment.getFullYear(),
+              invoiceIssueYear(issueMoment),
             );
           }
           this.logger.warn(
@@ -1886,7 +2037,7 @@ export class ElogoInvoicingService {
         if (raced) return raced;
         const number = await this.allocateInvoiceNumberInTransaction(
           tx,
-          now.getFullYear(),
+          invoiceIssueYear(now),
         );
         return tx.elogoInvoice.create({
           data: {
@@ -1895,6 +2046,13 @@ export class ElogoInvoicingService {
             recipientUserId: inv.recipientUserId,
             recipientVknTckn: inv.recipientVknTckn,
             recipientName: inv.recipientName,
+            // İletişim/adres snapshot'ı da TAŞINIR: misafir siparişlerinde tüm
+            // alıcılar tek sistem kullanıcısını paylaşır, kullanıcı kaydına
+            // dönmek iade faturasını sistem e-postasına ve boş adrese yazıyordu.
+            recipientEmail: inv.recipientEmail,
+            recipientCity: inv.recipientCity,
+            recipientDistrict: inv.recipientDistrict,
+            recipientStreet: inv.recipientStreet,
             documentType: inv.documentType,
             sendType: "ELEKTRONIK",
             invoiceNumber: number,
@@ -1934,15 +2092,13 @@ export class ElogoInvoicingService {
       (inv.type === "service_fee" &&
         adjustment.buyerFeeRefundAmount !== undefined)
     ) {
-      const ledger = await this.prisma.commissionLedger.findUnique({
-        where: { orderId: inv.sourceId },
-        select: { sellerCommission: true, buyerFee: true },
-      });
-      if (ledger) {
+      // Oran, faturanın KENDİ matrahı üzerinden hesaplanır: fatura paket
+      // başınadır, iade ise tek siparişin ücretini geri verir. Paketin toplamına
+      // bölmek, çok siparişli pakette doğru kısmi orana götürür.
+      const totals = await this.resolveFeeLedgerTotals(inv.sourceId);
+      if (totals) {
         const original =
-          inv.type === "commission"
-            ? Number(ledger.sellerCommission)
-            : Number(ledger.buyerFee);
+          inv.type === "commission" ? totals.sellerCommission : totals.buyerFee;
         const refund =
           inv.type === "commission"
             ? Number(adjustment.sellerFeeRefundAmount)
@@ -1964,15 +2120,10 @@ export class ElogoInvoicingService {
   /** Refund oranının uygulanacağı faturanın iade öncesi ekonomik brüt bazı. */
   private async resolveInvoiceRefundBase(inv: ElogoInvoice): Promise<number> {
     if (inv.type === "commission" || inv.type === "service_fee") {
-      const ledger = await this.prisma.commissionLedger.findUnique({
-        where: { orderId: inv.sourceId },
-        select: { sellerCommission: true, buyerFee: true },
-      });
-      if (ledger) {
+      const totals = await this.resolveFeeLedgerTotals(inv.sourceId);
+      if (totals) {
         const sourceAmount =
-          inv.type === "commission"
-            ? Number(ledger.sellerCommission)
-            : Number(ledger.buyerFee);
+          inv.type === "commission" ? totals.sellerCommission : totals.buyerFee;
         return this.invoiceAmounts(inv.type, sourceAmount, Number(inv.vatRate))
           .total;
       }

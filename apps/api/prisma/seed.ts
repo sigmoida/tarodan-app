@@ -44,6 +44,10 @@ import {
 import { generateReferenceCode } from "../src/common/helpers/generate-reference";
 import { publicProductRatingWhere } from "../src/common/helpers/public-rating";
 import {
+  formatElogoInvoiceNumber,
+  highestSequenceValue,
+} from "../src/modules/elogo/elogo-document-number";
+import {
   billableDesiForTier,
   tierCodeForDesi,
 } from "../src/modules/shipping/shipping-package-tier";
@@ -6933,10 +6937,18 @@ async function main() {
 
   // --- 29g. eLogo geçmiş faturaları: Invoice + ElogoInvoice + SellerUploadedInvoice (SADECE DB kaydı) ---
   const elogoYear = new Date().getFullYear();
-  // GİB zorunlu 16 karakter: 3 harf önek + 4 hane yıl + 9 hane sıra no.
-  let elogoSeq = 0;
-  const genElogoNumber = () =>
-    `TRD${elogoYear}${String((elogoSeq += 1)).padStart(9, "0")}`;
+  // GİB zorunlu 16 karakter — format runtime ile TEK kaynaktan gelir.
+  const elogoPrefix = process.env.ELOGO_INVOICE_PREFIX?.trim() || "TRD";
+  const seededElogoNumbers: string[] = [];
+  const genElogoNumber = () => {
+    const number = formatElogoInvoiceNumber(
+      elogoPrefix,
+      elogoYear,
+      seededElogoNumbers.length + 1,
+    );
+    seededElogoNumbers.push(number);
+    return number;
+  };
   // İç belge (sipariş makbuzu) numarası runtime ile aynı: SPR-YYYYMM-NNNNNN.
   const invoicePeriod = `${elogoYear}${String(new Date().getMonth() + 1).padStart(2, "0")}`;
   let invoiceSeq = 0;
@@ -6997,6 +7009,28 @@ async function main() {
         elogoResultMsg: "İşlem başarılı",
         issuedAt,
         sentAt: issuedAt,
+      },
+    });
+  }
+
+  // Numara sayacını yazılan belgelerin ÖTESİNE taşı.
+  //
+  // Sayaç geride kalırsa ilk gerçek tahsis zaten kullanılmış bir numara üretir,
+  // unique `invoice_number` kısıtına takılır ve artış aynı transaction'da olduğu
+  // için geri sarar: taze bir veritabanında hiçbir fatura kesilemez.
+  const seededLastValue = highestSequenceValue(
+    seededElogoNumbers,
+    elogoPrefix,
+    elogoYear,
+  );
+  if (seededLastValue > 0) {
+    await prisma.elogoDocSequence.upsert({
+      where: { prefix_year: { prefix: elogoPrefix, year: elogoYear } },
+      update: { lastValue: seededLastValue },
+      create: {
+        prefix: elogoPrefix,
+        year: elogoYear,
+        lastValue: seededLastValue,
       },
     });
   }
