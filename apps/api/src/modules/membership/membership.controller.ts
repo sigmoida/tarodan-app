@@ -156,10 +156,7 @@ export class MembershipController {
     return this.membershipService.listSavedCards(req.user.id);
   }
 
-  /**
-   * Kayıtlı kartı sil (PayTR capi/delete + yerelde revoke).
-   * DELETE /membership/cards/:id
-   */
+  /** PayTR silmeyi onayladıktan sonra yerelde revoke eder. */
   @Delete("cards/:id")
   async deleteSavedCard(
     @Request() req: any,

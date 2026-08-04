@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  BadGatewayException,
   Logger,
   Optional,
 } from "@nestjs/common";
@@ -1199,12 +1200,7 @@ export class MembershipSubscriptionService {
     }));
   }
 
-  /**
-   * Kayıtlı kartı kaldırır: önce PayTR capi/delete, sonra yerelde status=revoked.
-   * Kaydı fiziksel silmeyiz — geçmiş MembershipPayment/denetim izi korunsun. PayTR
-   * silme onayı alınamasa bile yerelde revoke edilir (kart "kullanılmaz" işaretlenir;
-   * bu sayede runAutoRenewals bu kartı bir daha seçmez). Kart sahibi değilse 404.
-   */
+  /** PayTR silmeyi onayladıktan sonra yerel kaydı revoke eder. */
   async deleteSavedCard(
     userId: string,
     cardId: string,
@@ -1220,20 +1216,25 @@ export class MembershipSubscriptionService {
     if (card.status === SavedCardStatus.revoked) {
       return { deleted: true }; // idempotent
     }
-    let providerDeleted = false;
+    let providerResult: { status: string; reason?: string };
     try {
-      const res = await this.paymentProviders
+      providerResult = await this.paymentProviders
         .resolve()
         .capiDeleteCard(card.utoken, card.ctoken);
-      providerDeleted = res.status === "success";
-      if (!providerDeleted) {
-        this.logger.warn(
-          `PayTR kart silme onayı alınamadı (card=${cardId}): ${res.reason || res.status}; yerelde revoke ediliyor`,
-        );
-      }
-    } catch (e: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `PayTR kart silme hatası (card=${cardId}): ${e?.message}`,
+        `PayTR kart silme hatası (card=${cardId}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new BadGatewayException(
+        i18nMessage("server.membership.savedCardDeleteFailed"),
+      );
+    }
+    if (providerResult.status !== "success") {
+      this.logger.warn(
+        `PayTR kart silme onayı alınamadı (card=${cardId}): ${providerResult.reason || providerResult.status}`,
+      );
+      throw new BadGatewayException(
+        i18nMessage("server.membership.savedCardDeleteFailed"),
       );
     }
     await this.prisma.savedCard.update({
