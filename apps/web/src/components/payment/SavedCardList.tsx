@@ -2,14 +2,10 @@
 
 "use client";
 
-import {
-  CreditCardIcon,
-  PlusIcon,
-  CheckCircleIcon,
-} from "@heroicons/react/24/outline";
+import { CreditCardIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { Radio, CvvInput } from "@tarodan/ui";
 import type { SavedCard } from "@/lib/api";
-import { NEW_CARD, brandFromLabel } from "./card";
+import { brandFromLabel } from "./card";
 import { BrandBadge, MastercardMark } from "./CardVisuals";
 
 interface SavedCardListProps {
@@ -86,18 +82,6 @@ export default function SavedCardList({
           </label>
         );
       })}
-
-      <label className={rowCls(selected === NEW_CARD)}>
-        <Radio
-          name="savedcard"
-          checked={selected === NEW_CARD}
-          onChange={() => onSelect(NEW_CARD)}
-        />
-        <span className="inline-flex h-8 w-12 items-center justify-center rounded-md border border-dashed border-border text-muted">
-          <PlusIcon className="h-5 w-5" />
-        </span>
-        <span className="font-medium text-heading">Yeni kart ile öde</span>
-      </label>
     </>
   );
 }

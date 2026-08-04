@@ -6,8 +6,9 @@ import {
   ShieldCheckIcon,
   LockClosedIcon,
   CheckCircleIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Spinner } from "@tarodan/ui";
+import { Badge, Button, Spinner } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import type { useCardPayment } from "@/hooks/useCardPayment";
 import { NEW_CARD } from "./card";
@@ -20,13 +21,17 @@ export type CardPaymentState = ReturnType<typeof useCardPayment>;
  * Kart seçim + giriş yüzeyi. Ödeme SAYFASI ve tek sayfalık checkout aynı
  * bileşeni kullanır; kart verisinin nasıl toplandığı tek yerde tanımlıdır.
  *
- * Gönder düğmesi BURADA DEĞİL: checkout'ta düğme sözleşme onayına ve adres
- * doğrulamasına da bakar, ödeme sayfasında ise tek iş yapar. Düğmeyi çağırana
- * bırakmak iki ekranın kuralını bu bileşene taşımaktan iyidir.
+ * Kayıtlı kartı olan kullanıcı için varsayılan yüzey kart listesidir; yeni kart
+ * formuna başlıktaki düğmeyle geçilir (iki mod aynı anda görünmez, yüzey sade
+ * kalır). Kayıtlı kartı olmayan kullanıcı doğrudan sade formu görür.
+ *
+ * Gönder düğmesi BURADA DEĞİL: iki ekranda da tutarın görüldüğü özet sütununda
+ * durur (checkout'ta sözleşme onayına ve adres doğrulamasına da bakar). Düğmeyi
+ * çağırana bırakmak iki ekranın kuralını bu bileşene taşımaktan iyidir.
  */
 export default function CardPaymentSection({
   card,
-  title = "Kart ile Öde",
+  title = "Kart Bilgileri",
   children,
 }: {
   card: CardPaymentState;
@@ -47,46 +52,62 @@ export default function CardPaymentSection({
     cardStorageEnabled,
   } = card;
 
+  const usingNewCard = selected === NEW_CARD;
+  const hasSavedCards = cards.length > 0;
+
   return (
     <SectionCard
       title={title}
       action={
-        <Badge
-          variant="success"
-          icon={<LockClosedIcon className="h-3.5 w-3.5" />}
-        >
-          Güvenli
-        </Badge>
+        loadingCards ? undefined : hasSavedCards ? (
+          usingNewCard ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelected(cards[0].id)}
+            >
+              Kayıtlı Kart İle Öde
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelected(NEW_CARD)}
+            >
+              <PlusIcon className="h-4 w-4" />
+              Kart Ekle
+            </Button>
+          )
+        ) : (
+          <Badge
+            variant="success"
+            icon={<LockClosedIcon className="h-3.5 w-3.5" />}
+          >
+            Güvenli
+          </Badge>
+        )
       }
     >
-      <p className="-mt-3 mb-4 text-sm text-muted">
-        PayTR güvenli ödeme altyapısı
-      </p>
-
       {loadingCards ? (
         <div className="flex items-center justify-center gap-2 py-8 text-muted">
           <Spinner size="sm" /> Kartlar yükleniyor…
         </div>
+      ) : usingNewCard ? (
+        <NewCardFields
+          form={form}
+          cardStorageEnabled={cardStorageEnabled}
+          saveCard={saveCard}
+          onSaveCardChange={setSaveCard}
+        />
       ) : (
         <div className="space-y-3">
-          {cards.length > 0 && (
-            <SavedCardList
-              cards={cards}
-              selected={selected}
-              onSelect={setSelected}
-              savedCvv={savedCvv}
-              onSavedCvvChange={setSavedCvv}
-            />
-          )}
-
-          {selected === NEW_CARD && (
-            <NewCardFields
-              form={form}
-              cardStorageEnabled={cardStorageEnabled}
-              saveCard={saveCard}
-              onSaveCardChange={setSaveCard}
-            />
-          )}
+          <SavedCardList
+            cards={cards}
+            selected={selected}
+            onSelect={setSelected}
+            savedCvv={savedCvv}
+            onSavedCvvChange={setSavedCvv}
+          />
         </div>
       )}
 

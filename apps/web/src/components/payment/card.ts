@@ -26,34 +26,10 @@ export function brandFromLabel(label?: string | null): CardBrand {
   return "unknown";
 }
 
-export function formatCardNumber(num: string, brand: CardBrand): string {
-  const n = num.replace(/\D/g, "");
-  if (brand === "amex") {
-    return [n.slice(0, 4), n.slice(4, 10), n.slice(10, 15)]
-      .filter(Boolean)
-      .join(" ");
-  }
-  return (n.match(/.{1,4}/g) || []).join(" ");
-}
-
-/** Split a raw MMYY string into its display parts. */
-export const parseExp = (raw: string) => ({
-  month: raw.slice(0, 2),
-  year: raw.slice(2, 4),
-});
-
 export const BRAND_LABEL: Record<CardBrand, string> = {
   visa: "VISA",
   mastercard: "Mastercard",
   amex: "AMEX",
   troy: "TROY",
   unknown: "",
-};
-
-export const BRAND_GRADIENT: Record<CardBrand, string> = {
-  visa: "from-[#1a1f71] via-[#243b8f] to-[#0b1b54]",
-  mastercard: "from-[#2b2b2f] via-[#3a2b25] to-[#101013]",
-  amex: "from-[#2e77bc] via-[#1f5e9e] to-[#103a6b]",
-  troy: "from-[#0090b8] via-[#00748f] to-[#00485a]",
-  unknown: "from-slate-700 via-slate-800 to-slate-900",
 };

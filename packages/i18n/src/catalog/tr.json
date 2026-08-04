@@ -805,7 +805,7 @@
     "distanceSalesRequired": "Devam etmek için mesafeli satış sözleşmesini onaylayın",
     "buyNowNotice": "Yalnız seçtiğiniz ürün ödenecek; sepetinizdeki diğer ürünler yerinde kalır.",
     "noItemsSelected": "Ödenecek ürün seçilmedi. Sepetinize dönüp ürün seçin.",
-    "cardSection": "Ödeme Bilgileri"
+    "cardSection": "Kart Bilgileri"
   },
   "order": {
     "myOrders": "Siparişlerim",

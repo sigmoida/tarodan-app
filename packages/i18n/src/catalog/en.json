@@ -805,7 +805,7 @@
     "distanceSalesRequired": "Accept the distance sales agreement to continue",
     "buyNowNotice": "Only the item you selected will be paid for; the rest of your cart stays put.",
     "noItemsSelected": "No items selected. Go back to your cart and pick one.",
-    "cardSection": "Payment details"
+    "cardSection": "Card details"
   },
   "order": {
     "myOrders": "My Orders",

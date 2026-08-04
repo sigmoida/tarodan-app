@@ -2,18 +2,20 @@
 
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { Controller, type UseFormReturn } from "react-hook-form";
+import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import {
   Input,
   Checkbox,
   CardNumberInput,
   ExpiryDateInput,
   CvvInput,
+  Tooltip,
+  TooltipProvider,
 } from "@tarodan/ui";
 import { detectBrand } from "./card";
 import type { NewCardValues } from "./schema";
-import CardPreview from "./CardPreview";
 import { BrandEmblem } from "./CardVisuals";
 
 interface NewCardFieldsProps {
@@ -30,24 +32,13 @@ export default function NewCardFields({
   onSaveCardChange,
 }: NewCardFieldsProps) {
   const { control, watch } = form;
-  const [cvcFocused, setCvcFocused] = useState(false);
   const expRef = useRef<HTMLInputElement>(null);
   const cvcRef = useRef<HTMLInputElement>(null);
 
-  const number = watch("number");
-  const brand = detectBrand(number);
+  const brand = detectBrand(watch("number"));
 
   return (
     <div className="space-y-4 pt-3">
-      <CardPreview
-        holder={watch("holder")}
-        number={number}
-        expiry={watch("expiry")}
-        cvc={watch("cvc")}
-        brand={brand}
-        flipped={cvcFocused}
-      />
-
       <Controller
         control={control}
         name="holder"
@@ -90,7 +81,7 @@ export default function NewCardFields({
           render={({ field, fieldState }) => (
             <ExpiryDateInput
               ref={expRef}
-              label="Son kullanma (AA/YY)"
+              label="Son kullanma tarihi"
               value={field.value}
               error={fieldState.error?.message}
               onValueChange={(d) => {
@@ -100,21 +91,41 @@ export default function NewCardFields({
             />
           )}
         />
-        <Controller
-          control={control}
-          name="cvc"
-          render={({ field, fieldState }) => (
-            <CvvInput
-              ref={cvcRef}
-              label="CVV"
-              value={field.value}
-              error={fieldState.error?.message}
-              onValueChange={field.onChange}
-              onFocus={() => setCvcFocused(true)}
-              onBlur={() => setCvcFocused(false)}
-            />
-          )}
-        />
+        <div className="w-full">
+          <span className="mb-1.5 flex items-center gap-1 text-sm font-medium text-body">
+            CVV
+            <TooltipProvider>
+              <Tooltip
+                content={
+                  <span className="block max-w-[15rem]">
+                    <strong className="mb-0.5 block">
+                      Güvenlik kodu (CVV)
+                    </strong>
+                    Kartınızın arka yüzündeki son 3 rakam; Amex için kartınızın
+                    ön yüzündeki 4 rakam.
+                  </span>
+                }
+              >
+                <span className="inline-flex cursor-help text-primary-500">
+                  <InformationCircleIcon className="h-4 w-4" />
+                </span>
+              </Tooltip>
+            </TooltipProvider>
+          </span>
+          <Controller
+            control={control}
+            name="cvc"
+            render={({ field, fieldState }) => (
+              <CvvInput
+                ref={cvcRef}
+                aria-label="CVV"
+                value={field.value}
+                error={fieldState.error?.message}
+                onValueChange={field.onChange}
+              />
+            )}
+          />
+        </div>
       </div>
 
       {cardStorageEnabled && (

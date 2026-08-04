@@ -4,7 +4,6 @@
 
 import { Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Container } from "@/components/layout/Container";
 import { CheckoutProvider, useCheckout } from "./_context/CheckoutContext";
 import OrderItemsCard from "./_sections/OrderItemsCard";
@@ -40,9 +39,7 @@ function CheckoutLayout() {
   return (
     <>
       <PageShell>
-        <PageHeader title={t("checkout.title")} />
-
-        <Container className="px-4 py-8">
+        <Container className="pt-4">
           <div className="grid gap-8 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               <OrderItemsCard />

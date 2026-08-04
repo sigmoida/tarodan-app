@@ -36,50 +36,6 @@ export function MastercardMark() {
   );
 }
 
-/** EMV chip. */
-export function CardChip() {
-  return (
-    <div className="relative h-7 w-10 rounded-md bg-gradient-to-br from-yellow-200 via-amber-300 to-yellow-500 shadow-inner ring-1 ring-yellow-600/30">
-      <div className="absolute inset-1 grid grid-cols-3 gap-px opacity-50">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <span key={i} className="border border-yellow-700/40" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Contactless waves. */
-export function ContactlessIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        d="M8.5 7.5a6 6 0 0 1 0 9"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="M11.5 5.5a9.5 9.5 0 0 1 0 13"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="M14.5 3.5a13 13 0 0 1 0 17"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 /** Brand emblem used inline (mastercard rings vs a pill). */
 export function BrandEmblem({ brand }: { brand: CardBrand }) {
   return brand === "mastercard" ? (
