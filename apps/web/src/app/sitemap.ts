@@ -38,6 +38,7 @@ const STATIC_PATHS = [
   "/sell",
   "/payment-options",
   "/platform-service-fee",
+  "/shipping-delivery",
   // support
   "/support",
   "/faq",
@@ -48,8 +49,7 @@ const STATIC_PATHS = [
   "/authenticity",
   "/security-features",
   // legal
-  // NOT: /terms içeriği yenilenirken `robots: noindex` ile yayında — noindex
-  // sayfa sitemap'e konmaz. İçerik döndüğünde bu satır da geri eklenecek.
+  "/terms",
   "/privacy",
   "/distance-sales",
   "/cookies",
