@@ -14,10 +14,24 @@ export interface Listing {
   images?: Array<{ url: string } | string>;
   createdAt: string;
   viewCount?: number;
-  soldAt?: string;
-  soldPrice?: number;
-  buyer?: { id: string; displayName: string };
-  orderId?: string;
+  relatedOrder?: {
+    id: string;
+    orderNumber: string;
+    status: string;
+    quantity: number;
+    unitPrice?: number | null;
+    subtotal?: number | null;
+    createdAt: string;
+    deliveredAt?: string | null;
+    completedAt?: string | null;
+    buyer: { id: string; displayName: string };
+  } | null;
+  relatedTrade?: {
+    id: string;
+    tradeNumber: string;
+    status: string;
+    createdAt: string;
+  } | null;
   rating?: { average: number | null; count: number };
   category?: { id: string; name: string; slug: string };
   /** Paket boyutu — komisyon/kargo net tahmini ilanın kendi kademesiyle yapılır. */

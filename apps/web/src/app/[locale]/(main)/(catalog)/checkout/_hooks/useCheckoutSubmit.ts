@@ -10,6 +10,7 @@ import { getFullPhoneNumber, normalizePhoneForPayload } from "@/lib/phone";
 import { useTranslations } from "next-intl";
 import type { ResolvedPayment } from "@/hooks/useCardPayment";
 import type { Address, CheckoutItem } from "../_lib/types";
+import { queryKeys } from "@/lib/query/keys";
 
 type Translate = ReturnType<typeof useTranslations<never>>;
 
@@ -516,6 +517,20 @@ export function useCheckoutSubmit({
             }
           } else if (orderError.message) {
             errorMessage = orderError.message;
+          }
+
+          if (
+            orderError.response?.status === 409 &&
+            orderError.response?.data?.code === "SELLER_SALES_SUSPENDED"
+          ) {
+            toast.error(errorMessage);
+            await queryClient.invalidateQueries({
+              queryKey: queryKeys.cart.all(),
+            });
+            await queryClient.invalidateQueries({
+              queryKey: ["checkout-quote"],
+            });
+            return null;
           }
 
           const stockoutKeywords = [

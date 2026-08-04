@@ -109,7 +109,7 @@ export default function ProductInfo() {
           >
             {isTradeAvailable && (
               <Button
-                variant="success"
+                variant="outline"
                 onClick={() => {
                   if (listing.status !== "active") {
                     toast.error(t("product.notForSale"));
@@ -138,7 +138,7 @@ export default function ProductInfo() {
               </Button>
             )}
             <Button
-              variant="secondary"
+              variant="outline"
               onClick={handleMakeOffer}
               disabled={listing.status !== "active"}
               className="w-full"
@@ -146,13 +146,13 @@ export default function ProductInfo() {
               {t("product.makeOffer")}
             </Button>
             <Button
-              variant={isInCart ? "danger" : "secondary"}
+              variant="outline"
               onClick={handleCartToggle}
               disabled={
                 isAddingToCart || cartLoading || listing.status !== "active"
               }
               isLoading={isAddingToCart}
-              className="w-full"
+              className={`w-full ${isInCart ? "text-danger-600" : ""}`}
             >
               {isAddingToCart
                 ? isInCart

@@ -41,7 +41,7 @@ export default function PaymentDetailsCard({
     <SectionCard title={t("payment.detailsTitle")} className="text-left">
       <div className="space-y-2 text-sm">
         <Row label={`${t("payment.amountLabel")}:`}>
-          {formatTL(payment.amount)} TL
+          {formatTL(payment.amount)}
         </Row>
         <div className="flex justify-between">
           <span className="text-muted">{t("common.status")}:</span>

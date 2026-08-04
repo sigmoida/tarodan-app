@@ -123,7 +123,7 @@ export default function ProductStaticInfoView({
           </div>
         )}
         <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary-500">
-          {formatTL(effectivePrice)} TL
+          {formatTL(effectivePrice)}
         </p>
       </div>
 

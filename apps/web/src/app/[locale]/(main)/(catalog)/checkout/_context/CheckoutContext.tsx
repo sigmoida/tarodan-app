@@ -135,7 +135,7 @@ function useCheckoutValue() {
     buyNowRequested,
   );
 
-  const checkoutItems: CheckoutItem[] = scopedLines
+  const requestedCheckoutItems: CheckoutItem[] = scopedLines
     .filter((line) => line.isAvailable)
     .map((line) => ({
       id: line.id,
@@ -152,21 +152,57 @@ function useCheckoutValue() {
         line.imageUrl || "https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün",
       seller: { id: line.sellerId, displayName: line.sellerName },
     }));
-  // Ara toplam KAPSAMDAN türetilir; sepetin tamamının toplamı değil.
-  const subtotal = checkoutItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
-
   // Quote her item'ı GERÇEK adediyle fiyatlar (adet değişince yeniden çeker) →
   // önizleme = tahsilat. Eskiden hep quantity:1 gönderiliyordu (çok-adet yanlış).
   const { quote, quoteLoading } = useCheckoutQuote(
-    checkoutItems.map((i) => ({
+    requestedCheckoutItems.map((i) => ({
       productId: i.productId,
       quantity: i.quantity,
     })),
     appliedCouponCode,
   );
+
+  const unavailableProductIds = new Set(
+    quote?.unavailableItems?.map((item) => item.productId) ?? [],
+  );
+  const checkoutItems = requestedCheckoutItems.filter(
+    (item) => !unavailableProductIds.has(item.productId),
+  );
+  const subtotal = checkoutItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+
+  const lastUnavailableNoticeRef = useRef("");
+  useEffect(() => {
+    const unavailable = quote?.unavailableItems ?? [];
+    if (unavailable.length === 0) {
+      lastUnavailableNoticeRef.current = "";
+      return;
+    }
+    const noticeKey = unavailable
+      .map((item) => `${item.productId}:${item.code}`)
+      .sort()
+      .join("|");
+    if (lastUnavailableNoticeRef.current === noticeKey) return;
+    lastUnavailableNoticeRef.current = noticeKey;
+    const first = unavailable[0];
+    const requested = requestedCheckoutItems.find(
+      (item) => item.productId === first.productId,
+    );
+    const message =
+      first.code === "SELLER_SALES_SUSPENDED"
+        ? t("server.commission.sellerSalesSuspended")
+        : first.code === "PRODUCT_NOT_ACTIVE"
+          ? t("server.order.productNotActiveByTitle", {
+              title: requested?.title ?? first.productId,
+            })
+          : t("server.order.productNotFoundById", {
+              productId: first.productId,
+            });
+    toast.error(message);
+    void refetchCart();
+  }, [quote?.unavailableItems, refetchCart, requestedCheckoutItems, t]);
 
   const shippingCity =
     isAuthenticated && selectedAddressId

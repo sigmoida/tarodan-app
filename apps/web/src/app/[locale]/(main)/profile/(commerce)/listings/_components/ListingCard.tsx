@@ -13,6 +13,10 @@ import {
   CurrencyDollarIcon,
   CalendarDaysIcon,
   RocketLaunchIcon,
+  PauseCircleIcon,
+  ArrowPathIcon,
+  LifebuoyIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
@@ -30,16 +34,18 @@ import {
   type EstimatedNet,
   type Listing,
 } from "../_lib/types";
-import { getListingStatus } from "../_lib/status";
+import { getListingActions, getListingStatus } from "../_lib/status";
 
-const VIEWABLE = ["active", "sold", "reserved", "inactive"];
+const VIEWABLE = ["active", "sold"];
 
 interface ListingCardProps {
   listing: Listing;
   index: number;
   estimatedNet?: EstimatedNet;
   isDeleting: boolean;
+  isDeactivating: boolean;
   onDelete: (id: string) => void;
+  onDeactivate: (id: string) => void;
   onBoost: (listing: Listing) => void;
 }
 
@@ -48,7 +54,9 @@ export default function ListingCard({
   index,
   estimatedNet,
   isDeleting,
+  isDeactivating,
   onDelete,
+  onDeactivate,
   onBoost,
 }: ListingCardProps) {
   const t = useTranslations();
@@ -56,11 +64,17 @@ export default function ListingCard({
   const StatusIcon = status.icon;
   const viewable = VIEWABLE.includes(listing.status);
   const onSale = isProductOnSaleDisplay(listing);
-
-  const canEdit = ["active", "pending", "inactive"].includes(listing.status);
-  const relist =
-    (listing.status === "sold" && !listing.orderId) ||
-    listing.status === "inactive";
+  const actions = getListingActions(listing);
+  const relatedOrder = listing.relatedOrder;
+  const soldAt =
+    relatedOrder?.completedAt ??
+    relatedOrder?.deliveredAt ??
+    relatedOrder?.createdAt;
+  const soldPrice =
+    relatedOrder?.subtotal ??
+    (relatedOrder?.unitPrice != null
+      ? relatedOrder.unitPrice * relatedOrder.quantity
+      : null);
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
@@ -162,93 +176,185 @@ export default function ListingCard({
           </div>
         </div>
 
-        {listing.status === "sold" && (
+        {listing.status === "sold" && relatedOrder && (
           <div className="mb-3 space-y-1.5 rounded-lg border border-border bg-surface-alt p-3 text-sm">
-            {listing.soldAt && (
+            {soldAt && (
               <div className="flex items-center gap-2 text-muted">
                 <CalendarDaysIcon className="h-4 w-4 text-primary-500" />
-                <span>
-                  {t("product.soldOn", { date: formatDate(listing.soldAt) })}
-                </span>
+                <span>{t("product.soldOn", { date: formatDate(soldAt) })}</span>
               </div>
             )}
-            {listing.buyer && (
+            {relatedOrder.buyer && (
               <div className="flex items-center gap-2 text-muted">
                 <UserIcon className="h-4 w-4 text-primary-500" />
                 <span>
                   {t("product.buyerHandle", {
-                    name: listing.buyer.displayName,
+                    name: relatedOrder.buyer.displayName,
                   })}
                 </span>
               </div>
             )}
-            {listing.soldPrice != null && (
+            {soldPrice != null && (
               <div className="flex items-center gap-2 font-medium text-body">
                 <CurrencyDollarIcon className="h-4 w-4 text-success-600" />
-                <span>{formatTL(listing.soldPrice)}</span>
+                <span>{formatTL(soldPrice)}</span>
               </div>
             )}
           </div>
         )}
 
         {/* Actions — above the card's stretched link */}
-        <div className="relative z-10 mt-auto flex gap-2 pt-1">
-          {canEdit && (
-            <ButtonLink
-              href={`/listings/${listing.id}/edit`}
-              variant="secondary"
-              size="sm"
-              className="flex-1 gap-1"
-            >
-              <PencilIcon className="h-4 w-4" />
-              {t("common.edit")}
-            </ButtonLink>
-          )}
-          {listing.status === "active" && (
-            <Button
-              variant="warning"
-              size="sm"
-              onClick={() => onBoost(listing)}
-              className="flex-1 gap-1"
-            >
-              <RocketLaunchIcon className="h-4 w-4" />
-              {listing.isBoosted
-                ? t("product.extendBoost")
-                : t("product.boostListing")}
-            </Button>
-          )}
-          {listing.status === "sold" && listing.orderId && (
-            <ButtonLink
-              href={`/profile/orders/${listing.orderId}`}
-              size="sm"
-              className="flex-1 gap-1"
-            >
-              <TruckIcon className="h-4 w-4" />
-              {t("product.orderDetail")}
-            </ButtonLink>
-          )}
-          {relist && (
-            <ButtonLink
-              href={`/listings/${listing.id}/edit`}
-              variant="warning"
-              size="sm"
-              className="flex-1 gap-1"
-            >
-              {t("product.relist")}
-            </ButtonLink>
-          )}
-          {listing.status === "rejected" && (
-            <Button
-              variant="danger"
-              size="sm"
-              className="flex-1 gap-1"
-              onClick={() => onDelete(listing.id)}
-              disabled={isDeleting}
-            >
-              <TrashIcon className="h-4 w-4" />
-              {isDeleting ? t("common.deleting") : t("common.delete")}
-            </Button>
-          )}
+        <div className="relative z-10 mt-auto flex flex-wrap gap-2 pt-1">
+          {actions.map((action) => {
+            const className = "min-w-[8rem] flex-1 gap-1";
+
+            switch (action) {
+              case "edit":
+                return (
+                  <ButtonLink
+                    key={action}
+                    href={`/listings/${listing.id}/edit`}
+                    variant="secondary"
+                    size="sm"
+                    className={className}
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                    {t("common.edit")}
+                  </ButtonLink>
+                );
+              case "revise":
+                return (
+                  <ButtonLink
+                    key={action}
+                    href={`/listings/${listing.id}/edit`}
+                    variant="warning"
+                    size="sm"
+                    className={className}
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                    {t("product.reviseAndResubmit")}
+                  </ButtonLink>
+                );
+              case "boost":
+                return (
+                  <Button
+                    key={action}
+                    variant="warning"
+                    size="sm"
+                    onClick={() => onBoost(listing)}
+                    className={className}
+                  >
+                    <RocketLaunchIcon className="h-4 w-4" />
+                    {listing.isBoosted
+                      ? t("product.extendBoost")
+                      : t("product.boostListing")}
+                  </Button>
+                );
+              case "deactivate":
+                return (
+                  <Button
+                    key={action}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onDeactivate(listing.id)}
+                    disabled={isDeactivating}
+                    className={className}
+                  >
+                    <PauseCircleIcon className="h-4 w-4" />
+                    {t("product.deactivateListing")}
+                  </Button>
+                );
+              case "delete":
+                return (
+                  <Button
+                    key={action}
+                    variant="danger"
+                    size="sm"
+                    className={className}
+                    onClick={() => onDelete(listing.id)}
+                    disabled={isDeleting}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                    {isDeleting ? t("common.deleting") : t("common.delete")}
+                  </Button>
+                );
+              case "relist":
+                return (
+                  <ButtonLink
+                    key={action}
+                    href={`/listings/${listing.id}/edit`}
+                    variant="warning"
+                    size="sm"
+                    className={className}
+                  >
+                    <ArrowPathIcon className="h-4 w-4" />
+                    {t("product.relist")}
+                  </ButtonLink>
+                );
+              case "order-detail":
+                return relatedOrder ? (
+                  <ButtonLink
+                    key={action}
+                    href={`/profile/orders/${relatedOrder.id}`}
+                    size="sm"
+                    className={className}
+                  >
+                    <TruckIcon className="h-4 w-4" />
+                    {t("product.orderDetail")}
+                  </ButtonLink>
+                ) : null;
+              case "trade-detail":
+                return listing.relatedTrade ? (
+                  <ButtonLink
+                    key={action}
+                    href={`/profile/trades/${listing.relatedTrade.id}`}
+                    size="sm"
+                    className={className}
+                  >
+                    <ArrowPathIcon className="h-4 w-4" />
+                    {t("product.tradeDetail")}
+                  </ButtonLink>
+                ) : null;
+              case "reservation-status":
+                return (
+                  <Button
+                    key={action}
+                    variant="secondary"
+                    size="sm"
+                    disabled
+                    className={className}
+                  >
+                    <PauseCircleIcon className="h-4 w-4" />
+                    {t("product.reservationOngoing")}
+                  </Button>
+                );
+              case "support":
+                return (
+                  <ButtonLink
+                    key={action}
+                    href="/support"
+                    variant="secondary"
+                    size="sm"
+                    className={className}
+                  >
+                    <LifebuoyIcon className="h-4 w-4" />
+                    {t("product.suspensionSupport")}
+                  </ButtonLink>
+                );
+              case "create-listing":
+                return (
+                  <ButtonLink
+                    key={action}
+                    href="/listings/new"
+                    size="sm"
+                    className={className}
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    {t("product.createNewListing")}
+                  </ButtonLink>
+                );
+            }
+          })}
         </div>
       </div>
     </div>

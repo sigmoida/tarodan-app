@@ -61,7 +61,7 @@ export default function PaymentFailClient() {
                     {t("payment.amountLabel")}:
                   </span>
                   <span className="font-semibold">
-                    {formatTL(payment.amount)} TL
+                    {formatTL(payment.amount)}
                   </span>
                 </div>
                 <div className="flex justify-between">

@@ -31,6 +31,13 @@ export interface CheckoutItem {
 }
 
 export interface CheckoutQuote {
+  items: Array<{ productId: string }>;
+  unavailableItems: Array<{
+    productId: string;
+    sellerId?: string;
+    code: "PRODUCT_NOT_FOUND" | "PRODUCT_NOT_ACTIVE" | "SELLER_SALES_SUSPENDED";
+    message: string;
+  }>;
   /** Coupon amount validated by the same server quote used for payment. */
   couponDiscount?: number;
   pricing: {

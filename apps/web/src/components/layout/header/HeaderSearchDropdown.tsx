@@ -197,7 +197,7 @@ export default function HeaderSearchDropdown({
                             {product.title}
                           </p>
                           <p className="text-xs text-primary-600 font-semibold">
-                            {formatTL(product.price)} TL
+                            {formatTL(product.price)}
                           </p>
                         </div>
                         <span className="text-2xs text-subtle font-medium px-2 py-0.5 bg-surface-alt rounded-full flex-shrink-0">

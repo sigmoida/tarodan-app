@@ -188,7 +188,7 @@ export default function TrackOrderClient() {
                   {order.product?.title}
                 </Link>
                 <p className="mt-1 font-semibold text-heading">
-                  {formatTL(Number(order.totalAmount))} TL
+                  {formatTL(Number(order.totalAmount))}
                 </p>
               </div>
             </div>

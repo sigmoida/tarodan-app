@@ -33,6 +33,8 @@ export function useCheckoutQuote(
       });
       if (res.data?.pricing)
         return {
+          items: res.data.items ?? [],
+          unavailableItems: res.data.unavailableItems ?? [],
           pricing: res.data.pricing,
           couponDiscount: res.data.couponDiscount ?? 0,
           shippingTariffVersion: res.data.shippingTariffVersion ?? null,
