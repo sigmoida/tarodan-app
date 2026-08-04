@@ -2,6 +2,7 @@ import {
   BusinessStatus,
   SubscriptionStatus,
   MembershipTierType,
+  Prisma,
 } from "@prisma/client";
 
 /**
@@ -168,4 +169,49 @@ export function isCorporateSellingSuspended(
     hasApprovedCorporateIdentity(owner) &&
     !isBusinessMembershipEntitled(membership, owner)
   );
+}
+
+/**
+ * Public sale eligibility. Individual accounts sell on FREE/BASIC/PREMIUM;
+ * entering the corporate flow makes approval plus a live BUSINESS entitlement
+ * mandatory. Invalid corporate records therefore fail closed instead of being
+ * reinterpreted as individual FREE sellers.
+ */
+export function canSellFromMembership(
+  membership: PremiumCheckMembership | null | undefined,
+  owner: BusinessEntitlementOwner | null | undefined,
+): boolean {
+  if (!owner) return false;
+  if (owner.businessStatus == null) return true;
+  return isBusinessMembershipEntitled(membership, owner);
+}
+
+/** Prisma equivalent of `canSellFromMembership`, shared by public catalog reads. */
+export function saleCapableSellerWhere(
+  now = new Date(),
+): Prisma.UserWhereInput {
+  return {
+    OR: [
+      { businessStatus: null },
+      {
+        businessStatus: BusinessStatus.approved,
+        AND: [
+          { companyName: { not: null } },
+          { companyName: { not: "" } },
+          { taxId: { not: null } },
+          { taxId: { not: "" } },
+        ],
+        membership: {
+          status: {
+            in: [SubscriptionStatus.active, SubscriptionStatus.cancelled],
+          },
+          currentPeriodEnd: { gt: now },
+          tier: {
+            type: MembershipTierType.business,
+            isActive: true,
+          },
+        },
+      },
+    ],
+  };
 }

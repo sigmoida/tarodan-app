@@ -25,7 +25,7 @@ import { CommissionLedgerService } from "../commission/commission-ledger.service
 import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
 import { RefundService } from "../refund/refund.service";
-import { OrderStatus, ProductStatus } from "@prisma/client";
+import { OrderStatus, ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
@@ -108,6 +108,7 @@ describe("OrderService checkout group (batch checkout)", () => {
   ) => ({
     id,
     title: `Ürün ${id.slice(-1)}`,
+    kind: ProductKind.listing,
     status: ProductStatus.active,
     sellerId,
     categoryId: "category-1",

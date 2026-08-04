@@ -10,14 +10,50 @@ import { CacheService } from "../cache/cache.service";
 import { SearchService } from "../search/search.service";
 import { DiscountService } from "../discount/discount.service";
 import { ProductQueryDto } from "./dto";
-import { ProductStatus, Prisma } from "@prisma/client";
+import {
+  OrderStatus,
+  ProductStatus,
+  Prisma,
+  TradeStatus,
+} from "@prisma/client";
 import { buildProductWhere } from "./helpers/build-product-where";
+import { catalogProductWhere } from "./helpers/catalog-product-where";
 import { fulltextProductSearch } from "./helpers/fulltext-search";
 import { ACTIVE_TRADE_STATUSES } from "../trade/trade.constants";
-import { tradeCapableSellerWhere } from "../membership/membership.util";
+import {
+  saleCapableSellerWhere,
+  tradeCapableSellerWhere,
+} from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductCommonService } from "./product-common.service";
 import { buildProductEditProjection } from "./product-edit-projection";
+
+const SELLER_LISTING_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.pending_payment,
+  OrderStatus.paid,
+  OrderStatus.preparing,
+  OrderStatus.shipped,
+  OrderStatus.delivered,
+  OrderStatus.awaiting_buyer_confirmation,
+  OrderStatus.completed,
+  OrderStatus.refund_requested,
+];
+
+const SELLER_LISTING_TRADE_STATUSES: TradeStatus[] = [
+  TradeStatus.pending,
+  TradeStatus.accepted,
+  TradeStatus.initiator_shipped,
+  TradeStatus.receiver_shipped,
+  TradeStatus.both_shipped,
+  TradeStatus.initiator_received,
+  TradeStatus.receiver_received,
+  TradeStatus.awaiting_payment,
+  TradeStatus.shipping_to_warehouse,
+  TradeStatus.at_warehouse,
+  TradeStatus.admin_reviewing,
+  TradeStatus.shipping_to_recipients,
+  TradeStatus.returning,
+];
 
 /**
  * ProductQueryService — ürün okuma/listeleme (findAll ES/PG akışı, popüler, tekil
@@ -151,9 +187,10 @@ export class ProductQueryService {
    */
   async findPopular(limit: number, page: number) {
     const where: Prisma.ProductWhereInput = {
+      ...catalogProductWhere(),
       status: ProductStatus.active,
-      NOT: { id: { startsWith: "membership-" } },
       AND: [{ OR: this.inStockOrConditions() }],
+      seller: saleCapableSellerWhere(),
     };
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
@@ -557,6 +594,25 @@ export class ProductQueryService {
   async findOne(id: string) {
     const cacheKey = `products:detail:${id}`;
 
+    // Seller entitlement is evaluated outside the cached projection. Otherwise
+    // a detail cached just before BUSINESS expiry remains purchasable-looking
+    // for the full cache TTL.
+    const publiclyViewable = await this.prisma.product.count({
+      where: {
+        ...catalogProductWhere(),
+        id,
+        seller: saleCapableSellerWhere(),
+        OR: [
+          { status: ProductStatus.active },
+          { status: ProductStatus.sold },
+          { status: ProductStatus.inactive, quantity: 0 },
+        ],
+      },
+    });
+    if (publiclyViewable !== 1) {
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
+    }
+
     // Use cache with 10 minute TTL for product details
     return this.cache.getOrSet(
       cacheKey,
@@ -640,8 +696,8 @@ export class ProductQueryService {
    * GET /products/my/:id
    */
   async findMyProductById(id: string, userId: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
+    const product = await this.prisma.product.findFirst({
+      where: { id, ...catalogProductWhere() },
       include: {
         images: { orderBy: { sortOrder: "asc" } },
         seller: {
@@ -719,17 +775,19 @@ export class ProductQueryService {
    * döner. Stockout cancel sayfası "alternatif ürünler" carousel'inde kullanır.
    */
   async findSimilarProducts(productId: string, limit = 12) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, ...catalogProductWhere() },
       select: { categoryId: true },
     });
     if (!product?.categoryId) return [];
 
     const products = await this.prisma.product.findMany({
       where: {
+        ...catalogProductWhere(),
         categoryId: product.categoryId,
         id: { not: productId },
         status: ProductStatus.active,
+        seller: saleCapableSellerWhere(),
         // Bulgu A: rezerv-duyarlı stok filtresi (kanonik inStockCondition ile aynı).
         // quantity = null → sınırsız stok (dijital/preorder) dahil; tamamen rezerve
         // ürün (available=0) "alternatif ürünler"de gösterilmez.
@@ -765,8 +823,11 @@ export class ProductQueryService {
    * Get seller's own single product (any status)
    */
   async findSellerProductById(sellerId: string, productId: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: {
+        id: productId,
+        ...catalogProductWhere(),
+      },
       include: {
         images: { orderBy: { sortOrder: "asc" } },
         seller: {
@@ -807,6 +868,7 @@ export class ProductQueryService {
     const { status, tradeEligible, page = 1, limit = 20 } = query;
 
     const where: Prisma.ProductWhereInput = {
+      ...catalogProductWhere(),
       sellerId,
       ...(status && status.trim() !== ""
         ? { status: status as ProductStatus }
@@ -857,6 +919,42 @@ export class ProductQueryService {
             slug: true,
           },
         },
+        // Bu bağlam yalnız satıcının kendi ürün ekranında döner. Genel ürün
+        // DTO'suna eklenmez; alıcı ve işlem kimlikleri herkese açılmaz.
+        orders: {
+          where: { status: { in: SELLER_LISTING_ORDER_STATUSES } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            quantity: true,
+            unitPrice: true,
+            subtotal: true,
+            createdAt: true,
+            deliveredAt: true,
+            completedAt: true,
+            buyer: { select: { id: true, displayName: true } },
+          },
+        },
+        tradeItemsOffered: {
+          where: {
+            trade: { status: { in: SELLER_LISTING_TRADE_STATUSES } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            trade: {
+              select: {
+                id: true,
+                tradeNumber: true,
+                status: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
         _count: {
           select: {
             offers: { where: { status: "pending" } },
@@ -879,10 +977,30 @@ export class ProductQueryService {
     products.sort((a, b) => Number(isTerminal(a)) - Number(isTerminal(b)));
 
     const formattedBase = await this.common.formatProductResponseMany(products);
-    const formattedProducts = formattedBase.map((f, i) => ({
-      ...f,
-      pendingOffersCount: products[i]._count.offers,
-    }));
+    const formattedProducts = formattedBase.map((f, i) => {
+      const product = products[i];
+      const relatedOrder = product.orders[0];
+      const relatedTrade = product.tradeItemsOffered[0]?.trade;
+
+      return {
+        ...f,
+        pendingOffersCount: product._count.offers,
+        relatedOrder: relatedOrder
+          ? {
+              ...relatedOrder,
+              unitPrice:
+                relatedOrder.unitPrice == null
+                  ? null
+                  : Number(relatedOrder.unitPrice),
+              subtotal:
+                relatedOrder.subtotal == null
+                  ? null
+                  : Number(relatedOrder.subtotal),
+            }
+          : null,
+        relatedTrade: relatedTrade ?? null,
+      };
+    });
 
     return {
       data: formattedProducts,

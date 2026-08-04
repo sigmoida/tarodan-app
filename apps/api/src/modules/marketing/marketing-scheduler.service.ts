@@ -18,6 +18,7 @@ import {
   NewsletterService,
   type NewsletterRecipient,
 } from "./newsletter.service";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /** Tek turda kaç alıcı çekileceği — bellekte tutulan sayfa boyutu. */
 const RECIPIENT_PAGE_SIZE = 200;
@@ -132,6 +133,7 @@ export class MarketingSchedulerService implements OnModuleInit {
       // Get trending products for the newsletter
       const trendingProducts = await this.prisma.product.findMany({
         where: {
+          ...catalogProductWhere(),
           status: "active",
         },
         orderBy: {
@@ -197,6 +199,7 @@ export class MarketingSchedulerService implements OnModuleInit {
       // Get featured products (high popularity, recent)
       const featuredProducts = await this.prisma.product.findMany({
         where: {
+          ...catalogProductWhere(),
           status: "active",
           createdAt: {
             gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days

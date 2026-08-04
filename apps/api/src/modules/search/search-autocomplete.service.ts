@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { ProductStatus } from "@prisma/client";
+import { ProductKind, ProductStatus } from "@prisma/client";
+import { saleCapableSellerWhere } from "../membership/membership.util";
+import { saleCapableEsFilters } from "./sale-capable-es-filter";
 import { StorageService } from "../storage/storage.service";
 import { resolveBrandLogoUrl } from "../brand/brand-logo-url";
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
@@ -80,7 +82,8 @@ export class SearchAutocompleteService {
             minimum_should_match: 1,
             filter: [
               { term: { status: ProductStatus.active } },
-              { bool: { must_not: this.common.virtualProductEsMustNot() } },
+              ...saleCapableEsFilters(),
+              { term: { productKind: ProductKind.listing } },
             ],
           },
         },
@@ -109,7 +112,8 @@ export class SearchAutocompleteService {
       where: {
         id: { in: productIds },
         status: ProductStatus.active,
-        NOT: this.common.virtualProductPrismaNot(),
+        seller: saleCapableSellerWhere(),
+        kind: ProductKind.listing,
       },
       select: { title: true },
       take: limit,
@@ -260,7 +264,8 @@ export class SearchAutocompleteService {
               minimum_should_match: 1,
               filter: [
                 { term: { status: ProductStatus.active } },
-                { bool: { must_not: this.common.virtualProductEsMustNot() } },
+                ...saleCapableEsFilters(),
+                { term: { productKind: ProductKind.listing } },
               ],
             },
           },
@@ -290,7 +295,8 @@ export class SearchAutocompleteService {
             where: {
               id: { in: productIds },
               status: ProductStatus.active,
-              NOT: this.common.virtualProductPrismaNot(),
+              seller: saleCapableSellerWhere(),
+              kind: ProductKind.listing,
             },
             select: {
               id: true,

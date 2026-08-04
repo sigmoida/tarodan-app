@@ -1,4 +1,6 @@
 import { Prisma, ProductStatus } from "@prisma/client";
+import { saleCapableSellerWhere } from "../../membership/membership.util";
+import { catalogProductWhere } from "./catalog-product-where";
 
 /**
  * Shared interface for product filter params.
@@ -103,12 +105,13 @@ export function buildProductWhere(
 
   const andConditions: Prisma.ProductWhereInput[] = [];
 
+  // Public catalog reads never expose a listing whose seller cannot currently
+  // sell. The predicate is time-aware, so an expired BUSINESS term is hidden
+  // even before the downgrade cron mutates the membership row.
+  andConditions.push({ seller: saleCapableSellerWhere() });
+
   const where: Prisma.ProductWhereInput = {
-    // Sanal ürünler (membership-* / boost-* sipariş kalemleri) listelemelerden hariç
-    NOT: [
-      { id: { startsWith: "membership-" } },
-      { id: { startsWith: "boost-" } },
-    ],
+    ...catalogProductWhere(),
   };
 
   // ── Görünürlük (status / stok) ──

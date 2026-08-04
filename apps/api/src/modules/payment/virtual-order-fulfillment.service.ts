@@ -10,7 +10,7 @@ import { Optional } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../workers/constants";
-import { enqueueTradeListingReindex } from "../membership/trade-listing-reindex";
+import { enqueueSellerListingReindex } from "../membership/seller-listing-reindex";
 import { PrismaService } from "../../prisma";
 import {
   computeRelevanceScore,
@@ -46,12 +46,13 @@ export class VirtualOrderFulfillmentService {
   ) {}
 
   /**
-   * POST-COMMIT: satıcının takas bayraklı ilanlarını yeniden indeksle.
+   * POST-COMMIT: satıcının tüm ilanlarını yeniden indeksle; üyelik hem satış
+   * hem takas yetkisini etkiler.
    * Fire-and-forget — issueMembershipInvoice ile aynı kalıp; reindex hatası
    * ödeme akışını bozmaz.
    */
-  reindexSellerTradeListings(sellerId: string): void {
-    void enqueueTradeListingReindex(
+  reindexSellerListings(sellerId: string): void {
+    void enqueueSellerListingReindex(
       this.prisma,
       this.searchQueue,
       sellerId,
@@ -176,7 +177,7 @@ export class VirtualOrderFulfillmentService {
           ...tierPatch,
         },
       });
-      this.reindexSellerTradeListings(payment.order.buyerId);
+      this.reindexSellerListings(payment.order.buyerId);
 
       if (intent) {
         const completedIntent = await tx.membershipPayment.updateMany({
@@ -441,7 +442,7 @@ export class VirtualOrderFulfillmentService {
             scheduledBillingPeriod: null,
           },
         });
-        this.reindexSellerTradeListings(attempt.membership.userId);
+        this.reindexSellerListings(attempt.membership.userId);
 
         const grantsPremium = isPremiumEntitled(
           {

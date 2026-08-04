@@ -11,7 +11,12 @@ import { chargedProductBaseOf } from "./order-charged-base.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
-import { OrderStatus, ProductStatus, Prisma } from "@prisma/client";
+import {
+  OrderStatus,
+  ProductKind,
+  ProductStatus,
+  Prisma,
+} from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
@@ -210,7 +215,10 @@ export class OrderCheckoutGroupService {
           }
 
           const products = await tx.product.findMany({
-            where: { id: { in: productIds } },
+            where: {
+              id: { in: productIds },
+              kind: ProductKind.listing,
+            },
             include: {
               seller: { select: { id: true, email: true, displayName: true } },
             },
@@ -599,6 +607,7 @@ export class OrderCheckoutGroupService {
               entry.quantity > 0
                 ? discountedPrice / entry.quantity
                 : discountedPrice,
+              entry.product.id,
             );
             lineCommissions.push({ discountedPrice, commission });
             sellerShareLines.set(entry.product.sellerId, [

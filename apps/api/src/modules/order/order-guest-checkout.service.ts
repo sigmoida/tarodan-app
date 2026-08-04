@@ -21,6 +21,7 @@ import {
 import {
   OrderStatus,
   OfferStatus,
+  ProductKind,
   ProductStatus,
   Prisma,
 } from "@prisma/client";
@@ -245,6 +246,12 @@ export class OrderGuestCheckoutService {
         );
       }
 
+      if (product.kind !== ProductKind.listing) {
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
+      }
+
       if (product.status !== ProductStatus.active) {
         throw new BadRequestException(
           i18nMessage("server.order.productNotOnSale"),
@@ -364,6 +371,7 @@ export class OrderGuestCheckoutService {
         product.categoryId,
         pinnedRuleSetId,
         finalPrice,
+        product.id,
       );
 
       // Kargo kararı (quote ile ORTAK): paket desisi → kademe → o kademenin payı →

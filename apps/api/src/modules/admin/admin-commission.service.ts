@@ -9,6 +9,7 @@ import { PrismaService } from "../../prisma";
 import {
   calculateCommissionFromRules,
   CommissionRuleMatchError,
+  roundCommissionMatchAmount,
   validateStrictCommissionCoverage,
 } from "../order/order-commission.helper";
 import { AdminAuditService } from "./admin-audit.service";
@@ -545,18 +546,22 @@ export class AdminCommissionService {
           where: { status: CommissionRuleSetStatus.ACTIVE },
         });
     if (!set) throw new BadRequestException("Komisyon seti bulunamadı");
+    const matchAmount = roundCommissionMatchAmount(dto.amount);
     const rules = await this.prisma.commissionRule.findMany({
       where: {
         ruleSetId: set.id,
         categoryId: dto.categoryId,
         sellerType: dto.sellerType,
-        minAmount: { lte: dto.amount },
-        OR: [{ maxAmount: null }, { maxAmount: { gt: dto.amount } }],
+        minAmount: { lte: matchAmount },
+        OR: [{ maxAmount: null }, { maxAmount: { gt: matchAmount } }],
       },
       include: { shippingShares: true },
     });
     try {
-      return calculateCommissionFromRules(dto.amount, rules, dto);
+      return calculateCommissionFromRules(dto.amount, rules, {
+        ...dto,
+        amount: matchAmount,
+      });
     } catch (error) {
       if (error instanceof CommissionRuleMatchError) {
         throw new ConflictException({

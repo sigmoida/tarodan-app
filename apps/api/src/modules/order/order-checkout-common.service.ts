@@ -53,6 +53,7 @@ export class OrderCheckoutCommonService {
    */
   async resolveOfferOrderPricing(params: {
     amount: number;
+    productId?: string;
     sellerId: string;
     categoryId: string | null;
     shippingDesi: number;
@@ -73,6 +74,7 @@ export class OrderCheckoutCommonService {
   }> {
     const {
       amount,
+      productId,
       sellerId,
       categoryId,
       shippingDesi,
@@ -88,6 +90,8 @@ export class OrderCheckoutCommonService {
       sellerId,
       categoryId,
       pinnedCommissionRuleSetId,
+      amount,
+      productId,
     );
     // Kargo kararı (quote/checkout ile ORTAK): kademe → o kademenin payı → bölüşüm.
     const {

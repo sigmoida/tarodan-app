@@ -1,5 +1,5 @@
-import { ProductStatus } from '@prisma/client';
-import { buildProductWhere } from './build-product-where';
+import { ProductKind, ProductStatus } from "@prisma/client";
+import { buildProductWhere } from "./build-product-where";
 
 /**
  * "Stoğu biten ilanlar da listelensin" davranışının regresyon kilidi.
@@ -7,8 +7,8 @@ import { buildProductWhere } from './build-product-where';
  *  - status verilmezse (genel gözatma): aktif + tükenen (inactive+qty0) + satıldı.
  *  - status verilirse: tam o statü (örn. 'active' → yalnızca stok-içi).
  */
-describe('buildProductWhere – stok/görünürlük filtresi', () => {
-  it('status verilmediğinde aktif + tükenen(inactive&qty0) + satıldı kümesini döndürür', () => {
+describe("buildProductWhere – stok/görünürlük filtresi", () => {
+  it("status verilmediğinde aktif + tükenen(inactive&qty0) + satıldı kümesini döndürür", () => {
     const where = buildProductWhere({});
     const and = (where.AND ?? []) as any[];
 
@@ -24,7 +24,7 @@ describe('buildProductWhere – stok/görünürlük filtresi', () => {
     expect(where.status).toBeUndefined();
   });
 
-  it('status=active verildiğinde yalnızca aktif + stok-içi (qty>0 veya null) döndürür', () => {
+  it("status=active verildiğinde yalnızca aktif + stok-içi (qty>0 veya null) döndürür", () => {
     const where = buildProductWhere({ status: ProductStatus.active });
     const and = (where.AND ?? []) as any[];
 
@@ -44,19 +44,36 @@ describe('buildProductWhere – stok/görünürlük filtresi', () => {
     expect(hasInclusiveOr).toBe(false);
   });
 
-  it('sanal ürünleri (membership-/boost-) her durumda hariç tutar', () => {
+  it("yalnızca katalog ilanlarını her durumda kabul eder", () => {
     const where = buildProductWhere({});
-    expect(where.NOT).toEqual([
-      { id: { startsWith: 'membership-' } },
-      { id: { startsWith: 'boost-' } },
-    ]);
+    expect(where.kind).toBe(ProductKind.listing);
   });
 
-  it('açık statü verilse de membership/boost istisnaları korunur', () => {
+  it("açık statü verilse de katalog sınırı korunur", () => {
     const where = buildProductWhere({ status: ProductStatus.active });
-    expect(where.NOT).toEqual([
-      { id: { startsWith: 'membership-' } },
-      { id: { startsWith: 'boost-' } },
-    ]);
+    expect(where.kind).toBe(ProductKind.listing);
+  });
+
+  it("public sonuçları satış yetkisi bulunan satıcılarla sınırlar", () => {
+    const where = buildProductWhere({});
+    const and = (where.AND ?? []) as any[];
+    const sellerGuard = and.find((condition) => condition.seller)?.seller;
+
+    expect(sellerGuard).toBeDefined();
+    expect(sellerGuard.OR).toEqual(
+      expect.arrayContaining([
+        { businessStatus: null },
+        expect.objectContaining({
+          businessStatus: "approved",
+          membership: expect.objectContaining({
+            currentPeriodEnd: expect.objectContaining({ gt: expect.any(Date) }),
+            tier: expect.objectContaining({
+              type: "business",
+              isActive: true,
+            }),
+          }),
+        }),
+      ]),
+    );
   });
 });

@@ -2,6 +2,7 @@ import {
   CommissionLedgerStatus,
   OrderCancellationType,
   OrderStatus,
+  ProductKind,
   ProductStatus,
   RefundRequestStatus,
 } from "@prisma/client";
@@ -53,6 +54,7 @@ describe("AdminAnalyticsDashboardService dashboard periods", () => {
           if (!where.createdAt) {
             if (where.status === ProductStatus.active) return 40;
             if (where.status === ProductStatus.pending) return 10;
+            return 80;
           }
           if (where.status === ProductStatus.active) {
             return valueForPeriod(where.createdAt, [2, 8, 5]);
@@ -274,6 +276,7 @@ describe("AdminAnalyticsDashboardService dashboard periods", () => {
     });
     expect(prisma.product.count).toHaveBeenCalledWith({
       where: {
+        kind: ProductKind.listing,
         createdAt: expect.any(Object),
         status: {
           in: [ProductStatus.inactive, ProductStatus.suspended],

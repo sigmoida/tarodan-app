@@ -7,6 +7,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { Client } from "@elastic/elasticsearch";
 import { Prisma, ProductStatus } from "@prisma/client";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 export interface ProductSearchResult {
   id: string;
@@ -86,10 +87,6 @@ export interface RichAutocompleteResult {
   manufacturers: Array<{ id: string; name: string; slug: string }>;
   suggestions: string[];
 }
-
-// Sanal/platform sözde-ürünleri (üyelik + öne-çıkarma) aramadan/indeksten hariç tut.
-// Tek kaynak — drift olmasın diye tüm exclusion noktaları bunu kullanır.
-const VIRTUAL_PRODUCT_ID_PREFIXES = ["membership-", "boost-"] as const;
 
 /**
  * Search modülü ortak servisi: paylaşılan Elasticsearch client'ı + bağlantı
@@ -176,31 +173,21 @@ export class SearchCommonService implements OnModuleInit {
     return this.esAvailable;
   }
 
-  /** Prisma: sanal sözde-ürünleri (membership-/boost-) hariç tutan NOT koşulu. */
-  virtualProductPrismaNot(): Prisma.ProductWhereInput[] {
-    return VIRTUAL_PRODUCT_ID_PREFIXES.map((p) => ({ id: { startsWith: p } }));
-  }
-
-  /** ElasticSearch: sanal sözde-ürünleri hariç tutan must_not prefix koşulları. */
-  virtualProductEsMustNot(): Array<{ prefix: { id: string } }> {
-    return VIRTUAL_PRODUCT_ID_PREFIXES.map((p) => ({ prefix: { id: p } }));
-  }
-
   /**
    * ES'e indekslenecek ürün kümesi: listelerde görünebilenler.
    * = aktif (stoklu) + otomatik tükenen (inactive + quantity=0) + satıldı.
    * Hariç: elle pasife alınan (inactive + quantity>0), draft/pending/reserved/rejected
-   * ve sanal (membership-/boost-) ürünler. Bu küme build-product-where.ts'teki kapsayıcı
+   * ve ödeme amaçlı ürün türleri. Bu küme build-product-where.ts'teki kapsayıcı
    * listeleme filtresiyle hizalıdır.
    */
   indexableProductWhere(): Prisma.ProductWhereInput {
     return {
+      ...catalogProductWhere(),
       OR: [
         { status: ProductStatus.active },
         { AND: [{ status: ProductStatus.inactive }, { quantity: 0 }] },
         { status: ProductStatus.sold },
       ],
-      NOT: this.virtualProductPrismaNot(),
     };
   }
 
@@ -297,6 +284,7 @@ export class SearchCommonService implements OnModuleInit {
               oldPrice: { type: "float" },
               condition: { type: "keyword" },
               status: { type: "keyword" },
+              productKind: { type: "keyword" },
               categoryId: { type: "keyword" },
               categoryName: {
                 type: "text",
@@ -364,6 +352,8 @@ export class SearchCommonService implements OnModuleInit {
               isTradeEnabled: { type: "boolean" },
               // Satıcının efektif takas yetkisi (üyelikten türetilir).
               sellerCanTrade: { type: "boolean" },
+              sellerCanSell: { type: "boolean" },
+              sellerSalesEntitledUntil: { type: "date" },
               tradeAvailable: { type: "boolean" },
               isPreorder: { type: "boolean" },
               isLimited: { type: "boolean" },
@@ -561,10 +551,10 @@ export class SearchCommonService implements OnModuleInit {
         index: this.PRODUCTS_INDEX,
       });
       const dbCount = await this.prisma.product.count({
-        where: {
-          status: ProductStatus.active,
-          NOT: this.virtualProductPrismaNot(),
-        },
+        // Keep the health check aligned with reindexAll(). The search index
+        // intentionally also contains sold and automatically depleted products
+        // so listing/status screens can resolve them consistently.
+        where: this.indexableProductWhere(),
       });
 
       const inSync = Math.abs(dbCount - esResponse.count) <= 2;

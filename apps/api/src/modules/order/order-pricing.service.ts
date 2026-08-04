@@ -11,6 +11,7 @@ import { i18nMessage } from "../i18n";
 import { CheckoutQuoteDto } from "./dto";
 import {
   CommissionRuleSetStatus,
+  ProductKind,
   ProductStatus,
   ShippingPackageTierCode,
 } from "@prisma/client";
@@ -24,7 +25,10 @@ import {
   resolveCommissionSellerType,
 } from "./order-commission.helper";
 import { TaxService } from "../tax/tax.service";
-import { effectiveMembershipTierType } from "../membership/membership.util";
+import {
+  canSellFromMembership,
+  effectiveMembershipTierType,
+} from "../membership/membership.util";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import {
   calculatePackageDesi,
@@ -59,6 +63,13 @@ export interface CommissionRuleSetSnapshot {
   id: string;
   version: number;
 }
+
+export type CheckoutQuoteUnavailableItem = {
+  productId: string;
+  sellerId?: string;
+  code: "PRODUCT_NOT_FOUND" | "PRODUCT_NOT_ACTIVE" | "SELLER_SALES_SUSPENDED";
+  message: string;
+};
 
 /**
  * Checkout'ta gösterilecek ETKİN alıcı ücreti oranı (%).
@@ -251,6 +262,7 @@ export class OrderPricingService {
       taxAmount: number;
       title?: string;
     }>;
+    unavailableItems: CheckoutQuoteUnavailableItem[];
     // Satıcı-başına kargo kırılımı (sepetteki her satıcı için tek kargo). UI "çatı"
     // görünümü ve doğru toplam için; `shippingAmount` bunların toplamıdır.
     shippingBySeller: Array<{
@@ -313,6 +325,7 @@ export class OrderPricingService {
       taxAmount: number;
       title?: string;
     }> = [];
+    const unavailableItems: CheckoutQuoteUnavailableItem[] = [];
     // Satıcı-başına kargo alt-toplamı (create ile aynı mantık — calculateShippingBySeller).
     const sellerSubtotals = new Map<string, number>();
     const sellerDesiLines = new Map<
@@ -344,7 +357,16 @@ export class OrderPricingService {
         sellerId: string;
         categoryId: string | null;
         shippingDesi: number;
-        seller: { businessStatus: string | null; taxId: string | null } | null;
+        seller: {
+          businessStatus: string | null;
+          companyName: string | null;
+          taxId: string | null;
+          membership: {
+            status: string;
+            currentPeriodEnd: Date | null;
+            tier: { type: string; isActive: boolean };
+          } | null;
+        } | null;
       };
       quantity: number;
       unitPrice: number;
@@ -361,22 +383,51 @@ export class OrderPricingService {
           sellerId: true,
           categoryId: true,
           shippingDesi: true,
+          kind: true,
           status: true,
-          seller: { select: { businessStatus: true, taxId: true } },
+          seller: {
+            select: {
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+              membership: {
+                select: {
+                  status: true,
+                  currentPeriodEnd: true,
+                  tier: { select: { type: true, isActive: true } },
+                },
+              },
+            },
+          },
         },
       });
 
-      if (!product) {
-        throw new NotFoundException(
-          i18nMessage("server.order.productNotFoundById", { productId }),
-        );
+      if (!product || product.kind !== ProductKind.listing) {
+        unavailableItems.push({
+          productId,
+          code: "PRODUCT_NOT_FOUND",
+          message: `Ürün bulunamadı: ${productId}`,
+        });
+        continue;
       }
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException(
-          i18nMessage("server.order.productNotActiveByTitle", {
-            title: product.title || productId,
-          }),
-        );
+        unavailableItems.push({
+          productId,
+          sellerId: product.sellerId,
+          code: "PRODUCT_NOT_ACTIVE",
+          message: `Ürün satışta değil: ${product.title || productId}`,
+        });
+        continue;
+      }
+      if (!canSellFromMembership(product.seller?.membership, product.seller)) {
+        unavailableItems.push({
+          productId,
+          sellerId: product.sellerId,
+          code: "SELLER_SALES_SUSPENDED",
+          message:
+            "Satıcının kurumsal üyeliği geçerli olmadığı için bu ürün şu anda satın alınamıyor.",
+        });
+        continue;
       }
 
       // Quote, checkout ile AYNI fiyat kuralını kullanmalı: indirim penceresi
@@ -409,7 +460,7 @@ export class OrderPricingService {
     // F1.1: kuponu quote'ta da uygula — YALNIZ uygun satırlara dağıt; fee/tax/kargo
     // İNDİRİMLİ baz üzerinden hesaplanır (create ile aynı) → önizleme = tahsilat.
     let couponDiscountTotal = 0;
-    if (dto.couponCode) {
+    if (dto.couponCode && lines.length > 0) {
       const validation = await this.discountService.validateCoupon(
         {
           code: dto.couponCode,
@@ -468,6 +519,7 @@ export class OrderPricingService {
         product.categoryId,
         pinnedRuleSetId,
         quantity > 0 ? discountedLine / quantity : discountedLine,
+        product.id,
       );
 
       // Paket payı satır sırasından BAĞIMSIZ olmalı ve paketin KADEMESİNE göre
@@ -654,6 +706,7 @@ export class OrderPricingService {
       totalAmount,
       sellerNetAmount,
       items: quoteItems,
+      unavailableItems,
       shippingBySeller,
       shippingTariffVersion: shippingTariff.tariffVersion,
       commissionRuleSetId: commissionRuleSet.id,
@@ -903,6 +956,7 @@ export class OrderPricingService {
     categoryId?: string | null,
     pinnedRuleSetId?: string,
     matchAmount = amount,
+    productId?: string,
   ): Promise<CommissionResult> {
     if (!categoryId) {
       this.logger.error(
@@ -939,6 +993,18 @@ export class OrderPricingService {
       );
     }
 
+    if (!canSellFromMembership(seller.membership, seller)) {
+      this.logger.warn(
+        `Selling suspended seller=${sellerId}: corporate sale requirements are not active`,
+      );
+      throw new ConflictException({
+        code: "SELLER_SALES_SUSPENDED",
+        productId,
+        sellerId,
+        message: i18nMessage("server.commission.sellerSalesSuspended"),
+      });
+    }
+
     const effectiveTierType = effectiveMembershipTierType(
       seller.membership,
       seller,
@@ -960,6 +1026,8 @@ export class OrderPricingService {
         );
         throw new ConflictException({
           code: "SELLER_SALES_SUSPENDED",
+          productId,
+          sellerId,
           message: i18nMessage("server.commission.sellerSalesSuspended"),
         });
       }

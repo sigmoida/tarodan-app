@@ -172,6 +172,8 @@ describe("OrderCheckoutCommonService.resolveOfferOrderPricing", () => {
       "s1",
       "c1",
       "set-1",
+      1000,
+      undefined,
     );
     expect(orderPricing.resolveShippingDecision).toHaveBeenCalledWith(
       expect.objectContaining({ tariff, subtotal: 1000, billableDesi: 1 }),

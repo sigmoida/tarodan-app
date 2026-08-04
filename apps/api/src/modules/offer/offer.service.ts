@@ -365,6 +365,7 @@ export class OfferService {
       // ve kargo bedava veriliyordu.
       const offerPricing = await this.checkoutCommon.resolveOfferOrderPricing({
         amount: Number(offerData.amount),
+        productId: productData.id,
         sellerId: offerData.sellerId,
         categoryId: productData.categoryId,
         shippingDesi: productData.shippingDesi,

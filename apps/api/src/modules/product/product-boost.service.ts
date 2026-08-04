@@ -8,7 +8,12 @@ import {
 import { Request } from "express";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
-import { ProductStatus, OrderStatus, Prisma } from "@prisma/client";
+import {
+  ProductKind,
+  ProductStatus,
+  OrderStatus,
+  Prisma,
+} from "@prisma/client";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { isPremiumEntitled } from "../membership/membership.util";
@@ -171,8 +176,8 @@ export class ProductBoostService {
    * kademeleri paket + süre bazında döndürür (modal bunu render eder).
    */
   async getBoostOptions(productId: string, userId: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, kind: ProductKind.listing },
       select: { id: true, price: true },
     });
     if (!product) {
@@ -255,8 +260,8 @@ export class ProductBoostService {
     }
 
     // Ürün + sahiplik + durum doğrula
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, kind: ProductKind.listing },
       select: {
         id: true,
         sellerId: true,
@@ -371,6 +376,7 @@ export class ProductBoostService {
           }${durationDays} günlük öne çıkarma`,
           price,
           condition: "new",
+          kind: ProductKind.boost,
           status: ProductStatus.active,
         },
       });

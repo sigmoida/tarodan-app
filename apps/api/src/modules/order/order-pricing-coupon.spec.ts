@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { ProductStatus } from "@prisma/client";
+import { ProductKind, ProductStatus } from "@prisma/client";
 import { OrderPricingService } from "./order-pricing.service";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
@@ -11,8 +11,9 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
     price: 100,
     sellerId: "seller-1",
     categoryId: "category-1",
+    kind: ProductKind.listing,
     status: ProductStatus.active,
-    seller: { businessStatus: "pending", taxId: null },
+    seller: { businessStatus: null, taxId: null },
   };
 
   function makeService(validation: Record<string, unknown>) {

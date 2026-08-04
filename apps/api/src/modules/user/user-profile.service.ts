@@ -22,6 +22,7 @@ import { publicUserRatingWhere } from "../../common/helpers/public-rating";
 import {
   effectiveMembershipTierType,
   isPremiumEntitled,
+  saleCapableSellerWhere,
 } from "../membership/membership.util";
 import { i18nMessage } from "../i18n";
 import {
@@ -35,6 +36,7 @@ import {
 } from "./dto";
 import { UserCommonService } from "./user-common.service";
 import { isUsernameAllowed, normalizeUsername } from "../auth/username.util";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
  * UserProfileService — profil/lookup/hesap grubu: avatar redirect, find*,
@@ -116,6 +118,7 @@ export class UserProfileService {
     // Count only active listings (exclude inactive and deleted)
     const listingCount = await this.prisma.product.count({
       where: {
+        ...catalogProductWhere(),
         sellerId: id,
         status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] },
       },
@@ -491,6 +494,7 @@ export class UserProfileService {
     // Check 1: Active products (active, pending, reserved)
     const activeProducts = await this.prisma.product.findMany({
       where: {
+        ...catalogProductWhere(),
         sellerId: userId,
         status: {
           in: [
@@ -799,9 +803,18 @@ export class UserProfileService {
     }
 
     // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).
-    const listingWhere = isOwner
-      ? { sellerId: userId, status: { notIn: ["deleted"] } as any }
-      : { sellerId: userId, status: "active" };
+    const listingWhere: Prisma.ProductWhereInput = isOwner
+      ? {
+          ...catalogProductWhere(),
+          sellerId: userId,
+          status: { notIn: [ProductStatus.deleted] },
+        }
+      : {
+          ...catalogProductWhere(),
+          sellerId: userId,
+          status: ProductStatus.active,
+          seller: saleCapableSellerWhere(),
+        };
     const collectionWhere = isOwner ? { userId } : { userId, isPublic: true };
 
     // Get seller stats + followers count + membership

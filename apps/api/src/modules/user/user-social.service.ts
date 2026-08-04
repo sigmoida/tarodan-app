@@ -10,6 +10,7 @@ import { NotificationType } from "../notification/dto";
 import { UserCommonService } from "./user-common.service";
 import { i18nMessage } from "../i18n";
 import { randomUUID } from "crypto";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -185,7 +186,10 @@ export class UserSocialService {
             _count: {
               select: {
                 products: {
-                  where: { status: "active" },
+                  where: {
+                    ...catalogProductWhere(),
+                    status: "active",
+                  },
                 },
               },
             },

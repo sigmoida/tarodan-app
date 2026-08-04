@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ServiceUnavailableException,
+  ConflictException,
   Optional,
   Logger,
 } from "@nestjs/common";
@@ -18,7 +19,12 @@ import {
   CartItemResponseDto,
   AppliedDiscountDto,
 } from "./dto";
-import { ProductStatus, DiscountScope, Prisma } from "@prisma/client";
+import {
+  ProductKind,
+  ProductStatus,
+  DiscountScope,
+  Prisma,
+} from "@prisma/client";
 import {
   getAvailableQuantity,
   canAddRequestedQuantityToCart,
@@ -29,6 +35,8 @@ import {
   outboundPackageShipping,
   ShippingPackageTiersNotConfiguredError,
 } from "../shipping/shipping-tariff.helper";
+import { i18nMessage } from "../i18n";
+import { canSellFromMembership } from "../membership/membership.util";
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
@@ -57,7 +65,7 @@ export class CartService {
             product: {
               include: {
                 images: { take: 1, orderBy: { sortOrder: "asc" } },
-                seller: { select: { id: true, displayName: true } },
+                seller: { select: this.saleEligibilitySellerSelect() },
               },
             },
           },
@@ -78,7 +86,7 @@ export class CartService {
               product: {
                 include: {
                   images: { take: 1, orderBy: { sortOrder: "asc" } },
-                  seller: { select: { id: true, displayName: true } },
+                  seller: { select: this.saleEligibilitySellerSelect() },
                 },
               },
             },
@@ -100,7 +108,7 @@ export class CartService {
               product: {
                 include: {
                   images: { take: 1, orderBy: { sortOrder: "asc" } },
-                  seller: { select: { id: true, displayName: true } },
+                  seller: { select: this.saleEligibilitySellerSelect() },
                 },
               },
             },
@@ -123,7 +131,7 @@ export class CartService {
       where: { id: dto.productId },
       include: {
         images: { take: 1, orderBy: { sortOrder: "asc" } },
-        seller: { select: { id: true, displayName: true } },
+        seller: { select: this.saleEligibilitySellerSelect() },
       },
     });
 
@@ -131,8 +139,21 @@ export class CartService {
       throw new NotFoundException("Ürün bulunamadı");
     }
 
+    if (product.kind !== ProductKind.listing) {
+      throw new NotFoundException("Ürün bulunamadı");
+    }
+
     if (product.status !== ProductStatus.active) {
       throw new BadRequestException("Bu ürün şu an satışa uygun değil");
+    }
+
+    if (!canSellFromMembership(product.seller?.membership, product.seller)) {
+      throw new ConflictException({
+        code: "SELLER_SALES_SUSPENDED",
+        productId: product.id,
+        sellerId: product.sellerId,
+        message: i18nMessage("server.commission.sellerSalesSuspended"),
+      });
     }
 
     // Check if user is trying to buy their own product
@@ -406,6 +427,23 @@ export class CartService {
     return cart;
   }
 
+  private saleEligibilitySellerSelect() {
+    return {
+      id: true,
+      displayName: true,
+      businessStatus: true,
+      companyName: true,
+      taxId: true,
+      membership: {
+        select: {
+          status: true,
+          currentPeriodEnd: true,
+          tier: { select: { type: true, isActive: true } },
+        },
+      },
+    } satisfies Prisma.UserSelect;
+  }
+
   private getNewExpiryDate(): Date {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + CART_EXPIRY_HOURS);
@@ -440,7 +478,6 @@ export class CartService {
     cart: any,
     userId: string,
   ): Promise<CartCalculationResponseDto> {
-    const now = new Date();
     const items: CartItemResponseDto[] = [];
     const appliedDiscounts: AppliedDiscountDto[] = [];
     const warnings: string[] = [];
@@ -472,10 +509,22 @@ export class CartService {
         : 0;
 
       const available = getAvailableQuantity(product);
-      let isAvailable = product.status === ProductStatus.active;
+      const sellerCanSell = canSellFromMembership(
+        product.seller?.membership,
+        product.seller,
+      );
+      let isAvailable =
+        product.kind === ProductKind.listing &&
+        product.status === ProductStatus.active &&
+        sellerCanSell;
       let stockWarning: string | undefined;
 
-      if (available !== null) {
+      if (!sellerCanSell) {
+        stockWarning =
+          "Satıcının kurumsal üyeliği geçerli olmadığı için bu ürün şu anda satın alınamıyor.";
+      }
+
+      if (sellerCanSell && available !== null) {
         if (available === 0) {
           isAvailable = false;
           stockWarning = "Stokta yok";
@@ -487,7 +536,11 @@ export class CartService {
       }
 
       if (!isAvailable) {
-        warnings.push(`"${product.title}" artık satışta değil`);
+        warnings.push(
+          sellerCanSell
+            ? `"${product.title}" artık satışta değil`
+            : `"${product.title}": ${stockWarning}`,
+        );
       } else {
         subtotal += lineTotal;
         productDiscountTotal += productDiscount;

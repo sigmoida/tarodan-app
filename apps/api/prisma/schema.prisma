@@ -571,6 +571,9 @@ model Product {
   description         String?
   price               Decimal                 @db.Decimal(10, 2)
   condition           ProductCondition
+  /// Catalog listings are publicly discoverable. Membership and boost rows are
+  /// payment-only products and must never be exposed through catalog surfaces.
+  kind                ProductKind             @default(listing)
   status              ProductStatus           @default(pending)
   isTradeEnabled      Boolean                 @default(false) @map("is_trade_enabled")
   viewCount           Int                     @default(0) @map("view_count")
@@ -653,6 +656,7 @@ model Product {
   @@index([carModelId])
   @@index([manufacturerId])
   @@index([status])
+  @@index([kind, status])
   @@index([isTradeEnabled])
   @@index([isPreorder])
   @@index([isLimited])
@@ -2950,6 +2954,12 @@ enum ProductStatus {
   rejected
   deleted
   suspended
+}
+
+enum ProductKind {
+  listing
+  membership
+  boost
 }
 
 enum ProductCondition {

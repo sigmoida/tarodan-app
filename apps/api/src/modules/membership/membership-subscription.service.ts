@@ -9,12 +9,13 @@ import {
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../workers/constants";
-import { enqueueTradeListingReindex } from "./trade-listing-reindex";
+import { enqueueSellerListingReindex } from "./seller-listing-reindex";
 import { PrismaService } from "../../prisma";
 import {
   MembershipTierType,
   SubscriptionStatus,
   ProductStatus,
+  ProductKind,
   OrderStatus,
   PaymentStatus,
   SavedCardStatus,
@@ -503,6 +504,7 @@ export class MembershipSubscriptionService {
           description: `Üyelik ödemesi için sanal ürün`,
           price: price,
           condition: "new",
+          kind: ProductKind.membership,
           status: ProductStatus.active,
         },
       });
@@ -1335,20 +1337,21 @@ export class MembershipSubscriptionService {
                 `Auto-cancelled ${cancelledPending.count} pending trade offer(s) for downgraded user`,
               );
             }
-
-            // Arama dokümanındaki `sellerCanTrade` bayatlamasın — ortak
-            // tetikleme (aktivasyon ve admin değişikliğiyle aynı yardımcı).
-            await enqueueTradeListingReindex(
-              this.prisma,
-              this.searchQueue,
-              membership.userId,
-            );
           } catch (tradeErr: any) {
             // Takas iptali downgrade'i bloklamasın; üyelik düşürme başarılı sayılır.
             this.logger.warn(
               `Failed to auto-cancel pending trades after downgrade: ${tradeErr?.message}`,
             );
           }
+
+        // Satış yetkisi dönem bittiği anda değişir. Tüm ilanları yeniden indeksle;
+        // yalnız takas bayraklı ürünleri tazelemek normal satış ilanlarını görünür
+        // bırakırdı.
+        await enqueueSellerListingReindex(
+          this.prisma,
+          this.searchQueue,
+          membership.userId,
+        );
       } catch (error) {
         this.logger.warn("Failed to downgrade membership");
       }

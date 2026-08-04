@@ -254,6 +254,17 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
  */
 describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
   const sellerId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+  const corporateSeller = {
+    sellerType: "business",
+    businessStatus: "approved",
+    companyName: "Örnek AŞ",
+    taxId: "1234567890",
+    membership: {
+      status: "active",
+      currentPeriodEnd: new Date("2100-01-01"),
+      tier: { type: "business", isActive: true },
+    },
+  };
 
   const commissionRule = {
     id: "rule-1",
@@ -408,12 +419,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
   });
 
   it("kurumsal satıcıda varsayılan %1 stopaj kesilir", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({
-      sellerType: "business",
-      membership: null,
-      businessStatus: "approved",
-      taxId: "1234567890",
-    });
+    mockPrisma.user.findUnique.mockResolvedValue(corporateSeller);
 
     const preview = await service.getCommissionPreview(
       1000,
@@ -427,12 +433,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
 
   it("stopaj oranı PlatformSetting withholding_tax_rate ile değişir", async () => {
     withSettings({ withholding_tax_rate: "2" });
-    mockPrisma.user.findUnique.mockResolvedValue({
-      sellerType: "business",
-      membership: null,
-      businessStatus: "approved",
-      taxId: "1234567890",
-    });
+    mockPrisma.user.findUnique.mockResolvedValue(corporateSeller);
 
     const preview = await service.getCommissionPreview(
       1000,
@@ -446,12 +447,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
 
   it("oran 0 yapılırsa stopaj kesilmez (hizmet KDV'si kalır)", async () => {
     withSettings({ withholding_tax_rate: "0" });
-    mockPrisma.user.findUnique.mockResolvedValue({
-      sellerType: "business",
-      membership: null,
-      businessStatus: "approved",
-      taxId: "1234567890",
-    });
+    mockPrisma.user.findUnique.mockResolvedValue(corporateSeller);
 
     const preview = await service.getCommissionPreview(
       1000,
@@ -465,12 +461,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
 
   it("hizmet KDV'si kapatılırsa önizleme KDV'siz nete döner", async () => {
     withSettings({ service_vat_enabled: "false" });
-    mockPrisma.user.findUnique.mockResolvedValue({
-      sellerType: "business",
-      membership: null,
-      businessStatus: "approved",
-      taxId: "1234567890",
-    });
+    mockPrisma.user.findUnique.mockResolvedValue(corporateSeller);
 
     const preview = await service.getCommissionPreview(
       1000,

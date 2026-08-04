@@ -4,8 +4,10 @@ import {
   MembershipTierType,
 } from "@prisma/client";
 import {
+  canSellFromMembership,
   isCorporateSellingSuspended,
   isPremiumEntitled,
+  saleCapableSellerWhere,
 } from "./membership.util";
 
 /**
@@ -153,5 +155,43 @@ describe("corporate selling suspension", () => {
 
   it("does not apply corporate suspension to an individual seller", () => {
     expect(isCorporateSellingSuspended(null, null)).toBe(false);
+  });
+
+  it("keeps individual sellers eligible but requires live BUSINESS for corporate sellers", () => {
+    const expired = {
+      status: SubscriptionStatus.active,
+      currentPeriodEnd: new Date(Date.now() - 1000),
+      tier: { type: MembershipTierType.business, isActive: true },
+    };
+    const renewed = {
+      ...expired,
+      currentPeriodEnd: new Date(Date.now() + 86_400_000),
+    };
+
+    expect(canSellFromMembership(null, { businessStatus: null })).toBe(true);
+    expect(canSellFromMembership(expired, owner)).toBe(false);
+    expect(canSellFromMembership(renewed, owner)).toBe(true);
+    expect(
+      canSellFromMembership(renewed, {
+        ...owner,
+        businessStatus: BusinessStatus.pending,
+      }),
+    ).toBe(false);
+  });
+
+  it("builds a fail-closed public catalog predicate", () => {
+    const now = new Date("2026-08-04T12:00:00.000Z");
+    expect(saleCapableSellerWhere(now)).toMatchObject({
+      OR: [
+        { businessStatus: null },
+        {
+          businessStatus: BusinessStatus.approved,
+          membership: {
+            currentPeriodEnd: { gt: now },
+            tier: { type: MembershipTierType.business, isActive: true },
+          },
+        },
+      ],
+    });
   });
 });

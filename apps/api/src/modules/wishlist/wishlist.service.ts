@@ -17,6 +17,7 @@ import {
   WishlistResponseDto,
   WishlistItemResponseDto,
 } from "./dto";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 @Injectable()
 export class WishlistService {
@@ -55,7 +56,10 @@ export class WishlistService {
     const wishlist = await this.getOrCreateWishlist(userId);
 
     const items = await this.prisma.wishlistItem.findMany({
-      where: { wishlistId: wishlist.id },
+      where: {
+        wishlistId: wishlist.id,
+        product: catalogProductWhere(),
+      },
       include: {
         product: {
           include: {
@@ -98,8 +102,8 @@ export class WishlistService {
     dto: AddToWishlistDto,
   ): Promise<WishlistItemResponseDto> {
     // Verify product exists and is active
-    const product = await this.prisma.product.findUnique({
-      where: { id: dto.productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: dto.productId, ...catalogProductWhere() },
       include: {
         images: { take: 1 },
         seller: { select: { id: true, displayName: true } },

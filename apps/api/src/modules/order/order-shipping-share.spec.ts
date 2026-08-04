@@ -1,4 +1,8 @@
-import { ProductStatus, ShippingPackageTierCode } from "@prisma/client";
+import {
+  ProductKind,
+  ProductStatus,
+  ShippingPackageTierCode,
+} from "@prisma/client";
 import { OrderPricingService } from "./order-pricing.service";
 import {
   resolvePackageShippingBuyerShare,
@@ -179,8 +183,9 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
     price: 100,
     sellerId: "seller-A",
     categoryId,
+    kind: ProductKind.listing,
     status: ProductStatus.active,
-    seller: { businessStatus: "pending", taxId: null },
+    seller: { businessStatus: null, taxId: null },
     shippingDesi: 1,
   });
 

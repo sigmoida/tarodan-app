@@ -15,6 +15,7 @@ import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
 import {
   OrderStatus,
   OfferStatus,
+  ProductKind,
   ProductStatus,
   Prisma,
 } from "@prisma/client";
@@ -124,6 +125,12 @@ export class OrderCheckoutDirectService {
       });
 
       if (!product) {
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
+      }
+
+      if (product.kind !== ProductKind.listing) {
         throw new NotFoundException(
           i18nMessage("server.order.productNotFound"),
         );
@@ -372,6 +379,7 @@ export class OrderCheckoutDirectService {
         product.categoryId,
         pinnedRuleSetId,
         discountedPrice,
+        product.id,
       );
 
       // Kargo kararı (quote ile ORTAK): paket desisi → kademe → o kademenin payı →
@@ -729,6 +737,10 @@ export class OrderCheckoutDirectService {
         throw new NotFoundException(i18nMessage("server.order.offerNotFound"));
       }
 
+      if (offer.product.kind !== ProductKind.listing) {
+        throw new NotFoundException(i18nMessage("server.order.offerNotFound"));
+      }
+
       // Only buyer can create order
       if (offer.buyerId !== buyerId) {
         throw new ForbiddenException(
@@ -783,6 +795,7 @@ export class OrderCheckoutDirectService {
       // kargo payı, KDV, stopaj ve tahsil edilecek toplam.
       const offerPricing = await this.checkoutCommon.resolveOfferOrderPricing({
         amount: Number(offer.amount),
+        productId: offer.product.id,
         sellerId: offer.sellerId,
         categoryId: offer.product.categoryId,
         shippingDesi: offer.product.shippingDesi,

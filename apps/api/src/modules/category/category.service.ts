@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { Category } from "@prisma/client";
+import { saleCapableSellerWhere } from "../membership/membership.util";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 @Injectable()
 export class CategoryService {
@@ -33,7 +35,13 @@ export class CategoryService {
           include: {
             _count: {
               select: {
-                products: { where: { status: "active" } },
+                products: {
+                  where: {
+                    ...catalogProductWhere(),
+                    status: "active",
+                    seller: saleCapableSellerWhere(),
+                  },
+                },
               },
             },
           },
@@ -76,7 +84,13 @@ export class CategoryService {
         },
         _count: {
           select: {
-            products: { where: { status: "active" } },
+            products: {
+              where: {
+                ...catalogProductWhere(),
+                status: "active",
+                seller: saleCapableSellerWhere(),
+              },
+            },
           },
         },
       },
@@ -113,7 +127,13 @@ export class CategoryService {
         },
         _count: {
           select: {
-            products: { where: { status: "active" } },
+            products: {
+              where: {
+                ...catalogProductWhere(),
+                status: "active",
+                seller: saleCapableSellerWhere(),
+              },
+            },
           },
         },
       },

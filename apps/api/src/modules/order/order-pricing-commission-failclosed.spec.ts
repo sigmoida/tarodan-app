@@ -96,9 +96,20 @@ describe("OrderPricingService strict fail-closed", () => {
       },
     });
     await expect(
-      instance.calculateCommission(100, "seller-1", "cat-1"),
+      instance.calculateCommission(
+        100,
+        "seller-1",
+        "cat-1",
+        undefined,
+        100,
+        "product-1",
+      ),
     ).rejects.toMatchObject({
-      response: expect.objectContaining({ code: "SELLER_SALES_SUSPENDED" }),
+      response: expect.objectContaining({
+        code: "SELLER_SALES_SUSPENDED",
+        sellerId: "seller-1",
+        productId: "product-1",
+      }),
     });
     await expect(
       instance.calculateCommission(100, "seller-1", "cat-1"),

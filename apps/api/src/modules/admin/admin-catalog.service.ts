@@ -20,6 +20,7 @@ import {
   CommissionRuleSetStatus,
   CommissionSellerType,
   Prisma,
+  ProductKind,
 } from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import {
@@ -171,7 +172,10 @@ export class AdminCatalogService {
           parent: true,
           children: { orderBy: { name: "asc" } },
           _count: {
-            select: { products: true, collections: true },
+            select: {
+              products: { where: { kind: ProductKind.listing } },
+              collections: true,
+            },
           },
         },
         orderBy,
@@ -187,6 +191,7 @@ export class AdminCatalogService {
       ? await this.prisma.product.groupBy({
           by: ["categoryId", "status"],
           where: {
+            kind: ProductKind.listing,
             categoryId: { in: catIds },
             status: { in: ["active", "inactive", "pending"] as any },
           },

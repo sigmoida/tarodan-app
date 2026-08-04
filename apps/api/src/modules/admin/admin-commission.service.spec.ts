@@ -118,6 +118,34 @@ describe("AdminCommissionService strict sets", () => {
     expect(validation.errors).toHaveLength(4);
   });
 
+  it("uses the same rounded amount for preview prefilter and strict matching", async () => {
+    const { service, prisma } = setup();
+    const upperRule = {
+      id: "rule-upper",
+      ruleSetId: draft.id,
+      ...dto,
+      minAmount: 1000,
+      maxAmount: 5000,
+      shippingShares: [],
+    };
+    prisma.commissionRule.findMany.mockImplementation(({ where }: any) => {
+      expect(where.minAmount).toEqual({ lte: 1000 });
+      expect(where.OR).toEqual([
+        { maxAmount: null },
+        { maxAmount: { gt: 1000 } },
+      ]);
+      return Promise.resolve([upperRule]);
+    });
+
+    const result = await service.previewCommission({
+      categoryId: "cat-1",
+      sellerType: CommissionSellerType.FREE,
+      amount: 999.996,
+    });
+
+    expect(result.ruleId).toBe("rule-upper");
+  });
+
   it("publishes complete 0-to-infinity coverage atomically", async () => {
     const { service, prisma } = setup();
     prisma.commissionRule.findMany.mockResolvedValue(

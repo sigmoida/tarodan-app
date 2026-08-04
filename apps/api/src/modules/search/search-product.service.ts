@@ -4,16 +4,18 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { ProductStatus } from "@prisma/client";
+import { ProductKind, ProductStatus } from "@prisma/client";
 import { StorageService } from "../storage/storage.service";
 import { buildProductWhere } from "../product/helpers/build-product-where";
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
 import {
+  canSellFromMembership,
   canTradeFromMembership,
   tradeCapableSellerWhere,
 } from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { tradeOnlyEsFilters } from "./trade-only-es-filter";
+import { saleCapableEsFilters } from "./sale-capable-es-filter";
 import {
   SearchCommonService,
   SearchOptions,
@@ -37,22 +39,39 @@ export class SearchProductService {
     private readonly common: SearchCommonService,
   ) {}
 
-  /** ES bağlı ama index boş, DB'de ürün varsa reindex çalıştır (db:reset senaryosu) */
+  /**
+   * ES bağlı ama index boşsa veya katalog şeması eskiyse tam reindex çalıştır.
+   * Tür ve satış-yetkisi filtreleri fail-closed olduğu için mapping değişimini
+   * başlangıçta algılayıp eski dokümanları atomik olarak yenileriz.
+   */
   async syncIndexIfEmpty(): Promise<void> {
     if (!this.common.isAvailable()) return;
     try {
-      const [esRes, dbCount] = await Promise.all([
+      const [esRes, dbCount, mappingRes] = await Promise.all([
         this.common.client
           .count({ index: this.common.productsIndex })
           .catch(() => ({ count: 0 })),
         this.prisma.product.count({
           where: this.common.indexableProductWhere(),
         }),
+        this.common.client.indices.getMapping({
+          index: this.common.productsIndex,
+        }),
       ]);
       const esCount = esRes?.count ?? 0;
-      if (esCount === 0 && dbCount > 0) {
+      const mapping = mappingRes as Record<
+        string,
+        { mappings?: { properties?: Record<string, unknown> } }
+      >;
+      const properties =
+        mapping[this.common.productsIndex]?.mappings?.properties ?? {};
+      const catalogSchemaMissing =
+        !("sellerCanSell" in properties) ||
+        !("sellerSalesEntitledUntil" in properties) ||
+        !("productKind" in properties);
+      if ((esCount === 0 || catalogSchemaMissing) && dbCount > 0) {
         this.logger.log(
-          `Elasticsearch index boş, DB'de ${dbCount} listelenebilir ürün var – reindex başlatılıyor...`,
+          `Elasticsearch index boş veya katalog şeması eski; DB'de ${dbCount} listelenebilir ürün var – reindex başlatılıyor...`,
         );
         const indexed = await this.reindexAll();
         this.logger.log(
@@ -187,7 +206,8 @@ export class SearchProductService {
         },
       });
     }
-    filter.push({ bool: { must_not: this.common.virtualProductEsMustNot() } });
+    filter.push(...saleCapableEsFilters());
+    filter.push({ term: { productKind: ProductKind.listing } });
 
     // ID-based filters (keyword exact match)
     if (categoryId) filter.push({ term: { categoryId } });
@@ -452,6 +472,7 @@ export class SearchProductService {
           : undefined,
       condition: product.condition,
       status: product.status,
+      productKind: product.kind,
       categoryId: product.categoryId,
       categoryName: product.category?.name,
       brandId: product.brandId || undefined,
@@ -504,6 +525,14 @@ export class SearchProductService {
         product.seller ?? null,
         freeTierCanTrade,
       ),
+      sellerCanSell: canSellFromMembership(
+        product.seller?.membership ?? null,
+        product.seller ?? null,
+      ),
+      sellerSalesEntitledUntil:
+        product.seller?.businessStatus === "approved"
+          ? (product.seller.membership?.currentPeriodEnd ?? undefined)
+          : undefined,
       // Önyüzün okuduğu tek alan: niyet VE yetki. REST DTO'su ile aynı ad.
       tradeAvailable:
         product.isTradeEnabled === true &&
@@ -553,12 +582,17 @@ export class SearchProductService {
   };
 
   async indexProduct(productId: string): Promise<void> {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: {
+        AND: [{ id: productId }, this.common.indexableProductWhere()],
+      },
       include: this.productInclude,
     });
 
-    if (!product) return;
+    if (!product) {
+      await this.removeProduct(productId);
+      return;
+    }
 
     try {
       await this.common.client.index({

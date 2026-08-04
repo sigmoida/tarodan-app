@@ -4,15 +4,16 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { Prisma } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { Prisma } from "@prisma/client";
 import {
   AddCollectionItemDto,
   ReorderCollectionItemsDto,
   CollectionItemResponseDto,
-} from './dto';
-import { CollectionCommonService } from './collection-common.service';
+} from "./dto";
+import { CollectionCommonService } from "./collection-common.service";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
  * CollectionItemsService — koleksiyon öğesi işlemleri: addItemToCollection,
@@ -42,28 +43,30 @@ export class CollectionItemsService {
     });
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyona ekleme yetkiniz yok');
+      throw new ForbiddenException("Bu koleksiyona ekleme yetkiniz yok");
     }
 
     // Validate: either productId or customTitle must be provided
     if (!dto.productId && !dto.customTitle) {
-      throw new BadRequestException('Ürün ID veya custom ürün bilgileri gerekli');
+      throw new BadRequestException(
+        "Ürün ID veya custom ürün bilgileri gerekli",
+      );
     }
 
     // If productId is provided, use existing product logic
     if (dto.productId) {
       // Verify product exists
-      const product = await this.prisma.product.findUnique({
-        where: { id: dto.productId },
+      const product = await this.prisma.product.findFirst({
+        where: { id: dto.productId, ...catalogProductWhere() },
         include: { images: { take: 1 } },
       });
 
       if (!product) {
-        throw new NotFoundException('Ürün bulunamadı');
+        throw new NotFoundException("Ürün bulunamadı");
       }
 
       // Check if already in collection
@@ -77,7 +80,7 @@ export class CollectionItemsService {
       });
 
       if (existing) {
-        throw new BadRequestException('Ürün zaten koleksiyonda');
+        throw new BadRequestException("Ürün zaten koleksiyonda");
       }
 
       // Get max sort order
@@ -106,9 +109,9 @@ export class CollectionItemsService {
         // ihlalini (collectionId, productId) 500 yerine aynı 400'e çevir.
         if (
           e instanceof Prisma.PrismaClientKnownRequestError &&
-          e.code === 'P2002'
+          e.code === "P2002"
         ) {
-          throw new BadRequestException('Ürün zaten koleksiyonda');
+          throw new BadRequestException("Ürün zaten koleksiyonda");
         }
         throw e;
       }
@@ -119,7 +122,7 @@ export class CollectionItemsService {
     // Custom product logic
     // Validate customTitle is required for custom products
     if (!dto.customTitle || dto.customTitle.trim().length === 0) {
-      throw new BadRequestException('Custom ürün için isim zorunludur');
+      throw new BadRequestException("Custom ürün için isim zorunludur");
     }
 
     // Get max sort order
@@ -162,11 +165,11 @@ export class CollectionItemsService {
     });
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyondan silme yetkiniz yok');
+      throw new ForbiddenException("Bu koleksiyondan silme yetkiniz yok");
     }
 
     const item = await this.prisma.collectionItem.findFirst({
@@ -174,7 +177,7 @@ export class CollectionItemsService {
     });
 
     if (!item) {
-      throw new NotFoundException('Koleksiyon öğesi bulunamadı');
+      throw new NotFoundException("Koleksiyon öğesi bulunamadı");
     }
 
     await this.prisma.collectionItem.delete({
@@ -195,11 +198,11 @@ export class CollectionItemsService {
     });
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyonu düzenleme yetkiniz yok');
+      throw new ForbiddenException("Bu koleksiyonu düzenleme yetkiniz yok");
     }
 
     await this.prisma.$transaction(

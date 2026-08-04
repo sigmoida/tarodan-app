@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
+import { saleCapableSellerWhere } from "../membership/membership.util";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 @Injectable()
 export class ManufacturerService {
@@ -49,7 +51,17 @@ export class ManufacturerService {
         description: true,
         country: true,
         foundedYear: true,
-        _count: { select: { products: { where: { status: "active" } } } },
+        _count: {
+          select: {
+            products: {
+              where: {
+                ...catalogProductWhere(),
+                status: "active",
+                seller: saleCapableSellerWhere(),
+              },
+            },
+          },
+        },
       },
     });
     return manufacturers.map((m) => ({
@@ -70,7 +82,17 @@ export class ManufacturerService {
         website: true,
         country: true,
         foundedYear: true,
-        _count: { select: { products: { where: { status: "active" } } } },
+        _count: {
+          select: {
+            products: {
+              where: {
+                ...catalogProductWhere(),
+                status: "active",
+                seller: saleCapableSellerWhere(),
+              },
+            },
+          },
+        },
       },
     });
     if (!manufacturer) {
@@ -95,7 +117,17 @@ export class ManufacturerService {
         website: true,
         country: true,
         foundedYear: true,
-        _count: { select: { products: { where: { status: "active" } } } },
+        _count: {
+          select: {
+            products: {
+              where: {
+                ...catalogProductWhere(),
+                status: "active",
+                seller: saleCapableSellerWhere(),
+              },
+            },
+          },
+        },
       },
     });
     if (!manufacturer) {

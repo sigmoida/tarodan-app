@@ -4,26 +4,26 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { Prisma } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { Prisma, ProductKind } from "@prisma/client";
 import {
   fulltextCollectionSearch,
   fulltextUserDisplayNameSearch,
-} from '../../common/helpers/fulltext-search';
+} from "../../common/helpers/fulltext-search";
 import {
   CreateCollectionDto,
   UpdateCollectionDto,
   CollectionResponseDto,
   CollectionListResponseDto,
-} from './dto';
-import { MembershipService } from '../membership/membership.service';
-import { ModerationAiClient } from '../moderation/moderation-ai.client';
-import { SearchService } from '../search/search.service';
-import { SearchIndexingService } from '../search/search-indexing.service';
-import { StorageService } from '../storage/storage.service';
-import { CollectionCommonService } from './collection-common.service';
-import { CollectionCoverService } from './collection-cover.service';
+} from "./dto";
+import { MembershipService } from "../membership/membership.service";
+import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { SearchService } from "../search/search.service";
+import { SearchIndexingService } from "../search/search-indexing.service";
+import { StorageService } from "../storage/storage.service";
+import { CollectionCommonService } from "./collection-common.service";
+import { CollectionCoverService } from "./collection-cover.service";
 
 // "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
 // mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
@@ -31,7 +31,12 @@ import { CollectionCoverService } from './collection-cover.service';
 const VISIBLE_ITEM_FILTER: Prisma.CollectionItemWhereInput = {
   OR: [
     { productId: null },
-    { product: { status: { in: ['active', 'sold'] } } },
+    {
+      product: {
+        kind: ProductKind.listing,
+        status: { in: ["active", "sold"] },
+      },
+    },
   ],
 };
 
@@ -68,23 +73,23 @@ export class CollectionCrudService {
     const canCreate = await this.membershipService.canCreateCollection(userId);
     if (!canCreate.allowed) {
       throw new ForbiddenException(
-        canCreate.reason || 'Koleksiyon oluşturma yetkiniz yok',
+        canCreate.reason || "Koleksiyon oluşturma yetkiniz yok",
       );
     }
 
     // Koleksiyon adı ve açıklaması metin denetimi
     await this.moderationAi.assertTextClean(dto.name, {
-      entityType: 'collection',
+      entityType: "collection",
       userId,
-      field: 'name',
-      label: 'koleksiyon adı',
+      field: "name",
+      label: "koleksiyon adı",
     });
     if (dto.description) {
       await this.moderationAi.assertTextClean(dto.description, {
-        entityType: 'collection',
+        entityType: "collection",
         userId,
-        field: 'description',
-        label: 'koleksiyon açıklaması',
+        field: "description",
+        label: "koleksiyon açıklaması",
       });
     }
 
@@ -97,7 +102,7 @@ export class CollectionCrudService {
     });
 
     if (existing) {
-      throw new BadRequestException('Bu isimde bir koleksiyonunuz zaten var');
+      throw new BadRequestException("Bu isimde bir koleksiyonunuz zaten var");
     }
 
     const collection = await this.prisma.collection.create({
@@ -116,14 +121,14 @@ export class CollectionCrudService {
         items: {
           include: {
             product: {
-              include: { 
-                images: { 
-                  take: 1
-                } 
+              include: {
+                images: {
+                  take: 1,
+                },
               },
             },
           },
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
         },
       },
     });
@@ -145,7 +150,7 @@ export class CollectionCrudService {
     });
 
     if (!basicCollection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     // Now get full collection with relations
@@ -159,6 +164,7 @@ export class CollectionCrudService {
             product: {
               select: {
                 id: true,
+                kind: true,
                 title: true,
                 price: true,
                 status: true,
@@ -166,23 +172,25 @@ export class CollectionCrudService {
               },
             },
           },
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
         },
       },
     });
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     // Fetch images separately for each product
-    const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
+    const productIds = (collection.items
+      ?.map((item) => item.productId)
+      .filter((id): id is string => id !== null) || []) as string[];
     if (productIds.length > 0) {
       const productImages = await this.prisma.productImage.findMany({
         where: { productId: { in: productIds } },
-        orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
+        orderBy: [{ productId: "asc" }, { sortOrder: "asc" }],
       });
-      
+
       const imagesByProduct = new Map<string, any[]>();
       for (const img of productImages) {
         if (!imagesByProduct.has(img.productId)) {
@@ -193,12 +201,13 @@ export class CollectionCrudService {
           arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
         }
       }
-      
+
       // Attach images to products
       if (collection.items) {
         for (const item of collection.items) {
           if (item.product && imagesByProduct.has(item.product.id)) {
-            (item.product as any).images = imagesByProduct.get(item.product.id) || [];
+            (item.product as any).images =
+              imagesByProduct.get(item.product.id) || [];
           } else if (item.product) {
             (item.product as any).images = [];
           }
@@ -208,7 +217,7 @@ export class CollectionCrudService {
 
     // Private collection can only be seen by owner
     if (!collection.isPublic && collection.userId !== viewerId) {
-      throw new ForbiddenException('Bu koleksiyon özel');
+      throw new ForbiddenException("Bu koleksiyon özel");
     }
 
     // Check if viewer has liked this collection
@@ -272,6 +281,7 @@ export class CollectionCrudService {
             product: {
               select: {
                 id: true,
+                kind: true,
                 title: true,
                 price: true,
                 status: true,
@@ -279,17 +289,19 @@ export class CollectionCrudService {
               },
             },
           },
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
         },
       },
     });
 
     if (collection) {
-      const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
+      const productIds = (collection.items
+        ?.map((item) => item.productId)
+        .filter((id): id is string => id !== null) || []) as string[];
       if (productIds.length > 0) {
         const productImages = await this.prisma.productImage.findMany({
           where: { productId: { in: productIds } },
-          orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
+          orderBy: [{ productId: "asc" }, { sortOrder: "asc" }],
         });
 
         const imagesByProduct = new Map<string, any[]>();
@@ -306,7 +318,8 @@ export class CollectionCrudService {
         if (collection.items) {
           for (const item of collection.items) {
             if (item.product && imagesByProduct.has(item.product.id)) {
-              (item.product as any).images = imagesByProduct.get(item.product.id) || [];
+              (item.product as any).images =
+                imagesByProduct.get(item.product.id) || [];
             } else if (item.product) {
               (item.product as any).images = [];
             }
@@ -316,12 +329,12 @@ export class CollectionCrudService {
     }
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     // Private collection can only be seen by owner
     if (!collection.isPublic && collection.userId !== viewerId) {
-      throw new ForbiddenException('Bu koleksiyon özel');
+      throw new ForbiddenException("Bu koleksiyon özel");
     }
 
     // Check if viewer has liked this collection
@@ -378,7 +391,7 @@ export class CollectionCrudService {
     // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    
+
     // If viewing own collections, show all. Otherwise only public.
     const isOwner = userId === viewerId;
 
@@ -394,7 +407,7 @@ export class CollectionCrudService {
           user: { select: { id: true, displayName: true } },
           _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
@@ -402,36 +415,44 @@ export class CollectionCrudService {
     ]);
 
     // Generate cover images for collections that don't have one (fire and forget)
-    const collectionsWithoutCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
+    const collectionsWithoutCover = collections.filter(
+      (c) => !c.coverImageKey && (c._count?.items ?? 0) > 0,
+    );
     if (collectionsWithoutCover.length > 0) {
       // Generate covers in background (don't await)
       Promise.all(
         collectionsWithoutCover.map((c) =>
           this.cover.generateCoverImage(c.id).catch((err) => {
-            this.logger.warn(`Failed to generate cover for collection ${c.id}: ${err.message}`);
-          })
-        )
+            this.logger.warn(
+              `Failed to generate cover for collection ${c.id}: ${err.message}`,
+            );
+          }),
+        ),
       ).catch(() => {
         // Ignore errors in background generation
       });
     }
 
     return {
-      collections: await Promise.all(collections.map(async (c) => ({
-        id: c.id,
-        userId: c.userId,
-        userName: c.user.displayName,
-        name: c.name,
-        slug: c.slug,
-        description: c.description || undefined,
-        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
-        isPublic: c.isPublic,
-        viewCount: c.viewCount,
-        likeCount: c.likeCount,
-        itemCount: c._count?.items ?? 0,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      }))),
+      collections: await Promise.all(
+        collections.map(async (c) => ({
+          id: c.id,
+          userId: c.userId,
+          userName: c.user.displayName,
+          name: c.name,
+          slug: c.slug,
+          description: c.description || undefined,
+          coverImageUrl: c.coverImageKey
+            ? this.storageService.getPublicAssetUrl(c.coverImageKey)
+            : undefined,
+          isPublic: c.isPublic,
+          viewCount: c.viewCount,
+          likeCount: c.likeCount,
+          itemCount: c._count?.items ?? 0,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        })),
+      ),
       total,
       page: safePage,
       pageSize: safePageSize,
@@ -444,7 +465,13 @@ export class CollectionCrudService {
   async browsePublicCollections(
     page?: number,
     pageSize?: number,
-    sortBy: 'popular' | 'recent' | 'name' | 'items' | 'items_asc' | 'items_desc' = 'popular',
+    sortBy:
+      | "popular"
+      | "recent"
+      | "name"
+      | "items"
+      | "items_asc"
+      | "items_desc" = "popular",
     search?: string,
     categoryId?: string,
     categorySlug?: string,
@@ -456,7 +483,7 @@ export class CollectionCrudService {
     if (!resolvedCategoryId && categorySlug?.trim()) {
       const slug = categorySlug.trim().toLowerCase();
       const cat = await this.prisma.category.findFirst({
-        where: { slug: { equals: slug, mode: 'insensitive' }, isActive: true },
+        where: { slug: { equals: slug, mode: "insensitive" }, isActive: true },
         select: { id: true },
       });
       resolvedCategoryId = cat?.id ?? undefined;
@@ -473,7 +500,9 @@ export class CollectionCrudService {
     });
 
     if (esResult && esResult.ids.length > 0) {
-      const validIds = esResult.ids.filter((id): id is string => id != null && id !== '');
+      const validIds = esResult.ids.filter(
+        (id): id is string => id != null && id !== "",
+      );
       const expectedCount = Math.min(esResult.total, safePageSize);
 
       if (validIds.length < expectedCount * 0.5) {
@@ -481,22 +510,45 @@ export class CollectionCrudService {
           `ES returned ${validIds.length} valid IDs but expected ~${expectedCount} (total=${esResult.total}) – falling back to Prisma and triggering reindex`,
         );
         this.searchIndexing.queueReindexAllCollections().catch(() => {});
-        return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
+        return this.browsePublicCollectionsPrisma(
+          safePage,
+          safePageSize,
+          sortBy,
+          search,
+          resolvedCategoryId,
+        );
       }
 
-      const hydrated = await this.hydrateCollections(validIds, esResult.total, safePage, safePageSize);
+      const hydrated = await this.hydrateCollections(
+        validIds,
+        esResult.total,
+        safePage,
+        safePageSize,
+      );
       if (hydrated.collections.length < validIds.length * 0.5) {
         this.logger.warn(
           `ES returned ${validIds.length} IDs but Prisma hydrated only ${hydrated.collections.length} – stale index, falling back to Prisma`,
         );
         this.searchIndexing.queueReindexAllCollections().catch(() => {});
-        return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
+        return this.browsePublicCollectionsPrisma(
+          safePage,
+          safePageSize,
+          sortBy,
+          search,
+          resolvedCategoryId,
+        );
       }
       return hydrated;
     }
 
     // ES returned null (unavailable) or 0 results – fall back to Prisma (source of truth).
-    return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
+    return this.browsePublicCollectionsPrisma(
+      safePage,
+      safePageSize,
+      sortBy,
+      search,
+      resolvedCategoryId,
+    );
   }
 
   private async hydrateCollections(
@@ -515,31 +567,47 @@ export class CollectionCrudService {
     });
 
     const orderMap = new Map(ids.map((id, i) => [id, i]));
-    collections.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+    collections.sort(
+      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+    );
 
-    const noCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
+    const noCover = collections.filter(
+      (c) => !c.coverImageKey && (c._count?.items ?? 0) > 0,
+    );
     if (noCover.length > 0) {
-      Promise.all(noCover.map((c) => this.cover.generateCoverImage(c.id).catch(() => {}))).catch(() => {});
+      Promise.all(
+        noCover.map((c) => this.cover.generateCoverImage(c.id).catch(() => {})),
+      ).catch(() => {});
     }
 
     return {
-      collections: await Promise.all(collections.map(async (c) => ({
-        id: c.id,
-        userId: c.userId,
-        userName: c.user.displayName,
-        categoryId: c.categoryId ?? undefined,
-        category: c.category ? { id: c.category.id, name: c.category.name, slug: c.category.slug } : undefined,
-        name: c.name,
-        slug: c.slug,
-        description: c.description || undefined,
-        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
-        isPublic: c.isPublic,
-        viewCount: c.viewCount,
-        likeCount: c.likeCount,
-        itemCount: c._count?.items ?? 0,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      }))),
+      collections: await Promise.all(
+        collections.map(async (c) => ({
+          id: c.id,
+          userId: c.userId,
+          userName: c.user.displayName,
+          categoryId: c.categoryId ?? undefined,
+          category: c.category
+            ? {
+                id: c.category.id,
+                name: c.category.name,
+                slug: c.category.slug,
+              }
+            : undefined,
+          name: c.name,
+          slug: c.slug,
+          description: c.description || undefined,
+          coverImageUrl: c.coverImageKey
+            ? this.storageService.getPublicAssetUrl(c.coverImageKey)
+            : undefined,
+          isPublic: c.isPublic,
+          viewCount: c.viewCount,
+          likeCount: c.likeCount,
+          itemCount: c._count?.items ?? 0,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        })),
+      ),
       total,
       page,
       pageSize,
@@ -558,7 +626,7 @@ export class CollectionCrudService {
       ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
     };
 
-    if (search && search.trim() !== '') {
+    if (search && search.trim() !== "") {
       const trimmed = search.trim();
       const [collectionIds, userIds] = await Promise.all([
         fulltextCollectionSearch(this.prisma, trimmed),
@@ -566,11 +634,17 @@ export class CollectionCrudService {
       ]);
 
       if (collectionIds.length === 0 && userIds.length === 0) {
-        return { collections: [], total: 0, page: safePage, pageSize: safePageSize };
+        return {
+          collections: [],
+          total: 0,
+          page: safePage,
+          pageSize: safePageSize,
+        };
       }
 
       const conditions: Prisma.CollectionWhereInput[] = [];
-      if (collectionIds.length > 0) conditions.push({ id: { in: collectionIds } });
+      if (collectionIds.length > 0)
+        conditions.push({ id: { in: collectionIds } });
       if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
       where.OR = conditions;
     }
@@ -579,12 +653,24 @@ export class CollectionCrudService {
     let needsInMemorySort = false;
 
     switch (sortBy) {
-      case 'popular': orderBy = { viewCount: 'desc' }; break;
-      case 'recent': orderBy = { createdAt: 'desc' }; break;
-      case 'name': needsInMemorySort = true; orderBy = { createdAt: 'desc' }; break;
-      case 'items': case 'items_asc': case 'items_desc':
-        needsInMemorySort = true; orderBy = { createdAt: 'desc' }; break;
-      default: orderBy = { viewCount: 'desc' };
+      case "popular":
+        orderBy = { viewCount: "desc" };
+        break;
+      case "recent":
+        orderBy = { createdAt: "desc" };
+        break;
+      case "name":
+        needsInMemorySort = true;
+        orderBy = { createdAt: "desc" };
+        break;
+      case "items":
+      case "items_asc":
+      case "items_desc":
+        needsInMemorySort = true;
+        orderBy = { createdAt: "desc" };
+        break;
+      default:
+        orderBy = { viewCount: "desc" };
     }
 
     let [collections, total] = await Promise.all([
@@ -595,46 +681,78 @@ export class CollectionCrudService {
           category: { select: { id: true, name: true, slug: true } },
           _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
         },
-        ...(needsInMemorySort ? {} : { orderBy, skip: (safePage - 1) * safePageSize, take: safePageSize }),
+        ...(needsInMemorySort
+          ? {}
+          : {
+              orderBy,
+              skip: (safePage - 1) * safePageSize,
+              take: safePageSize,
+            }),
       }),
       this.prisma.collection.count({ where }),
     ]);
 
     if (needsInMemorySort) {
-      if (sortBy === 'name') {
-        const collator = new Intl.Collator('tr', { sensitivity: 'base', numeric: false });
-        collections = collections.sort((a, b) => collator.compare(a.name.toLowerCase(), b.name.toLowerCase()));
-      } else if (sortBy === 'items' || sortBy === 'items_desc') {
-        collections = collections.sort((a, b) => (b._count?.items ?? 0) - (a._count?.items ?? 0));
-      } else if (sortBy === 'items_asc') {
-        collections = collections.sort((a, b) => (a._count?.items ?? 0) - (b._count?.items ?? 0));
+      if (sortBy === "name") {
+        const collator = new Intl.Collator("tr", {
+          sensitivity: "base",
+          numeric: false,
+        });
+        collections = collections.sort((a, b) =>
+          collator.compare(a.name.toLowerCase(), b.name.toLowerCase()),
+        );
+      } else if (sortBy === "items" || sortBy === "items_desc") {
+        collections = collections.sort(
+          (a, b) => (b._count?.items ?? 0) - (a._count?.items ?? 0),
+        );
+      } else if (sortBy === "items_asc") {
+        collections = collections.sort(
+          (a, b) => (a._count?.items ?? 0) - (b._count?.items ?? 0),
+        );
       }
-      collections = collections.slice((safePage - 1) * safePageSize, safePage * safePageSize);
+      collections = collections.slice(
+        (safePage - 1) * safePageSize,
+        safePage * safePageSize,
+      );
     }
 
-    const noCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
+    const noCover = collections.filter(
+      (c) => !c.coverImageKey && (c._count?.items ?? 0) > 0,
+    );
     if (noCover.length > 0) {
-      Promise.all(noCover.map((c) => this.cover.generateCoverImage(c.id).catch(() => {}))).catch(() => {});
+      Promise.all(
+        noCover.map((c) => this.cover.generateCoverImage(c.id).catch(() => {})),
+      ).catch(() => {});
     }
 
     return {
-      collections: await Promise.all(collections.map(async (c) => ({
-        id: c.id,
-        userId: c.userId,
-        userName: c.user.displayName,
-        categoryId: c.categoryId ?? undefined,
-        category: c.category ? { id: c.category.id, name: c.category.name, slug: c.category.slug } : undefined,
-        name: c.name,
-        slug: c.slug,
-        description: c.description || undefined,
-        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
-        isPublic: c.isPublic,
-        viewCount: c.viewCount,
-        likeCount: c.likeCount,
-        itemCount: c._count?.items ?? 0,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      }))),
+      collections: await Promise.all(
+        collections.map(async (c) => ({
+          id: c.id,
+          userId: c.userId,
+          userName: c.user.displayName,
+          categoryId: c.categoryId ?? undefined,
+          category: c.category
+            ? {
+                id: c.category.id,
+                name: c.category.name,
+                slug: c.category.slug,
+              }
+            : undefined,
+          name: c.name,
+          slug: c.slug,
+          description: c.description || undefined,
+          coverImageUrl: c.coverImageKey
+            ? this.storageService.getPublicAssetUrl(c.coverImageKey)
+            : undefined,
+          isPublic: c.isPublic,
+          viewCount: c.viewCount,
+          likeCount: c.likeCount,
+          itemCount: c._count?.items ?? 0,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        })),
+      ),
       total,
       page: safePage,
       pageSize: safePageSize,
@@ -654,30 +772,33 @@ export class CollectionCrudService {
     });
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyonu düzenleme yetkiniz yok');
+      throw new ForbiddenException("Bu koleksiyonu düzenleme yetkiniz yok");
     }
 
     // Değişen metin alanları denetimi
     if (dto.name && dto.name !== collection.name) {
       await this.moderationAi.assertTextClean(dto.name, {
-        entityType: 'collection',
+        entityType: "collection",
         entityId: collectionId,
         userId,
-        field: 'name',
-        label: 'koleksiyon adı',
+        field: "name",
+        label: "koleksiyon adı",
       });
     }
-    if (dto.description !== undefined && dto.description !== collection.description) {
+    if (
+      dto.description !== undefined &&
+      dto.description !== collection.description
+    ) {
       await this.moderationAi.assertTextClean(dto.description, {
-        entityType: 'collection',
+        entityType: "collection",
         entityId: collectionId,
         userId,
-        field: 'description',
-        label: 'koleksiyon açıklaması',
+        field: "description",
+        label: "koleksiyon açıklaması",
       });
     }
 
@@ -695,7 +816,7 @@ export class CollectionCrudService {
       });
 
       if (existing) {
-        throw new BadRequestException('Bu isimde bir koleksiyonunuz zaten var');
+        throw new BadRequestException("Bu isimde bir koleksiyonunuz zaten var");
       }
     }
 
@@ -704,12 +825,14 @@ export class CollectionCrudService {
       data: {
         ...(dto.name && { name: dto.name, slug: newSlug }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.coverImageKey !== undefined && { coverImageKey: dto.coverImageKey }),
+        ...(dto.coverImageKey !== undefined && {
+          coverImageKey: dto.coverImageKey,
+        }),
         ...(dto.isPublic !== undefined && { isPublic: dto.isPublic }),
         ...(dto.categoryId !== undefined
-          ? (dto.categoryId == null || dto.categoryId === ''
+          ? dto.categoryId == null || dto.categoryId === ""
             ? { category: { disconnect: true } }
-            : { category: { connect: { id: dto.categoryId } } })
+            : { category: { connect: { id: dto.categoryId } } }
           : {}),
       },
       include: {
@@ -718,14 +841,14 @@ export class CollectionCrudService {
         items: {
           include: {
             product: {
-              include: { 
-                images: { 
-                  take: 1
-                } 
+              include: {
+                images: {
+                  take: 1,
+                },
               },
             },
           },
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
         },
       },
     });
@@ -742,17 +865,16 @@ export class CollectionCrudService {
     });
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyonu silme yetkiniz yok');
+      throw new ForbiddenException("Bu koleksiyonu silme yetkiniz yok");
     }
 
     await this.prisma.collection.delete({
       where: { id: collectionId },
     });
-
   }
 
   // ==========================================================================
@@ -761,7 +883,7 @@ export class CollectionCrudService {
   private generateSlug(name: string): string {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9çğıöşü]+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/[^a-z0-9çğıöşü]+/g, "-")
+      .replace(/^-|-$/g, "");
   }
 }
