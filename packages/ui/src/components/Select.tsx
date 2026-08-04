@@ -150,6 +150,14 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     ref,
   ) => {
     const items = normalizeItems(options, children);
+    const hasEmptyOption = items.some((item) => item.value === "");
+    const mapValue = (rawValue: string) =>
+      rawValue === "" && !hasEmptyOption ? "" : toRadix(rawValue);
+    const controlledRawValue = value !== undefined ? String(value) : undefined;
+    const controlledValue =
+      controlledRawValue !== undefined
+        ? mapValue(controlledRawValue)
+        : undefined;
     const selectId =
       id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
@@ -162,9 +170,11 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
 
     const control = (
       <RadixSelect.Root
-        value={value !== undefined ? toRadix(String(value)) : undefined}
+        value={controlledValue}
         defaultValue={
-          defaultValue !== undefined ? toRadix(String(defaultValue)) : undefined
+          controlledValue === undefined && defaultValue !== undefined
+            ? mapValue(String(defaultValue))
+            : undefined
         }
         onValueChange={emit}
         disabled={disabled}

@@ -29,6 +29,7 @@ import {
 import { useEditListingForm } from "./_hooks/useEditListingForm";
 import { useProductDiscounts } from "./_hooks/useProductDiscounts";
 import { useListingLifecycle } from "./_hooks/useListingLifecycle";
+import { withSelectedReference } from "./_lib/selected-option";
 import StatusBanners from "./_sections/StatusBanners";
 import DeleteListingModal from "./_modals/DeleteListingModal";
 
@@ -73,6 +74,20 @@ export default function EditListingClient() {
     manufacturers: manufacturerList,
   } = useListingFilters(catalogEnabled);
   const manufacturerId = form.watch("manufacturerId");
+  const categoryOptions = withSelectedReference(flatCategories, {
+    id: record?.categoryId,
+    name: record?.categoryName,
+  });
+  const brandOptions = withSelectedReference(brands, {
+    id: record?.brandId,
+    name: record?.brandName,
+    slug: record?.brandSlug,
+  });
+  const manufacturerOptions = withSelectedReference(manufacturerList, {
+    id: record?.manufacturerId,
+    name: record?.manufacturerName,
+    slug: record?.manufacturerSlug,
+  });
   /**
    * Slug önce KAYITTAN okunur, marka/üretici listesi henüz gelmemişken bile.
    *
@@ -232,20 +247,20 @@ export default function EditListingClient() {
         <ProductDetailsCard
           locale={locale}
           conditions={getConditions(locale)}
-          flatCategories={flatCategories}
-          brands={brands}
+          flatCategories={categoryOptions}
+          brands={brandOptions}
           brandsLoading={brandsLoading}
           models={modelOptions}
           modelsLoading={modelsLoading && modelOptions.length === 0}
           scaleList={scaleList}
           materialList={materialList}
-          manufacturerList={manufacturerList}
+          manufacturerList={manufacturerOptions}
           yearOptions={getYearOptions()}
         />
         {/* Üretici nitelikleri: yeni ilan formunda vardı, burada yoktu —
             satıcı seçimlerini göremiyor, kaydedince hepsi siliniyordu. */}
         <ManufacturerAttributesCard
-          manufacturerList={manufacturerList}
+          manufacturerList={manufacturerOptions}
           manufacturerAttrGroups={manufacturerAttrGroups}
         />
         {/* Ön sipariş anahtarı YOK: yeni ilan formunda da bulunmuyor, iki form

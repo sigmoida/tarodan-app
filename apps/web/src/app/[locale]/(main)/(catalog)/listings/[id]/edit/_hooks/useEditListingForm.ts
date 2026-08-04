@@ -64,6 +64,7 @@ export function useEditListingForm({
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [showDiscountSection, setShowDiscountSection] = useState(false);
   const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
+  const [readyFormId, setReadyFormId] = useState<string | null>(null);
 
   // Auth gate.
   useEffect(() => {
@@ -141,10 +142,15 @@ export function useEditListingForm({
       buildSaleDataFromListing(edit);
     setSaleData(nextSaleData);
     setShowDiscountSection(saleActive);
+    setReadyFormId(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingQuery.data, id]);
 
-  const isFetching = !id ? false : authLoading || listingQuery.isPending;
+  const isFetching = !id
+    ? false
+    : authLoading ||
+      listingQuery.isPending ||
+      (!!listingQuery.data?.edit && readyFormId !== id);
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>

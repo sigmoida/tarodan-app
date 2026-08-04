@@ -149,10 +149,10 @@ describe("buildProductEditProjection", () => {
         brandId: null,
         carModelId: null,
         manufacturerId: null,
-        category: { id: "cat9" },
-        brand: { id: "brand9" },
-        carModel: { id: "model9" },
-        manufacturer: { id: "man9" },
+        category: { id: "cat9", name: "Araba", slug: "araba" },
+        brand: { id: "brand9", name: "Hot Wheels", slug: "hot-wheels" },
+        carModel: { id: "model9", name: "Camaro", slug: "camaro" },
+        manufacturer: { id: "man9", name: "Mattel", slug: "mattel" },
       }),
       { imageUrl },
     );
@@ -160,6 +160,14 @@ describe("buildProductEditProjection", () => {
     expect(edit.brandId).toBe("brand9");
     expect(edit.carModelId).toBe("model9");
     expect(edit.manufacturerId).toBe("man9");
+    expect(edit).toMatchObject({
+      categoryName: "Araba",
+      brandName: "Hot Wheels",
+      brandSlug: "hot-wheels",
+      carModelName: "Camaro",
+      manufacturerName: "Mattel",
+      manufacturerSlug: "mattel",
+    });
   });
 
   it("nitelikleri hem SLUG hem değeriyle verir", () => {

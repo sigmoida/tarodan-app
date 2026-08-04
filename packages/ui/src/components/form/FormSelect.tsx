@@ -21,10 +21,10 @@ export function FormSelect({ name, ...props }: FormSelectProps) {
   return (
     <Select
       {...props}
-      // Empty → `undefined` (not "") so an unselected field shows its
-      // placeholder: Select maps "" to a real item value, which would suppress
-      // the placeholder.
-      value={(field.value as string) || undefined}
+      // Keep the Radix control controlled for its entire lifetime. Select
+      // distinguishes this empty form value from a real `value=""` option and
+      // keeps showing the placeholder until async form data arrives.
+      value={field.value == null ? "" : String(field.value)}
       onChange={(e) => field.onChange(e.target.value)}
       error={fieldState.error?.message as string | undefined}
     />

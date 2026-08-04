@@ -57,6 +57,9 @@ export interface ProductEditProjection {
   brandId: string | null;
   carModelId: string | null;
   manufacturerId: string | null;
+  categoryName: string | null;
+  brandName: string | null;
+  manufacturerName: string | null;
   /**
    * Markanın ve üreticinin slug'ı.
    *
@@ -126,6 +129,9 @@ export function buildProductEditProjection(
     brandId: product.brandId ?? product.brand?.id ?? null,
     carModelId: product.carModelId ?? product.carModel?.id ?? null,
     manufacturerId: product.manufacturerId ?? product.manufacturer?.id ?? null,
+    categoryName: product.category?.name ?? null,
+    brandName: product.brand?.name ?? null,
+    manufacturerName: product.manufacturer?.name ?? null,
     brandSlug: product.brand?.slug ?? null,
     manufacturerSlug: product.manufacturer?.slug ?? null,
     carModelName: product.carModel?.name ?? null,
