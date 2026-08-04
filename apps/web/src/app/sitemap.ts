@@ -48,9 +48,10 @@ const STATIC_PATHS = [
   "/authenticity",
   "/security-features",
   // legal
-  // NOT: /terms, /privacy ve /distance-sales içerikleri yenilenirken
-  // `robots: noindex` ile yayında — noindex sayfa sitemap'e konmaz. İçerik
-  // döndüğünde noindex ile birlikte bu satırlar da geri eklenecek.
+  // NOT: /terms içeriği yenilenirken `robots: noindex` ile yayında — noindex
+  // sayfa sitemap'e konmaz. İçerik döndüğünde bu satır da geri eklenecek.
+  "/privacy",
+  "/distance-sales",
   "/cookies",
   "/refund-policy",
   "/seller-agreement",
