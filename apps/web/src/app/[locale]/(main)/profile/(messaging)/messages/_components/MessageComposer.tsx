@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import {
   XMarkIcon,
   PhotoIcon,
@@ -48,21 +48,28 @@ export default function MessageComposer({
    * yazı tipi/ölçek değiştiğinde 128px kimi temada 3, kimi temada 5 satıra denk
    * geliyordu.
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    const styles = window.getComputedStyle(el);
-    const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
-    const chrome =
-      Number.parseFloat(styles.paddingTop) +
-      Number.parseFloat(styles.paddingBottom) +
-      Number.parseFloat(styles.borderTopWidth) +
-      Number.parseFloat(styles.borderBottomWidth);
-    const maxHeight = lineHeight * MAX_COMPOSER_LINES + chrome;
 
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
-    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+    const resize = () => {
+      const styles = window.getComputedStyle(el);
+      const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
+      const chrome =
+        Number.parseFloat(styles.paddingTop) +
+        Number.parseFloat(styles.paddingBottom) +
+        Number.parseFloat(styles.borderTopWidth) +
+        Number.parseFloat(styles.borderBottomWidth);
+      const maxHeight = lineHeight * MAX_COMPOSER_LINES + chrome;
+
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+      el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
   }, [newMessage]);
 
   return (
@@ -132,7 +139,7 @@ export default function MessageComposer({
           }}
           placeholder={t("message.typeMessage")}
           maxLength={maxMessageLength}
-          className={`flex-1 resize-none rounded-xl ${contentWarning ? "border-warning-400 focus:border-warning-400 focus:ring-warning-400" : ""}`}
+          className={`min-h-10 flex-1 resize-none rounded-xl leading-5 ${contentWarning ? "border-warning-400 focus:border-warning-400 focus:ring-warning-400" : ""}`}
         />
         <Button
           type="button"
