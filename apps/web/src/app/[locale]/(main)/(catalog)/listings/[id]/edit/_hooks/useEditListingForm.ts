@@ -209,6 +209,8 @@ export function useEditListingForm({
   return {
     form,
     onSubmit,
+    /** Kaydın kendisi — bağlı listeleri slug'la hemen açabilmek için. */
+    record: listingQuery.data?.edit ?? null,
     saleData,
     setSaleData,
     imagePreviewUrls,

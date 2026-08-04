@@ -57,6 +57,24 @@ export interface ProductEditProjection {
   brandId: string | null;
   carModelId: string | null;
   manufacturerId: string | null;
+  /**
+   * Markanın ve üreticinin slug'ı.
+   *
+   * Bunlara bağlı listeler (araç modelleri, üreticiye özel nitelikler) slug ile
+   * çekiliyor. Slug kayıtta dönmeyince istemci önce marka listesinin gelmesini
+   * bekleyip id'den slug'a çevirmek zorunda kalıyordu: model seçimi ilanın bir
+   * TAM tur ardından doluyor, form geç akıyormuş gibi görünüyordu.
+   */
+  brandSlug: string | null;
+  manufacturerSlug: string | null;
+  /**
+   * Ürünün araç modelinin adı.
+   *
+   * Model listesi markaya bağlı ayrı bir istekle gelir; form açıldığında o liste
+   * henüz yoktur ve seçim boş görünür. Ad kayıtla birlikte geldiğinde alan
+   * doğru etiketle AÇILIR, liste arkadan tamamlanır.
+   */
+  carModelName: string | null;
   condition: string | null;
   status: string | null;
   modelCode: string | null;
@@ -108,6 +126,9 @@ export function buildProductEditProjection(
     brandId: product.brandId ?? product.brand?.id ?? null,
     carModelId: product.carModelId ?? product.carModel?.id ?? null,
     manufacturerId: product.manufacturerId ?? product.manufacturer?.id ?? null,
+    brandSlug: product.brand?.slug ?? null,
+    manufacturerSlug: product.manufacturer?.slug ?? null,
+    carModelName: product.carModel?.name ?? null,
     condition: product.condition ?? null,
     status: product.status ?? null,
     modelCode: product.modelCode ?? null,

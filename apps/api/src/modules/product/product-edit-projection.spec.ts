@@ -119,6 +119,29 @@ describe("buildProductEditProjection", () => {
     expect(edit.manufacturerId).toBe("man1");
   });
 
+  it("bağlı listeleri BEKLETMEMEK için marka/üretici slug'ını da verir", () => {
+    // Bunlar olmayınca istemci, model listesini çekmek için önce marka
+    // listesinin gelip id'den slug'a çevrilmesini bekliyordu (fazladan tam tur).
+    const edit = buildProductEditProjection(
+      product({
+        brand: { id: "brand1", slug: "hot-wheels" },
+        manufacturer: { id: "man1", slug: "mattel" },
+        carModel: { id: "model1", name: "Camaro" },
+      }),
+      { imageUrl },
+    );
+    expect(edit.brandSlug).toBe("hot-wheels");
+    expect(edit.manufacturerSlug).toBe("mattel");
+    // Model listesi gelene kadar alanın doğru etiketle açılması için.
+    expect(edit.carModelName).toBe("Camaro");
+  });
+
+  it("ilişki yüklenmemişse slug null kalır", () => {
+    const edit = buildProductEditProjection(product(), { imageUrl });
+    expect(edit.brandSlug).toBeNull();
+    expect(edit.manufacturerSlug).toBeNull();
+  });
+
   it("ilişki kimliği kolonda yoksa ilişkiden çözülür", () => {
     const edit = buildProductEditProjection(
       product({

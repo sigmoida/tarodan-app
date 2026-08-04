@@ -58,6 +58,11 @@ export interface ListingEditPayload {
   brandId: string | null;
   carModelId: string | null;
   manufacturerId: string | null;
+  /** Bağlı listeleri (araç modelleri, üretici nitelikleri) BEKLETMEDEN çekmek için. */
+  brandSlug: string | null;
+  manufacturerSlug: string | null;
+  /** Model listesi gelene kadar alanın doğru etiketle açılması için. */
+  carModelName: string | null;
   condition: string | null;
   status: string | null;
   modelCode: string | null;
