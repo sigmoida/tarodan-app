@@ -13,12 +13,13 @@ import {
   OptionsCard,
   PricingCard,
   ImagesCard,
+  DiscountCard,
+  ManufacturerAttributesCard,
 } from "@/components/listings/form";
 import {
   NewListingProvider,
   useNewListing,
 } from "./_context/NewListingContext";
-import ManufacturerAttributesSection from "./_sections/ManufacturerAttributesSection";
 import SubmitBar from "./_sections/SubmitBar";
 import { LimitBanner, BankGate } from "./_sections/ListingBanners";
 import NewListingTour from "./_components/NewListingTour";
@@ -49,6 +50,11 @@ function NewListingLayout() {
     uploadingImages,
     handleFileUpload,
     removeImage,
+    manufacturerAttrGroups,
+    saleData,
+    setSaleData,
+    showDiscountSection,
+    setShowDiscountSection,
   } = useNewListing();
 
   if (authLoading) {
@@ -94,7 +100,10 @@ function NewListingLayout() {
               yearOptions={yearOptions}
             />
           </div>
-          <ManufacturerAttributesSection />
+          <ManufacturerAttributesCard
+            manufacturerList={manufacturerList}
+            manufacturerAttrGroups={manufacturerAttrGroups}
+          />
           <OptionsCard locale={locale} canTrade={!!limits?.canTrade} />
           <div data-tour="listing-pricing">
             <PricingCard
@@ -105,6 +114,15 @@ function NewListingLayout() {
               quantityHelper={t("product.quantityDefaultHint")}
             />
           </div>
+          {/* İndirim: düzenleme ekranıyla AYNI bölüm — satıcı ilanı indirimli
+              açabilsin (eskiden önce yayınlayıp sonra düzenlemeye girmesi
+              gerekiyordu). */}
+          <DiscountCard
+            saleData={saleData}
+            setSaleData={setSaleData}
+            showDiscountSection={showDiscountSection}
+            setShowDiscountSection={setShowDiscountSection}
+          />
           <div data-tour="listing-images">
             <ImagesCard
               maxImages={limits?.maxImagesPerListing || 3}

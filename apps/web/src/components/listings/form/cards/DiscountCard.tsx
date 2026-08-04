@@ -10,23 +10,36 @@ import {
   ReceiptPercentIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button, DatePicker, Input } from "@tarodan/ui";
-import type { SaleData } from "../_lib/types";
 
-interface DiscountSectionProps {
+/**
+ * İlan indirimi — yeni ilan ve düzenleme formlarının ORTAK bölümü.
+ *
+ * Eskiden yalnız düzenleme ekranındaydı: satıcı ilanı indirimli açamıyor, önce
+ * yayınlayıp sonra düzenlemeye girmek zorunda kalıyordu.
+ */
+export interface SaleData {
+  originalPrice: string;
+  salePrice: string;
+  saleStartDate: string;
+  saleEndDate: string;
+}
+
+interface DiscountCardProps {
   saleData: SaleData;
   setSaleData: Dispatch<SetStateAction<SaleData>>;
   showDiscountSection: boolean;
   setShowDiscountSection: Dispatch<SetStateAction<boolean>>;
-  productDiscounts: any[];
+  /** Ürüne uygulanmış kampanyalar — yalnız düzenleme ekranında bilinir. */
+  productDiscounts?: any[];
 }
 
-export default function DiscountSection({
+export default function DiscountCard({
   saleData,
   setSaleData,
   showDiscountSection,
   setShowDiscountSection,
-  productDiscounts,
-}: DiscountSectionProps) {
+  productDiscounts = [],
+}: DiscountCardProps) {
   const t = useTranslations();
   const { watch } = useFormContext();
   const price = (watch("price") as string) || "";

@@ -302,6 +302,11 @@ export class ProductController {
   @Get("my/:id")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  // Düzenleme ekranını besleyen uç: bayat yanıt, satıcının o an geçerli olmayan
+  // değerleri geri kaydetmesi demek. Tarayıcının sezgisel önbelleği ve araya
+  // giren proxy'ler kapatılır (`/products` ve `/products/popular` ile aynı).
+  @Header("Cache-Control", "no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
   @ApiOperation({ summary: "Kendi ürünüm (düzenleme için)" })
   @ApiParam({ name: "id", description: "Product UUID" })
   @ApiResponse({ status: 200, description: "Ürün detayı" })

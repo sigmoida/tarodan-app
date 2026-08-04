@@ -34,6 +34,14 @@ export class ProductCommonService {
   ) {}
 
   /**
+   * Ürün görselinin herkese açık URL'i. Depolama erişimi bu serviste toplanır;
+   * çağıranlar StorageService'e ayrıca bağlanmasın diye dışa açılır.
+   */
+  publicAssetUrl(key: string): string {
+    return this.storageService.getPublicAssetUrl(key);
+  }
+
+  /**
    * Format product response (tekil). N+1 giderme (#67): tekil = tek-elemanlı batch.
    * Batch fetch + yanıt kurma tek otoritede (formatProductResponseMany / buildProductResponse)
    * → liste ve tekil yol arasında şekil/değer drift'i imkânsız.

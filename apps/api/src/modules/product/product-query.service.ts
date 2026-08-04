@@ -17,6 +17,7 @@ import { ACTIVE_TRADE_STATUSES } from "../trade/trade.constants";
 import { tradeCapableSellerWhere } from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductCommonService } from "./product-common.service";
+import { buildProductEditProjection } from "./product-edit-projection";
 
 /**
  * ProductQueryService — ürün okuma/listeleme (findAll ES/PG akışı, popüler, tekil
@@ -699,7 +700,18 @@ export class ProductQueryService {
       throw new ForbiddenException(i18nMessage("server.product.viewForbidden"));
     }
 
-    return await this.common.formatProductResponse(product);
+    const formatted = await this.common.formatProductResponse(product);
+    // Üst seviye GÖSTERİM projeksiyonudur (ilan detayında sahibin görünümü onu
+    // kullanır); `edit` ise kaydın ham hâlidir ve düzenleme formunu tek başına
+    // doldurur. İkisi ayrı olmazsa form, kampanya uygulanmış fiyatı ürünün
+    // fiyatı sanıyor ve kargo boyutu gibi hiç dönmeyen alanları varsayılana
+    // düşürüyordu. Bkz. `product-edit-projection.ts`.
+    return {
+      ...formatted,
+      edit: buildProductEditProjection(product, {
+        imageUrl: (key: string) => this.common.publicAssetUrl(key),
+      }),
+    };
   }
 
   /**

@@ -22,6 +22,7 @@ import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
 import { ProductStatsService } from "./product-stats.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
+import { resolveCreateSalePricing } from "./helpers/product-sale-pricing";
 import { sellerAutoEnableData } from "./helpers/seller-auto-enable.helper";
 
 /**
@@ -263,6 +264,14 @@ export class ProductCreateService {
     );
     const FRESH_POPULARITY_BASELINE = 10;
 
+    const salePricing = resolveCreateSalePricing({
+      price: dto.price,
+      originalPrice: dto.originalPrice,
+      salePrice: dto.salePrice,
+      saleStartDate: dto.saleStartDate,
+      saleEndDate: dto.saleEndDate,
+    });
+
     try {
       const product = await this.prisma.product.create({
         data: {
@@ -270,7 +279,12 @@ export class ProductCreateService {
           categoryId: dto.categoryId,
           title: dto.title,
           description: dto.description,
-          price: dto.price,
+          // `price` güncel satış fiyatı, `oldPrice` indirim öncesi (çizili)
+          // fiyattır — güncelleme yoluyla aynı kural.
+          price: salePricing.price,
+          oldPrice: salePricing.oldPrice,
+          saleStartDate: salePricing.saleStartDate,
+          saleEndDate: salePricing.saleEndDate,
           condition: dto.condition,
           status: ProductStatus.pending, // Needs admin approval
           quantity: dto.quantity !== undefined ? dto.quantity : 1, // default 1 adet; sınırsız (null) yalnızca açıkça istenince

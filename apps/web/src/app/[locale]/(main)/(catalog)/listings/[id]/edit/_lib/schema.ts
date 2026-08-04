@@ -21,6 +21,8 @@ export const editListingSchema = z
     isPreorder: z.boolean(),
     images: z.array(listingImageSchema),
     status: z.string(),
+    // Üreticiye özel nitelikler — yeni ilan formunda da var.
+    customAttributes: z.record(z.string(), z.array(z.string())),
   })
   .superRefine(bundleSizeRefine(msg.setSize));
 
@@ -32,4 +34,5 @@ export const emptyEditValues: EditListingValues = {
   isPreorder: false,
   images: [],
   status: "active",
+  customAttributes: {},
 };

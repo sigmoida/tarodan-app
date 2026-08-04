@@ -22,12 +22,14 @@ import {
   useCarModels,
   useCommissionPreview,
   useListingImageUpload,
+  useManufacturerAttributes,
+  DiscountCard,
+  ManufacturerAttributesCard,
 } from "@/components/listings/form";
 import { useEditListingForm } from "./_hooks/useEditListingForm";
 import { useProductDiscounts } from "./_hooks/useProductDiscounts";
 import { useListingLifecycle } from "./_hooks/useListingLifecycle";
 import StatusBanners from "./_sections/StatusBanners";
-import DiscountSection from "./_sections/DiscountSection";
 import DeleteListingModal from "./_modals/DeleteListingModal";
 
 const TERMINAL_STATUSES = ["sold", "reserved", "inactive", "deleted"];
@@ -71,6 +73,13 @@ export default function EditListingClient() {
   } = useListingFilters(catalogEnabled);
   const selectedBrandSlug = brands.find((b) => b.id === brandId)?.slug;
   const { models, modelsLoading } = useCarModels(selectedBrandSlug);
+  const manufacturerId = form.watch("manufacturerId");
+  const selectedManufacturerSlug = manufacturerList.find(
+    (m) => m.id === manufacturerId,
+  )?.slug;
+  const { manufacturerAttrGroups } = useManufacturerAttributes(
+    selectedManufacturerSlug,
+  );
   const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
     price,
     categoryId,
@@ -188,11 +197,16 @@ export default function EditListingClient() {
           manufacturerList={manufacturerList}
           yearOptions={getYearOptions()}
         />
-        <OptionsCard
-          locale={locale}
-          canTrade={!!limits?.canTrade}
-          showPreorder
+        {/* Üretici nitelikleri: yeni ilan formunda vardı, burada yoktu —
+            satıcı seçimlerini göremiyor, kaydedince hepsi siliniyordu. */}
+        <ManufacturerAttributesCard
+          manufacturerList={manufacturerList}
+          manufacturerAttrGroups={manufacturerAttrGroups}
         />
+        {/* Ön sipariş anahtarı YOK: yeni ilan formunda da bulunmuyor, iki form
+            aynı alan kümesini göstermeli. Kolon DB'de durur; bu ekran ona
+            dokunmaz (payload'a da girmez). */}
+        <OptionsCard locale={locale} canTrade={!!limits?.canTrade} />
         <PricingCard
           locale={locale}
           commissionPreview={commissionPreview}
@@ -200,7 +214,7 @@ export default function EditListingClient() {
           quantityPlaceholder={t("membership.unlimited")}
           quantityHelper={t("product.leaveEmptyUnlimitedStock")}
         />
-        <DiscountSection
+        <DiscountCard
           saleData={saleData}
           setSaleData={setSaleData}
           showDiscountSection={showDiscountSection}

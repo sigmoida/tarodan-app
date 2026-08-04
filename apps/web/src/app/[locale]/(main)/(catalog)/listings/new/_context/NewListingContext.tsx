@@ -34,6 +34,11 @@ import {
   useCommissionPreview,
 } from "@/components/listings/form/queries";
 import { useListingImageUpload } from "@/components/listings/form/useListingImageUpload";
+import {
+  createEmptySaleData,
+  saleDataToPayload,
+  type SaleData,
+} from "@/components/listings/form";
 
 function useNewListingValue() {
   const router = useRouter();
@@ -131,6 +136,11 @@ function useNewListingValue() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manufacturerId, manufacturerList]);
 
+  // İndirimli açılış: satıcı ilanı yayınlarken indirim tanımlayabilir (eskiden
+  // önce yayınlayıp sonra düzenlemeye girmek zorundaydı).
+  const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
+  const [showDiscountSection, setShowDiscountSection] = useState(false);
+
   const { uploadingImages, handleFileUpload, removeImage } =
     useListingImageUpload({
       form,
@@ -175,6 +185,7 @@ function useNewListingValue() {
             ? Number(values.bundleSize)
             : undefined,
         quantity: values.quantity !== "" ? Number(values.quantity) : 1,
+        ...saleDataToPayload(saleData, Number(values.price)),
         shippingPackageTier: values.shippingPackageTier,
         images: values.images.length > 0 ? values.images : undefined,
         attributes:
@@ -222,6 +233,10 @@ function useNewListingValue() {
     modelsLoading,
     manufacturerList,
     manufacturerAttrGroups,
+    saleData,
+    setSaleData,
+    showDiscountSection,
+    setShowDiscountSection,
     listingLimits,
     limitsLoading,
     commissionPreview,

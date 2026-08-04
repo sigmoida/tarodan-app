@@ -6,11 +6,29 @@ import { useFormContext } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { Button, Select } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
-import { useNewListing } from "../_context/NewListingContext";
 
-export default function ManufacturerAttributesSection() {
+interface ManufacturerAttributeGroup {
+  slug: string;
+  name: string;
+  attributes: Array<{ slug: string; label: string; color?: string | null }>;
+}
+
+interface ManufacturerAttributesCardProps {
+  manufacturerList: Array<{ id: string; name: string }>;
+  manufacturerAttrGroups: ManufacturerAttributeGroup[];
+}
+
+/**
+ * Üreticiye özel nitelikler (ör. Hot Wheels serisi/nadirlik).
+ *
+ * Context yerine props alır: yeni ilan ve düzenleme formlarının ikisi de aynı
+ * bölümü gösterir, ikisi de kendi veri kaynağından besler.
+ */
+export default function ManufacturerAttributesCard({
+  manufacturerList,
+  manufacturerAttrGroups,
+}: ManufacturerAttributesCardProps) {
   const t = useTranslations();
-  const { manufacturerList, manufacturerAttrGroups } = useNewListing();
   const { watch, setValue } = useFormContext();
   const manufacturerId = watch("manufacturerId");
   const customAttributes: Record<string, string[]> =
