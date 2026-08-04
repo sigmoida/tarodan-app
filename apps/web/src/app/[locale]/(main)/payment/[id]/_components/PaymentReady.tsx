@@ -2,12 +2,14 @@
 
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Link } from "@/i18n/navigation";
-import { LockClosedIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { XCircleIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/ui";
 import CardPaymentSection from "@/components/payment/CardPaymentSection";
+import DistanceSalesConsent from "@/components/payment/DistanceSalesConsent";
 import { useCardPayment, type PaymentTarget } from "@/hooks/useCardPayment";
 import AmountSummaryCard, { type TradePricingLines } from "./AmountSummaryCard";
 
@@ -25,10 +27,10 @@ interface PaymentReadyProps {
 
 /**
  * Ödemeye hazır ekran — checkout ile AYNI iskelet: solda kart bilgileri,
- * sağda yapışkan özet sütunu (tutar + "Güvenli Öde" + vazgeç). İki ekranın
- * tek farkı verinin yönü: burada sipariş ve ödeme kaydı ZATEN vardır, hedef
- * çözücü hazır id'leri döndürür; checkout'ta aynı bölüm siparişi submit
- * anında oluşturur.
+ * sağda yapışkan özet sütunu (tutar + sözleşme onayı + "Ödeme Yap" + vazgeç).
+ * İki ekranın tek farkı verinin yönü: burada sipariş ve ödeme kaydı ZATEN
+ * vardır, hedef çözücü hazır id'leri döndürür; checkout'ta aynı bölüm siparişi
+ * submit anında oluşturur.
  */
 export default function PaymentReady({
   target,
@@ -41,17 +43,15 @@ export default function PaymentReady({
   cancelling,
   retry,
 }: PaymentReadyProps) {
+  const t = useTranslations();
   const resolvePayment = useCallback(
     async () => ({ paymentId, target }),
     [paymentId, target],
   );
   const card = useCardPayment({ cardStorageEnabled, resolvePayment });
   const { processing, loadingCards, submit } = card;
-
-  const amountLabel =
-    amount != null
-      ? `${amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`
-      : null;
+  // Checkout ile aynı ön koşul: sözleşme onaylanmadan tahsilat başlatılmaz.
+  const [distanceSalesAccepted, setDistanceSalesAccepted] = useState(false);
 
   return (
     <div className="grid gap-8 lg:grid-cols-3">
@@ -77,25 +77,22 @@ export default function PaymentReady({
           <AmountSummaryCard amount={amount} pricing={pricing} />
 
           {hasTarget && (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <DistanceSalesConsent
+                checked={distanceSalesAccepted}
+                onChange={setDistanceSalesAccepted}
+              />
               <Button
                 onClick={submit}
-                disabled={processing || loadingCards}
+                disabled={processing || loadingCards || !distanceSalesAccepted}
                 isLoading={processing}
                 size="lg"
                 className="w-full"
               >
-                {processing ? (
-                  "İşleniyor…"
-                ) : (
-                  <span className="flex items-center justify-center gap-2">
-                    <LockClosedIcon className="h-5 w-5" />
-                    {amountLabel ? `${amountLabel} Güvenli Öde` : "Güvenli Öde"}
-                  </span>
-                )}
+                {processing ? "İşleniyor…" : t("checkout.payNow")}
               </Button>
               <Button
-                variant="ghost"
+                variant="outline"
                 className="w-full"
                 onClick={onCancel}
                 isLoading={cancelling}
@@ -106,8 +103,8 @@ export default function PaymentReady({
             </div>
           )}
 
-          <div className="rounded-xl border border-info-200 bg-info-50 p-4">
-            <p className="text-sm text-info-800">
+          <div className="rounded-xl border border-warning-200 bg-warning-50 p-4">
+            <p className="text-sm text-warning-800">
               <strong>Yardıma mı ihtiyacınız var?</strong> Ödeme sırasında sorun
               yaşarsanız, lütfen{" "}
               <Link href="/support" className="font-medium underline">

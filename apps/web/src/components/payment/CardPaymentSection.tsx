@@ -2,13 +2,7 @@
 
 "use client";
 
-import {
-  ShieldCheckIcon,
-  LockClosedIcon,
-  CheckCircleIcon,
-  PlusIcon,
-} from "@heroicons/react/24/outline";
-import { Badge, Button, Spinner } from "@tarodan/ui";
+import { Button, Spinner } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import type { useCardPayment } from "@/hooks/useCardPayment";
 import { NEW_CARD } from "./card";
@@ -59,32 +53,22 @@ export default function CardPaymentSection({
     <SectionCard
       title={title}
       action={
-        loadingCards ? undefined : hasSavedCards ? (
-          usingNewCard ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelected(cards[0].id)}
-            >
-              Kayıtlı Kart İle Öde
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelected(NEW_CARD)}
-            >
-              <PlusIcon className="h-4 w-4" />
-              Kart Ekle
-            </Button>
-          )
-        ) : (
-          <Badge
-            variant="success"
-            icon={<LockClosedIcon className="h-3.5 w-3.5" />}
+        loadingCards || !hasSavedCards ? undefined : usingNewCard ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelected(cards[0].id)}
           >
-            Güvenli
-          </Badge>
+            Kayıtlı Kart İle Öde
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelected(NEW_CARD)}
+          >
+            Kart Ekle
+          </Button>
         )
       }
     >
@@ -112,20 +96,6 @@ export default function CardPaymentSection({
       )}
 
       {children}
-
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted">
-        <span className="inline-flex items-center gap-1.5">
-          <ShieldCheckIcon className="h-4 w-4 text-success-500" /> 256-bit SSL
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <CheckCircleIcon className="h-4 w-4 text-success-500" /> PayTR
-          güvencesi
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <LockClosedIcon className="h-4 w-4 text-success-500" /> Kart verileri
-          PayTR korumasında
-        </span>
-      </div>
     </SectionCard>
   );
 }

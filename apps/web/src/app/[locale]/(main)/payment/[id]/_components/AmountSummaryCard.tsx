@@ -1,6 +1,5 @@
 /** @format */
 
-import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Badge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/ui";
@@ -71,10 +70,6 @@ export default function AmountSummaryCard({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-2 border-t border-success-200/60 bg-success-50 px-6 py-3 text-sm text-muted">
-        <ShieldCheckIcon className="h-5 w-5 shrink-0 text-success-500" />
-        <span>256-bit SSL ile şifrelenmiş, PayTR güvenceli güvenli ödeme</span>
-      </div>
     </SectionCard>
   );
 }

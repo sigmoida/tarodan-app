@@ -26,7 +26,7 @@ export default function OrderItemsCard() {
   return (
     <SectionCard title={t("checkout.orderSummary")}>
       {isBuyNow && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg bg-info-50 p-3 text-sm text-info-800">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
           <InformationCircleIcon className="mt-0.5 h-5 w-5 shrink-0" />
           <span>{t("checkout.buyNowNotice")}</span>
         </div>

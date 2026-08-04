@@ -6,7 +6,6 @@ import { useRouter } from "@/i18n/navigation";
 import { XCircleIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
-import { Container } from "@/components/layout/Container";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { usePaymentStatus } from "../_hooks/usePaymentStatus";
 import PaymentReady from "./PaymentReady";
@@ -67,21 +66,19 @@ export default function PaymentPageClient() {
 
   return (
     <PageShell>
-      <Container className="pt-4">
-        <PaymentReady
-          target={directTarget}
-          paymentId={payment.id}
-          amount={payment.amount}
-          // Kalemler yalnız takas ödemesinde döner (grup/sipariş ödemesinin
-          // kendi özeti sepet ekranındadır).
-          pricing={payment.tradeId ? payment.pricing : null}
-          cardStorageEnabled={cardStorageEnabled}
-          hasTarget={hasTarget}
-          onCancel={handleCancel}
-          cancelling={cancelling}
-          retry={retry}
-        />
-      </Container>
+      <PaymentReady
+        target={directTarget}
+        paymentId={payment.id}
+        amount={payment.amount}
+        // Kalemler yalnız takas ödemesinde döner (grup/sipariş ödemesinin
+        // kendi özeti sepet ekranındadır).
+        pricing={payment.tradeId ? payment.pricing : null}
+        cardStorageEnabled={cardStorageEnabled}
+        hasTarget={hasTarget}
+        onCancel={handleCancel}
+        cancelling={cancelling}
+        retry={retry}
+      />
     </PageShell>
   );
 }
