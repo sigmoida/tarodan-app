@@ -1,7 +1,7 @@
 import {
   PrismaClient,
   AdminRole,
-  CommissionRuleType,
+  CommissionRuleSetStatus,
   SellerType,
   CommissionSellerType,
   MembershipTierType,
@@ -29,6 +29,8 @@ import {
   OrderCancellationType,
   ElogoInvoiceType,
   ElogoInvoiceStatus,
+  ShippingTariffStatus,
+  CouponReservationStatus,
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
@@ -51,6 +53,8 @@ import {
   billableDesiForTier,
   tierCodeForDesi,
 } from "../src/modules/shipping/shipping-package-tier";
+import { SEED_COMMISSION_PROFILES, SEED_SHIPPING_TIERS } from "./seed-config";
+import { findMatchingCommissionRule } from "../src/modules/order/order-commission.helper";
 const prisma = new PrismaClient();
 
 // Initialize StorageService for seed script
@@ -176,6 +180,23 @@ async function copySeedCollectionCover(
 }
 
 async function main() {
+  const existingSeedActors = await prisma.user.count({
+    where: {
+      email: {
+        in: [
+          "admin@tarodan.com",
+          "moderator@tarodan.com",
+          "platform@tarodan.com",
+        ],
+      },
+    },
+  });
+  if (existingSeedActors > 0) {
+    throw new Error(
+      "Comprehensive seed yalnız boş/resetlenmiş test veritabanında çalışır. Mevcut seed verisine kısmi kayıt eklenmedi.",
+    );
+  }
+
   console.log("🌱 Starting COMPREHENSIVE database seed...");
   console.log("📦 This will create a large dataset for testing ALL features\n");
 
@@ -244,8 +265,9 @@ async function main() {
           description: cat.description ?? undefined,
           sortOrder: cat.sortOrder,
           parentId: null,
+          isActive: false,
         },
-        create: { ...cat, parentId: null },
+        create: { ...cat, parentId: null, isActive: false },
       }),
     ),
   );
@@ -1109,87 +1131,132 @@ async function main() {
   // ==========================================================================
   console.log("Creating commission rules...");
 
-  const commissionRules = await Promise.all([
-    prisma.commissionRule.upsert({
-      where: { id: "default-rule" },
-      update: {},
-      create: {
-        id: "default-rule",
-        name: "Varsayılan Komisyon",
-        ruleType: CommissionRuleType.default,
-        sellerType: CommissionSellerType.ALL,
-        appliesTo: "SELLER",
-        sellerRate: 5.0,
-        percentage: 0.05,
-        priority: 0,
-        isActive: true,
-      },
-    }),
-    prisma.commissionRule.upsert({
-      where: { id: "vintage-rule" },
-      update: {},
-      create: {
-        id: "vintage-rule",
-        name: "Vintage Komisyonu",
-        ruleType: CommissionRuleType.category,
-        categoryId: categories.find((c) => c.slug === "araba")?.id,
-        sellerType: CommissionSellerType.ALL,
-        appliesTo: "SELLER",
-        sellerRate: 7.0,
-        percentage: 0.07,
-        priority: 5,
-        isActive: true,
-      },
-    }),
-    prisma.commissionRule.upsert({
-      where: { id: "f1-rule" },
-      update: {},
-      create: {
-        id: "f1-rule",
-        name: "F1 Komisyonu",
-        ruleType: CommissionRuleType.category,
-        categoryId: categories.find((c) => c.slug === "motorspor")?.id,
-        sellerType: CommissionSellerType.ALL,
-        appliesTo: "SELLER",
-        sellerRate: 8.0,
-        percentage: 0.08,
-        priority: 5,
-        isActive: true,
-      },
-    }),
-    prisma.commissionRule.upsert({
-      where: { id: "platform-rule" },
-      update: {},
-      create: {
-        id: "platform-rule",
-        name: "Platform Satıcı",
-        ruleType: CommissionRuleType.seller_type,
-        sellerType: CommissionSellerType.BUSINESS,
-        appliesTo: "SELLER",
-        sellerRate: 0.0,
-        percentage: 0.0,
-        priority: 10,
-        isActive: true,
-      },
-    }),
-    prisma.commissionRule.upsert({
-      where: { id: "verified-rule" },
-      update: {},
-      create: {
-        id: "verified-rule",
-        name: "Onaylı Satıcı İndirimi",
-        ruleType: CommissionRuleType.seller_type,
-        sellerType: CommissionSellerType.FREE,
-        appliesTo: "SELLER",
-        sellerRate: 4.0,
-        percentage: 0.04,
-        priority: 3,
-        isActive: true,
-      },
-    }),
-  ]);
+  const commissionRuleSet = await prisma.commissionRuleSet.upsert({
+    where: { id: "local-commission-set-v1" },
+    update: {},
+    create: {
+      id: "local-commission-set-v1",
+      name: "Yerel Tam Kapsam v1",
+      version: 1,
+      status: CommissionRuleSetStatus.ACTIVE,
+      publishedAt: new Date(),
+      publishedBy: "seed",
+    },
+  });
+  const commissionRules = [];
+  for (const category of categories) {
+    for (const profile of SEED_COMMISSION_PROFILES) {
+      const id = `local-rule-${category.id}-${profile.key}`;
+      commissionRules.push(
+        await prisma.commissionRule.upsert({
+          where: { id },
+          update: {
+            name: `${category.name} / ${profile.label}`,
+            categoryId: category.id,
+            sellerType: profile.sellerType,
+            minAmount: profile.minAmount,
+            maxAmount: profile.maxAmount,
+            buyerCommissionRate: profile.buyerCommissionRate,
+            buyerCommissionMin: profile.buyerCommissionMin,
+            buyerCommissionMax: profile.buyerCommissionMax,
+            buyerServiceFeeRate: profile.buyerServiceFeeRate,
+            buyerServiceFeeMin: profile.buyerServiceFeeMin,
+            buyerServiceFeeMax: profile.buyerServiceFeeMax,
+            sellerCommissionRate: profile.sellerCommissionRate,
+            sellerCommissionMin: profile.sellerCommissionMin,
+            sellerCommissionMax: profile.sellerCommissionMax,
+            sellerPlatformFeeRate: profile.sellerPlatformFeeRate,
+            sellerPlatformFeeMin: profile.sellerPlatformFeeMin,
+            sellerPlatformFeeMax: profile.sellerPlatformFeeMax,
+            tradeFeeSellerAmount: profile.tradeFeeSellerAmount,
+            tradeFeeBuyerAmount: profile.tradeFeeBuyerAmount,
+            shippingBuyerShare: profile.shippingShares.small,
+            shippingShares: {
+              deleteMany: {},
+              create: Object.entries(profile.shippingShares).map(
+                ([tierCode, buyerShare]) => ({
+                  tierCode: tierCode as keyof typeof profile.shippingShares,
+                  buyerShare,
+                }),
+              ),
+            },
+          },
+          create: {
+            id,
+            ruleSetId: commissionRuleSet.id,
+            name: `${category.name} / ${profile.label}`,
+            categoryId: category.id,
+            sellerType: profile.sellerType,
+            minAmount: profile.minAmount,
+            maxAmount: profile.maxAmount,
+            buyerCommissionRate: profile.buyerCommissionRate,
+            buyerCommissionMin: profile.buyerCommissionMin,
+            buyerCommissionMax: profile.buyerCommissionMax,
+            buyerServiceFeeRate: profile.buyerServiceFeeRate,
+            buyerServiceFeeMin: profile.buyerServiceFeeMin,
+            buyerServiceFeeMax: profile.buyerServiceFeeMax,
+            sellerCommissionRate: profile.sellerCommissionRate,
+            sellerCommissionMin: profile.sellerCommissionMin,
+            sellerCommissionMax: profile.sellerCommissionMax,
+            sellerPlatformFeeRate: profile.sellerPlatformFeeRate,
+            sellerPlatformFeeMin: profile.sellerPlatformFeeMin,
+            sellerPlatformFeeMax: profile.sellerPlatformFeeMax,
+            tradeFeeSellerAmount: profile.tradeFeeSellerAmount,
+            tradeFeeBuyerAmount: profile.tradeFeeBuyerAmount,
+            shippingBuyerShare: profile.shippingShares.small,
+            shippingShares: {
+              create: Object.entries(profile.shippingShares).map(
+                ([tierCode, buyerShare]) => ({
+                  tierCode: tierCode as keyof typeof profile.shippingShares,
+                  buyerShare,
+                }),
+              ),
+            },
+          },
+        }),
+      );
+    }
+  }
 
   console.log(`✅ Created ${commissionRules.length} commission rules`);
+
+  await prisma.category.updateMany({
+    where: { id: { in: categories.map((category) => category.id) } },
+    data: { isActive: true },
+  });
+
+  const shippingTariff = await prisma.shippingTariff.upsert({
+    where: { provider_version: { provider: "surat", version: 1 } },
+    update: {
+      name: "Sürat Kargo Test Tarifesi",
+      status: ShippingTariffStatus.active,
+      freeShippingEnabled: false,
+      freeShippingThreshold: 999_999,
+      packageTiers: {
+        deleteMany: {},
+        create: SEED_SHIPPING_TIERS.map((tier) => ({ ...tier })),
+      },
+    },
+    create: {
+      provider: "surat",
+      name: "Sürat Kargo Test Tarifesi",
+      status: ShippingTariffStatus.active,
+      version: 1,
+      currency: "TRY",
+      freeShippingEnabled: false,
+      freeShippingThreshold: 999_999,
+      effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+      packageTiers: {
+        create: SEED_SHIPPING_TIERS.map((tier) => ({ ...tier })),
+      },
+    },
+    include: { packageTiers: true },
+  });
+  console.log(
+    `✅ Shipping tariff ${shippingTariff.name}: ${shippingTariff.packageTiers
+      .map((tier) => `${tier.code}=${tier.amount} TL`)
+      .join(", ")}`,
+  );
 
   // ==========================================================================
   // 4. Create Content Filters
@@ -1468,7 +1535,14 @@ async function main() {
   // Admin Users
   const superAdmin = await prisma.user.upsert({
     where: { email: "admin@tarodan.com" },
-    update: { passwordHash: adminPasswordHash },
+    update: {
+      passwordHash: adminPasswordHash,
+      isSeller: false,
+      sellerType: null,
+      companyName: null,
+      businessStatus: null,
+      taxId: null,
+    },
     create: {
       email: "admin@tarodan.com",
       phone: "+905550000001",
@@ -1482,7 +1556,14 @@ async function main() {
 
   const moderator = await prisma.user.upsert({
     where: { email: "moderator@tarodan.com" },
-    update: { passwordHash: adminPasswordHash },
+    update: {
+      passwordHash: adminPasswordHash,
+      isSeller: false,
+      sellerType: null,
+      companyName: null,
+      businessStatus: null,
+      taxId: null,
+    },
     create: {
       email: "moderator@tarodan.com",
       phone: "+905550000002",
@@ -1523,7 +1604,17 @@ async function main() {
   // Platform Seller
   const platformSeller = await prisma.user.upsert({
     where: { email: "platform@tarodan.com" },
-    update: {},
+    update: {
+      passwordHash,
+      displayName: "Tarodan Official Store",
+      isVerified: true,
+      isEmailVerified: true,
+      isSeller: true,
+      sellerType: SellerType.platform,
+      companyName: "Tarodan Platform Ticaret A.Ş.",
+      businessStatus: BusinessStatus.approved,
+      taxId: "9999999999",
+    },
     create: {
       email: "platform@tarodan.com",
       phone: "+905550000003",
@@ -1534,6 +1625,9 @@ async function main() {
       isEmailVerified: true,
       isSeller: true,
       sellerType: SellerType.platform,
+      companyName: "Tarodan Platform Ticaret A.Ş.",
+      businessStatus: BusinessStatus.approved,
+      taxId: "9999999999",
     },
   });
 
@@ -1608,7 +1702,6 @@ async function main() {
       bio: "Premium ve RLC modeller",
       seller: true,
       type: SellerType.verified,
-      companyName: "Premium Diecast Store",
     },
     {
       name: "Zeynep Hobici",
@@ -1689,7 +1782,15 @@ async function main() {
     const user = await prisma.user.upsert({
       where: { email: u.email },
       update: {
-        companyName: (u as any).companyName || undefined,
+        displayName: u.name,
+        bio: u.bio,
+        isVerified: true,
+        isEmailVerified: true,
+        isSeller: u.seller,
+        sellerType: u.type,
+        companyName: null,
+        businessStatus: null,
+        taxId: null,
       },
       create: {
         email: u.email,
@@ -1701,7 +1802,7 @@ async function main() {
         isEmailVerified: true,
         isSeller: u.seller,
         sellerType: u.type,
-        companyName: (u as any).companyName || null,
+        companyName: null,
       },
     });
     users.push(user);
@@ -1736,11 +1837,12 @@ async function main() {
 
   // Assign tiers to users
   const tierAssignments = [
+    { userId: users[2].id, tierId: businessTier.id }, // Platform - Business
     { userId: users[3].id, tierId: premiumTier.id }, // Ahmet - Premium
     { userId: users[4].id, tierId: basicTier.id }, // Mehmet - Basic
     { userId: users[5].id, tierId: premiumTier.id }, // Ayşe - Premium
     { userId: users[6].id, tierId: basicTier.id }, // Fatma - Basic
-    { userId: users[7].id, tierId: businessTier.id }, // Ali - Business
+    { userId: users[7].id, tierId: premiumTier.id }, // Ali - Premium
     { userId: users[8].id, tierId: freeTier.id }, // Zeynep - Free
     { userId: users[9].id, tierId: basicTier.id }, // Mustafa - Basic
     { userId: users[10].id, tierId: freeTier.id }, // Elif - Free
@@ -1784,6 +1886,19 @@ async function main() {
           ta.tierId === businessTier.id,
       )
       .map((ta) => ta.userId),
+  );
+  const commissionSellerTypeByUserId = new Map(
+    tierAssignments.map((assignment) => {
+      const sellerType =
+        assignment.tierId === businessTier.id
+          ? CommissionSellerType.BUSINESS
+          : assignment.tierId === premiumTier.id
+            ? CommissionSellerType.PREMIUM
+            : assignment.tierId === basicTier.id
+              ? CommissionSellerType.BASIC
+              : CommissionSellerType.FREE;
+      return [assignment.userId, sellerType] as const;
+    }),
   );
 
   // ==========================================================================
@@ -3110,7 +3225,8 @@ async function main() {
   ];
 
   const products: any[] = [];
-  const sellers = users.filter((u) => u.isSeller);
+  const marketplaceUsers = users.slice(2);
+  const sellers = marketplaceUsers.filter((u) => u.isSeller);
 
   // Count products per category to guarantee minimum 5 active per category
   const catProductCounts: Record<string, number> = {};
@@ -3245,19 +3361,19 @@ async function main() {
   );
 
   // ==========================================================================
-  // 10b. İndirim uygula (rastgele ~15 ürüne %10–30 indirim; oldPrice > price)
+  // 10b. İndirim uygula (deterministik 15 ürüne %10–30; oldPrice > price)
   // ==========================================================================
   const discountCount = Math.min(15, Math.floor(products.length * 0.2));
-  const indicesToDiscount = new Set<number>();
-  while (indicesToDiscount.size < discountCount) {
-    indicesToDiscount.add(Math.floor(Math.random() * products.length));
-  }
+  const indicesToDiscount = Array.from(
+    { length: discountCount },
+    (_, index) => (index * 6) % products.length,
+  );
   const saleStart = new Date();
   const saleEnd = new Date(saleStart.getTime() + 14 * 24 * 60 * 60 * 1000); // 2 hafta
-  for (const idx of indicesToDiscount) {
+  for (const [discountIndex, idx] of indicesToDiscount.entries()) {
     const p = products[idx];
     const originalPrice = Number(p.price);
-    const discountPct = Math.floor(Math.random() * (30 - 10 + 1) + 10);
+    const discountPct = [10, 15, 20, 25, 30][discountIndex % 5];
     const salePrice =
       Math.round(((originalPrice * (100 - discountPct)) / 100) * 100) / 100;
     if (salePrice >= originalPrice) continue;
@@ -3571,9 +3687,7 @@ async function main() {
 
   for (let i = 0; i < 35; i++) {
     const product = activeProducts[i % activeProducts.length];
-    const buyers = users.filter(
-      (u) => u.id !== product.sellerId && u.isSeller !== false,
-    );
+    const buyers = marketplaceUsers.filter((u) => u.id !== product.sellerId);
     const buyer = buyers[Math.floor(Math.random() * buyers.length)];
     const offerAmount = Number(product.price) * (0.6 + Math.random() * 0.35); // 60-95% of price
     const statuses = [
@@ -3698,7 +3812,10 @@ async function main() {
     if (!lines.length) continue;
 
     // Alıcı: sepetteki hiçbir satıcı olamaz.
-    const buyer = users.find((u) => !cartSellers.includes(u.id));
+    const buyerCandidates = marketplaceUsers.filter(
+      (u) => !cartSellers.includes(u.id),
+    );
+    const buyer = buyerCandidates[cartIndex % buyerCandidates.length];
     if (!buyer) continue;
     const buyerAddress = addresses.find((a) => a.userId === buyer.id);
     const shippingSnapshot = buyerAddress
@@ -4077,7 +4194,9 @@ async function main() {
     const sc = refundScenarios[i];
     const product = activeProducts[i % activeProducts.length];
     if (!product) continue;
-    const candidateBuyers = users.filter((u) => u.id !== product.sellerId);
+    const candidateBuyers = marketplaceUsers.filter(
+      (u) => u.id !== product.sellerId,
+    );
     if (candidateBuyers.length === 0) continue;
     const buyer = candidateBuyers[i % candidateBuyers.length];
     const buyerAddress = addresses.find((a) => a.userId === buyer.id);
@@ -4246,10 +4365,21 @@ async function main() {
 
     const status =
       tradeStatuses[Math.floor(Math.random() * tradeStatuses.length)];
-    const valueDiff = Math.abs(
+    const valueDiff = Math.round(
       Number(initiatorProduct.price) - Number(receiverProduct.price),
     );
-    const hasCash = valueDiff > 100;
+    const absoluteValueDiff = Math.abs(valueDiff);
+    const isHeadToHead = i % 2 === 0;
+    const hasCash = !isHeadToHead && absoluteValueDiff > 0;
+    const sharedTradeValue = Math.round(
+      (Number(initiatorProduct.price) + Number(receiverProduct.price)) / 2,
+    );
+    const initiatorTradeValue = isHeadToHead
+      ? sharedTradeValue
+      : Number(initiatorProduct.price);
+    const receiverTradeValue = isHeadToHead
+      ? sharedTradeValue
+      : Number(receiverProduct.price);
 
     try {
       const trade = await prisma.trade.create({
@@ -4258,12 +4388,14 @@ async function main() {
           initiatorId: initiatorProduct.sellerId,
           receiverId: receiverProduct.sellerId,
           status: status,
-          cashAmount: hasCash ? valueDiff * 0.5 : null,
+          pricingVersion: "v2",
+          cashAmount: hasCash ? absoluteValueDiff : null,
           cashPayerId: hasCash
             ? Number(initiatorProduct.price) < Number(receiverProduct.price)
               ? initiatorProduct.sellerId
               : receiverProduct.sellerId
             : null,
+          cashCommission: 0,
           initiatorMessage: `Merhaba! ${receiverProduct.title} için ${initiatorProduct.title} modelimi takas etmek istiyorum. İlgilenirseniz dönüş yapabilir misiniz?`,
           responseDeadline: randomFutureDate(3),
           acceptedAt:
@@ -4282,7 +4414,7 @@ async function main() {
           tradeId: trade.id,
           productId: initiatorProduct.id,
           side: "initiator",
-          valueAtTrade: initiatorProduct.price,
+          valueAtTrade: initiatorTradeValue,
         },
       });
 
@@ -4291,8 +4423,117 @@ async function main() {
           tradeId: trade.id,
           productId: receiverProduct.id,
           side: "receiver",
-          valueAtTrade: receiverProduct.price,
+          valueAtTrade: receiverTradeValue,
         },
+      });
+
+      const initiatorRule = findMatchingCommissionRule(commissionRules, {
+        categoryId: initiatorProduct.categoryId,
+        sellerType:
+          commissionSellerTypeByUserId.get(initiatorProduct.sellerId) ??
+          CommissionSellerType.FREE,
+        amount: initiatorTradeValue,
+      });
+      const receiverRule = findMatchingCommissionRule(commissionRules, {
+        categoryId: receiverProduct.categoryId,
+        sellerType:
+          commissionSellerTypeByUserId.get(receiverProduct.sellerId) ??
+          CommissionSellerType.FREE,
+        amount: receiverTradeValue,
+      });
+      const initiatorTradeFee =
+        Number(initiatorRule.tradeFeeSellerAmount) +
+        Number(receiverRule.tradeFeeBuyerAmount);
+      const receiverTradeFee =
+        Number(receiverRule.tradeFeeSellerAmount) +
+        Number(initiatorRule.tradeFeeBuyerAmount);
+
+      for (const [payerId, product, otherPartyId, tradeFeeAmount] of [
+        [
+          initiatorProduct.sellerId,
+          initiatorProduct,
+          receiverProduct.sellerId,
+          initiatorTradeFee,
+        ],
+        [
+          receiverProduct.sellerId,
+          receiverProduct,
+          initiatorProduct.sellerId,
+          receiverTradeFee,
+        ],
+      ] as const) {
+        if (status === TradeStatus.pending || status === TradeStatus.rejected) {
+          continue;
+        }
+        const packageAmount = Number(
+          SEED_SHIPPING_TIERS.find(
+            (tier) => tier.code === product.shippingPackageTier,
+          )?.amount ?? 100,
+        );
+        const shippingAmount = packageAmount * 2;
+        const cashDifference =
+          hasCash && trade.cashPayerId === payerId ? absoluteValueDiff : 0;
+        const paymentStatus =
+          status === TradeStatus.accepted
+            ? PaymentStatus.pending
+            : PaymentStatus.completed;
+        const cashPayment = await prisma.tradeCashPayment.create({
+          data: {
+            tradeId: trade.id,
+            payerId,
+            recipientId: cashDifference > 0 ? otherPartyId : null,
+            amount: cashDifference,
+            tradeFeeAmount,
+            shippingAmount,
+            commission: 0,
+            commissionTaxAmount: 0,
+            totalAmount: cashDifference + tradeFeeAmount + shippingAmount,
+            provider: "paytr",
+            providerPaymentId: `TRD-${randomUUID().substring(0, 8)}`,
+            status: paymentStatus,
+            paidAt:
+              paymentStatus === PaymentStatus.completed
+                ? randomPastDate(5)
+                : null,
+          },
+        });
+        await prisma.payment.create({
+          data: {
+            tradeCashPaymentId: cashPayment.id,
+            provider: "paytr",
+            providerPaymentId: cashPayment.providerPaymentId,
+            amount: cashPayment.totalAmount,
+            currency: "TRY",
+            status: paymentStatus,
+            paidAt: cashPayment.paidAt,
+          },
+        });
+      }
+
+      await prisma.tradeMessage.createMany({
+        data: [
+          {
+            tradeId: trade.id,
+            senderId: initiatorProduct.sellerId,
+            content: isHeadToHead
+              ? "Kafa kafaya takas teklif ediyorum; iki ürünü aynı değerde kabul edelim."
+              : `Aradaki ${absoluteValueDiff} TL farkı güvenli ödeme ile karşılayabilirim.`,
+          },
+          {
+            tradeId: trade.id,
+            senderId: receiverProduct.sellerId,
+            content:
+              status === TradeStatus.rejected
+                ? "Teklif için teşekkürler, bu kez kabul edemiyorum."
+                : "Ürün kondisyonlarını ve kutu detaylarını kontrol edip süreci başlatalım.",
+          },
+          {
+            tradeId: trade.id,
+            senderId: initiatorProduct.sellerId,
+            content:
+              "Kargo ve hizmet bedellerini gördüm; uygulama içinden devam ediyorum.",
+          },
+        ],
       });
 
       trades.push(trade);
@@ -4582,6 +4823,28 @@ async function main() {
           content:
             "Tabii, teklif yapabilirsiniz. Fotoğrafları da hemen gönderiyorum.",
         },
+        {
+          sender: user1.id,
+          receiver: user2.id,
+          content: "Kutuda ezik, boya hatası veya eksik aksesuar var mı?",
+        },
+        {
+          sender: user2.id,
+          receiver: user1.id,
+          content:
+            "Kutu temiz, yalnız sağ alt köşede çok hafif raf izi var. İlanda yakından fotoğrafı mevcut.",
+        },
+        {
+          sender: user1.id,
+          receiver: user2.id,
+          content: "Tamamdır, teklifimi uygulama üzerinden gönderdim.",
+        },
+        {
+          sender: user2.id,
+          receiver: user1.id,
+          content:
+            "Teklifi gördüm, kabul edersem güvenli ödeme üzerinden ilerleyelim.",
+        },
       ];
 
       for (let j = 0; j < messages.length; j++) {
@@ -4590,8 +4853,12 @@ async function main() {
             threadId: thread.id,
             senderId: messages[j].sender,
             receiverId: messages[j].receiver,
+            productId: product.id,
             content: messages[j].content,
-            status: MessageStatus.sent,
+            status: j === 5 ? MessageStatus.approved : MessageStatus.sent,
+            reviewedById: j === 5 ? moderator.id : null,
+            reviewedAt: j === 5 ? randomPastDate(2) : null,
+            readAt: j < messages.length - 2 ? randomPastDate(1) : null,
             createdAt: new Date(
               thread.lastMessageAt.getTime() - (messages.length - j) * 3600000,
             ),
@@ -4654,6 +4921,13 @@ async function main() {
       "Çok kaliteli",
       "Fena değil",
     ];
+    const reviews = [
+      "Ürün açıklamaya uygun, paketleme çok iyi yapılmış. Satıcıya teşekkürler.",
+      "Modelin boya ve tampon detayları fotoğraflardakinden daha iyi görünüyor.",
+      "Kutu köşesinde küçük bir raf izi vardı; ilan açıklamasında belirtildiği için sorun etmedim.",
+      "Kargo hızlıydı, blister ve kartonet ekstra korumayla gönderilmiş.",
+      "Fiyatına göre başarılı; koleksiyonda sergilemek için güzel bir parça.",
+    ];
 
     try {
       await prisma.productRating.create({
@@ -4663,8 +4937,7 @@ async function main() {
           orderId: order.id,
           score,
           title: titles[Math.floor(Math.random() * titles.length)],
-          review:
-            "Ürün açıklamaya uygun, paketleme çok iyi yapılmış. Satıcıya teşekkürler.",
+          review: reviews[i % reviews.length],
           isVerifiedPurchase: true,
           helpfulCount: Math.floor(Math.random() * 20),
           // Post-moderasyon akışıyla aynı (RatingService.createProductRating):
@@ -4676,6 +4949,39 @@ async function main() {
     } catch (e) {
       // Ignore duplicates
     }
+  }
+
+  // Teslim edilmiş siparişlerde moderasyon durumlarını da ürün bazında göster.
+  const moderationRatingOrders = orders
+    .filter((order) => order.status === OrderStatus.delivered)
+    .slice(0, 6);
+  for (const [index, order] of moderationRatingOrders.entries()) {
+    const status = [
+      RatingStatus.pending,
+      RatingStatus.rejected,
+      RatingStatus.approved,
+    ][index % 3];
+    await prisma.productRating.create({
+      data: {
+        productId: order.productId,
+        userId: order.buyerId,
+        orderId: order.id,
+        score: status === RatingStatus.rejected ? 2 : 4 + (index % 2),
+        title:
+          status === RatingStatus.pending
+            ? "Moderasyon bekleyen ayrıntılı yorum"
+            : status === RatingStatus.rejected
+              ? "Uygunsuz içerik örneği"
+              : "Onaylanmış teslimat yorumu",
+        review:
+          status === RatingStatus.rejected
+            ? "Platform dışı iletişim içeren ve yayınlanmaması gereken test yorumu."
+            : "Teslim edilen ürünün kutusu, boya kalitesi ve paketlemesi beklentimi karşıladı.",
+        isVerifiedPurchase: true,
+        helpfulCount: index * 2,
+        status,
+      },
+    });
   }
 
   // Update Product.averageRating and Product.ratingCount for all products with ratings.
@@ -5868,6 +6174,25 @@ async function main() {
     },
   });
 
+  for (const account of [bannedUser, newUser]) {
+    await prisma.userMembership.upsert({
+      where: { userId: account.id },
+      update: {
+        tierId: freeTier.id,
+        status: SubscriptionStatus.active,
+        currentPeriodStart: now,
+        currentPeriodEnd: oneYearLater,
+      },
+      create: {
+        userId: account.id,
+        tierId: freeTier.id,
+        status: SubscriptionStatus.active,
+        currentPeriodStart: now,
+        currentPeriodEnd: oneYearLater,
+      },
+    });
+  }
+
   // --- 28d. Üyelik durum çeşitleri (MEVCUT demo kullanıcılarında) ---
   // cancelled: iptal edildi ama ödenmiş dönem sonuna kadar aktif (currentPeriodEnd gelecekte).
   await prisma.userMembership.upsert({
@@ -6005,6 +6330,171 @@ async function main() {
         address: denizAddr.address,
       }
     : undefined;
+
+  // Her komisyon profilinin yalnızca tanımlı değil, gerçek bir satın alımda da
+  // kullanıldığını garanti et. Rastgele katalog fiyatları bazı üst bantları boş
+  // bırakabildiği için her profil kendi fiyat aralığının içinden deterministik
+  // bir ilan ve tamamlanmış sipariş üretir.
+  const commissionFixtureCategory =
+    categories.find((category) => category.slug === "araba") ?? categories[0];
+  const commissionSellerByType: Record<CommissionSellerType, any> = {
+    [CommissionSellerType.FREE]: users[8],
+    [CommissionSellerType.BASIC]: users[4],
+    [CommissionSellerType.PREMIUM]: users[3],
+    [CommissionSellerType.BUSINESS]: platformSeller,
+  };
+  const commissionFixtureCoupons = new Map(
+    (
+      await prisma.discount.findMany({
+        where: { code: { in: ["TARODAN50", "HOSGELDIN10"] } },
+      })
+    ).map((discount) => [discount.code, discount]),
+  );
+
+  for (let index = 0; index < SEED_COMMISSION_PROFILES.length; index += 1) {
+    const profile = SEED_COMMISSION_PROFILES[index];
+    const seller = commissionSellerByType[profile.sellerType];
+    const price =
+      profile.maxAmount === null
+        ? profile.minAmount + 1_000
+        : Math.round(((profile.minAmount + profile.maxAmount) / 2) * 100) / 100;
+    const hasListingDiscount = index % 2 === 0;
+    const couponCode =
+      index === 1 ? "TARODAN50" : index === 5 ? "HOSGELDIN10" : null;
+    const coupon = couponCode ? commissionFixtureCoupons.get(couponCode) : null;
+    const couponDiscount =
+      couponCode === "TARODAN50"
+        ? 50
+        : couponCode === "HOSGELDIN10"
+          ? Math.round((price / 0.9 - price) * 100) / 100
+          : 0;
+    const catalogPrice = Math.round((price + couponDiscount) * 100) / 100;
+    const originalPrice = hasListingDiscount
+      ? Math.round((price / 0.8) * 100) / 100
+      : null;
+    const tier = SEED_SHIPPING_TIERS[index % SEED_SHIPPING_TIERS.length];
+    const createdAt = daysAgoDate(35 - index);
+    const product = await prisma.product.create({
+      data: {
+        sellerId: seller.id,
+        categoryId: commissionFixtureCategory.id,
+        title: `Komisyon Profili: ${profile.label}`,
+        slug: `commission-profile-${profile.key}`,
+        description:
+          "Komisyon fiyat bandı, üyelik ve finans snapshot senaryosu için deterministik test ilanı.",
+        price: catalogPrice,
+        oldPrice: originalPrice,
+        originalPrice,
+        salePrice: hasListingDiscount ? price : null,
+        saleStartDate: hasListingDiscount
+          ? new Date(createdAt.getTime() - 86400000)
+          : null,
+        saleEndDate: hasListingDiscount
+          ? new Date(Date.now() + 30 * 86400000)
+          : null,
+        condition: ProductCondition.new,
+        status: ProductStatus.active,
+        isTradeEnabled: canTradeUserIds.has(seller.id),
+        quantity: 3,
+        shippingPackageTier: tier.code,
+        shippingDesi: billableDesiForTier(tier.code),
+        createdAt,
+      },
+    });
+    products.push(product);
+    activeProducts.push(product);
+
+    const productDiscount = originalPrice
+      ? Math.round((originalPrice - price) * 100) / 100
+      : 0;
+    const discountAmount =
+      Math.round((productDiscount + couponDiscount) * 100) / 100;
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(),
+        buyerId: buyerDeniz.id,
+        sellerId: seller.id,
+        productId: product.id,
+        quantity: 1,
+        unitPrice: price,
+        subtotal: price,
+        totalAmount: price,
+        shippingCost: 0,
+        commissionAmount: 0,
+        discountAmount,
+        discountCode: couponCode,
+        discountBreakdown:
+          discountAmount > 0
+            ? {
+                productDiscount,
+                couponDiscount,
+                appliedDiscountId: coupon?.id ?? null,
+                originalPrice: originalPrice ?? catalogPrice,
+              }
+            : undefined,
+        status: OrderStatus.completed,
+        paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+        deliveredAt: new Date(createdAt.getTime() + 4 * 86400000),
+        buyerConfirmedAt: new Date(createdAt.getTime() + 5 * 86400000),
+        completedAt: new Date(createdAt.getTime() + 5 * 86400000),
+        shippingAddress: denizShip,
+        createdAt,
+      },
+    });
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: "paytr",
+        providerPaymentId: `PAY-PROFILE-${profile.key}`,
+        amount: price,
+        currency: "TRY",
+        status: PaymentStatus.completed,
+        paidAt: new Date(createdAt.getTime() + 3600000),
+      },
+    });
+    await prisma.paymentHold.create({
+      data: {
+        paymentId: payment.id,
+        orderId: order.id,
+        sellerId: seller.id,
+        amount: price,
+        status: PaymentHoldStatus.released,
+        releaseAt: new Date(createdAt.getTime() + 5 * 86400000),
+        releasedAt: new Date(createdAt.getTime() + 5 * 86400000),
+      },
+    });
+    if (coupon) {
+      const consumedAt = new Date(createdAt.getTime() + 3600000);
+      await prisma.couponReservation.create({
+        data: {
+          discountId: coupon.id,
+          userId: buyerDeniz.id,
+          orderId: order.id,
+          amount: couponDiscount,
+          status: CouponReservationStatus.consumed,
+          expiresAt: new Date(createdAt.getTime() + 86400000),
+          consumedAt,
+          createdAt,
+        },
+      });
+      await prisma.discountUsage.create({
+        data: {
+          discountId: coupon.id,
+          userId: buyerDeniz.id,
+          orderId: order.id,
+          amount: couponDiscount,
+          createdAt: consumedAt,
+        },
+      });
+      await prisma.discount.update({
+        where: { id: coupon.id },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+  }
+  console.log(
+    `✅ Created ${SEED_COMMISSION_PROFILES.length} commission-profile purchases`,
+  );
 
   // --- 29a. Sipariş durumları: cancelled(iptal) / refund_requested / refunded(iade) / awaiting_buyer_confirmation ---
   const stateOrderProducts = activeProducts.slice(0, 4);
@@ -6232,6 +6722,123 @@ async function main() {
       },
     });
     frozenHeldHoldInfo = order.orderNumber;
+  }
+
+  // Kritik son durumların her birinden en az iki örnek bulunsun. İlk dört kayıt
+  // ayrıntılı senaryoları taşır; bu ikinci seri liste/filtre/toplam testlerini
+  // tek kayda bağımlı bırakmaz. Finans değerleri en sonda strict normalizer ile
+  // gerçek komisyon ve kargo kurallarından yeniden hesaplanır.
+  for (const [index, status] of [
+    OrderStatus.cancelled,
+    OrderStatus.refund_requested,
+    OrderStatus.refunded,
+    OrderStatus.awaiting_buyer_confirmation,
+  ].entries()) {
+    const product = activeProducts[4 + index];
+    if (!product) continue;
+    const subtotal = Number(product.price);
+    const createdAt = daysAgoDate(12 + index);
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(),
+        buyerId: buyerDeniz.id,
+        sellerId: product.sellerId,
+        productId: product.id,
+        totalAmount: subtotal,
+        subtotal,
+        shippingCost: 0,
+        commissionAmount: 0,
+        status,
+        cancellationType:
+          status === OrderStatus.cancelled
+            ? OrderCancellationType.iptal
+            : status === OrderStatus.refunded
+              ? OrderCancellationType.iade
+              : null,
+        cancelReason:
+          status === OrderStatus.cancelled
+            ? "Test kullanıcısı ödeme sonrası siparişi iptal etti."
+            : status === OrderStatus.refunded
+              ? "İnceleme sonrası ikinci iade senaryosu tamamlandı."
+              : null,
+        paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+        deliveredAt:
+          status === OrderStatus.refund_requested ||
+          status === OrderStatus.refunded ||
+          status === OrderStatus.awaiting_buyer_confirmation
+            ? new Date(createdAt.getTime() + 3 * 86400000)
+            : null,
+        confirmationDeadline:
+          status === OrderStatus.awaiting_buyer_confirmation
+            ? new Date(now.getTime() + 3 * 86400000)
+            : null,
+        shippingAddress: denizShip,
+        createdAt,
+      },
+    });
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: "paytr",
+        providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+        amount: subtotal,
+        currency: "TRY",
+        status:
+          status === OrderStatus.cancelled || status === OrderStatus.refunded
+            ? PaymentStatus.refunded
+            : PaymentStatus.completed,
+        paidAt: new Date(createdAt.getTime() + 3600000),
+      },
+    });
+    let frozenByRefundId: string | undefined;
+    if (
+      status === OrderStatus.refund_requested ||
+      status === OrderStatus.refunded
+    ) {
+      const request = await prisma.refundRequest.create({
+        data: {
+          refundNumber: generateRefundNumber(),
+          orderId: order.id,
+          requesterId: buyerDeniz.id,
+          reason:
+            status === OrderStatus.refunded
+              ? RefundReason.wrong_item
+              : RefundReason.missing_parts,
+          description:
+            status === OrderStatus.refunded
+              ? "Yanlış ürün gönderildi; iade tamamlandı."
+              : "Kutuda bir aksesuar eksik; inceleme bekleniyor.",
+          amount: subtotal,
+          status:
+            status === OrderStatus.refunded
+              ? RefundRequestStatus.refunded
+              : RefundRequestStatus.pending_review,
+          refundedAt: status === OrderStatus.refunded ? daysAgoDate(1) : null,
+        },
+      });
+      if (status === OrderStatus.refund_requested) {
+        frozenByRefundId = request.id;
+      }
+    }
+    if (status !== OrderStatus.cancelled) {
+      await prisma.paymentHold.create({
+        data: {
+          paymentId: payment.id,
+          orderId: order.id,
+          sellerId: product.sellerId,
+          amount: subtotal,
+          status:
+            status === OrderStatus.refunded
+              ? PaymentHoldStatus.cancelled
+              : PaymentHoldStatus.held,
+          releaseAt:
+            status === OrderStatus.awaiting_buyer_confirmation
+              ? new Date(now.getTime() + 3 * 86400000)
+              : null,
+          frozenByRefundId,
+        },
+      });
+    }
   }
 
   // --- 29a-2. Çoklu-satıcı checkout: 1 CheckoutGroup + 2 satıcıdan 2 sipariş ---
@@ -7155,6 +7762,70 @@ async function main() {
     `✅ Normalized ${allSeedProducts.length} products and ${commerceNormalization.orders} physical orders (${commerceNormalization.groups} groups, ${commerceNormalization.packages} packages created)`,
   );
 
+  // Ürün yorumları yalnız ilk oluşturulan `orders` dizisine bağlı kalmasın;
+  // iade/durum/kurumsal senaryolardaki teslimatları da kapsasın.
+  const existingRatedOrderIds = new Set(
+    (await prisma.productRating.findMany({ select: { orderId: true } })).map(
+      (rating) => rating.orderId,
+    ),
+  );
+  const reviewCandidates = await prisma.order.findMany({
+    where: {
+      status: { in: [OrderStatus.delivered, OrderStatus.completed] },
+      id: { notIn: [...existingRatedOrderIds] },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
+  const extendedReviewTexts = [
+    "Kutu kondisyonu ilandaki fotoğraflarla aynıydı; köşeler ayrıca korunmuştu.",
+    "Modelin boya, jant ve tampon detayları çok temiz. Koleksiyona doğrudan ekledim.",
+    "Paketleme sağlamdı ve ürün kutu içinde hareket etmeyecek şekilde sabitlenmişti.",
+    "Açıklamadaki küçük kusur doğru belirtilmişti; şeffaf satış için teşekkürler.",
+    "Teslimat süresi ve ürün kalitesi beklentimi karşıladı.",
+  ];
+  for (const [index, order] of reviewCandidates.entries()) {
+    const status =
+      index % 10 === 0
+        ? RatingStatus.pending
+        : index % 10 === 1
+          ? RatingStatus.rejected
+          : RatingStatus.approved;
+    await prisma.productRating.create({
+      data: {
+        productId: order.productId,
+        userId: order.buyerId,
+        orderId: order.id,
+        score: status === RatingStatus.rejected ? 2 : 4 + (index % 2),
+        title:
+          status === RatingStatus.approved
+            ? "Doğrulanmış alışveriş yorumu"
+            : status === RatingStatus.pending
+              ? "Moderasyon bekliyor"
+              : "Moderasyon tarafından reddedildi",
+        review:
+          status === RatingStatus.rejected
+            ? "İletişim bilgisi içeren ve yayınlanmaması gereken test yorumu."
+            : extendedReviewTexts[index % extendedReviewTexts.length],
+        isVerifiedPurchase: true,
+        helpfulCount: (index * 3) % 21,
+        status,
+      },
+    });
+  }
+  const refreshedRatingStats = await prisma.productRating.groupBy({
+    by: ["productId"],
+    where: publicProductRatingWhere(),
+    _avg: { score: true },
+    _count: true,
+  });
+  for (const row of refreshedRatingStats) {
+    await prisma.product.update({
+      where: { id: row.productId },
+      data: { averageRating: row._avg.score ?? 0, ratingCount: row._count },
+    });
+  }
+
   console.log(
     `✅ Chunk B: order/offer/trade/product/finance/content/eLogo states created (${stateProductCount} state products, held-hold order ${frozenHeldHoldInfo})`,
   );
@@ -7197,6 +7868,27 @@ async function main() {
   // ==========================================================================
   // Summary
   // ==========================================================================
+  const [
+    totalUsers,
+    totalProducts,
+    totalOrders,
+    totalMessages,
+    totalRatings,
+    totalRefundRequests,
+    totalRefundedPayments,
+    totalTrades,
+    totalTickets,
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.product.count(),
+    prisma.order.count(),
+    prisma.message.count(),
+    prisma.productRating.count(),
+    prisma.refundRequest.count(),
+    prisma.payment.count({ where: { status: PaymentStatus.refunded } }),
+    prisma.trade.count(),
+    prisma.supportTicket.count(),
+  ]);
   console.log("\n🎉 COMPREHENSIVE Database seed completed successfully!");
   console.log("\n📋 Summary:");
   console.log(`   - Categories: ${categories.length}`);
@@ -7207,17 +7899,19 @@ async function main() {
   console.log(`   - Commission Rules: ${commissionRules.length}`);
   console.log(`   - Content Filters: ${contentFilters.length}`);
   console.log(`   - Platform Settings: ${settings.length}`);
-  console.log(`   - Users: ${users.length} (with avatars)`);
-  console.log(`   - Products: ${products.length} (unique, with full data)`);
+  console.log(`   - Users: ${totalUsers}`);
+  console.log(`   - Products: ${totalProducts} (unique, with full data)`);
   console.log(`   - Collections: ${collections.length} (with covers)`);
   console.log(`   - Offers: ${offers.length}`);
-  console.log(`   - Orders: ${orders.length}`);
+  console.log(`   - Orders: ${totalOrders}`);
+  console.log(`   - Messages: ${totalMessages}`);
+  console.log(`   - Product Ratings: ${totalRatings}`);
   console.log(
-    `   - Refund Requests: ${refundRequests.length} (${refundedPaymentCount} refunded payments)`,
+    `   - Refund Requests: ${totalRefundRequests} (${totalRefundedPayments} refunded payments)`,
   );
-  console.log(`   - Trades: ${trades.length}`);
+  console.log(`   - Trades: ${totalTrades}`);
   console.log(`   - Conversations: ${conversations.length}`);
-  console.log(`   - Support Tickets: ${tickets.length}`);
+  console.log(`   - Support Tickets: ${totalTickets}`);
 
   console.log("\n👤 Test Accounts:");
   console.log(
@@ -7242,7 +7936,7 @@ async function main() {
     "   │ Premium User      │ ahmet@demo.com         │ Demo123!      │",
   );
   console.log(
-    "   │ Business User     │ ali@demo.com           │ Demo123!      │",
+    "   │ Premium User      │ ali@demo.com           │ Demo123!      │",
   );
   console.log(
     "   │ Basic User        │ mehmet@demo.com        │ Demo123!      │",
