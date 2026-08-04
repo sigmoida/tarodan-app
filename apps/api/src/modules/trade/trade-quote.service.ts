@@ -45,6 +45,8 @@ export interface TradePartyQuote extends TradePartyPricing {
 
 export interface TradeQuote {
   tradeId: string;
+  commissionRuleSet: { id: string; version: number };
+  ruleMatches: TradePricing["ruleMatches"];
   initiator: TradePartyQuote;
   receiver: TradePartyQuote;
 }
@@ -202,6 +204,11 @@ export class TradeQuoteService {
 
     return {
       tradeId: trade.id,
+      commissionRuleSet: {
+        id: commissionSet.id,
+        version: commissionSet.version,
+      },
+      ruleMatches: pricing.ruleMatches,
       initiator: {
         ...pricing.initiator,
         userId: trade.initiatorId,

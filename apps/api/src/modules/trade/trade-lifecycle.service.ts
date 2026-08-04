@@ -29,6 +29,7 @@ import { ACTIVE_TRADE_STATUSES, TRADE_PRICING_V2 } from "./trade.constants";
 import { TRADE_VALID_TRANSITIONS } from "./trade.state-machine";
 import { TradeQuoteService } from "./trade-quote.service";
 import { buildTradeCashPaymentRows } from "./trade-payment-rows.helper";
+import { buildTradeCommissionRuleSnapshot } from "./trade-commission-snapshot";
 import { PaymentService } from "../payment/payment.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { TradeShipmentService } from "./trade-shipment.service";
@@ -478,6 +479,7 @@ export class TradeLifecycleService {
       // v2: iki taraf da ödeyeceği için kafa kafaya takas da ödeme bekler.
       // v1: yalnız nakit farkı olan takas ödeme bekler (eski davranış korunur).
       const isV2 = trade.pricingVersion === TRADE_PRICING_V2;
+      const quote = isV2 ? await this.tradeQuote.quoteForTrade(tradeId) : null;
       const nextStatus =
         isV2 || (trade.cashPayerId && trade.cashAmount)
           ? TradeStatus.awaiting_payment
@@ -498,6 +500,9 @@ export class TradeLifecycleService {
             nextStatus === TradeStatus.shipping_to_warehouse
               ? shippingDeadline
               : null,
+          commissionRuleSnapshot: quote
+            ? buildTradeCommissionRuleSnapshot(quote)
+            : undefined,
           version: { increment: 1 },
         },
       });
@@ -513,7 +518,6 @@ export class TradeLifecycleService {
         // takasın fiyatı sabittir (siparişteki komisyon snapshot'ıyla aynı ilke).
         // Ekranların gösterdiği teklif ile tahsil edilen tutar aynı kaynaktan
         // gelir, bu yüzden ayrışamaz.
-        const quote = await this.tradeQuote.quoteForTrade(tradeId);
         if (quote) {
           await tx.tradeCashPayment.createMany({
             data: buildTradeCashPaymentRows(tradeId, quote),

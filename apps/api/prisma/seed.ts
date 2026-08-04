@@ -31,6 +31,7 @@ import {
   ElogoInvoiceStatus,
   ShippingTariffStatus,
   CouponReservationStatus,
+  Prisma,
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
@@ -4452,6 +4453,53 @@ async function main() {
         Number(receiverRule.tradeFeeSellerAmount) +
         Number(initiatorRule.tradeFeeBuyerAmount);
 
+      if (status !== TradeStatus.pending && status !== TradeStatus.rejected) {
+        const snapshotItem = (
+          product: (typeof products)[number],
+          side: "initiator" | "receiver",
+          value: number,
+          rule: (typeof commissionRules)[number],
+        ) => ({
+          productId: product.id,
+          side,
+          ruleId: rule.id,
+          ruleSetId: commissionRuleSet.id,
+          ruleName: rule.name,
+          categoryId: product.categoryId,
+          sellerType:
+            commissionSellerTypeByUserId.get(product.sellerId) ??
+            CommissionSellerType.FREE,
+          matchedAmount: value,
+          minAmount: Number(rule.minAmount),
+          maxAmount: rule.maxAmount == null ? null : Number(rule.maxAmount),
+          tradeFeeSellerAmount: Number(rule.tradeFeeSellerAmount),
+          tradeFeeBuyerAmount: Number(rule.tradeFeeBuyerAmount),
+        });
+        await prisma.trade.update({
+          where: { id: trade.id },
+          data: {
+            commissionRuleSnapshot: {
+              ruleSetId: commissionRuleSet.id,
+              ruleSetVersion: commissionRuleSet.version,
+              items: [
+                snapshotItem(
+                  initiatorProduct,
+                  "initiator",
+                  initiatorTradeValue,
+                  initiatorRule,
+                ),
+                snapshotItem(
+                  receiverProduct,
+                  "receiver",
+                  receiverTradeValue,
+                  receiverRule,
+                ),
+              ],
+            } as Prisma.InputJsonObject,
+          },
+        });
+      }
+
       for (const [payerId, product, otherPartyId, tradeFeeAmount] of [
         [
           initiatorProduct.sellerId,
@@ -5934,7 +5982,16 @@ async function main() {
 
   await prisma.userMembership.upsert({
     where: { userId: corporateSeller.id },
-    update: { tierId: businessTier.id, status: SubscriptionStatus.active },
+    update: {
+      tierId: businessTier.id,
+      status: SubscriptionStatus.active,
+      currentPeriodStart: now,
+      currentPeriodEnd: oneYearLater,
+      cancelledAt: null,
+      autoRenew: false,
+      scheduledTierType: null,
+      scheduledBillingPeriod: null,
+    },
     create: {
       userId: corporateSeller.id,
       tierId: businessTier.id,
@@ -6338,7 +6395,9 @@ async function main() {
   // Her komisyon profilinin yalnızca tanımlı değil, gerçek bir satın alımda da
   // kullanıldığını garanti et. Rastgele katalog fiyatları bazı üst bantları boş
   // bırakabildiği için her profil kendi fiyat aralığının içinden deterministik
-  // bir ilan ve tamamlanmış sipariş üretir.
+  // bir tarihsel ilan ve tamamlanmış sipariş üretir. Bu kayıtlar yalnız finans ve
+  // sipariş senaryosu fixture'ıdır; müşteri kataloğuna veya satıcının İlanlarım
+  // ekranına sızmamaları için oluşturuldukları anda deleted durumundadır.
   const commissionFixtureCategory =
     categories.find((category) => category.slug === "araba") ?? categories[0];
   const commissionSellerByType: Record<CommissionSellerType, any> = {
@@ -6397,7 +6456,7 @@ async function main() {
           ? new Date(Date.now() + 30 * 86400000)
           : null,
         condition: ProductCondition.new,
-        status: ProductStatus.active,
+        status: ProductStatus.deleted,
         isTradeEnabled: canTradeUserIds.has(seller.id),
         quantity: 3,
         shippingPackageTier: tier.code,
@@ -6405,9 +6464,6 @@ async function main() {
         createdAt,
       },
     });
-    products.push(product);
-    activeProducts.push(product);
-
     const productDiscount = originalPrice
       ? Math.round((originalPrice - price) * 100) / 100
       : 0;

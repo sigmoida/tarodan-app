@@ -17,10 +17,12 @@ import { ResourceList, useResourceList } from "@/components/list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
+import { useSession } from "@/context/SessionContext";
 import { CommissionSummary } from "./_components/CommissionSummary";
 import { CommissionTable } from "./_components/CommissionTable";
 import { CommissionRuleDeepLink } from "./_components/CommissionRuleDeepLink";
 import { CommissionRuleFormModal } from "./_modals/CommissionRuleFormModal";
+import { CommissionRuleDetailModal } from "./_modals/CommissionRuleDetailModal";
 import {
   sellerTypes,
   type CommissionCoverageValidation,
@@ -191,8 +193,9 @@ function CommissionRulesContent({
         </Alert>
       )}
       <CommissionTable
-        onEdit={(rule) => editable && onEdit(rule)}
-        onDelete={(rule) => editable && onDelete(rule)}
+        editable={editable}
+        onEdit={onEdit}
+        onDelete={onDelete}
       />
     </>
   );
@@ -201,10 +204,22 @@ function CommissionRulesContent({
 export default function CommissionPage() {
   const t = useTranslations();
   const confirm = useConfirm();
-  const [modal, setModal] = useState<{ rule?: CommissionRule } | null>(null);
+  const { user } = useSession();
+  const canEdit = user.role === "super_admin";
+  const [modal, setModal] = useState<
+    | { mode: "create" }
+    | { mode: "edit"; rule: CommissionRule }
+    | { mode: "view"; rule: CommissionRule }
+    | null
+  >(null);
   const openRule = useCallback(
-    (rule: CommissionRule) => setModal({ rule }),
-    [],
+    (rule: CommissionRule) =>
+      setModal(
+        rule.ruleSet?.status === "DRAFT" && canEdit
+          ? { mode: "edit", rule }
+          : { mode: "view", rule },
+      ),
+    [canEdit],
   );
 
   const setsQuery = useQuery<CommissionRuleSet[]>({
@@ -268,7 +283,7 @@ export default function CommissionPage() {
         description={t("admin.finance.commission.subtitle")}
         actions={
           <div className="flex gap-2">
-            {!draft ? (
+            {!draft && canEdit ? (
               <Button
                 leftIcon={<PlusIcon className="h-5 w-5" />}
                 onClick={() => createDraft.mutate(undefined)}
@@ -276,12 +291,12 @@ export default function CommissionPage() {
               >
                 {t("admin.finance.commission.createDraft")}
               </Button>
-            ) : (
+            ) : draft && canEdit ? (
               <>
                 <Button
                   variant="secondary"
                   leftIcon={<PlusIcon className="h-5 w-5" />}
-                  onClick={() => setModal({})}
+                  onClick={() => setModal({ mode: "create" })}
                 >
                   {t("admin.finance.commission.newRule")}
                 </Button>
@@ -292,7 +307,7 @@ export default function CommissionPage() {
                   {t("admin.finance.commission.publishDraft")}
                 </Button>
               </>
-            )}
+            ) : null}
           </div>
         }
       />
@@ -303,19 +318,26 @@ export default function CommissionPage() {
       </ResourceList.Toolbar>
       <CommissionRuleDeepLink onOpen={openRule} />
       <CommissionRulesContent
-        editable={Boolean(draft)}
+        editable={Boolean(draft) && canEdit}
         validation={validationQuery.data}
-        onEdit={(rule) => setModal({ rule })}
+        onEdit={(rule) => setModal({ mode: "edit", rule })}
         onDelete={onDelete}
       />
       <ResourceList.Pagination />
 
-      {modal && draft && (
+      {modal?.mode === "view" && (
+        <CommissionRuleDetailModal
+          rule={modal.rule}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal && modal.mode !== "view" && draft && canEdit && (
         <CommissionRuleFormModal
-          key={modal.rule?.id ?? "new"}
+          key={modal.mode === "edit" ? modal.rule.id : "new"}
           open
           onClose={() => setModal(null)}
-          rule={modal.rule}
+          rule={modal.mode === "edit" ? modal.rule : undefined}
         />
       )}
     </ResourceList>

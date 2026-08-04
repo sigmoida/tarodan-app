@@ -80,6 +80,28 @@ export class AdminCommissionService {
     });
   }
 
+  /**
+   * Resolve one immutable rule by its own id.
+   *
+   * Order/trade audit links must not use `getCommissionRules()` because that
+   * method intentionally switches to the current DRAFT when one exists. A
+   * transaction can reference an ACTIVE or ARCHIVED rule indefinitely.
+   */
+  async getCommissionRule(ruleId: string) {
+    const rule = await this.prisma.commissionRule.findUnique({
+      where: { id: ruleId },
+      include: {
+        category: { select: { id: true, name: true } },
+        shippingShares: true,
+        ruleSet: true,
+      },
+    });
+    if (!rule) {
+      throw new NotFoundException("Commission rule not found");
+    }
+    return this.serializeRule(rule);
+  }
+
   /** Admin grid works on the sole draft; without a draft it shows active rules. */
   async getCommissionRules(ruleSetId?: string) {
     const selectedSet = ruleSetId

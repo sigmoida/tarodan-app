@@ -20,6 +20,8 @@ import { TRADE_PRICING_V2 } from "./trade.constants";
 
 const quote = {
   tradeId: "trade-1",
+  commissionRuleSet: { id: "set-1", version: 1 },
+  ruleMatches: [],
   initiator: {
     userId: "user-a",
     side: "initiator" as const,

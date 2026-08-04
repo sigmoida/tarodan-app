@@ -240,6 +240,10 @@ export class AdminService {
     return this.commissionService.getCommissionRules(ruleSetId);
   }
 
+  async getCommissionRule(ruleId: string) {
+    return this.commissionService.getCommissionRule(ruleId);
+  }
+
   async getCommissionRuleSets() {
     return this.commissionService.getCommissionRuleSets();
   }

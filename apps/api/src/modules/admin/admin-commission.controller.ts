@@ -124,6 +124,15 @@ export class AdminCommissionController {
     return this.adminService.getCommissionRules(ruleSetId);
   }
 
+  @Get("commission-rules/:id")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Get one commission rule by its immutable ID" })
+  @ApiParam({ name: "id", description: "Commission rule ID" })
+  @ApiResponse({ status: HttpStatus.OK, type: CommissionRuleResponseDto })
+  async getCommissionRule(@Param("id") id: string) {
+    return this.adminService.getCommissionRule(id);
+  }
+
   @Get("commission-rule-sets")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "List commission rule sets" })

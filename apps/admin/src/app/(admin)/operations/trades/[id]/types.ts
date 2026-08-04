@@ -21,12 +21,30 @@ export interface TradeShipment {
 export interface TradeItem {
   id: string;
   valueAtTrade?: number;
+  commissionRule?: TradeCommissionRuleMatch;
   product: {
     id: string;
     title: string;
     price: number;
     images?: Array<{ url: string }>;
   };
+}
+
+export interface TradeCommissionRuleMatch {
+  productId: string;
+  side: "initiator" | "receiver";
+  ruleId: string;
+  ruleSetId: string;
+  ruleSetVersion: number;
+  ruleName: string;
+  categoryId: string;
+  sellerType: string;
+  matchedAmount: number;
+  minAmount: number;
+  maxAmount: number | null;
+  tradeFeeSellerAmount: number;
+  tradeFeeBuyerAmount: number;
+  source: "snapshot" | "live";
 }
 
 export interface TradeCashPayment {
@@ -76,6 +94,7 @@ export interface TradeDetail {
     initiator: TradePaymentQuoteParty;
     receiver: TradePaymentQuoteParty;
   } | null;
+  commissionRuleMatches?: TradeCommissionRuleMatch[];
   initiator: { id: string; displayName: string; email: string };
   receiver: { id: string; displayName: string; email: string };
   initiatorItems: TradeItem[];

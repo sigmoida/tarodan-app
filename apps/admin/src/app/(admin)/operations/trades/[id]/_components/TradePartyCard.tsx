@@ -3,6 +3,7 @@ import { getProductEffectivePrice } from "@/lib/product-price";
 import { fmtTry } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { TradeItem } from "../types";
+import { useTranslations } from "next-intl";
 
 /** A trade party (initiator/receiver) with their offered items. */
 export function TradePartyCard({
@@ -16,6 +17,7 @@ export function TradePartyCard({
   user: { id: string; displayName: string; email: string };
   items: TradeItem[];
 }) {
+  const t = useTranslations();
   return (
     <SectionCard title={title}>
       <div className="mb-4 space-y-2">
@@ -51,6 +53,28 @@ export function TradePartyCard({
               <p className="text-xs text-muted">
                 {fmtTry(getProductEffectivePrice(item.product))}
               </p>
+              {item.commissionRule && (
+                <div className="mt-2 border-t border-border-subtle pt-2 text-xs">
+                  <p className="text-muted">
+                    {item.commissionRule.source === "snapshot"
+                      ? t("admin.operations.trades.appliedCommissionRule")
+                      : t("admin.operations.trades.currentCommissionRule")}
+                  </p>
+                  <Link
+                    href={`/finance/commission?ruleId=${item.commissionRule.ruleId}`}
+                    className="font-medium text-primary-600 hover:underline"
+                  >
+                    {item.commissionRule.ruleName}
+                  </Link>
+                  <p className="mt-0.5 text-muted">
+                    {t("admin.operations.trades.commissionRuleMeta", {
+                      version: item.commissionRule.ruleSetVersion,
+                      sellerType: item.commissionRule.sellerType,
+                      amount: fmtTry(item.commissionRule.matchedAmount),
+                    })}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         ))}

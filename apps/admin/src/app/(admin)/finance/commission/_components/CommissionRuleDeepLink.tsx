@@ -6,8 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
-import { extractList } from "@/lib/extract";
-import { adminKeys } from "@/lib/query/keys";
 import type { CommissionRule } from "../_lib/types";
 
 /**
@@ -35,32 +33,37 @@ export function CommissionRuleDeepLink({
   const ruleId = params.get("ruleId");
   const handled = useRef<string | null>(null);
 
-  const { data } = useQuery({
-    // Ekrandaki sayfalı listeden AYRI bir anahtar: bu sorgu tüm kural setini
-    // çeker, listenin sayfa dilimini bozmamalı.
-    queryKey: adminKeys.options("commission-rules"),
-    queryFn: () =>
-      adminApi
-        .getCommissionRules()
-        .then((res) => extractList<CommissionRule>(res)),
+  const { data, isError } = useQuery({
+    // Sipariş ve takas bağlantıları tarihsel kural kimliğini taşır. Güncel
+    // DRAFT/ACTIVE listesini çözmek bu kimliği yanlış sete yönlendirebilir.
+    queryKey: ["commission-rules", "detail", ruleId],
+    queryFn: () => adminApi.getCommissionRule(ruleId!).then((res) => res.data),
     enabled: !!ruleId,
+    retry: false,
   });
 
   useEffect(() => {
     if (!ruleId || !data || handled.current === ruleId) return;
     handled.current = ruleId;
 
-    const rule = data.find((r) => r.id === ruleId);
-    if (rule) onOpen(rule);
-    // Kural silinmiş olabilir — sessizce yutmak yerine söyle, yoksa bağlantı
-    // hiçbir şey yapmamış gibi görünür.
-    else toast.error(t("admin.finance.commission.ruleNotFound"));
+    onOpen(data);
 
     const next = new URLSearchParams(params.toString());
     next.delete("ruleId");
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [ruleId, data, onOpen, params, pathname, router, t]);
+
+  useEffect(() => {
+    if (!ruleId || !isError || handled.current === ruleId) return;
+    handled.current = ruleId;
+    toast.error(t("admin.finance.commission.ruleNotFound"));
+
+    const next = new URLSearchParams(params.toString());
+    next.delete("ruleId");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [ruleId, isError, params, pathname, router, t]);
 
   return null;
 }

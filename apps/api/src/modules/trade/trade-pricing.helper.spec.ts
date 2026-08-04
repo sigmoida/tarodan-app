@@ -63,6 +63,10 @@ describe("trade fees from strict commission rules", () => {
     expect(result.initiator.serviceFee).toBe(30);
     expect(result.receiver.serviceFee).toBe(30);
     expect(result.initiator.shipping).toBe(50 * TRADE_SHIPPING_LEGS);
+    expect(result.ruleMatches).toEqual([
+      expect.objectContaining({ productId: "p1", ruleId: "trade-rule" }),
+      expect.objectContaining({ productId: "p2", ruleId: "trade-rule" }),
+    ]);
   });
 
   it("uses half-open trade value bands", () => {

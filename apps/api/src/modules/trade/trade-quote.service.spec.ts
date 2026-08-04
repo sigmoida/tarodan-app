@@ -98,7 +98,9 @@ describe("TradeQuoteService.quoteForTrade", () => {
     const prisma = {
       trade: { findUnique: jest.fn().mockResolvedValue(trade) },
       commissionRuleSet: {
-        findFirst: jest.fn().mockResolvedValue({ id: "set-1", rules }),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: "set-1", version: 1, rules }),
       },
     };
     const shipping = {
@@ -115,6 +117,14 @@ describe("TradeQuoteService.quoteForTrade", () => {
     const { service } = makeService();
 
     const quote = await service.quoteForTrade("trade-1");
+
+    expect(quote).toMatchObject({
+      commissionRuleSet: { id: "set-1", version: 1 },
+      ruleMatches: [
+        { productId: "p-a", ruleId: "r1" },
+        { productId: "p-b", ruleId: "r1" },
+      ],
+    });
 
     expect(quote.initiator).toMatchObject({
       userId: "user-a",

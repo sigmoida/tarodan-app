@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import { CommissionRuleSetStatus, CommissionSellerType } from "@prisma/client";
 import { AdminCommissionService } from "./admin-commission.service";
 
@@ -63,6 +67,44 @@ function setup() {
 }
 
 describe("AdminCommissionService strict sets", () => {
+  it("loads an exact historical rule without resolving the current draft", async () => {
+    const { service, prisma } = setup();
+    prisma.commissionRule.findUnique.mockResolvedValue({
+      id: "active-rule-1",
+      ruleSetId: "active-1",
+      ...dto,
+      category: { id: "cat-1", name: "Category" },
+      shippingShares: [],
+      ruleSet: {
+        id: "active-1",
+        name: "Published v1",
+        version: 1,
+        status: CommissionRuleSetStatus.ACTIVE,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.getCommissionRule("active-rule-1");
+
+    expect(prisma.commissionRule.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "active-rule-1" } }),
+    );
+    expect(result).toMatchObject({
+      id: "active-rule-1",
+      ruleSet: { id: "active-1", status: CommissionRuleSetStatus.ACTIVE },
+    });
+  });
+
+  it("returns not found for a missing historical rule", async () => {
+    const { service, prisma } = setup();
+    prisma.commissionRule.findUnique.mockResolvedValue(null);
+
+    await expect(service.getCommissionRule("missing")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
   it("allows an explicit all-zero rule in a draft", async () => {
     const { service, prisma } = setup();
     const result = await service.createCommissionRule("admin", dto);

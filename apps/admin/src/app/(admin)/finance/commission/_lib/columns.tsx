@@ -13,9 +13,11 @@ const range = (rule: CommissionRule) =>
 
 export function commissionColumns(
   {
+    editable,
     onEdit,
     onDelete,
   }: {
+    editable: boolean;
     onEdit: (rule: CommissionRule) => void;
     onDelete: (rule: CommissionRule) => void;
   },
@@ -57,6 +59,8 @@ export function commissionColumns(
         `${rule.tradeFeeSellerAmount.toFixed(2)} / ${rule.tradeFeeBuyerAmount.toFixed(2)} ₺`,
       { sortKey: "tradeFeeSellerAmount", sortType: "number" },
     ),
-    col.rowMenu<CommissionRule>(commissionRowMenu({ onEdit, onDelete })),
+    ...(editable
+      ? [col.rowMenu<CommissionRule>(commissionRowMenu({ onEdit, onDelete }))]
+      : []),
   ];
 }

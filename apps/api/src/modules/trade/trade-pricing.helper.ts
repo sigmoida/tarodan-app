@@ -62,6 +62,22 @@ export interface TradeFeeLine {
   amount: number;
 }
 
+/** Ürün değerine göre tam olarak eşleşen komisyon kuralının denetim izi. */
+export interface TradeRuleMatch {
+  productId: string;
+  side: TradeSide;
+  ruleId: string;
+  ruleSetId: string;
+  ruleName: string;
+  categoryId: string;
+  sellerType: CommissionRuleMatchable["sellerType"];
+  matchedAmount: number;
+  minAmount: number;
+  maxAmount: number | null;
+  tradeFeeSellerAmount: number;
+  tradeFeeBuyerAmount: number;
+}
+
 export interface TradePartyPricing {
   /** Ürün başına ücretlerin toplamı — ekranda TEK satır. */
   serviceFee: number;
@@ -83,6 +99,7 @@ export interface TradePricingInput {
 export interface TradePricing {
   initiator: TradePartyPricing;
   receiver: TradePartyPricing;
+  ruleMatches: TradeRuleMatch[];
 }
 
 /** Kargo bacağı sayısı: kullanıcı→depo + depo→karşı kullanıcı. */
@@ -129,28 +146,37 @@ function shippingFor(items: TradePricingItem[], tariff: TradeTariff): number {
 function partyPricing(
   side: TradeSide,
   input: TradePricingInput,
+  matchedItems: Array<{
+    item: TradePricingItem;
+    rule: TradeCommissionRule;
+  }>,
 ): TradePartyPricing {
-  const ownItems = input.items.filter((i) => i.side === side);
-  const incomingItems = input.items.filter((i) => i.side === other(side));
+  const ownItems = matchedItems.filter(({ item }) => item.side === side);
+  const incomingItems = matchedItems.filter(
+    ({ item }) => item.side === other(side),
+  );
 
   // Kendi verdiği ürünler → satıcı ücreti; karşıdan aldıkları → alıcı ücreti.
   const feeLines: TradeFeeLine[] = [
-    ...ownItems.map((i) => ({
-      productId: i.productId,
+    ...ownItems.map(({ item, rule }) => ({
+      productId: item.productId,
       role: "seller" as const,
-      amount: amountOf(matchRule(input.rules, i).tradeFeeSellerAmount),
+      amount: amountOf(rule.tradeFeeSellerAmount),
     })),
-    ...incomingItems.map((i) => ({
-      productId: i.productId,
+    ...incomingItems.map(({ item, rule }) => ({
+      productId: item.productId,
       role: "buyer" as const,
-      amount: amountOf(matchRule(input.rules, i).tradeFeeBuyerAmount),
+      amount: amountOf(rule.tradeFeeBuyerAmount),
     })),
   ];
 
   const serviceFee = round2(
     feeLines.reduce((total, line) => total + line.amount, 0),
   );
-  const shipping = shippingFor(ownItems, input.tariff);
+  const shipping = shippingFor(
+    ownItems.map(({ item }) => item),
+    input.tariff,
+  );
   const cashDifference =
     input.cash && input.cash.payerSide === side
       ? round2(Math.abs(input.cash.amount))
@@ -166,8 +192,28 @@ function partyPricing(
 }
 
 export function buildTradePricing(input: TradePricingInput): TradePricing {
+  // Eşleşmeyi ürün başına bir kez yap. Ücretler ve denetim snapshot'ı aynı
+  // sonuçtan türesin; iki ayrı çözümleme yolu zamanla birbirinden sapmasın.
+  const matchedItems = input.items.map((item) => ({
+    item,
+    rule: matchRule(input.rules, item),
+  }));
   return {
-    initiator: partyPricing("initiator", input),
-    receiver: partyPricing("receiver", input),
+    initiator: partyPricing("initiator", input, matchedItems),
+    receiver: partyPricing("receiver", input, matchedItems),
+    ruleMatches: matchedItems.map(({ item, rule }) => ({
+      productId: item.productId,
+      side: item.side,
+      ruleId: rule.id,
+      ruleSetId: rule.ruleSetId,
+      ruleName: rule.name,
+      categoryId: rule.categoryId,
+      sellerType: rule.sellerType,
+      matchedAmount: item.value,
+      minAmount: Number(rule.minAmount),
+      maxAmount: rule.maxAmount == null ? null : Number(rule.maxAmount),
+      tradeFeeSellerAmount: amountOf(rule.tradeFeeSellerAmount),
+      tradeFeeBuyerAmount: amountOf(rule.tradeFeeBuyerAmount),
+    })),
   };
 }

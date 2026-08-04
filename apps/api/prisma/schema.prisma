@@ -823,6 +823,9 @@ model Trade {
   // `v2`: iki taraflı sabit hizmet bedeli + 2× kargo. Devam eden takaslar
   // açıldıkları modelle biter; ekranlar ve iade yolları bu alana bakar.
   pricingVersion            String             @default("v1") @map("pricing_version")
+  /// v2 kabul anında ürün başına uygulanan CommissionRule ve set sürümü.
+  /// Tutarlar cashPayments'ta, kural denetim izi burada sabitlenir.
+  commissionRuleSnapshot    Json?              @map("commission_rule_snapshot")
   initiatorMessage          String?            @map("initiator_message")
   receiverMessage           String?            @map("receiver_message")
   // Tarafların TAKAS için seçtiği teslimat adresi. Depo→kullanıcı (çıkış)

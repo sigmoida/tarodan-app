@@ -6,6 +6,7 @@ import { AdminTradeQueryDto, TradeShipmentQueryDto } from "./dto";
 import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
 import { TradeQuoteService } from "../trade/trade-quote.service";
 import { TRADE_PRICING_V2 } from "../trade/trade.constants";
+import { readTradeCommissionRuleSnapshot } from "../trade/trade-commission-snapshot";
 
 /**
  * Takas yönetimi salt-okunur sorguları (admin liste/detay) — AdminTradeService'ten
@@ -327,6 +328,20 @@ export class AdminTradeQueryService {
       this.tradeQuoteService
         ? await this.tradeQuoteService.quoteForTrade(trade.id)
         : null;
+    const appliedSnapshot = readTradeCommissionRuleSnapshot(
+      trade.commissionRuleSnapshot,
+    );
+    const commissionRuleMatches = appliedSnapshot
+      ? appliedSnapshot.items.map((match) => ({
+          ...match,
+          ruleSetVersion: appliedSnapshot.ruleSetVersion,
+          source: "snapshot" as const,
+        }))
+      : (paymentQuote?.ruleMatches ?? []).map((match) => ({
+          ...match,
+          ruleSetVersion: paymentQuote!.commissionRuleSet.version,
+          source: "live" as const,
+        }));
 
     // Resolve product image S3 keys (cardKey) into usable URLs. The frontend
     // renders `item.product.images[0].url`, but ProductImage stores cardKey/detailKey
@@ -342,6 +357,6 @@ export class AdminTradeQueryService {
       }
     }
 
-    return { ...trade, paymentQuote };
+    return { ...trade, paymentQuote, commissionRuleMatches };
   }
 }

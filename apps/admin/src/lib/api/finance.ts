@@ -29,6 +29,7 @@ export const financeApi = {
     api.get("/admin/commission/revenue", { params }),
   getCommissionRules: (ruleSetId?: string) =>
     api.get("/admin/commission-rules", { params: { ruleSetId } }),
+  getCommissionRule: (id: string) => api.get(`/admin/commission-rules/${id}`),
   getCommissionRuleSets: () => api.get("/admin/commission-rule-sets"),
   createCommissionRuleSetDraft: (name?: string) =>
     api.post("/admin/commission-rule-sets/draft", { name }),
