@@ -98,6 +98,29 @@ export function buildTradePaymentPanels(
   return panels.sort((a, b) => Number(b.isViewer) - Number(a.isViewer));
 }
 
+/**
+ * İzleyen ŞU AN ödeyebilir mi — ödeme kartındaki eylem satırının kapısı.
+ *
+ * Ekranda iki tüketicisi var (kartın kendisi ve iptal düğmesini kartın devraldığını
+ * bilmesi gereken sayfa), bu yüzden koşul burada tanımlıdır: iki yerde ayrı ayrı
+ * yazılsa biri değişip diğeri kalınca iptal düğmesi ya kaybolur ya iki kez çıkar.
+ */
+export function viewerCanPay(
+  trade: Trade | null,
+  quote: TradeQuote | null,
+  viewerId?: string,
+): boolean {
+  if (!trade) return false;
+  const viewerPanel = buildTradePaymentPanels(trade, quote, viewerId).find(
+    (panel) => panel.isViewer,
+  );
+  return (
+    !!viewerPanel &&
+    viewerPanel.status === "pending" &&
+    (trade.status === "accepted" || trade.status === "awaiting_payment")
+  );
+}
+
 export interface TradePaymentProgress {
   /** Tahsil edilmiş satır sayısı. */
   paid: number;

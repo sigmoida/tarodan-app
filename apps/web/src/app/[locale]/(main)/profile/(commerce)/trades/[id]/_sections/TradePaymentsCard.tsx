@@ -1,11 +1,6 @@
 /** @format */
 
-import {
-  CheckCircleIcon,
-  ClockIcon,
-  ShieldCheckIcon,
-  TruckIcon,
-} from "@heroicons/react/24/outline";
+import { CheckCircleIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { formatTL } from "@/lib/format";
@@ -13,6 +8,7 @@ import type { Trade, TradeQuote } from "../_lib/types";
 import {
   buildTradePaymentPanels,
   tradePaymentProgress,
+  viewerCanPay,
   type TradePaymentPanel,
 } from "../_lib/tradePayments";
 
@@ -22,6 +18,16 @@ interface TradePaymentsCardProps {
   userId?: string;
   onPay: () => void;
   cashPaymentLoading: boolean;
+  /** Ödeme aşamasında iptal — düğme bu kartta, ödeme düğmesinin yanında durur. */
+  canCancel?: boolean;
+  onCancel?: () => void;
+  isActionLoading?: boolean;
+}
+
+/** Panellerde hangi KOŞULLU kalemlerin yer tutacağı. */
+interface OptionalLines {
+  cashDifference: boolean;
+  commission: boolean;
 }
 
 /**
@@ -29,21 +35,30 @@ interface TradePaymentsCardProps {
  *
  * `always` verilen kalemler (hizmet bedeli, kargo) YAPISALDIR: 0 olsalar da
  * gösterilirler — aksi halde "bu takasta ücret alınmıyor" ile "ücret
- * hesaplanamadı" ayırt edilemiyordu. Koşullu kalemler (nakit fark, v1
- * komisyonu) 0'da gizlenir; her takasta bulunmaları beklenmez.
+ * hesaplanamadı" ayırt edilemiyordu.
+ *
+ * `reserve`, kalemin KARŞI panelde bulunup bu panelde bulunmadığı durumdur:
+ * satır görünmez ama yerini korur. Yoksa nakit farkı yalnız bir taraf ödediğinde
+ * o panel bir satır uzuyor ve iki kartın "Toplam" satırları kayıyordu.
  */
 function AmountLine({
   label,
   amount,
   always = false,
+  reserve = false,
 }: {
   label: string;
   amount: number;
   always?: boolean;
+  reserve?: boolean;
 }) {
-  if (!always && !(amount > 0)) return null;
+  const visible = always || amount > 0;
+  if (!visible && !reserve) return null;
   return (
-    <div className="flex items-center justify-between text-sm">
+    <div
+      className={`flex items-center justify-between text-sm${visible ? "" : " invisible"}`}
+      aria-hidden={visible ? undefined : true}
+    >
       <span className="text-muted">{label}</span>
       <span className="text-body font-medium">{formatTL(amount)}</span>
     </div>
@@ -84,14 +99,20 @@ function PaymentStatusBadge({ status }: { status: string | null }) {
   );
 }
 
-function PaymentPanel({ panel }: { panel: TradePaymentPanel }) {
+function PaymentPanel({
+  panel,
+  optional,
+}: {
+  panel: TradePaymentPanel;
+  optional: OptionalLines;
+}) {
   const t = useTranslations();
   return (
     <div
-      className={`rounded-lg border p-4 ${
+      className={`flex flex-col rounded-lg border p-4 ${
         panel.isViewer
           ? "border-primary-200 bg-surface"
-          : "border-border bg-surface-elevated/60"
+          : "border-border bg-surface-alt/50"
       }`}
     >
       <div className="mb-3 flex items-start justify-between gap-2">
@@ -117,11 +138,13 @@ function PaymentPanel({ panel }: { panel: TradePaymentPanel }) {
         <AmountLine
           label={t("trade.cashDifferenceLine")}
           amount={panel.cashDifference}
+          reserve={optional.cashDifference}
         />
         {/* v1 takaslar komisyonla biter; kalem yalnız onlarda görünür. */}
         <AmountLine
           label={t("trade.commissionLine")}
           amount={panel.commission}
+          reserve={optional.commission}
         />
       </div>
 
@@ -143,6 +166,10 @@ function PaymentPanel({ panel }: { panel: TradePaymentPanel }) {
  * Eski kart yalnız nakit farkını ve onu ödeyen tarafı gösteriyordu. Artık her
  * iki taraf hizmet bedeli + 2 bacaklık kargo (+ varsa fark) ödüyor ve süreç iki
  * ödeme tamamlanmadan başlamıyor; ekranın da bunu göstermesi gerekiyor.
+ *
+ * Ödeme aşamasının TÜM eylemleri bu kartta toplanır (öde + iptal, yan yana):
+ * iptal ayrı bir kartta dururken kullanıcı aynı kararın iki parçasını iki farklı
+ * yüzeyde görüyordu.
  */
 export default function TradePaymentsCard({
   trade,
@@ -150,6 +177,9 @@ export default function TradePaymentsCard({
   userId,
   onPay,
   cashPaymentLoading,
+  canCancel = false,
+  onCancel,
+  isActionLoading = false,
 }: TradePaymentsCardProps) {
   const t = useTranslations();
   const panels = buildTradePaymentPanels(trade, quote, userId);
@@ -157,18 +187,23 @@ export default function TradePaymentsCard({
 
   const progress = tradePaymentProgress(trade);
   const viewerPanel = panels.find((panel) => panel.isViewer) ?? null;
-  const canPay =
-    !!viewerPanel &&
-    viewerPanel.status === "pending" &&
-    (trade.status === "accepted" || trade.status === "awaiting_payment");
+  const canPay = viewerCanPay(trade, quote, userId);
   const waitingForCounterparty =
     !!viewerPanel &&
     viewerPanel.status === "completed" &&
     !progress.allPaid &&
     trade.status === "awaiting_payment";
 
+  // Koşullu kalemler: bir tarafta varsa İKİ panelde de yer tutulur.
+  const optional: OptionalLines = {
+    cashDifference: panels.some((panel) => panel.cashDifference > 0),
+    commission: panels.some((panel) => panel.commission > 0),
+  };
+
+  const showCancel = canPay && canCancel && !!onCancel;
+
   return (
-    <div className="card mb-6 border-border bg-surface-alt p-6">
+    <div className="card mb-6 p-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-lg font-bold text-heading">
@@ -190,15 +225,14 @@ export default function TradePaymentsCard({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2">
         {panels.map((panel) => (
-          <PaymentPanel key={panel.userId} panel={panel} />
+          <PaymentPanel key={panel.userId} panel={panel} optional={optional} />
         ))}
       </div>
 
       {waitingForCounterparty && (
-        <div className="mt-4 flex items-center gap-3 rounded-lg bg-surface-elevated/70 px-4 py-3">
-          <ClockIcon className="w-5 h-5 text-success-700" />
+        <div className="mt-4 flex items-center gap-3 rounded-lg bg-surface-alt px-4 py-3">
           <p className="text-sm text-body">
             {t("trade.waitingCounterpartyPayment")}
           </p>
@@ -206,33 +240,38 @@ export default function TradePaymentsCard({
       )}
 
       {canPay && (
-        <div className="mt-5 space-y-4 border-t border-border pt-5">
-          <div className="-mx-1 rounded-lg border border-border bg-surface px-5 py-3">
-            <h3 className="text-base font-semibold text-heading">
-              {t("payment.completeYourPayment")}
-            </h3>
-            <p className="mt-0.5 text-sm text-muted">
-              {t("trade.bothMustPay")}
-            </p>
-          </div>
+        <div className="mt-5 border-t border-border pt-5">
+          <h3 className="text-base font-semibold text-heading">
+            {t("payment.completeYourPayment")}
+          </h3>
+          <p className="mt-0.5 text-sm text-muted">{t("trade.bothMustPay")}</p>
 
-          <Button
-            variant="primary"
-            size="lg"
-            className="flex w-full items-center justify-center gap-2 text-base"
-            onClick={onPay}
-            disabled={cashPaymentLoading}
-          >
-            <ShieldCheckIcon className="w-5 h-5" />
-            {cashPaymentLoading
-              ? t("checkout.processing")
-              : `${t("payment.pay")} – ${formatTL(viewerPanel.total)}`}
-          </Button>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <Button
+              variant="primary"
+              size="lg"
+              className="flex-1"
+              onClick={onPay}
+              disabled={cashPaymentLoading}
+            >
+              {cashPaymentLoading ? t("checkout.processing") : t("payment.pay")}
+            </Button>
+            {showCancel && (
+              <Button
+                variant="outline"
+                size="lg"
+                className="flex-1"
+                onClick={onCancel}
+                disabled={isActionLoading || cashPaymentLoading}
+              >
+                {t("trade.cancelTradeAction")}
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
-      <p className="mt-4 flex items-start gap-2 text-xs text-subtle">
-        <TruckIcon className="mt-0.5 w-4 h-4 flex-shrink-0" />
+      <p className="mt-4 text-xs text-subtle">
         {t("trade.shippingNotRefundable")}
       </p>
     </div>
