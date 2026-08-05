@@ -126,9 +126,11 @@ export class OrderCheckoutCommonService {
       },
     });
 
-    // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + ürün KDV'si +
-    // alıcıya verilen hizmetlerin KDV'si. (Stopaj ve satıcı hizmet KDV'si satıcı
-    // payout'undan kesilir, alıcıya yansıtılmaz.)
+    // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + alıcıya verilen
+    // hizmetlerin KDV'si. Ürün KDV'si BU TOPLAMA GİRMEZ — vitrin fiyatı KDV
+    // dahil kabul edilir ve `taxAmount` hep 0'dır (bkz. resolveOrderTaxes).
+    // (Stopaj ve satıcı hizmet KDV'si satıcı payout'undan kesilir, alıcıya
+    // yansıtılmaz.)
     const totalAmount = buyerTotalOf({
       subtotal: amount,
       buyerShippingAmount,
