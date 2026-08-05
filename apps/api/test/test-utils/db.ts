@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { drainE2EBackgroundTasks } from "./background-tasks";
 import Redis from "ioredis";
-import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-config";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-ids";
 
 let prismaSingleton: PrismaClient | null = null;
 

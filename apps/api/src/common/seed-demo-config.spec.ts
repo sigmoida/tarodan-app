@@ -2,10 +2,10 @@ import { CommissionSellerType } from "@prisma/client";
 import {
   SEED_COMMISSION_PROFILES,
   SEED_COMMISSION_PRICE_BANDS,
-  SEED_COMMISSION_RULE_SET_IDS,
   SEED_CATEGORY_DEFINITIONS,
   SEED_SHIPPING_TIERS,
-} from "../../prisma/seed-config";
+} from "../../prisma/seed-demo-config";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-ids";
 import { isUUID } from "class-validator";
 
 describe("comprehensive seed pricing config", () => {
@@ -16,7 +16,7 @@ describe("comprehensive seed pricing config", () => {
   });
 
   it("uses deterministic UUID-v4 ids for every seeded commission set", () => {
-    expect(Object.values(SEED_COMMISSION_RULE_SET_IDS)).toHaveLength(3);
+    expect(Object.values(SEED_COMMISSION_RULE_SET_IDS)).toHaveLength(4);
     for (const id of Object.values(SEED_COMMISSION_RULE_SET_IDS)) {
       expect(isUUID(id, "4")).toBe(true);
     }

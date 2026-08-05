@@ -1,0 +1,51 @@
+{
+  "superAdmin": {
+    "_note": "E-posta ve şifre buraya YAZILMAZ; bootstrap-production-admin.js bunları BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD env'lerinden okur (GitHub production environment secret'ları). Burada yalnız adres var.",
+    "displayName": "Tarodan Super Admin",
+    "address": {
+      "title": "Merkez",
+      "fullName": "Tarodan",
+      "phone": "0 232 433 41 42",
+      "city": "İzmir",
+      "district": "Konak",
+      "address": "İzmir",
+      "zipCode": null,
+      "isDefault": true
+    },
+    "useAddressAsWarehouse": true
+  },
+  "corporateSeller": {
+    "_note": "Şifre buraya YAZILMAZ; LAUNCH_SELLER_PASSWORD env'inden okunur.",
+    "email": "destek@tarodan.com.tr",
+    "displayName": "Tarodan Official Store",
+    "companyName": "Serhatlar Oyuncak Temizlik Gıda Maddeleri İnşaat San. Tic. Ltd. Şti.",
+    "taxId": "7620277268",
+    "taxOffice": "Konak Vergi Dairesi",
+    "companyType": "Limited Şirketi",
+    "companyCity": "İzmir",
+    "companyDistrict": "Konak",
+    "phone": "0 232 433 41 42",
+    "isSeller": true,
+    "sellerType": "business",
+    "businessStatus": "approved",
+    "isVerified": true,
+    "isEmailVerified": true,
+    "acceptsMarketingEmails": false,
+    "membership": {
+      "tierType": "business",
+      "status": "active",
+      "periodYears": 20
+    },
+    "address": {
+      "title": "Mağaza",
+      "fullName": "Tarodan Official Store",
+      "phone": "0 232 433 41 42",
+      "city": "İzmir",
+      "district": "Konak",
+      "address": "İzmir",
+      "zipCode": null,
+      "isDefault": true
+    },
+    "ownsLaunchProducts": true
+  }
+}

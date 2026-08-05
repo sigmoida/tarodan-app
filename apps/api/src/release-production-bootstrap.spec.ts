@@ -13,10 +13,11 @@ describe("production reference-data bootstrap", () => {
     apiRoot,
     "maintenance/reset-production-runtime.ts",
   );
-  const emptySmokePath = resolve(
+  const launchSmokePath = resolve(
     apiRoot,
-    "maintenance/verify-production-empty.ts",
+    "maintenance/verify-production-launch.ts",
   );
+  const launchSeedPath = resolve(apiRoot, "prisma/seed-launch.ts");
   const resetWorkflowPath = resolve(
     repoRoot,
     ".github/workflows/production-reset.yml",
@@ -39,10 +40,12 @@ describe("production reference-data bootstrap", () => {
     const source = readFileSync(bootstrapPath, "utf8");
     expect(source).toContain("upsert");
     expect(source).toMatch(/membershipTier/i);
-    expect(source).toMatch(/commissionRule/i);
     expect(source).toMatch(/taxRegion|taxRate|taxRule/i);
     expect(source).toMatch(/platform@tarodan\.com/i);
     expect(source).not.toMatch(/Demo123|Admin123|demo user/i);
+    // Komisyon BİLİNÇLİ olarak yok: bu seed her açılışta koşuyor ve eskiden demo
+    // oranlarını canlıya ACTIVE yayınlıyordu (bkz. seed-independence.spec.ts).
+    expect(source).not.toMatch(/commissionRule/i);
   });
 
   it("bootstraps only an explicitly configured production super admin", () => {
@@ -91,7 +94,7 @@ describe("production reference-data bootstrap", () => {
   });
 
   it("reports the package-tier prices that still need an operator decision", () => {
-    const source = readFileSync(emptySmokePath, "utf8");
+    const source = readFileSync(launchSmokePath, "utf8");
 
     expect(source).toContain("/shipping/package-tiers");
     expect(source).toContain("REVIEW");
@@ -107,9 +110,9 @@ describe("production reference-data bootstrap", () => {
     expect(source).toContain("LAUNCH_TARIFF_PACKAGE_FEE");
   });
 
-  it("has an empty-catalog production smoke check", () => {
-    expect(existsSync(emptySmokePath)).toBe(true);
-    const source = readFileSync(emptySmokePath, "utf8");
+  it("smoke-checks the seeded catalog and that no listing is publicly visible", () => {
+    expect(existsSync(launchSmokePath)).toBe(true);
+    const source = readFileSync(launchSmokePath, "utf8");
 
     expect(source).toContain("/health/ready");
     expect(source).toContain("/categories");
@@ -117,6 +120,22 @@ describe("production reference-data bootstrap", () => {
     expect(source).toContain("/ads/active");
     expect(source).toContain("/products");
     expect(source).toContain("/search/products");
+    // Asıl risk boşluk değil ters yönü: lansman ilanlarının onaysız vitrine
+    // düşmesi. Public uçlar hâlâ BOŞ dönmeli, katalog uçları ise sayılmalı.
+    expect(source).toContain('assertEmpty(baseUrl, "/products');
+    expect(source).toContain("assertCount(");
+  });
+
+  it("seeds the launch catalog from data files, independently of the demo seed", () => {
+    expect(existsSync(launchSeedPath)).toBe(true);
+    const source = readFileSync(launchSeedPath, "utf8");
+
+    expect(source).toContain('process.env.APP_ENV !== "production"');
+    expect(source).toContain("LAUNCH_SELLER_PASSWORD");
+    expect(source).toContain("warehouse_address_id");
+    expect(source).toContain("ProductStatus");
+    // İlanlar görselsiz ve inactive geliyor; hiçbir görsel satırı yazılmamalı.
+    expect(source).not.toContain("productImage");
   });
 
   it("keeps production reset manual, locked, backed up and demo-seed free", () => {
@@ -136,8 +155,14 @@ describe("production reference-data bootstrap", () => {
     expect(source).toContain("seed-production.js");
     expect(source).not.toContain("dist-seed/prisma/seed.js");
     expect(source).toContain("bootstrap-production-admin.js");
+    expect(source).toContain("seed-launch.js");
     expect(source).toContain("reset-production-runtime.js");
-    expect(source).toContain("verify-production-empty.js");
+    expect(source).toContain("verify-production-launch.js");
+    // Lansman seed'i depo adresini süper admine bağlıyor: sıra bozulursa
+    // "no active super admin" ile veritabanı silindikten SONRA patlar.
+    expect(source.indexOf("bootstrap-production-admin.js")).toBeLessThan(
+      source.indexOf("seed-launch.js"),
+    );
   });
 
   it("fails a mistyped confirmation instead of skipping into a green run", () => {

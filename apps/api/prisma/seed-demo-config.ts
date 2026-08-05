@@ -1,15 +1,14 @@
 import { CommissionSellerType, ShippingPackageTierCode } from "@prisma/client";
 
 /**
- * Seeded rule-set ids still obey the schema/API UUID-v4 contract. Keeping them
- * deterministic preserves idempotent upserts without weakening checkout DTO
- * validation to accept arbitrary strings.
+ * DEMO (yerel + staging) senaryosunun rakamları. Buradaki hiçbir değer canlıya
+ * gitmez: lansman/production tarafı `prisma/data/launch/*.json`'dan okur.
+ *
+ * Bu dosya eskiden `seed-config.ts` adıyla iki tarafın ORTAK config'iydi ve
+ * `seed-production.ts` komisyon oranlarını buradan alıyordu — yani yerel "Araba"
+ * senaryosu için yazılmış oranlar canlıda her kategoriye ACTIVE olarak
+ * yayınlanıyordu. `seed-independence.spec.ts` bu bağın geri kurulmasını engeller.
  */
-export const SEED_COMMISSION_RULE_SET_IDS = {
-  local: "8d9fe2c4-a82e-4fc2-8b6d-5a4d1e9f1001",
-  production: "8d9fe2c4-a82e-4fc2-8b6d-5a4d1e9f1002",
-  test: "8d9fe2c4-a82e-4fc2-8b6d-5a4d1e9f1003",
-} as const;
 
 /** Comprehensive local seed intentionally exposes a single marketplace category. */
 export const SEED_CATEGORY_DEFINITIONS = [

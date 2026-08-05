@@ -1,0 +1,263 @@
+[
+  {
+    "brandSlug": "ford",
+    "name": "Mustang Mach1 1971 Race",
+    "slug": "ford-mustang-mach1-1971-race",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "bmw",
+    "name": "Z8 Alpina Alpine",
+    "slug": "bmw-z8-alpina-alpine",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "lotus",
+    "name": "Esprit Turbo White For Your Eyes Only",
+    "slug": "lotus-esprit-turbo-white-for-your-eyes-only",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "bmw",
+    "name": "750IL Tomorrow Never Dies",
+    "slug": "bmw-750il-tomorrow-never-dies",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 1,
+    "isActive": true
+  },
+  {
+    "brandSlug": "abarth",
+    "name": "595 LB-WORKS x Abas Works",
+    "slug": "abarth-595-lb-works-x-abas-works",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "porsche",
+    "name": "911 Dakar Uncle Rally",
+    "slug": "porsche-911-dakar-uncle-rally",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "porsche",
+    "name": "911 Dakar Rally 1974",
+    "slug": "porsche-911-dakar-rally-1974",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 1,
+    "isActive": true
+  },
+  {
+    "brandSlug": "range-rover",
+    "name": "1971 International Hillrally Winner",
+    "slug": "range-rover-1971-international-hillrally-winner",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "bmw",
+    "name": "M3 M Performance Touring",
+    "slug": "bmw-m3-m-performance-touring",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 2,
+    "isActive": true
+  },
+  {
+    "brandSlug": "lamborghini",
+    "name": "Huracán STO Bianco Asopo",
+    "slug": "lamborghini-huracan-sto-bianco-asopo",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "bentley",
+    "name": "Flying Spur Orange Flame / Onyx",
+    "slug": "bentley-flying-spur-orange-flame-onyx",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "bmw",
+    "name": "Z8",
+    "slug": "bmw-z8",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 3,
+    "isActive": true
+  },
+  {
+    "brandSlug": "ford",
+    "name": "Mustang Mach 1 Diamonds Are Forever",
+    "slug": "ford-mustang-mach-1-diamonds-are-forever",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 1,
+    "isActive": true
+  },
+  {
+    "brandSlug": "mercedes",
+    "name": "Maybach S 680",
+    "slug": "mercedes-maybach-s-680",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "porsche",
+    "name": "911 Dakar Ice Grey Metallic",
+    "slug": "porsche-911-dakar-ice-grey-metallic",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 2,
+    "isActive": true
+  },
+  {
+    "brandSlug": "nissan",
+    "name": "Skyline GT-R (R34) V-Spec II Nür Millenium Jade",
+    "slug": "nissan-skyline-gt-r-r34-v-spec-ii-nur-millenium-jade",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "bmw",
+    "name": "M4 Competition (G82) Sakhir",
+    "slug": "bmw-m4-competition-g82-sakhir",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 4,
+    "isActive": true
+  },
+  {
+    "brandSlug": "nissan",
+    "name": "Skyline Gt-R (R32) Veilside Combat",
+    "slug": "nissan-skyline-gt-r-r32-veilside-combat",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 1,
+    "isActive": true
+  },
+  {
+    "brandSlug": "mazda",
+    "name": "AZ-1 Liberty Walk LB40",
+    "slug": "mazda-az-1-liberty-walk-lb40",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "mazda",
+    "name": "RX-7 LB-Super Silhouette IMSA",
+    "slug": "mazda-rx-7-lb-super-silhouette-imsa",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 1,
+    "isActive": true
+  },
+  {
+    "brandSlug": "mazda",
+    "name": "RX-7 LB-Super Silhouette",
+    "slug": "mazda-rx-7-lb-super-silhouette",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 2,
+    "isActive": true
+  },
+  {
+    "brandSlug": "mazda",
+    "name": "RX-7 (FD3S) Itosyoukai Rei-gouki",
+    "slug": "mazda-rx-7-fd3s-itosyoukai-rei-gouki",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 3,
+    "isActive": true
+  },
+  {
+    "brandSlug": "lamborghini",
+    "name": "Revuelto Verde Selvans",
+    "slug": "lamborghini-revuelto-verde-selvans",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 1,
+    "isActive": true
+  },
+  {
+    "brandSlug": "bmw",
+    "name": "M3 Competition Touring Brooklyn",
+    "slug": "bmw-m3-competition-touring-brooklyn",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 5,
+    "isActive": true
+  },
+  {
+    "brandSlug": "subaru",
+    "name": "Impreza WRC98 1998 Rally Monte",
+    "slug": "subaru-impreza-wrc98-1998-rally-monte",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "brandSlug": "bmw",
+    "name": "M3 M Performance Touring Daytona",
+    "slug": "bmw-m3-m-performance-touring-daytona",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 6,
+    "isActive": true
+  },
+  {
+    "brandSlug": "nissan",
+    "name": "GT-R Nismo 2024 NISMO Stealth",
+    "slug": "nissan-gt-r-nismo-2024-nismo-stealth",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 2,
+    "isActive": true
+  },
+  {
+    "brandSlug": "abarth",
+    "name": "595 LB-WORKS x Abas Works Gara",
+    "slug": "abarth-595-lb-works-x-abas-works-gara",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 1,
+    "isActive": true
+  },
+  {
+    "brandSlug": "toyota",
+    "name": "GR86 LB Nation",
+    "slug": "toyota-gr86-lb-nation",
+    "yearStart": null,
+    "yearEnd": null,
+    "sortOrder": 0,
+    "isActive": true
+  }
+]
