@@ -8,12 +8,6 @@
       "reason": "Build-time-only dependency of Sentry's Next.js tooling; await an SDK-compatible Rollup update instead of overriding its peer graph."
     },
     {
-      "ghsa": "GHSA-mh99-v99m-4gvg",
-      "package": "brace-expansion",
-      "expires": "2026-10-31",
-      "reason": "Build-time-only dependency of Sentry's webpack tooling; no attacker-controlled glob patterns are evaluated and forcing a transitive major would cross package compatibility boundaries."
-    },
-    {
       "ghsa": "GHSA-f88m-g3jw-g9cj",
       "package": "sharp",
       "expires": "2026-08-31",
