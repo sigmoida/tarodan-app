@@ -28,17 +28,17 @@ export type SeedCommissionProfile = {
   minAmount: number;
   maxAmount: number | null;
   buyerCommissionRate: number;
-  buyerCommissionMin: number;
-  buyerCommissionMax: number;
+  buyerCommissionMin: number | null;
+  buyerCommissionMax: number | null;
   buyerServiceFeeRate: number;
-  buyerServiceFeeMin: number;
-  buyerServiceFeeMax: number;
+  buyerServiceFeeMin: number | null;
+  buyerServiceFeeMax: number | null;
   sellerCommissionRate: number;
-  sellerCommissionMin: number;
-  sellerCommissionMax: number;
+  sellerCommissionMin: number | null;
+  sellerCommissionMax: number | null;
   sellerPlatformFeeRate: number;
-  sellerPlatformFeeMin: number;
-  sellerPlatformFeeMax: number;
+  sellerPlatformFeeMin: number | null;
+  sellerPlatformFeeMax: number | null;
   tradeFeeSellerAmount: number;
   tradeFeeBuyerAmount: number;
   shippingShares: Record<ShippingPackageTierCode, number>;
@@ -76,86 +76,35 @@ export const SEED_COMMISSION_PRICE_BANDS = [
   },
 ] as const;
 
-const BAND_FEE_LIMITS = [
-  {
-    buyerCommission: [1, 10],
-    buyerService: [2, 20],
-    sellerCommission: [3, 60],
-    sellerPlatform: [1, 15],
-  },
-  {
-    buyerCommission: [4, 40],
-    buyerService: [8, 80],
-    sellerCommission: [50, 550],
-    sellerPlatform: [8, 80],
-  },
-  {
-    buyerCommission: [15, 100],
-    buyerService: [30, 200],
-    sellerCommission: [250, 1_250],
-    sellerPlatform: [25, 250],
-  },
-  {
-    buyerCommission: [30, 250],
-    buyerService: [60, 500],
-    sellerCommission: [600, 3_000],
-    sellerPlatform: [50, 500],
-  },
-] as const;
-
 const SELLER_COMMISSION_CONFIGS = [
   {
     key: "free",
     label: "Free",
     sellerType: CommissionSellerType.FREE,
-    feeFactor: 1,
-    buyerCommissionRates: [0.5, 0.4, 0.3, 0.2],
-    buyerServiceRates: [1, 0.8, 0.6, 0.4],
-    sellerCommissionRates: [6, 5.5, 5, 4.5],
-    sellerPlatformRates: [1, 0.8, 0.6, 0.4],
-    tradeFees: [20, 25, 30, 35],
-    shippingShares: { small: 100, medium: 90, large: 80 },
   },
   {
     key: "basic",
     label: "Basic",
     sellerType: CommissionSellerType.BASIC,
-    feeFactor: 0.85,
-    buyerCommissionRates: [0.4, 0.3, 0.25, 0.15],
-    buyerServiceRates: [0.8, 0.6, 0.5, 0.3],
-    sellerCommissionRates: [5, 4.5, 4, 3.5],
-    sellerPlatformRates: [0.75, 0.6, 0.5, 0.3],
-    tradeFees: [18, 22, 27, 32],
-    shippingShares: { small: 90, medium: 80, large: 70 },
   },
   {
     key: "premium",
     label: "Premium",
     sellerType: CommissionSellerType.PREMIUM,
-    feeFactor: 0.65,
-    buyerCommissionRates: [0.25, 0.2, 0.15, 0.1],
-    buyerServiceRates: [0.5, 0.4, 0.3, 0.2],
-    sellerCommissionRates: [3.5, 3.25, 3, 2.75],
-    sellerPlatformRates: [0.4, 0.35, 0.3, 0.2],
-    tradeFees: [15, 20, 25, 30],
-    shippingShares: { small: 70, medium: 60, large: 50 },
   },
   {
     key: "business",
     label: "İşletme",
     sellerType: CommissionSellerType.BUSINESS,
-    feeFactor: 0.5,
-    buyerCommissionRates: [0.15, 0.12, 0.1, 0.08],
-    buyerServiceRates: [0.3, 0.25, 0.2, 0.15],
-    sellerCommissionRates: [2.5, 2.25, 2, 1.75],
-    sellerPlatformRates: [0.25, 0.22, 0.2, 0.15],
-    tradeFees: [12, 16, 20, 25],
-    shippingShares: { small: 50, medium: 40, large: 30 },
   },
 ] as const;
 
-const scaledMoney = (value: number, factor: number): number =>
-  Math.round(value * factor * 100) / 100;
+const BUYER_COMMISSION_RATES = [4, 4, 3, 0] as const;
+const BUYER_SERVICE_FEE_RATES = [5, 6, 4, 5] as const;
+const SELLER_COMMISSION_RATES = [6, 6, 6, 6] as const;
+const SELLER_PLATFORM_FEE_RATES = [5, 5, 5, 0] as const;
+const EQUAL_SHIPPING_SHARES = { small: 50, medium: 50, large: 50 } as const;
+const TRADE_FEE_PER_SIDE = 100;
 
 /**
  * Yerel Araba kategorisi için dört satıcı tipi × dört fiyat bandı. Her satıcı
@@ -163,49 +112,28 @@ const scaledMoney = (value: number, factor: number): number =>
  */
 export const SEED_COMMISSION_PROFILES: SeedCommissionProfile[] =
   SELLER_COMMISSION_CONFIGS.flatMap((seller) =>
-    SEED_COMMISSION_PRICE_BANDS.map((band, index) => {
-      const limits = BAND_FEE_LIMITS[index];
-      const scale = (pair: readonly [number, number]) =>
-        pair.map((value) => scaledMoney(value, seller.feeFactor)) as [
-          number,
-          number,
-        ];
-      const [buyerCommissionMin, buyerCommissionMax] = scale(
-        limits.buyerCommission,
-      );
-      const [buyerServiceFeeMin, buyerServiceFeeMax] = scale(
-        limits.buyerService,
-      );
-      const [sellerCommissionMin, sellerCommissionMax] = scale(
-        limits.sellerCommission,
-      );
-      const [sellerPlatformFeeMin, sellerPlatformFeeMax] = scale(
-        limits.sellerPlatform,
-      );
-
-      return {
-        key: `${seller.key}-${band.key}`,
-        label: `${seller.label} / ${band.label}`,
-        sellerType: seller.sellerType,
-        minAmount: band.minAmount,
-        maxAmount: band.maxAmount,
-        buyerCommissionRate: seller.buyerCommissionRates[index],
-        buyerCommissionMin,
-        buyerCommissionMax,
-        buyerServiceFeeRate: seller.buyerServiceRates[index],
-        buyerServiceFeeMin,
-        buyerServiceFeeMax,
-        sellerCommissionRate: seller.sellerCommissionRates[index],
-        sellerCommissionMin,
-        sellerCommissionMax,
-        sellerPlatformFeeRate: seller.sellerPlatformRates[index],
-        sellerPlatformFeeMin,
-        sellerPlatformFeeMax,
-        tradeFeeSellerAmount: seller.tradeFees[index],
-        tradeFeeBuyerAmount: seller.tradeFees[index],
-        shippingShares: seller.shippingShares,
-      };
-    }),
+    SEED_COMMISSION_PRICE_BANDS.map((band, index) => ({
+      key: `${seller.key}-${band.key}`,
+      label: `${seller.label} / ${band.label}`,
+      sellerType: seller.sellerType,
+      minAmount: band.minAmount,
+      maxAmount: band.maxAmount,
+      buyerCommissionRate: BUYER_COMMISSION_RATES[index],
+      buyerCommissionMin: null,
+      buyerCommissionMax: null,
+      buyerServiceFeeRate: BUYER_SERVICE_FEE_RATES[index],
+      buyerServiceFeeMin: null,
+      buyerServiceFeeMax: null,
+      sellerCommissionRate: SELLER_COMMISSION_RATES[index],
+      sellerCommissionMin: null,
+      sellerCommissionMax: null,
+      sellerPlatformFeeRate: SELLER_PLATFORM_FEE_RATES[index],
+      sellerPlatformFeeMin: null,
+      sellerPlatformFeeMax: null,
+      tradeFeeSellerAmount: TRADE_FEE_PER_SIDE,
+      tradeFeeBuyerAmount: TRADE_FEE_PER_SIDE,
+      shippingShares: EQUAL_SHIPPING_SHARES,
+    })),
   );
 
 export const SEED_SHIPPING_TIERS = [

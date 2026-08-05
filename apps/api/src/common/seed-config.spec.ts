@@ -76,4 +76,58 @@ describe("comprehensive seed pricing config", () => {
       { code: "large", minDesi: 5, maxDesi: null, amount: 160 },
     ]);
   });
+
+  it("uses the same uncapped commission schedule for every seller type", () => {
+    const expectedByBand = [
+      {
+        buyerCommissionRate: 4,
+        buyerServiceFeeRate: 5,
+        sellerCommissionRate: 6,
+        sellerPlatformFeeRate: 5,
+      },
+      {
+        buyerCommissionRate: 4,
+        buyerServiceFeeRate: 6,
+        sellerCommissionRate: 6,
+        sellerPlatformFeeRate: 5,
+      },
+      {
+        buyerCommissionRate: 3,
+        buyerServiceFeeRate: 4,
+        sellerCommissionRate: 6,
+        sellerPlatformFeeRate: 5,
+      },
+      {
+        buyerCommissionRate: 0,
+        buyerServiceFeeRate: 5,
+        sellerCommissionRate: 6,
+        sellerPlatformFeeRate: 0,
+      },
+    ];
+
+    for (const sellerType of Object.values(CommissionSellerType)) {
+      const profiles = SEED_COMMISSION_PROFILES.filter(
+        (profile) => profile.sellerType === sellerType,
+      ).sort((a, b) => a.minAmount - b.minAmount);
+
+      profiles.forEach((profile, index) => {
+        expect(profile).toEqual(
+          expect.objectContaining({
+            ...expectedByBand[index],
+            buyerCommissionMin: null,
+            buyerCommissionMax: null,
+            buyerServiceFeeMin: null,
+            buyerServiceFeeMax: null,
+            sellerCommissionMin: null,
+            sellerCommissionMax: null,
+            sellerPlatformFeeMin: null,
+            sellerPlatformFeeMax: null,
+            tradeFeeSellerAmount: 100,
+            tradeFeeBuyerAmount: 100,
+            shippingShares: { small: 50, medium: 50, large: 50 },
+          }),
+        );
+      });
+    }
+  });
 });
