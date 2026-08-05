@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
+import { Slider } from "@tarodan/ui";
 import {
   FormError,
   FormInput,
@@ -80,6 +81,148 @@ function RateBlock({
           disabled={boundsDisabled}
           placeholder={t("admin.finance.commission.noCap")}
         />
+      </div>
+    </div>
+  );
+}
+
+const clampShare = (value: number) => Math.min(100, Math.max(0, value));
+
+/**
+ * Number input + interactive split slider. Tier rows may stay empty and inherit
+ * the default; moving their slider creates an explicit override.
+ */
+function ShippingShareRow({
+  label,
+  name,
+  buyerShare,
+  inherited,
+  placeholder,
+}: {
+  label: string;
+  name: keyof CommissionFormValues;
+  buyerShare: number;
+  inherited: boolean;
+  placeholder: string;
+}) {
+  const t = useTranslations();
+  const form = useFormContext<CommissionFormValues>();
+  const roundedBuyerShare = Math.round(buyerShare * 100) / 100;
+  const sellerShare = Math.round((100 - roundedBuyerShare) * 100) / 100;
+
+  return (
+    <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(9rem,12rem)_6rem_1fr]">
+      <span className="text-sm text-body">{label}</span>
+      <FormInput
+        name={name}
+        type="number"
+        step="1"
+        min="0"
+        max="100"
+        placeholder={placeholder}
+        aria-label={label}
+      />
+      <div className="min-w-0">
+        <div className="mb-1 flex justify-between gap-2 text-xs">
+          <span className={inherited ? "text-subtle" : "text-body"}>
+            {t("admin.finance.common.buyer")} %{roundedBuyerShare}
+            {inherited && (
+              <span> ({t("admin.finance.commission.usesDefaultShare")})</span>
+            )}
+          </span>
+          <span className={inherited ? "text-subtle" : "text-body"}>
+            {t("admin.finance.common.seller")} %{sellerShare}
+          </span>
+        </div>
+        <Slider
+          min={0}
+          max={100}
+          step={1}
+          value={roundedBuyerShare}
+          aria-label={label}
+          className={inherited ? "opacity-60" : undefined}
+          onChange={(event) =>
+            form.setValue(name, event.target.value as never, {
+              shouldDirty: true,
+              shouldTouch: true,
+              shouldValidate: true,
+            })
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Default shipping split followed by optional per-package overrides. */
+function ShippingSplitSection() {
+  const t = useTranslations();
+  const form = useFormContext<CommissionFormValues>();
+  const values = form.watch();
+  const rawDefault = String(values.shippingBuyerShare ?? "");
+  const hasDefault = rawDefault.trim() !== "";
+  const defaultShare = hasDefault ? clampShare(Number(rawDefault) || 0) : 100;
+  const tiers: Array<{
+    name: keyof CommissionFormValues;
+    label: string;
+  }> = [
+    {
+      name: "shippingShareSmall",
+      label: t("admin.finance.commission.tierSmall"),
+    },
+    {
+      name: "shippingShareMedium",
+      label: t("admin.finance.commission.tierMedium"),
+    },
+    {
+      name: "shippingShareLarge",
+      label: t("admin.finance.commission.tierLarge"),
+    },
+  ];
+
+  return (
+    <div className="space-y-4 rounded-lg border border-border p-4">
+      <div>
+        <h3 className="text-sm font-medium text-heading">
+          {t("admin.finance.commission.shippingSharesTitle")}
+        </h3>
+        <p className="text-xs text-muted">
+          {t("admin.finance.commission.shippingSharesHelper")}
+        </p>
+      </div>
+
+      <ShippingShareRow
+        label={t("admin.finance.commission.defaultShareLabel")}
+        name="shippingBuyerShare"
+        buyerShare={defaultShare}
+        inherited={!hasDefault}
+        placeholder="100"
+      />
+
+      <div className="border-t border-border pt-4">
+        <p className="mb-3 text-xs font-medium text-muted">
+          {t("admin.finance.commission.tierOverridesTitle")} —{" "}
+          {t("admin.finance.commission.tierOverridesHint")}
+        </p>
+        <div className="space-y-4">
+          {tiers.map((tier) => {
+            const rawShare = String(values[tier.name] ?? "");
+            const hasOverride = rawShare.trim() !== "";
+            const buyerShare = hasOverride
+              ? clampShare(Number(rawShare) || 0)
+              : defaultShare;
+            return (
+              <ShippingShareRow
+                key={tier.name}
+                label={tier.label}
+                name={tier.name}
+                buyerShare={buyerShare}
+                inherited={!hasOverride}
+                placeholder={String(defaultShare)}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -262,41 +405,7 @@ export function CommissionRuleFormModal({
         </div>
       </div>
 
-      <div className="space-y-3 rounded-lg border border-border p-4">
-        <h3 className="text-sm font-medium text-heading">
-          {t("admin.finance.commission.shippingSplitTitle")}
-        </h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <FormInput
-            name="shippingBuyerShare"
-            label={t("admin.finance.commission.defaultBuyerShare")}
-            type="number"
-            min="0"
-            max="100"
-          />
-          <FormInput
-            name="shippingShareSmall"
-            label={t("admin.finance.commission.packageSmall")}
-            type="number"
-            min="0"
-            max="100"
-          />
-          <FormInput
-            name="shippingShareMedium"
-            label={t("admin.finance.commission.packageMedium")}
-            type="number"
-            min="0"
-            max="100"
-          />
-          <FormInput
-            name="shippingShareLarge"
-            label={t("admin.finance.commission.packageLarge")}
-            type="number"
-            min="0"
-            max="100"
-          />
-        </div>
-      </div>
+      <ShippingSplitSection />
     </FormModal>
   );
 }
