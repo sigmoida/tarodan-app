@@ -3,9 +3,25 @@ import { LedgerReconciliationService } from "./ledger-reconciliation.service";
 describe("LedgerReconciliationService.reconcile", () => {
   const config = { get: jest.fn(() => undefined) } as any;
 
-  function makePrisma(ledgerEntries: any[], payments: any[]) {
+  /**
+   * `orderEntries`: escrow kalıntı kontrolü sipariş bazında TÜM zamanları sorgular
+   * (capture pencere dışında kalmış olabilir) — pencere sorgusundan ayrı beslenir.
+   */
+  function makePrisma(
+    ledgerEntries: any[],
+    payments: any[],
+    orderEntries?: any[],
+  ) {
     return {
-      ledgerEntry: { findMany: jest.fn().mockResolvedValue(ledgerEntries) },
+      ledgerEntry: {
+        findMany: jest
+          .fn()
+          .mockImplementation(({ where }: any) =>
+            Promise.resolve(
+              where?.orderId ? (orderEntries ?? ledgerEntries) : ledgerEntries,
+            ),
+          ),
+      },
       payment: { findMany: jest.fn().mockResolvedValue(payments) },
       // PSP kesinti driftleri (4-5) bu testlerin konusu değil — boş/sıfır döner.
       paytrStatementLine: {
@@ -110,5 +126,105 @@ describe("LedgerReconciliationService.reconcile", () => {
     expect(r.driftAlarms.some((a) => a.includes("LEDGER_OVER_REFUND"))).toBe(
       true,
     );
+  });
+
+  /**
+   * ESCROW KALINTISI — payout'u TAMAMLANMIŞ bir siparişte escrow net'i 0 olmalı:
+   * capture'daki seller_escrow debit'i, settle/kesinti/iade kredileriyle kapanır.
+   * Kapanmıyorsa bir kayıt DÜŞMÜŞTÜR (klasik vaka: kesinti/adjustment yazımı
+   * sessizce başarısız olmuş) ve escrow sonsuza dek açık kalır. Mevcut dört
+   * invaryantın hiçbiri bunu görmüyordu: gruplar tek tek dengeliydi, fazla-iade
+   * yoktu, PSP tarafı ilgisizdi.
+   */
+  describe("escrow kalıntısı (payout tamamlanmış siparişler)", () => {
+    const capture = (orderId: string, amount: number) => [
+      {
+        entryGroupId: `cap-${orderId}`,
+        eventType: "payment_captured",
+        account: "buyer_payment",
+        direction: "credit",
+        amount,
+        orderId,
+      },
+      {
+        entryGroupId: `cap-${orderId}`,
+        eventType: "payment_captured",
+        account: "seller_escrow",
+        direction: "debit",
+        amount,
+        orderId,
+      },
+    ];
+    const settle = (orderId: string, amount: number) => [
+      {
+        entryGroupId: `pay-${orderId}`,
+        eventType: "payout_completed",
+        account: "seller_escrow",
+        direction: "credit",
+        amount,
+        orderId,
+      },
+      {
+        entryGroupId: `pay-${orderId}`,
+        eventType: "payout_completed",
+        account: "payout",
+        direction: "debit",
+        amount,
+        orderId,
+      },
+    ];
+
+    it("escrow tam kapanmışsa sessiz kalır", async () => {
+      const rows = [...capture("o1", 90), ...settle("o1", 90)];
+      const prisma = makePrisma(rows, [], rows);
+      const svc = new LedgerReconciliationService(prisma, config, {} as any);
+
+      const r = await svc.reconcile();
+
+      expect(r.escrowResidueOrders).toBe(0);
+      expect(r.driftAlarms).toHaveLength(0);
+    });
+
+    it("settle var ama escrow'da kalıntı kaldıysa alarm (kesinti kaydı düşmüş)", async () => {
+      // capture 90 borç, transfer 70 kapatır; 20 TL kesinti kaydı YAZILMAMIŞ.
+      const rows = [...capture("o1", 90), ...settle("o1", 70)];
+      const prisma = makePrisma(rows, [], rows);
+      const svc = new LedgerReconciliationService(prisma, config, {} as any);
+
+      const r = await svc.reconcile();
+
+      expect(r.escrowResidueOrders).toBe(1);
+      expect(
+        r.driftAlarms.some(
+          (a) => a.includes("LEDGER_ESCROW_RESIDUE") && a.includes("o1"),
+        ),
+      ).toBe(true);
+    });
+
+    it("capture penceredışı kalsa da kalıntıyı doğru hesaplar (tüm zamanları sorgular)", async () => {
+      // Pencerede YALNIZ settle var; capture günler önce yazılmış. Kontrol pencereye
+      // bakarsa escrow'u −70 görüp yanlış alarm basardı.
+      const prisma = makePrisma(
+        settle("o1", 70),
+        [],
+        [...capture("o1", 70), ...settle("o1", 70)],
+      );
+      const svc = new LedgerReconciliationService(prisma, config, {} as any);
+
+      const r = await svc.reconcile();
+
+      expect(r.escrowResidueOrders).toBe(0);
+    });
+
+    it("payout'u tamamlanmamış sipariş (açık escrow) alarm ÜRETMEZ", async () => {
+      const rows = capture("o1", 90);
+      const prisma = makePrisma(rows, [], rows);
+      const svc = new LedgerReconciliationService(prisma, config, {} as any);
+
+      const r = await svc.reconcile();
+
+      expect(r.escrowResidueOrders).toBe(0);
+      expect(r.driftAlarms).toHaveLength(0);
+    });
   });
 });

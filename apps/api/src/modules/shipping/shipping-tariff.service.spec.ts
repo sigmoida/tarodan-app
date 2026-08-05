@@ -33,11 +33,8 @@ describe("ShippingTariffService active tariff", () => {
       provider: "surat",
       status: ShippingTariffStatus.active,
       version,
-      outboundPackageFee: 30 + version,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      returnPackageFee: 30,
-      tradeLegFee: 30,
       packageTiers: validTiers,
       ...over,
     }) as any;

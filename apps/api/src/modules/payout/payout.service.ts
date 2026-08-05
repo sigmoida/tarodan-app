@@ -329,11 +329,17 @@ export class PayoutService {
     }
 
     // 2) TradeCashPayment released but no PayoutTransfer yet
+    //
+    // v2: her takasta İKİ ödeme satırı vardır ama karşı tarafa geçen tek kalem nakit
+    // farktır — hizmet bedeli ve kargo platformda kalır. Farkı olmayan tarafın
+    // satırında `recipientId` NULL'dur; onu buraya almak alıcısız transfer üretirdi.
     const releasedTradeCash = await this.prisma.tradeCashPayment.findMany({
       where: {
         status: PaymentStatus.completed,
         releasedAt: { not: null },
         payoutTransfers: { none: {} },
+        recipientId: { not: null },
+        amount: { gt: 0 },
       },
       include: {
         trade: true,
@@ -360,7 +366,9 @@ export class PayoutService {
         });
         if (activeRefundAttempt) continue;
       }
+      // Sorgu zaten NULL alıcıları eliyor; bu yalnız tip daraltması (defansif).
       const recipientId = tcp.recipientId;
+      if (!recipientId) continue;
       const recipient = await this.prisma.user.findUnique({
         where: { id: recipientId },
         include: { bankAccount: true },
@@ -502,42 +510,42 @@ export class PayoutService {
         // kadar borçlanan seller_escrow, payout ledger'ında yalnız transfer edilen
         // net kadar kapanır — kesinti burada kapatılmazsa escrow'da kalıntı sonsuza
         // dek açık kalır (fullyConsumed payout'ta escrow'u kapatan TEK kayıt budur).
-        // Best-effort: defter hatası payout üretimini BOZMAZ (mevcut kalıp).
+        //
+        // FAIL-LOUD (eskiden best-effort): yazım payout ile AYNI tx'te olduğundan
+        // hatayı yutmak "payout var, defterde kesinti yok" durumunu kalıcılaştırıyordu
+        // — escrow kalıntısı sonsuza dek açık kalırdı. Fırlatmak payout'u geri alır;
+        // sonraki tur yeniden dener. İdempotency anahtarı payout'tan türer (hold ↔
+        // payout 1:1) → tekrar denemede çift kayıt DB'de düşer.
         if (adjustmentDeduction > 0) {
-          try {
-            await this.ledger?.record(tx, {
-              eventType: LedgerEventType.adjustment,
-              entries: [
-                {
-                  account: LedgerAccount.seller_debt_recovery,
-                  direction: LedgerDirection.debit,
-                  amount: adjustmentDeduction,
-                },
-                {
-                  account: LedgerAccount.seller_escrow,
-                  direction: LedgerDirection.credit,
-                  amount: adjustmentDeduction,
-                  sellerId: hold.sellerId,
-                },
-              ],
-              refs: {
-                payoutId: payout.id,
+          await this.ledger?.record(tx, {
+            eventType: LedgerEventType.adjustment,
+            idempotencyKey: `adjustment:payout:${payout.id}`,
+            entries: [
+              {
+                account: LedgerAccount.seller_debt_recovery,
+                direction: LedgerDirection.debit,
+                amount: adjustmentDeduction,
+              },
+              {
+                account: LedgerAccount.seller_escrow,
+                direction: LedgerDirection.credit,
+                amount: adjustmentDeduction,
                 sellerId: hold.sellerId,
-                orderId: order.id,
-                holdId: hold.id,
               },
-              metadata: {
-                allocations: allocations.map((a) => ({
-                  adjustmentId: a.adjustmentId,
-                  amount: a.amount,
-                })),
-              },
-            });
-          } catch (e: any) {
-            this.logger.warn(
-              `Ledger adjustment kaydı başarısız (payout ${payout.id}): ${e?.message}`,
-            );
-          }
+            ],
+            refs: {
+              payoutId: payout.id,
+              sellerId: hold.sellerId,
+              orderId: order.id,
+              holdId: hold.id,
+            },
+            metadata: {
+              allocations: allocations.map((a) => ({
+                adjustmentId: a.adjustmentId,
+                amount: a.amount,
+              })),
+            },
+          });
         }
         for (const allocation of allocations) {
           const settled = allocation.remainingAmount <= 0.01;
@@ -920,12 +928,29 @@ export class PayoutService {
     );
     // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
     // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
-    // → sipariş bazında escrow net 0'a iner. Best-effort (payout'u bozmaz).
+    // → sipariş bazında escrow net 0'a iner.
+    //
+    // POST-COMMIT: payout zaten `completed` yazıldı; burada fırlatmak hiçbir şeyi
+    // geri almaz → best-effort KALIR (tx-içi yollardan farklı olarak). Reconciliation
+    // escrow kalıntısı olarak yakalar.
+    //
+    // `orderId`/`holdId` referansları escrow kalıntı invaryantının ön koşuludur:
+    // sipariş bazlı escrow bakiyesi ancak settle kaydı siparişe bağlıysa kapanır.
+    // Hold ↔ payout 1:1 (PayoutTransfer.paymentHoldId UNIQUE) → payout satırından türer.
     try {
       const net = params.netAmount;
-      if (net > 0)
+      if (net > 0) {
+        const payoutRow = await this.prisma.payoutTransfer.findUnique({
+          where: { id: params.payoutId },
+          select: {
+            paymentHoldId: true,
+            paymentHold: { select: { orderId: true } },
+          },
+        });
         await this.ledger?.record(this.prisma, {
           eventType: LedgerEventType.payout_completed,
+          // Payout başına TEK settle kaydı: PayTR "OK" görene dek bildirimi yineler.
+          idempotencyKey: `payout-completed:${params.payoutId}`,
           entries: [
             {
               account: LedgerAccount.seller_escrow,
@@ -941,8 +966,11 @@ export class PayoutService {
           refs: {
             payoutId: params.payoutId,
             sellerId: params.sellerId,
+            orderId: payoutRow?.paymentHold?.orderId ?? null,
+            holdId: payoutRow?.paymentHoldId ?? null,
           },
         });
+      }
     } catch (e: any) {
       this.logger.warn(
         `Ledger payout kaydı başarısız (payout ${params.payoutId}): ${e?.message}`,

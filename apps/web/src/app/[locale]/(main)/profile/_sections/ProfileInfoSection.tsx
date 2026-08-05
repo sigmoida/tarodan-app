@@ -192,7 +192,6 @@ export default function ProfileInfoSection() {
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 onClick={() => setEmailModalOpen(true)}
               >
                 Değiştir

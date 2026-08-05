@@ -4,7 +4,9 @@ import type { Translate } from "@/types/i18n";
 
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { ButtonLink } from "@/components/ui";
+import { formatTL } from "@/lib/format";
 import type { Trade } from "../_lib/types";
+import { buildTradePaymentPanels } from "../_lib/tradePayments";
 
 /** BCP-47 date-format locale for the active UI language. */
 const DATE_LOCALES: Record<string, string> = { en: "en-US", tr: "tr-TR" };
@@ -13,12 +15,30 @@ export default function CompletedTradeSummary({
   trade,
   locale,
   t,
+  userId,
 }: {
   trade: Trade;
   locale: string;
   t: Translate;
+  userId?: string;
 }) {
   if (trade.status !== "completed") return null;
+
+  // Tamamlanan takasta kullanıcı "ne ödedim" sorusunun cevabını burada arar;
+  // ödeme kartı bu aşamada aksiyon içermediği için döküm özete taşınır.
+  const myPanel = buildTradePaymentPanels(trade, null, userId).find(
+    (panel) => panel.isViewer,
+  );
+  const paidLines = myPanel
+    ? (
+        [
+          [t("trade.serviceFee"), myPanel.serviceFee],
+          [t("trade.shippingFee"), myPanel.shipping],
+          [t("trade.cashDifferenceLine"), myPanel.cashDifference],
+          [t("trade.commissionLine"), myPanel.commission],
+        ] as const
+      ).filter(([, amount]) => amount > 0)
+    : [];
 
   const fmtDate = (iso?: string) =>
     iso
@@ -70,6 +90,35 @@ export default function CompletedTradeSummary({
               </div>
             )}
           </div>
+          {paidLines.length > 0 && myPanel && (
+            <div className="mb-4 rounded-lg border border-border bg-surface-elevated/60 px-4 py-3">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-success-700">
+                {t("trade.paymentsSummaryTitle")}
+              </p>
+              <div className="space-y-1">
+                {paidLines.map(([label, amount]) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="text-muted">{label}</span>
+                    <span className="font-medium text-body">
+                      {formatTL(amount)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between border-t border-border pt-1 text-sm">
+                  <span className="font-semibold text-heading">
+                    {t("trade.paymentTotal")}
+                  </span>
+                  <span className="font-bold text-heading">
+                    {formatTL(myPanel.total)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-3">
             <ButtonLink href="/profile/trades" variant="primary" size="sm">
               {t("trade.backToTrades")}

@@ -14,6 +14,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ValidateNested,
+  IsDateString,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
@@ -245,4 +246,39 @@ export class CreateProductDto {
   @IsArray()
   @IsString({ each: true })
   attributes?: string[];
+
+  // ── İndirimli açılış ──
+  // Yeni ilan formunda indirim bölümü olmadığı için satıcı ilanı indirimli
+  // açamıyor, açtıktan hemen sonra düzenleme ekranına girmek zorunda kalıyordu.
+  // Kural güncelleme yoluyla aynı (A + oldPrice): bkz. `product-sale-pricing`.
+  @ApiPropertyOptional({
+    example: 299.99,
+    description:
+      "Price before the discount (strike-through). Defaults to `price`.",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  originalPrice?: number | null;
+
+  @ApiPropertyOptional({
+    example: 249.99,
+    description: "Discounted selling price",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  salePrice?: number | null;
+
+  @ApiPropertyOptional({ example: "2026-08-01T00:00:00.000Z" })
+  @IsOptional()
+  @IsDateString()
+  saleStartDate?: string | null;
+
+  @ApiPropertyOptional({ example: "2026-08-31T00:00:00.000Z" })
+  @IsOptional()
+  @IsDateString()
+  saleEndDate?: string | null;
 }

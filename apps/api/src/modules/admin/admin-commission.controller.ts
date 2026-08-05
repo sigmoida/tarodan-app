@@ -56,6 +56,7 @@ import {
 } from "../refund/dto";
 import {
   CreateCommissionRuleDto,
+  CreateCommissionRuleSetDto,
   PreviewCommissionDto,
   UpdateCommissionRuleDto,
   CommissionRuleResponseDto,
@@ -115,29 +116,55 @@ export class AdminCommissionController {
 
   // ==================== COMMISSION RULES ====================
 
-  @Get("trade-commission-rate")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Takas nakit farkı komisyon oranı (%)" })
-  async getTradeCommissionRate() {
-    return this.adminService.getTradeCommissionRate();
-  }
-
-  @Patch("trade-commission-rate")
-  @Roles(AdminRole.super_admin)
-  @ApiOperation({ summary: "Takas komisyon oranını güncelle" })
-  async setTradeCommissionRate(
-    @CurrentUser("id") adminId: string,
-    @Body() body: { rate: number },
-  ) {
-    return this.adminService.setTradeCommissionRate(adminId, Number(body.rate));
-  }
-
   @Get("commission-rules")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Get all commission rules" })
   @ApiResponse({ status: HttpStatus.OK, type: [CommissionRuleResponseDto] })
-  async getCommissionRules() {
-    return this.adminService.getCommissionRules();
+  async getCommissionRules(@Query("ruleSetId") ruleSetId?: string) {
+    return this.adminService.getCommissionRules(ruleSetId);
+  }
+
+  @Get("commission-rules/:id")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Get one commission rule by its immutable ID" })
+  @ApiParam({ name: "id", description: "Commission rule ID" })
+  @ApiResponse({ status: HttpStatus.OK, type: CommissionRuleResponseDto })
+  async getCommissionRule(@Param("id") id: string) {
+    return this.adminService.getCommissionRule(id);
+  }
+
+  @Get("commission-rule-sets")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "List commission rule sets" })
+  async getCommissionRuleSets() {
+    return this.adminService.getCommissionRuleSets();
+  }
+
+  @Post("commission-rule-sets/draft")
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: "Create a draft cloned from the active set" })
+  async createCommissionRuleSetDraft(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: CreateCommissionRuleSetDto,
+  ) {
+    return this.adminService.createDraftCommissionRuleSet(adminId, dto);
+  }
+
+  @Get("commission-rule-sets/:id/validate")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Validate strict commission coverage" })
+  async validateCommissionRuleSet(@Param("id") id: string) {
+    return this.adminService.validateCommissionRuleSet(id);
+  }
+
+  @Post("commission-rule-sets/:id/publish")
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: "Atomically publish a valid commission rule set" })
+  async publishCommissionRuleSet(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.adminService.publishCommissionRuleSet(adminId, id);
   }
 
   @Post("commission-rules/preview")

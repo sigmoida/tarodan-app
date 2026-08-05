@@ -2,12 +2,18 @@ import { AdminCatalogService } from "./admin-catalog.service";
 
 describe("AdminCatalogService list sorting", () => {
   let prisma: any;
+  let cache: { del: jest.Mock };
+  let audit: { createAuditLog: jest.Mock };
   let service: AdminCatalogService;
 
   beforeEach(() => {
     const model = () => ({
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     });
     prisma = {
       category: model(),
@@ -16,8 +22,16 @@ describe("AdminCatalogService list sorting", () => {
       carModel: model(),
       attributeGroup: model(),
       attribute: model(),
+      commissionRuleSet: model(),
     };
-    service = new AdminCatalogService(prisma, {} as any, {} as any, {} as any);
+    cache = { del: jest.fn().mockResolvedValue(undefined) };
+    audit = { createAuditLog: jest.fn().mockResolvedValue(undefined) };
+    service = new AdminCatalogService(
+      prisma,
+      cache as any,
+      audit as any,
+      {} as any,
+    );
   });
 
   it("paginates categories with their existing default sort", async () => {
@@ -157,5 +171,96 @@ describe("AdminCatalogService list sorting", () => {
     expect(prisma.attribute.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({ orderBy: { value: "asc" } }),
     );
+  });
+
+  it("invalidates the public category cache after creating a category", async () => {
+    prisma.category.findUnique.mockResolvedValue(null);
+    prisma.category.create.mockResolvedValue({
+      id: "category-1",
+      name: "Yeni kategori",
+      slug: "yeni-kategori",
+      isActive: false,
+    });
+
+    await service.createCategory("admin-1", { name: "Yeni kategori" });
+
+    expect(cache.del).toHaveBeenCalledWith("categories:all");
+  });
+
+  it("rejects activation below an inactive ancestor", async () => {
+    prisma.category.findUnique
+      .mockResolvedValueOnce({
+        id: "child",
+        parentId: "parent",
+        isActive: false,
+        children: [],
+      })
+      .mockResolvedValueOnce({
+        id: "parent",
+        parentId: null,
+        isActive: false,
+      });
+
+    await expect(
+      service.updateCategory("admin-1", "child", { isActive: true }),
+    ).rejects.toThrow("tüm üst kategoriler aktif olmalıdır");
+    expect(prisma.category.update).not.toHaveBeenCalled();
+    expect(cache.del).not.toHaveBeenCalled();
+  });
+
+  it("rejects deactivation while any active descendant remains", async () => {
+    prisma.category.findUnique.mockResolvedValue({
+      id: "root",
+      parentId: null,
+      isActive: true,
+      children: [{ id: "child" }],
+    });
+    prisma.category.findMany.mockResolvedValue([
+      { id: "root", parentId: null, isActive: true },
+      { id: "child", parentId: "root", isActive: false },
+      { id: "grandchild", parentId: "child", isActive: true },
+    ]);
+
+    await expect(
+      service.updateCategory("admin-1", "root", { isActive: false }),
+    ).rejects.toThrow("önce aktif alt kategorileri pasife alınmalıdır");
+    expect(prisma.category.update).not.toHaveBeenCalled();
+  });
+
+  it("invalidates the public category cache after updating a category", async () => {
+    prisma.category.findUnique.mockResolvedValue({
+      id: "category-1",
+      name: "Eski ad",
+      slug: "eski-ad",
+      parentId: null,
+      isActive: false,
+      children: [],
+    });
+    prisma.category.update.mockResolvedValue({
+      id: "category-1",
+      name: "Yeni ad",
+      slug: "yeni-ad",
+      isActive: false,
+    });
+
+    await service.updateCategory("admin-1", "category-1", {
+      name: "Yeni ad",
+    });
+
+    expect(cache.del).toHaveBeenCalledWith("categories:all");
+  });
+
+  it("invalidates the public category cache after deleting a category", async () => {
+    const category = {
+      id: "category-1",
+      children: [],
+      _count: { products: 0 },
+    };
+    prisma.category.findUnique.mockResolvedValue(category);
+    prisma.category.delete.mockResolvedValue(category);
+
+    await service.deleteCategory("admin-1", "category-1");
+
+    expect(cache.del).toHaveBeenCalledWith("categories:all");
   });
 });

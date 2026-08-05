@@ -20,12 +20,59 @@ export interface TradeShipment {
 
 export interface TradeItem {
   id: string;
+  valueAtTrade?: number;
+  commissionRule?: TradeCommissionRuleMatch;
   product: {
     id: string;
     title: string;
     price: number;
     images?: Array<{ url: string }>;
   };
+}
+
+export interface TradeCommissionRuleMatch {
+  productId: string;
+  side: "initiator" | "receiver";
+  ruleId: string;
+  ruleSetId: string;
+  ruleSetVersion: number;
+  ruleName: string;
+  categoryId: string;
+  sellerType: string;
+  matchedAmount: number;
+  minAmount: number;
+  maxAmount: number | null;
+  tradeFeeSellerAmount: number;
+  tradeFeeBuyerAmount: number;
+  source: "snapshot" | "live";
+}
+
+export interface TradeCashPayment {
+  id?: string;
+  payerId: string;
+  /** Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. */
+  recipientId?: string | null;
+  /** Nakit fark. */
+  amount: number;
+  /** v2: takas hizmet bedeli (KDV dahil). */
+  tradeFeeAmount?: number;
+  /** v2: bu tarafın 2 bacaklık kargo bedeli. */
+  shippingAmount?: number;
+  /** LEGACY (v1): aracılık komisyonu. */
+  commission: number;
+  totalAmount: number;
+  status: string;
+  paidAt?: string | null;
+  refundedAt?: string | null;
+}
+
+export interface TradePaymentQuoteParty {
+  userId: string;
+  side: "initiator" | "receiver";
+  serviceFee: number;
+  shipping: number;
+  cashDifference: number;
+  total: number;
 }
 
 export interface TradeDetail {
@@ -35,16 +82,19 @@ export interface TradeDetail {
   cashAmount?: number;
   /** Nakit farkını ödeyen taraf (initiator.id | receiver.id). null = eşit takas. */
   cashPayerId?: string | null;
-  /** Escrow nakit ödeme kaydı (accept'te oluşur): komisyon + toplam dahil. */
-  cashPayment?: {
-    payerId: string;
-    recipientId: string;
-    amount: number;
-    commission: number;
-    totalAmount: number;
-    status: string;
-    paidAt?: string | null;
+  /**
+   * Escrow ödeme satırları (accept'te oluşur). v2'de TARAF BAŞINA bir satır
+   * vardır: hizmet bedeli + 2 bacaklık kargo + varsa nakit fark.
+   */
+  cashPayments?: TradeCashPayment[];
+  /** LEGACY (v1): takas başına tek satır. */
+  cashPayment?: TradeCashPayment | null;
+  paymentQuote?: {
+    tradeId: string;
+    initiator: TradePaymentQuoteParty;
+    receiver: TradePaymentQuoteParty;
   } | null;
+  commissionRuleMatches?: TradeCommissionRuleMatch[];
   initiator: { id: string; displayName: string; email: string };
   receiver: { id: string; displayName: string; email: string };
   initiatorItems: TradeItem[];

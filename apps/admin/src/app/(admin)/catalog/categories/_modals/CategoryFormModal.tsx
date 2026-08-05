@@ -66,7 +66,7 @@ export function CategoryFormModal({
           description: "",
           parentId: NO_PARENT,
           sortOrder: "0",
-          isActive: true,
+          isActive: false,
         },
   });
 
@@ -128,7 +128,16 @@ export function CategoryFormModal({
         label={t("admin.catalog.common.sortOrder")}
         type="number"
       />
-      <FormCheckbox name="isActive" label={t("common.active")} />
+      <FormCheckbox
+        name="isActive"
+        label={t("common.active")}
+        disabled={!isEdit}
+      />
+      {!isEdit && (
+        <p className="text-sm text-muted">
+          {t("admin.catalog.categories.commissionCoverageHint")}
+        </p>
+      )}
     </FormModal>
   );
 }

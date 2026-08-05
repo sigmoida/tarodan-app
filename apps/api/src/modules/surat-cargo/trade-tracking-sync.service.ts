@@ -369,30 +369,33 @@ export class TradeTrackingSyncService {
       return true;
     });
 
-    // YENİ MODEL: takas nakit komisyonu e-Arşivi CASH PAYMENT'ta değil, ürünler DEPOYA VARINCA
+    // YENİ MODEL: takas hizmet bedeli e-Arşivi CASH PAYMENT'ta değil, ürünler DEPOYA VARINCA
     // (at_warehouse) kesilir → iptal penceresi geçmiş olur, iptalde fatura kesilmemiş olur.
+    // v2'de taraf başına bir satır vardır → HER tamamlanmış satır kendi faturasını doğurur.
     // Post-commit, non-blocking, idempotent (cut() type+sourceId tekil).
     if (!transitioned) return;
     try {
-      const tcp = await this.prisma.tradeCashPayment.findUnique({
-        where: { tradeId },
-        select: { id: true, status: true },
+      const tcps = await this.prisma.tradeCashPayment.findMany({
+        where: { tradeId, status: PaymentStatus.completed },
+        select: { id: true },
       });
-      if (tcp && tcp.status === PaymentStatus.completed) {
+      if (tcps.length > 0) {
         const elogo = this.moduleRef.get(ElogoInvoicingService, {
           strict: false,
         });
-        await elogo
-          .issueTradeCashCommissionInvoice(tcp.id)
-          .catch((e: any) =>
-            this.logger.warn(
-              `eLogo takas komisyonu (depo) tetik hatası ${tradeId}: ${e?.message}`,
-            ),
-          );
+        for (const tcp of tcps) {
+          await elogo
+            .issueTradeCashFeeInvoice(tcp.id)
+            .catch((e: any) =>
+              this.logger.warn(
+                `eLogo takas hizmet bedeli (depo) tetik hatası ${tradeId}/${tcp.id}: ${e?.message}`,
+              ),
+            );
+        }
       }
     } catch (e: any) {
       this.logger.warn(
-        `at_warehouse takas komisyonu faturası hatası ${tradeId}: ${e?.message}`,
+        `at_warehouse takas hizmet bedeli faturası hatası ${tradeId}: ${e?.message}`,
       );
     }
   }

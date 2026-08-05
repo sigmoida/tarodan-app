@@ -4,6 +4,7 @@ import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
 import { computeTradeCanCancel } from "./trade.state-machine";
 import { TradeResponseDto } from "./dto";
+import { primaryCashPayment } from "./trade.constants";
 
 /**
  * Takas modülü ortak yardımcıları (yanıt DTO formatlama + ürün cache
@@ -162,6 +163,23 @@ export class TradeCommonService {
       .map(applyShipmentPrivacy)
       .filter((s): s is any => s !== null);
 
+    // v2'de her tarafın kendi ödeme satırı vardır; ekranlar ikisini de gösterir.
+    // Tek satıra indirgemek (primaryCashPayment) yalnız LEGACY alan için kalır.
+    const mapCashPayment = (p: any) => ({
+      id: p.id,
+      payerId: p.payerId,
+      recipientId: p.recipientId ?? null,
+      amount: parseFloat(p.amount),
+      tradeFeeAmount: parseFloat(p.tradeFeeAmount ?? 0),
+      shippingAmount: parseFloat(p.shippingAmount ?? 0),
+      commission: parseFloat(p.commission),
+      totalAmount: parseFloat(p.totalAmount),
+      status: p.status,
+      paidAt: p.paidAt,
+    });
+    const cashPayments = (trade.cashPayments ?? []).map(mapCashPayment);
+    const cashPayment: any = primaryCashPayment(cashPayments);
+
     return {
       id: trade.id,
       tradeNumber: trade.tradeNumber,
@@ -249,18 +267,10 @@ export class TradeCommonService {
         shippedAt: shipment.shippedAt || undefined,
         deliveredAt: shipment.deliveredAt || undefined,
       })),
-      cashPayment: trade.cashPayment
-        ? {
-            id: trade.cashPayment.id,
-            payerId: trade.cashPayment.payerId,
-            recipientId: trade.cashPayment.recipientId,
-            amount: parseFloat(trade.cashPayment.amount),
-            commission: parseFloat(trade.cashPayment.commission),
-            totalAmount: parseFloat(trade.cashPayment.totalAmount),
-            status: trade.cashPayment.status,
-            paidAt: trade.cashPayment.paidAt,
-          }
-        : undefined,
+      // v1 tekil alan korunur (istemciler kırılmaz): fark taşıyan satır.
+      // v2 çok-satırlı döküm ayrı alanda taşınır.
+      cashPayments,
+      cashPayment: cashPayment ?? undefined,
       dispute: trade.dispute
         ? {
             id: trade.dispute.id,

@@ -22,12 +22,13 @@ export function useGuestOtp({
   checkoutItems,
   t,
   router,
-  goToStep,
+  onVerified,
 }: {
   checkoutItems: CheckoutItem[];
   t: Translate;
   router: { push: (href: string) => void };
-  goToStep: (step: number) => void;
+  /** Kod doğrulandığında çağrılır — tek sayfada ödeme kaldığı yerden sürer. */
+  onVerified: () => void;
 }) {
   // Guest checkout fields
   const [guestEmail, setGuestEmail] = useState("");
@@ -130,7 +131,7 @@ export function useGuestOtp({
       return;
     }
     setGuestOtpModalOpen(false);
-    goToStep(1);
+    onVerified();
   };
 
   return {

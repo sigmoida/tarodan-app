@@ -15,7 +15,7 @@ import {
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
 } from "../../common/helpers/fulltext-search";
-import { Prisma, Brand } from "@prisma/client";
+import { Brand, Prisma, ProductKind } from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import {
   AdminAttributeGroupQueryDto,
@@ -25,6 +25,12 @@ import {
   AdminCategoryQueryDto,
   AdminManufacturerQueryDto,
 } from "./dto";
+import {
+  assertCategoryHasPublishedCommissionCoverage,
+  assertNoActiveCategoryDescendants,
+  assertValidCategoryParent,
+  CATEGORIES_CACHE_KEY,
+} from "../category/category-integrity.helper";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -43,6 +49,10 @@ export class AdminCatalogService {
     @Optional()
     private readonly storageService: StorageService,
   ) {}
+
+  private async invalidateCategoriesCache(): Promise<void> {
+    await this.cache.del(CATEGORIES_CACHE_KEY);
+  }
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
@@ -120,7 +130,10 @@ export class AdminCatalogService {
           parent: true,
           children: { orderBy: { name: "asc" } },
           _count: {
-            select: { products: true, collections: true },
+            select: {
+              products: { where: { kind: ProductKind.listing } },
+              collections: true,
+            },
           },
         },
         orderBy,
@@ -136,6 +149,7 @@ export class AdminCatalogService {
       ? await this.prisma.product.groupBy({
           by: ["categoryId", "status"],
           where: {
+            kind: ProductKind.listing,
             categoryId: { in: catIds },
             status: { in: ["active", "inactive", "pending"] as any },
           },
@@ -184,6 +198,11 @@ export class AdminCatalogService {
       isActive?: boolean;
     },
   ) {
+    if (dto.isActive === true) {
+      throw new BadRequestException(
+        "Yeni kategori önce pasif oluşturulmalı, komisyon kuralları yayınlandıktan sonra aktifleştirilmelidir.",
+      );
+    }
     // Check if parent exists
     if (dto.parentId) {
       const parent = await this.prisma.category.findUnique({
@@ -218,9 +237,14 @@ export class AdminCatalogService {
         description: dto.description || null,
         parentId: dto.parentId || null, // Empty string becomes null (root category)
         sortOrder: dto.sortOrder || 0,
-        isActive: dto.isActive !== undefined ? dto.isActive : true,
+        // Yeni kategori önce komisyon taslağına eklenip yayınlanmalıdır. ID ancak
+        // create sonrası oluştuğu için doğrudan aktif yaratmak kapsama invariantını
+        // bozar; aktivasyon update yolundaki guard'dan geçer.
+        isActive: false,
       },
     });
+
+    await this.invalidateCategoriesCache();
 
     // Create audit log
     await this.audit.createAuditLog(
@@ -258,26 +282,28 @@ export class AdminCatalogService {
       throw new NotFoundException("Kategori bulunamadı");
     }
 
-    // Check circular reference if parentId is being changed
-    if (dto.parentId && dto.parentId !== category.parentId) {
-      // Check if new parent is a child of this category
-      const isChild = category.children.some(
-        (child) => child.id === dto.parentId,
+    const nextParentId =
+      dto.parentId !== undefined ? dto.parentId || null : category.parentId;
+    const nextIsActive = dto.isActive ?? category.isActive;
+
+    if (nextParentId && (dto.parentId !== undefined || dto.isActive === true)) {
+      await assertValidCategoryParent(
+        this.prisma,
+        categoryId,
+        nextParentId,
+        nextIsActive,
       );
-      if (isChild) {
-        throw new BadRequestException(
-          "Kategori kendi alt kategorisini üst kategori olarak seçemez",
-        );
-      }
+    }
 
-      // Check if new parent exists
-      const newParent = await this.prisma.category.findUnique({
-        where: { id: dto.parentId },
-      });
+    if (dto.isActive === false && category.isActive) {
+      await assertNoActiveCategoryDescendants(this.prisma, categoryId);
+    }
 
-      if (!newParent) {
-        throw new NotFoundException("Üst kategori bulunamadı");
-      }
+    if (dto.isActive === true && !category.isActive) {
+      await assertCategoryHasPublishedCommissionCoverage(
+        this.prisma,
+        categoryId,
+      );
     }
 
     // Generate new slug if name changed
@@ -315,6 +341,8 @@ export class AdminCatalogService {
         isActive: dto.isActive,
       },
     });
+
+    await this.invalidateCategoriesCache();
 
     // Create audit log
     await this.audit.createAuditLog(
@@ -364,6 +392,8 @@ export class AdminCatalogService {
     await this.prisma.category.delete({
       where: { id: categoryId },
     });
+
+    await this.invalidateCategoriesCache();
 
     // Create audit log
     await this.audit.createAuditLog(

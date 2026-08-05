@@ -8,12 +8,13 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getTradeStatusLabel } from "./_lib/types";
 import { useTradeDetail } from "./_hooks/useTradeDetail";
+import { viewerCanPay } from "./_lib/tradePayments";
 import TradeProgressTimeline from "./_sections/TradeProgressTimeline";
 import CompletedTradeSummary from "./_sections/CompletedTradeSummary";
 import TradeCountdown from "./_sections/TradeCountdown";
 import TradeInfoBanners from "./_sections/TradeInfoBanners";
 import TradeItemsComparison from "./_sections/TradeItemsComparison";
-import CashDifferenceCard from "./_sections/CashDifferenceCard";
+import TradePaymentsCard from "./_sections/TradePaymentsCard";
 import ShipInfoForm from "./_sections/ShipInfoForm";
 import WarehouseShipmentCard from "./_sections/WarehouseShipmentCard";
 import RecipientsShipmentCard from "./_sections/RecipientsShipmentCard";
@@ -27,6 +28,7 @@ export default function TradeDetailPage() {
   const vm = useTradeDetail();
   const {
     trade,
+    quote,
     isLoading,
     tradeId,
     user,
@@ -107,6 +109,10 @@ export default function TradeDetailPage() {
   const theirItems = isInitiator ? trade.receiverItems : trade.initiatorItems;
   const theirName = isInitiator ? trade.receiverName : trade.initiatorName;
 
+  // Ödeme aşamasında iptal düğmesini ödeme kartı gösterir; aksi halde aynı
+  // düğme hem orada hem alttaki eylem çubuğunda çıkardı.
+  const paymentCardOwnsCancel = viewerCanPay(trade, quote, user?.id);
+
   return (
     <PageShell className="pb-16">
       <PageHeader
@@ -144,7 +150,12 @@ export default function TradeDetailPage() {
 
       <TradeProgressTimeline trade={trade} />
 
-      <CompletedTradeSummary trade={trade} locale={locale} t={t} />
+      <CompletedTradeSummary
+        trade={trade}
+        locale={locale}
+        t={t}
+        userId={user?.id}
+      />
 
       <TradeCountdown countdown={countdown} />
 
@@ -157,11 +168,20 @@ export default function TradeDetailPage() {
         tradeId={tradeId}
       />
 
-      <CashDifferenceCard
+      {/*
+        Ödeme aşamasındaki iptal düğmesi ödeme kartının İÇİNDE, öde düğmesinin
+        yanında durur; TradeActionBar aynı düğmeyi ikinci bir kartta tekrar
+        etmesin diye aşağıda `canCancel` bu durumda kapatılır.
+      */}
+      <TradePaymentsCard
         trade={trade}
+        quote={quote}
         userId={user?.id}
         onPay={handleCashPayment}
         cashPaymentLoading={cashPaymentLoading}
+        canCancel={!!canCancel}
+        onCancel={handleCancel}
+        isActionLoading={isActionLoading}
       />
 
       {needToShip && (
@@ -200,7 +220,7 @@ export default function TradeDetailPage() {
         canAccept={!!canAccept}
         canReject={!!canReject}
         canCounter={!!canCounter}
-        canCancel={!!canCancel}
+        canCancel={!!canCancel && !paymentCardOwnsCancel}
         showCancelDisabled={!!showCancelDisabled}
         onAddressChange={setTradeAddressId}
         onAccept={handleAccept}

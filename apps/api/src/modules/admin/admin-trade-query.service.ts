@@ -4,6 +4,9 @@ import { StorageService } from "../storage/storage.service";
 import { Prisma } from "@prisma/client";
 import { AdminTradeQueryDto, TradeShipmentQueryDto } from "./dto";
 import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
+import { TradeQuoteService } from "../trade/trade-quote.service";
+import { TRADE_PRICING_V2 } from "../trade/trade.constants";
+import { readTradeCommissionRuleSnapshot } from "../trade/trade-commission-snapshot";
 
 /**
  * Takas yönetimi salt-okunur sorguları (admin liste/detay) — AdminTradeService'ten
@@ -17,6 +20,8 @@ export class AdminTradeQueryService {
     private readonly prisma: PrismaService,
     @Optional()
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly tradeQuoteService?: TradeQuoteService,
   ) {}
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -147,7 +152,7 @@ export class AdminTradeQueryService {
             },
           },
           shipments: true,
-          cashPayment: true,
+          cashPayments: true,
           dispute: true,
         },
         orderBy,
@@ -308,7 +313,7 @@ export class AdminTradeQueryService {
             events: { orderBy: { eventTime: "asc" } },
           },
         },
-        cashPayment: true,
+        cashPayments: true,
         dispute: true,
       },
     });
@@ -316,6 +321,27 @@ export class AdminTradeQueryService {
     if (!trade) {
       throw new NotFoundException("Takas bulunamadı");
     }
+
+    const paymentQuote =
+      trade.pricingVersion === TRADE_PRICING_V2 &&
+      trade.cashPayments.length === 0 &&
+      this.tradeQuoteService
+        ? await this.tradeQuoteService.quoteForTrade(trade.id)
+        : null;
+    const appliedSnapshot = readTradeCommissionRuleSnapshot(
+      trade.commissionRuleSnapshot,
+    );
+    const commissionRuleMatches = appliedSnapshot
+      ? appliedSnapshot.items.map((match) => ({
+          ...match,
+          ruleSetVersion: appliedSnapshot.ruleSetVersion,
+          source: "snapshot" as const,
+        }))
+      : (paymentQuote?.ruleMatches ?? []).map((match) => ({
+          ...match,
+          ruleSetVersion: paymentQuote!.commissionRuleSet.version,
+          source: "live" as const,
+        }));
 
     // Resolve product image S3 keys (cardKey) into usable URLs. The frontend
     // renders `item.product.images[0].url`, but ProductImage stores cardKey/detailKey
@@ -331,6 +357,6 @@ export class AdminTradeQueryService {
       }
     }
 
-    return trade;
+    return { ...trade, paymentQuote, commissionRuleMatches };
   }
 }

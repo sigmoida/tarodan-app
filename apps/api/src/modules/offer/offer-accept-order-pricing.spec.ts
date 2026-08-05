@@ -124,6 +124,7 @@ describe("OfferService.accept — order carries shipping, VAT and withholding", 
     expect(checkoutCommon.resolveOfferOrderPricing).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 1000,
+        productId: "product-1",
         sellerId: "seller-1",
         categoryId: "cat-1",
         shippingDesi: 2,

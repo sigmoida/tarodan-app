@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import { extractList } from "@/lib/extract";
+import { adminKeys } from "@/lib/query/keys";
 
 export interface CategoryOption {
   id: string;
   name: string;
+  slug?: string;
 }
 
 /**
@@ -13,7 +15,7 @@ export interface CategoryOption {
  */
 export function useCategories() {
   return useQuery({
-    queryKey: ["categories-min"],
+    queryKey: adminKeys.all("categories-min"),
     queryFn: async () =>
       extractList<CategoryOption>(await adminApi.getCategories({ limit: 100 })),
   });

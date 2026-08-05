@@ -8,7 +8,9 @@ import toast from "react-hot-toast";
 import { ordersApi, paymentsApi } from "@/lib/api";
 import { getFullPhoneNumber, normalizePhoneForPayload } from "@/lib/phone";
 import { useTranslations } from "next-intl";
+import type { ResolvedPayment } from "@/hooks/useCardPayment";
 import type { Address, CheckoutItem } from "../_lib/types";
+import { queryKeys } from "@/lib/query/keys";
 
 type Translate = ReturnType<typeof useTranslations<never>>;
 
@@ -40,11 +42,13 @@ export function useCheckoutSubmit({
   setIsLoading,
   router,
   paymentProvider,
-  authToken,
   appliedCouponCode,
-  clearCart,
+  clearPurchasedLines,
+  distanceSalesAccepted,
   onCheckoutSubmitted,
   expectedShippingTariffVersion,
+  expectedCommissionRuleSetId,
+  expectedCommissionRuleSetVersion,
   expectedPricingHash,
 }: {
   checkoutItems: CheckoutItem[];
@@ -68,14 +72,19 @@ export function useCheckoutSubmit({
   setIsLoading: Dispatch<SetStateAction<boolean>>;
   router: { push: (href: string) => void };
   paymentProvider: "paytr";
-  authToken: string | null;
   /** Applied cart coupon (from useCart); forwarded to the group order payload. */
   appliedCouponCode: string | null;
-  clearCart: () => Promise<void>;
+  /** Ödenen satırları sepetten düşürür — seçilmeyenler yerinde kalır. */
+  clearPurchasedLines: () => Promise<void>;
+  /** Mesafeli satış sözleşmesi onayı; sunucu zaman+sürüm damgasını kendisi basar. */
+  distanceSalesAccepted: boolean;
   /** Marks the checkout as submitted so the cart-empty guard stops redirecting. */
   onCheckoutSubmitted: () => void;
   /** Active shipping-tariff version from the quote; enables the 409 PRICING_CHANGED guard. */
   expectedShippingTariffVersion?: number | null;
+  /** Active commission set from the quote; both fields must still match at submit. */
+  expectedCommissionRuleSetId?: string | null;
+  expectedCommissionRuleSetVersion?: number | null;
   /** Unit-price hash from the quote; 409 PRICING_CHANGED if a price/campaign moved. */
   expectedPricingHash?: string | null;
 }) {
@@ -106,14 +115,21 @@ export function useCheckoutSubmit({
     return checkoutIdempotencyKeyRef.current;
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (): Promise<ResolvedPayment | null> => {
     if (checkoutItems.length === 0) {
       toast.error(t("cart.empty"));
-      return;
+      return null;
     }
     if (typeof expectedShippingTariffVersion !== "number") {
       toast.error(t("server.shipping.pricingChanged"));
-      return;
+      return null;
+    }
+    if (
+      !expectedCommissionRuleSetId ||
+      typeof expectedCommissionRuleSetVersion !== "number"
+    ) {
+      toast.error(t("server.commission.pricingChanged"));
+      return null;
     }
 
     setIsLoading(true);
@@ -142,14 +158,14 @@ export function useCheckoutSubmit({
         if (!selectedAddress) {
           toast.error(t("checkout.addressNotFound"));
           setIsLoading(false);
-          return;
+          return null;
         }
 
         const addressPhone = selectedAddress.phone || user?.phone;
         if (!addressPhone) {
           toast.error("Teslimat adresi için telefon numarası gereklidir");
           setIsLoading(false);
-          return;
+          return null;
         }
 
         shippingAddress = {
@@ -176,42 +192,42 @@ export function useCheckoutSubmit({
           if (!guestName?.trim()) {
             toast.error(t("checkout.enterName"));
             setIsLoading(false);
-            return;
+            return null;
           }
           if (!guestEmail?.trim()) {
             toast.error(t("checkout.enterEmail"));
             setIsLoading(false);
-            return;
+            return null;
           }
           if (!guestPhone?.trim()) {
             toast.error(t("checkout.enterPhone"));
             setIsLoading(false);
-            return;
+            return null;
           }
           const otpDigits = guestEmailVerificationCode.replace(/\D/g, "");
           if (!/^\d{6}$/.test(otpDigits)) {
             toast.error(t("checkout.guestEmailOtpRequired"));
             setIsLoading(false);
-            return;
+            return null;
           }
         }
 
         if (!email) {
           toast.error(t("checkout.enterEmail"));
           setIsLoading(false);
-          return;
+          return null;
         }
         if (!phone) {
           toast.error(t("checkout.enterPhone"));
           setIsLoading(false);
-          return;
+          return null;
         }
 
         const addressPhone = newAddress.phone?.trim() || phone;
         if (!addressPhone) {
           toast.error(t("checkout.enterAddressPhone"));
           setIsLoading(false);
-          return;
+          return null;
         }
 
         const formattedAddressPhone = getFullPhoneNumber(
@@ -259,7 +275,7 @@ export function useCheckoutSubmit({
           }
         }
         setIsLoading(false);
-        return;
+        return null;
       }
 
       // Tüm sepet TEK çağrıda, tek CheckoutGroup altında sipariş edilir; tek
@@ -298,11 +314,17 @@ export function useCheckoutSubmit({
               };
               couponCode?: string;
               expectedShippingTariffVersion: number;
+              expectedCommissionRuleSetId: string;
+              expectedCommissionRuleSetVersion: number;
               expectedPricingHash?: string;
+              distanceSalesAccepted?: boolean;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
               expectedShippingTariffVersion,
+              expectedCommissionRuleSetId,
+              expectedCommissionRuleSetVersion,
+              distanceSalesAccepted,
             };
 
             if (expectedPricingHash) {
@@ -386,7 +408,7 @@ export function useCheckoutSubmit({
               } else {
                 toast.error(t("checkout.selectOrEnterShippingAddress"));
                 setIsLoading(false);
-                return;
+                return null;
               }
             }
 
@@ -425,11 +447,15 @@ export function useCheckoutSubmit({
                 zipCode?: string;
               };
               expectedShippingTariffVersion: number;
+              expectedCommissionRuleSetId: string;
+              expectedCommissionRuleSetVersion: number;
               couponCode?: string;
               expectedPricingHash?: string;
+              distanceSalesAccepted?: boolean;
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
+              distanceSalesAccepted,
               email: contactEmail,
               phone: formattedContactPhone,
               guestName: contactName,
@@ -441,6 +467,8 @@ export function useCheckoutSubmit({
                 phone: formattedAddrPhone,
               },
               expectedShippingTariffVersion,
+              expectedCommissionRuleSetId,
+              expectedCommissionRuleSetVersion,
             };
             if (
               !billingSameAsShipping &&
@@ -491,6 +519,20 @@ export function useCheckoutSubmit({
             errorMessage = orderError.message;
           }
 
+          if (
+            orderError.response?.status === 409 &&
+            orderError.response?.data?.code === "SELLER_SALES_SUSPENDED"
+          ) {
+            toast.error(errorMessage);
+            await queryClient.invalidateQueries({
+              queryKey: queryKeys.cart.all(),
+            });
+            await queryClient.invalidateQueries({
+              queryKey: ["checkout-quote"],
+            });
+            return null;
+          }
+
           const stockoutKeywords = [
             "satışta değil",
             "stokta yok",
@@ -509,11 +551,11 @@ export function useCheckoutSubmit({
             orderError.response?.data?.productId || checkoutItems[0]?.productId;
           if (isStockout && stockoutProductId) {
             router.push(`/products/unavailable/${stockoutProductId}`);
-            return;
+            return null;
           }
 
           toast.error(errorMessage);
-          return;
+          return null;
         }
 
         // Batch checkout: { checkoutGroupId, orders: [{ orderId, ... }] } döner
@@ -532,7 +574,7 @@ export function useCheckoutSubmit({
           invalidateOrderCaches();
           invalidateOrderCaches();
           router.push("/profile/orders");
-          return;
+          return null;
         }
 
         if (orderId) {
@@ -548,22 +590,30 @@ export function useCheckoutSubmit({
                   paymentProvider,
                 );
             const paymentData = paymentResponse.data;
-            const hasSession = isAuthenticated || !!authToken;
 
-            // Guard against the cart-empty redirect before clearing the cart.
+            // Guard against the cart-empty redirect before touching the cart.
             onCheckoutSubmitted();
-            await clearCart();
+            // Sipariş ve ödeme kaydı BU NOKTADA var. Sepeti toparlamak bir
+            // görüntü işidir: burada patlayan bir çağrı ödemeyi iptal
+            // ettirmemeli, yoksa alıcı ödenmemiş bir siparişle kalır.
+            try {
+              await clearPurchasedLines();
+            } catch {
+              /* sepet sonraki okumada zaten sunucudaki haliyle tazelenir */
+            }
             invalidateOrderCaches();
 
-            // TEK ödeme yüzeyi: misafir + üye aynı site-içi kart formuna gider.
+            // Kart alanları ZATEN bu sayfada dolu: paymentId çağırana döner ve
+            // aynı ekranda PayTR'ye gönderilir. Ayrı bir /payment/[id] adımına
+            // düşmek yok (o rota yarım kalan ödemeye dönüş için duruyor).
             if (paymentData.paymentId) {
-              router.push(
-                `/payment/${paymentData.paymentId}${hasSession ? "" : "?guest=true"}`,
-              );
-              return;
+              return {
+                paymentId: paymentData.paymentId as string,
+                target: { checkoutGroupId },
+              };
             } else if (paymentData.paymentUrl) {
               window.location.href = paymentData.paymentUrl;
-              return;
+              return null;
             } else {
               throw new Error(t("payment.startFailed"));
             }
@@ -588,10 +638,10 @@ export function useCheckoutSubmit({
               checkoutItems[0]?.productId;
             if (isStockout && stockoutProductId) {
               router.push(`/products/unavailable/${stockoutProductId}`);
-              return;
+              return null;
             }
             toast.error(msg || t("checkout.paymentInitFailedRetry"));
-            return;
+            return null;
           }
         }
       }
@@ -600,8 +650,10 @@ export function useCheckoutSubmit({
       toast.error(t("checkout.completePaymentFromOrders"));
       invalidateOrderCaches();
       router.push("/profile/orders");
+      return null;
     } catch (error: any) {
       toast.error(error.response?.data?.message || t("checkout.orderFailed"));
+      return null;
     } finally {
       setIsLoading(false);
     }

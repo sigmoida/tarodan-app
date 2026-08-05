@@ -1,33 +1,31 @@
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
-import { DocPage } from "@/components/layout/DocPage";
-import SectionCard from "@/components/ui/SectionCard";
-import { PageContent } from "@/app/[locale]/(main)/(trash)/sayfa/[slug]/PageContent";
-import { getTermsPage } from "./_lib/data";
+/** @format */
 
-export async function generateMetadata(): Promise<Metadata> {
-  const page = await getTermsPage();
-  if (!page) return { title: "Kullanım Koşulları" };
+import type { Metadata } from "next";
+import { LegalDocument } from "@/components/legal/LegalDocument";
+import { localizedCanonical } from "@/lib/seo";
+import { TERMS_PARTS } from "./_lib/terms";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
-    title: page.metaTitle || page.title,
-    description: page.metaDescription || undefined,
-    keywords: page.metaKeywords || undefined,
-    openGraph: {
-      title: page.metaTitle || page.title,
-      description: page.metaDescription || undefined,
-    },
+    title: "Kullanım Koşulları · Tarodan",
+    description:
+      "Tarodan üyelik, ilan, satış, satın alma, teklif, takas, ödeme, komisyon, içerik ve hesap kullanım koşulları.",
+    alternates: localizedCanonical(locale, "/terms"),
   };
 }
 
-export default async function TermsPage() {
-  const page = await getTermsPage();
-  if (!page) notFound();
-
+export default function TermsPage() {
   return (
-    <DocPage title={page.title}>
-      <SectionCard className="p-0">
-        <PageContent content={page.content} />
-      </SectionCard>
-    </DocPage>
+    <LegalDocument
+      title="Kullanım Koşulları"
+      description="Tarodan pazar yerini ziyaret ederken, üyelik oluştururken, ilan verirken, satın alırken veya takas yaparken geçerli genel kurallar."
+      parts={TERMS_PARTS}
+      footer="Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır."
+    />
   );
 }

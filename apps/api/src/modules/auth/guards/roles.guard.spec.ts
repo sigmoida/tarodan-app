@@ -171,8 +171,8 @@ describe("RolesGuard — admin iade yüzeyi URL-segment izin kapısı", () => {
  * Fail-closed: kanonik /api/admin/<segment> route'u PERMISSION_MAP'te eşlenmemişse
  * (ör. yeni eklenip izin haritasına yazılması unutulmuş) erişim reddedilir —
  * moderator/admin sessizce sadece-rol kontrolüne düşemez. super_admin escape-hatch
- * olarak geçer. Bilinen rol-only istisnalar (invoices, seller-invoices,
- * trade-commission-rate) ve kanonik olmayan /module/admin/... route'ları fail-OPEN
+ * olarak geçer. Bilinen rol-only istisnalar (invoices, seller-invoices) ve
+ * kanonik olmayan /module/admin/... route'ları fail-OPEN
  * kalır (mevcut moderator erişimi korunur — MOD-045 regresyon koruması).
  */
 describe("RolesGuard — eşlenmemiş admin route fail-closed", () => {
@@ -237,7 +237,6 @@ describe("RolesGuard — eşlenmemiş admin route fail-closed", () => {
   it.each([
     ["invoices", "/api/admin/invoices"],
     ["seller-invoices", "/api/admin/seller-invoices/abc"],
-    ["trade-commission-rate", "/api/admin/trade-commission-rate"],
   ])(
     "moderator → rol-only istisna (%s) → izinli (fail-open korunur)",
     async (_d, url) => {

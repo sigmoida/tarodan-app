@@ -1,33 +1,31 @@
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
-import { DocPage } from "@/components/layout/DocPage";
-import SectionCard from "@/components/ui/SectionCard";
-import { PageContent } from "@/app/[locale]/(main)/(trash)/sayfa/[slug]/PageContent";
-import { getPrivacyPage } from "./_lib/data";
+/** @format */
 
-export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPrivacyPage();
-  if (!page) return { title: "Gizlilik Politikası" };
+import type { Metadata } from "next";
+import { localizedCanonical } from "@/lib/seo";
+import { LegalDocument } from "@/components/legal/LegalDocument";
+import { PRIVACY_PARTS } from "./_lib/privacy";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
   return {
-    title: page.metaTitle || page.title,
-    description: page.metaDescription || undefined,
-    keywords: page.metaKeywords || undefined,
-    openGraph: {
-      title: page.metaTitle || page.title,
-      description: page.metaDescription || undefined,
-    },
+    title: "Gizlilik Politikası · Tarodan",
+    description:
+      "Tarodan KVKK aydınlatma metni: veri sorumlusu, işlenen veri kategorileri, işleme amaçları, aktarım, ilgili kişinin hakları ve başvuru yöntemi.",
+    alternates: localizedCanonical(locale, "/privacy"),
   };
 }
 
-export default async function PrivacyPage() {
-  const page = await getPrivacyPage();
-  if (!page) notFound();
-
+export default function PrivacyPage() {
   return (
-    <DocPage title={page.title}>
-      <SectionCard className="p-0">
-        <PageContent content={page.content} />
-      </SectionCard>
-    </DocPage>
+    <LegalDocument
+      title="Gizlilik Politikası"
+      description="Kişisel verilerinizin hangi amaçlarla işlendiği, kimlere aktarıldığı ve haklarınızı nasıl kullanacağınız."
+      parts={PRIVACY_PARTS}
+      footer="Çerezler bakımından Çerez Politikası uygulanır. Bu metin, mevzuat ve uygulama değişikliklerine göre güncellenebilir; güncel metin Platform'da yayımlanır."
+    />
   );
 }

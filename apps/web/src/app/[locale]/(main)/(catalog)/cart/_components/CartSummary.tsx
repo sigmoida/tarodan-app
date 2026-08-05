@@ -36,12 +36,15 @@ export default function CartSummary({
   quote,
   isAuthenticated,
   canCheckout,
+  selectedCount,
 }: {
   subtotal: number;
   appliedDiscounts?: AppliedDiscount[];
   quote: OrderSummaryAmounts | null;
   isAuthenticated: boolean;
   canCheckout: boolean;
+  /** Ödemeye taşınacak satır sayısı — başlıkta ve boş-seçim uyarısında. */
+  selectedCount: number;
 }) {
   const t = useTranslations();
 
@@ -76,6 +79,11 @@ export default function CartSummary({
         <Button disabled className="w-full mt-6 flex gap-2">
           {t("cart.proceedToCheckout")}
         </Button>
+      )}
+      {selectedCount === 0 && (
+        <p className="mt-2 text-center text-xs text-muted">
+          {t("cart.selectItemsToCheckout")}
+        </p>
       )}
 
       {!isAuthenticated && (

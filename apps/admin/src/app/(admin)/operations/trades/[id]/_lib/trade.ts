@@ -82,12 +82,25 @@ export function mapTradePayload(payload: any): TradeDetail {
   const rawItems: RawTradeItem[] = Array.isArray(payload?.items)
     ? payload.items
     : [];
-  const initiatorItems = Array.isArray(payload?.initiatorItems)
+  const rawInitiatorItems = Array.isArray(payload?.initiatorItems)
     ? payload.initiatorItems
     : rawItems.filter((item) => item.side === "initiator" && item.product);
-  const receiverItems = Array.isArray(payload?.receiverItems)
+  const rawReceiverItems = Array.isArray(payload?.receiverItems)
     ? payload.receiverItems
     : rawItems.filter((item) => item.side === "receiver" && item.product);
+  const matches = Array.isArray(payload?.commissionRuleMatches)
+    ? payload.commissionRuleMatches
+    : [];
+  const withCommissionRule = (items: TradeItem[], side: string) =>
+    items.map((item) => ({
+      ...item,
+      commissionRule: matches.find(
+        (match: any) =>
+          match.productId === item.product?.id && match.side === side,
+      ),
+    }));
+  const initiatorItems = withCommissionRule(rawInitiatorItems, "initiator");
+  const receiverItems = withCommissionRule(rawReceiverItems, "receiver");
   return {
     ...payload,
     initiatorItems,

@@ -13,7 +13,7 @@ import {
   formatTL,
   getOrderPrimary,
   isGroupCancellable,
-  orderAmount,
+  productAmountOf,
   sellerNetOf,
   visibleCargoCode,
   type Order,
@@ -40,10 +40,13 @@ function OrderLine({
   const locale = useLocale();
   const display = getDisplayStatus(order, t, locale);
   const { product, image } = getOrderPrimary(order);
-  const amount = orderAmount(order);
+  // Kartta ürün bedeli gösterilir; alıcının ödediği toplam DEĞİL (bkz.
+  // productAmountOf). Değer yoksa tutar hiç basılmaz.
+  const productAmount = productAmountOf(order);
   const net = sellerNetOf(order);
   const quantity = order.items?.[0]?.quantity ?? 1;
-  const unitPrice = quantity > 0 ? amount / quantity : amount;
+  const unitPrice =
+    productAmount != null && quantity > 0 ? productAmount / quantity : null;
 
   return (
     <div className="rounded-lg border border-border bg-surface p-4">
@@ -70,7 +73,9 @@ function OrderLine({
             <p className="text-muted">{t("order.productInfoUnavailable")}</p>
           )}
           <p className="text-sm text-muted">
-            {quantity} {t("order.unitTimes")} {formatTL(unitPrice)}
+            {unitPrice != null
+              ? `${quantity} ${t("order.unitTimes")} ${formatTL(unitPrice)}`
+              : `${quantity} ${t("order.unitOnly")}`}
           </p>
           <p className="mt-0.5 text-xs text-subtle">
             {t("order.orderNumber")} #{order.orderNumber}
@@ -88,9 +93,11 @@ function OrderLine({
             label={display.label}
             size="sm"
           />
-          <p className="text-base font-semibold text-primary-500">
-            {formatTL(amount)}
-          </p>
+          {productAmount != null && (
+            <p className="text-base font-semibold text-primary-500">
+              {formatTL(productAmount)}
+            </p>
+          )}
           {order.isSeller && net != null && (
             <p className="text-xs text-success-600">
               {t("order.netToYou")}: {formatTL(net)}
@@ -136,13 +143,11 @@ export default function OrderGroupCard({
             <p className="font-mono text-sm text-muted">{group.groupNumber}</p>
             <p className="text-sm text-subtle">{formatDate(date)}</p>
           </div>
+          {/* Sepet toplamı başlıktan KALDIRILDI: satış sekmesinde alıcının
+              ödediği tutarı satıcıya gösteriyordu, alış sekmesinde de satırların
+              ürün bedeliyle toplanmayan bir rakam olarak kafa karıştırıyordu.
+              Ödeme dökümü sipariş detayındaki özet kartında duruyor. */}
           <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-xs text-muted">{t("common.total")}</p>
-              <p className="text-lg font-semibold text-primary-500">
-                {formatTL(group.totalAmount)}
-              </p>
-            </div>
             {isGroupCancellable(group) && (
               <Button
                 variant="danger"

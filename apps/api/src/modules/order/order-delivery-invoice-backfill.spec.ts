@@ -30,7 +30,9 @@ describe("OrderSchedulerService.runProcessDeliveredOrders — invoice candidate 
         autoCompleteDeliveredOrder: jest.fn(),
       } as any,
       { get: () => undefined } as any,
-      { issueTradeCashCommissionInvoice: jest.fn() } as any,
+      { issueTradeCashFeeInvoice: jest.fn() } as any,
+      // Satıcı ürün faturası taraması bu senaryonun konusu değil.
+      { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
       {} as any,
     );
     return { service, prisma };

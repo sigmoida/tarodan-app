@@ -14,6 +14,14 @@ import { PrismaService } from "../../prisma";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { StorageService } from "../storage/storage.service";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
+import {
+  NewsletterService,
+  type NewsletterRecipient,
+} from "./newsletter.service";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+
+/** Tek turda kaç alıcı çekileceği — bellekte tutulan sayfa boyutu. */
+const RECIPIENT_PAGE_SIZE = 200;
 
 @Injectable()
 export class MarketingSchedulerService implements OnModuleInit {
@@ -23,8 +31,79 @@ export class MarketingSchedulerService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly smtpProvider: SmtpProvider,
     private readonly storageService: StorageService,
+    private readonly newsletterService: NewsletterService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
+
+  private get baseUrl(): string {
+    return (process.env.FRONTEND_URL || "https://tarodan.com.tr").replace(
+      /\/+$/,
+      "",
+    );
+  }
+
+  /**
+   * Bir pazarlama kampanyasını abone listesine gönderir.
+   *
+   * Alıcılar `newsletter_subscribers`'tan sayfalanarak çekilir (eski kod
+   * `user` tablosundan `take: 1000` ile okuyordu: formdan abone olan misafirler
+   * hiç mail almıyor, 1000. üyeden sonrası da atlanıyordu). Her alıcı kendi
+   * token'ıyla üretilmiş bir çıkış linki ve `List-Unsubscribe` başlıkları alır —
+   * Gmail/Yahoo toplu gönderende bunları şart koşuyor.
+   */
+  private async sendCampaign(
+    kind: "newsletter" | "promotions",
+    templateKey: string,
+    buildData: (recipient: NewsletterRecipient) => Record<string, unknown>,
+    log: (msg: string) => void,
+  ): Promise<number> {
+    const dbTemplate = await this.prisma.emailTemplate.findUnique({
+      where: { key: templateKey },
+    });
+
+    let skip = 0;
+    let sent = 0;
+
+    for (;;) {
+      const recipients = await this.newsletterService.listRecipients(kind, {
+        skip,
+        take: RECIPIENT_PAGE_SIZE,
+      });
+      if (recipients.length === 0) break;
+      skip += RECIPIENT_PAGE_SIZE;
+
+      for (const recipient of recipients) {
+        const unsubscribeUrl = `${this.baseUrl}/newsletter/unsubscribe?token=${encodeURIComponent(recipient.unsubscribeToken)}`;
+        try {
+          const email = renderManagedEmailTemplate(
+            templateKey,
+            { ...buildData(recipient), to: recipient.email },
+            dbTemplate,
+            { frontendUrl: this.baseUrl, unsubscribeUrl },
+          );
+
+          await this.smtpProvider.sendEmail({
+            to: recipient.email,
+            subject: email.subject,
+            html: email.html,
+            template: templateKey,
+            headers: {
+              "List-Unsubscribe": `<${unsubscribeUrl}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+          });
+          sent += 1;
+        } catch (error: any) {
+          this.logger.error(
+            `${templateKey} gönderilemedi (${recipient.email}): ${error?.message ?? error}`,
+          );
+        }
+      }
+    }
+
+    log(`${sent} alıcıya gönderildi`);
+    return sent;
+  }
 
   async onModuleInit(): Promise<void> {
     await registerRepeatableCron(
@@ -42,7 +121,7 @@ export class MarketingSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Send weekly newsletter to users who accept marketing emails
+   * Send weekly newsletter to the marketing subscriber list.
    * Runs every Monday at 9:00 AM
    * Gerçek iş — Bull processor 'marketing-weekly' buradan çağırır.
    */
@@ -51,39 +130,10 @@ export class MarketingSchedulerService implements OnModuleInit {
     log("Haftalık bülten kampanyası başladı");
 
     try {
-      // Get users who accept marketing emails and are verified
-      // Note: acceptsMarketingEmails will be available after migration
-      // For now, we'll get all users and filter in memory (less efficient but works pre-migration)
-      const allUsers = await this.prisma.user.findMany({
-        where: {
-          isBanned: false,
-          isEmailVerified: true,
-        },
-        take: 1000, // Process in batches to avoid memory issues
-      });
-
-      // Filter users who accept marketing emails
-      // After migration, we can use where clause: acceptsMarketingEmails: true
-      const filteredUsers = allUsers
-        .filter((u: any) => {
-          try {
-            return u.acceptsMarketingEmails === true;
-          } catch {
-            return false; // Field doesn't exist yet, skip
-          }
-        })
-        .map((u: any) => ({
-          id: u.id,
-          email: u.email,
-          displayName: u.displayName,
-        }));
-      this.logger.log(
-        `Found ${filteredUsers.length} users for weekly newsletter (out of ${allUsers.length} total)`,
-      );
-
       // Get trending products for the newsletter
       const trendingProducts = await this.prisma.product.findMany({
         where: {
+          ...catalogProductWhere(),
           status: "active",
         },
         orderBy: {
@@ -101,49 +151,28 @@ export class MarketingSchedulerService implements OnModuleInit {
         },
       });
 
-      const baseUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
       const mappedTrending = trendingProducts.map((p) => ({
         ...p,
         imageUrl: p.images?.[0]?.cardKey
           ? this.storageService.getPublicAssetUrl(p.images[0].cardKey)
           : undefined,
-        productUrl: `${baseUrl}/listings/${p.id}`,
+        productUrl: `${this.baseUrl}/listings/${p.id}`,
       }));
 
-      const newsletterDbTemplate = await this.prisma.emailTemplate.findUnique({
-        where: { key: "marketing-newsletter" },
-      });
+      const sent = await this.sendCampaign(
+        "newsletter",
+        "marketing-newsletter",
+        (recipient) => ({
+          userName: recipient.displayName,
+          trendingProducts: mappedTrending,
+        }),
+        log,
+      );
 
-      for (const user of filteredUsers) {
-        try {
-          const templateData = {
-            userName: user.displayName,
-            trendingProducts: mappedTrending,
-          };
-          const email = renderManagedEmailTemplate(
-            "marketing-newsletter",
-            { ...templateData, to: user.email },
-            newsletterDbTemplate,
-            baseUrl,
-          );
-
-          await this.smtpProvider.sendEmail({
-            to: user.email,
-            subject: email.subject,
-            html: email.html,
-          });
-        } catch (error: any) {
-          this.logger.error(
-            `Failed to send newsletter email for user ${user.id}: ${error.message}`,
-          );
-        }
-      }
-
-      this.logger.log(`Sent ${filteredUsers.length} weekly newsletter emails`);
-      log(`${filteredUsers.length} kullanıcıya haftalık bülten gönderildi`);
+      this.logger.log(`Sent ${sent} weekly newsletter emails`);
       return {
-        summary: `${filteredUsers.length} bülten gönderildi`,
-        stats: { sent: filteredUsers.length },
+        summary: `${sent} bülten gönderildi`,
+        stats: { sent },
       };
     } catch (error: any) {
       this.logger.error(
@@ -167,39 +196,10 @@ export class MarketingSchedulerService implements OnModuleInit {
     this.logger.log("Starting monthly promotional email campaign...");
 
     try {
-      // Get users who accept marketing emails and are verified
-      // Note: acceptsMarketingEmails will be available after migration
-      // For now, we'll get all users and filter in memory (less efficient but works pre-migration)
-      const allUsers = await this.prisma.user.findMany({
-        where: {
-          isBanned: false,
-          isEmailVerified: true,
-        },
-        take: 1000, // Process in batches
-      });
-
-      // Filter users who accept marketing emails
-      // After migration, we can use where clause: acceptsMarketingEmails: true
-      const filteredUsers = allUsers
-        .filter((u: any) => {
-          try {
-            return u.acceptsMarketingEmails === true;
-          } catch {
-            return false; // Field doesn't exist yet, skip
-          }
-        })
-        .map((u: any) => ({
-          id: u.id,
-          email: u.email,
-          displayName: u.displayName,
-        }));
-      this.logger.log(
-        `Found ${filteredUsers.length} users for monthly promotions (out of ${allUsers.length} total)`,
-      );
-
       // Get featured products (high popularity, recent)
       const featuredProducts = await this.prisma.product.findMany({
         where: {
+          ...catalogProductWhere(),
           status: "active",
           createdAt: {
             gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
@@ -218,49 +218,28 @@ export class MarketingSchedulerService implements OnModuleInit {
         },
       });
 
-      const baseUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
       const mappedFeatured = featuredProducts.map((p) => ({
         ...p,
         imageUrl: p.images?.[0]?.cardKey
           ? this.storageService.getPublicAssetUrl(p.images[0].cardKey)
           : undefined,
-        productUrl: `${baseUrl}/listings/${p.id}`,
+        productUrl: `${this.baseUrl}/listings/${p.id}`,
       }));
 
-      const monthlyDbTemplate = await this.prisma.emailTemplate.findUnique({
-        where: { key: "marketing-monthly" },
-      });
+      const sent = await this.sendCampaign(
+        "promotions",
+        "marketing-monthly",
+        (recipient) => ({
+          userName: recipient.displayName,
+          featuredProducts: mappedFeatured,
+        }),
+        log,
+      );
 
-      for (const user of filteredUsers) {
-        try {
-          const templateData = {
-            userName: user.displayName,
-            featuredProducts: mappedFeatured,
-          };
-          const email = renderManagedEmailTemplate(
-            "marketing-monthly",
-            { ...templateData, to: user.email },
-            monthlyDbTemplate,
-            baseUrl,
-          );
-
-          await this.smtpProvider.sendEmail({
-            to: user.email,
-            subject: email.subject,
-            html: email.html,
-          });
-        } catch (error: any) {
-          this.logger.error(
-            `Failed to send monthly promotion email for user ${user.id}: ${error.message}`,
-          );
-        }
-      }
-
-      this.logger.log(`Sent ${filteredUsers.length} monthly promotion emails`);
-      log(`${filteredUsers.length} kullanıcıya aylık kampanya gönderildi`);
+      this.logger.log(`Sent ${sent} monthly promotion emails`);
       return {
-        summary: `${filteredUsers.length} kampanya maili gönderildi`,
-        stats: { sent: filteredUsers.length },
+        summary: `${sent} kampanya maili gönderildi`,
+        stats: { sent },
       };
     } catch (error: any) {
       this.logger.error(

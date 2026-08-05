@@ -82,6 +82,12 @@ export class PaymentQueryService {
             payerId: true,
             recipientId: true,
             tradeId: true,
+            // Ödeme sayfası neyin karşılığında tahsilat yapıldığını göstermeli:
+            // hizmet bedeli + 2 bacaklık kargo + (varsa) nakit fark.
+            amount: true,
+            tradeFeeAmount: true,
+            shippingAmount: true,
+            totalAmount: true,
           },
         },
         checkoutGroup: {
@@ -130,14 +136,23 @@ export class PaymentQueryService {
           i18nMessage("server.payment.viewStatusForbidden"),
         );
       }
+      const tcp = payment.tradeCashPayment;
       return {
         id: payment.id,
         orderId: null,
-        tradeId: payment.tradeCashPayment.tradeId,
+        tradeId: tcp.tradeId,
         status: payment.status,
         amount: Number(payment.amount),
         currency: payment.currency,
         provider: payment.provider,
+        // Grup ödemesindeki `pricing` ile aynı rol: ödeme sayfası tutarı tek
+        // rakam olarak değil, kalemleriyle gösterebilsin.
+        pricing: {
+          serviceFee: Number(tcp.tradeFeeAmount ?? 0),
+          shippingAmount: Number(tcp.shippingAmount ?? 0),
+          cashDifference: Number(tcp.amount ?? 0),
+          totalAmount: Number(tcp.totalAmount ?? payment.amount),
+        },
         createdAt: payment.createdAt,
         updatedAt: payment.updatedAt,
         ...pendingPaytrResume,

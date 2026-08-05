@@ -3,7 +3,12 @@ import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { CacheService } from "../cache/cache.service";
 import { UserCommonService } from "./user-common.service";
-import { isBusinessMembershipEntitled } from "../membership/membership.util";
+import {
+  isBusinessMembershipEntitled,
+  saleCapableSellerWhere,
+} from "../membership/membership.util";
+import { publicUserRatingWhere } from "../../common/helpers/public-rating";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
  * Anasayfa öne çıkarma bölümlerinin (haftanın koleksiyoneri / haftanın şirketi /
@@ -132,7 +137,12 @@ export class UserDiscoveryService {
       collections.map(async (collection) => {
         // Always show the collection owner's own active products so products always match the user
         const ownProducts = await this.prisma.product.findMany({
-          where: { sellerId: collection.user.id, status: "active" },
+          where: {
+            ...catalogProductWhere(),
+            sellerId: collection.user.id,
+            status: "active",
+            seller: saleCapableSellerWhere(),
+          },
           take: 5,
           include: { images: { take: 1, orderBy: { sortOrder: "asc" } } },
           orderBy: [
@@ -339,7 +349,12 @@ export class UserDiscoveryService {
 
     // Always show the collector's own active product listings (ensures products match the user)
     const ownProducts = await this.prisma.product.findMany({
-      where: { sellerId: collection.user.id, status: "active" },
+      where: {
+        ...catalogProductWhere(),
+        sellerId: collection.user.id,
+        status: "active",
+        seller: saleCapableSellerWhere(),
+      },
       take: 5,
       include: { images: { take: 1, orderBy: { sortOrder: "asc" } } },
       orderBy: [
@@ -435,7 +450,9 @@ export class UserDiscoveryService {
           include: {
             _count: {
               select: {
-                products: { where: { status: "active" } },
+                products: {
+                  where: { ...catalogProductWhere(), status: "active" },
+                },
               },
             },
           },
@@ -460,7 +477,11 @@ export class UserDiscoveryService {
         const [productStats, salesCount, recentLikes, recentViews] =
           await Promise.all([
             this.prisma.product.aggregate({
-              where: { sellerId: user.id, status: "active" },
+              where: {
+                ...catalogProductWhere(),
+                sellerId: user.id,
+                status: "active",
+              },
               _sum: { viewCount: true, likeCount: true },
             }),
             this.prisma.order.count({
@@ -472,12 +493,17 @@ export class UserDiscoveryService {
             }),
             this.prisma.productLike.count({
               where: {
-                product: { sellerId: user.id, status: "active" },
+                product: {
+                  ...catalogProductWhere(),
+                  sellerId: user.id,
+                  status: "active",
+                },
                 createdAt: { gte: sevenDaysAgo },
               },
             }),
             this.prisma.product.count({
               where: {
+                ...catalogProductWhere(),
                 sellerId: user.id,
                 status: "active",
                 updatedAt: { gte: sevenDaysAgo },
@@ -514,7 +540,13 @@ export class UserDiscoveryService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        _count: { select: { products: { where: { status: "active" } } } },
+        _count: {
+          select: {
+            products: {
+              where: { ...catalogProductWhere(), status: "active" },
+            },
+          },
+        },
         membership: {
           include: { tier: true },
         },
@@ -532,7 +564,11 @@ export class UserDiscoveryService {
     // Stats: tüm zamanlar view/like toplamı + son penceredeki tamamlanmış satış
     const [productStats, salesCount] = await Promise.all([
       this.prisma.product.aggregate({
-        where: { sellerId: userId, status: "active" },
+        where: {
+          ...catalogProductWhere(),
+          sellerId: userId,
+          status: "active",
+        },
         _sum: { viewCount: true, likeCount: true },
       }),
       this.prisma.order.count({
@@ -619,7 +655,11 @@ export class UserDiscoveryService {
     // Get business's featured products (top performing products)
     // Priority: featured products, then by engagement score (views + likes)
     const allProducts = await this.prisma.product.findMany({
-      where: { sellerId: userId, status: "active" },
+      where: {
+        ...catalogProductWhere(),
+        sellerId: userId,
+        status: "active",
+      },
       include: {
         images: { take: 1 },
         _count: {
@@ -639,9 +679,11 @@ export class UserDiscoveryService {
     // Get top 6 products
     const products = productsWithScores.slice(0, 6).map((item) => item.product);
 
-    // Get ratings
+    // Get ratings — yalnız yayınlanmış puanlar (getTopSellers/getPublicProfile
+    // ile aynı kural); filtresiz sayım ana sayfadaki öne çıkan işletme kartına
+    // onaysız puan sızdırıyordu.
     const ratings = await this.prisma.rating.aggregate({
-      where: { receiverId: userId },
+      where: publicUserRatingWhere({ receiverId: userId }),
       _avg: { score: true },
       _count: true,
     });
@@ -733,14 +775,19 @@ export class UserDiscoveryService {
     // Get sellers with most sales and good ratings
     const sellers = await this.prisma.user.findMany({
       where: {
+        ...saleCapableSellerWhere(),
         isSeller: true,
-        products: { some: { status: "active" } },
+        products: {
+          some: { ...catalogProductWhere(), status: "active" },
+        },
       },
       take: limit * 2, // Get more to filter
       include: {
         _count: {
           select: {
-            products: { where: { status: "active" } },
+            products: {
+              where: { ...catalogProductWhere(), status: "active" },
+            },
           },
         },
       },
@@ -754,7 +801,7 @@ export class UserDiscoveryService {
             where: { sellerId: seller.id, status: "completed" },
           }),
           this.prisma.rating.aggregate({
-            where: { receiverId: seller.id, status: "approved" },
+            where: publicUserRatingWhere({ receiverId: seller.id }),
             _avg: { score: true },
             _count: true,
           }),
@@ -801,10 +848,13 @@ export class UserDiscoveryService {
 
     const sellers = await this.prisma.user.findMany({
       where: {
+        ...saleCapableSellerWhere(),
         isSeller: true,
         isBanned: false,
         deletedAt: null,
-        products: { some: { status: "active" } },
+        products: {
+          some: { ...catalogProductWhere(), status: "active" },
+        },
         displayName: { contains: q, mode: "insensitive" },
       },
       take: Math.min(20, Math.max(1, Number(limit) || 8)),
@@ -814,7 +864,13 @@ export class UserDiscoveryService {
         displayName: true,
         avatarUrl: true,
         isVerified: true,
-        _count: { select: { products: { where: { status: "active" } } } },
+        _count: {
+          select: {
+            products: {
+              where: { ...catalogProductWhere(), status: "active" },
+            },
+          },
+        },
       },
     });
 

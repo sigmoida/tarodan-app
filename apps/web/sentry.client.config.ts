@@ -9,6 +9,7 @@ import {
   sentryRelease,
   sentryTracesSampleRate,
 } from "./sentry.release";
+import { replaySampleRates } from "./src/lib/replayPolicy.mjs";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -16,9 +17,13 @@ Sentry.init({
   // Performance monitoring
   tracesSampleRate: sentryTracesSampleRate,
 
-  // Session replay (captures user sessions for debugging)
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
+  // Session replay (captures user sessions for debugging). Kart sayfasına
+  // DOĞRUDAN girilirse oranlar 0'dır → replay hiç kurulmaz (PCI DSS 6.4.3:
+  // ödeme sayfasındaki script yüzeyini gerekçelendirilebilir tut). SPA ile
+  // sonradan girişte PaymentReplayGuard çalışan kaydı durdurur.
+  ...replaySampleRates(
+    typeof window === "undefined" ? undefined : window.location.pathname,
+  ),
 
   // Environment
   environment: sentryEnvironment,

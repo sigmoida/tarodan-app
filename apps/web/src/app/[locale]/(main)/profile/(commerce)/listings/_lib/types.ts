@@ -14,10 +14,6 @@ export interface Listing {
   images?: Array<{ url: string } | string>;
   createdAt: string;
   viewCount?: number;
-  soldAt?: string;
-  soldPrice?: number;
-  buyer?: { id: string; displayName: string };
-  orderId?: string;
   rating?: { average: number | null; count: number };
   category?: { id: string; name: string; slug: string };
   /** Paket boyutu — komisyon/kargo net tahmini ilanın kendi kademesiyle yapılır. */

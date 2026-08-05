@@ -2,18 +2,27 @@
 
 "use client";
 
-import { Spinner, Stepper } from "@tarodan/ui";
+import { Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Container } from "@/components/layout/Container";
 import { CheckoutProvider, useCheckout } from "./_context/CheckoutContext";
+import OrderItemsCard from "./_sections/OrderItemsCard";
 import AddressStep from "./_sections/AddressStep";
-import ConfirmStep from "./_sections/ConfirmStep";
+import PaymentSection from "./_sections/PaymentSection";
 import OrderSummarySidebar from "./_sections/OrderSummarySidebar";
 import GuestOtpModal from "./_modals/GuestOtpModal";
 
+/**
+ * Ödeme ekranı — TEK sayfa: ürünler, teslimat adresi ve kart bilgileri alt
+ * alta; özet, sözleşme onayı ve "Ödeme Yap" sağdaki sabit sütunda.
+ *
+ * Eskiden adres ve onay iki adımlı bir stepper'dı, kart bilgisi ise ayrı bir
+ * rotadaydı (/payment/[id]): alıcı tek bir alışverişi tamamlamak için üç ekran
+ * geziyordu. Artık sipariş, kart alanları doğrulandıktan sonra tek akışta
+ * oluşuyor. /payment/[id] duruyor — yarım kalmış bir ödemeye dönüş yolu o.
+ */
 function CheckoutLayout() {
-  const { t, isMounted, step, goToStep, checkoutGuardPending } = useCheckout();
+  const { t, isMounted, checkoutGuardPending } = useCheckout();
 
   // Wait for client mount and for the cart guard to resolve or redirect.
   if (!isMounted || checkoutGuardPending) {
@@ -21,7 +30,7 @@ function CheckoutLayout() {
       <PageShell className="flex items-center justify-center">
         <div className="text-center">
           <Spinner size="xl" className="mx-auto mb-4" />
-          <p className="text-muted">Yükleniyor...</p>
+          <p className="text-muted">{t("common.loading")}</p>
         </div>
       </PageShell>
     );
@@ -30,25 +39,14 @@ function CheckoutLayout() {
   return (
     <>
       <PageShell>
-        <PageHeader title={t("checkout.title")} />
-
-        <Container className="px-4 py-8">
-          {/* Clickable progress stepper — also handles going back to a step */}
-          <Stepper
-            steps={[t("checkout.step1"), t("checkout.step3")]}
-            current={step}
-            onStepClick={goToStep}
-            className="mb-8"
-          />
-
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {step === 0 && <AddressStep />}
-              {step === 1 && <ConfirmStep />}
+        <Container className="pt-4">
+          <div className="grid gap-8 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              <OrderItemsCard />
+              <AddressStep />
+              <PaymentSection />
             </div>
 
-            {/* Order Summary Sidebar */}
             <div className="lg:col-span-1">
               <OrderSummarySidebar />
             </div>

@@ -5,6 +5,7 @@ import {
   CommissionLedgerStatus,
   OrderCancellationType,
   OrderStatus,
+  ProductKind,
   ProductStatus,
   RefundRequestStatus,
 } from "@prisma/client";
@@ -91,7 +92,9 @@ export class AdminAnalyticsDashboardService {
         this.prisma.user.count({ where: { createdAt } }),
       ),
       this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.product.count({ where: { createdAt } }),
+        this.prisma.product.count({
+          where: { kind: ProductKind.listing, createdAt },
+        }),
       ),
       this.getMetricPeriods(periods, (createdAt) =>
         this.prisma.order.count({ where: { createdAt } }),
@@ -119,12 +122,17 @@ export class AdminAnalyticsDashboardService {
       // the requested account/catalog state.
       this.getMetricPeriods(periods, (createdAt) =>
         this.prisma.product.count({
-          where: { createdAt, status: ProductStatus.active },
+          where: {
+            kind: ProductKind.listing,
+            createdAt,
+            status: ProductStatus.active,
+          },
         }),
       ),
       this.getMetricPeriods(periods, (createdAt) =>
         this.prisma.product.count({
           where: {
+            kind: ProductKind.listing,
             createdAt,
             status: {
               in: [ProductStatus.inactive, ProductStatus.suspended],
@@ -204,9 +212,13 @@ export class AdminAnalyticsDashboardService {
       ),
       this.prisma.user.count(),
       this.prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      this.prisma.product.count(),
-      this.prisma.product.count({ where: { status: ProductStatus.active } }),
-      this.prisma.product.count({ where: { status: ProductStatus.pending } }),
+      this.prisma.product.count({ where: { kind: ProductKind.listing } }),
+      this.prisma.product.count({
+        where: { kind: ProductKind.listing, status: ProductStatus.active },
+      }),
+      this.prisma.product.count({
+        where: { kind: ProductKind.listing, status: ProductStatus.pending },
+      }),
       this.prisma.order.count(),
       this.prisma.order.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
       this.prisma.order.count({ where: { status: OrderStatus.completed } }),
@@ -223,6 +235,7 @@ export class AdminAnalyticsDashboardService {
       }),
       this.prisma.product.groupBy({
         by: ["categoryId"],
+        where: { kind: ProductKind.listing },
         _count: { id: true },
       }),
     ]);
@@ -597,7 +610,10 @@ export class AdminAnalyticsDashboardService {
         distinct: ["buyerId"],
       }),
       this.prisma.product.findMany({
-        where: { createdAt: { gte: startDate, lte: endDate } },
+        where: {
+          kind: ProductKind.listing,
+          createdAt: { gte: startDate, lte: endDate },
+        },
         select: { sellerId: true, createdAt: true },
         distinct: ["sellerId"],
       }),
@@ -692,6 +708,7 @@ export class AdminAnalyticsDashboardService {
    */
   async getTopProducts(limit: number = 10) {
     const products = await this.prisma.product.findMany({
+      where: { kind: ProductKind.listing },
       take: limit,
       orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
       select: {
@@ -737,7 +754,11 @@ export class AdminAnalyticsDashboardService {
         displayName: true,
         avatarUrl: true,
         storeViewCount: true,
-        _count: { select: { products: true } },
+        _count: {
+          select: {
+            products: { where: { kind: ProductKind.listing } },
+          },
+        },
       },
     });
 
@@ -746,6 +767,7 @@ export class AdminAnalyticsDashboardService {
       ? await this.prisma.product.groupBy({
           by: ["sellerId"],
           where: {
+            kind: ProductKind.listing,
             sellerId: { in: sellerIds },
             status: ProductStatus.active,
           },
@@ -773,7 +795,9 @@ export class AdminAnalyticsDashboardService {
   async getPendingActions() {
     const [pendingProducts, refundRequests, pendingMessages] =
       await Promise.all([
-        this.prisma.product.count({ where: { status: ProductStatus.pending } }),
+        this.prisma.product.count({
+          where: { kind: ProductKind.listing, status: ProductStatus.pending },
+        }),
         this.prisma.order.count({
           where: { status: OrderStatus.refund_requested },
         }),

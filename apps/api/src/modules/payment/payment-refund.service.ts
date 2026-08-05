@@ -44,6 +44,7 @@ import {
   ProviderRefundRejectedException,
   RefundPendingReconciliationException,
 } from "../payment-providers/refund-errors";
+import { refundableAmountFor } from "../trade/trade-refund-policy";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -1010,35 +1011,37 @@ export class PaymentRefundService {
             await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
           }
 
-          // Faz 6.2 (ledger): `refund_issued` oransal ters kayıt (best-effort — defter
-          // hatası iadeyi bozmaz). orderRefundThreshold = sipariş tutarı (T); komisyon/stopaj
-          // sipariş satırından okunur; LedgerService oranı ve yuvarlamayı yönetir.
-          try {
-            const ledgerOrder = await tx.order.findUnique({
-              where: { id: orderId },
-              select: {
-                sellerId: true,
-                buyerId: true,
-                commissionAmount: true,
-                withholdingTaxAmount: true,
-              },
+          // Faz 6.2 (ledger): `refund_issued` oransal ters kayıt. orderRefundThreshold =
+          // sipariş tutarı (T); komisyon/stopaj sipariş satırından okunur; LedgerService
+          // oranı ve yuvarlamayı yönetir. `refundAttemptId` idempotency anahtarını besler
+          // → aynı deneme yeniden işlenirse ikinci ters kayıt DB'de düşer.
+          //
+          // FAIL-LOUD (best-effort DEĞİL): bu yazım iade TX'İNİN İÇİNDE. Hata yutulursa
+          // para geri dönmüş ama defter ters kaydı eksik kalıyordu — sessiz muhasebe
+          // açığı. Fırlatmak tüm iadeyi geri alır: ya ikisi ya hiçbiri. (Post-commit
+          // yollarda — capture, payout tamamlama — best-effort kalıbı KORUNUR: orada
+          // para zaten commit'li olduğundan fırlatmanın geri alacağı bir şey yoktur.)
+          const ledgerOrder = await tx.order.findUnique({
+            where: { id: orderId },
+            select: {
+              sellerId: true,
+              buyerId: true,
+              commissionAmount: true,
+              withholdingTaxAmount: true,
+            },
+          });
+          if (ledgerOrder) {
+            await this.ledger?.recordRefund(tx, {
+              orderId,
+              paymentId: payment.id,
+              refundAttemptId: freshAttempt.id,
+              sellerId: ledgerOrder.sellerId,
+              buyerId: ledgerOrder.buyerId,
+              orderTotal: orderRefundThreshold,
+              commission: Number(ledgerOrder.commissionAmount ?? 0),
+              withholdingTax: Number(ledgerOrder.withholdingTaxAmount ?? 0),
+              refundAmount: amountToRefund,
             });
-            if (ledgerOrder) {
-              await this.ledger?.recordRefund(tx, {
-                orderId,
-                paymentId: payment.id,
-                sellerId: ledgerOrder.sellerId,
-                buyerId: ledgerOrder.buyerId,
-                orderTotal: orderRefundThreshold,
-                commission: Number(ledgerOrder.commissionAmount ?? 0),
-                withholdingTax: Number(ledgerOrder.withholdingTaxAmount ?? 0),
-                refundAmount: amountToRefund,
-              });
-            }
-          } catch (e: any) {
-            this.logger.warn(
-              `Ledger refund kaydı başarısız (order ${orderId}): ${e?.message}`,
-            );
           }
 
           // Her başarılı refund attempt kendi eLogo düzeltme olayını üretir. Kısmi
@@ -1300,12 +1303,23 @@ export class PaymentRefundService {
    * Takas nakit ödemesi PayTR ile tamamlanmışken iptal: PayTR iade API + payment / trade_cash_payment güncelleme.
    * Tamamlanmış PayTR trade ödemesi yoksa no-op (refunded: false).
    */
+  /**
+   * Takasın TÜM tamamlanmış ödemelerini iade eder.
+   *
+   * v2'de taraf başına bir ödeme vardır; iptal her ikisini de iade etmelidir.
+   * İade edilecek tutar satır bazında `refundableAmountFor` ile bulunur: ürün
+   * kargoya verildikten sonra KARGO bedeli iade DIŞIDIR (platform o maliyeti
+   * gerçekten ödemiştir), öncesinde tam iade yapılır.
+   *
+   * v1 takaslarda tek satır vardır ve kargo kalemi 0 olduğundan davranış
+   * değişmez (tam iade).
+   */
   async refundTradeCashPaymentIfCompleted(tradeId: string): Promise<{
     refunded: boolean;
     paymentId?: string;
     skippedReason?: string;
   }> {
-    const payment = await this.prisma.payment.findFirst({
+    const payments = await this.prisma.payment.findMany({
       where: {
         tradeCashPayment: {
           tradeId,
@@ -1317,12 +1331,78 @@ export class PaymentRefundService {
         provider: PaymentProvider.paytr,
       },
       include: { tradeCashPayment: true },
+      orderBy: { createdAt: "asc" },
     });
 
-    if (!payment) {
+    if (payments.length === 0) {
       return { refunded: false, skippedReason: "no_completed_paytr_payment" };
     }
 
+    const handedToCargo = await this.tradeHandedToCargo(tradeId);
+
+    let refundedPaymentId: string | undefined;
+    let skippedReason: string | undefined;
+    for (const payment of payments) {
+      const amount = refundableAmountFor(
+        {
+          totalAmount: payment.tradeCashPayment?.totalAmount ?? payment.amount,
+          shippingAmount: payment.tradeCashPayment?.shippingAmount ?? 0,
+        },
+        { handedToCargo },
+      );
+      if (amount <= 0) {
+        // Ödenenin tamamı kargoya gitmiş (iade edilecek bakiye yok).
+        skippedReason = "shipping_not_refundable";
+        continue;
+      }
+      const result = await this.refundOneTradeCashPayment(
+        payment,
+        tradeId,
+        amount,
+      );
+      if (result.refunded) {
+        refundedPaymentId = refundedPaymentId ?? result.paymentId;
+      } else {
+        skippedReason = result.skippedReason ?? skippedReason;
+      }
+    }
+
+    return refundedPaymentId
+      ? { refunded: true, paymentId: refundedPaymentId }
+      : {
+          refunded: false,
+          skippedReason: skippedReason ?? "nothing_refundable",
+        };
+  }
+
+  /**
+   * Takasın herhangi bir bacağı kargoya verildi mi — iade matrisinin eşiği.
+   * Kullanıcı iptal kilidiyle AYNI ölçüt (`computeTradeCanCancel`): gönderi
+   * `shippedAt` aldıysa ya da depoya varış damgalandıysa kargo tüketilmiştir.
+   */
+  private async tradeHandedToCargo(tradeId: string): Promise<boolean> {
+    const [trade, shippedCount] = await Promise.all([
+      this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: { firstWarehouseArrivalAt: true },
+      }),
+      this.prisma.tradeShipment.count({
+        where: { tradeId, shippedAt: { not: null } },
+      }),
+    ]);
+    return !!trade?.firstWarehouseArrivalAt || shippedCount > 0;
+  }
+
+  /** Tek bir takas ödemesinin PayTR iadesi (tutar çağırandan gelir). */
+  private async refundOneTradeCashPayment(
+    payment: any,
+    tradeId: string,
+    amount: number,
+  ): Promise<{
+    refunded: boolean;
+    paymentId?: string;
+    skippedReason?: string;
+  }> {
     // Defensive guard: eğer ilişkili tradeCashPayment bırakılmış veya iade edilmişse atla
     if (
       payment.tradeCashPayment?.releasedAt ||
@@ -1342,12 +1422,6 @@ export class PaymentRefundService {
     // `TRADE{no}T{...}`) → yanlış/eşleşmeyen oid'le PayTR çağrısı. Kaldırıldı; gerçek
     // yolda (bypass değil) oid yoksa reddedilir (aşağıda).
     const oid = payment.providerConversationId?.trim() ?? "";
-    // Always refund the full charged amount (product + commission). PayTR was
-    // charged the totalAmount at capture time; partial commission retention
-    // would leave the payer short when the admin reject is no-fault.
-    const amount = Number(
-      payment.tradeCashPayment?.totalAmount ?? payment.amount,
-    );
 
     const existingMeta = (payment.metadata as Record<string, unknown>) || {};
     if (!oid) {
@@ -1586,6 +1660,36 @@ export class PaymentRefundService {
       `Trade cash refunded via PayTR tradeId=${tradeId} paymentId=${payment.id}`,
     );
 
+    // Defter ters kaydı: POST-COMMIT best-effort (capture ile aynı felsefe). İade
+    // tx'inin İÇİNDE yazmak, defter hatasında para hareketini geri alırdı; burada
+    // hata yalnız loglanır ve reconcile açığı yakalar. Kargo bacağı yalnız GERÇEKTEN
+    // iade edildiyse ters kayıt alır (tek otorite: refundableAmountFor).
+    if (this.ledger) {
+      const tcp = payment.tradeCashPayment;
+      const shippingAmount = Number(tcp?.shippingAmount ?? 0);
+      const netAmount = Number(tcp?.amount ?? 0);
+      try {
+        await this.ledger.recordTradeCashRefund(this.prisma, {
+          tradeId,
+          tradeCashPaymentId: payment.tradeCashPaymentId,
+          refundAttemptId: refundAttempt.attempt.id,
+          payerId: tcp?.payerId,
+          recipientId: tcp?.recipientId,
+          refundAmount: amount,
+          escrowReversal: Math.min(netAmount, amount),
+          // İade tutarı kargoyu kapsıyorsa (tam iade) kargo da geri alınır.
+          shippingReversal:
+            amount >= Number(tcp?.totalAmount ?? 0) - 0.005
+              ? shippingAmount
+              : 0,
+        });
+      } catch (e: any) {
+        this.logger.warn(
+          `Ledger takas iade kaydı başarısız (tcp ${payment.tradeCashPaymentId}): ${e?.message}`,
+        );
+      }
+    }
+
     // Takas komisyon e-Arşivini iptal et / iade faturası kes (post-commit, non-blocking).
     if (payment.tradeCashPaymentId) {
       void this.elogoInvoicing
@@ -1626,7 +1730,7 @@ export class PaymentRefundService {
         .catch(() => {});
       if (result.refunded) {
         try {
-          const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
             where: { tradeId },
             select: { payerId: true },
           });
@@ -1666,7 +1770,7 @@ export class PaymentRefundService {
           ),
         );
       try {
-        const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+        const cashPayment = await this.prisma.tradeCashPayment.findFirst({
           where: { tradeId },
           select: { payerId: true },
         });

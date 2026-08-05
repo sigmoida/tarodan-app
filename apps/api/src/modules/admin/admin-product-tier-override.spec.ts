@@ -39,6 +39,7 @@ describe("AdminProductService — package tier override", () => {
       { del: jest.fn(), delPattern: jest.fn() } as any, // cache
       {} as any, // notificationService
       undefined as any, // storageService (@Optional)
+      { assertListingRuleExists: jest.fn() } as any,
     );
     return { service, prisma, audit };
   };

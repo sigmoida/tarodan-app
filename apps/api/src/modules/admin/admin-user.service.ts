@@ -10,7 +10,7 @@ import { AdminAuditService } from "./admin-audit.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../workers/constants";
-import { enqueueTradeListingReindex } from "../membership/trade-listing-reindex";
+import { enqueueSellerListingReindex } from "../membership/seller-listing-reindex";
 import { fulltextUserSearch } from "../../common/helpers/fulltext-search";
 import { AdminUserQueryDto } from "./dto";
 import { Prisma, MembershipTierType, SubscriptionStatus } from "@prisma/client";
@@ -22,6 +22,7 @@ import {
   paginate,
   resolveOrderBy,
 } from "../../common/list";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
  * Kullanıcı yönetimi + admin üyelik override'ları — AdminService'in
@@ -168,7 +169,7 @@ export class AdminUserService {
       },
       _count: {
         select: {
-          products: true,
+          products: { where: catalogProductWhere() },
           buyerOrders: true,
           sellerOrders: true,
           initiatedTrades: true,
@@ -328,6 +329,7 @@ export class AdminUserService {
       include: {
         addresses: true,
         products: {
+          where: catalogProductWhere(),
           take: 10,
           orderBy: { createdAt: "desc" },
           select: {
@@ -408,7 +410,7 @@ export class AdminUserService {
         },
         _count: {
           select: {
-            products: true,
+            products: { where: catalogProductWhere() },
             buyerOrders: true,
             sellerOrders: true,
             givenRatings: true,
@@ -587,7 +589,7 @@ export class AdminUserService {
       membership,
       updated,
     );
-    await enqueueTradeListingReindex(this.prisma, this.searchQueue, userId);
+    await enqueueSellerListingReindex(this.prisma, this.searchQueue, userId);
     return updated;
   }
 
@@ -622,14 +624,18 @@ export class AdminUserService {
     if (!tier.isActive) {
       throw new BadRequestException("Bu üyelik kademesi aktif değil");
     }
-    if (
-      tierType === MembershipTierType.business &&
-      (user.businessStatus !== "approved" ||
-        !user.companyName?.trim() ||
-        !user.taxId?.trim())
-    ) {
+    const isApprovedCorporate =
+      user.businessStatus === "approved" &&
+      !!user.companyName?.trim() &&
+      !!user.taxId?.trim();
+    if (tierType === MembershipTierType.business && !isApprovedCorporate) {
       throw new BadRequestException(
         "Business üyelik yalnız KYC onaylı şirket hesabına atanabilir",
+      );
+    }
+    if (tierType !== MembershipTierType.business && isApprovedCorporate) {
+      throw new BadRequestException(
+        "KYC onaylı şirket hesabına yalnız Business üyelik atanabilir",
       );
     }
 
@@ -679,8 +685,8 @@ export class AdminUserService {
       existing,
       updated,
     );
-    // Best-effort: takas bayraklı ilanların arama dokümanı tazelensin.
-    await enqueueTradeListingReindex(this.prisma, this.searchQueue, userId);
+    // Best-effort: üyelik değişince tüm ilanların satış/takas yetkisi tazelensin.
+    await enqueueSellerListingReindex(this.prisma, this.searchQueue, userId);
     return updated;
   }
 }

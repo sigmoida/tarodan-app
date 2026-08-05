@@ -19,7 +19,12 @@
   hedeflendiğini SSH değil, `COOLIFY_STAGING_UUIDS`/`COOLIFY_PROD_UUIDS` +
   script içi parmak izi guard'ları belirler.
 - Arama indeksleri `APP_ENV`'den otomatik izole edilir
-  (`production-products`, `production-collections`).
+  (`production-products`, `production-collections`). **`ELASTICSEARCH_INDEX_PREFIX`'i
+  elle vermek zorunda değilsin** — verirsen karşı ortamın adını ASLA yazma.
+  2026-08-02'de staging'e `production` yazılmıştı: iki ortam tek indekste buluştu,
+  canlı vitrinin araması staging'in demo ürünlerini gösterdi ve reset her
+  temizlediğinde staging beş dakika içinde geri doldurdu. Artık API açılışta
+  reddediyor; preview dağıtımlarının kendi öneki (`preview-…`) serbest.
 - Web kilidi: `SITE_LOCKED=true` → tüm public rotalar `/coming-soon`.
   `SITE_UNLOCK_SECRET` (≥32 karakter) unlock cookie'lerini imzalar — rotate
   etmek verilmiş tüm cookie'leri anında geçersiz kılar; `SITE_UNLOCK_PIN`
@@ -40,6 +45,24 @@
 
 Demo seed (`prisma/seed.ts`, `*@demo.com`, `Admin123!`) production yollarında
 asla çalışmaz; `release-production-bootstrap.spec.ts` bunu sözleşmeyle korur.
+
+### Bir kerelik: yorum sayacı backfill'i sonrası reindex
+
+`20260804090000_backfill_approved_only_product_rating_stats` migration'ı
+`products.average_rating` / `rating_count` kolonlarını yalnız **approved**
+yorumlardan yeniden hesaplar (onaysız yorum kartta sayılıyordu). SQL doğrudan
+yazdığı için Prisma middleware'i tetiklenmez → **Elasticsearch dokümanlarında
+eski sayaç kalır** ve "puana göre sırala" bayat sonuç verir. Deploy'dan sonra
+bir kez çalıştır:
+
+```
+curl -X POST https://<api-host>/api/search/admin/reindex   # admin token gerekir
+```
+
+**Beklemek çözmez:** 5 dk'lık delta ve saatlik reconcile yalnız _eksik_ ve
+_yetim_ dokümanları eşitler (`deltaSync` = ID kümesi farkı); ID'si zaten
+indekste olan bir ürünün alanlarını tazelemezler. Ürün bir sonraki kez
+düzenlenene kadar bayat kalır — bu yüzden tam reindex zorunlu adımdır.
 
 ---
 
@@ -195,7 +218,9 @@ silinmez; eski nesneler zararsız yetim olarak kalır (kurtarma yolu).
 4. **Settings** — Listing sekmesini bir kez **kaydet**: min/max ürün fiyatı
    kaydedilene kadar hiç uygulanmaz (arayüzdeki 10/100000 yalnız placeholder).
    **Warehouse** sekmesini doldur (güvenli takas depo operasyonunun önkoşulu;
-   boşken ilk takas onayı 400 verir ve `/health/ready` bunu kontrol etmez).
+   boşken ilk takas onayı 400 verir; `/health/ready` de depo adresi
+   çözülemiyorsa hazır-değil döner — takas onayıyla aynı çözümleme:
+   `warehouse_address_id` ayarı veya aktif bir admin'in adresi).
 5. **E-posta şablonları** — opsiyonel; kod varsayılanları hazır.
 6. **Staff** — ek admin hesapları (geçici şifre ekranda gösterilir, SMTP
    gerekmez); süper-admin'de 2FA aç.
@@ -211,6 +236,7 @@ silinmez; eski nesneler zararsız yetim olarak kalır (kurtarma yolu).
 | Pasif duran kural          | `Platform Hizmet Bedeli (Alıcı)` %3, `is_active=false`                        | alıcı bedeli alınacaksa aktive et                                 |
 | Kargo kademeleri           | migration'dan **üçü de 29,99 ₺**, örnek ölçüler boş                           | System → Shipping Tariffs (reset log'u "REVIEW" satırıyla uyarır) |
 | Kargo payı (kademe başına) | küçük 100/0, orta 70/30, büyük 50/50 (alıcı/satıcı)                           | Finance → Commission                                              |
+| Takas hizmet bedeli        | kurallarda **tanımsız (0 ₺)** — girilene kadar takas ücretsiz işler           | Finance → Commission (kural dialogu, KDV **dahil** sabit tutar)   |
 | Üyelik                     | free 0 ₺ (**takas kapalı**), basic 49,99, premium 99,99, business 249,99 ₺/ay | Membership Tiers                                                  |
 | Vergi                      | KDV %20, hizmet KDV'si açık, stopaj %1 (yalnız kurumsal)                      | System → Settings                                                 |
 | Serbest kargo eşiği        | 500 ₺                                                                         | System → Shipping Tariffs                                         |

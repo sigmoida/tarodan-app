@@ -8,11 +8,14 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
+import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
 import {
   OrderStatus,
   OfferStatus,
+  ProductKind,
   ProductStatus,
   Prisma,
 } from "@prisma/client";
@@ -74,6 +77,12 @@ export class OrderCheckoutDirectService {
         dto.expectedShippingTariffVersion,
         true,
       );
+    const commissionRuleSet =
+      await this.orderPricing.resolveCommissionRuleSetSnapshot(
+        dto.expectedCommissionRuleSetId,
+        dto.expectedCommissionRuleSetVersion,
+        true,
+      );
 
     // Validate DTO has necessary address info
     if (!dto.shippingAddressId && !dto.shippingAddress) {
@@ -116,6 +125,12 @@ export class OrderCheckoutDirectService {
       });
 
       if (!product) {
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
+      }
+
+      if (product.kind !== ProductKind.listing) {
         throw new NotFoundException(
           i18nMessage("server.order.productNotFound"),
         );
@@ -287,9 +302,11 @@ export class OrderCheckoutDirectService {
         billingAddress = billing;
       }
 
-      // A + oldPrice: price (A) = güncel satış fiyatı; siparişte sadece price kullan
+      // İndirim penceresi ORTAK kuraldan: pencere dışındaysa satış fiyatı
+      // indirim öncesi fiyattır — vitrin, sepet ve tahsilat aynı sayıyı görür.
       const now = new Date();
-      const basePrice = Number(product.price);
+      const sale = resolveSalePrice(product, now);
+      const basePrice = sale.price;
       // F1.4: charged base = efektif (kampanya) fiyat — ürün kartı/sepet ile aynı; kupon
       // yine baz üzerinden. Aktif code=null kampanya yoksa efektif == baz (no-op).
       const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
@@ -299,14 +316,7 @@ export class OrderCheckoutDirectService {
         basePrice,
       );
       const productPrice = campaignPrice ?? basePrice;
-      const isSaleActive =
-        product.oldPrice != null &&
-        (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
-        (!product.saleEndDate || now <= new Date(product.saleEndDate));
-      const originalPrice =
-        isSaleActive && product.oldPrice != null
-          ? Number(product.oldPrice)
-          : basePrice;
+      const originalPrice = sale.oldPrice ?? basePrice;
       const productDiscount = Math.max(0, originalPrice - productPrice);
 
       // F1.3: quote'un birim-fiyat hash'i ile doğrula — fiyat/kampanya değiştiyse
@@ -350,19 +360,26 @@ export class OrderCheckoutDirectService {
         }
       }
 
-      // Calculate total discount and subtotal
       const totalDiscount = productDiscount + couponDiscount;
-      const subtotal = originalPrice;
-      // Negatif-koruma: couponDiscount validateCoupon'da eligible-subtotal (= ürün
-      // fiyatı) ile capli, yine de floor ile discountedPrice asla negatif olmaz.
-      const discountedPrice = Math.max(0, productPrice - couponDiscount);
+      // Siparişin ürün tabanı = TAHSİL EDİLEN tutar; komisyon, kargo, vergi ve
+      // alıcı toplamı hep bunun üzerinden. İndirim öncesi liste fiyatı
+      // `discountAmount` / `discountBreakdown` / snapshot'ta durur.
+      const discountedPrice = chargedProductBaseOf({
+        unitPrice: productPrice,
+        couponDiscount,
+      });
+      const subtotal = discountedPrice;
+      const pinnedRuleSetId = commissionRuleSet.id;
 
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on discounted product price, not including shipping
       const commissionResult = await this.orderPricing.calculateCommission(
         discountedPrice,
         product.sellerId,
-        product.categoryId, // Pass categoryId for priority-based matching
+        product.categoryId,
+        pinnedRuleSetId,
+        discountedPrice,
+        product.id,
       );
 
       // Kargo kararı (quote ile ORTAK): paket desisi → kademe → o kademenin payı →
@@ -699,6 +716,8 @@ export class OrderCheckoutDirectService {
     }
     const shippingTariff =
       await this.orderPricing.resolveShippingTariffSnapshot();
+    const commissionRuleSet =
+      await this.orderPricing.resolveCommissionRuleSetSnapshot();
     let productIdForCache: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -715,6 +734,10 @@ export class OrderCheckoutDirectService {
       });
 
       if (!offer) {
+        throw new NotFoundException(i18nMessage("server.order.offerNotFound"));
+      }
+
+      if (offer.product.kind !== ProductKind.listing) {
         throw new NotFoundException(i18nMessage("server.order.offerNotFound"));
       }
 
@@ -772,10 +795,12 @@ export class OrderCheckoutDirectService {
       // kargo payı, KDV, stopaj ve tahsil edilecek toplam.
       const offerPricing = await this.checkoutCommon.resolveOfferOrderPricing({
         amount: Number(offer.amount),
+        productId: offer.product.id,
         sellerId: offer.sellerId,
         categoryId: offer.product.categoryId,
         shippingDesi: offer.product.shippingDesi,
         shippingTariff: shippingTariff.tariff,
+        commissionRuleSetId: commissionRuleSet.id,
       });
       const commissionResult = offerPricing.commission;
       const offerFullShipping = offerPricing.fullShippingAmount;

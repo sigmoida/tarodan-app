@@ -6,7 +6,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { OrderQueryDto, GuestOrderTrackDto } from "./dto";
-import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderStatus, Prisma, ProductKind } from "@prisma/client";
 import { OrderCommonService } from "./order-common.service";
 
 /**
@@ -278,14 +278,9 @@ export class OrderQueryService {
       where.status = { not: OrderStatus.cancelled };
     }
 
-    // Üyelik ve boost (öne çıkarma) sanal siparişlerini "siparişlerim" listesinde gösterme
-    // (sadece gerçek ürün siparişleri). Boost'lar "Boostlarım"da görünür.
-    where.NOT = {
-      OR: [
-        { productId: { startsWith: "membership-" } },
-        { productId: { startsWith: "boost-" } },
-      ],
-    };
+    // Siparişlerim yalnızca gerçek pazar ilanlarını gösterir. Üyelik ve boost
+    // satın alımları kendi ekranlarında ve finans kayıtlarında kalır.
+    where.product = { kind: ProductKind.listing };
 
     const total = await this.prisma.order.count({ where });
 
@@ -423,14 +418,9 @@ export class OrderQueryService {
     return pool.every((o) => o.status === first) ? String(first) : "mixed";
   }
 
-  /** Üyelik/boost sanal siparişlerini grup görünümlerinden dışarıda tut. */
+  /** Ödeme-only satın alımları grup görünümlerinden dışarıda tut. */
   private readonly virtualOrderExclusion: Prisma.OrderWhereInput = {
-    NOT: {
-      OR: [
-        { productId: { startsWith: "membership-" } },
-        { productId: { startsWith: "boost-" } },
-      ],
-    },
+    product: { kind: ProductKind.listing },
   };
 
   /**

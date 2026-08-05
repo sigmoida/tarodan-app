@@ -5,7 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useZodForm } from "@tarodan/ui/form";
 import { listingsApi, userApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { createInitialSaleData } from "../_lib/constants";
+import {
+  createEmptySaleData,
+  saleDataToPayload,
+  type SaleData,
+} from "@/components/listings/form";
 import {
   buildListingFormData,
   buildSaleDataFromListing,
@@ -15,7 +19,7 @@ import {
   emptyEditValues,
   type EditListingValues,
 } from "../_lib/schema";
-import type { EditListingFormData, SaleData } from "../_lib/types";
+import type { EditListingFormData, ListingEditPayload } from "../_lib/types";
 
 interface UseEditListingFormParams {
   id: string;
@@ -52,14 +56,15 @@ export function useEditListingForm({
   const form = useZodForm(editListingSchema, {
     defaultValues: emptyEditValues,
   });
-  const { reset, getValues } = form;
+  const { reset, formState } = form;
 
   // Shared submit/lifecycle busy flag (also driven by `useListingLifecycle`).
   const [isLoading, setIsLoading] = useState(false);
   // Store preview URLs separately (presigned URLs for display).
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [showDiscountSection, setShowDiscountSection] = useState(false);
-  const [saleData, setSaleData] = useState<SaleData>(createInitialSaleData);
+  const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
+  const [readyFormId, setReadyFormId] = useState<string | null>(null);
 
   // Auth gate.
   useEffect(() => {
@@ -70,27 +75,33 @@ export function useEditListingForm({
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // Load the listing — own-product endpoint first (works for all statuses), then
-  // the public endpoint if we're not the owner.
+  /**
+   * İlanın DÜZENLEME kaydını yükle.
+   *
+   * Yalnız sahibe açık uç kullanılır; 403/404 "bu ilan sizin değil" demektir ve
+   * aşağıdaki hata etkisi kullanıcıyı listeye geri gönderir. Eskiden bu durumda
+   * herkese açık uca düşülüyordu — o uç 10 dakika cache'li olduğu için düzenleme
+   * ekranı bayat veriyle açılabiliyordu.
+   *
+   * Bu ekranda ÖNBELLEK YOK: her açılışta ve her odaklanmada kayıt yeniden
+   * çekilir. Bayat bir değer, satıcının o an geçerli olmayan veriyi geri
+   * kaydetmesi demek.
+   */
   const listingQuery = useQuery({
     queryKey: queryKeys.listingEdit.detail(id),
     queryFn: async () => {
-      let response;
-      try {
-        response = await userApi.getMyProductById(id);
-      } catch (myProductError: any) {
-        if (
-          myProductError.response?.status === 404 ||
-          myProductError.response?.status === 403
-        ) {
-          response = await listingsApi.getOne(id);
-        } else {
-          throw myProductError;
-        }
-      }
-      return response.data.product || response.data;
+      const response = await userApi.getMyProductById(id);
+      const payload = response.data.product || response.data;
+      // Kayıt bloğu yoksa form sessizce boş açılır ve satıcı boş bir ilanı
+      // kaydetmeye çalışır. Yükleme hatası say: hata etkisi listeye döndürür.
+      if (!payload?.edit) throw new Error("listing-edit-payload-missing");
+      return payload as { edit: ListingEditPayload };
     },
     enabled: !authLoading && isAuthenticated && !!id,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     meta: { page: "listing-edit" },
   });
 
@@ -104,26 +115,42 @@ export function useEditListingForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingQuery.isError]);
 
-  // Populate the form from the fetched listing — once, when the data arrives.
-  const populatedRef = useRef(false);
+  /**
+   * Formu gelen kayıttan doldur.
+   *
+   * İşaret hangi İLANIN doldurulduğunu tutar, "doldurdum mu" bilgisini değil:
+   * aynı segmentte ilandan ilana geçildiğinde bileşen unmount olmadığı için
+   * boolean bir işaret formu önceki ilanın verisiyle bırakıyordu.
+   *
+   * Kullanıcı forma dokunduysa (`isDirty`) taze veri yazılmaz — aksi halde
+   * odak değişimindeki bir refetch, satıcının yazdıklarını silerdi.
+   */
+  const populatedForRef = useRef<string | null>(null);
   useEffect(() => {
-    const listing = listingQuery.data;
-    if (!listing || populatedRef.current) return;
-    populatedRef.current = true;
+    const edit = listingQuery.data?.edit;
+    if (!edit) return;
+    if (populatedForRef.current === id) {
+      if (formState.isDirty) return;
+    }
+    populatedForRef.current = id;
 
-    const prev = getValues() as unknown as EditListingFormData;
-    const { newFormData, previewUrls } = buildListingFormData(prev, listing);
+    const { newFormData, previewUrls } = buildListingFormData(edit);
     reset(toValues(newFormData));
     setImagePreviewUrls(previewUrls);
 
     const { saleData: nextSaleData, saleActive } =
-      buildSaleDataFromListing(listing);
+      buildSaleDataFromListing(edit);
     setSaleData(nextSaleData);
-    if (saleActive) setShowDiscountSection(true);
+    setShowDiscountSection(saleActive);
+    setReadyFormId(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listingQuery.data]);
+  }, [listingQuery.data, id]);
 
-  const isFetching = !id ? false : authLoading || listingQuery.isPending;
+  const isFetching = !id
+    ? false
+    : authLoading ||
+      listingQuery.isPending ||
+      (!!listingQuery.data?.edit && readyFormId !== id);
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
@@ -145,12 +172,6 @@ export function useEditListingForm({
 
   const onSubmit = (values: EditListingValues) => {
     const formPrice = Number(values.price);
-    const orig = saleData.originalPrice
-      ? Number(saleData.originalPrice)
-      : formPrice;
-    const sale = saleData.salePrice ? Number(saleData.salePrice) : 0;
-    const effectiveOrig = Math.max(orig, formPrice);
-    const hasSale = sale > 0 && effectiveOrig > sale && sale !== formPrice;
 
     const payload: Record<string, unknown> = {
       title: values.title,
@@ -168,7 +189,6 @@ export function useEditListingForm({
       isBoxed: values.isBoxed === "boxed",
       year: values.year ? Number(values.year) : undefined,
       isTradeEnabled: values.isTradeEnabled,
-      isPreorder: values.isPreorder,
       isSet: values.isSet,
       bundleSize:
         values.isSet && Number(values.bundleSize) >= 2
@@ -181,22 +201,13 @@ export function useEditListingForm({
       shippingPackageTier: values.shippingPackageTier,
       images: values.images.length > 0 ? values.images : undefined,
       status: values.status,
+      // Üreticiye özel nitelikler — sunucu önceki seçimleri temizleyip bunları
+      // yazar, yani boş dizi "seçim yok" demektir.
+      attributes: Object.values(values.customAttributes ?? {})
+        .flat()
+        .filter(Boolean),
     };
-    if (hasSale) {
-      payload.originalPrice = effectiveOrig;
-      payload.salePrice = sale;
-      payload.saleStartDate = saleData.saleStartDate
-        ? new Date(saleData.saleStartDate).toISOString()
-        : null;
-      payload.saleEndDate = saleData.saleEndDate
-        ? new Date(saleData.saleEndDate).toISOString()
-        : null;
-    } else {
-      payload.originalPrice = null;
-      payload.salePrice = null;
-      payload.saleStartDate = null;
-      payload.saleEndDate = null;
-    }
+    Object.assign(payload, saleDataToPayload(saleData, formPrice));
 
     updateMutation.mutate(payload);
   };
@@ -204,6 +215,8 @@ export function useEditListingForm({
   return {
     form,
     onSubmit,
+    /** Kaydın kendisi — bağlı listeleri slug'la hemen açabilmek için. */
+    record: listingQuery.data?.edit ?? null,
     saleData,
     setSaleData,
     imagePreviewUrls,

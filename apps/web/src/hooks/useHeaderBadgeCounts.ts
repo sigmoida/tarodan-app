@@ -25,22 +25,33 @@ export function useUnreadNotificationCount(enabled: boolean) {
   });
 }
 
-export function useHeaderBadgeCounts(enabled: boolean) {
-  const unreadMessages = useQuery({
+/**
+ * Okunmamış mesaj sayısı — uygulamadaki TEK kaynak.
+ *
+ * Aynı sayı üç ayrı sorgu anahtarından hesaplanıyordu (header rozeti, profil
+ * menüsü ve mesajlar ekranı). Anahtarlar ayrı olduğu için biri tazelenince
+ * diğerleri bayat kalıyor, bir mesaj okunduğunda rozet ancak 5 dakikalık yoklama
+ * ya da yeni bir soket olayıyla düşüyordu.
+ *
+ * Sayı ayrıca thread listesinin İLK SAYFASINDAKİ `unreadCount` değerlerinin
+ * toplamıydı; 20'den fazla sohbeti olan kullanıcıda eksik çıkıyordu. Artık
+ * sayfalamadan bağımsız adanmış uçtan okunur.
+ */
+export function useUnreadMessageCount(enabled: boolean) {
+  return useQuery({
     queryKey: queryKeys.messages.unreadCount(),
     queryFn: async () => {
-      const response = await messagesApi.getThreads();
-      const threads = response.data.data || response.data.threads || [];
-      return threads.reduce(
-        (sum: number, thread: { unreadCount?: number }) =>
-          sum + (thread.unreadCount || 0),
-        0,
-      );
+      const response = await messagesApi.getUnreadCount();
+      return Number(response.data?.count ?? 0);
     },
     enabled,
     ...sharedCountQueryOptions,
     meta: { page: "global-message-count" },
   });
+}
+
+export function useHeaderBadgeCounts(enabled: boolean) {
+  const unreadMessages = useUnreadMessageCount(enabled);
 
   const pendingOffers = useQuery({
     queryKey: queryKeys.offers.pendingCount(),

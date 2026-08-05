@@ -6,6 +6,7 @@ import { Alert, Stepper, type StepperStep } from "@tarodan/ui";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import type { Trade } from "../_lib/types";
+import { tradePaymentProgress } from "../_lib/tradePayments";
 
 const ACTIVE_STATUSES = [
   "accepted",
@@ -27,7 +28,10 @@ export default function TradeProgressTimeline({ trade }: { trade: Trade }) {
   const t = useTranslations();
   if (!ACTIVE_STATUSES.includes(trade.status)) return null;
 
-  const hasCash = !!trade.cashAmount;
+  // v2'de kafa kafaya takasta bile iki ödeme vardır → nakit farkı olmasa da
+  // ödeme adımı gösterilir. Ödeme satırı yoksa (v1 nakitsiz) adım gizlenir.
+  const progress = tradePaymentProgress(trade);
+  const hasCash = progress.total > 0 || !!trade.cashAmount;
   const isReturning = trade.status === "returning";
 
   const steps: StepperStep[] = [
@@ -51,9 +55,20 @@ export default function TradeProgressTimeline({ trade }: { trade: Trade }) {
 
   return (
     <div className="mb-6 rounded-lg border border-border bg-surface-elevated p-4 sm:p-6">
-      <h3 className="mb-4 text-sm font-semibold text-heading">
-        {t("trade.tradeProgress")}
-      </h3>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-heading">
+          {t("trade.tradeProgress")}
+        </h3>
+        {/* Süreç iki ödemeye kapılı; kullanıcı nerede beklendiğini görmeli. */}
+        {trade.status === "awaiting_payment" && progress.total > 0 && (
+          <span className="text-xs font-medium text-muted">
+            {t("trade.paymentsProgress", {
+              paid: progress.paid,
+              total: progress.total,
+            })}
+          </span>
+        )}
+      </div>
       {isReturning ? (
         <Alert
           variant="warning"

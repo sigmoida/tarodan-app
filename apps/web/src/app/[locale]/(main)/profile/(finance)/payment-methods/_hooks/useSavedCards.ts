@@ -15,7 +15,13 @@ export function useSavedCards(enabled: boolean) {
     fetcher: async () => (await membershipApi.listCards()).data,
     enabled,
   });
-  return { cards: query.data ?? [], isLoading: query.isLoading };
+  return {
+    cards: query.data ?? [],
+    isLoading: query.isLoading,
+    isError: query.isError,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
+  };
 }
 
 /** Delete a saved card — owns toast + invalidation. */

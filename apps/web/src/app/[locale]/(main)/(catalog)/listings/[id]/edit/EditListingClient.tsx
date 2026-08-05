@@ -22,12 +22,15 @@ import {
   useCarModels,
   useCommissionPreview,
   useListingImageUpload,
+  useManufacturerAttributes,
+  DiscountCard,
+  ManufacturerAttributesCard,
 } from "@/components/listings/form";
 import { useEditListingForm } from "./_hooks/useEditListingForm";
 import { useProductDiscounts } from "./_hooks/useProductDiscounts";
 import { useListingLifecycle } from "./_hooks/useListingLifecycle";
+import { withSelectedReference } from "./_lib/selected-option";
 import StatusBanners from "./_sections/StatusBanners";
-import DiscountSection from "./_sections/DiscountSection";
 import DeleteListingModal from "./_modals/DeleteListingModal";
 
 const TERMINAL_STATUSES = ["sold", "reserved", "inactive", "deleted"];
@@ -52,6 +55,7 @@ export default function EditListingClient() {
     isLoading,
     setIsLoading,
     isFetching,
+    record,
   } = useEditListingForm({ id, authLoading, isAuthenticated });
 
   const status = form.watch("status");
@@ -69,8 +73,73 @@ export default function EditListingClient() {
     materials: materialList,
     manufacturers: manufacturerList,
   } = useListingFilters(catalogEnabled);
-  const selectedBrandSlug = brands.find((b) => b.id === brandId)?.slug;
+  const manufacturerId = form.watch("manufacturerId");
+  const categoryOptions = withSelectedReference(flatCategories, {
+    id: record?.categoryId,
+    name: record?.categoryName,
+  });
+  const brandOptions = withSelectedReference(brands, {
+    id: record?.brandId,
+    name: record?.brandName,
+    slug: record?.brandSlug,
+  });
+  const manufacturerOptions = withSelectedReference(manufacturerList, {
+    id: record?.manufacturerId,
+    name: record?.manufacturerName,
+    slug: record?.manufacturerSlug,
+  });
+  /**
+   * Slug önce KAYITTAN okunur, marka/üretici listesi henüz gelmemişken bile.
+   *
+   * Eskiden yalnız listeden çözülüyordu: model seçimi ilanın ve marka listesinin
+   * İKİSİNİ birden bekleyip ancak sonra üçüncü bir istek atabiliyor, "Ürün
+   * Detayları" kartı gözle görülür şekilde geç doluyordu. Kullanıcı markayı
+   * değiştirdiğinde kayıttaki slug artık geçerli değildir; bu yüzden yalnız form
+   * hâlâ kaydın markasını gösterirken kullanılır.
+   */
+  const slugFor = (
+    id: string,
+    recordId: string | null | undefined,
+    recordSlug: string | null | undefined,
+    list: Array<{ id: string; slug: string }>,
+  ) =>
+    list.find((item) => item.id === id)?.slug ??
+    (id && id === recordId ? (recordSlug ?? undefined) : undefined);
+
+  const selectedBrandSlug = slugFor(
+    brandId,
+    record?.brandId,
+    record?.brandSlug,
+    brands,
+  );
   const { models, modelsLoading } = useCarModels(selectedBrandSlug);
+  /**
+   * Model listesi markaya bağlı AYRI bir istekle gelir; form spinner'ı kalkarken
+   * o istek daha yoldadır ve alan bir an boş görünürdü. Liste gelene kadar
+   * ürünün KENDİ modeli tek seçenek olarak konur — alan doğru etiketle açılır.
+   */
+  const modelOptions =
+    models.length > 0
+      ? models
+      : record?.carModelId && record.carModelName
+        ? [
+            {
+              id: record.carModelId,
+              name: record.carModelName,
+              slug: "",
+              brand: { slug: selectedBrandSlug ?? "" },
+            },
+          ]
+        : [];
+  const selectedManufacturerSlug = slugFor(
+    manufacturerId,
+    record?.manufacturerId,
+    record?.manufacturerSlug,
+    manufacturerList,
+  );
+  const { manufacturerAttrGroups } = useManufacturerAttributes(
+    selectedManufacturerSlug,
+  );
   const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
     price,
     categoryId,
@@ -178,21 +247,26 @@ export default function EditListingClient() {
         <ProductDetailsCard
           locale={locale}
           conditions={getConditions(locale)}
-          flatCategories={flatCategories}
-          brands={brands}
+          flatCategories={categoryOptions}
+          brands={brandOptions}
           brandsLoading={brandsLoading}
-          models={models}
-          modelsLoading={modelsLoading}
+          models={modelOptions}
+          modelsLoading={modelsLoading && modelOptions.length === 0}
           scaleList={scaleList}
           materialList={materialList}
-          manufacturerList={manufacturerList}
+          manufacturerList={manufacturerOptions}
           yearOptions={getYearOptions()}
         />
-        <OptionsCard
-          locale={locale}
-          canTrade={!!limits?.canTrade}
-          showPreorder
+        {/* Üretici nitelikleri: yeni ilan formunda vardı, burada yoktu —
+            satıcı seçimlerini göremiyor, kaydedince hepsi siliniyordu. */}
+        <ManufacturerAttributesCard
+          manufacturerList={manufacturerOptions}
+          manufacturerAttrGroups={manufacturerAttrGroups}
         />
+        {/* Ön sipariş anahtarı YOK: yeni ilan formunda da bulunmuyor, iki form
+            aynı alan kümesini göstermeli. Kolon DB'de durur; bu ekran ona
+            dokunmaz (payload'a da girmez). */}
+        <OptionsCard locale={locale} canTrade={!!limits?.canTrade} />
         <PricingCard
           locale={locale}
           commissionPreview={commissionPreview}
@@ -200,7 +274,7 @@ export default function EditListingClient() {
           quantityPlaceholder={t("membership.unlimited")}
           quantityHelper={t("product.leaveEmptyUnlimitedStock")}
         />
-        <DiscountSection
+        <DiscountCard
           saleData={saleData}
           setSaleData={setSaleData}
           showDiscountSection={showDiscountSection}

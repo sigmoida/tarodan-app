@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import StatusScreen from "../_components/StatusScreen";
-import SocialLinks from "../_components/SocialLinks";
+import SocialLinks from "@/components/ui/SocialLinks";
 import PinForm from "./_components/PinForm";
 
 export default function ComingSoonPage() {

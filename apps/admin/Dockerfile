@@ -27,6 +27,7 @@ RUN pnpm install --frozen-lockfile --shamefully-hoist
 
 # Copy app source
 COPY apps/admin ./apps/admin
+COPY apps/api/scripts/generate-product-import-template.mjs ./apps/api/scripts/generate-product-import-template.mjs
 
 # Switch to production for Next.js build
 ENV NODE_ENV=production

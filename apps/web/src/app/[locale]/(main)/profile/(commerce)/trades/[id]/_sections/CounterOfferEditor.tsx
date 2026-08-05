@@ -10,6 +10,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { getProductImage } from "../_lib/types";
 import type { TradeDetailVM } from "../_hooks/useTradeDetail";
+import TradeCostPreview from "@/components/trade/TradeCostPreview";
 
 /**
  * Full-screen counter-offer edit mode — replaces the whole detail view while
@@ -35,6 +36,9 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
     isActionLoading,
     handleCounterSubmit,
     handleExitCounterMode,
+    costPreview,
+    costPreviewLoading,
+    costPreviewFailed,
   } = vm;
 
   return (
@@ -271,6 +275,12 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                 )}
               </div>
             </div>
+
+            <TradeCostPreview
+              preview={costPreview}
+              loading={costPreviewLoading}
+              failed={costPreviewFailed}
+            />
 
             {/* Message */}
             <div className="bg-surface-elevated rounded-xl p-6 shadow-sm border border-border mb-6">

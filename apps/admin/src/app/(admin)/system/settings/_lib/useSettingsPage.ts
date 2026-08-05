@@ -27,12 +27,17 @@ export function useSettingsPage() {
   const activeTab = (isWarehouseTab ? "listing" : tab) as SettingsTab;
   const fieldsByTab = tabFields(t);
 
+  // Ham yanıt cache'lenir, dönüşüm `select`te: `usePspFeeRate` AYNI anahtarı
+  // paylaşır — queryFn'ler farklı şekil döndürseydi cache'i kim önce doldurursa
+  // diğeri yanlış şekli okurdu (form ham diziyle seed'lenir ya da oran hep
+  // varsayılana düşerdi).
   const query = useQuery({
     queryKey: adminKeys.all("platform-settings"),
     queryFn: async () => {
       const response = await adminApi.getSettings();
-      return parseSettings(response.data?.data ?? response.data ?? []);
+      return response.data?.data ?? response.data ?? [];
     },
+    select: parseSettings,
   });
 
   // Reactively reseed from the query (including after invalidation) without an

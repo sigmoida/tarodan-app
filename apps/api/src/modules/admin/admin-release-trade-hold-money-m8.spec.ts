@@ -10,12 +10,14 @@ describe("AdminPayoutService.releaseTradePaymentHold — MONEY-M8 trade-status g
   const makeService = (tradeStatus: TradeStatus | null) => {
     const prisma = {
       tradeCashPayment: {
+        findFirst: jest.fn().mockResolvedValue({ id: "tcp-1" }),
         findUnique: jest.fn().mockResolvedValue({
           id: "tcp-1",
           releasedAt: null,
           refundedAt: null,
         }),
-        update: jest.fn().mockResolvedValue({}),
+        // v2: hold serbest bırakma TÜM taraf satırlarına uygulanır.
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       trade: {
         findUnique: jest
@@ -40,7 +42,7 @@ describe("AdminPayoutService.releaseTradePaymentHold — MONEY-M8 trade-status g
     await expect(
       service.releaseTradePaymentHold("admin-1", "trade-1"),
     ).rejects.toThrow();
-    expect(prisma.tradeCashPayment.update).not.toHaveBeenCalled();
+    expect(prisma.tradeCashPayment.updateMany).not.toHaveBeenCalled();
   });
 
   it("returning takas: reddeder", async () => {
@@ -49,7 +51,7 @@ describe("AdminPayoutService.releaseTradePaymentHold — MONEY-M8 trade-status g
     await expect(
       service.releaseTradePaymentHold("admin-1", "trade-1"),
     ).rejects.toThrow();
-    expect(prisma.tradeCashPayment.update).not.toHaveBeenCalled();
+    expect(prisma.tradeCashPayment.updateMany).not.toHaveBeenCalled();
   });
 
   it("completed takas: serbest bırakır", async () => {
@@ -58,7 +60,7 @@ describe("AdminPayoutService.releaseTradePaymentHold — MONEY-M8 trade-status g
     const res = await service.releaseTradePaymentHold("admin-1", "trade-1");
 
     expect(res.success).toBe(true);
-    expect(prisma.tradeCashPayment.update).toHaveBeenCalledWith(
+    expect(prisma.tradeCashPayment.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { releasedAt: expect.any(Date) } }),
     );
   });

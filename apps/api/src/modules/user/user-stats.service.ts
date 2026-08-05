@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { OrderStatus, ProductStatus } from "@prisma/client";
+import { OrderStatus, ProductKind, ProductStatus } from "@prisma/client";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { i18nMessage } from "../i18n";
+import { publicUserRatingWhere } from "../../common/helpers/public-rating";
 import {
   effectiveMembershipTierType,
   isBusinessMembershipEntitled,
@@ -52,14 +54,26 @@ export class UserStatsService {
     const [revenue, soldOrdersCount, activeProductsCount, followersCount] =
       await Promise.all([
         this.prisma.order.aggregate({
-          where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
+          where: {
+            sellerId: userId,
+            status: { in: REVENUE_STATUSES },
+            product: { kind: ProductKind.listing },
+          },
           _sum: { totalAmount: true },
         }),
         this.prisma.order.count({
-          where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
+          where: {
+            sellerId: userId,
+            status: { in: REVENUE_STATUSES },
+            product: { kind: ProductKind.listing },
+          },
         }),
         this.prisma.product.count({
-          where: { sellerId: userId, status: ProductStatus.active },
+          where: {
+            ...catalogProductWhere(),
+            sellerId: userId,
+            status: ProductStatus.active,
+          },
         }),
         this.prisma.userFollow.count({ where: { followingId: userId } }),
       ]);
@@ -132,11 +146,16 @@ export class UserStatsService {
         },
       }),
       this.prisma.product.count({
-        where: { sellerId: userId, status: { notIn: ["deleted"] } },
+        where: {
+          ...catalogProductWhere(),
+          sellerId: userId,
+          status: { notIn: ["deleted"] },
+        },
       }),
       // Gerçekten satılabilir aktif ilan = active VE ödenmiş satış siparişi YOK
       this.prisma.product.count({
         where: {
+          ...catalogProductWhere(),
           sellerId: userId,
           status: "active",
           orders: { none: { status: { in: [...PAID_STATUSES] } } },
@@ -145,17 +164,18 @@ export class UserStatsService {
       // Satılmış ilan = en az bir ödenmiş satış siparişi OLAN farklı ürün sayısı
       this.prisma.product.count({
         where: {
+          ...catalogProductWhere(),
           sellerId: userId,
           status: { notIn: ["deleted"] },
           orders: { some: { status: { in: [...PAID_STATUSES] } } },
         },
       }),
       this.prisma.product.aggregate({
-        where: { sellerId: userId },
+        where: { ...catalogProductWhere(), sellerId: userId },
         _sum: { viewCount: true },
       }),
       this.prisma.product.aggregate({
-        where: { sellerId: userId },
+        where: { ...catalogProductWhere(), sellerId: userId },
         _sum: { likeCount: true },
       }),
       // "Siparişlerim" sayacı, listeyle tutarlı olmalı: liste artık GRUP çatısı
@@ -167,12 +187,7 @@ export class UserStatsService {
             buyerId: userId,
             orders: {
               some: {
-                NOT: {
-                  OR: [
-                    { productId: { startsWith: "membership-" } },
-                    { productId: { startsWith: "boost-" } },
-                  ],
-                },
+                product: { kind: ProductKind.listing },
               },
             },
           },
@@ -181,12 +196,7 @@ export class UserStatsService {
           where: {
             buyerId: userId,
             checkoutGroupId: null,
-            NOT: {
-              OR: [
-                { productId: { startsWith: "membership-" } },
-                { productId: { startsWith: "boost-" } },
-              ],
-            },
+            product: { kind: ProductKind.listing },
           },
         }),
       ]).then(([groups, loose]) => groups + loose),
@@ -194,7 +204,12 @@ export class UserStatsService {
         this.prisma.checkoutGroup.count({
           where: {
             buyerId: userId,
-            orders: { some: { status: { in: ["delivered", "completed"] } } },
+            orders: {
+              some: {
+                status: { in: ["delivered", "completed"] },
+                product: { kind: ProductKind.listing },
+              },
+            },
           },
         }),
         this.prisma.order.count({
@@ -202,23 +217,40 @@ export class UserStatsService {
             buyerId: userId,
             checkoutGroupId: null,
             status: { in: ["delivered", "completed"] },
+            product: { kind: ProductKind.listing },
           },
         }),
       ]).then(([groups, loose]) => groups + loose),
       // Harcama yapılan (ödemesi alınmış) alıcı siparişi sayısı
       this.prisma.order.count({
-        where: { buyerId: userId, status: { in: [...PAID_STATUSES] } },
+        where: {
+          buyerId: userId,
+          status: { in: [...PAID_STATUSES] },
+          product: { kind: ProductKind.listing },
+        },
       }),
       // Yapılan satış (ödemesi alınmış satıcı siparişi) sayısı
       this.prisma.order.count({
-        where: { sellerId: userId, status: { in: [...PAID_STATUSES] } },
+        where: {
+          sellerId: userId,
+          status: { in: [...PAID_STATUSES] },
+          product: { kind: ProductKind.listing },
+        },
       }),
       this.prisma.order.aggregate({
-        where: { buyerId: userId, status: { in: [...PAID_STATUSES] } },
+        where: {
+          buyerId: userId,
+          status: { in: [...PAID_STATUSES] },
+          product: { kind: ProductKind.listing },
+        },
         _sum: { totalAmount: true },
       }),
       this.prisma.order.aggregate({
-        where: { sellerId: userId, status: { in: [...PAID_STATUSES] } },
+        where: {
+          sellerId: userId,
+          status: { in: [...PAID_STATUSES] },
+          product: { kind: ProductKind.listing },
+        },
         _sum: { totalAmount: true },
       }),
       this.prisma.trade.count({
@@ -232,7 +264,7 @@ export class UserStatsService {
       }),
       this.prisma.collection.count({ where: { userId } }),
       this.prisma.rating.aggregate({
-        where: { receiverId: userId, status: "approved" },
+        where: publicUserRatingWhere({ receiverId: userId }),
         _avg: { score: true },
         _count: true,
       }),

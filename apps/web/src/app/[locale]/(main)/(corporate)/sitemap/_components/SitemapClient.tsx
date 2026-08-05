@@ -35,17 +35,6 @@ export default function SitemapClient() {
           </SectionCard>
         ))}
       </div>
-
-      <p className="text-center text-sm text-muted">
-        <a
-          href="/sitemap.xml"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary-500 hover:underline"
-        >
-          XML Sitemap
-        </a>
-      </p>
     </DocPage>
   );
 }

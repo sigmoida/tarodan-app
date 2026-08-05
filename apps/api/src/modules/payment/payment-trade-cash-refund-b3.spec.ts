@@ -77,7 +77,11 @@ describe("PaymentService trade cash refund idempotency", () => {
   };
 
   const mockPrisma = {
-    payment: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    // v2: takasın TÜM tamamlanmış ödemeleri iade edilir → findMany.
+    payment: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    // İade matrisi eşiği: herhangi bir bacak kargoya verildi mi?
+    trade: { findUnique: jest.fn().mockResolvedValue(null) },
+    tradeShipment: { count: jest.fn().mockResolvedValue(0) },
     refundAttempt: { updateMany: jest.fn() },
     payoutTransfer: { findFirst: jest.fn(), updateMany: jest.fn() },
     $transaction: jest.fn(),
@@ -161,9 +165,7 @@ describe("PaymentService trade cash refund idempotency", () => {
             handleOrderRefund: jest.fn().mockResolvedValue(undefined),
             issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined),
             handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
-            issueTradeCashCommissionInvoice: jest
-              .fn()
-              .mockResolvedValue(undefined),
+            issueTradeCashFeeInvoice: jest.fn().mockResolvedValue(undefined),
             retryPendingInvoices: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -198,7 +200,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("persists a prepared attempt before calling the provider", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
 
     const result = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
 
@@ -247,7 +249,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("finalizes a durable provider success without submitting another refund", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockTx.refundAttempt.findUnique.mockResolvedValue(
       refundAttempt(RefundAttemptStatus.succeeded),
     );
@@ -267,7 +269,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("treats an already-finalized attempt as an idempotent success", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockTx.refundAttempt.findUnique.mockResolvedValue(
       refundAttempt(RefundAttemptStatus.finalized),
     );
@@ -280,7 +282,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("does not call the provider when the durable attempt cannot be created", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockTx.refundAttempt.create.mockRejectedValueOnce(new Error("db down"));
 
     await expect(
@@ -290,7 +292,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("skips when no refundable completed PayTR payment exists", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(null);
+    mockPrisma.payment.findMany.mockResolvedValue([]);
 
     const result = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
 
@@ -302,7 +304,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("moves the attempt to manual review when a payout is already in progress", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockPrisma.payoutTransfer.findFirst.mockResolvedValue({
       id: "po-1",
       status: "completed",
@@ -325,7 +327,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("maps PayTR's not-yet-synced rejection and leaves a retryable failed attempt", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockPaytr.createRefund.mockRejectedValue(
       new ProviderRefundRejectedException("odeme henuz siteye bildirilmemis"),
     );
@@ -345,7 +347,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("requires reconciliation after an unknown provider outcome", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockPaytr.createRefund.mockRejectedValue(new Error("connection reset"));
 
     await expect(
@@ -361,10 +363,9 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("rejects a missing provider reference before creating an attempt", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue({
-      ...basePayment(),
-      providerConversationId: null,
-    });
+    mockPrisma.payment.findMany.mockResolvedValue([
+      { ...basePayment(), providerConversationId: null },
+    ]);
 
     await expect(
       service.refundTradeCashPaymentIfCompleted(TRADE_ID),
@@ -374,7 +375,7 @@ describe("PaymentService trade cash refund idempotency", () => {
   });
 
   it("keeps a definitive provider rejection retryable", async () => {
-    mockPrisma.payment.findFirst.mockResolvedValue(basePayment());
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockPaytr.createRefund.mockRejectedValue(
       new ProviderRefundRejectedException("insufficient balance"),
     );

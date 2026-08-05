@@ -30,6 +30,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { SellerChip } from "@/components/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { getProductEffectivePrice } from "@/lib/productPrice";
+import { formatTL } from "@/lib/format";
 import {
   calculateDiscount,
   formatTimeAgo,
@@ -221,9 +222,7 @@ export default function OfferCard({
               </Link>
               <p className="mt-1 text-sm text-muted">
                 {t("offer.listingPriceLabel")}:{" "}
-                <span className="line-through">
-                  ₺{listingPrice.toLocaleString("tr-TR")}
-                </span>
+                <span className="line-through">{formatTL(listingPrice)}</span>
               </p>
             </div>
             <div className="flex flex-col items-end gap-1">
@@ -244,7 +243,7 @@ export default function OfferCard({
                 {t("offer.offerAmountLabel")}
               </p>
               <p className="text-lg font-bold text-primary-600 sm:text-2xl">
-                ₺{offer.amount.toLocaleString("tr-TR")}
+                {formatTL(offer.amount)}
               </p>
               {isReceived &&
                 offer.status === "pending" &&

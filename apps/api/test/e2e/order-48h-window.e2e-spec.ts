@@ -1,15 +1,15 @@
-import { Prisma, OrderStatus, CommissionLedgerStatus } from '@prisma/client';
-import { PrismaService } from '../../src/prisma';
-import { OrderService } from '../../src/modules/order/order.service';
-import { OrderLifecycleService } from '../../src/modules/order/order-lifecycle.service';
-import { CommissionLedgerService } from '../../src/modules/commission/commission-ledger.service';
-import { OrderSchedulerService } from '../../src/modules/order/order-scheduler.service';
+import { Prisma, OrderStatus, CommissionLedgerStatus } from "@prisma/client";
+import { PrismaService } from "../../src/prisma";
+import { OrderService } from "../../src/modules/order/order.service";
+import { OrderLifecycleService } from "../../src/modules/order/order-lifecycle.service";
+import { CommissionLedgerService } from "../../src/modules/commission/commission-ledger.service";
+import { OrderSchedulerService } from "../../src/modules/order/order-scheduler.service";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
+} from "../test-utils/db";
 
 /**
  * Faz 3A.7-8 — 48h pencere tam akışı + auto-complete cron.
@@ -17,7 +17,7 @@ import {
  * OrderService manuel instantiate ediliyor; sadece test edilen
  * metodlar için bağımlılıklar mock.
  */
-describe('48h window core + auto-complete cron (E2E)', () => {
+describe("48h window core + auto-complete cron (E2E)", () => {
   let prisma: PrismaService;
   let ledger: CommissionLedgerService;
 
@@ -35,7 +35,11 @@ describe('48h window core + auto-complete cron (E2E)', () => {
       ledger, // commissionLedger
       {} as any, // orderCommon
       {} as any, // orderQuery
-      { issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {}, issuePlatformSaleInvoice: async () => {} } as any, // elogoInvoicing (no-op stub)
+      {
+        issueCommissionInvoice: async () => {},
+        issueServiceFeeInvoice: async () => {},
+        issuePlatformSaleInvoice: async () => {},
+      } as any, // elogoInvoicing (no-op stub)
     );
     return new OrderService(
       {} as any, // orderPricing
@@ -48,14 +52,20 @@ describe('48h window core + auto-complete cron (E2E)', () => {
   function makeScheduler(flagValue: string | undefined): OrderSchedulerService {
     const config = {
       get: jest.fn((k: string) =>
-        k === 'FEATURE_48H_CONFIRMATION_WINDOW' ? flagValue : undefined,
+        k === "FEATURE_48H_CONFIRMATION_WINDOW" ? flagValue : undefined,
       ),
     };
     return new OrderSchedulerService(
       prisma,
       makeOrderService(),
       config as any,
-      { issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {}, issuePlatformSaleInvoice: async () => {} } as any /* elogoInvoicing (no-op stub) */,
+      {
+        issueCommissionInvoice: async () => {},
+        issueServiceFeeInvoice: async () => {},
+        issuePlatformSaleInvoice: async () => {},
+      } as any /* elogoInvoicing (no-op stub) */,
+      // Satıcı ürün faturası taraması bu senaryonun konusu değil.
+      { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
       {} as any /* scheduledQueue */,
     );
   }
@@ -76,7 +86,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
 
   // ---------- completeOrder ----------
 
-  it('completeOrder: awaiting → completed + ledger.earned; hold HELD kalır (release escrow cron\'una bırakıldı)', async () => {
+  it("completeOrder: awaiting → completed + ledger.earned; hold HELD kalır (release escrow cron'una bırakıldı)", async () => {
     const o = await setupOrderInAwaitingConfirmation({
       commissionAmount: 50,
       buyerFeeAmount: 15,
@@ -88,13 +98,13 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     });
 
     const svc = makeOrderService();
-    const result = await svc.completeOrder(o.id, 'manual_ok');
+    const result = await svc.completeOrder(o.id, "manual_ok");
     expect(result.completed).toBe(true);
 
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
     expect(updated!.status).toBe(OrderStatus.completed);
     expect(updated!.completedAt).not.toBeNull();
-    expect(updated!.buyerConfirmationType).toBe('manual_ok');
+    expect(updated!.buyerConfirmationType).toBe("manual_ok");
 
     const ledgerRow = await prisma.commissionLedger.findUnique({
       where: { orderId: o.id },
@@ -108,11 +118,11 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     const hold = await prisma.paymentHold.findFirst({
       where: { paymentId: o.paymentId },
     });
-    expect(hold!.status).toBe('held');
+    expect(hold!.status).toBe("held");
     expect(hold!.releasedAt).toBeNull();
   });
 
-  it('completeOrder idempotent: ikinci çağrı noop', async () => {
+  it("completeOrder idempotent: ikinci çağrı noop", async () => {
     const o = await setupOrderInAwaitingConfirmation({
       commissionAmount: 10,
       buyerFeeAmount: 3,
@@ -124,19 +134,19 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     });
 
     const svc = makeOrderService();
-    const r1 = await svc.completeOrder(o.id, 'manual_ok');
-    const r2 = await svc.completeOrder(o.id, 'auto_timeout');
+    const r1 = await svc.completeOrder(o.id, "manual_ok");
+    const r2 = await svc.completeOrder(o.id, "auto_timeout");
 
     expect(r1.completed).toBe(true);
     expect(r2.completed).toBe(false);
 
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
-    expect(updated!.buyerConfirmationType).toBe('manual_ok');
+    expect(updated!.buyerConfirmationType).toBe("manual_ok");
   });
 
   // ---------- confirmReceipt ----------
 
-  it('confirmReceipt yetki kontrolü: başka kullanıcı 403', async () => {
+  it("confirmReceipt yetki kontrolü: başka kullanıcı 403", async () => {
     const o = await setupOrderInAwaitingConfirmation({
       commissionAmount: 10,
       buyerFeeAmount: 3,
@@ -144,10 +154,12 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     const other = await createUser(prisma);
 
     const svc = makeOrderService();
-    await expect(svc.confirmReceipt(o.id, other.id)).rejects.toThrow(/yetkiniz yok/);
+    await expect(svc.confirmReceipt(o.id, other.id)).rejects.toThrow(
+      /yetkiniz yok/,
+    );
   });
 
-  it('confirmReceipt status kontrolü: paid durumunda 400', async () => {
+  it("confirmReceipt status kontrolü: paid durumunda 400", async () => {
     const buyer = await createUser(prisma);
     const seller = await createUser(prisma, { isSeller: true });
     const category = await prisma.category.findFirst();
@@ -159,10 +171,12 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     });
 
     const svc = makeOrderService();
-    await expect(svc.confirmReceipt(order.id, buyer.id)).rejects.toThrow(/onaylanamaz/);
+    await expect(svc.confirmReceipt(order.id, buyer.id)).rejects.toThrow(
+      /onaylanamaz/,
+    );
   });
 
-  it('confirmReceipt açık refund varken 400', async () => {
+  it("confirmReceipt açık refund varken 400", async () => {
     const o = await setupOrderInAwaitingConfirmation({
       commissionAmount: 10,
       buyerFeeAmount: 3,
@@ -172,17 +186,19 @@ describe('48h window core + auto-complete cron (E2E)', () => {
         refundNumber: `REF-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         orderId: o.id,
         requesterId: o.buyerId,
-        reason: 'damaged' as any,
+        reason: "damaged" as any,
         amount: new Prisma.Decimal(100),
-        status: 'pending_review' as any,
+        status: "pending_review" as any,
       },
     });
 
     const svc = makeOrderService();
-    await expect(svc.confirmReceipt(o.id, o.buyerId)).rejects.toThrow(/iade talebi/);
+    await expect(svc.confirmReceipt(o.id, o.buyerId)).rejects.toThrow(
+      /iade talebi/,
+    );
   });
 
-  it('confirmReceipt happy path: buyer onayı → completed', async () => {
+  it("confirmReceipt happy path: buyer onayı → completed", async () => {
     const o = await setupOrderInAwaitingConfirmation({
       commissionAmount: 10,
       buyerFeeAmount: 3,
@@ -199,12 +215,12 @@ describe('48h window core + auto-complete cron (E2E)', () => {
 
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
     expect(updated!.status).toBe(OrderStatus.completed);
-    expect(updated!.buyerConfirmationType).toBe('manual_ok');
+    expect(updated!.buyerConfirmationType).toBe("manual_ok");
   });
 
   // ---------- autoCompleteConfirmedOrders cron ----------
 
-  it('cron flag OFF: hiçbir şey yapmaz', async () => {
+  it("cron flag OFF: hiçbir şey yapmaz", async () => {
     const o = await createExpiredAwaitingOrder();
     const s = makeScheduler(undefined);
     await s.runAutoCompleteConfirmedOrders();
@@ -212,19 +228,19 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     expect(updated!.status).toBe(OrderStatus.awaiting_buyer_confirmation);
   });
 
-  it('cron flag ON: deadline geçmiş tamamlanır → ledger earned', async () => {
+  it("cron flag ON: deadline geçmiş tamamlanır → ledger earned", async () => {
     const o = await createExpiredAwaitingOrder();
     await ledger.upsertPending({
       orderId: o.id,
       sellerCommission: 10,
       buyerFee: 3,
     });
-    const s = makeScheduler('true');
+    const s = makeScheduler("true");
     await s.runAutoCompleteConfirmedOrders();
 
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
     expect(updated!.status).toBe(OrderStatus.completed);
-    expect(updated!.buyerConfirmationType).toBe('auto_timeout');
+    expect(updated!.buyerConfirmationType).toBe("auto_timeout");
 
     const ledgerRow = await prisma.commissionLedger.findUnique({
       where: { orderId: o.id },
@@ -232,15 +248,15 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     expect(ledgerRow!.status).toBe(CommissionLedgerStatus.earned);
   });
 
-  it('cron flag ON: deadline gelecekte → atlanır', async () => {
+  it("cron flag ON: deadline gelecekte → atlanır", async () => {
     const o = await createFutureAwaitingOrder();
-    const s = makeScheduler('true');
+    const s = makeScheduler("true");
     await s.runAutoCompleteConfirmedOrders();
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
     expect(updated!.status).toBe(OrderStatus.awaiting_buyer_confirmation);
   });
 
-  it('cron flag ON: açık refund varsa atlanır', async () => {
+  it("cron flag ON: açık refund varsa atlanır", async () => {
     const o = await createExpiredAwaitingOrder();
     await ledger.upsertPending({
       orderId: o.id,
@@ -252,13 +268,13 @@ describe('48h window core + auto-complete cron (E2E)', () => {
         refundNumber: `REF-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         orderId: o.id,
         requesterId: o.buyerId,
-        reason: 'damaged' as any,
+        reason: "damaged" as any,
         amount: new Prisma.Decimal(100),
-        status: 'pending_review' as any,
+        status: "pending_review" as any,
       },
     });
 
-    const s = makeScheduler('true');
+    const s = makeScheduler("true");
     await s.runAutoCompleteConfirmedOrders();
 
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
@@ -276,8 +292,8 @@ async function createUser(
   return prisma.user.create({
     data: {
       email: `u-${uniq}@test.local`,
-      passwordHash: 'x',
-      displayName: 'Test User',
+      passwordHash: "x",
+      displayName: "Test User",
       isSeller: opts.isSeller ?? false,
     },
   });
@@ -301,10 +317,10 @@ async function createOrder(
       sellerId: opts.sellerId,
       categoryId: opts.categoryId,
       title: `T-${Date.now()}`,
-      description: 'x',
+      description: "x",
       price: new Prisma.Decimal(100),
-      condition: 'new' as any,
-      status: 'active' as any,
+      condition: "new" as any,
+      status: "active" as any,
       quantity: 1,
       reservedQuantity: 0,
     },
@@ -349,9 +365,9 @@ async function setupOrderInAwaitingConfirmation(opts: {
   const payment = await prisma.payment.create({
     data: {
       orderId: order.id,
-      provider: 'test',
+      provider: "test",
       amount: order.totalAmount,
-      status: 'completed' as any,
+      status: "completed" as any,
     },
   });
   await prisma.paymentHold.create({
@@ -360,7 +376,7 @@ async function setupOrderInAwaitingConfirmation(opts: {
       orderId: order.id,
       sellerId: seller.id,
       amount: new Prisma.Decimal(opts.commissionAmount + opts.buyerFeeAmount),
-      status: 'held' as any,
+      status: "held" as any,
     },
   });
 
@@ -390,9 +406,9 @@ async function createExpiredAwaitingOrder(): Promise<{
   const payment = await prisma.payment.create({
     data: {
       orderId: order.id,
-      provider: 'test',
+      provider: "test",
       amount: order.totalAmount,
-      status: 'completed' as any,
+      status: "completed" as any,
     },
   });
   await prisma.paymentHold.create({
@@ -401,7 +417,7 @@ async function createExpiredAwaitingOrder(): Promise<{
       orderId: order.id,
       sellerId: seller.id,
       amount: new Prisma.Decimal(13),
-      status: 'held' as any,
+      status: "held" as any,
     },
   });
 

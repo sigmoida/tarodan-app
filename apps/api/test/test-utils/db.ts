@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { drainE2EBackgroundTasks } from "./background-tasks";
 import Redis from "ioredis";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-config";
 
 let prismaSingleton: PrismaClient | null = null;
 
@@ -98,7 +99,9 @@ const TABLES_TO_TRUNCATE = [
   // Reference data (also truncated so seedBaseline can re-insert deterministically)
   "attributes",
   "attribute_groups",
+  "commission_rule_shipping_shares",
   "commission_rules",
+  "commission_rule_sets",
   "tax_rules",
   "tax_rates",
   "tax_regions",
@@ -222,32 +225,71 @@ export async function seedBaseline(): Promise<{
       status: "active",
       version: 1,
       currency: "TRY",
-      outboundPackageFee: 29.99,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      returnPackageFee: 29.99,
-      tradeLegFee: 29.99,
       effectiveFrom: new Date(0),
+      // Kademeler olmadan hiçbir fiyatlama yolu desiyi tutara çeviremez
+      // (checkout ve TAKAS ücretlendirmesi fail-closed davranır). Üretim
+      // migration'ındaki üç kademe birebir yansıtılır.
+      packageTiers: {
+        create: [
+          {
+            code: "small",
+            label: "Küçük Paket",
+            minDesi: 0,
+            maxDesi: 2,
+            amount: 29.99,
+            sortOrder: 0,
+          },
+          {
+            code: "medium",
+            label: "Orta Paket",
+            minDesi: 2,
+            maxDesi: 5,
+            amount: 39.99,
+            sortOrder: 1,
+          },
+          {
+            code: "large",
+            label: "Büyük Paket",
+            minDesi: 5,
+            maxDesi: null,
+            amount: 59.99,
+            sortOrder: 2,
+          },
+        ],
+      },
     },
   });
 
-  // Checkout fails closed without a matching commission rule. Mirror the
-  // production seed's catch-all rule so ordinary order fixtures reach the
-  // domain behavior they intend to test.
-  await prisma.commissionRule.create({
+  const commissionSet = await prisma.commissionRuleSet.create({
     data: {
-      id: "default-rule",
-      name: "Test Default Commission",
-      ruleType: "default",
-      sellerType: "ALL",
-      appliesTo: "SELLER",
-      sellerRate: 5,
-      sellerCommissionRate: 5,
-      percentage: 0.05,
-      priority: 0,
-      isActive: true,
+      id: SEED_COMMISSION_RULE_SET_IDS.test,
+      name: "Test strict commission",
+      version: 1,
+      status: "ACTIVE",
+      publishedAt: new Date(),
+      publishedBy: "test",
     },
   });
+  for (const sellerType of ["FREE", "BASIC", "PREMIUM", "BUSINESS"] as const) {
+    await prisma.commissionRule.create({
+      data: {
+        id: `default-rule-${sellerType}`,
+        ruleSetId: commissionSet.id,
+        name: `Test Default Commission ${sellerType}`,
+        categoryId: category.id,
+        sellerType,
+        minAmount: 0,
+        maxAmount: null,
+        buyerCommissionRate: 0,
+        buyerServiceFeeRate: 0,
+        sellerCommissionRate: 5,
+        sellerPlatformFeeRate: 0,
+        shippingBuyerShare: 100,
+      },
+    });
+  }
 
   return {
     categoryId: category.id,

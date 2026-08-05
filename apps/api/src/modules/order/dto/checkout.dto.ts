@@ -10,6 +10,7 @@ import {
   ArrayMaxSize,
   Matches,
   IsInt,
+  IsBoolean,
   Min,
   Max,
 } from "class-validator";
@@ -126,6 +127,15 @@ export class CheckoutDto {
   @Min(1)
   expectedShippingTariffVersion: number;
 
+  @ApiProperty({ description: "Checkout quote komisyon seti ID'si" })
+  @IsUUID("4")
+  expectedCommissionRuleSetId: string;
+
+  @ApiProperty({ description: "Checkout quote komisyon seti sürümü" })
+  @IsInt()
+  @Min(1)
+  expectedCommissionRuleSetVersion: number;
+
   @ApiProperty({
     description:
       "Checkout quote birim-fiyat hash'i. Ürün fiyatı/kampanya değiştiyse 409 PRICING_CHANGED.",
@@ -136,6 +146,17 @@ export class CheckoutDto {
     message: "Geçerli checkout fiyat hash'i gönderilmelidir",
   })
   expectedPricingHash: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Alıcı mesafeli satış sözleşmesini onayladı mı. true ise onay, zamanı ve " +
+      "yürürlükteki sözleşme sürümüyle birlikte sipariş grubuna yazılır. " +
+      "Zorunlu DEĞİLDİR: onay kutusunu henüz göndermeyen istemciler (eski mobil " +
+      "sürümler) sipariş verememezlik yaşamasın.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  distanceSalesAccepted?: boolean;
 }
 
 export class GuestCheckoutGroupDto extends CheckoutDto {

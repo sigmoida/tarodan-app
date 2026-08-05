@@ -1,6 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import {
   CommissionLedgerStatus,
+  LedgerAccount,
+  LedgerDirection,
   OrderStatus,
   PaymentHoldStatus,
   PaymentStatus,
@@ -10,6 +12,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { ledgerNetRevenue } from "../commission/ledger-net";
 import { ELOGO_MAX_SEND_ATTEMPTS } from "../elogo/elogo-retry-policy";
+import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
 
 /**
  * Finans ÖZETİ — admin'in "para nerede?" sorusuna tek bakışta cevap.
@@ -23,7 +26,21 @@ import { ELOGO_MAX_SEND_ATTEMPTS } from "../elogo/elogo-retry-policy";
  */
 @Injectable()
 export class AdminFinanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly taxPolicy?: OrderTaxPolicyService,
+  ) {}
+
+  /**
+   * Takas hizmet bedeli KDV DAHİL tahsil edilir; komisyon geliri ise KDV HARİÇ
+   * matrahtır. İkisini toplayabilmek için ücretin matrahı ayrıştırılır — oran
+   * platformun hizmet KDV politikasından gelir (tek otorite: OrderTaxPolicyService).
+   */
+  private async serviceVatRate(): Promise<number> {
+    if (!this.taxPolicy) return 0;
+    const policy = await this.taxPolicy.resolve();
+    return this.taxPolicy.effectiveServiceVatRate(policy);
+  }
 
   /** Faturasız teslimat alarmıyla (order-scheduler) AYNI eşik. */
   private invoiceDeadlineDays(): number {
@@ -52,6 +69,9 @@ export class AdminFinanceService {
       uninvoicedDelivered,
       exhaustedInvoices,
       openAdjustments,
+      pspFees,
+      tradeFees,
+      serviceVatRate,
     ] = await Promise.all([
       // Tahsilat (dönem): tamamlanan ödemelerin brüt toplamı = ciro. Platform
       // geliri DEĞİLDİR — o ledger'dan gelir (aşağıda).
@@ -120,9 +140,37 @@ export class AdminFinanceService {
         _sum: { remainingAmount: true },
         _count: { id: true },
       }),
+      // PSP (PayTR) kesintisi (dönem): defterdeki `psp_fee` DEBIT toplamı.
+      // GERÇEK tutardır — PayTR ekstresi eşleştirilirken yazılır (tahmini oran
+      // yalnız sipariş/kural ekranlarında kullanılır). Komisyon gelirinin
+      // İÇİNDEN çıkar: hak ediş = ledger net gelir − PSP kesintisi.
+      this.prisma.ledgerEntry.aggregate({
+        where: {
+          account: LedgerAccount.psp_fee,
+          direction: LedgerDirection.debit,
+          createdAt,
+        },
+        _sum: { amount: true },
+      }),
+      // TAKAS HİZMET BEDELİ (dönem): takas geliri sipariş komisyonundan ayrı bir
+      // kalemdir ve `commissionLedger`'da HİÇ görünmez — buradan gelmezse platform
+      // geliri takasların tamamı kadar eksik raporlanır. Ödeme anına (paidAt) göre
+      // dilimlenir; iade edilen satır `refunded` olduğu için kendiliğinden düşer.
+      this.prisma.tradeCashPayment.aggregate({
+        where: { status: PaymentStatus.completed, paidAt: createdAt },
+        _sum: { tradeFeeAmount: true },
+      }),
+      this.serviceVatRate(),
     ]);
 
     const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    // Ücret KDV DAHİL tahsil edilir; komisyon geliri KDV HARİÇ'tir → toplanabilmesi
+    // için matrahı ayrıştırılır (KDV platformun geliri değil, beyan edilecek borcudur).
+    const tradeFeeGross = Number(tradeFees._sum.tradeFeeAmount ?? 0);
+    const tradeFeeNet = round2(tradeFeeGross / (1 + serviceVatRate / 100));
+    const revenueNet = round2(ledgerNetRevenue(ledgerSums._sum) + tradeFeeNet);
+    const pspFeeTotal = round2(Number(pspFees._sum.amount ?? 0));
 
     return {
       period: { start: periodStart, end: now },
@@ -133,7 +181,13 @@ export class AdminFinanceService {
         escrowHeldCount: escrowHeld._count.id,
         transferredTotal: round2(Number(transferred._sum.netAmount ?? 0)),
         transferredCount: transferred._count.id,
-        platformRevenueNet: round2(ledgerNetRevenue(ledgerSums._sum)),
+        platformRevenueNet: revenueNet,
+        /** Takas hizmet bedelinin gelire katkısı (KDV hariç) — ayrıca gösterilir. */
+        tradeFeeRevenueNet: tradeFeeNet,
+        /** Taraflardan tahsil edilen ücret (KDV dahil). */
+        tradeFeeCollected: round2(tradeFeeGross),
+        pspFeeTotal,
+        platformNetAfterPsp: round2(revenueNet - pspFeeTotal),
       },
       health: {
         failedTransfers,

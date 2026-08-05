@@ -13,11 +13,17 @@ import {
   HttpStatus,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
   BadRequestException,
+  ParseUUIDPipe,
+  Headers,
   Res,
 } from "@nestjs/common";
 
-import { FileInterceptor } from "@nestjs/platform-express";
+import {
+  FileFieldsInterceptor,
+  FileInterceptor,
+} from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
@@ -25,6 +31,7 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
+  ApiConsumes,
 } from "@nestjs/swagger";
 import { AdminService } from "./admin.service";
 import { AdvertisementService } from "../advertisement/advertisement.service";
@@ -49,6 +56,14 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { AdminRole } from "@prisma/client";
+import { UPLOAD_MULTER_OPTIONS } from "../../common/upload/multer-options";
+import { totalLimitedMemoryStorage } from "../../common/upload/total-limited-memory-storage";
+import {
+  PRODUCT_BULK_IMPORT_LIMITS,
+  PRODUCT_BULK_IMPORT_MAX_FILES,
+  PRODUCT_BULK_IMPORT_MAX_IMAGES,
+} from "./admin-product-bulk-import.constants";
+import { AdminProductBulkImportService } from "./admin-product-bulk-import.service";
 import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
 import {
   OverrideRefundPolicyDto,
@@ -113,6 +128,7 @@ export class AdminProductController {
   constructor(
     private readonly adminService: AdminService,
     private readonly discountService: DiscountService,
+    private readonly productBulkImport: AdminProductBulkImportService,
   ) {}
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -122,6 +138,72 @@ export class AdminProductController {
   @ApiOperation({ summary: "Get products with filters" })
   async getProducts(@Query() query: AdminProductQueryDto) {
     return this.adminService.getProducts(query);
+  }
+
+  @Get("products/bulk-import/sellers")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "List corporate sellers eligible for product import",
+  })
+  async getProductImportSellers(@Query("search") search?: string) {
+    return this.productBulkImport.listEligibleSellers(search);
+  }
+
+  @Get("products/bulk-import/batches/:batchId")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Get a bulk product import result" })
+  async getProductImportBatch(
+    @CurrentUser("id") adminId: string,
+    @Param("batchId", new ParseUUIDPipe({ version: "4" })) batchId: string,
+  ) {
+    return this.productBulkImport.getBatch(adminId, batchId);
+  }
+
+  @Post("products/bulk-import")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({
+    summary:
+      "Import corporate seller products from Excel and publish them immediately",
+  })
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: "workbook", maxCount: 1 },
+        { name: "images", maxCount: PRODUCT_BULK_IMPORT_MAX_IMAGES },
+      ],
+      {
+        ...UPLOAD_MULTER_OPTIONS,
+        storage: totalLimitedMemoryStorage(
+          PRODUCT_BULK_IMPORT_LIMITS.maxTotalBytes,
+        ),
+        limits: {
+          ...UPLOAD_MULTER_OPTIONS.limits,
+          files: PRODUCT_BULK_IMPORT_MAX_FILES,
+          fields: 5,
+          parts: PRODUCT_BULK_IMPORT_MAX_FILES + 5,
+        },
+      },
+    ),
+  )
+  async bulkImportProducts(
+    @CurrentUser("id") adminId: string,
+    @Headers("idempotency-key") batchId: string,
+    @Body("sellerId", new ParseUUIDPipe({ version: "4" })) sellerId: string,
+    @UploadedFiles()
+    files: {
+      workbook?: Express.Multer.File[];
+      images?: Express.Multer.File[];
+    },
+  ) {
+    return this.productBulkImport.import(
+      adminId,
+      sellerId,
+      batchId,
+      files?.workbook?.[0],
+      files?.images ?? [],
+    );
   }
 
   @Get("products/:id")

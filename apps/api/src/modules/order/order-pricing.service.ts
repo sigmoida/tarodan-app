@@ -9,15 +9,26 @@ import {
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { CheckoutQuoteDto } from "./dto";
-import { ProductStatus, ShippingPackageTierCode } from "@prisma/client";
+import {
+  CommissionRuleSetStatus,
+  ProductKind,
+  ProductStatus,
+  ShippingPackageTierCode,
+} from "@prisma/client";
 import {
   calculateCommissionFromRules,
   CommissionCalculationResult,
-  mapSellerTypeForCommission,
-  resolveTaxpayerType,
+  CommissionRuleMatchError,
+  CommissionSellerConfigurationError,
+  CorporateSellingSuspendedError,
+  roundCommissionMatchAmount,
+  resolveCommissionSellerType,
 } from "./order-commission.helper";
 import { TaxService } from "../tax/tax.service";
-import { isPremiumEntitled } from "../membership/membership.util";
+import {
+  canSellFromMembership,
+  effectiveMembershipTierType,
+} from "../membership/membership.util";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import {
   calculatePackageDesi,
@@ -33,6 +44,7 @@ import { createHash } from "crypto";
 import { calculateServiceTax } from "./order-service-tax.helper";
 import { buyerTotalOf } from "./order-total.helper";
 import { sellerNetAmountOf } from "./order-net.helper";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
 /**
@@ -46,6 +58,18 @@ export interface ShippingTariffSnapshot {
   tariffVersion: number;
   tariff: OutboundTariffLike;
 }
+
+export interface CommissionRuleSetSnapshot {
+  id: string;
+  version: number;
+}
+
+export type CheckoutQuoteUnavailableItem = {
+  productId: string;
+  sellerId?: string;
+  code: "PRODUCT_NOT_FOUND" | "PRODUCT_NOT_ACTIVE" | "SELLER_SALES_SUSPENDED";
+  message: string;
+};
 
 /**
  * Checkout'ta gösterilecek ETKİN alıcı ücreti oranı (%).
@@ -238,6 +262,7 @@ export class OrderPricingService {
       taxAmount: number;
       title?: string;
     }>;
+    unavailableItems: CheckoutQuoteUnavailableItem[];
     // Satıcı-başına kargo kırılımı (sepetteki her satıcı için tek kargo). UI "çatı"
     // görünümü ve doğru toplam için; `shippingAmount` bunların toplamıdır.
     shippingBySeller: Array<{
@@ -250,6 +275,8 @@ export class OrderPricingService {
     // Aktif tarife sürümü — istemci order-create'e geri gönderir; sürüm değiştiyse
     // create 409 PRICING_CHANGED döner. Aktif tarife yoksa quote fail-closed davranır.
     shippingTariffVersion: number;
+    commissionRuleSetId: string;
+    commissionRuleSetVersion: number;
     // Birim fiyat bazının (efektif fiyatlar) stabil hash'i — istemci create'e geri
     // gönderir; ürün fiyatı/kampanya değiştiyse create 409 PRICING_CHANGED döner (F1.3).
     pricingHash: string;
@@ -298,6 +325,7 @@ export class OrderPricingService {
       taxAmount: number;
       title?: string;
     }> = [];
+    const unavailableItems: CheckoutQuoteUnavailableItem[] = [];
     // Satıcı-başına kargo alt-toplamı (create ile aynı mantık — calculateShippingBySeller).
     const sellerSubtotals = new Map<string, number>();
     const sellerDesiLines = new Map<
@@ -329,7 +357,16 @@ export class OrderPricingService {
         sellerId: string;
         categoryId: string | null;
         shippingDesi: number;
-        seller: { businessStatus: string | null; taxId: string | null } | null;
+        seller: {
+          businessStatus: string | null;
+          companyName: string | null;
+          taxId: string | null;
+          membership: {
+            status: string;
+            currentPeriodEnd: Date | null;
+            tier: { type: string; isActive: boolean };
+          } | null;
+        } | null;
       };
       quantity: number;
       unitPrice: number;
@@ -346,25 +383,57 @@ export class OrderPricingService {
           sellerId: true,
           categoryId: true,
           shippingDesi: true,
+          kind: true,
           status: true,
-          seller: { select: { businessStatus: true, taxId: true } },
+          seller: {
+            select: {
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+              membership: {
+                select: {
+                  status: true,
+                  currentPeriodEnd: true,
+                  tier: { select: { type: true, isActive: true } },
+                },
+              },
+            },
+          },
         },
       });
 
-      if (!product) {
-        throw new NotFoundException(
-          i18nMessage("server.order.productNotFoundById", { productId }),
-        );
+      if (!product || product.kind !== ProductKind.listing) {
+        unavailableItems.push({
+          productId,
+          code: "PRODUCT_NOT_FOUND",
+          message: `Ürün bulunamadı: ${productId}`,
+        });
+        continue;
       }
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException(
-          i18nMessage("server.order.productNotActiveByTitle", {
-            title: product.title || productId,
-          }),
-        );
+        unavailableItems.push({
+          productId,
+          sellerId: product.sellerId,
+          code: "PRODUCT_NOT_ACTIVE",
+          message: `Ürün satışta değil: ${product.title || productId}`,
+        });
+        continue;
+      }
+      if (!canSellFromMembership(product.seller?.membership, product.seller)) {
+        unavailableItems.push({
+          productId,
+          sellerId: product.sellerId,
+          code: "SELLER_SALES_SUSPENDED",
+          message:
+            "Satıcının kurumsal üyeliği geçerli olmadığı için bu ürün şu anda satın alınamıyor.",
+        });
+        continue;
       }
 
-      const basePrice = Number(product.price);
+      // Quote, checkout ile AYNI fiyat kuralını kullanmalı: indirim penceresi
+      // dışındaysa taban indirim öncesi fiyattır. Ayrışırsa pricing hash'i
+      // tutmaz ve alıcı 409 PRICING_CHANGED alır.
+      const basePrice = resolveSalePrice(product).price;
       const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
         product.id,
         product.sellerId,
@@ -391,7 +460,7 @@ export class OrderPricingService {
     // F1.1: kuponu quote'ta da uygula — YALNIZ uygun satırlara dağıt; fee/tax/kargo
     // İNDİRİMLİ baz üzerinden hesaplanır (create ile aynı) → önizleme = tahsilat.
     let couponDiscountTotal = 0;
-    if (dto.couponCode) {
+    if (dto.couponCode && lines.length > 0) {
       const validation = await this.discountService.validateCoupon(
         {
           code: dto.couponCode,
@@ -435,6 +504,10 @@ export class OrderPricingService {
       }
     }
 
+    // Tek quote içindeki tüm satırlar aynı yayınlanmış setten fiyatlanır.
+    const commissionRuleSet = await this.resolveCommissionRuleSetSnapshot();
+    const pinnedRuleSetId = commissionRuleSet.id;
+
     // Pass 2: satır ücretleri İNDİRİMLİ baz üzerinden (create yolu ile birebir).
     for (const line of lines) {
       const { product, quantity, unitPrice, lineSubtotal } = line;
@@ -444,6 +517,9 @@ export class OrderPricingService {
         discountedLine,
         product.sellerId,
         product.categoryId,
+        pinnedRuleSetId,
+        quantity > 0 ? discountedLine / quantity : discountedLine,
+        product.id,
       );
 
       // Paket payı satır sırasından BAĞIMSIZ olmalı ve paketin KADEMESİNE göre
@@ -630,8 +706,11 @@ export class OrderPricingService {
       totalAmount,
       sellerNetAmount,
       items: quoteItems,
+      unavailableItems,
       shippingBySeller,
       shippingTariffVersion: shippingTariff.tariffVersion,
+      commissionRuleSetId: commissionRuleSet.id,
+      commissionRuleSetVersion: commissionRuleSet.version,
       pricingHash,
       pricing,
     };
@@ -704,6 +783,7 @@ export class OrderPricingService {
     sellerId: string,
     categoryId?: string | null,
     shippingDesi = 1,
+    pinnedRuleSetId?: string,
   ): Promise<{
     sellerFeeAmount: number;
     buyerFeeAmount: number;
@@ -723,7 +803,7 @@ export class OrderPricingService {
     packageTier: ShippingPackageTierCode;
   }> {
     const [result, seller, tariff] = await Promise.all([
-      this.calculateCommission(amount, sellerId, categoryId),
+      this.calculateCommission(amount, sellerId, categoryId, pinnedRuleSetId),
       this.prisma.user.findUnique({
         where: { id: sellerId },
         select: { businessStatus: true, taxId: true },
@@ -811,6 +891,7 @@ export class OrderPricingService {
   ): Promise<{
     results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }>;
   }> {
+    const pinnedRuleSetId = await this.getActiveCommissionRuleSetId();
     const results = await Promise.all(
       items.map(async (item) => {
         const amount = Number(item.amount);
@@ -824,6 +905,7 @@ export class OrderPricingService {
           billableDesiForTier(
             item.packageTier ?? ShippingPackageTierCode.small,
           ),
+          pinnedRuleSetId,
         );
         return {
           sellerFeeAmount: preview.sellerFeeAmount,
@@ -834,23 +916,57 @@ export class OrderPricingService {
     return { results };
   }
 
-  /**
-   * Calculate commission based on rules with priority matching
-   * Requirement: Admin Commission Calculation (3.3)
-   *
-   * Matching hierarchy (by priority descending):
-   * 1. Exact match: categoryId + sellerType
-   * 2. Category match: categoryId only
-   * 3. Seller type match: sellerType only
-   * 4. Default rule: ruleType = 'default'
-   *
-   * Applies min/max limits after calculation
-   */
+  /** Aktif seti tek bir fiyatlandırma isteği boyunca sabitler ve stale quote'u reddeder. */
+  async resolveCommissionRuleSetSnapshot(
+    expectedId?: string | null,
+    expectedVersion?: number | null,
+    requireExpected = false,
+  ): Promise<CommissionRuleSetSnapshot> {
+    const active = await this.prisma.commissionRuleSet.findFirst({
+      where: { status: CommissionRuleSetStatus.ACTIVE },
+      select: { id: true, version: true },
+    });
+    if (!active) {
+      this.logger.error("No active commission rule set. Failing closed.");
+      throw new ServiceUnavailableException(
+        i18nMessage("server.commission.noRuleConfigured"),
+      );
+    }
+    if (
+      (requireExpected && (expectedId == null || expectedVersion == null)) ||
+      (expectedId != null && active.id !== expectedId) ||
+      (expectedVersion != null && active.version !== expectedVersion)
+    ) {
+      throw new ConflictException({
+        code: "COMMISSION_PRICING_CHANGED",
+        message: i18nMessage("server.commission.pricingChanged"),
+      });
+    }
+    return active;
+  }
+
+  async getActiveCommissionRuleSetId(): Promise<string> {
+    return (await this.resolveCommissionRuleSetSnapshot()).id;
+  }
+
+  /** Exact category + seller type + half-open price band; no fallback. */
   async calculateCommission(
     amount: number,
     sellerId: string,
     categoryId?: string | null,
+    pinnedRuleSetId?: string,
+    matchAmount = amount,
+    productId?: string,
   ): Promise<CommissionResult> {
+    if (!categoryId) {
+      this.logger.error(
+        `Commission category is required (amount=${amount} seller=${sellerId}). Failing closed.`,
+      );
+      throw new ServiceUnavailableException(
+        i18nMessage("server.commission.noRuleConfigured"),
+      );
+    }
+
     // Get seller info including membership tier
     const seller = await this.prisma.user.findUnique({
       where: { id: sellerId },
@@ -871,60 +987,91 @@ export class OrderPricingService {
       },
     });
 
-    // Paid-tier commission (PREMIUM/BUSINESS) applies only to an ENTITLED membership.
-    // A past_due / expired row (e.g. an unpaid upgrade) must NOT unlock the cheaper
-    // paid-tier commission — gate the tier type through isPremiumEntitled first.
-    const effectiveTierType = isPremiumEntitled(
-      seller?.membership ?? null,
+    if (!seller) {
+      throw new ServiceUnavailableException(
+        i18nMessage("server.commission.noRuleConfigured"),
+      );
+    }
+
+    if (!canSellFromMembership(seller.membership, seller)) {
+      this.logger.warn(
+        `Selling suspended seller=${sellerId}: corporate sale requirements are not active`,
+      );
+      throw new ConflictException({
+        code: "SELLER_SALES_SUSPENDED",
+        productId,
+        sellerId,
+        message: i18nMessage("server.commission.sellerSalesSuspended"),
+      });
+    }
+
+    const effectiveTierType = effectiveMembershipTierType(
+      seller.membership,
       seller,
-    )
-      ? (seller?.membership?.tier?.type ?? null)
-      : null;
-
-    // Map User.sellerType to CommissionSellerType (membership axis)
-    const commissionSellerType = mapSellerTypeForCommission(
-      seller?.sellerType ?? null,
-      effectiveTierType,
     );
-    // v2 taxpayer axis (individual/corporate) — same test as VAT/withholding.
-    const taxpayerType = resolveTaxpayerType({
-      businessStatus: seller?.businessStatus,
-      taxId: seller?.taxId,
+    let commissionSellerType;
+    try {
+      commissionSellerType = resolveCommissionSellerType({
+        userSellerType: seller.sellerType,
+        membershipTier: effectiveTierType,
+        configuredMembershipTier: seller.membership?.tier.type,
+        businessStatus: seller.businessStatus,
+        companyName: seller.companyName,
+        taxId: seller.taxId,
+      });
+    } catch (error) {
+      if (error instanceof CorporateSellingSuspendedError) {
+        this.logger.warn(
+          `Corporate selling suspended seller=${sellerId}: BUSINESS entitlement is not active`,
+        );
+        throw new ConflictException({
+          code: "SELLER_SALES_SUSPENDED",
+          productId,
+          sellerId,
+          message: i18nMessage("server.commission.sellerSalesSuspended"),
+        });
+      }
+      if (error instanceof CommissionSellerConfigurationError) {
+        this.logger.error(
+          `Invalid seller commission state seller=${sellerId}: ${error.message}`,
+        );
+        throw new ServiceUnavailableException(
+          i18nMessage("server.commission.noRuleConfigured"),
+        );
+      }
+      throw error;
+    }
+
+    const ruleSetId =
+      pinnedRuleSetId ?? (await this.getActiveCommissionRuleSetId());
+    const normalizedMatchAmount = roundCommissionMatchAmount(matchAmount);
+    const matchingRules = await this.prisma.commissionRule.findMany({
+      where: {
+        ruleSetId,
+        categoryId,
+        sellerType: commissionSellerType,
+        minAmount: { lte: normalizedMatchAmount },
+        OR: [{ maxAmount: null }, { maxAmount: { gt: normalizedMatchAmount } }],
+      },
+      include: { shippingShares: true },
     });
 
-    // Tüm aktif kuralları çek (Faz 5.1)
-    const allActive = await this.prisma.commissionRule.findMany({
-      where: { isActive: true },
-      // shippingShares: paket boyutu başına kargo bölüşümü — kademe çözüldükten
-      // sonra okunur. Include eksik kalırsa tüm kademeler sessizce tek paya düşer.
-      include: { category: true, shippingShares: true },
-    });
-
-    this.logger.debug(`Found ${allActive.length} active commission rules`);
-
-    const result = calculateCommissionFromRules(
-      amount,
-      allActive,
-      { categoryId, sellerType: commissionSellerType, taxpayerType, amount },
-      undefined,
-      this.logger,
-    );
-
-    // Fail closed: a missing commission rule is a configuration error, not a
-    // reason to silently apply 0 commission — that would zero platform revenue
-    // AND undercharge the buyer fee. Abort so no order is ever created at the
-    // wrong price; ops is alerted by the error log. In normal operation a
-    // catch-all default rule always matches, so this never fires.
-    //
-    // The SELLER side must match specifically: `ruleId` is `sellerMatch ??
-    // buyerMatch`, so a gap in seller-side rules that leaves only a global buyer
-    // fee rule matching would otherwise pass this guard and silently book
-    // `sellerFeeAmount = 0`. A genuinely commission-free category must be
-    // configured as an explicit SELLER/BOTH rule with rate 0, never as a missing
-    // rule.
-    if (!result.sellerRuleId) {
+    let result: CommissionCalculationResult;
+    try {
+      result = calculateCommissionFromRules(
+        amount,
+        matchingRules,
+        {
+          categoryId,
+          sellerType: commissionSellerType,
+          amount: normalizedMatchAmount,
+        },
+        this.logger,
+      );
+    } catch (error) {
+      if (!(error instanceof CommissionRuleMatchError)) throw error;
       this.logger.error(
-        `No matching seller-side commission rule (amount=${amount} category=${categoryId} sellerType=${commissionSellerType} taxpayer=${taxpayerType} buyerRule=${result.buyerRuleId ?? "none"}). Configure a catch-all commission rule with appliesTo=BOTH. Failing closed.`,
+        `Strict commission rule invariant failed set=${ruleSetId}: ${error.message}`,
       );
       throw new ServiceUnavailableException(
         i18nMessage("server.commission.noRuleConfigured"),
@@ -932,13 +1079,17 @@ export class OrderPricingService {
     }
 
     this.logger.log(
-      `Commission: amount=${amount} sellerFee=${result.sellerFeeAmount} buyerFee=${result.buyerFeeAmount} (primaryRule=${result.ruleId})`,
+      `Commission: set=${ruleSetId} rule=${result.ruleId} amount=${amount} ` +
+        `sellerFee=${result.sellerFeeAmount} buyerFee=${result.buyerFeeAmount}`,
     );
 
     return {
       ...result,
       effectiveMembershipTier: effectiveTierType,
-      taxpayerType,
+      taxpayerType:
+        seller.businessStatus === "approved" && seller.taxId
+          ? "corporate"
+          : "individual",
     };
   }
 }

@@ -270,6 +270,9 @@ export class PaytrReportMatchingService {
         await this.ledger.record(this.prisma, {
           eventType: LedgerEventType.psp_fee_accrued,
           currency: line.currency,
+          // Döküm satırı başına TEK tahakkuk: damga (ledgerRecordedAt) yazılamadan
+          // tur çökerse sonraki tur aynı satırı yeniden dener → ikinci kayıt DB'de düşer.
+          idempotencyKey: `psp-fee:statement-line:${line.id}`,
           entries: [
             {
               account: LedgerAccount.psp_fee,

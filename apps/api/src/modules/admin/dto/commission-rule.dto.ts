@@ -1,36 +1,27 @@
 import {
-  IsString,
-  IsNumber,
-  IsEnum,
-  IsOptional,
-  IsBoolean,
-  IsIn,
-  IsInt,
   IsArray,
-  Min,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
   Max,
+  Min,
   ValidateNested,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
-  CommissionRuleType,
-  CommissionAppliesTo,
+  CommissionRuleSetStatus,
   CommissionSellerType,
-  CommissionTaxpayerType,
   ShippingPackageTierCode,
 } from "@prisma/client";
 
-/**
- * Bir paket boyutunun kargo bölüşümü. Gönderilmeyen boyut, kuralın tek
- * `shippingBuyerShare` değerine düşer (kolaylık fallback'i).
- */
 export class CommissionShippingShareDto {
   @ApiProperty({ enum: ShippingPackageTierCode })
   @IsEnum(ShippingPackageTierCode)
   tierCode: ShippingPackageTierCode;
 
-  @ApiProperty({ example: 70, description: "Buyer share (%) for this size" })
+  @ApiProperty({ example: 70 })
   @IsNumber()
   @Type(() => Number)
   @Min(0)
@@ -39,648 +30,297 @@ export class CommissionShippingShareDto {
 }
 
 export class CreateCommissionRuleDto {
-  @ApiProperty({
-    example: "Standart Komisyon",
-    description: "Rule name",
-  })
+  @ApiPropertyOptional({ description: "Draft set; current draft when omitted" })
+  @IsOptional()
+  @IsString()
+  ruleSetId?: string;
+
+  @ApiProperty({ example: "Model Arabalar / Basic / 0-5000" })
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({
-    example: "category-uuid",
-    description: "Category ID (null for all categories)",
-  })
-  @IsOptional()
+  @ApiProperty({ description: "Exact category id; wildcards are not allowed" })
   @IsString()
-  categoryId?: string;
+  categoryId: string;
 
-  @ApiProperty({
-    enum: CommissionSellerType,
-    example: "ALL",
-    description: "Applicable seller type",
-  })
+  @ApiProperty({ enum: CommissionSellerType })
   @IsEnum(CommissionSellerType)
   sellerType: CommissionSellerType;
 
-  @ApiProperty({
-    enum: CommissionAppliesTo,
-    example: "SELLER",
-    description: "Who pays the commission",
-  })
-  @IsEnum(CommissionAppliesTo)
-  appliesTo: CommissionAppliesTo;
+  @ApiProperty({ example: 0, description: "Inclusive lower bound" })
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  minAmount: number;
 
-  @ApiPropertyOptional({
-    example: 5.0,
-    description:
-      "Legacy seller rate (%). v2 rules use sellerCommissionRate instead; " +
-      "the service requires at least one seller/buyer rate.",
-  })
+  @ApiPropertyOptional({ example: 5000, description: "Exclusive upper bound" })
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  sellerRate?: number;
-
-  @ApiPropertyOptional({
-    example: 2.0,
-    description:
-      "Legacy buyer rate (%). v2 rules use buyerServiceFeeRate instead.",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  buyerRate?: number;
-
-  @ApiPropertyOptional({
-    example: 5.0,
-    description: "Seller minimum commission (TRY)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerMin?: number;
-
-  @ApiPropertyOptional({
-    example: 100.0,
-    description: "Seller maximum commission (TRY)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerMax?: number;
-
-  @ApiPropertyOptional({
-    example: 0.0,
-    description: "Buyer minimum commission (TRY)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerMin?: number;
-
-  @ApiPropertyOptional({
-    example: 50.0,
-    description: "Buyer maximum commission (TRY)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerMax?: number;
-
-  @ApiPropertyOptional({
-    example: 0,
-    description: "Rule priority (higher values are evaluated first)",
-  })
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  priority?: number;
-
-  @ApiPropertyOptional({
-    example: true,
-    description: "Whether the rule is active",
-  })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-
-  // ── v2: kesinti profili (opsiyonel; verilmezse legacy oranlar kullanılır) ──
-  @ApiPropertyOptional({
-    enum: CommissionTaxpayerType,
-    example: "all",
-    description: "Taxpayer axis: individual / corporate / all",
-  })
-  @IsOptional()
-  @IsEnum(CommissionTaxpayerType)
-  taxpayerType?: CommissionTaxpayerType;
-
-  @ApiPropertyOptional({
-    example: 5000,
-    description: "Tiered range upper bound (TRY); minAmount = lower bound",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  maxAmount?: number;
-
-  @ApiPropertyOptional({
-    example: 2.0,
-    description: "Buyer commission rate (%)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  buyerCommissionRate?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerCommissionMin?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerCommissionMax?: number;
-
-  @ApiPropertyOptional({
-    example: 3.0,
-    description: "Buyer protection service fee rate (%)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  buyerServiceFeeRate?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerServiceFeeMin?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerServiceFeeMax?: number;
-
-  @ApiPropertyOptional({
-    example: 8.0,
-    description: "Seller commission rate (%)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  sellerCommissionRate?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerCommissionMin?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerCommissionMax?: number;
-
-  @ApiPropertyOptional({
-    example: 2.0,
-    description: "Seller platform service fee rate (%)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  sellerPlatformFeeRate?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerPlatformFeeMin?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerPlatformFeeMax?: number;
-
-  @ApiPropertyOptional({
-    example: 100,
-    description:
-      "Buyer share (%) of the single shipping cost (seller = 100 - this)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  shippingBuyerShare?: number;
-
-  @ApiPropertyOptional({
-    type: [CommissionShippingShareDto],
-    description:
-      "Per-package-size shipping split; a size omitted here uses shippingBuyerShare",
-  })
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CommissionShippingShareDto)
-  shippingShares?: CommissionShippingShareDto[];
-
-  // Legacy fields (optional for backward compatibility)
-  @ApiPropertyOptional({
-    example: 5.0,
-    description: "Legacy commission percentage",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(50)
-  percentage?: number;
-
-  @ApiPropertyOptional({
-    enum: CommissionRuleType,
-    example: "default",
-    description: "Legacy rule type",
-  })
-  @IsOptional()
-  @IsEnum(CommissionRuleType)
-  type?: CommissionRuleType;
-
-  @ApiPropertyOptional({
-    example: 100,
-    description: "Legacy minimum order amount",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  minAmount?: number;
-}
-
-export class UpdateCommissionRuleDto {
-  @ApiPropertyOptional({ example: "Premium Komisyon" })
-  @IsOptional()
-  @IsString()
-  name?: string;
-
-  @ApiPropertyOptional({
-    example: "category-uuid",
-    description: "Category ID (null for all categories)",
-  })
-  @IsOptional()
-  @IsString()
-  categoryId?: string;
-
-  @ApiPropertyOptional({
-    enum: CommissionSellerType,
-    example: "PREMIUM",
-  })
-  @IsOptional()
-  @IsEnum(CommissionSellerType)
-  sellerType?: CommissionSellerType;
-
-  @ApiPropertyOptional({
-    enum: CommissionAppliesTo,
-    example: "BOTH",
-  })
-  @IsOptional()
-  @IsEnum(CommissionAppliesTo)
-  appliesTo?: CommissionAppliesTo;
-
-  @ApiPropertyOptional({ example: 5.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  sellerRate?: number;
-
-  @ApiPropertyOptional({ example: 2.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  buyerRate?: number;
-
-  @ApiPropertyOptional({ example: 5.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerMin?: number;
-
-  @ApiPropertyOptional({ example: 100.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerMax?: number;
-
-  @ApiPropertyOptional({ example: 0.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerMin?: number;
-
-  @ApiPropertyOptional({ example: 50.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerMax?: number;
-
-  @ApiPropertyOptional({
-    example: 0,
-    description: "Rule priority (higher values are evaluated first)",
-  })
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  priority?: number;
-
-  @ApiPropertyOptional({ example: false })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-
-  // ── v2: kesinti profili ──
-  @ApiPropertyOptional({ enum: CommissionTaxpayerType })
-  @IsOptional()
-  @IsEnum(CommissionTaxpayerType)
-  taxpayerType?: CommissionTaxpayerType;
-
-  @ApiPropertyOptional({ example: 5000 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  maxAmount?: number;
-
-  @ApiPropertyOptional({ example: 2.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  buyerCommissionRate?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerCommissionMin?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerCommissionMax?: number;
-
-  @ApiPropertyOptional({ example: 3.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  buyerServiceFeeRate?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerServiceFeeMin?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerServiceFeeMax?: number;
-
-  @ApiPropertyOptional({ example: 8.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  sellerCommissionRate?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerCommissionMin?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerCommissionMax?: number;
-
-  @ApiPropertyOptional({ example: 2.0 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  sellerPlatformFeeRate?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerPlatformFeeMin?: number;
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerPlatformFeeMax?: number;
-
-  @ApiPropertyOptional({ example: 100 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  shippingBuyerShare?: number;
-
-  @ApiPropertyOptional({
-    type: [CommissionShippingShareDto],
-    description:
-      "Per-package-size shipping split; a size omitted here uses shippingBuyerShare",
-  })
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CommissionShippingShareDto)
-  shippingShares?: CommissionShippingShareDto[];
-
-  // Legacy fields
-  @ApiPropertyOptional({ example: 3.5 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(50)
-  percentage?: number;
-
-  @ApiPropertyOptional({ enum: CommissionRuleType })
-  @IsOptional()
-  @IsEnum(CommissionRuleType)
-  type?: CommissionRuleType;
-
-  @ApiPropertyOptional({ example: 500 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  minAmount?: number;
-}
-
-export class PreviewCommissionDto {
-  @ApiProperty({ example: 1000, description: "Example product price" })
   @IsNumber()
   @Type(() => Number)
   @Min(0.01)
-  amount: number;
-
-  @ApiPropertyOptional({ description: "Existing rule being edited" })
-  @IsOptional()
-  @IsString()
-  ruleId?: string;
-
-  @ApiPropertyOptional({ description: "Draft rule category (null for all)" })
-  @IsOptional()
-  @IsString()
-  categoryId?: string | null;
-
-  @ApiProperty({
-    enum: CommissionSellerType,
-    description: "Draft rule seller type",
-  })
-  @IsEnum(CommissionSellerType)
-  sellerType: CommissionSellerType;
-
-  @ApiProperty({ enum: CommissionAppliesTo })
-  @IsEnum(CommissionAppliesTo)
-  appliesTo: CommissionAppliesTo;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  sellerRate?: number | null;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @Max(100)
-  buyerRate?: number | null;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerMin?: number | null;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  sellerMax?: number | null;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerMin?: number | null;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  buyerMax?: number | null;
-
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-
-  @ApiPropertyOptional({
-    description: "Example product category (null for no category)",
-  })
-  @IsOptional()
-  @IsString()
-  previewCategoryId?: string | null;
-
-  @ApiProperty({
-    enum: [
-      CommissionSellerType.FREE,
-      CommissionSellerType.PREMIUM,
-      CommissionSellerType.BUSINESS,
-    ],
-    description: "Example checkout seller type",
-  })
-  @IsIn([
-    CommissionSellerType.FREE,
-    CommissionSellerType.PREMIUM,
-    CommissionSellerType.BUSINESS,
-  ])
-  previewSellerType: CommissionSellerType;
-}
-
-export class CommissionRuleResponseDto {
-  @ApiProperty({ example: "uuid" })
-  id: string;
-
-  @ApiProperty({ example: "Standart Komisyon" })
-  name: string;
-
-  @ApiPropertyOptional({ example: "category-uuid" })
-  categoryId?: string | null;
-
-  @ApiPropertyOptional({ example: "Kategori Adı" })
-  categoryName?: string | null;
-
-  @ApiProperty({ enum: CommissionSellerType, example: "ALL" })
-  sellerType: CommissionSellerType | null;
-
-  @ApiProperty({ enum: CommissionAppliesTo, example: "SELLER" })
-  appliesTo: CommissionAppliesTo;
-
-  @ApiPropertyOptional({ example: 5.0 })
-  sellerRate?: number | null;
-
-  @ApiPropertyOptional({ example: 2.0 })
-  buyerRate?: number | null;
-
-  @ApiPropertyOptional({ example: 5.0 })
-  sellerMin?: number | null;
-
-  @ApiPropertyOptional({ example: 100.0 })
-  sellerMax?: number | null;
-
-  @ApiPropertyOptional({ example: 0.0 })
-  buyerMin?: number | null;
-
-  @ApiPropertyOptional({ example: 50.0 })
-  buyerMax?: number | null;
+  maxAmount?: number | null;
 
   @ApiProperty({ example: 0 })
-  priority: number;
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerCommissionRate: number;
 
-  @ApiProperty({ example: true })
-  isActive: boolean;
+  @ApiProperty({ example: 0 })
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerServiceFeeRate: number;
 
-  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
-  createdAt: Date;
+  @ApiProperty({ example: 10 })
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerCommissionRate: number;
 
-  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
-  updatedAt: Date;
+  @ApiProperty({ example: 0 })
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerPlatformFeeRate: number;
 
-  // Legacy fields (for backward compatibility)
-  @ApiPropertyOptional({ example: 5.0 })
-  percentage?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerCommissionMin?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerCommissionMax?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerServiceFeeMin?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerServiceFeeMax?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerCommissionMin?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerCommissionMax?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerPlatformFeeMin?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerPlatformFeeMax?: number | null;
 
-  @ApiPropertyOptional({ example: "default" })
-  type?: string;
+  @ApiProperty({ example: 25 })
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  tradeFeeSellerAmount: number;
 
-  @ApiPropertyOptional({ example: 100 })
-  minAmount?: number | null;
+  @ApiProperty({ example: 15 })
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  tradeFeeBuyerAmount: number;
+
+  @ApiPropertyOptional({ default: 100 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  shippingBuyerShare?: number;
+
+  @ApiPropertyOptional({ type: [CommissionShippingShareDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CommissionShippingShareDto)
+  shippingShares?: CommissionShippingShareDto[];
+}
+
+export class UpdateCommissionRuleDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() categoryId?: string;
+  @ApiPropertyOptional({ enum: CommissionSellerType })
+  @IsOptional()
+  @IsEnum(CommissionSellerType)
+  sellerType?: CommissionSellerType;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  minAmount?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0.01)
+  maxAmount?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerCommissionRate?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerServiceFeeRate?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerCommissionRate?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerPlatformFeeRate?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerCommissionMin?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerCommissionMax?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerServiceFeeMin?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerServiceFeeMax?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerCommissionMin?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerCommissionMax?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerPlatformFeeMin?: number | null;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerPlatformFeeMax?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  tradeFeeSellerAmount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  tradeFeeBuyerAmount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  shippingBuyerShare?: number;
+  @ApiPropertyOptional({ type: [CommissionShippingShareDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CommissionShippingShareDto)
+  shippingShares?: CommissionShippingShareDto[];
+}
+
+export class PreviewCommissionDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() ruleSetId?: string;
+  @ApiProperty() @IsString() categoryId: string;
+  @ApiProperty({ enum: CommissionSellerType })
+  @IsEnum(CommissionSellerType)
+  sellerType: CommissionSellerType;
+  @ApiProperty() @IsNumber() @Type(() => Number) @Min(0) amount: number;
+}
+
+export class CreateCommissionRuleSetDto {
+  @ApiPropertyOptional({ example: "2026 Ağustos komisyonları" })
+  @IsOptional()
+  @IsString()
+  name?: string;
+}
+
+export class CommissionRuleSetResponseDto {
+  @ApiProperty() id: string;
+  @ApiProperty() name: string;
+  @ApiProperty() version: number;
+  @ApiProperty({ enum: CommissionRuleSetStatus })
+  status: CommissionRuleSetStatus;
+  @ApiPropertyOptional() publishedAt?: Date | null;
+}
+
+export class CommissionRuleResponseDto extends CreateCommissionRuleDto {
+  @ApiProperty() id: string;
+  @ApiProperty() ruleSetId: string;
+  @ApiProperty() categoryName: string;
+  @ApiProperty() createdAt: Date;
+  @ApiProperty() updatedAt: Date;
 }

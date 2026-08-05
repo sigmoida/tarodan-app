@@ -4,13 +4,13 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { Prisma } from '@prisma/client';
-import { CollectionListResponseDto } from './dto';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { CollectionCommonService } from './collection-common.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { Prisma, ProductKind } from "@prisma/client";
+import { CollectionListResponseDto } from "./dto";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { CollectionCommonService } from "./collection-common.service";
 
 // "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
 // mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
@@ -18,7 +18,12 @@ import { CollectionCommonService } from './collection-common.service';
 const VISIBLE_ITEM_FILTER: Prisma.CollectionItemWhereInput = {
   OR: [
     { productId: null },
-    { product: { status: { in: ['active', 'sold'] } } },
+    {
+      product: {
+        kind: ProductKind.listing,
+        status: { in: ["active", "sold"] },
+      },
+    },
   ],
 };
 
@@ -40,9 +45,15 @@ export class CollectionSocialService {
   // ==========================================================================
   // LIKE COLLECTION
   // ==========================================================================
-  async likeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-    const isCollectionId = idOrSlug.startsWith('collection-');
+  async likeCollection(
+    idOrSlug: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        idOrSlug,
+      );
+    const isCollectionId = idOrSlug.startsWith("collection-");
 
     // Find collection by ID or slug
     let collection;
@@ -51,15 +62,27 @@ export class CollectionSocialService {
         // Try to find by ID first
         collection = await this.prisma.collection.findUnique({
           where: { id: idOrSlug },
-          select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
+          select: {
+            id: true,
+            name: true,
+            likeCount: true,
+            isPublic: true,
+            userId: true,
+          },
         });
-        
+
         // If not found and it's a collection- prefixed ID, try to find by slug (strip prefix)
         if (!collection && isCollectionId) {
-          const slug = idOrSlug.replace('collection-', '');
+          const slug = idOrSlug.replace("collection-", "");
           collection = await this.prisma.collection.findFirst({
             where: { slug },
-            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
+            select: {
+              id: true,
+              name: true,
+              likeCount: true,
+              isPublic: true,
+              userId: true,
+            },
           });
         }
       } else {
@@ -67,48 +90,70 @@ export class CollectionSocialService {
         // First try to find public collection with this slug
         collection = await this.prisma.collection.findFirst({
           where: { slug: idOrSlug, isPublic: true },
-          select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
+          select: {
+            id: true,
+            name: true,
+            likeCount: true,
+            isPublic: true,
+            userId: true,
+          },
         });
-        
+
         // If not found and user is logged in, try to find user's own collection (even if private)
         if (!collection && userId) {
           collection = await this.prisma.collection.findFirst({
             where: { slug: idOrSlug, userId: userId },
-            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
+            select: {
+              id: true,
+              name: true,
+              likeCount: true,
+              isPublic: true,
+              userId: true,
+            },
           });
         }
-        
+
         // If still not found, try any collection (for cases where slug might match)
         if (!collection) {
           collection = await this.prisma.collection.findFirst({
             where: { slug: idOrSlug },
-            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
+            select: {
+              id: true,
+              name: true,
+              likeCount: true,
+              isPublic: true,
+              userId: true,
+            },
           });
         }
-        
+
         // If collection is private and user is not the owner, don't allow like
-        if (collection && !collection.isPublic && collection.userId !== userId) {
-          throw new ForbiddenException('Bu koleksiyon özel');
+        if (
+          collection &&
+          !collection.isPublic &&
+          collection.userId !== userId
+        ) {
+          throw new ForbiddenException("Bu koleksiyon özel");
         }
       }
     } catch (error) {
       if (error instanceof ForbiddenException) {
         throw error;
       }
-      this.logger.error('likeCollection: error finding collection');
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      this.logger.error("likeCollection: error finding collection");
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     if (!collection || !collection.id) {
-      this.logger.warn('likeCollection: collection not found');
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      this.logger.warn("likeCollection: collection not found");
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
-    
+
     // Prevent users from liking their own collections
     if (collection.userId === userId) {
-      throw new BadRequestException('Kendi koleksiyonunuzu beğenemezsiniz');
+      throw new BadRequestException("Kendi koleksiyonunuzu beğenemezsiniz");
     }
-    
+
     // Check if user already liked this collection
     // Use findFirst to avoid composite key issues
     let existingLike;
@@ -120,7 +165,7 @@ export class CollectionSocialService {
         },
       });
     } catch (findError) {
-      this.logger.error('likeCollection: error finding existing like');
+      this.logger.error("likeCollection: error finding existing like");
       throw findError;
     }
 
@@ -180,22 +225,22 @@ export class CollectionSocialService {
             where: { id: userId },
             select: { displayName: true },
           });
-          
+
           await this.notificationService.createInAppNotification(
             collection.userId,
             NotificationType.COLLECTION_LIKED,
             {
               collectionId: collection.id,
               collectionName: collection.name,
-              userName: user?.displayName || 'Bir kullanıcı',
+              userName: user?.displayName || "Bir kullanıcı",
             },
           );
         } catch (notifError) {
-          this.logger.warn('likeCollection: failed to send notification');
+          this.logger.warn("likeCollection: failed to send notification");
         }
       }
     } catch (error) {
-      this.logger.error('likeCollection: transaction error');
+      this.logger.error("likeCollection: transaction error");
       throw error;
     }
 
@@ -208,11 +253,17 @@ export class CollectionSocialService {
   // ==========================================================================
   // UNLIKE COLLECTION
   // ==========================================================================
-  async unlikeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+  async unlikeCollection(
+    idOrSlug: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
     // Check if idOrSlug is UUID or collection- prefixed ID
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-    const isCollectionId = idOrSlug.startsWith('collection-');
-    
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        idOrSlug,
+      );
+    const isCollectionId = idOrSlug.startsWith("collection-");
+
     // Find collection by ID or slug
     let collection;
     if (isUUID || isCollectionId) {
@@ -220,9 +271,9 @@ export class CollectionSocialService {
         where: { id: idOrSlug },
         select: { id: true, likeCount: true },
       });
-      
+
       if (!collection && isCollectionId) {
-        const slug = idOrSlug.replace('collection-', '');
+        const slug = idOrSlug.replace("collection-", "");
         collection = await this.prisma.collection.findFirst({
           where: { slug },
           select: { id: true, likeCount: true },
@@ -236,7 +287,7 @@ export class CollectionSocialService {
     }
 
     if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
+      throw new NotFoundException("Koleksiyon bulunamadı");
     }
 
     // Find and delete the like
@@ -286,11 +337,15 @@ export class CollectionSocialService {
         pageSize: 20,
       };
     }
-    
+
     // Validate and sanitize page and pageSize parameters
-    const validPage = isNaN(page) || page < 1 ? 1 : Math.max(1, Math.floor(page));
-    const validPageSize = isNaN(pageSize) || pageSize < 1 ? 20 : Math.max(1, Math.min(Math.floor(pageSize), 100));
-    
+    const validPage =
+      isNaN(page) || page < 1 ? 1 : Math.max(1, Math.floor(page));
+    const validPageSize =
+      isNaN(pageSize) || pageSize < 1
+        ? 20
+        : Math.max(1, Math.min(Math.floor(pageSize), 100));
+
     try {
       const skip = (validPage - 1) * validPageSize;
 
@@ -312,11 +367,12 @@ export class CollectionSocialService {
                 _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
                 items: {
                   take: 4,
-                  orderBy: { sortOrder: 'asc' },
+                  orderBy: { sortOrder: "asc" },
                   include: {
                     product: {
                       select: {
                         id: true,
+                        kind: true,
                         title: true,
                         status: true,
                         boostedUntil: true,
@@ -331,7 +387,7 @@ export class CollectionSocialService {
               },
             },
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           skip,
           take: validPageSize,
         }),
@@ -340,29 +396,32 @@ export class CollectionSocialService {
         }),
       ]);
 
-      const validLikes = likedCollections
-        .filter(like => {
-          const col = (like as any).collection;
-          if (!col) return false;
-          if (!col.isPublic && col.userId !== userId) return false;
-          return true;
-        });
+      const validLikes = likedCollections.filter((like) => {
+        const col = (like as any).collection;
+        if (!col) return false;
+        if (!col.isPublic && col.userId !== userId) return false;
+        return true;
+      });
 
-      const collections = (await Promise.all(
-        validLikes.map(async (like) => {
-          try {
-            const col = (like as any).collection;
-            const dto = await this.common.mapCollectionToDto(col, true);
-            // items take:4 ile sınırlı olduğu için mapCollectionToDto'nun
-            // ürettiği itemCount yanıltıcı; gerçek görünür sayıyla değiştir.
-            dto.itemCount = col._count?.items ?? dto.itemCount;
-            return dto;
-          } catch (err) {
-            this.logger.error('getLikedCollections: error mapping collection');
-            return null;
-          }
-        })
-      )).filter(collection => collection !== null);
+      const collections = (
+        await Promise.all(
+          validLikes.map(async (like) => {
+            try {
+              const col = (like as any).collection;
+              const dto = await this.common.mapCollectionToDto(col, true);
+              // items take:4 ile sınırlı olduğu için mapCollectionToDto'nun
+              // ürettiği itemCount yanıltıcı; gerçek görünür sayıyla değiştir.
+              dto.itemCount = col._count?.items ?? dto.itemCount;
+              return dto;
+            } catch (err) {
+              this.logger.error(
+                "getLikedCollections: error mapping collection",
+              );
+              return null;
+            }
+          }),
+        )
+      ).filter((collection) => collection !== null);
 
       return {
         collections,
@@ -371,7 +430,7 @@ export class CollectionSocialService {
         pageSize: validPageSize,
       };
     } catch (error) {
-      this.logger.error('getLikedCollections: database error');
+      this.logger.error("getLikedCollections: database error");
       // Return empty result instead of throwing
       return {
         collections: [],

@@ -26,10 +26,12 @@ import { collectionsApi, wishlistApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useCart } from "@/hooks/useCart";
 import { useAuthStore } from "@/stores/authStore";
+import { useCartStore } from "@/stores/cartStore";
 import { useAuthGate } from "@/hooks/useAuthGate";
 import { getCardImageUrl } from "../_lib/images";
 import { useListingData } from "../_hooks/useListingData";
 import { useProductGallery } from "../_hooks/useProductGallery";
+import { formatTL } from "@/lib/format";
 
 function useListingDetailValue() {
   const params = useParams();
@@ -50,6 +52,7 @@ function useListingDetailValue() {
     isLoading: cartLoading,
   } = useCart();
   const { isAuthenticated, user, limits } = useAuthStore();
+  const setBuyNowProductId = useCartStore((s) => s.setBuyNowProductId);
   const { requireAuth, authModal } = useAuthGate();
 
   const data = useListingData(id, isAuthenticated);
@@ -195,7 +198,11 @@ function useListingDetailValue() {
       const added = await handleAddToCart();
       if (!added) return false;
     }
-    router.push("/cart");
+    // Ürün sepette KALIR (vazgeçilirse kaybolmasın) ama ödeme kapsamı yalnız
+    // bu üründür; sepetteki kalıcı seçim bozulmaz — kullanıcı sepete dönerse
+    // eski seçimini olduğu gibi bulur.
+    setBuyNowProductId(listing.id);
+    router.push("/cart/payment?buyNow=true");
     return true;
   };
 
@@ -321,10 +328,7 @@ function useListingDetailValue() {
       listing?.title || "Check this out on Tarodan!",
     );
     const text = encodeURIComponent(
-      `${listing?.title} - ${effectivePrice.toLocaleString("tr-TR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })} TL`,
+      `${listing?.title} - ${formatTL(effectivePrice)}`,
     );
     let shareUrl = "";
     switch (platform) {

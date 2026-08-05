@@ -8,15 +8,25 @@ export const newsletterSchema = (locale: string) => {
     locale,
     messages: getMessages(resolveLocale(locale)),
   });
-  return z.object({
-    email: z
-      .string()
-      .trim()
-      .min(1, t("validation.emailRequired"))
-      .email(t("validation.invalidEmail")),
-    newsletter: z.boolean(),
-    promotions: z.boolean(),
-  });
+  return (
+    z
+      .object({
+        email: z
+          .string()
+          .trim()
+          .min(1, t("validation.emailRequired"))
+          .email(t("validation.invalidEmail")),
+        newsletter: z.boolean(),
+        promotions: z.boolean(),
+      })
+      // Kutular ön işaretsiz başladığı için (ETK: ön işaretli onay geçersiz)
+      // hiçbirini seçmeden gönderilebiliyordu; o durumda hiçbir şey almayan bir
+      // abonelik oluşup kullanıcıya "abone oldunuz" deniyordu.
+      .refine((v) => v.newsletter || v.promotions, {
+        path: ["newsletter"],
+        message: t("marketing.newsletter.preferenceRequired"),
+      })
+  );
 };
 
 export type NewsletterValues = z.infer<ReturnType<typeof newsletterSchema>>;

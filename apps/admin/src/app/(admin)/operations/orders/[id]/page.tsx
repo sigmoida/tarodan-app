@@ -45,9 +45,9 @@ export default function OrderGroupFilePage() {
       }
     >
       {(file) => (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Main: paket çatıları → her paketin altında sipariş dosyaları */}
-          <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-6">
+          {/* Paket çatıları → her paketin altında sipariş dosyaları */}
+          <div className="space-y-6">
             {file.packages.map((pkg) => (
               <PackageFileSection
                 key={pkg.packageId ?? pkg.orders[0]?.id}
@@ -57,28 +57,26 @@ export default function OrderGroupFilePage() {
             ))}
           </div>
 
-          {/* Sidebar: grup seviyesi — alıcı, tek ödeme, adres */}
-          <div className="space-y-6">
-            {file.buyer && (
-              <PartyCard
-                title={
-                  file.buyer.isGuest
-                    ? t("admin.operations.orders.file.guestBuyer")
-                    : t("admin.operations.orders.buyer")
-                }
-                name={file.buyer.displayName ?? "—"}
-                userHref={
-                  file.buyer.isGuest
-                    ? undefined
-                    : `/accounts/users/${file.buyer.id}`
-                }
-                email={file.buyer.email ?? undefined}
-                phone={file.buyer.phone ?? undefined}
-              />
-            )}
-            <GroupPaymentCard file={file} />
-            <AddressSection address={file.shippingAddress} />
-          </div>
+          {/* Grup seviyesi bilgiler ana sipariş dosyasının altında tam genişlikte. */}
+          {file.buyer && (
+            <PartyCard
+              title={
+                file.buyer.isGuest
+                  ? t("admin.operations.orders.file.guestBuyer")
+                  : t("admin.operations.orders.buyer")
+              }
+              name={file.buyer.displayName ?? "—"}
+              userHref={
+                file.buyer.isGuest
+                  ? undefined
+                  : `/accounts/users/${file.buyer.id}`
+              }
+              email={file.buyer.email ?? undefined}
+              phone={file.buyer.phone ?? undefined}
+            />
+          )}
+          <GroupPaymentCard file={file} />
+          <AddressSection address={file.shippingAddress} />
         </div>
       )}
     </DetailPage>

@@ -21,8 +21,8 @@ describe("entity code contract", () => {
   );
 
   it("ürün kodunu DB varsayılanı üretir (uygulama yazmaz)", () => {
-    expect(schema).toContain(
-      'productCode         String             @unique @default(dbgenerated("generate_product_code()")) @map("product_code")',
+    expect(schema).toMatch(
+      /productCode\s+String\s+@unique\s+@default\(dbgenerated\("generate_product_code\(\)"\)\)\s+@map\("product_code"\)/,
     );
     expect(migration).toContain(
       "CREATE OR REPLACE FUNCTION generate_product_code()",

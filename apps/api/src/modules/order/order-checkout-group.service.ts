@@ -7,9 +7,16 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
+import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
-import { OrderStatus, ProductStatus, Prisma } from "@prisma/client";
+import {
+  OrderStatus,
+  ProductKind,
+  ProductStatus,
+  Prisma,
+} from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
@@ -19,10 +26,12 @@ import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import {
   OrderPricingService,
   CommissionResult,
+  CommissionRuleSetSnapshot,
   ShippingTariffSnapshot,
 } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { distanceSalesConsent } from "./distance-sales-contract";
 import {
   calculatePackageDesi,
   type ShippingBuyerShareByTier,
@@ -104,6 +113,7 @@ export class OrderCheckoutGroupService {
     isGuest: boolean;
     guest?: { email: string; phone?: string; name?: string };
     shippingTariffSnapshot?: ShippingTariffSnapshot;
+    commissionRuleSetSnapshot?: CommissionRuleSetSnapshot;
   }) {
     const { buyerId, dto, isGuest, guest } = params;
 
@@ -123,6 +133,13 @@ export class OrderCheckoutGroupService {
       params.shippingTariffSnapshot ??
       (await this.orderPricing.resolveShippingTariffSnapshot(
         dto.expectedShippingTariffVersion,
+        true,
+      ));
+    const commissionRuleSet =
+      params.commissionRuleSetSnapshot ??
+      (await this.orderPricing.resolveCommissionRuleSetSnapshot(
+        dto.expectedCommissionRuleSetId,
+        dto.expectedCommissionRuleSetVersion,
         true,
       ));
     // Misafir kuponu: kişi-başı limit uygulanamaz (kimlik yok) — validateCoupon'a
@@ -198,7 +215,10 @@ export class OrderCheckoutGroupService {
           }
 
           const products = await tx.product.findMany({
-            where: { id: { in: productIds } },
+            where: {
+              id: { in: productIds },
+              kind: ProductKind.listing,
+            },
             include: {
               seller: { select: { id: true, email: true, displayName: true } },
             },
@@ -376,6 +396,7 @@ export class OrderCheckoutGroupService {
           // hangi fiyatı gösteriyorsa checkout onu tahsil eder (aksi halde bir code=null
           // kampanya aktifken alıcı gösterilenden fazla öderdi). Kupon YİNE baz fiyat
           // üzerinden hesaplanır (sepet ile aynı taban → önizleme = tahsilat).
+          const now = new Date();
           const effectiveMap =
             await this.discountService.getEffectiveDisplayPriceMany(
               productIds.map((productId) => {
@@ -384,27 +405,22 @@ export class OrderCheckoutGroupService {
                   productId,
                   sellerId: p.sellerId,
                   categoryId: p.categoryId ?? "",
-                  currentDisplayPrice: Number(p.price),
+                  // Kampanya, indirim penceresi UYGULANMIŞ fiyatın üstüne biner.
+                  currentDisplayPrice: resolveSalePrice(p, now).price,
                 };
               }),
             );
 
           // Fiyatlandırma (ürün başına) — createDirectOrder ile aynı kurallar
-          const now = new Date();
           const pricing = productIds.map((productId) => {
             const product = productMap.get(productId)!;
-            const basePrice = Number(product.price);
+            // İndirim penceresi ORTAK kuraldan: pencere dışındaysa satış fiyatı
+            // indirim öncesi fiyattır (vitrinle aynı sayı).
+            const sale = resolveSalePrice(product, now);
+            const basePrice = sale.price;
             const campaignPrice = effectiveMap.get(productId);
             const productPrice = campaignPrice ?? basePrice;
-            const isSaleActive =
-              product.oldPrice != null &&
-              (!product.saleStartDate ||
-                now >= new Date(product.saleStartDate)) &&
-              (!product.saleEndDate || now <= new Date(product.saleEndDate));
-            const originalPrice =
-              isSaleActive && product.oldPrice != null
-                ? Number(product.oldPrice)
-                : basePrice;
+            const originalPrice = sale.oldPrice ?? basePrice;
             return {
               productId,
               product,
@@ -511,6 +527,8 @@ export class OrderCheckoutGroupService {
             pricingEntry: (typeof pricing)[number];
             orderNumber: string;
             commissionResult: CommissionResult;
+            /** Tahsil edilen ürün tabanı — `Order.subtotal`. */
+            subtotal: number;
             shippingCost: number;
             fullShippingAmount: number;
             buyerShippingAmount: number;
@@ -536,10 +554,11 @@ export class OrderCheckoutGroupService {
             Array<{ shippingDesi: number; quantity: number }>
           >();
           for (const entry of pricing) {
-            const line = Math.max(
-              0,
-              entry.productPrice * entry.quantity - entry.couponDiscount,
-            );
+            const line = chargedProductBaseOf({
+              unitPrice: entry.productPrice,
+              quantity: entry.quantity,
+              couponDiscount: entry.couponDiscount,
+            });
             sellerLineSubtotals.set(
               entry.product.sellerId,
               (sellerLineSubtotals.get(entry.product.sellerId) ?? 0) + line,
@@ -573,17 +592,22 @@ export class OrderCheckoutGroupService {
             string,
             ShippingBuyerShareByTier[]
           >();
+          const pinnedRuleSetId = commissionRuleSet.id;
           for (const entry of pricing) {
-            // Negatif-koruma: kupon satır başına eligible-subtotal ile capli olsa da
-            // yuvarlama artığına karşı floor (order.totalAmount asla negatif olamaz).
-            const discountedPrice = Math.max(
-              0,
-              entry.productPrice * entry.quantity - entry.couponDiscount,
-            );
+            const discountedPrice = chargedProductBaseOf({
+              unitPrice: entry.productPrice,
+              quantity: entry.quantity,
+              couponDiscount: entry.couponDiscount,
+            });
             const commission = await this.orderPricing.calculateCommission(
               discountedPrice,
               entry.product.sellerId,
               entry.product.categoryId,
+              pinnedRuleSetId,
+              entry.quantity > 0
+                ? discountedPrice / entry.quantity
+                : discountedPrice,
+              entry.product.id,
             );
             lineCommissions.push({ discountedPrice, commission });
             sellerShareLines.set(entry.product.sellerId, [
@@ -613,9 +637,8 @@ export class OrderCheckoutGroupService {
           >();
 
           for (const [entryIndex, entry] of pricing.entries()) {
-            // Satır toplamı = birim fiyat * adet - (satıra düşen kupon). Komisyon,
-            // kargo ve vergi satır toplamı üzerinden hesaplanır (adet>1 ölçeklenir).
-            const lineSubtotal = entry.productPrice * entry.quantity;
+            // Satırın tahsil edilen ürün tabanı: komisyon, kargo, vergi ve alıcı
+            // toplamı hep bunun üzerinden hesaplanır (adet>1 ölçeklenir).
             const { discountedPrice, commission: commissionResult } =
               lineCommissions[entryIndex];
             // Satıcı-bazlı kargo ücreti: yalnız satıcının İLK satırına yükle, kardeşlere 0.
@@ -683,6 +706,9 @@ export class OrderCheckoutGroupService {
               pricingEntry: entry,
               orderNumber,
               commissionResult,
+              // `Order.subtotal` = tahsil edilen ürün tabanı. Tek yerde hesaplanıp
+              // taşınır; create'te yeniden türetilseydi ikinci bir kaynak olurdu.
+              subtotal: discountedPrice,
               shippingCost,
               fullShippingAmount: fullShipping,
               buyerShippingAmount,
@@ -709,6 +735,9 @@ export class OrderCheckoutGroupService {
               idempotencyKey: dto.idempotencyKey,
               totalAmount: groupTotalAmount,
               isGuest,
+              // Onay damgası SUNUCUDA basılır: istemci yalnız "kabul ettim" der,
+              // zamanı ve sözleşme sürümünü söyleyemez.
+              ...distanceSalesConsent(dto.distanceSalesAccepted),
             },
           });
 
@@ -808,7 +837,7 @@ export class OrderCheckoutGroupService {
                 quantity: entry.quantity,
                 unitPrice: entry.productPrice,
                 totalAmount: input.totalAmount,
-                subtotal: entry.originalPrice * entry.quantity,
+                subtotal: input.subtotal,
                 discountAmount: totalDiscount,
                 discountCode:
                   entry.couponDiscount > 0 ? appliedCouponCode : null,
@@ -850,7 +879,7 @@ export class OrderCheckoutGroupService {
                   quantity: entry.quantity,
                   unitPrice: entry.productPrice,
                   originalUnitPrice: entry.originalPrice,
-                  subtotal: entry.originalPrice * entry.quantity,
+                  subtotal: input.subtotal,
                   discountAmount: totalDiscount,
                   discountCode:
                     entry.couponDiscount > 0 ? appliedCouponCode : null,
@@ -897,7 +926,7 @@ export class OrderCheckoutGroupService {
               orderNumber: order.orderNumber,
               productId: entry.productId,
               totalAmount: input.totalAmount,
-              subtotal: entry.originalPrice * entry.quantity,
+              subtotal: input.subtotal,
               discountAmount: totalDiscount,
               productTitle: entry.product.title,
               sellerId: entry.product.sellerId,

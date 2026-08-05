@@ -4,7 +4,10 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { Checkbox } from "@tarodan/ui";
 import { useCart } from "@/hooks/useCart";
+import { useCartSelection } from "@/hooks/useCartSelection";
+import { useCartStore } from "@/stores/cartStore";
 import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -35,11 +38,32 @@ export default function CartClient() {
     canCheckout,
   } = useCart();
   const t = useTranslations();
+  const setBuyNowProductId = useCartStore((s) => s.setBuyNowProductId);
 
+  const {
+    isSelected,
+    selectedLines,
+    selectedCount,
+    allSelected,
+    toggleLine,
+    toggleAll,
+  } = useCartSelection(cartLines);
+
+  // Özet ve ödeme YALNIZ seçili satırları kapsar; seçimden çıkarılan ürün
+  // sepette durur ama tutarlara girmez.
+  const selectedProductIds = new Set(selectedLines.map((l) => l.productId));
   const quote = useCartQuote(
-    items.filter((item) => item.isAvailable),
+    items.filter(
+      (item) => item.isAvailable && selectedProductIds.has(item.productId),
+    ),
     appliedCouponCode,
   );
+
+  // Sepete dönmek "Hemen Al" kapsamından çıkmaktır: kullanıcı buradan
+  // ilerlerse seçili satırların tamamı ödenmeli.
+  useEffect(() => {
+    setBuyNowProductId(null);
+  }, [setBuyNowProductId]);
 
   // `isLoading` starts false in the store, so on a hard reload the very first
   // render has no items AND isn't "loading" yet → the empty state would flash
@@ -113,7 +137,14 @@ export default function CartClient() {
       line.source === "authenticated"
         ? handleRemove(line.productId)
         : handleOfflineRemove(line.productId),
+    isSelected: isSelected(line.productId),
+    onSelectedChange: () => toggleLine(line.productId),
   }));
+
+  const selectedSubtotal = selectedLines.reduce(
+    (sum, line) => sum + line.price * line.quantity,
+    0,
+  );
 
   // Toplam quote'tan gelir — sepet kendi aritmetiğini YAPMAZ. Quote henüz
   // dönmediyse (ya da sepet boşsa) ürün toplamı gösterilir.
@@ -130,6 +161,12 @@ export default function CartClient() {
           className="lg:col-span-2 space-y-4"
           data-testid="cart-products-column"
         >
+          <Checkbox
+            checked={allSelected}
+            indeterminate={selectedCount > 0 && !allSelected}
+            onChange={toggleAll}
+            label={t("cart.selectAll")}
+          />
           {lines.map((line) => (
             <CartItemCard key={line.key} item={line} />
           ))}
@@ -140,11 +177,12 @@ export default function CartClient() {
 
         <div className="lg:col-span-1">
           <CartSummary
-            subtotal={subtotal}
+            subtotal={selectedSubtotal}
             appliedDiscounts={appliedDiscounts}
             quote={quote}
             isAuthenticated={isAuthenticated}
-            canCheckout={canCheckout}
+            canCheckout={canCheckout && selectedCount > 0}
+            selectedCount={selectedCount}
           />
         </div>
       </div>

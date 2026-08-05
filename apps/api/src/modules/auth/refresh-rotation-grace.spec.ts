@@ -55,6 +55,7 @@ function makeService(tokenRow: Record<string, unknown> | null) {
     {} as any,
     {} as any,
     {} as any,
+    { syncUserConsent: jest.fn() } as any,
     {} as any,
   );
   jest

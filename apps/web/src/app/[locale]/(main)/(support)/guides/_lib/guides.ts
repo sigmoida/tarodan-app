@@ -1,27 +1,14 @@
 /** @format */
 
-import type { ComponentType, SVGProps } from "react";
-import {
-  UserPlusIcon,
-  ShoppingBagIcon,
-  CurrencyDollarIcon,
-  ArrowsRightLeftIcon,
-  CameraIcon,
-  TruckIcon,
-} from "@heroicons/react/24/outline";
-
 export interface GuideStep {
   title: string;
   content: string;
 }
 
 export interface Guide {
+  /** Anchor id — /support ve FAQ sayfalarından `#selling` gibi linklenir. */
   id: string;
   title: string;
-  description: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  color: string;
-  bgColor: string;
   steps: GuideStep[];
 }
 
@@ -29,210 +16,186 @@ export const GUIDES: Guide[] = [
   {
     id: "getting-started",
     title: "Başlangıç Rehberi",
-    description:
-      "TARODAN'a hoş geldiniz! Platformu kullanmaya başlamak için izlemeniz gereken adımlar.",
-    icon: UserPlusIcon,
-    color: "text-info-500",
-    bgColor: "bg-info-50",
     steps: [
       {
         title: "Üye Olun",
         content:
-          "E-posta adresiniz ve şifrenizle hızlıca üye olun. Google veya Facebook hesabınızla da giriş yapabilirsiniz.",
+          "E-posta adresiniz ve şifrenizle hızlıca kayıt olabilir ya da Google veya Facebook hesabınızla tek tıkla aramıza katılabilirsiniz.",
       },
       {
         title: "Profilinizi Tamamlayın",
         content:
-          "Profil fotoğrafı ekleyin, bio yazın ve iletişim bilgilerinizi güncelleyin. Tam profiller daha güvenilir görünür.",
+          "Profil fotoğrafınızı ekleyin, hobinizden kısaca bahseden bir biyografi yazın ve iletişim bilgilerinizi güncelleyin. Eksiksiz profiller, platformdaki güvenilirliğinizi her zaman bir adım öne taşır.",
       },
       {
         title: "Adres Ekleyin",
         content:
-          "Satın alma ve satış işlemleri için en az bir adres eklemeniz gerekiyor.",
+          "Koleksiyonunuza yeni parçalar eklemek veya takas süreçlerini başlatabilmek için sistemimize en az bir teslimat adresi tanımlayın.",
       },
       {
         title: "Keşfetmeye Başlayın",
         content:
-          "Kategorileri inceleyin, takip etmek istediğiniz satıcıları bulun ve favorilerinizi kaydedin.",
+          "Zengin kategorilerimizi inceleyin, favori satıcılarınızı takibe alın ve gözünüze kestirdiğiniz nadir modelleri favorilerinize kaydederek hemen keşfe başlayın.",
       },
     ],
   },
   {
     id: "buying",
     title: "Alışveriş Rehberi",
-    description: "TARODAN'da güvenle alışveriş yapmanın tüm detayları.",
-    icon: ShoppingBagIcon,
-    color: "text-success-500",
-    bgColor: "bg-success-50",
     steps: [
       {
-        title: "Ürün Arama",
+        title: "Model Arayın",
         content:
-          "Arama çubuğunu kullanarak marka, model veya anahtar kelime ile arama yapın. Filtreler ile sonuçları daraltın.",
+          "Arama çubuğunu kullanarak aradığınız markayı, özel seriyi veya modeli yazın; gelişmiş filtrelerle aradığınız parçaya saniyeler içinde ulaşın.",
       },
       {
-        title: "Ürün Detaylarını İnceleyin",
+        title: "Detayları İnceleyin",
         content:
-          "Fotoğrafları yakından inceleyin, açıklamayı okuyun, satıcı puanını kontrol edin. Sorularınız varsa mesaj gönderin.",
+          "Modelin fotoğraflarını yakından inceleyin, satıcının açıklamalarına göz atın ve satıcı puanını kontrol edin. Aklınıza takılan en ufak bir soru olursa mesaj yoluyla satıcıyla kolayca iletişime geçin.",
       },
       {
-        title: "Sepete Ekleyin",
+        title: "Sepetinize Ekleyin",
         content:
-          '"Sepete Ekle" butonuna tıklayın. Birden fazla ürünü aynı anda satın alabilirsiniz.',
+          "Beğendiğiniz modeli “Sepete Ekle” butonuna tıklayarak sepetinize atın. Dilerseniz aynı satıcıya ait birden fazla modeli tek seferde sepetinizde toplayabilirsiniz.",
       },
       {
-        title: "Ödeme Yapın",
+        title: "Ödemenizi Tamamlayın",
         content:
-          "Adres seçin, kargo seçeneğini belirleyin ve güvenli ödeme sayfasında işleminizi tamamlayın.",
+          "Teslimat adresinizi seçin, size uygun kargo tercihini belirleyin ve güvenli ödeme adımıyla işleminizi sorunsuzca tamamlayın.",
       },
       {
-        title: "Siparişi Takip Edin",
+        title: "Siparişinizi ve Takaslarınızı Takip Edin",
         content:
-          '"Siparişlerim" sayfasından kargo durumunu gerçek zamanlı takip edin.',
+          "“Siparişlerim” ve “Takaslarım” sayfasını ziyaret ederek yeni modelinizin yola çıkış ve kargo sürecini anlık olarak takip edin.",
       },
     ],
   },
   {
     id: "selling",
     title: "Satış Rehberi",
-    description:
-      "Model arabalarınızı satışa sunmanın A'dan Z'ye tüm aşamaları.",
-    icon: CurrencyDollarIcon,
-    color: "text-warning-500",
-    bgColor: "bg-warning-50",
     steps: [
       {
-        title: "İlan Ver Butonuna Tıklayın",
+        title: "İlan Verin",
         content:
-          'Ana sayfada veya menüde "İlan Ver" butonuna tıklayarak ilan oluşturma sayfasına gidin.',
+          "Ana sayfada veya menüde yer alan “İlan Ver” butonuna tıklayarak hızlıca ilan oluşturma sayfasına geçiş yapın.",
       },
       {
-        title: "Fotoğraf Yükleyin",
+        title: "Fotoğraf Ekleyin",
         content:
-          "En az 3 fotoğraf yükleyin. Farklı açılardan, iyi ışıkta çekilmiş fotoğraflar satışı artırır.",
+          "Modelinizi en iyi şekilde yansıtan, farklı açılardan ve net ışık altında çekilmiş en az 3 fotoğraf yükleyin; kaliteli görseller her zaman dikkat çeker ve satış şansınızı artırır.",
       },
       {
         title: "Detayları Girin",
         content:
-          "Marka, model, ölçek, durum ve açıklama bilgilerini eksiksiz doldurun. Ne kadar detay o kadar güven.",
+          "Marka, model, ölçek, kondisyon ve açıklama bilgilerini eksiksiz şekilde doldurun. Paylaştığınız her detay, alıcı gözünde güvenilirliğinizi artırır.",
       },
       {
         title: "Fiyat Belirleyin",
         content:
-          "Piyasa araştırması yapın, rekabetçi bir fiyat belirleyin. Takas seçeneğini de aktif edebilirsiniz.",
+          "Piyasa araştırması yaparak rekabetçi bir fiyat belirleyin. Dilerseniz koleksiyonunuzu çeşitlendirmek için takas seçeneğini de aktif hale getirebilirsiniz.",
       },
       {
-        title: "İlanı Yayınlayın",
+        title: "İlanınızı Yayınlayın",
         content:
-          "İlanınız onay sürecinden geçtikten sonra yayına alınır (genellikle 24 saat içinde).",
+          "İlanınız hızlı bir onay sürecinden geçtikten sonra (genellikle 24 saat içinde) vitrindeki yerini alır.",
       },
       {
-        title: "Satış Gerçekleşti!",
+        title: "Satışı Tamamlayın",
         content:
-          "Ürünü dikkatlice paketleyin, kargoya verin ve takip numarasını sisteme girin.",
+          "Satış gerçekleştiğinde modeli özenle paketleyin, kargoya teslim edin ve takip numarasını sisteme girerek süreci tamamlayın.",
       },
     ],
   },
   {
     id: "trade",
     title: "Takas Rehberi",
-    description: "Model araba takası yapmak için adım adım kılavuz.",
-    icon: ArrowsRightLeftIcon,
-    color: "text-primary-500",
-    bgColor: "bg-primary-50",
     steps: [
       {
-        title: "Takasa Açık Ürünleri Bulun",
+        title: "Takasa Açık Ürünleri Keşfedin",
         content:
-          'Ürün listelerinde "Takasa Açık" etiketine dikkat edin. Bu ürünlere takas teklifi gönderebilirsiniz.',
+          "Ürün listelerinde yer alan “Takas” etiketine dikkat edin. Beğendiğiniz bu modellere hemen takas teklifi gönderebilirsiniz.",
       },
       {
-        title: "Teklif Gönderin",
+        title: "Teklifinizi Gönderin",
         content:
-          '"Takas Teklifi" butonuna tıklayın, kendi ürünlerinizden birini seçin ve teklif gönderin.',
+          "“Takas Teklifi” butonuna tıklayın, kendi garajınızdan veya ilanlarınızdan takas için uygun bir ürün seçerek teklifinizi iletin.",
       },
       {
-        title: "Mesajlaşın",
+        title: "Detayları Görüşün",
         content:
-          "Karşı tarafla detayları görüşün. Fark varsa ek ödeme konusunda anlaşın.",
+          "Karşı tarafla mesajlaşarak takas koşullarını detaylandırın. Eğer model değerleri arasında fark varsa, ek ödeme konusunda anlaşma sağlayın.",
       },
       {
         title: "Takası Onaylayın",
-        content: "Her iki taraf da onayladığında takas kesinleşir.",
+        content:
+          "Her iki taraf da şartları onayladığında takas resmi olarak kesinleşir.",
       },
       {
-        title: "Karşılıklı Gönderim",
+        title: "Güvenli Gönderim Sağlayın",
         content:
-          "Ürünlerinizi aynı anda kargoya verin ve takip numaralarını paylaşın.",
+          "Ürünlerinizi güvenle paketleyerek kargoya verin. Tarodan güvenli depo incelemesi için depomuza ulaşan ürünlerin kontrolleri tamamlandıktan sonra onayınızı verin ve kargo takip numaraları üzerinden modelinizin size ne zaman ulaşacağını sistemden takip edin.",
       },
     ],
   },
   {
     id: "photography",
     title: "Fotoğraf Çekim Rehberi",
-    description: "İlanlarınız için profesyonel fotoğraflar çekmek.",
-    icon: CameraIcon,
-    color: "text-danger-500",
-    bgColor: "bg-danger-50",
     steps: [
       {
-        title: "Işık Çok Önemli",
+        title: "Doğal Işık Kullanın",
         content:
-          "Doğal ışık kullanın, pencere kenarında gündüz çekim yapın. Flash kullanmaktan kaçının.",
+          "Çekimlerinizde mutlaka doğal ışıktan yararlanın; gündüz vakti pencere kenarında yapılan çekimler modelin detaylarını en net şekilde ortaya çıkarır. Flaş kullanmaktan kaçının.",
       },
       {
-        title: "Arka Plan",
+        title: "Sade Bir Arka Plan Tercih Edin",
         content:
-          "Sade, tek renkli bir arka plan kullanın. Beyaz kağıt veya kumaş işinizi görür.",
+          "Modelin detaylarının ön plana çıkması için sade ve tek renkli bir arka plan kullanın. Beyaz bir kağıt veya kumaş bu işlem için fazlasıyla yeterlidir.",
       },
       {
-        title: "Farklı Açılar",
+        title: "Farklı Açılardan Çekim Yapın",
         content:
-          "Ön, arka, yan ve 45 derece açılardan fotoğraf çekin. Detayları gösterin.",
+          "Modelinizi ön, arka, yan ve 45 derecelik açılardan fotoğraflayın. İnce detayları ve hatları net bir şekilde göstererek alıcıya eksiksiz bir sunum yapın.",
       },
       {
-        title: "Kusurları Gösterin",
+        title: "Kusurları Şeffafça Gösterin",
         content:
-          "Çizik, eksik parça gibi kusurlar varsa yakından fotoğraflayın. Şeffaflık güven sağlar.",
+          "Modelde çizik veya eksik parça gibi kusurlar varsa bunları yakından fotoğraflayın. Şeffaflık, koleksiyonerler arasında her zaman güven sağlar.",
       },
       {
-        title: "Ambalaj Fotoğrafı",
+        title: "Orijinal Kutuyu Unutmayın",
         content:
-          "Orijinal kutusu varsa mutlaka fotoğraflayın. Koleksiyoncular için çok değerli.",
+          "Modelin orijinal kutusu varsa mutlaka fotoğraflayın; kutulu ürünler koleksiyoncular için her zaman çok daha değerlidir.",
       },
     ],
   },
   {
     id: "shipping",
-    title: "Paketleme ve Kargo Rehberi",
-    description: "Ürünlerinizi güvenle göndermenin yolları.",
-    icon: TruckIcon,
-    color: "text-primary-500",
-    bgColor: "bg-primary-50",
+    title: "Kargo Rehberi",
     steps: [
       {
-        title: "Koruyucu Malzeme",
+        title: "Doğru Koruyucu Malzeme Kullanın",
         content:
-          "Baloncuklu naylon, köpük veya gazete kağıdı ile ürünü sarın. Hareket etmemeli.",
+          "Modelinizi baloncuklu naylon, köpük veya gazete kağıdıyla sıkıca sarın; kutu içinde kesinlikle hareket etmemesini sağlayın.",
       },
       {
-        title: "Sağlam Kutu",
+        title: "Uygun Boyutta Sağlam Kutu Seçin",
         content:
-          "Ürüne uygun boyutta, sağlam bir karton kutu seçin. Çok büyük kutu tehlikelidir.",
+          "Ürünün ebatlarına uygun, dayanıklı bir karton kutu tercih edin. Çok büyük kutular modelin taşıma sırasında darbe almasına yol açabilir.",
       },
       {
-        title: "Çift Kat Koruma",
-        content: "Özellikle değerli parçalar için iç içe iki kutu kullanın.",
+        title: "Çift Kat Koruma Tercih Edin",
+        content:
+          "Özellikle koleksiyonunuzdaki değerli ve nadir parçalar için iç içe iki kutu kullanarak ekstra güvenlik sağlayın.",
       },
       {
-        title: "Etiketleme",
+        title: "Net Etiketleme Yapın",
         content:
-          'Adres bilgilerini okunaklı yazın, "KIRILACAK EŞYA" etiketi ekleyin.',
+          "Gönderici ve alıcı adres bilgilerini okunaklı bir şekilde yazın; kutunun üzerine mutlaka “KIRILACAK EŞYA” uyarısı ekleyin.",
       },
       {
-        title: "Kargoya Verin",
+        title: "Kargoya Teslim Edin",
         content:
-          "Sürat Kargo şubesine götürün, takip numarasını sisteme girin.",
+          "Paketinizi kargo şubesine götürerek size atanan kargo kodu ile şubeye teslim edin.",
       },
     ],
   },

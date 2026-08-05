@@ -7,21 +7,18 @@ import { type CommissionRule } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
 export function CommissionTable({
+  editable,
+  onView,
   onEdit,
   onDelete,
-  onToggle,
-  togglingId,
 }: {
+  editable: boolean;
+  onView: (rule: CommissionRule) => void;
   onEdit: (rule: CommissionRule) => void;
   onDelete: (rule: CommissionRule) => void;
-  onToggle: (rule: CommissionRule) => void;
-  togglingId?: string;
 }) {
   const t = useTranslations();
-  const columns = commissionColumns(
-    { onEdit, onDelete, onToggle, togglingId },
-    t,
-  );
+  const columns = commissionColumns({ editable, onView, onEdit, onDelete }, t);
 
   return (
     <SectionCard title={t("admin.finance.commission.rules")}>

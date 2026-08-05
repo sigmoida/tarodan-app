@@ -118,6 +118,15 @@ export class GuestCheckoutDto {
   @Min(1)
   expectedShippingTariffVersion: number;
 
+  @ApiProperty({ description: "Commission rule-set id used by the quote" })
+  @IsUUID("4")
+  expectedCommissionRuleSetId: string;
+
+  @ApiProperty({ description: "Commission rule-set version used by the quote" })
+  @IsInt()
+  @Min(1)
+  expectedCommissionRuleSetVersion: number;
+
   @ApiProperty({
     description:
       "Checkout quote birim-fiyat hash'i. Ürün fiyatı/kampanya değiştiyse 409 PRICING_CHANGED.",

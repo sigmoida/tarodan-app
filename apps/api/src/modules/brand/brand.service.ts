@@ -3,6 +3,8 @@ import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
 import { resolveBrandLogoUrl } from "./brand-logo-url";
+import { saleCapableSellerWhere } from "../membership/membership.util";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 @Injectable()
 export class BrandService {
@@ -34,7 +36,13 @@ export class BrandService {
           include: {
             _count: {
               select: {
-                products: { where: { status: "active" } },
+                products: {
+                  where: {
+                    ...catalogProductWhere(),
+                    status: "active",
+                    seller: saleCapableSellerWhere(),
+                  },
+                },
               },
             },
           },
@@ -69,7 +77,13 @@ export class BrandService {
           include: {
             _count: {
               select: {
-                products: { where: { status: "active" } },
+                products: {
+                  where: {
+                    ...catalogProductWhere(),
+                    status: "active",
+                    seller: saleCapableSellerWhere(),
+                  },
+                },
               },
             },
           },
@@ -104,7 +118,13 @@ export class BrandService {
       include: {
         _count: {
           select: {
-            products: { where: { status: "active" } },
+            products: {
+              where: {
+                ...catalogProductWhere(),
+                status: "active",
+                seller: saleCapableSellerWhere(),
+              },
+            },
           },
         },
       },

@@ -1,9 +1,6 @@
-import * as request from 'supertest';
-import {
-  TradeStatus,
-  ShipmentStatus,
-} from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+import * as request from "supertest";
+import { TradeStatus, ShipmentStatus } from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 
 // Helper waits below cover both the DB row creation AND the async surat
 // dispatch. Earlier versions only polled the DB, leading to occasional flakes
@@ -13,14 +10,50 @@ import {
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import {
-  createUser,
-  authHeader,
-} from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { SuratTrackingService } from '../../src/modules/surat-cargo/surat-tracking.service';
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { TradeTrackingSyncService } from "../../src/modules/surat-cargo/trade-tracking-sync.service";
+import { signCallback } from "../mocks/paytr.mock";
+
+/**
+ * Takasın İKİ ödemesini de tahsil et.
+ *
+ * v2'de kabul takası `awaiting_payment`ta bırakır: kafa kafaya takasta bile iki
+ * taraf hizmet bedeli + 2 bacaklık kargo öder ve ürünler ancak iki ödeme
+ * tamamlanınca kargoya çıkar. Inbound etiketler bu geçişte oluşur.
+ */
+async function payBothSides(
+  ctx: E2ETestApp,
+  tradeId: string,
+  parties: Array<{ id: string; accessToken: string }>,
+): Promise<void> {
+  const prisma = getPrisma();
+  for (const user of parties) {
+    await request(ctx.app.getHttpServer())
+      .post("/api/payments/initiate-trade-cash")
+      .set(authHeader(user))
+      .send({ tradeId })
+      .expect(201);
+    const row = await prisma.tradeCashPayment.findFirst({
+      where: { tradeId, payerId: user.id },
+    });
+    const payment = await prisma.payment.findFirst({
+      where: { tradeCashPaymentId: row!.id },
+    });
+    await request(ctx.app.getHttpServer())
+      .post("/api/payments/callback/paytr")
+      .send(
+        signCallback({
+          merchantOid: payment!.providerConversationId!,
+          status: "success",
+          totalAmount: Math.round(Number(payment!.amount) * 100),
+        }),
+      )
+      .expect(200);
+  }
+}
 
 /**
  * Helper: poll until both `to_warehouse` shipments exist, since the
@@ -46,8 +79,8 @@ async function waitForInboundShipments(
   const deadline = Date.now() + timeoutMs;
   const fetchRows = () =>
     prisma.tradeShipment.findMany({
-      where: { tradeId, leg: 'to_warehouse' },
-      orderBy: { trackingNumber: 'asc' },
+      where: { tradeId, leg: "to_warehouse" },
+      orderBy: { trackingNumber: "asc" },
     });
   let rows = await fetchRows();
   while (
@@ -65,14 +98,15 @@ async function waitForInboundShipments(
  * E2E coverage for the auto-shipping flow added in Task 1 + Task 2:
  *
  * - Trade accept (non-cash) auto-creates two `to_warehouse` TradeShipment
- *   rows with auto-issued OzelKargoTakipNo `TRD-{tradeNumber}-WH-{INI|REC}`.
+ *   rows with auto-issued OzelKargoTakipNo `{tradeNumber}-WH-{INI|REC}`
+ *   (trade references carry the TKS- prefix; see CODE_SCHEME.md).
  * - When both inbound legs are reported `delivered` by the carrier-poll
  *   cron (`syncAllActiveTradeShipments`), the parent trade auto-transitions
  *   from `shipping_to_warehouse` → `at_warehouse`.
  * - The legacy form-driven `POST /trades/:id/ship-to-warehouse` route is
  *   retired and now returns HTTP 410 Gone.
  */
-describe('Trade Auto-Shipping (E2E)', () => {
+describe("Trade Auto-Shipping (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -97,8 +131,14 @@ describe('Trade Auto-Shipping (E2E)', () => {
    * products fixture used by every test below.
    */
   async function setupBilateralTrade() {
-    const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-    const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+    const initiator = await createUser(ctx.module, {
+      isSeller: true,
+      premium: true,
+    });
+    const receiver = await createUser(ctx.module, {
+      isSeller: true,
+      premium: true,
+    });
     await createAddress({ userId: initiator.id });
     await createAddress({ userId: receiver.id });
 
@@ -120,12 +160,12 @@ describe('Trade Auto-Shipping (E2E)', () => {
     return { initiator, receiver, initiatorProduct, receiverProduct };
   }
 
-  it('trade accept (non-cash) creates two to_warehouse TradeShipments with auto tracking numbers', async () => {
+  it("trade accept (non-cash) creates two to_warehouse TradeShipments with auto tracking numbers", async () => {
     const { initiator, receiver, initiatorProduct, receiverProduct } =
       await setupBilateralTrade();
 
     const created = await request(ctx.app.getHttpServer())
-      .post('/api/trades')
+      .post("/api/trades")
       .set(authHeader(initiator))
       .send({
         receiverId: receiver.id,
@@ -140,25 +180,32 @@ describe('Trade Auto-Shipping (E2E)', () => {
       .set(authHeader(receiver))
       .send({})
       .expect(201);
+    await payBothSides(ctx, tradeId, [initiator, receiver]);
 
     const prisma = getPrisma();
-    const toWarehouse = await waitForInboundShipments(prisma, tradeId, 2, 4000, () => ctx.surat.shipmentCalls.length);
+    const toWarehouse = await waitForInboundShipments(
+      prisma,
+      tradeId,
+      2,
+      4000,
+      () => ctx.surat.shipmentCalls.length,
+    );
     expect(toWarehouse).toHaveLength(2);
 
-    const trackingPattern = /^TRD-[\w-]+-WH-(INI|REC)$/;
+    const trackingPattern = /^TKS-[\w-]+-WH-(INI|REC)$/;
     for (const ts of toWarehouse) {
-      expect(ts.carrier).toBe('surat');
+      expect(ts.carrier).toBe("surat");
       expect(ts.trackingNumber).toMatch(trackingPattern);
       expect(ts.status).toBe(ShipmentStatus.label_created);
-      expect(ts.leg).toBe('to_warehouse');
-      expect(ts.recipientType).toBe('warehouse');
+      expect(ts.leg).toBe("to_warehouse");
+      expect(ts.recipientType).toBe("warehouse");
       expect(ts.recipientUserId).toBeNull();
     }
 
     const suffixes = toWarehouse
       .map((s) => s.trackingNumber!.match(/WH-(INI|REC)$/)?.[1])
       .sort();
-    expect(suffixes).toEqual(['INI', 'REC']);
+    expect(suffixes).toEqual(["INI", "REC"]);
 
     // Sürat stub must have been called twice — one per leg.
     expect(ctx.surat.shipmentCalls.length).toBe(2);
@@ -168,12 +215,12 @@ describe('Trade Auto-Shipping (E2E)', () => {
     expect(stubRefs).toEqual(toWarehouse.map((s) => s.trackingNumber!).sort());
   });
 
-  it('only one to_warehouse leg delivered → trade stays in shipping_to_warehouse', async () => {
+  it("only one to_warehouse leg delivered → trade stays in shipping_to_warehouse", async () => {
     const { initiator, receiver, initiatorProduct, receiverProduct } =
       await setupBilateralTrade();
 
     const created = await request(ctx.app.getHttpServer())
-      .post('/api/trades')
+      .post("/api/trades")
       .set(authHeader(initiator))
       .send({
         receiverId: receiver.id,
@@ -188,9 +235,16 @@ describe('Trade Auto-Shipping (E2E)', () => {
       .set(authHeader(receiver))
       .send({})
       .expect(201);
+    await payBothSides(ctx, tradeId, [initiator, receiver]);
 
     const prisma = getPrisma();
-    const toWarehouse = await waitForInboundShipments(prisma, tradeId, 2, 4000, () => ctx.surat.shipmentCalls.length);
+    const toWarehouse = await waitForInboundShipments(
+      prisma,
+      tradeId,
+      2,
+      4000,
+      () => ctx.surat.shipmentCalls.length,
+    );
     expect(toWarehouse).toHaveLength(2);
 
     // Mark only ONE leg delivered.
@@ -204,19 +258,20 @@ describe('Trade Auto-Shipping (E2E)', () => {
 
     // Invoke the private transition helper directly. It must NOT flip the
     // trade because the second leg is still in `label_created`.
-    const surat = ctx.app.get(SuratTrackingService) as any;
-    await surat.maybeTransitionTradeToAtWarehouse(tradeId);
+    // Depoya-varış geçişi Sürat takip senkronundan tetiklenir.
+    const sync = ctx.app.get(TradeTrackingSyncService) as any;
+    await sync.maybeTransitionTradeToAtWarehouse(tradeId);
 
     const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
     expect(trade?.status).toBe(TradeStatus.shipping_to_warehouse);
   });
 
-  it('both to_warehouse legs delivered → trade transitions to at_warehouse', async () => {
+  it("both to_warehouse legs delivered → trade transitions to at_warehouse", async () => {
     const { initiator, receiver, initiatorProduct, receiverProduct } =
       await setupBilateralTrade();
 
     const created = await request(ctx.app.getHttpServer())
-      .post('/api/trades')
+      .post("/api/trades")
       .set(authHeader(initiator))
       .send({
         receiverId: receiver.id,
@@ -231,15 +286,22 @@ describe('Trade Auto-Shipping (E2E)', () => {
       .set(authHeader(receiver))
       .send({})
       .expect(201);
+    await payBothSides(ctx, tradeId, [initiator, receiver]);
 
     const prisma = getPrisma();
-    const toWarehouse = await waitForInboundShipments(prisma, tradeId, 2, 4000, () => ctx.surat.shipmentCalls.length);
+    const toWarehouse = await waitForInboundShipments(
+      prisma,
+      tradeId,
+      2,
+      4000,
+      () => ctx.surat.shipmentCalls.length,
+    );
     expect(toWarehouse).toHaveLength(2);
 
     // Mark BOTH legs delivered (mirrors what the carrier-poll cron does
     // when Sürat reports a delivery code).
     await prisma.tradeShipment.updateMany({
-      where: { tradeId, leg: 'to_warehouse' },
+      where: { tradeId, leg: "to_warehouse" },
       data: {
         status: ShipmentStatus.delivered,
         deliveredAt: new Date(),
@@ -248,8 +310,9 @@ describe('Trade Auto-Shipping (E2E)', () => {
 
     // Invoke the transition helper directly — same code path the cron runs
     // after the second leg flips to delivered.
-    const surat = ctx.app.get(SuratTrackingService) as any;
-    await surat.maybeTransitionTradeToAtWarehouse(tradeId);
+    // Depoya-varış geçişi Sürat takip senkronundan tetiklenir.
+    const sync = ctx.app.get(TradeTrackingSyncService) as any;
+    await sync.maybeTransitionTradeToAtWarehouse(tradeId);
 
     const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
     expect(trade?.status).toBe(TradeStatus.at_warehouse);
@@ -258,13 +321,13 @@ describe('Trade Auto-Shipping (E2E)', () => {
     const events = await prisma.tradeShipmentEvent.findMany({
       where: {
         tradeShipmentId: { in: toWarehouse.map((s) => s.id) },
-        status: 'auto_at_warehouse',
+        status: "auto_at_warehouse",
       },
     });
     expect(events).toHaveLength(2);
   });
 
-  it('deprecated POST /trades/:id/ship-to-warehouse returns 410 Gone', async () => {
+  it("deprecated POST /trades/:id/ship-to-warehouse returns 410 Gone", async () => {
     const { initiator, receiver, initiatorProduct, receiverProduct } =
       await setupBilateralTrade();
     const initiatorShipAddress = await createAddress({
@@ -273,7 +336,7 @@ describe('Trade Auto-Shipping (E2E)', () => {
     });
 
     const created = await request(ctx.app.getHttpServer())
-      .post('/api/trades')
+      .post("/api/trades")
       .set(authHeader(initiator))
       .send({
         receiverId: receiver.id,
@@ -288,6 +351,7 @@ describe('Trade Auto-Shipping (E2E)', () => {
       .set(authHeader(receiver))
       .send({})
       .expect(201);
+    await payBothSides(ctx, tradeId, [initiator, receiver]);
 
     // Trade is now in shipping_to_warehouse — even so, the deprecated
     // endpoint must reject every caller with 410, regardless of payload.
@@ -296,7 +360,7 @@ describe('Trade Auto-Shipping (E2E)', () => {
       .set(authHeader(initiator))
       .send({
         fromAddressId: initiatorShipAddress.id,
-        carrier: 'Sürat Kargo',
+        carrier: "Sürat Kargo",
       })
       .expect(410);
   });

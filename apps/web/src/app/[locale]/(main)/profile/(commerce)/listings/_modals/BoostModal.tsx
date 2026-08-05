@@ -17,6 +17,7 @@ import {
 } from "@tarodan/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { formatTL } from "@/lib/format";
 
 interface BoostDurationOption {
   durationDays: number;
@@ -56,11 +57,10 @@ interface BoostModalProps {
   onClose: () => void;
 }
 
-const fmtPrice = (v: number) =>
-  `${v.toLocaleString("tr-TR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} ₺`;
+// Para biçimi TEK yerden gelir (`lib/format`): ekranlar kendi
+// `toLocaleString` çağrılarını yazdığında aynı ürün bir kartta "468 ₺",
+// detayda "468,19 TL" görünüyor ve kart biçimi kuruşu YUVARLIYORDU.
+const fmtPrice = formatTL;
 
 /**
  * İlanı öne çıkar (boost) modalı: ürünün fiyatına göre değişen paketlerden
@@ -164,7 +164,7 @@ export default function BoostModal({
       isOpen={open}
       onClose={onClose}
       title={t("profile.boost.title")}
-      size="lg"
+      size="2xl"
       closeLabel={t("common.close")}
       dismissDisabled={boost.isPending}
       footer={
@@ -226,20 +226,17 @@ export default function BoostModal({
               key={pkg.id}
               className="rounded-lg border border-border overflow-hidden"
             >
-              <div className="flex items-center justify-between gap-2 bg-surface-alt/60 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-heading">{pkg.name}</span>
-                  {pkg.showcaseOnHome && (
-                    <Badge variant="primary" size="sm">
-                      {t("profile.boost.showcaseBadge")}
-                    </Badge>
-                  )}
-                </div>
-                <span className="text-xs text-muted">
+              {/*
+                Paket adı ve açıklaması ALT ALTA: yan yana dizilince açıklama
+                başlığı sıkıştırıp "Vitrin Paket"i iki satıra bölüyordu.
+              */}
+              <div className="bg-surface-alt/60 px-3 py-2">
+                <p className="font-semibold text-heading">{pkg.name}</p>
+                <p className="mt-0.5 text-xs text-muted">
                   {pkg.showcaseOnHome
                     ? t("profile.boost.showcaseHint")
                     : t("profile.boost.searchHint")}
-                </span>
+                </p>
               </div>
 
               <div className="divide-y divide-border">

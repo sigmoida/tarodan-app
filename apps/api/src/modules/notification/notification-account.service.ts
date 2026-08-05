@@ -100,6 +100,13 @@ export class NotificationAccountService {
       subject,
       html,
       template: "guest-contact-admin",
+      // Destek kutusunda "Yanıtla" doğrudan müşteriye gitsin. Gönderen kimliği
+      // MAIL_FROM olmak zorunda (SMTP sağlayıcısı eşleşme istiyor), o yüzden
+      // müşteri adresi from'a değil replyTo'ya konur. CRLF header injection'a
+      // karşı satır sonları temizlenir — subject ile aynı savunma.
+      replyTo: String(data.email ?? "")
+        .replace(/[\r\n]+/g, " ")
+        .trim(),
     });
 
     if (result.success) {

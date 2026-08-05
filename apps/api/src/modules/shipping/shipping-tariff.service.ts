@@ -18,10 +18,7 @@ import {
   SHIPPING_PACKAGE_TIER_ORDER,
   billableDesiForTier,
 } from "./shipping-package-tier";
-import {
-  outboundPackageShipping,
-  shippingAmountForDesi,
-} from "./shipping-tariff.helper";
+import { outboundPackageShipping } from "./shipping-tariff.helper";
 
 const DEFAULT_PROVIDER = "surat";
 /**
@@ -51,11 +48,8 @@ export interface ShippingPackageTierInput {
 export interface ShippingTariffInput {
   provider?: string;
   name: string;
-  outboundPackageFee: number;
   freeShippingEnabled?: boolean;
   freeShippingThreshold: number;
-  returnPackageFee?: number;
-  tradeLegFee?: number;
   effectiveFrom?: Date | string;
   packageTiers?: ShippingPackageTierInput[];
 }
@@ -145,27 +139,6 @@ export class ShippingTariffService {
     };
   }
 
-  /**
-   * Estimated return-leg shipping cost from the active exact desi tariff.
-   */
-  async quoteReturnShipment(
-    provider = DEFAULT_PROVIDER,
-    billableDesi = 1,
-  ): Promise<number> {
-    const tariff = await this.getActiveOutboundTariff(provider);
-    return shippingAmountForDesi(tariff, billableDesi).toNumber();
-  }
-
-  /**
-   * Estimated TRADE-leg shipping cost from the active tariff (Phase 2). Consumed by
-   * trade flows; falls back to the outbound fee if no trade fee is configured.
-   */
-  async quoteTradeShipment(provider = DEFAULT_PROVIDER): Promise<number> {
-    const tariff = await this.getActiveOutboundTariff(provider);
-    const fee = Number(tariff.tradeLegFee);
-    return fee > 0 ? fee : Number(tariff.outboundPackageFee);
-  }
-
   async list(provider?: string): Promise<ShippingTariffWithRates[]> {
     return this.prisma.shippingTariff.findMany({
       where: provider ? { provider } : undefined,
@@ -207,11 +180,8 @@ export class ShippingTariffService {
         name: input.name,
         status: ShippingTariffStatus.draft,
         version,
-        outboundPackageFee: input.outboundPackageFee,
         freeShippingEnabled: input.freeShippingEnabled ?? true,
         freeShippingThreshold: input.freeShippingThreshold,
-        returnPackageFee: input.returnPackageFee ?? 0,
-        tradeLegFee: input.tradeLegFee ?? 0,
         effectiveFrom: input.effectiveFrom
           ? new Date(input.effectiveFrom)
           : new Date(),
@@ -244,11 +214,8 @@ export class ShippingTariffService {
         where: { id },
         data: {
           name: input.name,
-          outboundPackageFee: input.outboundPackageFee,
           freeShippingEnabled: input.freeShippingEnabled,
           freeShippingThreshold: input.freeShippingThreshold,
-          returnPackageFee: input.returnPackageFee,
-          tradeLegFee: input.tradeLegFee,
           effectiveFrom: input.effectiveFrom
             ? new Date(input.effectiveFrom)
             : undefined,
@@ -290,11 +257,8 @@ export class ShippingTariffService {
       {
         provider,
         name: `${source.name} (kopya)`,
-        outboundPackageFee: Number(source.outboundPackageFee),
         freeShippingEnabled: source.freeShippingEnabled,
         freeShippingThreshold: Number(source.freeShippingThreshold),
-        returnPackageFee: Number(source.returnPackageFee),
-        tradeLegFee: Number(source.tradeLegFee),
         packageTiers: source.packageTiers.map((tier) => ({
           code: tier.code,
           label: tier.label,
@@ -377,12 +341,9 @@ export class ShippingTariffService {
   }
 
   private assertAmounts(input: Partial<ShippingTariffInput>): void {
-    const negative = [
-      input.outboundPackageFee,
-      input.freeShippingThreshold,
-      input.returnPackageFee,
-      input.tradeLegFee,
-    ].some((v) => v != null && Number(v) < 0);
+    const negative = [input.freeShippingThreshold].some(
+      (v) => v != null && Number(v) < 0,
+    );
     if (negative) {
       throw new BadRequestException(
         i18nMessage("server.shipping.tariffNegativeAmount"),

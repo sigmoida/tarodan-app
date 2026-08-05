@@ -454,15 +454,19 @@ export class PaymentCallbackService {
       );
       // CAPI (Faz 3): store_card ödemesinde PayTR bildirimle utoken döndürür → kullanıcının
       // kayıtlı kartlarını SavedCard'a senkronla (recurring için). Best-effort, ödemeyi etkilemez.
-      if (dto.utoken && payment.order?.buyerId) {
+      const savedCardOwnerId =
+        payment.order?.buyerId ??
+        payment.checkoutGroup?.buyerId ??
+        payment.tradeCashPayment?.payerId;
+      if (dto.utoken && savedCardOwnerId) {
         try {
           await this.paymentReconciliation.syncSavedCardsFromUtoken(
-            payment.order.buyerId,
+            savedCardOwnerId,
             dto.utoken,
           );
-        } catch (e: any) {
+        } catch (error: unknown) {
           this.logger.error(
-            `SavedCard senkron hatası (oid=${dto.merchant_oid}): ${e?.message}`,
+            `SavedCard senkron hatası (oid=${dto.merchant_oid}): ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }

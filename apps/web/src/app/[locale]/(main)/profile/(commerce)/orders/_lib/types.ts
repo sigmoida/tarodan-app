@@ -68,12 +68,25 @@ export const REVIEWABLE_STATUSES = ["completed", "delivered"];
 // Money formatting lives in one place — re-exported for local `formatTL` imports.
 export { formatPrice as formatTL } from "@/lib/format";
 
-/** Kart tutarı: totalAmount → amount → ilk kalem fiyatı. */
-export const orderAmount = (order: Order): number =>
-  Number(order.totalAmount) ||
-  Number(order.amount) ||
-  order.items?.[0]?.price ||
-  0;
+/**
+ * Kartta gösterilen ÜRÜN BEDELİ — alıcının ödediği toplam DEĞİL.
+ *
+ * Alıcı toplamı ürün bedeline kargo payı, alıcı hizmet bedeli ve hizmet
+ * KDV'sini ekler. Satış sekmesinde bu tutarı basmak satıcıya alıcının ne
+ * ödediğini gösteriyordu; alış sekmesinde de ürünün fiyatı yerine sepet
+ * kalemi gibi okunuyordu. Kartın işi ürünü tarif etmek, ödemeyi değil.
+ *
+ * TEK kaynak `pricing.subtotal`: `totalAmount`, `amount` ve `items[].price`'ın
+ * ÜÇÜ DE alıcı toplamıdır (`items[].price` API'de `order.totalAmount`'tan
+ * doldurulur), dolayısıyla hiçbiri yedek olarak kullanılamaz. Değer yoksa
+ * `null` döner ve çağıran tutarı hiç göstermez — sızdırmaktansa boş bırakılır.
+ */
+export const productAmountOf = (order: Order): number | null => {
+  const subtotal = order.pricing?.subtotal;
+  if (subtotal == null) return null;
+  const parsed = Number(subtotal);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 /** Karttaki birincil ürün + görsel. */
 export function getOrderPrimary(order: Order): {

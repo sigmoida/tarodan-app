@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { CreditCardIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
-import { Spinner, ConfirmDialog } from "@tarodan/ui";
+import { Button, Spinner, ConfirmDialog } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyStateCard } from "@/components/ui";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import type { SavedCard } from "@/lib/api";
@@ -17,7 +18,8 @@ export default function PaymentMethodsPage() {
   const { ready } = useRequireAuth();
   const [toDelete, setToDelete] = useState<SavedCard | null>(null);
 
-  const { cards, isLoading } = useSavedCards(ready);
+  const { cards, isLoading, isError, isFetching, refetch } =
+    useSavedCards(ready);
   const deleteCard = useDeleteCard();
 
   if (!ready) return <AuthLoadingScreen />;
@@ -38,6 +40,20 @@ export default function PaymentMethodsPage() {
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
+      ) : isError ? (
+        <EmptyStateCard
+          title={t("payment.savedCardsLoadFailed")}
+          description={t("payment.savedCardsLoadFailedDesc")}
+          action={
+            <Button
+              onClick={() => void refetch()}
+              isLoading={isFetching}
+              disabled={isFetching}
+            >
+              {t("common.tryAgain")}
+            </Button>
+          }
+        />
       ) : cards.length === 0 ? (
         <div className="rounded-lg border border-border bg-surface-elevated p-8 text-center">
           <CreditCardIcon className="mx-auto mb-3 h-12 w-12 text-muted" />

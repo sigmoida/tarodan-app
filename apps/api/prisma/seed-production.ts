@@ -1,16 +1,18 @@
 import {
-  CommissionAppliesTo,
-  CommissionRuleType,
-  CommissionSellerType,
+  CommissionRuleSetStatus,
   MembershipTierType,
   PrismaClient,
   SellerType,
-  ShippingPackageTierCode,
   ShippingTariffStatus,
+  SubscriptionStatus,
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/shipping-package-tier";
+import {
+  SEED_COMMISSION_PROFILES,
+  SEED_COMMISSION_RULE_SET_IDS,
+} from "./seed-config";
 
 const prisma = new PrismaClient();
 
@@ -91,37 +93,108 @@ async function seedMembershipTiers(): Promise<void> {
   }
 }
 
+/** Üretim referans setinin sürümü; `version` global olarak tekildir. */
+const PRODUCTION_RULE_SET_VERSION = 1;
+
 async function seedCommissionRule(): Promise<void> {
-  // appliesTo BOTH olmalı: isCatchAllCommissionRule (ve ona dayanan health check +
-  // checkout fail-closed guard'ı) yalnız her iki tarafa uygulanan jokeri catch-all
-  // sayar. SELLER olarak bırakıldığında checkBusinessConfig "catch-all kural yok"
-  // diyerek uyarıyordu.
-  await prisma.commissionRule.upsert({
-    where: { id: "production-default-commission" },
-    create: {
-      id: "production-default-commission",
-      name: "Default marketplace commission",
-      ruleType: CommissionRuleType.default,
-      sellerType: CommissionSellerType.ALL,
-      appliesTo: CommissionAppliesTo.BOTH,
-      sellerRate: 5,
-      sellerCommissionRate: 5,
-      percentage: 0.05,
-      shippingBuyerShare: 100,
-      priority: 0,
-      isActive: true,
-      // Paket boyutu başına kargo bölüşümü: küçük paketi alıcı öder, paket
-      // büyüdükçe satıcı payı artar. Tutarlar tarifede, paylar burada.
-      shippingShares: {
-        create: [
-          { tierCode: ShippingPackageTierCode.small, buyerShare: 100 },
-          { tierCode: ShippingPackageTierCode.medium, buyerShare: 70 },
-          { tierCode: ShippingPackageTierCode.large, buyerShare: 50 },
-        ],
-      },
-    },
-    update: { appliesTo: CommissionAppliesTo.BOTH },
+  const categories = await prisma.category.findMany({
+    where: { isActive: true },
   });
+  if (categories.length === 0) {
+    console.log(
+      "No active categories found; skipping strict commission rule set seed.",
+    );
+    return;
+  }
+  // Bu bootstrap her container açılışında koşar ve amacı "aktif bir kural seti
+  // OLSUN"dur — kendi setini dayatmak değil. Staging reset'i kapsamlı seed'in
+  // kendi setini ACTIVE bırakır; onun üstüne ikinci bir set yazmak hem
+  // `commission_rule_sets_one_active_idx` hem de tekil `version` kısıtını
+  // ihlal eder, seed exit 1 döner ve entrypoint (set -e) API'yi hiç
+  // başlatmazdı. Başka bir set sahayı tutuyorsa dokunmadan çık.
+  const conflicting = await prisma.commissionRuleSet.findFirst({
+    where: {
+      id: { not: SEED_COMMISSION_RULE_SET_IDS.production },
+      OR: [
+        { status: CommissionRuleSetStatus.ACTIVE },
+        { version: PRODUCTION_RULE_SET_VERSION },
+      ],
+    },
+    select: { id: true, name: true, status: true },
+  });
+  if (conflicting) {
+    console.log(
+      `Commission rule set "${conflicting.name}" (${conflicting.status}) already owns the active/version slot; skipping production strict set.`,
+    );
+    return;
+  }
+  const set = await prisma.commissionRuleSet.upsert({
+    where: { id: SEED_COMMISSION_RULE_SET_IDS.production },
+    create: {
+      id: SEED_COMMISSION_RULE_SET_IDS.production,
+      name: "Production strict commission v1",
+      version: PRODUCTION_RULE_SET_VERSION,
+      status: CommissionRuleSetStatus.ACTIVE,
+      publishedAt: new Date(),
+      publishedBy: "production-seed",
+    },
+    update: {},
+  });
+  for (const category of categories) {
+    for (const profile of SEED_COMMISSION_PROFILES) {
+      const id = `production-rule-${category.id}-${profile.key}`;
+      const data = {
+        name: `${category.name} / ${profile.label}`,
+        categoryId: category.id,
+        sellerType: profile.sellerType,
+        minAmount: profile.minAmount,
+        maxAmount: profile.maxAmount,
+        buyerCommissionRate: profile.buyerCommissionRate,
+        buyerCommissionMin: profile.buyerCommissionMin,
+        buyerCommissionMax: profile.buyerCommissionMax,
+        buyerServiceFeeRate: profile.buyerServiceFeeRate,
+        buyerServiceFeeMin: profile.buyerServiceFeeMin,
+        buyerServiceFeeMax: profile.buyerServiceFeeMax,
+        sellerCommissionRate: profile.sellerCommissionRate,
+        sellerCommissionMin: profile.sellerCommissionMin,
+        sellerCommissionMax: profile.sellerCommissionMax,
+        sellerPlatformFeeRate: profile.sellerPlatformFeeRate,
+        sellerPlatformFeeMin: profile.sellerPlatformFeeMin,
+        sellerPlatformFeeMax: profile.sellerPlatformFeeMax,
+        tradeFeeSellerAmount: profile.tradeFeeSellerAmount,
+        tradeFeeBuyerAmount: profile.tradeFeeBuyerAmount,
+        shippingBuyerShare: profile.shippingShares.small,
+      };
+      await prisma.commissionRule.upsert({
+        where: { id },
+        create: {
+          id,
+          ruleSetId: set.id,
+          ...data,
+          shippingShares: {
+            create: Object.entries(profile.shippingShares).map(
+              ([tierCode, buyerShare]) => ({
+                tierCode: tierCode as keyof typeof profile.shippingShares,
+                buyerShare,
+              }),
+            ),
+          },
+        },
+        update: {
+          ...data,
+          shippingShares: {
+            deleteMany: {},
+            create: Object.entries(profile.shippingShares).map(
+              ([tierCode, buyerShare]) => ({
+                tierCode: tierCode as keyof typeof profile.shippingShares,
+                buyerShare,
+              }),
+            ),
+          },
+        },
+      });
+    }
+  }
 }
 
 async function seedTaxReferences(): Promise<void> {
@@ -164,7 +237,7 @@ async function seedTaxReferences(): Promise<void> {
 
 async function seedPlatformSeller(): Promise<void> {
   const passwordHash = await bcrypt.hash(randomUUID(), 12);
-  await prisma.user.upsert({
+  const platformSeller = await prisma.user.upsert({
     where: { email: "platform@tarodan.com" },
     create: {
       email: "platform@tarodan.com",
@@ -174,6 +247,9 @@ async function seedPlatformSeller(): Promise<void> {
       isEmailVerified: true,
       isSeller: true,
       sellerType: SellerType.platform,
+      companyName: "Tarodan Platform Ticaret A.Ş.",
+      businessStatus: "approved",
+      taxId: "9999999999",
       acceptsMarketingEmails: false,
     },
     update: {
@@ -181,23 +257,41 @@ async function seedPlatformSeller(): Promise<void> {
       isEmailVerified: true,
       isSeller: true,
       sellerType: SellerType.platform,
+      companyName: "Tarodan Platform Ticaret A.Ş.",
+      businessStatus: "approved",
+      taxId: "9999999999",
       acceptsMarketingEmails: false,
+    },
+  });
+  const businessTier = await prisma.membershipTier.findUniqueOrThrow({
+    where: { type: MembershipTierType.business },
+  });
+  const periodStart = new Date();
+  const periodEnd = new Date(periodStart);
+  periodEnd.setFullYear(periodEnd.getFullYear() + 20);
+  await prisma.userMembership.upsert({
+    where: { userId: platformSeller.id },
+    create: {
+      userId: platformSeller.id,
+      tierId: businessTier.id,
+      status: SubscriptionStatus.active,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
+    },
+    update: {
+      tierId: businessTier.id,
+      status: SubscriptionStatus.active,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
     },
   });
 }
 
 /**
- * Kargo tarifesi + paket kademeleri READINESS SÖZLEŞMESİDİR: /health/ready aktif
- * bir surat tarifesi ve small/medium/large kademelerinin varlığını arar.
- *
- * Fiyat BURADAN GELMEZ. `20260727200000_shipping_tariffs` migration'ı zaten
- * aktif bir v1 tarifesi, `20260730180000_add_shipping_package_tiers` da üç
- * kademeyi tarifenin paket ücretinden türeterek yaratır — yani taze bir
- * veritabanında bu upsert her zaman `update` dalına düşer. Buraya "daha güzel"
- * varsayılan fiyatlar yazmak onları sessizce ölü koda çevirir (bir dönem öyleydi:
- * 100/130/160 yazıyordu, canlıda hiç uygulanmıyordu). O yüzden create dalı da
- * migration ile AYNI sonucu üretir ve iki yol tek bir gerçeği anlatır:
- * **kademe fiyatları ve örnek ölçüler admin panelinden girilir.**
+ * Production bootstrap container açılışında tekrar çalışır. Bu nedenle yalnız
+ * ilk kurulum için güvenli başlangıç fiyatını yazar; adminin daha sonra girdiği
+ * gerçek tarife fiyatlarını update dalında asla ezmez. Kapsamlı test seed'indeki
+ * 100/130/160 TL senaryosu production bootstrap'tan bilinçli olarak ayrıdır.
  */
 const LAUNCH_TARIFF_PACKAGE_FEE = 29.99;
 
@@ -215,11 +309,8 @@ async function seedShippingTariff(): Promise<void> {
       status: ShippingTariffStatus.active,
       version: 1,
       currency: "TRY",
-      outboundPackageFee: LAUNCH_TARIFF_PACKAGE_FEE,
       freeShippingEnabled: true,
       freeShippingThreshold: 500,
-      returnPackageFee: LAUNCH_TARIFF_PACKAGE_FEE,
-      tradeLegFee: LAUNCH_TARIFF_PACKAGE_FEE,
       effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
       packageTiers: {
         create: SHIPPING_PACKAGE_TIER_DEFAULTS.map((tier) => ({
@@ -232,8 +323,6 @@ async function seedShippingTariff(): Promise<void> {
         })),
       },
     },
-    // Operatörün admin panelinde girdiği fiyatları her container açılışında
-    // ezmemek için update dalı bilinçli olarak boştur (bu seed her boot'ta koşar).
     update: {},
   });
 }

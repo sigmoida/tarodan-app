@@ -3,11 +3,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import {
-  ChevronRightIcon,
-  PlusIcon,
-  ShieldCheckIcon,
-} from "@heroicons/react/24/outline";
+import { ChevronRightIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { Button, Input, Radio, Textarea } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
@@ -43,8 +39,6 @@ export default function AddressStep() {
     setGuestPhone,
     guestPhoneCountryCode,
     setGuestPhoneCountryCode,
-    addressStepValid,
-    handleAddressStepContinue,
     handleAddAddress,
   } = useCheckout();
 
@@ -260,8 +254,7 @@ export default function AddressStep() {
 
       {/* Billing address: same as shipping or different */}
       <div className="mt-6 pt-6 border-t border-border">
-        <h3 className="font-semibold text-heading mb-3 flex items-center gap-2">
-          <ShieldCheckIcon className="w-5 h-5 text-primary-500" />
+        <h3 className="font-semibold text-heading mb-3">
           {t("checkout.billingAddress")}
         </h3>
         <div className="mb-3">
@@ -339,16 +332,6 @@ export default function AddressStep() {
             />
           </div>
         )}
-      </div>
-
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          onClick={() => void handleAddressStepContinue()}
-          disabled={!addressStepValid}
-        >
-          Devam Et
-        </Button>
       </div>
     </SectionCard>
   );

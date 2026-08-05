@@ -22,7 +22,11 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
-import { useMyListings, useDeleteListing } from "./_hooks/useMyListings";
+import {
+  useMyListings,
+  useDeleteListing,
+  useDeactivateListing,
+} from "./_hooks/useMyListings";
 import { useCommissionPreviews } from "../_hooks/useCommissionPreviews";
 import { FILTER_TABS } from "./_lib/status";
 import type { Listing } from "./_lib/types";
@@ -51,6 +55,7 @@ export default function ProfileListingsPage() {
     })),
   );
   const deleteMutation = useDeleteListing();
+  const deactivateMutation = useDeactivateListing();
 
   const pendingCount = listings.filter((l) => l.status === "pending").length;
 
@@ -154,7 +159,12 @@ export default function ProfileListingsPage() {
                 deleteMutation.isPending &&
                 deleteMutation.variables === listing.id
               }
+              isDeactivating={
+                deactivateMutation.isPending &&
+                deactivateMutation.variables === listing.id
+              }
               onDelete={handleDelete}
+              onDeactivate={(id) => deactivateMutation.mutate(id)}
               onBoost={setBoostTarget}
             />
           ))}

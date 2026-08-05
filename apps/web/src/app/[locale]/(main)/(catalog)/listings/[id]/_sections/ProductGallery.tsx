@@ -6,12 +6,47 @@ import {
   ArrowsRightLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { PLACEHOLDER } from "../_lib/images";
 import { useListingDetail } from "../_context/ListingDetailContext";
+
+/**
+ * Görsel ileri/geri düğmesi — görselin üzerinde duran beyaz daire.
+ *
+ * Düğmenin KENDİSİ hover'da değişmez (eskiden tamamı turuncuya dönüp görselin
+ * önünde dikkat çeken bir blok oluyordu); yalnız chevron renklenir. Bu yüzden
+ * `Button`'ın secondary hover arka planı `hover:bg-surface-elevated` ile
+ * bilerek nötrleniyor.
+ */
+function GalleryNavButton({
+  side,
+  label,
+  onClick,
+  onMouseEnter,
+}: {
+  side: "left" | "right";
+  label: string;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onMouseEnter: () => void;
+}) {
+  const Icon = side === "left" ? ChevronLeftIcon : ChevronRightIcon;
+  return (
+    <Button
+      variant="secondary"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      className={`group absolute top-1/2 z-10 h-12 w-12 -translate-y-1/2 rounded-full border-0 bg-surface-elevated p-0 shadow-lg hover:bg-surface-elevated ${
+        side === "left" ? "left-4" : "right-4"
+      }`}
+    >
+      <Icon className="h-6 w-6 text-body transition-colors group-hover:text-primary-600" />
+    </Button>
+  );
+}
 
 export default function ProductGallery() {
   const {
@@ -87,8 +122,10 @@ export default function ProductGallery() {
 
         {images.length > 1 && (
           <>
-            <Button
-              variant="secondary"
+            <GalleryNavButton
+              side="left"
+              label={t("common.previous")}
+              onMouseEnter={() => setShowMagnifier(false)}
               onClick={(e) => {
                 e.stopPropagation();
                 setActiveImageIndex(
@@ -97,13 +134,11 @@ export default function ProductGallery() {
                     : images.length - 1,
                 );
               }}
+            />
+            <GalleryNavButton
+              side="right"
+              label={t("common.next")}
               onMouseEnter={() => setShowMagnifier(false)}
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-surface-elevated/90 rounded-full flex items-center justify-center hover:bg-primary-500 hover:text-inverted transition-colors z-10 group"
-            >
-              <ChevronLeftIcon className="w-6 h-6 text-body group-hover:text-inverted transition-colors" />
-            </Button>
-            <Button
-              variant="secondary"
               onClick={(e) => {
                 e.stopPropagation();
                 setActiveImageIndex(
@@ -112,11 +147,7 @@ export default function ProductGallery() {
                     : 0,
                 );
               }}
-              onMouseEnter={() => setShowMagnifier(false)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-surface-elevated/90 rounded-full flex items-center justify-center hover:bg-primary-500 hover:text-inverted transition-colors z-10 group"
-            >
-              <ChevronRightIcon className="w-6 h-6 text-body group-hover:text-inverted transition-colors" />
-            </Button>
+            />
           </>
         )}
       </div>
@@ -156,7 +187,6 @@ export default function ProductGallery() {
           title={t("product.view360")}
           disabled={images.length <= 1}
         >
-          <ArrowPathIcon className="w-6 h-6 mb-1" />
           <span className="text-xs font-semibold">360°</span>
         </Button>
 

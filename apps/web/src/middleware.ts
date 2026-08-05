@@ -7,6 +7,14 @@ import { routing } from "@/i18n/routing";
 import { SITE_UNLOCK_COOKIE } from "@/lib/siteLock";
 import { internalComingSoonPath, isSiteLocked } from "@/lib/siteLockPolicy.mjs";
 import { verifyUnlockCookie } from "@/lib/siteUnlockCookie.mjs";
+import {
+  buildContentSecurityPolicy,
+  cspHeaderName,
+  isPaymentPath,
+  safeOrigin,
+  sentryIngestOrigin,
+  sentryReportUri,
+} from "@/lib/cspPolicy.mjs";
 
 /**
  * Web middleware = i18n routing (#214) composed with the edge auth gate.
@@ -67,7 +75,11 @@ function splitLocale(pathname: string): { locale: string; rest: string } {
  * standalone authed pages; and the guest-only auth pages.
  */
 function isAuthRelevant(path: string): boolean {
-  if (/^\/(profile|seller|products|support)(\/|$)/.test(path)) return true;
+  if (/^\/(profile|seller|products)(\/|$)/.test(path)) return true;
+  // `/support` yardım içeriğini de barındırdığı için (eski /help ile birleşti)
+  // kök sayfa herkese açıktır; giriş gerektiren kısmı sayfa içinde kendi
+  // kartıyla anlatır. Talep DETAYI (`/support/<id>`) korumalı kalır.
+  if (/^\/support\/.+/.test(path)) return true;
   if (
     /^\/(login|register|forgot-password|reset-password|verify-email)(\/|$)/.test(
       path,
@@ -99,10 +111,51 @@ function reprefixRedirect(
   return dest.toString();
 }
 
+/**
+ * İstek başına nonce + CSP. Nonce'u İSTEK başlıklarına da yazarız: Next, RSC
+ * render'ında `content-security-policy` (veya report-only) başlığını okuyup
+ * kendi satır içi hidrasyon script'lerine bu nonce'u basar
+ * (`get-script-nonce-from-header`). Başlığı yalnız yanıta koymak, Next'in
+ * script'lerinin nonce'suz kalması ve zorlayıcı modda bloklanması demekti.
+ *
+ * İstek başlıklarını KOPYALAMAK yerine yerinde set ediyoruz: next-intl kendi
+ * rewrite'ında `request.headers`'ı aynen aşağı taşır (locale başlığını da böyle
+ * geçirir), bu yüzden mutasyon downstream'e ulaşır. Request'i klonlamak POST
+ * gövdeli isteklerde (server action) gövde akışını riske atardı.
+ */
+function applyCsp(request: NextRequest, isPayment: boolean): string {
+  const nonce = btoa(crypto.randomUUID());
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  const policy = buildContentSecurityPolicy({
+    nonce,
+    isPayment,
+    isProduction: process.env.NODE_ENV === "production",
+    apiOrigin: safeOrigin(process.env.NEXT_PUBLIC_API_URL),
+    wsOrigin: safeOrigin(process.env.NEXT_PUBLIC_WS_URL),
+    sentryOrigin: sentryIngestOrigin(dsn),
+    reportUri: sentryReportUri(dsn),
+  });
+  request.headers.set("x-nonce", nonce);
+  request.headers.set(cspHeaderName(isPayment), policy);
+  return policy;
+}
+
 export async function middleware(request: NextRequest) {
   const original = request.nextUrl.pathname;
   const { locale, rest } = splitLocale(original);
   const prefix = locale === defaultLocale ? "" : `/${locale}`;
+
+  // Kart alanları BİZİM sayfamızda toplanıp doğrudan PayTR'ye POST edildiği için
+  // ödeme rotası PCI DSS 6.4.3/11.6.1 kapsamındadır: orada politika ZORLAYICI,
+  // sitenin geri kalanında salt-rapor (ihlal envanteri gerçek trafikle toplanır).
+  const isPayment = isPaymentPath(rest);
+  const csp = applyCsp(request, isPayment);
+  const cspHeader = cspHeaderName(isPayment);
+  /** Politika middleware'in HER çıkışında yanıta binmeli — tek yerden. */
+  const withCsp = <T extends NextResponse>(response: T): T => {
+    response.headers.set(cspHeader, csp);
+    return response;
+  };
 
   // Pre-launch storefront gate (#398). Runs BEFORE the i18n/auth flow so we
   // can short-circuit every page for locked deployments. The API/proxy/static
@@ -132,7 +185,7 @@ export async function middleware(request: NextRequest) {
         request: { headers: requestHeaders },
       });
       response.headers.set("X-Robots-Tag", "noindex");
-      return response;
+      return withCsp(response);
     }
   }
 
@@ -151,7 +204,7 @@ export async function middleware(request: NextRequest) {
           reprefixRedirect(location, request, prefix),
         );
       }
-      return authResponse;
+      return withCsp(authResponse);
     }
   }
 
@@ -161,7 +214,7 @@ export async function middleware(request: NextRequest) {
       response.cookies.set(cookie);
     }
   }
-  return response;
+  return withCsp(response);
 }
 
 export const config = {

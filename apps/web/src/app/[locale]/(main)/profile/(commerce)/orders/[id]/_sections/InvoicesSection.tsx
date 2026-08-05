@@ -94,6 +94,18 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
         </SectionCard>
       )}
 
+      {/* Ürün faturası beklentisi: alıcı ne bekleyeceğini bilmeli. Bireysel
+          satıcıda ürün faturası HİÇ gelmez; kurumsalda gelir ama gecikebilir. */}
+      {sellerInvoice?.isBuyer && !sellerInvoice.invoice && (
+        <SectionCard title={t("order.sellerInvoice")}>
+          <p className="text-sm text-muted">
+            {sellerInvoice.sellerIssuesInvoice
+              ? t("payment.sellerInvoicePending")
+              : t("payment.individualSellerNoInvoice")}
+          </p>
+        </SectionCard>
+      )}
+
       {/* Kurumsal satıcı faturası (elle yüklenen PDF) */}
       {sellerInvoice &&
         (sellerInvoice.canUpload ||

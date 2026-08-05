@@ -12,11 +12,16 @@ import { DiscountService } from "../discount/discount.service";
 import { ProductQueryDto } from "./dto";
 import { ProductStatus, Prisma } from "@prisma/client";
 import { buildProductWhere } from "./helpers/build-product-where";
+import { catalogProductWhere } from "./helpers/catalog-product-where";
 import { fulltextProductSearch } from "./helpers/fulltext-search";
 import { ACTIVE_TRADE_STATUSES } from "../trade/trade.constants";
-import { tradeCapableSellerWhere } from "../membership/membership.util";
+import {
+  saleCapableSellerWhere,
+  tradeCapableSellerWhere,
+} from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductCommonService } from "./product-common.service";
+import { buildProductEditProjection } from "./product-edit-projection";
 
 /**
  * ProductQueryService — ürün okuma/listeleme (findAll ES/PG akışı, popüler, tekil
@@ -150,9 +155,10 @@ export class ProductQueryService {
    */
   async findPopular(limit: number, page: number) {
     const where: Prisma.ProductWhereInput = {
+      ...catalogProductWhere(),
       status: ProductStatus.active,
-      NOT: { id: { startsWith: "membership-" } },
       AND: [{ OR: this.inStockOrConditions() }],
+      seller: saleCapableSellerWhere(),
     };
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
@@ -259,7 +265,25 @@ export class ProductQueryService {
     if (!hasSearch && page === 1 && esResult.total < limit) return null;
 
     const products = await this.prisma.product.findMany({
-      where: { id: { in: esResult.ids } },
+      // Elasticsearch gecikmeli veya eski olabilir. ID'leri canlı veritabanında
+      // kanonik katalog görünürlüğüyle yeniden doğrula; pending/rejected ürünler
+      // ve satış yetkisini kaybetmiş satıcılar stale indeks yüzünden sızmasın.
+      where: {
+        AND: [
+          buildProductWhere({
+            ...query,
+            material: query.material,
+            ...(query.tradeOnly
+              ? {
+                  tradeCapableSeller: tradeCapableSellerWhere(
+                    await getFreeTierCanTrade(this.prisma),
+                  ),
+                }
+              : {}),
+          }),
+          { id: { in: esResult.ids } },
+        ],
+      },
       include: {
         images: { orderBy: { sortOrder: "asc" }, take: 1 },
         seller: {
@@ -281,8 +305,10 @@ export class ProductQueryService {
       },
     });
 
-    // ES index can be stale (e.g. after DB seed): ids exist in ES but not in DB → fallback to Postgres
-    if (products.length === 0) return null;
+    // Tek bir stale ID bile pagination/total değerlerini bozabilir. Canlı DB
+    // görünürlüğüyle eşleşmeyen bir sonuç varsa bu isteği PostgreSQL yolunda
+    // yeniden hesapla; indeks senkronu tamamlanana kadar doğru total korunur.
+    if (products.length !== esResult.ids.length) return null;
 
     // Preserve ES ordering
     const idOrder = new Map(esResult.ids.map((id, i) => [id, i]));
@@ -556,6 +582,25 @@ export class ProductQueryService {
   async findOne(id: string) {
     const cacheKey = `products:detail:${id}`;
 
+    // Seller entitlement is evaluated outside the cached projection. Otherwise
+    // a detail cached just before BUSINESS expiry remains purchasable-looking
+    // for the full cache TTL.
+    const publiclyViewable = await this.prisma.product.count({
+      where: {
+        ...catalogProductWhere(),
+        id,
+        seller: saleCapableSellerWhere(),
+        OR: [
+          { status: ProductStatus.active },
+          { status: ProductStatus.sold },
+          { status: ProductStatus.inactive, quantity: 0 },
+        ],
+      },
+    });
+    if (publiclyViewable !== 1) {
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
+    }
+
     // Use cache with 10 minute TTL for product details
     return this.cache.getOrSet(
       cacheKey,
@@ -639,8 +684,8 @@ export class ProductQueryService {
    * GET /products/my/:id
    */
   async findMyProductById(id: string, userId: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
+    const product = await this.prisma.product.findFirst({
+      where: { id, ...catalogProductWhere() },
       include: {
         images: { orderBy: { sortOrder: "asc" } },
         seller: {
@@ -699,7 +744,18 @@ export class ProductQueryService {
       throw new ForbiddenException(i18nMessage("server.product.viewForbidden"));
     }
 
-    return await this.common.formatProductResponse(product);
+    const formatted = await this.common.formatProductResponse(product);
+    // Üst seviye GÖSTERİM projeksiyonudur (ilan detayında sahibin görünümü onu
+    // kullanır); `edit` ise kaydın ham hâlidir ve düzenleme formunu tek başına
+    // doldurur. İkisi ayrı olmazsa form, kampanya uygulanmış fiyatı ürünün
+    // fiyatı sanıyor ve kargo boyutu gibi hiç dönmeyen alanları varsayılana
+    // düşürüyordu. Bkz. `product-edit-projection.ts`.
+    return {
+      ...formatted,
+      edit: buildProductEditProjection(product, {
+        imageUrl: (key: string) => this.common.publicAssetUrl(key),
+      }),
+    };
   }
 
   /**
@@ -707,17 +763,19 @@ export class ProductQueryService {
    * döner. Stockout cancel sayfası "alternatif ürünler" carousel'inde kullanır.
    */
   async findSimilarProducts(productId: string, limit = 12) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, ...catalogProductWhere() },
       select: { categoryId: true },
     });
     if (!product?.categoryId) return [];
 
     const products = await this.prisma.product.findMany({
       where: {
+        ...catalogProductWhere(),
         categoryId: product.categoryId,
         id: { not: productId },
         status: ProductStatus.active,
+        seller: saleCapableSellerWhere(),
         // Bulgu A: rezerv-duyarlı stok filtresi (kanonik inStockCondition ile aynı).
         // quantity = null → sınırsız stok (dijital/preorder) dahil; tamamen rezerve
         // ürün (available=0) "alternatif ürünler"de gösterilmez.
@@ -753,8 +811,11 @@ export class ProductQueryService {
    * Get seller's own single product (any status)
    */
   async findSellerProductById(sellerId: string, productId: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: {
+        id: productId,
+        ...catalogProductWhere(),
+      },
       include: {
         images: { orderBy: { sortOrder: "asc" } },
         seller: {
@@ -795,6 +856,7 @@ export class ProductQueryService {
     const { status, tradeEligible, page = 1, limit = 20 } = query;
 
     const where: Prisma.ProductWhereInput = {
+      ...catalogProductWhere(),
       sellerId,
       ...(status && status.trim() !== ""
         ? { status: status as ProductStatus }
@@ -845,11 +907,6 @@ export class ProductQueryService {
             slug: true,
           },
         },
-        _count: {
-          select: {
-            offers: { where: { status: "pending" } },
-          },
-        },
       },
     });
 
@@ -866,11 +923,8 @@ export class ProductQueryService {
       TERMINAL_STATUSES.includes(p.status);
     products.sort((a, b) => Number(isTerminal(a)) - Number(isTerminal(b)));
 
-    const formattedBase = await this.common.formatProductResponseMany(products);
-    const formattedProducts = formattedBase.map((f, i) => ({
-      ...f,
-      pendingOffersCount: products[i]._count.offers,
-    }));
+    const formattedProducts =
+      await this.common.formatProductResponseMany(products);
 
     return {
       data: formattedProducts,

@@ -4,8 +4,10 @@
 
 import Image from "next/image";
 import { TagIcon } from "@heroicons/react/24/outline";
+import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import OrderSummaryLines from "@/components/order/OrderSummaryLines";
+import DistanceSalesConsent from "@/components/payment/DistanceSalesConsent";
 import { useCheckout } from "../_context/CheckoutContext";
 import CouponBox from "../../cart/_components/CouponBox";
 
@@ -69,7 +71,46 @@ export default function OrderSummarySidebar() {
       <hr className="my-4" />
 
       <SummaryLines />
+
+      <PayAction />
     </SectionCard>
+  );
+}
+
+/**
+ * Onay + ödeme — tutarın hemen altında. Mesafeli satış sözleşmesi onaylanmadan
+ * düğme çalışmaz; onay siparişle birlikte sunucuya yazılır (zaman + sürüm
+ * damgasını sunucu basar).
+ */
+function PayAction() {
+  const {
+    t,
+    isLoading,
+    card,
+    distanceSalesAccepted,
+    setDistanceSalesAccepted,
+    handlePay,
+  } = useCheckout();
+
+  const busy = isLoading || card.processing;
+
+  return (
+    <div className="mt-5 space-y-3 border-t border-border-subtle pt-5">
+      <DistanceSalesConsent
+        checked={distanceSalesAccepted}
+        onChange={setDistanceSalesAccepted}
+      />
+
+      <Button
+        onClick={() => void handlePay()}
+        disabled={busy || !distanceSalesAccepted}
+        isLoading={busy}
+        size="lg"
+        className="w-full"
+      >
+        {t("checkout.payNow")}
+      </Button>
+    </div>
   );
 }
 

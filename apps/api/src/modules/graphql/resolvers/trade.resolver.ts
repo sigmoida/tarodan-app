@@ -2,17 +2,20 @@
 // GAP-L02: GRAPHQL TRADE RESOLVER
 // =============================================================================
 
-import { Resolver, Query, Args, Int, ID } from '@nestjs/graphql';
-import { TradeType, PaginatedTradesType } from '../types/trade.type';
-import { PrismaService } from '../../../prisma';
-import { TradeStatus } from '@prisma/client';
+import { Resolver, Query, Args, Int, ID } from "@nestjs/graphql";
+import { TradeType, PaginatedTradesType } from "../types/trade.type";
+import { PrismaService } from "../../../prisma";
+import { TradeStatus } from "@prisma/client";
+import { primaryCashPayment } from "../../trade/trade.constants";
 
 @Resolver(() => TradeType)
 export class TradeResolver {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Query(() => TradeType, { name: 'trade', nullable: true })
-  async getTrade(@Args('id', { type: () => ID }) id: string): Promise<TradeType | null> {
+  @Query(() => TradeType, { name: "trade", nullable: true })
+  async getTrade(
+    @Args("id", { type: () => ID }) id: string,
+  ): Promise<TradeType | null> {
     const trade = await this.prisma.trade.findUnique({
       where: { id },
       include: {
@@ -24,13 +27,13 @@ export class TradeResolver {
               include: {
                 seller: true,
                 category: true,
-                images: { orderBy: { sortOrder: 'asc' } },
+                images: { orderBy: { sortOrder: "asc" } },
               },
             },
           },
         },
         shipments: true,
-        cashPayment: true,
+        cashPayments: true,
         dispute: true,
       },
     });
@@ -40,12 +43,13 @@ export class TradeResolver {
     return this.mapTrade(trade);
   }
 
-  @Query(() => PaginatedTradesType, { name: 'trades' })
+  @Query(() => PaginatedTradesType, { name: "trades" })
   async getTrades(
-    @Args('userId', { type: () => ID }) userId: string,
-    @Args('status', { type: () => TradeStatus, nullable: true }) status?: TradeStatus,
-    @Args('page', { type: () => Int, defaultValue: 1 }) page: number = 1,
-    @Args('limit', { type: () => Int, defaultValue: 20 }) limit: number = 20,
+    @Args("userId", { type: () => ID }) userId: string,
+    @Args("status", { type: () => TradeStatus, nullable: true })
+    status?: TradeStatus,
+    @Args("page", { type: () => Int, defaultValue: 1 }) page: number = 1,
+    @Args("limit", { type: () => Int, defaultValue: 20 }) limit: number = 20,
   ): Promise<PaginatedTradesType> {
     const skip = (page - 1) * limit;
 
@@ -59,7 +63,7 @@ export class TradeResolver {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           initiator: true,
           receiver: true,
@@ -69,13 +73,13 @@ export class TradeResolver {
                 include: {
                   seller: true,
                   category: true,
-                  images: { orderBy: { sortOrder: 'asc' } },
+                  images: { orderBy: { sortOrder: "asc" } },
                 },
               },
             },
           },
           shipments: true,
-          cashPayment: true,
+          cashPayments: true,
           dispute: true,
         },
       }),
@@ -93,10 +97,11 @@ export class TradeResolver {
     };
   }
 
-  @Query(() => Int, { name: 'tradeCount' })
+  @Query(() => Int, { name: "tradeCount" })
   async getTradeCount(
-    @Args('userId', { type: () => ID }) userId: string,
-    @Args('status', { type: () => TradeStatus, nullable: true }) status?: TradeStatus,
+    @Args("userId", { type: () => ID }) userId: string,
+    @Args("status", { type: () => TradeStatus, nullable: true })
+    status?: TradeStatus,
   ): Promise<number> {
     const where: any = {
       OR: [{ initiatorId: userId }, { receiverId: userId }],
@@ -158,6 +163,8 @@ export class TradeResolver {
       product: mapProduct(item.product),
     });
 
+    const cashPayment = primaryCashPayment(trade.cashPayments) as any;
+
     return {
       id: trade.id,
       tradeNumber: trade.tradeNumber,
@@ -176,8 +183,12 @@ export class TradeResolver {
       createdAt: trade.createdAt,
       initiator: mapUser(trade.initiator),
       receiver: mapUser(trade.receiver),
-      initiatorItems: (trade.items || []).filter((i: { side: string }) => i.side === 'initiator').map(mapTradeItem),
-      receiverItems: (trade.items || []).filter((i: { side: string }) => i.side === 'receiver').map(mapTradeItem),
+      initiatorItems: (trade.items || [])
+        .filter((i: { side: string }) => i.side === "initiator")
+        .map(mapTradeItem),
+      receiverItems: (trade.items || [])
+        .filter((i: { side: string }) => i.side === "receiver")
+        .map(mapTradeItem),
       shipments: trade.shipments.map((s: any) => ({
         id: s.id,
         shipperId: s.shipperId,
@@ -188,25 +199,30 @@ export class TradeResolver {
         deliveredAt: s.deliveredAt,
         confirmedAt: s.confirmedAt,
       })),
-      cashPayment: trade.cashPayment ? {
-        id: trade.cashPayment.id,
-        payerId: trade.cashPayment.payerId,
-        recipientId: trade.cashPayment.recipientId,
-        amount: trade.cashPayment.amount.toNumber(),
-        commission: trade.cashPayment.commission.toNumber(),
-        totalAmount: trade.cashPayment.totalAmount.toNumber(),
-        status: trade.cashPayment.status,
-        paidAt: trade.cashPayment.paidAt,
-      } : undefined,
-      dispute: trade.dispute ? {
-        id: trade.dispute.id,
-        raisedById: trade.dispute.raisedById,
-        reason: trade.dispute.reason,
-        description: trade.dispute.description,
-        resolution: trade.dispute.resolution,
-        resolvedAt: trade.dispute.resolvedAt,
-        createdAt: trade.dispute.createdAt,
-      } : undefined,
+      // v1 tekil alan korunur (GraphQL şeması değişmez): fark taşıyan satır.
+      cashPayment: cashPayment
+        ? {
+            id: cashPayment.id,
+            payerId: cashPayment.payerId,
+            recipientId: cashPayment.recipientId,
+            amount: cashPayment.amount.toNumber(),
+            commission: cashPayment.commission.toNumber(),
+            totalAmount: cashPayment.totalAmount.toNumber(),
+            status: cashPayment.status,
+            paidAt: cashPayment.paidAt,
+          }
+        : undefined,
+      dispute: trade.dispute
+        ? {
+            id: trade.dispute.id,
+            raisedById: trade.dispute.raisedById,
+            reason: trade.dispute.reason,
+            description: trade.dispute.description,
+            resolution: trade.dispute.resolution,
+            resolvedAt: trade.dispute.resolvedAt,
+            createdAt: trade.dispute.createdAt,
+          }
+        : undefined,
     };
   }
 }

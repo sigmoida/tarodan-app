@@ -1,132 +1,102 @@
-"use client";
+/** @format */
 
-import { Link } from "@/i18n/navigation";
-import { ChevronRightIcon } from "@heroicons/react/24/outline";
-import { useLocale, useTranslations } from "next-intl";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
+import {
+  FEE_TABLE,
+  INDIVIDUAL_INTRO,
+  INDIVIDUAL_AGREEMENT,
+  CORPORATE_INTRO,
+  CORPORATE_AGREEMENT,
+  type AgreementSection,
+} from "../_lib/agreement";
+
+function FeeTable() {
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-muted">
+            <th className="pb-2 pr-4 font-medium">Tutar</th>
+            <th className="pb-2 pr-4 font-medium">Komisyon</th>
+            <th className="pb-2 pr-4 font-medium">
+              Satıcı Platform Hizmet Bedeli
+            </th>
+            <th className="pb-2 font-medium">Kargo</th>
+          </tr>
+        </thead>
+        <tbody className="text-body">
+          {FEE_TABLE.map((row) => (
+            <tr key={row.range} className="border-t border-border-subtle">
+              <td className="py-2 pr-4 font-medium">{row.range}</td>
+              <td className="py-2 pr-4 tabular-nums">{row.commission}</td>
+              <td className="py-2 pr-4 tabular-nums">{row.serviceFee}</td>
+              <td className="py-2 tabular-nums">{row.shipping}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Section({ section }: { section: AgreementSection }) {
+  return (
+    <section>
+      <h3 className="mb-2 font-semibold text-heading">{section.title}</h3>
+      {section.intro && (
+        <p className="text-sm leading-relaxed text-body">{section.intro}</p>
+      )}
+      {section.clauses && (
+        <ul className="mt-3 space-y-2">
+          {section.clauses.map((clause) => (
+            <li
+              key={`${clause.label ?? ""}${clause.text}`}
+              className="border-l-2 border-border pl-3 text-sm leading-relaxed text-body"
+            >
+              {clause.label && (
+                <strong className="font-medium text-heading">
+                  {clause.label}
+                  {": "}
+                </strong>
+              )}
+              {clause.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {section.showFeeTable && <FeeTable />}
+    </section>
+  );
+}
 
 export default function SellerAgreementClient() {
-  const t = useTranslations();
-
   return (
     <DocPage
-      title={t("legal.sellerAgreementTitle")}
-      description={`${t("legal.lastUpdated")}: 24 Ocak 2026`}
+      title="Satıcı Sözleşmeleri"
+      description="Tarodan platformunda satış yapan bireysel ve kurumsal satıcılar için geçerli üyelik ve satış sözleşmeleri."
     >
-      <SectionCard>
-        <div className="prose prose-gray max-w-none">
-          <h2>1. Giriş ve Kapsam</h2>
-          <p>
-            Bu Satıcı Sözleşmesi ("Sözleşme"), TARODAN platformunda satıcı
-            olarak ürün satmak isteyen gerçek veya tüzel kişiler ile TARODAN
-            Teknoloji A.Ş. ("Platform") arasındaki ilişkiyi düzenler. Platformda
-            satış yapmaya başlamadan önce bu sözleşmeyi ve Kullanım Şartlarını
-            kabul etmeniz gerekir.
-          </p>
-
-          <h2>2. Satıcı Olma Koşulları</h2>
-          <ul>
-            <li>18 yaşını doldurmuş olmak veya yasal temsilci onayı</li>
-            <li>Gerçek ve güncel kimlik ve iletişim bilgileri vermek</li>
-            <li>
-              Türkiye Cumhuriyeti mevzuatına uygun ticari faaliyet (gerekirse
-              vergi kimlik bilgisi)
-            </li>
-            <li>Platformun satıcı kayıt ve doğrulama sürecini tamamlamak</li>
-          </ul>
-
-          <h2>3. Komisyon ve Ödemeler</h2>
-          <p>
-            Satışlardan platform komisyonu kesilir. Güncel komisyon oranları ve
-            ödeme periyotları satıcı panelinde ve üyelik/pricing sayfalarında
-            ilan edilir. Komisyon oranları önceden bildirilmek kaydıyla
-            güncellenebilir. Satıcı ödemeleri, onaylanan siparişler ve iade
-            süreleri dikkate alınarak belirlenen takvimde hesabınıza aktarılır.
-          </p>
-
-          <h2>4. Satıcı Yükümlülükleri</h2>
-          <ul>
-            <li>
-              Ürün bilgilerini doğru, eksiksiz ve yanıltıcı olmayacak şekilde
-              girmek
-            </li>
-            <li>
-              Gerçek ve net fotoğraflar kullanmak; stok durumunu güncel tutmak
-            </li>
-            <li>Ödenen siparişleri belirtilen süre içinde kargoya vermek</li>
-            <li>
-              Mesafeli satış ve tüketici mevzuatına uymak (cayma hakkı, iade
-              koşulları)
-            </li>
-            <li>Alıcı ile iletişimde kibar ve profesyonel olmak</li>
-            <li>Platform kurallarına ve yasak ürün listesine uymak</li>
-          </ul>
-
-          <h2>5. Yasak Ürünler ve İçerik</h2>
-          <p>Aşağıdaki ürünlerin satışı veya tanıtımı yasaktır:</p>
-          <ul>
-            <li>Sahte veya taklit ürünler</li>
-            <li>Telif hakkı veya marka ihlali oluşturan materyaller</li>
-            <li>Yasalara aykırı veya tehlikeli maddeler</li>
-            <li>
-              Platformun "diecast / model araba" kapsamı dışındaki, izinsiz
-              kategoriler
-            </li>
-            <li>Yanıltıcı, spam veya uygunsuz liste açıklamaları</li>
-          </ul>
-          <p>
-            İhlal tespitinde ilan kaldırılır; tekrarlayan ihlallerde hesap
-            askıya alınabilir veya sözleşme feshedilir.
-          </p>
-
-          <h2>6. Hesap Askıya Alma ve Fesih</h2>
-          <p>
-            Platform, aşağıdaki durumlarda satıcı hesabını askıya alabilir veya
-            sözleşmeyi feshedebilir: sözleşme ihlali, şikayetlerin
-            tekrarlanması, dolandırıcılık şüphesi, yasal zorunluluk veya
-            platform güvenliği. Askıya alma öncesi (mümkünse) bildirim yapılır;
-            acil durumlarda önce askıya alınıp sonra bilgilendirme yapılabilir.
-          </p>
-
-          <h2>7. Fikri Mülkiyet ve Lisans</h2>
-          <p>
-            Satıcı, yüklediği metin ve görsellerin kullanım hakkına sahip
-            olduğunu beyan eder. Platforma yüklenen içerikler için, pazarlama ve
-            platform işleyişi amacıyla sınırlı bir lisans verilmiş kabul edilir.
-            Detaylar için{" "}
-            <Link
-              href="/intellectual-property"
-              className="inline-flex items-center text-primary-500 hover:underline"
-            >
-              Fikri Mülkiyet
-            </Link>{" "}
-            sayfamıza bakınız.
-          </p>
-
-          <h2>8. İletişim</h2>
-          <p>
-            Satıcı sözleşmesi ve satıcı hesabı ile ilgili: satıcı@tarodan.com
-          </p>
+      <SectionCard title="Bireysel Satıcı Üyelik ve Satış Sözleşmesi">
+        <p className="mb-6 text-sm leading-relaxed text-muted">
+          {INDIVIDUAL_INTRO}
+        </p>
+        <div className="space-y-7">
+          {INDIVIDUAL_AGREEMENT.map((section) => (
+            <Section key={section.title} section={section} />
+          ))}
         </div>
       </SectionCard>
 
-      <div className="flex flex-wrap gap-4">
-        <Link
-          href="/terms"
-          className="inline-flex items-center text-primary-500 hover:underline"
-        >
-          Kullanım Şartları
-          <ChevronRightIcon className="ml-1 h-4 w-4" />
-        </Link>
-        <Link
-          href="/sell"
-          className="inline-flex items-center text-primary-500 hover:underline"
-        >
-          Satışa Başla
-          <ChevronRightIcon className="ml-1 h-4 w-4" />
-        </Link>
-      </div>
+      <SectionCard title="Kurumsal Satıcı Üyelik ve Satış Sözleşmesi">
+        <p className="mb-6 text-sm leading-relaxed text-muted">
+          {CORPORATE_INTRO}
+        </p>
+        <div className="space-y-7">
+          {CORPORATE_AGREEMENT.map((section) => (
+            <Section key={section.title} section={section} />
+          ))}
+        </div>
+      </SectionCard>
     </DocPage>
   );
 }

@@ -2,11 +2,14 @@
 
 "use client";
 
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
-import { Radio } from "@tarodan/ui";
+import { CheckIcon } from "@heroicons/react/24/solid";
+import { Radio, cn } from "@tarodan/ui";
 import { FormInput } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/ui";
+import { formatTL } from "@/lib/format";
 import {
   usePackageTiers,
   sampleDimensionsLabel,
@@ -22,21 +25,22 @@ interface PricingCardProps {
     sellerNetAmount: number;
   } | null;
   commissionPreviewLoading: boolean;
+  commissionPreviewError?: unknown;
   /** Stock-quantity placeholder + helper differ between new ("1") and edit ("unlimited"). */
   quantityPlaceholder: string;
   quantityHelper: string;
 }
 
-const fmt = (n: number) =>
-  `₺${n.toLocaleString("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+// Para biçimi TEK yerden gelir (`lib/format`): ekranlar kendi
+// `toLocaleString` çağrılarını yazdığında aynı ürün bir kartta "468 ₺",
+// detayda "468,19 TL" görünüyor ve kart biçimi kuruşu YUVARLIYORDU.
+const fmt = formatTL;
 
 /** "Fiyatlandırma" — price + stock quantity + commission preview. Shared. */
 export default function PricingCard({
   commissionPreview,
   commissionPreviewLoading,
+  commissionPreviewError,
   quantityPlaceholder,
   quantityHelper,
 }: PricingCardProps) {
@@ -65,13 +69,19 @@ export default function PricingCard({
 
       <PackageSizePicker />
 
-      {(commissionPreviewLoading || commissionPreview) && (
+      {(commissionPreviewLoading ||
+        commissionPreview ||
+        Boolean(commissionPreviewError)) && (
         <div className="mt-4 p-4 bg-surface rounded-xl border border-border-subtle text-sm">
           <p className="text-muted font-medium mb-3">
             {t("product.estimatedPerSale")}
           </p>
           {commissionPreviewLoading ? (
             <span className="text-subtle">{t("product.calculating")}</span>
+          ) : commissionPreviewError ? (
+            <span className="text-danger-700">
+              {t("product.commissionRuleUnavailable")}
+            </span>
           ) : commissionPreview ? (
             <PricingBreakdown preview={commissionPreview} />
           ) : null}
@@ -82,9 +92,24 @@ export default function PricingCard({
 }
 
 /**
+ * Kademe görselleri. Kademe kodları sabit (small/medium/large) olduğu için
+ * statik: admin etiketi değiştirse de kutu görseli boyutu temsil etmeye devam
+ * eder. Şeffaf WebP — kart zemini seçili/seçili değil durumunda değişiyor.
+ */
+const TIER_IMAGE: Record<PackageTierCode, string> = {
+  small: "/package-tiers/small.webp",
+  medium: "/package-tiers/medium.webp",
+  large: "/package-tiers/large.webp",
+};
+
+/**
  * Kargo girdisi: satıcı desi yazmaz, üç paket boyutundan birini seçer. Kartlar
  * aktif tarifeden gelir (etiket + tam kargo bedeli + örnek ölçü); desi arayüzde
  * hiç görünmez. Seçim, altındaki "size kalan" önizlemesini canlı günceller.
+ *
+ * Kutu görseli kararın ASIL yardımcısı: satıcı "ürünüm bu koliye sığar mı"
+ * sorusunu ölçü metninden önce gözüyle cevaplıyor. Bu yüzden görsel kartın
+ * merkezinde, ücret ve örnek ölçü onun altında kendi bloklarında durur.
  */
 function PackageSizePicker() {
   const t = useTranslations();
@@ -109,46 +134,113 @@ function PackageSizePicker() {
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-3">
-          {tiers.map((tier) => {
-            const dimensions = sampleDimensionsLabel(tier);
-            const isSelected = selected === tier.code;
-            return (
-              <label
-                key={tier.code}
-                className={`flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition ${
-                  isSelected
-                    ? "border-primary-500 bg-primary-50"
-                    : "border-border hover:border-border-strong"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <Radio
-                    name="shippingPackageTier"
-                    value={tier.code}
-                    checked={isSelected}
-                    onChange={() =>
-                      setValue("shippingPackageTier", tier.code, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                  />
-                  <span className="font-medium text-heading">{tier.label}</span>
-                </span>
-                <span className="text-sm font-semibold text-primary-600">
-                  {fmt(tier.amount)}
-                </span>
-                {dimensions && (
-                  <span className="text-xs text-muted">
-                    {t("product.sampleDimensions", { dimensions })}
-                  </span>
-                )}
-              </label>
-            );
-          })}
+          {tiers.map((tier) => (
+            <PackageSizeOption
+              key={tier.code}
+              label={tier.label}
+              code={tier.code}
+              amount={tier.amount}
+              dimensions={sampleDimensionsLabel(tier)}
+              isSelected={selected === tier.code}
+              onSelect={() =>
+                setValue("shippingPackageTier", tier.code, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Tek paket boyutu kartı.
+ *
+ * Dar ekranda satır düzeni (görsel solda, bilgiler sağda): üç kartı alt alta
+ * dizmek formu gereksiz uzatıyordu, yatay düzen üçünü de tek bakışta bırakır.
+ * `sm` ve üstünde referans tasarımdaki dikey sütuna döner.
+ */
+function PackageSizeOption({
+  label,
+  code,
+  amount,
+  dimensions,
+  isSelected,
+  onSelect,
+}: {
+  label: string;
+  code: PackageTierCode;
+  amount: number;
+  dimensions: string | null;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const t = useTranslations();
+  return (
+    <label
+      className={cn(
+        "relative flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition",
+        "sm:flex-col sm:items-stretch sm:gap-2 sm:p-4",
+        isSelected
+          ? "border-primary-500 bg-primary-50/60"
+          : "border-border hover:border-primary-300",
+      )}
+    >
+      {/* Radyo görünmez ama DOM'da: klavye ve ekran okuyucu için tek seçim grubu. */}
+      <Radio
+        className="sr-only"
+        name="shippingPackageTier"
+        value={code}
+        checked={isSelected}
+        onChange={onSelect}
+      />
+      <span
+        aria-hidden
+        className={cn(
+          "absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full transition",
+          isSelected ? "bg-primary-600 text-inverted" : "hidden",
+        )}
+      >
+        <CheckIcon className="h-3 w-3" />
+      </span>
+
+      <span className="relative h-14 w-20 shrink-0 sm:h-24 sm:w-full">
+        <Image
+          src={TIER_IMAGE[code]}
+          alt=""
+          fill
+          sizes="(max-width: 640px) 80px, 240px"
+          className="object-contain"
+        />
+      </span>
+
+      <span className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-none">
+        <span className="truncate text-sm font-semibold text-heading sm:text-center">
+          {label}
+        </span>
+        <span className="block rounded-lg bg-primary-600 px-3 py-1.5 text-center">
+          <span className="block text-[10px] font-medium uppercase tracking-wide text-inverted/80">
+            {t("product.packageFeeLabel")}
+          </span>
+          <span className="block text-base font-bold text-inverted">
+            {fmt(amount)}
+          </span>
+        </span>
+        {dimensions && (
+          <span className="block rounded-lg border border-dashed border-border px-2 py-1 text-center">
+            <span className="block text-[10px] uppercase tracking-wide text-muted">
+              {t("product.sampleDimensionsLabel")}
+            </span>
+            <span className="block text-xs font-medium text-body">
+              {dimensions}
+            </span>
+          </span>
+        )}
+      </span>
+    </label>
   );
 }
 

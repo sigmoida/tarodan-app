@@ -11,9 +11,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   return {
-    title: "Destek Merkezi · Tarodan",
+    title: "Yardım & Destek · Tarodan",
     description:
-      "Sorununuzu bildirin; Tarodan destek ekibi sipariş, ödeme, hesap ve teknik konularda en kısa sürede yardımcı olsun.",
+      "Tarodan yardım konuları, sıkça sorulan sorular ve destek talebi oluşturma: sipariş, ödeme, hesap, takas ve teknik konularda yardım alın.",
     alternates: localizedCanonical(locale, "/support"),
   };
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { useTranslations } from "next-intl";
-import { settingsToMap } from "@/lib/settings";
+import { DEFAULT_PSP_FEE_RATE, settingsToMap } from "@/lib/settings";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -12,9 +12,11 @@ export interface Settings {
   minProductPrice: number;
   maxProductPrice: number;
   maxMessageLength: number;
+  /** PSP (PayTR) kesinti oranı (%) — hak ediş ekranlarındaki tahmini maliyet. */
+  pspFeeRate: number;
 }
 
-export type SettingsTab = "listing" | "trade" | "message";
+export type SettingsTab = "listing" | "trade" | "message" | "finance";
 /** All page tabs — "warehouse" renders its own card, not the numeric form. */
 export type SettingsPageTab = SettingsTab | "warehouse";
 
@@ -63,6 +65,11 @@ const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
   message: [
     { key: "maxMessageLength", backendKey: "max_message_length", min: 1 },
   ],
+  // Oran koda gömülmez: PayTR sözleşmesi değiştiğinde deploy gerekmesin diye
+  // ayardan okunur. Yalnız GÖSTERİM içindir — tahsilat akışında kullanılmaz.
+  finance: [
+    { key: "pspFeeRate", backendKey: "psp_fee_rate", min: 0, step: 0.01 },
+  ],
 };
 
 /** Per-field translation keys (label/helper) — display-only, kept apart from `FIELD_DEFS`. */
@@ -96,6 +103,10 @@ const FIELD_LABEL_KEYS = {
     label: "admin.settings.fields.maxMessageLength.label",
     helper: "admin.settings.fields.maxMessageLength.helper",
   },
+  pspFeeRate: {
+    label: "admin.settings.fields.pspFeeRate.label",
+    helper: "admin.settings.fields.pspFeeRate.helper",
+  },
 } as const satisfies Record<keyof Settings, { label: string; helper: string }>;
 
 export function settingsTabs(t: T): { key: SettingsPageTab; label: string }[] {
@@ -103,6 +114,7 @@ export function settingsTabs(t: T): { key: SettingsPageTab; label: string }[] {
     { key: "listing", label: t("admin.settings.tabs.listing") },
     { key: "trade", label: t("admin.settings.tabs.trade") },
     { key: "message", label: t("admin.settings.tabs.message") },
+    { key: "finance", label: t("admin.settings.tabs.finance") },
     { key: "warehouse", label: t("admin.settings.tabs.warehouse") },
   ];
 }
@@ -112,6 +124,7 @@ export function tabTitle(t: T): Record<SettingsTab, string> {
     listing: t("admin.settings.tabTitle.listing"),
     trade: t("admin.settings.tabTitle.trade"),
     message: t("admin.settings.tabTitle.message"),
+    finance: t("admin.settings.tabTitle.finance"),
   };
 }
 
@@ -127,6 +140,7 @@ export function tabFields(t: T): Record<SettingsTab, FieldDef[]> {
     listing: withLabels(FIELD_DEFS.listing),
     trade: withLabels(FIELD_DEFS.trade),
     message: withLabels(FIELD_DEFS.message),
+    finance: withLabels(FIELD_DEFS.finance),
   };
 }
 
@@ -138,6 +152,8 @@ const DEFAULTS: Settings = {
   minProductPrice: 10,
   maxProductPrice: 100000,
   maxMessageLength: 1000,
+  // Ayar satırı yokken gösterimde kullanılan oran — kırılım ekranlarıyla TEK kaynak.
+  pspFeeRate: DEFAULT_PSP_FEE_RATE,
 };
 
 /** Normalize the API response (array of key/value rows OR plain object) into Settings. */

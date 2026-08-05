@@ -6,6 +6,7 @@ import {
   ArrowsRightLeftIcon,
   CheckCircleIcon,
   ChatBubbleLeftRightIcon,
+  ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 
 export type Lang = "tr" | "en";
@@ -48,6 +49,12 @@ export const STEPS: Record<Lang, TradeStep[]> = {
         "Ürünlerinizi anlaşmalı kargo ile gönderin. Kargo takip numarası sistem üzerinden paylaşılır.",
     },
     {
+      icon: ClipboardDocumentCheckIcon,
+      title: "Depo Kontrolü",
+      description:
+        "Ürünleri Tarodan deposuna gönderin. Uzman ekibimiz depoda gerekli kontrolleri sağlar; her iki tarafın da onayı sonrasında ürünleri yeni sahiplerine kargolar.",
+    },
+    {
       icon: CheckCircleIcon,
       title: "Takas Tamamlandı",
       description:
@@ -72,6 +79,12 @@ export const STEPS: Record<Lang, TradeStep[]> = {
       title: "Secure Shipping",
       description:
         "Ship your products via contracted courier. Tracking numbers are shared through the system.",
+    },
+    {
+      icon: ClipboardDocumentCheckIcon,
+      title: "Warehouse Inspection",
+      description:
+        "Send the items to the Tarodan warehouse. Our experts run the required checks there, and once both parties approve, the items are shipped to their new owners.",
     },
     {
       icon: CheckCircleIcon,
@@ -126,7 +139,7 @@ export const FAQ: Record<Lang, TradeFaq[]> = {
   tr: [
     {
       q: "Takas ücretsiz mi?",
-      a: "Evet, takas işlemi için herhangi bir komisyon alınmaz. Sadece kargo ücretini siz karşılarsınız.",
+      a: "Takas işlemlerinde ürünün komisyon kuralına göre sabit bir takas hizmet bedeli alınır. Kargo ayrıca, ilanda seçilen paket boyutuna göre hesaplanır.",
     },
     {
       q: "Takas teklifi nasıl gönderilir?",
@@ -144,7 +157,7 @@ export const FAQ: Record<Lang, TradeFaq[]> = {
   en: [
     {
       q: "Is trading free?",
-      a: "Yes, there is no commission for trade transactions. You only pay for shipping.",
+      a: "Trades have a flat service fee determined by the product's commission rule. Shipping is calculated separately from the package size selected for the listing.",
     },
     {
       q: "How do I send a trade offer?",

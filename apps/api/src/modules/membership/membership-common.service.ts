@@ -11,6 +11,7 @@ import { MembershipTierResponseDto, UserMembershipResponseDto } from "./dto";
 import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
 import { i18nMessage } from "../i18n";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { isPremiumEntitled } from "./membership.util";
 
 /**
@@ -238,6 +239,7 @@ export class MembershipCommonService {
     // Count active listings
     const activeListings = await this.prisma.product.count({
       where: {
+        ...catalogProductWhere(),
         sellerId: userId,
         status: {
           in: [

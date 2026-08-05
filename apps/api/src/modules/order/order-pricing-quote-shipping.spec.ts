@@ -1,5 +1,5 @@
 import { OrderPricingService } from "./order-pricing.service";
-import { ProductStatus } from "@prisma/client";
+import { ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
 
@@ -19,6 +19,23 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     b1: mkProduct("b1", "seller-B", 100),
     aBig: mkProduct("aBig", "seller-A", 300),
     bBig: mkProduct("bBig", "seller-B", 300),
+    suspended: {
+      ...mkProduct("suspended", "seller-suspended", 250),
+      seller: {
+        businessStatus: "approved",
+        companyName: "Süresi Dolan İşletme",
+        taxId: "1234567890",
+        membership: {
+          status: "expired",
+          currentPeriodEnd: new Date("2025-01-01"),
+          tier: { type: "business", isActive: true },
+        },
+      },
+    },
+    virtual: {
+      ...mkProduct("virtual", "platform", 100),
+      kind: ProductKind.membership,
+    },
   };
 
   function mkProduct(id: string, sellerId: string, price: number) {
@@ -28,8 +45,9 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
       price,
       sellerId,
       categoryId: null,
+      kind: ProductKind.listing,
       status: ProductStatus.active,
-      seller: { businessStatus: "pending", taxId: null }, // non-corporate → KDV yok
+      seller: { businessStatus: null, taxId: null }, // individual → KDV yok
     };
   }
 
@@ -51,6 +69,9 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
           Promise.resolve(products[where.id] ?? null),
         ),
       },
+      commissionRuleSet: {
+        findFirst: jest.fn().mockResolvedValue({ id: "set-1", version: 7 }),
+      },
     } as any;
     const taxService = {
       resolveTaxRate: jest.fn(),
@@ -58,7 +79,6 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     } as any;
     const shippingTariffs = {
       getActiveOutboundTariff: async () => ({
-        outboundPackageFee: BASE,
         freeShippingEnabled: true,
         freeShippingThreshold: THRESHOLD,
         packageTiers: flatPackageTiers(BASE),
@@ -67,7 +87,6 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         tariffId: "tariff-1",
         tariffVersion: 1,
         tariff: {
-          outboundPackageFee: BASE,
           freeShippingEnabled: true,
           freeShippingThreshold: THRESHOLD,
           packageTiers: flatPackageTiers(BASE),
@@ -98,6 +117,39 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
     expect(q.shippingBySeller).toHaveLength(1);
     expect(q.shippingAmount).toBe(BASE);
     expect(q.items[0].sellerId).toBe("seller-A");
+    expect(q.commissionRuleSetId).toBe("set-1");
+    expect(q.commissionRuleSetVersion).toBe(7);
+  });
+
+  it("askıdaki satırı açık gerekçeyle ayırır, uygun satırların quote'unu sürdürür", async () => {
+    const q = await makeSvc().getCheckoutQuote({
+      items: [{ productId: "a1" }, { productId: "suspended" }],
+    });
+
+    expect(q.items.map((item) => item.productId)).toEqual(["a1"]);
+    expect(q.unavailableItems).toEqual([
+      expect.objectContaining({
+        productId: "suspended",
+        sellerId: "seller-suspended",
+        code: "SELLER_SALES_SUSPENDED",
+      }),
+    ]);
+    expect(q.itemsSubtotal).toBe(100);
+    expect(q.shippingBySeller).toHaveLength(1);
+  });
+
+  it("ödeme-only ürünü katalog ürünü gibi fiyatlamaz", async () => {
+    const q = await makeSvc().getCheckoutQuote({
+      items: [{ productId: "a1" }, { productId: "virtual" }],
+    });
+
+    expect(q.items.map((item) => item.productId)).toEqual(["a1"]);
+    expect(q.unavailableItems).toEqual([
+      expect.objectContaining({
+        productId: "virtual",
+        code: "PRODUCT_NOT_FOUND",
+      }),
+    ]);
   });
 
   it("tek satıcı ÇOK ürün (birleşik 200 < eşik) → yine TEK kargo (konsolidasyon)", async () => {

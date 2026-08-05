@@ -9,7 +9,7 @@ import { i18nMessage } from "../i18n";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { MembershipService } from "../membership/membership.service";
-import { isPremiumEntitled } from "../membership/membership.util";
+import { isCorporateSellingSuspended } from "../membership/membership.util";
 import { StorageService } from "../storage/storage.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
@@ -17,12 +17,18 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { CreateProductDto } from "./dto";
 import { ProductStatus } from "@prisma/client";
-import { computeRelevanceScore } from "./helpers/relevance-score";
+import { initialProductRanking } from "./helpers/product-initial-ranking";
+import {
+  loadProductPriceLimits,
+  productPriceLimitViolation,
+} from "./helpers/product-price-limits";
 import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
 import { ProductStatsService } from "./product-stats.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
+import { resolveCreateSalePricing } from "./helpers/product-sale-pricing";
 import { sellerAutoEnableData } from "./helpers/seller-auto-enable.helper";
+import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
 
 /**
  * ProductCreateService — ilan oluşturma. Üyelik ilan/görsel limiti, AI görsel+metin
@@ -46,6 +52,7 @@ export class ProductCreateService {
     private readonly common: ProductCommonService,
     private readonly ranking: ProductRankingService,
     private readonly stats: ProductStatsService,
+    private readonly commissionGuard: CommissionRuleGuardService,
   ) {}
 
   /**
@@ -62,6 +69,11 @@ export class ProductCreateService {
     // Verify seller status - auto-enable if not already a seller
     const seller = await this.prisma.user.findUnique({
       where: { id: sellerId },
+      include: {
+        membership: {
+          include: { tier: true },
+        },
+      },
     });
 
     if (!seller) {
@@ -85,6 +97,12 @@ export class ProductCreateService {
     ) {
       throw new ForbiddenException(
         i18nMessage("server.product.businessApprovalRequired"),
+      );
+    }
+
+    if (isCorporateSellingSuspended(seller.membership, seller)) {
+      throw new ForbiddenException(
+        i18nMessage("server.product.corporateSalesSuspended"),
       );
     }
 
@@ -202,29 +220,20 @@ export class ProductCreateService {
     // ========================================================================
     // PRICE VALIDATION FROM PLATFORM SETTINGS (Not retroactive - only new listings)
     // ========================================================================
-    const minPriceSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "min_product_price" },
-    });
-    const maxPriceSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "max_product_price" },
-    });
-
-    const minPrice = minPriceSetting?.settingValue
-      ? parseFloat(minPriceSetting.settingValue)
-      : null;
-    const maxPrice = maxPriceSetting?.settingValue
-      ? parseFloat(maxPriceSetting.settingValue)
-      : null;
-
-    if (minPrice != null && !isNaN(minPrice) && dto.price < minPrice) {
+    const priceLimits = await loadProductPriceLimits(this.prisma);
+    const priceViolation = productPriceLimitViolation(dto.price, priceLimits);
+    if (priceViolation?.type === "minimum") {
       throw new BadRequestException(
-        i18nMessage("server.product.priceBelowMinimum", { minPrice }),
+        i18nMessage("server.product.priceBelowMinimum", {
+          minPrice: priceViolation.limit,
+        }),
       );
     }
-
-    if (maxPrice != null && !isNaN(maxPrice) && dto.price > maxPrice) {
+    if (priceViolation?.type === "maximum") {
       throw new BadRequestException(
-        i18nMessage("server.product.priceAboveMaximum", { maxPrice }),
+        i18nMessage("server.product.priceAboveMaximum", {
+          maxPrice: priceViolation.limit,
+        }),
       );
     }
 
@@ -257,11 +266,33 @@ export class ProductCreateService {
         },
       },
     });
-    const isPremiumSeller = isPremiumEntitled(
+    const initialRanking = initialProductRanking(
       sellerMembership,
       sellerMembership?.user,
     );
-    const FRESH_POPULARITY_BASELINE = 10;
+
+    const salePricing = resolveCreateSalePricing({
+      price: dto.price,
+      originalPrice: dto.originalPrice,
+      salePrice: dto.salePrice,
+      saleStartDate: dto.saleStartDate,
+      saleEndDate: dto.saleEndDate,
+    });
+
+    // İlanın hem normal hem de varsa indirimli fiyatı ACTIVE sette tam olarak
+    // bir kurala düşmeli. İndirim penceresi açılıp kapandığında ürün farklı
+    // bareme geçebileceği için yalnız o anki fiyatı kontrol etmek yeterli değil.
+    const commissionAmounts = [salePricing.price, salePricing.oldPrice].filter(
+      (value, index, values): value is number =>
+        value != null && values.indexOf(value) === index,
+    );
+    for (const amount of commissionAmounts) {
+      await this.commissionGuard.assertListingRuleExists({
+        sellerId,
+        categoryId: dto.categoryId,
+        amount,
+      });
+    }
 
     try {
       const product = await this.prisma.product.create({
@@ -270,7 +301,12 @@ export class ProductCreateService {
           categoryId: dto.categoryId,
           title: dto.title,
           description: dto.description,
-          price: dto.price,
+          // `price` güncel satış fiyatı, `oldPrice` indirim öncesi (çizili)
+          // fiyattır — güncelleme yoluyla aynı kural.
+          price: salePricing.price,
+          oldPrice: salePricing.oldPrice,
+          saleStartDate: salePricing.saleStartDate,
+          saleEndDate: salePricing.saleEndDate,
           condition: dto.condition,
           status: ProductStatus.pending, // Needs admin approval
           quantity: dto.quantity !== undefined ? dto.quantity : 1, // default 1 adet; sınırsız (null) yalnızca açıkça istenince
@@ -279,14 +315,7 @@ export class ProductCreateService {
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,
           bundleSize: dto.isSet ? (dto.bundleSize ?? null) : null,
-          rankTier: isPremiumSeller ? 1 : 0,
-          popularityScore: FRESH_POPULARITY_BASELINE,
-          popularityUpdatedAt: new Date(),
-          relevanceScore: computeRelevanceScore({
-            rankTier: isPremiumSeller ? 1 : 0,
-            qualityScore: 0,
-            popularityScore: FRESH_POPULARITY_BASELINE,
-          }),
+          ...initialRanking,
           brandId,
           carModelId,
           manufacturerId,

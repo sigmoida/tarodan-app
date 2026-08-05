@@ -88,7 +88,6 @@ export default function OrderSummaryLines({
           {amount(amounts?.total)}
         </span>
       </div>
-      <p className="text-xs text-subtle">{t("checkout.vatIncluded")}</p>
     </div>
   );
 }

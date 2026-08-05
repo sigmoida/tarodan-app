@@ -21,6 +21,10 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { StorageService } from "../storage/storage.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import {
+  publicProductRatingWhere,
+  publicUserRatingWhere,
+} from "../../common/helpers/public-rating";
 
 @Injectable()
 export class RatingService {
@@ -363,10 +367,15 @@ export class RatingService {
   /**
    * Recalculate and update Product.averageRating and Product.ratingCount.
    * Called after create/delete/update of ProductRating. Prisma middleware emits product.changed for ES sync.
+   *
+   * Bu kolonlar ürün kartındaki sayaç/ortalamanın TEK kaynağıdır (kart hiç
+   * ProductRating okumaz), bu yüzden yalnız yayınlanmış yorumları saymalıdır —
+   * aksi halde admin bir yorumu reddettiğinde kartta sayaç kalır, detayda
+   * yorum çıkmaz.
    */
   async updateProductRatingStats(productId: string): Promise<void> {
     const stats = await this.prisma.productRating.aggregate({
-      where: { productId, status: RatingStatus.approved },
+      where: publicProductRatingWhere({ productId }),
       _avg: { score: true },
       _count: true,
     });
@@ -402,7 +411,7 @@ export class RatingService {
 
     const [ratings, total] = await Promise.all([
       this.prisma.rating.findMany({
-        where: { receiverId: userId, status: RatingStatus.approved },
+        where: publicUserRatingWhere({ receiverId: userId }),
         select: {
           id: true,
           giverId: true,
@@ -420,7 +429,7 @@ export class RatingService {
         take: safePageSize,
       }),
       this.prisma.rating.count({
-        where: { receiverId: userId, status: RatingStatus.approved },
+        where: publicUserRatingWhere({ receiverId: userId }),
       }),
     ]);
 
@@ -479,7 +488,9 @@ export class RatingService {
     }
 
     // Build where clause with optional score filter
-    const where: any = { productId, status: RatingStatus.approved };
+    const where: Prisma.ProductRatingWhereInput = publicProductRatingWhere({
+      productId,
+    });
     const safeScore = Number(score);
     if (safeScore >= 1 && safeScore <= 5) {
       where.score = safeScore;
@@ -519,7 +530,7 @@ export class RatingService {
   // ==========================================================================
   async getUserRatingStats(userId: string): Promise<UserRatingStatsDto> {
     const ratings = await this.prisma.rating.findMany({
-      where: { receiverId: userId, status: RatingStatus.approved },
+      where: publicUserRatingWhere({ receiverId: userId }),
       select: { score: true },
     });
 
@@ -549,7 +560,7 @@ export class RatingService {
     productId: string,
   ): Promise<ProductRatingStatsDto> {
     const ratings = await this.prisma.productRating.findMany({
-      where: { productId, status: RatingStatus.approved },
+      where: publicProductRatingWhere({ productId }),
       select: { score: true },
     });
 

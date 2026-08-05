@@ -6,45 +6,26 @@ import { Link } from "@/i18n/navigation";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { locales, type Locale } from "@tarodan/i18n";
-import { Button, Select } from "@tarodan/ui";
+import { Select } from "@tarodan/ui";
 import { useLanguagePreference } from "@/hooks/useLanguagePreference";
+import SocialLinks from "@/components/ui/SocialLinks";
 import { Container } from "./Container";
 
 const LOCALES: readonly Locale[] = locales;
 const LOCALE_NAMES: Record<Locale, string> = { tr: "Türkçe", en: "English" };
 const LOCALE_FLAGS: Record<Locale, string> = { tr: "🇹🇷", en: "🇬🇧" };
 
-const SOCIAL_LINKS = [
-  { label: "Instagram", href: "https://www.instagram.com/tarodan.com.tr/" },
-  { label: "Facebook", href: "https://www.facebook.com/tarodan.com.tr/" },
-  { label: "TikTok", href: "https://www.tiktok.com/@tarodan.com.tr" },
-];
-
 export default function Footer() {
   const t = useTranslations();
   const { currentLocale: locale, changeLanguage } = useLanguagePreference();
 
-  const clearCookieConsent = () => {
-    localStorage.removeItem("cookie_consent");
-    window.location.reload();
-  };
-
-  // Footer columns mirror the route-group taxonomy 1:1 (marketplace shortcuts +
-  // corporate / support / trust / shopping / legal). New categories simply wrap
-  // onto the next row of the grid below.
+  // Footer columns mirror the route-group taxonomy (corporate / support / trust
+  // / shopping / legal). New categories simply wrap onto the next row of the
+  // grid below. Social accounts live in the bottom bar, not as a column.
   const FOOTER_COLUMNS: {
     title: string;
     links: { href: string; label: string }[];
   }[] = [
-    {
-      title: t("footer.marketplace"),
-      links: [
-        { href: "/listings", label: t("nav.listings") },
-        { href: "/profile/trades", label: t("nav.trades") },
-        { href: "/collections", label: t("nav.collections") },
-        { href: "/membership", label: t("membership.title") },
-      ],
-    },
     {
       title: t("footer.corporate"),
       links: [
@@ -57,34 +38,20 @@ export default function Footer() {
     {
       title: t("footer.helpSupport"),
       links: [
-        { href: "/help", label: t("footer.help") },
-        { href: "/support", label: t("footer.supportCenter") },
+        { href: "/support", label: t("footer.helpSupport") },
         { href: "/faq", label: t("footer.faq") },
         { href: "/guides", label: t("nav.guides") },
         { href: "/collectors-guide", label: t("footer.collectorsGuide") },
         { href: "/size-guide", label: t("footer.sizeGuide") },
-      ],
-    },
-    {
-      title: t("footer.trustSafety"),
-      links: [
         { href: "/secure-swap", label: t("footer.secureSwap") },
-        { href: "/buyer-protection", label: t("footer.buyerProtection") },
-        { href: "/authenticity", label: t("footer.authenticity") },
-        { href: "/security-features", label: t("footer.securityFeatures") },
       ],
     },
     {
       title: t("common.shopping"),
       links: [
-        { href: "/payment-options", label: t("footer.paymentOptions") },
         { href: "/shipping-delivery", label: t("footer.shipping") },
-        { href: "/returns-exchanges", label: t("footer.returns") },
-        { href: "/sell", label: t("footer.sell") },
-        {
-          href: "/platform-service-fee",
-          label: t("footer.platformServiceFee"),
-        },
+        { href: "/track-order", label: t("order.trackOrder") },
+        { href: "/membership", label: t("membership.title") },
       ],
     },
     {
@@ -96,10 +63,6 @@ export default function Footer() {
         { href: "/distance-sales", label: t("footer.distanceSales") },
         { href: "/refund-policy", label: t("footer.refundPolicy") },
         { href: "/seller-agreement", label: t("footer.sellerAgreement") },
-        {
-          href: "/intellectual-property",
-          label: t("footer.intellectualProperty"),
-        },
       ],
     },
   ];
@@ -153,7 +116,7 @@ export default function Footer() {
         </div>
 
         {/* Category columns — new categories wrap onto the next row */}
-        <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4">
           {FOOTER_COLUMNS.map((col) => (
             <div key={col.title}>
               <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-heading">
@@ -173,35 +136,12 @@ export default function Footer() {
               </ul>
             </div>
           ))}
-
-          {/* Follow us */}
-          <div>
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-heading">
-              {t("footer.followUs")}
-            </h3>
-            <ul className="space-y-2">
-              {SOCIAL_LINKS.map((s) => (
-                <li key={s.label}>
-                  <a
-                    href={s.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-muted transition-colors hover:text-primary-500"
-                  >
-                    {s.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="border-t border-border mt-8 py-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p className="text-xs text-subtle">
-            &copy; {new Date().getFullYear()} TARODAN. {t("footer.copyright")}
-          </p>
-          <div className="flex items-center gap-3">
+        {/* Bottom bar — social accounts, locale/consent controls, copyright.
+				    Stacks and centers below md, spreads onto one row above it. */}
+        <div className="mt-8 flex flex-col items-center gap-4 border-t border-border py-6 md:grid md:grid-cols-3 md:items-center md:gap-6">
+          <div className="order-1 flex flex-wrap items-center justify-center gap-3 md:order-none md:justify-start">
             <Select
               value={locale}
               onChange={(e) => {
@@ -217,21 +157,23 @@ export default function Footer() {
                 </option>
               ))}
             </Select>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearCookieConsent}
-              className="text-xs text-muted"
-            >
-              {t("footer.cookieSettings")}
-            </Button>
             <Image
               src="/secure-payment-badge.svg"
               alt={t("checkout.securePayment")}
               width={135}
               height={24}
-              className="h-5 w-auto"
+              className="h-4 w-auto"
             />
+          </div>
+
+          <p className="order-3 text-center text-xs text-subtle md:order-none">
+            &copy; {new Date().getFullYear()} TARODAN. {t("footer.copyright")}
+          </p>
+
+          {/* Sarmalayıcı, `order` grid/flex ÖĞESİNE uygulanmalı diye var:
+					    SocialLinks'in className'i kendi iç flex satırına gidiyor. */}
+          <div className="order-2 md:order-none">
+            <SocialLinks size="sm" className="md:-mr-2 md:justify-end" />
           </div>
         </div>
       </Container>

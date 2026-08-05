@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { ProductStatus } from "@prisma/client";
+import { ProductKind, ProductStatus } from "@prisma/client";
 import { OrderPricingService } from "./order-pricing.service";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
@@ -10,13 +10,17 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
     title: "Test product",
     price: 100,
     sellerId: "seller-1",
-    categoryId: null,
+    categoryId: "category-1",
+    kind: ProductKind.listing,
     status: ProductStatus.active,
-    seller: { businessStatus: "pending", taxId: null },
+    seller: { businessStatus: null, taxId: null },
   };
 
   function makeService(validation: Record<string, unknown>) {
     const prisma = {
+      commissionRuleSet: {
+        findFirst: jest.fn().mockResolvedValue({ id: "set-1" }),
+      },
       product: {
         findUnique: jest.fn().mockResolvedValue(product),
       },
@@ -36,7 +40,6 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
           tariffId: "tariff-1",
           tariffVersion: 1,
           tariff: {
-            outboundPackageFee: 0,
             freeShippingEnabled: true,
             freeShippingThreshold: 0,
             packageTiers: flatPackageTiers(0),

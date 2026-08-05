@@ -12,6 +12,7 @@ import {
   isProductOnSaleDisplay,
 } from "@/lib/productPrice";
 import type { Listing } from "../_lib/types";
+import { formatTL } from "@/lib/format";
 
 type Translator = (key: any) => string;
 
@@ -122,11 +123,7 @@ export default function ProductStaticInfoView({
           </div>
         )}
         <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary-500">
-          {effectivePrice.toLocaleString("tr-TR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}{" "}
-          TL
+          {formatTL(effectivePrice)}
         </p>
       </div>
 

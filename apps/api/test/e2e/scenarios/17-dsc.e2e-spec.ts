@@ -108,7 +108,10 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   async function grantModeratorPermissions(perms: string[]): Promise<void> {
     await getPrisma().platformSetting.upsert({
       where: { settingKey: "admin_role_permissions" },
-      update: { settingValue: JSON.stringify({ moderator: perms }), settingType: "json" },
+      update: {
+        settingValue: JSON.stringify({ moderator: perms }),
+        settingType: "json",
+      },
       create: {
         settingKey: "admin_role_permissions",
         settingValue: JSON.stringify({ moderator: perms }),
@@ -2278,19 +2281,10 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     });
     const address = await createAddress({ userId: buyer.id });
     const prisma = getPrisma();
-    // %5 satıcı komisyonu (ALL/SELLER). NOT: seller_rate kolonu Decimal(5,4) → max 9.9999;
-    // yüzde tam sayı olarak saklanır (5 = %5, calculateCommission /100 böler). 10 taşma yapar.
-    await prisma.commissionRule.create({
-      data: {
-        name: "komisyon-dsc97",
-        ruleType: "default" as any,
-        appliesTo: "SELLER" as any,
-        sellerType: "ALL" as any,
-        percentage: new Prisma.Decimal(0),
-        sellerRate: new Prisma.Decimal(5),
-        isActive: true,
-        priority: 0,
-      },
+    // Baseline kategori + FREE satıcı kuralında %5 komisyon.
+    await prisma.commissionRule.update({
+      where: { id: "default-rule-FREE" },
+      data: { sellerCommissionRate: new Prisma.Decimal(5) },
     });
     // %20 global kupon → indirimli fiyat 80.
     await seedDiscount({

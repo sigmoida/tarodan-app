@@ -9,6 +9,8 @@ import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
+import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import {
@@ -19,12 +21,14 @@ import {
 import {
   OrderStatus,
   OfferStatus,
+  ProductKind,
   ProductStatus,
   Prisma,
 } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { DiscountService } from "../discount";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
@@ -51,6 +55,7 @@ export class OrderGuestCheckoutService {
     private readonly configService: ConfigService,
     private readonly notificationService: NotificationService,
     private readonly suratCargoService: SuratCargoService,
+    private readonly discountService: DiscountService,
     private readonly orderPricing: OrderPricingService,
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
@@ -160,6 +165,12 @@ export class OrderGuestCheckoutService {
         dto.expectedShippingTariffVersion,
         true,
       );
+    const commissionRuleSet =
+      await this.orderPricing.resolveCommissionRuleSetSnapshot(
+        dto.expectedCommissionRuleSetId,
+        dto.expectedCommissionRuleSetVersion,
+        true,
+      );
 
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
@@ -182,6 +193,7 @@ export class OrderGuestCheckoutService {
         name: dto.guestName?.trim(),
       },
       shippingTariffSnapshot: shippingTariff,
+      commissionRuleSetSnapshot: commissionRuleSet,
     });
   }
 
@@ -194,6 +206,12 @@ export class OrderGuestCheckoutService {
     const shippingTariff =
       await this.orderPricing.resolveShippingTariffSnapshot(
         dto.expectedShippingTariffVersion,
+        true,
+      );
+    const commissionRuleSet =
+      await this.orderPricing.resolveCommissionRuleSetSnapshot(
+        dto.expectedCommissionRuleSetId,
+        dto.expectedCommissionRuleSetVersion,
         true,
       );
     // Savunma derinliği: kod gönderildikten sonra bu e-postayla kayıt olunmuş
@@ -228,6 +246,12 @@ export class OrderGuestCheckoutService {
         );
       }
 
+      if (product.kind !== ProductKind.listing) {
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
+      }
+
       if (product.status !== ProductStatus.active) {
         throw new BadRequestException(
           i18nMessage("server.order.productNotOnSale"),
@@ -247,7 +271,19 @@ export class OrderGuestCheckoutService {
       // for any item (the PayTR amount-check validates against this same tampered
       // total). Direct buy -> the product's own (sale) price; accepted offer -> the
       // offer amount (set below).
-      let finalPrice = Number(product.salePrice ?? product.price);
+      //
+      // F1.4 misafirde de geçerli: tahsil edilen taban = EFEKTİF fiyat, yani ürün
+      // kartında/sepette görünen. Bu yol ikisini de atlıyordu — ham `salePrice ??
+      // price` kolonunu okuyor ve kampanyayı hiç sormuyordu; code'suz bir kampanya
+      // aktifken misafir, kartta gördüğünden fazla ödüyordu.
+      const listedPrice = resolveSalePrice(product).price;
+      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
+        product.id,
+        product.sellerId,
+        product.categoryId ?? "",
+        listedPrice,
+      );
+      let finalPrice = campaignPrice ?? listedPrice;
 
       if (dto.offerId) {
         const offer = await tx.offer.findUnique({
@@ -328,10 +364,14 @@ export class OrderGuestCheckoutService {
 
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on product price, not including shipping
+      const pinnedRuleSetId = commissionRuleSet.id;
       const commissionResult = await this.orderPricing.calculateCommission(
         finalPrice,
         product.sellerId,
-        product.categoryId, // Pass categoryId for priority-based matching
+        product.categoryId,
+        pinnedRuleSetId,
+        finalPrice,
+        product.id,
       );
 
       // Kargo kararı (quote ile ORTAK): paket desisi → kademe → o kademenin payı →
@@ -375,8 +415,13 @@ export class OrderGuestCheckoutService {
         buyerFeeAmount: commissionResult.buyerFeeAmount,
         buyerServiceTaxAmount: guestBuyerServiceTax,
       });
-      const guestOriginalPrice = Number(product.price);
+      // İndirim öncesi (çizili) fiyat — yoksa listelenen fiyatın kendisi.
+      const guestOriginalPrice =
+        resolveSalePrice(product).oldPrice ?? listedPrice;
       const guestDiscountAmount = Math.max(0, guestOriginalPrice - finalPrice);
+      // Siparişin ürün tabanı = TAHSİL EDİLEN tutar (kabul edilmiş teklifte teklif
+      // bedeli). Liste fiyatı `guestDiscountAmount` ve snapshot'ta durur.
+      const guestSubtotal = chargedProductBaseOf({ unitPrice: finalPrice });
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -473,7 +518,7 @@ export class OrderGuestCheckoutService {
           totalAmount,
           quantity: 1,
           unitPrice: finalPrice,
-          subtotal: guestOriginalPrice,
+          subtotal: guestSubtotal,
           discountAmount: guestDiscountAmount,
           shippingCost,
           taxAmount: guestTaxAmount,
@@ -496,7 +541,7 @@ export class OrderGuestCheckoutService {
             quantity: 1,
             unitPrice: finalPrice,
             originalUnitPrice: guestOriginalPrice,
-            subtotal: guestOriginalPrice,
+            subtotal: guestSubtotal,
             discountAmount: guestDiscountAmount,
             platformFundedDiscount: 0,
             shipping: {

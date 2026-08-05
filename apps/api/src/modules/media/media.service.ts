@@ -372,7 +372,7 @@ export class MediaService {
       isBlockedSharpMimeType(file.mimetype)
     ) {
       throw new BadRequestException(
-        "Geçersiz dosya tipi. Sadece JPEG, PNG ve WebP desteklenir.",
+        "Geçersiz dosya tipi. Sadece JPEG, PNG, WebP ve GIF desteklenir.",
       );
     }
     if (file.size > 10 * 1024 * 1024) {

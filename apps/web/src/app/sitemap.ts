@@ -37,16 +37,12 @@ const STATIC_PATHS = [
   // shopping
   "/sell",
   "/payment-options",
-  "/shipping-delivery",
-  "/returns-exchanges",
   "/platform-service-fee",
+  "/shipping-delivery",
   // support
-  "/help",
   "/support",
   "/faq",
   "/guides",
-  "/collectors-guide",
-  "/size-guide",
   // trust
   "/secure-swap",
   "/buyer-protection",
@@ -55,8 +51,8 @@ const STATIC_PATHS = [
   // legal
   "/terms",
   "/privacy",
-  "/cookies",
   "/distance-sales",
+  "/cookies",
   "/refund-policy",
   "/seller-agreement",
   "/intellectual-property",

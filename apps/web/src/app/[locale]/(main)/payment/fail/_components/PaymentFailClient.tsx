@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import {
   XCircleIcon,
   ExclamationTriangleIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button, Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
@@ -13,6 +14,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { SectionCard, ButtonLink } from "@/components/ui";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { usePaymentFail } from "../_hooks/usePaymentFail";
+import { formatTL } from "@/lib/format";
 
 const REASON_KEYS = [
   "payment.reasonInsufficientBalance",
@@ -59,18 +61,8 @@ export default function PaymentFailClient() {
                     {t("payment.amountLabel")}:
                   </span>
                   <span className="font-semibold">
-                    {payment.amount?.toLocaleString("tr-TR", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    TL
+                    {formatTL(payment.amount)}
                   </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">
-                    {t("checkout.paymentMethod")}:
-                  </span>
-                  <span className="font-semibold">PayTR</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">{t("common.status")}:</span>
@@ -104,26 +96,41 @@ export default function PaymentFailClient() {
             </div>
           </div>
 
-          <div className="mb-6 rounded-lg border border-info-200 bg-info-50 p-4 text-left text-sm text-info-800">
-            <strong>{t("payment.needHelp")}</strong>{" "}
+          {/*
+            Destek yönlendirmesi ekranın tek yardım yolu, bu yüzden metin duruyor;
+            yalnız mavi kutu kaldırıldı (success ekranıyla aynı sadeleştirme).
+          */}
+          <p className="mb-6 text-left text-sm text-muted">
+            <strong className="text-body">{t("payment.needHelp")}</strong>{" "}
             {t("payment.supportPrompt")}
-            <Link href="/support" className="font-medium underline">
+            <Link
+              href="/support"
+              className="font-medium text-primary-600 underline"
+            >
               {t("payment.supportTeam")}
             </Link>
             {t("payment.contactSuffix")}
-          </div>
+          </p>
 
-          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+          {/* Butonlar kartın tam genişliğini paylaşır; ikincil eylem solda. */}
+          <div className="flex flex-col gap-3 sm:flex-row">
             {isGuestCheckout ? (
-              <ButtonLink href="/listings">
+              <ButtonLink href="/listings" className="flex-1">
                 {t("seller.backToListings")}
               </ButtonLink>
             ) : (
               <>
-                <Button onClick={handleRetry}>{t("common.tryAgain")}</Button>
-                <ButtonLink variant="secondary" href="/profile/orders">
+                <ButtonLink
+                  variant="secondary"
+                  href="/profile/orders"
+                  className="flex-1"
+                >
                   {t("payment.backToMyOrders")}
                 </ButtonLink>
+                <Button onClick={handleRetry} className="flex-1 gap-2">
+                  {t("common.tryAgain")}
+                  <ChevronRightIcon className="h-5 w-5" />
+                </Button>
               </>
             )}
           </div>

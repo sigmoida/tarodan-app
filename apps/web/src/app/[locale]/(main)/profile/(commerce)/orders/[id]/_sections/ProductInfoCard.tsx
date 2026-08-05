@@ -15,10 +15,14 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
   const productInfo = getProductInfo(order);
   const productImage =
     productInfo?.imageUrl || order.items?.[0]?.product?.imageUrl;
-  const orderAmount = orderAmountOf(order);
+  // Ürün bedelinin TEK kaynağı `pricing.subtotal`. `items[].price` yedek
+  // DEĞİLDİR: API onu `order.totalAmount`tan doldurur, yani alıcının ödediği
+  // toplamdır — yedek olarak kullanmak satıcıya o toplamı gösterirdi.
+  const productAmount = order.pricing?.subtotal ?? null;
   // Çok adetli sipariş: gerçek adedi ve birim fiyatı göster (satır tutarı / adet).
   const quantity = order.items?.[0]?.quantity ?? 1;
-  const unitPrice = quantity > 0 ? orderAmount / quantity : orderAmount;
+  const unitPrice =
+    productAmount != null && quantity > 0 ? productAmount / quantity : null;
 
   return (
     <SectionCard title={t("product.productInfo")}>
@@ -46,11 +50,15 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
             {productInfo?.title || t("order.product")}
           </Link>
           <p className="text-sm text-muted mt-1">
-            {quantity} {t("order.unitTimes")} {formatTL(unitPrice)}
+            {unitPrice != null
+              ? `${quantity} ${t("order.unitTimes")} ${formatTL(unitPrice)}`
+              : `${quantity} ${t("order.unitOnly")}`}
           </p>
-          <p className="text-xl font-bold text-primary-500 mt-2">
-            {formatTL(orderAmount)}
-          </p>
+          {productAmount != null && (
+            <p className="text-xl font-bold text-primary-500 mt-2">
+              {formatTL(productAmount)}
+            </p>
+          )}
         </div>
       </div>
     </SectionCard>

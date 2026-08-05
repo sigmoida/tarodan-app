@@ -78,7 +78,7 @@ export default function ProductDetailsCard({
           render={({ field }) => (
             <Select
               label={t("product.brandRequired")}
-              value={field.value || undefined}
+              value={field.value == null ? "" : String(field.value)}
               onChange={(e) => {
                 field.onChange(e.target.value);
                 setValue("carModelId", "");

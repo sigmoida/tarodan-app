@@ -310,7 +310,7 @@ export default function PaymentSection({
           <Button
             variant="success"
             size="lg"
-            className="w-full flex items-center justify-center gap-2 text-base"
+            className="w-full text-base"
             onClick={handlePay}
             disabled={
               busy ||
@@ -323,7 +323,6 @@ export default function PaymentSection({
                   !newAddress.address))
             }
           >
-            <ShieldCheckIcon className="w-5 h-5" />
             {busy
               ? t("checkout.processing")
               : `${t("payment.pay")} – ${formatTL(payAmount)}`}

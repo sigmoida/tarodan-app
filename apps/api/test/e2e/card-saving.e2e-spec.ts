@@ -1,12 +1,18 @@
-import * as request from 'supertest';
-import { SavedCardStatus } from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
-import { truncateAll, getPrisma, seedBaseline, disconnectPrisma } from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { signCallback } from '../mocks/paytr.mock';
-import { PaymentService } from '../../src/modules/payment/payment.service';
+import * as request from "supertest";
+import { SavedCardStatus } from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
+import {
+  truncateAll,
+  getPrisma,
+  seedBaseline,
+  disconnectPrisma,
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { buyNow } from "../factories/flows";
+import { signCallback } from "../mocks/paytr.mock";
+import { PaymentService } from "../../src/modules/payment/payment.service";
 
 /**
  * Faz 3 + Faz 5 — CAPI kart saklama (CIT persist) + kullanıcı kart yönetimi.
@@ -19,7 +25,7 @@ import { PaymentService } from '../../src/modules/payment/payment.service';
  *
  * GERÇEK PayTR çağrısı yok; mock'lu PayTRService ile davranış doğrulanır.
  */
-describe('Card saving + management (CAPI, E2E)', () => {
+describe("Card saving + management (CAPI, E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -53,55 +59,67 @@ describe('Card saving + management (CAPI, E2E)', () => {
     });
     const addr = await createAddress({ userId: buyer.id });
 
-    const buyRes = await request(ctx.app.getHttpServer())
-      .post('/api/orders/buy')
-      .set(authHeader(buyer))
-      .send({ productId: product.id, shippingAddressId: addr.id })
-      .expect(201);
+    const buyRes = await buyNow(ctx, buyer, product.id, addr.id).expect(201);
 
     // Direct API form hazırlığı merchant_oid'i atar. Kart PayTR formunda
     // saklandığında callback'teki utoken yerel token kaydını başlatır.
-    await request(ctx.app.getHttpServer())
-      .post('/api/payments/direct-form')
+    const directFormRes = await request(ctx.app.getHttpServer())
+      .post("/api/payments/direct-form")
       .set(authHeader(buyer))
       .send({ orderId: buyRes.body.orderId, saveCard: true })
       .expect(201);
 
-    const payment = await prisma.payment.findFirst({
-      where: { orderId: buyRes.body.orderId },
+    const payment = await prisma.payment.findUnique({
+      where: { id: directFormRes.body.paymentId },
     });
 
-    await request(ctx.app.getHttpServer())
-      .post('/api/payments/callback/paytr')
+    const callbackRes = await request(ctx.app.getHttpServer())
+      .post("/api/payments/callback/paytr")
       .send(
         signCallback({
           merchantOid: payment!.providerConversationId!,
-          status: 'success',
+          status: "success",
           totalAmount: Math.round(Number(payment!.amount) * 100),
           utoken,
         }),
+      )
+      .expect(200);
+
+    if (callbackRes.text !== "OK") {
+      throw new Error(
+        `Unexpected PayTR callback response: ${callbackRes.text}`,
       );
+    }
 
     return { buyer, seller };
   }
 
-  it('store_card callback (utoken) gelince kartı SavedCard olarak kaydeder (PAN saklamaz)', async () => {
-    const utoken = 'UT-persist-1';
+  it("store_card callback (utoken) gelince kartı SavedCard olarak kaydeder (PAN saklamaz)", async () => {
+    const utoken = "UT-persist-1";
     ctx.paytr.setStoredCards(utoken, [
-      { ctoken: 'CT-persist-1', last4: '4242', brand: 'VISA', month: '12', year: '2030', requireCvv: false },
+      {
+        ctoken: "CT-persist-1",
+        last4: "4242",
+        brand: "VISA",
+        month: "12",
+        year: "2030",
+        requireCvv: false,
+      },
     ]);
 
     const { buyer } = await buyPayWithStoredCard(utoken);
 
     const prisma = getPrisma();
-    const cards = await prisma.savedCard.findMany({ where: { userId: buyer.id } });
+    const cards = await prisma.savedCard.findMany({
+      where: { userId: buyer.id },
+    });
     expect(cards.length).toBe(1);
     const c = cards[0];
-    expect(c.provider).toBe('paytr');
+    expect(c.provider).toBe("paytr");
     expect(c.utoken).toBe(utoken);
-    expect(c.ctoken).toBe('CT-persist-1');
-    expect(c.last4).toBe('4242');
-    expect(c.brand).toBe('VISA');
+    expect(c.ctoken).toBe("CT-persist-1");
+    expect(c.last4).toBe("4242");
+    expect(c.brand).toBe("VISA");
     expect(c.status).toBe(SavedCardStatus.active);
     expect(c.mandateAcceptedAt).toBeTruthy();
     // PAN/CVV asla saklanmaz — modelde böyle alanlar yok; emniyet için kontrol et.
@@ -109,41 +127,71 @@ describe('Card saving + management (CAPI, E2E)', () => {
     expect((c as any).cvv).toBeUndefined();
   });
 
-  it('aynı utoken/ctoken ikinci kez senkronlanınca kart çoğaltmaz (idempotent)', async () => {
+  it("aynı utoken/ctoken ikinci kez senkronlanınca kart çoğaltmaz (idempotent)", async () => {
     const prisma = getPrisma();
     const user = await createUser(ctx.module);
-    const utoken = 'UT-idem';
-    ctx.paytr.setStoredCards(utoken, [{ ctoken: 'CT-idem', last4: '1111', requireCvv: false }]);
+    const utoken = "UT-idem";
+    ctx.paytr.setStoredCards(utoken, [
+      { ctoken: "CT-idem", last4: "1111", requireCvv: false },
+    ]);
 
     const svc = ctx.app.get(PaymentService);
     await svc.syncSavedCardsFromUtoken(user.id, utoken);
     await svc.syncSavedCardsFromUtoken(user.id, utoken);
 
-    const cards = await prisma.savedCard.findMany({ where: { userId: user.id } });
+    const cards = await prisma.savedCard.findMany({
+      where: { userId: user.id },
+    });
     expect(cards.length).toBe(1);
   });
 
-  it('GET /membership/cards yalnız aktif kartları döndürür; require_cvv → autoRenewEligible=false; PAN içermez', async () => {
+  it("GET /membership/cards yalnız aktif kartları döndürür; require_cvv → autoRenewEligible=false; PAN içermez", async () => {
     const prisma = getPrisma();
     const user = await createUser(ctx.module);
     await prisma.savedCard.createMany({
       data: [
-        { userId: user.id, provider: 'paytr', utoken: 'U1', ctoken: 'A1', last4: '1000', brand: 'VISA', requireCvv: false, status: SavedCardStatus.active },
-        { userId: user.id, provider: 'paytr', utoken: 'U1', ctoken: 'A2', last4: '2000', brand: 'MC', requireCvv: true, status: SavedCardStatus.active },
-        { userId: user.id, provider: 'paytr', utoken: 'U1', ctoken: 'A3', last4: '3000', requireCvv: false, status: SavedCardStatus.revoked },
+        {
+          userId: user.id,
+          provider: "paytr",
+          utoken: "U1",
+          ctoken: "A1",
+          last4: "1000",
+          brand: "VISA",
+          requireCvv: false,
+          status: SavedCardStatus.active,
+        },
+        {
+          userId: user.id,
+          provider: "paytr",
+          utoken: "U1",
+          ctoken: "A2",
+          last4: "2000",
+          brand: "MC",
+          requireCvv: true,
+          status: SavedCardStatus.active,
+        },
+        {
+          userId: user.id,
+          provider: "paytr",
+          utoken: "U1",
+          ctoken: "A3",
+          last4: "3000",
+          requireCvv: false,
+          status: SavedCardStatus.revoked,
+        },
       ],
     });
 
     const res = await request(ctx.app.getHttpServer())
-      .get('/api/membership/cards')
+      .get("/api/membership/cards")
       .set(authHeader(user))
       .expect(200);
 
     const list = res.body as any[];
     expect(list.length).toBe(2); // revoked gizli
     const byLast4 = Object.fromEntries(list.map((c) => [c.last4, c]));
-    expect(byLast4['1000'].autoRenewEligible).toBe(true);
-    expect(byLast4['2000'].autoRenewEligible).toBe(false); // require_cvv
+    expect(byLast4["1000"].autoRenewEligible).toBe(true);
+    expect(byLast4["2000"].autoRenewEligible).toBe(false); // require_cvv
     // Yanıt maskeli — PAN/CVV/token içermez.
     for (const c of list) {
       expect(c.pan).toBeUndefined();
@@ -153,13 +201,22 @@ describe('Card saving + management (CAPI, E2E)', () => {
     }
   });
 
-  it('DELETE /membership/cards/:id → PayTR capi/delete çağrılır ve kart revoke edilir', async () => {
+  it("DELETE /membership/cards/:id → PayTR capi/delete çağrılır ve kart revoke edilir", async () => {
     const prisma = getPrisma();
     const user = await createUser(ctx.module);
-    const utoken = 'U-del';
-    ctx.paytr.setStoredCards(utoken, [{ ctoken: 'C-del', last4: '9999', requireCvv: false }]);
+    const utoken = "U-del";
+    ctx.paytr.setStoredCards(utoken, [
+      { ctoken: "C-del", last4: "9999", requireCvv: false },
+    ]);
     const card = await prisma.savedCard.create({
-      data: { userId: user.id, provider: 'paytr', utoken, ctoken: 'C-del', last4: '9999', status: SavedCardStatus.active },
+      data: {
+        userId: user.id,
+        provider: "paytr",
+        utoken,
+        ctoken: "C-del",
+        last4: "9999",
+        status: SavedCardStatus.active,
+      },
     });
 
     await request(ctx.app.getHttpServer())
@@ -168,17 +225,57 @@ describe('Card saving + management (CAPI, E2E)', () => {
       .expect(200);
 
     expect(ctx.paytr.capiDeleteCalls.length).toBe(1);
-    expect(ctx.paytr.capiDeleteCalls[0]).toEqual({ utoken, ctoken: 'C-del' });
+    expect(ctx.paytr.capiDeleteCalls[0]).toEqual({ utoken, ctoken: "C-del" });
     const after = await prisma.savedCard.findUnique({ where: { id: card.id } });
     expect(after!.status).toBe(SavedCardStatus.revoked);
   });
 
-  it('DELETE başkasının kartını silemez (404) ve PayTR çağrısı yapmaz', async () => {
+  it("PayTR silmeyi onaylamazsa 502 döner ve kart aktif kalır", async () => {
+    const prisma = getPrisma();
+    const user = await createUser(ctx.module);
+    const card = await prisma.savedCard.create({
+      data: {
+        userId: user.id,
+        provider: "paytr",
+        utoken: "U-provider-error",
+        ctoken: "C-provider-error",
+        last4: "4444",
+        status: SavedCardStatus.active,
+      },
+    });
+    const deleteSpy = jest
+      .spyOn(ctx.paytr, "capiDeleteCard")
+      .mockResolvedValueOnce({
+        status: "error",
+        reason: "provider unavailable",
+      });
+
+    try {
+      await request(ctx.app.getHttpServer())
+        .delete(`/api/membership/cards/${card.id}`)
+        .set(authHeader(user))
+        .expect(502);
+    } finally {
+      deleteSpy.mockRestore();
+    }
+
+    const after = await prisma.savedCard.findUnique({ where: { id: card.id } });
+    expect(after!.status).toBe(SavedCardStatus.active);
+  });
+
+  it("DELETE başkasının kartını silemez (404) ve PayTR çağrısı yapmaz", async () => {
     const prisma = getPrisma();
     const owner = await createUser(ctx.module);
     const attacker = await createUser(ctx.module);
     const card = await prisma.savedCard.create({
-      data: { userId: owner.id, provider: 'paytr', utoken: 'U-x', ctoken: 'C-x', last4: '0001', status: SavedCardStatus.active },
+      data: {
+        userId: owner.id,
+        provider: "paytr",
+        utoken: "U-x",
+        ctoken: "C-x",
+        last4: "0001",
+        status: SavedCardStatus.active,
+      },
     });
 
     await request(ctx.app.getHttpServer())

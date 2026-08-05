@@ -61,6 +61,7 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   messages: ["messages"],
   "support-tickets": ["support"],
   "commission-rules": ["commission"],
+  "commission-rule-sets": ["commission"],
   commission: ["commission"],
   payouts: ["payouts"],
   tax: ["tax"],
@@ -104,7 +105,6 @@ function extractSegment(url: string): string {
 export const ROLE_ONLY_ADMIN_SEGMENTS = new Set<string>([
   "invoices",
   "seller-invoices",
-  "trade-commission-rate",
 ]);
 
 /**

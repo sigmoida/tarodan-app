@@ -9,6 +9,7 @@ import { StorageService } from "../storage/storage.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { AdminAuditService } from "./admin-audit.service";
 import { ProductStatus, Prisma, type ModerationEvent } from "@prisma/client";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import {
   buildSearchWhere,
   paginate,
@@ -85,7 +86,10 @@ export class AdminModerationService {
     if (!type || type === "product") {
       const [products, productCount] = await Promise.all([
         this.prisma.product.findMany({
-          where: { status: ProductStatus.pending },
+          where: {
+            ...catalogProductWhere(),
+            status: ProductStatus.pending,
+          },
           include: {
             seller: { select: { id: true, displayName: true, email: true } },
             category: { select: { id: true, name: true } },
@@ -95,7 +99,12 @@ export class AdminModerationService {
           skip: type === "product" ? skip : 0,
           take: type === "product" ? pageSize : 10,
         }),
-        this.prisma.product.count({ where: { status: ProductStatus.pending } }),
+        this.prisma.product.count({
+          where: {
+            ...catalogProductWhere(),
+            status: ProductStatus.pending,
+          },
+        }),
       ]);
 
       items.push(
@@ -212,7 +221,12 @@ export class AdminModerationService {
   async getModerationStats() {
     const [pendingProducts, pendingMessages, recentReviews, flaggedUsers] =
       await Promise.all([
-        this.prisma.product.count({ where: { status: ProductStatus.pending } }),
+        this.prisma.product.count({
+          where: {
+            ...catalogProductWhere(),
+            status: ProductStatus.pending,
+          },
+        }),
         this.prisma.message.count({ where: { status: "pending_approval" } }),
         this.prisma.rating.count({
           where: {
@@ -246,9 +260,12 @@ export class AdminModerationService {
     pageSize?: number;
   }) {
     const { status, page = 1, pageSize = 20 } = options;
-    const where: Prisma.ProductWhereInput = status
-      ? { aiCheckStatus: status }
-      : { aiCheckStatus: { not: null } };
+    const where: Prisma.ProductWhereInput = {
+      ...catalogProductWhere(),
+      ...(status
+        ? { aiCheckStatus: status }
+        : { aiCheckStatus: { not: null } }),
+    };
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,

@@ -141,6 +141,13 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: true,
   },
   {
+    key: "product-import-stale-batches",
+    label: "Yarıda kalan toplu yüklemeler",
+    description:
+      "Süreç çökmesi nedeniyle 'işleniyor' durumunda asılı kalan toplu ürün yükleme kayıtlarını kapatır",
+    triggerable: true,
+  },
+  {
     key: "ledger-reconcile",
     label: "Defter mutabakatı",
     description:

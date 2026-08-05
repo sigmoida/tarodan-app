@@ -9,17 +9,17 @@ import {
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../workers/constants";
-import { enqueueTradeListingReindex } from "./trade-listing-reindex";
+import { enqueueSellerListingReindex } from "./seller-listing-reindex";
 import { PrismaService } from "../../prisma";
 import {
   MembershipTierType,
   SubscriptionStatus,
   ProductStatus,
+  ProductKind,
   OrderStatus,
   PaymentStatus,
   SavedCardStatus,
   TradeStatus,
-  CommissionTaxpayerType,
   type MembershipTier,
   Prisma,
 } from "@prisma/client";
@@ -32,13 +32,17 @@ import { PaymentProviderRegistry } from "../payment-providers/payment-provider.r
 import { ConfigService } from "@nestjs/config";
 import { MembershipCommonService } from "./membership-common.service";
 import { isPremiumEntitled } from "./membership.util";
-import { resolveTaxpayerType } from "../order/order-commission.helper";
 import { i18nMessage } from "../i18n";
 import { PaymentProviderEventService } from "../payment/payment-provider-event.service";
 import { createHash } from "node:crypto";
 import { VirtualOrderFulfillmentService } from "../payment/virtual-order-fulfillment.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { OutboxService } from "../outbox/outbox.service";
+import {
+  OUTBOX_SAVED_CARD_PROVIDER_DELETE,
+  type SavedCardProviderDeletePayload,
+} from "../outbox/outbox.types";
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -57,6 +61,7 @@ export class MembershipSubscriptionService {
     private readonly configService: ConfigService,
     private readonly common: MembershipCommonService,
     private readonly providerEvents: PaymentProviderEventService,
+    private readonly outbox: OutboxService,
     private readonly virtualOrder?: VirtualOrderFulfillmentService,
     // Takas yetkisi düşünce satıcının ürünlerini yeniden indeksle: arama
     // dokümanındaki `sellerCanTrade` üyelikten türetilir ve ürün düzenlemesi
@@ -89,30 +94,27 @@ export class MembershipSubscriptionService {
       );
     }
 
-    // Business tier: only APPROVED corporate accounts. companyName + taxId are
-    // client-writable via the profile endpoint, so their mere presence is not proof
-    // of a corporate seller — the approval gate is businessStatus === "approved"
-    // (the SAME corporate test used by pricing/VAT/commission via resolveTaxpayerType).
-    // Otherwise a user could self-assign company details and reach Business unreviewed.
+    // Üyelik/kimlik eksenleri birbirini dışlar: BUSINESS yalnız kurumsal;
+    // FREE/BASIC/PREMIUM yalnız bireysel hesap içindir.
+    const commissionIdentity = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { companyName: true, taxId: true, businessStatus: true },
+    });
+    const isApprovedCorporate =
+      !!commissionIdentity &&
+      !!commissionIdentity.companyName?.trim() &&
+      commissionIdentity.businessStatus === "approved" &&
+      !!commissionIdentity.taxId?.trim();
     if (dto.tierType === MembershipTierType.business) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { companyName: true, taxId: true, businessStatus: true },
-      });
-
-      const isApprovedCorporate =
-        !!user &&
-        !!user.companyName &&
-        resolveTaxpayerType({
-          businessStatus: user.businessStatus,
-          taxId: user.taxId,
-        }) === CommissionTaxpayerType.corporate;
-
       if (!isApprovedCorporate) {
         throw new ForbiddenException(
           i18nMessage("server.membership.businessTierRequiresCompany"),
         );
       }
+    } else if (isApprovedCorporate) {
+      throw new ForbiddenException(
+        i18nMessage("server.membership.businessTierRequiresCompany"),
+      );
     }
 
     const existingMembership = await this.prisma.userMembership.findUnique({
@@ -508,6 +510,7 @@ export class MembershipSubscriptionService {
           description: `Üyelik ödemesi için sanal ürün`,
           price: price,
           condition: "new",
+          kind: ProductKind.membership,
           status: ProductStatus.active,
         },
       });
@@ -1203,10 +1206,9 @@ export class MembershipSubscriptionService {
   }
 
   /**
-   * Kayıtlı kartı kaldırır: önce PayTR capi/delete, sonra yerelde status=revoked.
-   * Kaydı fiziksel silmeyiz — geçmiş MembershipPayment/denetim izi korunsun. PayTR
-   * silme onayı alınamasa bile yerelde revoke edilir (kart "kullanılmaz" işaretlenir;
-   * bu sayede runAutoRenewals bu kartı bir daha seçmez). Kart sahibi değilse 404.
+   * Kullanıcının silme niyetini yerelde hemen kesinleştirir. Sağlayıcı temizliği
+   * aynı transaction'da yazılan outbox olayıyla, kullanıcı isteğinden bağımsız
+   * olarak yeniden denenir.
    */
   async deleteSavedCard(
     userId: string,
@@ -1220,28 +1222,20 @@ export class MembershipSubscriptionService {
         i18nMessage("server.membership.savedCardNotFound"),
       );
     }
-    if (card.status === SavedCardStatus.revoked) {
-      return { deleted: true }; // idempotent
-    }
-    let providerDeleted = false;
-    try {
-      const res = await this.paymentProviders
-        .resolve()
-        .capiDeleteCard(card.utoken, card.ctoken);
-      providerDeleted = res.status === "success";
-      if (!providerDeleted) {
-        this.logger.warn(
-          `PayTR kart silme onayı alınamadı (card=${cardId}): ${res.reason || res.status}; yerelde revoke ediliyor`,
-        );
+    await this.prisma.$transaction(async (tx) => {
+      if (card.status !== SavedCardStatus.revoked) {
+        await tx.savedCard.update({
+          where: { id: card.id },
+          data: { status: SavedCardStatus.revoked, isDefault: false },
+        });
       }
-    } catch (e: any) {
-      this.logger.error(
-        `PayTR kart silme hatası (card=${cardId}): ${e?.message}`,
-      );
-    }
-    await this.prisma.savedCard.update({
-      where: { id: card.id },
-      data: { status: SavedCardStatus.revoked, isDefault: false },
+      await this.outbox.enqueue(tx, {
+        type: OUTBOX_SAVED_CARD_PROVIDER_DELETE,
+        payload: {
+          savedCardId: card.id,
+        } satisfies SavedCardProviderDeletePayload,
+        dedupeKey: `saved-card-provider-delete:${card.id}`,
+      });
     });
     return { deleted: true };
   }
@@ -1340,20 +1334,21 @@ export class MembershipSubscriptionService {
                 `Auto-cancelled ${cancelledPending.count} pending trade offer(s) for downgraded user`,
               );
             }
-
-            // Arama dokümanındaki `sellerCanTrade` bayatlamasın — ortak
-            // tetikleme (aktivasyon ve admin değişikliğiyle aynı yardımcı).
-            await enqueueTradeListingReindex(
-              this.prisma,
-              this.searchQueue,
-              membership.userId,
-            );
           } catch (tradeErr: any) {
             // Takas iptali downgrade'i bloklamasın; üyelik düşürme başarılı sayılır.
             this.logger.warn(
               `Failed to auto-cancel pending trades after downgrade: ${tradeErr?.message}`,
             );
           }
+
+        // Satış yetkisi dönem bittiği anda değişir. Tüm ilanları yeniden indeksle;
+        // yalnız takas bayraklı ürünleri tazelemek normal satış ilanlarını görünür
+        // bırakırdı.
+        await enqueueSellerListingReindex(
+          this.prisma,
+          this.searchQueue,
+          membership.userId,
+        );
       } catch (error) {
         this.logger.warn("Failed to downgrade membership");
       }

@@ -15,11 +15,11 @@ import {
   paymentHoldStatusConfig,
   refundRequestStatusConfig,
 } from "@tarodan/ui";
-import { useTranslations } from "next-intl";
-import { SectionCard } from "@/components/detail/SectionCard";
+import { useLocale, useTranslations } from "next-intl";
 import { DataList, Field } from "@/components/detail/DataList";
 import { fmtDate, fmtDateTime, fmtTry } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
+import { usePspFeeRate } from "@/hooks/usePspFeeRate";
 import {
   canManuallyUpdateOrderStatus,
   getOrderStatusInfo,
@@ -37,6 +37,10 @@ import { AddTrackingModal } from "../_modals/AddTrackingModal";
  * kırılım (stopaj/KDV dahil), GERÇEK escrow hold'u, iade talepleri, komisyon
  * defteri ve sipariş-başına admin aksiyonları. Ayrı sipariş detay ekranı yoktur —
  * her şey burada, grup çatısının altında.
+ *
+ * KART DEĞİL bölümdür: satıcı paketinin kartının içinde, üstündeki çizgiyle
+ * ayrılır. Kendi kartı olduğunda paket çatısıyla arasındaki bağ görsel olarak
+ * kopuyordu.
  */
 export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
   const t = useTranslations();
@@ -52,18 +56,18 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
   const f = entry.finance;
 
   return (
-    <SectionCard
-      title={
+    <section className="mt-5 border-t border-border pt-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <span className="flex flex-wrap items-center gap-3">
-          <span className="font-mono text-base">#{entry.orderNumber}</span>
+          <span className="font-mono text-sm font-medium text-heading">
+            #{entry.orderNumber}
+          </span>
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${status.color} ${status.bg}`}
           >
             {status.label}
           </span>
         </span>
-      }
-      actions={
         <div className="flex flex-wrap gap-2">
           {canManage && canManuallyUpdateOrderStatus(entry.status) && (
             <Button
@@ -85,8 +89,8 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
             </Button>
           )}
         </div>
-      }
-    >
+      </div>
+
       {/* Ürün satırı */}
       <div className="flex items-start gap-4">
         {entry.product.imageUrl && (
@@ -107,16 +111,21 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
           >
             {entry.product.title ?? entry.product.id}
           </Link>
-          <p className="text-sm text-muted">
-            {t("admin.operations.orders.file.quantity")}: {entry.quantity}
-            {entry.unitPrice != null && (
-              <>
-                {" "}
-                · {t("admin.operations.orders.file.unitPrice")}:{" "}
-                {fmtTry(entry.unitPrice)}
-              </>
-            )}
-          </p>
+          {/* Adet ve birim fiyat YALNIZ çoklu adette bilgi taşır: tek adette
+              ikisi de aşağıdaki "Ürün bedeli" satırının aynısıdır ve ekranda
+              üçüncü bir fiyat varmış izlenimi bırakıyordu. */}
+          {entry.quantity > 1 && (
+            <p className="text-sm text-muted">
+              {t("admin.operations.orders.file.quantity")}: {entry.quantity}
+              {entry.unitPrice != null && (
+                <>
+                  {" "}
+                  · {t("admin.operations.orders.file.unitPrice")}:{" "}
+                  {fmtTry(entry.unitPrice)}
+                </>
+              )}
+            </p>
+          )}
           <p className="mt-0.5 text-xs text-subtle">
             {fmtDateTime(entry.createdAt)}
             {entry.deliveredAt && (
@@ -143,17 +152,46 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
       {/* Finansal kırılım — her kalem ayrı satır. Tutarı 0 olan kalem GİZLENMEZ:
           satır kaybolunca admin, kalemin sıfır mı olduğunu yoksa hiç
           uygulanmadığını mı ayırt edemiyordu. */}
-      <OrderMoneyBreakdown f={f} />
+      <OrderMoneyBreakdown
+        f={f}
+        isRefunded={
+          entry.status === "refunded" || entry.ledger?.status === "refunded"
+        }
+      />
 
-      <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-1 border-t border-border pt-4 text-sm sm:grid-cols-2">
+      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-border pt-3 text-sm">
+        {/* Hangi komisyon kuralına düştüğü: sipariş anındaki snapshot. Tıklanınca
+            kural ekranı açılır ve o kuralın dialogu kendiliğinden gelir —
+            admin, oranların nereden geldiğini listede aramak zorunda kalmasın. */}
+        <span>
+          <span className="text-muted">
+            {t("admin.operations.orders.file.commissionRule")}:{" "}
+          </span>
+          {entry.commissionRule ? (
+            <Link
+              href={`/finance/commission?ruleId=${entry.commissionRule.id}`}
+              className="font-medium text-primary-600 hover:underline"
+            >
+              {entry.commissionRule.name ??
+                t("admin.operations.orders.file.commissionRuleUnnamed")}
+            </Link>
+          ) : (
+            <span className="font-medium text-heading">—</span>
+          )}
+        </span>
         {entry.ledger && (
-          <FinRow label={t("admin.operations.orders.file.ledgerTitle")}>
-            {t(
-              `admin.operations.orders.file.ledgerStatus.${entry.ledger.status}` as Parameters<
-                typeof t
-              >[0],
-            )}
-          </FinRow>
+          <span>
+            <span className="text-muted">
+              {t("admin.operations.orders.file.ledgerTitle")}:{" "}
+            </span>
+            <span className="font-medium text-heading">
+              {t(
+                `admin.operations.orders.file.ledgerStatus.${entry.ledger.status}` as Parameters<
+                  typeof t
+                >[0],
+              )}
+            </span>
+          </span>
         )}
       </div>
 
@@ -240,6 +278,9 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <span className="text-muted">
+                    {t("admin.operations.orders.file.refundedTotal")}:
+                  </span>
                   <span className="font-medium">{fmtTry(r.amount)}</span>
                   <Button asChild variant="ghost" size="sm">
                     <Link href={`/operations/refund-requests/${r.id}`}>
@@ -273,22 +314,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
         onClose={() => setTrackingOpen(false)}
         orderId={entry.id}
       />
-    </SectionCard>
-  );
-}
-
-function FinRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-muted">{label}</span>
-      <span>{children}</span>
-    </div>
+    </section>
   );
 }
 
@@ -309,8 +335,16 @@ const LINE_LABEL = {
  * `serviceVatRate` ile türetilir, güncel ayarla değil — oran sonradan değişse
  * bile eski sipariş tahsil edildiği haliyle görünür.
  */
-function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
+function OrderMoneyBreakdown({
+  f,
+  isRefunded,
+}: {
+  f: OrderFileFinance;
+  isRefunded: boolean;
+}) {
   const t = useTranslations();
+  const locale = useLocale();
+  const pspFeeRate = usePspFeeRate();
   const b = buildOrderBreakdown({
     subtotal: f.subtotal,
     sellerCommissionAmount: f.sellerCommissionAmount,
@@ -321,7 +355,24 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
     buyerShippingAmount: f.buyerShippingAmount,
     withholdingTaxAmount: f.withholdingTaxAmount,
     serviceVatRate: f.serviceVatRate,
+    pspFeeRate,
   });
+
+  const formatRate = (rate: number) =>
+    new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(rate);
+  const withRate = (label: string, rate: number) => {
+    const rateText = `%${formatRate(rate)}`;
+    return label.endsWith(")")
+      ? label.replace(/\)$/, `, ${rateText})`)
+      : `${label} (${rateText})`;
+  };
+  const withholdingRate =
+    f.subtotal > 0
+      ? Math.round((f.withholdingTaxAmount / f.subtotal) * 10_000) / 100
+      : 0;
 
   const Line = ({
     label,
@@ -332,9 +383,13 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
     amount: number;
     vat?: number;
   }) => (
-    <div className="grid grid-cols-[1fr_auto_5rem] items-baseline gap-x-3 py-0.5">
-      <span className="text-muted">{label}</span>
-      <span className="tabular-nums text-heading">{fmtTry(amount)}</span>
+    <div className="grid grid-cols-[minmax(max-content,1fr)_7rem_5rem] items-baseline gap-x-3 py-0.5">
+      <span className="whitespace-nowrap text-muted">{label}</span>
+      {/* Sabit genişlik + sağa yaslama: tutar sütunu içeriğe göre daralınca
+          "₺0,06" ile "₺885,60" aynı sütunda hizasız duruyordu. */}
+      <span className="text-right tabular-nums text-heading">
+        {fmtTry(amount)}
+      </span>
       <span className="text-right text-xs tabular-nums text-subtle">
         {vat == null ? "" : fmtTry(vat)}
       </span>
@@ -350,9 +405,9 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
     amount: number;
     tone?: string;
   }) => (
-    <div className="mt-1 grid grid-cols-[1fr_auto_5rem] items-baseline gap-x-3 border-t border-border pt-1 font-medium">
-      <span>{label}</span>
-      <span className={`tabular-nums ${tone ?? "text-heading"}`}>
+    <div className="mt-1 grid grid-cols-[minmax(max-content,1fr)_7rem_5rem] items-baseline gap-x-3 border-t border-border pt-1 font-medium">
+      <span className="whitespace-nowrap">{label}</span>
+      <span className={`text-right tabular-nums ${tone ?? "text-heading"}`}>
         {fmtTry(amount)}
       </span>
       <span />
@@ -360,7 +415,7 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
   );
 
   const Head = ({ title }: { title: string }) => (
-    <div className="grid grid-cols-[1fr_auto_5rem] gap-x-3 text-xs uppercase tracking-wide text-subtle">
+    <div className="grid grid-cols-[minmax(max-content,1fr)_7rem_5rem] gap-x-3 text-xs uppercase tracking-wide text-subtle">
       <span>{title}</span>
       <span className="text-right">
         {t("admin.operations.orders.file.lineAmount")}
@@ -371,89 +426,236 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
     </div>
   );
 
+  type SideValue = { label: string; amount: number; vat?: number };
+  const SideCells = ({ value }: { value?: SideValue }) =>
+    value ? (
+      <>
+        <span className="whitespace-nowrap text-muted">{value.label}</span>
+        <span className="whitespace-nowrap text-right tabular-nums text-heading">
+          {fmtTry(value.amount)}
+        </span>
+        <span className="whitespace-nowrap text-right text-xs tabular-nums text-subtle">
+          {value.vat == null ? "" : fmtTry(value.vat)}
+        </span>
+      </>
+    ) : (
+      <>
+        <span aria-hidden />
+        <span aria-hidden />
+        <span aria-hidden />
+      </>
+    );
+
+  const PairedLine = ({
+    seller,
+    buyer,
+    total = false,
+    sellerTone,
+    buyerTone,
+  }: {
+    seller?: SideValue;
+    buyer?: SideValue;
+    total?: boolean;
+    sellerTone?: string;
+    buyerTone?: string;
+  }) => (
+    <div
+      className={`grid grid-cols-[minmax(max-content,1fr)_7rem_5rem_minmax(max-content,1fr)_7rem_5rem] items-baseline gap-x-3 py-0.5 ${
+        total ? "mt-1 border-t border-border pt-1 font-medium" : ""
+      }`}
+    >
+      {seller ? (
+        <>
+          <span className="whitespace-nowrap text-muted">{seller.label}</span>
+          <span
+            className={`whitespace-nowrap text-right tabular-nums ${sellerTone ?? "text-heading"}`}
+          >
+            {fmtTry(seller.amount)}
+          </span>
+          <span className="whitespace-nowrap text-right text-xs tabular-nums text-subtle">
+            {seller.vat == null ? "" : fmtTry(seller.vat)}
+          </span>
+        </>
+      ) : (
+        <SideCells />
+      )}
+      {buyer ? (
+        <>
+          <span className="whitespace-nowrap text-muted">{buyer.label}</span>
+          <span
+            className={`whitespace-nowrap text-right tabular-nums ${buyerTone ?? "text-heading"}`}
+          >
+            {fmtTry(buyer.amount)}
+          </span>
+          <span className="whitespace-nowrap text-right text-xs tabular-nums text-subtle">
+            {buyer.vat == null ? "" : fmtTry(buyer.vat)}
+          </span>
+        </>
+      ) : (
+        <SideCells />
+      )}
+    </div>
+  );
+
+  const sellerRows: SideValue[] = [
+    {
+      label: t("admin.operations.orders.file.productPrice"),
+      amount: b.subtotal,
+    },
+    ...b.seller.lines.map((line) => ({
+      label: t(LINE_LABEL[line.key]),
+      amount: line.amount,
+      vat: line.vat,
+    })),
+    {
+      label: t("admin.operations.orders.file.sellerVatTotal"),
+      amount: b.seller.vatTotal,
+    },
+    {
+      label: withRate(
+        t("admin.operations.orders.file.withholding"),
+        withholdingRate,
+      ),
+      amount: b.seller.withholding,
+    },
+  ];
+  const buyerRows: SideValue[] = [
+    {
+      label: t("admin.operations.orders.file.productPrice"),
+      amount: b.subtotal,
+    },
+    ...b.buyer.lines.map((line) => ({
+      label: t(LINE_LABEL[line.key]),
+      amount: line.amount,
+      vat: line.vat,
+    })),
+    {
+      label: t("admin.operations.orders.file.buyerVatTotal"),
+      amount: b.buyer.vatTotal,
+    },
+  ];
+
   return (
-    <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 border-t border-border pt-4 text-sm lg:grid-cols-2">
-      <div>
-        <Head title={t("admin.operations.orders.file.sellerSide")} />
-        <Line
-          label={t("admin.operations.orders.file.productPrice")}
-          amount={b.subtotal}
-        />
-        {b.seller.lines.map((line) => (
-          <Line
-            key={line.key}
-            label={t(LINE_LABEL[line.key])}
-            amount={line.amount}
-            vat={line.vat}
+    <div className="mt-4 space-y-4 border-t border-border pt-4 text-sm">
+      {isRefunded && (
+        <p className="rounded-lg bg-warning-50 px-3 py-2 text-warning-800">
+          {t("admin.operations.orders.file.refundedBreakdownNote")}
+        </p>
+      )}
+      <div className="overflow-x-auto">
+        <div className="min-w-[900px]">
+          <div className="grid grid-cols-[minmax(max-content,1fr)_7rem_5rem_minmax(max-content,1fr)_7rem_5rem] gap-x-3 text-xs uppercase tracking-wide text-subtle">
+            <span>{t("admin.operations.orders.file.sellerSide")}</span>
+            <span className="text-right">
+              {t("admin.operations.orders.file.lineAmount")}
+            </span>
+            <span className="text-right">
+              {t("admin.operations.orders.file.lineVat")}
+            </span>
+            <span>{t("admin.operations.orders.file.buyerSide")}</span>
+            <span className="text-right">
+              {t("admin.operations.orders.file.lineAmount")}
+            </span>
+            <span className="text-right">
+              {t("admin.operations.orders.file.lineVat")}
+            </span>
+          </div>
+          {sellerRows.map((seller, index) => (
+            <PairedLine
+              key={seller.label}
+              seller={seller}
+              buyer={buyerRows[index]}
+            />
+          ))}
+          <PairedLine
+            total
+            seller={{
+              label: t("admin.operations.orders.file.sellerDeductionTotal"),
+              amount: b.seller.deductionTotal,
+            }}
+            buyer={{
+              label: t("admin.operations.orders.file.buyerAddedTotal"),
+              amount: b.buyer.addedTotal,
+            }}
+            sellerTone="text-danger-600"
           />
-        ))}
-        <Line
-          label={t("admin.operations.orders.file.sellerVatTotal")}
-          amount={b.seller.vatTotal}
-        />
-        <Line
-          label={t("admin.operations.orders.file.withholding")}
-          amount={b.seller.withholding}
-        />
-        <Total
-          label={t("admin.operations.orders.file.sellerDeductionTotal")}
-          amount={b.seller.deductionTotal}
-          tone="text-danger-600"
-        />
-        <Total
-          label={t("admin.operations.orders.financial.sellerNet")}
-          amount={b.seller.net}
-          tone="text-success-600"
-        />
+          <PairedLine
+            total
+            seller={{
+              label: t("admin.operations.orders.financial.sellerNet"),
+              amount: b.seller.net,
+            }}
+            buyer={{
+              label: t("admin.operations.orders.financial.buyerTotal"),
+              amount: b.buyer.payable,
+            }}
+            sellerTone="text-success-600"
+            buyerTone="text-primary-600"
+          />
+        </div>
       </div>
 
-      <div>
-        <Head title={t("admin.operations.orders.file.buyerSide")} />
-        <Line
-          label={t("admin.operations.orders.file.productPrice")}
-          amount={b.subtotal}
-        />
-        {b.buyer.lines.map((line) => (
+      <div className="overflow-x-auto">
+        <div className="min-w-[440px]">
+          <Head title={t("admin.operations.orders.file.moneySplit")} />
+          {/* Şelale: elde kalan brütten maliyetler sırayla düşülür → net hak ediş. */}
           <Line
-            key={line.key}
-            label={t(LINE_LABEL[line.key])}
-            amount={line.amount}
-            vat={line.vat}
+            label={t("admin.operations.orders.file.grossRetained")}
+            amount={b.platform.grossRetained}
           />
-        ))}
-        <Line
-          label={t("admin.operations.orders.file.buyerVatTotal")}
-          amount={b.buyer.vatTotal}
-        />
-        <Total
-          label={t("admin.operations.orders.file.buyerAddedTotal")}
-          amount={b.buyer.addedTotal}
-        />
-        <Total
-          label={t("admin.operations.orders.financial.buyerTotal")}
-          amount={b.buyer.payable}
-          tone="text-primary-600"
-        />
-      </div>
-
-      <div className="lg:col-span-2">
-        <Head title={t("admin.operations.orders.file.moneySplit")} />
-        <Line
-          label={t("admin.operations.orders.file.platformRevenue")}
-          amount={b.platform.revenue}
-        />
-        <Line
-          label={t("admin.operations.orders.file.platformTax")}
-          amount={b.platform.tax}
-        />
-        <Line
-          label={t("admin.operations.orders.file.platformShipping")}
-          amount={b.platform.shipping}
-        />
-        <div className="grid grid-cols-[1fr_auto_5rem] gap-x-3 pt-1 text-xs text-subtle">
-          <span>{t("admin.operations.orders.file.platformTakeRate")}</span>
-          <span className="tabular-nums">%{b.platform.takeRate}</span>
-          <span />
+          <Line
+            label={t("admin.operations.orders.file.platformShipping")}
+            amount={-b.platform.shipping}
+          />
+          <Line
+            label={t("admin.operations.orders.file.afterShipping")}
+            amount={b.platform.afterShipping}
+          />
+          <Line
+            label={withRate(
+              t("admin.operations.orders.file.withholding"),
+              withholdingRate,
+            )}
+            amount={-b.seller.withholding}
+          />
+          <Line
+            label={t("admin.operations.orders.file.afterWithholding")}
+            amount={b.platform.afterWithholding}
+          />
+          <Line
+            label={withRate(
+              t("admin.operations.orders.file.serviceVatOut"),
+              f.serviceVatRate,
+            )}
+            amount={-b.platform.vatOut}
+          />
+          <Line
+            label={t("admin.operations.orders.file.afterVat")}
+            amount={b.platform.afterVat}
+          />
+          <Line
+            label={withRate(
+              t("admin.operations.orders.file.pspFee"),
+              pspFeeRate,
+            )}
+            amount={-b.platform.pspFee}
+          />
+          <Total
+            label={t(
+              isRefunded
+                ? "admin.operations.orders.file.netRevenueAtCharge"
+                : "admin.operations.orders.file.netRevenue",
+            )}
+            amount={b.platform.netRevenue}
+            tone="text-primary-600"
+          />
+          <div className="grid grid-cols-[minmax(max-content,1fr)_7rem_5rem] gap-x-3 pt-1 text-xs text-subtle">
+            <span>{t("admin.operations.orders.file.netTakeRate")}</span>
+            <span className="text-right tabular-nums">
+              %{b.platform.netTakeRate}
+            </span>
+            <span />
+          </div>
         </div>
       </div>
     </div>

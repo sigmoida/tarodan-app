@@ -160,11 +160,12 @@ describe("PayoutService stage-1 with transfer-result callback flag", () => {
 });
 
 describe("PayoutService.handleTransferResultCallback", () => {
-  const submitted = () =>
+  const submitted = (overrides: Record<string, unknown> = {}) =>
     makePayout({
       status: PayoutStatus.processing,
       submittedAt: new Date("2026-08-01T10:00:00Z"),
       submittedAmount: 88, // netAmount'tan (90) BİLEREK farklı — hangisinin kullanıldığını ayırt eder
+      ...overrides,
     });
 
   it("completes a submitted payout and fires side effects with the SUBMITTED amount", async () => {
@@ -191,12 +192,44 @@ describe("PayoutService.handleTransferResultCallback", () => {
     expect(ledger.record).toHaveBeenCalledTimes(1);
     const entries = ledger.record.mock.calls[0][1].entries;
     expect(entries.every((e: any) => e.amount === 88)).toBe(true);
+    // Payout başına TEK settle kaydı: callback tekrarı (PayTR "OK" görene dek
+    // yineler) ikinci kez yazamaz.
+    expect(ledger.record.mock.calls[0][1].idempotencyKey).toBe(
+      "payout-completed:payout-1",
+    );
     // Başarılı transfer → IBAN otomatik doğrulanır.
     expect(prisma.sellerBankAccount.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ isVerified: true }),
       }),
     );
+  });
+
+  /**
+   * Escrow kalıntı invaryantının ÖN KOŞULU: settle kaydı siparişe bağlanmalı.
+   * Eskiden `payout_completed` yalnız payoutId/sellerId taşıyordu; sipariş bazlı
+   * escrow bakiyesi capture debit'iyle açık kalıp asla kapanmıyor görünüyordu, bu
+   * yüzden "escrow kapandı mı" sorusu defterden HİÇ sorulamıyordu. Hold ↔ payout
+   * 1:1 olduğundan sipariş referansı payout satırından türetilir.
+   */
+  it("links the settle entry to the order and hold (escrow sipariş bazında kapansın)", async () => {
+    const prisma = makePrisma(
+      submitted({
+        paymentHoldId: "hold-1",
+        paymentHold: { orderId: "order-1" },
+      }),
+      activeAccount,
+    );
+    const { service, ledger } = makeService({ prisma, flagEnabled: true });
+
+    await service.handleTransferResultCallback('["TRANSFER1"]', "hash");
+
+    expect(ledger.record.mock.calls[0][1].refs).toMatchObject({
+      payoutId: "payout-1",
+      sellerId: "seller-1",
+      orderId: "order-1",
+      holdId: "hold-1",
+    });
   });
 
   it("is idempotent: a replayed callback fires side effects only once", async () => {

@@ -74,6 +74,22 @@ export class CheckoutQuoteItemResponseDto {
   title?: string;
 }
 
+export class CheckoutQuoteUnavailableItemResponseDto {
+  @ApiProperty()
+  productId: string;
+
+  @ApiPropertyOptional()
+  sellerId?: string;
+
+  @ApiProperty({
+    enum: ["PRODUCT_NOT_FOUND", "PRODUCT_NOT_ACTIVE", "SELLER_SALES_SUSPENDED"],
+  })
+  code: "PRODUCT_NOT_FOUND" | "PRODUCT_NOT_ACTIVE" | "SELLER_SALES_SUSPENDED";
+
+  @ApiProperty()
+  message: string;
+}
+
 export class CheckoutQuoteResponseDto {
   @ApiProperty({ description: "Sum of item subtotals" })
   itemsSubtotal: number;
@@ -117,8 +133,23 @@ export class CheckoutQuoteResponseDto {
   })
   shippingTariffVersion: number;
 
+  @ApiProperty({ description: "Published commission set used by this quote" })
+  commissionRuleSetId: string;
+
+  @ApiProperty({
+    description: "Published commission set version used by this quote",
+  })
+  commissionRuleSetVersion: number;
+
   @ApiProperty({ type: [CheckoutQuoteItemResponseDto] })
   items: CheckoutQuoteItemResponseDto[];
+
+  @ApiProperty({
+    type: [CheckoutQuoteUnavailableItemResponseDto],
+    description:
+      "Requested lines excluded from this quote, with an explicit business reason.",
+  })
+  unavailableItems: CheckoutQuoteUnavailableItemResponseDto[];
 
   @ApiProperty({
     description: "Buyer shipping cost breakdown by seller package",

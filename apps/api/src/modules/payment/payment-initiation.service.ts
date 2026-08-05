@@ -25,6 +25,7 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { i18nMessage } from "../i18n";
+import { primaryCashPayment, TRADE_PRICING_V2 } from "../trade/trade.constants";
 
 @Injectable()
 export class PaymentInitiationService {
@@ -856,7 +857,7 @@ export class PaymentInitiationService {
       const trade = await this.prisma.trade.findUnique({
         where: { id: dto.tradeId },
         include: {
-          cashPayment: true,
+          cashPayments: true,
           initiator: {
             select: { id: true, displayName: true, email: true, phone: true },
           },
@@ -878,17 +879,24 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.tradeNotAcceptedOrInvalidStatus"),
         );
       }
-      if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
+      // v2: iki taraf da öder — ödeyen "farkı ödeyen taraf" değil, SATIRIN
+      // SAHİBİDİR. Kart formu, initiate-trade-cash ile AYNI kurala uymak
+      // zorunda; aksi halde iki uç aynı takasta farklı taraflara izin verir
+      // (kafa kafaya takasta bu dal herkese kapalıydı: cashAmount 0).
+      const isV2 = trade.pricingVersion === TRADE_PRICING_V2;
+      if (!isV2 && (!trade.cashAmount || Number(trade.cashAmount) <= 0)) {
         throw new BadRequestException(
           i18nMessage("server.payment.tradeNoCashDifference"),
         );
       }
-      if (trade.cashPayerId !== userId) {
+      if (!isV2 && trade.cashPayerId !== userId) {
         throw new ForbiddenException(
           i18nMessage("server.payment.onlyDesignatedPayerCanInitiate"),
         );
       }
-      const cashPayment = trade.cashPayment;
+      const cashPayment = isV2
+        ? (trade.cashPayments?.find((p: any) => p.payerId === userId) ?? null)
+        : primaryCashPayment(trade.cashPayments);
       if (!cashPayment)
         throw new BadRequestException(
           i18nMessage("server.payment.cashPaymentRecordNotFound"),
@@ -898,8 +906,9 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"),
         );
       amount = Number(cashPayment.totalAmount);
+      // Alıcı bilgisi satırın sahibinden gelir (v1'de sahip = farkı ödeyen).
       const payer =
-        trade.cashPayerId === trade.initiatorId
+        cashPayment.payerId === trade.initiatorId
           ? trade.initiator
           : trade.receiver;
       payment =
@@ -1031,7 +1040,7 @@ export class PaymentInitiationService {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
-        cashPayment: true,
+        cashPayments: true,
         initiator: {
           select: { id: true, displayName: true, email: true, phone: true },
         },
@@ -1054,18 +1063,24 @@ export class PaymentInitiationService {
         i18nMessage("server.payment.tradeNotAcceptedOrInvalidStatus"),
       );
     }
-    if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
+    // v2: her tarafın KENDİ satırı vardır (hizmet bedeli + kargo + varsa fark),
+    // dolayısıyla ödeyen "farkı ödeyen taraf" değil, satırın sahibidir.
+    // v1: takas başına tek satır ve yalnız farkı ödeyen taraf öderdi.
+    const isV2 = trade.pricingVersion === TRADE_PRICING_V2;
+    if (!isV2 && (!trade.cashAmount || Number(trade.cashAmount) <= 0)) {
       throw new BadRequestException(
         i18nMessage("server.payment.tradeNoCashDifference"),
       );
     }
-    if (trade.cashPayerId !== userId) {
+    if (!isV2 && trade.cashPayerId !== userId) {
       throw new ForbiddenException(
         i18nMessage("server.payment.onlyDesignatedPayerCanInitiate"),
       );
     }
 
-    const cashPayment = trade.cashPayment;
+    const cashPayment = isV2
+      ? (trade.cashPayments?.find((p: any) => p.payerId === userId) ?? null)
+      : primaryCashPayment(trade.cashPayments);
     if (!cashPayment) {
       throw new BadRequestException(
         i18nMessage("server.payment.cashPaymentRecordNotFound"),

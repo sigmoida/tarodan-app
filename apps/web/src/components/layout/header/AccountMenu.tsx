@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import {
   UserCircleIcon,
@@ -87,6 +87,47 @@ interface AccountMenuProps {
 const MENU_LINK_CLASS =
   "flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600";
 
+/** Panelin alt kenarı ile ekranın alt kenarı arasında bırakılan nefes payı (px). */
+const VIEWPORT_GAP = 16;
+
+/**
+ * Panelin yüksekliğini GERÇEK boşluğa göre sınırlar.
+ *
+ * Sabit bir `max-h-[calc(100vh-8rem)]` vardı: bu bütçe panelin ekranda nerede
+ * açıldığını bilmediği için yer varken bile menüyü kısaltıp scroll çıkarıyordu.
+ * Panelin viewport'a göre üst konumunu ölçüp kalan yüksekliği veriyoruz —
+ * içerik sığdığı sürece scroll hiç oluşmaz.
+ */
+function useAvailableHeight(open: boolean) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [maxHeight, setMaxHeight] = useState<number | undefined>();
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMaxHeight(undefined);
+      return;
+    }
+    const measure = () => {
+      const el = panelRef.current;
+      if (!el) return;
+      // maxHeight paneli kısaltır ama üst kenarını oynatmaz (absolute), bu
+      // yüzden ölçüm kendi kendini beslemez.
+      const { top } = el.getBoundingClientRect();
+      setMaxHeight(Math.max(160, window.innerHeight - top - VIEWPORT_GAP));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    // Sticky header ile birlikte panel de kayabilir → scroll'da yeniden ölç.
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open]);
+
+  return { panelRef, maxHeight };
+}
+
 /**
  * The account dropdown: trigger button + panel (authed profile menu or the
  * guest login/register panel).
@@ -108,6 +149,7 @@ export default function AccountMenu({
     handleMouseEnter,
     handleMouseLeave,
   } = useAccountDropdown();
+  const { panelRef, maxHeight } = useAvailableHeight(showAccountDropdown);
 
   const membershipTier = user?.membershipTier || "free";
   const close = () => setShowAccountDropdown(false);
@@ -138,7 +180,11 @@ export default function AccountMenu({
       </Button>
 
       {showAccountDropdown && (
-        <div className="absolute right-0 mt-1 w-56 bg-surface-elevated rounded-lg shadow-xl border border-border-subtle py-1 z-[100] overflow-y-auto max-h-[calc(100vh-8rem)]">
+        <div
+          ref={panelRef}
+          style={{ maxHeight }}
+          className="absolute right-0 mt-1 w-56 bg-surface-elevated rounded-lg shadow-xl border border-border-subtle py-1 z-[100] overflow-y-auto"
+        >
           {showAuthUI ? (
             <>
               {/* İsim / e-posta alanı — profile linkli */}

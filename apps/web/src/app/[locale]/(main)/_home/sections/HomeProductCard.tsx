@@ -9,9 +9,12 @@ import {
 } from "@/lib/productPrice";
 import type { Product } from "@/types/product";
 import { getImageUrl } from "../lib/helpers";
+import { formatTL } from "@/lib/format";
 
-const formatPrice = (value: number) =>
-  `${value.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} ₺`;
+// Para biçimi TEK yerden gelir (`lib/format`): ekranlar kendi
+// `toLocaleString` çağrılarını yazdığında aynı ürün bir kartta "468 ₺",
+// detayda "468,19 TL" görünüyor ve kart biçimi kuruşu YUVARLIYORDU.
+const formatPrice = formatTL;
 
 /** Server-rendered home card; only the image itself uses Next's built-in loader. */
 export default function HomeProductCard({

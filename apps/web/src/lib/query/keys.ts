@@ -87,7 +87,6 @@ export const queryKeys = {
   profile: {
     /** The profile overview aggregate (stats + membership + pending counts). */
     overview: () => ["profile", "overview"] as const,
-    unreadMessages: () => ["profile-unread-messages"] as const,
   },
   membership: {
     /** All membership tiers with their prices (single source: DB MembershipTier). */
@@ -138,6 +137,11 @@ export const queryKeys = {
   trades: {
     all: () => ["trades"] as const,
     detail: (id: string) => ["trade", id] as const,
+    /** Taraf başına ödeme dökümü (v2) — takas detayından ayrı sorgu. */
+    paymentQuote: (id: string) => ["trade-payment-quote", id] as const,
+    /** Kaydedilmemiş teklifin maliyeti; `signature` seçim + fark imzasıdır. */
+    costPreview: (signature: string) =>
+      ["trade-cost-preview", signature] as const,
     pendingCount: () => ["trades-pending-count"] as const,
   },
   payments: {

@@ -5,6 +5,8 @@ import { TradeService } from "./trade.service";
 import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "./trade-common.service";
 import { TradeQueryService } from "./trade-query.service";
+import { TradeQuoteService } from "./trade-quote.service";
+import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 import { TradeLifecycleService } from "./trade-lifecycle.service";
 import { TradeReconciliationService } from "./trade-reconciliation.service";
 import { TradeSchedulerService } from "./trade-scheduler.service";
@@ -34,6 +36,8 @@ import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
     ProductModule,
     EventModule,
     SuratCargoModule,
+    // Takas kargo bedeli sipariş tarifesiyle AYNI kaynaktan gelir (leaf modül).
+    ShippingTariffModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [TradeController],
@@ -44,12 +48,13 @@ import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
     TradeShipmentService,
     TradeCommonService,
     TradeQueryService,
+    TradeQuoteService,
     TradeLifecycleService,
     TradeReconciliationService,
     TradeSchedulerService,
     ...scheduledProcessors(TradeScheduledProcessor),
     TradeCashClearedListener,
   ],
-  exports: [TradeService],
+  exports: [TradeService, TradeQuoteService],
 })
 export class TradeModule {}

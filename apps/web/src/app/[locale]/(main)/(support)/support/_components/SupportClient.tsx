@@ -2,8 +2,6 @@
 
 import { Link } from "@/i18n/navigation";
 import {
-  QuestionMarkCircleIcon,
-  ChatBubbleLeftRightIcon,
   EnvelopeIcon,
   LifebuoyIcon,
   PlusIcon,
@@ -16,33 +14,20 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 import { formatDate } from "@/lib/format";
-import { CATEGORIES, STATUS_CONFIG, categoryLabel } from "../_lib/data";
+import {
+  CATEGORIES,
+  STATUS_CONFIG,
+  HELP_TOPICS,
+  POPULAR_TOPICS,
+  categoryLabel,
+} from "../_lib/data";
 import { useSupport } from "../_hooks/useSupport";
 
-const QUICK_LINKS = [
-  {
-    href: "/help",
-    icon: QuestionMarkCircleIcon,
-    color: "text-info-500",
-    title: "Yardım Merkezi",
-    sub: "Rehberler ve konu başlıkları",
-  },
-  {
-    href: "/faq",
-    icon: ChatBubbleLeftRightIcon,
-    color: "text-success-500",
-    title: "Sıkça Sorulan Sorular",
-    sub: "Hızlı yanıtlar",
-  },
-  {
-    href: "/contact",
-    icon: EnvelopeIcon,
-    color: "text-primary-500",
-    title: "İletişim",
-    sub: "Bize yazın",
-  },
-];
-
+/**
+ * Yardım & Destek — tek sayfa. Önce kendine yardım (konu listeleri, popüler
+ * sorular), sonra çözülemeyen durum için talep açma ve talep geçmişi. Ayrı bir
+ * /help sayfası yok; ikisi aynı kullanıcı yolculuğunun iki adımıydı.
+ */
 export default function SupportClient() {
   const {
     isAuthenticated,
@@ -55,47 +40,84 @@ export default function SupportClient() {
     onSubmit,
     isSubmitting,
   } = useSupport();
-  const { register, setValue, watch, formState } = form;
+  const { setValue, watch, formState, register } = form;
   register("category");
   const category = watch("category");
 
   return (
     <DocPage
-      title="Destek Merkezi"
-      description="Size yardımcı olmak için buradayız. Sorununuzu bildirin, ekibimiz en kısa sürede sizinle ilgilensin."
+      title="Yardım & Destek"
+      description="Önce hazır yanıtlara göz atın; çözemezseniz destek talebi oluşturun."
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink variant="secondary" size="sm" href="/faq">
+            Sıkça Sorulan Sorular
+          </ButtonLink>
+          <ButtonLink variant="secondary" size="sm" href="/guides">
+            Kullanım Kılavuzları
+          </ButtonLink>
+          <ButtonLink variant="secondary" size="sm" href="/contact">
+            İletişim
+          </ButtonLink>
+        </div>
+      }
     >
-      {/* Quick links */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        {QUICK_LINKS.map((q) => (
-          <Link
-            key={q.href}
-            href={q.href}
-            className="flex items-center gap-3 rounded-lg border border-border bg-surface-elevated p-4 transition-shadow hover:shadow-md"
-          >
-            <q.icon className={`h-8 w-8 flex-shrink-0 ${q.color}`} />
-            <div>
-              <p className="font-semibold text-heading">{q.title}</p>
-              <p className="text-sm text-muted">{q.sub}</p>
+      {/* Self-serve: topics + popular questions in one card, no colour blocks */}
+      <SectionCard title="Yardım Konuları">
+        <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          {HELP_TOPICS.map((topic) => (
+            <div key={topic.title}>
+              <div className="mb-2 flex items-center gap-2">
+                <topic.icon className="h-5 w-5 text-muted" />
+                <h3 className="font-medium text-heading">{topic.title}</h3>
+              </div>
+              <ul className="space-y-1.5">
+                {topic.links.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-muted transition-colors hover:text-primary-600"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </Link>
-        ))}
-      </div>
+          ))}
+        </div>
+      </SectionCard>
 
+      <SectionCard title="Popüler Sorular">
+        <ul className="divide-y divide-border-subtle">
+          {POPULAR_TOPICS.map((item) => (
+            <li key={item.q}>
+              <Link
+                href={item.href}
+                className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-surface"
+              >
+                <span className="text-sm text-body">{item.q}</span>
+                <ChevronRightIcon className="h-4 w-4 flex-shrink-0 text-subtle" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+
+      {/* Ticketing */}
       {!authLoading && !isAuthenticated && (
         <SectionCard className="text-center">
-          <LifebuoyIcon className="mx-auto mb-4 h-12 w-12 text-subtle" />
-          <h2 className="mb-2 text-xl font-semibold text-heading">
+          <LifebuoyIcon className="mx-auto mb-3 h-10 w-10 text-subtle" />
+          <h2 className="mb-2 text-lg font-semibold text-heading">
             Destek talebi oluşturmak için giriş yapın
           </h2>
-          <p className="mb-6 text-muted">
+          <p className="mb-5 text-sm text-muted">
             Siparişleriniz, ödemeleriniz veya hesabınızla ilgili talepler için
             giriş yapmanız gerekir. Üye değilseniz iletişim formunu da
             kullanabilirsiniz.
           </p>
-          <div className="flex items-center justify-center gap-3">
-            <ButtonLink variant="primary" href="/login?redirect=/support">
-              Giriş Yap
-            </ButtonLink>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <ButtonLink href="/login?redirect=/support">Giriş Yap</ButtonLink>
             <ButtonLink variant="secondary" href="/contact">
               İletişim Formu
             </ButtonLink>
@@ -106,7 +128,7 @@ export default function SupportClient() {
       {isAuthenticated && (
         <>
           <SectionCard
-            title="Destek Talebi Oluştur"
+            title="Destek Talebi"
             action={
               !showForm ? (
                 <Button
@@ -118,18 +140,13 @@ export default function SupportClient() {
               ) : undefined
             }
           >
-            <p className="mb-4 text-sm text-muted">
-              Sorununuzu kategorisiyle birlikte iletin; ekibimiz genellikle 24
-              saat içinde yanıt verir.
-            </p>
-
-            {showForm && (
+            {showForm ? (
               <Form form={form} onSubmit={onSubmit} className="space-y-5">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-heading">
+                  <p className="mb-2 text-sm font-medium text-heading">
                     Kategori
-                  </label>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {CATEGORIES.map((cat) => (
                       <Button
                         key={cat.id}
@@ -144,7 +161,7 @@ export default function SupportClient() {
                             : "text-body"
                         }`}
                       >
-                        <cat.icon className="h-6 w-6" />
+                        <cat.icon className="h-5 w-5" />
                         {cat.label}
                       </Button>
                     ))}
@@ -187,6 +204,11 @@ export default function SupportClient() {
                   </Button>
                 </div>
               </Form>
+            ) : (
+              <p className="text-sm text-muted">
+                Sorununuzu kategorisiyle birlikte iletin; ekibimiz genellikle 24
+                saat içinde yanıt verir.
+              </p>
             )}
           </SectionCard>
 
@@ -242,16 +264,12 @@ export default function SupportClient() {
       )}
 
       <SectionCard className="text-center">
-        <h2 className="mb-2 text-lg font-semibold text-heading">
-          Hâlâ yardıma mı ihtiyacınız var?
-        </h2>
-        <p className="mb-4 text-muted">
-          E-posta ile de bize ulaşabilirsiniz; hafta içi 09.00–18.00 arasında
-          yanıt veriyoruz.
+        <p className="mb-3 text-sm text-muted">
+          Hafta içi 09.00–18.00 arasında e-posta ile de ulaşabilirsiniz.
         </p>
         <a
           href="mailto:destek@tarodan.com.tr"
-          className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700"
+          className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700"
         >
           <EnvelopeIcon className="h-5 w-5" />
           destek@tarodan.com.tr

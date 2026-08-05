@@ -130,7 +130,8 @@ export function useCommissionPreview(
   packageTier: PackageTierCode = "small",
 ) {
   const amount = Number(price);
-  const enabled = !!price && !Number.isNaN(amount) && amount > 0;
+  const enabled =
+    !!price && !!categoryId && !Number.isNaN(amount) && amount > 0;
   const query = useWebList<{
     sellerFeeAmount: number;
     withholdingTaxAmount: number;
@@ -160,6 +161,7 @@ export function useCommissionPreview(
   return {
     commissionPreview: enabled ? (query.data ?? null) : null,
     commissionPreviewLoading: enabled && query.isLoading,
+    commissionPreviewError: enabled ? query.error : null,
   };
 }
 

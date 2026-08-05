@@ -19,7 +19,6 @@ export interface PackageTierLike {
 
 export interface OutboundTariffLike {
   provider?: string;
-  outboundPackageFee: DecimalLike;
   freeShippingEnabled: boolean;
   freeShippingThreshold: DecimalLike;
   packageTiers?: PackageTierLike[];
@@ -45,7 +44,9 @@ export class ShippingPackageTiersNotConfiguredError extends Error {
  * ortadan kalkar. Kademe tanımı hiç yoksa bu bir yapılandırma hatasıdır.
  */
 export function resolvePackageTier(
-  tariff: OutboundTariffLike,
+  // Yalnız kademeler okunur: takas fiyatlaması gibi ücretsiz-kargo eşiği
+  // taşımayan çağıranlar tam tarife kurmak zorunda kalmasın.
+  tariff: Pick<OutboundTariffLike, "packageTiers">,
   billableDesi: number,
 ): PackageTierLike {
   const tiers = [...(tariff.packageTiers ?? [])].sort(

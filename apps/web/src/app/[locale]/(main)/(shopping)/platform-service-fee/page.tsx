@@ -106,10 +106,10 @@ export default function PlatformHizmetBedeliPage() {
           <h2>6. Sorularınız İçin</h2>
           <p>
             Platform Hizmet Bedeli hakkında daha fazla bilgi için{" "}
-            <Link href="/help" className="text-primary-600 underline">
-              Yardım Merkezi
-            </Link>
-            'ni ziyaret edebilir veya{" "}
+            <Link href="/support" className="text-primary-600 underline">
+              Yardım &amp; Destek
+            </Link>{" "}
+            sayfasını ziyaret edebilir veya{" "}
             <a
               href="mailto:destek@tarodan.com.tr"
               className="text-primary-600 underline"

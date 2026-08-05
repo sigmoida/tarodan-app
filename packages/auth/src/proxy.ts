@@ -79,6 +79,26 @@ function isForbiddenCrossOrigin(request: NextRequest): boolean {
 }
 
 /**
+ * İstemciden yukarı API'ye TAŞINAN istek başlıkları.
+ *
+ * Bu bir safelist'tir: burada olmayan başlık sessizce düşer. `idempotency-key`
+ * eksik olduğu için toplu ürün yükleme canlıda hiç çalışamıyordu — tarayıcı
+ * başlığı gönderiyor, gateway atıyor, API "geçerli bir Idempotency-Key
+ * gönderilmelidir" diyip 400 dönüyordu. Uçtan uca bir başlık gerektiren her
+ * yeni özellik burayı da güncellemek zorunda.
+ *
+ * `authorization` ve `cookie` bilinçli olarak YOKTUR: yetki sunucu tarafında
+ * Bearer ile ekleniyor, tarayıcının kimlik bilgisi yukarı taşınmıyor.
+ */
+export const FORWARDED_REQUEST_HEADERS = [
+  "content-type",
+  "accept",
+  "cache-control",
+  "pragma",
+  "idempotency-key",
+] as const;
+
+/**
  * The BFF proxy handlers, factored out of the admin app. Every client data call
  * goes to same-origin `/api/*` (no CORS) and is forwarded to the upstream API
  * with a server-side `Bearer` header; the browser never holds the API tokens.
@@ -109,7 +129,7 @@ export function createBffProxy(session: ProxySession) {
     // Forward a safelist of request headers (auth is added server-side via the
     // Bearer token, so the browser's cookies/host are intentionally dropped).
     const fwd = new Headers();
-    for (const name of ["content-type", "accept", "cache-control", "pragma"]) {
+    for (const name of FORWARDED_REQUEST_HEADERS) {
       const value = request.headers.get(name);
       if (value) fwd.set(name, value);
     }

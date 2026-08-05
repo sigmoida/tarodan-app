@@ -71,6 +71,9 @@ describe("PaytrReportMatchingService.accruePspFees", () => {
       },
     ]);
     expect(input.refs).toMatchObject({ paymentId: "pay-1" });
+    // İdempotency: döküm satırı başına TEK tahakkuk. Damga (ledgerRecordedAt) yazılamadan
+    // tur çökerse sonraki tur aynı satırı yeniden dener — ikinci kayıt DB'de düşer.
+    expect(input.idempotencyKey).toBe("psp-fee:statement-line:line-1");
     expect(prisma.paytrStatementLine.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "line-1" },

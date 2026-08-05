@@ -67,9 +67,11 @@ export default function OrderActions({
     (order.hasProductRating !== true || order.hasSellerRating !== true);
 
   const show = {
+    // Fatura TESLİMDE kesilir; ödeme/kargo aşamasında butonu göstermek
+    // kullanıcıyı "fatura hazır değil" uyarısına götürüyordu.
     invoiceBuyer:
       isBuyer &&
-      ["paid", "preparing", "shipped", "delivered", "completed"].includes(
+      ["delivered", "awaiting_buyer_confirmation", "completed"].includes(
         order.status,
       ),
     reorder: isBuyer && hasProduct && isTerminal,

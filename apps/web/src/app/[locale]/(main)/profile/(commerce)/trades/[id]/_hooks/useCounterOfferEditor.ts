@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { tradesApi, listingsApi, userApi } from "@/lib/api";
 import type { Trade, TradeItem } from "../_lib/types";
+import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
 
 interface UseCounterOfferEditorArgs {
   trade: Trade | null;
@@ -299,7 +300,20 @@ export function useCounterOfferEditor({
     });
   };
 
+  // Teklifin maliyeti seçime bağlıdır (ürün başına ücret + birleşik desi kargo);
+  // kullanıcı bunu teklifi gönderdikten SONRA değil, kurarken görmeli.
+  const { preview, previewLoading, previewFailed } = useTradeCostPreview({
+    myProductIds: selectedCounterProducts,
+    theirProductIds: selectedCounterTargetProducts,
+    cashAmount: counterCashAmount,
+    cashPayer: counterCashPayer,
+    enabled: isCounterMode,
+  });
+
   return {
+    costPreview: preview,
+    costPreviewLoading: previewLoading,
+    costPreviewFailed: previewFailed,
     isCounterMode,
     isLoadingCounterData,
     counterProducts,

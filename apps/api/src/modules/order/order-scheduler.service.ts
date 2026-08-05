@@ -8,6 +8,7 @@ import { OrderStatus, TradeStatus, PaymentStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { OrderService } from "./order.service";
 import { ElogoInvoicingService } from "../elogo/elogo-invoicing.service";
+import { SellerInvoiceService } from "./seller-invoice.service";
 
 const OPEN_REFUND_STATUSES = [
   "pending_review",
@@ -28,6 +29,7 @@ export class OrderSchedulerService implements OnModuleInit {
     private readonly orderService: OrderService,
     private readonly configService: ConfigService,
     private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly sellerInvoice: SellerInvoiceService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
 
@@ -143,6 +145,7 @@ export class OrderSchedulerService implements OnModuleInit {
   async reportInvoiceStaleness(): Promise<{
     stuckShipped: number;
     uninvoicedDelivered: number;
+    missingSellerInvoices: number;
   }> {
     const stuckDays =
       Number(
@@ -185,7 +188,31 @@ export class OrderSchedulerService implements OnModuleInit {
         `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadlineDays} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`,
       );
     }
-    return { stuckShipped, uninvoicedDelivered };
+
+    // SATICI ürün faturası: Tarodan'ın kendi e-Arşivlerinin satıcı tarafındaki
+    // karşılığı. Fatura kesmek satıcının yükümlülüğü ama takibi platformun
+    // sorumluluğu; hatırlatılmazsa yüklenmeyen faturalar sessizce kayboluyor.
+    const sellerInvoiceDeadlineDays =
+      Number(
+        this.configService.get<string>("SELLER_INVOICE_DEADLINE_DAYS") ?? "7",
+      ) || 7;
+    const sellerInvoices = await this.sellerInvoice
+      .remindMissing({ deadlineDays: sellerInvoiceDeadlineDays })
+      .catch((e: any) => {
+        this.logger.warn(`satıcı fatura taraması hatası: ${e?.message}`);
+        return { missing: 0, reminded: 0 };
+      });
+    if (sellerInvoices.missing > 0) {
+      this.logger.error(
+        `SELLER_INVOICE_MISSING count=${sellerInvoices.missing} reminded=${sellerInvoices.reminded} — kurumsal satıcı ürün faturasını teslimden ${sellerInvoiceDeadlineDays} gün sonra hâlâ yüklemedi`,
+      );
+    }
+
+    return {
+      stuckShipped,
+      uninvoicedDelivered,
+      missingSellerInvoices: sellerInvoices.missing,
+    };
   }
 
   async runProcessDeliveredOrders(log: (msg: string) => void = () => {}) {
@@ -210,6 +237,7 @@ export class OrderSchedulerService implements OnModuleInit {
       orderBy: [{ deliveredAt: "desc" }, { updatedAt: "desc" }],
       select: {
         id: true,
+        packageId: true,
         commissionLedger: {
           select: { buyerFee: true, sellerCommission: true },
         },
@@ -219,9 +247,19 @@ export class OrderSchedulerService implements OnModuleInit {
     });
     let invoiced = 0;
     if (delivered.length > 0) {
+      // Komisyon ve hizmet bedeli PAKET anahtarlı, platform satışı SİPARİŞ
+      // anahtarlıdır. İki anahtar da sorulmazsa "zaten faturalanmış" testi hiç
+      // tutmaz ve her tur boşa fatura denemesi yapılır.
       const invSources = await this.prisma.elogoInvoice.findMany({
         where: {
-          sourceId: { in: delivered.map((o) => o.id) },
+          sourceId: {
+            in: [
+              ...delivered.map((o) => o.id),
+              ...delivered
+                .map((o) => o.packageId)
+                .filter((id): id is string => !!id),
+            ],
+          },
           type: { in: ["commission", "service_fee", "platform_sale"] as any },
         },
         select: { sourceId: true, type: true },
@@ -230,20 +268,20 @@ export class OrderSchedulerService implements OnModuleInit {
         invSources.map((i) => `${i.sourceId}:${i.type}`),
       );
       for (const o of delivered) {
-        const expectedTypes =
+        // Paketi olmayan (eski) siparişlerde ücret faturaları sipariş anahtarlıdır.
+        const feeSourceId = o.packageId ?? o.id;
+        const expectedKeys =
           o.seller.sellerType === "platform"
-            ? ["platform_sale"]
+            ? [`${o.id}:platform_sale`]
             : [
                 ...(Number(o.commissionLedger?.sellerCommission) > 0
-                  ? ["commission"]
+                  ? [`${feeSourceId}:commission`]
                   : []),
                 ...(Number(o.commissionLedger?.buyerFee) > 0
-                  ? ["service_fee"]
+                  ? [`${feeSourceId}:service_fee`]
                   : []),
               ];
-        if (
-          expectedTypes.every((type) => invoicedKeys.has(`${o.id}:${type}`))
-        ) {
+        if (expectedKeys.every((key) => invoicedKeys.has(key))) {
           // Faturaları tam ama işareti eksik (tekil tetiklerle kesilmiş) sipariş:
           // işaretlemeden atlanırsa aday penceresinde sonsuza dek yer tutar ve
           // işaretin çözdüğü take:500 doygunluğu geri gelir. İşaretle ve çık.
@@ -300,9 +338,10 @@ export class OrderSchedulerService implements OnModuleInit {
       }
     }
 
-    // 3) TAKAS KOMİSYONU: ürünler DEPOYA varmış (at_warehouse+) + nakit ödemesi tamamlanmış
-    // takasların komisyon e-Arşivi faturasızsa kes. Tüm at_warehouse yollarını (admin
+    // 3) TAKAS HİZMET BEDELİ: ürünler DEPOYA varmış (at_warehouse+) + ödemesi tamamlanmış
+    // takas satırlarının e-Arşivi faturasızsa kes. Tüm at_warehouse yollarını (admin
     // mark-warehouse-received + Sürat sync) yakalar; idempotent (sourceId=tradeCashPayment.id).
+    // v2'de TARAF BAŞINA bir satır vardır → her satır kendi faturasını doğurur.
     const paidWarehouseTcps = await this.prisma.tradeCashPayment.findMany({
       where: {
         status: PaymentStatus.completed,
@@ -329,7 +368,8 @@ export class OrderSchedulerService implements OnModuleInit {
           await this.prisma.elogoInvoice.findMany({
             where: {
               sourceId: { in: paidWarehouseTcps.map((c) => c.id) },
-              type: "trade_commission" as any,
+              // v1 komisyon / v2 hizmet bedeli — ikisi de bu satırın faturasıdır.
+              type: { in: ["trade_commission", "trade_service_fee"] as any },
             },
             select: { sourceId: true },
           })
@@ -338,11 +378,11 @@ export class OrderSchedulerService implements OnModuleInit {
       for (const c of paidWarehouseTcps) {
         if (invoicedTcp.has(c.id)) continue;
         try {
-          await this.elogoInvoicing.issueTradeCashCommissionInvoice(c.id);
+          await this.elogoInvoicing.issueTradeCashFeeInvoice(c.id);
           tradeInvoiced++;
         } catch (e: any) {
           this.logger.warn(
-            `processDeliveredOrders takas komisyonu hatası ${c.id}: ${e?.message}`,
+            `processDeliveredOrders takas faturası hatası ${c.id}: ${e?.message}`,
           );
         }
       }
@@ -352,7 +392,7 @@ export class OrderSchedulerService implements OnModuleInit {
     const staleness = await this.reportInvoiceStaleness();
 
     this.logger.log(
-      `processDeliveredOrders: teslim=${delivered.length} yeniFatura=${invoiced} tamamlanan=${completed} takasFatura=${tradeInvoiced} takılıKargo=${staleness.stuckShipped} faturasız=${staleness.uninvoicedDelivered} (returnWindow=${returnWindowDays}g)`,
+      `processDeliveredOrders: teslim=${delivered.length} yeniFatura=${invoiced} tamamlanan=${completed} takasFatura=${tradeInvoiced} takılıKargo=${staleness.stuckShipped} faturasız=${staleness.uninvoicedDelivered} satıcıFaturasız=${staleness.missingSellerInvoices} (returnWindow=${returnWindowDays}g)`,
     );
     log(
       `${delivered.length} teslim · ${invoiced} yeni fatura · ${completed} tamamlandı · ${tradeInvoiced} takas faturası`,

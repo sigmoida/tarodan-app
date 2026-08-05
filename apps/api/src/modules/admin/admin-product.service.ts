@@ -25,6 +25,8 @@ import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
 
 /**
  * Ürün yönetimi + admin ürün silme/geri yükleme — AdminService'in
@@ -44,6 +46,7 @@ export class AdminProductService {
     private readonly notificationService: NotificationService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly commissionGuard: CommissionRuleGuardService,
   ) {}
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -87,7 +90,7 @@ export class AdminProductService {
   async getProducts(query: AdminProductQueryDto) {
     const { search, status, categoryId, sellerId, brandId, carModelId } = query;
 
-    const where: Prisma.ProductWhereInput = {};
+    const where: Prisma.ProductWhereInput = catalogProductWhere();
 
     if (search) {
       // Tek arama kutusu: ürün metni (fulltext) VEYA satıcı adı/e-postası eşleşsin.
@@ -204,7 +207,7 @@ export class AdminProductService {
     categoryId?: string;
     sellerId?: string;
   }) {
-    const where: Prisma.ProductWhereInput = {};
+    const where: Prisma.ProductWhereInput = catalogProductWhere();
 
     if (query.status) {
       where.status = query.status as ProductStatus;
@@ -266,8 +269,8 @@ export class AdminProductService {
    * Get single product by ID (admin)
    */
   async getProduct(productId: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, ...catalogProductWhere() },
       include: {
         seller: { select: { id: true, displayName: true, email: true } },
         category: { select: { id: true, name: true, slug: true } },
@@ -416,6 +419,12 @@ export class AdminProductService {
       throw new BadRequestException("Sadece bekleyen ürünler onaylanabilir");
     }
 
+    await this.commissionGuard.assertListingRuleExists({
+      sellerId: product.sellerId,
+      categoryId: product.categoryId,
+      amount: Number(product.price),
+    });
+
     const updated = await this.prisma.product.update({
       where: { id: productId },
       data: { status: ProductStatus.active },
@@ -552,6 +561,12 @@ export class AdminProductService {
           });
           continue;
         }
+
+        await this.commissionGuard.assertListingRuleExists({
+          sellerId: product.sellerId,
+          categoryId: product.categoryId,
+          amount: Number(product.price),
+        });
 
         const updated = await this.prisma.product.update({
           where: { id: productId },

@@ -18,9 +18,11 @@ import {
 } from "@prisma/client";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { computeTrustScore } from "./helpers/trust-score";
+import { publicUserRatingWhere } from "../../common/helpers/public-rating";
 import {
   effectiveMembershipTierType,
   isPremiumEntitled,
+  saleCapableSellerWhere,
 } from "../membership/membership.util";
 import { i18nMessage } from "../i18n";
 import {
@@ -34,6 +36,7 @@ import {
 } from "./dto";
 import { UserCommonService } from "./user-common.service";
 import { isUsernameAllowed, normalizeUsername } from "../auth/username.util";
+import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
  * UserProfileService — profil/lookup/hesap grubu: avatar redirect, find*,
@@ -115,6 +118,7 @@ export class UserProfileService {
     // Count only active listings (exclude inactive and deleted)
     const listingCount = await this.prisma.product.count({
       where: {
+        ...catalogProductWhere(),
         sellerId: id,
         status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] },
       },
@@ -123,7 +127,7 @@ export class UserProfileService {
     // Güven Skoru için ek istatistikler (puan, satış, takas)
     const [ratingAgg, salesCount, tradesCount] = await Promise.all([
       this.prisma.rating.aggregate({
-        where: { receiverId: id, status: "approved" },
+        where: publicUserRatingWhere({ receiverId: id }),
         _avg: { score: true },
         _count: true,
       }),
@@ -490,6 +494,7 @@ export class UserProfileService {
     // Check 1: Active products (active, pending, reserved)
     const activeProducts = await this.prisma.product.findMany({
       where: {
+        ...catalogProductWhere(),
         sellerId: userId,
         status: {
           in: [
@@ -685,6 +690,15 @@ export class UserProfileService {
           await tx.address.deleteMany({ where: { userId } });
           await tx.notificationLog.deleteMany({ where: { userId } });
 
+          // 3b) Pazarlama listesinden çıkar. E-posta birazdan
+          // `deleted_...@deleted.local` olarak anonimleştirileceği için abone
+          // satırı gerçek adresle öksüz kalır ve hesap silinmiş olmasına rağmen
+          // bülten gitmeye devam ederdi. Aynı transaction'da olmalı.
+          await tx.newsletterSubscriber.updateMany({
+            where: { email: user.email.toLowerCase(), unsubscribedAt: null },
+            data: { unsubscribedAt: new Date(), updatedAt: new Date() },
+          });
+
           // 4) PII'yi anonimleştir + login engelle. Unique alanları (email/phone/companyName)
           //    serbest bırak ki kullanıcı aynı bilgiyle yeniden kayıt olabilsin.
           await tx.user.update({
@@ -789,9 +803,18 @@ export class UserProfileService {
     }
 
     // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).
-    const listingWhere = isOwner
-      ? { sellerId: userId, status: { notIn: ["deleted"] } as any }
-      : { sellerId: userId, status: "active" };
+    const listingWhere: Prisma.ProductWhereInput = isOwner
+      ? {
+          ...catalogProductWhere(),
+          sellerId: userId,
+          status: { notIn: [ProductStatus.deleted] },
+        }
+      : {
+          ...catalogProductWhere(),
+          sellerId: userId,
+          status: ProductStatus.active,
+          seller: saleCapableSellerWhere(),
+        };
     const collectionWhere = isOwner ? { userId } : { userId, isPublic: true };
 
     // Get seller stats + followers count + membership
@@ -823,7 +846,7 @@ export class UserProfileService {
         },
       }),
       this.prisma.rating.aggregate({
-        where: { receiverId: userId, status: "approved" },
+        where: publicUserRatingWhere({ receiverId: userId }),
         _avg: { score: true },
         _count: true,
       }),

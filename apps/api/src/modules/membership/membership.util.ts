@@ -2,6 +2,7 @@ import {
   BusinessStatus,
   SubscriptionStatus,
   MembershipTierType,
+  Prisma,
 } from "@prisma/client";
 
 /**
@@ -33,6 +34,16 @@ export interface BusinessEntitlementOwner {
   taxId?: string | null;
 }
 
+export function hasApprovedCorporateIdentity(
+  owner: BusinessEntitlementOwner | null | undefined,
+): boolean {
+  return (
+    owner?.businessStatus === BusinessStatus.approved &&
+    !!owner.companyName?.trim() &&
+    !!owner.taxId?.trim()
+  );
+}
+
 export function isPremiumEntitled(
   membership: PremiumCheckMembership | null | undefined,
   owner?: BusinessEntitlementOwner | null,
@@ -51,11 +62,7 @@ export function isPremiumEntitled(
 
   if (membership.tier.type === MembershipTierType.business) {
     if (!owner) return false;
-    return (
-      owner.businessStatus === BusinessStatus.approved &&
-      !!owner.companyName?.trim() &&
-      !!owner.taxId?.trim()
-    );
+    return hasApprovedCorporateIdentity(owner);
   }
 
   return true;
@@ -147,4 +154,64 @@ export function isBusinessMembershipEntitled(
     membership?.tier?.type === MembershipTierType.business &&
     isPremiumEntitled(membership, owner)
   );
+}
+
+/**
+ * Onaylı kurumsal kimlik BUSINESS hakkı olmadan bireysel satıcıya dönüşmez.
+ * Süre dolduğu anda satış yetkisi askıya alınır; geçerli BUSINESS üyeliği
+ * yenilendiğinde ayrıca veri taşımaya gerek kalmadan kendiliğinden açılır.
+ */
+export function isCorporateSellingSuspended(
+  membership: PremiumCheckMembership | null | undefined,
+  owner: BusinessEntitlementOwner | null | undefined,
+): boolean {
+  return (
+    hasApprovedCorporateIdentity(owner) &&
+    !isBusinessMembershipEntitled(membership, owner)
+  );
+}
+
+/**
+ * Public sale eligibility. Individual accounts sell on FREE/BASIC/PREMIUM;
+ * entering the corporate flow makes approval plus a live BUSINESS entitlement
+ * mandatory. Invalid corporate records therefore fail closed instead of being
+ * reinterpreted as individual FREE sellers.
+ */
+export function canSellFromMembership(
+  membership: PremiumCheckMembership | null | undefined,
+  owner: BusinessEntitlementOwner | null | undefined,
+): boolean {
+  if (!owner) return false;
+  if (owner.businessStatus == null) return true;
+  return isBusinessMembershipEntitled(membership, owner);
+}
+
+/** Prisma equivalent of `canSellFromMembership`, shared by public catalog reads. */
+export function saleCapableSellerWhere(
+  now = new Date(),
+): Prisma.UserWhereInput {
+  return {
+    OR: [
+      { businessStatus: null },
+      {
+        businessStatus: BusinessStatus.approved,
+        AND: [
+          { companyName: { not: null } },
+          { companyName: { not: "" } },
+          { taxId: { not: null } },
+          { taxId: { not: "" } },
+        ],
+        membership: {
+          status: {
+            in: [SubscriptionStatus.active, SubscriptionStatus.cancelled],
+          },
+          currentPeriodEnd: { gt: now },
+          tier: {
+            type: MembershipTierType.business,
+            isActive: true,
+          },
+        },
+      },
+    ],
+  };
 }

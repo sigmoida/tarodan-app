@@ -41,6 +41,8 @@ export const ordersApi = {
       zipCode?: string;
     };
     expectedShippingTariffVersion: number;
+    expectedCommissionRuleSetId: string;
+    expectedCommissionRuleSetVersion: number;
     expectedPricingHash?: string;
   }) => api.post("/orders/buy", data),
   sendGuestVerificationCode: (data: {
@@ -75,6 +77,8 @@ export const ordersApi = {
     };
     offerId?: string;
     expectedShippingTariffVersion: number;
+    expectedCommissionRuleSetId: string;
+    expectedCommissionRuleSetVersion: number;
     expectedPricingHash?: string;
   }) => api.post("/orders/guest", data),
   /** Toplu checkout (üye): sepetteki tüm ürünler tek CheckoutGroup altında, tek ödeme */
@@ -102,6 +106,8 @@ export const ordersApi = {
     couponCode?: string;
     /** Tariff version the quote was built on; 409 PRICING_CHANGED if it moved. */
     expectedShippingTariffVersion: number;
+    expectedCommissionRuleSetId: string;
+    expectedCommissionRuleSetVersion: number;
     /** Unit-price hash the quote was built on; 409 PRICING_CHANGED if a price/campaign moved. */
     expectedPricingHash?: string;
   }) => api.post("/orders/checkout", data),
@@ -131,6 +137,8 @@ export const ordersApi = {
     };
     couponCode?: string;
     expectedShippingTariffVersion: number;
+    expectedCommissionRuleSetId: string;
+    expectedCommissionRuleSetVersion: number;
     expectedPricingHash?: string;
   }) => api.post("/orders/checkout/guest", data),
   /** Birleşik grup listesi: alıcı=CheckoutGroup çatısı, satıcı=kendi paketi. */

@@ -138,7 +138,8 @@ rakamlar tuhaf görünürse sebebi anlamak için:
 - Ödeme akışı, PayTR sözleşmesi, 3DS — dokunulmadı.
 - İade **talep** akışı ve ekranları — dokunulmadı (arka planda kargo bacağının
   muhasebesi değişti ama uçlar ve yanıt alanları aynı).
-- Takas bacağı kargosu kademelerin dışında (`tradeLegFee`) — değişmedi.
+- Takas kargosu da AYNI kademelerden çözülür (taraf başına kademe tutarı × 2
+  bacak, `trade-pricing.helper.ts`); ayrı bir takas ücreti alanı yoktur.
 - Sipariş listesi/detay uçları, kargo takibi, Sürat entegrasyonu.
 
 ## 6. Kabul kriterleri

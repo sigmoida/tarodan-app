@@ -1,4 +1,8 @@
-import { ProductStatus, ShippingPackageTierCode } from "@prisma/client";
+import {
+  ProductKind,
+  ProductStatus,
+  ShippingPackageTierCode,
+} from "@prisma/client";
 import { OrderPricingService } from "./order-pricing.service";
 import {
   resolvePackageShippingBuyerShare,
@@ -50,7 +54,6 @@ describe("resolvePackageShippingBuyerShare", () => {
  */
 describe("resolvePackageShippingDecision", () => {
   const tariff = {
-    outboundPackageFee: 0,
     freeShippingEnabled: false,
     freeShippingThreshold: 0,
     packageTiers: packageTiers(100, 130, 160),
@@ -180,8 +183,9 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
     price: 100,
     sellerId: "seller-A",
     categoryId,
+    kind: ProductKind.listing,
     status: ProductStatus.active,
-    seller: { businessStatus: "pending", taxId: null },
+    seller: { businessStatus: null, taxId: null },
     shippingDesi: 1,
   });
 
@@ -192,6 +196,9 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
 
   const makeSvc = () => {
     const prisma = {
+      commissionRuleSet: {
+        findFirst: jest.fn().mockResolvedValue({ id: "set-1" }),
+      },
       platformSetting: {
         // Vergi politikası tek sorguda okunur (OrderTaxPolicyService).
         findMany: jest.fn().mockResolvedValue([]),
@@ -208,7 +215,6 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
         tariffId: "tariff-1",
         tariffVersion: 1,
         tariff: {
-          outboundPackageFee: BASE,
           freeShippingEnabled: false,
           freeShippingThreshold: null,
           packageTiers: flatPackageTiers(BASE),

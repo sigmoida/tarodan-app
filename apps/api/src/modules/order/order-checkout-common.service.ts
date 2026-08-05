@@ -53,10 +53,12 @@ export class OrderCheckoutCommonService {
    */
   async resolveOfferOrderPricing(params: {
     amount: number;
+    productId?: string;
     sellerId: string;
     categoryId: string | null;
     shippingDesi: number;
     shippingTariff?: OutboundTariffLike;
+    commissionRuleSetId?: string;
   }): Promise<{
     commission: CommissionResult;
     fullShippingAmount: number;
@@ -70,13 +72,26 @@ export class OrderCheckoutCommonService {
     serviceVatRate: number;
     totalAmount: number;
   }> {
-    const { amount, sellerId, categoryId, shippingDesi, shippingTariff } =
-      params;
+    const {
+      amount,
+      productId,
+      sellerId,
+      categoryId,
+      shippingDesi,
+      shippingTariff,
+      commissionRuleSetId,
+    } = params;
 
+    const pinnedCommissionRuleSetId =
+      commissionRuleSetId ??
+      (await this.orderPricing.resolveCommissionRuleSetSnapshot()).id;
     const commission = await this.orderPricing.calculateCommission(
       amount,
       sellerId,
       categoryId,
+      pinnedCommissionRuleSetId,
+      amount,
+      productId,
     );
     // Kargo kararı (quote/checkout ile ORTAK): kademe → o kademenin payı → bölüşüm.
     const {
@@ -111,9 +126,11 @@ export class OrderCheckoutCommonService {
       },
     });
 
-    // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + ürün KDV'si +
-    // alıcıya verilen hizmetlerin KDV'si. (Stopaj ve satıcı hizmet KDV'si satıcı
-    // payout'undan kesilir, alıcıya yansıtılmaz.)
+    // Alıcıdan tahsil edilen: ürün + kargo payı + alıcı ücreti + alıcıya verilen
+    // hizmetlerin KDV'si. Ürün KDV'si BU TOPLAMA GİRMEZ — vitrin fiyatı KDV
+    // dahil kabul edilir ve `taxAmount` hep 0'dır (bkz. resolveOrderTaxes).
+    // (Stopaj ve satıcı hizmet KDV'si satıcı payout'undan kesilir, alıcıya
+    // yansıtılmaz.)
     const totalAmount = buyerTotalOf({
       subtotal: amount,
       buyerShippingAmount,
@@ -166,7 +183,7 @@ export class OrderCheckoutCommonService {
     totalAmount: number;
   }): Prisma.InputJsonObject {
     return {
-      version: 1,
+      version: 2,
       confirmedAt: new Date().toISOString(),
       pricing: {
         hash: params.pricingHash,
@@ -191,11 +208,12 @@ export class OrderCheckoutCommonService {
         sellerAmount: params.shipping.sellerAmount,
       },
       commission: {
+        ruleSetId: params.commission.ruleSetId,
         ruleId: params.commission.ruleId,
         ruleName: params.commission.ruleName,
-        ruleType: params.commission.ruleType
-          ? String(params.commission.ruleType)
-          : null,
+        matchedCategoryId: params.commission.matchedCategoryId,
+        matchedSellerType: params.commission.matchedSellerType,
+        matchedAmount: params.commission.matchedAmount,
         effectiveMembershipTier:
           params.commission.effectiveMembershipTier ?? null,
         taxpayerType: params.commission.taxpayerType ?? null,

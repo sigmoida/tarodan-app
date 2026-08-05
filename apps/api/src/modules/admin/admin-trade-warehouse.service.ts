@@ -16,6 +16,7 @@ import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
+import { primaryCashPayment } from "../trade/trade.constants";
 
 /**
  * Safe-trade (depo escrow) admin akışının depo-tarafı: depo teslim alma
@@ -701,7 +702,7 @@ export class AdminTradeWarehouseService {
         where: { id: tradeId },
         include: {
           items: true,
-          cashPayment: true,
+          cashPayments: true,
         },
       });
       if (!trade) {
@@ -802,8 +803,9 @@ export class AdminTradeWarehouseService {
       );
 
       const shouldRefund =
-        !!trade.cashPayment &&
-        trade.cashPayment.status === PaymentStatus.completed;
+        !!primaryCashPayment(trade.cashPayments) &&
+        primaryCashPayment(trade.cashPayments).status ===
+          PaymentStatus.completed;
 
       return {
         initiatorId: trade.initiatorId,
@@ -873,7 +875,7 @@ export class AdminTradeWarehouseService {
           data: { refundFailureReason: null, refundFailureAt: null },
         });
         try {
-          const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
             where: { tradeId },
             select: { payerId: true },
           });
@@ -906,7 +908,7 @@ export class AdminTradeWarehouseService {
           );
         }
         try {
-          const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
             where: { tradeId },
             select: { payerId: true },
           });

@@ -9,11 +9,15 @@ import { HealthService } from "./health.service";
 import { PrismaModule } from "../../prisma";
 import { WorkerHeartbeatService } from "./worker-heartbeat.service";
 import { AuthModule } from "../auth";
+import { AdminTradeCommonService } from "../admin/admin-trade-common.service";
 
 @Module({
   imports: [ConfigModule, PrismaModule, AuthModule],
   controllers: [HealthController],
-  providers: [HealthService, WorkerHeartbeatService],
+  // AdminTradeCommonService leaf'tir (bağımlılığı yok): admin modülünü import
+  // etmeden burada da provide edilir — depo readiness'ı takas onayıyla aynı
+  // çözümleme mantığını paylaşır.
+  providers: [HealthService, WorkerHeartbeatService, AdminTradeCommonService],
   exports: [HealthService],
 })
 export class HealthModule {}

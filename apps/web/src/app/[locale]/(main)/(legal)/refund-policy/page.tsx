@@ -13,7 +13,7 @@ export async function generateMetadata({
   return {
     title: "İade Politikası · Tarodan",
     description:
-      "TARODAN iade ve cayma hakkı koşulları: iade süreci, süreler, ödeme iadesi ve mesafeli satış kapsamındaki tüketici hakları.",
+      "Tarodan iade ve iptal koşulları: talep oluşturma adımları, değerlendirme süreci, kargo ücretinin kime ait olduğu ve ücret iadesi süreleri.",
     alternates: localizedCanonical(locale, "/refund-policy"),
   };
 }

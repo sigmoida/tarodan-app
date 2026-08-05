@@ -8,6 +8,12 @@ export interface EmailBrandOptions {
   logoUrl?: string;
   supportEmail?: string;
   preferencesUrl?: string;
+  /**
+   * Pazarlama gönderimlerinde alıcıya özel abonelikten çıkış linki. Yalnız
+   * verildiğinde footer'a basılır — işlemsel mailler (şifre sıfırlama, sipariş
+   * bildirimi) abonelikten çıkışa tabi değildir, orada boş bırakılır.
+   */
+  unsubscribeUrl?: string;
 }
 
 export const EMAIL_CONTENT_START = "<!-- TARODAN_CONTENT_START -->";
@@ -55,6 +61,7 @@ function normalizeEmailBrandOptions(
     supportEmail: options?.supportEmail || "destek@tarodan.com.tr",
     preferencesUrl:
       options?.preferencesUrl || `${frontendUrl}/profile/security`,
+    unsubscribeUrl: options?.unsubscribeUrl || "",
   };
 }
 
@@ -122,6 +129,17 @@ export function wrapEmailTemplateLayout(
     `${frontendUrl}/profile/security`,
   );
   const supportEmail = escapeEmailHtml(brand.supportEmail);
+  // Abonelikten çıkış linki yalnız pazarlama gönderimlerinde dolu gelir; boşsa
+  // footer'a hiçbir şey basılmaz (işlemsel maillerde çıkış linki olmamalı).
+  const unsubscribeUrl = brand.unsubscribeUrl
+    ? safeEmailUrl(brand.unsubscribeUrl, "")
+    : "";
+  const unsubscribeBlock = unsubscribeUrl
+    ? `
+              <p style="margin: 0 0 12px; font-size: 12px; line-height: 1.6;">
+                Bu e-postaları almak istemiyorsanız <a href="${unsubscribeUrl}" style="color: #52525b; text-decoration: underline;">abonelikten çıkabilirsiniz</a>.
+              </p>`
+    : "";
 
   return `
 <!DOCTYPE html>
@@ -159,7 +177,7 @@ export function wrapEmailTemplateLayout(
               <p style="margin: 0 0 12px; font-size: 12px; line-height: 1.6;">
                 <a href="${frontendUrl}" style="color: #52525b; text-decoration: none; margin-right: 14px;">Tarodan</a>
                 <a href="${preferencesUrl}" style="color: #52525b; text-decoration: none;">Bildirim tercihleri</a>
-              </p>
+              </p>${unsubscribeBlock}
               <p style="margin: 0; font-size: 11px; line-height: 1.6; color: #a1a1aa;">
                 © ${new Date().getFullYear()} Tarodan. Bu e-posta ${escapeEmailHtml(data?.to || "size")} gönderilmiştir.
               </p>
@@ -269,6 +287,7 @@ export function getEmailTemplateSubject(
     "invoice-seller": `Satış Faturası - ${data?.invoiceNumber || ""}`,
     "elogo-invoice": `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ""}`,
     "seller-invoice": `Satıcı Faturanız - Sipariş #${data?.orderNumber || ""}`,
+    "seller-invoice-reminder": `Fatura Bekleniyor - Sipariş #${data?.orderNumber || ""}`,
     "order-cancelled-buyer": `Siparişiniz İptal Edildi - ${data?.orderNumber || ""}`,
     "order-cancelled-seller": `Sipariş İptal Edildi - ${data?.orderNumber || ""}`,
     "refund-requested-seller": `İade Talebi - ${data?.orderNumber || ""}`,
@@ -1137,6 +1156,31 @@ export function renderEmailTemplate(
       ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Faturanız ektedir. Siparişlerim sayfasından da görüntüleyebilirsiniz.</p>`)}
     `,
       "Satıcı Faturanız Hazır",
+    ),
+
+    // Kurumsal satıcıya: teslim edilen siparişin ÜRÜN faturası hâlâ yüklenmedi.
+    // Fatura kesmek satıcının yasal yükümlülüğü; platform yalnız hatırlatır.
+    "seller-invoice-reminder": wrapEmail(
+      `
+      ${titleBlock("Fatura Bekleniyor", "⏳")}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        Teslim edilen aşağıdaki siparişinize ait <strong>ürün faturası</strong> henüz yüklenmedi.
+        Faturayı kendi sisteminizde düzenleyip PDF'ini sipariş detayından yükleyebilirsiniz;
+        yükledikten sonra alıcıya otomatik olarak iletilir.
+      </p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+        </table>
+      `)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Ürün faturasını düzenlemek satıcının yasal yükümlülüğüdür. Tarodan'ın kestiği komisyon/hizmet bedeli faturaları bunun yerine geçmez.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Faturayı Yükle", `${frontendUrl}/profile/orders`)}
+      </div>
+    `,
+      "Fatura Bekleniyor",
     ),
 
     "order-cancelled-buyer": wrapEmail(

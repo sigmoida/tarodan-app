@@ -12,6 +12,9 @@ import { noVatTaxPolicy, testTaxPolicy } from "./testing/tax-policy-fixture";
  */
 describe("OrderPricingService listing commission preview", () => {
   const prisma = {
+    commissionRuleSet: {
+      findFirst: jest.fn().mockResolvedValue({ id: "set-1" }),
+    },
     user: {
       findUnique: jest.fn().mockResolvedValue({
         businessStatus: null,
@@ -23,7 +26,6 @@ describe("OrderPricingService listing commission preview", () => {
     getActiveOutboundTariff: jest.fn().mockResolvedValue({
       id: "tariff-1",
       version: 3,
-      outboundPackageFee: 100,
       freeShippingEnabled: false,
       freeShippingThreshold: null,
       packageTiers: packageTiers(100, 180, 260),

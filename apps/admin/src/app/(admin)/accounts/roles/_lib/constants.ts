@@ -251,12 +251,8 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         description: t("admin.roles.permissions.emailTemplates.description"),
         pages: ["/marketing/email-templates"],
       },
-      {
-        key: "pages",
-        label: t("admin.roles.permissions.pages.label"),
-        description: t("admin.roles.permissions.pages.description"),
-        pages: ["/marketing/pages"],
-      },
+      // "pages" izni kaldırıldı: /marketing/pages ekranı artık yok (kurumsal
+      // metinler kodla yönetiliyor). Ekran geri gelirse izin de geri eklenir.
     ],
   },
   {

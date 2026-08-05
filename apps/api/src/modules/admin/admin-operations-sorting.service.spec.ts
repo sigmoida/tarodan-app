@@ -15,10 +15,11 @@ function createDelegate() {
 }
 
 describe("admin operations list sorting", () => {
-  it("paginates orders by checkout group so a cart stays on one page", async () => {
+  it("paginates grouped and groupless orders as common row sources", async () => {
     const checkoutGroup = createDelegate();
+    const order = createDelegate();
     const service = new AdminOrderService(
-      { checkoutGroup } as any,
+      { checkoutGroup, order } as any,
       {} as any,
       undefined as any,
     );
@@ -30,59 +31,196 @@ describe("admin operations list sorting", () => {
 
     expect(checkoutGroup.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-        skip: 5,
-        take: 5,
+        orderBy: [{ createdAt: "desc" }],
+        take: 10,
       }),
     );
+    // Ürün türü şartı: üyelik ve öne çıkarma siparişleri de gruba bağlanmadan
+    // oluşuyor; şart olmadan sanal ürün satırları operasyon listesine sızar.
+    expect(order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          checkoutGroupId: null,
+          product: { kind: "listing" },
+        },
+        take: 10,
+      }),
+    );
+    expect(order.count).toHaveBeenCalledWith({
+      where: {
+        checkoutGroupId: null,
+        product: { kind: "listing" },
+      },
+    });
+  });
+
+  it("gives both row sources the same tie-break so pages stay stable", async () => {
+    const checkoutGroup = createDelegate();
+    const order = createDelegate();
+    const service = new AdminOrderService(
+      { checkoutGroup, order } as any,
+      {} as any,
+      undefined as any,
+    );
+
+    // Eşit tutarlar `take` sınırında keyfi seçilirse bir satır iki sayfada
+    // birden çıkar; ikincil anahtar iki kaynakta da AYNI olmak zorunda.
+    await service.getOrders({
+      page: 1,
+      limit: 5,
+      sortBy: "totalAmount",
+      sortOrder: "asc",
+    } as any);
+
+    expect(checkoutGroup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ totalAmount: "asc" }, { createdAt: "desc" }],
+      }),
+    );
+    expect(order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ totalAmount: "asc" }, { createdAt: "desc" }],
+      }),
+    );
+  });
+
+  it("orders equal-amount rows from both sources by the shared tie-break", async () => {
+    const shared = 250;
+    const checkoutGroup = {
+      count: jest.fn().mockResolvedValue(1),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: "group-1",
+          groupNumber: "GRP-1",
+          totalAmount: shared,
+          createdAt: new Date("2026-08-01T00:00:00.000Z"),
+          buyer: { displayName: "Buyer" },
+        },
+      ]),
+    };
+    const looseRow = {
+      id: "order-1",
+      orderNumber: "ORD-1",
+      checkoutGroupId: null,
+      buyerId: "buyer-1",
+      sellerId: "seller-1",
+      productId: "product-1",
+      totalAmount: shared,
+      subtotal: shared,
+      commissionAmount: 0,
+      shippingAddress: {},
+      checkoutGroup: null,
+      package: null,
+      buyer: { id: "buyer-1", displayName: "Buyer", email: "b@example.com" },
+      seller: { id: "seller-1", displayName: "Seller", email: "s@example.com" },
+      product: { id: "product-1", title: "Product", images: [] },
+      shipment: null,
+      refundRequests: [],
+      // Daha YENİ: eşitlikte createdAt DESC kuralı bunu öne almalı.
+      createdAt: new Date("2026-08-03T00:00:00.000Z"),
+    };
+    // Grubun ESKİ üyesi: satırlar aynı tutarda olduğu için sırayı yalnızca
+    // ortak eşitlik kuralı belirler.
+    const groupRow = {
+      ...looseRow,
+      id: "group-order-1",
+      orderNumber: "ORD-2",
+      checkoutGroupId: "group-1",
+      checkoutGroup: { groupNumber: "GRP-1" },
+      createdAt: new Date("2026-08-01T00:00:00.000Z"),
+    };
+    const order = {
+      count: jest.fn().mockResolvedValue(1),
+      findMany: jest
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            id: looseRow.id,
+            orderNumber: looseRow.orderNumber,
+            totalAmount: shared,
+            createdAt: looseRow.createdAt,
+            buyer: { displayName: "Buyer" },
+          },
+        ])
+        .mockResolvedValueOnce([looseRow, groupRow]),
+    };
+    const service = new AdminOrderService(
+      { checkoutGroup, order } as any,
+      {} as any,
+      undefined as any,
+    );
+
+    const result = await service.getOrders({
+      page: 1,
+      limit: 20,
+      sortBy: "totalAmount",
+      sortOrder: "asc",
+    } as any);
+
+    // Tutarlar eşit → createdAt DESC: daha yeni olan grupsuz sipariş önce.
+    expect(result.data.map((row: any) => row.id)).toEqual([
+      "order-1",
+      "group-order-1",
+    ]);
   });
 
   it("returns every checkout group as one complete admin row source", async () => {
     const checkoutGroup = {
       count: jest.fn().mockResolvedValue(1),
-      findMany: jest.fn().mockResolvedValue([{ id: "group-1" }]),
-    };
-    const order = {
       findMany: jest.fn().mockResolvedValue([
         {
-          id: "order-1",
-          orderNumber: "ORD-1",
-          checkoutGroupId: "group-1",
-          packageId: "package-1",
-          buyerId: "buyer-1",
-          sellerId: "seller-1",
-          productId: "product-1",
+          id: "group-1",
+          groupNumber: "GRP-1",
           totalAmount: 130,
-          subtotal: 100,
-          commissionAmount: 10,
-          shippingAddress: {},
-          checkoutGroup: { groupNumber: "GRP-1" },
-          buyer: {
-            id: "buyer-1",
-            displayName: "Buyer",
-            email: "buyer@example.com",
-          },
-          seller: {
-            id: "seller-1",
-            displayName: "Seller",
-            email: "seller@example.com",
-          },
-          product: {
-            id: "product-1",
-            title: "Product",
-            images: [],
-          },
-          shipment: {
-            id: "shipment-1",
-            status: "shipped",
-            trackingNumber: "INTERNAL-1",
-            providerTrackingId: "SURAT-1",
-          },
-          refundRequests: [],
           createdAt: new Date("2026-07-29T08:00:00.000Z"),
+          buyer: { displayName: "Buyer" },
         },
       ]),
+    };
+    const order = {
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: "order-1",
+            orderNumber: "ORD-1",
+            checkoutGroupId: "group-1",
+            packageId: "package-1",
+            buyerId: "buyer-1",
+            sellerId: "seller-1",
+            productId: "product-1",
+            totalAmount: 130,
+            subtotal: 100,
+            commissionAmount: 10,
+            shippingAddress: {},
+            checkoutGroup: { groupNumber: "GRP-1" },
+            buyer: {
+              id: "buyer-1",
+              displayName: "Buyer",
+              email: "buyer@example.com",
+            },
+            seller: {
+              id: "seller-1",
+              displayName: "Seller",
+              email: "seller@example.com",
+            },
+            product: {
+              id: "product-1",
+              title: "Product",
+              images: [],
+            },
+            shipment: {
+              id: "shipment-1",
+              status: "shipped",
+              trackingNumber: "INTERNAL-1",
+              providerTrackingId: "SURAT-1",
+            },
+            refundRequests: [],
+            createdAt: new Date("2026-07-29T08:00:00.000Z"),
+          },
+        ]),
     };
     const service = new AdminOrderService(
       { checkoutGroup, order } as any,
@@ -106,7 +244,79 @@ describe("admin operations list sorting", () => {
     ]);
     expect(order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { checkoutGroupId: { in: ["group-1"] } },
+        where: { OR: [{ checkoutGroupId: { in: ["group-1"] } }] },
+      }),
+    );
+  });
+
+  it("includes an accepted-offer order without a checkout group", async () => {
+    const createdAt = new Date("2026-08-05T08:00:00.000Z");
+    const checkoutGroup = createDelegate();
+    const looseOrder = {
+      id: "offer-order-1",
+      orderNumber: "ORD-OFFER-1",
+      checkoutGroupId: null,
+      packageId: null,
+      buyerId: "buyer-1",
+      sellerId: "seller-1",
+      productId: "product-1",
+      totalAmount: 120,
+      subtotal: 100,
+      commissionAmount: 10,
+      shippingAddress: {},
+      checkoutGroup: null,
+      package: null,
+      buyer: {
+        id: "buyer-1",
+        displayName: "Buyer",
+        email: "buyer@example.com",
+      },
+      seller: {
+        id: "seller-1",
+        displayName: "Seller",
+        email: "seller@example.com",
+      },
+      product: { id: "product-1", title: "Offer product", images: [] },
+      shipment: null,
+      refundRequests: [],
+      createdAt,
+    };
+    const order = {
+      count: jest.fn().mockResolvedValue(1),
+      findMany: jest
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            id: looseOrder.id,
+            orderNumber: looseOrder.orderNumber,
+            totalAmount: looseOrder.totalAmount,
+            createdAt,
+            buyer: { displayName: "Buyer" },
+          },
+        ])
+        .mockResolvedValueOnce([looseOrder]),
+    };
+    const service = new AdminOrderService(
+      { checkoutGroup, order } as any,
+      {} as any,
+      undefined as any,
+    );
+
+    const result = await service.getOrders({ page: 1, limit: 20 });
+
+    expect(result.data).toEqual([
+      expect.objectContaining({
+        id: "offer-order-1",
+        checkoutGroupId: null,
+        groupNumber: null,
+        groupItemCount: 1,
+      }),
+    ]);
+    expect(order.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [{ id: { in: ["offer-order-1"] }, checkoutGroupId: null }],
+        },
       }),
     );
   });

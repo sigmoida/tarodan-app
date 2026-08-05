@@ -26,6 +26,8 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       status: RefundAttemptStatus;
     };
     unresolvedAttempt?: boolean;
+    /** Faz 6.2 defter kaydı testleri için enjekte edilen LedgerService taklidi. */
+    ledger?: { recordRefund: jest.Mock };
   }) => {
     const captured = {
       paymentUpdate: undefined as any,
@@ -202,6 +204,8 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         cancelSuratShipmentIfExists: jest.fn().mockResolvedValue(undefined),
       } as any,
       { record: jest.fn().mockResolvedValue(undefined) } as any, // providerEvents
+      undefined, // outbox
+      opts.ledger as any, // Faz 6.2 ledger (@Optional)
     );
     return {
       service,
@@ -435,5 +439,58 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     expect(captured.holdUpdate.data).toEqual(
       expect.objectContaining({ refundedAmount: 0 }),
     );
+  });
+
+  /**
+   * Faz 6.2 `refund_issued` kaydı iade TX'İNİN İÇİNDE yazılır. İki sertleştirme:
+   *
+   *  - İDEMPOTENCY: anahtar iade DENEMESİNDEN türetilir → aynı deneme tekrar
+   *    işlenirse ikinci ters kayıt DB'de (idempotency_key, line_no) UNIQUE ile düşer.
+   *  - FAIL-LOUD: tx içindeki defter hatası artık YUTULMAZ. Yutulduğunda para geri
+   *    dönmüş ama ters kayıt yazılmamış oluyordu; defter sessizce eksiliyordu.
+   *    Aynı tx'te olduğu için fırlatmak iadeyi geri alır → ya ikisi ya hiçbiri.
+   *    (POST-COMMIT yollar — capture, payout tamamlama — best-effort KALIR: orada
+   *    para zaten commit'li, fırlatmak hiçbir şeyi geri almaz.)
+   */
+  describe("refund_issued defter kaydı", () => {
+    it("ters kaydı iade denemesinin kimliğiyle (idempotency) yazar", async () => {
+      const ledger = { recordRefund: jest.fn().mockResolvedValue("group-1") };
+      const { service, mockTx } = makeService({
+        paymentAmount: 1000,
+        holdAmount: 1000,
+        ledger,
+      });
+
+      await service.processRefund(ORDER_ID, 400, {
+        idempotencyKey: "ledger-refund-400",
+      });
+
+      expect(ledger.recordRefund).toHaveBeenCalledTimes(1);
+      const [txArg, input] = ledger.recordRefund.mock.calls[0];
+      expect(txArg).toBe(mockTx); // iade ile AYNI transaction
+      expect(input).toMatchObject({
+        orderId: ORDER_ID,
+        refundAttemptId: "attempt-1",
+        orderTotal: 1000,
+        refundAmount: 400,
+      });
+    });
+
+    it("defter yazımı düşerse iade TX'İ GERİ ALINIR (hata yutulmaz)", async () => {
+      const ledger = {
+        recordRefund: jest.fn().mockRejectedValue(new Error("ledger down")),
+      };
+      const { service } = makeService({
+        paymentAmount: 1000,
+        holdAmount: 1000,
+        ledger,
+      });
+
+      await expect(
+        service.processRefund(ORDER_ID, 400, {
+          idempotencyKey: "ledger-refund-fails",
+        }),
+      ).rejects.toThrow("ledger down");
+    });
   });
 });

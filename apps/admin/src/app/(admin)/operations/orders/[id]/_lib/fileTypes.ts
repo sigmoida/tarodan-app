@@ -59,6 +59,20 @@ export interface OrderFileLedger {
   refundedBuyerFee: number;
 }
 
+/**
+ * Siparişin düştüğü komisyon kuralı — checkout anındaki SNAPSHOT'tan. Kural
+ * sonradan değişse/silinse bile tahsilatın dayandığı kural budur.
+ */
+export interface OrderFileCommissionRule {
+  id: string;
+  ruleSetId: string | null;
+  name: string | null;
+  categoryId: string | null;
+  sellerType: string | null;
+  matchedAmount: number | null;
+  membershipTier: string | null;
+}
+
 export interface OrderFileEntry {
   id: string;
   orderNumber: string;
@@ -77,6 +91,7 @@ export interface OrderFileEntry {
   escrow: OrderFileEscrow | null;
   refundRequests: OrderFileRefundRequest[];
   ledger: OrderFileLedger | null;
+  commissionRule: OrderFileCommissionRule | null;
 }
 
 export interface OrderFilePackage {

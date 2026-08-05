@@ -82,6 +82,9 @@ describe("ProductCreateService required listing details", () => {
     linkProductAttributes: jest.fn().mockResolvedValue(undefined),
     formatProductResponse: jest.fn().mockImplementation((product) => product),
   };
+  const commissionGuard = {
+    assertListingRuleExists: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new ProductCreateService(
     prisma as any,
     { delPattern: jest.fn() } as any,
@@ -102,6 +105,7 @@ describe("ProductCreateService required listing details", () => {
     common as any,
     { recomputeProductRanking: jest.fn().mockResolvedValue(undefined) } as any,
     { getActiveListingCount: jest.fn().mockResolvedValue(0) } as any,
+    commissionGuard as any,
   );
 
   beforeEach(() => {
@@ -115,6 +119,12 @@ describe("ProductCreateService required listing details", () => {
 
   it("persists model code, color and boxed state with required references", async () => {
     await service.create(sellerId, dto);
+
+    expect(commissionGuard.assertListingRuleExists).toHaveBeenCalledWith({
+      sellerId,
+      categoryId: dto.categoryId,
+      amount: dto.price,
+    });
 
     expect(prisma.product.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -138,6 +148,25 @@ describe("ProductCreateService required listing details", () => {
       "diecast",
       undefined,
     );
+  });
+
+  it("requires coverage for both the normal and discounted listing prices", async () => {
+    await service.create(sellerId, {
+      ...dto,
+      originalPrice: 1000,
+      salePrice: 800,
+    });
+
+    expect(commissionGuard.assertListingRuleExists).toHaveBeenNthCalledWith(1, {
+      sellerId,
+      categoryId: dto.categoryId,
+      amount: 800,
+    });
+    expect(commissionGuard.assertListingRuleExists).toHaveBeenNthCalledWith(2, {
+      sellerId,
+      categoryId: dto.categoryId,
+      amount: 1000,
+    });
   });
 
   it("rejects a model that does not belong to the selected brand", async () => {

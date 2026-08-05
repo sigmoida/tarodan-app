@@ -1,4 +1,4 @@
-import * as request from 'supertest';
+import * as request from "supertest";
 import {
   PaymentStatus,
   PaymentHoldStatus,
@@ -7,25 +7,25 @@ import {
   TradeStatus,
   ShipmentStatus,
   OrderStatus,
-} from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+} from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
+} from "../test-utils/db";
 import {
   createUser,
   createAdminUser,
   authHeader,
-} from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { signCallback } from '../mocks/paytr.mock';
-import { PaymentService } from '../../src/modules/payment/payment.service';
-import { PayoutService } from '../../src/modules/payout/payout.service';
-import { TradeSchedulerService } from '../../src/modules/trade/trade-scheduler.service';
+} from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { signCallback } from "../mocks/paytr.mock";
+import { PaymentService } from "../../src/modules/payment/payment.service";
+import { PayoutService } from "../../src/modules/payout/payout.service";
+import { TradeSchedulerService } from "../../src/modules/trade/trade-scheduler.service";
 
 /**
  * Wait for the post-accept fire-and-forget inbound dispatch to settle.
@@ -40,12 +40,12 @@ async function waitForInboundShipments(
 ) {
   const deadline = Date.now() + timeoutMs;
   let rows = await prisma.tradeShipment.findMany({
-    where: { tradeId, leg: 'to_warehouse' },
+    where: { tradeId, leg: "to_warehouse" },
   });
   while (rows.length < expected && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 50));
     rows = await prisma.tradeShipment.findMany({
-      where: { tradeId, leg: 'to_warehouse' },
+      where: { tradeId, leg: "to_warehouse" },
     });
   }
   return rows;
@@ -54,16 +54,20 @@ async function waitForInboundShipments(
 async function configureWarehouseAddress(addressId: string): Promise<void> {
   const prisma = getPrisma();
   await prisma.platformSetting.upsert({
-    where: { settingKey: 'warehouse_address_id' },
+    where: { settingKey: "warehouse_address_id" },
     update: { settingValue: addressId },
-    create: { settingKey: 'warehouse_address_id', settingValue: addressId, settingType: 'string' },
+    create: {
+      settingKey: "warehouse_address_id",
+      settingValue: addressId,
+      settingType: "string",
+    },
   });
 }
 
 /**
  * Tests for auto-confirm timeout and race conditions in the escrow system.
  */
-describe('Escrow Edge Cases (E2E)', () => {
+describe("Escrow Edge Cases (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -82,17 +86,29 @@ describe('Escrow Edge Cases (E2E)', () => {
     ctx.paytr.reset();
   });
 
-  describe('Auto-confirm expired receipts', () => {
-    it('auto-completes a trade when confirmationDeadline passes without user confirmation', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+  describe("Auto-confirm expired receipts", () => {
+    it("auto-completes a trade when confirmationDeadline passes without user confirmation", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
       await createAddress({ userId: initiator.id });
       await createAddress({ userId: receiver.id });
-      const initiatorShip = await createAddress({ userId: initiator.id, isDefault: false });
-      const receiverShip = await createAddress({ userId: receiver.id, isDefault: false });
+      const initiatorShip = await createAddress({
+        userId: initiator.id,
+        isDefault: false,
+      });
+      const receiverShip = await createAddress({
+        userId: receiver.id,
+        isDefault: false,
+      });
 
       const ip = await createProduct({
         sellerId: initiator.id,
@@ -111,7 +127,7 @@ describe('Escrow Edge Cases (E2E)', () => {
 
       // Create + accept (no cash)
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -149,7 +165,7 @@ describe('Escrow Edge Cases (E2E)', () => {
 
       // Force shipments to delivered
       const fromWarehouse = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'from_warehouse' },
+        where: { tradeId, leg: "from_warehouse" },
       });
       for (const s of fromWarehouse) {
         await prisma.tradeShipment.update({
@@ -159,7 +175,9 @@ describe('Escrow Edge Cases (E2E)', () => {
       }
 
       // Trade is shipping_to_recipients — nobody confirms
-      const tradeBefore = await prisma.trade.findUnique({ where: { id: tradeId } });
+      const tradeBefore = await prisma.trade.findUnique({
+        where: { id: tradeId },
+      });
       expect(tradeBefore?.status).toBe(TradeStatus.shipping_to_recipients);
 
       // Force confirmationDeadline into the past
@@ -173,13 +191,15 @@ describe('Escrow Edge Cases (E2E)', () => {
       await tradeScheduler.runHandleExpiredTrades();
 
       // Trade should be auto-completed
-      const tradeAfter = await prisma.trade.findUnique({ where: { id: tradeId } });
+      const tradeAfter = await prisma.trade.findUnique({
+        where: { id: tradeId },
+      });
       expect(tradeAfter?.status).toBe(TradeStatus.completed);
       expect(tradeAfter?.completedAt).toBeTruthy();
 
       // All from_warehouse shipments should be confirmed
       const shipmentsAfter = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'from_warehouse' },
+        where: { tradeId, leg: "from_warehouse" },
       });
       for (const s of shipmentsAfter) {
         expect(s.confirmedAt).toBeTruthy();
@@ -187,10 +207,13 @@ describe('Escrow Edge Cases (E2E)', () => {
     });
   });
 
-  describe('Race condition: release + refund', () => {
-    it('blocks refund when payout is already in progress', async () => {
+  describe("Race condition: release + refund", () => {
+    it("blocks refund when payout is already in progress", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -203,32 +226,34 @@ describe('Escrow Edge Cases (E2E)', () => {
       await prisma.sellerBankAccount.create({
         data: {
           userId: seller.id,
-          accountHolder: 'Seller',
-          iban: 'TR330006100519786457841326',
+          accountHolder: "Seller",
+          iban: "TR330006100519786457841326",
         },
       });
 
       // Buy + pay
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
       const payment = await prisma.payment.findFirst({
         where: { orderId: buyRes.body.orderId },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Release hold
       const hold = await prisma.paymentHold.findFirst({
@@ -262,9 +287,12 @@ describe('Escrow Edge Cases (E2E)', () => {
       ).rejects.toThrow(/transfer zaten başlatılmış/i);
     });
 
-    it('does not create duplicate PayoutTransfer when releaseHoldsDue runs twice', async () => {
+    it("does not create duplicate PayoutTransfer when releaseHoldsDue runs twice", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -277,32 +305,34 @@ describe('Escrow Edge Cases (E2E)', () => {
       await prisma.sellerBankAccount.create({
         data: {
           userId: seller.id,
-          accountHolder: 'Seller',
-          iban: 'TR330006100519786457841326',
+          accountHolder: "Seller",
+          iban: "TR330006100519786457841326",
         },
       });
 
       // Buy + pay
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
       const payment = await prisma.payment.findFirst({
         where: { orderId: buyRes.body.orderId },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Release hold
       const hold = await prisma.paymentHold.findFirst({
@@ -334,17 +364,29 @@ describe('Escrow Edge Cases (E2E)', () => {
     });
   });
 
-  describe('Auto-confirm with cash hold', () => {
-    it('auto-confirm on cash trade sets holdReleaseAt after completion', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+  describe("Auto-confirm with cash hold", () => {
+    it("auto-confirm on cash trade sets holdReleaseAt after completion", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
       await createAddress({ userId: initiator.id });
       await createAddress({ userId: receiver.id });
-      const initiatorShip = await createAddress({ userId: initiator.id, isDefault: false });
-      const receiverShip = await createAddress({ userId: receiver.id, isDefault: false });
+      const initiatorShip = await createAddress({
+        userId: initiator.id,
+        isDefault: false,
+      });
+      const receiverShip = await createAddress({
+        userId: receiver.id,
+        isDefault: false,
+      });
 
       const prisma = getPrisma();
 
@@ -365,7 +407,7 @@ describe('Escrow Edge Cases (E2E)', () => {
 
       // Create trade with cash, accept, pay
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -382,20 +424,26 @@ describe('Escrow Edge Cases (E2E)', () => {
         .send({})
         .expect(201);
 
-      const cp = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      const cp = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate-trade-cash')
+        .post("/api/payments/initiate-trade-cash")
         .set(authHeader(initiator))
         .send({ tradeId })
         .expect(201);
-      const payment = await prisma.payment.findFirst({ where: { tradeCashPaymentId: cp!.id } });
+      const payment = await prisma.payment.findFirst({
+        where: { tradeCashPaymentId: cp!.id },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }))
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        )
         .expect(200);
 
       // Inbound shipments now auto-created post-cash-payment by PaymentService;
@@ -417,7 +465,9 @@ describe('Escrow Edge Cases (E2E)', () => {
         .expect(200);
 
       // Force shipments delivered
-      const fromWarehouse = await prisma.tradeShipment.findMany({ where: { tradeId, leg: 'from_warehouse' } });
+      const fromWarehouse = await prisma.tradeShipment.findMany({
+        where: { tradeId, leg: "from_warehouse" },
+      });
       for (const s of fromWarehouse) {
         await prisma.tradeShipment.update({
           where: { id: s.id },
@@ -436,20 +486,27 @@ describe('Escrow Edge Cases (E2E)', () => {
       await tradeScheduler.runHandleExpiredTrades();
 
       // Trade should be completed
-      const tradeAfter = await prisma.trade.findUnique({ where: { id: tradeId } });
+      const tradeAfter = await prisma.trade.findUnique({
+        where: { id: tradeId },
+      });
       expect(tradeAfter?.status).toBe(TradeStatus.completed);
 
       // Cash payment should have holdReleaseAt set
-      const cpAfter = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+      const cpAfter = await prisma.tradeCashPayment.findFirst({
+        where: { tradeId },
+      });
       expect(cpAfter?.holdReleaseAt).toBeTruthy();
       expect(cpAfter?.releasedAt).toBeNull();
     });
   });
 
-  describe('Preparing deadline expiry', () => {
-    it('auto-cancels order and refunds when preparing deadline passes', async () => {
+  describe("Preparing deadline expiry", () => {
+    it("auto-cancels order and refunds when preparing deadline passes", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -461,33 +518,39 @@ describe('Escrow Edge Cases (E2E)', () => {
 
       // Buy + pay
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const payment = await prisma.payment.findFirst({
+        where: { orderId: buyRes.body.orderId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Order should be preparing
-      const orderBefore = await prisma.order.findUnique({ where: { id: buyRes.body.orderId } });
-      expect(['paid', 'preparing']).toContain(orderBefore?.status);
+      const orderBefore = await prisma.order.findUnique({
+        where: { id: buyRes.body.orderId },
+      });
+      expect(["paid", "preparing"]).toContain(orderBefore?.status);
 
       // Force preparingDeadline into the past
       await prisma.order.update({
         where: { id: buyRes.body.orderId },
         data: {
-          status: 'preparing',
+          status: "preparing",
           preparingDeadline: new Date(Date.now() - 1000),
           version: { increment: 1 },
         },
@@ -498,22 +561,29 @@ describe('Escrow Edge Cases (E2E)', () => {
       await paymentService.handleExpiredPreparingOrders();
 
       // Order should be cancelled
-      const orderAfter = await prisma.order.findUnique({ where: { id: buyRes.body.orderId } });
-      expect(orderAfter?.status).toBe('cancelled');
+      const orderAfter = await prisma.order.findUnique({
+        where: { id: buyRes.body.orderId },
+      });
+      expect(orderAfter?.status).toBe("cancelled");
 
       // PayTR refund was called
       expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
 
       // Hold should be cancelled
-      const holdAfter = await prisma.paymentHold.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const holdAfter = await prisma.paymentHold.findFirst({
+        where: { orderId: buyRes.body.orderId },
+      });
       expect(holdAfter?.status).toBe(PaymentHoldStatus.cancelled);
     });
   });
 
-  describe('Sürat Kargo cancellation on refund', () => {
-    it('cancels Sürat shipment when order is refunded (sets shipment to cancelled)', async () => {
+  describe("Sürat Kargo cancellation on refund", () => {
+    it("cancels Sürat shipment when order is refunded (sets shipment to cancelled)", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -525,30 +595,34 @@ describe('Escrow Edge Cases (E2E)', () => {
 
       // Buy + pay (auto-creates Surat shipment in pending state)
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const payment = await prisma.payment.findFirst({
+        where: { orderId: buyRes.body.orderId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Verify auto-created shipment exists
       const shipmentBefore = await prisma.shipment.findFirst({
         where: { orderId: buyRes.body.orderId },
       });
-      expect(shipmentBefore?.provider).toBe('surat');
-      expect(shipmentBefore?.status).toBe('pending');
+      expect(shipmentBefore?.provider).toBe("surat");
+      expect(shipmentBefore?.status).toBe("pending");
 
       // Process refund — should cancel Surat shipment
       await ctx.app.get(PaymentService).processRefund(buyRes.body.orderId);
@@ -557,12 +631,15 @@ describe('Escrow Edge Cases (E2E)', () => {
       const shipmentAfter = await prisma.shipment.findUnique({
         where: { id: shipmentBefore!.id },
       });
-      expect(shipmentAfter?.status).toBe('cancelled');
+      expect(shipmentAfter?.status).toBe("cancelled");
     });
 
-    it('cancels Sürat shipment when payment expires (auto-cancel)', async () => {
+    it("cancels Sürat shipment when payment expires (auto-cancel)", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -573,22 +650,22 @@ describe('Escrow Edge Cases (E2E)', () => {
       const prisma = getPrisma();
 
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
 
       // Manually create a shipment record (simulating auto-create that would happen on payment success)
       await prisma.shipment.create({
         data: {
           orderId: buyRes.body.orderId,
-          provider: 'surat',
-          status: 'pending',
+          provider: "surat",
+          status: "pending",
           cost: 29.99,
         },
       });
@@ -598,7 +675,9 @@ describe('Escrow Edge Cases (E2E)', () => {
       // into the past — otherwise cancelExpiredPayments only fails the Payment
       // row and leaves the order (and its shipment) alive so the buyer can
       // re-initiate.
-      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const payment = await prisma.payment.findFirst({
+        where: { orderId: buyRes.body.orderId },
+      });
       await prisma.payment.update({
         where: { id: payment!.id },
         data: { createdAt: new Date(Date.now() - 60 * 60 * 1000) }, // 1 hour ago
@@ -615,40 +694,55 @@ describe('Escrow Edge Cases (E2E)', () => {
       const shipmentAfter = await prisma.shipment.findFirst({
         where: { orderId: buyRes.body.orderId },
       });
-      expect(shipmentAfter?.status).toBe('cancelled');
+      expect(shipmentAfter?.status).toBe("cancelled");
     });
   });
 
-  describe('Webhook authentication', () => {
-    it('rejects webhook without secret header (401)', async () => {
+  describe("Webhook authentication", () => {
+    it("rejects webhook without secret header (401)", async () => {
       await request(ctx.app.getHttpServer())
-        .post('/api/shipping/webhook/surat')
-        .send({ provider: 'surat', trackingNumber: 'TEST123', status: 'in_transit' })
+        .post("/api/shipping/webhook/surat")
+        .send({
+          provider: "surat",
+          trackingNumber: "TEST123",
+          status: "in_transit",
+        })
         .expect(401);
     });
 
-    it('rejects webhook with wrong secret (401)', async () => {
+    it("rejects webhook with wrong secret (401)", async () => {
       await request(ctx.app.getHttpServer())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', 'wrong-secret')
-        .send({ provider: 'surat', trackingNumber: 'TEST123', status: 'in_transit' })
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", "wrong-secret")
+        .send({
+          provider: "surat",
+          trackingNumber: "TEST123",
+          status: "in_transit",
+        })
         .expect(401);
     });
 
-    it('accepts webhook with correct secret', async () => {
+    it("accepts webhook with correct secret", async () => {
       const res = await request(ctx.app.getHttpServer())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', 'test-webhook-secret')
-        .send({ provider: 'surat', trackingNumber: 'NONEXIST', status: 'in_transit' });
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", "test-webhook-secret")
+        .send({
+          provider: "surat",
+          trackingNumber: "NONEXIST",
+          status: "in_transit",
+        });
       // 200 if shipment found, but with non-existent tracking we expect 404 or 200 with error
       expect([200, 404, 500]).toContain(res.status);
     });
   });
 
-  describe('Sürat shipment cancel call assertions (using stub tracking)', () => {
-    it('processRefund calls Sürat cancel with correct order number', async () => {
+  describe("Sürat shipment cancel call assertions (using stub tracking)", () => {
+    it("processRefund calls Sürat cancel with correct order number", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -659,23 +753,27 @@ describe('Escrow Edge Cases (E2E)', () => {
       const prisma = getPrisma();
 
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/initiate')
+        .post("/api/payments/initiate")
         .set(authHeader(buyer))
-        .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+        .send({ orderId: buyRes.body.orderId, provider: "paytr" })
         .expect(201);
-      const payment = await prisma.payment.findFirst({ where: { orderId: buyRes.body.orderId } });
+      const payment = await prisma.payment.findFirst({
+        where: { orderId: buyRes.body.orderId },
+      });
       await request(ctx.app.getHttpServer())
-        .post('/api/payments/callback/paytr')
-        .send(signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: Math.round(Number(payment!.amount) * 100),
-        }));
+        .post("/api/payments/callback/paytr")
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: "success",
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        );
 
       // Reset stub history before refund
       ctx.surat.reset();
@@ -683,22 +781,36 @@ describe('Escrow Edge Cases (E2E)', () => {
       await ctx.app.get(PaymentService).processRefund(buyRes.body.orderId);
 
       // Surat cancel was called with the order number
-      const order = await prisma.order.findUnique({ where: { id: buyRes.body.orderId } });
+      const order = await prisma.order.findUnique({
+        where: { id: buyRes.body.orderId },
+      });
       expect(ctx.surat.cancelCalls).toContain(order!.orderNumber);
     });
   });
 
-  describe('Admin warehouse — Sürat shipment submission', () => {
+  describe("Admin warehouse — Sürat shipment submission", () => {
     async function setupApprovedTrade() {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
       await createAddress({ userId: initiator.id });
       await createAddress({ userId: receiver.id });
-      const initiatorShip = await createAddress({ userId: initiator.id, isDefault: false });
-      const receiverShip = await createAddress({ userId: receiver.id, isDefault: false });
+      const initiatorShip = await createAddress({
+        userId: initiator.id,
+        isDefault: false,
+      });
+      const receiverShip = await createAddress({
+        userId: receiver.id,
+        isDefault: false,
+      });
       const ip = await createProduct({
         sellerId: initiator.id,
         categoryId: baseline.categoryId,
@@ -714,7 +826,7 @@ describe('Escrow Edge Cases (E2E)', () => {
         price: 200,
       });
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -744,7 +856,7 @@ describe('Escrow Edge Cases (E2E)', () => {
       return { tradeId, admin, initiator, receiver };
     }
 
-    it('approveWarehouseTrade submits 2 from_warehouse shipments to Sürat', async () => {
+    it("approveWarehouseTrade submits 2 from_warehouse shipments to Sürat", async () => {
       const { tradeId, admin } = await setupApprovedTrade();
       ctx.surat.reset();
 
@@ -757,38 +869,46 @@ describe('Escrow Edge Cases (E2E)', () => {
       // Two from_warehouse shipments submitted to Sürat
       expect(ctx.surat.shipmentCalls.length).toBe(2);
       const oids = ctx.surat.shipmentCalls.map((c) => c.OzelKargoTakipNo);
-      expect(oids.some((o) => o.includes('INI'))).toBe(true);
-      expect(oids.some((o) => o.includes('REC'))).toBe(true);
+      expect(oids.some((o) => o.includes("INI"))).toBe(true);
+      expect(oids.some((o) => o.includes("REC"))).toBe(true);
 
       // Both shipments marked as Sürat carrier
       const prisma = getPrisma();
       const shipments = await prisma.tradeShipment.findMany({
-        where: { tradeId, leg: 'from_warehouse' },
+        where: { tradeId, leg: "from_warehouse" },
       });
       expect(shipments.length).toBe(2);
-      expect(shipments.every((s) => s.carrier === 'surat')).toBe(true);
+      expect(shipments.every((s) => s.carrier === "surat")).toBe(true);
     });
 
-    it('rejectWarehouseTrade submits 2 return shipments to Sürat with Iademi=true', async () => {
+    it("rejectWarehouseTrade submits 2 return shipments to Sürat with Iademi=true", async () => {
       const { tradeId, admin } = await setupApprovedTrade();
       ctx.surat.reset();
 
       await request(ctx.app.getHttpServer())
         .post(`/api/admin/trades/${tradeId}/reject`)
         .set(authHeader(admin))
-        .send({ reason: 'Hasarlı' })
+        .send({ reason: "Hasarlı" })
         .expect(200);
 
       // Two return shipments submitted to Sürat with Iademi=true
       expect(ctx.surat.shipmentCalls.length).toBe(2);
-      expect(ctx.surat.shipmentCalls.every((c) => c.Iademi === true)).toBe(true);
+      expect(ctx.surat.shipmentCalls.every((c) => c.Iademi === true)).toBe(
+        true,
+      );
     });
   });
 
-  describe('Trade cancellation cancels Sürat shipments', () => {
-    it('resolveDispute with cancel_trade cancels active Sürat shipments', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+  describe("Trade cancellation cancels Sürat shipments", () => {
+    it("resolveDispute with cancel_trade cancels active Sürat shipments", async () => {
+      const initiator = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const receiver = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -807,7 +927,7 @@ describe('Escrow Edge Cases (E2E)', () => {
         quantity: 1,
       });
       const created = await request(ctx.app.getHttpServer())
-        .post('/api/trades')
+        .post("/api/trades")
         .set(authHeader(initiator))
         .send({
           receiverId: receiver.id,
@@ -819,18 +939,20 @@ describe('Escrow Edge Cases (E2E)', () => {
       const prisma = getPrisma();
 
       // Manually create an active Surat tradeShipment
-      const adminAddrRow = await prisma.address.findFirst({ where: { userId: admin.id } });
+      const adminAddrRow = await prisma.address.findFirst({
+        where: { userId: admin.id },
+      });
       await prisma.tradeShipment.create({
         data: {
           tradeId,
           shipperId: admin.id,
           fromAddressId: adminAddrRow!.id,
-          carrier: 'surat',
+          carrier: "surat",
           trackingNumber: `TRD-${created.body.tradeNumber}-INI`,
-          status: 'label_created' as any,
+          status: "label_created" as any,
           shippedAt: new Date(),
-          leg: 'from_warehouse',
-          recipientType: 'user',
+          leg: "from_warehouse",
+          recipientType: "user",
           recipientUserId: initiator.id,
         },
       });
@@ -838,24 +960,24 @@ describe('Escrow Edge Cases (E2E)', () => {
       // Force trade to disputed
       await prisma.trade.update({
         where: { id: tradeId },
-        data: { status: 'disputed' as any },
+        data: { status: "disputed" as any },
       });
       await prisma.tradeDispute.create({
         data: {
           tradeId,
           raisedById: initiator.id,
-          reason: 'damaged',
-          description: 'damaged product',
+          reason: "damaged",
+          description: "damaged product",
         },
       });
 
       ctx.surat.reset();
 
-      const { TradeService } = require('../../src/modules/trade/trade.service');
+      const { TradeService } = require("../../src/modules/trade/trade.service");
       const tradeService = ctx.app.get(TradeService);
       await tradeService.resolveDispute(tradeId, admin.id, {
-        resolution: 'cancel_trade',
-        notes: 'admin decision',
+        resolution: "cancel_trade",
+        notes: "admin decision",
       });
 
       // Sürat cancel should be called with the trade shipment's tracking number
@@ -863,22 +985,34 @@ describe('Escrow Edge Cases (E2E)', () => {
     });
   });
 
-  describe('Sürat business failure rolls back admin approve', () => {
-    it('admin approve fails when Sürat returns business error', async () => {
+  describe("Sürat business failure rolls back admin approve", () => {
+    it("admin approve fails when Sürat returns business error", async () => {
       // Set stub to return non-Tamam response (simulates Sürat rejecting payload)
       const oldEnv = process.env.SURAT_STUB_RESPONSE;
-      process.env.SURAT_STUB_RESPONSE = 'Adres eksik';
+      process.env.SURAT_STUB_RESPONSE = "Adres eksik";
 
       try {
-        const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
-        const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+        const initiator = await createUser(ctx.module, {
+          isSeller: true,
+          premium: true,
+        });
+        const receiver = await createUser(ctx.module, {
+          isSeller: true,
+          premium: true,
+        });
         const admin = await createAdminUser(ctx.module);
         const adminAddr = await createAddress({ userId: admin.id });
         await configureWarehouseAddress(adminAddr.id);
         await createAddress({ userId: initiator.id });
         await createAddress({ userId: receiver.id });
-        const initiatorShip = await createAddress({ userId: initiator.id, isDefault: false });
-        const receiverShip = await createAddress({ userId: receiver.id, isDefault: false });
+        const initiatorShip = await createAddress({
+          userId: initiator.id,
+          isDefault: false,
+        });
+        const receiverShip = await createAddress({
+          userId: receiver.id,
+          isDefault: false,
+        });
         const ip = await createProduct({
           sellerId: initiator.id,
           categoryId: baseline.categoryId,
@@ -892,7 +1026,7 @@ describe('Escrow Edge Cases (E2E)', () => {
           quantity: 1,
         });
         const created = await request(ctx.app.getHttpServer())
-          .post('/api/trades')
+          .post("/api/trades")
           .set(authHeader(initiator))
           .send({
             receiverId: receiver.id,
@@ -930,18 +1064,23 @@ describe('Escrow Edge Cases (E2E)', () => {
         expect([400, 500]).toContain(res.status);
 
         // Trade should still be at_warehouse (not transitioned)
-        const tradeAfter = await prisma.trade.findUnique({ where: { id: tradeId } });
-        expect(tradeAfter?.status).toBe('at_warehouse');
+        const tradeAfter = await prisma.trade.findUnique({
+          where: { id: tradeId },
+        });
+        expect(tradeAfter?.status).toBe("at_warehouse");
       } finally {
         process.env.SURAT_STUB_RESPONSE = oldEnv;
       }
     });
   });
 
-  describe('Tracking sync filters out shipments without tracking number', () => {
-    it('syncAllActiveShipments skips Shipments with null providerTrackingId', async () => {
+  describe("Tracking sync filters out shipments without tracking number", () => {
+    it("syncAllActiveShipments skips Shipments with null providerTrackingId", async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -953,7 +1092,7 @@ describe('Escrow Edge Cases (E2E)', () => {
 
       // Create order
       const buyRes = await request(ctx.app.getHttpServer())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addr.id })
         .expect(201);
@@ -962,15 +1101,17 @@ describe('Escrow Edge Cases (E2E)', () => {
       await prisma.shipment.create({
         data: {
           orderId: buyRes.body.orderId,
-          provider: 'surat',
-          status: 'pending',
+          provider: "surat",
+          status: "pending",
           cost: 29.99,
           // No trackingNumber, no providerTrackingId
         },
       });
 
       // Run sync — should NOT try to sync the no-tracking shipment
-      const { SuratTrackingService } = require('../../src/modules/surat-cargo/surat-tracking.service');
+      const {
+        SuratTrackingService,
+      } = require("../../src/modules/surat-cargo/surat-tracking.service");
       const tracking = ctx.app.get(SuratTrackingService);
       const result = await tracking.syncAllActiveShipments();
 

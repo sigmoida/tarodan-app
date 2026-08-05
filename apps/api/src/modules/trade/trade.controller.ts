@@ -26,6 +26,7 @@ import {
   ResolveTradeDisputeDto,
   TradeResponseDto,
   TradeListResponseDto,
+  TradeQuotePreviewDto,
 } from "./dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
@@ -34,6 +35,7 @@ import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { AdminRole } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
+import { TradeQuoteService } from "./trade-quote.service";
 import { i18nMessage } from "../i18n";
 
 @Controller("trades")
@@ -44,6 +46,7 @@ export class TradeController {
   constructor(
     private readonly tradeService: TradeService,
     private readonly paymentService: PaymentService,
+    private readonly tradeQuote: TradeQuoteService,
   ) {}
 
   private getUserId(req: any): string {
@@ -120,6 +123,41 @@ export class TradeController {
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<TradeResponseDto> {
     return this.tradeService.getTradeById(id, this.getUserId(req));
+  }
+
+  /**
+   * Takasın ödeme dökümü — hangi tarafın ne ödeyeceği (v2).
+   * GET /trades/:id/payment-quote
+   *
+   * Kabul/teklif ekranları ödemeden ÖNCE bunu gösterir; kabulde yazılan ödeme
+   * satırları da aynı servisten üretilir, böylece önizleme ile tahsilat ayrışmaz.
+   * v1 takasta `null` döner (eski gösterim geçerlidir).
+   */
+  /**
+   * Kaydedilmemiş teklifin ödeme dökümü (karşı teklif düzenleyicisi).
+   * POST /trades/payment-quote/preview
+   *
+   * Kabul edilmiş takasla aynı motoru kullanır; kullanıcı ürün ekleyip
+   * çıkardıkça "bu teklif bana kaça mal olur" sorusunu canlı yanıtlar.
+   * Takasa bağlı olmadığı için :id ROTASINDAN ÖNCE tanımlıdır.
+   */
+  @Post("payment-quote/preview")
+  async previewPaymentQuote(
+    @Request() req: any,
+    @Body() dto: TradeQuotePreviewDto,
+  ) {
+    this.getUserId(req);
+    return this.tradeQuote.previewQuote(dto);
+  }
+
+  @Get(":id/payment-quote")
+  async getPaymentQuote(
+    @Request() req: any,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    // Görüntüleme yetkisi takasın kendisiyle aynı: taraf değilse 403/404.
+    await this.tradeService.getTradeById(id, this.getUserId(req));
+    return this.tradeQuote.quoteForTrade(id);
   }
 
   /**

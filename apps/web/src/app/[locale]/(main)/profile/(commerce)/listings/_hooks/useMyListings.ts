@@ -2,7 +2,7 @@
 
 "use client";
 
-import { userApi, api } from "@/lib/api";
+import { userApi, api, listingsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
@@ -46,6 +46,20 @@ export function useDeleteListing() {
       onSuccess: () => {
         void useAuthStore.getState().refreshUserData?.();
       },
+    },
+  );
+}
+
+export function useDeactivateListing() {
+  return useWebMutation(
+    async (listingId: string) => {
+      await listingsApi.update(listingId, { status: "inactive" } as any);
+      return listingId;
+    },
+    {
+      invalidates: [RESOURCE, LISTING_RESOURCE],
+      successMessage: "İlan pasife alındı",
+      errorMessage: "İlan pasife alınamadı",
     },
   );
 }

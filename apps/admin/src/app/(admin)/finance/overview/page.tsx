@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowsRightLeftIcon,
   BanknotesIcon,
   ChartPieIcon,
   CreditCardIcon,
@@ -53,7 +54,7 @@ export default function FinanceOverviewPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Link href="/finance/payments" className="block">
               <MetricCard
                 icon={CreditCardIcon}
@@ -116,6 +117,52 @@ export default function FinanceOverviewPage() {
                 }
               />
             </Link>
+            {/* Takas geliri komisyon defterinde GÖRÜNMEZ (o tablo sipariş
+                bazlıdır); platform gelirinin içindeki payı ayrıca gösterilir. */}
+            <Link href="/operations/trades" className="block">
+              <MetricCard
+                icon={ArrowsRightLeftIcon}
+                tone="primary"
+                label={t("admin.finance.overview.funnel.tradeFee")}
+                value={funnel ? fmtTry(funnel.tradeFeeRevenueNet) : "—"}
+                loading={isLoading}
+                footer={
+                  <span className="text-muted">
+                    {t("admin.finance.overview.funnel.tradeFeeHint", {
+                      collected: funnel
+                        ? fmtTry(funnel.tradeFeeCollected)
+                        : "—",
+                    })}
+                  </span>
+                }
+              />
+            </Link>
+            {/* Komisyon geliri hak edişin KENDİSİ değil: PSP kesintisi içinden
+                çıkar. İki kart, "kalan" ile "hak ediş" farkını görünür kılar. */}
+            <MetricCard
+              icon={CreditCardIcon}
+              tone="warning"
+              label={t("admin.finance.overview.funnel.pspFee")}
+              value={funnel ? fmtTry(funnel.pspFeeTotal) : "—"}
+              loading={isLoading}
+              footer={
+                <span className="text-muted">
+                  {t("admin.finance.overview.funnel.pspFeeHint")}
+                </span>
+              }
+            />
+            <MetricCard
+              icon={BanknotesIcon}
+              tone="success"
+              label={t("admin.finance.overview.funnel.netAfterPsp")}
+              value={funnel ? fmtTry(funnel.platformNetAfterPsp) : "—"}
+              loading={isLoading}
+              footer={
+                <span className="text-muted">
+                  {t("admin.finance.overview.funnel.netAfterPspHint")}
+                </span>
+              }
+            />
           </div>
 
           {data && <HealthStrip health={data.health} />}

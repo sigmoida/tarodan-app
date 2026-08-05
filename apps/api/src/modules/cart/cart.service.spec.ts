@@ -4,7 +4,7 @@ import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
 import { StorageService } from "../storage/storage.service";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
-import { ProductStatus } from "@prisma/client";
+import { ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
 /**
@@ -35,6 +35,7 @@ describe("CartService.addItem — idempotent re-add", () => {
   const makeProduct = (overrides: Record<string, unknown> = {}) => ({
     id: productId,
     title: "Tekil Ürün",
+    kind: ProductKind.listing,
     status: ProductStatus.active,
     sellerId: "seller-1",
     quantity: 1,
@@ -57,7 +58,6 @@ describe("CartService.addItem — idempotent re-add", () => {
           provide: ShippingTariffService,
           useValue: {
             getActiveOutboundTariff: async () => ({
-              outboundPackageFee: 29.99,
               freeShippingEnabled: true,
               freeShippingThreshold: 500,
               packageTiers: flatPackageTiers(29.99),
@@ -128,6 +128,49 @@ describe("CartService.addItem — idempotent re-add", () => {
     ).resolves.toBeDefined();
     expect(mockPrisma.cartItem.update).not.toHaveBeenCalled();
   });
+
+  it("BUSINESS hakkı bitmiş kurumsal satıcının ürünü sepete eklenemez", async () => {
+    mockPrisma.product.findUnique.mockResolvedValue(
+      makeProduct({
+        seller: {
+          id: "seller-1",
+          displayName: "Kurumsal Satıcı",
+          businessStatus: "approved",
+          companyName: "Örnek AŞ",
+          taxId: "1234567890",
+          membership: {
+            status: "expired",
+            currentPeriodEnd: new Date("2025-01-01"),
+            tier: { type: "business", isActive: true },
+          },
+        },
+      }),
+    );
+
+    await expect(
+      service.addItem("user-1", { productId, quantity: 1 } as any),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "SELLER_SALES_SUSPENDED",
+        productId,
+        sellerId: "seller-1",
+      }),
+    });
+    expect(mockPrisma.cartItem.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("ödeme-only ürün normal sepete eklenemez", async () => {
+    mockPrisma.product.findUnique.mockResolvedValue(
+      makeProduct({ kind: ProductKind.boost }),
+    );
+
+    await expect(
+      service.addItem("user-1", { productId, quantity: 1 } as any),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 404 }),
+    });
+    expect(mockPrisma.cartItem.findUnique).not.toHaveBeenCalled();
+  });
 });
 
 describe("CartService.calculateCart — unavailable items", () => {
@@ -158,6 +201,7 @@ describe("CartService.calculateCart — unavailable items", () => {
       id: `product-${id}`,
       title: `Ürün ${id}`,
       price: 100,
+      kind: ProductKind.listing,
       status: ProductStatus.active,
       sellerId: "seller-1",
       categoryId: "category-1",
@@ -190,7 +234,6 @@ describe("CartService.calculateCart — unavailable items", () => {
       mockDiscountService,
       {
         getActiveOutboundTariff: async () => ({
-          outboundPackageFee: 29.99,
           freeShippingEnabled: true,
           freeShippingThreshold: 500,
           packageTiers: flatPackageTiers(29.99),
@@ -232,6 +275,37 @@ describe("CartService.calculateCart — unavailable items", () => {
     expect(result.shippingCost).toBe(0);
     expect(result.amountToFreeShipping).toBe(0);
     expect(result.grandTotal).toBe(0);
+  });
+
+  it("askıdaki kurumsal satırı görünür bırakır fakat uygun satırların toplamını engellemez", async () => {
+    const result = await calculateCart([
+      makeCartItem("available"),
+      makeCartItem("suspended", {
+        sellerId: "seller-suspended",
+        seller: {
+          id: "seller-suspended",
+          displayName: "Kurumsal Satıcı",
+          businessStatus: "approved",
+          companyName: "Örnek AŞ",
+          taxId: "1234567890",
+          membership: {
+            status: "expired",
+            currentPeriodEnd: new Date("2025-01-01"),
+            tier: { type: "business", isActive: true },
+          },
+        },
+      }),
+    ]);
+
+    expect(result.items).toHaveLength(2);
+    expect(result.items[1]).toMatchObject({
+      productId: "product-suspended",
+      isAvailable: false,
+      stockWarning: expect.stringContaining("kurumsal üyeliği"),
+    });
+    expect(result.itemCount).toBe(1);
+    expect(result.subtotal).toBe(100);
+    expect(result.shippingCost).toBe(29.99);
   });
 
   it("calculates coupon (base price, no cap) and shipping from available items only", async () => {

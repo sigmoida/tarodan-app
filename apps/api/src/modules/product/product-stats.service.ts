@@ -9,6 +9,7 @@ import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { MembershipService } from "../membership/membership.service";
 import { ProductStatus } from "@prisma/client";
+import { catalogProductWhere } from "./helpers/catalog-product-where";
 
 /**
  * ProductStatsService — ilan sayacı ve satıcı istatistikleri (leaf; prisma +
@@ -31,6 +32,7 @@ export class ProductStatsService {
   async getActiveListingCount(sellerId: string): Promise<number> {
     return this.prisma.product.count({
       where: {
+        ...catalogProductWhere(),
         sellerId,
         status: {
           in: [
@@ -47,8 +49,8 @@ export class ProductStatsService {
    * Get product stats (views, likes) for seller dashboard
    */
   async getProductStats(productId: string, sellerId: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, ...catalogProductWhere() },
       include: {
         _count: {
           select: {
@@ -105,30 +107,59 @@ export class ProductStatsService {
         all,
       ] = await Promise.all([
         this.prisma.product.count({
-          where: { sellerId, status: ProductStatus.pending },
+          where: {
+            ...catalogProductWhere(),
+            sellerId,
+            status: ProductStatus.pending,
+          },
         }),
         this.prisma.product.count({
-          where: { sellerId, status: ProductStatus.active },
+          where: {
+            ...catalogProductWhere(),
+            sellerId,
+            status: ProductStatus.active,
+          },
         }),
         this.prisma.product.count({
-          where: { sellerId, status: ProductStatus.reserved },
+          where: {
+            ...catalogProductWhere(),
+            sellerId,
+            status: ProductStatus.reserved,
+          },
         }),
         this.prisma.product.count({
-          where: { sellerId, status: ProductStatus.sold },
+          where: {
+            ...catalogProductWhere(),
+            sellerId,
+            status: ProductStatus.sold,
+          },
         }),
         this.prisma.product.count({
-          where: { sellerId, status: ProductStatus.rejected },
+          where: {
+            ...catalogProductWhere(),
+            sellerId,
+            status: ProductStatus.rejected,
+          },
         }),
         this.prisma.product.count({
-          where: { sellerId, status: ProductStatus.inactive },
+          where: {
+            ...catalogProductWhere(),
+            sellerId,
+            status: ProductStatus.inactive,
+          },
         }),
         // Kaldırılan (yönetici/satıcı silmesi) — ayrı sayaç.
         this.prisma.product.count({
-          where: { sellerId, status: ProductStatus.deleted },
+          where: {
+            ...catalogProductWhere(),
+            sellerId,
+            status: ProductStatus.deleted,
+          },
         }),
         // Total should exclude inactive and deleted listings (limit/usage card uses this)
         this.prisma.product.count({
           where: {
+            ...catalogProductWhere(),
             sellerId,
             status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] },
           },
@@ -137,6 +168,7 @@ export class ProductStatsService {
         // filtresi (findSellerProducts: notIn[deleted]) ile birebir.
         this.prisma.product.count({
           where: {
+            ...catalogProductWhere(),
             sellerId,
             status: { notIn: [ProductStatus.deleted] },
           },

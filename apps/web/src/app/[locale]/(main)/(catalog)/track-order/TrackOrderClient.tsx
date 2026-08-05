@@ -2,37 +2,39 @@
 
 "use client";
 
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import {
-  ChevronRightIcon,
-  TruckIcon,
-  MapPinIcon,
-  MagnifyingGlassIcon,
-  TagIcon,
-} from "@heroicons/react/24/outline";
+import { TruckIcon, MapPinIcon, TagIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner, StatusBadge, orderStatusConfig } from "@tarodan/ui";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import { useLocale, useTranslations } from "next-intl";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import SectionCard from "@/components/ui/SectionCard";
 import { useTrackOrder } from "./_hooks/useTrackOrder";
 import { trackOrderSchema } from "./_lib/schema";
+import { formatTL } from "@/lib/format";
+
+/** Etiket + değer satırı — kargo ve adres bloklarında tekrar eden desen. */
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <p className="text-sm text-body">
+      <span className="text-muted">{label}: </span>
+      {children}
+    </p>
+  );
+}
 
 export default function TrackOrderClient() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  // Geri: tarayıcı geçmişi varsa önceki sayfaya (sipariş listesi/detayı) dön,
-  // yoksa (doğrudan/derin link) anasayfaya düş.
-  const handleBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
-    } else {
-      router.push("/");
-    }
-  };
   const locale = useLocale();
   const t = useTranslations();
   const {
@@ -50,27 +52,28 @@ export default function TrackOrderClient() {
 
   const statusLabel = order ? getOrderStatusLabel(order.status) : null;
   const shipAddr = order?.shippingAddress as Record<string, string> | undefined;
+  const looking =
+    loading && searchParams.get("orderNumber") && searchParams.get("email");
 
   return (
     <PageShell className="pb-8">
       <PageHeader
-        onBack={handleBack}
         title={t("order.trackOrder")}
         description={t("order.trackDescription")}
       />
 
       {!order ? (
-        <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-          {loading &&
-          searchParams.get("orderNumber") &&
-          searchParams.get("email") ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-4">
+        <SectionCard>
+          {looking ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-12">
               <Spinner size="lg" />
               <p className="text-muted">{t("order.loadingDetails")}</p>
             </div>
           ) : (
             <>
-              <p className="text-muted mb-4">{t("order.trackInstructions")}</p>
+              <p className="mb-4 text-sm text-muted">
+                {t("order.trackInstructions")}
+              </p>
               <Form
                 form={form}
                 onSubmit={(v) => lookup(v, { toastOnError: true })}
@@ -87,127 +90,109 @@ export default function TrackOrderClient() {
                   label={`${t("auth.emailAddress")} *`}
                   placeholder="siparişte kullandığınız e-posta"
                 />
-                {error && (
-                  <p className="text-sm text-danger-600 bg-danger-50 p-3 rounded-lg">
-                    {error}
-                  </p>
-                )}
+                {error && <p className="text-sm text-danger-600">{error}</p>}
                 <Button
                   type="submit"
+                  isLoading={loading}
                   disabled={loading}
-                  className="w-full flex gap-2"
+                  className="w-full"
                 >
-                  {loading ? (
-                    <Spinner
-                      size="sm"
-                      color="border-surface-elevated border-t-transparent"
-                    />
-                  ) : (
-                    <MagnifyingGlassIcon className="w-5 h-5" />
-                  )}
                   {t("order.viewOrder")}
                 </Button>
               </Form>
-              <p className="text-sm text-muted mt-4">
+              <p className="mt-4 text-sm text-muted">
                 {t("order.orderNumberHint")}
               </p>
             </>
           )}
-        </div>
+        </SectionCard>
       ) : (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-heading">
-                {t("order.order")} #{order.orderNumber}
-              </h2>
-              <p className="text-sm text-muted mt-1">
-                {new Date(order.createdAt).toLocaleDateString(
-                  t("common.dateLocale"),
-                  {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  },
-                )}
-              </p>
-              {/* Üç kod seviyesi: sepet (GRP) · koli (PKG) · sipariş (ORD).
-                  Müşteri hangisini girdiyse diğerlerini de burada görür. */}
-              {(order.groupNumber || order.packageNumber) && (
-                <p className="text-sm text-muted mt-2 flex flex-wrap gap-x-4">
-                  {order.groupNumber && (
-                    <span>
-                      {t("order.groupNumber")}:{" "}
-                      <span className="font-mono">{order.groupNumber}</span>
-                    </span>
-                  )}
-                  {order.packageNumber && (
-                    <span>
-                      {t("order.packageNumber")}:{" "}
-                      <span className="font-mono">{order.packageNumber}</span>
-                    </span>
+        <>
+          <SectionCard>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-heading">
+                  {t("order.order")} #{order.orderNumber}
+                </h2>
+                <p className="mt-1 text-sm text-muted">
+                  {new Date(order.createdAt).toLocaleDateString(
+                    t("common.dateLocale"),
+                    {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    },
                   )}
                 </p>
-              )}
-              {order.siblingOrderNumbers &&
-                order.siblingOrderNumbers.length > 0 && (
-                  <p className="text-sm text-muted mt-2">
-                    {t("order.cartSiblings")}{" "}
-                    {order.siblingOrderNumbers.map((num, i) => (
-                      <span key={num} className="font-mono">
-                        {i > 0 && ", "}
-                        {num}
+                {/* Üç kod seviyesi: sepet (GRP) · koli (PKG) · sipariş (ORD).
+                    Müşteri hangisini girdiyse diğerlerini de burada görür. */}
+                {(order.groupNumber || order.packageNumber) && (
+                  <p className="mt-2 flex flex-wrap gap-x-4 text-sm text-muted">
+                    {order.groupNumber && (
+                      <span>
+                        {t("order.groupNumber")}:{" "}
+                        <span className="font-mono">{order.groupNumber}</span>
                       </span>
-                    ))}
+                    )}
+                    {order.packageNumber && (
+                      <span>
+                        {t("order.packageNumber")}:{" "}
+                        <span className="font-mono">{order.packageNumber}</span>
+                      </span>
+                    )}
                   </p>
                 )}
+                {order.siblingOrderNumbers &&
+                  order.siblingOrderNumbers.length > 0 && (
+                    <p className="mt-2 text-sm text-muted">
+                      {t("order.cartSiblings")}{" "}
+                      {order.siblingOrderNumbers.map((num, i) => (
+                        <span key={num} className="font-mono">
+                          {i > 0 && ", "}
+                          {num}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+              </div>
+              <StatusBadge
+                status={order.status}
+                config={orderStatusConfig}
+                label={statusLabel!}
+              />
             </div>
-            <StatusBadge
-              status={order.status}
-              config={orderStatusConfig}
-              label={statusLabel!}
-            />
-          </div>
 
-          <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-            <h3 className="font-semibold text-heading mb-3">
-              {t("order.product")}
-            </h3>
-            <div className="flex gap-4">
-              <div className="w-20 h-20 bg-surface-alt rounded-lg overflow-hidden flex-shrink-0">
+            <div className="mt-5 flex gap-4 border-t border-border-subtle pt-5">
+              <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-surface-alt">
                 {order.product?.image ? (
                   <Image
                     src={order.product.image}
                     alt={order.product.title}
-                    width={80}
-                    height={80}
-                    className="w-full h-full object-cover"
+                    width={64}
+                    height={64}
+                    className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-surface">
-                    <TagIcon className="w-6 h-6 text-border-strong" />
+                  <div className="flex h-full w-full items-center justify-center">
+                    <TagIcon className="h-6 w-6 text-border-strong" />
                   </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <Link
                   href={`/listings/${order.product?.id}`}
-                  className="font-medium text-heading hover:text-primary-500 line-clamp-2"
+                  className="line-clamp-2 font-medium text-heading hover:text-primary-600"
                 >
                   {order.product?.title}
                 </Link>
-                <p className="text-lg font-bold text-primary-500 mt-1">
-                  {Number(order.totalAmount).toLocaleString("tr-TR", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  TL
+                <p className="mt-1 font-semibold text-heading">
+                  {formatTL(Number(order.totalAmount))}
                 </p>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {order.shipment &&
             (() => {
@@ -248,39 +233,31 @@ export default function TrackOrderClient() {
               const showTracking = !isPending && !isCancelled && !!trackingCode;
 
               return (
-                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-                  <h3 className="font-semibold text-heading mb-3 flex items-center gap-2">
-                    <TruckIcon className="w-5 h-5 text-primary-500" />
+                <SectionCard>
+                  <h3 className="mb-3 flex items-center gap-2 font-medium text-heading">
+                    <TruckIcon className="h-5 w-5 text-muted" />
                     {t("checkout.shipping")}
                   </h3>
                   {isPending && (
-                    <p className="text-sm bg-info-50 border border-info-200 rounded p-3 text-info-800">
+                    <p className="text-sm text-muted">
                       {t("order.shipmentPreparing")}
                     </p>
                   )}
                   {isCancelled && (
-                    <p className="text-sm bg-danger-50 border border-danger-200 rounded p-3 text-danger-800">
+                    <p className="text-sm text-danger-600">
                       {t("order.shipmentCancelled")}
                     </p>
                   )}
                   {showTracking && (
-                    <div className="space-y-2 text-body">
-                      <p>
-                        <span className="text-muted">
-                          {t("order.carrier")}:
-                        </span>{" "}
+                    <div className="space-y-1.5">
+                      <Row label={t("order.carrier")}>
                         {order.shipment.provider === "surat"
                           ? "Sürat Kargo"
                           : order.shipment.provider}
-                      </p>
-                      <p>
-                        <span className="text-muted">
-                          {t("order.trackingNumber")}:
-                        </span>{" "}
-                        <span className="font-mono bg-surface-alt px-2 py-1 rounded">
-                          {trackingCode}
-                        </span>
-                      </p>
+                      </Row>
+                      <Row label={t("order.trackingNumber")}>
+                        <span className="font-mono">{trackingCode}</span>
+                      </Row>
                       {(order.shipment.trackingUrl ||
                         order.shipment.provider === "surat") && (
                         <a
@@ -290,25 +267,24 @@ export default function TrackOrderClient() {
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center text-primary-500 hover:underline"
+                          className="inline-block text-sm text-primary-600 hover:underline"
                         >
                           {t("order.trackShipment")}
-                          <ChevronRightIcon className="ml-1 h-4 w-4" />
                         </a>
                       )}
                     </div>
                   )}
-                </div>
+                </SectionCard>
               );
             })()}
 
           {shipAddr && (shipAddr.address || shipAddr.fullName) && (
-            <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-              <h3 className="font-semibold text-heading mb-3 flex items-center gap-2">
-                <MapPinIcon className="w-5 h-5 text-primary-500" />
+            <SectionCard>
+              <h3 className="mb-3 flex items-center gap-2 font-medium text-heading">
+                <MapPinIcon className="h-5 w-5 text-muted" />
                 {t("checkout.shippingAddress")}
               </h3>
-              <div className="text-body">
+              <div className="space-y-0.5 text-sm text-body">
                 {shipAddr.fullName && (
                   <p className="font-medium">{shipAddr.fullName}</p>
                 )}
@@ -323,10 +299,10 @@ export default function TrackOrderClient() {
                 )}
                 {shipAddr.phone && <p>Tel: {shipAddr.phone}</p>}
               </div>
-            </div>
+            </SectionCard>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button
               variant="secondary"
               type="button"
@@ -334,15 +310,14 @@ export default function TrackOrderClient() {
                 reset();
                 form.reset({ orderNumber: "", email: "" });
               }}
-              className="flex-1"
             >
               {t("order.trackAnother")}
             </Button>
-            <ButtonLink href="/listings" className="flex-1 text-center">
+            <ButtonLink variant="outline" href="/listings">
               {t("cart.continueShopping")}
             </ButtonLink>
           </div>
-        </div>
+        </>
       )}
     </PageShell>
   );

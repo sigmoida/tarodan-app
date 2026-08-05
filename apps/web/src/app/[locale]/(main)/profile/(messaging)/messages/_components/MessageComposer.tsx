@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import {
   XMarkIcon,
   PhotoIcon,
@@ -8,6 +8,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { Alert, Button, Textarea, IconButton } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+
+/** Yazı alanının büyüyebileceği en fazla satır sayısı; sonrası kayar. */
+const MAX_COMPOSER_LINES = 4;
 
 export default function MessageComposer({
   newMessage,
@@ -33,16 +36,40 @@ export default function MessageComposer({
   onSend: () => void;
 }) {
   const t = useTranslations();
+  const atLengthLimit = newMessage.length >= maxMessageLength;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-grow the composer with content, up to a max height; resets when the
-  // draft is cleared (e.g. after send).
-  useEffect(() => {
+  /**
+   * Tek satır başlar, içerik uzadıkça EN FAZLA 4 satıra kadar büyür, sonrası
+   * kendi içinde kayar.
+   *
+   * Sınır sabit bir piksel değeri değil, ölçülen satır yüksekliğinden türetilir:
+   * yazı tipi/ölçek değiştiğinde 128px kimi temada 3, kimi temada 5 satıra denk
+   * geliyordu.
+   */
+  useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+
+    const resize = () => {
+      const styles = window.getComputedStyle(el);
+      const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
+      const chrome =
+        Number.parseFloat(styles.paddingTop) +
+        Number.parseFloat(styles.paddingBottom) +
+        Number.parseFloat(styles.borderTopWidth) +
+        Number.parseFloat(styles.borderBottomWidth);
+      const maxHeight = lineHeight * MAX_COMPOSER_LINES + chrome;
+
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+      el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
   }, [newMessage]);
 
   return (
@@ -112,7 +139,7 @@ export default function MessageComposer({
           }}
           placeholder={t("message.typeMessage")}
           maxLength={maxMessageLength}
-          className={`flex-1 resize-none rounded-xl max-h-32 ${contentWarning ? "border-warning-400 focus:border-warning-400 focus:ring-warning-400" : ""}`}
+          className={`min-h-10 flex-1 resize-none rounded-xl leading-5 ${contentWarning ? "border-warning-400 focus:border-warning-400 focus:ring-warning-400" : ""}`}
         />
         <Button
           type="button"
@@ -126,9 +153,14 @@ export default function MessageComposer({
           {t("common.send")}
         </Button>
       </div>
-      <p className="text-xs text-muted mt-1.5">
-        {newMessage.length}/{maxMessageLength}
-      </p>
+      {/* Sürekli görünen bir karakter sayacı yerine yalnız sınıra gelince
+          uyarı: sayaç her tuşta dikkat çekiyor ama neredeyse hiçbir mesaj
+          sınıra yaklaşmıyordu. */}
+      {atLengthLimit && (
+        <p className="mt-1.5 text-xs text-warning-600">
+          {t("message.lengthLimitReached", { max: maxMessageLength })}
+        </p>
+      )}
     </div>
   );
 }

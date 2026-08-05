@@ -36,9 +36,15 @@ const ZERO_BALANCE: OrderLedgerBalance = {
  *
  * NOT (6.3 kapsam kararı): defter burada OKUMA/çapraz-doğrulama kaynağıdır. Para YAZMA
  * yolunu (refund tavanı / payout uygunluğu) defterden zorlamak (Payment/Hold'u kaynak
- * olmaktan tamamen çıkarmak) bilinçli olarak ERTELENDİ: defter @Optional + best-effort
- * (eksik/gecikmeli olabilir); onunla para akışını BLOKLAMAK "defter hatası parayı bozmaz"
- * invaryantını çiğnerdi. Bunun yerine reconciliation defter-native fazla-iade alarmı basar.
+ * olmaktan tamamen çıkarmak) bilinçli olarak ERTELENDİ: defter @Optional ve POST-COMMIT
+ * yollarda (capture, payout tamamlama) best-effort — eksik/gecikmeli olabilir; onunla
+ * para akışını BLOKLAMAK "defter hatası parayı bozmaz" invaryantını çiğnerdi. Bunun
+ * yerine reconciliation defter-native fazla-iade ve escrow kalıntısı alarmı basar.
+ *
+ * TX-İÇİ yazımlar (iade, payout kesintisi) ise FAIL-LOUD: aynı transaction'da
+ * olduklarından hata tüm işlemi geri alır → "para hareketi var, defter kaydı yok"
+ * durumu oluşamaz. Bakiyeleri buradan TÜRETİP kaynak yapmak (Faz 6.3'ün geri kalanı)
+ * ancak tüm para yolları bu garantiye taşınınca anlamlıdır.
  */
 @Injectable()
 export class LedgerBalanceService {

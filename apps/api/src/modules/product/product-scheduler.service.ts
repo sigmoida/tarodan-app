@@ -9,6 +9,7 @@ import { computeQualityScore } from "./helpers/quality-score";
 import { computeRelevanceScore } from "./helpers/relevance-score";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
+import { publicUserRatingWhere } from "../../common/helpers/public-rating";
 
 /**
  * Product Scheduler Service
@@ -142,7 +143,7 @@ export class ProductSchedulerService implements OnModuleInit {
       const ratingGroups = sellerIds.length
         ? await this.prisma.rating.groupBy({
             by: ["receiverId"],
-            where: { receiverId: { in: sellerIds }, status: "approved" },
+            where: publicUserRatingWhere({ receiverId: { in: sellerIds } }),
             _avg: { score: true },
           })
         : [];
