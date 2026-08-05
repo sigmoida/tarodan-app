@@ -35,6 +35,11 @@ import { SiteAccessModule } from "../site-access/site-access.module";
 import { AdminUserService } from "./admin-user.service";
 import { AdminStaffService } from "./admin-staff.service";
 import { AdminProductService } from "./admin-product.service";
+import { AdminProductBulkImportService } from "./admin-product-bulk-import.service";
+import {
+  ProductImportBatchProcessor,
+  ProductImportBatchScheduler,
+} from "./product-import-batch.scheduler";
 import { AdminOrderService } from "./admin-order.service";
 import { AdminAnalyticsService } from "./admin-analytics.service";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
@@ -95,6 +100,8 @@ import { ElogoModule } from "../elogo/elogo.module";
 import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 import { TradeModule } from "../trade/trade.module";
 import { CommissionModule } from "../commission/commission.module";
+import { MembershipModule } from "../membership/membership.module";
+import { ProductModule } from "../product/product.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -121,7 +128,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ShippingTariffModule,
     TradeModule,
     CommissionModule,
+    MembershipModule,
+    ProductModule,
     SiteAccessModule,
+    BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
   ],
@@ -162,6 +172,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminUserService,
     AdminStaffService,
     AdminProductService,
+    AdminProductBulkImportService,
     AdminOrderService,
     AdminAnalyticsService,
     AdminAnalyticsCommonService,
@@ -197,6 +208,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     LogRetentionService,
     LogRetentionScheduler,
     ...scheduledProcessors(LogRetentionProcessor),
+    ProductImportBatchScheduler,
+    ...scheduledProcessors(ProductImportBatchProcessor),
   ],
   exports: [AdminService],
 })

@@ -493,6 +493,98 @@ export class ProductCommonService {
   }
 
   /**
+   * Resolve every product attribute through the same canonical lookup used by
+   * both regular listing creation and admin bulk import.
+   */
+  async resolveProductAttributeIds(
+    scale?: string,
+    attributeIds?: string[],
+    materialSlug?: string,
+    attributeSlugs?: string[],
+    options: { rejectUnknown?: boolean } = {},
+  ): Promise<string[]> {
+    const toLink: string[] = [];
+    const unknown: string[] = [];
+
+    if (scale?.trim()) {
+      const scaleTrim = scale.trim();
+      const scaleNorm = scaleTrim.replace(/\s/g, "").replace(/[:\/]/g, "");
+      const scaleSlugAlt = scaleTrim.replace(":", "-");
+      const scaleAttr = await this.prisma.attribute.findFirst({
+        where: {
+          group: { slug: "scale", isActive: true },
+          isActive: true,
+          OR: [
+            { slug: { equals: scaleNorm, mode: "insensitive" } },
+            { slug: { equals: scaleSlugAlt, mode: "insensitive" } },
+            { value: { equals: scaleTrim, mode: "insensitive" } },
+            { displayValue: { equals: scaleTrim, mode: "insensitive" } },
+          ],
+        },
+        orderBy: { sortOrder: "asc" },
+        select: { id: true },
+      });
+      if (scaleAttr) toLink.push(scaleAttr.id);
+      else unknown.push(`ölçek '${scaleTrim}'`);
+    }
+
+    if (materialSlug?.trim()) {
+      const material = materialSlug.trim();
+      const materialAttr = await this.prisma.attribute.findFirst({
+        where: {
+          group: { slug: "material", isActive: true },
+          isActive: true,
+          OR: [
+            { slug: { equals: material, mode: "insensitive" } },
+            { value: { equals: material, mode: "insensitive" } },
+            { displayValue: { equals: material, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true },
+      });
+      if (materialAttr) toLink.push(materialAttr.id);
+      else unknown.push(`malzeme '${material}'`);
+    }
+
+    if (attributeIds?.length) toLink.push(...attributeIds);
+
+    const requestedSlugs =
+      attributeSlugs?.map((slug) => slug.trim()).filter(Boolean) ?? [];
+    if (requestedSlugs.length) {
+      const resolved = await this.prisma.attribute.findMany({
+        where: {
+          OR: requestedSlugs.map((slug) => ({
+            slug: { equals: slug, mode: "insensitive" as const },
+          })),
+          isActive: true,
+          group: { isActive: true },
+        },
+        select: { id: true, slug: true },
+      });
+      const resolvedSlugs = new Set(
+        resolved.map((item) => item.slug.toLocaleLowerCase("tr-TR")),
+      );
+      unknown.push(
+        ...requestedSlugs
+          .filter((slug) => !resolvedSlugs.has(slug.toLocaleLowerCase("tr-TR")))
+          .map((slug) => `özellik '${slug}'`),
+      );
+      toLink.push(...resolved.map((item) => item.id));
+    }
+
+    if (unknown.length && options.rejectUnknown) {
+      throw new Error(`aktif katalogda bulunamadı: ${unknown.join(", ")}`);
+    }
+    if (unknown.length && process.env.NODE_ENV === "development") {
+      this.logger.warn(
+        `Unknown product attribute(s) ignored: ${unknown.join(", ")}`,
+      );
+    }
+
+    return [...new Set(toLink)];
+  }
+
+  /**
    * Link scale (1:64), material (slug), attributeIds, and attribute slugs to product via ProductAttribute.
    * attributeSlugs: opaque list of Attribute.slug values from any group (used for Hot Wheels extras
    * like 'mainline', 'treasure-hunt', 'red'). Slugs are resolved server-side to attribute IDs.
@@ -505,61 +597,12 @@ export class ProductCommonService {
     materialSlug?: string,
     attributeSlugs?: string[],
   ) {
-    const toLink: string[] = [];
-
-    if (scale?.trim()) {
-      const scaleTrim = scale.trim();
-      const scaleNorm = scaleTrim.replace(/\s/g, "").replace(/[:\/]/g, ""); // "1:64" or "1/64" -> "164"
-      const scaleSlugAlt = scaleTrim.replace(":", "-"); // "1:64" -> "1-64" (seed format)
-      const scaleAttr = await this.prisma.attribute.findFirst({
-        where: {
-          group: { slug: "scale", isActive: true },
-          isActive: true,
-          OR: [
-            { slug: scaleNorm },
-            { slug: scaleSlugAlt },
-            { value: scaleTrim },
-            { displayValue: scaleTrim },
-          ],
-        },
-        orderBy: { sortOrder: "asc" },
-        select: { id: true },
-      });
-      if (scaleAttr) toLink.push(scaleAttr.id);
-    }
-    if (materialSlug?.trim()) {
-      const materialAttr = await this.prisma.attribute.findFirst({
-        where: {
-          group: { slug: "material" },
-          slug: materialSlug.trim(),
-          isActive: true,
-        },
-        select: { id: true },
-      });
-      if (materialAttr) toLink.push(materialAttr.id);
-    }
-    if (attributeIds?.length) toLink.push(...attributeIds);
-
-    if (attributeSlugs?.length) {
-      // Resolve slug -> attribute id. Slugs are unique within a group; the same slug could
-      // theoretically exist under multiple groups, so we accept all matches.
-      const resolved = await this.prisma.attribute.findMany({
-        where: {
-          slug: { in: attributeSlugs.map((s) => s.trim()).filter(Boolean) },
-          isActive: true,
-          group: { isActive: true },
-        },
-        select: { id: true, slug: true },
-      });
-      const resolvedSlugs = new Set(resolved.map((r) => r.slug));
-      const unknown = attributeSlugs.filter((s) => !resolvedSlugs.has(s));
-      if (unknown.length > 0 && process.env.NODE_ENV === "development") {
-        this.logger.warn(
-          `Unknown attribute slug(s) ignored for product ${productId}: ${unknown.join(", ")}`,
-        );
-      }
-      toLink.push(...resolved.map((r) => r.id));
-    }
+    const toLink = await this.resolveProductAttributeIds(
+      scale,
+      attributeIds,
+      materialSlug,
+      attributeSlugs,
+    );
 
     for (const attributeId of toLink) {
       await this.prisma.productAttribute.upsert({

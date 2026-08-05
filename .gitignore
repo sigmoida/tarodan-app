@@ -60,6 +60,8 @@ apps/admin/public/tarodan-logo.jpg
 apps/admin/public/tarodan-logo-transparent.png
 apps/web/public/tarodan-favicon.png
 apps/admin/public/tarodan-favicon.png
+# Build/dev sırasında generator tarafından üretilen toplu ürün şablonu
+apps/admin/public/templates/tarodan-toplu-urun-sablonu.xlsx
 .claude/
 
 # PayTR Direkt API vendor PDF/örnek klasörü — lokal referans, repoya girmez

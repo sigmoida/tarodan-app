@@ -8,6 +8,7 @@ import { PrismaService } from "../../prisma";
 import { Client } from "@elastic/elasticsearch";
 import { Prisma, ProductStatus } from "@prisma/client";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { saleCapableSellerWhere } from "../membership/membership.util";
 
 export interface ProductSearchResult {
   id: string;
@@ -183,6 +184,7 @@ export class SearchCommonService implements OnModuleInit {
   indexableProductWhere(): Prisma.ProductWhereInput {
     return {
       ...catalogProductWhere(),
+      seller: saleCapableSellerWhere(),
       OR: [
         { status: ProductStatus.active },
         { AND: [{ status: ProductStatus.inactive }, { quantity: 0 }] },

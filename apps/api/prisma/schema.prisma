@@ -672,6 +672,28 @@ model Product {
   @@map("products")
 }
 
+/// Admin toplu ürün yüklemelerinin idempotency ve yeniden bağlanma kaydı.
+/// Sonuç ürünlerle aynı transaction içinde tamamlandı olarak işaretlenir;
+/// istemci/proxy zaman aşımından sonra aynı batch kimliğiyle güvenle sorgulayabilir.
+model ProductImportBatch {
+  id                 String                   @id @default(uuid())
+  adminId            String                   @map("admin_id")
+  sellerId           String                   @map("seller_id")
+  sourceFilename     String                   @map("source_filename")
+  requestFingerprint String                   @map("request_fingerprint")
+  status             ProductImportBatchStatus @default(processing)
+  result             Json?
+  errorMessages      String[]                 @default([]) @map("error_messages")
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  updatedAt          DateTime                 @updatedAt @map("updated_at")
+  completedAt        DateTime?                @map("completed_at")
+
+  @@index([adminId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([status, createdAt])
+  @@map("product_import_batches")
+}
+
 model ProductBoost {
   id                     String      @id @default(uuid())
   productId              String      @map("product_id")
@@ -2957,6 +2979,12 @@ enum ProductStatus {
   rejected
   deleted
   suspended
+}
+
+enum ProductImportBatchStatus {
+  processing
+  completed
+  failed
 }
 
 enum ProductKind {

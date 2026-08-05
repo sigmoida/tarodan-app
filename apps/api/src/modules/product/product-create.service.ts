@@ -9,10 +9,7 @@ import { i18nMessage } from "../i18n";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { MembershipService } from "../membership/membership.service";
-import {
-  isCorporateSellingSuspended,
-  isPremiumEntitled,
-} from "../membership/membership.util";
+import { isCorporateSellingSuspended } from "../membership/membership.util";
 import { StorageService } from "../storage/storage.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
@@ -20,7 +17,11 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { CreateProductDto } from "./dto";
 import { ProductStatus } from "@prisma/client";
-import { computeRelevanceScore } from "./helpers/relevance-score";
+import { initialProductRanking } from "./helpers/product-initial-ranking";
+import {
+  loadProductPriceLimits,
+  productPriceLimitViolation,
+} from "./helpers/product-price-limits";
 import { ProductCommonService } from "./product-common.service";
 import { ProductRankingService } from "./product-ranking.service";
 import { ProductStatsService } from "./product-stats.service";
@@ -219,29 +220,20 @@ export class ProductCreateService {
     // ========================================================================
     // PRICE VALIDATION FROM PLATFORM SETTINGS (Not retroactive - only new listings)
     // ========================================================================
-    const minPriceSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "min_product_price" },
-    });
-    const maxPriceSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "max_product_price" },
-    });
-
-    const minPrice = minPriceSetting?.settingValue
-      ? parseFloat(minPriceSetting.settingValue)
-      : null;
-    const maxPrice = maxPriceSetting?.settingValue
-      ? parseFloat(maxPriceSetting.settingValue)
-      : null;
-
-    if (minPrice != null && !isNaN(minPrice) && dto.price < minPrice) {
+    const priceLimits = await loadProductPriceLimits(this.prisma);
+    const priceViolation = productPriceLimitViolation(dto.price, priceLimits);
+    if (priceViolation?.type === "minimum") {
       throw new BadRequestException(
-        i18nMessage("server.product.priceBelowMinimum", { minPrice }),
+        i18nMessage("server.product.priceBelowMinimum", {
+          minPrice: priceViolation.limit,
+        }),
       );
     }
-
-    if (maxPrice != null && !isNaN(maxPrice) && dto.price > maxPrice) {
+    if (priceViolation?.type === "maximum") {
       throw new BadRequestException(
-        i18nMessage("server.product.priceAboveMaximum", { maxPrice }),
+        i18nMessage("server.product.priceAboveMaximum", {
+          maxPrice: priceViolation.limit,
+        }),
       );
     }
 
@@ -274,11 +266,10 @@ export class ProductCreateService {
         },
       },
     });
-    const isPremiumSeller = isPremiumEntitled(
+    const initialRanking = initialProductRanking(
       sellerMembership,
       sellerMembership?.user,
     );
-    const FRESH_POPULARITY_BASELINE = 10;
 
     const salePricing = resolveCreateSalePricing({
       price: dto.price,
@@ -324,14 +315,7 @@ export class ProductCreateService {
           isPreorder: dto.isPreorder ?? false,
           isSet: dto.isSet ?? false,
           bundleSize: dto.isSet ? (dto.bundleSize ?? null) : null,
-          rankTier: isPremiumSeller ? 1 : 0,
-          popularityScore: FRESH_POPULARITY_BASELINE,
-          popularityUpdatedAt: new Date(),
-          relevanceScore: computeRelevanceScore({
-            rankTier: isPremiumSeller ? 1 : 0,
-            qualityScore: 0,
-            popularityScore: FRESH_POPULARITY_BASELINE,
-          }),
+          ...initialRanking,
           brandId,
           carModelId,
           manufacturerId,

@@ -5,14 +5,17 @@
  *  - NSFW şüphesi ya da düşük ilgililik           -> pending bırak (admin kuyruğu)
  * AI servisi kapalı/erişilemezse ürün bugünkü gibi `pending` kalır (graceful).
  */
-import { Processor, Process, OnQueueFailed } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
-import { ProductStatus } from '@prisma/client';
-import { PrismaService } from '../prisma';
-import { StorageService } from '../modules/storage/storage.service';
-import { ModerationAiClient } from '../modules/moderation/moderation-ai.client';
-import { QUEUE_NAMES } from './constants';
+import { Processor, Process, OnQueueFailed } from "@nestjs/bull";
+import { Logger } from "@nestjs/common";
+import { Job } from "bull";
+import { ProductStatus } from "@prisma/client";
+import { PrismaService } from "../prisma";
+import { StorageService } from "../modules/storage/storage.service";
+import { ModerationAiClient } from "../modules/moderation/moderation-ai.client";
+import { SearchService } from "../modules/search/search.service";
+import { CacheService } from "../modules/cache/cache.service";
+import { notifyWebRevalidate } from "../common/revalidate";
+import { QUEUE_NAMES } from "./constants";
 
 export interface ProductModerationJob {
   productId: string;
@@ -20,6 +23,8 @@ export interface ProductModerationJob {
   imageKeys?: string[];
   /** Eski job'lar için geriye uyumluluk. */
   cardKeys?: string[];
+  /** Admin bulk imports start active; a later review/flag must withdraw them. */
+  directApproval?: boolean;
 }
 
 @Processor(QUEUE_NAMES.MODERATION)
@@ -30,17 +35,21 @@ export class ModerationWorker {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly ai: ModerationAiClient,
+    private readonly search: SearchService,
+    private readonly cache: CacheService,
   ) {}
 
-  @Process('product-image')
+  @Process("product-image")
   async handleProductImage(job: Job<ProductModerationJob>) {
     const { productId } = job.data;
-    const imageKeys = job.data.imageKeys?.length ? job.data.imageKeys : job.data.cardKeys;
+    const imageKeys = job.data.imageKeys?.length
+      ? job.data.imageKeys
+      : job.data.cardKeys;
     if (!this.ai.isEnabled) {
-      return { skipped: true, reason: 'ai_disabled' };
+      return { skipped: true, reason: "ai_disabled" };
     }
     if (!imageKeys?.length) {
-      return { skipped: true, reason: 'no_images' };
+      return { skipped: true, reason: "no_images" };
     }
 
     let maxNsfw = 0;
@@ -59,27 +68,27 @@ export class ModerationWorker {
       maxNsfw = Math.max(maxNsfw, result.nsfwScore);
       minRelevance = Math.min(minRelevance, result.relevanceScore);
       if (topLabels === null) topLabels = result.topLabels;
-      if (result.decision === 'flag') anyFlag = true;
-      else if (result.decision === 'review') anyReview = true;
+      if (result.decision === "flag") anyFlag = true;
+      else if (result.decision === "review") anyReview = true;
     }
 
     if (checked === 0) {
       // Hiç görsel denetlenemedi (servis down/URL yok) -> dokunma, pending kalsın
-      return { skipped: true, reason: 'none_checked' };
+      return { skipped: true, reason: "none_checked" };
     }
 
     // Karar
-    let status: 'passed' | 'flagged' | 'review';
+    let status: "passed" | "flagged" | "review";
     let reason: string;
     if (anyFlag) {
-      status = 'flagged';
-      reason = 'nsfw';
+      status = "flagged";
+      reason = "nsfw";
     } else if (anyReview) {
-      status = 'review';
-      reason = 'low_relevance';
+      status = "review";
+      reason = "low_relevance";
     } else {
-      status = 'passed';
-      reason = 'relevant_clean';
+      status = "passed";
+      reason = "relevant_clean";
     }
 
     // AI sonuçlarını ürüne yaz
@@ -98,12 +107,13 @@ export class ModerationWorker {
 
     // Birleşik AI denetim günlüğüne yaz (admin "AI Denetim" — tüm varlıklar ortak)
     await this.ai.recordEvent({
-      entityType: 'product',
+      entityType: "product",
       entityId: productId,
       userId: updated.sellerId,
-      kind: 'image',
-      field: 'product_image',
-      decision: status === 'passed' ? 'pass' : status === 'flagged' ? 'flag' : 'review',
+      kind: "image",
+      field: "product_image",
+      decision:
+        status === "passed" ? "pass" : status === "flagged" ? "flag" : "review",
       relevanceScore: minRelevance,
       nsfwScore: maxNsfw,
       labels: topLabels,
@@ -111,21 +121,45 @@ export class ModerationWorker {
     });
 
     // Temiz + ilgili -> OTO-ONAY (yalnızca hâlâ pending ise; admin kararını ezme)
-    if (status === 'passed') {
+    if (status === "passed") {
       const res = await this.prisma.product.updateMany({
         where: { id: productId, status: ProductStatus.pending },
         data: { status: ProductStatus.active },
       });
       if (res.count > 0) {
+        await this.refreshProductVisibility(productId);
         this.logger.log(`Ürün ${productId} AI ile oto-onaylandı (active)`);
       }
     } else {
+      if (job.data.directApproval) {
+        const withdrawn = await this.prisma.product.updateMany({
+          where: { id: productId, status: ProductStatus.active },
+          data: { status: ProductStatus.pending },
+        });
+        if (withdrawn.count > 0) {
+          await this.refreshProductVisibility(productId);
+        }
+      }
       this.logger.log(
         `Ürün ${productId} admin incelemesine kaldı (${status}/${reason})`,
       );
     }
 
     return { status, reason, maxNsfw, minRelevance, checked };
+  }
+
+  private async refreshProductVisibility(productId: string): Promise<void> {
+    await Promise.all([
+      this.search.syncProduct(productId),
+      this.cache
+        .delPattern("products:list:*")
+        .catch((error) =>
+          this.logger.warn(
+            `Moderasyon cache temizliği başarısız (${productId}): ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        ),
+    ]);
+    void notifyWebRevalidate(["products:list", `product:${productId}`]);
   }
 
   @OnQueueFailed()

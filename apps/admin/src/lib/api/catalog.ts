@@ -35,6 +35,41 @@ export const catalogApi = {
     categoryId?: string;
     sellerId?: string;
   }) => api.get("/admin/products-export", { params, responseType: "blob" }),
+  getProductImportSellers: (search?: string) =>
+    api.get("/admin/products/bulk-import/sellers", {
+      params: search ? { search } : undefined,
+    }),
+  getProductImportBatch: (batchId: string) =>
+    api.get(`/admin/products/bulk-import/batches/${batchId}`),
+  bulkImportProducts: (data: {
+    batchId: string;
+    sellerId: string;
+    workbook: File;
+    images: File[];
+    onUploadProgress?: (progress: number) => void;
+  }) => {
+    const formData = new FormData();
+    formData.append("sellerId", data.sellerId);
+    formData.append("workbook", data.workbook);
+    data.images.forEach((image) => formData.append("images", image));
+    return api.post("/admin/products/bulk-import", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        "Idempotency-Key": data.batchId,
+      },
+      onUploadProgress: (event) => {
+        const ratio =
+          event.total && event.total > 0
+            ? event.loaded / event.total
+            : event.progress;
+        if (ratio != null) {
+          data.onUploadProgress?.(
+            Math.min(100, Math.max(0, Math.round(ratio * 100))),
+          );
+        }
+      },
+    });
+  },
 
   // Reviews
   getReviews: (params?: any) => api.get("/admin/reviews", { params }),

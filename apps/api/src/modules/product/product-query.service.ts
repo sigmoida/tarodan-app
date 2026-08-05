@@ -265,7 +265,25 @@ export class ProductQueryService {
     if (!hasSearch && page === 1 && esResult.total < limit) return null;
 
     const products = await this.prisma.product.findMany({
-      where: { id: { in: esResult.ids } },
+      // Elasticsearch gecikmeli veya eski olabilir. ID'leri canlı veritabanında
+      // kanonik katalog görünürlüğüyle yeniden doğrula; pending/rejected ürünler
+      // ve satış yetkisini kaybetmiş satıcılar stale indeks yüzünden sızmasın.
+      where: {
+        AND: [
+          buildProductWhere({
+            ...query,
+            material: query.material,
+            ...(query.tradeOnly
+              ? {
+                  tradeCapableSeller: tradeCapableSellerWhere(
+                    await getFreeTierCanTrade(this.prisma),
+                  ),
+                }
+              : {}),
+          }),
+          { id: { in: esResult.ids } },
+        ],
+      },
       include: {
         images: { orderBy: { sortOrder: "asc" }, take: 1 },
         seller: {
@@ -287,8 +305,10 @@ export class ProductQueryService {
       },
     });
 
-    // ES index can be stale (e.g. after DB seed): ids exist in ES but not in DB → fallback to Postgres
-    if (products.length === 0) return null;
+    // Tek bir stale ID bile pagination/total değerlerini bozabilir. Canlı DB
+    // görünürlüğüyle eşleşmeyen bir sonuç varsa bu isteği PostgreSQL yolunda
+    // yeniden hesapla; indeks senkronu tamamlanana kadar doğru total korunur.
+    if (products.length !== esResult.ids.length) return null;
 
     // Preserve ES ordering
     const idOrder = new Map(esResult.ids.map((id, i) => [id, i]));

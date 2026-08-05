@@ -61,6 +61,8 @@ import { CommissionModule } from "../commission/commission.module";
   // hâlâ ProductLockService'i alsın (davranış korunur).
   exports: [
     ProductService,
+    ProductCommonService,
+    ProductRankingService,
     ProductBoostService,
     ProductSchedulerService,
     ProductLockModule,
