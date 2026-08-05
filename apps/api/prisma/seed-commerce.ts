@@ -2,7 +2,11 @@ import { createHash } from "crypto";
 import {
   CommissionLedgerStatus,
   CommissionRuleSetStatus,
+  OrderCancellationType,
   OrderStatus,
+  PaymentStatus,
+  RefundAttemptStatus,
+  RefundRequestStatus,
   Prisma,
   PrismaClient,
   ProductKind,
@@ -24,6 +28,10 @@ import {
   calculatePackageDesi,
   resolvePackageShippingDecision,
 } from "../src/modules/shipping/shipping-tariff.helper";
+import {
+  calculateRefundFinancials,
+  resolveReturnPolicy,
+} from "../src/modules/refund/refund-financial-policy";
 
 const money = (value: number): number =>
   Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
@@ -307,6 +315,18 @@ export async function normalizeSeedCommerce(
           },
         },
       },
+      checkoutGroup: {
+        select: {
+          payment: {
+            select: {
+              id: true,
+              provider: true,
+              providerPaymentId: true,
+            },
+          },
+        },
+      },
+      refundRequests: true,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -533,6 +553,20 @@ export async function normalizeSeedCommerce(
         },
         sellerNetAmount,
       };
+      // `refundQuantity` şemada 1 varsayılanlıdır ve iade politikası tutarları
+      // `refundQuantity / orderQuantity` ile oranlar. Bu yüzden "iadesi
+      // tamamlanmış talep var" ile "sipariş tamamen iade edildi" aynı şey
+      // değildir: adedin bir kısmı iade edilmişken siparişi `refunded` yazmak,
+      // ödeme kartındaki kalan tahsilatla çelişen bir satır üretir.
+      const finalizedRefunds = order.refundRequests.filter(
+        (request) => request.status === RefundRequestStatus.refunded,
+      );
+      const finalizedRefundQuantity = finalizedRefunds.reduce(
+        (sum, request) => sum + request.refundQuantity,
+        0,
+      );
+      const isFullyRefunded =
+        finalizedRefunds.length > 0 && finalizedRefundQuantity >= base.quantity;
       await prisma.order.update({
         where: { id: order.id },
         data: {
@@ -558,11 +592,114 @@ export async function normalizeSeedCommerce(
           serviceVatRate,
           withholdingTaxAmount,
           financialSnapshot,
+          ...(isFullyRefunded
+            ? {
+                status: OrderStatus.refunded,
+                cancellationType: OrderCancellationType.iade,
+              }
+            : {}),
         },
       });
 
+      // İade kayıtları, normalizer öncesindeki örnek toplamla değil yukarıda
+      // oluşturulan nihai sipariş snapshot'ıyla aynı finansal politikadan
+      // hesaplanır. Böylece Payment, RefundRequest ve admin ekranı aynı tutarı
+      // gösterir.
+      for (const request of order.refundRequests) {
+        const policy = resolveReturnPolicy(request.reason);
+        const financials = calculateRefundFinancials(policy, {
+          totalAmount,
+          buyerShippingAmount: lineBuyerShipping,
+          buyerFeeAmount: commission.buyerFeeAmount,
+          buyerServiceFeeAmount: commission.buyerServiceFeeAmount,
+          sellerFeeAmount: commission.sellerFeeAmount,
+          sellerCommissionAmount: commission.sellerCommissionAmount,
+          sellerPlatformFeeAmount: commission.sellerPlatformFeeAmount,
+          returnShippingAmount: numeric(request.returnShippingAmount),
+          sellerShippingAmount: lineSellerShipping,
+          orderQuantity: base.quantity,
+          refundQuantity: request.refundQuantity,
+        });
+        const snapshot = {
+          version: 1,
+          reason: request.reason,
+          policy,
+          financials,
+          returnTariff: null,
+          createdAt: request.createdAt.toISOString(),
+        } as unknown as Prisma.InputJsonValue;
+        await prisma.refundRequest.update({
+          where: { id: request.id },
+          data: {
+            amount: financials.buyerRefundAmount,
+            policyCode: policy.policyCode,
+            financialPolicySnapshot: snapshot,
+            refundedProductAmount: financials.productRefundAmount,
+            refundedOutboundShippingAmount:
+              financials.outboundShippingRefundAmount,
+            refundedBuyerProtectionAmount:
+              financials.buyerProtectionRefundAmount,
+            refundedSellerFeeAmount: financials.sellerFeeRefundAmount,
+            retainedSellerPlatformFeeAmount:
+              financials.sellerPlatformFeeRetainedAmount,
+            returnShippingChargeToBuyer: financials.returnShippingChargeToBuyer,
+            returnShippingChargeToSeller:
+              financials.returnShippingChargeToSeller,
+            sellerShippingCompensationAmount:
+              financials.sellerShippingCompensationAmount,
+            outboundShippingChargeToSeller:
+              financials.outboundShippingChargeToSeller,
+            requiresAdminReview: policy.requiresAdminReview,
+            penaltyReviewRequired: policy.penaltyReviewRequired,
+            refundProductAmount: true,
+            refundShippingFee: policy.refundOutboundShipping,
+            refundBuyerFee: policy.refundBuyerProtectionFee,
+            refundSellerCommission: financials.sellerFeeRefundAmount > 0,
+            returnShippingPayer: policy.returnShippingPayer,
+          },
+        });
+
+        if (request.status === RefundRequestStatus.refunded) {
+          const payment = order.checkoutGroup?.payment;
+          if (!payment) {
+            throw new Error(
+              `Refunded seed order ${order.orderNumber} has no payment.`,
+            );
+          }
+          const finalizedAt = request.refundedAt ?? request.updatedAt;
+          await prisma.refundAttempt.upsert({
+            where: { idempotencyKey: `seed-refund-request:${request.id}` },
+            update: {
+              amount: financials.buyerRefundAmount,
+              status: RefundAttemptStatus.finalized,
+              providerSucceededAt: finalizedAt,
+              finalizedAt,
+            },
+            create: {
+              paymentId: payment.id,
+              orderId: order.id,
+              idempotencyKey: `seed-refund-request:${request.id}`,
+              amount: financials.buyerRefundAmount,
+              provider: payment.provider,
+              providerReference: payment.providerPaymentId,
+              providerRefundId:
+                request.providerRefundId ?? `SEED-RFD-${request.id}`,
+              providerResponse: { seeded: true },
+              status: RefundAttemptStatus.finalized,
+              requestStartedAt: finalizedAt,
+              providerSucceededAt: finalizedAt,
+              finalizedAt,
+            },
+          });
+        }
+      }
+
       if (order.status !== OrderStatus.pending_payment) {
+        // Kısmi iade defteri tamamen iade edilmiş saymaz: aşağıdaki alanlar
+        // komisyonun TAMAMINI iade edilmiş olarak yazıyor, oysa adedin bir
+        // kısmı iade edildiğinde platform komisyonun kalanını hak ediyor.
         const isRefunded =
+          isFullyRefunded ||
           order.status === OrderStatus.refunded ||
           order.status === OrderStatus.cancelled;
         const ledgerStatus = isRefunded
@@ -645,10 +782,31 @@ export async function normalizeSeedCommerce(
       where: { id: groupId },
       data: { totalAmount: aggregate._sum.totalAmount ?? 0 },
     });
-    await prisma.payment.updateMany({
+    const groupPayment = await prisma.payment.findUnique({
       where: { checkoutGroupId: groupId },
-      data: { amount: aggregate._sum.totalAmount ?? 0 },
+      include: { refundAttempts: true },
     });
+    if (groupPayment) {
+      const normalizedAmount = numeric(aggregate._sum.totalAmount);
+      const refundedTotal = money(
+        groupPayment.refundAttempts
+          .filter(
+            (attempt) =>
+              attempt.status === RefundAttemptStatus.succeeded ||
+              attempt.status === RefundAttemptStatus.finalized,
+          )
+          .reduce((sum, attempt) => sum + numeric(attempt.amount), 0),
+      );
+      await prisma.payment.update({
+        where: { id: groupPayment.id },
+        data: {
+          amount: normalizedAmount,
+          ...(refundedTotal >= normalizedAmount - 0.005
+            ? { status: PaymentStatus.refunded }
+            : {}),
+        },
+      });
+    }
   }
 
   return {
