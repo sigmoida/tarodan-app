@@ -93,6 +93,9 @@ async function seedMembershipTiers(): Promise<void> {
   }
 }
 
+/** Üretim referans setinin sürümü; `version` global olarak tekildir. */
+const PRODUCTION_RULE_SET_VERSION = 1;
+
 async function seedCommissionRule(): Promise<void> {
   const categories = await prisma.category.findMany({
     where: { isActive: true },
@@ -103,12 +106,34 @@ async function seedCommissionRule(): Promise<void> {
     );
     return;
   }
+  // Bu bootstrap her container açılışında koşar ve amacı "aktif bir kural seti
+  // OLSUN"dur — kendi setini dayatmak değil. Staging reset'i kapsamlı seed'in
+  // kendi setini ACTIVE bırakır; onun üstüne ikinci bir set yazmak hem
+  // `commission_rule_sets_one_active_idx` hem de tekil `version` kısıtını
+  // ihlal eder, seed exit 1 döner ve entrypoint (set -e) API'yi hiç
+  // başlatmazdı. Başka bir set sahayı tutuyorsa dokunmadan çık.
+  const conflicting = await prisma.commissionRuleSet.findFirst({
+    where: {
+      id: { not: SEED_COMMISSION_RULE_SET_IDS.production },
+      OR: [
+        { status: CommissionRuleSetStatus.ACTIVE },
+        { version: PRODUCTION_RULE_SET_VERSION },
+      ],
+    },
+    select: { id: true, name: true, status: true },
+  });
+  if (conflicting) {
+    console.log(
+      `Commission rule set "${conflicting.name}" (${conflicting.status}) already owns the active/version slot; skipping production strict set.`,
+    );
+    return;
+  }
   const set = await prisma.commissionRuleSet.upsert({
     where: { id: SEED_COMMISSION_RULE_SET_IDS.production },
     create: {
       id: SEED_COMMISSION_RULE_SET_IDS.production,
       name: "Production strict commission v1",
-      version: 1,
+      version: PRODUCTION_RULE_SET_VERSION,
       status: CommissionRuleSetStatus.ACTIVE,
       publishedAt: new Date(),
       publishedBy: "production-seed",

@@ -124,7 +124,17 @@ jobs:
             if [ -z "$API_CID" ]; then
               API_CID="$(docker ps --filter "name=$API_UUID" --format '{{.ID}}' | head -1)"
             fi
-            [ -n "$API_CID" ] || die "api container not found for UUID '$API_UUID'. Inspect: docker ps --format '{{.Names}}\t{{.Label \"coolify.applicationId\"}}'"
+            if [ -z "$API_CID" ]; then
+              # A crash-looping api is absent from `docker ps` but present in
+              # `docker ps -a` — say so (and show why) instead of the useless
+              # "not found", which reads like a wrong UUID.
+              DEAD="$(docker ps -a --filter "label=coolify.applicationId=$API_UUID" --format '{{.ID}} {{.Status}}' | head -1)"
+              if [ -n "$DEAD" ]; then
+                log "api container exists but is NOT running: $DEAD"
+                docker logs --tail 40 "${DEAD%% *}" 2>&1 || true
+              fi
+              die "no running api container for UUID '$API_UUID'. Inspect: docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Label \"coolify.applicationId\"}}'"
+            fi
             log "api container: $API_CID"
 
             # --- Guard: staging fingerprint (never touch production) -----------
@@ -190,4 +200,28 @@ jobs:
             log "restarting api so Elasticsearch reindexes from the fresh DB..."
             docker restart "$API_CID" >/dev/null
 
-            log "staging reset + seed complete (images: $IMG). Elasticsearch reindexes on api boot."
+            # --- Verify the api actually came back ------------------------------
+            # entrypoint.sh runs `migrate deploy` + the production reference seed
+            # BEFORE the server listens, and dies (set -e) if either fails. Without
+            # this gate the run reported success while staging was left down — the
+            # boot seed collided with the freshly seeded commission rule set
+            # (2026-08-05). Fail loudly, with logs, instead.
+            log "waiting for the api to become healthy again..."
+            HEALTHY=0
+            i=0
+            while [ "$i" -lt 36 ]; do
+              i=$((i + 1))
+              sleep 5
+              [ "$(docker inspect -f '{{.State.Status}}' "$API_CID" 2>/dev/null || echo gone)" = "running" ] || continue
+              if docker exec "$API_CID" node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+                HEALTHY=1
+                break
+              fi
+            done
+            if [ "$HEALTHY" != "1" ]; then
+              log "api did NOT come back healthy within 3 minutes — last 60 log lines:"
+              docker logs --tail 60 "$API_CID" 2>&1 || true
+              die "api unhealthy after reset (database IS reseeded; fix the boot failure above)."
+            fi
+
+            log "staging reset + seed complete (images: $IMG). api healthy; Elasticsearch reindexes on api boot."
