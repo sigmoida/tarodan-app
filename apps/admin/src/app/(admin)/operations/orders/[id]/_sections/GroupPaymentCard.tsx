@@ -29,7 +29,9 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
         <Field label={t("common.status")}>
           {enumLabel(paymentStatusConfig, payment.status)}
         </Field>
-        <Field label={t("common.amount")}>{fmtTry(payment.amount)}</Field>
+        <Field label={t("admin.operations.orders.file.chargedTotal")}>
+          {fmtTry(payment.amount)}
+        </Field>
         {payment.refundedTotal > 0 && (
           <Field label={t("admin.operations.orders.file.refundedTotal")}>
             <span className="text-danger-600">
@@ -37,6 +39,14 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
             </span>
           </Field>
         )}
+        {payment.refundedTotal > 0 &&
+          payment.refundedTotal < payment.amount && (
+            <Field
+              label={t("admin.operations.orders.file.remainingChargedTotal")}
+            >
+              {fmtTry(payment.amount - payment.refundedTotal)}
+            </Field>
+          )}
         <Field label={t("admin.operations.orders.provider")}>
           {enumLabel(paymentProviderConfig, payment.provider ?? "")}
         </Field>

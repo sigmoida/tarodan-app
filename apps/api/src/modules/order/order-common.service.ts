@@ -205,9 +205,11 @@ export class OrderCommonService {
       commissionAmount,
       taxAmount,
       withholdingTaxAmount,
+      sellerShippingAmount,
       // Hizmet bedeli KDV'si — UI fiyat dökümünde ayrı satır olarak gösterilir.
       buyerServiceTaxAmount,
       sellerServiceTaxAmount,
+      serviceVatRate: Number(order.serviceVatRate ?? 0),
       totalAmount,
       sellerNetAmount,
     };

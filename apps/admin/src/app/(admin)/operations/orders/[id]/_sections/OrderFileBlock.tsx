@@ -152,7 +152,12 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
       {/* Finansal kırılım — her kalem ayrı satır. Tutarı 0 olan kalem GİZLENMEZ:
           satır kaybolunca admin, kalemin sıfır mı olduğunu yoksa hiç
           uygulanmadığını mı ayırt edemiyordu. */}
-      <OrderMoneyBreakdown f={f} />
+      <OrderMoneyBreakdown
+        f={f}
+        isRefunded={
+          entry.status === "refunded" || entry.ledger?.status === "refunded"
+        }
+      />
 
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-border pt-3 text-sm">
         {/* Hangi komisyon kuralına düştüğü: sipariş anındaki snapshot. Tıklanınca
@@ -273,6 +278,9 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <span className="text-muted">
+                    {t("admin.operations.orders.file.refundedTotal")}:
+                  </span>
                   <span className="font-medium">{fmtTry(r.amount)}</span>
                   <Button asChild variant="ghost" size="sm">
                     <Link href={`/operations/refund-requests/${r.id}`}>
@@ -327,7 +335,13 @@ const LINE_LABEL = {
  * `serviceVatRate` ile türetilir, güncel ayarla değil — oran sonradan değişse
  * bile eski sipariş tahsil edildiği haliyle görünür.
  */
-function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
+function OrderMoneyBreakdown({
+  f,
+  isRefunded,
+}: {
+  f: OrderFileFinance;
+  isRefunded: boolean;
+}) {
   const t = useTranslations();
   const locale = useLocale();
   const pspFeeRate = usePspFeeRate();
@@ -523,6 +537,11 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
 
   return (
     <div className="mt-4 space-y-4 border-t border-border pt-4 text-sm">
+      {isRefunded && (
+        <p className="rounded-lg bg-warning-50 px-3 py-2 text-warning-800">
+          {t("admin.operations.orders.file.refundedBreakdownNote")}
+        </p>
+      )}
       <div className="overflow-x-auto">
         <div className="min-w-[900px]">
           <div className="grid grid-cols-[minmax(max-content,1fr)_7rem_5rem_minmax(max-content,1fr)_7rem_5rem] gap-x-3 text-xs uppercase tracking-wide text-subtle">
@@ -622,7 +641,11 @@ function OrderMoneyBreakdown({ f }: { f: OrderFileFinance }) {
             amount={-b.platform.pspFee}
           />
           <Total
-            label={t("admin.operations.orders.file.netRevenue")}
+            label={t(
+              isRefunded
+                ? "admin.operations.orders.file.netRevenueAtCharge"
+                : "admin.operations.orders.file.netRevenue",
+            )}
             amount={b.platform.netRevenue}
             tone="text-primary-600"
           />

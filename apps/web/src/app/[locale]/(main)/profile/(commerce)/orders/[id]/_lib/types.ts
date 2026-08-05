@@ -25,11 +25,15 @@ export interface OrderDetail {
   pricing?: {
     subtotal: number;
     shippingAmount: number;
+    sellerShippingAmount?: number;
     buyerFeeAmount: number;
     sellerFeeAmount: number;
     commissionAmount: number;
     taxAmount?: number;
     withholdingTaxAmount?: number;
+    buyerServiceTaxAmount?: number;
+    sellerServiceTaxAmount?: number;
+    serviceVatRate?: number;
     totalAmount: number;
     sellerNetAmount: number;
   };

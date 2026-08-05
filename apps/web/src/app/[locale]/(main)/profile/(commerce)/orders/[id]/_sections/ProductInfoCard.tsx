@@ -16,9 +16,11 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
   const productImage =
     productInfo?.imageUrl || order.items?.[0]?.product?.imageUrl;
   const orderAmount = orderAmountOf(order);
+  const productAmount =
+    order.pricing?.subtotal ?? order.items?.[0]?.price ?? orderAmount;
   // Çok adetli sipariş: gerçek adedi ve birim fiyatı göster (satır tutarı / adet).
   const quantity = order.items?.[0]?.quantity ?? 1;
-  const unitPrice = quantity > 0 ? orderAmount / quantity : orderAmount;
+  const unitPrice = quantity > 0 ? productAmount / quantity : productAmount;
 
   return (
     <SectionCard title={t("product.productInfo")}>
@@ -49,7 +51,7 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
             {quantity} {t("order.unitTimes")} {formatTL(unitPrice)}
           </p>
           <p className="text-xl font-bold text-primary-500 mt-2">
-            {formatTL(orderAmount)}
+            {formatTL(productAmount)}
           </p>
         </div>
       </div>
