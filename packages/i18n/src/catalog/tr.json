@@ -7046,7 +7046,6 @@
       "notFound": "Üyelik bulunamadı",
       "platformSellerNotFound": "Platform seller bulunamadı",
       "premiumFeatureOnly": "Bu özellik premium ve üzeri üyelikler içindir",
-      "savedCardDeleteFailed": "Kart PayTR'dan silinemedi. Lütfen tekrar deneyin.",
       "savedCardNotFound": "Kayıtlı kart bulunamadı",
       "tierAlreadyExists": "Üyelik tipi zaten mevcut: {type}",
       "tierNoPaymentNeeded": "Bu üyelik seviyesi için ödeme gerekmez",

@@ -72,3 +72,14 @@ export interface OrderFulfillmentOutboxPayload {
   skipBuyer?: boolean;
   transactionId?: string;
 }
+
+/**
+ * Kullanıcının yerelde revoke ettiği kayıtlı kartı ödeme sağlayıcısından temizle.
+ * Payload yalnız yerel kayıt kimliğini taşır; sağlayıcı token'ları handler içinde
+ * taze yüklenir ve outbox tablosuna yazılmaz.
+ */
+export const OUTBOX_SAVED_CARD_PROVIDER_DELETE = "saved_card.provider_delete";
+
+export interface SavedCardProviderDeletePayload {
+  savedCardId: string;
+}

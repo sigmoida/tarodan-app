@@ -3,7 +3,6 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
-  BadGatewayException,
   Logger,
   Optional,
 } from "@nestjs/common";
@@ -39,6 +38,11 @@ import { createHash } from "node:crypto";
 import { VirtualOrderFulfillmentService } from "../payment/virtual-order-fulfillment.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { OutboxService } from "../outbox/outbox.service";
+import {
+  OUTBOX_SAVED_CARD_PROVIDER_DELETE,
+  type SavedCardProviderDeletePayload,
+} from "../outbox/outbox.types";
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -57,6 +61,7 @@ export class MembershipSubscriptionService {
     private readonly configService: ConfigService,
     private readonly common: MembershipCommonService,
     private readonly providerEvents: PaymentProviderEventService,
+    private readonly outbox: OutboxService,
     private readonly virtualOrder?: VirtualOrderFulfillmentService,
     // Takas yetkisi düşünce satıcının ürünlerini yeniden indeksle: arama
     // dokümanındaki `sellerCanTrade` üyelikten türetilir ve ürün düzenlemesi
@@ -1200,7 +1205,11 @@ export class MembershipSubscriptionService {
     }));
   }
 
-  /** PayTR silmeyi onayladıktan sonra yerel kaydı revoke eder. */
+  /**
+   * Kullanıcının silme niyetini yerelde hemen kesinleştirir. Sağlayıcı temizliği
+   * aynı transaction'da yazılan outbox olayıyla, kullanıcı isteğinden bağımsız
+   * olarak yeniden denenir.
+   */
   async deleteSavedCard(
     userId: string,
     cardId: string,
@@ -1213,33 +1222,20 @@ export class MembershipSubscriptionService {
         i18nMessage("server.membership.savedCardNotFound"),
       );
     }
-    if (card.status === SavedCardStatus.revoked) {
-      return { deleted: true }; // idempotent
-    }
-    let providerResult: { status: string; reason?: string };
-    try {
-      providerResult = await this.paymentProviders
-        .resolve()
-        .capiDeleteCard(card.utoken, card.ctoken);
-    } catch (error: unknown) {
-      this.logger.error(
-        `PayTR kart silme hatası (card=${cardId}): ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw new BadGatewayException(
-        i18nMessage("server.membership.savedCardDeleteFailed"),
-      );
-    }
-    if (providerResult.status !== "success") {
-      this.logger.warn(
-        `PayTR kart silme onayı alınamadı (card=${cardId}): ${providerResult.reason || providerResult.status}`,
-      );
-      throw new BadGatewayException(
-        i18nMessage("server.membership.savedCardDeleteFailed"),
-      );
-    }
-    await this.prisma.savedCard.update({
-      where: { id: card.id },
-      data: { status: SavedCardStatus.revoked, isDefault: false },
+    await this.prisma.$transaction(async (tx) => {
+      if (card.status !== SavedCardStatus.revoked) {
+        await tx.savedCard.update({
+          where: { id: card.id },
+          data: { status: SavedCardStatus.revoked, isDefault: false },
+        });
+      }
+      await this.outbox.enqueue(tx, {
+        type: OUTBOX_SAVED_CARD_PROVIDER_DELETE,
+        payload: {
+          savedCardId: card.id,
+        } satisfies SavedCardProviderDeletePayload,
+        dedupeKey: `saved-card-provider-delete:${card.id}`,
+      });
     });
     return { deleted: true };
   }

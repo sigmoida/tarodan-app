@@ -6,9 +6,10 @@ import {
   SavedCardStatus,
   SubscriptionStatus,
 } from "@prisma/client";
-import { BadGatewayException, ForbiddenException } from "@nestjs/common";
+import { ForbiddenException } from "@nestjs/common";
 import { PaymentProvider } from "../payment/dto";
 import { MembershipSubscriptionService } from "./membership-subscription.service";
+import { OUTBOX_SAVED_CARD_PROVIDER_DELETE } from "../outbox/outbox.types";
 
 describe("MembershipSubscriptionService", () => {
   const money = (value: number) => ({
@@ -66,6 +67,7 @@ describe("MembershipSubscriptionService", () => {
     const tx = {
       order: { create: jest.fn() },
       membershipPayment: { create: jest.fn() },
+      savedCard: { update: jest.fn() },
     };
     const prisma = {
       // Sipariş numarası çakışma kontrolü (generateUniqueReference).
@@ -114,6 +116,7 @@ describe("MembershipSubscriptionService", () => {
       }),
     };
     const providerEvents = { record: jest.fn().mockResolvedValue(undefined) };
+    const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
     const virtualOrder = {
       completeRecurringMembershipPayment: jest.fn(),
       failRecurringMembershipPayment: jest.fn(),
@@ -125,6 +128,7 @@ describe("MembershipSubscriptionService", () => {
       config as any,
       common as any,
       providerEvents as any,
+      outbox as any,
       virtualOrder as any,
     );
     return {
@@ -136,12 +140,13 @@ describe("MembershipSubscriptionService", () => {
       config,
       common,
       providerEvents,
+      outbox,
       virtualOrder,
     };
   };
 
-  it("revokes a saved card only after PayTR confirms deletion", async () => {
-    const { service, prisma, provider } = makeService();
+  it("revokes a saved card locally and enqueues provider cleanup atomically", async () => {
+    const { service, prisma, tx, outbox, provider } = makeService();
     prisma.savedCard.findFirst.mockResolvedValue({
       id: "card-1",
       userId: "user-1",
@@ -149,23 +154,45 @@ describe("MembershipSubscriptionService", () => {
       ctoken: "ctoken-1",
       status: SavedCardStatus.active,
     });
-    provider.capiDeleteCard.mockResolvedValue({ status: "success" });
+    await expect(service.deleteSavedCard("user-1", "card-1")).resolves.toEqual({
+      deleted: true,
+    });
+    expect(provider.capiDeleteCard).not.toHaveBeenCalled();
+    expect(tx.savedCard.update).toHaveBeenCalledWith({
+      where: { id: "card-1" },
+      data: { status: SavedCardStatus.revoked, isDefault: false },
+    });
+    expect(outbox.enqueue).toHaveBeenCalledWith(tx, {
+      type: OUTBOX_SAVED_CARD_PROVIDER_DELETE,
+      payload: { savedCardId: "card-1" },
+      dedupeKey: "saved-card-provider-delete:card-1",
+    });
+  });
+
+  it("keeps deletion idempotent while ensuring cleanup is enqueued", async () => {
+    const { service, prisma, tx, outbox } = makeService();
+    prisma.savedCard.findFirst.mockResolvedValue({
+      id: "card-1",
+      userId: "user-1",
+      utoken: "utoken-1",
+      ctoken: "ctoken-1",
+      status: SavedCardStatus.revoked,
+    });
 
     await expect(service.deleteSavedCard("user-1", "card-1")).resolves.toEqual({
       deleted: true,
     });
-    expect(provider.capiDeleteCard).toHaveBeenCalledWith(
-      "utoken-1",
-      "ctoken-1",
+    expect(tx.savedCard.update).not.toHaveBeenCalled();
+    expect(outbox.enqueue).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        dedupeKey: "saved-card-provider-delete:card-1",
+      }),
     );
-    expect(prisma.savedCard.update).toHaveBeenCalledWith({
-      where: { id: "card-1" },
-      data: { status: SavedCardStatus.revoked, isDefault: false },
-    });
   });
 
-  it("keeps a saved card active when PayTR does not confirm deletion", async () => {
-    const { service, prisma, provider } = makeService();
+  it("does not persist a local-only revoke when cleanup cannot be enqueued", async () => {
+    const { service, prisma, outbox } = makeService();
     prisma.savedCard.findFirst.mockResolvedValue({
       id: "card-1",
       userId: "user-1",
@@ -173,32 +200,11 @@ describe("MembershipSubscriptionService", () => {
       ctoken: "ctoken-1",
       status: SavedCardStatus.active,
     });
-    provider.capiDeleteCard.mockResolvedValue({
-      status: "error",
-      reason: "provider unavailable",
-    });
+    outbox.enqueue.mockRejectedValue(new Error("database unavailable"));
 
-    await expect(
-      service.deleteSavedCard("user-1", "card-1"),
-    ).rejects.toBeInstanceOf(BadGatewayException);
-    expect(prisma.savedCard.update).not.toHaveBeenCalled();
-  });
-
-  it("keeps a saved card active when the PayTR deletion call fails", async () => {
-    const { service, prisma, provider } = makeService();
-    prisma.savedCard.findFirst.mockResolvedValue({
-      id: "card-1",
-      userId: "user-1",
-      utoken: "utoken-1",
-      ctoken: "ctoken-1",
-      status: SavedCardStatus.active,
-    });
-    provider.capiDeleteCard.mockRejectedValue(new Error("network failure"));
-
-    await expect(
-      service.deleteSavedCard("user-1", "card-1"),
-    ).rejects.toBeInstanceOf(BadGatewayException);
-    expect(prisma.savedCard.update).not.toHaveBeenCalled();
+    await expect(service.deleteSavedCard("user-1", "card-1")).rejects.toThrow(
+      "database unavailable",
+    );
   });
 
   it("does not let an unapproved company subscribe to Business", async () => {

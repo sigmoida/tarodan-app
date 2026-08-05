@@ -11,6 +11,7 @@ import { PrismaModule } from "../../prisma";
 import { PaymentModule } from "../payment/payment.module";
 import { PaymentProvidersModule } from "../payment-providers/payment-providers.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
+import { SavedCardOutboxHandlers } from "./saved-card-outbox-handlers.service";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     MembershipService,
     MembershipCommonService,
     MembershipSubscriptionService,
+    SavedCardOutboxHandlers,
     MembershipSchedulerService,
     ...scheduledProcessors(MembershipScheduledProcessor),
   ],
