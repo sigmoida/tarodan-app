@@ -89,12 +89,59 @@ const border = "FFE5E7EB";
 const heading = "FF202124";
 const muted = "FF6B7280";
 
+/**
+ * Zorunlu sütunlar — `REQUIRED_HEADERS` (admin-product-bulk-import.service.ts)
+ * ile AYNI küme olmalıdır. Orası doğrulamanın otoritesi, burası yalnız rengi
+ * belirler; kayma görsel bir yanlışlık üretir (yükleme yine doğru çalışır).
+ * İki listeyi tek manifestte birleştirme işi #436'da.
+ */
+const requiredHeaders = new Set([
+  "urun_ref",
+  "baslik",
+  "aciklama",
+  "kategori",
+  "marka",
+  "arac_modeli",
+  "uretici",
+  "model_kodu",
+  "durum",
+  "renk",
+  "olcek",
+  "malzeme",
+  "kutulu",
+  "fiyat",
+  "stok",
+  "kargo_paketi",
+  "gorsel_1",
+  "gorsel_2",
+  "gorsel_3",
+]);
+
+// Sütun adının kendisi zorunlu olsa da hücresi boş bırakılabilen alanlar var;
+// başlıkta bunu göstermezsek kullanıcı hepsini doldurmak zorunda sanıyor.
 products.getRow(1).height = 32;
-products.getRow(1).eachCell((cell) => {
-  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: orange } };
-  cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+products.getRow(1).eachCell((cell, column) => {
+  const isRequired = requiredHeaders.has(headers[column - 1]);
+  cell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: isRequired ? orange : orangeSoft },
+  };
+  cell.font = {
+    bold: isRequired,
+    color: { argb: isRequired ? "FFFFFFFF" : muted },
+    size: 10,
+  };
   cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-  cell.border = { bottom: { style: "medium", color: { argb: "FFCC4B1D" } } };
+  cell.border = {
+    bottom: {
+      style: isRequired ? "medium" : "thin",
+      color: { argb: isRequired ? "FFCC4B1D" : border },
+    },
+  };
+  cell.note = isRequired
+    ? "Zorunlu alan — boş bırakılamaz."
+    : "Opsiyonel alan — boş bırakabilirsiniz, sütunu silmeyin.";
 });
 for (let row = 2; row <= 26; row += 1) {
   products.getRow(row).height = 24;
@@ -176,10 +223,21 @@ const exampleSheet = workbook.addWorksheet("Ornek", {
 });
 exampleSheet.addRow(headers);
 exampleSheet.addRow(example);
+// Örnek sayfası da aynı ayrımı taşımalı: kullanıcı doldururken iki sayfayı yan
+// yana koyuyor, renkler farklı olursa hangisinin doğru olduğunu bilemez.
 exampleSheet.getRow(1).height = 32;
-exampleSheet.getRow(1).eachCell((cell) => {
-  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: orange } };
-  cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+exampleSheet.getRow(1).eachCell((cell, column) => {
+  const isRequired = requiredHeaders.has(headers[column - 1]);
+  cell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: isRequired ? orange : orangeSoft },
+  };
+  cell.font = {
+    bold: isRequired,
+    color: { argb: isRequired ? "FFFFFFFF" : muted },
+    size: 10,
+  };
   cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
 });
 exampleSheet.getRow(2).height = 54;
@@ -224,39 +282,38 @@ instructions.getColumn("D").width = 20;
 instructions.getColumn("E").width = 20;
 instructions.getColumn("F").width = 20;
 
+// Adım numarası sırayla türetilir — elle yazılınca araya madde eklendiğinde
+// numaralar sessizce çakışıyordu.
 const steps = [
   [
-    "1",
     "Satıcıyı admin ekranından seçin",
     "Satıcı Excel içinde yazılmaz. Yalnızca satış yetkisi açık BUSINESS kurumsal satıcılar listelenir.",
   ],
   [
-    "2",
     "Urunler sayfasını doldurun",
     "Sütun adlarını değiştirmeyin. Bir ürün bir satırdır. Urunler sayfası bilerek boştur; örnek kayıt Ornek sayfasındadır. Tek yüklemede en fazla 25 ürün kabul edilir.",
   ],
   [
-    "3",
+    "Başlık renklerine bakın",
+    "Turuncu başlıklar ZORUNLUDUR, boş bırakılamaz. Soluk turuncu başlıklar opsiyoneldir: hücreyi boş bırakabilirsiniz ama sütunun kendisini silmeyin. Her başlığın üzerine gelince aynı bilgi not olarak görünür.",
+  ],
+  [
     "Katalog adlarını doğru yazın",
     "Kategori, marka, araç modeli ve üretici alanına admin kataloglarında görünen adı, slug'ı veya UUID'yi yazabilirsiniz.",
   ],
   [
-    "4",
     "En az üç görsel ekleyin",
     "gorsel_1, gorsel_2 ve gorsel_3 zorunludur. Dosya adları yüklediğiniz görsellerle birebir aynı olmalıdır.",
   ],
   [
-    "5",
     "İndirim alanlarını birlikte kullanın",
     "indirimli_fiyat girilirse fiyat indirim öncesi fiyat sayılır. Başlangıç ve bitiş tarihlerini Excel tarihi olarak girin.",
   ],
   [
-    "6",
     "Dosyaları birlikte yükleyin",
     "Excel ve adı geçen tüm JPEG, PNG veya WebP görselleri aynı işlemde seçin. Tüm satırlar geçmeden hiçbir ürün oluşturulmaz.",
   ],
   [
-    "7",
     "Doğrudan yayın",
     "Başarılı ürünler Aktif durumda oluşturulur ve web kataloğunda görünür. Kurumsal ürünlerde takas daima kapalıdır.",
   ],
@@ -264,14 +321,24 @@ const steps = [
 instructions.addRow([]);
 instructions.addRow([]);
 instructions.addRow(["Adım", "Konu", "Açıklama"]);
-steps.forEach((step) => instructions.addRow(step));
-const instructionHeader = instructions.getRow(5);
+steps.forEach((step, index) =>
+  instructions.addRow([String(index + 1), ...step]),
+);
+// Satır konumları adım sayısından türetilir; madde eklenince aşağıdaki bloklar
+// elle kaydırılmak zorunda kalmasın.
+const STEP_HEADER_ROW = 5;
+const lastStepRow = STEP_HEADER_ROW + steps.length;
+const notesTitleRow = lastStepRow + 2;
+const notesHeaderRow = notesTitleRow + 1;
+const firstNoteRow = notesHeaderRow + 1;
+
+const instructionHeader = instructions.getRow(STEP_HEADER_ROW);
 instructionHeader.eachCell((cell) => {
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: heading } };
   cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
   cell.alignment = { vertical: "middle" };
 });
-for (let row = 6; row <= 12; row += 1) {
+for (let row = STEP_HEADER_ROW + 1; row <= lastStepRow; row += 1) {
   instructions.getRow(row).height = 42;
   instructions.getRow(row).eachCell((cell) => {
     cell.alignment = { vertical: "middle", wrapText: true };
@@ -279,8 +346,8 @@ for (let row = 6; row <= 12; row += 1) {
   });
 }
 
-instructions.getCell("B15").value = "Önemli alanlar";
-instructions.getCell("B15").font = {
+instructions.getCell(`B${notesTitleRow}`).value = "Önemli alanlar";
+instructions.getCell(`B${notesTitleRow}`).font = {
   bold: true,
   size: 14,
   color: { argb: heading },
@@ -293,9 +360,9 @@ const notes = [
   ["set_parca_sayisi", "Yalnız set_urun=Evet ise zorunlu ve en az 2."],
   ["gorsel_1..10", "En az 3, en fazla 10 görsel dosya adı."],
 ];
-instructions.getCell("B16").value = "Alan";
-instructions.getCell("C16").value = "Kural";
-for (const address of ["B16", "C16"]) {
+instructions.getCell(`B${notesHeaderRow}`).value = "Alan";
+instructions.getCell(`C${notesHeaderRow}`).value = "Kural";
+for (const address of [`B${notesHeaderRow}`, `C${notesHeaderRow}`]) {
   const cell = instructions.getCell(address);
   cell.fill = {
     type: "pattern",
@@ -305,10 +372,10 @@ for (const address of ["B16", "C16"]) {
   cell.font = { bold: true, color: { argb: heading } };
 }
 notes.forEach((note, index) => {
-  instructions.getCell(`B${17 + index}`).value = note[0];
-  instructions.getCell(`C${17 + index}`).value = note[1];
+  instructions.getCell(`B${firstNoteRow + index}`).value = note[0];
+  instructions.getCell(`C${firstNoteRow + index}`).value = note[1];
 });
-for (let row = 17; row <= 22; row += 1) {
+for (let row = firstNoteRow; row < firstNoteRow + notes.length; row += 1) {
   instructions.getRow(row).height = 28;
   instructions.getCell(`B${row}`).font = {
     bold: true,
