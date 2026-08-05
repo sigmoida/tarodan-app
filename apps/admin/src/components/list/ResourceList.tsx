@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AxiosResponse } from "axios";
+import { Spinner } from "@tarodan/ui";
 import { useAdminResource } from "@/hooks/useAdminResource";
 import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
 import { AdminPage } from "@/components/page/AdminPage";
@@ -44,9 +45,32 @@ export function ResourceListRoot<T>({
 }: ResourceListProps<T>) {
   return (
     <SuspenseBoundary>
-      <ResourceListInner {...config}>{children}</ResourceListInner>
+      <HydratedResourceList {...config}>{children}</HydratedResourceList>
     </SuspenseBoundary>
   );
+}
+
+/**
+ * Admin data calls use the browser-only same-origin `/gateway` BFF so its
+ * httpOnly session can be attached server-side. Client Components are still
+ * pre-rendered by Next.js; starting a relative gateway request during that
+ * pass makes Axios fail before hydration. Keep the server and first browser
+ * render on the same loading snapshot, then start the query after hydration.
+ */
+function HydratedResourceList<T>(props: ResourceListProps<T>) {
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => setHydrated(true), []);
+
+  if (!hydrated) {
+    return (
+      <div className="flex items-center justify-center py-16" aria-busy="true">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  return <ResourceListInner {...props} />;
 }
 
 function ResourceListInner<T>({
