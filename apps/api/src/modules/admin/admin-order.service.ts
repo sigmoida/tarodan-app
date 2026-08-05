@@ -9,8 +9,7 @@ import { StorageService } from "../storage/storage.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { PaymentService } from "../payment/payment.service";
 import { AdminOrderQueryDto, ResolveDisputeDto } from "./dto";
-import { OrderStatus, Prisma } from "@prisma/client";
-import { paginate, resolveOrderBy } from "../../common/list";
+import { OrderStatus, Prisma, ProductKind } from "@prisma/client";
 
 /**
  * Sipariş yönetimi (liste, ihtilaflar, ihtilaf çözümü) — AdminService'in
@@ -138,79 +137,210 @@ export class AdminOrderService {
       where.AND = and;
     }
 
-    // Grup (CheckoutGroup) bazında sayfala: bir sepet asla sayfa sınırına
-    // bölünmez. `orders.some` order-seviye filtreyle eşleşen EN AZ bir siparişi
-    // olan grupları getirir; sonra o grupların TÜM siparişlerini (eksiksiz sepet)
-    // çekeriz. Sıralama: grup createdAt (en yeni). Her order backfill ile bir
-    // CheckoutGroup'a bağlıdır (grupsuz order admin listesinde görünmez).
-    const groupOrderBy =
-      resolveOrderBy<Prisma.CheckoutGroupOrderByWithRelationInput>(
-        "CheckoutGroup",
-        query,
-        {
-          defaultSort: { createdAt: "desc" },
-          sortMap: {
-            orderNumber: (d) => ({ groupNumber: d }),
-            totalAmount: (d) => ({ totalAmount: d }),
-            "buyer.displayName": (d) => ({ buyer: { displayName: d } }),
-          },
-        },
-      );
-    const groupPage = await paginate(
-      this.prisma.checkoutGroup,
-      {
+    // Yönetim listesindeki bir satır ya gerçek CheckoutGroup ya da teklif gibi
+    // grup oluşturmayan geçerli bir tekil sipariştir. İki kaynağı ortak bir
+    // "çatı" listesinde sıralayıp sayfalıyoruz; böylece sepet bölünmez ve
+    // tekliften kabul edilen sipariş de sessizce kaybolmaz.
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const candidateTake = page * limit;
+    const direction = query.sortOrder === "asc" ? 1 : -1;
+    const sortDirection: Prisma.SortOrder =
+      query.sortOrder === "asc" ? "asc" : "desc";
+    const sortBy = query.sortBy ?? "createdAt";
+    const sortsByCreatedAt =
+      sortBy !== "orderNumber" &&
+      sortBy !== "totalAmount" &&
+      sortBy !== "buyer.displayName";
+    // İkincil sıralama, iki kaynağı bellekte birleştirmenin ön koşuludur.
+    // `take` yalnız her kaynağın İLK N satırını çeker; eşit `totalAmount` gibi
+    // değerlerde ikincil anahtar olmadan Postgres bu N'i her istekte farklı
+    // seçebilir ve aynı satır iki sayfada birden çıkabilir ya da hiç çıkmaz.
+    // Anahtar `createdAt DESC`: aşağıdaki karşılaştırıcı da eşitlikte tam olarak
+    // bunu uyguluyor, dolayısıyla DB sırası ile bellekteki sıra aynı tanımdır.
+    // Yön'e göre değişmez — iki tarafın da sabit olması yeterlidir.
+    const secondaryGroupSort: Prisma.CheckoutGroupOrderByWithRelationInput = {
+      createdAt: "desc",
+    };
+    const secondaryLooseSort: Prisma.OrderOrderByWithRelationInput = {
+      createdAt: "desc",
+    };
+    const groupOrderBy: Prisma.CheckoutGroupOrderByWithRelationInput[] =
+      sortsByCreatedAt
+        ? [{ createdAt: sortDirection }]
+        : [
+            sortBy === "orderNumber"
+              ? { groupNumber: sortDirection }
+              : sortBy === "totalAmount"
+                ? { totalAmount: sortDirection }
+                : { buyer: { displayName: sortDirection } },
+            secondaryGroupSort,
+          ];
+    const looseOrderBy: Prisma.OrderOrderByWithRelationInput[] =
+      sortsByCreatedAt
+        ? [{ createdAt: sortDirection }]
+        : [
+            sortBy === "orderNumber"
+              ? { orderNumber: sortDirection }
+              : sortBy === "totalAmount"
+                ? { totalAmount: sortDirection }
+                : { buyer: { displayName: sortDirection } },
+            secondaryLooseSort,
+          ];
+    // Grupsuz sipariş = teklif akışı DEĞİL demek yeterli değil: üyelik
+    // (membership-subscription.service) ve öne çıkarma (product-boost.service)
+    // siparişleri de sanal ürünle, gruba bağlanmadan oluşuyor. Ürün türü şartı
+    // olmadan bu iki tür sipariş yönetim listesine sızardı — kargosu, satıcısı
+    // ve iade süreci olmayan satırlar operasyon ekranını kirletir.
+    const looseOrderWhere: Prisma.OrderWhereInput = {
+      ...where,
+      checkoutGroupId: null,
+      product: { kind: ProductKind.listing },
+    };
+    const [groupCount, looseCount, groups, looseOrders] = await Promise.all([
+      this.prisma.checkoutGroup.count({ where: { orders: { some: where } } }),
+      this.prisma.order.count({ where: looseOrderWhere }),
+      this.prisma.checkoutGroup.findMany({
         where: { orders: { some: where } },
+        select: {
+          id: true,
+          groupNumber: true,
+          totalAmount: true,
+          createdAt: true,
+          buyer: { select: { displayName: true } },
+        },
         orderBy: groupOrderBy,
-        select: { id: true },
-      },
-      query,
-    );
-    const groupIds = groupPage.data.map((g) => g.id);
+        take: candidateTake,
+      }),
+      this.prisma.order.findMany({
+        where: looseOrderWhere,
+        select: {
+          id: true,
+          orderNumber: true,
+          totalAmount: true,
+          createdAt: true,
+          buyer: { select: { displayName: true } },
+        },
+        orderBy: looseOrderBy,
+        take: candidateTake,
+      }),
+    ]);
+    type Umbrella = {
+      kind: "group" | "order";
+      id: string;
+      number: string;
+      totalAmount: number;
+      buyerName: string;
+      createdAt: Date;
+    };
+    const umbrellas: Umbrella[] = [
+      ...groups.map((group) => ({
+        kind: "group" as const,
+        id: group.id,
+        number: group.groupNumber,
+        totalAmount: Number(group.totalAmount),
+        buyerName: group.buyer?.displayName ?? "",
+        createdAt: group.createdAt,
+      })),
+      ...looseOrders.map((order) => ({
+        kind: "order" as const,
+        id: order.id,
+        number: order.orderNumber,
+        totalAmount: Number(order.totalAmount),
+        buyerName: order.buyer?.displayName ?? "",
+        createdAt: order.createdAt,
+      })),
+    ];
+    umbrellas.sort((a, b) => {
+      const av =
+        sortBy === "orderNumber"
+          ? a.number
+          : sortBy === "totalAmount"
+            ? a.totalAmount
+            : sortBy === "buyer.displayName"
+              ? a.buyerName
+              : a.createdAt.getTime();
+      const bv =
+        sortBy === "orderNumber"
+          ? b.number
+          : sortBy === "totalAmount"
+            ? b.totalAmount
+            : sortBy === "buyer.displayName"
+              ? b.buyerName
+              : b.createdAt.getTime();
+      const compared =
+        typeof av === "string" && typeof bv === "string"
+          ? av.localeCompare(bv, "tr")
+          : Number(av) - Number(bv);
+      if (compared !== 0) return compared * direction;
+      // Yukarıdaki `secondaryGroupSort`/`secondaryLooseSort` ile AYNI kural:
+      // eşitlikte her iki kaynak da createdAt DESC'e düşer, böylece `take`
+      // sınırında hangi satırların çekildiği ile burada hangi satırların öne
+      // geçtiği çelişmez. Biri değişirse diğeri de değişmeli.
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+    const selected = umbrellas.slice((page - 1) * limit, page * limit);
+    const groupIds = selected
+      .filter((item) => item.kind === "group")
+      .map((item) => item.id);
+    const looseOrderIds = selected
+      .filter((item) => item.kind === "order")
+      .map((item) => item.id);
 
-    const orders = groupIds.length
-      ? await this.prisma.order.findMany({
-          where: { checkoutGroupId: { in: groupIds } },
-          include: {
-            buyer: { select: { id: true, displayName: true, email: true } },
-            seller: { select: { id: true, displayName: true, email: true } },
-            product: {
-              select: {
-                id: true,
-                title: true,
-                images: {
-                  take: 1,
-                  orderBy: { sortOrder: "asc" },
-                  select: { cardKey: true },
+    const orders =
+      groupIds.length || looseOrderIds.length
+        ? await this.prisma.order.findMany({
+            where: {
+              OR: [
+                ...(groupIds.length
+                  ? [{ checkoutGroupId: { in: groupIds } }]
+                  : []),
+                ...(looseOrderIds.length
+                  ? [{ id: { in: looseOrderIds }, checkoutGroupId: null }]
+                  : []),
+              ],
+            },
+            include: {
+              buyer: { select: { id: true, displayName: true, email: true } },
+              seller: { select: { id: true, displayName: true, email: true } },
+              product: {
+                select: {
+                  id: true,
+                  title: true,
+                  images: {
+                    take: 1,
+                    orderBy: { sortOrder: "asc" },
+                    select: { cardKey: true },
+                  },
                 },
               },
-            },
-            checkoutGroup: { select: { groupNumber: true } },
-            // Koli numarası (PKG-…) — kargo etiketindeki kod; Sürat'a bu gider.
-            package: { select: { packageNumber: true } },
-            // Kargo durumu + takip no — liste kolonu + expanded detayda paket kargosu.
-            shipment: {
-              select: {
-                id: true,
-                status: true,
-                trackingNumber: true,
-                providerTrackingId: true,
-              },
-            },
-            // Açık (aktif) iade talebi — "İade Sürecinde" rozeti için.
-            refundRequests: {
-              where: {
-                status: {
-                  notIn: ["refunded", "rejected", "cancelled"] as any,
+              checkoutGroup: { select: { groupNumber: true } },
+              // Koli numarası (PKG-…) — kargo etiketindeki kod; Sürat'a bu gider.
+              package: { select: { packageNumber: true } },
+              // Kargo durumu + takip no — liste kolonu + expanded detayda paket kargosu.
+              shipment: {
+                select: {
+                  id: true,
+                  status: true,
+                  trackingNumber: true,
+                  providerTrackingId: true,
                 },
               },
-              orderBy: { createdAt: "desc" },
-              take: 1,
-              select: { id: true, status: true, refundNumber: true },
+              // Açık (aktif) iade talebi — "İade Sürecinde" rozeti için.
+              refundRequests: {
+                where: {
+                  status: {
+                    notIn: ["refunded", "rejected", "cancelled"] as any,
+                  },
+                },
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: { id: true, status: true, refundNumber: true },
+              },
             },
-          },
-          orderBy: { createdAt: "asc" },
-        })
-      : [];
+            orderBy: { createdAt: "asc" },
+          })
+        : [];
 
     // userId/productId filtresi: grup satırı yalnız FİLTREYE UYAN üyeleri taşır
     // (kullanıcı görünümünde başka satıcının siparişleri sızmaz; ürün görünümünde
@@ -232,12 +362,15 @@ export class AdminOrderService {
     // diz ki client-side gruplama sırayı korusun; her grubun gerçek boyutunu tut.
     const byGroup = new Map<string, typeof orders>();
     for (const o of scopedOrders) {
-      const k = o.checkoutGroupId as string;
+      const k = o.checkoutGroupId ?? `order:${o.id}`;
       const bucket = byGroup.get(k);
       if (bucket) bucket.push(o);
       else byGroup.set(k, [o]);
     }
-    const ordered = groupIds.flatMap((id) => byGroup.get(id) ?? []);
+    const ordered = selected.flatMap(
+      (item) =>
+        byGroup.get(item.kind === "group" ? item.id : `order:${item.id}`) ?? [],
+    );
     const groupSize = new Map(
       groupIds.map((id) => [id, byGroup.get(id)?.length ?? 0]),
     );
@@ -265,7 +398,9 @@ export class AdminOrderService {
         packageNumber: (o as any).package?.packageNumber ?? null,
         groupNumber: o.checkoutGroup?.groupNumber ?? null,
         // Grup artık eksiksiz döndüğü için gerçek üye sayısı = grubun boyutu.
-        groupItemCount: groupSize.get(o.checkoutGroupId as string) ?? 1,
+        groupItemCount: o.checkoutGroupId
+          ? (groupSize.get(o.checkoutGroupId) ?? 1)
+          : 1,
         productImageUrl: this.resolveProductImageUrl(
           (o.product as any)?.images?.[0]?.cardKey,
         ),
@@ -277,7 +412,12 @@ export class AdminOrderService {
             }
           : null,
       })),
-      meta: groupPage.meta,
+      meta: {
+        total: groupCount + looseCount,
+        page,
+        limit,
+        totalPages: Math.ceil((groupCount + looseCount) / limit),
+      },
     };
   }
 
