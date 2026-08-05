@@ -853,6 +853,7 @@
     "filterCancelled": "Cancelled",
     "filterRefunds": "Refunds",
     "unitTimes": "x",
+    "unitOnly": "pcs",
     "productInfoUnavailable": "Product info could not be loaded",
     "buyer": "Buyer",
     "netToYou": "Net to you",
