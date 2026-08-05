@@ -1,7 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { Spinner } from "@tarodan/ui";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
@@ -47,6 +49,27 @@ function DashboardContent() {
   );
 }
 
+/**
+ * Dashboard data is loaded through the browser-only same-origin gateway. Wait
+ * until hydration completes before starting those requests, so SSR and the
+ * browser's first render share the same loading snapshot.
+ */
+function HydratedDashboardContent() {
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => setHydrated(true), []);
+
+  if (!hydrated) {
+    return (
+      <div className="flex items-center justify-center py-16" aria-busy="true">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  return <DashboardContent />;
+}
+
 export default function DashboardPage() {
   const t = useTranslations();
 
@@ -57,7 +80,7 @@ export default function DashboardPage() {
         description={t("admin.dashboard.description")}
       />
       <SuspenseBoundary>
-        <DashboardContent />
+        <HydratedDashboardContent />
       </SuspenseBoundary>
     </AdminPage>
   );
