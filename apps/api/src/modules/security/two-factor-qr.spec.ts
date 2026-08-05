@@ -29,18 +29,31 @@ describe("SecurityService 2FA setup QR", () => {
   };
   const service = new SecurityService(prisma as any, config as any);
 
-  it("taranabilir bir PNG data URL döndürür", async () => {
-    const result = await service.enable2FA("user-1");
+  // Her iki test de gerçek bir QR PNG'si üretiyor. Tek başına ~100 ms sürüyor
+  // ama tüm paket paralel koşarken 5 sn'lik varsayılanı aşıp sürüm kapısını
+  // rastgele kırıyordu; ölçtüğümüz şey hız değil, çıktının biçimi.
+  const QR_TIMEOUT_MS = 20_000;
 
-    expect(result.qrCodeImage).toMatch(/^data:image\/png;base64,/);
-    // Boş/kısa bir gövde "üretildi" sayılmamalı.
-    expect(result.qrCodeImage.length).toBeGreaterThan(200);
-  });
+  it(
+    "taranabilir bir PNG data URL döndürür",
+    async () => {
+      const result = await service.enable2FA("user-1");
 
-  it("sağlama URI'sini de korur — kimlik doğrulayıcıya derin bağlantı için", async () => {
-    const result = await service.enable2FA("user-1");
+      expect(result.qrCodeImage).toMatch(/^data:image\/png;base64,/);
+      // Boş/kısa bir gövde "üretildi" sayılmamalı.
+      expect(result.qrCodeImage.length).toBeGreaterThan(200);
+    },
+    QR_TIMEOUT_MS,
+  );
 
-    expect(result.qrCodeUrl).toContain("otpauth://totp/");
-    expect(result.qrCodeUrl).toContain(`secret=${result.secret}`);
-  });
+  it(
+    "sağlama URI'sini de korur — kimlik doğrulayıcıya derin bağlantı için",
+    async () => {
+      const result = await service.enable2FA("user-1");
+
+      expect(result.qrCodeUrl).toContain("otpauth://totp/");
+      expect(result.qrCodeUrl).toContain(`secret=${result.secret}`);
+    },
+    QR_TIMEOUT_MS,
+  );
 });
