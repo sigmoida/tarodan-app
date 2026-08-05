@@ -186,6 +186,8 @@ describe("AdminCommissionService strict sets", () => {
     });
 
     expect(result.ruleId).toBe("rule-upper");
+    expect(result.matchedAmount).toBe(1000);
+    expect(result.calculationAmount).toBe(999.996);
   });
 
   it("publishes complete 0-to-infinity coverage atomically", async () => {

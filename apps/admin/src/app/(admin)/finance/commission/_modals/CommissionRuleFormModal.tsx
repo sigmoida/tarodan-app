@@ -365,16 +365,16 @@ export function CommissionRuleFormModal({
           maxName="sellerPlatformFeeMax"
         />
         <RateBlock
-          title={t("admin.finance.commission.buyerServiceFee")}
-          rateName="buyerServiceFeeRate"
-          minName="buyerServiceFeeMin"
-          maxName="buyerServiceFeeMax"
-        />
-        <RateBlock
           title={t("admin.finance.commission.buyerCommission")}
           rateName="buyerCommissionRate"
           minName="buyerCommissionMin"
           maxName="buyerCommissionMax"
+        />
+        <RateBlock
+          title={t("admin.finance.commission.buyerServiceFee")}
+          rateName="buyerServiceFeeRate"
+          minName="buyerServiceFeeMin"
+          maxName="buyerServiceFeeMax"
         />
       </div>
 

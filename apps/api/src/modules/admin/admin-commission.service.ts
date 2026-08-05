@@ -580,10 +580,20 @@ export class AdminCommissionService {
       include: { shippingShares: true },
     });
     try {
-      return calculateCommissionFromRules(dto.amount, rules, {
+      const result = calculateCommissionFromRules(dto.amount, rules, {
         ...dto,
         amount: matchAmount,
       });
+      const matchedRule = rules.find((rule) => rule.id === result.ruleId);
+      return {
+        ...result,
+        // Eşleşme tutarı kuruşa yuvarlanır; ücretler ise checkout gibi
+        // kullanıcının gönderdiği ham satır tutarından hesaplanır. Admin
+        // önizlemesinde iki kavramı birbirine karıştırmamak için ikisini de dön.
+        calculationAmount: dto.amount,
+        tradeFeeSellerAmount: Number(matchedRule?.tradeFeeSellerAmount ?? 0),
+        tradeFeeBuyerAmount: Number(matchedRule?.tradeFeeBuyerAmount ?? 0),
+      };
     } catch (error) {
       if (error instanceof CommissionRuleMatchError) {
         throw new ConflictException({

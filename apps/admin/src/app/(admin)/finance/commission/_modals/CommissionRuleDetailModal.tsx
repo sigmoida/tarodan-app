@@ -4,7 +4,11 @@ import { Badge, Modal } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { DataList, Field } from "@/components/detail/DataList";
 import { fmtTry } from "@/lib/format";
-import { sellerTypeLabel, type CommissionRule } from "../_lib/types";
+import {
+  inclusiveCommissionMaximum,
+  sellerTypeLabel,
+  type CommissionRule,
+} from "../_lib/types";
 
 const percent = (value: number) => `%${value.toFixed(2)}`;
 const optionalMoney = (value: number | null) =>
@@ -12,9 +16,11 @@ const optionalMoney = (value: number | null) =>
 
 export function CommissionRuleDetailModal({
   rule,
+  historical = false,
   onClose,
 }: {
   rule: CommissionRule;
+  historical?: boolean;
   onClose: () => void;
 }) {
   const t = useTranslations();
@@ -24,8 +30,16 @@ export function CommissionRuleDetailModal({
     <Modal
       isOpen
       onClose={onClose}
-      title={t("admin.finance.commission.historicalRuleTitle")}
-      description={t("admin.finance.commission.historicalRuleDescription")}
+      title={t(
+        historical
+          ? "admin.finance.commission.historicalRuleTitle"
+          : "admin.finance.commission.readonlyRuleTitle",
+      )}
+      description={t(
+        historical
+          ? "admin.finance.commission.historicalRuleDescription"
+          : "admin.finance.commission.readonlyRuleDescription",
+      )}
       size="2xl"
     >
       <div className="space-y-5">
@@ -50,7 +64,7 @@ export function CommissionRuleDetailModal({
             {fmtTry(rule.minAmount)}
           </Field>
           <Field label={t("admin.finance.commission.maxAmountLabel")}>
-            {optionalMoney(rule.maxAmount)}
+            {optionalMoney(inclusiveCommissionMaximum(rule.maxAmount))}
           </Field>
           <Field label={t("admin.finance.commission.sellerCommission")}>
             {percent(rule.sellerCommissionRate)}
