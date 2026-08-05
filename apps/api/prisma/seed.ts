@@ -56,7 +56,9 @@ import {
 } from "../src/modules/shipping/shipping-package-tier";
 import {
   SEED_COMMISSION_PROFILES,
+  SEED_COMMISSION_PRICE_BANDS,
   SEED_COMMISSION_RULE_SET_IDS,
+  SEED_CATEGORY_DEFINITIONS,
   SEED_SHIPPING_TIERS,
 } from "./seed-config";
 import { findMatchingCommissionRule } from "../src/modules/order/order-commission.helper";
@@ -206,60 +208,11 @@ async function main() {
   console.log("📦 This will create a large dataset for testing ALL features\n");
 
   // ==========================================================================
-  // 1. Create Categories - Sadece araç türü (üst seviye)
+  // 1. Create Categories - Yerel test kataloğunda yalnız Araba
   // ==========================================================================
-  console.log("Creating categories (vehicle types only)...");
+  console.log("Creating the car-only category catalog...");
 
-  const categoryData = [
-    {
-      name: "Araba",
-      slug: "araba",
-      description: "Binek ve spor arabalar",
-      sortOrder: 1,
-    },
-    {
-      name: "Motosiklet",
-      slug: "motosiklet",
-      description: "Motosiklet modelleri",
-      sortOrder: 2,
-    },
-    {
-      name: "Uçak",
-      slug: "ucak",
-      description: "Uçak ve helikopter modelleri",
-      sortOrder: 3,
-    },
-    {
-      name: "Gemi",
-      slug: "gemi",
-      description: "Gemi ve tekne modelleri",
-      sortOrder: 4,
-    },
-    {
-      name: "Tren",
-      slug: "tren",
-      description: "Tren ve lokomotif modelleri",
-      sortOrder: 5,
-    },
-    {
-      name: "Kamyon / İş Makinesi",
-      slug: "kamyon",
-      description: "Kamyon, SUV, iş makinesi",
-      sortOrder: 6,
-    },
-    {
-      name: "Motorspor",
-      slug: "motorspor",
-      description: "Yarış, F1, motorspor",
-      sortOrder: 7,
-    },
-    {
-      name: "Set / Diğer",
-      slug: "set-diger",
-      description: "Setler ve diğer modeller",
-      sortOrder: 8,
-    },
-  ];
+  const categoryData = SEED_CATEGORY_DEFINITIONS;
 
   const categories = await Promise.all(
     categoryData.map((cat) =>
@@ -281,9 +234,7 @@ async function main() {
   const newSlugs = categoryData.map((c) => c.slug);
   await prisma.category.deleteMany({ where: { slug: { notIn: newSlugs } } });
 
-  console.log(
-    `✅ Created ${categories.length} categories (vehicle types only)`,
-  );
+  console.log(`✅ Created ${categories.length} category (car only)`);
 
   // ==========================================================================
   // 1b. Create Manufacturers (diecast brands: Hot Wheels, Tomica, etc.)
@@ -1983,12 +1934,13 @@ async function main() {
   console.log(`✅ Created wishlists for all users`);
 
   // ==========================================================================
-  // 10. Create Products (85 unique products – one per image)
+  // 10. Create Products (only car-category products)
   // ==========================================================================
   console.log("Creating products...");
 
-  // Each entry maps 1:1 to a generated image file
-  const productData: Array<{
+  // Catalog source keeps the available media map together; only `araba`
+  // entries are materialized into the local database below.
+  const catalogProductData: Array<{
     img: string;
     title: string;
     desc: string;
@@ -3232,25 +3184,30 @@ async function main() {
   const products: any[] = [];
   const marketplaceUsers = users.slice(2);
   const sellers = marketplaceUsers.filter((u) => u.isSeller);
-
-  // Count products per category to guarantee minimum 5 active per category
-  const catProductCounts: Record<string, number> = {};
-  const catActiveAssigned: Record<string, number> = {};
-  for (const d of productData) {
-    catProductCounts[d.cat] = (catProductCounts[d.cat] || 0) + 1;
-    catActiveAssigned[d.cat] = 0;
-  }
-
-  // 70% active, 15% pending, 5% reserved, 5% sold, 5% inactive (for categories with >5 products)
-  // NOT: draft, gerçek uygulamada hiçbir akışla oluşmaz (oluşturma → pending), bu yüzden
-  // demo veride de üretmiyoruz. inactive (quantity>0) = elle pasife alınmış geçerli durum.
-  const statusPool = [
-    ...Array(14).fill(ProductStatus.active),
-    ...Array(3).fill(ProductStatus.pending),
-    ProductStatus.reserved,
-    ProductStatus.sold,
-    ProductStatus.inactive,
+  const carProductSources = catalogProductData.filter(
+    (product) => product.cat === "araba",
+  );
+  const requiredProductCount =
+    sellers.length * SEED_COMMISSION_PRICE_BANDS.length;
+  const variantLabels = [
+    "Kırmızı Seri",
+    "Mavi Seri",
+    "Siyah Seri",
+    "Gümüş Seri",
   ];
+  const productData = Array.from(
+    { length: requiredProductCount },
+    (_, index) => {
+      const source = carProductSources[index % carProductSources.length];
+      if (index < carProductSources.length) return source;
+      const variant = variantLabels[index % variantLabels.length];
+      return {
+        ...source,
+        title: `${source.title} - ${variant}`,
+        desc: `${source.desc} ${variant} koleksiyon varyantıdır.`,
+      };
+    },
+  );
 
   for (let i = 0; i < productData.length; i++) {
     const d = productData[i];
@@ -3265,20 +3222,19 @@ async function main() {
     const mfg = d.mfgSlug
       ? manufacturers.find((m) => m.slug === d.mfgSlug)
       : null;
-    const price = randomPrice(d.min, d.max);
+    // Every seller receives products in every strict price band. Keeping the
+    // sample away from boundaries also lets listing discounts vary the price
+    // without accidentally leaving the intended band.
+    const priceBand =
+      SEED_COMMISSION_PRICE_BANDS[
+        Math.floor(i / sellers.length) % SEED_COMMISSION_PRICE_BANDS.length
+      ];
+    const price = priceBand.sample;
 
-    // Ensure minimum 5 active per category; remaining use status pool
-    const catTotal = catProductCounts[d.cat] || 0;
-    const catActive = catActiveAssigned[d.cat] || 0;
-    let status: ProductStatus;
-    if (catActive < 5 || catTotal <= 5) {
-      status = ProductStatus.active;
-    } else {
-      status = statusPool[i % statusPool.length];
-    }
-    if (status === ProductStatus.active) {
-      catActiveAssigned[d.cat] = (catActiveAssigned[d.cat] || 0) + 1;
-    }
+    // Primary catalog is the active seller-type × price-band matrix. Pending,
+    // rejected, suspended, reserved, sold and inactive states are seeded later
+    // as dedicated fixtures so they cannot punch holes in this matrix.
+    const status = ProductStatus.active;
     const slugBase = d.img.replace("product-", "").replace(".png", "");
     const slug = `${slugBase}-${i}`;
 
@@ -3369,9 +3325,8 @@ async function main() {
   // 10b. İndirim uygula (deterministik 15 ürüne %10–30; oldPrice > price)
   // ==========================================================================
   const discountCount = Math.min(15, Math.floor(products.length * 0.2));
-  const indicesToDiscount = Array.from(
-    { length: discountCount },
-    (_, index) => (index * 6) % products.length,
+  const indicesToDiscount = Array.from({ length: discountCount }, (_, index) =>
+    Math.floor((index * products.length) / discountCount),
   );
   const saleStart = new Date();
   const saleEnd = new Date(saleStart.getTime() + 14 * 24 * 60 * 60 * 1000); // 2 hafta
@@ -3516,7 +3471,7 @@ async function main() {
       slug: "trade-list",
       name: "Takas Listesi",
       desc: "Takas için açık modellerim",
-      catSlug: null,
+      catSlug: "araba",
       coverFile: "collection-trade-list.png",
       user: users[9],
       featured: false,
@@ -3584,7 +3539,7 @@ async function main() {
       user: users[9],
       featured: false,
     },
-  ];
+  ].filter((collection) => collection.catSlug === "araba");
 
   const collections: any[] = [];
   for (const cd of collectionDefs) {

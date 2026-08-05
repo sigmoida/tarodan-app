@@ -11,6 +11,16 @@ export const SEED_COMMISSION_RULE_SET_IDS = {
   test: "8d9fe2c4-a82e-4fc2-8b6d-5a4d1e9f1003",
 } as const;
 
+/** Comprehensive local seed intentionally exposes a single marketplace category. */
+export const SEED_CATEGORY_DEFINITIONS = [
+  {
+    name: "Araba",
+    slug: "araba",
+    description: "Binek ve spor arabalar",
+    sortOrder: 1,
+  },
+] as const;
+
 export type SeedCommissionProfile = {
   key: string;
   label: string;
@@ -34,233 +44,169 @@ export type SeedCommissionProfile = {
   shippingShares: Record<ShippingPackageTierCode, number>;
 };
 
-/**
- * Strict model kategori jokerine izin vermediği için bu on profil her aktif
- * kategoriye ayrı somut kural satırları olarak açılır. Bir kategoride tam olarak
- * on bitişik kural vardır: FREE/BASIC için üçer, PREMIUM/BUSINESS için ikişer.
- */
-export const SEED_COMMISSION_PROFILES: SeedCommissionProfile[] = [
+/** Üst sınırlar runtime eşleştiricisiyle aynı biçimde hariçtir: [min, max). */
+export const SEED_COMMISSION_PRICE_BANDS = [
   {
-    key: "free-entry",
-    label: "Free Baslangic",
-    sellerType: CommissionSellerType.FREE,
+    key: "0-999",
+    label: "0-999 TL",
     minAmount: 0,
     maxAmount: 1_000,
-    buyerCommissionRate: 0.5,
-    buyerCommissionMin: 1,
-    buyerCommissionMax: 10,
-    buyerServiceFeeRate: 1,
-    buyerServiceFeeMin: 2,
-    buyerServiceFeeMax: 20,
-    sellerCommissionRate: 6,
-    sellerCommissionMin: 3,
-    sellerCommissionMax: 60,
-    sellerPlatformFeeRate: 1,
-    sellerPlatformFeeMin: 1,
-    sellerPlatformFeeMax: 15,
-    tradeFeeSellerAmount: 20,
-    tradeFeeBuyerAmount: 20,
+    sample: 499,
+  },
+  {
+    key: "1000-9999",
+    label: "1.000-9.999 TL",
+    minAmount: 1_000,
+    maxAmount: 10_000,
+    sample: 4_999,
+  },
+  {
+    key: "10000-24999",
+    label: "10.000-24.999 TL",
+    minAmount: 10_000,
+    maxAmount: 25_000,
+    sample: 14_999,
+  },
+  {
+    key: "25000-plus",
+    label: "25.000 TL ve üzeri",
+    minAmount: 25_000,
+    maxAmount: null,
+    sample: 34_999,
+  },
+] as const;
+
+const BAND_FEE_LIMITS = [
+  {
+    buyerCommission: [1, 10],
+    buyerService: [2, 20],
+    sellerCommission: [3, 60],
+    sellerPlatform: [1, 15],
+  },
+  {
+    buyerCommission: [4, 40],
+    buyerService: [8, 80],
+    sellerCommission: [50, 550],
+    sellerPlatform: [8, 80],
+  },
+  {
+    buyerCommission: [15, 100],
+    buyerService: [30, 200],
+    sellerCommission: [250, 1_250],
+    sellerPlatform: [25, 250],
+  },
+  {
+    buyerCommission: [30, 250],
+    buyerService: [60, 500],
+    sellerCommission: [600, 3_000],
+    sellerPlatform: [50, 500],
+  },
+] as const;
+
+const SELLER_COMMISSION_CONFIGS = [
+  {
+    key: "free",
+    label: "Free",
+    sellerType: CommissionSellerType.FREE,
+    feeFactor: 1,
+    buyerCommissionRates: [0.5, 0.4, 0.3, 0.2],
+    buyerServiceRates: [1, 0.8, 0.6, 0.4],
+    sellerCommissionRates: [6, 5.5, 5, 4.5],
+    sellerPlatformRates: [1, 0.8, 0.6, 0.4],
+    tradeFees: [20, 25, 30, 35],
     shippingShares: { small: 100, medium: 90, large: 80 },
   },
   {
-    key: "free-standard",
-    label: "Free Standart",
-    sellerType: CommissionSellerType.FREE,
-    minAmount: 1_000,
-    maxAmount: 5_000,
-    buyerCommissionRate: 0.4,
-    buyerCommissionMin: 4,
-    buyerCommissionMax: 20,
-    buyerServiceFeeRate: 0.8,
-    buyerServiceFeeMin: 8,
-    buyerServiceFeeMax: 40,
-    sellerCommissionRate: 5.5,
-    sellerCommissionMin: 55,
-    sellerCommissionMax: 275,
-    sellerPlatformFeeRate: 0.8,
-    sellerPlatformFeeMin: 8,
-    sellerPlatformFeeMax: 40,
-    tradeFeeSellerAmount: 25,
-    tradeFeeBuyerAmount: 25,
+    key: "basic",
+    label: "Basic",
+    sellerType: CommissionSellerType.BASIC,
+    feeFactor: 0.85,
+    buyerCommissionRates: [0.4, 0.3, 0.25, 0.15],
+    buyerServiceRates: [0.8, 0.6, 0.5, 0.3],
+    sellerCommissionRates: [5, 4.5, 4, 3.5],
+    sellerPlatformRates: [0.75, 0.6, 0.5, 0.3],
+    tradeFees: [18, 22, 27, 32],
     shippingShares: { small: 90, medium: 80, large: 70 },
   },
   {
-    key: "free-high",
-    label: "Free Yuksek Deger",
-    sellerType: CommissionSellerType.FREE,
-    minAmount: 5_000,
-    maxAmount: null,
-    buyerCommissionRate: 0.25,
-    buyerCommissionMin: 12.5,
-    buyerCommissionMax: 75,
-    buyerServiceFeeRate: 0.5,
-    buyerServiceFeeMin: 25,
-    buyerServiceFeeMax: 150,
-    sellerCommissionRate: 5,
-    sellerCommissionMin: 250,
-    sellerCommissionMax: 1_000,
-    sellerPlatformFeeRate: 0.5,
-    sellerPlatformFeeMin: 25,
-    sellerPlatformFeeMax: 100,
-    tradeFeeSellerAmount: 30,
-    tradeFeeBuyerAmount: 30,
-    shippingShares: { small: 80, medium: 70, large: 60 },
-  },
-  {
-    key: "basic-entry",
-    label: "Basic Baslangic",
-    sellerType: CommissionSellerType.BASIC,
-    minAmount: 0,
-    maxAmount: 1_000,
-    buyerCommissionRate: 0.4,
-    buyerCommissionMin: 1,
-    buyerCommissionMax: 8,
-    buyerServiceFeeRate: 0.8,
-    buyerServiceFeeMin: 2,
-    buyerServiceFeeMax: 16,
-    sellerCommissionRate: 5,
-    sellerCommissionMin: 2.5,
-    sellerCommissionMax: 50,
-    sellerPlatformFeeRate: 0.75,
-    sellerPlatformFeeMin: 1,
-    sellerPlatformFeeMax: 12,
-    tradeFeeSellerAmount: 18,
-    tradeFeeBuyerAmount: 18,
-    shippingShares: { small: 90, medium: 80, large: 70 },
-  },
-  {
-    key: "basic-standard",
-    label: "Basic Standart",
-    sellerType: CommissionSellerType.BASIC,
-    minAmount: 1_000,
-    maxAmount: 5_000,
-    buyerCommissionRate: 0.3,
-    buyerCommissionMin: 3,
-    buyerCommissionMax: 15,
-    buyerServiceFeeRate: 0.6,
-    buyerServiceFeeMin: 6,
-    buyerServiceFeeMax: 30,
-    sellerCommissionRate: 4.5,
-    sellerCommissionMin: 45,
-    sellerCommissionMax: 225,
-    sellerPlatformFeeRate: 0.6,
-    sellerPlatformFeeMin: 6,
-    sellerPlatformFeeMax: 30,
-    tradeFeeSellerAmount: 22,
-    tradeFeeBuyerAmount: 22,
-    shippingShares: { small: 80, medium: 70, large: 60 },
-  },
-  {
-    key: "basic-high",
-    label: "Basic Yuksek Deger",
-    sellerType: CommissionSellerType.BASIC,
-    minAmount: 5_000,
-    maxAmount: null,
-    buyerCommissionRate: 0.2,
-    buyerCommissionMin: 10,
-    buyerCommissionMax: 60,
-    buyerServiceFeeRate: 0.4,
-    buyerServiceFeeMin: 20,
-    buyerServiceFeeMax: 120,
-    sellerCommissionRate: 4,
-    sellerCommissionMin: 200,
-    sellerCommissionMax: 800,
-    sellerPlatformFeeRate: 0.4,
-    sellerPlatformFeeMin: 20,
-    sellerPlatformFeeMax: 80,
-    tradeFeeSellerAmount: 27,
-    tradeFeeBuyerAmount: 27,
+    key: "premium",
+    label: "Premium",
+    sellerType: CommissionSellerType.PREMIUM,
+    feeFactor: 0.65,
+    buyerCommissionRates: [0.25, 0.2, 0.15, 0.1],
+    buyerServiceRates: [0.5, 0.4, 0.3, 0.2],
+    sellerCommissionRates: [3.5, 3.25, 3, 2.75],
+    sellerPlatformRates: [0.4, 0.35, 0.3, 0.2],
+    tradeFees: [15, 20, 25, 30],
     shippingShares: { small: 70, medium: 60, large: 50 },
   },
   {
-    key: "premium-standard",
-    label: "Premium Standart",
-    sellerType: CommissionSellerType.PREMIUM,
-    minAmount: 0,
-    maxAmount: 2_500,
-    buyerCommissionRate: 0.25,
-    buyerCommissionMin: 1,
-    buyerCommissionMax: 12.5,
-    buyerServiceFeeRate: 0.5,
-    buyerServiceFeeMin: 1.5,
-    buyerServiceFeeMax: 25,
-    sellerCommissionRate: 3.5,
-    sellerCommissionMin: 2,
-    sellerCommissionMax: 87.5,
-    sellerPlatformFeeRate: 0.4,
-    sellerPlatformFeeMin: 1,
-    sellerPlatformFeeMax: 10,
-    tradeFeeSellerAmount: 15,
-    tradeFeeBuyerAmount: 15,
-    shippingShares: { small: 70, medium: 60, large: 50 },
-  },
-  {
-    key: "premium-high",
-    label: "Premium Yuksek Deger",
-    sellerType: CommissionSellerType.PREMIUM,
-    minAmount: 2_500,
-    maxAmount: null,
-    buyerCommissionRate: 0.15,
-    buyerCommissionMin: 3.75,
-    buyerCommissionMax: 45,
-    buyerServiceFeeRate: 0.3,
-    buyerServiceFeeMin: 7.5,
-    buyerServiceFeeMax: 90,
-    sellerCommissionRate: 3,
-    sellerCommissionMin: 75,
-    sellerCommissionMax: 600,
-    sellerPlatformFeeRate: 0.3,
-    sellerPlatformFeeMin: 7.5,
-    sellerPlatformFeeMax: 60,
-    tradeFeeSellerAmount: 20,
-    tradeFeeBuyerAmount: 20,
-    shippingShares: { small: 60, medium: 50, large: 40 },
-  },
-  {
-    key: "business-standard",
-    label: "Isletme Standart",
+    key: "business",
+    label: "İşletme",
     sellerType: CommissionSellerType.BUSINESS,
-    minAmount: 0,
-    maxAmount: 5_000,
-    buyerCommissionRate: 0.15,
-    buyerCommissionMin: 1,
-    buyerCommissionMax: 15,
-    buyerServiceFeeRate: 0.3,
-    buyerServiceFeeMin: 1.5,
-    buyerServiceFeeMax: 30,
-    sellerCommissionRate: 2.5,
-    sellerCommissionMin: 2,
-    sellerCommissionMax: 125,
-    sellerPlatformFeeRate: 0.25,
-    sellerPlatformFeeMin: 1,
-    sellerPlatformFeeMax: 12.5,
-    tradeFeeSellerAmount: 12,
-    tradeFeeBuyerAmount: 12,
+    feeFactor: 0.5,
+    buyerCommissionRates: [0.15, 0.12, 0.1, 0.08],
+    buyerServiceRates: [0.3, 0.25, 0.2, 0.15],
+    sellerCommissionRates: [2.5, 2.25, 2, 1.75],
+    sellerPlatformRates: [0.25, 0.22, 0.2, 0.15],
+    tradeFees: [12, 16, 20, 25],
     shippingShares: { small: 50, medium: 40, large: 30 },
   },
-  {
-    key: "business-high",
-    label: "Isletme Yuksek Deger",
-    sellerType: CommissionSellerType.BUSINESS,
-    minAmount: 5_000,
-    maxAmount: null,
-    buyerCommissionRate: 0.1,
-    buyerCommissionMin: 5,
-    buyerCommissionMax: 30,
-    buyerServiceFeeRate: 0.2,
-    buyerServiceFeeMin: 10,
-    buyerServiceFeeMax: 60,
-    sellerCommissionRate: 2,
-    sellerCommissionMin: 100,
-    sellerCommissionMax: 400,
-    sellerPlatformFeeRate: 0.2,
-    sellerPlatformFeeMin: 10,
-    sellerPlatformFeeMax: 40,
-    tradeFeeSellerAmount: 16,
-    tradeFeeBuyerAmount: 16,
-    shippingShares: { small: 40, medium: 30, large: 20 },
-  },
-];
+] as const;
+
+const scaledMoney = (value: number, factor: number): number =>
+  Math.round(value * factor * 100) / 100;
+
+/**
+ * Yerel Araba kategorisi için dört satıcı tipi × dört fiyat bandı. Her satıcı
+ * tipi 0'dan sonsuza kadar tam, bitişik ve çakışmasız kapsanır.
+ */
+export const SEED_COMMISSION_PROFILES: SeedCommissionProfile[] =
+  SELLER_COMMISSION_CONFIGS.flatMap((seller) =>
+    SEED_COMMISSION_PRICE_BANDS.map((band, index) => {
+      const limits = BAND_FEE_LIMITS[index];
+      const scale = (pair: readonly [number, number]) =>
+        pair.map((value) => scaledMoney(value, seller.feeFactor)) as [
+          number,
+          number,
+        ];
+      const [buyerCommissionMin, buyerCommissionMax] = scale(
+        limits.buyerCommission,
+      );
+      const [buyerServiceFeeMin, buyerServiceFeeMax] = scale(
+        limits.buyerService,
+      );
+      const [sellerCommissionMin, sellerCommissionMax] = scale(
+        limits.sellerCommission,
+      );
+      const [sellerPlatformFeeMin, sellerPlatformFeeMax] = scale(
+        limits.sellerPlatform,
+      );
+
+      return {
+        key: `${seller.key}-${band.key}`,
+        label: `${seller.label} / ${band.label}`,
+        sellerType: seller.sellerType,
+        minAmount: band.minAmount,
+        maxAmount: band.maxAmount,
+        buyerCommissionRate: seller.buyerCommissionRates[index],
+        buyerCommissionMin,
+        buyerCommissionMax,
+        buyerServiceFeeRate: seller.buyerServiceRates[index],
+        buyerServiceFeeMin,
+        buyerServiceFeeMax,
+        sellerCommissionRate: seller.sellerCommissionRates[index],
+        sellerCommissionMin,
+        sellerCommissionMax,
+        sellerPlatformFeeRate: seller.sellerPlatformRates[index],
+        sellerPlatformFeeMin,
+        sellerPlatformFeeMax,
+        tradeFeeSellerAmount: seller.tradeFees[index],
+        tradeFeeBuyerAmount: seller.tradeFees[index],
+        shippingShares: seller.shippingShares,
+      };
+    }),
+  );
 
 export const SEED_SHIPPING_TIERS = [
   {
