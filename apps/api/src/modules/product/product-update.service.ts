@@ -22,6 +22,7 @@ import { ProductRankingService } from "./product-ranking.service";
 import { MembershipService } from "../membership/membership.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
 import { isCorporateSellingSuspended } from "../membership/membership.util";
+import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -43,6 +44,7 @@ export class ProductUpdateService {
     private readonly common: ProductCommonService,
     private readonly ranking: ProductRankingService,
     private readonly membershipService: MembershipService,
+    private readonly commissionGuard: CommissionRuleGuardService,
   ) {}
 
   /**
@@ -146,6 +148,11 @@ export class ProductUpdateService {
             i18nMessage("server.product.setQuantityToReopen"),
           );
         }
+        await this.commissionGuard.assertListingRuleExists({
+          sellerId,
+          categoryId: product.categoryId,
+          amount: Number(product.price),
+        });
         await this.prisma.product.update({
           where: { id },
           data: {
@@ -312,6 +319,28 @@ export class ProductUpdateService {
           ? priceUpdate
           : dto.price;
 
+    const resolvedStatus = this.resolveUpdatedStatus(product, dto);
+    const remainsListable =
+      dto.status !== ProductStatus.inactive &&
+      resolvedStatus !== ProductStatus.inactive;
+    if (remainsListable) {
+      const nextCategoryId = dto.categoryId ?? product.categoryId;
+      const nextPrice = effectivePrice ?? currentPrice;
+      const nextOldPrice =
+        oldPriceUpdate !== undefined ? oldPriceUpdate : currentOldPrice;
+      const commissionAmounts = [nextPrice, nextOldPrice].filter(
+        (value, index, values): value is number =>
+          value != null && values.indexOf(value) === index,
+      );
+      for (const amount of commissionAmounts) {
+        await this.commissionGuard.assertListingRuleExists({
+          sellerId,
+          categoryId: nextCategoryId,
+          amount,
+        });
+      }
+    }
+
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
       description: dto.description,
@@ -321,7 +350,7 @@ export class ProductUpdateService {
       ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
       // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girsin (re-submit → pending).
-      status: this.resolveUpdatedStatus(product, dto),
+      status: resolvedStatus,
       isTradeEnabled:
         dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
       isPreorder: dto.isPreorder !== undefined ? dto.isPreorder : undefined,

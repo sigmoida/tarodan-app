@@ -29,6 +29,7 @@ describe("ProductCreateService — kurumsal onay kapısı", () => {
       {} as any,
       {} as any,
       {} as any,
+      { assertListingRuleExists: jest.fn() } as any,
     );
   };
 

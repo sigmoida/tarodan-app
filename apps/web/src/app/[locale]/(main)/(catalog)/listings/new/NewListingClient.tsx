@@ -45,6 +45,7 @@ function NewListingLayout() {
     yearOptions,
     commissionPreview,
     commissionPreviewLoading,
+    commissionPreviewError,
     limits,
     imagePreviewUrls,
     uploadingImages,
@@ -110,6 +111,7 @@ function NewListingLayout() {
               locale={locale}
               commissionPreview={commissionPreview}
               commissionPreviewLoading={commissionPreviewLoading}
+              commissionPreviewError={commissionPreviewError}
               quantityPlaceholder="1"
               quantityHelper={t("product.quantityDefaultHint")}
             />

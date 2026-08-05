@@ -25,6 +25,7 @@ interface PricingCardProps {
     sellerNetAmount: number;
   } | null;
   commissionPreviewLoading: boolean;
+  commissionPreviewError?: unknown;
   /** Stock-quantity placeholder + helper differ between new ("1") and edit ("unlimited"). */
   quantityPlaceholder: string;
   quantityHelper: string;
@@ -39,6 +40,7 @@ const fmt = formatTL;
 export default function PricingCard({
   commissionPreview,
   commissionPreviewLoading,
+  commissionPreviewError,
   quantityPlaceholder,
   quantityHelper,
 }: PricingCardProps) {
@@ -67,13 +69,19 @@ export default function PricingCard({
 
       <PackageSizePicker />
 
-      {(commissionPreviewLoading || commissionPreview) && (
+      {(commissionPreviewLoading ||
+        commissionPreview ||
+        Boolean(commissionPreviewError)) && (
         <div className="mt-4 p-4 bg-surface rounded-xl border border-border-subtle text-sm">
           <p className="text-muted font-medium mb-3">
             {t("product.estimatedPerSale")}
           </p>
           {commissionPreviewLoading ? (
             <span className="text-subtle">{t("product.calculating")}</span>
+          ) : commissionPreviewError ? (
+            <span className="text-danger-700">
+              {t("product.commissionRuleUnavailable")}
+            </span>
           ) : commissionPreview ? (
             <PricingBreakdown preview={commissionPreview} />
           ) : null}

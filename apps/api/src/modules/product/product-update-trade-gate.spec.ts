@@ -45,6 +45,7 @@ describe("ProductCreateService — ilan oluştururken takasa açma kapısı", ()
       {} as any,
       {} as any,
       {} as any,
+      { assertListingRuleExists: jest.fn() } as any,
     );
   };
 
@@ -75,6 +76,7 @@ describe("ProductUpdateService — takasa açma kapısı", () => {
       {} as any,
       {} as any,
       membershipService as any,
+      { assertListingRuleExists: jest.fn() } as any,
     );
     return { service, membershipService };
   };

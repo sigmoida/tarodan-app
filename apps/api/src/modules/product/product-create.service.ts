@@ -27,6 +27,7 @@ import { ProductStatsService } from "./product-stats.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
 import { resolveCreateSalePricing } from "./helpers/product-sale-pricing";
 import { sellerAutoEnableData } from "./helpers/seller-auto-enable.helper";
+import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
 
 /**
  * ProductCreateService — ilan oluşturma. Üyelik ilan/görsel limiti, AI görsel+metin
@@ -50,6 +51,7 @@ export class ProductCreateService {
     private readonly common: ProductCommonService,
     private readonly ranking: ProductRankingService,
     private readonly stats: ProductStatsService,
+    private readonly commissionGuard: CommissionRuleGuardService,
   ) {}
 
   /**
@@ -285,6 +287,21 @@ export class ProductCreateService {
       saleStartDate: dto.saleStartDate,
       saleEndDate: dto.saleEndDate,
     });
+
+    // İlanın hem normal hem de varsa indirimli fiyatı ACTIVE sette tam olarak
+    // bir kurala düşmeli. İndirim penceresi açılıp kapandığında ürün farklı
+    // bareme geçebileceği için yalnız o anki fiyatı kontrol etmek yeterli değil.
+    const commissionAmounts = [salePricing.price, salePricing.oldPrice].filter(
+      (value, index, values): value is number =>
+        value != null && values.indexOf(value) === index,
+    );
+    for (const amount of commissionAmounts) {
+      await this.commissionGuard.assertListingRuleExists({
+        sellerId,
+        categoryId: dto.categoryId,
+        amount,
+      });
+    }
 
     try {
       const product = await this.prisma.product.create({

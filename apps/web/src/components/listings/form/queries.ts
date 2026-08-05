@@ -161,6 +161,7 @@ export function useCommissionPreview(
   return {
     commissionPreview: enabled ? (query.data ?? null) : null,
     commissionPreviewLoading: enabled && query.isLoading,
+    commissionPreviewError: enabled ? query.error : null,
   };
 }
 

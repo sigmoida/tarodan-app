@@ -24,6 +24,7 @@ import { DiscountModule } from "../discount/discount.module";
 import { StorageModule } from "../storage/storage.module";
 import { PaymentModule } from "../payment";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
+import { CommissionModule } from "../commission/commission.module";
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     // Pilot: cron-tipi işler için 'scheduled' kuyruğu (Bull Board otomatik gösterir).
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     ModerationModule,
+    CommissionModule,
   ],
   controllers: [ProductController],
   providers: [

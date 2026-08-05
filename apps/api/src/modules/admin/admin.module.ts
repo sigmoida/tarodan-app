@@ -94,6 +94,7 @@ import { OrderModule } from "../order/order.module";
 import { ElogoModule } from "../elogo/elogo.module";
 import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 import { TradeModule } from "../trade/trade.module";
+import { CommissionModule } from "../commission/commission.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -119,6 +120,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ElogoModule,
     ShippingTariffModule,
     TradeModule,
+    CommissionModule,
     SiteAccessModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),

@@ -80,6 +80,24 @@ function useNewListingValue() {
   );
 
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  // İndirimli açılış: komisyon önizlemesi o anda geçerli satış fiyatını
+  // kullanır; API kapısı ayrıca normal ve indirimli fiyatın ikisini de denetler.
+  const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
+  const [showDiscountSection, setShowDiscountSection] = useState(false);
+  const formPrice = Number(price);
+  const salePayload = saleDataToPayload(saleData, formPrice);
+  const now = Date.now();
+  const saleStartsAt = salePayload.saleStartDate
+    ? new Date(salePayload.saleStartDate).getTime()
+    : null;
+  const saleEndsAt = salePayload.saleEndDate
+    ? new Date(salePayload.saleEndDate).getTime()
+    : null;
+  const saleIsActive =
+    salePayload.salePrice != null &&
+    (saleStartsAt == null || now >= saleStartsAt) &&
+    (saleEndsAt == null || now <= saleEndsAt);
+  const commissionPreviewPrice = saleIsActive ? salePayload.salePrice! : price;
 
   // ---- Server data (shared catalog queries) ----
   const queryEnabled = !authLoading && isAuthenticated;
@@ -101,8 +119,12 @@ function useNewListingValue() {
   );
   const { listingLimits, limitsLoading, refetchLimits } =
     useListingLimits(queryEnabled);
-  const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
-    price,
+  const {
+    commissionPreview,
+    commissionPreviewLoading,
+    commissionPreviewError,
+  } = useCommissionPreview(
+    commissionPreviewPrice,
     categoryId,
     shippingPackageTier,
   );
@@ -136,11 +158,6 @@ function useNewListingValue() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manufacturerId, manufacturerList]);
 
-  // İndirimli açılış: satıcı ilanı yayınlarken indirim tanımlayabilir (eskiden
-  // önce yayınlayıp sonra düzenlemeye girmek zorundaydı).
-  const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
-  const [showDiscountSection, setShowDiscountSection] = useState(false);
-
   const { uploadingImages, handleFileUpload, removeImage } =
     useListingImageUpload({
       form,
@@ -154,6 +171,14 @@ function useNewListingValue() {
       toast.error(
         `İlan limitinize ulaştınız (${listingLimits.currentCount}/${listingLimits.maxListings}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.`,
       );
+      return;
+    }
+    if (commissionPreviewLoading) {
+      toast.error(t("product.commissionStillCalculating"));
+      return;
+    }
+    if (!commissionPreview || commissionPreviewError) {
+      toast.error(t("product.commissionRuleUnavailable"));
       return;
     }
 
@@ -241,6 +266,7 @@ function useNewListingValue() {
     limitsLoading,
     commissionPreview,
     commissionPreviewLoading,
+    commissionPreviewError,
     hasBankAccount,
     bankAccountLoading,
     // actions

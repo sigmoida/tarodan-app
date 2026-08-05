@@ -26,6 +26,7 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
 
 /**
  * Ürün yönetimi + admin ürün silme/geri yükleme — AdminService'in
@@ -45,6 +46,7 @@ export class AdminProductService {
     private readonly notificationService: NotificationService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly commissionGuard: CommissionRuleGuardService,
   ) {}
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -417,6 +419,12 @@ export class AdminProductService {
       throw new BadRequestException("Sadece bekleyen ürünler onaylanabilir");
     }
 
+    await this.commissionGuard.assertListingRuleExists({
+      sellerId: product.sellerId,
+      categoryId: product.categoryId,
+      amount: Number(product.price),
+    });
+
     const updated = await this.prisma.product.update({
       where: { id: productId },
       data: { status: ProductStatus.active },
@@ -553,6 +561,12 @@ export class AdminProductService {
           });
           continue;
         }
+
+        await this.commissionGuard.assertListingRuleExists({
+          sellerId: product.sellerId,
+          categoryId: product.categoryId,
+          amount: Number(product.price),
+        });
 
         const updated = await this.prisma.product.update({
           where: { id: productId },
