@@ -34,7 +34,7 @@ import {
   CommissionSellerType,
   Prisma,
 } from "@prisma/client";
-import { SEED_COMMISSION_RULE_SET_IDS } from "../../../prisma/seed-config";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../../prisma/seed-ids";
 import { ConfigService } from "@nestjs/config";
 import { createE2ETestApp, E2ETestApp } from "../../test-utils/create-app";
 import {

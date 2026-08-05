@@ -1,0 +1,214 @@
+{
+  "_note": "Lansman is degerleri. seed-production.js acilista guvenli varsayilanlari yazar; lansman seed'i bunlari asagidaki onaylanmis degerlerle EZER ve tek kaynak olur.",
+  "shippingTariff": {
+    "provider": "surat",
+    "name": "Sürat Kargo Tarifesi",
+    "version": 1,
+    "currency": "TRY",
+    "freeShippingEnabled": false,
+    "freeShippingThreshold": 999999,
+    "effectiveFrom": "2026-01-01T00:00:00.000Z",
+    "packageTiers": [
+      {
+        "code": "small",
+        "label": "Küçük Paket",
+        "minDesi": 0,
+        "maxDesi": 2,
+        "amount": 100,
+        "sampleWidth": 20,
+        "sampleHeight": 10,
+        "sampleLength": 25,
+        "sortOrder": 0
+      },
+      {
+        "code": "medium",
+        "label": "Orta Paket",
+        "minDesi": 2,
+        "maxDesi": 5,
+        "amount": 130,
+        "sampleWidth": 35,
+        "sampleHeight": 20,
+        "sampleLength": 45,
+        "sortOrder": 1
+      },
+      {
+        "code": "large",
+        "label": "Büyük Paket",
+        "minDesi": 5,
+        "maxDesi": null,
+        "amount": 160,
+        "sampleWidth": 60,
+        "sampleHeight": 40,
+        "sampleLength": 70,
+        "sortOrder": 2
+      }
+    ]
+  },
+  "tax": {
+    "region": { "name": "Türkiye", "countryCode": "TR", "isDefault": true },
+    "rates": [
+      {
+        "key": "kdv-20",
+        "name": "KDV %20",
+        "rate": 20,
+        "isDefault": true,
+        "sortOrder": 0
+      },
+      {
+        "key": "kdv-10",
+        "name": "KDV %10",
+        "rate": 10,
+        "isDefault": false,
+        "sortOrder": 1
+      },
+      {
+        "key": "kdv-1",
+        "name": "KDV %1",
+        "rate": 1,
+        "isDefault": false,
+        "sortOrder": 2
+      },
+      {
+        "key": "kdv-0",
+        "name": "KDV Muaf",
+        "rate": 0,
+        "isDefault": false,
+        "sortOrder": 3
+      }
+    ],
+    "defaultRuleRateKey": "kdv-20"
+  },
+  "membershipTiers": [
+    {
+      "type": "free",
+      "name": "Ücretsiz Üyelik",
+      "description": "Temel özelliklerle başlayın",
+      "monthlyPrice": 0,
+      "yearlyPrice": 0,
+      "maxFreeListings": 5,
+      "maxTotalListings": 10,
+      "maxImagesPerListing": 3,
+      "canCreateCollections": false,
+      "canTrade": false,
+      "isAdFree": false,
+      "featuredListingSlots": 0,
+      "commissionDiscount": 0,
+      "sortOrder": 0
+    },
+    {
+      "type": "basic",
+      "name": "Temel Üyelik",
+      "description": "Daha fazla ilan ve takas özelliği",
+      "monthlyPrice": 49.99,
+      "yearlyPrice": 479.99,
+      "maxFreeListings": 15,
+      "maxTotalListings": 50,
+      "maxImagesPerListing": 6,
+      "canCreateCollections": true,
+      "canTrade": true,
+      "isAdFree": false,
+      "featuredListingSlots": 2,
+      "commissionDiscount": 0.005,
+      "sortOrder": 1
+    },
+    {
+      "type": "premium",
+      "name": "Premium Üyelik",
+      "description": "Profesyonel koleksiyoncular için",
+      "monthlyPrice": 99.99,
+      "yearlyPrice": 959.99,
+      "maxFreeListings": 50,
+      "maxTotalListings": 200,
+      "maxImagesPerListing": 10,
+      "canCreateCollections": true,
+      "canTrade": true,
+      "isAdFree": true,
+      "featuredListingSlots": 10,
+      "commissionDiscount": 0.01,
+      "sortOrder": 2
+    },
+    {
+      "type": "business",
+      "name": "İş Üyeliği",
+      "description": "Kurumsal satıcılar için",
+      "monthlyPrice": 249.99,
+      "yearlyPrice": 2399.99,
+      "maxFreeListings": 200,
+      "maxTotalListings": 1000,
+      "maxImagesPerListing": 15,
+      "canCreateCollections": true,
+      "canTrade": true,
+      "isAdFree": true,
+      "featuredListingSlots": 50,
+      "commissionDiscount": 0.015,
+      "sortOrder": 3
+    }
+  ],
+  "platformSettings": [
+    {
+      "key": "offer_expiry_hours",
+      "value": "24",
+      "type": "number",
+      "description": "Tekliflerin geçerlilik süresi (saat)"
+    },
+    {
+      "key": "payment_hold_days",
+      "value": "3",
+      "type": "number",
+      "description": "Ödeme bekletme süresi (gün)"
+    },
+    {
+      "key": "withholding_tax_rate",
+      "value": "1",
+      "type": "number",
+      "description": "E-ticaret stopaj oranı (%) — GVK 94/19"
+    },
+    {
+      "key": "service_vat_enabled",
+      "value": "true",
+      "type": "boolean",
+      "description": "Hizmet bedellerine KDV uygulansın mı"
+    },
+    {
+      "key": "service_vat_rate",
+      "value": "20",
+      "type": "number",
+      "description": "Hizmet bedeli KDV oranı (%)"
+    },
+    {
+      "key": "withholding_applies_to_individual",
+      "value": "false",
+      "type": "boolean",
+      "description": "Stopaj bireysel satıcıdan da kesilsin mi"
+    },
+    {
+      "key": "min_offer_percentage",
+      "value": "50",
+      "type": "number",
+      "description": "Minimum teklif yüzdesi"
+    },
+    {
+      "key": "platform_name",
+      "value": "Tarodan",
+      "type": "string",
+      "description": "Platform adı"
+    },
+    {
+      "key": "default_carrier",
+      "value": "surat",
+      "type": "string",
+      "description": "Varsayılan kargo firması"
+    },
+    {
+      "key": "trade_response_deadline_hours",
+      "value": "72",
+      "type": "number",
+      "description": "Takas teklifi yanıt süresi"
+    }
+  ],
+  "_omittedSettings": {
+    "_note": "Bilinçli olarak YAZILMIYOR — kod yokluklarında kendi varsayılanını kullanır.",
+    "min_product_price": "ilan fiyatına alt sınır konmayacak",
+    "max_product_price": "ilan fiyatına üst sınır konmayacak"
+  }
+}

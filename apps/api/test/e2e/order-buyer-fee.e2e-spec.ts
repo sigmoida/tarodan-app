@@ -8,7 +8,7 @@ import {
   truncateAll,
 } from "../test-utils/db";
 import { testTaxPolicy } from "../../src/modules/order/testing/tax-policy-fixture";
-import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-config";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-ids";
 
 describe("strict order commission (E2E)", () => {
   let prisma: PrismaService;

@@ -1,5 +1,19 @@
+/**
+ * Production REFERANS verisi — her API açılışında koşar (entrypoint.sh).
+ *
+ * Kapsamı bilinçli olarak dar: uygulamanın açılabilmesi için satırı VAR olması
+ * gereken, kendisi bir iş kararı OLMAYAN kayıtlar. Fiyat/oran gibi iş değerleri
+ * lansman seed'ine (`seed-launch.ts` + `data/launch/*.json`) aittir ve bu dosya
+ * onları asla ezmez — bütün upsert'lerin `update` dalı boştur.
+ *
+ * Komisyon kuralları buradan KALDIRILDI. Eskiden demo config'in (yerel "Araba"
+ * senaryosu) oranlarını her aktif kategoriye ACTIVE olarak yayınlıyordu; yani
+ * kategoriler girildikten sonraki ilk redeploy'da canlı fiyatlandırma kimse
+ * onaylamadan demo rakamlarına dönüyordu. Artık komisyonun tek kaynağı lansman
+ * seed'i ya da adminin yayınladığı kural setidir; hiçbiri yoksa `/health/ready`
+ * kırmızı kalır ve ilan oluşturma 503 döner — sessizce yanlış fiyat yerine.
+ */
 import {
-  CommissionRuleSetStatus,
   MembershipTierType,
   PrismaClient,
   SellerType,
@@ -9,10 +23,7 @@ import {
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/shipping-package-tier";
-import {
-  SEED_COMMISSION_PROFILES,
-  SEED_COMMISSION_RULE_SET_IDS,
-} from "./seed-config";
+import { PRODUCTION_REFERENCE_IDS } from "./seed-ids";
 
 const prisma = new PrismaClient();
 
@@ -93,115 +104,11 @@ async function seedMembershipTiers(): Promise<void> {
   }
 }
 
-/** Üretim referans setinin sürümü; `version` global olarak tekildir. */
-const PRODUCTION_RULE_SET_VERSION = 1;
-
-async function seedCommissionRule(): Promise<void> {
-  const categories = await prisma.category.findMany({
-    where: { isActive: true },
-  });
-  if (categories.length === 0) {
-    console.log(
-      "No active categories found; skipping strict commission rule set seed.",
-    );
-    return;
-  }
-  // Bu bootstrap her container açılışında koşar ve amacı "aktif bir kural seti
-  // OLSUN"dur — kendi setini dayatmak değil. Staging reset'i kapsamlı seed'in
-  // kendi setini ACTIVE bırakır; onun üstüne ikinci bir set yazmak hem
-  // `commission_rule_sets_one_active_idx` hem de tekil `version` kısıtını
-  // ihlal eder, seed exit 1 döner ve entrypoint (set -e) API'yi hiç
-  // başlatmazdı. Başka bir set sahayı tutuyorsa dokunmadan çık.
-  const conflicting = await prisma.commissionRuleSet.findFirst({
-    where: {
-      id: { not: SEED_COMMISSION_RULE_SET_IDS.production },
-      OR: [
-        { status: CommissionRuleSetStatus.ACTIVE },
-        { version: PRODUCTION_RULE_SET_VERSION },
-      ],
-    },
-    select: { id: true, name: true, status: true },
-  });
-  if (conflicting) {
-    console.log(
-      `Commission rule set "${conflicting.name}" (${conflicting.status}) already owns the active/version slot; skipping production strict set.`,
-    );
-    return;
-  }
-  const set = await prisma.commissionRuleSet.upsert({
-    where: { id: SEED_COMMISSION_RULE_SET_IDS.production },
-    create: {
-      id: SEED_COMMISSION_RULE_SET_IDS.production,
-      name: "Production strict commission v1",
-      version: PRODUCTION_RULE_SET_VERSION,
-      status: CommissionRuleSetStatus.ACTIVE,
-      publishedAt: new Date(),
-      publishedBy: "production-seed",
-    },
-    update: {},
-  });
-  for (const category of categories) {
-    for (const profile of SEED_COMMISSION_PROFILES) {
-      const id = `production-rule-${category.id}-${profile.key}`;
-      const data = {
-        name: `${category.name} / ${profile.label}`,
-        categoryId: category.id,
-        sellerType: profile.sellerType,
-        minAmount: profile.minAmount,
-        maxAmount: profile.maxAmount,
-        buyerCommissionRate: profile.buyerCommissionRate,
-        buyerCommissionMin: profile.buyerCommissionMin,
-        buyerCommissionMax: profile.buyerCommissionMax,
-        buyerServiceFeeRate: profile.buyerServiceFeeRate,
-        buyerServiceFeeMin: profile.buyerServiceFeeMin,
-        buyerServiceFeeMax: profile.buyerServiceFeeMax,
-        sellerCommissionRate: profile.sellerCommissionRate,
-        sellerCommissionMin: profile.sellerCommissionMin,
-        sellerCommissionMax: profile.sellerCommissionMax,
-        sellerPlatformFeeRate: profile.sellerPlatformFeeRate,
-        sellerPlatformFeeMin: profile.sellerPlatformFeeMin,
-        sellerPlatformFeeMax: profile.sellerPlatformFeeMax,
-        tradeFeeSellerAmount: profile.tradeFeeSellerAmount,
-        tradeFeeBuyerAmount: profile.tradeFeeBuyerAmount,
-        shippingBuyerShare: profile.shippingShares.small,
-      };
-      await prisma.commissionRule.upsert({
-        where: { id },
-        create: {
-          id,
-          ruleSetId: set.id,
-          ...data,
-          shippingShares: {
-            create: Object.entries(profile.shippingShares).map(
-              ([tierCode, buyerShare]) => ({
-                tierCode: tierCode as keyof typeof profile.shippingShares,
-                buyerShare,
-              }),
-            ),
-          },
-        },
-        update: {
-          ...data,
-          shippingShares: {
-            deleteMany: {},
-            create: Object.entries(profile.shippingShares).map(
-              ([tierCode, buyerShare]) => ({
-                tierCode: tierCode as keyof typeof profile.shippingShares,
-                buyerShare,
-              }),
-            ),
-          },
-        },
-      });
-    }
-  }
-}
-
 async function seedTaxReferences(): Promise<void> {
   const taxRegion = await prisma.taxRegion.upsert({
-    where: { id: "production-tax-region-tr" },
+    where: { id: PRODUCTION_REFERENCE_IDS.taxRegion },
     create: {
-      id: "production-tax-region-tr",
+      id: PRODUCTION_REFERENCE_IDS.taxRegion,
       name: "Turkiye",
       countryCode: "TR",
       isDefault: true,
@@ -210,9 +117,9 @@ async function seedTaxReferences(): Promise<void> {
     update: {},
   });
   const taxRate = await prisma.taxRate.upsert({
-    where: { id: "production-tax-rate-kdv-20" },
+    where: { id: PRODUCTION_REFERENCE_IDS.taxRateDefault },
     create: {
-      id: "production-tax-rate-kdv-20",
+      id: PRODUCTION_REFERENCE_IDS.taxRateDefault,
       taxRegionId: taxRegion.id,
       name: "KDV 20%",
       rate: 20,
@@ -222,9 +129,9 @@ async function seedTaxReferences(): Promise<void> {
     update: {},
   });
   await prisma.taxRule.upsert({
-    where: { id: "production-tax-rule-default" },
+    where: { id: PRODUCTION_REFERENCE_IDS.taxRuleDefault },
     create: {
-      id: "production-tax-rule-default",
+      id: PRODUCTION_REFERENCE_IDS.taxRuleDefault,
       taxRegionId: taxRegion.id,
       taxRateId: taxRate.id,
       scope: "default_rate",
@@ -235,6 +142,12 @@ async function seedTaxReferences(): Promise<void> {
   });
 }
 
+/**
+ * TEK istisna: `update` dalı doludur. Platform servis hesabı bir iş kararı değil,
+ * sistemin kendi kaydı — komisyon/ödeme akışları onun `sellerType=platform`
+ * olmasına güvenir. Yanlışlıkla bozulursa kendini onarması istenen davranıştır;
+ * bu dosyadaki "adminin girdiğini ezme" kuralı iş değerleri içindir.
+ */
 async function seedPlatformSeller(): Promise<void> {
   const passwordHash = await bcrypt.hash(randomUUID(), 12);
   const platformSeller = await prisma.user.upsert({
@@ -288,10 +201,11 @@ async function seedPlatformSeller(): Promise<void> {
 }
 
 /**
- * Production bootstrap container açılışında tekrar çalışır. Bu nedenle yalnız
- * ilk kurulum için güvenli başlangıç fiyatını yazar; adminin daha sonra girdiği
- * gerçek tarife fiyatlarını update dalında asla ezmez. Kapsamlı test seed'indeki
- * 100/130/160 TL senaryosu production bootstrap'tan bilinçli olarak ayrıdır.
+ * Bootstrap her açılışta koştuğu için yalnız İSKELET yazar: üç kademesi de olan
+ * bir tarife satırı bulunsun ki checkout kargo fiyatı çözebilsin ve
+ * `/health/ready` "eksik kademe" demesin. Gerçek fiyatlar lansman seed'inden
+ * (`data/launch/business-config.json`) ya da adminden gelir; `update: {}` olduğu
+ * için sonraki her açılış onlara dokunmaz.
  */
 const LAUNCH_TARIFF_PACKAGE_FEE = 29.99;
 
@@ -329,7 +243,6 @@ async function seedShippingTariff(): Promise<void> {
 
 async function main(): Promise<void> {
   await seedMembershipTiers();
-  await seedCommissionRule();
   await seedTaxReferences();
   await seedPlatformSeller();
   await seedShippingTariff();

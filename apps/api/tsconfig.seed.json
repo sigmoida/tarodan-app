@@ -11,6 +11,7 @@
     "prisma/seed-commerce.ts",
     "prisma/seed-media.ts",
     "prisma/seed-production.ts",
+    "prisma/seed-launch.ts",
     "prisma/bootstrap-production-admin.ts",
     "scripts/migrate-media-folders.ts",
     "maintenance/**/*.ts"

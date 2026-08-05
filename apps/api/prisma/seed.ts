@@ -57,10 +57,10 @@ import {
 import {
   SEED_COMMISSION_PROFILES,
   SEED_COMMISSION_PRICE_BANDS,
-  SEED_COMMISSION_RULE_SET_IDS,
   SEED_CATEGORY_DEFINITIONS,
   SEED_SHIPPING_TIERS,
-} from "./seed-config";
+} from "./seed-demo-config";
+import { SEED_COMMISSION_RULE_SET_IDS } from "./seed-ids";
 import { findMatchingCommissionRule } from "../src/modules/order/order-commission.helper";
 const prisma = new PrismaClient();
 

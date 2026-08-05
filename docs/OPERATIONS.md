@@ -34,17 +34,26 @@
 ### Her API açılışında otomatik koşanlar
 
 `apps/api/entrypoint.sh` → `prisma migrate deploy` + `dist-seed/prisma/seed-production.js`.
-İkincisi zorunlu iş referanslarını **idempotent** garanti eder:
+İkincisi yalnız **iskeleti** idempotent garanti eder; her upsert'in `update` dalı
+boştur, yani girilmiş hiçbir değeri ezmez:
 
 - üyelik katmanları (free/basic/premium/business);
-- catch-all komisyon kuralı (`appliesTo: BOTH` — checkout fail-closed guard'ı
-  ve `/api/health/ready` bunu arar);
 - TR vergi bölgesi, varsayılan KDV oranı ve vergi kuralı;
-- `platform@tarodan.com` platform-satıcı hesabı (rastgele şifre);
-- aktif Sürat kargo tarifesi + paket kademeleri.
+- `platform@tarodan.com` platform-satıcı hesabı (rastgele şifre) — **tek
+  istisna**, `update` dalı doludur: sistemin kendi servis hesabı, bozulursa
+  kendini onarması istenir;
+- aktif Sürat kargo tarifesi + üç paket kademesi (fiyatlar başlangıç değeri).
+
+**Komisyon kuralı bilinçli olarak YOK.** Eskiden buradaydı ve demo config'in
+yerel "Araba" senaryosu için yazılmış oranlarını her aktif kategoriye ACTIVE
+olarak yayınlıyordu — kategoriler girildikten sonraki ilk redeploy'da canlı
+fiyatlandırma kimse onaylamadan değişebiliyordu. Artık komisyonun kaynağı
+lansman seed'i (`seed-launch.js`) ya da adminin yayınladığı kural setidir;
+hiçbiri yoksa `/api/health/ready` kırmızı kalır ve ilan oluşturma 503 döner.
 
 Demo seed (`prisma/seed.ts`, `*@demo.com`, `Admin123!`) production yollarında
-asla çalışmaz; `release-production-bootstrap.spec.ts` bunu sözleşmeyle korur.
+asla çalışmaz; `release-production-bootstrap.spec.ts` ve
+`seed-independence.spec.ts` bunu sözleşmeyle korur.
 
 ### Bir kerelik: yorum sayacı backfill'i sonrası reindex
 
@@ -128,9 +137,32 @@ mutlak S3 URL'i (veya `null`) olarak döndürür.
 
 ## 3. Production launch runbook'u
 
-Hedef: **boş vitrin** (üye/ürün yok) + tek operasyonel süper-admin'li çalışan
-admin paneli. Katalog (kategori, marka, üretici, attribute) bilinçli olarak
-seed'lenmez — reset sonrası admin panelinden elle girilir.
+Hedef: **asgari lansman verisi** + tek operasyonel süper-admin'li çalışan admin
+paneli. Reset, `prisma/data/launch/*.json`'daki onaylanmış veriyi yazar:
+katalog (kategori, marka, araç modeli, üretici, özellik), tek kurumsal satıcı,
+ACTIVE komisyon kural seti ve **görselsiz, `inactive` ilanlar**. Sipariş/takas/
+ödeme gibi operasyonel veri YOKTUR.
+
+İlanlar `inactive` olduğu için hiçbiri vitrine düşmez: görselleri eklenip admin
+tarafından yayınlanana kadar public katalog ve arama boş döner — reset'in son
+adımı bunu ayrıca doğrular.
+
+> Eski plan "boş vitrin"di (katalog elle girilecekti). Bu, `/health/ready`'nin
+> aktif komisyon kapsamı ve depo adresi şart koşmasıyla çelişiyordu: boş bir
+> veritabanında readiness asla yeşile dönmüyor, reset "başarısız" raporlayıp
+> operatörü yedekten dönmeye çağırıyordu. Lansman seed'i her ikisini de yazar.
+
+**Seed katmanları** — hangisi neyin kaynağı:
+
+| Katman   | Dosya                | Ne zaman                   | Ne yazar                                                                                                                                                        |
+| -------- | -------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Referans | `seed-production.ts` | her API açılışında         | Uygulama açılsın diye gereken iskelet: üyelik satırları, vergi, platform hesabı, tarife kabuğu. Tüm upsert'lerin `update` dalı boş — girilen değeri ASLA ezmez. |
+| Lansman  | `seed-launch.ts`     | yalnız reset workflow'unda | Onaylanmış iş değerleri + katalog + kurumsal satıcı + komisyon seti + ilanlar. Veri `data/launch/*.json`'da.                                                    |
+| Demo     | `seed.ts`            | yalnız staging reset       | Demo kullanıcı/sipariş/takas senaryoları. Canlıya asla karışmaz.                                                                                                |
+
+Demo ile canlı arasındaki bağ `src/common/seed-independence.spec.ts` ile CI'da
+kilitli: komisyon oranları bir dönem ortak config'ten geliyordu ve yerel "Araba"
+senaryosunun rakamları canlıya ACTIVE olarak yayınlanıyordu.
 
 ### Adım 1 — Kod hazırlığı
 
@@ -143,7 +175,13 @@ seed'lenmez — reset sonrası admin panelinden elle girilir.
 GitHub `production` environment'ı (korumalı, required reviewer):
 `PRODUCTION_BOOTSTRAP_ADMIN_EMAIL`, `PRODUCTION_BOOTSTRAP_ADMIN_PASSWORD`
 (16–72 byte), `COOLIFY_PROD_UUIDS` (`api,web,admin` sırasıyla — üçüncü UUID
-verilmezse admin app restart edilmez ve cache'i temizlenmez).
+verilmezse admin app restart edilmez ve cache'i temizlenmez),
+`LAUNCH_SELLER_PASSWORD` (16–72 byte; lansman seed'inin açtığı kurumsal satıcı)
+ve opsiyonel `LAUNCH_SELLER_EMAIL` (verilmezse `accounts.json`'daki adres).
+
+`LAUNCH_SELLER_PASSWORD` eksikse workflow guard aşamasında, hiçbir şeye
+dokunmadan reddeder — eskiden bu tür eksikler veritabanı silindikten SONRA
+patlıyordu.
 
 Reset workflow'unun API container'ında aradığı değerler (biri tutmazsa hiçbir
 şeye dokunmadan reddeder):
@@ -193,12 +231,16 @@ erişimini değiştirmeden doğrular. Sonra `dry_run=false` ile sırayla:
 1. zorunlu ve doğrulanmış `pg_dump -Fc` yedeği (host'ta kalır; workflow yedeği
    `pg_restore -l` ile doğrulayamazsa devam etmez — yolu ve SHA-256'yı kaydet);
 2. `prisma migrate reset --force --skip-seed`;
-3. `seed-production.js` (yukarıdaki zorunlu referanslar);
+3. `seed-production.js` (referans iskeleti);
 4. `bootstrap-production-admin.js` → secrets'taki tek süper-admin;
-5. Redis + production arama indeksi temizliği, web `.next/cache` silme;
-6. restart, readiness beklemesi, `verify-production-empty.js` (API hazırken
-   `/categories`, `/manufacturers`, `/products`, `/search/products`,
-   `/ads/active` boş olmalı).
+5. `seed-launch.js` → katalog, kurumsal satıcı, komisyon seti, depo adresi ve
+   `inactive` ilanlar. **Süper adminden sonra koşmak zorunda:** depo adresini o
+   hesaba bağlıyor, admin yoksa "no active super admin" ile durur;
+6. Redis + production arama indeksi temizliği, web `.next/cache` silme;
+7. restart, readiness beklemesi, `verify-production-launch.js`: API `ready`
+   dönmeli, `/categories` ve `/manufacturers` seed'lenen sayıyı vermeli,
+   `/products`, `/search/products`, `/ads/active` ise **boş** olmalı — ilanların
+   gerçekten `inactive` kaldığının kanıtı budur.
 
 Bu, bilinçli olarak `master` deploy workflow'unun **parçası olmayan**, tek
 seferlik yıkıcı bir operasyondur — kod deploy'u asla veri silmez. S3 bucket'ı
@@ -206,21 +248,25 @@ silinmez; eski nesneler zararsız yetim olarak kalır (kurtarma yolu).
 
 ### Adım 5 — Admin içerik girişi (site hâlâ kilitli)
 
-1. **İş değerlerini onayla** — seed/migration'dan gelen varsayılanlar
-   çalışır durumdadır ama iş kararı DEĞİLDİR (tablo aşağıda).
-2. **Katalog** (sıra önemli): Categories (ağaç + sıralama) → Manufacturers
-   (logolu) → Brands → Car Models (marka ister) → Attributes (grup + değerler).
-   `scale` ve `material` grupları özellikle önemli: filtre kenar çubuğu ve
-   üst menüdeki "Ölçek" başlığı doğrudan bunlardan beslenir, boşken görünmezler.
-3. **Statik sayfalar** — `Marketing → Pages`: **about, faq, privacy, terms**.
-   Vitrin bunları DB'den okur, yoksa 404 verir; **yayınlanmamış (draft) sayfa da
-   404'tür**. `/terms` ve `/privacy` kayıt formundaki onay kutusundan linklidir.
-4. **Settings** — Listing sekmesini bir kez **kaydet**: min/max ürün fiyatı
-   kaydedilene kadar hiç uygulanmaz (arayüzdeki 10/100000 yalnız placeholder).
-   **Warehouse** sekmesini doldur (güvenli takas depo operasyonunun önkoşulu;
-   boşken ilk takas onayı 400 verir; `/health/ready` de depo adresi
-   çözülemiyorsa hazır-değil döner — takas onayıyla aynı çözümleme:
-   `warehouse_address_id` ayarı veya aktif bir admin'in adresi).
+Katalog, komisyon, tarife, vergi, üyelik ve depo adresi artık lansman seed'inden
+geliyor — bu adım onları **girmek** değil, **doğrulamak** ve eksik kalanları
+tamamlamak içindir.
+
+1. **İlan görselleri** — lansman ilanları görselsiz ve `inactive` geldi. API ilan
+   başına **en az 3, en fazla 10** görsel şart koşuyor; görseller yüklenmeden
+   ilan `active` yapılamaz. Yayına alma sırası: görselleri ekle → ilanı aktifleştir.
+2. **Katalog kontrolü** — Categories / Manufacturers / Brands / Car Models /
+   Attributes seed'lendi. Marka logoları ve üretici logoları seed'de YOK, elle
+   eklenir. `scale` ve `material` grupları filtre kenar çubuğunu ve üst menüdeki
+   "Ölçek" başlığını besler; lansman verisinde `scale` yalnız **1:64**, `material`
+   yalnız **diecast** içeriyor.
+3. **Kurumsal satıcı** — hesap `approved` ve 20 yıllık BUSINESS üyelikle açıldı.
+   İlk satıştan önce **IBAN** (`SellerBankAccount`) girilmeli, yoksa payout
+   yapılamaz. Faturalama için e-Logo yapılandırması ayrıdır.
+4. **Settings** — Listing sekmesindeki min/max ilan fiyatı **bilinçli olarak
+   boş** (sınır uygulanmıyor). Sınır istenirse buradan girilir. Warehouse:
+   `warehouse_address_id` seed tarafından süper adminin adresine bağlandı;
+   değiştirilecekse bu sekmeden.
 5. **E-posta şablonları** — opsiyonel; kod varsayılanları hazır.
 6. **Staff** — ek admin hesapları (geçici şifre ekranda gösterilir, SMTP
    gerekmez); süper-admin'de 2FA aç.
@@ -228,18 +274,26 @@ silinmez; eski nesneler zararsız yetim olarak kalır (kurtarma yolu).
    Davet e-postası SMTP kurulu değilken de "gönderildi" der (sessiz hata) —
    güvenli yol "kodu kopyala".
 
-#### Onay bekleyen varsayılan iş değerleri
+Statik hukuki sayfalar (terms, privacy, cookies, mesafeli satış, iade, satıcı
+sözleşmesi, fikri mülkiyet) artık **kodda**; admin CMS sayfa ekranı kaldırıldı,
+girilecek bir şey yok.
 
-| Ne                         | Gelen değer                                                                   | Nerede değişir                                                    |
-| -------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Komisyon (catch-all)       | satıcıdan **%5**, alıcıdan **%0** — alıcı komisyonu ve hizmet bedeli tanımsız | Finance → Commission                                              |
-| Pasif duran kural          | `Platform Hizmet Bedeli (Alıcı)` %3, `is_active=false`                        | alıcı bedeli alınacaksa aktive et                                 |
-| Kargo kademeleri           | migration'dan **üçü de 29,99 ₺**, örnek ölçüler boş                           | System → Shipping Tariffs (reset log'u "REVIEW" satırıyla uyarır) |
-| Kargo payı (kademe başına) | küçük 100/0, orta 70/30, büyük 50/50 (alıcı/satıcı)                           | Finance → Commission                                              |
-| Takas hizmet bedeli        | kurallarda **tanımsız (0 ₺)** — girilene kadar takas ücretsiz işler           | Finance → Commission (kural dialogu, KDV **dahil** sabit tutar)   |
-| Üyelik                     | free 0 ₺ (**takas kapalı**), basic 49,99, premium 99,99, business 249,99 ₺/ay | Membership Tiers                                                  |
-| Vergi                      | KDV %20, hizmet KDV'si açık, stopaj %1 (yalnız kurumsal)                      | System → Settings                                                 |
-| Serbest kargo eşiği        | 500 ₺                                                                         | System → Shipping Tariffs                                         |
+#### Lansman seed'inin yazdığı iş değerleri
+
+Hepsi `apps/api/prisma/data/launch/*.json`'dan gelir; değiştirmek için önce o
+dosyayı güncelle (tek kaynak), admin panelinden yapılan düzeltme bir sonraki
+reset'te geri alınır.
+
+| Ne                         | Gelen değer                                                                                                                                                                                                                                                                            | Nerede değişir                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Komisyon                   | kategori × 4 satıcı tipi × 4 fiyat bandı = 16 kural. Bantlar 0-999 / 1.000-9.999 / 10.000-24.999 / 25.000+. Alıcı komisyonu %4/%4/%3/%0, alıcı hizmet bedeli %5/%6/%4/%5, satıcı komisyonu %6, satıcı platform bedeli %5/%5/%5/%0. **Oranlar satıcı tipine göre değişmez (bilinçli).** | `commission.json` · Finance → Commission           |
+| Takas hizmet bedeli        | **veren taraf 0 ₺, alan taraf 100 ₺** (KDV dahil sabit). 1'e 1 takasta iki taraf da 100 ₺ öder.                                                                                                                                                                                        | `commission.json`                                  |
+| Kargo payı (kademe başına) | üçünde de alıcı %50 / satıcı %50                                                                                                                                                                                                                                                       | `commission.json`                                  |
+| Kargo kademeleri           | Küçük 100 ₺ (0-2 desi) · Orta 130 ₺ (2-5) · Büyük 160 ₺ (5+)                                                                                                                                                                                                                           | `business-config.json` · System → Shipping Tariffs |
+| Ücretsiz kargo             | **kapalı** (`freeShippingEnabled: false`)                                                                                                                                                                                                                                              | `business-config.json`                             |
+| Üyelik                     | free 0 ₺ (**takas kapalı**), basic 49,99, premium 99,99, business 249,99 ₺/ay                                                                                                                                                                                                          | `business-config.json` · Membership Tiers          |
+| Vergi                      | KDV %20 varsayılan (+%10/%1/muaf), hizmet KDV'si açık %20, stopaj %1 (yalnız kurumsal)                                                                                                                                                                                                 | `business-config.json` · System → Settings         |
+| İlan fiyat sınırı          | **yok** — `min_product_price`/`max_product_price` bilinçli yazılmıyor                                                                                                                                                                                                                  | `business-config.json`                             |
 
 ### Adım 6-7 — Kademeli açılış ve sonrası
 
@@ -248,17 +302,20 @@ yeni unlock'ları keser; açılmış tarayıcılar cookie süresince girmeye dev
 herkesi anında düşürmek için `SITE_UNLOCK_SECRET` rotate et.
 
 **Tam açılış:** Coolify'da `SITE_LOCKED=false` + web restart; smoke test
-(anasayfa boş raylarla açılır, kategori gezinme, kayıt + giriş,
-`/api/health/ready` yeşil — ready kontrolü catch-all komisyon kuralunu da doğrular).
-Arama motorlarına açmak için web `NEXT_PUBLIC_ALLOW_INDEXING=true` — ama 4 CMS
-sayfası yayınlanmadan açma, `sitemap.xml` onları listeler ve soft-404 üretir.
+(anasayfa, kategori gezinme, kayıt + giriş, `/api/health/ready` yeşil — ready
+kontrolü komisyon kapsamını ve depo adresini de doğrular). Arama motorlarına
+açmak için web `NEXT_PUBLIC_ALLOW_INDEXING=true`.
 
-**Vitrin boşken beklenen görünüm** (hepsi bilinçli): üretici/kategori/ölçek
-menüleri ve marka şeridi hiç çıkmaz, "popüler aramalar" çipleri kataloğun kendi
-üreticilerinden türer (boşken görünmez), indirim rayı çizilmez, ilan listesi
-"Henüz ilan yok / İlk ilanı siz verin" der. Filtre kenar çubuğundaki yedek
-listeler yalnız API **hata verdiğinde** devreye girer — boş yanıt boş liste
-demektir.
+**İlanlar yayınlanmadan önceki görünüm** (hepsi bilinçli): kategori, üretici,
+marka ve ölçek menüleri katalog seed'lendiği için ÇIKAR; ama ilan listesi
+"Henüz ilan yok / İlk ilanı siz verin" der, çünkü 30 lansman ilanı `inactive`
+ve public sorgular yalnız `active` görür. İndirim rayı çizilmez, "popüler
+aramalar" çipleri kataloğun kendi üreticilerinden türer. Filtre kenar
+çubuğundaki yedek listeler yalnız API **hata verdiğinde** devreye girer — boş
+yanıt boş liste demektir.
+
+İlanlar göründüğü anda bir şey ters gitmiş demektir: seed onları `inactive`
+yazar ve reset'in son adımı public katalogun boş olduğunu doğrular.
 
 **Rollback:** vitrin kilitliyken workflow'un yazdığı yedeği production
 PostgreSQL container'ından `pg_restore --clean --if-exists` ile geri yükle;

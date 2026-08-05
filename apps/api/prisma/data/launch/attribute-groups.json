@@ -1,0 +1,34 @@
+[
+  {
+    "name": "Ölçek",
+    "slug": "scale",
+    "isRequired": false,
+    "sortOrder": 0,
+    "isActive": true,
+    "values": [
+      {
+        "value": "1:64",
+        "slug": "1-64",
+        "displayValue": "1:64",
+        "sortOrder": 0,
+        "isActive": true
+      }
+    ]
+  },
+  {
+    "name": "Malzeme",
+    "slug": "material",
+    "isRequired": false,
+    "sortOrder": 1,
+    "isActive": true,
+    "values": [
+      {
+        "value": "Diecast",
+        "slug": "diecast",
+        "displayValue": "Diecast",
+        "sortOrder": 0,
+        "isActive": true
+      }
+    ]
+  }
+]

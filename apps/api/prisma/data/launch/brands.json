@@ -1,0 +1,132 @@
+[
+  {
+    "name": "Ford",
+    "slug": "ford",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "name": "BMW",
+    "slug": "bmw",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 1,
+    "isActive": true
+  },
+  {
+    "name": "Lotus",
+    "slug": "lotus",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 2,
+    "isActive": true
+  },
+  {
+    "name": "Abarth",
+    "slug": "abarth",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 3,
+    "isActive": true
+  },
+  {
+    "name": "Porsche",
+    "slug": "porsche",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 4,
+    "isActive": true
+  },
+  {
+    "name": "Range Rover",
+    "slug": "range-rover",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 5,
+    "isActive": true
+  },
+  {
+    "name": "Lamborghini",
+    "slug": "lamborghini",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 6,
+    "isActive": true
+  },
+  {
+    "name": "Bentley",
+    "slug": "bentley",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 7,
+    "isActive": true
+  },
+  {
+    "name": "Mercedes",
+    "slug": "mercedes",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 8,
+    "isActive": true
+  },
+  {
+    "name": "Nissan",
+    "slug": "nissan",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 9,
+    "isActive": true
+  },
+  {
+    "name": "Mazda",
+    "slug": "mazda",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 10,
+    "isActive": true
+  },
+  {
+    "name": "Subaru",
+    "slug": "subaru",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 11,
+    "isActive": true
+  },
+  {
+    "name": "Toyota",
+    "slug": "toyota",
+    "country": null,
+    "foundedYear": null,
+    "website": null,
+    "description": null,
+    "sortOrder": 12,
+    "isActive": true
+  }
+]

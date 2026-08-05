@@ -1,0 +1,10 @@
+[
+  {
+    "name": "Araba",
+    "slug": "araba",
+    "description": "Binek ve spor arabalar",
+    "sortOrder": 1,
+    "isActive": true,
+    "parentSlug": null
+  }
+]
