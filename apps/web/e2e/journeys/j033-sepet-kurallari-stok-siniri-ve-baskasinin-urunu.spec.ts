@@ -19,19 +19,12 @@
  *
  * Hibrit (API + UI). loginViaToken protected sayfa dogrulamasinda kullanilir.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 import {
-  API,
-  USERS,
-  loginViaToken,
-  apiLogin,
-  apiMe,
-  apiFirstBuyableProduct,
-  apiDefaultAddressId,
-  apiBuyAndPay,
-  apiGetOrder,
-} from "../support/helpers";
-import { dbFind, dbCount } from "../support/db";
+  API, USERS, loginViaToken, apiLogin, apiMe, apiFirstBuyableProduct,
+  apiDefaultAddressId, apiBuyAndPay, apiGetOrder,
+} from '../support/helpers';
+import { dbFind, dbCount } from '../support/db';
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
@@ -42,16 +35,12 @@ async function buyableProduct(request: any, buyerId: string) {
 
 /** Bir kullanicinin (satici) kendi aktif urununu bul. */
 async function ownActiveProduct(request: any, token: string) {
-  const res = await request.get(`${API}/products/my`, {
-    headers: auth(token),
-    params: { limit: "50" },
-  });
-  expect(res.ok(), "GET /products/my").toBeTruthy();
+  const res = await request.get(`${API}/products/my`, { headers: auth(token), params: { limit: '50' } });
+  expect(res.ok(), 'GET /products/my').toBeTruthy();
   const body = await res.json();
-  const list: any[] =
-    body?.data ?? body?.products ?? (Array.isArray(body) ? body : []);
-  const p = list.find((x) => x.status === "active");
-  expect(p, "saticinin aktif kendi urunu bulundu").toBeTruthy();
+  const list: any[] = body?.data ?? body?.products ?? (Array.isArray(body) ? body : []);
+  const p = list.find((x) => x.status === 'active');
+  expect(p, 'saticinin aktif kendi urunu bulundu').toBeTruthy();
   return p;
 }
 
@@ -64,11 +53,8 @@ async function clearCart(request: any, token: string) {
 // J33 — Sepet kurallari: stok siniri, kendi urunu engeli, qty=0 ile cikarma
 // ───────────────────────────────────────────────────────────────────────────
 
-test.describe("J33 — Sepet kurallari (stok / kendi urunu / qty0)", () => {
-  test("stok asimi reddedilir, kendi urunu engellenir, qty0 satiri kaldirir, gecerli urunle tamamlanir", async ({
-    page,
-    request,
-  }) => {
+test.describe('J33 — Sepet kurallari (stok / kendi urunu / qty0)', () => {
+  test('stok asimi reddedilir, kendi urunu engellenir, qty0 satiri kaldirir, gecerli urunle tamamlanir', async ({ page, request }) => {
     test.setTimeout(60_000);
 
     // buyerClean: ilani yok, her urunu alabilir
@@ -82,23 +68,21 @@ test.describe("J33 — Sepet kurallari (stok / kendi urunu / qty0)", () => {
       headers: auth(token),
       data: { productId: product.id, quantity: 1 },
     });
-    expect(add1.ok(), "urun sepete eklendi").toBeTruthy();
+    expect(add1.ok(), 'urun sepete eklendi').toBeTruthy();
     const cart1 = await add1.json();
-    const inCart = cart1?.calculation?.items?.find(
-      (i: any) => i.productId === product.id,
-    );
-    expect(inCart?.quantity, "sepette 1 adet").toBe(1);
+    const inCart = cart1?.calculation?.items?.find((i: any) => i.productId === product.id);
+    expect(inCart?.quantity, 'sepette 1 adet').toBe(1);
 
     // 2) Stoktan fazla adet eklemeyi dene -> kabul edilmemeli.
     //    DTO Max=99 oldugundan stok kontrolunu test etmek icin gercek stok degerini kullaniriz.
     const stock: number | null = product.quantity ?? null;
-    if (typeof stock === "number" && stock + 1 <= 99) {
+    if (typeof stock === 'number' && stock + 1 <= 99) {
       // PATCH ile mevcut satiri stok+1'e cek -> "Stokta sadece X adet var" (400)
       const over = await request.patch(`${API}/cart/items/${product.id}`, {
         headers: auth(token),
         data: { quantity: stock + 1 },
       });
-      expect(over.ok(), "stok asimi reddedildi").toBeFalsy();
+      expect(over.ok(), 'stok asimi reddedildi').toBeFalsy();
       expect([400, 409]).toContain(over.status());
     } else {
       // Stok cok yuksek/null -> DTO Max=99 ustu deger ValidationPipe ile 400 verir (yine "kabul edilmedi").
@@ -106,7 +90,7 @@ test.describe("J33 — Sepet kurallari (stok / kendi urunu / qty0)", () => {
         headers: auth(token),
         data: { quantity: 100 }, // Max=99
       });
-      expect(over.ok(), "asiri adet (DTO Max=99) reddedildi").toBeFalsy();
+      expect(over.ok(), 'asiri adet (DTO Max=99) reddedildi').toBeFalsy();
       expect([400, 409]).toContain(over.status());
     }
 
@@ -118,7 +102,7 @@ test.describe("J33 — Sepet kurallari (stok / kendi urunu / qty0)", () => {
       headers: auth(sellerToken),
       data: { productId: own.id, quantity: 1 },
     });
-    expect(selfAdd.ok(), "kendi urununu sepete ekleme engellendi").toBeFalsy();
+    expect(selfAdd.ok(), 'kendi urununu sepete ekleme engellendi').toBeFalsy();
     expect([400, 403]).toContain(selfAdd.status());
 
     // 4) Adedi 0 yap -> urun sepetten cikmali.
@@ -126,31 +110,22 @@ test.describe("J33 — Sepet kurallari (stok / kendi urunu / qty0)", () => {
       headers: auth(token),
       data: { quantity: 0 },
     });
-    expect(toZero.ok(), "qty=0 islemi").toBeTruthy();
+    expect(toZero.ok(), 'qty=0 islemi').toBeTruthy();
     const cartAfter = await toZero.json();
-    const stillThere = cartAfter?.calculation?.items?.find(
-      (i: any) => i.productId === product.id,
-    );
-    expect(stillThere, "urun sepetten cikti").toBeFalsy();
+    const stillThere = cartAfter?.calculation?.items?.find((i: any) => i.productId === product.id);
+    expect(stillThere, 'urun sepetten cikti').toBeFalsy();
 
     // 5) Baska bir urunu ekleyip sepeti tamamla (Hemen Al + ode), akis bitti.
     const product2 = await buyableProduct(request, me.id);
     const { orderId } = await apiBuyAndPay(request, token, product2.id);
-    const order = await dbFind(
-      request,
-      "order",
-      { id: orderId },
-      { id: true, status: true, buyerId: true },
-    );
+    const order = await dbFind(request, 'order', { id: orderId }, { id: true, status: true, buyerId: true });
     expect(order.buyerId).toBe(me.id);
-    expect(["paid", "preparing", "shipped", "completed"]).toContain(
-      order.status,
-    );
+    expect(['paid', 'preparing', 'shipped', 'completed']).toContain(order.status);
 
     // UI dogrulama: alici kendi siparisini goruyor
     await loginViaToken(page, token);
     await page.goto(`/profile/orders/${orderId}`);
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState('networkidle').catch(() => {});
     expect(page.url()).toContain(`/profile/orders/${orderId}`);
   });
 });
