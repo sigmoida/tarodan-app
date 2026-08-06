@@ -243,6 +243,36 @@ describe("bildirim hedefleri", () => {
     });
   });
 
+  describe("iç link güvenliği", () => {
+    /**
+     * Regresyon: `/` ile başlayan her şey güvenli sayılıyordu. Tarayıcı
+     * `/\evil.example/x` adresini `https://evil.example/x` olarak çözüyor —
+     * ters bölü ile site DIŞINA çıkılabiliyordu. Ayrıca olmayan bir yol da
+     * kabul edildiği için yönetici bildirimi 404 üretebiliyordu.
+     */
+    it.each([
+      ["ters bölü ile origin kaçışı", "/\\evil.example/x"],
+      ["kontrol karakteri", "/profile/orders/\u0000x"],
+      ["izinli olmayan yol", "/olmayan-bir-sayfa"],
+      ["protokol-göreli", "//evil.example.com"],
+    ])("reddedilir: %s", (_name, link) => {
+      expect(isSafeFreeLink(link)).toBe(false);
+    });
+
+    it.each([
+      "/",
+      "/listings",
+      "/listings/p1",
+      "/profile/orders/o1",
+      "/seller/orders/o1",
+      "/collections/c1",
+      "/products/unavailable/p1",
+      "https://tarodan.com.tr/kampanya",
+    ])("kabul edilir: %s", (link) => {
+      expect(isSafeFreeLink(link)).toBe(true);
+    });
+  });
+
   describe("eski kayıtların düzeltilmesi", () => {
     it.each([
       ["/orders/o1", "/profile/orders/o1"],

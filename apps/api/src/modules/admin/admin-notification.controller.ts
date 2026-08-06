@@ -16,6 +16,7 @@ import {
   BadRequestException,
   Res,
 } from "@nestjs/common";
+import { AdminSendNotificationDto } from "./dto/admin-notification.dto";
 
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -138,16 +139,9 @@ export class AdminNotificationController {
   @ApiResponse({ status: HttpStatus.OK, description: "Notification sent" })
   async sendNotification(
     @CurrentUser("id") adminId: string,
-    @Body()
-    body: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      data?: Record<string, any>;
-    },
+    // Satır içi TypeScript tipi ÇALIŞMA ZAMANINDA yoktur: `data.link`
+    // hiçbir doğrulamadan geçmiyordu. Gerçek DTO ile serbest link denetlenir.
+    @Body() body: AdminSendNotificationDto,
   ) {
     return this.adminService.sendNotification(adminId, body);
   }
