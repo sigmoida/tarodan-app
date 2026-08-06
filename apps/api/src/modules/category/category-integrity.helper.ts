@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { CommissionRuleSetStatus, CommissionSellerType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { descendantCategoryIds } from "./category-tree.helper";
 
 export const CATEGORIES_CACHE_KEY = "categories:all";
 
@@ -90,22 +91,7 @@ export async function assertNoActiveCategoryDescendants(
   const categories = await prisma.category.findMany({
     select: { id: true, parentId: true, isActive: true },
   });
-  const descendantIds = new Set([categoryId]);
-  let changed = true;
-
-  while (changed) {
-    changed = false;
-    for (const category of categories) {
-      if (
-        category.parentId &&
-        descendantIds.has(category.parentId) &&
-        !descendantIds.has(category.id)
-      ) {
-        descendantIds.add(category.id);
-        changed = true;
-      }
-    }
-  }
+  const descendantIds = descendantCategoryIds(categories, categoryId);
 
   if (
     categories.some(
