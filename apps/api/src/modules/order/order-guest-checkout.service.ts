@@ -202,6 +202,19 @@ export class OrderGuestCheckoutService {
    * Requirement: Guest checkout (requirements.txt)
    */
   async guestCheckout(dto: GuestCheckoutDto) {
+    // Kabul edilmiş teklif + kupon DESTEKLENMİYOR ve sessizce yok sayılamaz.
+    // Teklif fiyatı taraflarca pazarlıkla belirlenmiş bir tutardır; üzerine
+    // kupon binmesi ayrı bir ticari karardır ve üye teklif yolunda da yoktur
+    // (createOrderFromOffer kuponu hiç almaz). Kombinasyonu açık bir kodla
+    // reddetmek, kuponun katalog fiyatı üzerinden hesaplanıp teklif tutarını
+    // aşmasından çok daha güvenli.
+    if (dto.offerId && dto.couponCode) {
+      throw new BadRequestException({
+        code: "COUPON_NOT_ALLOWED_WITH_OFFER",
+        message:
+          "Kabul edilmiş teklifle alışverişte kupon kullanılamaz. Kuponu kaldırıp tekrar deneyin.",
+      });
+    }
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
     const shippingTariff =
       await this.orderPricing.resolveShippingTariffSnapshot(

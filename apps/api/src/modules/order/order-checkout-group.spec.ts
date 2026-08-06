@@ -952,6 +952,45 @@ describe("OrderService checkout group (batch checkout)", () => {
       expect(data.discountCode).toBe("HOSGELDIN");
       expect(discountService.reserveUsage).toHaveBeenCalled();
     });
+
+    /**
+     * Teklif + kupon DESTEKLENMİYOR ve sessizce yok sayılamaz: kupon katalog
+     * fiyatı üzerinden hesaplanıp teklif tutarını aşabiliyordu.
+     */
+    it("teklif + kupon açık bir kodla reddedilir", async () => {
+      mockTx.product.findUnique.mockResolvedValue(
+        makeProduct(productA, { quantity: 100 }),
+      );
+
+      await expect(
+        service.guestCheckout({
+          productId: productA,
+          offerId: "11111111-1111-1111-1111-111111111111",
+          couponCode: "HOSGELDIN",
+          idempotencyKey,
+          email: guestEmail,
+          emailVerificationCode: guestCode,
+          phone: "+905551234567",
+          guestName: "Guest User",
+          shippingAddress: {
+            fullName: "Guest User",
+            phone: "+905551234567",
+            city: "İstanbul",
+            district: "Kadıköy",
+            address: "Test cad. 1",
+          },
+          expectedShippingTariffVersion: 1,
+          expectedCommissionRuleSetId: "set-1",
+          expectedCommissionRuleSetVersion: 1,
+          expectedPricingHash: "irrelevant",
+        } as any),
+      ).rejects.toMatchObject({
+        response: { code: "COUPON_NOT_ALLOWED_WITH_OFFER" },
+      });
+
+      // Reddedilen istek hiçbir sipariş yaratmamalı.
+      expect(mockTx.order.create).not.toHaveBeenCalled();
+    });
   });
 
   /**

@@ -89,12 +89,16 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
       "buyer-1",
     );
 
+    // Üçüncü argüman: kuponun YETKİLİ matrahı (satırın tahsil edilecek tutarı).
+    // Katalog fiyatı yerine bunun geçilmesi, teklif gibi fiyatı dışarıdan gelen
+    // yollarda kuponun tahsil edilen bedeli aşmasını engelleyen sözleşmedir.
     expect(discountService.validateCoupon).toHaveBeenCalledWith(
       {
         code: "SAVE20",
         cartItems: [{ productId: product.id, quantity: 1 }],
       },
       "buyer-1",
+      new Map([[product.id, 100]]),
     );
     expect(quote.couponDiscount).toBe(20);
     expect(quote.totalAmount).toBe(80);

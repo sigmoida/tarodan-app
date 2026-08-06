@@ -598,6 +598,17 @@ export class DiscountService {
      * checkout'ta (giriş/e-posta ile) devreye girer.
      */
     userId: string | null,
+    /**
+     * Satırın YETKİLİ tutarı (productId → tutar). Verilirse kupon matrahı
+     * kataloğa değil buna dayanır.
+     *
+     * Fiyatı katalogdan gelmeyen yollar için şart: kabul edilmiş teklifte
+     * tahsil edilen tutar teklif bedelidir, ama kupon katalog/kampanya fiyatı
+     * üzerinden hesaplanınca indirim tahsil edilen bedeli aşabiliyordu —
+     * platform-fonlu kuponda satıcıya teklif tutarından fazla hakediş
+     * yazılabiliyordu.
+     */
+    authoritativeLineAmounts?: Map<string, number>,
   ): Promise<ValidationResultDto> {
     const code = dto.code.toUpperCase();
     const sellerCategoryInclude = {
@@ -737,7 +748,9 @@ export class DiscountService {
         if (!product) continue;
         const unitPrice =
           unitPrices.get(product.id)?.unitPrice ?? Number(product.price);
-        const itemPrice = unitPrice * item.quantity;
+        const itemPrice =
+          authoritativeLineAmounts?.get(product.id) ??
+          unitPrice * item.quantity;
         cartTotal += itemPrice;
         if (this.scope.covers(product, discount, ancestors)) {
           eligibleSubtotal += itemPrice;
@@ -849,15 +862,39 @@ export class DiscountService {
   ): Promise<{ coupon: AllocatedCoupon | null; error?: string }> {
     if (!code || !lines.length) return { coupon: null };
 
+    // Aynı ürün birden çok satırda olabilir; kupon matrahı ürün başına toplanır
+    // ki doğrulama tarafı tek kayıt görsün, dağıtım yine satır bazında kalsın.
+    const byProduct = new Map<
+      string,
+      { quantity: number; lineSubtotal: number }
+    >();
+    for (const line of lines) {
+      const totals = byProduct.get(line.productId) ?? {
+        quantity: 0,
+        lineSubtotal: 0,
+      };
+      totals.quantity += line.quantity;
+      totals.lineSubtotal += line.lineSubtotal;
+      byProduct.set(line.productId, totals);
+    }
+
     const validation = await this.validateCoupon(
       {
         code,
-        cartItems: lines.map((line) => ({
-          productId: line.productId,
-          quantity: line.quantity,
+        cartItems: [...byProduct].map(([productId, totals]) => ({
+          productId,
+          quantity: totals.quantity,
         })),
       },
       userId,
+      // Kuponun matrahı ÇAĞIRANIN tahsil edeceği tutardır; katalog fiyatı
+      // değil. Teklif gibi fiyatı dışarıdan gelen yollarda ikisi ayrışır.
+      new Map(
+        [...byProduct].map(([productId, totals]) => [
+          productId,
+          totals.lineSubtotal,
+        ]),
+      ),
     );
     if (!validation.isValid || !validation.discount) {
       return { coupon: null, error: validation.error ?? "Kupon uygulanamadı" };
