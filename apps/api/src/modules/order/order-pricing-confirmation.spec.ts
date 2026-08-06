@@ -4,6 +4,7 @@ import { validate } from "class-validator";
 import { CheckoutDto, DirectBuyDto, GuestCheckoutDto } from "./dto";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
 import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
+import { noCouponDiscountService } from "../discount/testing/discount-service-fixture";
 
 describe("OrderPricingService checkout confirmation", () => {
   const items = [{ productId: "product-1", unitPrice: 100, quantity: 1 }];
@@ -13,7 +14,7 @@ describe("OrderPricingService checkout confirmation", () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      noCouponDiscountService(),
       testPriceResolver(),
       testTaxPolicy(),
     );

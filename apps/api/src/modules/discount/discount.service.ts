@@ -39,6 +39,33 @@ import {
   descendantCategoryIds,
   loadCategoryEdges,
 } from "../category/category-tree.helper";
+import { allocateProportionally } from "./discount-allocation.helper";
+
+/** Kuponun dağıtılacağı sepet satırı. Sıra korunur. */
+export interface CouponAllocationLine {
+  productId: string;
+  quantity: number;
+  /** Satırın kupon ÖNCESİ tutarı (birim fiyat × adet). */
+  lineSubtotal: number;
+}
+
+/** Doğrulanmış ve satırlara dağıtılmış kupon. */
+export interface AllocatedCoupon {
+  discountId: string;
+  code: string;
+  name: string;
+  type: string;
+  value: number;
+  scope: string;
+  voucherCodeId?: string;
+  /** Kupon maliyetinin platform payı [0,1] — escrow'da satıcıya geri eklenir. */
+  platformFundedShare: number;
+  eligibleProductIds: string[];
+  /** `lines` ile aynı sırada; kapsam dışı satır 0 alır. */
+  shares: number[];
+  /** Σ shares — sepetten düşülecek toplam. */
+  total: number;
+}
 
 /**
  * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
@@ -754,6 +781,72 @@ export class DiscountService {
       discount = maxDiscountAmount;
     }
     return discount;
+  }
+
+  /**
+   * Kuponu doğrula ve indirimi UYGUN satırlara dağıt — kuponun sepete
+   * uygulanmasının tek adımı.
+   *
+   * "Doğrula, uygun ürünleri bul, satır toplamı oranında dağıt, artığı son
+   * satıra yaz" dizisi sepet, checkout önizlemesi, tekil sipariş ve grup
+   * sipariş yollarında ayrı ayrı yazılmıştı. Dördü de aynı kuralı hedefliyordu
+   * ama farklı tabanlar ve farklı hata davranışlarıyla — bu yüzden aynı kupon
+   * ekranlar arasında farklı tutar gösterebiliyordu.
+   *
+   * Hata FIRLATILMAZ, `error` alanında döner: sepet uyarı olarak gösterir,
+   * checkout 400'e çevirir. Karar çağıranındır.
+   *
+   * @param lines Sıra korunur; dönen `shares` bu sırayla hizalıdır. Kapsam
+   *   dışındaki satır 0 alır — kapsamlı bir kupon başka satıcının payout
+   *   tabanını düşüremez.
+   */
+  async allocateCoupon(
+    code: string | null | undefined,
+    lines: CouponAllocationLine[],
+    userId: string | null,
+  ): Promise<{ coupon: AllocatedCoupon | null; error?: string }> {
+    if (!code || !lines.length) return { coupon: null };
+
+    const validation = await this.validateCoupon(
+      {
+        code,
+        cartItems: lines.map((line) => ({
+          productId: line.productId,
+          quantity: line.quantity,
+        })),
+      },
+      userId,
+    );
+    if (!validation.isValid || !validation.discount) {
+      return { coupon: null, error: validation.error ?? "Kupon uygulanamadı" };
+    }
+
+    const discount = validation.discount;
+    const eligible = new Set(discount.eligibleProductIds);
+    const shares = allocateProportionally(
+      discount.estimatedDiscount,
+      lines.map((line) =>
+        eligible.has(line.productId) ? line.lineSubtotal : 0,
+      ),
+    );
+
+    return {
+      coupon: {
+        discountId: discount.id,
+        // Voucher'da parent şablonun kodu boştur; girilen kod döner.
+        code: discount.code,
+        name: discount.name,
+        type: discount.type,
+        value: discount.value,
+        scope: discount.scope,
+        voucherCodeId: discount.voucherCodeId,
+        platformFundedShare: discount.platformFundedShare,
+        eligibleProductIds: discount.eligibleProductIds,
+        shares,
+        total:
+          Math.round(shares.reduce((sum, share) => sum + share, 0) * 100) / 100,
+      },
+    };
   }
 
   /**

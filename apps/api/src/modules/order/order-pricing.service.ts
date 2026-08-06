@@ -40,7 +40,6 @@ import {
 } from "../shipping/shipping-tariff.helper";
 import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import { DiscountService } from "../discount/discount.service";
-import { allocateProportionally } from "../discount/discount-allocation.helper";
 import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { createHash } from "crypto";
 import { calculateServiceTax } from "./order-service-tax.helper";
@@ -462,45 +461,25 @@ export class OrderPricingService {
 
     // F1.1: kuponu quote'ta da uygula — YALNIZ uygun satırlara dağıt; fee/tax/kargo
     // İNDİRİMLİ baz üzerinden hesaplanır (create ile aynı) → önizleme = tahsilat.
-    let couponDiscountTotal = 0;
-    if (dto.couponCode && lines.length > 0) {
-      const validation = await this.discountService.validateCoupon(
-        {
-          code: dto.couponCode,
-          cartItems: lines.map((l) => ({
-            productId: l.product.id,
-            quantity: l.quantity,
-          })),
-        },
+    const { coupon, error: couponError } =
+      await this.discountService.allocateCoupon(
+        dto.couponCode,
+        lines.map((l) => ({
+          productId: l.product.id,
+          quantity: l.quantity,
+          lineSubtotal: l.lineSubtotal,
+        })),
         userId,
       );
-      if (!validation.isValid) {
-        throw new BadRequestException(
-          validation.error || i18nMessage("server.order.invalidCouponCode"),
-        );
-      }
-      if (validation.discount) {
-        const total = validation.discount.estimatedDiscount;
-        const eligibleIds = new Set(validation.discount.eligibleProductIds);
-        const eligibleLines = lines.filter((l) =>
-          eligibleIds.has(l.product.id),
-        );
-        const eligiblePriceSum = eligibleLines.reduce(
-          (s, l) => s + l.lineSubtotal,
-          0,
-        );
-        if (eligiblePriceSum > 0) {
-          const shares = allocateProportionally(
-            total,
-            eligibleLines.map((l) => l.lineSubtotal),
-          );
-          eligibleLines.forEach((l, idx) => {
-            l.couponDiscount = shares[idx];
-          });
-          couponDiscountTotal = total;
-        }
-      }
+    if (couponError) {
+      throw new BadRequestException(
+        couponError || i18nMessage("server.order.invalidCouponCode"),
+      );
     }
+    lines.forEach((line, index) => {
+      line.couponDiscount = coupon?.shares[index] ?? 0;
+    });
+    const couponDiscountTotal = coupon?.total ?? 0;
 
     // Tek quote içindeki tüm satırlar aynı yayınlanmış setten fiyatlanır.
     const commissionRuleSet = await this.resolveCommissionRuleSetSnapshot();

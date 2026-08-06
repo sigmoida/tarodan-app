@@ -440,66 +440,34 @@ export class OrderCheckoutGroupService {
             })),
           );
 
-          // Kupon: tüm sepetle bir kez doğrula, indirimi fiyat oranında dağıt
-          let appliedCouponCode: string | null = null;
-          let appliedDiscountId: string | null = null;
-          let appliedVoucherCodeId: string | undefined;
-          // F2.4: kupon indiriminin platform payı [0,1] — her siparişin
-          // platformFundedDiscount snapshot'ını hesaplamak için.
-          let appliedPlatformFundedShare = 0;
-          if (dto.couponCode) {
-            const validation = await this.discountService.validateCoupon(
-              {
-                code: dto.couponCode,
-                // Adet bazlı: kupon doğrulama/indirim dağıtımı gerçek adetle yapılmalı
-                // (1 değil) → yoksa yüzde kupon, minCartValue, maxDiscount tek-birim
-                // fiyat üzerinden hesaplanıp çoklu-adet sepette alıcıyı fazla yükler.
-                cartItems: productIds.map((productId) => ({
-                  productId,
-                  quantity: qtyByProduct.get(productId) ?? 1,
-                })),
-              },
+          // Kupon: TEK adımda doğrula + uygun satırlara dağıt (DiscountService).
+          // Kapsam dışı satır 0 alır → kapsamlı bir kupon başka satıcıların
+          // payout tabanını düşürmez.
+          const { coupon, error: couponError } =
+            await this.discountService.allocateCoupon(
+              dto.couponCode,
+              pricing.map((p) => ({
+                productId: p.productId,
+                quantity: p.quantity,
+                lineSubtotal: p.productPrice * p.quantity,
+              })),
               // Misafirde kişi-başı limit atlanır (paylaşımlı guest kimliği anlamsız).
               isGuest ? null : buyerId,
             );
-            if (!validation.isValid) {
-              throw new BadRequestException(
-                validation.error ||
-                  i18nMessage("server.order.invalidCouponCode"),
-              );
-            }
-            if (validation.discount) {
-              appliedCouponCode = dto.couponCode.toUpperCase();
-              appliedDiscountId = validation.discount.id;
-              appliedVoucherCodeId = validation.discount.voucherCodeId;
-              appliedPlatformFundedShare =
-                validation.discount.platformFundedShare;
-              const totalCoupon = validation.discount.estimatedDiscount;
-              // Kupon YALNIZ uygun (scope) satırlara, satır toplamı oranında
-              // dağıtılır — uygun olmayan satıcı/kategori satırları indirim payı
-              // ALMAZ (aksi halde kapsamlı bir kupon başka satıcıların payout
-              // tabanını düşürürdü). Son uygun satıra yuvarlama artığı yazılır.
-              const eligibleIds = new Set(
-                validation.discount.eligibleProductIds,
-              );
-              const eligibleLines = pricing.filter((p) =>
-                eligibleIds.has(p.productId),
-              );
-              const eligiblePriceSum = eligibleLines.reduce(
-                (sum, p) => sum + p.productPrice * p.quantity,
-                0,
-              );
-              if (eligiblePriceSum > 0) {
-                const shares = allocateProportionally(
-                  totalCoupon,
-                  eligibleLines.map((p) => p.productPrice * p.quantity),
-                );
-                eligibleLines.forEach((p, idx) => {
-                  p.couponDiscount = shares[idx];
-                });
-              }
-            }
+          if (couponError) {
+            throw new BadRequestException(
+              couponError || i18nMessage("server.order.invalidCouponCode"),
+            );
           }
+          pricing.forEach((p, index) => {
+            p.couponDiscount = coupon?.shares[index] ?? 0;
+          });
+          const appliedCouponCode = coupon?.code ?? null;
+          const appliedDiscountId = coupon?.discountId ?? null;
+          const appliedVoucherCodeId = coupon?.voucherCodeId;
+          // F2.4: kupon indiriminin platform payı [0,1] — her siparişin
+          // platformFundedDiscount snapshot'ını hesaplamak için.
+          const appliedPlatformFundedShare = coupon?.platformFundedShare ?? 0;
 
           // Grup + sipariş numaraları
           const groupNumber = await generateUniqueReference(

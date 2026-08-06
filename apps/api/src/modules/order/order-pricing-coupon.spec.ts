@@ -4,6 +4,8 @@ import { OrderPricingService } from "./order-pricing.service";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
 import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
+import { DiscountService } from "../discount/discount.service";
+import { DiscountScopeService } from "../discount/discount-scope.service";
 
 describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
   const product = {
@@ -26,10 +28,19 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
         findUnique: jest.fn().mockResolvedValue(product),
       },
     } as any;
-    const discountService = {
-      getEffectiveDisplayPrice: jest.fn().mockResolvedValue(null),
-      validateCoupon: jest.fn().mockResolvedValue(validation),
-    } as any;
+    // GERÇEK DiscountService: quote'un çağırdığı `allocateCoupon` (doğrula +
+    // uygun satırlara dağıt) gerçek koddan çalışsın, yalnız doğrulama sonucu
+    // sabitlensin. Sahte bir allocateCoupon dağıtımı hiç ölçmezdi.
+    const discountService = new DiscountService(
+      prisma,
+      { delPattern: jest.fn() } as any,
+      { syncProduct: jest.fn() } as any,
+      testPriceResolver(),
+      new DiscountScopeService(prisma),
+    );
+    jest
+      .spyOn(discountService, "validateCoupon")
+      .mockResolvedValue(validation as any);
     const service = new OrderPricingService(
       prisma,
       {

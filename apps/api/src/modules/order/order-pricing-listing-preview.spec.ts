@@ -2,6 +2,7 @@ import { OrderPricingService } from "./order-pricing.service";
 import { packageTiers } from "../shipping/testing/tariff-fixture";
 import { noVatTaxPolicy, testTaxPolicy } from "./testing/tax-policy-fixture";
 import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
+import { noCouponDiscountService } from "../discount/testing/discount-service-fixture";
 
 /**
  * İlan formu / ilan listesi komisyon önizlemesi.
@@ -39,7 +40,7 @@ describe("OrderPricingService listing commission preview", () => {
     prisma as any,
     {} as any,
     shippingTariffs as any,
-    {} as any,
+    noCouponDiscountService(),
     testPriceResolver(),
     noVatTaxPolicy(),
   );
@@ -91,7 +92,7 @@ describe("OrderPricingService listing commission preview", () => {
       prisma as any,
       {} as any,
       shippingTariffs as any,
-      {} as any,
+      noCouponDiscountService(),
       testPriceResolver(),
       testTaxPolicy(),
     );

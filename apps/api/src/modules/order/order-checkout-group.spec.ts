@@ -300,7 +300,7 @@ describe("OrderService checkout group (batch checkout)", () => {
         {
           provide: DiscountService,
           useValue: {
-            validateCoupon: jest.fn(),
+            allocateCoupon: jest.fn().mockResolvedValue({ coupon: null }),
             reserveUsage: jest.fn(),
             releaseReservedUsageForOrders: jest.fn(),
           },
@@ -858,19 +858,19 @@ describe("OrderService checkout group (batch checkout)", () => {
       expect(mockTx.order.create).not.toHaveBeenCalled();
     });
 
-    it("misafir kuponu ARTIK reddedilmez: validateCoupon userId=null ile çağrılır ve indirim uygulanır", async () => {
-      discountService.validateCoupon.mockResolvedValue({
-        isValid: true,
-        discount: {
-          id: "disc-1",
+    it("misafir kuponu ARTIK reddedilmez: kupon userId=null ile çözülür ve indirim uygulanır", async () => {
+      discountService.allocateCoupon.mockResolvedValue({
+        coupon: {
+          discountId: "disc-1",
           name: "İndirim",
           code: "INDIRIM10",
           type: "percentage",
           value: 10,
           scope: "global",
-          estimatedDiscount: 10,
           platformFundedShare: 1,
           eligibleProductIds: [productA],
+          shares: [10],
+          total: 10,
         },
       });
 
@@ -879,9 +879,12 @@ describe("OrderService checkout group (batch checkout)", () => {
         couponCode: "INDIRIM10",
       } as any);
 
-      // Kişi-başı limit atlanır: validateCoupon userId=null ile çağrılır.
-      expect(discountService.validateCoupon).toHaveBeenCalledWith(
-        expect.objectContaining({ code: "INDIRIM10" }),
+      // Kişi-başı limit atlanır: kupon userId=null ile çözülür.
+      expect(discountService.allocateCoupon).toHaveBeenCalledWith(
+        "INDIRIM10",
+        expect.arrayContaining([
+          expect.objectContaining({ productId: productA }),
+        ]),
         null,
       );
       // Kupon indirimi siparişe yansır; ödeme öncesi yalnız kota rezerve edilir.

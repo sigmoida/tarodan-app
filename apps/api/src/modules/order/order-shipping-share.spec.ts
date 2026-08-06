@@ -15,6 +15,7 @@ import {
 } from "../shipping/testing/tariff-fixture";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
 import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
+import { noCouponDiscountService } from "../discount/testing/discount-service-fixture";
 
 /**
  * BLOCKER: `shippingBuyerShare` önizleme ile tahsilat arasında ayrışıyordu.
@@ -226,10 +227,7 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
       prisma,
       { resolveTaxRate: jest.fn(), calculateTaxAmount: jest.fn() } as any,
       shippingTariffs,
-      {
-        getEffectiveDisplayPrice: async () => null,
-        getEffectiveDisplayPriceMany: async () => new Map(),
-      } as any,
+      noCouponDiscountService(),
       testPriceResolver(),
       testTaxPolicy(),
     );

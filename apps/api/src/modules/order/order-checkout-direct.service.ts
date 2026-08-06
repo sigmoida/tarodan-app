@@ -323,35 +323,30 @@ export class OrderCheckoutDirectService {
         },
       ]);
 
-      // Apply coupon discount if provided
-      let couponDiscount = 0;
-      let appliedCouponCode: string | null = null;
-      let appliedDiscountId: string | null = null;
-      let appliedVoucherCodeId: string | undefined;
-      // F2.4: kupon indiriminin platform payı [0,1].
-      let couponPlatformFundedShare = 0;
-
-      if (dto.couponCode) {
-        const validation = await this.discountService.validateCoupon(
-          {
-            code: dto.couponCode,
-            cartItems: [{ productId: dto.productId, quantity: 1 }],
-          },
+      // Kupon: TEK adımda doğrula + dağıt (tek satırlık sepet).
+      const { coupon, error: couponError } =
+        await this.discountService.allocateCoupon(
+          dto.couponCode,
+          [
+            {
+              productId: dto.productId,
+              quantity: 1,
+              lineSubtotal: productPrice,
+            },
+          ],
           buyerId,
         );
-
-        if (validation.isValid && validation.discount) {
-          couponDiscount = validation.discount.estimatedDiscount;
-          appliedCouponCode = dto.couponCode.toUpperCase();
-          appliedDiscountId = validation.discount.id;
-          appliedVoucherCodeId = validation.discount.voucherCodeId;
-          couponPlatformFundedShare = validation.discount.platformFundedShare;
-        } else if (!validation.isValid) {
-          throw new BadRequestException(
-            validation.error || i18nMessage("server.order.invalidCouponCode"),
-          );
-        }
+      if (couponError) {
+        throw new BadRequestException(
+          couponError || i18nMessage("server.order.invalidCouponCode"),
+        );
       }
+      const couponDiscount = coupon?.total ?? 0;
+      const appliedCouponCode = coupon?.code ?? null;
+      const appliedDiscountId = coupon?.discountId ?? null;
+      const appliedVoucherCodeId = coupon?.voucherCodeId;
+      // F2.4: kupon indiriminin platform payı [0,1].
+      const couponPlatformFundedShare = coupon?.platformFundedShare ?? 0;
 
       const totalDiscount = productDiscount + couponDiscount;
       // Siparişin ürün tabanı = TAHSİL EDİLEN tutar; komisyon, kargo, vergi ve
