@@ -16,16 +16,13 @@ export const discountSchema = (t: T) =>
         .string()
         .min(1, t("admin.marketing.discounts.validation.nameRequired")),
       description: z.string(),
-      type: z.enum(["percentage", "fixed_amount", "bogo", "bulk_quantity"]),
+      type: z.enum(["percentage", "fixed_amount"]),
       value: z
         .string()
         .min(1, t("admin.marketing.discounts.validation.valueRequired")),
       scope: z.enum(["global", "category"]),
       categoryId: z.string(),
       minCartValue: z.string(),
-      minQuantity: z.string(),
-      buyQuantity: z.string(),
-      getQuantity: z.string(),
       maxDiscountAmount: z.string(),
       usageLimitTotal: z.string(),
       usageLimitPerUser: z.string(),
@@ -42,6 +39,12 @@ export const discountSchema = (t: T) =>
     .refine((d) => d.scope !== "category" || d.categoryId.length > 0, {
       message: t("admin.marketing.discounts.selectCategory"),
       path: ["categoryId"],
+    })
+    // Bitiş başlangıçtan sonra olmalı — API de reddediyor, kullanıcı 400
+    // beklemeden formda görsün.
+    .refine((d) => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
+      message: t("admin.marketing.discounts.validation.endBeforeStart"),
+      path: ["endDate"],
     });
 
 export type DiscountFormValues = z.infer<ReturnType<typeof discountSchema>>;

@@ -37,9 +37,6 @@ function toDefaults(d?: Discount): DiscountFormValues {
       scope: "global",
       categoryId: "",
       minCartValue: "",
-      minQuantity: "",
-      buyQuantity: "",
-      getQuantity: "",
       maxDiscountAmount: "",
       usageLimitTotal: "",
       usageLimitPerUser: "1",
@@ -54,17 +51,17 @@ function toDefaults(d?: Discount): DiscountFormValues {
     code: d.code ?? "",
     name: d.name,
     description: d.description ?? "",
-    type: d.type,
+    // Motorda karşılığı olmayan eski tipler (bogo / bulk_quantity) zaten sabit
+    // tutar gibi işleniyordu; form onları o türe indirir ki kayıt açılabilsin.
+    type: d.type === "percentage" ? "percentage" : "fixed_amount",
     value: String(d.value),
     scope: d.scope === "category" ? "category" : "global",
     categoryId: d.categoryId ?? "",
     minCartValue: d.minCartValue?.toString() ?? "",
-    minQuantity: d.minQuantity?.toString() ?? "",
-    buyQuantity: d.buyQuantity?.toString() ?? "",
-    getQuantity: d.getQuantity?.toString() ?? "",
     maxDiscountAmount: d.maxDiscountAmount?.toString() ?? "",
     usageLimitTotal: d.usageLimitTotal?.toString() ?? "",
-    usageLimitPerUser: d.usageLimitPerUser.toString(),
+    // null = sınırsız; formda 0 ile temsil edilir.
+    usageLimitPerUser: (d.usageLimitPerUser ?? 0).toString(),
     isStackable: d.isStackable,
     isActive: d.isActive,
     isFlashSale: d.isFlashSale,
@@ -74,7 +71,7 @@ function toDefaults(d?: Discount): DiscountFormValues {
 }
 
 /** Convert form values into the backend payload (string→number/ISO). */
-function toPayload(v: DiscountFormValues) {
+function toPayload(v: DiscountFormValues, isCoupon: boolean) {
   return {
     code: v.code.trim() ? v.code.trim().toUpperCase() : null,
     name: v.name,
@@ -84,16 +81,15 @@ function toPayload(v: DiscountFormValues) {
     scope: v.scope,
     categoryId: v.scope === "category" ? v.categoryId : undefined,
     minCartValue: v.minCartValue ? parseFloat(v.minCartValue) : undefined,
-    minQuantity: v.minQuantity ? parseInt(v.minQuantity) : undefined,
-    buyQuantity: v.buyQuantity ? parseInt(v.buyQuantity) : undefined,
-    getQuantity: v.getQuantity ? parseInt(v.getQuantity) : undefined,
     maxDiscountAmount: v.maxDiscountAmount
       ? parseFloat(v.maxDiscountAmount)
       : undefined,
-    usageLimitTotal: v.usageLimitTotal
-      ? parseInt(v.usageLimitTotal)
-      : undefined,
-    usageLimitPerUser: parseInt(v.usageLimitPerUser) || 1,
+    // Kullanım limitleri yalnız KUPONDA anlamlıdır (kodsuz kampanyada sayaç
+    // tutulmaz); kampanyada alan gösterilmez ve gönderilmez.
+    usageLimitTotal:
+      isCoupon && v.usageLimitTotal ? parseInt(v.usageLimitTotal) : undefined,
+    // 0 = sınırsız (misafirin de kullanabilmesi için).
+    usageLimitPerUser: isCoupon ? parseInt(v.usageLimitPerUser) || 0 : 0,
     isStackable: v.isStackable,
     priority: 0,
     isActive: v.isActive,
@@ -122,12 +118,18 @@ export function DiscountFormModal({
 
   const type = form.watch("type");
   const scope = form.watch("scope");
+  // Kod girildiyse KUPON, girilmediyse otomatik kampanyadır. İkisi farklı
+  // alanlara sahiptir; kupon kotası kampanyada tutulmaz.
+  const isCoupon = Boolean(form.watch("code")?.trim());
 
   const save = useAdminMutation(
     (v: DiscountFormValues) =>
       isEdit
-        ? adminApi.patch(`/admin/discounts/${discount!.id}`, toPayload(v))
-        : adminApi.post("/admin/discounts", toPayload(v)),
+        ? adminApi.patch(
+            `/admin/discounts/${discount!.id}`,
+            toPayload(v, isCoupon),
+          )
+        : adminApi.post("/admin/discounts", toPayload(v, isCoupon)),
     {
       invalidates: ["discounts"],
       successMessage: isEdit
@@ -190,64 +192,12 @@ export function DiscountFormModal({
           name="value"
           type="number"
           min="0"
-          max={type === "percentage" || type === "bogo" ? 100 : 10000}
-          step={type === "percentage" || type === "bogo" ? 1 : 0.01}
-          label={
-            type === "bogo"
-              ? t("admin.marketing.discounts.bogoRate")
-              : t("admin.marketing.discounts.value")
-          }
-          placeholder={
-            type === "bogo"
-              ? t("admin.marketing.discounts.freePlaceholder")
-              : type === "percentage"
-                ? "10"
-                : "100"
-          }
-          helperText={
-            type === "bogo"
-              ? t("admin.marketing.discounts.bogoHelper")
-              : undefined
-          }
+          max={type === "percentage" ? 100 : 10000}
+          step={type === "percentage" ? 1 : 0.01}
+          label={t("admin.marketing.discounts.value")}
+          placeholder={type === "percentage" ? "10" : "100"}
         />
       </div>
-
-      {type === "bogo" && (
-        <div className="grid grid-cols-1 gap-4 rounded-lg border border-border bg-surface/60 p-4 sm:grid-cols-2">
-          <p className="text-sm font-medium text-primary sm:col-span-2">
-            {t("admin.marketing.discounts.bogoSettings")}
-          </p>
-          <FormInput
-            name="buyQuantity"
-            type="number"
-            min="1"
-            label={t("admin.marketing.discounts.buyQuantity")}
-            placeholder={t("admin.marketing.discounts.oneExample")}
-          />
-          <FormInput
-            name="getQuantity"
-            type="number"
-            min="1"
-            label={t("admin.marketing.discounts.getQuantity")}
-            placeholder={t("admin.marketing.discounts.oneExample")}
-          />
-        </div>
-      )}
-
-      {type === "bulk_quantity" && (
-        <div className="rounded-lg border border-border bg-surface/60 p-4">
-          <p className="mb-2 text-sm font-medium text-primary">
-            {t("admin.marketing.discounts.bulkSettings")}
-          </p>
-          <FormInput
-            name="minQuantity"
-            type="number"
-            min="2"
-            label={t("admin.marketing.discounts.minQuantity")}
-            placeholder={t("admin.marketing.discounts.minQuantityPlaceholder")}
-          />
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormSelect
@@ -283,22 +233,27 @@ export function DiscountFormModal({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormInput
-          name="usageLimitTotal"
-          type="number"
-          min="1"
-          label={t("admin.marketing.discounts.totalUsageLimit")}
-          placeholder={t("admin.marketing.discounts.unlimited")}
-        />
-        <FormInput
-          name="usageLimitPerUser"
-          type="number"
-          min="1"
-          label={t("admin.marketing.discounts.perUserLimit")}
-          placeholder="1"
-        />
-      </div>
+      {/* Kullanım limitleri yalnız KUPONDA anlamlı: kodsuz kampanyada motor
+          sayaç tutmaz, alanlar doldurulsa da hiçbir şey yapmazdı. */}
+      {isCoupon && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormInput
+            name="usageLimitTotal"
+            type="number"
+            min="1"
+            label={t("admin.marketing.discounts.totalUsageLimit")}
+            placeholder={t("admin.marketing.discounts.unlimited")}
+          />
+          <FormInput
+            name="usageLimitPerUser"
+            type="number"
+            min="0"
+            label={t("admin.marketing.discounts.perUserLimit")}
+            placeholder="1"
+            helperText={t("admin.marketing.discounts.perUserLimitHelper")}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormDatePicker

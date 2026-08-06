@@ -111,11 +111,9 @@ export const discountTypeOptions = (t: T) => [
     value: "fixed_amount",
     label: t("admin.marketing.discounts.type.fixedAmount"),
   },
-  { value: "bogo", label: t("admin.marketing.discounts.type.bogo") },
-  {
-    value: "bulk_quantity",
-    label: t("admin.marketing.discounts.type.bulkQuantity"),
-  },
+  // bogo / bulk_quantity motorda YOK: API bunları 400 ile reddediyor
+  // (assertSupportedDiscountType). Seçenek olarak sunmak, doldurulup
+  // kaydedilemeyen bir form demekti.
 ];
 
 export const scopeFormOptions = (t: T) => [

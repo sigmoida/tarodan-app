@@ -3594,7 +3594,8 @@
           "nameRequired": "İndirim adı gerekli",
           "valueRequired": "Değer gerekli",
           "startDateRequired": "Başlangıç tarihi gerekli",
-          "endDateRequired": "Bitiş tarihi gerekli"
+          "endDateRequired": "Bitiş tarihi gerekli",
+          "endBeforeStart": "Bitiş tarihi başlangıç tarihinden sonra olmalıdır"
         },
         "codes": {
           "title": "Voucher Kodu Üret",
@@ -3607,7 +3608,8 @@
           "generateFailed": "Kod üretilemedi",
           "rowGenerate": "Kod Üret",
           "rowExport": "Kodları İndir (CSV)"
-        }
+        },
+        "perUserLimitHelper": "0 = sınırsız (misafirler de kullanabilir)"
       },
       "emailTemplates": {
         "title": "E-posta Şablonları",

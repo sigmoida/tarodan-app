@@ -3594,7 +3594,8 @@
           "nameRequired": "Discount name is required",
           "valueRequired": "Value is required",
           "startDateRequired": "Start date is required",
-          "endDateRequired": "End date is required"
+          "endDateRequired": "End date is required",
+          "endBeforeStart": "End date must be after the start date"
         },
         "codes": {
           "title": "Generate Voucher Codes",
@@ -3607,7 +3608,8 @@
           "generateFailed": "Failed to generate codes",
           "rowGenerate": "Generate Codes",
           "rowExport": "Export Codes (CSV)"
-        }
+        },
+        "perUserLimitHelper": "0 = unlimited (guests can use it too)"
       },
       "emailTemplates": {
         "title": "Email Templates",
