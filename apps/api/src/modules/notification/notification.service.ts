@@ -19,6 +19,7 @@ import {
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { NotificationCommerceService } from "./notification-commerce.service";
 import { NotificationAccountService } from "./notification-account.service";
+import type { NotificationAudience } from "./notification-link";
 
 @Injectable()
 export class NotificationService {
@@ -124,22 +125,30 @@ export class NotificationService {
     );
   }
 
-  async notifyOrderAutoCompleted(userId: string, orderId: string) {
-    return this.commerce.notifyOrderAutoCompleted(userId, orderId);
+  /** `audience` ZORUNLU: aynı bildirim iki tarafa da gidiyor. */
+  async notifyOrderAutoCompleted(
+    userId: string,
+    orderId: string,
+    audience: NotificationAudience,
+  ) {
+    return this.commerce.notifyOrderAutoCompleted(userId, orderId, audience);
   }
 
   async notifyOrderManuallyConfirmed(sellerId: string, orderId: string) {
     return this.commerce.notifyOrderManuallyConfirmed(sellerId, orderId);
   }
 
+  /** `audience` ZORUNLU: aynı bildirim iki tarafa da gidiyor. */
   async notifyOrderForceCompletedByAdmin(
     userId: string,
     orderId: string,
+    audience: NotificationAudience,
     reason?: string,
   ) {
     return this.commerce.notifyOrderForceCompletedByAdmin(
       userId,
       orderId,
+      audience,
       reason,
     );
   }

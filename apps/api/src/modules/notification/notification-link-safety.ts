@@ -27,7 +27,10 @@ const ALLOWED_INTERNAL_PATHS: RegExp[] = [
   /^\/seller\/orders\/[^/]+$/,
   /^\/membership$/,
   /^\/profile$/,
-  /^\/profile\/(orders|offers|trades|messages|listings|favorites|payments|notifications)(\/[^/]+)?$/,
+  // Alt segmenti GERÇEKTEN olan iki bölüm (`[id]` route'u var).
+  /^\/profile\/(orders|trades)(\/[^/]+)?$/,
+  // Kalanlar yalnız liste ekranı: `/profile/offers/x` diye bir sayfa yok.
+  /^\/profile\/(offers|messages|listings|favorites|payments|notifications)$/,
 ];
 
 /**

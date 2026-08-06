@@ -58,6 +58,14 @@ describe("bildirim hedefi", () => {
       ["var olmayan sayfa", "/olmayan-bir-sayfa"],
       ["eski takas yolu (rewrite dışı)", "/trade-center/t1"],
       ["profil altında olmayan sekme", "/profile/gizli-sekme"],
+      // Bu bölümlerin `[id]` route'u YOK; alt segment 404 demek.
+      ["olmayan alt sayfa: offers", "/profile/offers/x"],
+      ["olmayan alt sayfa: messages", "/profile/messages/x"],
+      ["olmayan alt sayfa: payments", "/profile/payments/x"],
+      ["olmayan alt sayfa: notifications", "/profile/notifications/x"],
+      ["olmayan alt sayfa: favorites", "/profile/favorites/x"],
+      ["olmayan alt sayfa: listings", "/profile/listings/x"],
+      ["iki kademe derin", "/profile/orders/o1/detay"],
     ])("%s", (_name, value) => {
       const resolved = resolveNotificationHref(link(value));
       expect(resolved.href).toBe(NOTIFICATION_FALLBACK_HREF);

@@ -59,7 +59,11 @@ describe("bildirim hedefleri", () => {
   it.each(ALL_TYPES)("%s — zorunlu alan eksikse link ÜRETİLMEZ", (type) => {
     const required = requiredFieldsFor(type);
     if (!required.length) return;
-    expect(resolveWebNotificationLink(type, {})).toBeNull();
+    const spec = NOTIFICATION_LINKS[type];
+    // Kontrollü fallback'i olan tek tip (sepet ödemesi) listeye düşer; diğerleri
+    // linksiz kalır — yanlış kayda götürmektense hedefsiz kalmak yeğdir.
+    const expected = spec.kind === "pattern" ? (spec.fallback ?? null) : null;
+    expect(resolveWebNotificationLink(type, {})).toBe(expected);
   });
 
   describe("hedef matrisi", () => {
@@ -108,25 +112,99 @@ describe("bildirim hedefleri", () => {
      * satıcıya gidiyor (ORDER_PAID, ORDER_MANUALLY_CONFIRMED,
      * ORDER_PREPARING_DEADLINE_WARNING). Hedef tek başına tipten çıkarılamaz.
      */
-    it.each([
+    const AUDIENCE_TYPES = [
       NotificationType.ORDER_PAID,
       NotificationType.ORDER_MANUALLY_CONFIRMED,
       NotificationType.ORDER_PREPARING_DEADLINE_WARNING,
       NotificationType.ORDER_AUTO_COMPLETED,
       NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
-      NotificationType.PAYMENT_CONFIRMED,
       NotificationType.PAYMENT_REFUNDED,
-    ])("%s — audience satıcı ekranını seçer", (type) => {
+    ];
+
+    it.each(AUDIENCE_TYPES)("%s — audience ekranı seçer", (type) => {
       expect(
         resolveWebNotificationLink(type, { orderId: "o1", audience: "seller" }),
       ).toBe("/seller/orders/o1");
       expect(
         resolveWebNotificationLink(type, { orderId: "o1", audience: "buyer" }),
       ).toBe("/profile/orders/o1");
-      // Belirtilmezse alıcı varsayılır (eski davranış).
-      expect(resolveWebNotificationLink(type, { orderId: "o1" })).toBe(
-        "/profile/orders/o1",
-      );
+    });
+
+    /**
+     * Regresyon: `audience` yoksa ALICI varsayılıyordu. Satıcıya giden bir
+     * bildirim sessizce alıcının ekranını açıyor, hata hiçbir yerde
+     * görünmüyordu. Artık üretici hedef kitleyi söylemek zorunda.
+     */
+    it.each(AUDIENCE_TYPES)("%s — audience yoksa link ÜRETİLMEZ", (type) => {
+      expect(resolveWebNotificationLink(type, { orderId: "o1" })).toBeNull();
+      expect(
+        resolveWebNotificationLink(type, { orderId: "o1", audience: "" }),
+      ).toBeNull();
+      // Tanınmayan değer de sessizce alıcıya düşmemeli.
+      expect(
+        resolveWebNotificationLink(type, { orderId: "o1", audience: "admin" }),
+      ).toBeNull();
+    });
+
+    it.each(AUDIENCE_TYPES)("%s — audience zorunlu alan sayılır", (type) => {
+      expect(requiredFieldsFor(type)).toContain("audience");
+    });
+
+    /**
+     * `payment_confirmed` yalnız ALICIYA gider; satıcının karşılığı
+     * `payment_received`. Audience ile ikiye ayrılması yanlıştı.
+     */
+    it("payment_confirmed alıcıya gider, audience istemez", () => {
+      expect(
+        resolveWebNotificationLink(NotificationType.PAYMENT_CONFIRMED, {
+          orderId: "o1",
+        }),
+      ).toBe("/profile/orders/o1");
+      expect(
+        requiredFieldsFor(NotificationType.PAYMENT_CONFIRMED),
+      ).not.toContain("audience");
+    });
+
+    /**
+     * Sepet ödemesi TEK sipariş göstermiyor: grup bildirimi yalnız
+     * `checkoutGroupId` taşıyordu ve hedef üretilemiyordu. Temsilci sipariş
+     * varsa detayına, yoksa listeye gider — hedefsiz kalmaz.
+     */
+    describe("grup ödeme bildirimi", () => {
+      it("temsilci sipariş varsa detayına gider", () => {
+        expect(
+          resolveWebNotificationLink(NotificationType.PAYMENT_CONFIRMED, {
+            checkoutGroupId: "g1",
+            groupNumber: "GRP-1",
+            orderId: "o1",
+          }),
+        ).toBe("/profile/orders/o1");
+      });
+
+      it("temsilci sipariş yoksa sipariş listesine düşer", () => {
+        expect(
+          resolveWebNotificationLink(NotificationType.PAYMENT_CONFIRMED, {
+            checkoutGroupId: "g1",
+            groupNumber: "GRP-1",
+          }),
+        ).toBe("/profile/orders");
+      });
+
+      it("tekil ödeme bildirimi listeye DÜŞMEZ", () => {
+        expect(
+          resolveWebNotificationLink(NotificationType.PAYMENT_CONFIRMED, {
+            orderId: "o9",
+            orderNumber: "ORD-9",
+          }),
+        ).toBe("/profile/orders/o9");
+      });
+
+      /** Fallback yalnız bu tipe özeldir; genel bir kaçış değil. */
+      it("fallback'i olmayan tip eksik alanda linksiz kalır", () => {
+        expect(
+          resolveWebNotificationLink(NotificationType.ORDER_SHIPPED, {}),
+        ).toBeNull();
+      });
     });
   });
 
@@ -255,8 +333,36 @@ describe("bildirim hedefleri", () => {
       ["kontrol karakteri", "/profile/orders/\u0000x"],
       ["izinli olmayan yol", "/olmayan-bir-sayfa"],
       ["protokol-göreli", "//evil.example.com"],
+      // Bu bölümlerin `[id]` route'u YOK: alt segment kabul edilirse
+      // tıklayan kullanıcı 404 görür.
+      ["olmayan alt sayfa: offers", "/profile/offers/x"],
+      ["olmayan alt sayfa: messages", "/profile/messages/x"],
+      ["olmayan alt sayfa: payments", "/profile/payments/x"],
+      ["olmayan alt sayfa: notifications", "/profile/notifications/x"],
+      ["olmayan alt sayfa: favorites", "/profile/favorites/x"],
+      ["olmayan alt sayfa: listings", "/profile/listings/x"],
+      ["iki kademe derin", "/profile/orders/o1/detay"],
     ])("reddedilir: %s", (_name, link) => {
       expect(isSafeFreeLink(link)).toBe(false);
+    });
+
+    /** Dinamik alt segment YALNIZ gerçekten `[id]` route'u olan bölümlerde. */
+    it.each(["/profile/orders/o1", "/profile/trades/t1"])(
+      "dinamik alt segment kabul edilir: %s",
+      (link) => {
+        expect(isSafeFreeLink(link)).toBe(true);
+      },
+    );
+
+    it.each([
+      "/profile/offers",
+      "/profile/messages",
+      "/profile/payments",
+      "/profile/notifications",
+      "/profile/favorites",
+      "/profile/listings",
+    ])("liste ekranı kabul edilir: %s", (link) => {
+      expect(isSafeFreeLink(link)).toBe(true);
     });
 
     it.each([

@@ -126,6 +126,14 @@ export interface GroupBuyerOrderPaidPayload {
   buyerSystemEmail?: string;
   /** Temsilci sipariş no — misafir takip linki için kullanılır */
   representativeOrderNumber?: string;
+  /**
+   * Temsilci sipariş id — bildirim hedefi için.
+   *
+   * Grup bildirimi tek bir siparişi göstermiyordu (`checkoutGroupId` var,
+   * `orderId` yok) ve tıklanınca hedef üretilemiyordu. Sepette birden çok
+   * sipariş var; hedef olarak ilki kullanılır, yoksa sipariş listesine düşülür.
+   */
+  representativeOrderId?: string;
 }
 
 export interface OrderShippedPayload {
@@ -494,6 +502,9 @@ export class EventService {
           type: "payment_confirmed",
           checkoutGroupId: payload.checkoutGroupId,
           groupNumber: payload.groupNumber,
+          // Hedef: temsilci siparişin detayı. Yoksa link üretimi sipariş
+          // listesine düşer — grup bildirimi hedefsiz kalmaz.
+          orderId: payload.representativeOrderId,
         },
       },
       {
@@ -850,6 +861,8 @@ export class EventService {
         body: `Sipariş ${payload.orderNumber} için ${payload.refundAmount.toFixed(2)} TL iade edildi.`,
         data: {
           type: "payment_refunded",
+          // Alıcının kendi sipariş ekranı.
+          audience: "buyer",
           orderId: payload.orderId,
           orderNumber: payload.orderNumber,
         },
@@ -868,6 +881,8 @@ export class EventService {
         body: `Sipariş ${payload.orderNumber} için iade işlemi gerçekleştirildi.`,
         data: {
           type: "payment_refunded",
+          // Aynı sipariş, SATICI ekranı.
+          audience: "seller",
           orderId: payload.orderId,
           orderNumber: payload.orderNumber,
         },

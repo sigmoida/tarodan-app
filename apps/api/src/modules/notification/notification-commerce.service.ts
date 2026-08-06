@@ -103,7 +103,7 @@ export class NotificationCommerceService {
   async notifyOrderAutoCompleted(
     userId: string,
     orderId: string,
-    audience: NotificationAudience = "buyer",
+    audience: NotificationAudience,
   ) {
     return this.dispatch.send({
       userId,
@@ -127,8 +127,8 @@ export class NotificationCommerceService {
   async notifyOrderForceCompletedByAdmin(
     userId: string,
     orderId: string,
+    audience: NotificationAudience,
     reason?: string,
-    audience: NotificationAudience = "buyer",
   ) {
     return this.dispatch.send({
       userId,

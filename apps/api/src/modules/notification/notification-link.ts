@@ -38,6 +38,15 @@ export interface FreeLinkSpec {
 export interface PatternLinkSpec {
   kind: "pattern";
   pattern: string;
+  /**
+   * Zorunlu alan gelmediğinde gidilecek LİSTE ekranı.
+   *
+   * Yalnız üreticinin tekil kaydı bilemediği tipler içindir (sepet ödemesi tek
+   * `checkoutGroupId` gönderiyor, tek bir `orderId` yok). Genel bir kaçış
+   * değildir: fallback'i olmayan tipte eksik alan hâlâ linksiz bildirim
+   * demektir, çünkü yanlış ekrana götürmek 404'ten iyi değildir.
+   */
+  fallback?: string;
 }
 
 /**
@@ -61,12 +70,19 @@ export type NotificationLinkSpec =
 /** Bildirimin gönderildiği taraf; `data.audience` ile taşınır. */
 export type NotificationAudience = "buyer" | "seller";
 
-const pattern = (value: string): PatternLinkSpec => ({
+const pattern = (value: string, fallback?: string): PatternLinkSpec => ({
   kind: "pattern",
   pattern: value,
+  ...(fallback ? { fallback } : {}),
 });
 const free = (key: string): FreeLinkSpec => ({ kind: "free", key });
-/** Alıcı/satıcı ayrımı `data.audience`tan; verilmezse alıcı varsayılır. */
+/**
+ * Alıcı/satıcı ayrımı YALNIZ `data.audience`tan gelir; varsayılanı yoktur.
+ *
+ * Eskiden `audience` yoksa alıcı varsayılıyordu: satıcıya giden bildirim
+ * sessizce alıcının ekranını açıyordu ve bu hiçbir yerde hata olarak
+ * görünmüyordu. Artık üretici kime gönderdiğini SÖYLEMEK zorunda.
+ */
 const byAudience = (buyer: string, seller: string): AudienceLinkSpec => ({
   kind: "audience",
   buyer,
@@ -210,9 +226,11 @@ export const NOTIFICATION_LINKS: Record<
 
   // ── EventService'in yazdığı tipler ───────────────────────────────────────
   // Bunlar enum dışındaydı ve linksiz kaydediliyordu.
-  [NotificationType.PAYMENT_CONFIRMED]: byAudience(
+  // Yalnız ALICIYA gider (satıcının karşılığı PAYMENT_RECEIVED). Sepet ödemesi
+  // tek bir sipariş göstermediği için temsilci sipariş yoksa listeye düşer.
+  [NotificationType.PAYMENT_CONFIRMED]: pattern(
     "/profile/orders/{{orderId}}",
-    "/seller/orders/{{orderId}}",
+    "/profile/orders",
   ),
   [NotificationType.PAYMENT_FAILED]: pattern("/profile/orders/{{orderId}}"),
   [NotificationType.PAYMENT_REFUNDED]: byAudience(
@@ -257,7 +275,8 @@ export function requiredFieldsFor(type: NotificationType): string[] {
   const spec = NOTIFICATION_LINKS[type];
   if (spec?.kind === "free") return [spec.key];
   if (spec?.kind === "audience") {
-    return [...spec.buyer.matchAll(TOKEN)].map((match) => match[1]);
+    // `audience` da zorunludur: hangi ekranın açılacağı ona bağlı.
+    return ["audience", ...[...spec.buyer.matchAll(TOKEN)].map((m) => m[1])];
   }
   if (spec?.kind !== "pattern") return [];
   return [...spec.pattern.matchAll(TOKEN)].map((match) => match[1]);
@@ -290,14 +309,23 @@ export function resolveWebNotificationLink(
     return link;
   }
 
-  // Hedef kitle `data.audience`tan; verilmezse alıcı. Aynı tip iki tarafa
-  // gidebildiği için `orderId` varlığına bakarak ekran seçilemez.
-  const template =
-    spec.kind === "audience"
-      ? data?.audience === "seller"
-        ? spec.seller
-        : spec.buyer
-      : spec.pattern;
+  // Hedef kitle YALNIZ `data.audience`tan gelir. Aynı tip iki tarafa
+  // gidebildiği için `orderId` varlığına bakarak ekran seçilemez; eksikse
+  // alıcı VARSAYILMAZ — yanlış ekran açmaktansa link üretilmez.
+  let template: string;
+  if (spec.kind === "audience") {
+    const audience = data?.audience;
+    if (audience !== "buyer" && audience !== "seller") {
+      logger.warn(
+        `Bildirim linki üretilemedi type=${type} eksikAlan=audience` +
+          ` (üretici hedef kitleyi bildirmeli)`,
+      );
+      return null;
+    }
+    template = audience === "seller" ? spec.seller : spec.buyer;
+  } else {
+    template = spec.pattern;
+  }
 
   let missing: string | null = null;
   const resolved = template.replace(TOKEN, (_match, key: string) => {
@@ -311,6 +339,13 @@ export function resolveWebNotificationLink(
   });
 
   if (missing) {
+    if (spec.kind === "pattern" && spec.fallback) {
+      logger.warn(
+        `Bildirim linki listeye düşürüldü type=${type} eksikAlan=${missing}` +
+          ` hedef=${spec.fallback}`,
+      );
+      return spec.fallback;
+    }
     logger.warn(`Bildirim linki üretilemedi type=${type} eksikAlan=${missing}`);
     return null;
   }
