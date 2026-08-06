@@ -26,7 +26,10 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { Button, IconButton } from "@tarodan/ui";
-import type { ListingImageItem } from "@/components/listings/form/listing-image-item";
+import {
+  coverIndexOf,
+  type ListingImageItem,
+} from "@/components/listings/form/listing-image-item";
 
 export interface ImagePreviewGridProps {
   /** Görseller — EKRANDAKİ sırayla. İlk kalem kapak görselidir. */
@@ -86,11 +89,16 @@ export default function ImagePreviewGrid({
   const grid =
     `grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 ${className}`.trim();
 
+  // Kapak listenin ilk YÜKLENMİŞ kalemidir; hata almış bir görsel kapak
+  // etiketi almaz (forma zaten yazılmıyor).
+  const coverIndex = coverIndexOf(items);
+
   const tiles = items.map((item, index) => (
     <SortableTile
       key={item.clientId}
       item={item}
       index={index}
+      isCover={index === coverIndex}
       sortable={!!onMove}
       onRemove={onRemove}
       onRetry={onRetry}
@@ -130,6 +138,7 @@ export default function ImagePreviewGrid({
 function SortableTile({
   item,
   index,
+  isCover,
   sortable,
   onRemove,
   onRetry,
@@ -137,6 +146,7 @@ function SortableTile({
 }: {
   item: ListingImageItem;
   index: number;
+  isCover: boolean;
   sortable: boolean;
   onRemove: (clientId: string) => void;
   onRetry?: (clientId: string) => void;
@@ -155,8 +165,6 @@ function SortableTile({
     item.status === "queued" ||
     item.status === "uploading" ||
     item.status === "processing";
-  const isCover = index === 0;
-
   return (
     <div
       ref={setNodeRef}

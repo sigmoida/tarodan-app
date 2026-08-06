@@ -49,6 +49,7 @@ export default function EditListingClient() {
     saleData,
     setSaleData,
     seedExistingImagesRef,
+    imageSubmitBlockerRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,
@@ -152,6 +153,7 @@ export default function EditListingClient() {
   const {
     items: imageItems,
     uploadingImages,
+    submitBlocker: imageSubmitBlocker,
     seedExistingImages,
     handleFileUpload,
     removeImage,
@@ -164,6 +166,7 @@ export default function EditListingClient() {
   });
   // Kayıt yüklendiğinde mevcut görselleri yerleştirir (yeniden yükleme yok).
   seedExistingImagesRef.current = seedExistingImages;
+  imageSubmitBlockerRef.current = imageSubmitBlocker;
   const {
     reactivateQuantity,
     setReactivateQuantity,
@@ -314,10 +317,15 @@ export default function EditListingClient() {
             variant="primary"
             size="lg"
             className="flex-1"
-            disabled={isLoading}
+            disabled={isLoading || !!imageSubmitBlocker}
           >
             {isLoading ? "Güncelleniyor..." : "Değişiklikleri Kaydet"}
           </Button>
+          {imageSubmitBlocker && (
+            <p role="status" className="w-full text-sm text-danger-600">
+              {imageSubmitBlocker.message}
+            </p>
+          )}
         </div>
       </Form>
 

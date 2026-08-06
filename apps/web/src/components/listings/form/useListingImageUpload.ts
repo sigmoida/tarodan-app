@@ -13,6 +13,7 @@ import {
 } from "./listing-upload-queue";
 import {
   acceptFiles,
+  imageSubmitBlocker,
   hasPendingUploads,
   itemFromExisting,
   itemFromFile,
@@ -102,14 +103,29 @@ export function useListingImageUpload({
   const formRef = useRef(form);
   formRef.current = form;
 
-  /** Listeyi güncelle ve forma yazılacak yükü aynı anda tazele. */
-  const commit = useCallback((next: ListingImageItem[]) => {
-    itemsRef.current = next;
-    setItems(next);
-    formRef.current.setValue("images", toFormImages(next), {
-      shouldValidate: true,
-    });
-  }, []);
+  /**
+   * Listeyi güncelle ve forma yazılacak yükü aynı anda tazele.
+   *
+   * `shouldDirty`: KULLANICININ yaptığı her değişiklik (ekleme, kaldırma,
+   * sıralama, kapak seçme) formu kirletmeli. Aksi halde pencere odağı
+   * değiştiğinde çalışan refetch, form "temiz" göründüğü için kaydedilmemiş
+   * görsel düzenini sessizce eziyordu. Sunucudan gelen mevcut görsellerin
+   * yerleştirilmesi ise kullanıcı değişikliği DEĞİLDİR ve kirletmez.
+   */
+  const commit = useCallback(
+    (
+      next: ListingImageItem[],
+      { userEdit = true }: { userEdit?: boolean } = {},
+    ) => {
+      itemsRef.current = next;
+      setItems(next);
+      formRef.current.setValue("images", toFormImages(next), {
+        shouldValidate: true,
+        shouldDirty: userEdit,
+      });
+    },
+    [],
+  );
 
   // Kuyruk bir KEZ kurulur: her render'da yeniden yaratılırsa aktif istekler
   // ve iptal denetleyicileri kaybolurdu.
@@ -159,7 +175,8 @@ export function useListingImageUpload({
         detailUrl?: string | null;
       }>,
     ) => {
-      commit(images.map(itemFromExisting));
+      // Sunucudan gelen kayıt — kullanıcı değişikliği değil.
+      commit(images.map(itemFromExisting), { userEdit: false });
     },
     [commit],
   );
@@ -244,6 +261,8 @@ export function useListingImageUpload({
     items,
     /** Kuyrukta/aktarımda kalem varken form gönderilmemeli. */
     uploadingImages: hasPendingUploads(items),
+    /** Gönderim engeli — yoksa null. */
+    submitBlocker: imageSubmitBlocker(items),
     seedExistingImages,
     handleFileUpload,
     removeImage,

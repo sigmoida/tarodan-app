@@ -126,6 +126,11 @@ export function useEditListingForm({
    */
   const populatedForRef = useRef<string | null>(null);
   /**
+   * Görsel gönderim engeli. Buton kapatmak yetmez: Enter ile gönderim ve
+   * programatik çağrı da bu kapıdan geçmeli.
+   */
+  const imageSubmitBlockerRef = useRef<{ message: string } | null>(null);
+  /**
    * Görsel listesini dolduran callback. Hook sırası yüzünden (form önce, görsel
    * durumu sonra) doğrudan çağıramıyoruz; kayıt yüklenince tetiklenmesi için
    * ref üzerinden bağlanır.
@@ -187,6 +192,10 @@ export function useEditListingForm({
   });
 
   const onSubmit = (values: EditListingValues) => {
+    if (imageSubmitBlockerRef.current) {
+      toast.error(imageSubmitBlockerRef.current.message);
+      return;
+    }
     const formPrice = Number(values.price);
 
     const payload: Record<string, unknown> = {
@@ -236,6 +245,7 @@ export function useEditListingForm({
     saleData,
     setSaleData,
     seedExistingImagesRef,
+    imageSubmitBlockerRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,

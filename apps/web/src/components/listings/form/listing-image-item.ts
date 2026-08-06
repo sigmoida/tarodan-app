@@ -119,7 +119,7 @@ export function toFormImages(items: ListingImageItem[]): ListingImagePayload[] {
     .map((item) => ({ cardKey: item.cardKey, detailKey: item.detailKey }));
 }
 
-/** Kuyrukta ya da aktarımda olan kalem var mı? Varsa form gönderilmemeli. */
+/** Kuyrukta ya da aktarımda olan kalem var mı? */
 export function hasPendingUploads(items: ListingImageItem[]): boolean {
   return items.some(
     (item) =>
@@ -127,6 +127,44 @@ export function hasPendingUploads(items: ListingImageItem[]): boolean {
       item.status === "uploading" ||
       item.status === "processing",
   );
+}
+
+/**
+ * Form GÖNDERİLEBİLİR mi? Gönderilemiyorsa gerekçesi de döner.
+ *
+ * Yalnız butonu kapatmak yetmez: Enter ile gönderim ve programatik çağrı da
+ * aynı kapıdan geçmeli. Çözümlenmemiş görselle kaydedilen ilan, kullanıcının
+ * ekranda gördüğünden EKSİK görselle yayınlanıyordu — forma yalnız `uploaded`
+ * kalemler yazıldığı için sessizce düşüyorlardı.
+ */
+export function imageSubmitBlocker(
+  items: ListingImageItem[],
+): { reason: "pending" | "failed"; message: string } | null {
+  if (hasPendingUploads(items)) {
+    return {
+      reason: "pending",
+      message: "Görsel yüklemesi sürüyor, lütfen tamamlanmasını bekleyin.",
+    };
+  }
+  if (items.some((item) => item.status === "failed")) {
+    return {
+      reason: "failed",
+      message:
+        "Yüklenemeyen görsel var. Tekrar deneyin ya da o görseli kaldırın.",
+    };
+  }
+  return null;
+}
+
+/**
+ * Kapak görseli = listenin ilk YÜKLENMİŞ kalemi.
+ *
+ * Sıradaki ilk kalem hata almışsa kapak sayılmamalı: forma yalnız `uploaded`
+ * kalemler yazıldığı için kaydedilen kapak başka bir görsel olurdu ve ekranda
+ * gösterilen kapak ile ilanda görünen kapak ayrışırdı.
+ */
+export function coverIndexOf(items: ListingImageItem[]): number {
+  return items.findIndex((item) => item.status === "uploaded");
 }
 
 /** Kontenjan sayılırken başarısız kalemler yer kaplamaz — kullanıcı yerine yenisini koyabilmeli. */

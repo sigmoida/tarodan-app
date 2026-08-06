@@ -160,6 +160,7 @@ function useNewListingValue() {
   const {
     items: imageItems,
     uploadingImages,
+    submitBlocker: imageSubmitBlocker,
     handleFileUpload,
     removeImage,
     retryImage,
@@ -171,6 +172,13 @@ function useNewListingValue() {
   });
 
   const onSubmit = async (values: NewListingValues) => {
+    // Butonu kapatmak yetmez: Enter ile gönderim ve programatik çağrı da bu
+    // kapıdan geçer. Çözümlenmemiş görselle kaydedilen ilan, kullanıcının
+    // ekranda gördüğünden eksik görselle yayınlanıyordu.
+    if (imageSubmitBlocker) {
+      toast.error(imageSubmitBlocker.message);
+      return;
+    }
     if (listingLimits && !listingLimits.canCreateListing) {
       toast.error(
         `İlan limitinize ulaştınız (${listingLimits.currentCount}/${listingLimits.maxListings}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.`,
@@ -249,6 +257,7 @@ function useNewListingValue() {
     form,
     onSubmit,
     uploadingImages,
+    imageSubmitBlocker,
     imageItems,
     retryImage,
     moveImage,

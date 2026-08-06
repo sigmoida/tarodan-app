@@ -11,8 +11,13 @@ import path from "node:path";
  * Playwright kendi koşucusunda (`test:e2e`) kalır.
  */
 export default defineConfig({
+  // TSX testleri React'i açıkça import etmez; klasik runtime yerine otomatik
+  // JSX runtime kullanılır (Next'in kendi ayarıyla aynı).
+  esbuild: { jsx: "automatic" },
   test: {
     include: ["src/**/*.test.{ts,tsx}"],
+    // Varsayılan node; hook testleri dosya başındaki
+    // `// @vitest-environment jsdom` ile kendi ortamını seçer.
     environment: "node",
   },
   resolve: {

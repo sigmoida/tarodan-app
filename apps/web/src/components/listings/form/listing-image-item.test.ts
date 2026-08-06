@@ -3,6 +3,8 @@
 import { describe, expect, it } from "vitest";
 import {
   acceptFiles,
+  coverIndexOf,
+  imageSubmitBlocker,
   hasPendingUploads,
   itemFromExisting,
   itemFromFile,
@@ -238,6 +240,99 @@ describe("ilan görseli durum modeli", () => {
           { ...uploaded("b"), status: "failed" },
         ]),
       ).toBe(false);
+    });
+  });
+
+  describe("gönderim kapısı — çözümlenmemiş görsel", () => {
+    /**
+     * Regresyon: forma yalnız `uploaded` kalemler yazıldığı için, yükleme
+     * sürerken kaydedilen ilan kullanıcının ekranda gördüğünden EKSİK görselle
+     * yayınlanıyordu. Kapı hem butonu hem submit handler'ı korumalı.
+     */
+    it("yükleme sürerken gönderimi engeller", () => {
+      const blocker = imageSubmitBlocker([
+        uploaded("a"),
+        { ...uploaded("b"), status: "uploading" },
+      ]);
+
+      expect(blocker?.reason).toBe("pending");
+      expect(blocker?.message).toMatch(/bekleyin/i);
+    });
+
+    it("sırada bekleyen kalem de engeller", () => {
+      expect(
+        imageSubmitBlocker([{ ...uploaded("a"), status: "queued" }])?.reason,
+      ).toBe("pending");
+    });
+
+    it("işlenmekte olan kalem de engeller", () => {
+      expect(
+        imageSubmitBlocker([{ ...uploaded("a"), status: "processing" }])
+          ?.reason,
+      ).toBe("pending");
+    });
+
+    it("hata almış görsel varken gönderimi engeller", () => {
+      const blocker = imageSubmitBlocker([
+        uploaded("a"),
+        { ...uploaded("b"), status: "failed" },
+      ]);
+
+      expect(blocker?.reason).toBe("failed");
+      expect(blocker?.message).toMatch(/kaldırın|tekrar/i);
+    });
+
+    it("hepsi yüklendiyse engel yoktur", () => {
+      expect(imageSubmitBlocker([uploaded("a"), uploaded("b")])).toBeNull();
+    });
+
+    it("hiç görsel yoksa engel yoktur", () => {
+      expect(imageSubmitBlocker([])).toBeNull();
+    });
+  });
+
+  describe("kapak görseli", () => {
+    /**
+     * Regresyon: kapak "ilk kalem" sayılıyordu. İlk kalem hata almışsa forma
+     * yazılmadığı için ilanda BAŞKA bir görsel kapak oluyordu; ekranda
+     * gösterilen kapak ile yayınlanan kapak ayrışıyordu.
+     */
+    it("hata almış ilk görsel kapak KABUL EDİLMEZ", () => {
+      const items = [
+        { ...uploaded("a"), status: "failed" as const },
+        uploaded("b"),
+      ];
+
+      expect(coverIndexOf(items)).toBe(1);
+    });
+
+    it("bekleyen ilk görsel de kapak sayılmaz", () => {
+      const items = [
+        { ...uploaded("a"), status: "uploading" as const },
+        uploaded("b"),
+      ];
+
+      expect(coverIndexOf(items)).toBe(1);
+    });
+
+    it("ilk kalem yüklendiyse kapak odur", () => {
+      expect(coverIndexOf([uploaded("a"), uploaded("b")])).toBe(0);
+    });
+
+    it("kapak, forma yazılan ilk görselle AYNI olmalı", () => {
+      const items = [
+        { ...uploaded("a"), status: "failed" as const },
+        uploaded("b"),
+        uploaded("c"),
+      ];
+
+      expect(toFormImages(items)[0].cardKey).toBe(
+        items[coverIndexOf(items)].cardKey,
+      );
+    });
+
+    it("hiç yüklenmiş görsel yoksa kapak yoktur", () => {
+      expect(coverIndexOf([{ ...uploaded("a"), status: "failed" }])).toBe(-1);
     });
   });
 
