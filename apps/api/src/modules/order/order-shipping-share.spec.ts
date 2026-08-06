@@ -207,8 +207,11 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
         findUnique: jest.fn().mockResolvedValue(null),
       },
       product: {
-        findUnique: jest.fn(({ where }: any) =>
-          Promise.resolve(products[where.id] ?? null),
+        // Quote ürünleri TEK sorguda çeker (satır başına findUnique değil).
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            (where.id.in as string[]).map((id) => products[id]).filter(Boolean),
+          ),
         ),
       },
     } as any;

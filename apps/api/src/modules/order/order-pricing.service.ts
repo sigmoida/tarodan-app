@@ -375,41 +375,60 @@ export class OrderPricingService {
       lineSubtotal: number;
       couponDiscount: number;
     }> = [];
-    for (const { productId, quantity = 1 } of dto.items) {
-      const product = await this.prisma.product.findUnique({
-        where: { id: productId },
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          // İndirim penceresi alanları: bunlar seçilmediği için quote her ürünü
-          // "indirimsiz" sayıyor, create yolu ise pencereyi uyguluyordu — aynı
-          // sepet için önizleme ile tahsilat ayrışıyordu.
-          oldPrice: true,
-          saleStartDate: true,
-          saleEndDate: true,
-          sellerId: true,
-          categoryId: true,
-          shippingDesi: true,
-          kind: true,
-          status: true,
-          seller: {
-            select: {
-              businessStatus: true,
-              companyName: true,
-              taxId: true,
-              membership: {
-                select: {
-                  status: true,
-                  currentPeriodEnd: true,
-                  tier: { select: { type: true, isActive: true } },
-                },
+    // Ürünler TEK sorguda: quote'ta ürün başına findUnique + ürün başına
+    // kampanya çözümü yapılıyordu (N+1). Daha önemlisi, ürün başına çözüm
+    // kampanya eşiğini SATIR bazında değerlendiriyor, create ise sepet bazında
+    // değerlendiriyordu → minCartValue'lu bir kampanyada quote fiyatı
+    // uygulamıyor, create uyguluyor ve alıcı 409 PRICING_CHANGED'e takılıyordu.
+    const now = new Date();
+    const requested = dto.items.map(({ productId, quantity = 1 }) => ({
+      productId,
+      quantity,
+    }));
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: requested.map((item) => item.productId) } },
+      select: {
+        id: true,
+        title: true,
+        price: true,
+        // İndirim penceresi alanları: bunlar seçilmediği için quote her ürünü
+        // "indirimsiz" sayıyor, create yolu ise pencereyi uyguluyordu — aynı
+        // sepet için önizleme ile tahsilat ayrışıyordu.
+        oldPrice: true,
+        saleStartDate: true,
+        saleEndDate: true,
+        sellerId: true,
+        categoryId: true,
+        shippingDesi: true,
+        kind: true,
+        status: true,
+        seller: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+            membership: {
+              select: {
+                status: true,
+                currentPeriodEnd: true,
+                tier: { select: { type: true, isActive: true } },
               },
             },
           },
         },
-      });
+      },
+    });
+    const productById = new Map(
+      products.map((product) => [product.id, product]),
+    );
 
+    // Satın alınabilir satırlar — kampanya eşiğinin tabanı yalnız bunlardır.
+    const sellable: Array<{
+      product: (typeof products)[number];
+      quantity: number;
+    }> = [];
+    for (const { productId, quantity } of requested) {
+      const product = productById.get(productId);
       if (!product || product.kind !== ProductKind.listing) {
         unavailableItems.push({
           productId,
@@ -437,12 +456,19 @@ export class OrderPricingService {
         });
         continue;
       }
+      sellable.push({ product, quantity });
+    }
 
-      // Quote, checkout ile AYNI fiyat kuralını kullanmalı: indirim penceresi
-      // dışındaysa taban indirim öncesi fiyattır. Ayrışırsa pricing hash'i
-      // tutmaz ve alıcı 409 PRICING_CHANGED alır.
-      const unitPrice = (await this.priceResolver.resolveOne(product))
-        .unitPrice;
+    // Fiyatlar TEK çağrıda ve create ile AYNI semantikle: aynı `now`, aynı
+    // adetler, sepet bazlı kampanya eşiği.
+    const resolvedPrices = await this.priceResolver.resolveMany(
+      sellable.map(({ product, quantity }) => ({ product, quantity })),
+      { now, minCartValueBasis: "cart" },
+    );
+
+    for (const { product, quantity } of sellable) {
+      const unitPrice =
+        resolvedPrices.get(product.id)?.unitPrice ?? Number(product.price);
       lines.push({
         product: {
           id: product.id,

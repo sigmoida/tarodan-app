@@ -25,7 +25,7 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
         findFirst: jest.fn().mockResolvedValue({ id: "set-1" }),
       },
       product: {
-        findUnique: jest.fn().mockResolvedValue(product),
+        findMany: jest.fn().mockResolvedValue([product]),
       },
     } as any;
     // GERÇEK DiscountService: quote'un çağırdığı `allocateCoupon` (doğrula +

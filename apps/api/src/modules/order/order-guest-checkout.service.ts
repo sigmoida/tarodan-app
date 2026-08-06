@@ -276,7 +276,10 @@ export class OrderGuestCheckoutService {
       // kartında/sepette görünen. Bu yol ikisini de atlıyordu — ham `salePrice ??
       // price` kolonunu okuyor ve kampanyayı hiç sormuyordu; code'suz bir kampanya
       // aktifken misafir, kartta gördüğünden fazla ödüyordu.
-      const resolvedPrice = await this.priceResolver.resolveOne(product);
+      const resolvedPrice = await this.priceResolver.resolveOne(product, {
+        // Tek satırlık sepet — kampanya eşiği quote ile aynı semantikle.
+        minCartValueBasis: "cart",
+      });
       const listedPrice = resolvedPrice.saleUnitPrice;
       let finalPrice = resolvedPrice.unitPrice;
 

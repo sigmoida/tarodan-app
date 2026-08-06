@@ -307,7 +307,11 @@ export class OrderCheckoutDirectService {
       const now = new Date();
       // Tahsil edilen taban ORTAK çözümleyiciden: indirim penceresi + kampanya.
       // Ürün kartı, sepet ve checkout aynı sayıyı görsün.
-      const resolved = await this.priceResolver.resolveOne(product, { now });
+      const resolved = await this.priceResolver.resolveOne(product, {
+        now,
+        // Tek satırlık sepet — kampanya eşiği quote ile aynı semantikle.
+        minCartValueBasis: "cart",
+      });
       const productPrice = resolved.unitPrice;
       const originalPrice = resolved.originalUnitPrice;
       const productDiscount = Math.max(0, originalPrice - productPrice);

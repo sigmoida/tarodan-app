@@ -67,8 +67,11 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         }),
       },
       product: {
-        findUnique: jest.fn(({ where }: any) =>
-          Promise.resolve(products[where.id] ?? null),
+        // Quote ürünleri TEK sorguda çeker (satır başına findUnique değil).
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            (where.id.in as string[]).map((id) => products[id]).filter(Boolean),
+          ),
         ),
       },
       commissionRuleSet: {
