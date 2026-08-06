@@ -3,6 +3,7 @@ import {
   NOTIFICATION_LINKS,
   isSafeFreeLink,
   normalizeLegacyNotificationLink,
+  isKnownNotificationType,
   requiredFieldsFor,
   resolveWebNotificationLink,
 } from "./notification-link";
@@ -28,6 +29,8 @@ const SAMPLE: Record<string, string> = {
   promotionLink: "/listings",
   offerLink: "/listings",
   announcementLink: "https://tarodan.com.tr/duyuru",
+  link: "https://tarodan.com.tr/duyuru",
+  audience: "buyer",
 };
 
 const sampleFor = (type: NotificationType) =>
@@ -95,6 +98,69 @@ describe("bildirim hedefleri", () => {
 
     it.each(cases)("%s → %j = %s", (type, data, expected) => {
       expect(resolveWebNotificationLink(type, data)).toBe(expected);
+    });
+  });
+
+  describe("hedef kitle (audience)", () => {
+    /**
+     * Regresyon: bazı tipler AYNI tiple hem alıcıya hem satıcıya gidiyor
+     * (ORDER_AUTO_COMPLETED, ORDER_FORCE_COMPLETED_BY_ADMIN) ya da yalnız
+     * satıcıya gidiyor (ORDER_PAID, ORDER_MANUALLY_CONFIRMED,
+     * ORDER_PREPARING_DEADLINE_WARNING). Hedef tek başına tipten çıkarılamaz.
+     */
+    it.each([
+      NotificationType.ORDER_PAID,
+      NotificationType.ORDER_MANUALLY_CONFIRMED,
+      NotificationType.ORDER_PREPARING_DEADLINE_WARNING,
+      NotificationType.ORDER_AUTO_COMPLETED,
+      NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
+      NotificationType.PAYMENT_CONFIRMED,
+      NotificationType.PAYMENT_REFUNDED,
+    ])("%s — audience satıcı ekranını seçer", (type) => {
+      expect(
+        resolveWebNotificationLink(type, { orderId: "o1", audience: "seller" }),
+      ).toBe("/seller/orders/o1");
+      expect(
+        resolveWebNotificationLink(type, { orderId: "o1", audience: "buyer" }),
+      ).toBe("/profile/orders/o1");
+      // Belirtilmezse alıcı varsayılır (eski davranış).
+      expect(resolveWebNotificationLink(type, { orderId: "o1" })).toBe(
+        "/profile/orders/o1",
+      );
+    });
+  });
+
+  describe("EventService tipleri", () => {
+    /**
+     * Regresyon: bu tipler enum dışındaydı, push worker `as NotificationType`
+     * ile cast ediyordu ve resolver null dönüp bildirim LİNKSİZ kaydediliyordu.
+     */
+    it.each([
+      NotificationType.TRADE_READY_FOR_SHIPPING,
+      NotificationType.TRADE_WAREHOUSE_APPROVED,
+      NotificationType.TRADE_WAREHOUSE_REJECTED,
+      NotificationType.TRADE_CANCEL_LOCKED,
+      NotificationType.TRADE_RETURN_COMPLETED,
+      NotificationType.TRADE_RETURN_LOST,
+      NotificationType.TRADE_REFUND_FAILED,
+      NotificationType.TRADE_REFUND_COMPLETED,
+    ])("%s → takas detayı", (type) => {
+      expect(resolveWebNotificationLink(type, { tradeId: "t1" })).toBe(
+        "/profile/trades/t1",
+      );
+    });
+
+    it("payment_failed alıcının siparişine gider", () => {
+      expect(
+        resolveWebNotificationLink(NotificationType.PAYMENT_FAILED, {
+          orderId: "o1",
+        }),
+      ).toBe("/profile/orders/o1");
+    });
+
+    it("bilinmeyen tip kalıcı yazılamaz (tip kapısı)", () => {
+      expect(isKnownNotificationType("uydurma_tip")).toBe(false);
+      expect(isKnownNotificationType(NotificationType.ORDER_PAID)).toBe(true);
     });
   });
 

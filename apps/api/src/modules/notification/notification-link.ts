@@ -40,18 +40,38 @@ export interface PatternLinkSpec {
   pattern: string;
 }
 
+/**
+ * Aynı tip hem alıcıya hem satıcıya gidiyorsa hedef TEK BAŞINA tipten
+ * çıkarılamaz: `data.audience` ile ayrılır. Üretici kime gönderdiğini bilir.
+ */
+export interface AudienceLinkSpec {
+  kind: "audience";
+  buyer: string;
+  seller: string;
+}
+
 /** Hedefi olmayan tip (yalnız e-posta/bilgilendirme). */
 export interface NoLinkSpec {
   kind: "none";
 }
 
-export type NotificationLinkSpec = PatternLinkSpec | FreeLinkSpec | NoLinkSpec;
+export type NotificationLinkSpec =
+  PatternLinkSpec | AudienceLinkSpec | FreeLinkSpec | NoLinkSpec;
+
+/** Bildirimin gönderildiği taraf; `data.audience` ile taşınır. */
+export type NotificationAudience = "buyer" | "seller";
 
 const pattern = (value: string): PatternLinkSpec => ({
   kind: "pattern",
   pattern: value,
 });
 const free = (key: string): FreeLinkSpec => ({ kind: "free", key });
+/** Alıcı/satıcı ayrımı `data.audience`tan; verilmezse alıcı varsayılır. */
+const byAudience = (buyer: string, seller: string): AudienceLinkSpec => ({
+  kind: "audience",
+  buyer,
+  seller,
+});
 const none: NoLinkSpec = { kind: "none" };
 
 /** Alıcının kendi sipariş ekranı. */
@@ -68,18 +88,33 @@ export const NOTIFICATION_LINKS: Record<
 > = {
   // ── Sipariş (alıcı) ──────────────────────────────────────────────────────
   [NotificationType.ORDER_CREATED]: BUYER_ORDER,
-  [NotificationType.ORDER_PAID]: BUYER_ORDER,
+  [NotificationType.ORDER_PAID]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
   [NotificationType.ORDER_SHIPPED]: BUYER_ORDER,
   [NotificationType.ORDER_DELIVERED]: BUYER_ORDER,
   [NotificationType.ORDER_COMPLETED]: BUYER_ORDER,
   [NotificationType.ORDER_CANCELLED]: BUYER_ORDER,
   [NotificationType.ORDER_REFUNDED]: BUYER_ORDER,
-  [NotificationType.ORDER_PREPARING_DEADLINE_WARNING]: BUYER_ORDER,
+  [NotificationType.ORDER_PREPARING_DEADLINE_WARNING]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
   [NotificationType.ORDER_RESERVATION_RELEASED]: BUYER_ORDER,
   [NotificationType.ORDER_DELIVERED_CONFIRM]: BUYER_ORDER,
-  [NotificationType.ORDER_AUTO_COMPLETED]: BUYER_ORDER,
-  [NotificationType.ORDER_MANUALLY_CONFIRMED]: BUYER_ORDER,
-  [NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN]: BUYER_ORDER,
+  [NotificationType.ORDER_AUTO_COMPLETED]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
+  [NotificationType.ORDER_MANUALLY_CONFIRMED]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
+  [NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
   [NotificationType.SELLER_DID_NOT_SHIP_REFUNDED]: BUYER_ORDER,
   [NotificationType.RESERVATION_EXPIRED]: pattern("/profile/orders"),
 
@@ -95,8 +130,10 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.OFFER_RECEIVED]: pattern("/profile/offers?tab=received"),
   [NotificationType.OFFER_COUNTER]: pattern("/profile/offers?tab=sent"),
   [NotificationType.OFFER_AUTO_REJECTED]: pattern("/profile/offers"),
-  // Kabul edilen teklif SİPARİŞE dönüşür; sipariş yoksa ilana düşer.
-  [NotificationType.OFFER_ACCEPTED]: BUYER_ORDER,
+  // Kabul edilen teklifte HENÜZ SİPARİŞ YOKTUR: alıcının ödemesi gerekir.
+  // Harita `orderId` istiyordu ama üretici onu hiç göndermiyor; bu yüzden
+  // link üretilemiyordu. Hedef, alıcının satın almayı tamamlayacağı ilandır.
+  [NotificationType.OFFER_ACCEPTED]: LISTING,
   [NotificationType.OFFER_REJECTED]: LISTING,
   [NotificationType.OFFER_COUNTER_DECLINED]: LISTING,
   [NotificationType.OFFER_EXPIRED]: LISTING,
@@ -171,10 +208,47 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.SPECIAL_OFFER]: free("offerLink"),
   [NotificationType.SYSTEM_ANNOUNCEMENT]: free("announcementLink"),
 
+  // ── EventService'in yazdığı tipler ───────────────────────────────────────
+  // Bunlar enum dışındaydı ve linksiz kaydediliyordu.
+  [NotificationType.PAYMENT_CONFIRMED]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
+  [NotificationType.PAYMENT_FAILED]: pattern("/profile/orders/{{orderId}}"),
+  [NotificationType.PAYMENT_REFUNDED]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
+  [NotificationType.TRADE_READY_FOR_SHIPPING]: TRADE,
+  [NotificationType.TRADE_WAREHOUSE_APPROVED]: TRADE,
+  [NotificationType.TRADE_WAREHOUSE_REJECTED]: TRADE,
+  [NotificationType.TRADE_CANCEL_LOCKED]: TRADE,
+  [NotificationType.TRADE_RETURN_COMPLETED]: TRADE,
+  [NotificationType.TRADE_RETURN_LOST]: TRADE,
+  [NotificationType.TRADE_REFUND_FAILED]: TRADE,
+  [NotificationType.TRADE_REFUND_COMPLETED]: TRADE,
+  // Yönetici yayını: hedef dışarıdan gelir, DTO sınırında doğrulanır.
+  [NotificationType.ADMIN_BROADCAST]: free("link"),
+
   // ── Hedefi olmayanlar (yalnız e-posta) ───────────────────────────────────
   [NotificationType.PASSWORD_RESET]: none,
   [NotificationType.EMAIL_VERIFICATION]: none,
 };
+
+const KNOWN_TYPES = new Set<string>(Object.values(NotificationType));
+
+/**
+ * Gelen string, kalıcı olarak yazılabilen bir bildirim tipi mi?
+ *
+ * Push worker `as NotificationType` ile cast ediyordu; enum dışı tipler
+ * derlemeden geçip resolver'da `null` dönüyor ve bildirim LİNKSİZ
+ * kaydediliyordu. Cast yerine bu kapı kullanılır.
+ */
+export function isKnownNotificationType(
+  value: unknown,
+): value is NotificationType {
+  return typeof value === "string" && KNOWN_TYPES.has(value);
+}
 
 const TOKEN = /\{\{(\w+)\}\}/g;
 
@@ -182,6 +256,9 @@ const TOKEN = /\{\{(\w+)\}\}/g;
 export function requiredFieldsFor(type: NotificationType): string[] {
   const spec = NOTIFICATION_LINKS[type];
   if (spec?.kind === "free") return [spec.key];
+  if (spec?.kind === "audience") {
+    return [...spec.buyer.matchAll(TOKEN)].map((match) => match[1]);
+  }
   if (spec?.kind !== "pattern") return [];
   return [...spec.pattern.matchAll(TOKEN)].map((match) => match[1]);
 }
@@ -213,8 +290,17 @@ export function resolveWebNotificationLink(
     return link;
   }
 
+  // Hedef kitle `data.audience`tan; verilmezse alıcı. Aynı tip iki tarafa
+  // gidebildiği için `orderId` varlığına bakarak ekran seçilemez.
+  const template =
+    spec.kind === "audience"
+      ? data?.audience === "seller"
+        ? spec.seller
+        : spec.buyer
+      : spec.pattern;
+
   let missing: string | null = null;
-  const resolved = spec.pattern.replace(TOKEN, (_match, key: string) => {
+  const resolved = template.replace(TOKEN, (_match, key: string) => {
     const value = data?.[key];
     if (value === undefined || value === null || value === "") {
       missing = key;

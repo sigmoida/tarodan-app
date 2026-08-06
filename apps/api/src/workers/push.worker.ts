@@ -17,7 +17,10 @@ import {
   shouldDeliver,
 } from "../modules/notification/notification-preferences";
 import { NotificationType } from "../modules/notification/dto";
-import { resolveWebNotificationLink } from "../modules/notification/notification-link";
+import {
+  isKnownNotificationType,
+  resolveWebNotificationLink,
+} from "../modules/notification/notification-link";
 
 export interface PushJobData {
   userId: string;
@@ -381,9 +384,16 @@ export class PushWorker {
     // `/offers?tab=received`, `/trades/:id`, `/messages?thread=`): tıklanan
     // bildirim 404'e gidiyordu. Ayrıca hedefi entity önceliğine göre seçmek
     // yanlıştır — aynı sipariş alıcıya ve satıcıya farklı ekran açar.
-    const link =
-      resolveWebNotificationLink(notificationType as NotificationType, data) ??
-      undefined;
+    const link = isKnownNotificationType(notificationType)
+      ? (resolveWebNotificationLink(notificationType, data) ?? undefined)
+      : undefined;
+    if (!isKnownNotificationType(notificationType)) {
+      // Cast YOK: `as NotificationType` desteklenmeyen bir tipin sessizce
+      // linksiz kaydedilmesine yol açıyordu.
+      this.logger.warn(
+        `Bilinmeyen bildirim tipi, hedef üretilemedi: ${String(notificationType)}`,
+      );
+    }
 
     // Get icon based on notification type
     const icon = this.getNotificationIcon(notificationType);

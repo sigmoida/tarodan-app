@@ -132,6 +132,23 @@ export enum NotificationType {
   PASSWORD_RESET = "password_reset",
   EMAIL_VERIFICATION = "email_verification",
   SYSTEM_ANNOUNCEMENT = "system_announcement",
+  ADMIN_BROADCAST = "admin_broadcast",
+
+  // EventService bunları KALICI olarak yazıyordu ama enum'da yoktu: push
+  // worker'daki `as NotificationType` cast'i derlemeyi susturuyor, resolver
+  // bilmediği tip için null dönüyor ve bildirim LİNKSİZ kaydediliyordu.
+  // Cast kaldırıldı; kalıcı yazılabilen her tip artık burada.
+  PAYMENT_CONFIRMED = "payment_confirmed",
+  PAYMENT_FAILED = "payment_failed",
+  PAYMENT_REFUNDED = "payment_refunded",
+  TRADE_READY_FOR_SHIPPING = "trade_ready_for_shipping",
+  TRADE_WAREHOUSE_APPROVED = "trade_warehouse_approved",
+  TRADE_WAREHOUSE_REJECTED = "trade_warehouse_rejected",
+  TRADE_CANCEL_LOCKED = "trade_cancel_locked",
+  TRADE_RETURN_COMPLETED = "trade_return_completed",
+  TRADE_RETURN_LOST = "trade_return_lost",
+  TRADE_REFUND_FAILED = "trade_refund_failed",
+  TRADE_REFUND_COMPLETED = "trade_refund_completed",
 }
 
 export enum NotificationChannel {
