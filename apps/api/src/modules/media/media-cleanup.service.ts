@@ -27,9 +27,12 @@ export class MediaCleanupService {
     scanned: number;
     deleted: number;
   }> {
-    const objects = await this.storage.listObjects(
-      "products/product-images/temp/",
-    );
+    // Tüm ürün görseli önekini tarar: yüklemeler artık kullanıcıya özel
+    // klasöre iniyor (`product-images/u/{userId}/`), eski kayıtlar `temp/`
+    // altında duruyor. Yalnız `temp/` taransaydı yeni şemadaki terk edilmiş
+    // taslaklar sonsuza kadar kalırdı. Referans kontrolü aynen geçerli:
+    // ProductImage/MediaFile'da geçen hiçbir nesne silinmez.
+    const objects = await this.storage.listObjects("products/product-images/");
     const cutoff = new Date(
       Date.now() - TEMP_MIN_AGE_DAYS * 24 * 60 * 60 * 1000,
     );

@@ -21,10 +21,21 @@ describe("ProductCreateService required listing details", () => {
     scale: "1:64",
     material: "diecast",
     shippingPackageTier: ShippingPackageTierCode.medium,
+    // Gerçekçi anahtarlar: yüklemeler kullanıcıya özel klasöre iner ve
+    // create sahiplik doğrulaması yapar (product-image-keys).
     images: [
-      { cardKey: "card-1.webp", detailKey: "detail-1.webp" },
-      { cardKey: "card-2.webp", detailKey: "detail-2.webp" },
-      { cardKey: "card-3.webp", detailKey: "detail-3.webp" },
+      {
+        cardKey: `dev/products/product-images/u/${sellerId}/1-card.webp`,
+        detailKey: `dev/products/product-images/u/${sellerId}/1-detail.webp`,
+      },
+      {
+        cardKey: `dev/products/product-images/u/${sellerId}/2-card.webp`,
+        detailKey: `dev/products/product-images/u/${sellerId}/2-detail.webp`,
+      },
+      {
+        cardKey: `dev/products/product-images/u/${sellerId}/3-card.webp`,
+        detailKey: `dev/products/product-images/u/${sellerId}/3-detail.webp`,
+      },
     ],
   };
   const createdProduct = {
