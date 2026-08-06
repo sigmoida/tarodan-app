@@ -79,7 +79,6 @@ function useNewListingValue() {
     (_, i) => currentYear - i,
   );
 
-  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   // İndirimli açılış: komisyon önizlemesi o anda geçerli satış fiyatını
   // kullanır; API kapısı ayrıca normal ve indirimli fiyatın ikisini de denetler.
   const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
@@ -158,13 +157,17 @@ function useNewListingValue() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manufacturerId, manufacturerList]);
 
-  const { uploadingImages, handleFileUpload, removeImage } =
-    useListingImageUpload({
-      form,
-      maxImages: limits?.maxImagesPerListing || 3,
-      imagePreviewUrls,
-      setImagePreviewUrls,
-    });
+  const {
+    items: imageItems,
+    uploadingImages,
+    handleFileUpload,
+    removeImage,
+    moveImage,
+    makeCover,
+  } = useListingImageUpload({
+    form,
+    maxImages: limits?.maxImagesPerListing || 3,
+  });
 
   const onSubmit = async (values: NewListingValues) => {
     if (listingLimits && !listingLimits.canCreateListing) {
@@ -245,7 +248,9 @@ function useNewListingValue() {
     form,
     onSubmit,
     uploadingImages,
-    imagePreviewUrls,
+    imageItems,
+    moveImage,
+    makeCover,
     CONDITIONS,
     yearOptions,
     // catalog data

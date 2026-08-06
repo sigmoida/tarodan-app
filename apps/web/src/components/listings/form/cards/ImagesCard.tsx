@@ -7,34 +7,31 @@ import { useFormContext } from "react-hook-form";
 import { PhotoIcon } from "@heroicons/react/24/outline";
 import { Input } from "@tarodan/ui";
 import { SectionCard, ImagePreviewGrid } from "@/components/ui";
-import type { ListingImage } from "../useListingImageUpload";
+import type { ListingImageItem } from "../listing-image-item";
 
 interface ImagesCardProps {
   maxImages: number;
-  imagePreviewUrls: string[];
+  /** Görseller — ekrandaki sırayla; tek durum kaynağı. */
+  items: ListingImageItem[];
   uploadingImages: boolean;
-  handleFileUpload: (files: FileList | null) => void;
-  removeImage: (index: number) => void;
+  handleFileUpload: (files: FileList | File[] | null) => void;
+  removeImage: (clientId: string) => void;
 }
 
 /** "Görseller" — upload dropzone + compact preview grid. Reads the `images`
  *  field from form context (and surfaces its validation error). Shared. */
 export default function ImagesCard({
   maxImages,
-  imagePreviewUrls,
+  items,
   uploadingImages,
   handleFileUpload,
   removeImage,
 }: ImagesCardProps) {
-  const { watch, formState } = useFormContext();
-  const images: ListingImage[] = watch("images") ?? [];
+  const { formState } = useFormContext();
   const imagesError = formState.errors.images?.message as string | undefined;
   const t = useTranslations();
-
-  const previewUrls = images.map(
-    (img, index) =>
-      imagePreviewUrls[index] || (typeof img === "object" ? img?.cardKey : img),
-  );
+  // Kontenjan, EKRANDAKİ kalemlerden sayılır; forma yalnız yüklenmişler yazılır.
+  const usedSlots = items.filter((item) => item.status !== "failed").length;
 
   return (
     <SectionCard title={t("product.images")}>
@@ -42,14 +39,14 @@ export default function ImagesCard({
         {t("product.upToImages", { count: maxImages })}
       </p>
       <div className="space-y-3">
-        {images.length < maxImages ? (
+        {usedSlots < maxImages ? (
           <label className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
             <PhotoIcon className="w-8 h-8 text-subtle" />
             <span className="text-sm text-muted font-medium">
               {t("product.clickToUpload")}
             </span>
             <span className="text-xs text-subtle">
-              {images.length} / {maxImages} {t("product.uploaded")}
+              {usedSlots} / {maxImages} {t("product.uploaded")}
             </span>
             <Input
               type="file"
@@ -73,7 +70,7 @@ export default function ImagesCard({
             {t("product.uploadingImages")}
           </p>
         )}
-        <ImagePreviewGrid urls={previewUrls} onRemove={removeImage} />
+        <ImagePreviewGrid items={items} onRemove={removeImage} />
       </div>
     </SectionCard>
   );

@@ -61,7 +61,6 @@ export function useEditListingForm({
   // Shared submit/lifecycle busy flag (also driven by `useListingLifecycle`).
   const [isLoading, setIsLoading] = useState(false);
   // Store preview URLs separately (presigned URLs for display).
-  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [showDiscountSection, setShowDiscountSection] = useState(false);
   const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
   const [readyFormId, setReadyFormId] = useState<string | null>(null);
@@ -126,6 +125,22 @@ export function useEditListingForm({
    * odak değişimindeki bir refetch, satıcının yazdıklarını silerdi.
    */
   const populatedForRef = useRef<string | null>(null);
+  /**
+   * Görsel listesini dolduran callback. Hook sırası yüzünden (form önce, görsel
+   * durumu sonra) doğrudan çağıramıyoruz; kayıt yüklenince tetiklenmesi için
+   * ref üzerinden bağlanır.
+   */
+  const seedExistingImagesRef = useRef<
+    | ((
+        images: Array<{
+          cardKey: string;
+          detailKey: string;
+          cardUrl?: string | null;
+          detailUrl?: string | null;
+        }>,
+      ) => void)
+    | null
+  >(null);
   useEffect(() => {
     const edit = listingQuery.data?.edit;
     if (!edit) return;
@@ -134,9 +149,10 @@ export function useEditListingForm({
     }
     populatedForRef.current = id;
 
-    const { newFormData, previewUrls } = buildListingFormData(edit);
+    const { newFormData } = buildListingFormData(edit);
     reset(toValues(newFormData));
-    setImagePreviewUrls(previewUrls);
+    // Kayıtlı görseller `uploaded` olarak yerleşir; yeniden YÜKLENMEZ.
+    seedExistingImagesRef.current?.(edit.images ?? []);
 
     const { saleData: nextSaleData, saleActive } =
       buildSaleDataFromListing(edit);
@@ -219,8 +235,7 @@ export function useEditListingForm({
     record: listingQuery.data?.edit ?? null,
     saleData,
     setSaleData,
-    imagePreviewUrls,
-    setImagePreviewUrls,
+    seedExistingImagesRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,

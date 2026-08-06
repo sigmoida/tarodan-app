@@ -47,7 +47,7 @@ function NewListingLayout() {
     commissionPreviewLoading,
     commissionPreviewError,
     limits,
-    imagePreviewUrls,
+    imageItems,
     uploadingImages,
     handleFileUpload,
     removeImage,
@@ -128,7 +128,7 @@ function NewListingLayout() {
           <div data-tour="listing-images">
             <ImagesCard
               maxImages={limits?.maxImagesPerListing || 3}
-              imagePreviewUrls={imagePreviewUrls}
+              items={imageItems}
               uploadingImages={uploadingImages}
               handleFileUpload={handleFileUpload}
               removeImage={removeImage}

@@ -48,8 +48,7 @@ export default function EditListingClient() {
     onSubmit,
     saleData,
     setSaleData,
-    imagePreviewUrls,
-    setImagePreviewUrls,
+    seedExistingImagesRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,
@@ -150,13 +149,18 @@ export default function EditListingClient() {
     authLoading,
     isAuthenticated,
   });
-  const { uploadingImages, handleFileUpload, removeImage } =
-    useListingImageUpload({
-      form,
-      maxImages: limits?.maxImagesPerListing || 3,
-      imagePreviewUrls,
-      setImagePreviewUrls,
-    });
+  const {
+    items: imageItems,
+    uploadingImages,
+    seedExistingImages,
+    handleFileUpload,
+    removeImage,
+  } = useListingImageUpload({
+    form,
+    maxImages: limits?.maxImagesPerListing || 3,
+  });
+  // Kayıt yüklendiğinde mevcut görselleri yerleştirir (yeniden yükleme yok).
+  seedExistingImagesRef.current = seedExistingImages;
   const {
     reactivateQuantity,
     setReactivateQuantity,
@@ -283,7 +287,7 @@ export default function EditListingClient() {
         />
         <ImagesCard
           maxImages={limits?.maxImagesPerListing || 3}
-          imagePreviewUrls={imagePreviewUrls}
+          items={imageItems}
           uploadingImages={uploadingImages}
           handleFileUpload={handleFileUpload}
           removeImage={removeImage}
