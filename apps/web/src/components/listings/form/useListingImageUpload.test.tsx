@@ -308,6 +308,64 @@ describe("useListingImageUpload — gerçek form ile kirlilik", () => {
       unmount();
     });
 
+    /**
+     * Regresyon: bayrak oturum boyunca kalıcıydı. Bu segmentte ilandan ilana
+     * geçerken bileşen unmount OLMAYABİLİR; A ilanında görsel düzenleyen
+     * kullanıcı B ilanına geçtiğinde seed reddediliyor ve B formunda A'nın
+     * görselleri kalıyordu.
+     */
+    it("BAŞKA ilana geçince liste zorunlu olarak yenilenir", () => {
+      const { result, unmount } = setup();
+      act(() => result.current.images.seedExistingImages(seeded, "listing-a"));
+      act(() => result.current.images.moveImage(1, 0));
+      expect(result.current.images.hasUserImageEdits).toBe(true);
+
+      act(() =>
+        result.current.images.seedExistingImages([existing("z")], "listing-b"),
+      );
+
+      // Ekranda YALNIZ B'nin görselleri.
+      expect(result.current.images.items.map((i) => i.cardKey)).toEqual([
+        "z-card",
+      ]);
+      // Ve düzenleme bayrağı yeni kayıt için sıfırlanır.
+      expect(result.current.images.hasUserImageEdits).toBe(false);
+      unmount();
+    });
+
+    it("başka ilana geçerken bekleyen yükleme iptal edilir ve taşınmaz", () => {
+      const { result, unmount } = setup();
+      act(() => result.current.images.seedExistingImages(seeded, "listing-a"));
+      act(() => result.current.images.handleFileUpload([fakeFile("a.png")]));
+      expect(result.current.images.items).toHaveLength(3);
+      expect(result.current.images.submitBlocker?.reason).toBe("pending");
+
+      act(() =>
+        result.current.images.seedExistingImages([existing("z")], "listing-b"),
+      );
+
+      // A'nın yüklemesi B'nin listesine düşmemeli ve gönderimi kilitlememeli.
+      expect(result.current.images.items.map((i) => i.cardKey)).toEqual([
+        "z-card",
+      ]);
+      expect(result.current.images.submitBlocker).toBeNull();
+      unmount();
+    });
+
+    it("aynı ilan kimliğiyle yapılan refetch yine ezmez", () => {
+      const { result, unmount } = setup();
+      act(() => result.current.images.seedExistingImages(seeded, "listing-a"));
+      act(() => result.current.images.moveImage(1, 0));
+      const reordered = result.current.images.items.map((i) => i.cardKey);
+
+      act(() => result.current.images.seedExistingImages(seeded, "listing-a"));
+
+      expect(result.current.images.items.map((i) => i.cardKey)).toEqual(
+        reordered,
+      );
+      unmount();
+    });
+
     it("kullanıcı dokunmadıysa seed normal çalışır (ilk doldurma bozulmasın)", () => {
       const { result, unmount } = setup();
 

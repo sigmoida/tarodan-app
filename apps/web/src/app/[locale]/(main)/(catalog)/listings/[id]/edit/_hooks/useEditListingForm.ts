@@ -149,6 +149,7 @@ export function useEditListingForm({
           cardUrl?: string | null;
           detailUrl?: string | null;
         }>,
+        sessionId?: string,
       ) => void)
     | null
   >(null);
@@ -163,7 +164,9 @@ export function useEditListingForm({
     const { newFormData } = buildListingFormData(edit);
     reset(toValues(newFormData));
     // Kayıtlı görseller `uploaded` olarak yerleşir; yeniden YÜKLENMEZ.
-    seedExistingImagesRef.current?.(edit.images ?? []);
+    // İlan kimliği geçilir: aynı ilanda refetch kullanıcının düzenini ezmez,
+    // BAŞKA ilana geçildiğinde liste zorunlu olarak yenilenir.
+    seedExistingImagesRef.current?.(edit.images ?? [], id);
 
     const { saleData: nextSaleData, saleActive } =
       buildSaleDataFromListing(edit);

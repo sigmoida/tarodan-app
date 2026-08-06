@@ -119,6 +119,8 @@ export function useListingImageUpload({
   formRef.current = form;
   // State güncellemesi asenkron; seed koruması aynı turda karar verebilmeli.
   const userEditsRef = useRef(false);
+  /** O an düzenlenen kaydın kimliği — seed guard'ı buna bağlıdır. */
+  const sessionRef = useRef<string | null>(null);
 
   /**
    * Listeyi güncelle ve forma yazılacak yükü aynı anda tazele.
@@ -189,7 +191,20 @@ export function useListingImageUpload({
     [queue],
   );
 
-  /** Düzenleme ekranı: kayıtlı görselleri yükleme yapmadan yerleştirir. */
+  /**
+   * Düzenleme ekranı: kayıtlı görselleri yükleme yapmadan yerleştirir.
+   *
+   * `sessionId` DÜZENLENEN KAYDI tanımlar (ilan id'si). Guard ona bağlıdır:
+   *
+   *  - aynı kayıt + kullanıcı düzenlemesi → sunucudan gelen liste REDDEDİLİR
+   *    (focus refetch'i bekleyen yüklemeyi ve değiştirilmiş sırayı ezmesin);
+   *  - kayıt DEĞİŞTİYSE liste ZORUNLU olarak yenilenir.
+   *
+   * Kimliğe bağlamak şart: bu segmentte ilandan ilana geçerken bileşen
+   * unmount OLMAYABİLİR. Oturumdan bağımsız bir bayrakla, A ilanında görsel
+   * düzenleyen kullanıcı B ilanına geçtiğinde B'nin görselleri
+   * yerleştirilemiyor ve B formunda A'nın görselleri kalıyordu.
+   */
   const seedExistingImages = useCallback(
     (
       images: Array<{
@@ -198,16 +213,32 @@ export function useListingImageUpload({
         cardUrl?: string | null;
         detailUrl?: string | null;
       }>,
+      sessionId?: string,
     ) => {
-      // Kullanıcı görsellere dokunduysa sunucudan gelen liste ONU EZEMEZ.
-      // Focus refetch'i kaydedilmemiş düzeni ve yüklenmekte olan görseli
-      // silmemeli; guard çağıranda değil BURADA durur ki her çağıran
-      // hatırlamak zorunda kalmasın.
-      if (userEditsRef.current) return;
+      const nextSession = sessionId ?? null;
+      const isNewSession = sessionRef.current !== nextSession;
+
+      if (!isNewSession) {
+        // Guard çağıranda değil BURADA durur ki her çağıran hatırlamak
+        // zorunda kalmasın.
+        if (userEditsRef.current) return;
+      } else {
+        // Başka bir kayda geçildi: ÖNCEKİ kaydın devam eden yüklemeleri
+        // iptal edilir ve önizleme URL'leri serbest bırakılır — aksi halde
+        // eski ilanın yüklemesi yeni ilanın listesine düşerdi.
+        queue.cancelAll();
+        for (const item of itemsRef.current) {
+          if (item.isObjectUrl) URL.revokeObjectURL(item.previewUrl);
+        }
+        userEditsRef.current = false;
+        setHasUserImageEdits(false);
+        sessionRef.current = nextSession;
+      }
+
       // Sunucudan gelen kayıt — kullanıcı değişikliği değil.
       commit(images.map(itemFromExisting), { userEdit: false });
     },
-    [commit],
+    [commit, queue],
   );
 
   const addFiles = useCallback(
