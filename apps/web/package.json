@@ -69,6 +69,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "vitest": "^3.2.7",
     "@tarodan/brand": "workspace:*",
     "@tarodan/eslint-config": "workspace:*",
     "@tarodan/eslint-plugin": "workspace:*",
