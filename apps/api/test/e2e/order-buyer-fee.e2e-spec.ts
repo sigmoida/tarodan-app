@@ -8,6 +8,8 @@ import {
   truncateAll,
 } from "../test-utils/db";
 import { testTaxPolicy } from "../../src/modules/order/testing/tax-policy-fixture";
+import { testPriceResolver } from "../../src/modules/discount/testing/price-resolver-fixture";
+import { noCouponDiscountService } from "../../src/modules/discount/testing/discount-service-fixture";
 import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-ids";
 
 describe("strict order commission (E2E)", () => {
@@ -20,7 +22,8 @@ describe("strict order commission (E2E)", () => {
       prisma,
       {} as any,
       {} as any,
-      {} as any,
+      noCouponDiscountService(),
+      testPriceResolver(),
       testTaxPolicy(),
     );
     return new OrderService(pricing, {} as any, {} as any, {} as any);
