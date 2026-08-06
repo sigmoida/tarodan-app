@@ -37,12 +37,15 @@ function ExternalNotificationLink({
   onClick,
   className,
   children,
+  ...rest
 }: {
   href: string;
   onClick?: () => void;
   className?: string;
   children: React.ReactNode;
-}) {
+} & Pick<React.AnchorHTMLAttributes<HTMLAnchorElement>, "id"> & {
+    "data-testid"?: string;
+  }) {
   return (
     <a
       href={href}
@@ -50,6 +53,7 @@ function ExternalNotificationLink({
       rel="noopener noreferrer"
       onClick={onClick}
       className={className}
+      {...rest}
     >
       {children}
     </a>
@@ -213,7 +217,10 @@ export default function NotificationBell() {
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-border-subtle">
+              <div
+                className="divide-y divide-border-subtle"
+                data-testid="notification-bell-list"
+              >
                 {notifications.map((notification) => {
                   // Hedef TEK yardımcıdan (resolveNotificationHref): ham `link`
                   // alanı güvenilir değil — çözülmemiş şablon, artık var
@@ -231,6 +238,7 @@ export default function NotificationBell() {
                       }`}
                     >
                       <NotificationLink
+                        data-testid="notification-bell-link"
                         href={resolved.href}
                         onClick={() => {
                           if (!notification.isRead) {

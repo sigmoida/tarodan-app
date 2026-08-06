@@ -17,6 +17,8 @@ import { TradeService } from "../trade/trade.service";
 import { MembershipService } from "../membership/membership.service";
 import { OfferSchedulerService } from "../offer/offer-scheduler.service";
 import { MembershipSchedulerService } from "../membership/membership-scheduler.service";
+import { NotificationDispatchService } from "../notification/notification-dispatch.service";
+import { isKnownNotificationType } from "../notification/notification-link";
 
 function assertTestEnv(): void {
   if (process.env.NODE_ENV !== "test") {
@@ -36,6 +38,7 @@ export class DevController {
     private readonly offerScheduler: OfferSchedulerService,
     private readonly membershipScheduler: MembershipSchedulerService,
     private readonly cache: CacheService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   // ───────── Scheduler / sweep tetikleyiciler ─────────
@@ -147,6 +150,56 @@ export class DevController {
     if (!m?.count)
       throw new NotFoundException(`Bilinmeyen model: ${body.model}`);
     return { count: await m.count({ where: body.where }) };
+  }
+
+  // ───────── Bildirim tohumlama (link E2E'si için) ─────────
+  /**
+   * Verilen kullanıcıya belirtilen tipte bildirim üretir.
+   *
+   * Satırı doğrudan INSERT ETMEZ: gerçek yazma yolundan (`createInAppNotification`)
+   * geçer, böylece link üretimi de üretimdekiyle aynı kodla çalışır. E2E'nin
+   * "bildirim linki 404 vermiyor" iddiası ancak böyle anlamlı olur.
+   *
+   * `clear` ile kullanıcının mevcut bildirimleri silinir — test hangi kartın
+   * nerede olduğunu bilmeden doğrulama yapamaz.
+   */
+  @Post("notifications/seed")
+  async seedNotifications(
+    @Body()
+    body: {
+      email: string;
+      clear?: boolean;
+      items: Array<{ type: string; data?: Record<string, any> }>;
+    },
+  ) {
+    assertTestEnv();
+    const user = await this.prisma.user.findUnique({
+      where: { email: body.email },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException(`Kullanıcı yok: ${body.email}`);
+
+    if (body.clear) {
+      // Yalnız zil/bildirim merkezinin okuduğu kanal; e-posta/SMS logu durur.
+      await this.prisma.notificationLog.deleteMany({
+        where: { userId: user.id, channel: "in_app" },
+      });
+    }
+
+    const created: string[] = [];
+    const skipped: string[] = [];
+    for (const item of body.items ?? []) {
+      if (!isKnownNotificationType(item.type)) {
+        throw new NotFoundException(`Bilinmeyen bildirim tipi: ${item.type}`);
+      }
+      const ok = await this.notifications.createInAppNotification(
+        user.id,
+        item.type,
+        item.data,
+      );
+      (ok ? created : skipped).push(item.type);
+    }
+    return { userId: user.id, created, skipped };
   }
 
   // ───────── Per-journey state reset (her senaryoyu 0'dan izole koşmak için) ─────────

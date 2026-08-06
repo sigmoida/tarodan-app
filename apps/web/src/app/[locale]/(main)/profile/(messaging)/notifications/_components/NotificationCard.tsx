@@ -63,6 +63,7 @@ export default function NotificationCard({
 
       {href && (
         <ButtonLink
+          data-testid="notification-card-link"
           href={href}
           // Dış hedef locale önekli `Link`ten geçemez — `/tr/https://…` olurdu.
           external={resolved.isExternal}

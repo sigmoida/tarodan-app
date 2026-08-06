@@ -42,6 +42,8 @@ import { MailModule } from "../mail/mail.module";
   ],
   exports: [
     NotificationService,
+    // DevModule (yalnız NODE_ENV=test) bildirimi gerçek yazma yolundan tohumlar.
+    NotificationDispatchService,
     ExpoPushProvider,
     SmsProvider,
     NetGsmProvider,
