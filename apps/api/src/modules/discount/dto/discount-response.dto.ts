@@ -1,5 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DiscountType, DiscountScope } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { DiscountType, DiscountScope } from "@prisma/client";
 
 export class DiscountResponseDto {
   @ApiProperty()
@@ -59,9 +59,9 @@ export class DiscountResponseDto {
   @ApiPropertyOptional()
   isFlashSale?: boolean;
 
-
   @ApiProperty()
-  usageLimitPerUser: number;
+  /** null = sınırsız (kimlik gerektirmez; misafir de kullanabilir). */
+  usageLimitPerUser: number | null;
 
   @ApiProperty()
   usedCount: number;
@@ -88,10 +88,10 @@ export class DiscountResponseDto {
   updatedAt: Date;
 
   // Computed fields
-  @ApiProperty({ description: 'İndirim şu an geçerli mi?' })
+  @ApiProperty({ description: "İndirim şu an geçerli mi?" })
   isCurrentlyValid: boolean;
 
-  @ApiProperty({ description: 'Kalan kullanım hakkı' })
+  @ApiProperty({ description: "Kalan kullanım hakkı" })
   remainingUsage?: number;
 }
 

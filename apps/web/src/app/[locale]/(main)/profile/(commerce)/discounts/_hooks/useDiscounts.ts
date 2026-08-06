@@ -62,7 +62,10 @@ function buildPayload(form: DiscountFormData) {
     usageLimitTotal: form.usageLimitTotal
       ? parseInt(form.usageLimitTotal)
       : undefined,
-    usageLimitPerUser: parseInt(form.usageLimitPerUser) || 1,
+    // 0 = sınırsız. Kampanyada (kodsuz) limit sayılmaz; 0 gönderilir.
+    usageLimitPerUser: form.code?.trim()
+      ? parseInt(form.usageLimitPerUser) || 0
+      : 0,
     isStackable: form.isStackable,
     isActive: form.isActive,
     startDate: new Date(form.startDate).toISOString(),

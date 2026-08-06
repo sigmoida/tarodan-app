@@ -42,7 +42,8 @@ function fromDiscount(d: Discount): DiscountFormData {
     minCartValue: d.minCartValue?.toString() || "",
     maxDiscountAmount: d.maxDiscountAmount?.toString() || "",
     usageLimitTotal: d.usageLimitTotal?.toString() || "",
-    usageLimitPerUser: d.usageLimitPerUser.toString(),
+    // null = sınırsız; formda 0 ile temsil edilir (alan artık null olabilir).
+    usageLimitPerUser: (d.usageLimitPerUser ?? 0).toString(),
     isStackable: d.isStackable,
     isActive: d.isActive,
     startDate: d.startDate.split("T")[0],
@@ -70,6 +71,8 @@ export default function DiscountFormModal({
   register("targetProductIds");
   const type = watch("type");
   const scope = watch("scope");
+  // Kod girildiyse KUPON, girilmediyse otomatik kampanyadır.
+  const isCoupon = Boolean(watch("code")?.trim());
   const value = watch("value");
   const targetProductIds = watch("targetProductIds") ?? [];
 
@@ -237,22 +240,27 @@ export default function DiscountFormModal({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <FormInput
-          name="usageLimitTotal"
-          label="Toplam Kullanım Limiti"
-          type="number"
-          min="1"
-          placeholder="Sınırsız"
-        />
-        <FormInput
-          name="usageLimitPerUser"
-          label="Kullanıcı Başı Limit"
-          type="number"
-          min="1"
-          placeholder="1"
-        />
-      </div>
+      {/* Kullanım limitleri yalnız KUPONDA sayılır; kodsuz kampanyada motor
+          sayaç tutmaz, alan doldurulsa da hiçbir şey yapmazdı. */}
+      {isCoupon && (
+        <div className="grid grid-cols-2 gap-4">
+          <FormInput
+            name="usageLimitTotal"
+            label="Toplam Kullanım Limiti"
+            type="number"
+            min="1"
+            placeholder="Sınırsız"
+          />
+          <FormInput
+            name="usageLimitPerUser"
+            label="Kullanıcı Başı Limit"
+            type="number"
+            min="0"
+            placeholder="1"
+            helperText="0 = sınırsız (misafirler de kullanabilir)"
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <FormDatePicker name="startDate" label="Başlangıç Tarihi *" />
