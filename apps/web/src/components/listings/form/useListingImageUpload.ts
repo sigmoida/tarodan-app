@@ -92,6 +92,21 @@ export function useListingImageUpload({
   upload = defaultUpload,
 }: UseListingImageUploadParams) {
   const [items, setItems] = useState<ListingImageItem[]>([]);
+  /**
+   * Kullanıcı görsellerde bir değişiklik yaptı mı?
+   *
+   * Form alanının kendisine GÜVENİLEMEZ: `setValue(..., shouldDirty: true)`
+   * RHF'te "zorla kirlet" demek değildir — yeni değer varsayılanla
+   * karşılaştırılır. Bekleyen bir yükleme sırasında forma yalnız `uploaded`
+   * kalemler yazıldığı için `images` HENÜZ DEĞİŞMEZ ve `isDirty` false kalır.
+   * Dosya seçiciden pencereye dönmek React Query'nin focus refetch'ini
+   * tetiklediğinde, "temiz" görünen form sunucudaki eski görsellerle yeniden
+   * doldurulup yüklenmekte olan görseli ekrandan siliyordu (nesne depoda
+   * sahipsiz kalıyordu).
+   *
+   * Bu yüzden kullanıcı düzenlemesi AYRI tutulur ve payload'dan bağımsızdır.
+   */
+  const [hasUserImageEdits, setHasUserImageEdits] = useState(false);
 
   // Object URL'ler ve aktif istekler unmount'ta serbest bırakılmalı; `items`
   // state'i temizlik anında bayat olmasın diye ref üzerinden okunur.
@@ -102,15 +117,18 @@ export function useListingImageUpload({
 
   const formRef = useRef(form);
   formRef.current = form;
+  // State güncellemesi asenkron; seed koruması aynı turda karar verebilmeli.
+  const userEditsRef = useRef(false);
 
   /**
    * Listeyi güncelle ve forma yazılacak yükü aynı anda tazele.
    *
-   * `shouldDirty`: KULLANICININ yaptığı her değişiklik (ekleme, kaldırma,
-   * sıralama, kapak seçme) formu kirletmeli. Aksi halde pencere odağı
-   * değiştiğinde çalışan refetch, form "temiz" göründüğü için kaydedilmemiş
-   * görsel düzenini sessizce eziyordu. Sunucudan gelen mevcut görsellerin
-   * yerleştirilmesi ise kullanıcı değişikliği DEĞİLDİR ve kirletmez.
+   * KULLANICININ yaptığı her değişiklik (ekleme, kaldırma, sıralama, kapak
+   * seçme) hem formu kirletir hem `hasUserImageEdits` bayrağını kaldırır.
+   * `shouldDirty` TEK BAŞINA yetmez: RHF yeni değeri varsayılanla
+   * karşılaştırır ve bekleyen bir yükleme forma henüz yazılmadığı için
+   * `images` değişmez. Sunucudan gelen mevcut görsellerin yerleştirilmesi ise
+   * kullanıcı değişikliği DEĞİLDİR; ikisini de tetiklemez.
    */
   const commit = useCallback(
     (
@@ -119,6 +137,12 @@ export function useListingImageUpload({
     ) => {
       itemsRef.current = next;
       setItems(next);
+      if (userEdit) {
+        // Payload'dan BAĞIMSIZ bayrak: `shouldDirty` bekleyen yüklemede
+        // form değerini değiştirmediği için tek başına yetmiyor.
+        userEditsRef.current = true;
+        setHasUserImageEdits(true);
+      }
       formRef.current.setValue("images", toFormImages(next), {
         shouldValidate: true,
         shouldDirty: userEdit,
@@ -175,6 +199,11 @@ export function useListingImageUpload({
         detailUrl?: string | null;
       }>,
     ) => {
+      // Kullanıcı görsellere dokunduysa sunucudan gelen liste ONU EZEMEZ.
+      // Focus refetch'i kaydedilmemiş düzeni ve yüklenmekte olan görseli
+      // silmemeli; guard çağıranda değil BURADA durur ki her çağıran
+      // hatırlamak zorunda kalmasın.
+      if (userEditsRef.current) return;
       // Sunucudan gelen kayıt — kullanıcı değişikliği değil.
       commit(images.map(itemFromExisting), { userEdit: false });
     },
@@ -263,6 +292,12 @@ export function useListingImageUpload({
     uploadingImages: hasPendingUploads(items),
     /** Gönderim engeli — yoksa null. */
     submitBlocker: imageSubmitBlocker(items),
+    /**
+     * Kullanıcı görsellerde değişiklik yaptı mı? Düzenleme formu refetch
+     * korumasında `formState.isDirty` ile BİRLİKTE kullanmalı: bekleyen
+     * yükleme form değerini henüz değiştirmediği için isDirty yetmez.
+     */
+    hasUserImageEdits,
     seedExistingImages,
     handleFileUpload,
     removeImage,

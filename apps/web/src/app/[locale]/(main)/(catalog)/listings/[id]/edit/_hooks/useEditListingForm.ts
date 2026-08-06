@@ -131,6 +131,12 @@ export function useEditListingForm({
    */
   const imageSubmitBlockerRef = useRef<{ message: string } | null>(null);
   /**
+   * Kullanıcı görsellere dokundu mu? `formState.isDirty` tek başına YETMEZ:
+   * bekleyen bir yükleme forma henüz yazılmadığı için form "temiz" görünür ve
+   * focus refetch'i yüklenmekte olan görseli ekrandan silerdi.
+   */
+  const hasUserImageEditsRef = useRef(false);
+  /**
    * Görsel listesini dolduran callback. Hook sırası yüzünden (form önce, görsel
    * durumu sonra) doğrudan çağıramıyoruz; kayıt yüklenince tetiklenmesi için
    * ref üzerinden bağlanır.
@@ -150,7 +156,7 @@ export function useEditListingForm({
     const edit = listingQuery.data?.edit;
     if (!edit) return;
     if (populatedForRef.current === id) {
-      if (formState.isDirty) return;
+      if (formState.isDirty || hasUserImageEditsRef.current) return;
     }
     populatedForRef.current = id;
 
@@ -246,6 +252,7 @@ export function useEditListingForm({
     setSaleData,
     seedExistingImagesRef,
     imageSubmitBlockerRef,
+    hasUserImageEditsRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,

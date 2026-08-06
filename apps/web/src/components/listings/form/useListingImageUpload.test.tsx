@@ -4,6 +4,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useForm } from "react-hook-form";
 import { useListingImageUpload } from "./useListingImageUpload";
 import type { UploadPort } from "./listing-upload-queue";
 
@@ -183,6 +184,141 @@ describe("useListingImageUpload — form kirliliği", () => {
     expect(dirtyCalls().length).toBeGreaterThan(0);
     expect(result.current.items.map((i) => i.cardKey)).toEqual(reordered);
     unmount();
+  });
+});
+
+/**
+ * GERÇEK react-hook-form ile.
+ *
+ * Regresyon: `setValue(..., { shouldDirty: true })` RHF'te "zorla kirlet"
+ * demek DEĞİLDİR — yeni değer varsayılanla karşılaştırılır. Bekleyen bir
+ * yükleme sırasında forma yalnız `uploaded` kalemler yazıldığı için `images`
+ * değişmez ve `isDirty` FALSE kalır. Sahte bir `setValue` ile bu görülemezdi:
+ * önceki test yalnız çağrıya `shouldDirty: true` geçildiğini doğruluyordu.
+ */
+describe("useListingImageUpload — gerçek form ile kirlilik", () => {
+  const seeded = [existing("a"), existing("b")];
+
+  const setup = (upload?: UploadPort) =>
+    renderHook(() => {
+      const form = useForm({
+        defaultValues: {
+          images: seeded.map((image) => ({
+            cardKey: image.cardKey,
+            detailKey: image.detailKey,
+          })),
+        },
+      });
+      const images = useListingImageUpload({
+        form: form as never,
+        maxImages: 5,
+        upload: upload ?? (() => new Promise(() => {})),
+      });
+      // RHF `formState`i Proxy ile abone eder: RENDER sırasında okunmayan alan
+      // yeniden hesaplanmaz. Gerçek bileşen de böyle okur.
+      const { isDirty } = form.formState;
+      return { form, images, isDirty };
+    });
+
+  it("bekleyen yüklemede isDirty FALSE kalır — guard bu yüzden ayrı tutulur", () => {
+    const { result, unmount } = setup();
+    act(() => result.current.images.seedExistingImages(seeded));
+
+    act(() => result.current.images.handleFileUpload([fakeFile("yeni.png")]));
+
+    // Kanıt: form değeri değişmedi (yükleme bitmedi), dolayısıyla isDirty yok.
+    expect(result.current.form.getValues("images")).toHaveLength(2);
+    expect(result.current.isDirty).toBe(false);
+    // Ama kullanıcı düzenlemesi bayrağı DOĞRU: refetch koruması bunu görür.
+    expect(result.current.images.hasUserImageEdits).toBe(true);
+    unmount();
+  });
+
+  it("yükleme tamamlanınca form da kirlenir", async () => {
+    const { result, unmount } = setup(async () => ({
+      cardKey: "c-card",
+      detailKey: "c-detail",
+    }));
+    act(() => result.current.images.seedExistingImages(seeded));
+
+    await act(async () => {
+      result.current.images.handleFileUpload([fakeFile("yeni.png")]);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.form.getValues("images")).toHaveLength(3);
+    expect(result.current.isDirty).toBe(true);
+    unmount();
+  });
+
+  it("ilk seed kullanıcı düzenlemesi sayılmaz", () => {
+    const { result, unmount } = setup();
+
+    act(() => result.current.images.seedExistingImages(seeded));
+
+    expect(result.current.images.hasUserImageEdits).toBe(false);
+    expect(result.current.isDirty).toBe(false);
+    unmount();
+  });
+
+  it("yalnız sıra değiştirmek bayrağı kaldırır", () => {
+    const { result, unmount } = setup();
+    act(() => result.current.images.seedExistingImages(seeded));
+
+    act(() => result.current.images.moveImage(1, 0));
+
+    expect(result.current.images.hasUserImageEdits).toBe(true);
+    unmount();
+  });
+
+  describe("refetch koruması", () => {
+    /**
+     * Asıl senaryo: dosya seçicisinden pencereye dönmek React Query'nin focus
+     * refetch'ini tetikler; ikinci seed yüklenmekte olan görseli ezerse
+     * kullanıcı onu ekranda kaybeder ve nesne depoda sahipsiz kalır.
+     */
+    it("ikinci seed BEKLEYEN görseli EZMEZ", () => {
+      const { result, unmount } = setup();
+      act(() => result.current.images.seedExistingImages(seeded));
+      act(() => result.current.images.handleFileUpload([fakeFile("yeni.png")]));
+
+      const before = result.current.images.items.map((i) => i.clientId);
+      expect(before).toHaveLength(3);
+
+      // Focus refetch → sunucu yine iki görsel döndürür.
+      act(() => result.current.images.seedExistingImages(seeded));
+
+      expect(result.current.images.items.map((i) => i.clientId)).toEqual(
+        before,
+      );
+      unmount();
+    });
+
+    it("ikinci seed kullanıcının SIRASINI da ezmez", () => {
+      const { result, unmount } = setup();
+      act(() => result.current.images.seedExistingImages(seeded));
+      act(() => result.current.images.moveImage(1, 0));
+      const reordered = result.current.images.items.map((i) => i.cardKey);
+
+      act(() => result.current.images.seedExistingImages(seeded));
+
+      expect(result.current.images.items.map((i) => i.cardKey)).toEqual(
+        reordered,
+      );
+      unmount();
+    });
+
+    it("kullanıcı dokunmadıysa seed normal çalışır (ilk doldurma bozulmasın)", () => {
+      const { result, unmount } = setup();
+
+      act(() => result.current.images.seedExistingImages(seeded));
+      act(() => result.current.images.seedExistingImages([existing("z")]));
+
+      expect(result.current.images.items.map((i) => i.cardKey)).toEqual([
+        "z-card",
+      ]);
+      unmount();
+    });
   });
 });
 

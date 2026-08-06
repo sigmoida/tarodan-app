@@ -50,6 +50,7 @@ export default function EditListingClient() {
     setSaleData,
     seedExistingImagesRef,
     imageSubmitBlockerRef,
+    hasUserImageEditsRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,
@@ -154,6 +155,7 @@ export default function EditListingClient() {
     items: imageItems,
     uploadingImages,
     submitBlocker: imageSubmitBlocker,
+    hasUserImageEdits,
     seedExistingImages,
     handleFileUpload,
     removeImage,
@@ -167,6 +169,7 @@ export default function EditListingClient() {
   // Kayıt yüklendiğinde mevcut görselleri yerleştirir (yeniden yükleme yok).
   seedExistingImagesRef.current = seedExistingImages;
   imageSubmitBlockerRef.current = imageSubmitBlocker;
+  hasUserImageEditsRef.current = hasUserImageEdits;
   const {
     reactivateQuantity,
     setReactivateQuantity,
