@@ -39,9 +39,13 @@ export class CreateDiscountDto {
   type: DiscountType;
 
   @ApiProperty({
-    description: "İndirim değeri (yüzde veya tutar)",
+    description:
+      "İndirim değeri. type=percentage ise yüzde (0-100), fixed_amount ise tutar (TL).",
     example: 10,
   })
+  // Yüzde için üst sınır (100) serviste doğrulanır: class-validator'da
+  // @ValidateIf ALANIN TAMAMINI koşullar, buraya konsaydı fixed_amount'ta
+  // @IsNumber/@Min de devre dışı kalırdı.
   @IsNumber()
   @Min(0)
   @Type(() => Number)
@@ -131,12 +135,14 @@ export class CreateDiscountDto {
   usageLimitTotal?: number;
 
   @ApiPropertyOptional({
-    description: "Kullanıcı başı kullanım limiti",
+    description:
+      "Kullanıcı başı kullanım limiti. 0 = SINIRSIZ (kimlik gerektirmez, " +
+      "misafir de kullanabilir). Verilmezse 1.",
     default: 1,
   })
   @IsOptional()
   @IsNumber()
-  @Min(1)
+  @Min(0)
   @Type(() => Number)
   usageLimitPerUser?: number;
 

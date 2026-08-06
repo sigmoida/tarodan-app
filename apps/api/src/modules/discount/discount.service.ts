@@ -80,6 +80,31 @@ function assertSupportedDiscountType(type?: DiscountType | null): void {
   }
 }
 
+/**
+ * Yüzde indirim 100'ü aşamaz. Motor fiyatı 0'a taban yapıyor (negatife
+ * düşmüyor) ama alıcı kargo ve hizmet bedelini ödemeye devam ederken satıcının
+ * hak edişi sıfırlanıyordu — sessiz para kaybı, hiçbir uyarı yok.
+ */
+function assertValueInRange(
+  type: DiscountType | undefined,
+  value: number | undefined,
+): void {
+  if (type !== DiscountType.percentage || value == null) return;
+  if (value > 100) {
+    throw new BadRequestException("Yüzde indirim %100'ü aşamaz");
+  }
+}
+
+/** Bitiş başlangıçtan önce olamaz: hiç yürürlüğe girmeyen indirim sessizce kaydediliyordu. */
+function assertDateRange(start?: string | Date, end?: string | Date): void {
+  if (!start || !end) return;
+  if (new Date(end).getTime() <= new Date(start).getTime()) {
+    throw new BadRequestException(
+      "Bitiş tarihi başlangıç tarihinden sonra olmalıdır",
+    );
+  }
+}
+
 @Injectable()
 export class DiscountService {
   private readonly logger = new Logger(DiscountService.name);
@@ -140,6 +165,8 @@ export class DiscountService {
     // the per-line bug). Block their creation until real buy-X-get-Y / quantity-tier
     // logic exists (F4.2).
     assertSupportedDiscountType(dto.type);
+    assertValueInRange(dto.type, dto.value);
+    assertDateRange(dto.startDate, dto.endDate);
 
     // Sellers can only create discounts for their own products
     if (!isAdmin && dto.scope === DiscountScope.global) {
@@ -217,7 +244,12 @@ export class DiscountService {
           ? new Prisma.Decimal(dto.maxDiscountAmount)
           : null,
         usageLimitTotal: dto.usageLimitTotal || null,
-        usageLimitPerUser: dto.usageLimitPerUser || 1,
+        // 0 = SINIRSIZ. Alan hiç verilmezse eski varsayılan (1) korunur.
+        // Eskiden `|| 1` yazıyordu: sınırsız bir kupon TANIMLANAMIYORDU, bu
+        // yüzden kişi-başı limit her kuponda doluydu ve validateCoupon kimlik
+        // istediği için MİSAFİR hiçbir kuponu kullanamıyordu.
+        usageLimitPerUser:
+          dto.usageLimitPerUser == null ? 1 : dto.usageLimitPerUser || null,
         minQuantity: dto.minQuantity || null,
         buyQuantity: dto.buyQuantity || null,
         getQuantity: dto.getQuantity || null,
@@ -275,6 +307,14 @@ export class DiscountService {
 
     // bogo/bulk_quantity unsupported (F4.2) — reject switching to an unimplemented type.
     assertSupportedDiscountType(dto.type);
+    assertValueInRange(
+      dto.type ?? discount.type,
+      dto.value ?? Number(discount.value),
+    );
+    assertDateRange(
+      dto.startDate ?? discount.startDate,
+      dto.endDate ?? discount.endDate,
+    );
 
     // Sellers can only update their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
@@ -334,7 +374,8 @@ export class DiscountService {
         usageLimitTotal: dto.usageLimitTotal,
       }),
       ...(dto.usageLimitPerUser !== undefined && {
-        usageLimitPerUser: dto.usageLimitPerUser,
+        // 0 = sınırsız (bkz. create).
+        usageLimitPerUser: dto.usageLimitPerUser || null,
       }),
       ...(dto.minQuantity !== undefined && {
         minQuantity: dto.minQuantity,
