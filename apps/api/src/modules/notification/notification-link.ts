@@ -346,8 +346,14 @@ export function normalizeLegacyNotificationLink(
     [/^\/products\/unavailable(\/|\?|$)/, "/products/unavailable$1"],
     [/^\/products(\/|\?|$)/, "/listings$1"],
   ];
+  let rewritten = trimmed;
   for (const [from, to] of rules) {
-    if (from.test(trimmed)) return trimmed.replace(from, to);
+    if (from.test(trimmed)) {
+      rewritten = trimmed.replace(from, to);
+      break;
+    }
   }
-  return trimmed;
+  // Yeniden yazmak yetmiyor: eski satırda `/olmayan-bir-sayfa` ya da ters bölü
+  // ile origin'den kaçan bir yol olabilir. Serbest link ile AYNI kapıdan geçer.
+  return isSafeFreeLink(rewritten) ? rewritten : null;
 }

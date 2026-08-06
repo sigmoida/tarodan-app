@@ -64,6 +64,8 @@ export default function NotificationCard({
       {href && (
         <ButtonLink
           href={href}
+          // Dış hedef locale önekli `Link`ten geçemez — `/tr/https://…` olurdu.
+          external={resolved.isExternal}
           onClick={() => !isRead && onMarkRead(notification.id)}
           variant="outline"
           size="sm"

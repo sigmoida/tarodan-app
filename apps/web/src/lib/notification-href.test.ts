@@ -49,6 +49,15 @@ describe("bildirim hedefi", () => {
       ["http (https değil)", "http://tarodan.com.tr"],
       ["ayrıştırılamayan", "http://"],
       ["boş", "   "],
+      // Tarayıcı bunu `https://evil.example/x` olarak çözüyor: `/` ile
+      // başlıyor diye iç link sayılırsa site DIŞINA çıkılıyordu.
+      ["ters bölü ile origin kaçışı", "/\\evil.example/x"],
+      ["ters bölü (kodlanmış değil)", "/profile\\@evil.example"],
+      ["kontrol karakteri", "/profile/orders\n/x"],
+      // Site içinde KARŞILIĞI OLMAYAN yol: tıklayan kullanıcı 404 görürdü.
+      ["var olmayan sayfa", "/olmayan-bir-sayfa"],
+      ["eski takas yolu (rewrite dışı)", "/trade-center/t1"],
+      ["profil altında olmayan sekme", "/profile/gizli-sekme"],
     ])("%s", (_name, value) => {
       const resolved = resolveNotificationHref(link(value));
       expect(resolved.href).toBe(NOTIFICATION_FALLBACK_HREF);
@@ -60,6 +69,42 @@ describe("bildirim hedefi", () => {
         NOTIFICATION_FALLBACK_HREF,
       );
       expect(resolveNotificationHref({}).isFallback).toBe(true);
+    });
+  });
+
+  /**
+   * Drift koruması: API'nin `NOTIFICATION_LINKS` haritasından çıkabilecek her
+   * hedef burada kabul edilmeli. Sunucu yeni bir yol üretip web reddederse
+   * kullanıcı sessizce bildirim merkezine düşer — bu test onu yakalar.
+   */
+  describe("API'nin ürettiği hedeflerin tamamı kabul edilir", () => {
+    it.each([
+      "/",
+      "/listings",
+      "/listings/p1",
+      "/products/unavailable/p1",
+      "/collections",
+      "/collections/c1",
+      "/seller/s1",
+      "/seller/orders/o1",
+      "/membership",
+      "/profile",
+      "/profile/orders",
+      "/profile/orders/o1",
+      "/profile/offers?tab=received",
+      "/profile/offers?tab=sent",
+      "/profile/trades",
+      "/profile/trades/t1",
+      "/profile/messages",
+      "/profile/messages?thread=th1",
+      "/profile/listings",
+      "/profile/favorites",
+      "/profile/payments",
+      "/profile/notifications",
+    ])("%s", (target) => {
+      const resolved = resolveNotificationHref(link(target));
+      expect(resolved.isFallback, `${target} reddedildi`).toBe(false);
+      expect(resolved.href).toBe(target);
     });
   });
 

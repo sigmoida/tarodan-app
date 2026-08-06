@@ -299,5 +299,20 @@ describe("bildirim hedefleri", () => {
       expect(normalizeLegacyNotificationLink("//evil.example.com")).toBeNull();
       expect(normalizeLegacyNotificationLink("javascript:alert(1)")).toBeNull();
     });
+
+    /**
+     * Regresyon: yeniden yazma kuralına uymayan her `/` yolu olduğu gibi
+     * dönüyordu. Eski satır sitede karşılığı olmayan ya da ters bölü ile
+     * origin'den kaçan bir adres taşıyorsa kullanıcı 404'e veya site dışına
+     * gidiyordu — okuma yolu serbest link ile aynı kapıdan geçmeliydi.
+     */
+    it.each([
+      ["sitede karşılığı yok", "/olmayan-bir-sayfa"],
+      ["profil altında olmayan sekme", "/profile/gizli-sekme"],
+      ["ters bölü ile origin kaçışı", "/\\evil.example/x"],
+      ["yeniden yazılıp da geçersiz kalan", "/orders/o1/gizli/derin"],
+    ])("eski link doğrulamadan geçmez: %s", (_name, legacy) => {
+      expect(normalizeLegacyNotificationLink(legacy)).toBeNull();
+    });
   });
 });
