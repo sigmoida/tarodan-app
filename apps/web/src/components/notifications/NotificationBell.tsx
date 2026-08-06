@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
+import { resolveNotificationHref } from "@/lib/notification-href";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BellIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { BellIcon as BellSolidIcon } from "@heroicons/react/24/solid";
@@ -190,11 +191,10 @@ export default function NotificationBell() {
                     }`}
                   >
                     <Link
-                      href={
-                        notification.link ||
-                        notification.data?.link ||
-                        "/profile/notifications"
-                      }
+                      // Hedef TEK yardımcıdan (resolveNotificationHref):
+                      // ham `link` alanı güvenilir değil — çözülmemiş şablon,
+                      // artık var olmayan eski yol ve site dışı adres taşıyor.
+                      href={resolveNotificationHref(notification).href}
                       onClick={() => {
                         if (!notification.isRead) {
                           markAsRead(notification.id);

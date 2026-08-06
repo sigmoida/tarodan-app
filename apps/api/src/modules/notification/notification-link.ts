@@ -1,5 +1,8 @@
 import { Logger } from "@nestjs/common";
 import { NotificationType } from "./dto";
+import { isSafeFreeLink } from "./notification-link-safety";
+
+export { isSafeFreeLink };
 
 /**
  * Bildirim hedeflerinin TEK kaynağı.
@@ -261,17 +264,4 @@ export function normalizeLegacyNotificationLink(
     if (from.test(trimmed)) return trimmed.replace(from, to);
   }
   return trimmed;
-}
-
-/** Serbest link yalnız HTTPS ya da site-içi mutlak yol olabilir. */
-export function isSafeFreeLink(link: string): boolean {
-  const trimmed = link.trim();
-  if (!trimmed || trimmed.includes("{{")) return false;
-  if (trimmed.startsWith("//")) return false;
-  if (trimmed.startsWith("/")) return true;
-  try {
-    return new URL(trimmed).protocol === "https:";
-  } catch {
-    return false;
-  }
 }
