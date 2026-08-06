@@ -16,6 +16,10 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@headlessui/react": "^1.7.18",
     "@heroicons/react": "^2.1.1",
     "@hookform/resolvers": "^3.3.4",
@@ -42,8 +46,8 @@
     "@tarodan/auth": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/i18n": "workspace:*",
-    "@tarodan/shared": "workspace:*",
     "@tarodan/logger": "workspace:*",
+    "@tarodan/shared": "workspace:*",
     "@tarodan/types": "workspace:*",
     "@tarodan/ui": "workspace:*",
     "axios": "^1.18.1",

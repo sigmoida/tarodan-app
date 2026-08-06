@@ -23,6 +23,8 @@ interface ImagesCardProps {
   handleFileUpload: (files: FileList | File[] | null) => void;
   removeImage: (clientId: string) => void;
   retryImage: (clientId: string) => void;
+  moveImage: (from: number, to: number) => void;
+  makeCover: (index: number) => void;
 }
 
 const megabytes = (bytes: number) => Math.round(bytes / (1024 * 1024));
@@ -41,6 +43,8 @@ export default function ImagesCard({
   handleFileUpload,
   removeImage,
   retryImage,
+  moveImage,
+  makeCover,
 }: ImagesCardProps) {
   const { formState } = useFormContext();
   const imagesError = formState.errors.images?.message as string | undefined;
@@ -135,6 +139,8 @@ export default function ImagesCard({
           items={items}
           onRemove={removeImage}
           onRetry={retryImage}
+          onMove={moveImage}
+          onMakeCover={makeCover}
         />
       </div>
     </SectionCard>
