@@ -76,8 +76,10 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
       isValid: true,
       discount: {
         id: "discount-1",
+        revision: "2026-01-01T00:00:00.000Z",
         estimatedDiscount: 20,
         eligibleProductIds: [product.id],
+        platformFundedShare: 0,
       },
     });
 

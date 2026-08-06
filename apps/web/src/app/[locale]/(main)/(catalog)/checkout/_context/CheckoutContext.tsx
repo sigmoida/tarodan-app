@@ -317,6 +317,9 @@ function useCheckoutValue() {
     // Unit-price hash the quote was priced with — same 409 guard for product
     // price / campaign changes between quote and pay (F1.3).
     expectedPricingHash: quote?.pricingHash ?? undefined,
+    // Kupon quote'tan sonra değiştiyse API 409 döner; alıcı onaylamadığı bir
+    // tutarla tahsil edilmez.
+    expectedCouponFingerprint: quote?.couponFingerprint ?? undefined,
   });
 
   // Kart kasası yalnız üyede ve sunucu izin veriyorsa açıktır (misafir kart

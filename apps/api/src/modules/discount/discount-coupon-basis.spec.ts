@@ -41,6 +41,7 @@ describe("DiscountService.allocateCoupon — matrah", () => {
           isActive: true,
           startDate: new Date("2020-01-01"),
           endDate: new Date("2100-01-01"),
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
           fundedBy: "seller",
           platformFundedRatio: null,
           ...coupon,

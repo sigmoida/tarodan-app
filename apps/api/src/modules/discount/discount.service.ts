@@ -3,8 +3,10 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from "@nestjs/common";
+import { createHash } from "crypto";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { SearchService } from "../search/search.service";
@@ -42,6 +44,28 @@ import {
 import { allocateProportionally } from "./discount-allocation.helper";
 import { activeAutomaticCampaignWhere } from "./discount-predicates";
 
+/** Kuponun para üreten girdilerinin kararlı özeti. */
+function couponFingerprintOf(input: {
+  discountId: string;
+  revision: string;
+  total: number;
+  platformFundedShare: number;
+  eligibleProductIds: string[];
+}): string {
+  // Eksik/bozuk alan checkout'u 500'e düşürmemeli: parmak izi yine hesaplanır,
+  // alan gerçek değerine kavuştuğunda değişir ve 409 zaten devreye girer.
+  const numeric = (value: unknown): number =>
+    Number.isFinite(Number(value)) ? Number(value) : 0;
+  const basis = [
+    input.discountId,
+    input.revision ?? "",
+    numeric(input.total).toFixed(2),
+    numeric(input.platformFundedShare).toFixed(4),
+    [...(input.eligibleProductIds ?? [])].sort().join(","),
+  ].join("|");
+  return createHash("sha256").update(basis).digest("hex").slice(0, 16);
+}
+
 /** Kuponun dağıtılacağı sepet satırı. Sıra korunur. */
 export interface CouponAllocationLine {
   productId: string;
@@ -66,6 +90,18 @@ export interface AllocatedCoupon {
   shares: number[];
   /** Σ shares — sepetten düşülecek toplam. */
   total: number;
+  /** Kuponun tahsil anındaki hâli (Discount.updatedAt). */
+  revision: string;
+  /**
+   * Kuponun PARA ÜRETEN girdilerinin özeti. Quote bunu döndürür, istemci
+   * create'e geri gönderir; tutmazsa 409 PRICING_CHANGED.
+   *
+   * `pricingHash` kuponu bilerek dışarıda bırakır (kullanıcıya bağlı, quote
+   * ucu @Public). Bu yüzden kuponun oranı, tavanı, kapsamı ya da finansman
+   * tipi quote'tan sonra değişse create sessizce YENİ tutarla ve yeni
+   * komisyonla devam ediyordu — alıcı onaylamadığı bir tahsilatla karşılaşıyordu.
+   */
+  fingerprint: string;
 }
 
 /**
@@ -796,6 +832,9 @@ export class DiscountService {
       discount: {
         id: discount.id,
         name: discount.name,
+        // Kuponun o anki hâli — quote ile create arasında oran/tavan/kapsam
+        // değişirse fingerprint tutmaz ve create 409 döner.
+        revision: discount.updatedAt.toISOString(),
         // Voucher'da parent şablonun `code`'u null'dır → girilen kodu döndür.
         code: discount.code ?? code,
         type: discount.type,
@@ -909,6 +948,9 @@ export class DiscountService {
       ),
     );
 
+    const total =
+      Math.round(shares.reduce((sum, share) => sum + share, 0) * 100) / 100;
+
     return {
       coupon: {
         discountId: discount.id,
@@ -922,10 +964,37 @@ export class DiscountService {
         platformFundedShare: discount.platformFundedShare,
         eligibleProductIds: discount.eligibleProductIds,
         shares,
-        total:
-          Math.round(shares.reduce((sum, share) => sum + share, 0) * 100) / 100,
+        total,
+        revision: discount.revision,
+        fingerprint: couponFingerprintOf({
+          discountId: discount.id,
+          revision: discount.revision,
+          total,
+          platformFundedShare: discount.platformFundedShare,
+          eligibleProductIds: discount.eligibleProductIds,
+        }),
       },
     };
+  }
+
+  /**
+   * Quote'ta görülen kupon, create anında hâlâ AYNI mı?
+   *
+   * Kupon uygulanıyorsa istemci quote'tan aldığı parmak izini geri
+   * göndermelidir; göndermezse ya da tutmazsa tahsilat yapılmaz. Kupon
+   * uygulanmıyorsa kontrol edilecek bir şey yoktur.
+   */
+  assertCouponUnchanged(
+    coupon: AllocatedCoupon | null,
+    expectedFingerprint: string | undefined | null,
+  ): void {
+    if (!coupon) return;
+    if (expectedFingerprint === coupon.fingerprint) return;
+    throw new ConflictException({
+      code: "PRICING_CHANGED",
+      message:
+        "Kupon koşulları güncellendi. Lütfen sepeti yenileyip tekrar deneyin.",
+    });
   }
 
   /**

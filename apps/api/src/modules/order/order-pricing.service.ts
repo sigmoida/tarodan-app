@@ -282,6 +282,12 @@ export class OrderPricingService {
     // Birim fiyat bazının (efektif fiyatlar) stabil hash'i — istemci create'e geri
     // gönderir; ürün fiyatı/kampanya değiştiyse create 409 PRICING_CHANGED döner (F1.3).
     pricingHash: string;
+    /**
+     * Uygulanan kuponun parmak izi — istemci create'e geri gönderir; kupon
+     * quote'tan sonra değiştiyse create 409 PRICING_CHANGED döner. Kupon
+     * uygulanmadıysa null.
+     */
+    couponFingerprint: string | null;
     pricing: {
       subtotal: number;
       shippingAmount: number;
@@ -715,6 +721,7 @@ export class OrderPricingService {
       commissionRuleSetId: commissionRuleSet.id,
       commissionRuleSetVersion: commissionRuleSet.version,
       pricingHash,
+      couponFingerprint: coupon?.fingerprint ?? null,
       pricing,
     };
   }

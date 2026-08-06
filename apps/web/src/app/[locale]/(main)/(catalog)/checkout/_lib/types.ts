@@ -70,4 +70,6 @@ export interface CheckoutQuote {
   commissionRuleSetVersion?: number | null;
   /** Unit-price hash this quote was priced with; sent back on submit → 409 if a price/campaign moved. */
   pricingHash?: string;
+  /** Uygulanan kuponun parmak izi — create'e geri gönderilir (409 koruması). */
+  couponFingerprint?: string | null;
 }

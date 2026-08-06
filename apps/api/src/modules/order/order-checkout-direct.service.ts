@@ -345,6 +345,12 @@ export class OrderCheckoutDirectService {
           couponError || i18nMessage("server.order.invalidCouponCode"),
         );
       }
+      // Quote'ta görülen kupon hâlâ aynı mı? Değiştiyse alıcı onaylamadığı bir
+      // tutarla tahsil edilmemeli.
+      this.discountService.assertCouponUnchanged(
+        coupon,
+        dto.expectedCouponFingerprint,
+      );
       const couponDiscount = coupon?.total ?? 0;
       const appliedCouponCode = coupon?.code ?? null;
       const appliedDiscountId = coupon?.discountId ?? null;

@@ -41,6 +41,7 @@ export function useCheckoutQuote(
           commissionRuleSetId: res.data.commissionRuleSetId ?? null,
           commissionRuleSetVersion: res.data.commissionRuleSetVersion ?? null,
           pricingHash: res.data.pricingHash,
+          couponFingerprint: res.data.couponFingerprint,
         };
       return (res.data ?? null) as CheckoutQuote | null;
     },

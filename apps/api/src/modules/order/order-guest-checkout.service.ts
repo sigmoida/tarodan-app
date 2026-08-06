@@ -347,6 +347,11 @@ export class OrderGuestCheckoutService {
           couponError || i18nMessage("server.order.invalidCouponCode"),
         );
       }
+      // Quote'ta görülen kupon hâlâ aynı mı?
+      this.discountService.assertCouponUnchanged(
+        coupon,
+        dto.expectedCouponFingerprint,
+      );
       const guestCouponDiscount = coupon?.total ?? 0;
 
       // Get or create a system guest user for all guest orders

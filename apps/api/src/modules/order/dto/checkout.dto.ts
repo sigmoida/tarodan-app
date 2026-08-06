@@ -149,6 +149,15 @@ export class CheckoutDto {
 
   @ApiPropertyOptional({
     description:
+      "Quote'un döndürdüğü kupon parmak izi. Kupon uygulanıyorsa ZORUNLU: " +
+      "kuponun oranı/tavanı/kapsamı quote'tan sonra değiştiyse 409 PRICING_CHANGED.",
+  })
+  @IsOptional()
+  @IsString()
+  expectedCouponFingerprint?: string;
+
+  @ApiPropertyOptional({
+    description:
       "Alıcı mesafeli satış sözleşmesini onayladı mı. true ise onay, zamanı ve " +
       "yürürlükteki sözleşme sürümüyle birlikte sipariş grubuna yazılır. " +
       "Zorunlu DEĞİLDİR: onay kutusunu henüz göndermeyen istemciler (eski mobil " +

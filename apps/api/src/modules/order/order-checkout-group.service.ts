@@ -458,6 +458,11 @@ export class OrderCheckoutGroupService {
               couponError || i18nMessage("server.order.invalidCouponCode"),
             );
           }
+          // Quote'ta görülen kupon hâlâ aynı mı?
+          this.discountService.assertCouponUnchanged(
+            coupon,
+            dto.expectedCouponFingerprint,
+          );
           pricing.forEach((p, index) => {
             p.couponDiscount = coupon?.shares[index] ?? 0;
           });

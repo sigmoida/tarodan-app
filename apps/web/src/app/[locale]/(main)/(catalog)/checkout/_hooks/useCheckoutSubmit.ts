@@ -50,6 +50,7 @@ export function useCheckoutSubmit({
   expectedCommissionRuleSetId,
   expectedCommissionRuleSetVersion,
   expectedPricingHash,
+  expectedCouponFingerprint,
 }: {
   checkoutItems: CheckoutItem[];
   t: Translate;
@@ -87,6 +88,8 @@ export function useCheckoutSubmit({
   expectedCommissionRuleSetVersion?: number | null;
   /** Unit-price hash from the quote; 409 PRICING_CHANGED if a price/campaign moved. */
   expectedPricingHash?: string | null;
+  /** Quote'un döndürdüğü kupon parmak izi — kupon değiştiyse API 409 döner. */
+  expectedCouponFingerprint?: string | null;
 }) {
   const queryClient = useQueryClient();
   // Checkout sipariş(ler) yarattı: sipariş listesi/sayaç/profil cache'leri
@@ -317,6 +320,7 @@ export function useCheckoutSubmit({
               expectedCommissionRuleSetId: string;
               expectedCommissionRuleSetVersion: number;
               expectedPricingHash?: string;
+              expectedCouponFingerprint?: string;
               distanceSalesAccepted?: boolean;
             } = {
               items: checkoutGroupItems,
@@ -329,6 +333,9 @@ export function useCheckoutSubmit({
 
             if (expectedPricingHash) {
               payload.expectedPricingHash = expectedPricingHash;
+            }
+            if (expectedCouponFingerprint) {
+              payload.expectedCouponFingerprint = expectedCouponFingerprint;
             }
 
             // Forward the applied cart coupon so the order is created at the
@@ -451,6 +458,7 @@ export function useCheckoutSubmit({
               expectedCommissionRuleSetVersion: number;
               couponCode?: string;
               expectedPricingHash?: string;
+              expectedCouponFingerprint?: string;
               distanceSalesAccepted?: boolean;
             } = {
               items: checkoutGroupItems,
@@ -491,6 +499,10 @@ export function useCheckoutSubmit({
 
             if (expectedPricingHash) {
               guestPayload.expectedPricingHash = expectedPricingHash;
+            }
+            if (expectedCouponFingerprint) {
+              guestPayload.expectedCouponFingerprint =
+                expectedCouponFingerprint;
             }
 
             // Forward the guest's applied coupon so the order is created at the

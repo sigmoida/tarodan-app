@@ -302,6 +302,7 @@ describe("OrderService checkout group (batch checkout)", () => {
           provide: DiscountService,
           useValue: {
             allocateCoupon: jest.fn().mockResolvedValue({ coupon: null }),
+            assertCouponUnchanged: jest.fn(),
             reserveUsage: jest.fn(),
             releaseReservedUsageForOrders: jest.fn(),
           },

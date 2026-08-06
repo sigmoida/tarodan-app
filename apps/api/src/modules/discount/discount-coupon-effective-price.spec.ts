@@ -29,6 +29,7 @@ describe("DiscountService coupon pricing base", () => {
     isActive: true,
     startDate: new Date(now.getTime() - 60_000),
     endDate: new Date(now.getTime() + 60_000),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     fundedBy: "seller",
     platformFundedRatio: null,
   };

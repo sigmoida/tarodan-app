@@ -10,6 +10,7 @@ import type { AllocatedCoupon } from "../discount.service";
 export const noCouponDiscountService = () =>
   ({
     allocateCoupon: async () => ({ coupon: null }),
+    assertCouponUnchanged: () => {},
   }) as any;
 
 /** Belirli bir kupon dağıtımını döndüren sahte — kupon davranışını ölçen suite'ler için. */
@@ -17,6 +18,7 @@ export const stubCouponDiscountService = (
   coupon: Partial<AllocatedCoupon> & Pick<AllocatedCoupon, "shares" | "total">,
 ) =>
   ({
+    assertCouponUnchanged: () => {},
     allocateCoupon: async () => ({
       coupon: {
         discountId: "discount-1",
@@ -36,4 +38,5 @@ export const stubCouponDiscountService = (
 export const rejectingCouponDiscountService = (error: string) =>
   ({
     allocateCoupon: async () => ({ coupon: null, error }),
+    assertCouponUnchanged: () => {},
   }) as any;

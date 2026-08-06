@@ -48,6 +48,12 @@ export class ValidationResultDto {
   discount?: {
     id: string;
     name: string;
+    /**
+     * Kuponun o anki hâli (Discount.updatedAt, ISO). Quote ile create arasında
+     * kuponun oranı/tavanı/kapsamı/finansmanı değişirse bu değer değişir ve
+     * create 409 PRICING_CHANGED döner.
+     */
+    revision: string;
     code: string;
     type: string;
     value: number;

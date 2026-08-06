@@ -139,6 +139,15 @@ export class DirectBuyDto {
     message: "Geçerli checkout fiyat hash'i gönderilmelidir",
   })
   expectedPricingHash: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Quote'un döndürdüğü kupon parmak izi. Kupon uygulanıyorsa ZORUNLU: " +
+      "kuponun oranı/tavanı/kapsamı quote'tan sonra değiştiyse 409 PRICING_CHANGED.",
+  })
+  @IsOptional()
+  @IsString()
+  expectedCouponFingerprint?: string;
 }
 
 /**
