@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
+import { allocateProportionally } from "../discount/discount-allocation.helper";
 import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import {
@@ -654,22 +655,17 @@ export class CartService {
     const eligibleLines = availableItems.filter((item) =>
       affectedProductIds.has(item.productId),
     );
-    const eligibleTotal = eligibleLines.reduce(
-      (sum, item) => sum + item.lineTotal,
-      0,
+    const couponShares = allocateProportionally(
+      couponDiscountTotal,
+      eligibleLines.map((item) => item.lineTotal),
     );
-    let allocatedCoupon = 0;
     eligibleLines.forEach((item, index) => {
       const packageEntry = sellerPackages.get(item.sellerId);
-      if (!packageEntry || eligibleTotal <= 0) return;
-      const lineCoupon =
-        index === eligibleLines.length - 1
-          ? Math.round((couponDiscountTotal - allocatedCoupon) * 100) / 100
-          : Math.round(
-              ((couponDiscountTotal * item.lineTotal) / eligibleTotal) * 100,
-            ) / 100;
-      allocatedCoupon += lineCoupon;
-      packageEntry.subtotal = Math.max(0, packageEntry.subtotal - lineCoupon);
+      if (!packageEntry) return;
+      packageEntry.subtotal = Math.max(
+        0,
+        packageEntry.subtotal - couponShares[index],
+      );
     });
 
     let shippingCost = 0;

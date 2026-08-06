@@ -40,6 +40,7 @@ import {
 } from "../shipping/shipping-tariff.helper";
 import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import { DiscountService } from "../discount/discount.service";
+import { allocateProportionally } from "../discount/discount-allocation.helper";
 import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { createHash } from "crypto";
 import { calculateServiceTax } from "./order-service-tax.helper";
@@ -489,17 +490,12 @@ export class OrderPricingService {
           0,
         );
         if (eligiblePriceSum > 0) {
-          let allocated = 0;
+          const shares = allocateProportionally(
+            total,
+            eligibleLines.map((l) => l.lineSubtotal),
+          );
           eligibleLines.forEach((l, idx) => {
-            if (idx === eligibleLines.length - 1) {
-              l.couponDiscount = Math.round((total - allocated) * 100) / 100;
-            } else {
-              l.couponDiscount =
-                Math.round(
-                  ((total * l.lineSubtotal) / eligiblePriceSum) * 100,
-                ) / 100;
-              allocated += l.couponDiscount;
-            }
+            l.couponDiscount = shares[idx];
           });
           couponDiscountTotal = total;
         }

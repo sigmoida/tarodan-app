@@ -21,6 +21,7 @@ import { generateUniqueReference } from "../../common/helpers/generate-reference
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { EventService } from "../events";
 import { DiscountService, ProductPriceResolver } from "../discount";
+import { allocateProportionally } from "../discount/discount-allocation.helper";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import {
   OrderPricingService,
@@ -489,20 +490,12 @@ export class OrderCheckoutGroupService {
                 0,
               );
               if (eligiblePriceSum > 0) {
-                let allocated = 0;
+                const shares = allocateProportionally(
+                  totalCoupon,
+                  eligibleLines.map((p) => p.productPrice * p.quantity),
+                );
                 eligibleLines.forEach((p, idx) => {
-                  if (idx === eligibleLines.length - 1) {
-                    p.couponDiscount =
-                      Math.round((totalCoupon - allocated) * 100) / 100;
-                  } else {
-                    p.couponDiscount =
-                      Math.round(
-                        ((totalCoupon * p.productPrice * p.quantity) /
-                          eligiblePriceSum) *
-                          100,
-                      ) / 100;
-                    allocated += p.couponDiscount;
-                  }
+                  p.couponDiscount = shares[idx];
                 });
               }
             }
