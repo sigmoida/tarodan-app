@@ -31,6 +31,7 @@ import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
 import { RefundService } from "../refund/refund.service";
 import {
+  DiscountFundedBy,
   DiscountScope,
   OrderStatus,
   ProductKind,
@@ -951,6 +952,102 @@ describe("OrderService checkout group (batch checkout)", () => {
       expect(Number(data.subtotal)).toBe(85);
       expect(data.discountCode).toBe("HOSGELDIN");
       expect(discountService.reserveUsage).toHaveBeenCalled();
+    });
+
+    /**
+     * Regresyon: otomatik kampanyanın finansman bilgisi siparişe hiç
+     * taşınmıyordu. `platformFundedDiscount` yalnız kupondan hesaplandığı için
+     * platform-fonlu bir kampanyanın maliyeti satıcıya kalıyordu.
+     */
+    it("platform-fonlu kampanyanın maliyeti siparişte platforma yazılır", async () => {
+      mockTx.product.findUnique.mockResolvedValue(
+        makeProduct(productA, { quantity: 100 }),
+      );
+      priceResolver.setCampaigns([
+        testCampaign({
+          id: "campaign-platform",
+          value: 20,
+          scope: DiscountScope.global,
+          fundedBy: DiscountFundedBy.platform,
+        }),
+      ]);
+
+      await service.guestCheckout({
+        productId: productA,
+        idempotencyKey,
+        email: guestEmail,
+        emailVerificationCode: guestCode,
+        phone: "+905551234567",
+        guestName: "Guest User",
+        shippingAddress: {
+          fullName: "Guest User",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+        },
+        expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
+        expectedPricingHash: pricingHashFor([
+          { productId: productA, unitPrice: 80 },
+        ]),
+      } as any);
+
+      const data = mockTx.order.create.mock.calls[0][0].data;
+      expect(Number(data.subtotal)).toBe(80);
+      // 20 TL kampanya indiriminin TAMAMI platforma ait.
+      expect(Number(data.platformFundedDiscount)).toBe(20);
+      expect(data.discountBreakdown).toMatchObject({
+        campaignId: "campaign-platform",
+        campaignDiscount: 20,
+        campaignFundedBy: DiscountFundedBy.platform,
+      });
+      // Snapshot dondurulur: kampanya sonradan değişse de mutabakat yapılabilir.
+      expect((data.financialSnapshot as any).discount).toMatchObject({
+        campaignId: "campaign-platform",
+        campaignAmount: 20,
+        platformFundedAmount: 20,
+      });
+    });
+
+    it("seller-fonlu kampanyada platform payı yazılmaz", async () => {
+      mockTx.product.findUnique.mockResolvedValue(
+        makeProduct(productA, { quantity: 100 }),
+      );
+      priceResolver.setCampaigns([
+        testCampaign({
+          id: "campaign-seller",
+          value: 20,
+          scope: DiscountScope.global,
+          fundedBy: DiscountFundedBy.seller,
+        }),
+      ]);
+
+      await service.guestCheckout({
+        productId: productA,
+        idempotencyKey,
+        email: guestEmail,
+        emailVerificationCode: guestCode,
+        phone: "+905551234567",
+        guestName: "Guest User",
+        shippingAddress: {
+          fullName: "Guest User",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+        },
+        expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
+        expectedPricingHash: pricingHashFor([
+          { productId: productA, unitPrice: 80 },
+        ]),
+      } as any);
+
+      const data = mockTx.order.create.mock.calls[0][0].data;
+      expect(Number(data.platformFundedDiscount)).toBe(0);
     });
 
     /**

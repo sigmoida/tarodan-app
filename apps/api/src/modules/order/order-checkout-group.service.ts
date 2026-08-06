@@ -21,6 +21,7 @@ import { generateUniqueReference } from "../../common/helpers/generate-reference
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { EventService } from "../events";
 import { DiscountService, ProductPriceResolver } from "../discount";
+import { buildOrderDiscountBreakdown } from "./order-discount-breakdown.helper";
 import { allocateProportionally } from "../discount/discount-allocation.helper";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import {
@@ -415,15 +416,13 @@ export class OrderCheckoutGroupService {
             // İndirim penceresi ORTAK kuraldan: pencere dışındaysa satış fiyatı
             // indirim öncesi fiyattır (vitrinle aynı sayı).
             const resolved = effectiveMap.get(productId)!;
-            const productPrice = resolved.unitPrice;
-            const originalPrice = resolved.originalUnitPrice;
             return {
               productId,
               product,
               quantity: qtyByProduct.get(productId) ?? 1,
-              productPrice,
-              originalPrice,
-              productDiscount: Math.max(0, originalPrice - productPrice),
+              productPrice: resolved.unitPrice,
+              originalPrice: resolved.originalUnitPrice,
+              resolved,
               couponDiscount: 0,
             };
           });
@@ -748,7 +747,15 @@ export class OrderCheckoutGroupService {
 
           for (const input of orderInputs) {
             const entry = input.pricingEntry;
-            const totalDiscount = entry.productDiscount + entry.couponDiscount;
+            // İndirim dökümü ORTAK yardımcıdan: satıcı indirimi ile otomatik
+            // kampanya ayrı, platform payı ikisinden birlikte.
+            const discountBreakdown = buildOrderDiscountBreakdown({
+              resolved: entry.resolved,
+              quantity: entry.quantity,
+              couponDiscount: entry.couponDiscount,
+              couponPlatformFundedShare: appliedPlatformFundedShare,
+            });
+            const totalDiscount = discountBreakdown.totalDiscount;
 
             const shippingAddressJson: Record<string, unknown> = {
               id: shippingAddress.id,
@@ -800,16 +807,13 @@ export class OrderCheckoutGroupService {
                 discountBreakdown:
                   totalDiscount > 0
                     ? {
-                        productDiscount: entry.productDiscount,
-                        couponDiscount: entry.couponDiscount,
+                        ...discountBreakdown,
                         appliedDiscountId,
                         originalPrice: entry.originalPrice,
                       }
                     : undefined,
                 platformFundedDiscount:
-                  Math.round(
-                    entry.couponDiscount * appliedPlatformFundedShare * 100,
-                  ) / 100,
+                  discountBreakdown.platformFundedDiscount,
                 shippingCost: input.shippingCost,
                 taxAmount: input.taxAmount,
                 withholdingTaxAmount: input.withholdingTaxAmount,
@@ -840,9 +844,8 @@ export class OrderCheckoutGroupService {
                   discountCode:
                     entry.couponDiscount > 0 ? appliedCouponCode : null,
                   platformFundedDiscount:
-                    Math.round(
-                      entry.couponDiscount * appliedPlatformFundedShare * 100,
-                    ) / 100,
+                    discountBreakdown.platformFundedDiscount,
+                  campaign: discountBreakdown,
                   shipping: {
                     tariffId: shippingTariff.tariffId,
                     tariffVersion: shippingTariff.tariffVersion,

@@ -226,4 +226,70 @@ describe("EscrowHoldService.createHold", () => {
 
     expect(tx.paymentHold.create.mock.calls[0][0].data.amount).toBe(85.06);
   });
+
+  /**
+   * Platform-fonlu KAMPANYA (kupon değil) da satıcıya geri eklenmeli.
+   *
+   * Regresyon: `platformFundedDiscount` yalnız kupondan hesaplanıyordu, bu yüzden
+   * platform-fonlu bir kampanyada satıcı indirimin maliyetini üstlenmiş gibi
+   * eksik hak ediş alıyordu. Escrow tarafı zaten kolonu okuyor; kırılan yer
+   * kolonun sipariş anında DOLDURULMAMASIYDI — bu test ikisini birlikte tutar.
+   */
+  describe("platform-fonlu indirim satıcıya geri eklenir", () => {
+    /** 100 TL liste, %20 platform-fonlu kampanya → alıcı 80 öder. */
+    const campaignOrder = (platformFundedDiscount: number) =>
+      makeOrder({
+        totalAmount: 80,
+        commissionAmount: 0,
+        withholdingTaxAmount: 0,
+        sellerFeeAmount: 0,
+        buyerFeeAmount: 0,
+        buyerShippingAmount: 0,
+        sellerShippingAmount: 0,
+        shippingCost: 0,
+        buyerServiceTaxAmount: 0,
+        sellerServiceTaxAmount: 0,
+        platformFundedDiscount,
+      });
+
+    it("platform-fonlu kampanyada satıcı indirim ÖNCESİ tutarı alır", async () => {
+      const { svc } = makeSvc();
+      const tx = makeTx();
+
+      await svc.createHold(tx, campaignOrder(20), "p1");
+
+      expect(tx.paymentHold.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ amount: 100 }),
+        }),
+      );
+    });
+
+    it("shared kampanyada yalnız platform payı geri eklenir", async () => {
+      const { svc } = makeSvc();
+      const tx = makeTx();
+
+      // 20 TL indirimin %30'u platform → 6 TL geri eklenir.
+      await svc.createHold(tx, campaignOrder(6), "p1");
+
+      expect(tx.paymentHold.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ amount: 86 }),
+        }),
+      );
+    });
+
+    it("seller-funded kampanyada satıcı indirimli tutarı alır", async () => {
+      const { svc } = makeSvc();
+      const tx = makeTx();
+
+      await svc.createHold(tx, campaignOrder(0), "p1");
+
+      expect(tx.paymentHold.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ amount: 80 }),
+        }),
+      );
+    });
+  });
 });

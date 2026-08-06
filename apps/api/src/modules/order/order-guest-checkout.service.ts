@@ -28,6 +28,7 @@ import { getAvailableQuantity } from "../product/helpers/product-availability.he
 import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { DiscountService, ProductPriceResolver } from "../discount";
+import { buildOrderDiscountBreakdown } from "./order-discount-breakdown.helper";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
@@ -457,17 +458,33 @@ export class OrderGuestCheckoutService {
         buyerFeeAmount: commissionResult.buyerFeeAmount,
         buyerServiceTaxAmount: guestBuyerServiceTax,
       });
-      // İndirim öncesi (çizili) fiyat — yoksa listelenen fiyatın kendisi.
-      const guestOriginalPrice = resolvedPrice.originalUnitPrice;
-      const guestDiscountAmount =
-        Math.max(0, guestOriginalPrice - finalPrice) + guestCouponDiscount;
+      // Teklifle alımda ürünün katalog indirimi geçerli DEĞİLDİR: tahsil edilen
+      // tutar pazarlıkla belirlenen teklif bedelidir. Bu yüzden hem indirim
+      // dökümü hem "indirim öncesi fiyat" teklif tutarından türer — aksi halde
+      // snapshot'ta `original - unit` ile `discountAmount` birbirini tutmazdı.
+      const guestPricingBasis = dto.offerId
+        ? {
+            originalUnitPrice: finalPrice,
+            saleUnitPrice: finalPrice,
+            unitPrice: finalPrice,
+            campaign: null,
+          }
+        : resolvedPrice;
+      // İndirim dökümü ORTAK yardımcıdan.
+      const guestDiscountBreakdown = buildOrderDiscountBreakdown({
+        resolved: guestPricingBasis,
+        quantity: 1,
+        couponDiscount: guestCouponDiscount,
+        couponPlatformFundedShare: coupon?.platformFundedShare ?? 0,
+      });
+      const guestDiscountAmount = guestDiscountBreakdown.totalDiscount;
+      /** İndirim öncesi (çizili) fiyat. */
+      const guestOriginalPrice = guestPricingBasis.originalUnitPrice;
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
       const guestPaymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const guestPlatformFundedDiscount =
-        Math.round(
-          guestCouponDiscount * (coupon?.platformFundedShare ?? 0) * 100,
-        ) / 100;
+        guestDiscountBreakdown.platformFundedDiscount;
 
       const guestSuratKey =
         dto.idempotencyKey?.trim() ||
@@ -588,6 +605,7 @@ export class OrderGuestCheckoutService {
             discountAmount: guestDiscountAmount,
             discountCode: coupon?.code,
             platformFundedDiscount: guestPlatformFundedDiscount,
+            campaign: guestDiscountBreakdown,
             shipping: {
               tariffId: shippingTariff.tariffId,
               tariffVersion: shippingTariff.tariffVersion,
@@ -603,6 +621,17 @@ export class OrderGuestCheckoutService {
             totalAmount,
           }),
           discountCode: coupon?.code ?? null,
+          // Diğer iki checkout yoluyla aynı kırılım: hangi katman ne kadar
+          // indirdi. Bu yol kolonu hiç yazmıyordu, o yüzden misafir
+          // siparişlerinde indirimin kaynağı sonradan bilinemiyordu.
+          discountBreakdown:
+            guestDiscountAmount > 0
+              ? {
+                  ...guestDiscountBreakdown,
+                  appliedDiscountId: coupon?.discountId ?? null,
+                  originalPrice: guestOriginalPrice,
+                }
+              : undefined,
           platformFundedDiscount: guestPlatformFundedDiscount,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: guestPaymentExpiresAt,

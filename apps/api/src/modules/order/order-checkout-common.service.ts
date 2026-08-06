@@ -4,6 +4,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { createHash } from "crypto";
+import type { OrderDiscountBreakdown } from "./order-discount-breakdown.helper";
 import { PrismaService } from "../../prisma";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
@@ -168,6 +169,12 @@ export class OrderCheckoutCommonService {
     discountAmount: number;
     discountCode?: string | null;
     platformFundedDiscount: number;
+    /**
+     * Uygulanan otomatik kampanyanın kimliği ve finansman kırılımı. Sipariş
+     * anında dondurulur: kampanya sonradan değişse/silinse bile mutabakat ve
+     * iade dağıtımı bu snapshot'tan yapılabilir.
+     */
+    campaign?: OrderDiscountBreakdown;
     shipping: {
       tariffId: string;
       tariffVersion: number;
@@ -199,6 +206,16 @@ export class OrderCheckoutCommonService {
         code: params.discountCode ?? null,
         amount: params.discountAmount,
         platformFundedAmount: params.platformFundedDiscount,
+        // Kırılım: hangi katman ne kadar indirdi ve platform payı nereden geldi.
+        saleAmount: params.campaign?.saleDiscount ?? 0,
+        campaignAmount: params.campaign?.campaignDiscount ?? 0,
+        campaignId: params.campaign?.campaignId ?? null,
+        campaignFundedBy: params.campaign?.campaignFundedBy ?? null,
+        campaignPlatformFundedShare:
+          params.campaign?.campaignPlatformFundedShare ?? 0,
+        couponAmount: params.campaign?.couponDiscount ?? 0,
+        couponPlatformFundedShare:
+          params.campaign?.couponPlatformFundedShare ?? 0,
       },
       shipping: {
         tariffId: params.shipping.tariffId,

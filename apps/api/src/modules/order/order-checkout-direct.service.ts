@@ -23,6 +23,7 @@ import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { DiscountService, ProductPriceResolver } from "../discount";
+import { buildOrderDiscountBreakdown } from "./order-discount-breakdown.helper";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
@@ -314,7 +315,6 @@ export class OrderCheckoutDirectService {
       });
       const productPrice = resolved.unitPrice;
       const originalPrice = resolved.originalUnitPrice;
-      const productDiscount = Math.max(0, originalPrice - productPrice);
 
       // F1.3: quote'un birim-fiyat hash'i ile doğrula — fiyat/kampanya değiştiyse
       // 409 PRICING_CHANGED (sessiz farklı tahsil yok). Hash yoksa atlanır.
@@ -352,7 +352,15 @@ export class OrderCheckoutDirectService {
       // F2.4: kupon indiriminin platform payı [0,1].
       const couponPlatformFundedShare = coupon?.platformFundedShare ?? 0;
 
-      const totalDiscount = productDiscount + couponDiscount;
+      // İndirim dökümü ORTAK yardımcıdan: satıcının kendi indirimi ile otomatik
+      // kampanya ayrı tutulur, platform payı ikisinden birlikte hesaplanır.
+      const discountBreakdown = buildOrderDiscountBreakdown({
+        resolved,
+        quantity: 1,
+        couponDiscount,
+        couponPlatformFundedShare,
+      });
+      const totalDiscount = discountBreakdown.totalDiscount;
       // Siparişin ürün tabanı = TAHSİL EDİLEN tutar; komisyon, kargo, vergi ve
       // alıcı toplamı hep bunun üzerinden. İndirim öncesi liste fiyatı
       // `discountAmount` / `discountBreakdown` / snapshot'ta durur.
@@ -518,15 +526,9 @@ export class OrderCheckoutDirectService {
           discountCode: appliedCouponCode,
           discountBreakdown:
             totalDiscount > 0
-              ? {
-                  productDiscount,
-                  couponDiscount,
-                  appliedDiscountId,
-                  originalPrice,
-                }
+              ? { ...discountBreakdown, appliedDiscountId, originalPrice }
               : undefined,
-          platformFundedDiscount:
-            Math.round(couponDiscount * couponPlatformFundedShare * 100) / 100,
+          platformFundedDiscount: discountBreakdown.platformFundedDiscount,
           shippingCost,
           taxAmount,
           withholdingTaxAmount,
@@ -551,9 +553,8 @@ export class OrderCheckoutDirectService {
             subtotal,
             discountAmount: totalDiscount,
             discountCode: appliedCouponCode,
-            platformFundedDiscount:
-              Math.round(couponDiscount * couponPlatformFundedShare * 100) /
-              100,
+            platformFundedDiscount: discountBreakdown.platformFundedDiscount,
+            campaign: discountBreakdown,
             shipping: {
               tariffId: shippingTariff.tariffId,
               tariffVersion: shippingTariff.tariffVersion,

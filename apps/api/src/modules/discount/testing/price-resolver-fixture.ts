@@ -1,4 +1,4 @@
-import { DiscountScope, DiscountType } from "@prisma/client";
+import { DiscountFundedBy, DiscountScope, DiscountType } from "@prisma/client";
 import { DiscountScopeService } from "../discount-scope.service";
 import { ProductPriceResolver } from "../product-price-resolver.service";
 
@@ -31,6 +31,8 @@ export const testCampaign = (
     code: string | null;
     /** Toplu voucher ŞABLONU mu? true ise otomatik kampanya değildir. */
     isBatch: boolean;
+    fundedBy: DiscountFundedBy;
+    platformFundedRatio: number | null;
   }> = {},
 ) => ({
   id: "campaign-1",
@@ -45,6 +47,8 @@ export const testCampaign = (
   maxDiscountAmount: null,
   code: null,
   isBatch: false,
+  fundedBy: DiscountFundedBy.seller,
+  platformFundedRatio: null,
   ...overrides,
 });
 

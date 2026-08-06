@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { DiscountScope, DiscountType } from "@prisma/client";
+import { DiscountFundedBy, DiscountScope, DiscountType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { activeAutomaticCampaignWhere } from "./discount-predicates";
 import {
@@ -37,6 +37,17 @@ export interface CampaignMatch {
   name: string;
   /** Kampanyanın BİRİM başına indirdiği tutar. */
   discountPerUnit: number;
+  /** Kampanya maliyetini kim üstlenir. */
+  fundedBy: DiscountFundedBy;
+  /**
+   * Kampanya maliyetinin PLATFORM payı [0,1]. seller→0, platform→1,
+   * shared→platformFundedRatio.
+   *
+   * Sipariş bunu kampanya indirimiyle çarpıp `platformFundedDiscount`a ekler;
+   * escrow o tutarı satıcı hak edişine geri ekler. Taşınmadığında
+   * platform-fonlu bir kampanyanın maliyeti sessizce satıcıya kalıyordu.
+   */
+  platformFundedShare: number;
 }
 
 export interface ResolvedUnitPrice {
@@ -85,6 +96,8 @@ type CampaignRow = {
   targetProductIds: string[];
   minCartValue: unknown;
   maxDiscountAmount: unknown;
+  fundedBy: DiscountFundedBy;
+  platformFundedRatio: unknown;
 };
 
 const num = (value: unknown): number => {
@@ -94,6 +107,17 @@ const num = (value: unknown): number => {
 
 const round2 = (value: number): number =>
   Math.round((value + Number.EPSILON) * 100) / 100;
+
+/** Kampanya maliyetinin platform payı [0,1]. Bozuk oran güvenli tarafa düşer. */
+function platformFundedShareOf(campaign: {
+  fundedBy: DiscountFundedBy;
+  platformFundedRatio: unknown;
+}): number {
+  if (campaign.fundedBy === DiscountFundedBy.platform) return 1;
+  if (campaign.fundedBy !== DiscountFundedBy.shared) return 0;
+  const ratio = num(campaign.platformFundedRatio);
+  return Math.min(1, Math.max(0, ratio));
+}
 
 @Injectable()
 export class ProductPriceResolver {
@@ -223,6 +247,10 @@ export class ProductPriceResolver {
         targetProductIds: true,
         minCartValue: true,
         maxDiscountAmount: true,
+        // Finansman siparişe kadar taşınmalı: platform-fonlu kampanyanın
+        // maliyeti satıcıya kalmasın (bkz. CampaignMatch.platformFundedShare).
+        fundedBy: true,
+        platformFundedRatio: true,
       },
     });
   }
@@ -262,6 +290,8 @@ export class ProductPriceResolver {
           discountId: campaign.id,
           name: campaign.name,
           discountPerUnit,
+          fundedBy: campaign.fundedBy,
+          platformFundedShare: platformFundedShareOf(campaign),
         };
       }
     }
