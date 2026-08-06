@@ -12,13 +12,19 @@ import { i18nMessage } from "../../i18n";
  * yolundan üyelik sınırının üstüne çıkmak mümkündü.
  *
  * Sahiplik kanıtı anahtarın KENDİSİNDEDİR: yeni yüklemeler kullanıcıya ait bir
- * klasöre iner (`product-images/u/{userId}/`). Böylece ayrı bir tablo ya da
+ * klasöre iner (`product-images/temp/u/{userId}/`). Böylece ayrı bir tablo ya da
  * migration gerekmeden anahtarın sahibi okunabilir.
  */
 
-/** Yüklemenin ineceği klasör — sahiplik bu yolda kodlanır. */
+/**
+ * Yüklemenin ineceği klasör — sahiplik bu yolda kodlanır.
+ *
+ * `temp/` ALTINDA durur: temizlik cron'u yalnız bu öneki tarar. Kullanıcı
+ * klasörleri `temp/` dışına alındığında cron'un tüm ürün görsellerini taraması
+ * gerekiyordu — canlı her görsel için referans sorgusu (N+1) demekti.
+ */
 export function productImageFolder(userId: string): string {
-  return `product-images/u/${userId}`;
+  return `product-images/temp/u/${userId}`;
 }
 
 /** Anahtar bu kullanıcının yükleme klasöründen mi geliyor? */

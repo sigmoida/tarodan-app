@@ -25,16 +25,16 @@ describe("ProductCreateService required listing details", () => {
     // create sahiplik doğrulaması yapar (product-image-keys).
     images: [
       {
-        cardKey: `dev/products/product-images/u/${sellerId}/1-card.webp`,
-        detailKey: `dev/products/product-images/u/${sellerId}/1-detail.webp`,
+        cardKey: `dev/products/product-images/temp/u/${sellerId}/1-card.webp`,
+        detailKey: `dev/products/product-images/temp/u/${sellerId}/1-detail.webp`,
       },
       {
-        cardKey: `dev/products/product-images/u/${sellerId}/2-card.webp`,
-        detailKey: `dev/products/product-images/u/${sellerId}/2-detail.webp`,
+        cardKey: `dev/products/product-images/temp/u/${sellerId}/2-card.webp`,
+        detailKey: `dev/products/product-images/temp/u/${sellerId}/2-detail.webp`,
       },
       {
-        cardKey: `dev/products/product-images/u/${sellerId}/3-card.webp`,
-        detailKey: `dev/products/product-images/u/${sellerId}/3-detail.webp`,
+        cardKey: `dev/products/product-images/temp/u/${sellerId}/3-card.webp`,
+        detailKey: `dev/products/product-images/temp/u/${sellerId}/3-detail.webp`,
       },
     ],
   };
