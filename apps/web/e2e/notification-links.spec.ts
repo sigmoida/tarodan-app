@@ -33,6 +33,10 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 /** Tohumlanan bildirim + o bildirimin AÇMASI GEREKEN hedef. */
 type LinkCase = SeedNotification & { expected: string };
 
+/** `expected` yalnız testin beklentisi; tohumlama hattına gitmez. */
+const seedOf = ({ expected: _expected, ...seed }: LinkCase): SeedNotification =>
+  seed;
+
 /**
  * Hedefin gerçekten açıldığını doğrula: HTTP durumu 4xx/5xx olmamalı ve sayfa
  * "bulunamadı" metni göstermemeli (Next `not-found` bazı durumlarda 200 ile
@@ -160,13 +164,19 @@ test.describe("bildirim hedefleri gerçek sayfaya gider", () => {
       },
       { type: "membership_expiring", data: {}, expected: "/membership" },
       { type: "payment_received", data: {}, expected: "/profile/payments" },
+      {
+        // ŞABLONU YOK: EventService bunu push kuyruğuna atar, satırı
+        // PushWorker yazar. Dispatch yolundan geçirilemez.
+        type: "payment_confirmed",
+        path: "worker",
+        title: "Ödeme Onaylandı",
+        body: "Siparişiniz için ödeme alındı",
+        data: { orderId },
+        expected: `/profile/orders/${orderId}`,
+      },
     ];
 
-    await seedNotifications(
-      request,
-      USERS.buyer.email,
-      cases.map(({ type, data }) => ({ type, data })),
-    );
+    await seedNotifications(request, USERS.buyer.email, cases.map(seedOf));
     await loginViaToken(page, token);
 
     const hrefs = await centreHrefs(page);
@@ -255,7 +265,11 @@ test.describe("bildirim hedefleri gerçek sayfaya gider", () => {
         expected: `/profile/trades/${tradeId}`,
       },
       {
+        // ŞABLONU YOK: gerçek hattı kuyruk + worker.
         type: "trade_ready_for_shipping",
+        path: "worker",
+        title: "Takas Kargoya Hazır",
+        body: "Ürününüzü kargoya verebilirsiniz",
         data: { tradeId },
         expected: `/profile/trades/${tradeId}`,
       },
@@ -264,7 +278,7 @@ test.describe("bildirim hedefleri gerçek sayfaya gider", () => {
     await seedNotifications(
       request,
       USERS.sellerPremium.email,
-      cases.map(({ type, data }) => ({ type, data })),
+      cases.map(seedOf),
     );
     await loginViaToken(page, sellerToken);
 
@@ -297,11 +311,7 @@ test.describe("bildirim hedefleri gerçek sayfaya gider", () => {
         expected: "/profile/offers?tab=sent",
       },
     ];
-    await seedNotifications(
-      request,
-      USERS.buyer.email,
-      cases.map(({ type, data }) => ({ type, data })),
-    );
+    await seedNotifications(request, USERS.buyer.email, cases.map(seedOf));
     await loginViaToken(page, token);
 
     const centre = await centreHrefs(page);
@@ -352,6 +362,35 @@ test.describe("bildirim hedefleri gerçek sayfaya gider", () => {
       }
     });
   }
+});
+
+test.describe("EventService bildirimleri gerçek kuyruk hattından gelir", () => {
+  /**
+   * Sepet ödemesinde tek bir sipariş yoktur: grup bildirimi yalnız
+   * `checkoutGroupId` taşıyor. Hedef üretilemediği için kart tıklanamıyordu;
+   * artık kontrollü olarak sipariş listesine düşer.
+   */
+  test("grup ödemesi temsilci sipariş olmadan listeye düşer", async ({
+    page,
+    request,
+  }) => {
+    const token = await apiLogin(request, USERS.buyer);
+    await seedNotifications(request, USERS.buyer.email, [
+      {
+        type: "payment_confirmed",
+        path: "worker",
+        title: "Ödeme Onaylandı",
+        body: "2 ürünlük siparişiniz için ödeme alındı",
+        // Grup bildiriminin ürettiği payload: temsilci sipariş YOK.
+        data: { checkoutGroupId: "grp-e2e", groupNumber: "GRP-E2E" },
+      },
+    ]);
+    await loginViaToken(page, token);
+
+    const hrefs = await centreHrefs(page);
+    expect(hrefs).toEqual(["/profile/orders"]);
+    await expectRealPage(page, hrefs[0]);
+  });
 });
 
 test.describe("hedefi çözülemeyen bildirim", () => {

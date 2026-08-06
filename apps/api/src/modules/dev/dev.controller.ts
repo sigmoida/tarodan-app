@@ -17,6 +17,9 @@ import { TradeService } from "../trade/trade.service";
 import { MembershipService } from "../membership/membership.service";
 import { OfferSchedulerService } from "../offer/offer-scheduler.service";
 import { MembershipSchedulerService } from "../membership/membership-scheduler.service";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { QUEUE_NAMES } from "../../workers/constants";
 import { NotificationDispatchService } from "../notification/notification-dispatch.service";
 import { isKnownNotificationType } from "../notification/notification-link";
 
@@ -39,6 +42,8 @@ export class DevController {
     private readonly membershipScheduler: MembershipSchedulerService,
     private readonly cache: CacheService,
     private readonly notifications: NotificationDispatchService,
+    // Bildirimi PushWorker'ın yazdığı yolu test edebilmek için gerçek kuyruk.
+    @InjectQueue(QUEUE_NAMES.PUSH) private readonly pushQueue: Queue,
   ) {}
 
   // ───────── Scheduler / sweep tetikleyiciler ─────────
@@ -156,9 +161,15 @@ export class DevController {
   /**
    * Verilen kullanıcıya belirtilen tipte bildirim üretir.
    *
-   * Satırı doğrudan INSERT ETMEZ: gerçek yazma yolundan (`createInAppNotification`)
-   * geçer, böylece link üretimi de üretimdekiyle aynı kodla çalışır. E2E'nin
-   * "bildirim linki 404 vermiyor" iddiası ancak böyle anlamlı olur.
+   * Satırı doğrudan INSERT ETMEZ. Üretimde bildirimi yazan İKİ ayrı yol var ve
+   * ikisi de kendi linkini üretiyor:
+   *
+   *  - `dispatch`: `createInAppNotification` — şablonu olan tipler.
+   *  - `worker`:   `push` kuyruğuna `send-notification` işi; satırı
+   *                PushWorker yazar. EventService'in ürettiği tipler
+   *                (trade_ready_for_shipping, payment_confirmed …) bu yoldan
+   *                gelir ve şablonları YOKTUR — testi geçirmek için sahte
+   *                şablon eklemek, gerçek yolu test etmemek olurdu.
    *
    * `clear` ile kullanıcının mevcut bildirimleri silinir — test hangi kartın
    * nerede olduğunu bilmeden doğrulama yapamaz.
@@ -169,7 +180,15 @@ export class DevController {
     body: {
       email: string;
       clear?: boolean;
-      items: Array<{ type: string; data?: Record<string, any> }>;
+      items: Array<{
+        type: string;
+        data?: Record<string, any>;
+        /** Üretim yolu. Belirtilmezse şablon yolu. */
+        path?: "dispatch" | "worker";
+        /** Worker yolu için push başlığı/gövdesi (şablon yok). */
+        title?: string;
+        body?: string;
+      }>;
     },
   ) {
     assertTestEnv();
@@ -192,6 +211,22 @@ export class DevController {
       if (!isKnownNotificationType(item.type)) {
         throw new NotFoundException(`Bilinmeyen bildirim tipi: ${item.type}`);
       }
+
+      if (item.path === "worker") {
+        const before = await this.countInApp(user.id, item.type);
+        // EventService ne yapıyorsa o: kuyruğa `send-notification` işi.
+        await this.pushQueue.add("send-notification", {
+          userId: user.id,
+          title: item.title ?? item.type,
+          body: item.body ?? item.type,
+          data: { type: item.type, ...(item.data ?? {}) },
+        });
+        // Worker asenkron yazar; test kartı arayabilsin diye satır beklenir.
+        const written = await this.waitForInApp(user.id, item.type, before);
+        (written ? created : skipped).push(item.type);
+        continue;
+      }
+
       const ok = await this.notifications.createInAppNotification(
         user.id,
         item.type,
@@ -200,6 +235,27 @@ export class DevController {
       (ok ? created : skipped).push(item.type);
     }
     return { userId: user.id, created, skipped };
+  }
+
+  private countInApp(userId: string, type: string): Promise<number> {
+    return this.prisma.notificationLog.count({
+      where: { userId, channel: "in_app", type },
+    });
+  }
+
+  /** Kuyruk işinin yazdığı satırı bekler (worker asenkron). */
+  private async waitForInApp(
+    userId: string,
+    type: string,
+    before: number,
+    timeoutMs = 15000,
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if ((await this.countInApp(userId, type)) > before) return true;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    return false;
   }
 
   // ───────── Per-journey state reset (her senaryoyu 0'dan izole koşmak için) ─────────

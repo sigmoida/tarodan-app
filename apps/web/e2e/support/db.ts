@@ -93,8 +93,24 @@ export async function expectDbEventually(
   );
 }
 
-/** Tohumlanacak tek bildirim: tip + üretici verisi. */
-export type SeedNotification = { type: string; data?: Record<string, any> };
+/**
+ * Tohumlanacak tek bildirim: tip + üretici verisi + hangi ÜRETİM YOLU.
+ *
+ * Üretimde bildirimi yazan iki ayrı hat var: şablonlu tipler dispatch
+ * servisinden, EventService'in ürettiği tipler (`trade_ready_for_shipping`,
+ * `payment_confirmed` …) push kuyruğundan geçip PushWorker tarafından yazılır.
+ * İkincilerin ŞABLONU YOKTUR; dispatch'ten geçirmeye çalışmak sessizce
+ * düşer, sahte şablon eklemek de gerçek yolu test etmemek olur.
+ */
+export type SeedNotification = {
+  type: string;
+  data?: Record<string, any>;
+  /** Varsayılan `dispatch` (şablonlu tipler). */
+  path?: "dispatch" | "worker";
+  /** Worker yolunda push başlığı/gövdesi — şablon olmadığı için gerekir. */
+  title?: string;
+  body?: string;
+};
 
 /**
  * Kullanıcıya deterministik bildirim yaz (E2E'nin hangi kartın nerede olduğunu
