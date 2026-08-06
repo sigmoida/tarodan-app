@@ -98,6 +98,16 @@ export class GuestCheckoutDto {
   @IsOptional()
   offerId?: string;
 
+  @ApiPropertyOptional({
+    description:
+      "Kupon kodu. Kişi-başı limiti OLAN kuponlar misafirde kullanılamaz " +
+      "(paylaşımlı misafir kimliği limiti taşıyamaz); sınırsız kuponlar geçerlidir.",
+    example: "HOSGELDIN",
+  })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
+
   // NOTE: no client-supplied `price` field — the server always derives the
   // amount from the product (or accepted offer). A client "override price" here
   // was a price-tampering hole (pay ~1 TL for anything). Do not re-add it.

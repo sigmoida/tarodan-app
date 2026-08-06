@@ -309,6 +309,29 @@ export class OrderGuestCheckoutService {
         },
       ]);
 
+      // Kupon: üye ve misafir GRUP yolları kuponu uyguluyordu, TEKİL misafir
+      // alımı uygulamıyordu — aynı kupon sepetten alınca çalışıp "hemen al" ile
+      // alınca sessizce yok sayılıyordu. Misafir kimliği paylaşımlı olduğu için
+      // userId=null geçilir: kişi-başı limitli kuponlar zaten reddedilir.
+      const { coupon, error: couponError } =
+        await this.discountService.allocateCoupon(
+          dto.couponCode,
+          [
+            {
+              productId: dto.productId,
+              quantity: 1,
+              lineSubtotal: finalPrice,
+            },
+          ],
+          null,
+        );
+      if (couponError) {
+        throw new BadRequestException(
+          couponError || i18nMessage("server.order.invalidCouponCode"),
+        );
+      }
+      const guestCouponDiscount = coupon?.total ?? 0;
+
       // Get or create a system guest user for all guest orders
       // This avoids unique constraint issues - actual guest info stored in shippingAddress
       const SYSTEM_GUEST_EMAIL = "guest@tarodan.system";
@@ -357,15 +380,23 @@ export class OrderGuestCheckoutService {
         );
       }
 
+      // Siparişin ürün tabanı = TAHSİL EDİLEN tutar (kampanya ve kupon sonrası).
+      // Komisyon, kargo kararı, vergiler ve alıcı toplamı bu tabandan türer —
+      // diğer checkout yollarıyla aynı sıra.
+      const guestSubtotal = chargedProductBaseOf({
+        unitPrice: finalPrice,
+        couponDiscount: guestCouponDiscount,
+      });
+
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on product price, not including shipping
       const pinnedRuleSetId = commissionRuleSet.id;
       const commissionResult = await this.orderPricing.calculateCommission(
-        finalPrice,
+        guestSubtotal,
         product.sellerId,
         product.categoryId,
         pinnedRuleSetId,
-        finalPrice,
+        guestSubtotal,
         product.id,
       );
 
@@ -377,7 +408,7 @@ export class OrderGuestCheckoutService {
         seller: sellerShippingAmount,
       } = this.orderPricing.resolveShippingDecision({
         tariff: shippingTariff.tariff,
-        subtotal: finalPrice,
+        subtotal: guestSubtotal,
         billableDesi: product.shippingDesi,
         lineShares: [commissionResult.shippingBuyerShares],
       });
@@ -392,7 +423,7 @@ export class OrderGuestCheckoutService {
       } = await this.checkoutCommon.resolveOrderTaxes({
         sellerId: product.sellerId,
         categoryId: product.categoryId,
-        subtotal: finalPrice,
+        subtotal: guestSubtotal,
         fees: {
           buyerCommissionAmount: commissionResult.buyerCommissionAmount,
           buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
@@ -405,20 +436,22 @@ export class OrderGuestCheckoutService {
       // Alıcı ücretleri + ürün KDV'si + alıcıya verilen hizmetlerin KDV'si eklenir
       // (stopaj ve satıcı hizmet KDV'si satıcı payout'undan kesilir).
       const totalAmount = buyerTotalOf({
-        subtotal: finalPrice,
+        subtotal: guestSubtotal,
         buyerShippingAmount: shippingCost,
         buyerFeeAmount: commissionResult.buyerFeeAmount,
         buyerServiceTaxAmount: guestBuyerServiceTax,
       });
       // İndirim öncesi (çizili) fiyat — yoksa listelenen fiyatın kendisi.
       const guestOriginalPrice = resolvedPrice.originalUnitPrice;
-      const guestDiscountAmount = Math.max(0, guestOriginalPrice - finalPrice);
-      // Siparişin ürün tabanı = TAHSİL EDİLEN tutar (kabul edilmiş teklifte teklif
-      // bedeli). Liste fiyatı `guestDiscountAmount` ve snapshot'ta durur.
-      const guestSubtotal = chargedProductBaseOf({ unitPrice: finalPrice });
-
+      const guestDiscountAmount =
+        Math.max(0, guestOriginalPrice - finalPrice) + guestCouponDiscount;
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
+      const guestPaymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const guestPlatformFundedDiscount =
+        Math.round(
+          guestCouponDiscount * (coupon?.platformFundedShare ?? 0) * 100,
+        ) / 100;
 
       const guestSuratKey =
         dto.idempotencyKey?.trim() ||
@@ -537,7 +570,8 @@ export class OrderGuestCheckoutService {
             originalUnitPrice: guestOriginalPrice,
             subtotal: guestSubtotal,
             discountAmount: guestDiscountAmount,
-            platformFundedDiscount: 0,
+            discountCode: coupon?.code,
+            platformFundedDiscount: guestPlatformFundedDiscount,
             shipping: {
               tariffId: shippingTariff.tariffId,
               tariffVersion: shippingTariff.tariffVersion,
@@ -552,8 +586,10 @@ export class OrderGuestCheckoutService {
             sellerServiceTaxAmount: guestSellerServiceTax,
             totalAmount,
           }),
+          discountCode: coupon?.code ?? null,
+          platformFundedDiscount: guestPlatformFundedDiscount,
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt: guestPaymentExpiresAt,
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {
@@ -586,9 +622,24 @@ export class OrderGuestCheckoutService {
         order.id,
         orderNumber,
         commissionResult.commissionAmount,
-        finalPrice,
+        guestSubtotal,
         commissionResult,
       );
+
+      // Kupon kotasını ödeme beklerken TUT: usedCount ve DiscountUsage burada
+      // artmaz, başarılı tahsilat rezervasyonu gerçek kullanıma çevirir. Misafir
+      // kimliği paylaşımlıdır; rezervasyon sistem misafir kullanıcısına yazılır.
+      if (coupon && guestCouponDiscount > 0) {
+        await this.discountService.reserveUsage(
+          coupon.discountId,
+          guestUser.id,
+          order.id,
+          guestCouponDiscount,
+          coupon.voucherCodeId,
+          guestPaymentExpiresAt,
+          tx,
+        );
+      }
 
       // Adet bazlı rezervasyon: 1 adet rezerve et (invalidation yok — cron halledecek).
       // Bulgu F: yalnız DIRECT-BUY'da (offerId yok) create'de rezerve et. Teklif

@@ -892,6 +892,66 @@ describe("OrderService checkout group (batch checkout)", () => {
       const orderData = mockTx.order.create.mock.calls[0][0].data;
       expect(orderData.discountAmount).toBeGreaterThan(0);
     });
+
+    /**
+     * TEKİL misafir alımı (guestCheckout) kuponu HİÇ uygulamıyordu: DTO'da alan
+     * bile yoktu. Aynı kupon sepetten alınca çalışıp "hemen al" ile alınca
+     * sessizce yok sayılıyordu.
+     */
+    it("tekil misafir alımında kupon uygulanır ve kotası rezerve edilir", async () => {
+      mockTx.product.findUnique.mockResolvedValue(
+        makeProduct(productA, { quantity: 100 }),
+      );
+      discountService.allocateCoupon.mockResolvedValue({
+        coupon: {
+          discountId: "disc-guest",
+          code: "HOSGELDIN",
+          name: "Hoş geldin",
+          type: "fixed_amount",
+          value: 15,
+          scope: "global",
+          platformFundedShare: 0,
+          eligibleProductIds: [productA],
+          shares: [15],
+          total: 15,
+        },
+      });
+
+      await service.guestCheckout({
+        productId: productA,
+        idempotencyKey,
+        email: guestEmail,
+        emailVerificationCode: guestCode,
+        phone: "+905551234567",
+        guestName: "Guest User",
+        couponCode: "HOSGELDIN",
+        shippingAddress: {
+          fullName: "Guest User",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+        },
+        expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
+        expectedPricingHash: pricingHashFor([
+          { productId: productA, unitPrice: 100 },
+        ]),
+      } as any);
+
+      // Misafirde kişi-başı limit uygulanamaz → userId null geçilir.
+      expect(discountService.allocateCoupon).toHaveBeenCalledWith(
+        "HOSGELDIN",
+        [{ productId: productA, quantity: 1, lineSubtotal: 100 }],
+        null,
+      );
+      const data = mockTx.order.create.mock.calls[0][0].data;
+      // Tahsil edilen taban kupon sonrası; komisyon ve toplam bundan türer.
+      expect(Number(data.subtotal)).toBe(85);
+      expect(data.discountCode).toBe("HOSGELDIN");
+      expect(discountService.reserveUsage).toHaveBeenCalled();
+    });
   });
 
   /**
