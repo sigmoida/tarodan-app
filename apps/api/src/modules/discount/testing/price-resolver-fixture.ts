@@ -28,6 +28,9 @@ export const testCampaign = (
     targetProductIds: string[];
     minCartValue: number | null;
     maxDiscountAmount: number | null;
+    code: string | null;
+    /** Toplu voucher ŞABLONU mu? true ise otomatik kampanya değildir. */
+    isBatch: boolean;
   }> = {},
 ) => ({
   id: "campaign-1",
@@ -40,6 +43,8 @@ export const testCampaign = (
   targetProductIds: [] as string[],
   minCartValue: null,
   maxDiscountAmount: null,
+  code: null,
+  isBatch: false,
   ...overrides,
 });
 
@@ -53,7 +58,17 @@ export const testPriceResolver = (
 ): TestPriceResolver => {
   let active = campaigns;
   const prisma = {
-    discount: { findMany: async () => active },
+    discount: {
+      // Sahte de olsa `where`in AYIRT EDİCİ alanlarını uygular: aksi halde
+      // "toplu voucher şablonu otomatik kampanya sayılmaz" gibi kurallar
+      // testte hiç ölçülemez, sahte her satırı geri verirdi.
+      findMany: async ({ where }: any = {}) =>
+        active.filter((row: any) => {
+          if (where?.code === null && row.code != null) return false;
+          if (where?.isBatch === false && row.isBatch === true) return false;
+          return true;
+        }),
+    },
     category: { findMany: async () => [] },
   } as any;
   const resolver = new ProductPriceResolver(

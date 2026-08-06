@@ -40,6 +40,7 @@ import {
   loadCategoryEdges,
 } from "../category/category-tree.helper";
 import { allocateProportionally } from "./discount-allocation.helper";
+import { activeAutomaticCampaignWhere } from "./discount-predicates";
 
 /** Kuponun dağıtılacağı sepet satırı. Sıra korunur. */
 export interface CouponAllocationLine {
@@ -1286,12 +1287,7 @@ export class DiscountService {
   async getActiveDiscountCriteria() {
     const now = new Date();
     const activeDiscounts = await this.prisma.discount.findMany({
-      where: {
-        isActive: true,
-        code: null, // Only auto-applied
-        startDate: { lte: now },
-        endDate: { gte: now },
-      },
+      where: activeAutomaticCampaignWhere(now),
       select: {
         scope: true,
         sellerId: true,
@@ -1344,10 +1340,7 @@ export class DiscountService {
 
     const campaigns = await this.prisma.discount.findMany({
       where: {
-        isActive: true,
-        code: null, // Only auto-applied campaigns
-        startDate: { lte: now },
-        endDate: { gte: now },
+        ...activeAutomaticCampaignWhere(now),
         scope: { in: [DiscountScope.global, DiscountScope.category] },
         sellerId: null, // Only admin-created campaigns
       },

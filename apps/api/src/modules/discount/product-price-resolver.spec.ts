@@ -11,7 +11,15 @@ const CATEGORY_TREE = [
 
 const makeResolver = (campaigns: unknown[] = []) => {
   const prisma = {
-    discount: { findMany: async () => campaigns },
+    // `where`in ayırt edici alanlarını uygular — filtre davranışı da ölçülsün.
+    discount: {
+      findMany: async ({ where }: any = {}) =>
+        campaigns.filter((row: any) => {
+          if (where?.code === null && row.code != null) return false;
+          if (where?.isBatch === false && row.isBatch === true) return false;
+          return true;
+        }),
+    },
     category: { findMany: async () => CATEGORY_TREE },
   } as any;
   return new ProductPriceResolver(prisma, new DiscountScopeService(prisma));
@@ -185,6 +193,31 @@ describe("ProductPriceResolver", () => {
       ]).resolveOne(product(), { now });
 
       expect(resolved.unitPrice).toBe(100);
+    });
+
+    /**
+     * Regresyon: toplu üretilen voucher'ların ŞABLON kaydında da paylaşımlı bir
+     * `code` yoktur (kodlar discount_codes altındadır). Otomatik kampanyalar
+     * yalnız `code: null` ile aranınca şablon da kampanya sayılıyor, yani
+     * hediye kodunun indirimi KOD GİRİLMEDEN herkese uygulanıyordu: kullanım
+     * limiti ve tek-kullanım kontrolünün tamamı devre dışı kalıyordu.
+     */
+    it("toplu voucher ŞABLONU otomatik kampanya sayılmaz", async () => {
+      const resolved = await makeResolver([
+        testCampaign({ id: "batch-1", value: 40, isBatch: true }),
+      ]).resolveOne(product(), { now });
+
+      expect(resolved.unitPrice).toBe(100);
+      expect(resolved.campaign).toBeNull();
+    });
+
+    it("aynı değerdeki normal kampanya uygulanmaya devam eder", async () => {
+      const resolved = await makeResolver([
+        testCampaign({ id: "auto-1", value: 40, isBatch: false }),
+      ]).resolveOne(product(), { now });
+
+      expect(resolved.unitPrice).toBe(60);
+      expect(resolved.campaign?.discountId).toBe("auto-1");
     });
 
     it("hedef listesi boş bir ürün kampanyası hiçbir ürünü kapsamaz", async () => {

@@ -40,6 +40,79 @@ describe("DiscountService yapılandırma kuralları", () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  /**
+   * "İndirimdekiler" filtresi ve ana sayfa kampanya listesi de fiyat
+   * çözümleyiciyle AYNI otomatik-kampanya tanımını kullanmalı; aksi halde
+   * toplu voucher şablonunun kapsadığı ürünler indirimli gibi listelenirdi.
+   */
+  describe("otomatik kampanya tanımı (toplu voucher şablonu hariç)", () => {
+    const makeCriteriaService = (rows: any[]) => {
+      const prisma = {
+        discount: {
+          findMany: async ({ where }: any = {}) =>
+            rows.filter((row) => {
+              if (where?.code === null && row.code != null) return false;
+              if (where?.isBatch === false && row.isBatch === true)
+                return false;
+              return true;
+            }),
+        },
+        category: { findMany: async () => [] },
+      } as any;
+      return new DiscountService(
+        prisma,
+        { delPattern: jest.fn() } as any,
+        { syncProduct: jest.fn() } as any,
+        testPriceResolver(),
+        new DiscountScopeService(prisma),
+      );
+    };
+
+    const row = (overrides: Record<string, unknown>) => ({
+      scope: DiscountScope.seller,
+      sellerId: "seller-1",
+      categoryId: null,
+      targetProductIds: [],
+      code: null,
+      isBatch: false,
+      ...overrides,
+    });
+
+    it("toplu voucher şablonu indirim ölçütlerine girmez", async () => {
+      const criteria = await makeCriteriaService([
+        row({ isBatch: true, sellerId: "seller-batch" }),
+      ]).getActiveDiscountCriteria();
+
+      expect(criteria.sellerIds).toEqual([]);
+      expect(criteria.hasGlobal).toBe(false);
+    });
+
+    it("normal otomatik kampanya ölçütlere girmeye devam eder", async () => {
+      const criteria = await makeCriteriaService([
+        row({ sellerId: "seller-1" }),
+      ]).getActiveDiscountCriteria();
+
+      expect(criteria.sellerIds).toEqual(["seller-1"]);
+    });
+
+    it("ana sayfa kampanya listesi de şablonu göstermez", async () => {
+      const campaigns = await makeCriteriaService([
+        row({
+          id: "batch",
+          name: "Hediye",
+          scope: DiscountScope.global,
+          sellerId: null,
+          isBatch: true,
+          type: DiscountType.fixed_amount,
+          value: 10,
+          endDate: new Date(),
+        }),
+      ]).getActiveCampaigns();
+
+      expect(campaigns).toEqual([]);
+    });
+  });
+
   describe("değer aralığı", () => {
     it("yüzde indirim %100'ü aşamaz", async () => {
       await expect(

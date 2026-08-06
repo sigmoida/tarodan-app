@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { DiscountScope, DiscountType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { activeAutomaticCampaignWhere } from "./discount-predicates";
 import {
   resolveSalePrice,
   type ProductSaleWindow,
@@ -194,10 +195,9 @@ export class ProductPriceResolver {
 
     return this.prisma.discount.findMany({
       where: {
-        isActive: true,
-        code: null,
-        startDate: { lte: now },
-        endDate: { gte: now },
+        // Kod GEREKTİRMEYEN indirimler — toplu voucher şablonu buraya girmez
+        // (bkz. discount-predicates.ts).
+        ...activeAutomaticCampaignWhere(now),
         OR: [
           { scope: DiscountScope.global, sellerId: null },
           { scope: DiscountScope.seller, sellerId: { in: sellerIds } },
