@@ -443,7 +443,8 @@ export class NotificationCommerceService {
       this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
     await this.dispatch.sendTemplateEmailToUser(userId, "back-in-stock", {
       productTitle: data.productTitle,
-      productUrl: `${frontendUrl}/products/${productId}`,
+      // Ürün detayının gerçek yolu `/listings/:id`; `/products/:id` 404'tü.
+      productUrl: `${frontendUrl}/listings/${encodeURIComponent(productId)}`,
     });
     return result;
   }

@@ -2,15 +2,22 @@
  * Push Notification Worker
  * Processes push notifications via Expo Push API
  */
-import { Processor, Process, OnQueueFailed, OnQueueCompleted } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma';
+import {
+  Processor,
+  Process,
+  OnQueueFailed,
+  OnQueueCompleted,
+} from "@nestjs/bull";
+import { Logger } from "@nestjs/common";
+import { Job } from "bull";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../prisma";
 import {
   resolveSettings,
   shouldDeliver,
-} from '../modules/notification/notification-preferences';
+} from "../modules/notification/notification-preferences";
+import { NotificationType } from "../modules/notification/dto";
+import { resolveWebNotificationLink } from "../modules/notification/notification-link";
 
 export interface PushJobData {
   userId: string;
@@ -19,22 +26,22 @@ export interface PushJobData {
   body: string;
   data?: Record<string, any>;
   badge?: number;
-  sound?: 'default' | null;
+  sound?: "default" | null;
   channelId?: string;
-  priority?: 'default' | 'normal' | 'high';
+  priority?: "default" | "normal" | "high";
   ttl?: number;
 }
 
 /**
  * Notification types for order flow
  */
-export type OrderNotificationType = 
-  | 'order_created'
-  | 'payment_confirmed'
-  | 'payment_received'
-  | 'order_shipped'
-  | 'order_delivered'
-  | 'order_completed';
+export type OrderNotificationType =
+  | "order_created"
+  | "payment_confirmed"
+  | "payment_received"
+  | "order_shipped"
+  | "order_delivered"
+  | "order_completed";
 
 export interface PushNotificationJobData {
   userId: string;
@@ -54,30 +61,33 @@ interface ExpoPushMessage {
   body: string;
   data?: Record<string, any>;
   badge?: number;
-  sound?: 'default' | null;
+  sound?: "default" | null;
   channelId?: string;
-  priority?: 'default' | 'normal' | 'high';
+  priority?: "default" | "normal" | "high";
   ttl?: number;
 }
 
 interface ExpoPushTicket {
-  status: 'ok' | 'error';
+  status: "ok" | "error";
   id?: string;
   message?: string;
   details?: Record<string, any>;
 }
 
-@Processor('push')
+@Processor("push")
 export class PushWorker {
   private readonly logger = new Logger(PushWorker.name);
-  private readonly expoPushUrl = 'https://exp.host/--/api/v2/push/send';
+  private readonly expoPushUrl = "https://exp.host/--/api/v2/push/send";
   private readonly expoAccessToken: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.expoAccessToken = this.configService.get<string>('EXPO_ACCESS_TOKEN', '');
+    this.expoAccessToken = this.configService.get<string>(
+      "EXPO_ACCESS_TOKEN",
+      "",
+    );
   }
 
   /**
@@ -87,25 +97,37 @@ export class PushWorker {
    */
   private buildExpoHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      Accept: 'application/json',
-      'Accept-Encoding': 'gzip, deflate',
-      'Content-Type': 'application/json',
+      Accept: "application/json",
+      "Accept-Encoding": "gzip, deflate",
+      "Content-Type": "application/json",
     };
     if (this.expoAccessToken) {
-      headers['Authorization'] = `Bearer ${this.expoAccessToken}`;
+      headers["Authorization"] = `Bearer ${this.expoAccessToken}`;
     }
     return headers;
   }
 
-  @Process('send')
+  @Process("send")
   async handleSend(job: Job<PushJobData>) {
-    this.logger.log(`Processing push notification job ${job.id} for user ${job.data.userId}`);
+    this.logger.log(
+      `Processing push notification job ${job.id} for user ${job.data.userId}`,
+    );
 
-    const { pushTokens, title, body, data, badge, sound, channelId, priority, ttl } = job.data;
+    const {
+      pushTokens,
+      title,
+      body,
+      data,
+      badge,
+      sound,
+      channelId,
+      priority,
+      ttl,
+    } = job.data;
 
     if (!pushTokens || pushTokens.length === 0) {
       this.logger.warn(`No push tokens for user ${job.data.userId}`);
-      return { success: false, reason: 'No push tokens' };
+      return { success: false, reason: "No push tokens" };
     }
 
     // Build Expo push messages
@@ -117,15 +139,15 @@ export class PushWorker {
         body,
         data,
         badge,
-        sound: sound ?? 'default',
-        channelId: channelId ?? 'default',
-        priority: priority ?? 'high',
+        sound: sound ?? "default",
+        channelId: channelId ?? "default",
+        priority: priority ?? "high",
         ttl: ttl ?? 86400,
       }));
 
     if (messages.length === 0) {
       this.logger.warn(`No valid Expo push tokens for user ${job.data.userId}`);
-      return { success: false, reason: 'No valid Expo tokens' };
+      return { success: false, reason: "No valid Expo tokens" };
     }
 
     try {
@@ -135,7 +157,7 @@ export class PushWorker {
 
       for (const chunk of chunks) {
         const response = await fetch(this.expoPushUrl, {
-          method: 'POST',
+          method: "POST",
           headers: this.buildExpoHeaders(),
           body: JSON.stringify(chunk),
         });
@@ -148,8 +170,8 @@ export class PushWorker {
         results.push(...(responseData.data || []));
       }
 
-      const successCount = results.filter((r) => r.status === 'ok').length;
-      const failCount = results.filter((r) => r.status === 'error').length;
+      const successCount = results.filter((r) => r.status === "ok").length;
+      const failCount = results.filter((r) => r.status === "error").length;
 
       this.logger.log(
         `Push notification sent: ${successCount} success, ${failCount} failed`,
@@ -172,12 +194,14 @@ export class PushWorker {
    * Used by EventService for order notifications
    * Also stores in-app notification for web/mobile app
    */
-  @Process('send-notification')
+  @Process("send-notification")
   async handleSendNotification(job: Job<PushNotificationJobData>) {
-    this.logger.log(`Processing send-notification job ${job.id} for user ${job.data.userId}`);
+    this.logger.log(
+      `Processing send-notification job ${job.id} for user ${job.data.userId}`,
+    );
 
     const { userId, title, body, data } = job.data;
-    const notificationType = data?.type || 'general';
+    const notificationType = data?.type || "general";
 
     // Kullanıcı bildirim tercihleri (Bulgu #9): event.service → pushQueue yolu da
     // tercihe uymalı. Kategori kapalıysa zil + push birlikte atlanır; kategori
@@ -190,17 +214,19 @@ export class PushWorker {
         })
       )?.notificationSettings,
     );
-    const inAppAllowed = shouldDeliver(settings, notificationType, 'in_app');
+    const inAppAllowed = shouldDeliver(settings, notificationType, "in_app");
 
     // 1. Store as in-app notification — skip for admin_broadcast because
     // admin.service.ts already creates the in_app log before queuing this job.
-    if (data?.type !== 'admin_broadcast') {
+    if (data?.type !== "admin_broadcast") {
       if (inAppAllowed) {
         try {
           await this.saveInAppNotification(userId, title, body, data);
           this.logger.log(`In-app notification stored for user ${userId}`);
         } catch (error: any) {
-          this.logger.error(`Failed to store in-app notification: ${error.message}`);
+          this.logger.error(
+            `Failed to store in-app notification: ${error.message}`,
+          );
         }
       } else {
         this.logger.log(
@@ -210,7 +236,7 @@ export class PushWorker {
     }
 
     // 1b. Push tercihe uymuyorsa hiç gönderme (in-app yukarıda ele alındı).
-    if (!shouldDeliver(settings, notificationType, 'push')) {
+    if (!shouldDeliver(settings, notificationType, "push")) {
       this.logger.log(
         `Push suppressed by user preference: user=${userId} type=${notificationType}`,
       );
@@ -218,7 +244,7 @@ export class PushWorker {
         success: true,
         inAppStored: inAppAllowed,
         pushSent: false,
-        reason: 'Suppressed by user preference',
+        reason: "Suppressed by user preference",
       };
     }
 
@@ -238,18 +264,23 @@ export class PushWorker {
 
       if (pushTokens.length === 0) {
         this.logger.warn(`No push tokens for user ${userId}`);
-        return { success: true, inAppStored: true, pushSent: false, reason: 'No push tokens' };
+        return {
+          success: true,
+          inAppStored: true,
+          pushSent: false,
+          reason: "No push tokens",
+        };
       }
 
       // Determine channel based on notification type
-      let channelId = 'default';
+      let channelId = "default";
       if (data?.type) {
-        if (data.type.includes('order') || data.type.includes('payment')) {
-          channelId = 'orders';
-        } else if (data.type.includes('trade')) {
-          channelId = 'trades';
-        } else if (data.type.includes('message')) {
-          channelId = 'messages';
+        if (data.type.includes("order") || data.type.includes("payment")) {
+          channelId = "orders";
+        } else if (data.type.includes("trade")) {
+          channelId = "trades";
+        } else if (data.type.includes("message")) {
+          channelId = "messages";
         }
       }
 
@@ -261,20 +292,25 @@ export class PushWorker {
           title,
           body,
           data,
-          sound: 'default',
+          sound: "default",
           channelId,
-          priority: 'high' as const,
+          priority: "high" as const,
           ttl: 86400,
         }));
 
       if (messages.length === 0) {
         this.logger.warn(`No valid Expo push tokens for user ${userId}`);
-        return { success: true, inAppStored: true, pushSent: false, reason: 'No valid Expo tokens' };
+        return {
+          success: true,
+          inAppStored: true,
+          pushSent: false,
+          reason: "No valid Expo tokens",
+        };
       }
 
       // Send to Expo Push API
       const response = await fetch(this.expoPushUrl, {
-        method: 'POST',
+        method: "POST",
         headers: this.buildExpoHeaders(),
         body: JSON.stringify(messages),
       });
@@ -285,15 +321,15 @@ export class PushWorker {
 
       const responseData = await response.json();
       const results: ExpoPushTicket[] = responseData.data || [];
-      const successCount = results.filter((r) => r.status === 'ok').length;
+      const successCount = results.filter((r) => r.status === "ok").length;
 
       // Ölü token temizliği: Expo bir cihaz için 'DeviceNotRegistered' dönerse
       // (uygulama silinmiş / token geçersiz) o token'ı deaktive et ki bir daha
       // denenmesin ve push_tokens şişmesin. results, messages ile aynı sıradadır.
       const deadTokens = results
         .map((ticket, i) =>
-          ticket.status === 'error' &&
-          ticket.details?.error === 'DeviceNotRegistered'
+          ticket.status === "error" &&
+          ticket.details?.error === "DeviceNotRegistered"
             ? messages[i]?.to
             : null,
         )
@@ -316,9 +352,16 @@ export class PushWorker {
         tickets: results,
       };
     } catch (error: any) {
-      this.logger.error(`Failed to process push notification: ${error.message}`);
+      this.logger.error(
+        `Failed to process push notification: ${error.message}`,
+      );
       // Return success because in-app notification was stored
-      return { success: true, inAppStored: true, pushSent: false, error: error.message };
+      return {
+        success: true,
+        inAppStored: true,
+        pushSent: false,
+        error: error.message,
+      };
     }
   }
 
@@ -331,27 +374,16 @@ export class PushWorker {
     body: string,
     data?: Record<string, any>,
   ): Promise<void> {
-    const notificationType = data?.type || 'general';
-    
-    // Generate link based on notification type
-    let link: string | undefined;
-    if (data?.orderId) {
-      link = `/orders/${data.orderId}`;
-    } else if (data?.offerId) {
-      // Teklif bildirimleri (örn. offer_received) gelen teklifler listesine gitmeli,
-      // ürün detayına değil. orderId'den sonra gelir ki offer_accepted (orderId+offerId)
-      // /orders/... olarak kalsın.
-      link = `/offers?tab=received`;
-    } else if (data?.productId) {
-      link = `/listings/${data.productId}`;
-    } else if (data?.tradeId) {
-      link = `/trades/${data.tradeId}`;
-    } else if (data?.threadId) {
-      // /messages opens a thread via ?thread=<id>; there is no /messages/<id> route.
-      link = `/messages?thread=${data.threadId}`;
-    } else if (data?.collectionId) {
-      link = `/collections/${data.collectionId}`;
-    }
+    const notificationType = data?.type || "general";
+
+    // Hedef MERKEZÎ çözümleyiciden gelir. Burada `data` alanlarına bakarak
+    // link kurulmuştu ve üretilen yolların çoğu web'de YOKTU (`/orders/:id`,
+    // `/offers?tab=received`, `/trades/:id`, `/messages?thread=`): tıklanan
+    // bildirim 404'e gidiyordu. Ayrıca hedefi entity önceliğine göre seçmek
+    // yanlıştır — aynı sipariş alıcıya ve satıcıya farklı ekran açar.
+    const link =
+      resolveWebNotificationLink(notificationType as NotificationType, data) ??
+      undefined;
 
     // Get icon based on notification type
     const icon = this.getNotificationIcon(notificationType);
@@ -361,13 +393,13 @@ export class PushWorker {
     // tekrar oluşturma. (payment-scheduler sweep'i iptal edilmiş teklif/takasları
     // tekrar bildirdiği için "Teklifiniz iptal edildi" / "Takas İptal" çiftleniyordu.)
     const dedupField = data?.offerId
-      ? 'offerId'
+      ? "offerId"
       : data?.tradeId
-        ? 'tradeId'
+        ? "tradeId"
         : data?.productId
-          ? 'productId'
+          ? "productId"
           : data?.orderId
-            ? 'orderId'
+            ? "orderId"
             : null;
     const dedupValue = dedupField ? data?.[dedupField] : null;
     if (dedupField && dedupValue) {
@@ -375,7 +407,7 @@ export class PushWorker {
       const existing = await this.prisma.notificationLog.findFirst({
         where: {
           userId,
-          channel: 'in_app',
+          channel: "in_app",
           type: notificationType,
           createdAt: { gte: since },
           data: { path: [dedupField], equals: dedupValue },
@@ -393,7 +425,7 @@ export class PushWorker {
     await this.prisma.notificationLog.create({
       data: {
         userId,
-        channel: 'in_app',
+        channel: "in_app",
         type: notificationType,
         title,
         body,
@@ -402,7 +434,7 @@ export class PushWorker {
           icon,
           link,
         },
-        status: 'sent',
+        status: "sent",
         sentAt: new Date(),
       },
     });
@@ -413,35 +445,35 @@ export class PushWorker {
    */
   private getNotificationIcon(type: string): string {
     const icons: Record<string, string> = {
-      order_created: '📦',
-      payment_confirmed: '💳',
-      payment_received: '💰',
-      order_shipped: '🚚',
-      order_delivered: '✅',
-      order_completed: '🎉',
-      offer_received: '💵',
-      offer_accepted: '✅',
-      offer_rejected: '❌',
-      trade_received: '🔄',
-      trade_accepted: '✅',
-      trade_completed: '🎉',
-      new_message: '💬',
-      review_received: '⭐',
-      price_drop: '📉',
-      new_follower: '👤',
-      collection_liked: '❤️',
-      product_approved: '✅',
-      product_sold: '💰',
-      membership_expiring: '⏰',
-      listing_expiring: '⏰',
-      listing_views_milestone: '👀',
-      welcome: '🎉',
-      promotion: '🎁',
+      order_created: "📦",
+      payment_confirmed: "💳",
+      payment_received: "💰",
+      order_shipped: "🚚",
+      order_delivered: "✅",
+      order_completed: "🎉",
+      offer_received: "💵",
+      offer_accepted: "✅",
+      offer_rejected: "❌",
+      trade_received: "🔄",
+      trade_accepted: "✅",
+      trade_completed: "🎉",
+      new_message: "💬",
+      review_received: "⭐",
+      price_drop: "📉",
+      new_follower: "👤",
+      collection_liked: "❤️",
+      product_approved: "✅",
+      product_sold: "💰",
+      membership_expiring: "⏰",
+      listing_expiring: "⏰",
+      listing_views_milestone: "👀",
+      welcome: "🎉",
+      promotion: "🎁",
     };
-    return icons[type] || '🔔';
+    return icons[type] || "🔔";
   }
 
-  @Process('send-bulk')
+  @Process("send-bulk")
   async handleSendBulk(job: Job<{ notifications: PushJobData[] }>) {
     this.logger.log(`Processing bulk push notification job ${job.id}`);
 
@@ -453,7 +485,7 @@ export class PushWorker {
           id: job.id,
           data: notification,
         } as Job<PushJobData>;
-        
+
         const result = await this.handleSend(mockJob);
         results.push({ userId: notification.userId, ...result });
       } catch (error: any) {
@@ -475,7 +507,9 @@ export class PushWorker {
 
   @OnQueueFailed()
   onFailed(job: Job, error: Error) {
-    this.logger.error(`Push notification job ${job.id} failed: ${error.message}`);
+    this.logger.error(
+      `Push notification job ${job.id} failed: ${error.message}`,
+    );
   }
 
   private chunkArray<T>(array: T[], size: number): T[][] {
