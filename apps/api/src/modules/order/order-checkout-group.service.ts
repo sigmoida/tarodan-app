@@ -8,7 +8,6 @@ import {
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
-import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
 import {
@@ -21,7 +20,7 @@ import { getAvailableQuantity } from "../product/helpers/product-availability.he
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { EventService } from "../events";
-import { DiscountService } from "../discount";
+import { DiscountService, ProductPriceResolver } from "../discount";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import {
   OrderPricingService,
@@ -52,6 +51,7 @@ export class OrderCheckoutGroupService {
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
     private readonly discountService: DiscountService,
+    private readonly priceResolver: ProductPriceResolver,
     private readonly suratCargoService: SuratCargoService,
     private readonly orderPricing: OrderPricingService,
     private readonly orderCommon: OrderCommonService,
@@ -397,30 +397,25 @@ export class OrderCheckoutGroupService {
           // kampanya aktifken alıcı gösterilenden fazla öderdi). Kupon YİNE baz fiyat
           // üzerinden hesaplanır (sepet ile aynı taban → önizleme = tahsilat).
           const now = new Date();
-          const effectiveMap =
-            await this.discountService.getEffectiveDisplayPriceMany(
-              productIds.map((productId) => {
-                const p = productMap.get(productId)!;
-                return {
-                  productId,
-                  sellerId: p.sellerId,
-                  categoryId: p.categoryId ?? "",
-                  // Kampanya, indirim penceresi UYGULANMIŞ fiyatın üstüne biner.
-                  currentDisplayPrice: resolveSalePrice(p, now).price,
-                };
-              }),
-            );
+          // Tahsil edilen satır tabanı ORTAK çözümleyiciden: indirim penceresi +
+          // kampanya tek yerde uygulanır. Kampanya eşiği (minCartValue) sepetin
+          // tamamına bakar — sepet ve checkout önizlemesiyle aynı taban.
+          const effectiveMap = await this.priceResolver.resolveMany(
+            productIds.map((productId) => ({
+              product: productMap.get(productId)!,
+              quantity: qtyByProduct.get(productId) ?? 1,
+            })),
+            { now, minCartValueBasis: "cart" },
+          );
 
           // Fiyatlandırma (ürün başına) — createDirectOrder ile aynı kurallar
           const pricing = productIds.map((productId) => {
             const product = productMap.get(productId)!;
             // İndirim penceresi ORTAK kuraldan: pencere dışındaysa satış fiyatı
             // indirim öncesi fiyattır (vitrinle aynı sayı).
-            const sale = resolveSalePrice(product, now);
-            const basePrice = sale.price;
-            const campaignPrice = effectiveMap.get(productId);
-            const productPrice = campaignPrice ?? basePrice;
-            const originalPrice = sale.oldPrice ?? basePrice;
+            const resolved = effectiveMap.get(productId)!;
+            const productPrice = resolved.unitPrice;
+            const originalPrice = resolved.originalUnitPrice;
             return {
               productId,
               product,

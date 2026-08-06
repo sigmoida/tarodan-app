@@ -30,6 +30,15 @@ import {
   CouponReservationStatus,
   Prisma,
 } from "@prisma/client";
+import {
+  ProductPriceResolver,
+  type PriceableEntry,
+} from "./product-price-resolver.service";
+import { DiscountScopeService } from "./discount-scope.service";
+import {
+  descendantCategoryIds,
+  loadCategoryEdges,
+} from "../category/category-tree.helper";
 
 /**
  * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
@@ -52,6 +61,8 @@ export class DiscountService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly searchService: SearchService,
+    private readonly priceResolver: ProductPriceResolver,
+    private readonly scope: DiscountScopeService,
   ) {}
 
   /**
@@ -636,26 +647,32 @@ export class DiscountService {
       const products = await this.prisma.product.findMany({
         where: { id: { in: dto.cartItems.map((i) => i.productId) } },
       });
-      const effectivePrices = await this.getEffectiveDisplayPriceMany(
-        products.map((product) => ({
-          productId: product.id,
-          sellerId: product.sellerId,
-          categoryId: product.categoryId ?? "",
-          currentDisplayPrice: Number(product.price),
-        })),
-      );
+      const productById = new Map(products.map((p) => [p.id, p]));
+
+      // Kuponun tabanı, alıcının GERÇEKTEN ödeyeceği birim fiyattır: ürünün
+      // kendi indirim penceresi + kampanya uygulanmış hâli. Burada ham
+      // `product.price` okunuyordu; sepet ise başka bir taban kullanıyordu, bu
+      // yüzden aynı kupon iki ekranda iki farklı tutar indiriyordu.
+      const entries = dto.cartItems.flatMap((item) => {
+        const product = productById.get(item.productId);
+        return product ? [{ product, quantity: item.quantity }] : [];
+      }) as PriceableEntry[];
+      const unitPrices = await this.priceResolver.resolveMany(entries, {
+        now,
+        minCartValueBasis: "cart",
+      });
+      const ancestors = await this.scope.resolveAncestors([discount], products);
 
       for (const item of dto.cartItems) {
-        const product = products.find((p) => p.id === item.productId);
-        if (product) {
-          const unitPrice =
-            effectivePrices.get(product.id) ?? Number(product.price);
-          const itemPrice = unitPrice * item.quantity;
-          cartTotal += itemPrice;
-          if (this.isProductEligibleForDiscount(product, discount)) {
-            eligibleSubtotal += itemPrice;
-            eligibleProductIds.push(product.id);
-          }
+        const product = productById.get(item.productId);
+        if (!product) continue;
+        const unitPrice =
+          unitPrices.get(product.id)?.unitPrice ?? Number(product.price);
+        const itemPrice = unitPrice * item.quantity;
+        cartTotal += itemPrice;
+        if (this.scope.covers(product, discount, ancestors)) {
+          eligibleSubtotal += itemPrice;
+          eligibleProductIds.push(product.id);
         }
       }
     }
@@ -1123,106 +1140,14 @@ export class DiscountService {
   }
 
   /**
-   * Get the best effective display price for a product from active auto-applied campaigns.
-   * Used by product listing/detail to show campaign discount on the product card.
-   * @returns The lowest price from applicable campaigns, or null if none apply
-   */
-  async getEffectiveDisplayPrice(
-    productId: string,
-    sellerId: string,
-    categoryId: string,
-    currentDisplayPrice: number,
-  ): Promise<number | null> {
-    // Tek ürün = tek-elemanlı batch. Matematik ve DB filtresi tek otoritede
-    // (getEffectiveDisplayPriceMany) → liste ile drift imkânsız.
-    const map = await this.getEffectiveDisplayPriceMany([
-      { productId, sellerId, categoryId, currentDisplayPrice },
-    ]);
-    return map.get(productId) ?? null;
-  }
-
-  /**
-   * N+1 giderme (#67): Bir sayfadaki tüm ürünler için etkin kampanya fiyatını TEK
-   * discount.findMany ile çözer. Aktif auto-discount'lar (kampanyalar) az sayıdadır;
-   * hepsini bir kez çekip her ürün için uygunluğu BELLEKTE değerlendiririz — best-price
-   * hesabı getEffectiveDisplayPrice'ın birebir aynısıdır (yalnız kaynak sorgu toplu).
-   * Dönen map: productId → indirimli görüntü fiyatı (indirim yoksa null).
-   */
-  async getEffectiveDisplayPriceMany(
-    items: {
-      productId: string;
-      sellerId: string;
-      categoryId: string;
-      currentDisplayPrice: number;
-    }[],
-  ): Promise<Map<string, number | null>> {
-    const result = new Map<string, number | null>();
-    if (!items.length) return result;
-
-    const now = new Date();
-    const sellerIds = [
-      ...new Set(items.map((i) => i.sellerId).filter(Boolean)),
-    ];
-    const categoryIds = [
-      ...new Set(items.map((i) => i.categoryId).filter(Boolean)),
-    ];
-    const productIds = items.map((i) => i.productId);
-
-    const discounts = await this.prisma.discount.findMany({
-      where: {
-        isActive: true,
-        code: null,
-        startDate: { lte: now },
-        endDate: { gte: now },
-        OR: [
-          { scope: DiscountScope.global, sellerId: null },
-          { scope: DiscountScope.seller, sellerId: { in: sellerIds } },
-          { scope: DiscountScope.category, categoryId: { in: categoryIds } },
-          {
-            scope: DiscountScope.product,
-            targetProductIds: { hasSome: productIds },
-          },
-        ],
-      },
-      orderBy: { priority: "asc" },
-    });
-
-    for (const item of items) {
-      const { productId, sellerId, categoryId, currentDisplayPrice } = item;
-      const product = { id: productId, sellerId, categoryId };
-      let bestPrice: number | null = null;
-      for (const d of discounts) {
-        if (!this.isProductEligibleForDiscount(product, d)) continue;
-
-        let effectivePrice: number;
-        if (d.type === "percentage") {
-          const discountAmount = currentDisplayPrice * (Number(d.value) / 100);
-          const capped =
-            d.maxDiscountAmount != null
-              ? Math.min(discountAmount, Number(d.maxDiscountAmount))
-              : discountAmount;
-          effectivePrice = Math.max(0, currentDisplayPrice - capped);
-        } else {
-          effectivePrice = Math.max(
-            0,
-            currentDisplayPrice -
-              Math.min(Number(d.value), currentDisplayPrice),
-          );
-        }
-        if (effectivePrice < currentDisplayPrice) {
-          if (bestPrice == null || effectivePrice < bestPrice) {
-            bestPrice = effectivePrice;
-          }
-        }
-      }
-      result.set(productId, bestPrice);
-    }
-    return result;
-  }
-
-  /**
-   * Get criteria for all currently active auto-applied discounts.
-   * Used for filtering products in findAll.
+   * "İndirimdekiler" filtresinin ürün koşulu — yürürlükteki kodsuz kampanyaların
+   * kapsadığı satıcı / kategori / ürün kümesi.
+   *
+   * Kategori kümesi kampanyanın kategorisinin ALT kategorilerini de içerir:
+   * fiyatlama tarafı üst kategoriye tanımlı kampanyayı alt kategorideki ürüne
+   * uyguladığı için (ProductPriceResolver), filtre de aynı ürünleri
+   * listelemelidir. Aksi halde ürün indirimli fiyatla satılır ama
+   * "İndirimdekiler" listesinde hiç görünmezdi.
    */
   async getActiveDiscountCriteria() {
     const now = new Date();
@@ -1263,6 +1188,17 @@ export class DiscountService {
       }
     }
 
+    if (criteria.categoryIds.length) {
+      const edges = await loadCategoryEdges(this.prisma);
+      criteria.categoryIds = [
+        ...new Set(
+          criteria.categoryIds.flatMap((categoryId) => [
+            ...descendantCategoryIds(edges, categoryId),
+          ]),
+        ),
+      ];
+    }
+
     return criteria;
   }
 
@@ -1301,91 +1237,7 @@ export class DiscountService {
     }));
   }
 
-  /**
-   * Get discounts applicable to specific products
-   */
-  async getProductDiscounts(
-    productIds: string[],
-    sellerId?: string,
-  ): Promise<Map<string, DiscountResponseDto[]>> {
-    const now = new Date();
-
-    // Get all active discounts that could apply to these products
-    const discounts = await this.prisma.discount.findMany({
-      where: {
-        isActive: true,
-        startDate: { lte: now },
-        endDate: { gte: now },
-        OR: [
-          { scope: DiscountScope.global, sellerId: null },
-          {
-            scope: DiscountScope.product,
-            targetProductIds: { hasSome: productIds },
-          },
-          ...(sellerId ? [{ scope: DiscountScope.seller, sellerId }] : []),
-        ],
-      },
-      include: {
-        seller: { select: { id: true, displayName: true } },
-        category: { select: { id: true, name: true } },
-      },
-      orderBy: { priority: "asc" },
-    });
-
-    const result = new Map<string, DiscountResponseDto[]>();
-
-    for (const productId of productIds) {
-      const applicableDiscounts = discounts.filter(
-        (d) =>
-          d.scope === DiscountScope.global ||
-          (d.scope === DiscountScope.product &&
-            d.targetProductIds.includes(productId)) ||
-          (d.scope === DiscountScope.seller && d.sellerId === sellerId),
-      );
-      result.set(
-        productId,
-        applicableDiscounts.map((d) => this.mapToResponse(d)),
-      );
-    }
-
-    return result;
-  }
-
   // Helper methods
-
-  private isProductEligibleForDiscount(
-    product: { id: string; categoryId: string; sellerId: string },
-    discount: {
-      scope: DiscountScope;
-      sellerId: string | null;
-      categoryId: string | null;
-      targetProductIds: string[];
-    },
-  ): boolean {
-    switch (discount.scope) {
-      case DiscountScope.global:
-        return (
-          discount.sellerId === null || discount.sellerId === product.sellerId
-        );
-
-      case DiscountScope.category:
-        return product.categoryId === discount.categoryId;
-
-      case DiscountScope.product:
-        // Sadece seçili ürünler: boş liste = hiçbir ürüne uygulanmaz
-        if (!discount.targetProductIds?.length) return false;
-        return discount.targetProductIds.includes(product.id);
-
-      case DiscountScope.seller:
-        // Tüm mağaza: sadece bu satıcının ürünleri
-        return (
-          discount.sellerId != null && product.sellerId === discount.sellerId
-        );
-
-      default:
-        return false;
-    }
-  }
 
   private mapToResponse(discount: any): DiscountResponseDto {
     const now = new Date();

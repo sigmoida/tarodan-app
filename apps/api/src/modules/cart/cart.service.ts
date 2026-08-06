@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
+import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import {
   AddToCartDto,
@@ -48,6 +49,7 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly discountService: DiscountService,
+    private readonly priceResolver: ProductPriceResolver,
     private readonly shippingTariffs: ShippingTariffService,
     @Optional()
     private readonly storageService: StorageService,
@@ -485,22 +487,28 @@ export class CartService {
     let subtotal = 0;
     let productDiscountTotal = 0;
 
-    // Calculate effective prices with campaign discounts
+    // Fiyatlar TEK toplu çağrıyla çözülür (ürün başına sorgu yerine). Kampanya
+    // eşiği sepetin tamamına bakar — checkout ile aynı taban.
+    const resolvedPrices = await this.priceResolver.resolveMany(
+      (cart.items || []).map((item: any) => ({
+        product: item.product,
+        quantity: item.quantity,
+      })),
+      { minCartValueBasis: "cart" },
+    );
+
     for (const item of cart.items || []) {
       const product = item.product;
-      const basePrice = Number(product.price);
 
-      // Get campaign discount price from DiscountService
-      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
-        product.id,
-        product.sellerId,
-        product.categoryId,
-        basePrice,
-      );
-
-      // Use campaign price if available, otherwise base price
-      const effectivePrice = campaignPrice ?? basePrice;
-      const originalPrice = basePrice; // Original is always the base price
+      // Fiyat ORTAK çözümleyiciden: indirim penceresi + kampanya. Sepet daha önce
+      // ham `product.price` okuyordu — penceresi kapanmış bir üründe sepet
+      // indirimli fiyatı gösterirken checkout indirim ÖNCESİ fiyattan tahsil
+      // ediyordu.
+      const resolved =
+        resolvedPrices.get(product.id) ??
+        (await this.priceResolver.resolveOne(product));
+      const effectivePrice = resolved.unitPrice;
+      const originalPrice = resolved.originalUnitPrice;
       const hasDiscount = effectivePrice < originalPrice;
 
       const lineTotal = effectivePrice * item.quantity;

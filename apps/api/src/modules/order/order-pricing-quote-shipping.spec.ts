@@ -2,6 +2,7 @@ import { OrderPricingService } from "./order-pricing.service";
 import { ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
+import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
 
 /**
  * Checkout quote kargosu artık SATICI-BAŞINA (create ile ortak calculateShippingBySeller).
@@ -101,6 +102,7 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
         getEffectiveDisplayPrice: async () => null,
         getEffectiveDisplayPriceMany: async () => new Map(),
       } as any,
+      testPriceResolver(),
       testTaxPolicy(),
     );
     // Komisyonu izole et — bu spec yalnız kargoyu ölçer.

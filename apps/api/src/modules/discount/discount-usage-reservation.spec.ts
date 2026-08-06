@@ -1,4 +1,6 @@
 import { DiscountService } from "./discount.service";
+import { ProductPriceResolver } from "./product-price-resolver.service";
+import { DiscountScopeService } from "./discount-scope.service";
 
 describe("DiscountService coupon usage lifecycle", () => {
   const expiresAt = new Date("2026-07-30T00:00:00.000Z");
@@ -42,6 +44,8 @@ describe("DiscountService coupon usage lifecycle", () => {
         prisma,
         { delPattern: jest.fn() } as any,
         { syncProduct: jest.fn() } as any,
+        new ProductPriceResolver(prisma, new DiscountScopeService(prisma)),
+        new DiscountScopeService(prisma),
       ),
       tx,
     };

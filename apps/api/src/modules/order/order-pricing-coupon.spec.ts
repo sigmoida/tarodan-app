@@ -3,6 +3,7 @@ import { ProductKind, ProductStatus } from "@prisma/client";
 import { OrderPricingService } from "./order-pricing.service";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
+import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
 
 describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
   const product = {
@@ -47,6 +48,7 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
         }),
       } as any,
       discountService,
+      testPriceResolver(),
       testTaxPolicy(),
     );
     jest.spyOn(service, "calculateCommission").mockResolvedValue({

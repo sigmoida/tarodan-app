@@ -19,7 +19,7 @@ import {
   RejectProductDto,
 } from "./dto";
 import { ProductStatus, OrderStatus, Prisma } from "@prisma/client";
-import { DiscountService } from "../discount/discount.service";
+import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { SearchService } from "../search/search.service";
 import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
@@ -40,7 +40,7 @@ export class AdminProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
-    private readonly discountService: DiscountService,
+    private readonly priceResolver: ProductPriceResolver,
     private readonly searchService: SearchService,
     private readonly cache: CacheService,
     private readonly notificationService: NotificationService,
@@ -156,42 +156,37 @@ export class AdminProductService {
       query,
     );
 
-    // Calculate campaign prices for each product
-    const productsWithCampaignPrices = await Promise.all(
-      result.data.map(async (p) => {
-        const basePrice = Number(p.price);
-
-        // Get campaign discount price from DiscountService
-        const campaignPrice =
-          await this.discountService.getEffectiveDisplayPrice(
-            p.id,
-            p.sellerId,
-            p.categoryId ?? undefined,
-            basePrice,
-          );
-
-        const effectivePrice = campaignPrice ?? basePrice;
-        const hasDiscount = effectivePrice < basePrice;
-
-        // Convert S3 key to presigned URL for image
-        const imageUrl = this.resolveProductImageUrl(p.images[0]?.cardKey);
-
-        return {
-          ...p,
-          price: effectivePrice,
-          originalPrice: hasDiscount
-            ? basePrice
-            : p.originalPrice != null
-              ? Number(p.originalPrice)
-              : null,
-          salePrice: p.salePrice != null ? Number(p.salePrice) : null,
-          isOnSale:
-            hasDiscount ||
-            (p.salePrice != null && Number(p.salePrice) < basePrice),
-          imageUrl,
-        };
-      }),
+    // Fiyatlar ORTAK çözümleyiciden (indirim penceresi + kampanya) ve TEK toplu
+    // çağrıyla: eskiden liste her ürün için ayrı bir kampanya sorgusu atıyordu
+    // (N+1) ve indirim penceresini hiç uygulamıyordu.
+    const resolvedPrices = await this.priceResolver.resolveMany(
+      result.data.map((p) => ({ product: p })),
+      { minCartValueBasis: "line" },
     );
+    const productsWithCampaignPrices = result.data.map((p) => {
+      const resolved = resolvedPrices.get(p.id);
+      const effectivePrice = resolved?.unitPrice ?? Number(p.price);
+      const listPrice = resolved?.originalUnitPrice ?? Number(p.price);
+      const hasDiscount = effectivePrice < listPrice;
+
+      // Convert S3 key to presigned URL for image
+      const imageUrl = this.resolveProductImageUrl(p.images[0]?.cardKey);
+
+      return {
+        ...p,
+        price: effectivePrice,
+        originalPrice: hasDiscount
+          ? listPrice
+          : p.originalPrice != null
+            ? Number(p.originalPrice)
+            : null,
+        salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+        isOnSale:
+          hasDiscount ||
+          (p.salePrice != null && Number(p.salePrice) < listPrice),
+        imageUrl,
+      };
+    });
 
     return {
       ...result,

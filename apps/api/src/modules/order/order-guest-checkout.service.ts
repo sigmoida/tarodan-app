@@ -10,7 +10,6 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
-import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import {
@@ -28,7 +27,7 @@ import {
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import { DiscountService } from "../discount";
+import { DiscountService, ProductPriceResolver } from "../discount";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
@@ -56,6 +55,7 @@ export class OrderGuestCheckoutService {
     private readonly notificationService: NotificationService,
     private readonly suratCargoService: SuratCargoService,
     private readonly discountService: DiscountService,
+    private readonly priceResolver: ProductPriceResolver,
     private readonly orderPricing: OrderPricingService,
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
@@ -276,14 +276,9 @@ export class OrderGuestCheckoutService {
       // kartında/sepette görünen. Bu yol ikisini de atlıyordu — ham `salePrice ??
       // price` kolonunu okuyor ve kampanyayı hiç sormuyordu; code'suz bir kampanya
       // aktifken misafir, kartta gördüğünden fazla ödüyordu.
-      const listedPrice = resolveSalePrice(product).price;
-      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
-        product.id,
-        product.sellerId,
-        product.categoryId ?? "",
-        listedPrice,
-      );
-      let finalPrice = campaignPrice ?? listedPrice;
+      const resolvedPrice = await this.priceResolver.resolveOne(product);
+      const listedPrice = resolvedPrice.saleUnitPrice;
+      let finalPrice = resolvedPrice.unitPrice;
 
       if (dto.offerId) {
         const offer = await tx.offer.findUnique({
@@ -416,8 +411,7 @@ export class OrderGuestCheckoutService {
         buyerServiceTaxAmount: guestBuyerServiceTax,
       });
       // İndirim öncesi (çizili) fiyat — yoksa listelenen fiyatın kendisi.
-      const guestOriginalPrice =
-        resolveSalePrice(product).oldPrice ?? listedPrice;
+      const guestOriginalPrice = resolvedPrice.originalUnitPrice;
       const guestDiscountAmount = Math.max(0, guestOriginalPrice - finalPrice);
       // Siparişin ürün tabanı = TAHSİL EDİLEN tutar (kabul edilmiş teklifte teklif
       // bedeli). Liste fiyatı `guestDiscountAmount` ve snapshot'ta durur.

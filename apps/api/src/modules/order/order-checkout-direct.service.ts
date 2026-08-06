@@ -9,7 +9,6 @@ import {
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
-import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
 import {
@@ -23,7 +22,7 @@ import { getAvailableQuantity } from "../product/helpers/product-availability.he
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
-import { DiscountService } from "../discount";
+import { DiscountService, ProductPriceResolver } from "../discount";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
@@ -50,6 +49,7 @@ export class OrderCheckoutDirectService {
     private readonly eventService: EventService,
     private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
+    private readonly priceResolver: ProductPriceResolver,
     private readonly suratCargoService: SuratCargoService,
     private readonly orderPricing: OrderPricingService,
     private readonly orderCommon: OrderCommonService,
@@ -305,18 +305,11 @@ export class OrderCheckoutDirectService {
       // İndirim penceresi ORTAK kuraldan: pencere dışındaysa satış fiyatı
       // indirim öncesi fiyattır — vitrin, sepet ve tahsilat aynı sayıyı görür.
       const now = new Date();
-      const sale = resolveSalePrice(product, now);
-      const basePrice = sale.price;
-      // F1.4: charged base = efektif (kampanya) fiyat — ürün kartı/sepet ile aynı; kupon
-      // yine baz üzerinden. Aktif code=null kampanya yoksa efektif == baz (no-op).
-      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
-        product.id,
-        product.sellerId,
-        product.categoryId ?? "",
-        basePrice,
-      );
-      const productPrice = campaignPrice ?? basePrice;
-      const originalPrice = sale.oldPrice ?? basePrice;
+      // Tahsil edilen taban ORTAK çözümleyiciden: indirim penceresi + kampanya.
+      // Ürün kartı, sepet ve checkout aynı sayıyı görsün.
+      const resolved = await this.priceResolver.resolveOne(product, { now });
+      const productPrice = resolved.unitPrice;
+      const originalPrice = resolved.originalUnitPrice;
       const productDiscount = Math.max(0, originalPrice - productPrice);
 
       // F1.3: quote'un birim-fiyat hash'i ile doğrula — fiyat/kampanya değiştiyse

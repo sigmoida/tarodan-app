@@ -1,6 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { DiscountService } from "../discount/discount.service";
+import {
+  ProductPriceResolver,
+  type ResolvedUnitPrice,
+} from "../discount/product-price-resolver.service";
 import { StorageService } from "../storage/storage.service";
 import {
   canTradeFromMembership,
@@ -30,7 +33,7 @@ export class ProductCommonService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly discountService: DiscountService,
+    private readonly priceResolver: ProductPriceResolver,
     private readonly storageService: StorageService,
   ) {}
 
@@ -58,7 +61,7 @@ export class ProductCommonService {
    * discount atılıyordu → 20'lik sayfa 80+ sorgu. Artık sayfa başına:
    *   - benzersiz sellerId'ler için 4 grouped sorgu (product/order/rating groupBy + membership findMany)
    *   - cached rating'i olmayan ürünler için 1 grouped productRating sorgusu
-   *   - tüm ürünler için 1 toplu discount çözümü (DiscountService.getEffectiveDisplayPriceMany)
+   *   - tüm ürünler için 1 toplu fiyat çözümü (ProductPriceResolver.resolveMany)
    * Değerler ve yanıt şekli birebir korunur (buildProductResponse aynı çıktıyı üretir).
    */
   async formatProductResponseMany(products: any[]): Promise<any[]> {
@@ -167,27 +170,20 @@ export class ProductCommonService {
     }
 
     // ── 3) Kampanya indirimleri (tek toplu çözüm) ───────────────────────────
-    const discountItems = products
-      .map((p) => {
-        const sellerId = p.sellerId ?? p.seller?.id;
-        const categoryId = p.categoryId ?? p.category?.id;
-        if (!sellerId || !categoryId) return null;
-        return {
-          productId: p.id,
-          sellerId,
-          categoryId,
-          // Kampanya, indirim penceresi UYGULANMIŞ fiyatın üstüne biner.
-          currentDisplayPrice: resolveSalePrice(p).price,
-        };
-      })
-      .filter(Boolean) as {
-      productId: string;
-      sellerId: string;
-      categoryId: string;
-      currentDisplayPrice: number;
-    }[];
-    const discountPrices =
-      await this.discountService.getEffectiveDisplayPriceMany(discountItems);
+    // İndirim penceresi ve kampanya ARTIK tek yerde çözülüyor
+    // (ProductPriceResolver): vitrin, sepet ve tahsilat aynı sayıyı üretsin.
+    // Liste bağlamında eşik satır bazlıdır — sayfadaki ürünlerin toplamı sepet
+    // tutarı sayılmamalı.
+    const priceableProducts = products.flatMap((p) => {
+      const sellerId = p.sellerId ?? p.seller?.id;
+      const categoryId = p.categoryId ?? p.category?.id;
+      if (!sellerId || !categoryId) return [];
+      return [{ product: { ...p, sellerId, categoryId } }];
+    });
+    const discountPrices = await this.priceResolver.resolveMany(
+      priceableProducts,
+      { minCartValueBasis: "line" },
+    );
 
     const pre = { sellerStats, productRatings, discountPrices };
     return Promise.all(products.map((p) => this.buildProductResponse(p, pre)));
@@ -213,7 +209,7 @@ export class ProductCommonService {
         }
       >;
       productRatings: Map<string, { average: number | null; count: number }>;
-      discountPrices: Map<string, number | null>;
+      discountPrices: Map<string, ResolvedUnitPrice>;
     },
   ) {
     const s = product.seller?.id
@@ -238,12 +234,22 @@ export class ProductCommonService {
       ratingCount = pr?.count ?? 0;
     }
 
-    // İndirim penceresi ORTAK kuraldan (`resolveSalePrice`): pencere dışındaysa
-    // satış fiyatı indirim ÖNCESİ fiyattır. Eskiden burada yalnız çizili fiyat
-    // düşürülüyordu — vitrin indirimsiz görünürken tahsilat indirimli kalıyordu.
+    // Fiyat ORTAK çözümleyiciden gelir (ProductPriceResolver): indirim penceresi
+    // + kampanya tek yerde uygulanır, kart burada kendi hesabını yapmaz. Satıcı/
+    // kategori bilgisi eksik olduğu için çözümleyiciye giremeyen ürün yalnız
+    // kendi indirim penceresine düşer.
     const now = new Date();
-    const sale = resolveSalePrice(product, now);
-    const priceA = sale.price;
+    const sellerId = product.sellerId ?? product.seller?.id;
+    const resolved = pre.discountPrices.get(product.id);
+    const fallbackSale = resolved ? null : resolveSalePrice(product, now);
+    /** Kampanya ÖNCESİ satış fiyatı — ürünün kendi indirimi uygulanmış hâli. */
+    const priceA = resolved?.saleUnitPrice ?? fallbackSale!.price;
+    /** Ürünün kendi indiriminin çizili fiyatı (indirim yoksa null). */
+    const saleOldPrice = resolved
+      ? resolved.isOnSale
+        ? resolved.originalUnitPrice
+        : null
+      : fallbackSale!.oldPrice;
     const saleStartDate = product.saleStartDate
       ? new Date(product.saleStartDate)
       : null;
@@ -251,24 +257,15 @@ export class ProductCommonService {
       ? new Date(product.saleEndDate)
       : null;
 
-    // Kampanya indirimi (satıcı/ürün/kategori/global): ürün kartında gösterilecek fiyata yansıt
-    const sellerId = product.sellerId ?? product.seller?.id;
-    const categoryId = product.categoryId ?? product.category?.id;
-    let displayPrice = priceA;
-    let displayOldPrice: number | null = sale.oldPrice;
-    let discountPercent: number | null =
-      sale.isOnSale && sale.oldPrice
-        ? Math.round(((sale.oldPrice - priceA) / sale.oldPrice) * 100)
+    // Kampanya varsa çizili fiyat kampanya ÖNCESİ satış fiyatıdır; yoksa ürünün
+    // kendi indirim öncesi fiyatı.
+    const displayPrice = resolved?.unitPrice ?? priceA;
+    const displayOldPrice: number | null =
+      displayPrice < priceA ? priceA : saleOldPrice;
+    const discountPercent =
+      displayOldPrice != null && displayOldPrice > displayPrice
+        ? Math.round(((displayOldPrice - displayPrice) / displayOldPrice) * 100)
         : null;
-
-    if (sellerId && categoryId) {
-      const campaignPrice = pre.discountPrices.get(product.id) ?? null;
-      if (campaignPrice != null && campaignPrice < priceA) {
-        displayPrice = campaignPrice;
-        displayOldPrice = priceA;
-        discountPercent = Math.round(((priceA - campaignPrice) / priceA) * 100);
-      }
-    }
 
     const isOnSale = displayOldPrice != null && displayOldPrice > displayPrice;
 

@@ -18,13 +18,24 @@ import { CacheService } from "../cache/cache.service";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
 import { DiscountService } from "../discount/discount.service";
+import { ProductPriceResolver } from "../discount/product-price-resolver.service";
+import {
+  testCampaign,
+  testPriceResolver,
+  type TestPriceResolver,
+} from "../discount/testing/price-resolver-fixture";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
 import { RefundService } from "../refund/refund.service";
-import { OrderStatus, ProductKind, ProductStatus } from "@prisma/client";
+import {
+  DiscountScope,
+  OrderStatus,
+  ProductKind,
+  ProductStatus,
+} from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
 
@@ -125,6 +136,7 @@ describe("OrderService checkout group (batch checkout)", () => {
   let mockTx: any;
   let cache: any;
   let discountService: any;
+  let priceResolver: TestPriceResolver;
 
   const mockPrisma: any = {
     user: { findUnique: jest.fn(), findFirst: jest.fn() },
@@ -291,12 +303,9 @@ describe("OrderService checkout group (batch checkout)", () => {
             validateCoupon: jest.fn(),
             reserveUsage: jest.fn(),
             releaseReservedUsageForOrders: jest.fn(),
-            getEffectiveDisplayPriceMany: jest
-              .fn()
-              .mockResolvedValue(new Map()),
-            getEffectiveDisplayPrice: jest.fn().mockResolvedValue(null),
           },
         },
+        { provide: ProductPriceResolver, useValue: testPriceResolver() },
         {
           provide: SuratCargoService,
           useValue: {
@@ -320,6 +329,7 @@ describe("OrderService checkout group (batch checkout)", () => {
     service = module.get(OrderService);
     cache = module.get(CacheService);
     discountService = module.get(DiscountService);
+    priceResolver = module.get(ProductPriceResolver);
   });
 
   const baseDto = () => {
@@ -770,8 +780,10 @@ describe("OrderService checkout group (batch checkout)", () => {
       mockTx.product.findUnique.mockResolvedValue(
         makeProduct(productA, { quantity: 100 }),
       );
-      // code=null kampanya: kartta görünen efektif fiyat 80.
-      discountService.getEffectiveDisplayPrice.mockResolvedValue(80);
+      // code=null kampanya: 100 TL'lik üründen 20 TL indirir → kartta 80.
+      priceResolver.setCampaigns([
+        testCampaign({ value: 20, scope: DiscountScope.global }),
+      ]);
 
       await service.guestCheckout({
         productId: productA,

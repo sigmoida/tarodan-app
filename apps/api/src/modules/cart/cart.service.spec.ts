@@ -1,10 +1,15 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { CartService } from "./cart.service";
+import {
+  testCampaign,
+  testPriceResolver,
+} from "../discount/testing/price-resolver-fixture";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
+import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { StorageService } from "../storage/storage.service";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
-import { ProductKind, ProductStatus } from "@prisma/client";
+import { DiscountScope, ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
 /**
@@ -53,6 +58,7 @@ describe("CartService.addItem — idempotent re-add", () => {
         CartService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: DiscountService, useValue: {} },
+        { provide: ProductPriceResolver, useValue: testPriceResolver() },
         { provide: StorageService, useValue: {} },
         {
           provide: ShippingTariffService,
@@ -176,7 +182,6 @@ describe("CartService.addItem — idempotent re-add", () => {
 describe("CartService.calculateCart — unavailable items", () => {
   const mockCartFindUnique = jest.fn();
   const mockDiscountFindUnique = jest.fn();
-  const mockGetEffectiveDisplayPrice = jest.fn();
   const mockCheckUsageLimit = jest.fn();
   const mockPrisma = {
     cart: {
@@ -187,7 +192,6 @@ describe("CartService.calculateCart — unavailable items", () => {
     },
   } as unknown as PrismaService;
   const mockDiscountService = {
-    getEffectiveDisplayPrice: mockGetEffectiveDisplayPrice,
     checkUsageLimit: mockCheckUsageLimit,
   } as unknown as DiscountService;
 
@@ -218,6 +222,7 @@ describe("CartService.calculateCart — unavailable items", () => {
   const calculateCart = async (
     items: ReturnType<typeof makeCartItem>[],
     couponCode: string | null = null,
+    campaigns: unknown[] = [],
   ) => {
     mockCartFindUnique.mockResolvedValue({
       id: "cart-1",
@@ -232,6 +237,7 @@ describe("CartService.calculateCart — unavailable items", () => {
     const service = new CartService(
       mockPrisma,
       mockDiscountService,
+      testPriceResolver(campaigns),
       {
         getActiveOutboundTariff: async () => ({
           freeShippingEnabled: true,
@@ -248,19 +254,21 @@ describe("CartService.calculateCart — unavailable items", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetEffectiveDisplayPrice.mockResolvedValue(null);
     mockCheckUsageLimit.mockResolvedValue(true);
   });
 
   it("keeps a deleted item visible but excludes it from every payable total", async () => {
-    mockGetEffectiveDisplayPrice.mockResolvedValueOnce(100);
-
-    const result = await calculateCart([
-      makeCartItem("deleted", {
-        status: ProductStatus.deleted,
-        price: 125,
-      }),
-    ]);
+    const result = await calculateCart(
+      [makeCartItem("deleted", { status: ProductStatus.deleted, price: 125 })],
+      null,
+      [
+        testCampaign({
+          scope: DiscountScope.product,
+          value: 25,
+          targetProductIds: ["product-deleted"],
+        }),
+      ],
+    );
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({

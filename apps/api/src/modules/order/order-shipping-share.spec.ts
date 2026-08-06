@@ -14,6 +14,7 @@ import {
   packageTiers,
 } from "../shipping/testing/tariff-fixture";
 import { testTaxPolicy } from "./testing/tax-policy-fixture";
+import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
 
 /**
  * BLOCKER: `shippingBuyerShare` önizleme ile tahsilat arasında ayrışıyordu.
@@ -229,6 +230,7 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
         getEffectiveDisplayPrice: async () => null,
         getEffectiveDisplayPriceMany: async () => new Map(),
       } as any,
+      testPriceResolver(),
       testTaxPolicy(),
     );
     // Kategoriye göre farklı kargo payı döndür.

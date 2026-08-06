@@ -1,5 +1,6 @@
 import { RatingService } from "./rating.service";
 import { ProductCommonService } from "../product/product-common.service";
+import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
 import { publicProductRatingWhere } from "../../common/helpers/public-rating";
 
 /**
@@ -134,7 +135,7 @@ describe("yayınlanmış puan görünürlüğü — yalnız approved", () => {
       };
       const service = new ProductCommonService(
         prisma as any,
-        discountService as any,
+        testPriceResolver(),
         storageService as any,
       );
       return { service, prisma };

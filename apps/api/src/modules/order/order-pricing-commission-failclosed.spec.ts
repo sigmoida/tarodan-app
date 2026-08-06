@@ -6,6 +6,7 @@ import {
   SellerType,
 } from "@prisma/client";
 import { OrderPricingService } from "./order-pricing.service";
+import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
 
 const seller = {
   sellerType: SellerType.individual,
@@ -54,6 +55,7 @@ function service(rules: any[], hasActiveSet = true) {
     {} as any,
     {} as any,
     {} as any,
+    testPriceResolver(),
     {} as any,
   );
 }

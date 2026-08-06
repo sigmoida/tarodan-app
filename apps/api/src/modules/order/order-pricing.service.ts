@@ -40,6 +40,7 @@ import {
 } from "../shipping/shipping-tariff.helper";
 import { billableDesiForTier } from "../shipping/shipping-package-tier";
 import { DiscountService } from "../discount/discount.service";
+import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { createHash } from "crypto";
 import { calculateServiceTax } from "./order-service-tax.helper";
 import { buyerTotalOf } from "./order-total.helper";
@@ -103,6 +104,7 @@ export class OrderPricingService {
     private readonly taxService: TaxService,
     private readonly shippingTariffs: ShippingTariffService,
     private readonly discountService: DiscountService,
+    private readonly priceResolver: ProductPriceResolver,
     private readonly taxPolicy: OrderTaxPolicyService,
   ) {}
 
@@ -380,6 +382,12 @@ export class OrderPricingService {
           id: true,
           title: true,
           price: true,
+          // İndirim penceresi alanları: bunlar seçilmediği için quote her ürünü
+          // "indirimsiz" sayıyor, create yolu ise pencereyi uyguluyordu — aynı
+          // sepet için önizleme ile tahsilat ayrışıyordu.
+          oldPrice: true,
+          saleStartDate: true,
+          saleEndDate: true,
           sellerId: true,
           categoryId: true,
           shippingDesi: true,
@@ -433,14 +441,8 @@ export class OrderPricingService {
       // Quote, checkout ile AYNI fiyat kuralını kullanmalı: indirim penceresi
       // dışındaysa taban indirim öncesi fiyattır. Ayrışırsa pricing hash'i
       // tutmaz ve alıcı 409 PRICING_CHANGED alır.
-      const basePrice = resolveSalePrice(product).price;
-      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
-        product.id,
-        product.sellerId,
-        product.categoryId ?? "",
-        basePrice,
-      );
-      const unitPrice = campaignPrice ?? basePrice;
+      const unitPrice = (await this.priceResolver.resolveOne(product))
+        .unitPrice;
       lines.push({
         product: {
           id: product.id,

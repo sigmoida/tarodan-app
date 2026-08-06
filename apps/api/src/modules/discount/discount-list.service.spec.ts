@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { DiscountService } from "./discount.service";
+import { ProductPriceResolver } from "./product-price-resolver.service";
+import { DiscountScopeService } from "./discount-scope.service";
 
 describe("DiscountService admin list contract", () => {
   it("composes full-content search with the selected column sort", async () => {
@@ -16,6 +18,11 @@ describe("DiscountService admin list contract", () => {
       prisma as any,
       {} as any, // cache
       { syncProduct: jest.fn() } as any, // searchService
+      new ProductPriceResolver(
+        prisma as any,
+        new DiscountScopeService(prisma as any),
+      ),
+      new DiscountScopeService(prisma as any),
     );
 
     await service.findAll(

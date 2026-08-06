@@ -1,4 +1,5 @@
 import { AdminProductService } from "./admin-product.service";
+import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
 
 describe("AdminProductService list sorting", () => {
   let prisma: any;
@@ -14,7 +15,7 @@ describe("AdminProductService list sorting", () => {
     service = new AdminProductService(
       prisma,
       {} as any,
-      {} as any,
+      testPriceResolver(),
       {} as any,
       {} as any,
       {} as any,

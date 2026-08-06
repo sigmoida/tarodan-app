@@ -10,7 +10,7 @@ import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { ProductStatus } from "@prisma/client";
-import { DiscountService } from "../discount/discount.service";
+import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import {
   AddToWishlistDto,
@@ -27,7 +27,7 @@ export class WishlistService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly notificationService: NotificationService,
-    private readonly discountService: DiscountService,
+    private readonly priceResolver: ProductPriceResolver,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
@@ -297,18 +297,13 @@ export class WishlistService {
   // ==========================================================================
   private async mapItemToDto(item: any): Promise<WishlistItemResponseDto> {
     const product = item.product;
-    const basePrice = Number(product.price);
 
-    // Get campaign discount price
-    const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
-      product.id,
-      product.sellerId,
-      product.categoryId,
-      basePrice,
-    );
-
-    const effectivePrice = campaignPrice ?? basePrice;
-    const originalPrice = basePrice;
+    // Fiyat ORTAK çözümleyiciden: indirim penceresi + kampanya. Burada ham
+    // `product.price` okunuyordu — penceresi kapanmış bir üründe istek listesi
+    // vitrinden ve sepetten farklı fiyat gösteriyordu.
+    const resolved = await this.priceResolver.resolveOne(product);
+    const effectivePrice = resolved.unitPrice;
+    const originalPrice = resolved.originalUnitPrice;
 
     // Resolve product image URL (S3 key -> presigned URL)
     const resolvedImage = this.resolveProductImageUrl(

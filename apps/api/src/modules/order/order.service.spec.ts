@@ -16,6 +16,8 @@ import { CacheService } from "../cache/cache.service";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
 import { DiscountService } from "../discount/discount.service";
+import { ProductPriceResolver } from "../discount/product-price-resolver.service";
+import { testPriceResolver } from "../discount/testing/price-resolver-fixture";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
@@ -172,6 +174,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: NotificationService, useValue: {} },
         { provide: DiscountService, useValue: {} },
+        { provide: ProductPriceResolver, useValue: testPriceResolver() },
         { provide: SuratCargoService, useValue: {} },
         { provide: ProductLockService, useValue: {} },
         { provide: CommissionLedgerService, useValue: {} },
@@ -347,6 +350,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: NotificationService, useValue: {} },
         { provide: DiscountService, useValue: {} },
+        { provide: ProductPriceResolver, useValue: testPriceResolver() },
         { provide: SuratCargoService, useValue: {} },
         { provide: ProductLockService, useValue: {} },
         { provide: CommissionLedgerService, useValue: {} },

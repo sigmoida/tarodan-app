@@ -1,5 +1,7 @@
 import { DiscountScope, DiscountType } from "@prisma/client";
 import { DiscountService } from "./discount.service";
+import { ProductPriceResolver } from "./product-price-resolver.service";
+import { DiscountScopeService } from "./discount-scope.service";
 
 describe("DiscountService coupon pricing base", () => {
   const now = new Date();
@@ -58,11 +60,20 @@ describe("DiscountService coupon pricing base", () => {
       product: {
         findMany: jest.fn().mockResolvedValue([product]),
       },
+      // Kategori kapsamlı indirim ata zincirini gezer (üst kategoriye tanımlı
+      // indirim alt kategoriyi de kapsar) → ağaç okunabilir olmalı.
+      category: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: "category-1", parentId: null }]),
+      },
     } as any;
     return new DiscountService(
       prisma,
       { delPattern: jest.fn() } as any,
       { syncProduct: jest.fn() } as any,
+      new ProductPriceResolver(prisma, new DiscountScopeService(prisma)),
+      new DiscountScopeService(prisma),
     );
   }
 
