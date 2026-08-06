@@ -2,12 +2,18 @@
 
 "use client";
 
+import { useCallback, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
 import { PhotoIcon } from "@heroicons/react/24/outline";
 import { Input } from "@tarodan/ui";
 import { SectionCard, ImagePreviewGrid } from "@/components/ui";
-import type { ListingImageItem } from "../listing-image-item";
+import {
+  ACCEPTED_IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  occupiedSlots,
+  type ListingImageItem,
+} from "../listing-image-item";
 
 interface ImagesCardProps {
   maxImages: number;
@@ -16,22 +22,50 @@ interface ImagesCardProps {
   uploadingImages: boolean;
   handleFileUpload: (files: FileList | File[] | null) => void;
   removeImage: (clientId: string) => void;
+  retryImage: (clientId: string) => void;
 }
 
-/** "Görseller" — upload dropzone + compact preview grid. Reads the `images`
- *  field from form context (and surfaces its validation error). Shared. */
+const megabytes = (bytes: number) => Math.round(bytes / (1024 * 1024));
+
+/**
+ * "Görseller" — sürükle-bırak alanı + dosya bazlı ilerleme gösteren önizleme
+ * ızgarası.
+ *
+ * Masaüstünde dosyalar alana bırakılabilir; mobilde ve klavyeyle normal dosya
+ * seçici çalışmaya devam eder (alan bir `<label>`, girdi gizli ama erişilebilir).
+ */
 export default function ImagesCard({
   maxImages,
   items,
   uploadingImages,
   handleFileUpload,
   removeImage,
+  retryImage,
 }: ImagesCardProps) {
   const { formState } = useFormContext();
   const imagesError = formState.errors.images?.message as string | undefined;
   const t = useTranslations();
-  // Kontenjan, EKRANDAKİ kalemlerden sayılır; forma yalnız yüklenmişler yazılır.
-  const usedSlots = items.filter((item) => item.status !== "failed").length;
+  const [dragActive, setDragActive] = useState(false);
+  /**
+   * `dragenter`/`dragleave` iç elemanlarda da tetiklenir; sayaç tutulmazsa alan
+   * kullanıcı içeride gezinirken sürekli yanıp sönerdi.
+   */
+  const dragDepth = useRef(0);
+
+  // Kontenjan EKRANDAKİ kalemlerden sayılır; forma yalnız yüklenmişler yazılır.
+  const usedSlots = occupiedSlots(items);
+  const isFull = usedSlots >= maxImages;
+
+  const onDrop = useCallback(
+    (event: React.DragEvent<HTMLLabelElement>) => {
+      event.preventDefault();
+      dragDepth.current = 0;
+      setDragActive(false);
+      if (isFull) return;
+      handleFileUpload(event.dataTransfer?.files ?? null);
+    },
+    [handleFileUpload, isFull],
+  );
 
   return (
     <SectionCard title={t("product.images")}>
@@ -39,8 +73,28 @@ export default function ImagesCard({
         {t("product.upToImages", { count: maxImages })}
       </p>
       <div className="space-y-3">
-        {usedSlots < maxImages ? (
-          <label className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+        {!isFull ? (
+          <label
+            onDragEnter={(event) => {
+              event.preventDefault();
+              dragDepth.current += 1;
+              setDragActive(true);
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              dragDepth.current = Math.max(0, dragDepth.current - 1);
+              if (dragDepth.current === 0) setDragActive(false);
+            }}
+            onDrop={onDrop}
+            data-drag-active={dragActive || undefined}
+            data-testid="listing-image-dropzone"
+            className={`flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+              dragActive
+                ? "border-primary-500 bg-primary-50/60"
+                : "border-border hover:border-primary-400 hover:bg-primary-50/30"
+            }`}
+          >
             <PhotoIcon className="w-8 h-8 text-subtle" />
             <span className="text-sm text-muted font-medium">
               {t("product.clickToUpload")}
@@ -48,12 +102,19 @@ export default function ImagesCard({
             <span className="text-xs text-subtle">
               {usedSlots} / {maxImages} {t("product.uploaded")}
             </span>
+            <span className="text-xs text-subtle">
+              JPEG, PNG, WebP, GIF · en fazla {megabytes(MAX_IMAGE_BYTES)} MB
+            </span>
             <Input
               type="file"
-              accept="image/*"
+              accept={ACCEPTED_IMAGE_TYPES.join(",")}
               multiple
-              onChange={(e) => handleFileUpload(e.target.files)}
-              disabled={uploadingImages}
+              data-testid="listing-image-input"
+              onChange={(e) => {
+                handleFileUpload(e.target.files);
+                // Aynı dosya ikinci kez seçilebilsin diye girdi sıfırlanır.
+                e.target.value = "";
+              }}
               className="hidden"
             />
           </label>
@@ -66,11 +127,15 @@ export default function ImagesCard({
           <p className="text-sm text-danger-600">{imagesError}</p>
         )}
         {uploadingImages && (
-          <p className="text-sm text-primary-600">
+          <p className="text-sm text-primary-600" role="status">
             {t("product.uploadingImages")}
           </p>
         )}
-        <ImagePreviewGrid items={items} onRemove={removeImage} />
+        <ImagePreviewGrid
+          items={items}
+          onRemove={removeImage}
+          onRetry={retryImage}
+        />
       </div>
     </SectionCard>
   );

@@ -51,6 +51,7 @@ function NewListingLayout() {
     uploadingImages,
     handleFileUpload,
     removeImage,
+    retryImage,
     manufacturerAttrGroups,
     saleData,
     setSaleData,
@@ -132,6 +133,7 @@ function NewListingLayout() {
               uploadingImages={uploadingImages}
               handleFileUpload={handleFileUpload}
               removeImage={removeImage}
+              retryImage={retryImage}
             />
           </div>
           <div data-tour="listing-submit">

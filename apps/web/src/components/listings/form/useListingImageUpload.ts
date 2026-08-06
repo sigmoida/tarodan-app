@@ -7,6 +7,11 @@ import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
 import { mediaApi } from "@/lib/api";
 import {
+  createUploadQueue,
+  type QueueEvent,
+  type UploadPort,
+} from "./listing-upload-queue";
+import {
   acceptFiles,
   hasPendingUploads,
   itemFromExisting,
@@ -33,7 +38,22 @@ interface UseListingImageUploadParams {
   form: UseFormReturn<any>;
   /** Üyeliğe göre izin verilen görsel adedi. */
   maxImages: number;
+  /** Testler için değiştirilebilir yükleme portu. */
+  upload?: UploadPort;
 }
+
+/** Üretim portu: tek dosya, ilerleme ve iptal destekli. */
+const defaultUpload: UploadPort = async (file, { signal, onProgress }) => {
+  const response = await mediaApi.uploadProductImage(file, {
+    signal,
+    onProgress,
+  });
+  const [result] = response.data ?? [];
+  if (!result?.cardKey || !result?.detailKey) {
+    throw new Error("Sunucu bu dosya için sonuç döndürmedi");
+  }
+  return { cardKey: result.cardKey, detailKey: result.detailKey };
+};
 
 const rejectionMessage = (rejected: RejectedFile[]): string => {
   const byReason = {
@@ -68,31 +88,65 @@ const rejectionMessage = (rejected: RejectedFile[]): string => {
 export function useListingImageUpload({
   form,
   maxImages,
+  upload = defaultUpload,
 }: UseListingImageUploadParams) {
   const [items, setItems] = useState<ListingImageItem[]>([]);
 
-  // Object URL'ler unmount'ta serbest bırakılmalı; `items` state'i temizlik
-  // anında bayat olmasın diye ref üzerinden okunur.
+  // Object URL'ler ve aktif istekler unmount'ta serbest bırakılmalı; `items`
+  // state'i temizlik anında bayat olmasın diye ref üzerinden okunur.
   const itemsRef = useRef<ListingImageItem[]>([]);
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  const formRef = useRef(form);
+  formRef.current = form;
+
+  /** Listeyi güncelle ve forma yazılacak yükü aynı anda tazele. */
+  const commit = useCallback((next: ListingImageItem[]) => {
+    itemsRef.current = next;
+    setItems(next);
+    formRef.current.setValue("images", toFormImages(next), {
+      shouldValidate: true,
+    });
+  }, []);
+
+  // Kuyruk bir KEZ kurulur: her render'da yeniden yaratılırsa aktif istekler
+  // ve iptal denetleyicileri kaybolurdu.
+  const uploadRef = useRef(upload);
+  uploadRef.current = upload;
+  const queueRef = useRef<ReturnType<typeof createUploadQueue> | null>(null);
+  if (!queueRef.current) {
+    const applyEvent = (event: QueueEvent) => {
+      commit(
+        patchItem(itemsRef.current, event.clientId, {
+          status: event.status,
+          ...(event.progress !== undefined ? { progress: event.progress } : {}),
+          ...(event.result
+            ? {
+                cardKey: event.result.cardKey,
+                detailKey: event.result.detailKey,
+              }
+            : {}),
+          ...(event.status === "failed" ? { error: event.error } : {}),
+        }),
+      );
+    };
+    queueRef.current = createUploadQueue({
+      upload: (file, options) => uploadRef.current(file, options),
+      onEvent: applyEvent,
+    });
+  }
+  const queue = queueRef.current;
+
   useEffect(
     () => () => {
+      queue.cancelAll();
       for (const item of itemsRef.current) {
         if (item.isObjectUrl) URL.revokeObjectURL(item.previewUrl);
       }
     },
-    [],
-  );
-
-  /** Listeyi güncelle ve forma yazılacak yükü aynı anda tazele. */
-  const commit = useCallback(
-    (next: ListingImageItem[]) => {
-      setItems(next);
-      form.setValue("images", toFormImages(next), { shouldValidate: true });
-    },
-    [form],
+    [queue],
   );
 
   /** Düzenleme ekranı: kayıtlı görselleri yükleme yapmadan yerleştirir. */
@@ -111,7 +165,7 @@ export function useListingImageUpload({
   );
 
   const addFiles = useCallback(
-    async (files: File[]) => {
+    (files: File[]) => {
       if (!files.length) return;
       const current = itemsRef.current;
       const { accepted, rejected } = acceptFiles(current, files, { maxImages });
@@ -122,64 +176,22 @@ export function useListingImageUpload({
       const queued = accepted.map((file) =>
         itemFromFile(file, (f) => URL.createObjectURL(f)),
       );
-      let next = [...current, ...queued];
-      commit(next);
-
-      // Tek istek: dosya bazlı kuyruk bir sonraki adımda.
-      next = next.map((item) =>
-        queued.some((q) => q.clientId === item.clientId)
-          ? { ...item, status: "uploading", progress: 0 }
-          : item,
+      commit([...current, ...queued]);
+      queue.enqueue(
+        queued.map((item) => ({
+          clientId: item.clientId,
+          file: item.file as File,
+        })),
       );
-      commit(next);
-
-      try {
-        const response = await mediaApi.uploadProductImages(accepted);
-        const uploaded: Array<{
-          cardKey: string;
-          detailKey: string;
-          cardUrl?: string;
-        }> = response.data;
-
-        let done = itemsRef.current;
-        queued.forEach((item, index) => {
-          const result = uploaded[index];
-          done = result
-            ? patchItem(done, item.clientId, {
-                status: "uploaded",
-                progress: 100,
-                cardKey: result.cardKey,
-                detailKey: result.detailKey,
-              })
-            : patchItem(done, item.clientId, {
-                status: "failed",
-                error: "Sunucu bu dosya için sonuç döndürmedi",
-              });
-        });
-        commit(done);
-        toast.success(`${uploaded.length} resim başarıyla yüklendi`);
-      } catch (error: any) {
-        const message =
-          error?.response?.data?.message || "Resim yükleme başarısız";
-        let failed = itemsRef.current;
-        for (const item of queued) {
-          failed = patchItem(failed, item.clientId, {
-            status: "failed",
-            error: message,
-          });
-        }
-        commit(failed);
-        toast.error(message);
-      }
     },
-    [commit, maxImages],
+    [commit, maxImages, queue],
   );
 
   /** `<input type=file>` ve sürükle-bırak aynı yola girer. */
   const handleFileUpload = useCallback(
     (files: FileList | File[] | null) => {
       if (!files) return;
-      void addFiles(Array.from(files));
+      addFiles(Array.from(files));
     },
     [addFiles],
   );
@@ -189,10 +201,32 @@ export function useListingImageUpload({
       const target = itemsRef.current.find(
         (item) => item.clientId === clientId,
       );
+      // Kaldırılan kalemin isteği DE durdurulmalı; aksi halde silinen görsel
+      // arkada yüklenmeye devam edip depoda çöp bırakırdı.
+      queue.cancel(clientId);
       if (target?.isObjectUrl) URL.revokeObjectURL(target.previewUrl);
       commit(removeItemById(itemsRef.current, clientId));
     },
-    [commit],
+    [commit, queue],
+  );
+
+  /** Hata alan kalemi yeniden kuyruğa alır. */
+  const retryImage = useCallback(
+    (clientId: string) => {
+      const target = itemsRef.current.find(
+        (item) => item.clientId === clientId,
+      );
+      if (!target?.file || target.status !== "failed") return;
+      commit(
+        patchItem(itemsRef.current, clientId, {
+          status: "queued",
+          progress: 0,
+          error: undefined,
+        }),
+      );
+      queue.enqueue([{ clientId, file: target.file }]);
+    },
+    [commit, queue],
   );
 
   const moveImage = useCallback(
@@ -213,6 +247,7 @@ export function useListingImageUpload({
     seedExistingImages,
     handleFileUpload,
     removeImage,
+    retryImage,
     moveImage,
     makeCover,
   };

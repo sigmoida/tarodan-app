@@ -155,6 +155,7 @@ export default function EditListingClient() {
     seedExistingImages,
     handleFileUpload,
     removeImage,
+    retryImage,
   } = useListingImageUpload({
     form,
     maxImages: limits?.maxImagesPerListing || 3,
@@ -291,6 +292,7 @@ export default function EditListingClient() {
           uploadingImages={uploadingImages}
           handleFileUpload={handleFileUpload}
           removeImage={removeImage}
+          retryImage={retryImage}
         />
 
         <div className="flex gap-4 pt-2">
