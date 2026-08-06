@@ -7,13 +7,22 @@
  * Gercek PayTR sayfasi yerine odeme bypass ile tamamlanir (PAYMENT_BYPASS=true).
  * UI dogrulamada form-login yerine token enjekte edilir (flakiness yok).
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 import {
-  USERS, loginViaToken, apiLogin, apiMe, apiFirstBuyableProduct, apiBuyAndPay, apiGetOrder,
-} from '../support/helpers';
+  USERS,
+  loginViaToken,
+  apiLogin,
+  apiMe,
+  apiFirstBuyableProduct,
+  apiBuyAndPay,
+  apiGetOrder,
+} from "../support/helpers";
 
-test.describe('J1 — Ilk alisveris (satin al + ode + dogrula)', () => {
-  test('alici bir urunu satin alip oder, siparis odenmis olur', async ({ page, request }) => {
+test.describe("J1 — Ilk alisveris (satin al + ode + dogrula)", () => {
+  test("alici bir urunu satin alip oder, siparis odenmis olur", async ({
+    page,
+    request,
+  }) => {
     test.setTimeout(60_000); // hibrit (API+UI) test
 
     // 1) API: alici token + kendi id
@@ -28,15 +37,20 @@ test.describe('J1 — Ilk alisveris (satin al + ode + dogrula)', () => {
 
     // 4) API dogrulama: siparis odendi/hazirlaniyor (sonuca assertion)
     const order = await apiGetOrder(request, token, orderId);
-    expect(['paid', 'preparing', 'shipped', 'completed']).toContain(order?.status);
+    expect(["paid", "preparing", "shipped", "completed"]).toContain(
+      order?.status,
+    );
 
     // 5) UI dogrulama: token enjekte -> alici kendi siparisini gorebiliyor (404/login degil)
     await loginViaToken(page, token);
-    await page.goto(`/orders/${orderId}`);
-    await page.waitForLoadState('networkidle').catch(() => {});
-    const body = (await page.locator('body').textContent()) ?? '';
+    // Sipariş detayının GERÇEK yolu `/profile/orders/:id`. Eskiden `/orders/:id`
+    // deneniyordu; o yol yönlendirmeye düştüğü için test yanlış pozitif
+    // üretebiliyordu (bildirim linkleri de bu yüzden 404'e gidiyordu).
+    await page.goto(`/profile/orders/${orderId}`);
+    await page.waitForLoadState("networkidle").catch(() => {});
+    const body = (await page.locator("body").textContent()) ?? "";
     expect(body.length).toBeGreaterThan(200);
     expect(body).not.toMatch(/sayfa bulunamad|not found|404/i);
-    expect(page.url()).toContain(`/orders/${orderId}`);
+    expect(page.url()).toContain(`/profile/orders/${orderId}`);
   });
 });

@@ -28,7 +28,7 @@
  * initiate, providerConversationId üretmez; findPaymentForPaytrCallback
  * OR:[{providerConversationId},{orderId}] ile orderId üzerinden eşleşir.
  */
-import { test, expect, APIRequestContext } from '@playwright/test';
+import { test, expect, APIRequestContext } from "@playwright/test";
 import {
   API,
   USERS,
@@ -40,14 +40,20 @@ import {
   apiGetOrder,
   apiDefaultAddressId,
   signPaytrCallback,
-} from '../support/helpers';
-import { dbFind, dbCount, backdate, runScheduler, expectDbEventually } from '../support/db';
-import { tokenForSeller } from '../support/journeys-extra';
-import { getLastEmailTo, extractCode, clearMailbox } from '../support/mail';
+} from "../support/helpers";
+import {
+  dbFind,
+  dbCount,
+  backdate,
+  runScheduler,
+  expectDbEventually,
+} from "../support/db";
+import { tokenForSeller } from "../support/journeys-extra";
+import { getLastEmailTo, extractCode, clearMailbox } from "../support/mail";
 
 // .env.test'teki gerçek PayTR test anahtarları (playwright webServer NODE_ENV=test -> .env.test).
-const PAYTR_KEY = 'test-key';
-const PAYTR_SALT = 'test-salt';
+const PAYTR_KEY = "test-key";
+const PAYTR_SALT = "test-salt";
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
@@ -58,35 +64,61 @@ async function buyAndInitiate(
   productId: string,
 ): Promise<{ orderId: string; paymentId: string; amount: number }> {
   const shippingAddressId = await apiDefaultAddressId(request, token);
-  const buyRes = await request.post(`${API}/orders/buy`, { headers: auth(token), data: { productId, shippingAddressId } });
-  expect(buyRes.ok(), 'orders/buy').toBeTruthy();
+  const buyRes = await request.post(`${API}/orders/buy`, {
+    headers: auth(token),
+    data: { productId, shippingAddressId },
+  });
+  expect(buyRes.ok(), "orders/buy").toBeTruthy();
   const orderId = (await buyRes.json())?.orderId;
-  expect(orderId, 'orderId').toBeTruthy();
+  expect(orderId, "orderId").toBeTruthy();
 
-  const initRes = await request.post(`${API}/payments/initiate`, { headers: auth(token), data: { orderId, provider: 'paytr' } });
-  expect(initRes.ok(), 'payments/initiate').toBeTruthy();
+  const initRes = await request.post(`${API}/payments/initiate`, {
+    headers: auth(token),
+    data: { orderId, provider: "paytr" },
+  });
+  expect(initRes.ok(), "payments/initiate").toBeTruthy();
   const initBody = await initRes.json();
   const paymentId = initBody?.paymentId;
-  expect(paymentId, 'paymentId').toBeTruthy();
+  expect(paymentId, "paymentId").toBeTruthy();
   const amount = Number(initBody?.amount ?? 0);
   return { orderId, paymentId, amount };
 }
 
 /** Sipariş paid -> completed: prepare + delivered backdate + buyer confirm. Hold serbest bırakılmaz. */
-async function driveToCompleted(request: APIRequestContext, buyerToken: string, sellerToken: string, orderId: string) {
+async function driveToCompleted(
+  request: APIRequestContext,
+  buyerToken: string,
+  sellerToken: string,
+  orderId: string,
+) {
   // paid -> preparing (satıcı)
-  const prep = await request.post(`${API}/orders/${orderId}/prepare`, { headers: auth(sellerToken) });
+  const prep = await request.post(`${API}/orders/${orderId}/prepare`, {
+    headers: auth(sellerToken),
+  });
   // preparing -> delivered (kargo modülü tarayıcıdan sürülemez; backdate ile durum ilerletilir)
-  await backdate(request, 'order', { id: orderId }, { status: 'delivered', deliveredAt: new Date().toISOString() });
+  await backdate(
+    request,
+    "order",
+    { id: orderId },
+    { status: "delivered", deliveredAt: new Date().toISOString() },
+  );
   // delivered -> completed (alıcı teslim onayı)
-  const confirm = await request.post(`${API}/orders/${orderId}/confirm`, { headers: auth(buyerToken) });
-  expect(confirm.ok(), 'alıcı teslim onayı (delivered->completed)').toBeTruthy();
+  const confirm = await request.post(`${API}/orders/${orderId}/confirm`, {
+    headers: auth(buyerToken),
+  });
+  expect(
+    confirm.ok(),
+    "alıcı teslim onayı (delivered->completed)",
+  ).toBeTruthy();
 }
 
 // ───────────────────────────── J11 — Ödeme timeout, geri dönüp ödeme ─────────────────────────────
 
-test.describe('J96 — Teklif → sipariş → ödeme → satıcıya aktarım', () => {
-  test('teklif kabul edilir, sipariş oluşur, ödenir, hold süre sonunda serbest', async ({ page, request }) => {
+test.describe("J96 — Teklif → sipariş → ödeme → satıcıya aktarım", () => {
+  test("teklif kabul edilir, sipariş oluşur, ödenir, hold süre sonunda serbest", async ({
+    page,
+    request,
+  }) => {
     test.setTimeout(60_000);
     const buyerToken = await apiLogin(request, USERS.buyerClean);
     const me = await apiMe(request, buyerToken);
@@ -95,65 +127,122 @@ test.describe('J96 — Teklif → sipariş → ödeme → satıcıya aktarım', 
     // 1) Alıcı teklif verdi (ürün fiyatının en az %50'si). Teklif = fiyat (kabul kesin).
     //    Üründe alıcının önceki bekleyen teklifi varsa iptal et (state-leak'e karşı dayanıklı).
     const offerAmount = Number(product.price);
-    const existing = await dbFind(request, 'offer', { buyerId: me.id, productId: product.id, status: 'pending' }, { id: true } as any);
-    if (existing?.id) await request.post(`${API}/offers/${existing.id}/cancel`, { headers: auth(buyerToken) }).catch(() => {});
+    const existing = await dbFind(
+      request,
+      "offer",
+      { buyerId: me.id, productId: product.id, status: "pending" },
+      { id: true } as any,
+    );
+    if (existing?.id)
+      await request
+        .post(`${API}/offers/${existing.id}/cancel`, {
+          headers: auth(buyerToken),
+        })
+        .catch(() => {});
     const offerRes = await request.post(`${API}/offers`, {
       headers: auth(buyerToken),
-      data: { productId: product.id, amount: offerAmount, message: 'Bu fiyata alabilir miyim?' },
+      data: {
+        productId: product.id,
+        amount: offerAmount,
+        message: "Bu fiyata alabilir miyim?",
+      },
     });
-    if (!offerRes.ok()) expect(offerRes.ok(), `teklif oluştu (${offerRes.status()}) ${(await offerRes.text()).slice(0, 100)}`).toBeTruthy();
+    if (!offerRes.ok())
+      expect(
+        offerRes.ok(),
+        `teklif oluştu (${offerRes.status()}) ${(await offerRes.text()).slice(0, 100)}`,
+      ).toBeTruthy();
     const offerId = (await offerRes.json())?.id;
-    expect(offerId, 'offerId').toBeTruthy();
+    expect(offerId, "offerId").toBeTruthy();
 
     // Satıcı kabul etti -> otomatik pending_payment sipariş oluşur
     const sellerToken = await tokenForSeller(request, product.sellerId);
-    const acceptRes = await request.post(`${API}/offers/${offerId}/accept`, { headers: auth(sellerToken) });
-    expect(acceptRes.ok(), 'teklif kabul').toBeTruthy();
+    const acceptRes = await request.post(`${API}/offers/${offerId}/accept`, {
+      headers: auth(sellerToken),
+    });
+    expect(acceptRes.ok(), "teklif kabul").toBeTruthy();
 
     // 2) Otomatik oluşan siparişi offerId ile bul
     const order = await expectDbEventually(
       request,
-      'order',
+      "order",
       { offerId },
       (o) => !!o?.id,
       8000,
     );
     const orderId = order.id;
-    expect(order.status, 'teklif siparişi ödeme bekliyor').toBe('pending_payment');
+    expect(order.status, "teklif siparişi ödeme bekliyor").toBe(
+      "pending_payment",
+    );
 
     // Teklif siparişinde adres yok -> alıcı teslimat adresini ekler (PATCH /orders/:id/shipping-address)
-    const addr = await request.patch(`${API}/orders/${orderId}/shipping-address`, {
-      headers: auth(buyerToken),
-      data: { fullName: 'Deniz Demo', phone: '+905551112233', city: 'İstanbul', district: 'Beşiktaş', address: 'Test Mah. 1. Sok No:5', zipCode: '34000' },
-    });
-    expect(addr.ok(), 'teslimat adresi eklendi').toBeTruthy();
+    const addr = await request.patch(
+      `${API}/orders/${orderId}/shipping-address`,
+      {
+        headers: auth(buyerToken),
+        data: {
+          fullName: "Deniz Demo",
+          phone: "+905551112233",
+          city: "İstanbul",
+          district: "Beşiktaş",
+          address: "Test Mah. 1. Sok No:5",
+          zipCode: "34000",
+        },
+      },
+    );
+    expect(addr.ok(), "teslimat adresi eklendi").toBeTruthy();
 
     // 3) Alıcı ödedi -> para emanete (hold = held)
-    const initRes = await request.post(`${API}/payments/initiate`, { headers: auth(buyerToken), data: { orderId, provider: 'paytr' } });
-    expect(initRes.ok(), 'teklif siparişi initiate').toBeTruthy();
+    const initRes = await request.post(`${API}/payments/initiate`, {
+      headers: auth(buyerToken),
+      data: { orderId, provider: "paytr" },
+    });
+    expect(initRes.ok(), "teklif siparişi initiate").toBeTruthy();
     const paymentId = (await initRes.json())?.paymentId;
-    const done = await request.post(`${API}/payments/${paymentId}/bypass-complete`, { data: {} });
-    expect(done.ok(), 'bypass-complete').toBeTruthy();
-    const hold = await dbFind(request, 'paymentHold', { paymentId }, { status: true, sellerId: true });
-    expect(hold, 'escrow hold').toBeTruthy();
-    expect(hold.status).toBe('held');
+    const done = await request.post(
+      `${API}/payments/${paymentId}/bypass-complete`,
+      { data: {} },
+    );
+    expect(done.ok(), "bypass-complete").toBeTruthy();
+    const hold = await dbFind(
+      request,
+      "paymentHold",
+      { paymentId },
+      { status: true, sellerId: true },
+    );
+    expect(hold, "escrow hold").toBeTruthy();
+    expect(hold.status).toBe("held");
 
     // 4) Satıcı hazırlar, kargolar (delivered backdate), alıcı onaylar -> completed
     await driveToCompleted(request, buyerToken, sellerToken, orderId);
-    expect((await dbFind(request, 'order', { id: orderId }, { status: true })).status).toBe('completed');
+    expect(
+      (await dbFind(request, "order", { id: orderId }, { status: true }))
+        .status,
+    ).toBe("completed");
 
     // 5) Süre dolunca para satıcıya aktarılır (releaseAt backdate + release-holds-due)
-    await backdate(request, 'paymentHold', { paymentId }, { releaseAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() });
-    await runScheduler(request, 'release-holds-due');
-    const released = await expectDbEventually(request, 'paymentHold', { paymentId }, (h) => h?.status === 'released', 8000);
-    expect(released.status, 'hold satıcıya aktarıldı').toBe('released');
+    await backdate(
+      request,
+      "paymentHold",
+      { paymentId },
+      { releaseAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() },
+    );
+    await runScheduler(request, "release-holds-due");
+    const released = await expectDbEventually(
+      request,
+      "paymentHold",
+      { paymentId },
+      (h) => h?.status === "released",
+      8000,
+    );
+    expect(released.status, "hold satıcıya aktarıldı").toBe("released");
 
     // UI dogrulama: alıcı kendi tamamlanmış siparişini görebiliyor (token enjekte)
     await loginViaToken(page, buyerToken);
-    await page.goto(`/orders/${orderId}`);
-    await page.waitForLoadState('networkidle').catch(() => {});
-    const bodyText = (await page.locator('body').textContent()) ?? '';
+    await page.goto(`/profile/orders/${orderId}`);
+    await page.waitForLoadState("networkidle").catch(() => {});
+    const bodyText = (await page.locator("body").textContent()) ?? "";
     expect(bodyText).not.toMatch(/sayfa bulunamad|not found|404/i);
-    expect(page.url()).toContain(`/orders/${orderId}`);
+    expect(page.url()).toContain(`/profile/orders/${orderId}`);
   });
 });
