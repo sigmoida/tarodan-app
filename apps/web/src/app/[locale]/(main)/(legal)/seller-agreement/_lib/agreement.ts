@@ -25,37 +25,60 @@ export interface AgreementSection {
 
 export interface FeeRow {
   range: string;
-  commission: string;
-  serviceFee: string;
-  shipping: string;
+  sellerCommission: string;
+  buyerCommission: string;
+  sellerShipping: string;
+  buyerShipping: string;
+  sellerServiceFee: string;
+  buyerProtectionFee: string;
 }
 
 export const FEE_TABLE: FeeRow[] = [
   {
     range: "250 TL – 999 TL",
-    commission: "%10",
-    serviceFee: "%6",
-    shipping: "65 TL",
+    sellerCommission: "%6",
+    buyerCommission: "%4",
+    sellerShipping: "50 TL",
+    buyerShipping: "50 TL",
+    sellerServiceFee: "%5",
+    buyerProtectionFee: "%5",
   },
   {
     range: "1.000 TL – 9.999 TL",
-    commission: "%10",
-    serviceFee: "%4",
-    shipping: "65 TL",
+    sellerCommission: "%6",
+    buyerCommission: "%4",
+    sellerShipping: "50 TL",
+    buyerShipping: "50 TL",
+    sellerServiceFee: "%5",
+    buyerProtectionFee: "%6",
   },
   {
     range: "10.000 TL – 24.999 TL",
-    commission: "1.250 TL",
-    serviceFee: "%1",
-    shipping: "65 TL",
+    sellerCommission: "%6",
+    buyerCommission: "%3",
+    sellerShipping: "50 TL",
+    buyerShipping: "50 TL",
+    sellerServiceFee: "%5",
+    buyerProtectionFee: "%4",
   },
   {
     range: "25.000 TL ve üstü",
-    commission: "2.000 TL",
-    serviceFee: "%1",
-    shipping: "65 TL",
+    sellerCommission: "%3",
+    buyerCommission: "%3",
+    sellerShipping: "50 TL",
+    buyerShipping: "50 TL",
+    sellerServiceFee: "%3",
+    buyerProtectionFee: "%3",
   },
-  { range: "Takas", commission: "%10", serviceFee: "%3", shipping: "260 TL" },
+  {
+    range: "Takas",
+    sellerCommission: "—",
+    buyerCommission: "—",
+    sellerShipping: "100 TL",
+    buyerShipping: "100 TL",
+    sellerServiceFee: "150 TL",
+    buyerProtectionFee: "150 TL",
+  },
 ];
 
 export const INDIVIDUAL_INTRO =

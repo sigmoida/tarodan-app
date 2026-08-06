@@ -196,7 +196,7 @@ const PRE_INFORMATION: LegalPart = {
           items: [
             {
               label: "Platform",
-              text: "Destek Merkezi üzerinden talep açarak, support@tarodan.com.tr adresinden veya 0 232 433 41 42 numarasından.",
+              text: "Destek Merkezi üzerinden talep açarak, destek@tarodan.com.tr adresinden veya 0 232 433 41 42 numarasından.",
             },
             {
               label: "Satıcı",

@@ -15,7 +15,7 @@ export const PLATFORM_ENTITY = {
   taxRegistration: "7620277268 — Torbalı/İZMİR",
   address: "Yenişehir Mah. 1145/2 No:3 Gıda Çarşısı, Konak/İZMİR",
   phone: "0 232 433 41 42",
-  email: "support@tarodan.com.tr",
+  email: "destek@tarodan.com.tr",
   kep: "serhatlaroyuncak@hs03.kep.tr",
   website: "www.tarodan.com.tr",
 } as const;

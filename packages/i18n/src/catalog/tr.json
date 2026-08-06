@@ -2424,11 +2424,9 @@
     "contactInfo": {
       "title": "İletişim Bilgileri",
       "email": "E-posta",
-      "phone": "Telefon",
       "address": "Adres",
       "emailValue": "destek@tarodan.com.tr",
-      "phoneValue": "+90 212 XXX XX XX",
-      "addressValue": "İstanbul, Türkiye"
+      "addressValue": "İzmir/Türkiye"
     }
   },
   "utility": {
