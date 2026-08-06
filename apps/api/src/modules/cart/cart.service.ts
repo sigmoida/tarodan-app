@@ -593,22 +593,38 @@ export class CartService {
 
     const availableItems = items.filter((item) => item.isAvailable);
 
-    // Apply coupon discount
+    // Kupon kuralları TEK yetkilide: DiscountService.validateCoupon. Sepet kendi
+    // kopyasını taşıdığı sürece checkout'tan üç noktada ayrışıyordu — voucher
+    // (toplu üretilen tek-kullanımlık) kodları hiç tanımıyor, toplam kullanım
+    // limitini hiç kontrol etmiyor ve minimum sepet tutarını farklı matraha
+    // uyguluyordu. Kupon "uygulandı" görünüp 0 TL indiriyordu.
     let couponDiscountTotal = 0;
-    let couponIsStackable = true; // default: allow campaigns when no coupon
     if (cart.couponCode) {
-      const couponResult = await this.applyCouponDiscount(
-        cart.couponCode,
-        availableItems,
+      const validation = await this.discountService.validateCoupon(
+        {
+          code: cart.couponCode,
+          cartItems: availableItems.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+          })),
+        },
         userId,
       );
-      couponDiscountTotal = couponResult.discountAmount;
-      if (couponResult.appliedDiscount) {
-        appliedDiscounts.push(couponResult.appliedDiscount);
-        couponIsStackable = couponResult.couponIsStackable ?? true;
-      }
-      if (couponResult.warning) {
-        warnings.push(couponResult.warning);
+      if (validation.isValid && validation.discount) {
+        const coupon = validation.discount;
+        couponDiscountTotal = coupon.estimatedDiscount;
+        appliedDiscounts.push({
+          discountId: coupon.id,
+          discountName: coupon.name,
+          discountCode: coupon.code,
+          type: coupon.type,
+          value: coupon.value,
+          scope: coupon.scope,
+          appliedAmount: couponDiscountTotal,
+          affectedProductIds: coupon.eligibleProductIds,
+        });
+      } else if (validation.error) {
+        warnings.push(validation.error);
       }
     }
 
@@ -716,293 +732,6 @@ export class CartService {
       appliedCouponCode: cart.couponCode,
       appliedDiscounts,
       warnings,
-    };
-  }
-
-  private isSaleActive(product: any, now: Date): boolean {
-    if (product.oldPrice == null) return false;
-    if (product.saleStartDate && now < product.saleStartDate) return false;
-    if (product.saleEndDate && now > product.saleEndDate) return false;
-    return true;
-  }
-
-  private async applyCouponDiscount(
-    code: string,
-    items: CartItemResponseDto[],
-    userId: string,
-  ): Promise<{
-    discountAmount: number;
-    appliedDiscount?: AppliedDiscountDto;
-    warning?: string;
-    couponIsStackable?: boolean;
-  }> {
-    try {
-      const discount = await this.prisma.discount.findUnique({
-        where: { code: code.toUpperCase() },
-      });
-
-      if (!discount || !discount.isActive) {
-        return { discountAmount: 0, warning: "Kupon artık geçerli değil" };
-      }
-
-      const now = new Date();
-      if (now < discount.startDate || now > discount.endDate) {
-        return { discountAmount: 0, warning: "Kuponun süresi doldu" };
-      }
-
-      // Check usage limits
-      const canUse = await this.discountService.checkUsageLimit(
-        discount.id,
-        userId,
-      );
-      if (!canUse) {
-        return { discountAmount: 0, warning: "Bu kuponu zaten kullandınız" };
-      }
-
-      // Category scope needs each product's categoryId — fetch it once so the
-      // eligibility check below matches the authoritative checkout path
-      // (DiscountService.isProductEligibleForDiscount). Previously the category
-      // branch ignored the product's category entirely and behaved like global.
-      const categoryByProduct = new Map<string, string | null>();
-      if (discount.scope === DiscountScope.category) {
-        const prods = await this.prisma.product.findMany({
-          where: { id: { in: items.map((i) => i.productId) } },
-          select: { id: true, categoryId: true },
-        });
-        for (const p of prods) categoryByProduct.set(p.id, p.categoryId);
-      }
-
-      // Calculate discount based on scope
-      let eligibleAmount = 0;
-      const affectedProductIds: string[] = [];
-
-      for (const item of items) {
-        if (!item.isAvailable) continue;
-
-        let isEligible = false;
-
-        switch (discount.scope) {
-          case DiscountScope.global:
-            isEligible =
-              discount.sellerId === null || discount.sellerId === item.sellerId;
-            break;
-          case DiscountScope.seller:
-            isEligible = discount.sellerId === item.sellerId;
-            break;
-          case DiscountScope.product:
-            isEligible = discount.targetProductIds.includes(item.productId);
-            break;
-          case DiscountScope.category:
-            isEligible =
-              discount.categoryId != null &&
-              categoryByProduct.get(item.productId) === discount.categoryId;
-            break;
-        }
-
-        if (isEligible) {
-          // Kupon BAZ fiyat üzerinden hesaplanır (kampanyalı/efektif fiyat değil)
-          // → checkout'taki validateCoupon ile aynı taban (product.price * adet).
-          eligibleAmount += item.originalPrice * item.quantity;
-          affectedProductIds.push(item.productId);
-        }
-      }
-
-      if (eligibleAmount === 0) {
-        return {
-          discountAmount: 0,
-          warning: "Bu kupon sepetinizdeki ürünlere uygulanamaz",
-        };
-      }
-
-      // Check minimum cart value
-      if (
-        discount.minCartValue &&
-        eligibleAmount < Number(discount.minCartValue)
-      ) {
-        return {
-          discountAmount: 0,
-          warning: `Minimum sepet tutarı: ${Number(discount.minCartValue).toFixed(2)} TL`,
-        };
-      }
-
-      // Calculate discount amount
-      let discountAmount = 0;
-      if (discount.type === "percentage") {
-        discountAmount = eligibleAmount * (Number(discount.value) / 100);
-      } else {
-        discountAmount = Number(discount.value);
-      }
-
-      // Apply max discount cap
-      if (
-        discount.maxDiscountAmount &&
-        discountAmount > Number(discount.maxDiscountAmount)
-      ) {
-        discountAmount = Number(discount.maxDiscountAmount);
-      }
-
-      // Don't exceed eligible amount
-      discountAmount = Math.min(discountAmount, eligibleAmount);
-
-      return {
-        discountAmount,
-        appliedDiscount: {
-          discountId: discount.id,
-          discountName: discount.name,
-          discountCode: discount.code || undefined,
-          type: discount.type,
-          value: Number(discount.value),
-          scope: discount.scope,
-          appliedAmount: discountAmount,
-          affectedProductIds,
-        },
-        couponIsStackable: discount.isStackable,
-      };
-    } catch (error) {
-      this.logger.error(`Error applying coupon: ${error}`);
-      return { discountAmount: 0, warning: "Kupon uygulanırken hata oluştu" };
-    }
-  }
-
-  /**
-   * Apply seller-scoped auto campaigns (code=null, scope=seller).
-   * Admin oluşturduğu kodsuz satıcı kampanyaları (sellerId=null = tüm satıcılara) veya belirli satıcıya özel kampanyalar.
-   */
-  private async applySellerAutoCampaigns(
-    items: CartItemResponseDto[],
-  ): Promise<{
-    discountAmount: number;
-    appliedDiscounts: AppliedDiscountDto[];
-  }> {
-    const now = new Date();
-    const appliedDiscounts: AppliedDiscountDto[] = [];
-    let totalDiscountAmount = 0;
-
-    const sellerGroups = new Map<string, CartItemResponseDto[]>();
-    for (const item of items) {
-      if (!item.isAvailable) continue;
-      const group = sellerGroups.get(item.sellerId) || [];
-      group.push(item);
-      sellerGroups.set(item.sellerId, group);
-    }
-
-    for (const [sellerId, sellerItems] of sellerGroups) {
-      const sellerSubtotal = sellerItems.reduce((s, i) => s + i.lineTotal, 0);
-      const campaigns = await this.prisma.discount.findMany({
-        where: {
-          isActive: true,
-          code: null,
-          scope: DiscountScope.seller,
-          OR: [{ sellerId }, { sellerId: null }],
-          startDate: { lte: now },
-          endDate: { gte: now },
-        },
-        orderBy: { priority: "asc" },
-      });
-
-      for (const campaign of campaigns) {
-        if (
-          campaign.minCartValue &&
-          sellerSubtotal < Number(campaign.minCartValue)
-        )
-          continue;
-        let discountAmount = 0;
-        if (campaign.type === "percentage") {
-          discountAmount = sellerSubtotal * (Number(campaign.value) / 100);
-        } else {
-          discountAmount = Math.min(Number(campaign.value), sellerSubtotal);
-        }
-        if (
-          campaign.maxDiscountAmount &&
-          discountAmount > Number(campaign.maxDiscountAmount)
-        ) {
-          discountAmount = Number(campaign.maxDiscountAmount);
-        }
-        if (discountAmount > 0) {
-          totalDiscountAmount += discountAmount;
-          appliedDiscounts.push({
-            discountId: campaign.id,
-            discountName: campaign.name,
-            type: campaign.type,
-            value: Number(campaign.value),
-            scope: campaign.scope,
-            appliedAmount: discountAmount,
-          });
-          if (!campaign.isStackable) break;
-        }
-      }
-    }
-
-    return { discountAmount: totalDiscountAmount, appliedDiscounts };
-  }
-
-  private async applyAutoCampaigns(
-    items: CartItemResponseDto[],
-    subtotal: number,
-  ): Promise<{
-    discountAmount: number;
-    appliedDiscounts: AppliedDiscountDto[];
-  }> {
-    const now = new Date();
-    const appliedDiscounts: AppliedDiscountDto[] = [];
-    let totalDiscountAmount = 0;
-
-    // Get active auto campaigns (no coupon code) – platform only (scope global/category)
-    const campaigns = await this.prisma.discount.findMany({
-      where: {
-        isActive: true,
-        code: null,
-        sellerId: null,
-        startDate: { lte: now },
-        endDate: { gte: now },
-        scope: { in: [DiscountScope.global, DiscountScope.category] },
-      },
-      orderBy: { priority: "asc" },
-    });
-
-    for (const campaign of campaigns) {
-      // Check min cart value
-      if (campaign.minCartValue && subtotal < Number(campaign.minCartValue)) {
-        continue;
-      }
-
-      // Calculate discount
-      let discountAmount = 0;
-      if (campaign.type === "percentage") {
-        discountAmount = subtotal * (Number(campaign.value) / 100);
-      } else {
-        discountAmount = Number(campaign.value);
-      }
-
-      // Apply max cap
-      if (
-        campaign.maxDiscountAmount &&
-        discountAmount > Number(campaign.maxDiscountAmount)
-      ) {
-        discountAmount = Number(campaign.maxDiscountAmount);
-      }
-
-      if (discountAmount > 0) {
-        totalDiscountAmount += discountAmount;
-        appliedDiscounts.push({
-          discountId: campaign.id,
-          discountName: campaign.name,
-          type: campaign.type,
-          value: Number(campaign.value),
-          scope: campaign.scope,
-          appliedAmount: discountAmount,
-        });
-
-        // If not stackable, stop after first campaign
-        if (!campaign.isStackable) {
-          break;
-        }
-      }
-    }
-
-    return {
-      discountAmount: totalDiscountAmount,
-      appliedDiscounts,
     };
   }
 

@@ -6,6 +6,7 @@ import {
 } from "../discount/testing/price-resolver-fixture";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
+import { DiscountScopeService } from "../discount/discount-scope.service";
 import { ProductPriceResolver } from "../discount/product-price-resolver.service";
 import { StorageService } from "../storage/storage.service";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
@@ -182,7 +183,7 @@ describe("CartService.addItem — idempotent re-add", () => {
 describe("CartService.calculateCart — unavailable items", () => {
   const mockCartFindUnique = jest.fn();
   const mockDiscountFindUnique = jest.fn();
-  const mockCheckUsageLimit = jest.fn();
+  const mockProductFindMany = jest.fn().mockResolvedValue([]);
   const mockPrisma = {
     cart: {
       findUnique: mockCartFindUnique,
@@ -190,10 +191,23 @@ describe("CartService.calculateCart — unavailable items", () => {
     discount: {
       findUnique: mockDiscountFindUnique,
     },
+    discountCode: { findUnique: jest.fn().mockResolvedValue(null) },
+    discountUsage: { count: jest.fn().mockResolvedValue(0) },
+    couponReservation: { count: jest.fn().mockResolvedValue(0) },
+    product: { findMany: mockProductFindMany },
+    category: { findMany: jest.fn().mockResolvedValue([]) },
   } as unknown as PrismaService;
-  const mockDiscountService = {
-    checkUsageLimit: mockCheckUsageLimit,
-  } as unknown as DiscountService;
+  // Kupon kuralları artık sepette değil DiscountService'te; test de gerçek
+  // servisi kullanır ki sepetin gösterdiği tutar checkout'un uygulayacağıyla
+  // aynı koddan gelsin.
+  const makeDiscountService = () =>
+    new DiscountService(
+      mockPrisma,
+      { delPattern: jest.fn() } as any,
+      { syncProduct: jest.fn() } as any,
+      testPriceResolver(),
+      new DiscountScopeService(mockPrisma),
+    );
 
   const makeCartItem = (
     id: string,
@@ -236,7 +250,7 @@ describe("CartService.calculateCart — unavailable items", () => {
 
     const service = new CartService(
       mockPrisma,
-      mockDiscountService,
+      makeDiscountService(),
       testPriceResolver(campaigns),
       {
         getActiveOutboundTariff: async () => ({
@@ -254,7 +268,6 @@ describe("CartService.calculateCart — unavailable items", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCheckUsageLimit.mockResolvedValue(true);
   });
 
   it("keeps a deleted item visible but excludes it from every payable total", async () => {
@@ -334,6 +347,15 @@ describe("CartService.calculateCart — unavailable items", () => {
       isStackable: true,
     });
 
+    mockProductFindMany.mockResolvedValue([
+      {
+        id: "product-available",
+        sellerId: "seller-1",
+        categoryId: "category-1",
+        price: 100,
+      },
+    ]);
+
     const result = await calculateCart(
       [
         makeCartItem("available"),
@@ -358,5 +380,57 @@ describe("CartService.calculateCart — unavailable items", () => {
     expect(result.appliedDiscounts[0].affectedProductIds).toEqual([
       "product-available",
     ]);
+  });
+
+  /**
+   * Regresyon: toplu üretilen tek-kullanımlık voucher kodları `discount_codes`
+   * tablosunda durur, `discounts.code` boştur. Sepet kendi kupon motorunu
+   * taşırken yalnız `discounts.code`'a bakıyordu: kod uygulanıyor (applyCoupon
+   * DiscountService'i çağırıyor), sonra sepet özeti aynı kodu bulamayıp
+   * "geçerli değil" uyarısıyla 0 TL indiriyor, checkout'ta indirim yeniden
+   * beliriyordu.
+   */
+  it("toplu üretilen voucher kodunu sepette de tanır", async () => {
+    mockDiscountFindUnique.mockResolvedValue(null);
+    (mockPrisma as any).discountCode.findUnique.mockResolvedValue({
+      id: "voucher-1",
+      isRedeemed: false,
+      discount: {
+        id: "discount-batch",
+        name: "Hediye kodu",
+        code: null,
+        isActive: true,
+        startDate: new Date("2020-01-01"),
+        endDate: new Date("2100-01-01"),
+        scope: "global",
+        sellerId: null,
+        categoryId: null,
+        targetProductIds: [],
+        minCartValue: null,
+        type: "fixed_amount",
+        value: 40,
+        maxDiscountAmount: null,
+        usageLimitPerUser: 1,
+        fundedBy: "seller",
+      },
+    });
+    mockProductFindMany.mockResolvedValue([
+      {
+        id: "product-available",
+        sellerId: "seller-1",
+        categoryId: "category-1",
+        price: 100,
+      },
+    ]);
+
+    const result = await calculateCart([makeCartItem("available")], "GIFT-ABC");
+
+    expect(result.couponDiscountTotal).toBe(40);
+    expect(result.warnings).toEqual([]);
+    expect(result.appliedDiscounts[0]).toMatchObject({
+      discountId: "discount-batch",
+      discountCode: "GIFT-ABC",
+      appliedAmount: 40,
+    });
   });
 });
