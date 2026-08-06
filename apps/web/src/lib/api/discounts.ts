@@ -17,7 +17,6 @@ export const discountsApi = {
     maxDiscountAmount?: number;
     usageLimitTotal?: number;
     usageLimitPerUser?: number;
-    isStackable?: boolean;
     priority?: number;
     isActive?: boolean;
     startDate: string;

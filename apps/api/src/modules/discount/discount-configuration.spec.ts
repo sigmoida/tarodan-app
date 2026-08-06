@@ -113,6 +113,22 @@ describe("DiscountService yapılandırma kuralları", () => {
     });
   });
 
+  describe("kullanım dışı isStackable", () => {
+    it("gönderilse bile kaydedilmez (motor uygulamıyor)", async () => {
+      await makeService().create(
+        { ...baseDto, isStackable: true } as any,
+        null,
+        true,
+      );
+
+      expect(created).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ isStackable: false }),
+        }),
+      );
+    });
+  });
+
   describe("değer aralığı", () => {
     it("yüzde indirim %100'ü aşamaz", async () => {
       await expect(

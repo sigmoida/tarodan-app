@@ -66,7 +66,8 @@ export class DiscountResponseDto {
   @ApiProperty()
   usedCount: number;
 
-  @ApiProperty()
+  /** @deprecated Motor uygulamıyor; her zaman false döner. */
+  @ApiProperty({ deprecated: true })
   isStackable: boolean;
 
   @ApiProperty()

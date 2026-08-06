@@ -19,7 +19,6 @@ export const discountSchema = z
     maxDiscountAmount: z.string(),
     usageLimitTotal: z.string(),
     usageLimitPerUser: z.string(),
-    isStackable: z.boolean(),
     isActive: z.boolean(),
     startDate: z.string().min(1, "Başlangıç tarihi gerekli"),
     endDate: z.string().min(1, "Bitiş tarihi gerekli"),

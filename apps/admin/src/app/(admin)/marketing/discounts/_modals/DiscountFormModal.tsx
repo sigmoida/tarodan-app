@@ -40,7 +40,6 @@ function toDefaults(d?: Discount): DiscountFormValues {
       maxDiscountAmount: "",
       usageLimitTotal: "",
       usageLimitPerUser: "1",
-      isStackable: false,
       isActive: true,
       isFlashSale: false,
       startDate: isoDate(),
@@ -62,7 +61,6 @@ function toDefaults(d?: Discount): DiscountFormValues {
     usageLimitTotal: d.usageLimitTotal?.toString() ?? "",
     // null = sınırsız; formda 0 ile temsil edilir.
     usageLimitPerUser: (d.usageLimitPerUser ?? 0).toString(),
-    isStackable: d.isStackable,
     isActive: d.isActive,
     isFlashSale: d.isFlashSale,
     startDate: d.startDate.split("T")[0],
@@ -90,7 +88,6 @@ function toPayload(v: DiscountFormValues, isCoupon: boolean) {
       isCoupon && v.usageLimitTotal ? parseInt(v.usageLimitTotal) : undefined,
     // 0 = sınırsız (misafirin de kullanabilmesi için).
     usageLimitPerUser: isCoupon ? parseInt(v.usageLimitPerUser) || 0 : 0,
-    isStackable: v.isStackable,
     priority: 0,
     isActive: v.isActive,
     isFlashSale: v.isFlashSale,
@@ -270,10 +267,6 @@ export function DiscountFormModal({
         <FormCheckbox
           name="isFlashSale"
           label={t("admin.marketing.discounts.flashSale")}
-        />
-        <FormCheckbox
-          name="isStackable"
-          label={t("admin.marketing.discounts.stackable")}
         />
         <FormCheckbox name="isActive" label={t("common.active")} />
       </div>

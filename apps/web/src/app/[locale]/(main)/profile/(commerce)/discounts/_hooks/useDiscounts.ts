@@ -66,7 +66,6 @@ function buildPayload(form: DiscountFormData) {
     usageLimitPerUser: form.code?.trim()
       ? parseInt(form.usageLimitPerUser) || 0
       : 0,
-    isStackable: form.isStackable,
     isActive: form.isActive,
     startDate: new Date(form.startDate).toISOString(),
     endDate: new Date(form.endDate + "T23:59:59").toISOString(),

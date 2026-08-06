@@ -44,7 +44,6 @@ function fromDiscount(d: Discount): DiscountFormData {
     usageLimitTotal: d.usageLimitTotal?.toString() || "",
     // null = sınırsız; formda 0 ile temsil edilir (alan artık null olabilir).
     usageLimitPerUser: (d.usageLimitPerUser ?? 0).toString(),
-    isStackable: d.isStackable,
     isActive: d.isActive,
     startDate: d.startDate.split("T")[0],
     endDate: d.endDate.split("T")[0],
@@ -268,7 +267,6 @@ export default function DiscountFormModal({
       </div>
 
       <div className="flex items-center gap-6">
-        <FormCheckbox name="isStackable" label="Kombine edilebilir" />
         <FormCheckbox name="isActive" label="Aktif" />
       </div>
     </FormModal>

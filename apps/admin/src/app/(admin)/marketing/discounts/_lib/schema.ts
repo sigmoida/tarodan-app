@@ -26,7 +26,6 @@ export const discountSchema = (t: T) =>
       maxDiscountAmount: z.string(),
       usageLimitTotal: z.string(),
       usageLimitPerUser: z.string(),
-      isStackable: z.boolean(),
       isActive: z.boolean(),
       isFlashSale: z.boolean(),
       startDate: z

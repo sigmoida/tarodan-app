@@ -26,6 +26,7 @@ export interface Discount {
   /** null = sınırsız. */
   usageLimitPerUser: number | null;
   usedCount: number;
+  /** @deprecated Motor uygulamıyor; yalnız API yanıtıyla uyum için durur. */
   isStackable: boolean;
   priority: number;
   isActive: boolean;

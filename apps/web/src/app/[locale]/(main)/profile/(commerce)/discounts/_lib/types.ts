@@ -17,7 +17,6 @@ export interface Discount {
   /** null = sınırsız. */
   usageLimitPerUser: number | null;
   usedCount: number;
-  isStackable: boolean;
   priority: number;
   isActive: boolean;
   startDate: string;
@@ -47,7 +46,6 @@ export interface DiscountFormData {
   maxDiscountAmount: string;
   usageLimitTotal: string;
   usageLimitPerUser: string;
-  isStackable: boolean;
   isActive: boolean;
   startDate: string;
   endDate: string;
@@ -120,7 +118,6 @@ export const emptyDiscountForm = (): DiscountFormData => ({
   maxDiscountAmount: "",
   usageLimitTotal: "",
   usageLimitPerUser: "1",
-  isStackable: false,
   isActive: true,
   startDate: new Date().toISOString().split("T")[0],
   endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)

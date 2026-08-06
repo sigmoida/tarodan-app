@@ -291,7 +291,9 @@ export class DiscountService {
         buyQuantity: dto.buyQuantity || null,
         getQuantity: dto.getQuantity || null,
         isFlashSale: dto.isFlashSale ?? false,
-        isStackable: dto.isStackable ?? false,
+        // KULLANIM DIŞI: motor birleştirme kararında bu alanı okumuyor. Gelen
+        // değer yok sayılır ki ayar bir şey yapıyormuş gibi kaydedilmesin.
+        isStackable: false,
 
         priority: dto.priority ?? 0,
         isActive: dto.isActive ?? true,
@@ -424,7 +426,6 @@ export class DiscountService {
         getQuantity: dto.getQuantity,
       }),
       ...(dto.isFlashSale !== undefined && { isFlashSale: dto.isFlashSale }),
-      ...(dto.isStackable !== undefined && { isStackable: dto.isStackable }),
 
       ...(dto.priority !== undefined && { priority: dto.priority }),
       ...(dto.isActive !== undefined && { isActive: dto.isActive }),

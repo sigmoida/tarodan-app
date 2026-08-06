@@ -146,9 +146,19 @@ export class CreateDiscountDto {
   @Type(() => Number)
   usageLimitPerUser?: number;
 
+  /**
+   * @deprecated Motor bu alanı UYGULAMIYOR ve gönderilse de yok sayılır.
+   *
+   * Yürürlükteki birleştirme kuralı sabittir: ürünün kendi indirimi, otomatik
+   * kampanya ve kupon ÜST ÜSTE biner; birden fazla otomatik kampanya ise
+   * toplanmaz, alıcı lehine olan tek kampanya uygulanır. Alan bir seçenek
+   * sunuyormuş gibi durduğu için formlardan kaldırıldı; kolon geriye uyum için
+   * şemada duruyor.
+   */
   @ApiPropertyOptional({
-    description: "Diğer indirimlerle birleştirilebilir mi?",
-    default: false,
+    description:
+      "KULLANIM DIŞI — motor uygulamıyor, gönderilse de yok sayılır.",
+    deprecated: true,
   })
   @IsOptional()
   @IsBoolean()
