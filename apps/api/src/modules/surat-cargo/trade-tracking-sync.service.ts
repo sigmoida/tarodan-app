@@ -33,25 +33,43 @@ export class TradeTrackingSyncService {
    * parent Trade are delivered, transitions the Trade to `at_warehouse`.
    */
   async syncTradeShipmentTracking(tradeShipmentId: string): Promise<boolean> {
+    return (
+      (await this.syncTradeShipmentTrackingState(tradeShipmentId)) === "synced"
+    );
+  }
+
+  private async syncTradeShipmentTrackingState(
+    tradeShipmentId: string,
+  ): Promise<"synced" | "pending" | "ignored"> {
     const tradeShipment = await this.prisma.tradeShipment.findUnique({
       where: { id: tradeShipmentId },
+      include: {
+        trade: {
+          select: { initiatorId: true, receiverId: true },
+        },
+      },
     });
 
     if (!tradeShipment || tradeShipment.carrier !== "surat") {
-      return false;
+      return "ignored";
     }
 
     // For TradeShipment we don't store a providerTrackingId column, so the
     // tracking reference is the trackingNumber we recorded at label creation.
     const webSiparisKodu = tradeShipment.trackingNumber;
     if (!webSiparisKodu) {
-      return false;
+      return "ignored";
     }
 
-    const data = await this.client.fetchTrackingInfo(webSiparisKodu);
-    if (!data || data.Gonderiler.length === 0) {
-      return false;
+    const lookup = await this.client.lookupTracking(webSiparisKodu);
+    if (lookup.kind === "pending") return "pending";
+    if (lookup.kind === "failure") {
+      throw new Error(
+        `Sürat takip ${lookup.category} hatası: ${lookup.message}`,
+      );
     }
+    const data = lookup.data;
+    if (data.Gonderiler.length === 0) return "pending";
 
     const gonderi = data.Gonderiler[0];
     const mappedStatus = mapSuratStatusToShipmentStatus(
@@ -72,7 +90,7 @@ export class TradeTrackingSyncService {
         `Skipping illegal trade-shipment transition ${tradeShipment.status} → ${newStatus} ` +
           `for ${tradeShipment.id} (Sürat poll, code=${gonderi.KargonunDurumuSayi})`,
       );
-      return false;
+      return "ignored";
     }
 
     const updateData: Record<string, any> = {
@@ -96,7 +114,9 @@ export class TradeTrackingSyncService {
       ShipmentStatus.out_for_delivery,
       ShipmentStatus.delivered,
     ];
-    if (!tradeShipment.shippedAt && movementStatuses.includes(newStatus)) {
+    const firstPhysicalHandoff =
+      !tradeShipment.shippedAt && movementStatuses.includes(newStatus);
+    if (firstPhysicalHandoff) {
       updateData.shippedAt = new Date();
     }
 
@@ -110,17 +130,47 @@ export class TradeTrackingSyncService {
 
     // M7 CAS: order path ile aynı — stale snapshot'la yazma.
     const cas = await this.prisma.tradeShipment.updateMany({
-      where: { id: tradeShipment.id, status: tradeShipment.status },
+      where: {
+        id: tradeShipment.id,
+        status: tradeShipment.status,
+        ...(firstPhysicalHandoff ? { shippedAt: null } : {}),
+      },
       data: updateData,
     });
     if (cas.count === 0) {
       this.logger.warn(
         `Skipping stale trade-shipment update for ${tradeShipment.id}: status changed concurrently (snapshot=${tradeShipment.status})`,
       );
-      return false;
+      return "ignored";
     }
 
     await this.syncTradeShipmentEvents(tradeShipment.id, gonderi);
+
+    if (firstPhysicalHandoff) {
+      const recipientId =
+        tradeShipment.recipientUserId ??
+        (tradeShipment.shipperId === tradeShipment.trade.initiatorId
+          ? tradeShipment.trade.receiverId
+          : tradeShipment.trade.initiatorId);
+      if (recipientId && recipientId !== tradeShipment.shipperId) {
+        try {
+          const { NotificationService } =
+            await import("../notification/notification.service");
+          const notificationService = this.moduleRef.get(NotificationService, {
+            strict: false,
+          });
+          await notificationService?.notifyTradeShipped(
+            recipientId,
+            tradeShipment.tradeId,
+            gonderi.KargoTakipNo || webSiparisKodu,
+          );
+        } catch (e: any) {
+          this.logger.warn(
+            `notify trade-shipped failed (poll) for ${tradeShipment.id}: ${e?.message}`,
+          );
+        }
+      }
+    }
 
     // Critical transition: when this is a `to_warehouse` leg and it just
     // became delivered, check whether the OTHER to_warehouse leg of the same
@@ -140,7 +190,7 @@ export class TradeTrackingSyncService {
       `TradeShipment ${tradeShipment.id} synced: status=${newStatus} suratCode=${gonderi.KargonunDurumuSayi} (${gonderi.KargonunDurumu})`,
     );
 
-    return true;
+    return "synced";
   }
 
   /**
@@ -149,6 +199,7 @@ export class TradeTrackingSyncService {
    */
   async syncAllActiveTradeShipments(): Promise<{
     synced: number;
+    pending: number;
     failed: number;
   }> {
     // #2: order sync ile AYNI filtre — terminal-OLMAYAN her bacağı pollala.
@@ -171,12 +222,14 @@ export class TradeTrackingSyncService {
     });
 
     let synced = 0;
+    let pending = 0;
     let failed = 0;
 
     for (const ts of activeTradeShipments) {
       try {
-        const success = await this.syncTradeShipmentTracking(ts.id);
-        if (success) synced++;
+        const result = await this.syncTradeShipmentTrackingState(ts.id);
+        if (result === "synced") synced++;
+        else if (result === "pending") pending++;
         else failed++;
       } catch (error: any) {
         this.logger.error(
@@ -187,9 +240,9 @@ export class TradeTrackingSyncService {
     }
 
     this.logger.log(
-      `Surat trade-shipment sync: ${synced} synced, ${failed} failed out of ${activeTradeShipments.length}`,
+      `Surat trade-shipment sync: ${synced} synced, ${pending} pending, ${failed} failed out of ${activeTradeShipments.length}`,
     );
-    return { synced, failed };
+    return { synced, pending, failed };
   }
 
   /**

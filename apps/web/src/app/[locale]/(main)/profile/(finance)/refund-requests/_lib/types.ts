@@ -17,6 +17,7 @@ export interface RefundRequest {
   sellerResponse?: string | null;
   evidencePhotoUrls?: string[];
   returnTrackingNumber?: string | null;
+  returnProviderTrackingId?: string | null;
   returnProvider?: string | null;
   refundedAt?: string | null;
   createdAt: string;

@@ -79,6 +79,8 @@ export enum NotificationType {
   REFUND_COMPLETED = "refund_completed",
   // İade akışı — eksik adımlar (satıcı tarafı + kargo takip + talep onayı)
   REFUND_REQUEST_RECEIVED = "refund_request_received",
+  REFUND_REQUEST_RECEIVED_SELLER = "refund_request_received_seller",
+  REFUND_REVIEW_REQUIRED_ADMIN = "refund_review_required_admin",
   REFUND_RETURN_SHIPPED_SELLER = "refund_return_shipped_seller",
   REFUND_RETURN_IN_TRANSIT = "refund_return_in_transit",
   REFUND_RETURN_DELIVERED_BUYER = "refund_return_delivered_buyer",

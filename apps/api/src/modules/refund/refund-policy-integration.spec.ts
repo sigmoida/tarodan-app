@@ -8,6 +8,7 @@ import {
 import { BadRequestException } from "@nestjs/common";
 import { RefundService } from "./refund.service";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import { NotificationType } from "../notification/dto/notification.dto";
 
 describe("RefundService policy integration", () => {
   const baseOrder = {
@@ -54,6 +55,9 @@ describe("RefundService policy integration", () => {
         update: jest.fn().mockResolvedValue({}),
       },
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      adminUser: {
+        findMany: jest.fn().mockResolvedValue([{ userId: "admin-1" }]),
+      },
     };
     const shippingTariff = {
       getById: jest.fn().mockResolvedValue({
@@ -64,24 +68,26 @@ describe("RefundService policy integration", () => {
       }),
     };
     const payment = { processRefund: jest.fn() };
+    const notification = {
+      createInAppNotification: jest.fn().mockResolvedValue(undefined),
+      sendTemplateEmailToUser: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new RefundService(
       prisma as any,
       payment as any,
       {} as any,
       {} as any,
       {} as any,
-      {
-        createInAppNotification: jest.fn().mockResolvedValue(undefined),
-        sendTemplateEmailToUser: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      notification as any,
       {} as any,
       shippingTariff as any,
     );
-    return { service, prisma, payment, createdRows };
+    return { service, prisma, payment, notification, createdRows };
   };
 
   it("routes seller-fault claims to admin review with immutable exact amounts", async () => {
-    const { service, prisma, payment, createdRows } = makeService();
+    const { service, prisma, payment, notification, createdRows } =
+      makeService();
 
     await service.createRefundRequest("order-1", "buyer-1", {
       reason: RefundReason.damaged,
@@ -102,10 +108,26 @@ describe("RefundService policy integration", () => {
     });
     expect(prisma.paymentHold.updateMany).toHaveBeenCalled();
     expect(payment.processRefund).not.toHaveBeenCalled();
+    expect(notification.createInAppNotification).toHaveBeenCalledWith(
+      "seller-1",
+      NotificationType.REFUND_REQUEST_RECEIVED_SELLER,
+      expect.objectContaining({ orderId: "order-1" }),
+    );
+    expect(notification.createInAppNotification).toHaveBeenCalledWith(
+      "admin-1",
+      NotificationType.REFUND_REVIEW_REQUIRED_ADMIN,
+      expect.objectContaining({
+        refundRequestId: "refund-1",
+        adminLink: expect.stringContaining(
+          "/operations/refund-requests/refund-1",
+        ),
+      }),
+    );
   });
 
   it("auto-approves buyer remorse while deducting return shipping and retained buyer fees", async () => {
-    const { service, payment, createdRows } = makeService();
+    const { service, prisma, payment, notification, createdRows } =
+      makeService();
 
     await service.createRefundRequest("order-1", "buyer-1", {
       reason: RefundReason.changed_mind,
@@ -123,6 +145,12 @@ describe("RefundService policy integration", () => {
       requiresAdminReview: false,
     });
     expect(payment.processRefund).not.toHaveBeenCalled();
+    expect(notification.createInAppNotification).toHaveBeenCalledWith(
+      "seller-1",
+      NotificationType.REFUND_REQUEST_RECEIVED_SELLER,
+      expect.objectContaining({ orderId: "order-1" }),
+    );
+    expect(prisma.adminUser.findMany).not.toHaveBeenCalled();
   });
 
   it("rejects seller-fault claims without evidence", async () => {

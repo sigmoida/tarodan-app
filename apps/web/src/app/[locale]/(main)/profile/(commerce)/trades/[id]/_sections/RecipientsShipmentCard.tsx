@@ -44,21 +44,18 @@ export default function RecipientsShipmentCard({
             {myFromWarehouseShipment.carrier === "surat"
               ? "Sürat Kargo"
               : myFromWarehouseShipment.carrier || "—"}
-            {/* L1: Sürat'ta yalnız GERÇEK kod göster (iç ref şubede geçersiz);
-               manuel taşıyıcıda trackingNumber referanstır. */}
+            {/* Şube kabulüne kadar gönderi referansı, sonra gerçek takip kodu. */}
             {(() => {
               const code =
                 myFromWarehouseShipment.cargoCode ??
-                (myFromWarehouseShipment.carrier !== "surat"
-                  ? myFromWarehouseShipment.trackingNumber
-                  : null);
+                myFromWarehouseShipment.trackingNumber;
               return code ? ` · ${code}` : "";
             })()}
           </p>
           {myFromWarehouseShipment.carrier === "surat" &&
             !myFromWarehouseShipment.cargoCode && (
               <p className="text-xs text-muted italic mt-1">
-                {t("order.cargoCodePending")}
+                {t("order.trackingAppearsAfterDropoff")}
               </p>
             )}
           {myFromWarehouseShipment.carrier === "surat" &&
@@ -92,9 +89,7 @@ export default function RecipientsShipmentCard({
             {(() => {
               const code =
                 otherFromWarehouseShipment.cargoCode ??
-                (otherFromWarehouseShipment.carrier !== "surat"
-                  ? otherFromWarehouseShipment.trackingNumber
-                  : null);
+                otherFromWarehouseShipment.trackingNumber;
               return code ? ` · ${code}` : "";
             })()}
           </p>

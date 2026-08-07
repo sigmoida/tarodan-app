@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
+import { ShipmentStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
   mapSuratStatusToShipmentStatus,
@@ -29,6 +30,7 @@ export class RefundReturnTrackingSyncService {
    */
   async syncAllActiveRefundReturns(): Promise<{
     synced: number;
+    pending: number;
     failed: number;
   }> {
     const activeReturns = await this.prisma.refundRequest.findMany({
@@ -42,11 +44,13 @@ export class RefundReturnTrackingSyncService {
     });
 
     let synced = 0;
+    let pending = 0;
     let failed = 0;
     for (const rr of activeReturns) {
       try {
-        const ok = await this.syncRefundReturnTracking(rr.id);
-        if (ok) synced++;
+        const result = await this.syncRefundReturnTrackingState(rr.id);
+        if (result === "synced") synced++;
+        else if (result === "pending") pending++;
         else failed++;
       } catch (error: any) {
         this.logger.error(
@@ -55,19 +59,34 @@ export class RefundReturnTrackingSyncService {
         failed++;
       }
     }
-    return { synced, failed };
+    return { synced, pending, failed };
   }
 
   async syncRefundReturnTracking(refundRequestId: string): Promise<boolean> {
+    return (
+      (await this.syncRefundReturnTrackingState(refundRequestId)) === "synced"
+    );
+  }
+
+  private async syncRefundReturnTrackingState(
+    refundRequestId: string,
+  ): Promise<"synced" | "pending" | "ignored"> {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
     });
     if (!rr || rr.returnProvider !== "surat" || !rr.returnTrackingNumber) {
-      return false;
+      return "ignored";
     }
 
-    const data = await this.client.fetchTrackingInfo(rr.returnTrackingNumber);
-    if (!data || data.Gonderiler.length === 0) return false;
+    const lookup = await this.client.lookupTracking(rr.returnTrackingNumber);
+    if (lookup.kind === "pending") return "pending";
+    if (lookup.kind === "failure") {
+      throw new Error(
+        `Sürat takip ${lookup.category} hatası: ${lookup.message}`,
+      );
+    }
+    const data = lookup.data;
+    if (data.Gonderiler.length === 0) return "pending";
 
     const gonderi = data.Gonderiler[0];
     const suratCode = gonderi.KargonunDurumuSayi;
@@ -77,7 +96,7 @@ export class RefundReturnTrackingSyncService {
       this.logger.warn(
         `Unknown Surat status code ${suratCode} for refund return ${refundRequestId}; skipping update`,
       );
-      return false;
+      return "ignored";
     }
     // İade gönderisinin "geri teslim edildi" durumu, Sürat dokümanına (KargoTakip
     // HareketDetayi) göre KargonunDurumuSayi = 12 (İade Teslim Edildi). İleri
@@ -109,11 +128,17 @@ export class RefundReturnTrackingSyncService {
       this.logger.warn(
         `RefundService not resolvable when syncing ${refundRequestId}`,
       );
-      return false;
+      return "ignored";
     }
 
     await refundService.applyReturnTrackingUpdate(refundRequestId, {
       status: newStatus,
+      shippedAt:
+        !rr.returnShippedAt &&
+        newStatus !== ShipmentStatus.pending &&
+        newStatus !== ShipmentStatus.label_created
+          ? new Date()
+          : undefined,
       // H1: parse edilemeyen tarihte teslim gerçeği kaybolmasın — şimdi'ye düş.
       deliveredAt: isReturnDelivered
         ? ((gonderi.TeslimTarihi
@@ -132,6 +157,6 @@ export class RefundReturnTrackingSyncService {
       );
     }
 
-    return true;
+    return "synced";
   }
 }

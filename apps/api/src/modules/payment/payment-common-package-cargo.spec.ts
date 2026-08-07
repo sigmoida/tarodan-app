@@ -22,6 +22,7 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     packageOrders?: any[];
     orderPackage?: any;
     existingShipment?: any;
+    cargoTrackingCode?: string | null;
   }) => {
     const captured: any = {
       barcodeCall: undefined,
@@ -91,7 +92,10 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
         captured.barcodeCall = arg;
         return Promise.resolve({
           ok: true,
-          trackingCode: "SURAT-123",
+          trackingCode:
+            over.cargoTrackingCode === undefined
+              ? "SURAT-123"
+              : over.cargoTrackingCode,
           labelData: "ZPL",
         });
       }),
@@ -181,6 +185,38 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     expect(captured.shipmentCreate.orderId).toBe("o2");
     // Gönderi satırı koliye bağlanır → poller/webhook kardeşleri bulabilir.
     expect(captured.shipmentCreate.packageId).toBe("pkg-1");
+  });
+
+  it("şube kabulünden önce gerçek kod olmadan gönderiyi label_created yapar", async () => {
+    const { provisioner, captured } = makeService({
+      orderUnique: {
+        id: "o2",
+        orderNumber: "ORD-2",
+        status: OrderStatus.preparing,
+        shippingCost: 30,
+        packageId: "pkg-1",
+        shippingAddress: validAddr,
+        product: { title: "B" },
+      },
+      packageOrders: [
+        {
+          orderNumber: "ORD-2",
+          quantity: 1,
+          shippingAddress: validAddr,
+          product: { title: "B" },
+        },
+      ],
+      existingShipment: null,
+      cargoTrackingCode: null,
+    });
+
+    await expect(provisioner.ensure("o2")).resolves.toBe("created");
+    expect(captured.shipmentUpdate).toEqual(
+      expect.objectContaining({
+        providerTrackingId: null,
+        status: "label_created",
+      }),
+    );
   });
 
   it("OrderShipmentProvisioner: iptal sonrası yeni paket ref'i ayırır ve retry kimliğini değiştirir", async () => {

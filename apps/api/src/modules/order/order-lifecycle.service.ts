@@ -473,6 +473,7 @@ export class OrderLifecycleService {
 
     const preHandover: ShipmentStatus[] = [
       ShipmentStatus.pending,
+      ShipmentStatus.label_created,
       ShipmentStatus.cancelled,
       ShipmentStatus.failed,
     ];
@@ -532,6 +533,7 @@ export class OrderLifecycleService {
       }
       const preHandoverShipmentStatuses: ShipmentStatus[] = [
         ShipmentStatus.pending,
+        ShipmentStatus.label_created,
         ShipmentStatus.cancelled,
         ShipmentStatus.failed,
       ];

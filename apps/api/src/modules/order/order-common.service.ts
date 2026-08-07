@@ -300,7 +300,7 @@ export class OrderCommonService {
             id: order.shipment.id,
             provider: order.shipment.provider,
             trackingNumber: order.shipment.trackingNumber,
-            // Gerçek Sürat kargo kodu (KargoTakipNo) — UI'da gösterilir, şubede verilir.
+            // Gerçek Sürat kargo kodu (KargoTakipNo) — şube kabulünden sonra UI'da gösterilir.
             cargoCode,
             trackingUrl,
             status: order.shipment.status,
@@ -384,7 +384,7 @@ export class OrderCommonService {
       status: active.status,
       reason: active.reason,
       returnTrackingNumber: active.returnTrackingNumber,
-      // Real Sürat return code (KargoTakipNo) — shown in UI, given at the branch.
+      // Gerçek Sürat dönüş kodu (KargoTakipNo); şube kabulünden sonra oluşur.
       returnCargoCode: active.returnProviderTrackingId,
       returnProvider: active.returnProvider,
       returnStatus: active.returnStatus,

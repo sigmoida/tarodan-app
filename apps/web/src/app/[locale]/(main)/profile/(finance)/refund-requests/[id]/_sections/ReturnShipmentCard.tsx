@@ -40,6 +40,8 @@ export default function ReturnShipmentCard({
   const t = useTranslations();
   const copy = TRANSIT_COPY[refund.status];
   const side = isBuyer ? "buyer" : "seller";
+  const displayTrackingCode =
+    refund.returnProviderTrackingId ?? refund.returnTrackingNumber;
 
   return (
     <Alert
@@ -53,17 +55,17 @@ export default function ReturnShipmentCard({
     >
       {copy && <p className="mb-3 text-body">{t(copy[side])}</p>}
 
-      {refund.returnTrackingNumber ? (
+      {displayTrackingCode ? (
         <>
           <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-alt p-4">
             <span className="break-all font-mono text-lg font-bold text-heading">
-              {refund.returnTrackingNumber}
+              {displayTrackingCode}
             </span>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
-                navigator.clipboard.writeText(refund.returnTrackingNumber!);
+                navigator.clipboard.writeText(displayTrackingCode);
                 toast.success(t("common.copiedShort"));
               }}
             >
@@ -71,20 +73,27 @@ export default function ReturnShipmentCard({
               {t("common.copy")}
             </Button>
           </div>
-          {refund.returnProvider === "surat" && (
-            <Button asChild variant="link" size="sm">
-              <a
-                href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(
-                  refund.returnTrackingNumber,
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <TruckIcon className="h-4 w-4" />
-                {t("order.trackOnSurat")}
-              </a>
-            </Button>
-          )}
+          {refund.returnProvider === "surat" &&
+            !refund.returnProviderTrackingId && (
+              <p className="mb-2 text-xs text-muted">
+                {t("order.trackingAppearsAfterDropoff")}
+              </p>
+            )}
+          {refund.returnProvider === "surat" &&
+            refund.returnProviderTrackingId && (
+              <Button asChild variant="link" size="sm">
+                <a
+                  href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(
+                    refund.returnProviderTrackingId,
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <TruckIcon className="h-4 w-4" />
+                  {t("order.trackOnSurat")}
+                </a>
+              </Button>
+            )}
         </>
       ) : (
         <p className="text-muted">{t("refund.trackingGenerating")}</p>

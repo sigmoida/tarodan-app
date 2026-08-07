@@ -81,10 +81,12 @@ export interface OrderDetail {
     id: string;
     provider: string;
     trackingNumber: string | null;
-    /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
+    /** Real Sürat cargo code (KargoTakipNo), available after branch acceptance. */
     cargoCode?: string | null;
     status: string;
     cost?: number;
+    shippedAt?: string | null;
+    deliveredAt?: string | null;
   };
   activeRefundRequest?: {
     id: string;
@@ -92,7 +94,7 @@ export interface OrderDetail {
     status: string;
     reason?: string;
     returnTrackingNumber?: string | null;
-    /** Real Sürat return code (KargoTakipNo) — given at the branch. */
+    /** Real Sürat return code (KargoTakipNo), available after branch acceptance. */
     returnCargoCode?: string | null;
     returnProvider?: string | null;
     returnStatus?: string | null;

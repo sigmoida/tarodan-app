@@ -31,19 +31,16 @@ export default function ReturnShipmentCard({
         {myReturnShipment.carrier === "surat"
           ? "Sürat Kargo"
           : myReturnShipment.carrier || "—"}
-        {/* L1: Sürat'ta yalnız GERÇEK kod; iç ref şubede geçersiz. */}
+        {/* Şube kabulüne kadar gönderi referansı, sonra gerçek takip kodu. */}
         {(() => {
           const code =
-            myReturnShipment.cargoCode ??
-            (myReturnShipment.carrier !== "surat"
-              ? myReturnShipment.trackingNumber
-              : null);
+            myReturnShipment.cargoCode ?? myReturnShipment.trackingNumber;
           return code ? ` · ${code}` : "";
         })()}
       </p>
       {myReturnShipment.carrier === "surat" && !myReturnShipment.cargoCode && (
         <p className="mt-1 text-xs italic text-muted">
-          {t("order.cargoCodePending")}
+          {t("order.trackingAppearsAfterDropoff")}
         </p>
       )}
       {myReturnShipment.carrier === "surat" && myReturnShipment.cargoCode && (

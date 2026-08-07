@@ -8,6 +8,7 @@ describe("RefundReturnTrackingSyncService", () => {
       returnProvider: "surat",
       returnTrackingNumber: "RETURN-REF-1",
       returnProviderTrackingId: null,
+      returnShippedAt: null,
     };
     const prisma = {
       refundRequest: {
@@ -24,15 +25,18 @@ describe("RefundReturnTrackingSyncService", () => {
       get: jest.fn().mockReturnValue(refundService),
     };
     const client = {
-      fetchTrackingInfo: jest.fn().mockResolvedValue({
-        Gonderiler: [
-          {
-            KargonunDurumuSayi: code,
-            KargonunDurumu: `status-${code}`,
-            KargoTakipNo: "RETURN-CARGO-CODE",
-            TeslimTarihi: code === 12 ? "28.07.2026 12:00:00" : "",
-          },
-        ],
+      lookupTracking: jest.fn().mockResolvedValue({
+        kind: "found",
+        data: {
+          Gonderiler: [
+            {
+              KargonunDurumuSayi: code,
+              KargonunDurumu: `status-${code}`,
+              KargoTakipNo: "RETURN-CARGO-CODE",
+              TeslimTarihi: code === 12 ? "28.07.2026 12:00:00" : "",
+            },
+          ],
+        },
       }),
       parseSuratDate: jest
         .fn()
@@ -53,7 +57,7 @@ describe("RefundReturnTrackingSyncService", () => {
       true,
     );
 
-    expect(client.fetchTrackingInfo).toHaveBeenCalledWith("RETURN-REF-1");
+    expect(client.lookupTracking).toHaveBeenCalledWith("RETURN-REF-1");
     expect(prisma.refundRequest.update).toHaveBeenCalledWith({
       where: { id: "refund-1" },
       data: { returnProviderTrackingId: "RETURN-CARGO-CODE" },
@@ -62,6 +66,22 @@ describe("RefundReturnTrackingSyncService", () => {
       "refund-1",
       {
         status: ShipmentStatus.in_transit,
+        shippedAt: expect.any(Date),
+        deliveredAt: undefined,
+      },
+    );
+  });
+
+  it("treats the first visible carrier record as physical branch acceptance", async () => {
+    const { service, refundService } = makeService(1);
+
+    await service.syncRefundReturnTracking("refund-1");
+
+    expect(refundService.applyReturnTrackingUpdate).toHaveBeenCalledWith(
+      "refund-1",
+      {
+        status: ShipmentStatus.picked_up,
+        shippedAt: expect.any(Date),
         deliveredAt: undefined,
       },
     );
@@ -78,6 +98,7 @@ describe("RefundReturnTrackingSyncService", () => {
       "refund-1",
       {
         status: ShipmentStatus.returned,
+        shippedAt: expect.any(Date),
         deliveredAt: new Date("2026-07-28T09:00:00.000Z"),
       },
     );

@@ -371,6 +371,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.refundRequestReceived.message",
     icon: "📨",
   },
+  [NotificationType.REFUND_REQUEST_RECEIVED_SELLER]: {
+    titleKey: "server.notification.refundRequestReceivedSeller.title",
+    messageKey: "server.notification.refundRequestReceivedSeller.message",
+    icon: "↩️",
+  },
+  [NotificationType.REFUND_REVIEW_REQUIRED_ADMIN]: {
+    titleKey: "server.notification.refundReviewRequiredAdmin.title",
+    messageKey: "server.notification.refundReviewRequiredAdmin.message",
+    icon: "🔎",
+  },
   [NotificationType.REFUND_RETURN_SHIPPED_SELLER]: {
     titleKey: "server.notification.refundReturnShippedSeller.title",
     messageKey: "server.notification.refundReturnShippedSeller.message",

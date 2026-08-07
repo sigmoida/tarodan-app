@@ -39,6 +39,10 @@ inputs:
     description: 'Whether to poll Coolify until every deployment finishes'
     required: false
     default: 'true'
+  retry-failed-deployments:
+    description: 'Number of times to retry a failed deployment with a forced rebuild'
+    required: false
+    default: '1'
 
 runs:
   using: 'composite'
@@ -54,8 +58,110 @@ runs:
         TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
         POLL_INTERVAL: ${{ inputs.poll-interval }}
         WAIT_FOR_RESULT: ${{ inputs.wait-for-result }}
+        RETRY_FAILED_DEPLOYMENTS: ${{ inputs.retry-failed-deployments }}
       run: |
         set -euo pipefail
+
+        print_deployment_diagnostics() {
+          local details_file="$1"
+          echo "----- Coolify deployment details -----"
+          if jq -e . "$details_file" >/dev/null 2>&1; then
+            jq '{
+              deployment_uuid,
+              application_name,
+              status,
+              commit,
+              commit_message,
+              created_at,
+              updated_at,
+              deployment_url
+            }' "$details_file"
+          else
+            echo "No valid deployment details returned."
+          fi
+          echo "----- Coolify deployment log tail -----"
+          if jq -e . "$details_file" >/dev/null 2>&1; then
+            jq -r '.logs // "No deployment logs returned. The Coolify token may need read:sensitive permission."' \
+              "$details_file" | tail -n 200
+          else
+            echo "No deployment logs returned."
+          fi
+          echo "----------------------------------------"
+        }
+
+        trigger_deploy() {
+          local resource_uuids="$1"
+          local force_rebuild="$2"
+          local response_file http_code response_body
+          response_file="$(mktemp)"
+          if ! http_code="$(curl -sS --retry 3 --retry-delay 10 --retry-all-errors \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              -o "$response_file" -w '%{http_code}' \
+              "$COOLIFY_URL/api/v1/deploy?uuid=$resource_uuids&force=$force_rebuild")"; then
+            echo "::error::Could not reach the Coolify deploy API." >&2
+            cat "$response_file" >&2 || true
+            unlink "$response_file" || true
+            return 1
+          fi
+          echo "Coolify deploy trigger -> HTTP $http_code" >&2
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Coolify deploy trigger returned HTTP $http_code" >&2
+            echo "----- response body -----" >&2
+            cat "$response_file" >&2 || true
+            echo >&2
+            echo "-------------------------" >&2
+            unlink "$response_file" || true
+            return 1
+          fi
+          response_body="$(cat "$response_file")"
+          unlink "$response_file" || true
+          printf '%s\n' "$response_body"
+        }
+
+        wait_for_deployment() {
+          local deployment_uuid="$1"
+          local max_polls="$2"
+          local details_file http_code status
+          details_file="$(mktemp)"
+
+          for i in $(seq 1 "$max_polls"); do
+            if ! http_code="$(curl -sS --retry 3 --retry-delay 2 --retry-all-errors \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              -o "$details_file" -w '%{http_code}' \
+              "$COOLIFY_URL/api/v1/deployments/$deployment_uuid")"; then
+              echo "::warning::Could not read deployment $deployment_uuid on poll $i; retrying."
+              sleep "$POLL_INTERVAL"
+              continue
+            fi
+            if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+              echo "::warning::Deployment status request for $deployment_uuid returned HTTP $http_code on poll $i; retrying."
+              sleep "$POLL_INTERVAL"
+              continue
+            fi
+
+            status="$(jq -r '.status // "unknown"' "$details_file")"
+            echo "[$i/$max_polls] $deployment_uuid -> $status"
+            case "$status" in
+              finished|success)
+                echo "✓ $deployment_uuid succeeded"
+                unlink "$details_file" || true
+                return 0
+                ;;
+              failed|error|cancelled*|failed*)
+                echo "::error::deployment $deployment_uuid ended: $status"
+                print_deployment_diagnostics "$details_file"
+                unlink "$details_file" || true
+                return 1
+                ;;
+            esac
+            sleep "$POLL_INTERVAL"
+          done
+
+          echo "::error::deployment $deployment_uuid did not finish within ${TIMEOUT_SECONDS}s"
+          print_deployment_diagnostics "$details_file"
+          unlink "$details_file" || true
+          return 1
+        }
 
         # Resolve the effective UUIDs. Preferred path: map app NAMES (apps) to a
         # subset of ALL_UUIDS here, inside the action, because ALL_UUIDS is a
@@ -85,6 +191,12 @@ runs:
           echo "::error::No UUIDs to deploy — pass 'uuids', or 'apps' + 'all-uuids'."
           exit 1
         fi
+        if ! [[ "$TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] ||
+          ! [[ "$POLL_INTERVAL" =~ ^[1-9][0-9]*$ ]] ||
+          ! [[ "$RETRY_FAILED_DEPLOYMENTS" =~ ^[0-9]+$ ]]; then
+          echo "::error::timeout-seconds and poll-interval must be positive integers; retry-failed-deployments must be a non-negative integer."
+          exit 1
+        fi
 
         echo "Triggering Coolify deploy for: $UUIDS"
         # Capture the HTTP status AND body separately (no -f) so a non-2xx from
@@ -92,55 +204,59 @@ runs:
         # A 401 = bad/expired token; 403 = token authenticated but lacks the
         # deploy scope or belongs to a different team than the app UUIDs; an HTML
         # body usually means a WAF/Cloudflare in front of Coolify blocked us.
-        body_file="$(mktemp)"
-        http_code="$(curl -sS --retry 3 --retry-delay 10 \
-          -H "Authorization: Bearer $COOLIFY_TOKEN" \
-          -o "$body_file" -w '%{http_code}' \
-          "$COOLIFY_URL/api/v1/deploy?uuid=$UUIDS&force=false")"
-        echo "Coolify deploy trigger -> HTTP $http_code"
-        if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-          echo "::error::Coolify deploy trigger returned HTTP $http_code"
-          echo "----- response body -----"
-          cat "$body_file" || true
-          echo
-          echo "-------------------------"
+        if ! resp="$(trigger_deploy "$UUIDS" false)"; then
           exit 1
         fi
-        resp="$(cat "$body_file")"
         echo "$resp" | jq .
 
-        # Collect the deployment UUID(s) Coolify queued (one per app).
-        mapfile -t DEPLOY_UUIDS < <(echo "$resp" | jq -r '.deployments[].deployment_uuid')
-        if [ "${#DEPLOY_UUIDS[@]}" -eq 0 ]; then
+        # Keep the resource/deployment pair so a transient failure can be
+        # retried for only that application instead of redeploying all apps.
+        DEPLOYMENTS=()
+        while IFS= read -r deployment; do
+          DEPLOYMENTS+=("$deployment")
+        done < <(
+          echo "$resp" | jq -r '.deployments[] | [.resource_uuid, .deployment_uuid] | @tsv'
+        )
+        if [ "${#DEPLOYMENTS[@]}" -eq 0 ]; then
           echo "::error::No deployment_uuid returned — deploy was not queued."
           exit 1
         fi
 
         if [ "$WAIT_FOR_RESULT" != "true" ]; then
-          echo "Queued ${#DEPLOY_UUIDS[@]} Coolify deployment(s); result polling disabled."
+          echo "Queued ${#DEPLOYMENTS[@]} Coolify deployment(s); result polling disabled."
           exit 0
         fi
 
         max_polls=$(( TIMEOUT_SECONDS / POLL_INTERVAL ))
+        if [ "$max_polls" -lt 1 ]; then
+          max_polls=1
+        fi
         fail=0
-        for du in "${DEPLOY_UUIDS[@]}"; do
+        for deployment in "${DEPLOYMENTS[@]}"; do
+          IFS=$'\t' read -r resource_uuid deployment_uuid <<< "$deployment"
+          du="$deployment_uuid"
           echo "::group::Waiting for deployment $du"
-          done_flag=0
-          for i in $(seq 1 "$max_polls"); do
-            status="$(curl -fsSL -H "Authorization: Bearer $COOLIFY_TOKEN" \
-              "$COOLIFY_URL/api/v1/deployments/$du" | jq -r '.status // "unknown"')"
-            echo "[$i/$max_polls] $du -> $status"
-            case "$status" in
-              finished|success)
-                echo "✓ $du succeeded"; done_flag=1; break ;;
-              failed|error|cancelled*|failed*)
-                echo "::error::deployment $du ended: $status"; fail=1; done_flag=1; break ;;
-            esac
-            sleep "$POLL_INTERVAL"
-          done
-          if [ "$done_flag" -eq 0 ]; then
-            echo "::error::deployment $du did not finish within ${TIMEOUT_SECONDS}s"
-            fail=1
+          if ! wait_for_deployment "$du" "$max_polls"; then
+            succeeded=0
+            for retry in $(seq 1 "$RETRY_FAILED_DEPLOYMENTS"); do
+              echo "::warning::Retrying failed deployment for resource $resource_uuid ($retry/$RETRY_FAILED_DEPLOYMENTS) with force=true."
+              if ! retry_resp="$(trigger_deploy "$resource_uuid" true)"; then
+                continue
+              fi
+              echo "$retry_resp" | jq .
+              retry_du="$(echo "$retry_resp" | jq -r '.deployments[0].deployment_uuid // empty')"
+              if [ -z "$retry_du" ]; then
+                echo "::error::Retry did not return a deployment_uuid for resource $resource_uuid."
+                continue
+              fi
+              if wait_for_deployment "$retry_du" "$max_polls"; then
+                succeeded=1
+                break
+              fi
+            done
+            if [ "$succeeded" -ne 1 ]; then
+              fail=1
+            fi
           fi
           echo "::endgroup::"
         done

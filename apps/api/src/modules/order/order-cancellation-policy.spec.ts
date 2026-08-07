@@ -60,6 +60,16 @@ describe("OrderLifecycleService structured cancellation", () => {
     expect(result.status).toBe(OrderStatus.cancelled);
   });
 
+  it("keeps a registered but not-yet-accepted shipment cancellable", async () => {
+    const { service, refund } = makeService(ShipmentStatus.label_created);
+
+    await service.cancel("order-1", "buyer-1", {
+      reasonCode: OrderCancellationReason.changed_mind,
+    });
+
+    expect(refund.createCancellationRefund).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects cancellation after carrier handover and directs the flow to returns", async () => {
     const { service, refund } = makeService(ShipmentStatus.picked_up);
 

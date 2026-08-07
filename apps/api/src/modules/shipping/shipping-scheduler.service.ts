@@ -41,8 +41,11 @@ export class ShippingSchedulerService implements OnModuleInit {
       barcodeRetried: 0,
       barcodeRetryFailed: 0,
       shipmentSynced: 0,
+      shipmentPending: 0,
       tradeSynced: 0,
+      tradePending: 0,
       refundSynced: 0,
+      refundPending: 0,
       failed: 0,
     };
 
@@ -79,6 +82,7 @@ export class ShippingSchedulerService implements OnModuleInit {
     try {
       const result = await this.suratTracking.syncAllActiveShipments();
       stats.shipmentSynced = result.synced;
+      stats.shipmentPending = result.pending;
       stats.failed += result.failed;
       if (result.failed > 0) {
         recordStepFailure(
@@ -87,7 +91,7 @@ export class ShippingSchedulerService implements OnModuleInit {
         );
       }
       log(
-        `Sipariş kargo senkron: ${result.synced} güncellendi, ${result.failed} başarısız`,
+        `Sipariş kargo senkron: ${result.synced} güncellendi, ${result.pending} kabul bekliyor, ${result.failed} başarısız`,
       );
       if (result.synced > 0 || result.failed > 0) {
         this.logger.log(
@@ -104,6 +108,7 @@ export class ShippingSchedulerService implements OnModuleInit {
       const tradeResult =
         await this.suratTracking.syncAllActiveTradeShipments();
       stats.tradeSynced = tradeResult.synced;
+      stats.tradePending = tradeResult.pending;
       stats.failed += tradeResult.failed;
       if (tradeResult.failed > 0) {
         recordStepFailure(
@@ -112,7 +117,7 @@ export class ShippingSchedulerService implements OnModuleInit {
         );
       }
       log(
-        `Takas kargo senkron: ${tradeResult.synced} güncellendi, ${tradeResult.failed} başarısız`,
+        `Takas kargo senkron: ${tradeResult.synced} güncellendi, ${tradeResult.pending} kabul bekliyor, ${tradeResult.failed} başarısız`,
       );
       if (tradeResult.synced > 0 || tradeResult.failed > 0) {
         this.logger.log(
@@ -129,6 +134,7 @@ export class ShippingSchedulerService implements OnModuleInit {
       const refundResult =
         await this.suratTracking.syncAllActiveRefundReturns();
       stats.refundSynced = refundResult.synced;
+      stats.refundPending = refundResult.pending;
       stats.failed += refundResult.failed;
       if (refundResult.failed > 0) {
         recordStepFailure(
@@ -137,7 +143,7 @@ export class ShippingSchedulerService implements OnModuleInit {
         );
       }
       log(
-        `İade kargo senkron: ${refundResult.synced} güncellendi, ${refundResult.failed} başarısız`,
+        `İade kargo senkron: ${refundResult.synced} güncellendi, ${refundResult.pending} kabul bekliyor, ${refundResult.failed} başarısız`,
       );
       if (refundResult.synced > 0 || refundResult.failed > 0) {
         this.logger.log(
@@ -161,6 +167,8 @@ export class ShippingSchedulerService implements OnModuleInit {
 
     const totalSynced =
       stats.shipmentSynced + stats.tradeSynced + stats.refundSynced;
+    const totalPending =
+      stats.shipmentPending + stats.tradePending + stats.refundPending;
     const retrySummary =
       stats.barcodeRetried > 0
         ? ` · ${stats.barcodeRetried} kod tamamlandı`
@@ -169,7 +177,7 @@ export class ShippingSchedulerService implements OnModuleInit {
       throw new CronStepFailuresError(failedSteps, failureDetails);
     }
     return {
-      summary: `${totalSynced} kargo güncellendi · ${stats.failed} başarısız${retrySummary}`,
+      summary: `${totalSynced} kargo güncellendi · ${totalPending} kabul bekliyor · ${stats.failed} başarısız${retrySummary}`,
       stats,
     };
   }

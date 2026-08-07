@@ -16,7 +16,7 @@ export interface TradeShipment {
   recipientUserId?: string | null;
   carrier?: string | null;
   trackingNumber?: string | null;
-  /** Real Sürat cargo code (KargoTakipNo) — given at the branch. */
+  /** Real Sürat cargo code (KargoTakipNo), available after branch acceptance. */
   cargoCode?: string | null;
   status?: string | null;
   shippedAt?: string | null;

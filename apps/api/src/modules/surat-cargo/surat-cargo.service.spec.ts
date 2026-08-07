@@ -77,7 +77,14 @@ describe("SuratCargoService", () => {
         },
         {
           provide: SuratTrackingClient,
-          useValue: { fetchTrackingInfo: trackingFetch },
+          useValue: {
+            lookupTracking: jest.fn(async (ref: string) => {
+              const data = await trackingFetch(ref);
+              return data
+                ? { kind: "found", data }
+                : { kind: "pending", message: "Kargo kabul bekleniyor" };
+            }),
+          },
         },
         {
           provide: CacheService,
@@ -279,6 +286,30 @@ describe("SuratCargoService", () => {
     expect((result as SuratTechnicalFailure).code).toBe("TRACKING_PENDING");
     expect(soapCall).toHaveBeenCalledTimes(1);
     expect(trackingFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("exposes a successful provider registration before branch acceptance", async () => {
+    trackingFetch.mockResolvedValue(null);
+
+    await expect(
+      service.createShipment({
+        idempotencyKey: "registered-pending",
+        correlationId: "registered-pending",
+        reference: "PKG-PENDING",
+        recipient: {
+          name: "Ayşe Kaya",
+          address: "Adres 1",
+          city: "İstanbul",
+          district: "Kadıköy",
+          phone: "05551112233",
+        },
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      trackingCode: null,
+      labelData: null,
+      providerMessage: "registered_pending_carrier_acceptance",
+    });
   });
 
   it("cancels only local state and never calls a carrier cancel endpoint", async () => {

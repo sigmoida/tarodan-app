@@ -92,7 +92,7 @@ export class OrderShipmentProvisioner {
   async createBarcode(
     orderId: string,
     trackingRefOverride?: string,
-  ): Promise<{ kargoTakipNo: string; labelZpl: string | null } | null> {
+  ): Promise<{ kargoTakipNo: string | null; labelZpl: string | null } | null> {
     if (!this.cargo.isEnabled()) return null;
 
     const order = await this.prisma.order.findUnique({
@@ -252,6 +252,7 @@ export class OrderShipmentProvisioner {
           data: {
             providerTrackingId: barcode.kargoTakipNo,
             labelZpl: barcode.labelZpl,
+            status: "label_created",
           },
         });
       }
@@ -288,6 +289,7 @@ export class OrderShipmentProvisioner {
         data: {
           providerTrackingId: barcode.kargoTakipNo,
           labelZpl: barcode.labelZpl,
+          status: "label_created" as any,
         },
       });
     }

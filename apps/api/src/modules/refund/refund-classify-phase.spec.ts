@@ -67,4 +67,17 @@ describe("RefundService.classifyOrderPhase", () => {
       }),
     ).toBe("in_cooling_off");
   });
+
+  it("label_created fiziksel teslim değildir → preparing", () => {
+    expect(
+      classify({
+        status: OrderStatus.preparing,
+        deliveredAt: null,
+        shipment: {
+          status: ShipmentStatus.label_created,
+          deliveredAt: null,
+        },
+      }),
+    ).toBe("preparing");
+  });
 });

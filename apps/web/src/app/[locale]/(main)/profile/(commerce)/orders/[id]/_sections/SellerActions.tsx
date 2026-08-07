@@ -41,6 +41,11 @@ export default function SellerActions({
 
   if (order.status === "preparing" && showCargoRef) {
     const cargoCode = order.shipment?.cargoCode ?? null;
+    const dropoffReference =
+      cargoCode ??
+      order.shipment?.trackingNumber ??
+      order.packageNumber ??
+      null;
     return (
       <SectionCard title={t("order.cargoReference")}>
         {/* Bu kod hangi koliye ait: aynı alıcının aynı sepetteki diğer ürünleri
@@ -51,26 +56,33 @@ export default function SellerActions({
             <span className="font-mono text-body">{order.packageNumber}</span>
           </p>
         )}
-        {cargoCode ? (
+        {dropoffReference ? (
           <>
             <p className="text-muted mb-4">
-              {t("order.cargoCodeInstructions")}
+              {cargoCode
+                ? t("order.cargoCodeInstructions")
+                : t("order.cargoRefInstructions")}
             </p>
             <div className="flex items-center gap-2">
               <code className="flex-1 font-mono text-lg bg-surface-alt px-4 py-3 rounded-lg border border-border text-center font-semibold tracking-wider">
-                {cargoCode}
+                {dropoffReference}
               </code>
               <Button
                 variant="secondary"
                 size="md"
                 onClick={() => {
-                  navigator.clipboard.writeText(cargoCode);
+                  navigator.clipboard.writeText(dropoffReference);
                   toast.success(t("order.cargoCodeCopied"));
                 }}
               >
                 {t("common.copy")}
               </Button>
             </div>
+            {!cargoCode && (
+              <p className="mt-3 text-sm text-muted">
+                {t("order.trackingAppearsAfterDropoff")}
+              </p>
+            )}
             {/* İnsani senaryolar A5/A6: tek koli-tek sipariş uyarısı + ücret bilgisi. */}
             <div className="mt-4 space-y-2">
               <Alert

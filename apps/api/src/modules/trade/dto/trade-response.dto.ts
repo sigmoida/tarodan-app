@@ -17,7 +17,7 @@ export class TradeShipmentResponseDto {
   shipperName: string;
   carrier: string;
   trackingNumber?: string;
-  /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
+  /** Real Sürat cargo code (KargoTakipNo), available after branch acceptance. */
   cargoCode?: string;
   status: ShipmentStatus;
   shippedAt?: Date;
@@ -32,7 +32,7 @@ export class TradeEscrowShipmentResponseDto {
   recipientUserId?: string;
   carrier?: string;
   trackingNumber?: string;
-  /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
+  /** Real Sürat cargo code (KargoTakipNo), available after branch acceptance. */
   cargoCode?: string;
   status?: ShipmentStatus;
   shippedAt?: Date;

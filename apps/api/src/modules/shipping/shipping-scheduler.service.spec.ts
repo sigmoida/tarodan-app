@@ -10,13 +10,13 @@ describe("ShippingSchedulerService", () => {
       }),
       syncAllActiveShipments: jest
         .fn()
-        .mockResolvedValue({ synced: 0, failed: 0 }),
+        .mockResolvedValue({ synced: 0, pending: 0, failed: 0 }),
       syncAllActiveTradeShipments: jest
         .fn()
-        .mockResolvedValue({ synced: 0, failed: 0 }),
+        .mockResolvedValue({ synced: 0, pending: 0, failed: 0 }),
       syncAllActiveRefundReturns: jest
         .fn()
-        .mockResolvedValue({ synced: 0, failed: 0 }),
+        .mockResolvedValue({ synced: 0, pending: 0, failed: 0 }),
       alertStaleCargo: jest.fn().mockResolvedValue(undefined),
     };
     return {
@@ -35,13 +35,42 @@ describe("ShippingSchedulerService", () => {
     );
   });
 
+  it("şube kabulü bekleyen kayıtları hata saymadan raporlar", async () => {
+    const { service, tracking } = makeService();
+    tracking.syncAllActiveShipments.mockResolvedValue({
+      synced: 0,
+      pending: 4,
+      failed: 0,
+    });
+    tracking.syncAllActiveTradeShipments.mockResolvedValue({
+      synced: 0,
+      pending: 2,
+      failed: 0,
+    });
+
+    await expect(service.runSyncSuratTracking()).resolves.toEqual(
+      expect.objectContaining({
+        summary: expect.stringContaining("6 kabul bekliyor"),
+        stats: expect.objectContaining({
+          shipmentPending: 4,
+          tradePending: 2,
+          failed: 0,
+        }),
+      }),
+    );
+  });
+
   it("kayıt bazlı başarısızlığı Bull retry için job hatasına çevirir", async () => {
     const { service, tracking } = makeService();
     tracking.retryPendingBarcodes.mockResolvedValue({
       order: { retried: 0, failed: 1 },
       trade: { retried: 0, failed: 0 },
     });
-    tracking.syncAllActiveShipments.mockResolvedValue({ synced: 2, failed: 1 });
+    tracking.syncAllActiveShipments.mockResolvedValue({
+      synced: 2,
+      pending: 0,
+      failed: 1,
+    });
 
     await expect(service.runSyncSuratTracking()).rejects.toBeInstanceOf(
       CronStepFailuresError,

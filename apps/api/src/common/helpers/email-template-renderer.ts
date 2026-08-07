@@ -1227,7 +1227,7 @@ export function renderEmailTemplate(
       `
       ${titleBlock("İade Talebi Aldınız", "🔄")}
       ${greeting(data?.sellerName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bir siparişiniz için alıcı iade talebinde bulundu. Lütfen talebi inceleyerek onaylayın veya itiraz edin.</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bir alıcı siparişiniz için iade talebi oluşturdu. Sürecin güncel durumunu satış detayından takip edebilirsiniz.</p>
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
@@ -1237,7 +1237,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       ${data?.refundReason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İade nedeni:</strong> ${data.refundReason}</p>`) : ""}
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Belirlenen süre içinde yanıt vermezseniz talep otomatik olarak işleme alınabilir.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Yönetici incelemesi gereken talepler Tarodan ekibi tarafından değerlendirilecek; sonuç ayrıca bildirilecektir.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("İade Talebini İncele", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
       </div>
