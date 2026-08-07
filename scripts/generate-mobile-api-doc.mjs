@@ -193,7 +193,7 @@ const workflows = [
       "İlanlarım, boost ve durum yönetimi",
     ],
     routes: [
-      "POST /media/upload",
+      "POST /media/upload/product",
       "GET /orders/commission-preview",
       "POST /products",
       "PATCH /products/:id",
@@ -239,7 +239,7 @@ const workflows = [
     owner: "Alıcı + satıcı",
     steps: [
       "Sipariş/grup detayını izleme",
-      "Satıcının hazırlama ve kargo başlatması",
+      "Mevcut shipment'ı okuma; yoksa satıcının kargo başlatması",
       "Sürat takip statülerini gösterme",
       "Teslim onayı, iptal veya yeniden aktifleştirme",
     ],
@@ -247,8 +247,8 @@ const workflows = [
       "GET /orders",
       "GET /orders/groups/:id",
       "POST /orders/:id/prepare",
-      "POST /shipping",
       "GET /shipping/order/:orderId",
+      "POST /shipping",
       "POST /orders/:id/confirm",
     ],
   },
@@ -1488,7 +1488,9 @@ function makeHtml(data) {
         <p class="lede">
           Bu belge API controller’larını ve web istemcisinin işlev yüzeyini tarar. Mobil uygulama ayrı bir
           repoda yönetilir; bu katalog mobil implementasyon durumunu ölçmez, uygulanması gereken sunucu
-          sözleşmesini tanımlar.
+          sözleşmesini tanımlar. Güncel istemci uyarlamaları için
+          <a href="./mobile-parity/18-api-delta-2026-08-07.md"><strong>18 — API Değişiklik Güncesi</strong></a>
+          ile birlikte okunmalıdır.
         </p>
       </div>
       <aside class="scope-note">
@@ -1575,9 +1577,10 @@ function makeHtml(data) {
           <ul>
             <li>Guest uçlarında auth interceptor içermeyen <code>guestApi</code> kullanılır.</li>
             <li><code>POST /orders/quote</code> isteği ürün adedi ve varsa kupon kodunu içerir.</li>
-            <li>Quote’taki <code>pricingHash</code> ve <code>shippingTariffVersion</code>, checkout isteğine değiştirilmeden geri gönderilir.</li>
+            <li>Quote’taki <code>pricingHash</code>, <code>shippingTariffVersion</code>, <code>commissionRuleSetId</code> ve <code>commissionRuleSetVersion</code> checkout isteğine değiştirilmeden geri gönderilir.</li>
+            <li><code>unavailableItems</code> ödeme kapsamından çıkarılır; kullanıcıya gerekçesi gösterilir ve sepet yeniden çekilir.</li>
             <li>Ekrandaki ara toplam, kargo, vergi ve nihai tutar quote <code>pricing</code> alanından gösterilir; istemci hesabı otorite değildir.</li>
-            <li><code>409 PRICING_CHANGED</code> sonrasında quote yenilenir ve kullanıcı güncel tutarı yeniden onaylar.</li>
+            <li><code>409 PRICING_CHANGED</code> veya <code>COMMISSION_PRICING_CHANGED</code> sonrasında quote yenilenir ve kullanıcı güncel tutarı yeniden onaylar.</li>
             <li>PayTR sonucu yalnız callback ile kesinleşir; mobil status endpointini poll eder.</li>
             <li>Ödeme başlatma yanıtındaki <code>paymentAccessToken</code> güvenli depoda tutulur ve public ödeme uçlarına <code>X-Payment-Capability</code> olarak eklenir.</li>
             <li>Mutation tekrarlarında checkout/idempotency anahtarı korunur.</li>
