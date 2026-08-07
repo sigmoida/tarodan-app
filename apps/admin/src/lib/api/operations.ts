@@ -126,6 +126,15 @@ export const operationsApi = {
   getShipments(params?: any) {
     return api.get("/admin/shipping/shipments", { params });
   },
+  getCarrierCancellationTasks(params?: any) {
+    return api.get("/admin/shipping/carrier-cancellations", { params });
+  },
+  resolveCarrierCancellationTask(
+    id: string,
+    body: { status: "resolved" | "dismissed"; resolution: string },
+  ) {
+    return api.patch(`/admin/shipping/carrier-cancellations/${id}`, body);
+  },
   // Syncs a Sürat shipment's tracking status instantly, without waiting for the 30-min cron.
   syncShipmentTracking(id: string) {
     return api.post(`/admin/shipping/shipments/${id}/sync-tracking`);
@@ -137,9 +146,5 @@ export const operationsApi = {
   // Test console: Sürat tracking query by reference (KargoTakipHareketDetayi).
   suratTestTrack(ref: string) {
     return api.post("/admin/shipping/surat/track", { ref });
-  },
-  // Test console: Sürat cancel/withdraw by reference (GonderiGeriCek).
-  suratTestCancel(ref: string) {
-    return api.post("/admin/shipping/surat/cancel", { ref });
   },
 };

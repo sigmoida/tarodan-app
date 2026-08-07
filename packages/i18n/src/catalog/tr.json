@@ -4796,7 +4796,7 @@
         "resolveFailed": "Çözüm işlemi başarısız",
         "resolutionNoteMinLen": "Çözüm notu en az 10 karakter olmalıdır",
         "forceCancelTitle": "Sıkışmış Takası Çöz",
-        "forceCancelBody": "Karşı tarafın kargosu Sürat'ta iptal edilecek. Ulaşan ürün (depoda) sahibine geri kargolanacak; nakit fark varsa ödeyen kişiye iade edilir.",
+        "forceCancelBody": "Karşı tarafın kargosu Tarodan'da iptal edilecek; Sürat kaydı gerekiyorsa panelden manuel iptal edilmelidir. Ulaşan ürün (depoda) sahibine geri kargolanacak; nakit fark varsa ödeyen kişiye iade edilir.",
         "cancelReasonLabel": "İptal Gerekçesi (en az 10 karakter)",
         "forceCancelPlaceholder": "Örn. Karşı tarafın kargosu 14 gündür sürat şubesinde sıkıştı, gelen ürünü sahibine iade ediyoruz",
         "sendBackLabel": "Ulaşan ürünü sahibine geri yolla (önerilen)",
@@ -5042,7 +5042,8 @@
           "orders": "Siparişler",
           "trades": "Takas",
           "returns": "İade",
-          "surat": "Sürat Takip"
+          "surat": "Sürat Takip",
+          "cancellations": "Taşıyıcı İptalleri"
         },
         "carrier": "Kargo",
         "direction": "Yön",
@@ -5116,10 +5117,14 @@
           "testConsoleTitle": "Sürat Endpoint Test Konsolu",
           "requestFailed": "İstek başarısız oldu",
           "enterRefFirst": "Önce bir referans gir (veya 'Gönderi Oluştur + Takip' ile üret)",
-          "testConsoleIntro": "Elimizdeki Sürat REST endpoint'lerini buradan test et. Sunucu → Sürat gerçek istek atar; DB'ye/siparişe dokunmaz.",
-          "createHint": "Yeni bir test gönderisi oluşturur, hemen takibini sorgular; referansı aşağı doldurur.",
+          "testConsoleIntro": "Resmi Sürat REST endpoint'lerini buradan test et. Sunucu yalnız GonderiyiKargoyaGonder ve KargoTakipHareketDetayi uçlarına gerçek istek atar; sipariş verisine dokunmaz ve başarılı oluşturma sonrasında manuel temizleme görevi kaydeder.",
+          "createHint": "Sürat'ta gerçek bir test gönderisi kaydı oluşturur, hemen takibini sorgular ve referansı aşağı doldurur. API üzerinden otomatik iptal edilmez.",
+          "testConfirmTitle": "Gerçek Sürat test gönderisi oluşturulsun mu?",
+          "testConfirmDescription": "Bu işlem Sürat'ta gerçek bir gönderi kaydı oluşturur. Uzak iptal endpoint'i bulunmadığı için sistem otomatik olarak manuel iptal görevi açacaktır.",
           "testing": "Test ediliyor…",
           "createAndTrack": "Gönderi Oluştur + Takip",
+          "cleanupTaskCreated": "Manuel temizleme görevi oluşturuldu: {id}",
+          "cleanupTaskFailed": "DİKKAT: Manuel temizleme görevi oluşturulamadı: {error}",
           "reference": "Referans",
           "step1": "1) Gönderi oluştur:",
           "ok": "✓ başarılı",
@@ -5128,8 +5133,28 @@
           "singleEndpointHint": "Bir referans (OzelKargoTakipNo) ile tekil endpoint testi:",
           "refPlaceholder": "Referans (OzelKargoTakipNo)",
           "trackQuery": "Takip Sorgula",
-          "cancelShipment": "Geri Çek (İptal)",
-          "footerNote": "Not: Barkod (OrtakBarkodOlustur) endpoint'i mevcut ama istek şeması Sürat'tan bekleniyor; geldiğinde eklenecek. Ayrıca test ortamında gönderiler fiziksel \"kabul\" aşamasına gelmediği için takip/iptal genelde \"kabul bekleniyor / Kayıt Bulunamadı\" döner (üretimde ilerler)."
+          "footerNote": "Gerçek KargoTakipNo, gönderi oluşturulduktan sonra KargoTakipHareketDetayi yanıtından alınır. Sürat kaydı henüz takipte görünmüyorsa 30 dakikalık worker yeniden sorgular. Uzak iptal resmi iki-endpoint sözleşmesinde yoktur; gerektiğinde Sürat paneli kullanılır."
+        },
+        "cancellations": {
+          "info": "Resmi entegrasyonda iptal endpoint'i bulunmadığı için bu görevler Sürat panelinden tamamlanır. İşlemi panelde doğruladıktan sonra sonuç notuyla kapatın.",
+          "empty": "Taşıyıcı iptal görevi bulunamadı",
+          "reference": "Sürat Referansı",
+          "source": "Kaynak Kayıt",
+          "reason": "Neden",
+          "requestedAt": "Talep Tarihi",
+          "resolvedAt": "Sonuç Tarihi",
+          "resolvedBy": "Sonuçlandıran",
+          "resolution": "Sonuç Notu",
+          "resolveTitle": "Taşıyıcı iptal görevini sonuçlandır",
+          "resolveDescription": "{reference} referansı için Sürat panelinde yaptığınız işlemi kaydedin.",
+          "markResolved": "İptal Edildi",
+          "dismiss": "Görevi Kapat",
+          "updateSuccess": "Taşıyıcı iptal görevi güncellendi",
+          "status": {
+            "pending": "Bekliyor",
+            "resolved": "Tamamlandı",
+            "dismissed": "Kapatıldı"
+          }
         }
       }
     },

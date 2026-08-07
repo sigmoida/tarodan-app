@@ -4796,7 +4796,7 @@
         "resolveFailed": "Resolution failed",
         "resolutionNoteMinLen": "Resolution note must be at least 10 characters",
         "forceCancelTitle": "Resolve Stuck Trade",
-        "forceCancelBody": "The other party's shipment will be cancelled at Sürat. The arrived product (in the warehouse) will be shipped back to its owner; any cash difference is refunded to the payer.",
+        "forceCancelBody": "The other party's shipment will be cancelled in Tarodan; cancel the Sürat record manually in its panel if required. The arrived product (in the warehouse) will be shipped back to its owner; any cash difference is refunded to the payer.",
         "cancelReasonLabel": "Cancellation Reason (at least 10 characters)",
         "forceCancelPlaceholder": "e.g. The other party's shipment has been stuck at the Sürat branch for 14 days; we're returning the arrived product to its owner",
         "sendBackLabel": "Send the arrived product back to its owner (recommended)",
@@ -5042,7 +5042,8 @@
           "orders": "Orders",
           "trades": "Trades",
           "returns": "Returns",
-          "surat": "Sürat Tracking"
+          "surat": "Sürat Tracking",
+          "cancellations": "Carrier Cancellations"
         },
         "carrier": "Carrier",
         "direction": "Direction",
@@ -5116,10 +5117,14 @@
           "testConsoleTitle": "Sürat Endpoint Test Console",
           "requestFailed": "Request failed",
           "enterRefFirst": "Enter a reference first (or generate one with 'Create Shipment + Track')",
-          "testConsoleIntro": "Test the Sürat REST endpoints we have here. The server sends a real request to Sürat; it doesn't touch the DB/orders.",
-          "createHint": "Creates a new test shipment, immediately queries its tracking, and fills the reference below.",
+          "testConsoleIntro": "Test the official Sürat REST endpoints here. The server sends real requests only to GonderiyiKargoyaGonder and KargoTakipHareketDetayi; it does not modify order data and records a manual cleanup task after a successful creation.",
+          "createHint": "Creates a real test-shipment record at Sürat, immediately queries tracking, and fills the reference below. It is not automatically cancelled through the API.",
+          "testConfirmTitle": "Create a real Sürat test shipment?",
+          "testConfirmDescription": "This creates a real shipment record at Sürat. Because the approved contract has no remote-cancel endpoint, the system will automatically open a manual cancellation task.",
           "testing": "Testing…",
           "createAndTrack": "Create Shipment + Track",
+          "cleanupTaskCreated": "Manual cleanup task created: {id}",
+          "cleanupTaskFailed": "WARNING: Manual cleanup task could not be created: {error}",
           "reference": "Reference",
           "step1": "1) Create shipment:",
           "ok": "✓ success",
@@ -5128,8 +5133,28 @@
           "singleEndpointHint": "Single endpoint test with a reference (OzelKargoTakipNo):",
           "refPlaceholder": "Reference (OzelKargoTakipNo)",
           "trackQuery": "Query Tracking",
-          "cancelShipment": "Withdraw (Cancel)",
-          "footerNote": "Note: The barcode (OrtakBarkodOlustur) endpoint exists but its request schema is pending from Sürat; it'll be added when it arrives. Also, in the test environment shipments don't reach the physical \"acceptance\" stage, so tracking/cancel usually returns \"awaiting acceptance / Record Not Found\" (it progresses in production)."
+          "footerNote": "The real KargoTakipNo is read from KargoTakipHareketDetayi after creation. If the Sürat record is not visible yet, the 30-minute worker queries it again. Remote cancellation is not part of the approved two-endpoint contract; use the Sürat panel when needed."
+        },
+        "cancellations": {
+          "info": "The approved integration has no cancellation endpoint, so these tasks are completed in the Sürat panel. Close each task with a result note after verifying the panel action.",
+          "empty": "No carrier cancellation tasks found",
+          "reference": "Sürat Reference",
+          "source": "Source Record",
+          "reason": "Reason",
+          "requestedAt": "Requested At",
+          "resolvedAt": "Resolved At",
+          "resolvedBy": "Resolved By",
+          "resolution": "Resolution Note",
+          "resolveTitle": "Resolve carrier cancellation task",
+          "resolveDescription": "Record the action completed in the Sürat panel for reference {reference}.",
+          "markResolved": "Cancellation Done",
+          "dismiss": "Dismiss Task",
+          "updateSuccess": "Carrier cancellation task updated",
+          "status": {
+            "pending": "Pending",
+            "resolved": "Resolved",
+            "dismissed": "Dismissed"
+          }
         }
       }
     },
