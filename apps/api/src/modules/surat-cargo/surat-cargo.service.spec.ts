@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { SuratCargoService, SURAT_CARRIER_CLIENT } from "./surat-cargo.service";
 import { CacheService } from "../cache/cache.service";
+import { SuratTrackingClient } from "./surat-tracking.client";
 import type {
   SuratBusinessFailure,
   SuratGonderiPayload,
@@ -38,21 +39,24 @@ const basePayload: SuratGonderiPayload = {
 describe("SuratCargoService", () => {
   let service: SuratCargoService;
   let soapCall: jest.Mock;
-  let barcodeCall: jest.Mock;
+  let trackingFetch: jest.Mock;
   let cacheGet: jest.Mock;
   let cacheSet: jest.Mock;
+  let cacheDel: jest.Mock;
+  let recordLocalCancel: jest.Mock;
   let configGet: jest.Mock;
 
   beforeEach(async () => {
     soapCall = jest.fn().mockResolvedValue("Tamam");
-    barcodeCall = jest.fn().mockResolvedValue({
-      isError: false,
-      message: "Tamam",
-      kargoTakipNo: "SURAT-123",
-      labelZpl: null,
+    trackingFetch = jest.fn().mockResolvedValue({
+      IsError: false,
+      errorMessage: null,
+      Gonderiler: [{ KargoTakipNo: "SURAT-123" }],
     });
     cacheGet = jest.fn().mockResolvedValue(null);
     cacheSet = jest.fn().mockResolvedValue(undefined);
+    cacheDel = jest.fn().mockResolvedValue(undefined);
+    recordLocalCancel = jest.fn();
     configGet = jest.fn((key: string, defaultValue?: string) => {
       if (key === "SURAT_CARGO_MAX_RETRIES") return "3";
       if (key === "SURAT_CARGO_RETRY_BASE_MS") return "1";
@@ -66,12 +70,19 @@ describe("SuratCargoService", () => {
         {
           provide: SURAT_CARRIER_CLIENT,
           useValue: {
-            supportsBarcode: () => true,
-            callGonderiyiKargoyaGonderYeni: soapCall,
-            callOrtakBarkodOlustur: barcodeCall,
+            callGonderiyiKargoyaGonder: soapCall,
+            getLocalTrackingCode: () => null,
+            recordLocalCancel,
           },
         },
-        { provide: CacheService, useValue: { get: cacheGet, set: cacheSet } },
+        {
+          provide: SuratTrackingClient,
+          useValue: { fetchTrackingInfo: trackingFetch },
+        },
+        {
+          provide: CacheService,
+          useValue: { get: cacheGet, set: cacheSet, del: cacheDel },
+        },
         { provide: ConfigService, useValue: { get: configGet } },
       ],
     }).compile();
@@ -105,7 +116,7 @@ describe("SuratCargoService", () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  it("EMPTY_RESPONSE for blank SOAP result", async () => {
+  it("returns EMPTY_RESPONSE for a blank create response", async () => {
     soapCall.mockResolvedValue("   ");
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "k3",
@@ -142,7 +153,7 @@ describe("SuratCargoService", () => {
     expect((r as SuratTechnicalFailure).code).toBe("TIMEOUT");
   });
 
-  it("returns cached success without calling SOAP again", async () => {
+  it("returns cached success without calling create again", async () => {
     cacheGet.mockResolvedValue({
       ok: true,
       suratMessage: "Tamam",
@@ -189,8 +200,74 @@ describe("SuratCargoService", () => {
     expect(soapCall).toHaveBeenCalledTimes(1);
   });
 
-  it("classifies an empty barcode response and retries it only once", async () => {
-    barcodeCall.mockResolvedValue(undefined);
+  it("treats the documented duplicate-shipment response as idempotent success", async () => {
+    soapCall.mockResolvedValue("Bu Siparişe Ait Gönderi Oluşmuştur");
+
+    const result = await service.submitShipmentWithRetry({
+      idempotencyKey: "duplicate",
+      correlationId: "duplicate",
+      payload: basePayload,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(soapCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates with the documented endpoint then resolves the code from tracking", async () => {
+    const result = await service.createShipmentWithBarcode({
+      idempotencyKey: "create-track",
+      correlationId: "create-track",
+      payload: basePayload,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(soapCall).toHaveBeenCalledTimes(1);
+    expect(trackingFetch).toHaveBeenCalledWith("ORD-1");
+    if (result.ok) {
+      expect(result.kargoTakipNo).toBe("SURAT-123");
+      expect(result.labelZpl).toBeNull();
+    }
+  });
+
+  it("maps the provider-neutral shipment port to the documented Surat payload", async () => {
+    const result = await service.createShipment({
+      idempotencyKey: "neutral-create",
+      correlationId: "neutral-create",
+      reference: "PKG-42",
+      recipient: {
+        name: "  Ayşe Kaya  ",
+        address: "Adres 1",
+        city: " İstanbul ",
+        district: " Kadıköy ",
+        phone: "+90 555 111 22 33",
+      },
+      content: "Ürün",
+      desi: 4,
+      isReturn: true,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      trackingCode: "SURAT-123",
+      labelData: null,
+      providerMessage: "Tamam",
+    });
+    expect(soapCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        OzelKargoTakipNo: "PKG-42",
+        KisiKurum: "Ayşe Kaya",
+        Il: "İstanbul",
+        Ilce: "Kadıköy",
+        TelefonCep: "05551112233",
+        BirimDesi: 4,
+        Iademi: true,
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("returns TRACKING_PENDING while the documented tracking record is not visible yet", async () => {
+    trackingFetch.mockResolvedValue(null);
 
     const result = await service.createShipmentWithBarcode({
       idempotencyKey: "barcode-empty",
@@ -199,8 +276,39 @@ describe("SuratCargoService", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect((result as SuratTechnicalFailure).code).toBe("EMPTY_RESPONSE");
-    expect(barcodeCall).toHaveBeenCalledTimes(2);
-    expect(cacheSet).not.toHaveBeenCalled();
+    expect((result as SuratTechnicalFailure).code).toBe("TRACKING_PENDING");
+    expect(soapCall).toHaveBeenCalledTimes(1);
+    expect(trackingFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels only local state and never calls a carrier cancel endpoint", async () => {
+    configGet.mockImplementation((key: string, defaultValue?: string) => {
+      if (key === "SURAT_CARGO_ENABLED") return "true";
+      return defaultValue;
+    });
+
+    await expect(service.cancelShipmentLocally("ORD-1")).resolves.toEqual({
+      ok: true,
+      suratMessage: "remote_cancel_unsupported_local_only",
+    });
+    expect(recordLocalCancel).toHaveBeenCalledWith("ORD-1");
+    expect(cacheDel).toHaveBeenCalledTimes(2);
+    expect(soapCall).not.toHaveBeenCalled();
+    expect(trackingFetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps local cancellation successful if cache cleanup fails", async () => {
+    configGet.mockImplementation((key: string, defaultValue?: string) => {
+      if (key === "SURAT_CARGO_ENABLED") return "true";
+      return defaultValue;
+    });
+    cacheDel.mockRejectedValue(new Error("redis unavailable"));
+
+    await expect(service.cancelShipmentLocally("ORD-2")).resolves.toEqual({
+      ok: true,
+      suratMessage: "remote_cancel_unsupported_local_only",
+    });
+    expect(recordLocalCancel).toHaveBeenCalledWith("ORD-2");
+    expect(soapCall).not.toHaveBeenCalled();
   });
 });

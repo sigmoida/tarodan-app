@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
   Optional,
   Logger,
 } from "@nestjs/common";
@@ -11,8 +12,10 @@ import { ApproveWarehouseTradeDto, RejectWarehouseTradeDto } from "./dto";
 import { PaymentStatus, TradeStatus, ShipmentStatus } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { EventService } from "../events/event.service";
-import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import {
+  CARGO_PROVIDER,
+  type CargoProvider,
+} from "../surat-cargo/cargo-provider";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
@@ -37,7 +40,8 @@ export class AdminTradeWarehouseService {
     private readonly eventService: EventService,
     private readonly common: AdminTradeCommonService,
     @Optional()
-    private readonly suratCargoService?: SuratCargoService,
+    @Inject(CARGO_PROVIDER)
+    private readonly cargo?: CargoProvider,
   ) {}
 
   /**
@@ -76,10 +80,7 @@ export class AdminTradeWarehouseService {
     providerTrackingId: string | null;
     labelZpl: string | null;
   }> {
-    if (
-      !this.suratCargoService ||
-      !this.suratCargoService.isIntegrationEnabled()
-    ) {
+    if (!this.cargo || !this.cargo.isEnabled()) {
       const fallbackTracking = generateReferenceCode(
         REFERENCE_PREFIX.shipmentFallback,
       );
@@ -90,29 +91,23 @@ export class AdminTradeWarehouseService {
         labelZpl: null,
       };
     }
-    const result = await this.suratCargoService.createShipmentWithBarcode({
+    const result = await this.cargo.createShipment({
       idempotencyKey: `surat:trade-return:${oid}`,
       correlationId: `trade-reject-${tradeId}`,
-      payload: buildStandardGonderiPayload({
-        recipientName: address.fullName || user?.displayName || "Takas İade",
+      reference: oid,
+      recipient: {
+        name: address.fullName || user?.displayName || "Takas İade",
         address: address.address,
         city: address.city,
         district: address.district,
         phone: address.phone,
-        ref: oid,
-        content: "Takas İade Gönderisi",
-        isReturn: true,
-        // KisiKurum fallback zinciri "Takas İade" (builder'ın "Alıcı"sı
-        // değil) ve trim yok → birebir korumak için override.
-        overrides: {
-          KisiKurum: address.fullName || user?.displayName || "Takas İade",
-        },
-      }),
+      },
+      content: "Takas İade Gönderisi",
+      isReturn: true,
     });
     if (!result.ok) {
       const r = result as any;
-      const errMsg =
-        r.kind === "business" ? r.suratMessage : `technical: ${r.code}`;
+      const errMsg = r.kind === "business" ? r.message : `technical: ${r.code}`;
       throw new BadRequestException(
         `Sürat iade kargo siparişi reddedildi: ${errMsg}`,
       );
@@ -120,8 +115,8 @@ export class AdminTradeWarehouseService {
     return {
       carrier: "surat",
       trackingNumber: oid,
-      providerTrackingId: result.kargoTakipNo,
-      labelZpl: result.labelZpl,
+      providerTrackingId: result.trackingCode,
+      labelZpl: result.labelData,
     };
   }
 
@@ -140,10 +135,7 @@ export class AdminTradeWarehouseService {
    * bilinçli — dokunulmaz. Throw etmez, boolean döner.
    */
   async retryReturnBarcode(tradeShipmentId: string): Promise<boolean> {
-    if (
-      !this.suratCargoService ||
-      !this.suratCargoService.isIntegrationEnabled()
-    ) {
+    if (!this.cargo || !this.cargo.isEnabled()) {
       return false;
     }
 
@@ -466,10 +458,7 @@ export class AdminTradeWarehouseService {
         providerTrackingId: string | null;
         labelZpl: string | null;
       }> => {
-        if (
-          !this.suratCargoService ||
-          !this.suratCargoService.isIntegrationEnabled()
-        ) {
+        if (!this.cargo || !this.cargo.isEnabled()) {
           return {
             carrier: "Tarodan Warehouse",
             trackingNumber: genTrackingNumber(),
@@ -478,32 +467,23 @@ export class AdminTradeWarehouseService {
           };
         }
         try {
-          const result = await this.suratCargoService.createShipmentWithBarcode(
-            {
-              idempotencyKey: `surat:trade:${oid}`,
-              correlationId: `trade-approve-${tradeId}`,
-              payload: buildStandardGonderiPayload({
-                recipientName:
-                  addr.fullName || user?.displayName || "Takas Alıcısı",
-                address: addr.address,
-                city: addr.city,
-                district: addr.district,
-                phone: addr.phone,
-                ref: oid,
-                content: "Takas Gönderisi",
-                // KisiKurum fallback zinciri "Takas Alıcısı" (builder'ın
-                // "Alıcı"sı değil) ve trim yok → birebir korumak için override.
-                overrides: {
-                  KisiKurum:
-                    addr.fullName || user?.displayName || "Takas Alıcısı",
-                },
-              }),
+          const result = await this.cargo.createShipment({
+            idempotencyKey: `surat:trade:${oid}`,
+            correlationId: `trade-approve-${tradeId}`,
+            reference: oid,
+            recipient: {
+              name: addr.fullName || user?.displayName || "Takas Alıcısı",
+              address: addr.address,
+              city: addr.city,
+              district: addr.district,
+              phone: addr.phone,
             },
-          );
+            content: "Takas Gönderisi",
+          });
           if (!result.ok) {
             const r = result as any;
             const errMsg =
-              r.kind === "business" ? r.suratMessage : `technical: ${r.code}`;
+              r.kind === "business" ? r.message : `technical: ${r.code}`;
             throw new BadRequestException(
               `Sürat kargo onay siparişi reddedildi: ${errMsg}`,
             );
@@ -511,8 +491,8 @@ export class AdminTradeWarehouseService {
           return {
             carrier: "surat",
             trackingNumber: oid,
-            providerTrackingId: result.kargoTakipNo,
-            labelZpl: result.labelZpl,
+            providerTrackingId: result.trackingCode,
+            labelZpl: result.labelData,
           };
         } catch (error: any) {
           this.logger.error(

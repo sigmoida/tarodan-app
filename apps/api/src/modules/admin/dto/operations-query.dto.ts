@@ -1,11 +1,18 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
-import { MessageStatus, ShipmentStatus, TradeStatus } from "@prisma/client";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  CarrierCancellationTaskStatus,
+  MessageStatus,
+  ShipmentStatus,
+  TradeStatus,
+} from "@prisma/client";
 import {
   IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
+  IsIn,
+  MaxLength,
   Max,
   Min,
 } from "class-validator";
@@ -99,6 +106,29 @@ export class AdminShipmentQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+}
+
+export class CarrierCancellationTaskQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({ enum: CarrierCancellationTaskStatus })
+  @IsOptional()
+  @IsEnum(CarrierCancellationTaskStatus)
+  status?: CarrierCancellationTaskStatus;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class ResolveCarrierCancellationTaskDto {
+  @ApiProperty({ enum: ["resolved", "dismissed"] })
+  @IsIn(["resolved", "dismissed"])
+  status!: "resolved" | "dismissed";
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(1000)
+  resolution!: string;
 }
 
 export class AdminRefundHistoryQueryDto extends AdminListQueryDto {

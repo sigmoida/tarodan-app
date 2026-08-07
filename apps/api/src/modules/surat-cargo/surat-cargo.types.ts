@@ -1,6 +1,6 @@
 /**
- * Sürat Kargo SOAP (GonderiyiKargoyaGonderYeni) — result & payload types.
- * Based on official Sürat Kargo API documentation (2024).
+ * Sürat Kargo GonderiyiKargoyaGonder + KargoTakipHareketDetayi sonuç ve
+ * payload tipleri. Resmi Sürat Kargo API dokümanlarına dayanır.
  */
 
 // ─── Technical error classification ───────────────────────────────────────────
@@ -11,6 +11,7 @@ export type SuratTechnicalCode =
   | "HTTP_5XX"
   | "PARSE_ERROR"
   | "EMPTY_RESPONSE"
+  | "TRACKING_PENDING"
   | "SOAP_FAULT"
   | "UNKNOWN";
 
@@ -46,25 +47,15 @@ export type SuratShipmentResult =
 
 export type SuratShipmentFailure = SuratTechnicalFailure | SuratBusinessFailure;
 
-// ─── Barcode create result (OrtakBarkodOlustur) ───────────────────────────────
-// Unlike the plain create ("Tamam", no code), OrtakBarkodOlustur creates the
-// shipment AND returns the real Sürat KargoTakipNo + a ZPL label immediately.
-
-/** Raw client-layer response from OrtakBarkodOlustur. */
-export interface SuratBarcodeRaw {
-  isError: boolean;
-  message: string;
-  /** Real Sürat cargo code (KargoTakipNo). */
-  kargoTakipNo: string | null;
-  /** First parcel's ZPL label content (full, not truncated). */
-  labelZpl: string | null;
-}
+// ─── Create + tracking result ─────────────────────────────────────────────────
+// Gönderi resmi create ucuyla oluşturulur; gerçek KargoTakipNo resmi takip
+// ucundan okunur. Bu iki endpoint ZPL döndürmediği için labelZpl null kalır.
 
 export type SuratBarcodeSuccess = {
   ok: true;
   /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
   kargoTakipNo: string;
-  /** ZPL label (stored for future printing; not surfaced today). */
+  /** Resmi create+tracking sözleşmesinde ZPL dönmez; daima null. */
   labelZpl: string | null;
   suratMessage: string;
   correlationId: string;
@@ -74,7 +65,7 @@ export type SuratBarcodeSuccess = {
 export type SuratBarcodeResult =
   SuratBarcodeSuccess | SuratTechnicalFailure | SuratBusinessFailure;
 
-// ─── Gonderi (Shipment) payload — matches WSDL Gonderi class ──────────────────
+// ─── Gonderi (Shipment) payload — resmi REST Gonderi modeli ───────────────────
 
 /** KargoTuru: 1=Dosya, 2=Mi, 3=Koli (WSDL: int) */
 export enum SuratKargoTuru {
@@ -116,7 +107,7 @@ export enum SuratKapidanOdemeTahsilatTipi {
 }
 
 /**
- * Full Gonderi payload matching the Sürat Kargo WSDL spec.
+ * Full Gonderi payload matching the documented Sürat Kargo REST model.
  * Fields marked optional are "Zorunlu Değil" per the documentation.
  */
 export interface SuratGonderiPayload {
@@ -153,12 +144,12 @@ export interface SuratGonderiPayload {
   OzelKargoTakipNo: string;
   /** Kargo adedi (WSDL: int) */
   Adet: number;
-  /** Bir parçanın desi bilgisi (WSDL: string) */
+  /** Bir parçanın desi bilgisi (REST isteğinde string gönderilir) */
   BirimDesi: number;
-  /** Bir parçanın kg bilgisi (WSDL: string) */
+  /** Bir parçanın kg bilgisi (REST isteğinde string gönderilir) */
   BirimKg: number;
-  /** Kapıdan ödeme tahsilat tipi (WSDL: int, ZORUNLU) */
-  KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi;
+  /** Kapıdan ödeme tahsilat tipi; peşin gönderide 0. */
+  KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi | 0;
   /** Taşıma şekli (WSDL: int) */
   TasimaSekli: SuratTasimaSekli;
   /** Teslim şekli (WSDL: int) */

@@ -36,6 +36,8 @@ import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { CARGO_PROVIDER } from "../surat-cargo/cargo-provider";
+import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
+import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
 import { I18nService } from "../i18n";
@@ -185,6 +187,8 @@ describe("PaymentService trade cash refund idempotency", () => {
         { provide: NotificationService, useValue: noop },
         { provide: SuratCargoService, useValue: noop },
         { provide: CARGO_PROVIDER, useValue: noop },
+        { provide: OrderShipmentProvisioner, useValue: noop },
+        { provide: CarrierCancellationService, useValue: noop },
         { provide: CommissionLedgerService, useValue: noop },
         { provide: StorageService, useValue: noop },
         { provide: OutboxService, useValue: mockOutbox },

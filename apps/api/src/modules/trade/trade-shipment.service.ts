@@ -1,24 +1,33 @@
 import {
   Injectable,
   BadRequestException,
+  Inject,
   Optional,
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { ShipmentStatus } from "@prisma/client";
-import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
-import { SuratGonderiPayload } from "../surat-cargo/surat-cargo.types";
+import {
+  CARGO_PROVIDER,
+  type CargoProvider,
+  type CargoShipmentRequest,
+} from "../surat-cargo/cargo-provider";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
+import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
+
+type CargoShipmentDetails = Omit<
+  CargoShipmentRequest,
+  "idempotencyKey" | "correlationId"
+>;
 
 /**
  * Takas Sürat Kargo orkestrasyonu — TradeService'ten birebir taşındı
  * (facade-delege deseni; order split'teki alt-servis düzeniyle aynı).
  * Inbound (kullanıcı → depo) etiket/sevkiyat oluşturma, takas iptalinde
- * Sürat gönderilerini iptal etme ve teslimat adresi çözümü burada yaşar.
+ * Sürat gönderilerini yerelde iptal etme ve teslimat adresi çözümü burada yaşar.
  */
 @Injectable()
 export class TradeShipmentService {
@@ -29,19 +38,19 @@ export class TradeShipmentService {
     private readonly cache: CacheService,
     private readonly notificationService: NotificationService,
     @Optional()
-    private readonly suratCargoService?: SuratCargoService,
+    @Inject(CARGO_PROVIDER)
+    private readonly cargo?: CargoProvider,
+    @Optional()
+    private readonly carrierCancellations?: CarrierCancellationService,
   ) {}
 
   /**
-   * Cancel any Sürat shipments associated with a trade (best-effort).
+   * Cancel any Sürat shipments associated with a trade locally (best-effort).
    * Used when a trade is cancelled after admin warehouse approval (i.e. there
    * are from_warehouse shipments already submitted to Sürat).
    */
   async cancelSuratShipmentsForTrade(tradeId: string): Promise<void> {
-    if (
-      !this.suratCargoService ||
-      !this.suratCargoService.isIntegrationEnabled()
-    ) {
+    if (!this.cargo || !this.cargo.isEnabled() || !this.carrierCancellations) {
       return;
     }
     try {
@@ -50,7 +59,7 @@ export class TradeShipmentService {
           tradeId,
           carrier: "surat",
           status: {
-            notIn: ["delivered", "returned", "cancelled", "failed"] as any,
+            notIn: ["delivered", "returned", "cancelled"] as any,
           },
           trackingNumber: { not: null },
         },
@@ -58,15 +67,27 @@ export class TradeShipmentService {
       for (const shipment of shipments) {
         if (!shipment.trackingNumber) continue;
         try {
-          await this.suratCargoService.cancelShipmentByOrderNumber(
-            shipment.trackingNumber,
-          );
-          await this.prisma.tradeShipment.update({
-            where: { id: shipment.id },
-            data: { status: "cancelled" as any },
+          const task = await this.carrierCancellations.request({
+            provider: "surat",
+            reference: shipment.trackingNumber,
+            entityType: "trade_shipment",
+            entityId: shipment.id,
+            reason: "trade_cancelled",
+            metadata: {
+              tradeId,
+              leg: shipment.leg,
+              previousStatus: shipment.status,
+            },
+            updateLocal: async (tx) => {
+              await tx.tradeShipment.update({
+                where: { id: shipment.id },
+                data: { status: "cancelled" as any },
+              });
+            },
           });
           this.logger.log(
-            `Surat trade shipment cancelled: ${shipment.trackingNumber}`,
+            `Surat trade shipment locally cancelled: ${shipment.trackingNumber}; ` +
+              `carrier cancellation task=${task.id}`,
           );
         } catch (err: any) {
           this.logger.error(
@@ -233,7 +254,7 @@ export class TradeShipmentService {
       const dispatched: Array<{
         shipmentId: string;
         ozelKargoTakipNo: string;
-        payload: SuratGonderiPayload | null;
+        payload: CargoShipmentDetails | null;
       }> = [];
 
       await this.prisma.$transaction(async (tx) => {
@@ -339,12 +360,9 @@ export class TradeShipmentService {
         }
       }
 
-      // Now, OUTSIDE the tx, fire the Sürat SOAP calls. Each is wrapped in
+      // Now, OUTSIDE the tx, run the documented Sürat create+tracking flow. Each is wrapped in
       // try/catch so one failure doesn't block the other side.
-      if (
-        !this.suratCargoService ||
-        !this.suratCargoService.isIntegrationEnabled()
-      ) {
+      if (!this.cargo || !this.cargo.isEnabled()) {
         this.logger.log(
           `Sürat integration disabled; ${dispatched.length} inbound shipments for trade ${tradeId} left at label_created without remote dispatch`,
         );
@@ -354,21 +372,19 @@ export class TradeShipmentService {
       for (const item of dispatched) {
         if (!item.payload) continue;
         try {
-          const result = await this.suratCargoService.createShipmentWithBarcode(
-            {
-              idempotencyKey: `surat:trade-inbound:${item.ozelKargoTakipNo}`,
-              correlationId: `trade-inbound-${tradeId}`,
-              payload: item.payload,
-            },
-          );
+          const result = await this.cargo.createShipment({
+            idempotencyKey: `surat:trade-inbound:${item.ozelKargoTakipNo}`,
+            correlationId: `trade-inbound-${tradeId}`,
+            ...item.payload,
+          });
           if (result.ok) {
             // Persist the REAL Sürat cargo code + label (KargoTakipNo).
             await this.prisma.tradeShipment
               .update({
                 where: { id: item.shipmentId },
                 data: {
-                  providerTrackingId: result.kargoTakipNo,
-                  labelZpl: result.labelZpl,
+                  providerTrackingId: result.trackingCode,
+                  labelZpl: result.labelData,
                 },
               })
               .catch((e) =>
@@ -380,7 +396,7 @@ export class TradeShipmentService {
           if (!result.ok) {
             const r = result as any;
             const errMsg =
-              r.kind === "business" ? r.suratMessage : `technical:${r.code}`;
+              r.kind === "business" ? r.message : `technical:${r.code}`;
             this.logger.warn(
               `Sürat inbound submit non-ok for trade ${tradeId} oid=${item.ozelKargoTakipNo}: ${errMsg}; leaving shipment at label_created for admin review`,
             );
@@ -420,7 +436,7 @@ export class TradeShipmentService {
   }
 
   /**
-   * Build the Sürat SOAP payload for an inbound (user → Tarodan warehouse) leg.
+   * Build the Sürat REST payload for an inbound (user → Tarodan warehouse) leg.
    * Mirrors `admin.service.ts#approveWarehouseTrade` payload (lines 4514-4533),
    * but the recipient is the Tarodan warehouse — Sürat uses the recipient
    * fields, so the user's address fills the sender side at the branch they
@@ -442,7 +458,7 @@ export class TradeShipmentService {
     } | null,
     ozelKargoTakipNo: string,
     tradeNumber: string,
-  ): SuratGonderiPayload | null {
+  ): CargoShipmentDetails | null {
     if (!fromAddress) return null;
 
     // Sürat payload fields below describe the destination (alıcı). For inbound
@@ -469,27 +485,29 @@ export class TradeShipmentService {
 
     // warehouseName zaten `?.trim() || "Tarodan Depo"` → daima boş olmayan trimli
     // değer; builder'ın `KisiKurum.trim() || "Alıcı"` mantığı burada no-op olur.
-    return buildStandardGonderiPayload({
-      recipientName: warehouseName,
-      address: warehouseAddress,
-      city: warehouseCity,
-      district: warehouseDistrict,
-      phone: warehousePhone,
-      ref: ozelKargoTakipNo,
+    return {
+      reference: ozelKargoTakipNo,
+      recipient: {
+        name: warehouseName,
+        address: warehouseAddress,
+        city: warehouseCity,
+        district: warehouseDistrict,
+        phone: warehousePhone,
+      },
       content: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
-    });
+    };
   }
 
   /**
    * Kargo kodu retry job: kodsuz (providerTrackingId NULL) kalmış tek bir
-   * depoya-giriş (to_warehouse) takas gönderisi için OrtakBarkodOlustur'u yeniden
+   * depoya-giriş (to_warehouse) takas gönderisi için resmi create+tracking akışını
    * dener. İlk oluşturmadaki payload builder'ı + idempotency anahtarını AYNEN
    * kullanır → Sürat'ta mükerrer gönderi oluşmaz. Başarılıysa kodu+etiketi yazar
    * ve gönderiyi (pending'e düşmüşse) label_created'a çeker. SuratTrackingService
    * orchestrator'ı çağırır; hiçbir zaman throw etmez, boolean döner.
    */
   async retryInboundBarcode(tradeShipmentId: string): Promise<boolean> {
-    if (!this.suratCargoService?.isIntegrationEnabled()) return false;
+    if (!this.cargo?.isEnabled()) return false;
 
     const ship = await this.prisma.tradeShipment.findUnique({
       where: { id: tradeShipmentId },
@@ -525,28 +543,28 @@ export class TradeShipmentService {
     if (!payload) return false;
 
     try {
-      const result = await this.suratCargoService.createShipmentWithBarcode({
+      const result = await this.cargo.createShipment({
         idempotencyKey: `surat:trade-inbound:${ship.trackingNumber}`,
         correlationId: `trade-inbound-retry-${ship.tradeId}`,
-        payload,
+        ...payload,
       });
       if (!result.ok) {
         const r = result as any;
         this.logger.warn(
-          `Retry inbound barcode non-ok trade-shipment=${tradeShipmentId} oid=${ship.trackingNumber}: ${r.kind === "business" ? r.suratMessage : `technical:${r.code}`}`,
+          `Retry inbound barcode non-ok trade-shipment=${tradeShipmentId} oid=${ship.trackingNumber}: ${r.kind === "business" ? r.message : `technical:${r.code}`}`,
         );
         return false;
       }
       await this.prisma.tradeShipment.update({
         where: { id: tradeShipmentId },
         data: {
-          providerTrackingId: result.kargoTakipNo,
-          labelZpl: result.labelZpl,
+          providerTrackingId: result.trackingCode,
+          labelZpl: result.labelData,
           status: ShipmentStatus.label_created,
         },
       });
       this.logger.log(
-        `Retry OK: trade inbound barcode filled ${tradeShipmentId} oid=${ship.trackingNumber} code=${result.kargoTakipNo}`,
+        `Retry OK: trade inbound barcode filled ${tradeShipmentId} oid=${ship.trackingNumber} code=${result.trackingCode}`,
       );
       // A2/C24: kod gecikmeli oluştu — gönderen "hazırlanıyor" görüp bekliyordu;
       // artık şubeye gidebilir, haber ver.

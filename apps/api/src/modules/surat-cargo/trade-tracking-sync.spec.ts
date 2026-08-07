@@ -18,8 +18,10 @@ describe("TradeTrackingSyncService", () => {
         ShipmentStatus.delivered,
         ShipmentStatus.returned,
         ShipmentStatus.cancelled,
-        ShipmentStatus.failed,
       ]);
+      // `failed` terminal değildir: geçici takip hatasından sonra worker tekrar
+      // sorgulayıp taşıyıcının gerçek durumuyla kaydı iyileştirebilmelidir.
+      expect(where.status.notIn).not.toContain(ShipmentStatus.failed);
       // Eski beyaz-liste artık yok — at_delivery_branch/out_for_delivery pollanır.
       expect(where.status.in).toBeUndefined();
     });

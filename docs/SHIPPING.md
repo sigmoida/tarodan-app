@@ -9,11 +9,11 @@
 
 ## 1. Üç kimlik — yeni gelenlerin en çok karıştırdığı şey
 
-| Kimlik                        | Biçim                | Ne                                                                                                                                                                                                                                                 |
-| ----------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Order.orderNumber`           | `ORD-…`              | Satır sipariş                                                                                                                                                                                                                                      |
-| `OrderPackage.packageNumber`  | `PKG-…`              | **Bir fiziksel koli.** Sürat'a `OzelKargoTakipNo` olarak gönderilir ve `Shipment.trackingNumber`'a yazılır. Takip sorgusunun ve iptalin anahtarıdır. Türetilmez, saklanan kolondur (türetilen referans geçmişte kaymış ve mükerrer koli üretmişti) |
-| `Shipment.providerTrackingId` | Sürat `KargoTakipNo` | Sürat'ın kendi numarası; UI'da gösterilen budur. `Shipment.labelZpl` ham etiketi tutar                                                                                                                                                             |
+| Kimlik                        | Biçim                | Ne                                                                                                                                                                                                                                      |
+| ----------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Order.orderNumber`           | `ORD-…`              | Satır sipariş                                                                                                                                                                                                                           |
+| `OrderPackage.packageNumber`  | `PKG-…`              | **Bir fiziksel koli.** Sürat'a `OzelKargoTakipNo` olarak gönderilir ve `Shipment.trackingNumber`'a yazılır. Takip sorgusunun anahtarıdır. Türetilmez, saklanan kolondur (türetilen referans geçmişte kaymış ve mükerrer koli üretmişti) |
+| `Shipment.providerTrackingId` | Sürat `KargoTakipNo` | Sürat'ın kendi numarası; UI'da gösterilen budur. Resmi iki endpoint ZPL döndürmediğinden legacy `Shipment.labelZpl` alanı boş kalır                                                                                                     |
 
 Kullanıcıya dönük ad: `packageNumber` = **"Teslimat No"**.
 
@@ -21,25 +21,32 @@ Kullanıcıya dönük ad: `packageNumber` = **"Teslimat No"**.
 
 ## 2. Sürat entegrasyonu
 
-`modules/surat-cargo/`. Ana şalter `SURAT_CARGO_ENABLED`; taşıma `SURAT_SOAP_MODE`
-ile REST (`surat-rest.client.ts`) veya SOAP (`surat-soap.client.ts`) —
-ikisi de `SuratCarrierClient` arkasında.
+`modules/surat-cargo/`. Ana şalter `SURAT_CARGO_ENABLED`; geriye dönük adı
+korunan `SURAT_SOAP_MODE` production'da yalnız `rest` olabilir. Dış Sürat
+trafiği iki resmi endpoint'le sınırlıdır.
 
-- **Barkod anında oluşur, poll edilmez:** `createShipmentWithBarcode()` →
-  **`OrtakBarkodOlustur`**, aynı yanıtta gerçek `KargoTakipNo` + ZPL etiket
-  döner. Bu uç **yalnız REST'tedir** (SOAP `supportsBarcode() === false`).
-  Eski `submitShipmentWithRetry()` (`GonderiyiKargoyaGonderYeni`) yalnız admin
-  yolunda kullanılır.
+- **Gönderi oluşturma:** `createShipmentWithBarcode()` önce resmi
+  `GonderiyiKargoyaGonder` endpoint'ine idempotent create gönderir.
+- **Gerçek kargo kodu:** aynı `OzelKargoTakipNo`, resmi
+  `KargoTakipHareketDetayi` endpoint'ine `WebSiparisKodu` olarak verilir;
+  yanıttaki `KargoTakipNo`, `providerTrackingId` alanına yazılır. Takip kaydı
+  henüz görünmüyorsa shipment `pending`+kodsuz kalır ve retry worker tamamlar.
+  Bu sözleşme ZPL döndürmediği için `labelZpl` null kalır.
 - **Retry + idempotency:** `withSuratTechnicalRetries` (3 deneme, 200 ms taban,
-  15 sn timeout); başarı Redis'te `OzelKargoTakipNo` anahtarıyla 7 gün cache'lenir
-  — replay aynı kodu döndürür, iptal cache'i geçersiz kılar.
+  15 sn timeout); create başarısı Redis'te `OzelKargoTakipNo` anahtarıyla 7 gün
+  cache'lenir. Takip kodu görünür olduğunda ayrıca cache'lenir; yerel iptal bu
+  cache'leri geçersiz kılar.
 - **Ortak fulfilment yolu:** `PaymentCommonService.ensureSuratShipmentForOrder`
   — `Shipment` satırını yaratır, yeniden ödenen siparişte `cancelled` satırı
   "diriltir" (orderId unique), yoksa no-op. **Non-blocking**: barkod çağrısı
   patlarsa satır `pending` + `providerTrackingId = null` kalır, retry cron'u
-  doldurur. Koli toplaması burada yapılır (Σ`billableDesi`, Σadet, başlıklar).
+  doldurur. Koli toplaması burada yapılır (Σ`billableDesi`, tek fiziksel koli,
+  birleştirilmiş ürün başlıkları).
+- **İptal:** verilen resmi dokümanlarda uzaktan iptal endpoint'i yoktur. Uygulama
+  yalnız yerel shipment durumunu iptal eder ve cache'i temizler; fiziksel Sürat
+  kaydı gerektiğinde operasyon ekibi tarafından Sürat panelinden iptal edilir.
 - **Satıcı şubeye koli koduyla gider** — gönderi ödeme anında Sürat'ta
-  kayıtlıdır; ZPL/`PKG-…` referansı koliyi tanımlar.
+  kayıtlıdır; `PKG-…` referansı koliyi tanımlar.
 - **Poll, webhook değil:** `sync-surat-tracking` cron'u **30 dk'da bir** önce
   eksik barkodları dener (`barcode-retry.service.ts`), sonra durumları senkronlar.
   `surat-tracking.service.ts` artık ince bir facade'dır; davranış

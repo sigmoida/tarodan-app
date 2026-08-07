@@ -46,7 +46,10 @@ const HEADERS = [
   "indirimli_fiyat",
 ];
 
-async function workbookFile(salePrice?: number): Promise<Express.Multer.File> {
+async function workbookFile(
+  salePrice?: number,
+  optionalModel: { carModel?: string | null; modelCode?: string | null } = {},
+): Promise<Express.Multer.File> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Urunler");
   sheet.addRow(HEADERS);
@@ -56,9 +59,11 @@ async function workbookFile(salePrice?: number): Promise<Express.Multer.File> {
     "Koleksiyon için uygun, kutulu ve ayrıntılı model araba ürünüdür.",
     "Araba",
     "Dodge",
-    "Challenger R/T",
+    optionalModel.carModel === undefined
+      ? "Challenger R/T"
+      : optionalModel.carModel,
     "Hot Wheels",
-    "HW-001",
+    optionalModel.modelCode === undefined ? "HW-001" : optionalModel.modelCode,
     "new",
     "Mor",
     "1:64",
@@ -337,6 +342,27 @@ describe("AdminProductBulkImportService", () => {
         }),
       }),
     });
+  });
+
+  it("accepts bulk-import rows without car model and model code", async () => {
+    const { service, tx } = setup();
+
+    await service.import(
+      "admin-1",
+      IDS.seller,
+      IDS.batch,
+      await workbookFile(undefined, { carModel: null, modelCode: null }),
+      images,
+    );
+
+    expect(tx.product.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          carModelId: undefined,
+          modelCode: undefined,
+        }),
+      }),
+    );
   });
 
   it("rejects an invalid discount before uploading images", async () => {

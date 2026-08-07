@@ -11,13 +11,15 @@ import {
   ArrowsRightLeftIcon,
   ArrowUturnLeftIcon,
   MapPinIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { OrderShipmentsTab } from "./_components/OrderShipmentsTab";
 import { TradeShipmentsTab } from "./_components/TradeShipmentsTab";
 import { ReturnShipmentsTab } from "./_components/ReturnShipmentsTab";
 import { SuratTrackingTab } from "./_components/SuratTrackingTab";
+import { CarrierCancellationsTab } from "./_components/CarrierCancellationsTab";
 
-type TabKey = "siparisler" | "takas" | "iade" | "surat";
+type TabKey = "siparisler" | "takas" | "iade" | "surat" | "iptaller";
 
 const TAB_DEFS = [
   {
@@ -39,6 +41,11 @@ const TAB_DEFS = [
     key: "surat",
     labelKey: "admin.operations.shipping.tabs.surat",
     icon: MapPinIcon,
+  },
+  {
+    key: "iptaller",
+    labelKey: "admin.operations.shipping.tabs.cancellations",
+    icon: ExclamationTriangleIcon,
   },
 ] as const;
 
@@ -83,6 +90,7 @@ export default function ShippingPage() {
       {activeTab === "takas" && <TradeShipmentsTab />}
       {activeTab === "iade" && <ReturnShipmentsTab />}
       {activeTab === "surat" && <SuratTrackingTab />}
+      {activeTab === "iptaller" && <CarrierCancellationsTab />}
     </AdminPage>
   );
 }

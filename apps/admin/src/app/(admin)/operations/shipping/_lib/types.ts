@@ -107,3 +107,23 @@ export interface SuratShipmentRow {
    * paket başına TEK satır; kardeşler etikette gösterilir. */
   siblingOrderNumbers?: string[];
 }
+
+export interface CarrierCancellationTaskRow {
+  id: string;
+  provider: string;
+  reference: string;
+  entityType: string;
+  entityId: string;
+  reason: string;
+  status: "pending" | "resolved" | "dismissed";
+  metadata: Record<string, unknown> | null;
+  requestedAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  resolvedByAdmin: {
+    id: string;
+    displayName: string;
+    email: string;
+  } | null;
+  resolution: string | null;
+}

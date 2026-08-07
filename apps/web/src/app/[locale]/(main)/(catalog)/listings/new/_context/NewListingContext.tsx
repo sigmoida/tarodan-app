@@ -207,7 +207,7 @@ function useNewListingValue() {
         condition: values.condition,
         brandId: values.brandId || undefined,
         carModelId: values.carModelId || undefined,
-        modelCode: values.modelCode,
+        modelCode: values.modelCode.trim() || undefined,
         color: values.color,
         scale: values.scale || undefined,
         material: values.material || undefined,

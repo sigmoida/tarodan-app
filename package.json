@@ -9,7 +9,7 @@
     "build": "turbo run build",
     "dev": "pnpm dev:local",
     "dev:restart": "lsof -ti:3000 -ti:3001 -ti:3002 2>/dev/null | xargs kill -9 2>/dev/null; sleep 2; pnpm dev",
-    "dev:env": "[ -f apps/api/.env ] || cp apps/api/.env.example apps/api/.env; [ -f apps/web/.env.local ] || cp apps/web/env.example.txt apps/web/.env.local; [ -f apps/admin/.env.local ] || cp apps/admin/env.example.txt apps/admin/.env.local",
+    "dev:env": "[ -f apps/api/.env ] || cp apps/api/.env.example apps/api/.env; [ -f apps/web/.env.local ] || cp apps/web/.env.example apps/web/.env.local; [ -f apps/admin/.env.local ] || cp apps/admin/.env.example apps/admin/.env.local",
     "dev:up": "docker compose up -d --remove-orphans && docker compose up -d --wait postgres redis",
     "dev:tools": "docker compose --profile tools up -d kibana",
     "dev:types": "[ -f packages/types/dist/index.js ] || pnpm --filter @tarodan/types run build",

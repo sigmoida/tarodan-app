@@ -1,5 +1,7 @@
 import { PaymentCommonService } from "./payment-common.service";
 import { OrderStatus } from "@prisma/client";
+import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
+import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 
 /**
  * Faz 2 (a): Satıcı paketi başına TEK Sürat gönderisi. Paketin order'ları tek barkodu/
@@ -25,8 +27,15 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
       barcodeCall: undefined,
       shipmentCreate: undefined,
       shipmentUpdate: undefined,
+      shipmentReviveUpdate: undefined,
       cancelRef: undefined,
       cancelCalled: false,
+    };
+    const packageState = {
+      billableDesi: 3,
+      packageNumber: "PKG-COLI0001",
+      carrierReference: "PKG-COLI0001",
+      ...(over.orderPackage ?? {}),
     };
     const prisma = {
       order: {
@@ -40,12 +49,16 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
       orderPackage: {
         // Paketin Sürat referansı ARTIK saklanan koli numarasıdır (türetilmiş
         // min-orderNumber değil) → mock hem billableDesi hem packageNumber verir.
-        findUnique: jest.fn().mockResolvedValue(
-          over.orderPackage ?? {
-            billableDesi: 3,
-            packageNumber: "PKG-COLI0001",
-          },
-        ),
+        findUnique: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ ...packageState })),
+        updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
+          if (where.carrierReference !== packageState.carrierReference) {
+            return Promise.resolve({ count: 0 });
+          }
+          Object.assign(packageState, data);
+          return Promise.resolve({ count: 1 });
+        }),
       },
       shipment: {
         findFirst: jest.fn().mockResolvedValue(over.existingShipment ?? null),
@@ -57,36 +70,45 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
           captured.shipmentUpdate = arg.data;
           return Promise.resolve({});
         }),
+        updateMany: jest.fn().mockImplementation((arg: any) => {
+          captured.shipmentReviveUpdate = arg.data;
+          captured.shipmentUpdate = arg.data;
+          return Promise.resolve({ count: 1 });
+        }),
+      },
+      carrierCancellationTask: {
+        upsert: jest.fn().mockResolvedValue({ id: "cancel-task-1" }),
       },
     } as any;
+    prisma.$transaction = jest.fn((fn: any) => fn(prisma));
     // order.findMany `where.packageId` ile paket-booking ve cancel sibling'leri
     // için kullanılır → mock packageOrders döndürür; cancel testleri sibling'leri
     // packageOrders olarak (id+status) verir. Sürat referansı ise artık
     // orderPackage.packageNumber'dan okunur.
     const cargo = {
-      isIntegrationEnabled: () => true,
-      createShipmentWithBarcode: jest.fn().mockImplementation((arg: any) => {
+      isEnabled: () => true,
+      createShipment: jest.fn().mockImplementation((arg: any) => {
         captured.barcodeCall = arg;
         return Promise.resolve({
           ok: true,
-          kargoTakipNo: "SURAT-123",
-          labelZpl: "ZPL",
+          trackingCode: "SURAT-123",
+          labelData: "ZPL",
         });
       }),
-      cancelShipmentByOrderNumber: jest
-        .fn()
-        .mockImplementation((ref: string) => {
-          captured.cancelCalled = true;
-          captured.cancelRef = ref;
-          return Promise.resolve({ ok: true });
-        }),
+      clearLocalShipment: jest.fn().mockImplementation((ref: string) => {
+        captured.cancelCalled = true;
+        captured.cancelRef = ref;
+        return Promise.resolve({ ok: true });
+      }),
     } as any;
-    const svc = new PaymentCommonService(prisma, cargo);
-    return { svc, captured, prisma, cargo };
+    const provisioner = new OrderShipmentProvisioner(prisma, cargo);
+    const cancellations = new CarrierCancellationService(prisma, cargo);
+    const svc = new PaymentCommonService(prisma, cancellations);
+    return { svc, provisioner, captured, prisma, cargo };
   };
 
-  it("createSuratBarcodeForOrder: paket başına TEK gönderi (ortak ref + toplam adet + birleşik içerik)", async () => {
-    const { svc, captured } = makeService({
+  it("OrderShipmentProvisioner: paket başına TEK gönderi (ortak ref + toplam adet + birleşik içerik)", async () => {
+    const { provisioner, captured } = makeService({
       orderUnique: {
         orderNumber: "ORD-2",
         shippingAddress: validAddr,
@@ -109,22 +131,20 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
       ],
     });
 
-    const res = await svc.createSuratBarcodeForOrder("o2");
+    const res = await provisioner.createBarcode("o2");
 
     expect(res).toEqual({ kargoTakipNo: "SURAT-123", labelZpl: "ZPL" });
     // idempotency + ref paket-bazlı; ref = KOLİ NUMARASI (sipariş no değil)
     expect(captured.barcodeCall.idempotencyKey).toBe("surat:package:pkg-1");
     expect(captured.barcodeCall.correlationId).toBe("PKG-COLI0001");
-    expect(captured.barcodeCall.payload.OzelKargoTakipNo).toBe("PKG-COLI0001");
-    // toplam adet (2+1) + birleşik içerik
-    expect(captured.barcodeCall.payload.Adet).toBe(3);
-    expect(captured.barcodeCall.payload.BirimDesi).toBe(3);
-    expect(captured.barcodeCall.payload.SahisBirim).toContain("A");
-    expect(captured.barcodeCall.payload.SahisBirim).toContain("B");
+    expect(captured.barcodeCall.reference).toBe("PKG-COLI0001");
+    expect(captured.barcodeCall.desi).toBe(3);
+    expect(captured.barcodeCall.content).toContain("A");
+    expect(captured.barcodeCall.content).toContain("B");
   });
 
-  it("ensureSuratShipmentForOrder: shipment satırı PAKET ref'i (trackingNumber) ile oluşur", async () => {
-    const { svc, captured } = makeService({
+  it("OrderShipmentProvisioner: shipment satırı PAKET ref'i (trackingNumber) ile oluşur", async () => {
+    const { provisioner, captured } = makeService({
       orderUnique: {
         id: "o2",
         orderNumber: "ORD-2",
@@ -151,15 +171,57 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
       existingShipment: null,
     });
 
-    const res = await svc.ensureSuratShipmentForOrder("o2");
+    const res = await provisioner.ensure("o2");
 
     expect(res).toBe("created");
     // trackingNumber = KOLİ numarası, sipariş numarası (ORD-2) DEĞİL
     expect(captured.shipmentCreate.trackingNumber).toBe("PKG-COLI0001");
-    expect(captured.shipmentCreate.providerTrackingId).toBe("SURAT-123");
+    expect(captured.shipmentCreate.providerTrackingId).toBeNull();
+    expect(captured.shipmentUpdate.providerTrackingId).toBe("SURAT-123");
     expect(captured.shipmentCreate.orderId).toBe("o2");
     // Gönderi satırı koliye bağlanır → poller/webhook kardeşleri bulabilir.
     expect(captured.shipmentCreate.packageId).toBe("pkg-1");
+  });
+
+  it("OrderShipmentProvisioner: iptal sonrası yeni paket ref'i ayırır ve retry kimliğini değiştirir", async () => {
+    const { provisioner, captured, prisma } = makeService({
+      orderUnique: {
+        id: "o2",
+        orderNumber: "ORD-2",
+        status: OrderStatus.preparing,
+        shippingCost: 30,
+        packageId: "pkg-1",
+        shippingAddress: validAddr,
+        product: { title: "B" },
+      },
+      packageOrders: [
+        {
+          orderNumber: "ORD-2",
+          quantity: 1,
+          shippingAddress: validAddr,
+          product: { title: "B" },
+        },
+      ],
+      existingShipment: {
+        id: "sh-old",
+        status: "cancelled",
+        trackingNumber: "PKG-COLI0001",
+      },
+    });
+
+    const res = await provisioner.ensure("o2");
+
+    expect(res).toBe("revived");
+    expect(captured.shipmentReviveUpdate.trackingNumber).toMatch(
+      /^PKG-COLI0001-R[A-Z0-9]+$/,
+    );
+    expect(captured.barcodeCall.correlationId).toBe(
+      captured.shipmentReviveUpdate.trackingNumber,
+    );
+    expect(captured.barcodeCall.idempotencyKey).toContain(
+      captured.shipmentReviveUpdate.trackingNumber,
+    );
+    expect(prisma.orderPackage.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it("cancel: paketin BİR order'ı iptal, kardeş hâlâ canlı → fiziksel gönderi İPTAL EDİLMEZ (yerel cancel)", async () => {
@@ -178,7 +240,7 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
 
     await svc.cancelSuratShipmentIfExists("o1", "ORD-1");
 
-    expect(cargo.cancelShipmentByOrderNumber).not.toHaveBeenCalled();
+    expect(cargo.clearLocalShipment).not.toHaveBeenCalled();
     expect(captured.shipmentUpdate.status).toBe("cancelled"); // yerel cancel
   });
 
@@ -196,12 +258,12 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     await svc.cancelSuratShipmentIfExists("o1", "ORD-1");
 
     // Terminal → fiziksel iptal yok VE yerel status EZİLMEZ (delivered korunur)
-    expect(cargo.cancelShipmentByOrderNumber).not.toHaveBeenCalled();
+    expect(cargo.clearLocalShipment).not.toHaveBeenCalled();
     expect(captured.shipmentUpdate).toBeUndefined();
   });
 
   it("cancel: paketin TÜM order'ları iptal → fiziksel gönderi PAYLAŞILAN ref ile iptal", async () => {
-    const { svc, captured, cargo } = makeService({
+    const { svc, captured, cargo, prisma } = makeService({
       existingShipment: {
         id: "sh1",
         status: "pending",
@@ -216,8 +278,18 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
 
     await svc.cancelSuratShipmentIfExists("o1", "ORD-1");
 
-    expect(cargo.cancelShipmentByOrderNumber).toHaveBeenCalledTimes(1);
+    expect(cargo.clearLocalShipment).toHaveBeenCalledTimes(1);
     expect(captured.cancelRef).toBe("ORD-1"); // paylaşılan ref (order-no değil illa)
     expect(captured.shipmentUpdate.status).toBe("cancelled");
+    expect(prisma.carrierCancellationTask.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          provider: "surat",
+          reference: "ORD-1",
+          entityType: "order_shipment",
+          entityId: "sh1",
+        }),
+      }),
+    );
   });
 });

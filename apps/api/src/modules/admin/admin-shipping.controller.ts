@@ -71,6 +71,8 @@ import {
   AdminProductQueryDto,
   AdminOrderQueryDto,
   AdminShipmentQueryDto,
+  CarrierCancellationTaskQueryDto,
+  ResolveCarrierCancellationTaskDto,
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
@@ -231,6 +233,28 @@ export class AdminShippingController {
     return this.adminService.getShipments(query);
   }
 
+  @Get("shipping/carrier-cancellations")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({
+    summary: "Sürat panelinde manuel iptal bekleyen fiziksel kayıtlar",
+  })
+  async getCarrierCancellationTasks(
+    @Query() query: CarrierCancellationTaskQueryDto,
+  ) {
+    return this.shippingSvc.getCarrierCancellationTasks(query);
+  }
+
+  @Patch("shipping/carrier-cancellations/:id")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Manuel taşıyıcı iptal görevini sonuçlandır" })
+  async resolveCarrierCancellationTask(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: ResolveCarrierCancellationTaskDto,
+  ) {
+    return this.shippingSvc.resolveCarrierCancellationTask(id, adminId, dto);
+  }
+
   @Post("shipping/shipments/:id/sync-tracking")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({
@@ -246,14 +270,14 @@ export class AdminShippingController {
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @ApiOperation({
     summary:
-      "Sürat REST endpoint testi: gönderi oluştur + takibini sorgula (DB/siparişe dokunmaz)",
+      "Sürat REST endpoint testi: gönderi oluştur + takibini sorgula; manuel temizleme görevi açar",
   })
   @ApiResponse({
     status: HttpStatus.OK,
     description: "Sürat create + track ham cevapları",
   })
-  async runSuratEndpointTest() {
-    return this.adminService.runSuratEndpointTest();
+  async runSuratEndpointTest(@CurrentUser("id") adminId: string) {
+    return this.adminService.runSuratEndpointTest(adminId);
   }
 
   @Post("shipping/surat/track")
@@ -265,38 +289,5 @@ export class AdminShippingController {
   @ApiResponse({ status: HttpStatus.OK, description: "Ham takip cevabı" })
   async suratTestTrack(@Body() body: { ref: string }) {
     return this.adminService.suratTestTrack(body?.ref);
-  }
-
-  @Post("shipping/surat/cancel")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({
-    summary: "Test konsolu: referansla Sürat iptal/geri-çek (GonderiGeriCek)",
-  })
-  @ApiResponse({ status: HttpStatus.OK, description: "İptal cevabı" })
-  async suratTestCancel(@Body() body: { ref: string }) {
-    return this.adminService.suratTestCancel(body?.ref);
-  }
-
-  @Post("shipping/surat/barcode")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({
-    summary: "Test konsolu: Sürat barkod/etiket üret (OrtakBarkodOlustur)",
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: "KargoTakipNo + ZPL etiket",
-  })
-  async suratTestBarcode() {
-    return this.adminService.suratTestBarcode();
-  }
-
-  @Post("shipping/surat/sil")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({
-    summary: "Test konsolu: referansla Sürat gönderi sil (GonderiSil)",
-  })
-  @ApiResponse({ status: HttpStatus.OK, description: "GonderiSil cevabı" })
-  async suratTestSil(@Body() body: { ref: string }) {
-    return this.adminService.suratTestSil(body?.ref);
   }
 }

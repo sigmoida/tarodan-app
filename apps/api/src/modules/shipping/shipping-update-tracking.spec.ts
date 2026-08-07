@@ -33,7 +33,6 @@ describe("ShippingService.updateTracking — #5 tracking-key koruması", () => {
     } as any;
     const svc = new ShippingService(
       prisma,
-      {} as any, // configService
       {} as any, // paymentService
       notificationService,
       {
@@ -42,6 +41,7 @@ describe("ShippingService.updateTracking — #5 tracking-key koruması", () => {
           freeShippingThreshold: 500,
         }),
       } as any, // shippingTariffs
+      {} as any, // orderShipments
     );
     return { svc, captured };
   };

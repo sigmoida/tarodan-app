@@ -77,7 +77,6 @@ export class OrderTrackingSyncService {
             ShipmentStatus.delivered,
             ShipmentStatus.returned,
             ShipmentStatus.cancelled,
-            ShipmentStatus.failed,
           ],
         },
         OR: [

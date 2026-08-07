@@ -26,7 +26,8 @@ describe("RefundService — MONEY-H6 frozen-hold terminal escape", () => {
     const service = new RefundService(
       prisma as any, // prisma
       {} as any, // paymentService
-      {} as any, // suratCargoService
+      {} as any, // cargoProvider
+      {} as any, // carrierCancellationService
       {} as any, // suratTrackingService
       notificationService as any, // notificationService
       {} as any, // storageService

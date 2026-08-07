@@ -33,10 +33,10 @@ describe("ShippingService.handleProviderWebhook — koli bazlı yayılım", () =
     };
     const service = new ShippingService(
       prisma as any,
-      {} as any, // configService
       paymentService as any,
       {} as any, // notificationService
       {} as any, // shippingTariffs
+      {} as any, // orderShipments
     );
     return { service, prisma, tx, paymentService };
   };

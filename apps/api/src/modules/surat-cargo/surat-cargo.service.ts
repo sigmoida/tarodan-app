@@ -5,19 +5,26 @@ import type {
   SuratShipmentInput,
   SuratShipmentResult,
   SuratShipmentSuccess,
+  SuratShipmentFailure,
   SuratTechnicalCode,
   SuratBarcodeResult,
   SuratBarcodeSuccess,
 } from "./surat-cargo.types";
 import { SuratCarrierClient } from "./surat-soap.client";
+import { SuratTrackingClient } from "./surat-tracking.client";
 import { withSuratTechnicalRetries } from "./surat-technical-retry";
-import type { CargoProvider } from "./cargo-provider";
+import type {
+  CargoProvider,
+  CargoShipmentRequest,
+  CargoShipmentResult,
+} from "./cargo-provider";
+import { buildStandardGonderiPayload } from "./surat-address.util";
 
 export const SURAT_CARRIER_CLIENT = Symbol("SURAT_CARRIER_CLIENT");
 
 // Idempotency caches are keyed by OzelKargoTakipNo (= our order/trade/refund
-// number) so BOTH create and cancel can compute the key — the cancel path can
-// now invalidate it (previously it couldn't, leaving a stale "success").
+// number) so create and local cancel can compute the same key. Local cancel
+// invalidates it to avoid leaving a stale success in our own cache.
 const IDEM_CACHE_PREFIX = "surat:idem:ok:";
 const IDEM_BARCODE_PREFIX = "surat:idem:barcode:";
 const IDEM_CACHE_TTL_SEC = 7 * 24 * 3600;
@@ -57,6 +64,7 @@ export class SuratCargoService implements CargoProvider {
     private readonly cache: CacheService,
     @Inject(SURAT_CARRIER_CLIENT)
     private readonly carrierClient: SuratCarrierClient,
+    private readonly trackingClient: SuratTrackingClient,
   ) {}
 
   /**
@@ -69,8 +77,59 @@ export class SuratCargoService implements CargoProvider {
     return v === "true" || v === "1";
   }
 
+  isEnabled(): boolean {
+    return this.isIntegrationEnabled();
+  }
+
+  async createShipment(
+    input: CargoShipmentRequest,
+  ): Promise<CargoShipmentResult> {
+    const result = await this.createShipmentWithBarcode({
+      idempotencyKey: input.idempotencyKey,
+      correlationId: input.correlationId,
+      payload: buildStandardGonderiPayload({
+        recipientName: input.recipient.name,
+        address: input.recipient.address,
+        city: input.recipient.city,
+        district: input.recipient.district,
+        phone: input.recipient.phone,
+        ref: input.reference,
+        content: input.content,
+        desi: input.desi ?? undefined,
+        isReturn: input.isReturn,
+      }),
+    });
+    if (result.ok) {
+      return {
+        ok: true,
+        trackingCode: result.kargoTakipNo,
+        labelData: result.labelZpl,
+        providerMessage: result.suratMessage,
+      };
+    }
+    const failure = result as SuratShipmentFailure;
+    if (failure.kind === "business") {
+      return { ok: false, kind: "business", message: failure.suratMessage };
+    }
+    return {
+      ok: false,
+      kind: "technical",
+      code: failure.code,
+      cause: failure.cause,
+    };
+  }
+
+  async clearLocalShipment(reference: string) {
+    const result = await this.cancelShipmentLocally(reference);
+    return {
+      ok: result.ok,
+      providerMessage: result.suratMessage,
+    };
+  }
+
   /**
-   * Idempotent success cache + technical retries. Same idempotencyKey replays cached Tamam without second SOAP.
+   * Idempotent success cache + technical retries. Aynı referans, ikinci bir
+   * create isteği göndermeden cache'lenmiş Tamam sonucunu tekrar kullanır.
    */
   async submitShipmentWithRetry(
     input: SuratShipmentInput,
@@ -116,13 +175,13 @@ export class SuratCargoService implements CargoProvider {
     const { idempotencyKey, correlationId, payload } = input;
     let raw: string | undefined;
     try {
-      raw = await this.carrierClient.callGonderiyiKargoyaGonderYeni(payload, {
+      raw = await this.carrierClient.callGonderiyiKargoyaGonder(payload, {
         timeoutMs,
       });
     } catch (e) {
       const code = classifyCaughtError(e);
       this.logger.warn({
-        msg: "Surat SOAP call threw",
+        msg: "Surat create call threw",
         correlationId,
         idempotencyKey,
         code,
@@ -160,10 +219,13 @@ export class SuratCargoService implements CargoProvider {
     }
 
     // Idempotency: retry sonrası "Bu gönderi daha önce oluşturulmuş" yanıtı,
-    // ilk denemenin Sürat'ta gönderiyi gerçekten oluşturduğu anlamına gelir →
-    // başarı say (cancel yolundaki "Bulunamadi = başarı" mantığıyla simetrik).
+    // ilk denemenin Sürat'ta gönderiyi gerçekten oluşturduğu anlamına gelir;
+    // ikinci create'i business failure saymadan takip sorgusuna devam et.
     // Türkçe karakter varyasyonlarına toleranslı (gonderi/gönderi, olustur/oluştur).
-    if (/daha\s*[öo]nce\s*olu[şs]turul/i.test(normalized)) {
+    if (
+      /daha\s*[öo]nce\s*olu[şs]turul/i.test(normalized) ||
+      /bu\s*sipari[şs]e\s*ait\s*g[öo]nderi\s*olu[şs]mu[şs]tur/i.test(normalized)
+    ) {
       this.logger.warn({
         msg: "Surat shipment already exists (idempotent success)",
         correlationId,
@@ -195,11 +257,15 @@ export class SuratCargoService implements CargoProvider {
   }
 
   /**
-   * Create a shipment via OrtakBarkodOlustur and return the REAL Sürat cargo
-   * code (KargoTakipNo) + ZPL label immediately (unlike the plain create which
-   * returns only "Tamam"). Same retry + idempotency semantics as
-   * submitShipmentWithRetry, but the cached success carries the code+label so a
-   * replay returns them (and cancel can invalidate it).
+   * Resmi iki-adımlı akış:
+   * 1) GonderiyiKargoyaGonder ile idempotent gönderi oluştur.
+   * 2) Aynı OzelKargoTakipNo'yu WebSiparisKodu olarak KargoTakipHareketDetayi
+   *    üzerinden sorgulayıp gerçek KargoTakipNo'yu al.
+   *
+   * Takip kaydı Sürat tarafında henüz görünmüyorsa TRACKING_PENDING döner;
+   * çağıran yerel gönderiyi pending+kodsuz bırakır ve 30 dk'lık retry aynı resmi
+   * create+track akışını yeniden çalıştırır. ZPL resmi iki endpoint'te dönmediği
+   * için labelZpl her zaman null'dır.
    */
   async createShipmentWithBarcode(
     input: SuratShipmentInput,
@@ -218,196 +284,71 @@ export class SuratCargoService implements CargoProvider {
       };
     }
 
-    const maxAttempts = Math.max(
-      1,
-      Number(this.configService.get("SURAT_CARGO_MAX_RETRIES", "3")) || 3,
-    );
-    const baseMs =
-      Number(this.configService.get("SURAT_CARGO_RETRY_BASE_MS", "200")) || 200;
-    const timeoutMs =
-      Number(this.configService.get("SURAT_SOAP_TIMEOUT_MS", "15000")) || 15000;
+    const createResult = await this.submitShipmentWithRetry(input);
+    if (!createResult.ok) return createResult as SuratShipmentFailure;
 
-    const result = await withSuratTechnicalRetries<SuratBarcodeSuccess>(
-      maxAttempts,
-      baseMs,
-      () => this.createBarcodeOnce(input, timeoutMs),
-    );
-
-    if (result.ok) {
-      await this.cache.set(cacheKey, result, { ttl: IDEM_CACHE_TTL_SEC });
+    const localTrackingCode = this.carrierClient.getLocalTrackingCode(oid);
+    const tracking = localTrackingCode
+      ? null
+      : await this.trackingClient.fetchTrackingInfo(oid);
+    const kargoTakipNo =
+      localTrackingCode ??
+      tracking?.Gonderiler?.find((shipment) => Boolean(shipment.KargoTakipNo))
+        ?.KargoTakipNo;
+    if (!kargoTakipNo) {
+      this.logger.warn({
+        msg: "Surat shipment created but tracking code is not available yet",
+        correlationId: input.correlationId,
+        idempotencyKey: input.idempotencyKey,
+        webSiparisKodu: oid,
+      });
+      return {
+        ok: false,
+        kind: "technical",
+        code: "TRACKING_PENDING",
+        cause: undefined,
+        correlationId: input.correlationId,
+        idempotencyKey: input.idempotencyKey,
+      };
     }
+
+    const result: SuratBarcodeSuccess = {
+      ok: true,
+      kargoTakipNo,
+      labelZpl: null,
+      suratMessage: "Tamam",
+      correlationId: input.correlationId,
+      idempotencyKey: input.idempotencyKey,
+    };
+    await this.cache.set(cacheKey, result, { ttl: IDEM_CACHE_TTL_SEC });
     return result;
   }
 
-  private async createBarcodeOnce(
-    input: SuratShipmentInput,
-    timeoutMs: number,
-  ): Promise<SuratBarcodeResult> {
-    const { idempotencyKey, correlationId, payload } = input;
-
-    // Capability guard (LSP/ISP): clients that cannot create barcodes (the
-    // legacy SOAP web service) declare supportsBarcode()=false. Previously such
-    // a client threw inside callOrtakBarkodOlustur; that throw was caught below,
-    // classified, and returned as a non-retryable technical UNKNOWN failure.
-    // We reproduce that EXACT outcome here — same error message, same
-    // classifyCaughtError path, same warn log, same returned result — without
-    // relying on the throw.
-    if (!this.carrierClient.supportsBarcode()) {
-      const e = new Error(
-        "OrtakBarkodOlustur SOAP modunda desteklenmiyor — SURAT_SOAP_MODE=rest kullanın",
-      );
-      const code = classifyCaughtError(e);
-      this.logger.warn({
-        msg: "Surat OrtakBarkodOlustur threw",
-        correlationId,
-        idempotencyKey,
-        code,
-        err: e.message,
-      });
-      return {
-        ok: false,
-        kind: "technical",
-        code,
-        cause: e,
-        correlationId,
-        idempotencyKey,
-      };
-    }
-
-    let raw;
-    try {
-      raw = await this.carrierClient.callOrtakBarkodOlustur(payload, {
-        timeoutMs,
-      });
-    } catch (e) {
-      const code = classifyCaughtError(e);
-      this.logger.warn({
-        msg: "Surat OrtakBarkodOlustur threw",
-        correlationId,
-        idempotencyKey,
-        code,
-        err: e instanceof Error ? e.message : String(e),
-      });
-      return {
-        ok: false,
-        kind: "technical",
-        code,
-        cause: e instanceof Error ? e : undefined,
-        correlationId,
-        idempotencyKey,
-      };
-    }
-
-    if (!raw || typeof raw !== "object") {
-      return {
-        ok: false,
-        kind: "technical",
-        code: "EMPTY_RESPONSE",
-        cause: undefined,
-        correlationId,
-        idempotencyKey,
-      };
-    }
-
-    if (raw.isError || !raw.kargoTakipNo) {
-      this.logger.warn({
-        msg: "Surat barcode business failure",
-        correlationId,
-        idempotencyKey,
-        suratMessage: raw.message,
-        kargoTakipNo: raw.kargoTakipNo,
-      });
-      return {
-        ok: false,
-        kind: "business",
-        suratMessage: raw.message || "KargoTakipNo dönmedi",
-        correlationId,
-        idempotencyKey,
-      };
-    }
-
-    return {
-      ok: true,
-      kargoTakipNo: raw.kargoTakipNo,
-      labelZpl: raw.labelZpl,
-      suratMessage: raw.message || "Tamam",
-      correlationId,
-      idempotencyKey,
-    };
-  }
-
   /**
-   * Cancel a shipment in Sürat by OzelKargoTakipNo (typically order number).
-   * Idempotent: "Pasif Edilecek Gonderi Bulunamadi!" is treated as success
-   * (already cancelled or never existed).
-   *
-   * Returns { ok: true } if Sürat confirms cancellation or shipment doesn't exist.
-   * Returns { ok: false, suratMessage } if Sürat rejects the call for other reasons.
-   * Throws on technical failures (timeout, network).
+   * Resmi REST dokümanında uzaktan iptal endpoint'i bulunmuyor. Bu metot Sürat'e
+   * ağ çağrısı yapmaz; çağıranın yerel kaydı cancelled tutabilmesi için açık bir
+   * local-only sonucu döndürür. Operasyon ekibi fiziksel gönderiyi gerektiğinde
+   * Sürat panelinden yönetmelidir.
    */
-  async cancelShipmentByOrderNumber(
+  async cancelShipmentLocally(
     ozelKargoTakipNo: string,
   ): Promise<{ ok: boolean; suratMessage?: string }> {
     if (!this.isIntegrationEnabled()) {
       return { ok: true, suratMessage: "integration_disabled" };
     }
 
-    // Uzak iptal desteklemeyen bir client için güvenli davranış: akışı bozmadan
-    // iptali YEREL olarak tutarlı say (çağıran kargoyu 'cancelled' işaretler).
-    // Not: REST client artık GonderiGeriCek, SOAP client GonderiSil ile uzak iptali
-    // destekler; bu dal yalnızca gelecekte cancel'sız bir client için geçerli.
-    if (!this.carrierClient.supportsRemoteCancel()) {
-      this.logger.warn(
-        `Surat uzak iptal desteklenmiyor — yalnızca yerel iptal ref=${ozelKargoTakipNo}.`,
-      );
-      return { ok: true, suratMessage: "remote_cancel_unsupported_local_only" };
-    }
-
-    const timeoutMs =
-      Number(this.configService.get("SURAT_SOAP_TIMEOUT_MS", "15000")) || 15000;
-
+    this.carrierClient.recordLocalCancel(ozelKargoTakipNo);
     try {
-      const raw = await this.carrierClient.callGonderiSil(ozelKargoTakipNo, {
-        timeoutMs,
-      });
-      const normalized = (raw || "").trim();
-
-      // Success patterns: "Tamam", "Gönderiniz başarı ile pasif edilmiştir.",
-      // "Pasif Edilecek Gonderi Bulunamadi!" (already gone, idempotent OK)
-      if (
-        normalized === "Tamam" ||
-        /başarı\s*ile\s*pasif/i.test(normalized) ||
-        /basari\s*ile\s*pasif/i.test(normalized) ||
-        /pasif\s*edil(miş|mistir|miştir|mis)/i.test(normalized) ||
-        /pasif edilecek gonderi bulunamadi/i.test(normalized) ||
-        /bulunamadi/i.test(normalized)
-      ) {
-        // Invalidate idempotency caches so a future re-submit goes back to the
-        // API (both keyed by OzelKargoTakipNo). Without this, a cancel→re-create
-        // returned a stale cached success and no real shipment was made.
-        try {
-          await this.cache.del(`${IDEM_CACHE_PREFIX}${ozelKargoTakipNo}`);
-          await this.cache.del(`${IDEM_BARCODE_PREFIX}${ozelKargoTakipNo}`);
-        } catch (e: any) {
-          this.logger.warn(
-            `Surat idempotency cache del failed ref=${ozelKargoTakipNo}: ${e?.message}`,
-          );
-        }
-        this.logger.log(
-          `Surat shipment cancelled (or absent) ref=${ozelKargoTakipNo} result="${normalized}"`,
-        );
-        return { ok: true, suratMessage: normalized };
-      }
-
-      this.logger.warn(
-        `Surat cancel failed ref=${ozelKargoTakipNo} result="${normalized}"`,
-      );
-      return { ok: false, suratMessage: normalized };
+      await this.cache.del(`${IDEM_CACHE_PREFIX}${ozelKargoTakipNo}`);
+      await this.cache.del(`${IDEM_BARCODE_PREFIX}${ozelKargoTakipNo}`);
     } catch (error: any) {
-      this.logger.error(
-        `Surat cancel threw ref=${ozelKargoTakipNo}: ${error.message}`,
+      this.logger.warn(
+        `Surat local-cancel cache cleanup failed ref=${ozelKargoTakipNo}: ${error?.message}`,
       );
-      throw error;
     }
+    this.logger.warn(
+      `Surat remote cancel is not in the approved API contract; local-only cancel ref=${ozelKargoTakipNo}`,
+    );
+    return { ok: true, suratMessage: "remote_cancel_unsupported_local_only" };
   }
 }

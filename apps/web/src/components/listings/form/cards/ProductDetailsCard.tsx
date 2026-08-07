@@ -94,7 +94,7 @@ export default function ProductDetailsCard({
 
         <FormSelect
           name="carModelId"
-          label={t("product.modelRequired")}
+          label={t("product.model")}
           options={models.map((m) => ({ value: m.id, label: m.name }))}
           placeholder={
             !brandId
@@ -110,7 +110,7 @@ export default function ProductDetailsCard({
 
         <FormInput
           name="modelCode"
-          label={t("product.modelCodeRequired")}
+          label={t("product.modelCode")}
           placeholder={t("product.modelCodePlaceholder")}
           maxLength={100}
         />

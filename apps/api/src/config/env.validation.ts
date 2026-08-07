@@ -365,7 +365,7 @@ const envSchema = z
           code: z.ZodIssueCode.custom,
           path: ["SURAT_SOAP_MODE"],
           message:
-            "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (live/soap do not support barcode creation)",
+            "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (only the documented REST create + tracking contract is supported)",
         });
       }
       const cargoTestMode = (env.SURAT_KARGO_TEST_MODE ?? "")

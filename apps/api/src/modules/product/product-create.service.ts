@@ -186,11 +186,14 @@ export class ProductCreateService {
       });
     }
 
-    // Verify required catalog references together and keep model/brand consistency.
+    // Verify required catalog references together. Car model is optional, but
+    // when supplied it must be active and belong to the selected brand.
     const [category, brand, carModel, manufacturer] = await Promise.all([
       this.prisma.category.findUnique({ where: { id: dto.categoryId } }),
       this.prisma.brand.findUnique({ where: { id: dto.brandId } }),
-      this.prisma.carModel.findUnique({ where: { id: dto.carModelId } }),
+      dto.carModelId
+        ? this.prisma.carModel.findUnique({ where: { id: dto.carModelId } })
+        : null,
       this.prisma.manufacturer.findUnique({
         where: { id: dto.manufacturerId },
       }),
@@ -204,9 +207,8 @@ export class ProductCreateService {
     if (
       !brand ||
       !brand.isActive ||
-      !carModel ||
-      !carModel.isActive ||
-      carModel.brandId !== brand.id ||
+      (dto.carModelId &&
+        (!carModel || !carModel.isActive || carModel.brandId !== brand.id)) ||
       !manufacturer ||
       !manufacturer.isActive
     ) {
@@ -317,7 +319,7 @@ export class ProductCreateService {
           brandId,
           carModelId,
           manufacturerId,
-          modelCode: dto.modelCode.trim(),
+          modelCode: dto.modelCode?.trim() || null,
           color: dto.color.trim(),
           isBoxed: dto.isBoxed,
           releaseDate,

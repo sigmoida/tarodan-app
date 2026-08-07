@@ -12,7 +12,8 @@ import type { Queue } from "bull";
 /**
  * Bir cron'un Bull repeatable kaydını SENKRONLAR (kendi kendini onarır): önce aynı
  * isimli mevcut repeatable'ları siler (restart'larda çoğalmasın) ve ardından yeniden
- * kaydeder. Tüm hatalar yutulur + loglanır: bir kayıt işi API açılışını bloklamaz.
+ * kaydeder. Kayıt hatası loglandıktan sonra yükseltilir: cron'un hiç oluşmadığı
+ * bir instance production trafiğine hazır görünmemelidir.
  */
 export async function registerRepeatableCron(
   queue: Queue,
@@ -34,14 +35,15 @@ export async function registerRepeatableCron(
         // Konteynerlerde TZ set edilmiyor (UTC): tz verilmezse tüm saatler
         // +3 kayar — "09:00" gönderimleri öğlen, gece bakımı sabah koşardı.
         repeat: { cron, tz: "Europe/Istanbul" },
+        attempts: 3,
+        backoff: { type: "exponential", delay: 30_000 },
         removeOnComplete: 50,
         removeOnFail: 50,
       },
     );
     logger.log(`Bull repeatable kayıtlı: '${jobName}' (${cron}).`);
   } catch (e: any) {
-    logger.error(
-      `Bull repeatable sync başarısız ('${jobName}', non-fatal): ${e.message}`,
-    );
+    logger.error(`Bull repeatable sync başarısız ('${jobName}'): ${e.message}`);
+    throw e;
   }
 }

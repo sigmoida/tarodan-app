@@ -11,7 +11,7 @@ import {
 const makeDeps = (over?: { order?: any; payment?: any }) => {
   const registry = new OutboxHandlerRegistry();
   const paymentCommon = {
-    cancelSuratShipmentIfExists: jest.fn().mockResolvedValue(undefined),
+    cancelSuratShipmentIfExists: jest.fn().mockResolvedValue({ ok: true }),
   } as any;
   const elogoInvoicing = {
     handleOrderRefund: jest.fn().mockResolvedValue(undefined),
@@ -77,6 +77,22 @@ describe("PaymentOutboxHandlers", () => {
       "o2",
       "o2",
     );
+  });
+
+  it("yerel iptal başarısızsa outbox retry edebilsin diye hata fırlatır", async () => {
+    const { registry, paymentCommon, svc } = makeDeps();
+    paymentCommon.cancelSuratShipmentIfExists.mockResolvedValue({
+      ok: false,
+      error: "db unavailable",
+    });
+    svc.onModuleInit();
+
+    await expect(
+      registry.get(OUTBOX_SHIPMENT_CANCEL)!(
+        { orderId: "o3", orderNumber: "ORD3" },
+        {} as any,
+      ),
+    ).rejects.toThrow("db unavailable");
   });
 
   it("invoice.refund_reverse handler'ını kaydeder ve eLogo ters kaydına yönlendirir", async () => {

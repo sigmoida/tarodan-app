@@ -18,8 +18,8 @@ import { OUTBOX_ORDER_FULFILLMENT } from "../outbox/outbox.types";
  * devreder. Böylece PaymentFulfillmentService fulfillment ayrıntısına DOĞRUDAN bağlı
  * kalmaz (DIP) ve tekil↔grup yolu aynı seam'i paylaşır (DRY).
  *
- * Best-effort: sonlandırma hatası burada YUTULUR — ödeme zaten commit'li, akış bozulmaz
- * (finalizer da her adımı kendi içinde try/catch'liyor; bu ikinci savunma hattı).
+ * Ödeme zaten commit'lidir; hata kullanıcı akışına taşınmaz. Kargo persist hatası
+ * finalizer'dan gelir ve burada outbox satırı pending bırakılarak retry edilir.
  *
  * #8 (dayanıklılık): ödeme tx'i AYNI ZAMANDA bir `order.fulfillment_requested` outbox
  * satırı yazdı (backstop). Bu anlık yol BAŞARIRSA satırı `completed` işaretleriz →

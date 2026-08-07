@@ -4,6 +4,7 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
+import { CronStepFailuresError } from "../../monitoring/cron-step-runner";
 
 @Injectable()
 export class ShippingSchedulerService implements OnModuleInit {
@@ -28,6 +29,14 @@ export class ShippingSchedulerService implements OnModuleInit {
    * Gerçek iş — Bull processor 'sync-surat-tracking' buradan çağırır.
    */
   async runSyncSuratTracking(log: (msg: string) => void = () => {}) {
+    const failedSteps: string[] = [];
+    const failureDetails: string[] = [];
+    const recordStepFailure = (step: string, error: unknown) => {
+      const message = (error as Error)?.message ?? String(error);
+      failedSteps.push(step);
+      failureDetails.push(`${step}: ${message}`);
+      return message;
+    };
     const stats = {
       barcodeRetried: 0,
       barcodeRetryFailed: 0,
@@ -46,6 +55,12 @@ export class ShippingSchedulerService implements OnModuleInit {
       const retry = await this.suratTracking.retryPendingBarcodes();
       stats.barcodeRetried = retry.order.retried + retry.trade.retried;
       stats.barcodeRetryFailed = retry.order.failed + retry.trade.failed;
+      if (stats.barcodeRetryFailed > 0) {
+        recordStepFailure(
+          "barcode-retry-records",
+          new Error(`${stats.barcodeRetryFailed} kayıt tamamlanamadı`),
+        );
+      }
       if (stats.barcodeRetried > 0 || stats.barcodeRetryFailed > 0) {
         log(
           `Kargo kodu retry: ${stats.barcodeRetried} tamamlandı, ${stats.barcodeRetryFailed} başarısız`,
@@ -56,14 +71,21 @@ export class ShippingSchedulerService implements OnModuleInit {
         );
       }
     } catch (error: any) {
-      this.logger.error(`Surat barcode retry error: ${error.message}`);
-      log(`Kargo kodu retry HATASI: ${error.message}`);
+      const message = recordStepFailure("barcode-retry", error);
+      this.logger.error(`Surat barcode retry error: ${message}`);
+      log(`Kargo kodu retry HATASI: ${message}`);
     }
 
     try {
       const result = await this.suratTracking.syncAllActiveShipments();
       stats.shipmentSynced = result.synced;
       stats.failed += result.failed;
+      if (result.failed > 0) {
+        recordStepFailure(
+          "order-tracking-records",
+          new Error(`${result.failed} kayıt senkronlanamadı`),
+        );
+      }
       log(
         `Sipariş kargo senkron: ${result.synced} güncellendi, ${result.failed} başarısız`,
       );
@@ -73,8 +95,9 @@ export class ShippingSchedulerService implements OnModuleInit {
         );
       }
     } catch (error: any) {
-      this.logger.error(`Sürat tracking sync error: ${error.message}`);
-      log(`Sipariş kargo senkron HATASI: ${error.message}`);
+      const message = recordStepFailure("order-tracking", error);
+      this.logger.error(`Sürat tracking sync error: ${message}`);
+      log(`Sipariş kargo senkron HATASI: ${message}`);
     }
 
     try {
@@ -82,6 +105,12 @@ export class ShippingSchedulerService implements OnModuleInit {
         await this.suratTracking.syncAllActiveTradeShipments();
       stats.tradeSynced = tradeResult.synced;
       stats.failed += tradeResult.failed;
+      if (tradeResult.failed > 0) {
+        recordStepFailure(
+          "trade-tracking-records",
+          new Error(`${tradeResult.failed} kayıt senkronlanamadı`),
+        );
+      }
       log(
         `Takas kargo senkron: ${tradeResult.synced} güncellendi, ${tradeResult.failed} başarısız`,
       );
@@ -91,8 +120,9 @@ export class ShippingSchedulerService implements OnModuleInit {
         );
       }
     } catch (error: any) {
-      this.logger.error(`Sürat trade-shipment sync error: ${error.message}`);
-      log(`Takas kargo senkron HATASI: ${error.message}`);
+      const message = recordStepFailure("trade-tracking", error);
+      this.logger.error(`Sürat trade-shipment sync error: ${message}`);
+      log(`Takas kargo senkron HATASI: ${message}`);
     }
 
     try {
@@ -100,6 +130,12 @@ export class ShippingSchedulerService implements OnModuleInit {
         await this.suratTracking.syncAllActiveRefundReturns();
       stats.refundSynced = refundResult.synced;
       stats.failed += refundResult.failed;
+      if (refundResult.failed > 0) {
+        recordStepFailure(
+          "refund-tracking-records",
+          new Error(`${refundResult.failed} kayıt senkronlanamadı`),
+        );
+      }
       log(
         `İade kargo senkron: ${refundResult.synced} güncellendi, ${refundResult.failed} başarısız`,
       );
@@ -109,8 +145,9 @@ export class ShippingSchedulerService implements OnModuleInit {
         );
       }
     } catch (error: any) {
-      this.logger.error(`Sürat refund-return sync error: ${error.message}`);
-      log(`İade kargo senkron HATASI: ${error.message}`);
+      const message = recordStepFailure("refund-tracking", error);
+      this.logger.error(`Sürat refund-return sync error: ${message}`);
+      log(`İade kargo senkron HATASI: ${message}`);
     }
 
     // İnsani senaryolar (A9 ghost-pickup, B15/D27 kayıp şüphesi): bayat kargo
@@ -118,7 +155,8 @@ export class ShippingSchedulerService implements OnModuleInit {
     try {
       await this.suratTracking.alertStaleCargo();
     } catch (error: any) {
-      this.logger.error(`Stale cargo alert error: ${error.message}`);
+      const message = recordStepFailure("stale-cargo-alert", error);
+      this.logger.error(`Stale cargo alert error: ${message}`);
     }
 
     const totalSynced =
@@ -127,6 +165,9 @@ export class ShippingSchedulerService implements OnModuleInit {
       stats.barcodeRetried > 0
         ? ` · ${stats.barcodeRetried} kod tamamlandı`
         : "";
+    if (failedSteps.length > 0) {
+      throw new CronStepFailuresError(failedSteps, failureDetails);
+    }
     return {
       summary: `${totalSynced} kargo güncellendi · ${stats.failed} başarısız${retrySummary}`,
       stats,

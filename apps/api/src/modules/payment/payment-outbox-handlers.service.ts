@@ -43,10 +43,15 @@ export class PaymentOutboxHandlers implements OnModuleInit {
   onModuleInit(): void {
     this.registry.register(OUTBOX_SHIPMENT_CANCEL, async (payload) => {
       const { orderId, orderNumber } = payload as ShipmentCancelPayload;
-      await this.paymentCommon.cancelSuratShipmentIfExists(
+      const result = await this.paymentCommon.cancelSuratShipmentIfExists(
         orderId,
         orderNumber ?? orderId,
       );
+      if (!result.ok) {
+        throw new Error(
+          `Shipment local cancellation failed for ${orderId}: ${result.error ?? "unknown error"}`,
+        );
+      }
     });
 
     this.registry.register(OUTBOX_INVOICE_REFUND_REVERSE, async (payload) => {

@@ -68,9 +68,7 @@ const REQUIRED_HEADERS = [
   "aciklama",
   "kategori",
   "marka",
-  "arac_modeli",
   "uretici",
-  "model_kodu",
   "durum",
   "renk",
   "olcek",
@@ -858,11 +856,13 @@ export class AdminProductBulkImportService {
         );
         const brand = this.resolveRef(brands, this.text(get("marka")), "marka");
         const modelValue = this.text(get("arac_modeli"));
-        const carModel = this.resolveRef(
-          models.filter((model) => model.brandId === brand.id),
-          modelValue,
-          "araç modeli",
-        );
+        const carModel = modelValue
+          ? this.resolveRef(
+              models.filter((model) => model.brandId === brand.id),
+              modelValue,
+              "araç modeli",
+            )
+          : null;
         const manufacturer = this.resolveRef(
           manufacturers,
           this.text(get("uretici")),
@@ -941,9 +941,9 @@ export class AdminProductBulkImportService {
             ? this.number(get("set_parca_sayisi"), "set_parca_sayisi")
             : undefined,
           brandId: brand.id,
-          carModelId: carModel.id,
+          carModelId: carModel?.id,
           manufacturerId: manufacturer.id,
-          modelCode: this.text(get("model_kodu")),
+          modelCode: this.text(get("model_kodu")) || undefined,
           color: this.text(get("renk")),
           isBoxed: this.boolean(get("kutulu")),
           quantity: this.number(get("stok"), "stok"),

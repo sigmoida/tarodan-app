@@ -4,6 +4,7 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { RefundService } from "./refund.service";
+import { CronStepFailuresError } from "../../monitoring/cron-step-runner";
 
 @Injectable()
 export class RefundSchedulerService implements OnModuleInit {
@@ -25,10 +26,14 @@ export class RefundSchedulerService implements OnModuleInit {
 
   /** Gerçek iş — Bull processor 'refund-crons' buradan çağırır. */
   async runRefundCrons(log: (msg: string) => void = () => {}) {
-    const opened = await this.openReturnShipmentsForDeliveredOrders();
-    log(`${opened} iade kargosu açıldı (teslim edilmiş siparişler)`);
-    const finalized = await this.finalizeReturnedShipments();
-    log(`${finalized} iade finalize edildi (kargo döndü)`);
+    const openResult = await this.openReturnShipmentsForDeliveredOrders();
+    log(
+      `${openResult.processed} iade kargosu açıldı, ${openResult.failed} başarısız`,
+    );
+    const finalizeResult = await this.finalizeReturnedShipments();
+    log(
+      `${finalizeResult.processed} iade finalize edildi, ${finalizeResult.failed} başarısız`,
+    );
     // D25: şubeye hiç götürülmeyen iadeleri süre dolunca iptal et (hold çözülür).
     const expired = await this.refundService.expireStaleOpenReturns();
     if (expired > 0)
@@ -40,46 +45,83 @@ export class RefundSchedulerService implements OnModuleInit {
       log(
         `${waitExpired} iade teslim-bekleme süresi dolduğu için iptal edildi`,
       );
+    const failed = openResult.failed + finalizeResult.failed;
+    if (failed > 0) {
+      throw new CronStepFailuresError(
+        [
+          ...(openResult.failed ? ["open-return-shipments"] : []),
+          ...(finalizeResult.failed ? ["finalize-returned-shipments"] : []),
+        ],
+        [
+          ...(openResult.failed
+            ? [`open-return-shipments: ${openResult.failed} kayıt`]
+            : []),
+          ...(finalizeResult.failed
+            ? [`finalize-returned-shipments: ${finalizeResult.failed} kayıt`]
+            : []),
+        ],
+      );
+    }
     return {
-      summary: `${opened} açıldı · ${finalized} finalize · ${expired} süre doldu · ${waitExpired} teslim-bekleme doldu`,
-      stats: { opened, finalized, expired, waitExpired },
+      summary: `${openResult.processed} açıldı · ${finalizeResult.processed} finalize · ${expired} süre doldu · ${waitExpired} teslim-bekleme doldu`,
+      stats: {
+        opened: openResult.processed,
+        finalized: finalizeResult.processed,
+        expired,
+        waitExpired,
+        failed,
+      },
     };
   }
 
-  private async openReturnShipmentsForDeliveredOrders(): Promise<number> {
+  private async openReturnShipmentsForDeliveredOrders(): Promise<{
+    processed: number;
+    failed: number;
+  }> {
     const pending = await this.refundService.findPendingDeliveryToOpenReturn();
-    if (pending.length === 0) return 0;
+    if (pending.length === 0) return { processed: 0, failed: 0 };
     this.logger.log(
       `Opening return shipments for ${pending.length} delivered refund request(s)`,
     );
+    let processed = 0;
+    let failed = 0;
     for (const id of pending) {
       try {
         await this.refundService.openReturnShipment(id);
+        processed++;
       } catch (e) {
+        failed++;
         this.logger.error(
           `Failed to open return shipment for ${id}: ${(e as Error).message}`,
         );
       }
     }
-    return pending.length;
+    return { processed, failed };
   }
 
-  private async finalizeReturnedShipments(): Promise<number> {
+  private async finalizeReturnedShipments(): Promise<{
+    processed: number;
+    failed: number;
+  }> {
     const pending =
       await this.refundService.findReturnDeliveredPendingFinalize();
-    if (pending.length === 0) return 0;
+    if (pending.length === 0) return { processed: 0, failed: 0 };
     this.logger.log(
       `Finalizing refund for ${pending.length} returned shipment(s)`,
     );
+    let processed = 0;
+    let failed = 0;
     for (const id of pending) {
       try {
         await this.refundService.finalizeRefundForReturnedShipment(id);
+        processed++;
       } catch (e) {
+        failed++;
         this.logger.error(
           `Failed to finalize refund ${id}: ${(e as Error).message}`,
         );
       }
     }
-    return pending.length;
+    return { processed, failed };
   }
 }

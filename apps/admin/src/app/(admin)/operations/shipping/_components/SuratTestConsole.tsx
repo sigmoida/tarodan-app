@@ -7,21 +7,29 @@ import { Button, Input } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { extractErrorMessage } from "@/lib/error";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { useConfirm } from "@/provider/ConfirmProvider";
 
 /**
  * Dev tool: fires real Sürat REST endpoints and shows the raw responses. These
- * are diagnostic POSTs (they don't touch app data/cache), so they stay as plain
- * imperative calls with local result state — not useAdminMutation.
+ * are diagnostic POSTs. A successful create opens a durable manual-cleanup task
+ * because the approved provider contract has no remote-cancel endpoint.
  */
 export function SuratTestConsole() {
   const t = useTranslations();
+  const confirm = useConfirm();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
   const [cref, setCref] = useState("");
-  const [opLoading, setOpLoading] = useState<null | "track" | "cancel">(null);
+  const [opLoading, setOpLoading] = useState(false);
   const [opResult, setOpResult] = useState<any>(null);
 
   async function runEndpointTest() {
+    const approved = await confirm({
+      title: t("admin.operations.shipping.surat.testConfirmTitle"),
+      description: t("admin.operations.shipping.surat.testConfirmDescription"),
+      confirmLabel: t("admin.operations.shipping.surat.createAndTrack"),
+    });
+    if (!approved) return;
     setTesting(true);
     setTestResult(null);
     try {
@@ -40,19 +48,16 @@ export function SuratTestConsole() {
     }
   }
 
-  async function runOp(op: "track" | "cancel") {
+  async function runTrackingQuery() {
     const r = cref.trim();
     if (!r) {
       toast.error(t("admin.operations.shipping.surat.enterRefFirst"));
       return;
     }
-    setOpLoading(op);
+    setOpLoading(true);
     setOpResult(null);
     try {
-      const res =
-        op === "track"
-          ? await adminApi.suratTestTrack(r)
-          : await adminApi.suratTestCancel(r);
+      const res = await adminApi.suratTestTrack(r);
       setOpResult(res.data);
     } catch (error) {
       setOpResult({
@@ -62,7 +67,7 @@ export function SuratTestConsole() {
         ),
       });
     } finally {
-      setOpLoading(null);
+      setOpLoading(false);
     }
   }
 
@@ -103,6 +108,23 @@ export function SuratTestConsole() {
                 {t("admin.operations.shipping.surat.reference")}:{" "}
                 <span className="text-body">{testResult.ref}</span>
               </div>
+              {testResult.create?.ok && (
+                <div
+                  className={
+                    testResult.cleanupTask?.ok
+                      ? "text-success-600"
+                      : "text-danger-600"
+                  }
+                >
+                  {testResult.cleanupTask?.ok
+                    ? t("admin.operations.shipping.surat.cleanupTaskCreated", {
+                        id: testResult.cleanupTask.id,
+                      })
+                    : t("admin.operations.shipping.surat.cleanupTaskFailed", {
+                        error: testResult.cleanupTask?.error ?? "—",
+                      })}
+                </div>
+              )}
               <div>
                 {t("admin.operations.shipping.surat.step1")}{" "}
                 <span
@@ -153,18 +175,10 @@ export function SuratTestConsole() {
           <Button
             variant="outline"
             size="sm"
-            isLoading={opLoading === "track"}
-            onClick={() => runOp("track")}
+            isLoading={opLoading}
+            onClick={runTrackingQuery}
           >
             {t("admin.operations.shipping.surat.trackQuery")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            isLoading={opLoading === "cancel"}
-            onClick={() => runOp("cancel")}
-          >
-            {t("admin.operations.shipping.surat.cancelShipment")}
           </Button>
         </div>
         {opResult && (

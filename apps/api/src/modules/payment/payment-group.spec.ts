@@ -32,6 +32,8 @@ import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { CARGO_PROVIDER } from "../surat-cargo/cargo-provider";
+import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
+import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
 import { I18nService } from "../i18n";
@@ -244,6 +246,8 @@ describe("PaymentService group payment (checkout group)", () => {
         { provide: SuratCargoService, useValue: {} },
         // Faz 11.5a: PaymentCommonService artık CARGO_PROVIDER token'ına bağlı.
         { provide: CARGO_PROVIDER, useValue: {} },
+        { provide: OrderShipmentProvisioner, useValue: {} },
+        { provide: CarrierCancellationService, useValue: {} },
         { provide: CommissionLedgerService, useValue: mockCommissionLedger },
         {
           provide: StorageService,

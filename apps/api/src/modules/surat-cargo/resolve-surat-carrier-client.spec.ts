@@ -1,6 +1,6 @@
 import { resolveSuratCarrierClient } from "./surat-cargo.module";
 import { RestSuratClient } from "./surat-rest.client";
-import { StubSuratSoapClient, LiveSuratSoapClient } from "./surat-soap.client";
+import { StubSuratSoapClient } from "./surat-soap.client";
 
 /**
  * Stub fail-fast: production'da kargo AÇIKken SURAT_SOAP_MODE gerçek bir taşıyıcı
@@ -61,10 +61,13 @@ describe("resolveSuratCarrierClient — stub fail-fast + mode seçimi", () => {
     );
   });
 
-  it("mode 'live' → LiveSuratSoapClient", () => {
-    const config = makeConfig({ SURAT_SOAP_MODE: "live" });
-    expect(resolveSuratCarrierClient(config)).toBeInstanceOf(
-      LiveSuratSoapClient,
-    );
-  });
+  it.each(["live", "soap"])(
+    "mode '%s' → reddedilir; yalnız belgeli REST akışı desteklenir",
+    (mode) => {
+      const config = makeConfig({ SURAT_SOAP_MODE: mode });
+      expect(() => resolveSuratCarrierClient(config)).toThrow(
+        /yalnız resmi REST/,
+      );
+    },
+  );
 });

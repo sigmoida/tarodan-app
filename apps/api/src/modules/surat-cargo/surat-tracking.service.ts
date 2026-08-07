@@ -1,8 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type {
-  SuratTakipResponse,
-  SuratGonderiPayload,
-} from "./surat-cargo.types";
+import type { SuratTakipResponse } from "./surat-cargo.types";
 import { SuratTrackingClient } from "./surat-tracking.client";
 import { OrderTrackingSyncService } from "./order-tracking-sync.service";
 import { TradeTrackingSyncService } from "./trade-tracking-sync.service";
@@ -17,8 +14,8 @@ export type { BarcodeRetryStat } from "./barcode-retry.service";
 
 /**
  * SuratTrackingService (Faz 11.3a): THIN FACADE. Eski 1766-LOC god-service tek
- * sorumluluklu alt servislere bölündü; bu sınıf aynı public API'yi (12 metot,
- * aynı imzalar) koruyup çağrıyı ilgili alt servise devreder. Çağıranlar
+ * sorumluluklu alt servislere bölündü; bu sınıf takip/senkron/retry çağrılarını
+ * ilgili alt servise devreder. Çağıranlar
  * (shipping-scheduler, admin(.service/-shipping), refund) DEĞİŞMEZ.
  */
 @Injectable()
@@ -50,28 +47,6 @@ export class SuratTrackingService {
     error?: string;
   }> {
     return this.client.probeTracking(webSiparisKodu);
-  }
-
-  probeBarcode(payload: SuratGonderiPayload): Promise<{
-    ok: boolean;
-    isError?: boolean;
-    message?: string | null;
-    kargoTakipNo?: string | null;
-    barcodeCount?: number;
-    barcodeSample?: string | null;
-    error?: string;
-  }> {
-    return this.client.probeBarcode(payload);
-  }
-
-  probeGonderiSil(webSiparisKodu: string): Promise<{
-    ok: boolean;
-    httpStatus?: number;
-    isError?: boolean;
-    message?: string | null;
-    error?: string;
-  }> {
-    return this.client.probeGonderiSil(webSiparisKodu);
   }
 
   // ─── Order Shipment sync (OrderTrackingSyncService) ───────────────────────

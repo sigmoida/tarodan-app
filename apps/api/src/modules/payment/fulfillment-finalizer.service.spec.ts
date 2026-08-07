@@ -39,8 +39,8 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
     const eventService = {
       emitOrderPaid: jest.fn().mockResolvedValue(undefined),
     } as any;
-    const paymentCommon = {
-      ensureSuratShipmentForOrder: jest.fn().mockResolvedValue("created"),
+    const orderShipments = {
+      ensure: jest.fn().mockResolvedValue("created"),
     } as any;
     const ledger = {
       recordCapture: jest.fn().mockResolvedValue("grp-1"),
@@ -48,10 +48,10 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
     const svc = new FulfillmentFinalizer(
       prisma,
       eventService,
-      paymentCommon,
+      orderShipments,
       ledger,
     );
-    return { svc, prisma, eventService, paymentCommon, ledger };
+    return { svc, prisma, eventService, orderShipments, ledger };
   };
 
   it("capture YOKSA: existence-check yapar, recordCapture'ı doğru tutarlarla çağırır", async () => {
@@ -76,16 +76,14 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
   });
 
   it("capture VARSA: recordCapture ATLANIR (çift ledger yok) — order.paid+kargo yine koşar", async () => {
-    const { svc, ledger, eventService, paymentCommon } = make(true);
+    const { svc, ledger, eventService, orderShipments } = make(true);
 
     await svc.finalizePaidOrder(order, payment, {});
 
     expect(ledger.recordCapture).not.toHaveBeenCalled();
     // 2. ve 3. adımlar (order.paid + kargo) kendi idempotency'leriyle yine çalışır
     expect(eventService.emitOrderPaid).toHaveBeenCalledTimes(1);
-    expect(paymentCommon.ensureSuratShipmentForOrder).toHaveBeenCalledWith(
-      "o1",
-    );
+    expect(orderShipments.ensure).toHaveBeenCalledWith("o1");
   });
 
   /**
@@ -95,7 +93,7 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
    * kalan adımlar (order.paid + kargo) normal koşmalı.
    */
   it("eşzamanlı finalize'da P2002'yi yutar ve kalan adımları çalıştırır", async () => {
-    const { svc, ledger, eventService, paymentCommon } = make(false);
+    const { svc, ledger, eventService, orderShipments } = make(false);
     ledger.recordCapture.mockRejectedValue(
       Object.assign(new Error("Unique constraint failed"), { code: "P2002" }),
     );
@@ -105,13 +103,11 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
     ).resolves.toBeUndefined();
 
     expect(eventService.emitOrderPaid).toHaveBeenCalledTimes(1);
-    expect(paymentCommon.ensureSuratShipmentForOrder).toHaveBeenCalledWith(
-      "o1",
-    );
+    expect(orderShipments.ensure).toHaveBeenCalledWith("o1");
   });
 
   it("iptal edilmiş siparişte bildirim ve kargo yan etkilerini çalıştırmaz", async () => {
-    const { svc, prisma, eventService, paymentCommon } = make(false);
+    const { svc, prisma, eventService, orderShipments } = make(false);
     prisma.order.findUnique.mockResolvedValue({
       status: OrderStatus.cancelled,
     });
@@ -119,6 +115,17 @@ describe("FulfillmentFinalizer — ledger capture idempotency (#8)", () => {
     await svc.finalizePaidOrder(order, payment, {});
 
     expect(eventService.emitOrderPaid).not.toHaveBeenCalled();
-    expect(paymentCommon.ensureSuratShipmentForOrder).not.toHaveBeenCalled();
+    expect(orderShipments.ensure).not.toHaveBeenCalled();
+  });
+
+  it("kargo persist hatasını outbox retry için dışarı taşır", async () => {
+    const { svc, orderShipments } = make(false);
+    orderShipments.ensure.mockRejectedValue(
+      new Error("shipment db unavailable"),
+    );
+
+    await expect(svc.finalizePaidOrder(order, payment, {})).rejects.toThrow(
+      "shipment db unavailable",
+    );
   });
 });

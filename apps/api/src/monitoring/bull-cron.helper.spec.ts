@@ -28,6 +28,8 @@ describe("registerRepeatableCron", () => {
       {},
       {
         repeat: { cron: "15 4 * * *", tz: "Europe/Istanbul" },
+        attempts: 3,
+        backoff: { type: "exponential", delay: 30_000 },
         removeOnComplete: 50,
         removeOnFail: 50,
       },
@@ -47,12 +49,12 @@ describe("registerRepeatableCron", () => {
     expect(queue.add).toHaveBeenCalledTimes(1);
   });
 
-  it("kayıt hatası yutulur — açılışı bloklamaz", async () => {
+  it("kayıt hatasını yükseltir — cron'suz instance hazır başlamaz", async () => {
     const queue = makeQueue();
     (queue.add as jest.Mock).mockRejectedValue(new Error("redis down"));
 
     await expect(
       registerRepeatableCron(queue, "ornek-is", "0 * * * *", logger),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow("redis down");
   });
 });

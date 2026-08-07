@@ -834,6 +834,7 @@ export class PaymentRefundService {
 
       // Update payment status after successful refund
       let invoiceAdjustment: InvoiceRefundReversePayload | null = null;
+      let shipmentCancellationRequired = false;
       const refundCommitResult = await this.prisma
         .$transaction(async (tx) => {
           const oldStatus = payment.status;
@@ -1099,6 +1100,7 @@ export class PaymentRefundService {
             // artık "tam iade" sanılmaz; art arda kısmi iadeler tamı bulunca kapanır.
             const isFullRefund =
               isOrderFullyRefunded || Boolean(opts?.settlement?.closeOrder);
+            shipmentCancellationRequired = isFullRefund;
             // Stok: adet-bazlı iadede o kadar adet; TAM iadede tüm adet; tutar-bazlı
             // KISMİ iadede (admin jest/telafi) stok geri YÜKLENMEZ — alıcı malı elinde
             // tutar. Aksi halde 50 TL jest 1000 TL siparişin TÜM stoğunu geri yükler +
@@ -1176,20 +1178,22 @@ export class PaymentRefundService {
           // finalize tx'inde DEĞİL, POST-COMMIT çağrılır (notifyRefundOutcome, aşağıdaki
           // .then) → FOR UPDATE kilidi kısalır + bir bildirim hatası para-tx'ini abort etmez.
 
-          // Faz 5 (outbox): iade commit'iyle ATOMİK olarak "Sürat iptali" satırını yaz.
-          // Böylece post-commit anlık iptal (aşağıda) çökme/hata ile kaçsa bile drainer
-          // güvenilir şekilde iptal eder. Handler idempotent → çift iptal zararsız.
-          await this.outbox?.enqueue(tx, {
-            type: OUTBOX_SHIPMENT_CANCEL,
-            payload: {
-              orderId,
-              orderNumber:
-                payment.order?.orderNumber ??
-                refundTargetOrder?.orderNumber ??
+          // Kargo yalnız sipariş KÜMÜLATİF olarak tamamen iade edilip kapandığında
+          // iptal edilir. Tutar/adet bazlı kısmi iade siparişi açık bırakır; aktif
+          // kolinin takibini kesmek kalan ürünleri görünmez yapardı.
+          if (shipmentCancellationRequired) {
+            await this.outbox?.enqueue(tx, {
+              type: OUTBOX_SHIPMENT_CANCEL,
+              payload: {
                 orderId,
-            },
-            dedupeKey: `${OUTBOX_SHIPMENT_CANCEL}:${orderId}`,
-          });
+                orderNumber:
+                  payment.order?.orderNumber ??
+                  refundTargetOrder?.orderNumber ??
+                  orderId,
+              },
+              dedupeKey: `${OUTBOX_SHIPMENT_CANCEL}:${orderId}`,
+            });
+          }
 
           // Başarılı iadenin eLogo düzeltmesini de iade commit'iyle
           // Para/ledger mutasyonuyla ATOMİK sıraya al. Her refund attempt ayrı
@@ -1224,19 +1228,20 @@ export class PaymentRefundService {
             response.providerRefundId,
             opts?.skipRefundEvent,
           );
-          // After PayTR refund + DB updates succeed, cancel the Sürat shipment.
-          // Best-effort: a failure here doesn't undo the refund (money is already back).
-          try {
-            await this.paymentCommon.cancelSuratShipmentIfExists(
-              orderId,
-              payment.order?.orderNumber ??
-                refundTargetOrder?.orderNumber ??
+          if (shipmentCancellationRequired) {
+            // Para commit'inden sonra hızlı yol; aynı iş outbox'ta kalıcıdır.
+            try {
+              await this.paymentCommon.cancelSuratShipmentIfExists(
                 orderId,
-            );
-          } catch (err) {
-            this.logger.error(
-              `Sürat cancel failed after successful refund for order ${orderId}: ${(err as Error).message}. Manual cleanup may be needed.`,
-            );
+                payment.order?.orderNumber ??
+                  refundTargetOrder?.orderNumber ??
+                  orderId,
+              );
+            } catch (err) {
+              this.logger.error(
+                `Sürat cancel failed after successful refund for order ${orderId}: ${(err as Error).message}. Manual cleanup may be needed.`,
+              );
+            }
           }
           return response;
         });
