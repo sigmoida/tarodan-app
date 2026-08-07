@@ -261,7 +261,7 @@ export class TradeCommonService {
         recipientUserId: shipment.recipientUserId || undefined,
         carrier: shipment.carrier || undefined,
         trackingNumber: shipment.trackingNumber || undefined,
-        // Gerçek Sürat kargo kodu (KargoTakipNo) — şubede verilen numara.
+        // Gerçek Sürat kargo kodu (KargoTakipNo) — şube kabulünden sonra oluşur.
         cargoCode: shipment.providerTrackingId || undefined,
         status: shipment.status || undefined,
         shippedAt: shipment.shippedAt || undefined,

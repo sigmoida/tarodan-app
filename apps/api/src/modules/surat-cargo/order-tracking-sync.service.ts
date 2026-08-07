@@ -2,7 +2,10 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { PrismaService } from "../../prisma";
 import { ShipmentStatus, OrderStatus } from "@prisma/client";
-import type { SuratTakipGonderi } from "./surat-cargo.types";
+import type {
+  SuratTakipGonderi,
+  SuratTrackingLookupResult,
+} from "./surat-cargo.types";
 import {
   mapSuratStatusToShipmentStatus,
   isSuratDelivered,
@@ -50,9 +53,9 @@ export class OrderTrackingSyncService {
     if (!shipment.trackingNumber) {
       return false;
     }
-    const gonderi = await this.fetchParcel(shipment.trackingNumber);
-    if (!gonderi) return false;
-    return this.applyTrackingUpdate(shipment, gonderi);
+    const lookup = await this.fetchParcel(shipment.trackingNumber);
+    if (lookup.kind !== "found") return false;
+    return this.applyTrackingUpdate(shipment, lookup.gonderi);
   }
 
   /**
@@ -65,7 +68,11 @@ export class OrderTrackingSyncService {
    * paketin tüm satırlarına uygulanır. Statü geçişi (CAS) ve teslim escrow'u
    * satır bazında kalır — iade/ödeme muhasebesi sipariş bazlı olduğu için.
    */
-  async syncAllActiveShipments(): Promise<{ synced: number; failed: number }> {
+  async syncAllActiveShipments(): Promise<{
+    synced: number;
+    pending: number;
+    failed: number;
+  }> {
     // Only sync shipments that have a tracking reference. Auto-created
     // pending shipments without a Sürat tracking number would just spam
     // the API with "not found" responses.
@@ -99,20 +106,28 @@ export class OrderTrackingSyncService {
     }
 
     let synced = 0;
+    let pending = 0;
     let failed = 0;
 
     for (const [ref, siblings] of parcels) {
       try {
         // Tek Sürat çağrısı; sonuç kolinin tüm satırlarına uygulanır.
-        const gonderi = siblings[0].trackingNumber
+        const lookup = siblings[0].trackingNumber
           ? await this.fetchParcel(siblings[0].trackingNumber)
-          : null;
-        if (!gonderi) {
+          : ({ kind: "failure" } as const);
+        if (lookup.kind === "pending") {
+          pending += siblings.length;
+          continue;
+        }
+        if (lookup.kind !== "found") {
           failed += siblings.length;
           continue;
         }
         for (const shipment of siblings) {
-          const success = await this.applyTrackingUpdate(shipment, gonderi);
+          const success = await this.applyTrackingUpdate(
+            shipment,
+            lookup.gonderi,
+          );
           if (success) synced++;
           else failed++;
         }
@@ -123,17 +138,25 @@ export class OrderTrackingSyncService {
     }
 
     this.logger.log(
-      `Surat tracking sync: ${synced} synced, ${failed} failed out of ` +
+      `Surat tracking sync: ${synced} synced, ${pending} pending, ${failed} failed out of ` +
         `${activeShipments.length} shipments in ${parcels.size} parcels`,
     );
-    return { synced, failed };
+    return { synced, pending, failed };
   }
 
   /** Bir koliyi Sürat'tan tek sorguyla çeker (OzelKargoTakipNo = PKG-…). */
-  private async fetchParcel(ref: string): Promise<SuratTakipGonderi | null> {
-    const data = await this.client.fetchTrackingInfo(ref);
-    if (!data || data.Gonderiler.length === 0) return null;
-    return data.Gonderiler[0];
+  private async fetchParcel(
+    ref: string,
+  ): Promise<
+    | { kind: "found"; gonderi: SuratTakipGonderi }
+    | Exclude<SuratTrackingLookupResult, { kind: "found" }>
+  > {
+    const lookup = await this.client.lookupTracking(ref);
+    if (lookup.kind !== "found") return lookup;
+    const gonderi = lookup.data.Gonderiler[0];
+    return gonderi
+      ? { kind: "found", gonderi }
+      : { kind: "pending", message: "Takip kaydı henüz görünmüyor" };
   }
 
   private async applyTrackingUpdate(
@@ -154,6 +177,12 @@ export class OrderTrackingSyncService {
     const isReturnCompleted = isSuratReturnCompleted(
       gonderi.KargonunDurumuSayi,
     );
+    // KargoTakipHareketDetayi'nda gönderi satırının görünmesi, ön bildirimin
+    // şubede kabul edilip gerçek Sürat koduna dönüştüğü ilk güvenilir işarettir.
+    const firstPhysicalHandoff =
+      !shipment.shippedAt &&
+      Boolean(gonderi.KargoTakipNo) &&
+      !isSuratReturnFlow(gonderi.KargonunDurumuSayi);
 
     // #86: a re-poll can return a stale/older code; never regress a terminal
     // shipment (e.g. delivered → in_transit). Skip the update, keep current state.
@@ -171,6 +200,7 @@ export class OrderTrackingSyncService {
       providerStatusCode: gonderi.KargonunDurumuSayi,
       providerRawStatus: gonderi.KargonunDurumu,
     };
+    if (firstPhysicalHandoff) updateData.shippedAt = new Date();
 
     // Set tracking number and URL from Sürat if we don't have them yet
     if (!shipment.trackingNumber && gonderi.KargoTakipNo) {
@@ -239,6 +269,7 @@ export class OrderTrackingSyncService {
     // desen: CAS + escrow tek tx'te (ya ikisi ya hiçbiri; hata → rollback → sonraki poll
     // retry eder). handleOrderDelivered tx-güvenli (webhook de tx geçiyor) + idempotent.
     // Bildirim + event sync POST-COMMIT (dış I/O / kritik olmayan tx'e girmez).
+    let orderMarkedShipped = false;
     let deliveryResult: {
       acted: boolean;
       use48h: boolean;
@@ -247,10 +278,27 @@ export class OrderTrackingSyncService {
     } | null = null;
     const flipped = await this.prisma.$transaction(async (tx) => {
       const cas = await tx.shipment.updateMany({
-        where: { id: shipment.id, status: shipment.status },
+        where: {
+          id: shipment.id,
+          status: shipment.status,
+          ...(firstPhysicalHandoff ? { shippedAt: null } : {}),
+        },
         data: updateData,
       });
       if (cas.count === 0) return false;
+      if (firstPhysicalHandoff) {
+        const orderCas = await tx.order.updateMany({
+          where: {
+            id: shipment.orderId,
+            status: { in: [OrderStatus.paid, OrderStatus.preparing] },
+          },
+          data: {
+            status: OrderStatus.shipped,
+            version: { increment: 1 },
+          },
+        });
+        orderMarkedShipped = orderCas.count > 0;
+      }
       if (isDelivered) {
         const deliveredAt =
           updateData.deliveredAt instanceof Date
@@ -280,6 +328,26 @@ export class OrderTrackingSyncService {
 
     // Sync movement events (Hareketler) — POST-COMMIT (bilgi amaçlı, kritik değil).
     await this.syncShipmentEvents(shipment.id, gonderi);
+
+    // Sipariş statüsü CAS ile ilk kez shipped olduğunda tek seferlik alıcı bildirimi.
+    if (orderMarkedShipped && shipment.order?.buyerId) {
+      try {
+        const { NotificationService } =
+          await import("../notification/notification.service");
+        const notificationService = this.moduleRef.get(NotificationService, {
+          strict: false,
+        });
+        await notificationService?.notifyOrderShipped(
+          shipment.order.buyerId,
+          shipment.orderId,
+          gonderi.KargoTakipNo,
+        );
+      } catch (e: any) {
+        this.logger.warn(
+          `notify order-shipped failed (poll) for ${shipment.orderId}: ${e?.message}`,
+        );
+      }
+    }
 
     // 48h teslim-onay bildirimi — POST-COMMIT best-effort (dış I/O tx'e girmez).
     const dr = deliveryResult as {

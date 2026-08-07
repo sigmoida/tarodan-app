@@ -30,6 +30,7 @@ const SAMPLE: Record<string, string> = {
   offerLink: "/listings",
   announcementLink: "https://tarodan.com.tr/duyuru",
   link: "https://tarodan.com.tr/duyuru",
+  adminLink: "https://admin.tarodan.com.tr/operations/refund-requests/refund-1",
   audience: "buyer",
 };
 
@@ -272,6 +273,12 @@ describe("bildirim hedefleri", () => {
           orderId: "o1",
         }),
       ).toBe("/seller/orders/o1");
+      expect(
+        resolveWebNotificationLink(
+          NotificationType.REFUND_REQUEST_RECEIVED_SELLER,
+          { orderId: "o1" },
+        ),
+      ).toBe("/seller/orders/o1");
     });
   });
 
@@ -297,6 +304,15 @@ describe("bildirim hedefleri", () => {
           offerLink: "/listings",
         }),
       ).toBe("/listings");
+      expect(
+        resolveWebNotificationLink(
+          NotificationType.REFUND_REVIEW_REQUIRED_ADMIN,
+          {
+            adminLink:
+              "https://admin.tarodan.com.tr/operations/refund-requests/r1",
+          },
+        ),
+      ).toBe("https://admin.tarodan.com.tr/operations/refund-requests/r1");
     });
 
     it.each([

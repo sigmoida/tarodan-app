@@ -156,6 +156,25 @@ export function SuratTestConsole() {
                   </span>
                 )}
               </div>
+              {testResult.track?.kargoTakipNo && (
+                <div>
+                  {t("admin.operations.common.trackingNumber")}:{" "}
+                  {testResult.track?.takipUrl ? (
+                    <a
+                      href={testResult.track.takipUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary-600 hover:underline"
+                    >
+                      {testResult.track.kargoTakipNo}
+                    </a>
+                  ) : (
+                    <span className="text-body">
+                      {testResult.track.kargoTakipNo}
+                    </span>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

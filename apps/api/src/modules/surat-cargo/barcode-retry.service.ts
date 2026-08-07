@@ -3,7 +3,6 @@ import { ModuleRef } from "@nestjs/core";
 import { CacheService } from "../cache/cache.service";
 import { PrismaService } from "../../prisma";
 import { Prisma, ShipmentStatus, OrderStatus } from "@prisma/client";
-import { notifyUser } from "./surat-tracking-support";
 import { CronStepFailuresError } from "../../monitoring/cron-step-runner";
 import { OrderShipmentProvisioner } from "./order-shipment-provisioner.service";
 
@@ -16,9 +15,11 @@ export interface BarcodeRetryStat {
 }
 
 /**
- * BarcodeRetryService (Faz 11.3a): kodsuz kalmış (providerTrackingId NULL)
- * order/trade kayıtları için barkod oluşturmayı yaş-filtreli + üstel backoff'lu
- * yeniden dener; pencereden düşenleri alarmlar.
+ * BarcodeRetryService (Faz 11.3a): taşıyıcı ön kaydı tamamlanamamış `pending`
+ * order/trade kayıtları için resmi gönderi oluşturmayı yaş-filtreli + üstel
+ * backoff'lu yeniden dener; pencereden düşenleri alarmlar. `label_created` ve
+ * providerTrackingId NULL ise bu normal şube-kabul bekleyişidir; takip poller'ı
+ * gerçek KargoTakipNo'yu daha sonra doldurur.
  */
 @Injectable()
 export class BarcodeRetryService {
@@ -161,7 +162,7 @@ export class BarcodeRetryService {
       where: {
         provider: "surat",
         providerTrackingId: null,
-        status: { in: [ShipmentStatus.pending, ShipmentStatus.label_created] },
+        status: ShipmentStatus.pending,
         createdAt: { lt: createdAfter, gte: oldest },
         order: { status: { in: [OrderStatus.paid, OrderStatus.preparing] } },
       },
@@ -209,7 +210,7 @@ export class BarcodeRetryService {
     const agedTradeLegs = await this.prisma.tradeShipment.findMany({
       where: {
         providerTrackingId: null,
-        status: { in: [ShipmentStatus.pending, ShipmentStatus.label_created] },
+        status: ShipmentStatus.pending,
         createdAt: { lt: createdAfter, gte: oldest },
         OR: [{ carrier: "surat" }, { leg: "return", carrier: "pending" }],
       },
@@ -238,9 +239,7 @@ export class BarcodeRetryService {
     const codelessWhere: Prisma.ShipmentWhereInput = {
       provider: "surat",
       providerTrackingId: null,
-      status: {
-        in: [ShipmentStatus.pending, ShipmentStatus.label_created],
-      },
+      status: ShipmentStatus.pending,
       trackingNumber: { not: null },
       createdAt: { gte: createdAfter, lte: createdBefore },
       // Siparişi hâlâ canlı olanlar; iptal/teslim/iade akışına düşmüş sipariş
@@ -315,18 +314,18 @@ export class BarcodeRetryService {
         if (res === "created" || res === "revived") {
           const persisted = await this.prisma.shipment.findFirst({
             where: { orderId: o.id, provider: "surat" },
-            select: { providerTrackingId: true },
+            select: { providerTrackingId: true, status: true },
           });
-          if (persisted?.providerTrackingId) {
+          if (persisted?.status === ShipmentStatus.label_created) {
             retried++;
             await this.clearRetryBackoff("order-orphan", o.id);
             this.logger.log(
-              `Retry OK: shipment ${res} with cargo code for order ${o.orderNumber}`,
+              `Retry OK: shipment ${res} and registered with carrier for order ${o.orderNumber}`,
             );
           } else {
             failed++;
             this.logger.warn(
-              `Retry created shipment row but cargo code is still pending for order ${o.orderNumber}`,
+              `Retry created shipment row but carrier registration is still pending for order ${o.orderNumber}`,
             );
           }
         } else if (res === "skipped") {
@@ -351,34 +350,20 @@ export class BarcodeRetryService {
           // packageNumber'a dönüp iptal edilmiş eski gönderiyi açmasını engelle.
           s.trackingNumber ?? undefined,
         );
-        if (barcode?.kargoTakipNo) {
+        if (barcode) {
           await this.prisma.shipment.update({
             where: { id: s.id },
             data: {
               providerTrackingId: barcode.kargoTakipNo,
               labelZpl: barcode.labelZpl ?? null,
+              status: ShipmentStatus.label_created,
             },
           });
           retried++;
           await this.clearRetryBackoff("order", s.id);
           this.logger.log(
-            `Retry OK: order barcode filled shipment=${s.id} oid=${s.trackingNumber} code=${barcode.kargoTakipNo}`,
+            `Retry OK: order registered shipment=${s.id} oid=${s.trackingNumber} code=${barcode.kargoTakipNo ?? "pending-carrier-acceptance"}`,
           );
-          // A2: kod gecikmeli oluştu — satıcı "hazırlanıyor" görüp bekliyordu;
-          // artık şubeye gidebilir, haber ver.
-          if (s.order) {
-            await notifyUser(
-              this.moduleRef,
-              this.logger,
-              s.order.sellerId,
-              "CARGO_CODE_READY",
-              {
-                reference: s.order.orderNumber,
-                orderId: s.orderId,
-                link: `/orders/${s.orderId}`,
-              },
-            );
-          }
         } else {
           failed++;
           await this.recordRetryFailure("order", s.id);
@@ -407,9 +392,7 @@ export class BarcodeRetryService {
       carrier: "surat",
       providerTrackingId: null,
       leg: "to_warehouse",
-      status: {
-        in: [ShipmentStatus.pending, ShipmentStatus.label_created],
-      },
+      status: ShipmentStatus.pending,
       trackingNumber: { not: null },
       fromAddressId: { not: null },
       createdAt: { gte: createdAfter, lte: createdBefore },
@@ -427,9 +410,7 @@ export class BarcodeRetryService {
       leg: "return",
       providerTrackingId: null,
       carrier: { in: ["pending", "surat"] },
-      status: {
-        in: [ShipmentStatus.pending, ShipmentStatus.label_created],
-      },
+      status: ShipmentStatus.pending,
       createdAt: { gte: createdAfter, lte: createdBefore },
     };
     const returns = await this.prisma.tradeShipment.findMany({

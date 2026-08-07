@@ -22,7 +22,8 @@ export interface CargoShipmentRequest {
 export type CargoShipmentResult =
   | {
       ok: true;
-      trackingCode: string;
+      /** Taşıyıcının gerçek takip kodu; şube kabulünden önce henüz null olabilir. */
+      trackingCode: string | null;
       labelData: string | null;
       providerMessage?: string;
     }

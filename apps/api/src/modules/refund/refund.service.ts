@@ -8,6 +8,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import {
+  AdminRole,
   OrderStatus,
   OrderCancellationReason,
   PaymentHoldStatus,
@@ -152,6 +153,70 @@ export class RefundService {
     } catch (err: any) {
       this.logger.error(
         `Notification ${type} → ${userId} failed: ${err?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Yeni ve kalıcı bir iade talebini satıcıya bildirir. Yönetici incelemesi
+   * gerekiyorsa yalnız iade kararı verebilen aktif admin/super-admin hesaplarına
+   * ayrıca operasyon uyarısı gönderir. Bildirim arızaları ticaret akışını bozmaz.
+   */
+  private async notifyRefundRequestOpened(input: {
+    refundRequestId: string;
+    refundNumber: string;
+    orderId: string;
+    sellerId: string;
+    reason: string;
+    requiresAdminReview: boolean;
+  }): Promise<void> {
+    await this.safeNotify(
+      input.sellerId,
+      NotificationType.REFUND_REQUEST_RECEIVED_SELLER,
+      {
+        refundNumber: input.refundNumber,
+        orderId: input.orderId,
+      },
+    );
+    await this.sendRefundEmail(
+      input.refundRequestId,
+      "seller",
+      "refund-requested-seller",
+      { refundNumber: input.refundNumber, refundReason: input.reason },
+    );
+
+    if (!input.requiresAdminReview) return;
+
+    try {
+      const admins = await this.prisma.adminUser.findMany({
+        where: {
+          isActive: true,
+          role: { in: [AdminRole.super_admin, AdminRole.admin] },
+        },
+        select: { userId: true },
+      });
+      const adminBaseUrl =
+        process.env.ADMIN_URL?.replace(/\/$/, "") ||
+        (process.env.NODE_ENV === "production"
+          ? "https://admin.tarodan.com.tr"
+          : "http://localhost:3002");
+      const adminLink = `${adminBaseUrl}/operations/refund-requests/${encodeURIComponent(input.refundRequestId)}`;
+
+      for (const admin of admins) {
+        await this.safeNotify(
+          admin.userId,
+          NotificationType.REFUND_REVIEW_REQUIRED_ADMIN,
+          {
+            refundRequestId: input.refundRequestId,
+            refundNumber: input.refundNumber,
+            orderId: input.orderId,
+            adminLink,
+          },
+        );
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `Refund review admin notifications failed for ${input.refundNumber}: ${error?.message}`,
       );
     }
   }
@@ -373,6 +438,7 @@ export class RefundService {
     }
     const preHandoverShipmentStatuses: ShipmentStatus[] = [
       ShipmentStatus.pending,
+      ShipmentStatus.label_created,
       ShipmentStatus.cancelled,
       ShipmentStatus.failed,
     ];
@@ -452,6 +518,14 @@ export class RefundService {
         action: "cancellation_pending_admin_review",
         by: requesterId,
         details: { reasonCode, policyCode: policy.policyCode },
+      });
+      await this.notifyRefundRequestOpened({
+        refundRequestId: created.id,
+        refundNumber,
+        orderId: order.id,
+        sellerId: order.sellerId,
+        reason: reasonCode,
+        requiresAdminReview: true,
       });
       return created;
     }
@@ -926,7 +1000,8 @@ export class RefundService {
         status: RefundRequestStatus.return_shipment_open,
         returnProvider: "surat",
         returnTrackingNumber: rr.refundNumber,
-        // Real Sürat return code (KargoTakipNo) + label, created immediately.
+        // Gerçek Sürat kodu şube kabulünden önce null kalabilir; kullanıcı
+        // paketi returnTrackingNumber (OzelKargoTakipNo) ile şubeye teslim eder.
         returnProviderTrackingId: result.trackingCode,
         returnLabelZpl: result.labelData,
         returnStatus: ShipmentStatus.label_created,
@@ -1314,7 +1389,7 @@ export class RefundService {
     // sarmasın (ör. returned → in_transit).
     const current = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
-      select: { returnStatus: true },
+      select: { returnStatus: true, returnShippedAt: true },
     });
     if (
       current?.returnStatus &&
@@ -1360,9 +1435,12 @@ export class RefundService {
       refundNumber: updated.refundNumber,
       orderId: updated.orderId,
     };
+    const statusChanged = current?.returnStatus !== update.status;
     if (
-      update.status === ShipmentStatus.in_transit ||
-      update.status === ShipmentStatus.picked_up
+      statusChanged &&
+      (update.status === ShipmentStatus.in_transit ||
+        update.status === ShipmentStatus.picked_up ||
+        update.status === ShipmentStatus.return_in_progress)
     ) {
       await this.safeNotify(
         updated.requesterId,
@@ -1385,8 +1463,9 @@ export class RefundService {
         },
       );
     } else if (
-      update.status === ShipmentStatus.delivered ||
-      update.status === ShipmentStatus.returned
+      statusChanged &&
+      (update.status === ShipmentStatus.delivered ||
+        update.status === ShipmentStatus.returned)
     ) {
       await this.safeNotify(
         updated.requesterId,
@@ -1450,6 +1529,7 @@ export class RefundService {
       const stillNotShipped =
         !order.shipment ||
         order.shipment.status === ShipmentStatus.pending ||
+        order.shipment.status === ShipmentStatus.label_created ||
         order.shipment.status === ShipmentStatus.cancelled ||
         order.shipment.status === ShipmentStatus.failed;
       return stillNotShipped ? "preparing" : "in_cooling_off";
@@ -1680,6 +1760,7 @@ export class RefundService {
   private async createInstantRefund(
     order: {
       id: string;
+      sellerId: string;
       totalAmount: Prisma.Decimal;
       orderNumber: string;
       quantity?: number;
@@ -1745,6 +1826,14 @@ export class RefundService {
         action: "pending_admin_review",
         by: requesterId,
         details: { policyCode: policy.policyCode },
+      });
+      await this.notifyRefundRequestOpened({
+        refundRequestId: created.id,
+        refundNumber,
+        orderId: order.id,
+        sellerId: order.sellerId,
+        reason: dto.reason,
+        requiresAdminReview: true,
       });
       return created;
     }
@@ -1836,6 +1925,7 @@ export class RefundService {
   private async createCoolingOffRefund(
     order: {
       id: string;
+      sellerId: string;
       totalAmount: Prisma.Decimal;
       status: OrderStatus;
       shipment: { status: ShipmentStatus } | null;
@@ -1901,6 +1991,14 @@ export class RefundService {
 
     // İade açıldı → satıcı hold'unu kilitle (payout bu iade kapanana kadar bloke).
     await this.freezeHoldForRefund(order.id, created.id);
+    await this.notifyRefundRequestOpened({
+      refundRequestId: created.id,
+      refundNumber,
+      orderId: order.id,
+      sellerId: order.sellerId,
+      reason: dto.reason,
+      requiresAdminReview: requiresReview,
+    });
 
     if (requiresReview) {
       await this.appendHistory(created.id, {

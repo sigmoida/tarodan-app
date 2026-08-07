@@ -47,6 +47,7 @@ const envSchema = z
 
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
     FRONTEND_URL: z.string().optional(),
+    ADMIN_URL: z.string().optional(),
     API_URL: z.string().optional(),
 
     // Auth realm secrets — each realm sets its own; no cross-realm fallback.
@@ -82,6 +83,10 @@ const envSchema = z
     SURAT_KARGO_TEST_MODE: z.string().optional(),
     SURAT_KARGO_CARI_KODU: z.string().optional(),
     SURAT_KARGO_SIFRE: z.string().optional(),
+    SURAT_SOAP_TIMEOUT_MS: z.string().optional(),
+    SURAT_TRACKING_TIMEOUT_MS: z.string().optional(),
+    SURAT_CARGO_MAX_RETRIES: z.string().optional(),
+    SURAT_CARGO_RETRY_BASE_MS: z.string().optional(),
 
     // eLogo — when enabled in production it must use the live SOAP client.
     ELOGO_ENABLED: z.string().optional(),

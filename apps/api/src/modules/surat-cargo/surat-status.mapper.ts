@@ -1,4 +1,4 @@
-import { ShipmentStatus } from '@prisma/client';
+import { ShipmentStatus } from "@prisma/client";
 
 /**
  * Maps Sürat Kargo KargonunDurumuSayi (1-16) to our ShipmentStatus enum.
@@ -23,15 +23,17 @@ import { ShipmentStatus } from '@prisma/client';
  *  16 = İade Yönlendirme Sürecinde
  */
 const SURAT_STATUS_MAP: Record<number, ShipmentStatus> = {
-  1:  ShipmentStatus.pending,
-  2:  ShipmentStatus.in_transit,
-  3:  ShipmentStatus.in_transit,
-  4:  ShipmentStatus.at_delivery_branch,
-  5:  ShipmentStatus.out_for_delivery,
-  6:  ShipmentStatus.delivered,
-  7:  ShipmentStatus.delivered,
-  8:  ShipmentStatus.in_transit,
-  9:  ShipmentStatus.return_in_progress,
+  // Takip ucunda kod 1'in görünmesi, önceki "kargo kabul bekleniyor" cevabının
+  // bittiği ve paketin şubede fiziksel kabul edildiği anlamına gelir.
+  1: ShipmentStatus.picked_up,
+  2: ShipmentStatus.in_transit,
+  3: ShipmentStatus.in_transit,
+  4: ShipmentStatus.at_delivery_branch,
+  5: ShipmentStatus.out_for_delivery,
+  6: ShipmentStatus.delivered,
+  7: ShipmentStatus.delivered,
+  8: ShipmentStatus.in_transit,
+  9: ShipmentStatus.return_in_progress,
   10: ShipmentStatus.return_in_progress,
   11: ShipmentStatus.return_in_progress,
   12: ShipmentStatus.returned,

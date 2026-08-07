@@ -385,6 +385,7 @@ export class TradeShipmentService {
                 data: {
                   providerTrackingId: result.trackingCode,
                   labelZpl: result.labelData,
+                  status: ShipmentStatus.label_created,
                 },
               })
               .catch((e) =>
@@ -564,27 +565,8 @@ export class TradeShipmentService {
         },
       });
       this.logger.log(
-        `Retry OK: trade inbound barcode filled ${tradeShipmentId} oid=${ship.trackingNumber} code=${result.trackingCode}`,
+        `Retry OK: trade inbound registered ${tradeShipmentId} oid=${ship.trackingNumber} code=${result.trackingCode ?? "pending-carrier-acceptance"}`,
       );
-      // A2/C24: kod gecikmeli oluştu — gönderen "hazırlanıyor" görüp bekliyordu;
-      // artık şubeye gidebilir, haber ver.
-      try {
-        await this.notificationService.createInAppNotification(
-          ship.shipperId,
-          NotificationType.CARGO_CODE_READY,
-          {
-            reference: ship.trade.tradeNumber,
-            // Hedef `tradeId`den merkezî çözümleyici tarafından üretilir;
-            // burada serbest link göndermek web'de olmayan `/trades/:id`
-            // yolunu kaydediyordu.
-            tradeId: ship.tradeId,
-          },
-        );
-      } catch (err: any) {
-        this.logger.warn(
-          `CARGO_CODE_READY notify failed trade-shipment=${tradeShipmentId}: ${err?.message}`,
-        );
-      }
       return true;
     } catch (e: any) {
       this.logger.error(

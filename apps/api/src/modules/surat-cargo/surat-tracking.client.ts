@@ -1,6 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { SuratTakipResponse } from "./surat-cargo.types";
+import type {
+  SuratTakipResponse,
+  SuratTrackingLookupResult,
+} from "./surat-cargo.types";
 
 const SURAT_API_LIVE =
   "https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi";
@@ -38,13 +41,27 @@ export class SuratTrackingClient {
 
   constructor(private readonly configService: ConfigService) {}
 
+  private timeoutMs(): number {
+    const configured = Number(
+      this.configService.get<string>(
+        "SURAT_TRACKING_TIMEOUT_MS",
+        this.configService.get<string>("SURAT_SOAP_TIMEOUT_MS", "15000"),
+      ),
+    );
+    return Number.isFinite(configured) && configured > 0 ? configured : 15000;
+  }
+
+  private isAcceptancePending(message: string): boolean {
+    return /veri\s+aktar[ıi]m[ıi].*kargo\s+kabul\s+bekleniyor/i.test(message);
+  }
+
   /**
-   * Query Sürat Kargo tracking API for a shipment by our order reference (OzelKargoTakipNo).
-   * Returns the raw Sürat response or null on failure.
+   * Ham takip sonucunu operasyonel durumlara ayırır. Böylece normal şube-kabul
+   * bekleyişi cron hatası sayılmaz; yetki/HTTP/timeout gerçekten alarm üretir.
    */
-  async fetchTrackingInfo(
+  async lookupTracking(
     webSiparisKodu: string,
-  ): Promise<SuratTakipResponse | null> {
+  ): Promise<SuratTrackingLookupResult> {
     const cariKodu = this.configService.get<string>(
       "SURAT_KARGO_CARI_KODU",
       "",
@@ -52,10 +69,10 @@ export class SuratTrackingClient {
     const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
 
     if (!cariKodu || !sifre) {
-      this.logger.error(
-        "SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured",
-      );
-      return null;
+      const message =
+        "SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured";
+      this.logger.error(message);
+      return { kind: "failure", category: "configuration", message };
     }
 
     const isTestMode =
@@ -63,43 +80,95 @@ export class SuratTrackingClient {
         .get<string>("SURAT_KARGO_TEST_MODE", "true")
         ?.trim() !== "false";
     const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
-
     const url = buildAuthedSuratUrl(baseUrl, cariKodu, sifre, webSiparisKodu);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs());
 
     try {
       const response = await fetch(url, {
         method: "POST",
         headers: { Accept: "application/json" },
+        // Sürat IIS boş POST'ta Content-Length: 0 bekliyor.
+        body: "",
         signal: controller.signal,
       });
+      const text = await response.text();
 
       if (!response.ok) {
-        this.logger.warn(
-          `Surat tracking API HTTP ${response.status} for ${webSiparisKodu}`,
-        );
-        return null;
+        const message = `Surat tracking API HTTP ${response.status} for ${webSiparisKodu}`;
+        this.logger.warn(message);
+        return {
+          kind: "failure",
+          category: "http",
+          message,
+          httpStatus: response.status,
+        };
       }
 
-      const data: SuratTakipResponse = await response.json();
+      let data: SuratTakipResponse;
+      try {
+        data = JSON.parse(text) as SuratTakipResponse;
+      } catch {
+        const message = `Surat tracking API returned non-JSON for ${webSiparisKodu}`;
+        this.logger.warn(message);
+        return { kind: "failure", category: "parse", message };
+      }
 
       if (data.IsError) {
+        const providerMessage = String(data.errorMessage ?? "").trim();
+        if (this.isAcceptancePending(providerMessage)) {
+          this.logger.debug(
+            `Surat tracking pending carrier acceptance for ${webSiparisKodu}`,
+          );
+          return {
+            kind: "pending",
+            message: providerMessage || "Kargo kabul bekleniyor",
+          };
+        }
         this.logger.warn(
-          `Surat tracking API error for ${webSiparisKodu}: ${data.errorMessage}`,
+          `Surat tracking API error for ${webSiparisKodu}: ${providerMessage}`,
         );
-        return null;
+        return {
+          kind: "failure",
+          category: "provider",
+          message: providerMessage || "Bilinmeyen Sürat takip hatası",
+        };
       }
 
-      return data;
+      if (!Array.isArray(data.Gonderiler) || data.Gonderiler.length === 0) {
+        return {
+          kind: "pending",
+          message: data.errorMessage || "Takip kaydı henüz görünmüyor",
+        };
+      }
+
+      return { kind: "found", data };
     } catch (error: any) {
-      this.logger.error(
-        `Surat tracking API request failed for ${webSiparisKodu}: ${redactSuratUrl(String(error?.message ?? error))}`,
-      );
-      return null;
+      const aborted = error?.name === "AbortError";
+      const message = aborted
+        ? `Surat tracking API timed out after ${this.timeoutMs()}ms for ${webSiparisKodu}`
+        : `Surat tracking API request failed for ${webSiparisKodu}: ${redactSuratUrl(String(error?.message ?? error))}`;
+      if (aborted) this.logger.warn(message);
+      else this.logger.error(message);
+      return {
+        kind: "failure",
+        category: aborted ? "timeout" : "network",
+        message,
+      };
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * Query Sürat Kargo tracking API for a shipment by our order reference (OzelKargoTakipNo).
+   * Returns the raw Sürat response or null on failure.
+   */
+  async fetchTrackingInfo(
+    webSiparisKodu: string,
+  ): Promise<SuratTakipResponse | null> {
+    const result = await this.lookupTracking(webSiparisKodu);
+    return result.kind === "found" ? result.data : null;
   }
 
   /**
@@ -115,6 +184,8 @@ export class SuratTrackingClient {
     message?: string | null;
     gonderiCount?: number;
     durum?: string | null;
+    kargoTakipNo?: string | null;
+    takipUrl?: string | null;
     error?: string;
   }> {
     const cariKodu = this.configService.get<string>(
@@ -135,7 +206,7 @@ export class SuratTrackingClient {
     const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
     const url = buildAuthedSuratUrl(baseUrl, cariKodu, sifre, webSiparisKodu);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs());
 
     try {
       // Sürat (IIS) POST'ta Content-Length ister → boş gövde ile 0 gönderiyoruz.
@@ -164,6 +235,8 @@ export class SuratTrackingClient {
         message: body?.errorMessage ?? null,
         gonderiCount: body?.Gonderiler?.length ?? 0,
         durum: body?.Gonderiler?.[0]?.KargonunDurumu ?? null,
+        kargoTakipNo: body?.Gonderiler?.[0]?.KargoTakipNo ?? null,
+        takipUrl: body?.Gonderiler?.[0]?.TakipUrl ?? null,
       };
     } catch (error: any) {
       return {

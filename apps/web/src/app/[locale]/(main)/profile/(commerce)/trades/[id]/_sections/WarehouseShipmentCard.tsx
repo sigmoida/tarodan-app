@@ -39,11 +39,13 @@ export default function WarehouseShipmentCard({
         <p className="text-xs uppercase text-subtle mb-1">
           {t("trade.warehouseShipping.yourShipment")}
         </p>
-        {/* L1: gerçek Sürat kodu yoksa iç referansı (trackingNumber) KOD GİBİ
-           gösterme — şubede geçersiz. Kod gelene dek bekleme mesajı. */}
-        {myToWarehouseShipment?.cargoCode ? (
+        {/* Şubeye teslimde OzelKargoTakipNo kullanılır; fiziksel kabulden sonra
+           gerçek KargoTakipNo aynı kartta onun yerini alır. */}
+        {(myToWarehouseShipment?.cargoCode ??
+        myToWarehouseShipment?.trackingNumber) ? (
           <p className="font-mono text-base font-bold text-heading break-all">
-            {myToWarehouseShipment.cargoCode}
+            {myToWarehouseShipment.cargoCode ??
+              myToWarehouseShipment.trackingNumber}
           </p>
         ) : (
           <p className="text-sm text-muted italic">
@@ -53,6 +55,12 @@ export default function WarehouseShipmentCard({
         <p className="text-xs text-muted mt-2">
           {t("trade.warehouseShipping.handIn")}
         </p>
+        {myToWarehouseShipment?.trackingNumber &&
+          !myToWarehouseShipment.cargoCode && (
+            <p className="text-xs text-muted mt-2">
+              {t("order.trackingAppearsAfterDropoff")}
+            </p>
+          )}
         <div className="mt-3">
           <ShipmentStatusChip status={myToWarehouseShipment?.status} />
         </div>

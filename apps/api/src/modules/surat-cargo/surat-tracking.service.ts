@@ -44,6 +44,8 @@ export class SuratTrackingService {
     message?: string | null;
     gonderiCount?: number;
     durum?: string | null;
+    kargoTakipNo?: string | null;
+    takipUrl?: string | null;
     error?: string;
   }> {
     return this.client.probeTracking(webSiparisKodu);
@@ -55,7 +57,11 @@ export class SuratTrackingService {
     return this.orderSync.syncShipmentTracking(shipmentId);
   }
 
-  syncAllActiveShipments(): Promise<{ synced: number; failed: number }> {
+  syncAllActiveShipments(): Promise<{
+    synced: number;
+    pending: number;
+    failed: number;
+  }> {
     return this.orderSync.syncAllActiveShipments();
   }
 
@@ -76,7 +82,11 @@ export class SuratTrackingService {
 
   // ─── İade dönüş kargosu sync (RefundReturnTrackingSyncService) ────────────
 
-  syncAllActiveRefundReturns(): Promise<{ synced: number; failed: number }> {
+  syncAllActiveRefundReturns(): Promise<{
+    synced: number;
+    pending: number;
+    failed: number;
+  }> {
     return this.refundSync.syncAllActiveRefundReturns();
   }
 
@@ -90,7 +100,11 @@ export class SuratTrackingService {
     return this.tradeSync.syncTradeShipmentTracking(tradeShipmentId);
   }
 
-  syncAllActiveTradeShipments(): Promise<{ synced: number; failed: number }> {
+  syncAllActiveTradeShipments(): Promise<{
+    synced: number;
+    pending: number;
+    failed: number;
+  }> {
     return this.tradeSync.syncAllActiveTradeShipments();
   }
 }

@@ -108,6 +108,17 @@ export class SuratCargoService implements CargoProvider {
       };
     }
     const failure = result as SuratShipmentFailure;
+    // GonderiyiKargoyaGonder başarılıdır; gerçek KargoTakipNo ancak paket şubede
+    // kabul edilince takip ucunda görünür. Bu, provider kayıt başarısıdır ve
+    // sipariş/iade/takas akışını bloke etmemelidir.
+    if (failure.kind === "technical" && failure.code === "TRACKING_PENDING") {
+      return {
+        ok: true,
+        trackingCode: null,
+        labelData: null,
+        providerMessage: "registered_pending_carrier_acceptance",
+      };
+    }
     if (failure.kind === "business") {
       return { ok: false, kind: "business", message: failure.suratMessage };
     }
@@ -288,9 +299,20 @@ export class SuratCargoService implements CargoProvider {
     if (!createResult.ok) return createResult as SuratShipmentFailure;
 
     const localTrackingCode = this.carrierClient.getLocalTrackingCode(oid);
-    const tracking = localTrackingCode
+    const lookup = localTrackingCode
       ? null
-      : await this.trackingClient.fetchTrackingInfo(oid);
+      : await this.trackingClient.lookupTracking(oid);
+    if (lookup?.kind === "failure") {
+      return {
+        ok: false,
+        kind: "technical",
+        code: lookup.category === "timeout" ? "TIMEOUT" : "UNKNOWN",
+        cause: new Error(lookup.message),
+        correlationId: input.correlationId,
+        idempotencyKey: input.idempotencyKey,
+      };
+    }
+    const tracking = lookup?.kind === "found" ? lookup.data : null;
     const kargoTakipNo =
       localTrackingCode ??
       tracking?.Gonderiler?.find((shipment) => Boolean(shipment.KargoTakipNo))

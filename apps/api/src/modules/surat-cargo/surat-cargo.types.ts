@@ -53,7 +53,7 @@ export type SuratShipmentFailure = SuratTechnicalFailure | SuratBusinessFailure;
 
 export type SuratBarcodeSuccess = {
   ok: true;
-  /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
+  /** Real Sürat cargo code (KargoTakipNo) — shown after branch acceptance. */
   kargoTakipNo: string;
   /** Resmi create+tracking sözleşmesinde ZPL dönmez; daima null. */
   labelZpl: string | null;
@@ -242,3 +242,19 @@ export interface SuratTakipResponse {
   errorMessage: string | null;
   Gonderiler: SuratTakipGonderi[];
 }
+
+/**
+ * KargoTakipHareketDetayi sonucu. Sürat, gönderi ön bildirimi alınmış fakat
+ * şubede henüz kabul edilmemişken HTTP 200 + IsError=true döndürür. Bu durum
+ * teknik hata değildir; poller daha sonra yeniden denemelidir.
+ */
+export type SuratTrackingLookupResult =
+  | { kind: "found"; data: SuratTakipResponse }
+  | { kind: "pending"; message: string }
+  | {
+      kind: "failure";
+      category:
+        "configuration" | "http" | "provider" | "timeout" | "network" | "parse";
+      message: string;
+      httpStatus?: number;
+    };

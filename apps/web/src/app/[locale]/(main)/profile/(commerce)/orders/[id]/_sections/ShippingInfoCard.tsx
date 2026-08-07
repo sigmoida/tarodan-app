@@ -42,12 +42,18 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
   };
 
   const isIptalOrder = order.cancellationType === "iptal";
+  const shipmentHasStarted =
+    Boolean(order.shipment?.shippedAt) ||
+    (!!order.shipment &&
+      !["pending", "label_created", "cancelled", "failed"].includes(
+        order.shipment.status,
+      ));
   if (
     !order.shipment ||
     !displayTrackingCode ||
     isIptalOrder ||
     order.status === "cancelled" ||
-    !SHIPPED_ORDER_STATUSES.includes(order.status)
+    (!SHIPPED_ORDER_STATUSES.includes(order.status) && !shipmentHasStarted)
   ) {
     return null;
   }
@@ -55,7 +61,8 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
   // Sipariş durumu (order.status) admin tarafından elle ileri alındığında shipment.status
   // geride kalabiliyor. Bu durumda sipariş durumunu gerçeğin kaynağı kabul edip etkin
   // (effective) bir kargo durumu türetiyoruz.
-  const orderShipped = SHIPPED_ORDER_STATUSES.includes(order.status);
+  const orderShipped =
+    SHIPPED_ORDER_STATUSES.includes(order.status) || shipmentHasStarted;
   const orderDelivered = [
     "delivered",
     "awaiting_buyer_confirmation",

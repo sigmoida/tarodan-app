@@ -5,6 +5,107 @@ import { ShipmentStatus, TradeStatus } from "@prisma/client";
  * #2 (takip donması) + #3 (at_warehouse geri-sarma) regresyon testleri.
  */
 describe("TradeTrackingSyncService", () => {
+  describe("fiziksel teslim ve bildirim", () => {
+    const makeService = (shippedAt: Date | null = null) => {
+      const tradeShipment = {
+        id: "trade-shipment-1",
+        tradeId: "trade-1",
+        carrier: "surat",
+        trackingNumber: "PKG-TRADE-1",
+        providerTrackingId: null,
+        status: ShipmentStatus.label_created,
+        shippedAt,
+        deliveredAt: null,
+        shipperId: "initiator-1",
+        recipientUserId: null,
+        leg: "to_warehouse",
+        recipientType: "warehouse",
+        trade: {
+          initiatorId: "initiator-1",
+          receiverId: "receiver-1",
+        },
+      };
+      const prisma = {
+        tradeShipment: {
+          findUnique: jest.fn().mockResolvedValue(tradeShipment),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        tradeShipmentEvent: {
+          findMany: jest.fn().mockResolvedValue([]),
+          createMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+      const notifyTradeShipped = jest.fn().mockResolvedValue(undefined);
+      const moduleRef = {
+        get: jest.fn().mockReturnValue({ notifyTradeShipped }),
+      };
+      const client = {
+        lookupTracking: jest.fn().mockResolvedValue({
+          kind: "found",
+          data: {
+            IsError: false,
+            errorMessage: null,
+            Gonderiler: [
+              {
+                KargonunDurumuSayi: 3,
+                KargonunDurumu: "Transfer merkezinde",
+                KargoTakipNo: "SURAT-TRADE-123",
+                TeslimTarihi: "",
+                Hareketler: [],
+              },
+            ],
+          },
+        }),
+        parseSuratDate: jest.fn(),
+      };
+      return {
+        service: new TradeTrackingSyncService(
+          prisma as any,
+          moduleRef as any,
+          client as any,
+        ),
+        prisma,
+        notifyTradeShipped,
+      };
+    };
+
+    it("ilk taşıyıcı hareketinde shippedAt yazar ve karşı tarafı bir kez bilgilendirir", async () => {
+      const { service, prisma, notifyTradeShipped } = makeService();
+
+      await expect(
+        service.syncTradeShipmentTracking("trade-shipment-1"),
+      ).resolves.toBe(true);
+
+      expect(prisma.tradeShipment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "trade-shipment-1",
+          status: ShipmentStatus.label_created,
+          shippedAt: null,
+        },
+        data: expect.objectContaining({
+          status: ShipmentStatus.in_transit,
+          providerTrackingId: "SURAT-TRADE-123",
+          shippedAt: expect.any(Date),
+        }),
+      });
+      expect(notifyTradeShipped).toHaveBeenCalledWith(
+        "receiver-1",
+        "trade-1",
+        "SURAT-TRADE-123",
+      );
+    });
+
+    it("shippedAt zaten varsa aynı bildirimi yeniden göndermez", async () => {
+      const { service, notifyTradeShipped } = makeService(
+        new Date("2026-08-07T10:00:00.000Z"),
+      );
+
+      await service.syncTradeShipmentTracking("trade-shipment-1");
+
+      expect(notifyTradeShipped).not.toHaveBeenCalled();
+    });
+  });
+
   describe("syncAllActiveTradeShipments filtresi (#2)", () => {
     it("terminal-OLMAYAN tüm bacakları seçer (notIn terminal) — ara durumlar dahil", async () => {
       const findMany = jest.fn().mockResolvedValue([]);
