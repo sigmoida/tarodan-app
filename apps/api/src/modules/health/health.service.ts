@@ -8,8 +8,11 @@
 import {
   Injectable,
   Logger,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import type { Queue } from "bull";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -19,6 +22,8 @@ import { AdminTradeCommonService } from "../admin/admin-trade-common.service";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
 import { validateStrictCommissionCoverage } from "../order/order-commission.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { CRON_CATALOG } from "../../workers/cron-catalog";
 
 /**
  * Bu sayıda DLQ (`dead`) outbox satırı biriktiğinde instance hazır-değil sayılır:
@@ -67,6 +72,9 @@ export class HealthService {
     // Depo adresi readiness'ı, takas onayının kullandığı çözümlemeyle AYNI
     // olmalı (tek kaynak) — leaf servis, health module'de de provide edilir.
     private readonly tradeCommon: AdminTradeCommonService,
+    @Optional()
+    @InjectQueue(QUEUE_NAMES.SCHEDULED)
+    private readonly scheduledQueue?: Queue,
   ) {}
 
   /**
@@ -158,14 +166,41 @@ export class HealthService {
 
   private async checkWorker(): Promise<boolean> {
     if (process.env.NODE_ENV !== "production") return true;
-    if (getProcessRole() !== "web") return true;
+    if (!this.scheduledQueue) return false;
 
-    const heartbeat = await this.cacheService.get<{ at?: number }>(
-      WORKER_HEARTBEAT_KEY,
-    );
-    return (
-      typeof heartbeat?.at === "number" && Date.now() - heartbeat.at < 60_000
-    );
+    try {
+      const [workers, repeatableJobs] = await Promise.all([
+        this.scheduledQueue.getWorkers(),
+        this.scheduledQueue.getRepeatableJobs(),
+      ]);
+      const registeredNames = new Set(repeatableJobs.map((job) => job.name));
+      const missingCrons = CRON_CATALOG.map((entry) => entry.key).filter(
+        (key) => !registeredNames.has(key),
+      );
+      if (workers.length === 0 || missingCrons.length > 0) {
+        this.logger.error(
+          `BULL_NOT_READY workers=${workers.length} missingCrons=${missingCrons.join(",") || "none"}`,
+        );
+        return false;
+      }
+
+      // Ayrı web/worker dağıtımında heartbeat, worker process'inin yalnız Redis'e
+      // bağlı değil event-loop olarak da canlı olduğunu doğrular. `all` rolünde
+      // aynı process zaten yukarıdaki Bull worker bağlantısıyla kanıtlanır.
+      if (getProcessRole() === "web") {
+        const heartbeat = await this.cacheService.get<{ at?: number }>(
+          WORKER_HEARTBEAT_KEY,
+        );
+        return (
+          typeof heartbeat?.at === "number" &&
+          Date.now() - heartbeat.at < 60_000
+        );
+      }
+      return true;
+    } catch (error) {
+      this.logger.error("Bull worker readiness check failed", error);
+      return false;
+    }
   }
 
   /**
