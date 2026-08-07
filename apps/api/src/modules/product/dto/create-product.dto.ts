@@ -134,12 +134,13 @@ export class CreateProductDto {
   @IsUUID("4", { message: "Geçerli bir marka ID giriniz" })
   brandId: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: "uuid-car-model-id",
-    description: "Car Model ID",
+    description: "Car Model ID (optional)",
   })
+  @IsOptional()
   @IsUUID("4", { message: "Geçerli bir model ID giriniz" })
-  carModelId: string;
+  carModelId?: string;
 
   @ApiProperty({
     example: "uuid-manufacturer-id",
@@ -148,12 +149,15 @@ export class CreateProductDto {
   @IsUUID("4", { message: "Geçerli bir üretici ID giriniz" })
   manufacturerId: string;
 
-  @ApiProperty({ example: "HKG72", description: "Manufacturer model code" })
+  @ApiPropertyOptional({
+    example: "HKG72",
+    description: "Manufacturer model code (optional)",
+  })
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsOptional()
   @IsString()
-  @MinLength(1, { message: "Model kodu zorunludur" })
   @MaxLength(100, { message: "Model kodu en fazla 100 karakter olabilir" })
-  modelCode: string;
+  modelCode?: string;
 
   @ApiProperty({ example: "Kırmızı", description: "Product color" })
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))

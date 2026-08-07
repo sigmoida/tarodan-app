@@ -180,6 +180,24 @@ describe("ProductCreateService required listing details", () => {
     });
   });
 
+  it("creates a listing without a catalog model or manufacturer model code", async () => {
+    const optionalModelDto = { ...dto };
+    delete optionalModelDto.carModelId;
+    delete optionalModelDto.modelCode;
+
+    await service.create(sellerId, optionalModelDto);
+
+    expect(prisma.carModel.findUnique).not.toHaveBeenCalled();
+    expect(prisma.product.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          carModelId: undefined,
+          modelCode: null,
+        }),
+      }),
+    );
+  });
+
   it("rejects a model that does not belong to the selected brand", async () => {
     prisma.carModel.findUnique.mockResolvedValueOnce({
       id: dto.carModelId,

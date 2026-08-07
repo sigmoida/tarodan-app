@@ -205,7 +205,8 @@ export class ProductUpdateService {
       dto.manufacturerId !== undefined
     ) {
       const nextBrandId = dto.brandId ?? product.brandId;
-      const nextCarModelId = dto.carModelId ?? product.carModelId;
+      const nextCarModelId =
+        dto.carModelId !== undefined ? dto.carModelId : product.carModelId;
       const nextManufacturerId = dto.manufacturerId ?? product.manufacturerId;
       const [brand, carModel, manufacturer] = await Promise.all([
         nextBrandId
@@ -223,9 +224,8 @@ export class ProductUpdateService {
       if (
         !brand ||
         !brand.isActive ||
-        !carModel ||
-        !carModel.isActive ||
-        carModel.brandId !== brand.id ||
+        (nextCarModelId &&
+          (!carModel || !carModel.isActive || carModel.brandId !== brand.id)) ||
         !manufacturer ||
         !manufacturer.isActive
       ) {
@@ -348,7 +348,8 @@ export class ProductUpdateService {
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
       description: dto.description,
-      modelCode: dto.modelCode?.trim(),
+      modelCode:
+        dto.modelCode !== undefined ? dto.modelCode?.trim() || null : undefined,
       color: dto.color?.trim(),
       isBoxed: dto.isBoxed,
       ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),

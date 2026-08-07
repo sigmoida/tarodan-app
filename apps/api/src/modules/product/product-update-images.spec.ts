@@ -57,7 +57,12 @@ describe("ProductUpdateService — görsel güncellemesi", () => {
           price: 100,
           oldPrice: null,
           categoryId: "cat-1",
+          brandId: "brand-1",
+          carModelId: "model-1",
+          manufacturerId: "manufacturer-1",
           status: "active",
+          quantity: 1,
+          reservedQuantity: 0,
           images: existingImages,
         }),
       },
@@ -76,6 +81,23 @@ describe("ProductUpdateService — görsel güncellemesi", () => {
           .fn()
           .mockResolvedValue({ isBanned: false, bannedUntil: null }),
       },
+      brand: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: "brand-1", isActive: true }),
+      },
+      carModel: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "model-1",
+          brandId: "brand-1",
+          isActive: true,
+        }),
+      },
+      manufacturer: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: "manufacturer-1", isActive: true }),
+      },
       attribute: { findMany: jest.fn().mockResolvedValue([]) },
       productAttribute: { deleteMany: jest.fn(), createMany: jest.fn() },
       productImage: { deleteMany: jest.fn(), createMany: jest.fn() },
@@ -89,12 +111,14 @@ describe("ProductUpdateService — görsel güncellemesi", () => {
 
     const service = new ProductUpdateService(
       prisma as any,
-      { delPattern: jest.fn() } as any, // cache
-      { syncProduct: jest.fn() } as any, // search
+      { del: jest.fn(), delPattern: jest.fn() } as any, // cache
+      { syncProduct: jest.fn().mockResolvedValue(undefined) } as any, // search
       {} as any, // notification
       {} as any, // smtp
       { formatProductResponse: jest.fn().mockResolvedValue({}) } as any, // common
-      { recompute: jest.fn() } as any, // ranking
+      {
+        recomputeProductRanking: jest.fn().mockResolvedValue(undefined),
+      } as any, // ranking
       membershipService as any,
       { assertListingRuleExists: jest.fn() } as any,
     );
@@ -145,6 +169,25 @@ describe("ProductUpdateService — görsel güncellemesi", () => {
         expect.objectContaining({ cardKey: key("a-card"), sortOrder: 1 }),
       ],
     });
+  });
+
+  it("opsiyonel araç modelini ve model kodunu temizler", async () => {
+    const { service, prisma, tx } = makeService();
+
+    await service.update(productId, sellerId, {
+      carModelId: null,
+      modelCode: " ",
+    } as any);
+
+    expect(prisma.carModel.findUnique).not.toHaveBeenCalled();
+    expect(tx.product.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          carModel: { disconnect: true },
+          modelCode: null,
+        }),
+      }),
+    );
   });
 
   it("iyimser kilit hatasında transaction geri sarılır (görseller durur)", async () => {

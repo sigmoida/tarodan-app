@@ -35,8 +35,6 @@ describe("CreateProductDto required listing fields", () => {
   it.each([
     "description",
     "brandId",
-    "carModelId",
-    "modelCode",
     "color",
     "scale",
     "material",
@@ -47,6 +45,16 @@ describe("CreateProductDto required listing fields", () => {
     delete (input as Record<string, unknown>)[field];
 
     await expect(validationErrors(input)).resolves.toContain(field);
+  });
+
+  it("accepts a new listing without car model and model code", async () => {
+    const input = { ...VALID_PRODUCT };
+    delete (input as Record<string, unknown>).carModelId;
+    delete (input as Record<string, unknown>).modelCode;
+
+    await expect(validationErrors(input)).resolves.not.toEqual(
+      expect.arrayContaining(["carModelId", "modelCode"]),
+    );
   });
 
   it("accepts description boundaries of 30 and 330 characters", async () => {
@@ -67,7 +75,7 @@ describe("CreateProductDto required listing fields", () => {
     ).resolves.toContain("description");
   });
 
-  it.each(["title", "description", "modelCode", "color", "scale", "material"])(
+  it.each(["title", "description", "color", "scale", "material"])(
     "rejects whitespace-only %s",
     async (field) => {
       await expect(

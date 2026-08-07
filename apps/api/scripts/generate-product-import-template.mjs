@@ -101,9 +101,7 @@ const requiredHeaders = new Set([
   "aciklama",
   "kategori",
   "marka",
-  "arac_modeli",
   "uretici",
-  "model_kodu",
   "durum",
   "renk",
   "olcek",
@@ -299,7 +297,7 @@ const steps = [
   ],
   [
     "Katalog adlarını doğru yazın",
-    "Kategori, marka, araç modeli ve üretici alanına admin kataloglarında görünen adı, slug'ı veya UUID'yi yazabilirsiniz.",
+    "Kategori, marka ve üretici alanına admin kataloglarında görünen adı, slug'ı veya UUID'yi yazabilirsiniz. Araç modeli opsiyoneldir; girilirse seçilen markayla eşleşmelidir.",
   ],
   [
     "En az üç görsel ekleyin",
@@ -419,7 +417,7 @@ references.columns.forEach((column, index) => {
   column.width = index === 6 ? 28 : 22;
 });
 references.getCell("A9").value =
-  "Not: Kategori, marka, araç modeli, üretici, ölçek, malzeme ve ek özellikler admin panelindeki aktif katalog kayıtlarıyla eşleşmelidir.";
+  "Not: Kategori, marka, üretici, ölçek, malzeme ve ek özellikler admin panelindeki aktif katalog kayıtlarıyla eşleşmelidir. Araç modeli ve model kodu opsiyoneldir.";
 references.mergeCells("A9:G10");
 references.getCell("A9").fill = {
   type: "pattern",
