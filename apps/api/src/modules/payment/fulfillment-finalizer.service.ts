@@ -2,8 +2,8 @@ import { Injectable, Logger, Optional } from "@nestjs/common";
 import { LedgerEventType, OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { EventService } from "../events";
-import { PaymentCommonService } from "./payment-common.service";
 import { LedgerService } from "../ledger/ledger.service";
+import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
 
 /**
  * FulfillmentFinalizer (Faz 8.2) — FİZİKSEL (üyelik/boost olmayan) bir ödenmiş
@@ -11,7 +11,8 @@ import { LedgerService } from "../ledger/ledger.service";
  * aynı olan üç adımı tek yere alır (god-service dedup): (1) çift-taraflı defter
  * yakalaması, (2) order.paid event'i (misafir tespiti dahil), (3) Sürat gönderi kaydı.
  *
- * TÜM adımlar best-effort — hata loglanır, ödemeyi/akışı BOZMAZ (ödeme zaten commit'li).
+ * Ledger ve bildirim best-effort'tur. Kargo persist adımı hata verirse dışarı
+ * taşınır: çağıran fulfillment outbox'ını pending bırakır ve drainer retry eder.
  */
 @Injectable()
 export class FulfillmentFinalizer {
@@ -20,7 +21,7 @@ export class FulfillmentFinalizer {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
-    private readonly paymentCommon: PaymentCommonService,
+    private readonly orderShipments: OrderShipmentProvisioner,
     @Optional() private readonly ledger?: LedgerService,
   ) {}
 
@@ -153,13 +154,14 @@ export class FulfillmentFinalizer {
       this.logger.error(`Failed to emit order.paid event: ${error}`);
     }
 
-    // 3) Sürat gönderi kaydı (create + H4 cancelled-revive; PaymentCommonService).
+    // 3) Kargo gönderi kaydı (create + H4 cancelled-revive; kanonik provisioner).
     try {
-      await this.paymentCommon.ensureSuratShipmentForOrder(order.id);
+      await this.orderShipments.ensure(order.id);
     } catch (error) {
       this.logger.error(
         `Failed to auto-create shipment for order ${order.orderNumber}: ${error}`,
       );
+      throw error;
     }
   }
 

@@ -921,8 +921,8 @@ model TradeShipment {
   carrier            String
   // trackingNumber = OzelKargoTakipNo (bizim ref; poller bununla sorgular).
   trackingNumber     String?              @map("tracking_number")
-  // Gerçek Sürat kargo kodu (KargoTakipNo) + ZPL etiket (OrtakBarkodOlustur ile
-  // takas onaylanınca anında oluşur; UI'da providerTrackingId gösterilir).
+  // Gerçek Sürat kargo kodu KargoTakipHareketDetayi üzerinden alınır.
+  // Resmi iki endpoint ZPL döndürmediği için labelZpl boş kalır.
   providerTrackingId String?              @map("provider_tracking_id")
   labelZpl           String?              @map("label_zpl")
   status             ShipmentStatus       @default(pending)
@@ -1401,6 +1401,10 @@ model OrderPackage {
   // küçük orderNumber'ı TÜRETİLİYORDU; türetilmiş referans paketin sipariş kümesi
   // değişince kayıyor ve idempotency cache'i ıskalayıp MÜKERRER gönderi açıyordu.
   packageNumber           String         @unique @map("package_number")
+  // Sürat'ta halen kullanılan fiziksel gönderi referansı. İlk gönderide
+  // packageNumber ile aynıdır; yerel/manuel iptal sonrası yeniden ödeme yeni bir
+  // revizyon üretir. Böylece iptal edilmiş taşıyıcı kaydı tekrar canlandırılmaz.
+  carrierReference        String?        @map("carrier_reference")
   checkoutGroupId         String?        @map("checkout_group_id")
   sellerId                String         @map("seller_id")
   buyerId                 String         @map("buyer_id")
@@ -2191,7 +2195,7 @@ model Shipment {
   providerTrackingId  String?         @map("provider_tracking_id")
   providerStatusCode  Int?            @map("provider_status_code")
   providerRawStatus   String?         @map("provider_raw_status")
-  // Raw ZPL label from OrtakBarkodOlustur (stored for future printing; not shown in UI).
+  // Legacy nullable label alanı; resmi create+tracking sözleşmesi ZPL döndürmez.
   labelZpl            String?         @map("label_zpl")
   receivedBy          String?         @map("received_by")
   returnReason        String?         @map("return_reason")
@@ -2294,7 +2298,7 @@ model RefundRequest {
   returnProvider           String?         @map("return_provider")
   // returnTrackingNumber = OzelKargoTakipNo (refundNumber; poller sorgu anahtarı).
   returnTrackingNumber     String?         @map("return_tracking_number")
-  // Gerçek Sürat iade kodu (KargoTakipNo) + ZPL etiket (OrtakBarkodOlustur).
+  // Gerçek Sürat iade kodu KargoTakipHareketDetayi üzerinden alınır.
   returnProviderTrackingId String?         @map("return_provider_tracking_id")
   returnLabelZpl           String?         @map("return_label_zpl")
   returnStatus             ShipmentStatus? @map("return_status")
@@ -3379,11 +3383,40 @@ model OutboxEvent {
   @@map("outbox_events")
 }
 
+/// Belgelenmiş taşıyıcı sözleşmesinde uzaktan iptal bulunmadığında operasyon
+/// ekibinin panelden tamamlaması gereken fiziksel iptallerin kalıcı kuyruğu.
+/// Log satırı yerine sorgulanabilir ve çözümlenebilir bir iş kaydı sağlar.
+model CarrierCancellationTask {
+  id          String                        @id @default(uuid())
+  dedupeKey   String                        @unique @map("dedupe_key")
+  provider    String
+  reference   String
+  entityType  String                        @map("entity_type")
+  entityId    String                        @map("entity_id")
+  reason      String
+  status      CarrierCancellationTaskStatus @default(pending)
+  metadata    Json?
+  requestedAt DateTime                      @default(now()) @map("requested_at")
+  resolvedAt  DateTime?                     @map("resolved_at")
+  resolvedBy  String?                       @map("resolved_by")
+  resolution  String?
+
+  @@index([status, requestedAt])
+  @@index([entityType, entityId])
+  @@map("carrier_cancellation_tasks")
+}
+
 enum OutboxStatus {
   pending
   processing
   completed
   dead // maxAttempts aşıldı — DLQ (manuel inceleme + alarm)
+}
+
+enum CarrierCancellationTaskStatus {
+  pending
+  resolved
+  dismissed
 }
 
 // =============================================================================

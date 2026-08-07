@@ -11,18 +11,16 @@ import { RefundReturnTrackingSyncService } from "./refund-return-tracking-sync.s
 import { BarcodeRetryService } from "./barcode-retry.service";
 import { CargoAlertingService } from "./cargo-alerting.service";
 import { CARGO_PROVIDER } from "./cargo-provider";
-import {
-  StubSuratSoapClient,
-  LiveSuratSoapClient,
-  SuratCarrierClient,
-} from "./surat-soap.client";
+import { StubSuratSoapClient, SuratCarrierClient } from "./surat-soap.client";
 import { RestSuratClient } from "./surat-rest.client";
+import { OrderShipmentProvisioner } from "./order-shipment-provisioner.service";
+import { CarrierCancellationService } from "./carrier-cancellation.service";
 
 /**
- * SURAT_SOAP_MODE → taşıyıcı client seçimi (test edilebilir olsun diye export):
- *   'rest' → RestSuratClient  (dokümandaki REST GonderiyiKargoyaGonder — test/canlı SURAT_KARGO_TEST_MODE ile)
- *   'live' | 'soap' → LiveSuratSoapClient (eski SOAP webservices.asmx)
- *   diğer/boş → StubSuratSoapClient (gerçek çağrı yok)
+ * SURAT_SOAP_MODE → taşıyıcı client seçimi (geriye dönük env adı korunuyor):
+ *   'rest' → RestSuratClient (yalnız resmi GonderiyiKargoyaGonder)
+ *   'stub' / boş → StubSuratSoapClient (yerel, ağ çağrısı yok)
+ *   diğer değerler → reddedilir; sistem yalnız belgelenmiş REST sözleşmesini kullanır.
  *
  * Fail-fast: production'da kargo ENTEGRASYONU AÇIKken gerçek bir taşıyıcı modu
  * ZORUNLUDUR. Aksi halde stub sessizce devreye girer (sahte başarı + sahte takip
@@ -36,24 +34,28 @@ export function resolveSuratCarrierClient(
     .get<string>("SURAT_SOAP_MODE", "stub")
     ?.trim()
     .toLowerCase();
-  const isRealMode = mode === "rest" || mode === "live" || mode === "soap";
+  if (mode === "live" || mode === "soap") {
+    throw new Error(
+      `FATAL: SURAT_SOAP_MODE='${mode}' artık desteklenmiyor. ` +
+        `Sürat entegrasyonu yalnız resmi REST GonderiyiKargoyaGonder ve ` +
+        `KargoTakipHareketDetayi endpoint'lerini kullanır; 'rest' seçin.`,
+    );
+  }
 
   const isProduction =
     (config.get<string>("NODE_ENV") ?? "").trim() === "production";
   const cargoEnabled = ["true", "1"].includes(
     (config.get<string>("SURAT_CARGO_ENABLED", "false") ?? "").trim(),
   );
-  if (isProduction && cargoEnabled && !isRealMode) {
+  if (isProduction && cargoEnabled && mode !== "rest") {
     throw new Error(
       `FATAL: SURAT_CARGO_ENABLED=true ancak SURAT_SOAP_MODE gerçek bir ` +
         `taşıyıcı moduna ayarlı değil (mevcut="${mode}"). Production'da ` +
-        `'rest' | 'live' | 'soap' olmalı — stub sahte kargo başarısı üretir.`,
+        `'rest' olmalı — stub sahte kargo başarısı üretir.`,
     );
   }
 
   if (mode === "rest") return new RestSuratClient(config);
-  if (mode === "live" || mode === "soap")
-    return new LiveSuratSoapClient(config);
   return new StubSuratSoapClient(config);
 }
 
@@ -74,10 +76,18 @@ export function resolveSuratCarrierClient(
     RefundReturnTrackingSyncService,
     BarcodeRetryService,
     CargoAlertingService,
+    OrderShipmentProvisioner,
+    CarrierCancellationService,
     // Faz 11.5a (DIP): CARGO_PROVIDER token → aynı SuratCargoService singleton'ına
     // bağlanır; tüketiciler (ör. Payment) somut servis yerine bu soyutlamayı enjekte eder.
     { provide: CARGO_PROVIDER, useExisting: SuratCargoService },
   ],
-  exports: [SuratCargoService, SuratTrackingService, CARGO_PROVIDER],
+  exports: [
+    SuratCargoService,
+    SuratTrackingService,
+    OrderShipmentProvisioner,
+    CarrierCancellationService,
+    CARGO_PROVIDER,
+  ],
 })
 export class SuratCargoModule {}

@@ -4,6 +4,8 @@ import { CacheService } from "../cache/cache.service";
 import { PrismaService } from "../../prisma";
 import { Prisma, ShipmentStatus, OrderStatus } from "@prisma/client";
 import { notifyUser } from "./surat-tracking-support";
+import { CronStepFailuresError } from "../../monitoring/cron-step-runner";
+import { OrderShipmentProvisioner } from "./order-shipment-provisioner.service";
 
 /** Kargo kodu (barkod) retry job istatistiği — yüzey başına. */
 export interface BarcodeRetryStat {
@@ -26,14 +28,14 @@ export class BarcodeRetryService {
     private readonly prisma: PrismaService,
     private readonly moduleRef: ModuleRef,
     private readonly cache: CacheService,
+    private readonly orderShipments: OrderShipmentProvisioner,
   ) {}
 
   // ─── Kargo kodu (barkod) retry job ────────────────────────────────────────
-  // İlk barkod oluşturma (OrtakBarkodOlustur) NON-BLOCKING'tir: Sürat timeout'u,
+  // İlk create+tracking akışı NON-BLOCKING'tir: Sürat timeout'u veya takip
   // entegrasyonun o an kapalı olması ya da geçici hata yüzünden kayıt kodsuz
-  // (providerTrackingId NULL) kalabilir. Poller yalnız DURUM çeker, kod üretmez —
-  // ve Sürat'ta hiç oluşmamış bir gönderiyi backfill de edemez. Bu iş o boşluğu
-  // kapatır: kodsuz kalmış kayıtlar için oluşturmayı güvenle yeniden dener.
+  // kaydının gecikmesi nedeniyle kayıt kodsuz (providerTrackingId NULL) kalabilir.
+  // Bu iş aynı resmi oluşturma+takip akışını güvenle yeniden dener.
   //
   // Idempotency anahtarı ilk oluşturmayla AYNI (OzelKargoTakipNo bazlı) → retry
   // Sürat'ta mükerrer gönderi oluşturmaz; ilk başarıdan sonra cache'ten döner.
@@ -113,16 +115,22 @@ export class BarcodeRetryService {
     const empty: BarcodeRetryStat = { retried: 0, failed: 0 };
     let order = empty;
     let trade = empty;
+    const failedSteps: string[] = [];
+    const failureDetails: string[] = [];
 
     try {
       order = await this.retryPendingOrderBarcodes(createdAfter, createdBefore);
     } catch (e: any) {
       this.logger.error(`Order barcode retry failed: ${e?.message}`);
+      failedSteps.push("order-barcode-retry");
+      failureDetails.push(`order-barcode-retry: ${e?.message ?? e}`);
     }
     try {
       trade = await this.retryPendingTradeBarcodes(createdAfter, createdBefore);
     } catch (e: any) {
       this.logger.error(`Trade barcode retry failed: ${e?.message}`);
+      failedSteps.push("trade-barcode-retry");
+      failureDetails.push(`trade-barcode-retry: ${e?.message ?? e}`);
     }
 
     // M2: pencereden kodsuz düşen kayıtlar sessizce kaybolmasın.
@@ -130,8 +138,13 @@ export class BarcodeRetryService {
       await this.alertAgedOutBarcodes(createdAfter);
     } catch (e: any) {
       this.logger.error(`Barcode age-out alert failed: ${e?.message}`);
+      failedSteps.push("barcode-ageout-alert");
+      failureDetails.push(`barcode-ageout-alert: ${e?.message ?? e}`);
     }
 
+    if (failedSteps.length > 0) {
+      throw new CronStepFailuresError(failedSteps, failureDetails);
+    }
     return { order, trade };
   }
 
@@ -164,6 +177,35 @@ export class BarcodeRetryService {
       );
     }
 
+    // Fulfillment finalizer kargo satırını persist edemeden çökerse outbox ve
+    // 48 saatlik orphan retry bunu toparlar. Pencere yine de kaçırılırsa Shipment
+    // satırı olmadığı için yukarıdaki alarm göremezdi; ödenmiş sipariş sessizce
+    // kalıcı olarak kargosuz kalmasın.
+    const agedOrphanOrders = await this.prisma.order.findMany({
+      where: {
+        status: { in: [OrderStatus.paid, OrderStatus.preparing] },
+        updatedAt: { lt: createdAfter, gte: oldest },
+        OR: [
+          { shipment: null },
+          { shipment: { status: ShipmentStatus.cancelled } },
+        ],
+        NOT: [
+          { productId: { startsWith: "membership-" } },
+          { productId: { startsWith: "boost-" } },
+        ],
+      },
+      select: { id: true, orderNumber: true },
+      take: 50,
+    });
+    for (const order of agedOrphanOrders) {
+      const key = `surat:retry:ageout:order:${order.id}`;
+      if (await this.cache.get(key)) continue;
+      await this.cache.set(key, 1, { ttl: 7 * 24 * 3600 });
+      this.logger.error(
+        `BARCODE AGE-OUT: paid order ${order.orderNumber} (${order.id}) left the 48h retry window with NO active shipment row — manual intervention required`,
+      );
+    }
+
     const agedTradeLegs = await this.prisma.tradeShipment.findMany({
       where: {
         providerTrackingId: null,
@@ -184,10 +226,10 @@ export class BarcodeRetryService {
     }
   }
 
-  /** Order Shipment kodsuzları — mevcut createSuratBarcodeForOrder'ı yeniden
+  /** Order Shipment kodsuzları — kanonik OrderShipmentProvisioner'ı yeniden
    * kullanır (payload/idempotency birebir aynı). Ayrıca M1/H4: shipment satırı
    * hiç oluşmamış (Sürat OK ama lokal create patladı) veya iptal sonrası yeniden
-   * ödemede `cancelled` kalmış CANLI siparişleri ensureSuratShipmentForOrder ile
+   * ödemede `cancelled` kalmış CANLI siparişleri aynı provisioner ile
    * onarır. */
   private async retryPendingOrderBarcodes(
     createdAfter: Date,
@@ -260,18 +302,6 @@ export class BarcodeRetryService {
       return { retried: 0, failed: 0 };
     }
 
-    const { PaymentCommonService } =
-      await import("../payment/payment-common.service");
-    const paymentCommon = this.moduleRef.get(PaymentCommonService, {
-      strict: false,
-    });
-    if (!paymentCommon) {
-      this.logger.warn(
-        `PaymentCommonService not resolvable; skipping ${candidates.length + orphanOrders.length} order barcode retries`,
-      );
-      return { retried: 0, failed: candidates.length + orphanOrders.length };
-    }
-
     let retried = 0;
     let failed = 0;
 
@@ -281,13 +311,24 @@ export class BarcodeRetryService {
     for (const o of orphanOrders) {
       if (await this.inRetryBackoff("order-orphan", o.id)) continue;
       try {
-        const res = await paymentCommon.ensureSuratShipmentForOrder(o.id);
+        const res = await this.orderShipments.ensure(o.id);
         if (res === "created" || res === "revived") {
-          retried++;
-          await this.clearRetryBackoff("order-orphan", o.id);
-          this.logger.log(
-            `Retry OK: shipment ${res} for order ${o.orderNumber}`,
-          );
+          const persisted = await this.prisma.shipment.findFirst({
+            where: { orderId: o.id, provider: "surat" },
+            select: { providerTrackingId: true },
+          });
+          if (persisted?.providerTrackingId) {
+            retried++;
+            await this.clearRetryBackoff("order-orphan", o.id);
+            this.logger.log(
+              `Retry OK: shipment ${res} with cargo code for order ${o.orderNumber}`,
+            );
+          } else {
+            failed++;
+            this.logger.warn(
+              `Retry created shipment row but cargo code is still pending for order ${o.orderNumber}`,
+            );
+          }
         } else if (res === "skipped") {
           failed++;
           await this.recordRetryFailure("order-orphan", o.id);
@@ -304,8 +345,11 @@ export class BarcodeRetryService {
     for (const s of candidates) {
       if (await this.inRetryBackoff("order", s.id)) continue;
       try {
-        const barcode = await paymentCommon.createSuratBarcodeForOrder(
+        const barcode = await this.orderShipments.createBarcode(
           s.orderId,
+          // Revive edilmiş shipment yeni bir -R… referansı taşır. Retry'nin
+          // packageNumber'a dönüp iptal edilmiş eski gönderiyi açmasını engelle.
+          s.trackingNumber ?? undefined,
         );
         if (barcode?.kargoTakipNo) {
           await this.prisma.shipment.update({

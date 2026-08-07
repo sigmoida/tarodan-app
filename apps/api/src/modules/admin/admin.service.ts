@@ -1489,24 +1489,12 @@ export class AdminService {
     return this.shippingService.syncShipmentTracking(shipmentId);
   }
 
-  async runSuratEndpointTest() {
-    return this.shippingService.runSuratEndpointTest();
+  async runSuratEndpointTest(adminId: string) {
+    return this.shippingService.runSuratEndpointTest(adminId);
   }
 
   async suratTestTrack(ref: string) {
     return this.shippingService.suratTestTrack(ref);
-  }
-
-  async suratTestCancel(ref: string) {
-    return this.shippingService.suratTestCancel(ref);
-  }
-
-  async suratTestBarcode() {
-    return this.shippingService.suratTestBarcode();
-  }
-
-  async suratTestSil(ref: string) {
-    return this.shippingService.suratTestSil(ref);
   }
 
   // ==================== NOTIFICATION MANAGEMENT ====================

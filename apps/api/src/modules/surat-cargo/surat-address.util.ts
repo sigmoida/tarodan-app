@@ -12,7 +12,6 @@ import {
   SuratTasimaSekli,
   SuratTeslimSekli,
   SuratGonderiSekli,
-  SuratKapidanOdemeTahsilatTipi,
   type SuratGonderiPayload,
 } from "./surat-cargo.types";
 
@@ -92,7 +91,8 @@ export function buildStandardGonderiPayload(input: {
         ? Number(input.desi)
         : 1,
     BirimKg: 1,
-    KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
+    // Peşin gönderide kapıdan ödeme alanı resmi dokümana göre 0 olmalıdır.
+    KapidanOdemeTahsilatTipi: 0,
     TasimaSekli: SuratTasimaSekli.KaraYolu,
     TeslimSekli: SuratTeslimSekli.AdreseTeslim,
     GonderiSekli: SuratGonderiSekli.Standart,

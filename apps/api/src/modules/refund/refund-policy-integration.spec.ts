@@ -69,6 +69,7 @@ describe("RefundService policy integration", () => {
       payment as any,
       {} as any,
       {} as any,
+      {} as any,
       {
         createInAppNotification: jest.fn().mockResolvedValue(undefined),
         sendTemplateEmailToUser: jest.fn().mockResolvedValue(undefined),

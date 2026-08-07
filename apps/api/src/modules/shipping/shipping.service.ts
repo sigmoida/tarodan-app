@@ -6,7 +6,6 @@ import {
   ForbiddenException,
   Logger,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
 import { NotificationService } from "../notification/notification.service";
@@ -16,7 +15,6 @@ import {
   UpdateTrackingDto,
   ShippingProvider,
 } from "./dto";
-import { resolveShippingDestinationCity } from "./shipping-destination.util";
 import { canTransitionShipmentStatus } from "./shipment-state-machine";
 import { ShippingTariffService } from "./shipping-tariff.service";
 import {
@@ -29,6 +27,7 @@ import {
   ShippingPackageTierCode,
 } from "@prisma/client";
 import { billableDesiForTier } from "./shipping-package-tier";
+import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
 
 @Injectable()
 export class ShippingService {
@@ -47,10 +46,10 @@ export class ShippingService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly paymentService: PaymentService,
     private readonly notificationService: NotificationService,
     private readonly shippingTariffs: ShippingTariffService,
+    private readonly orderShipments: OrderShipmentProvisioner,
   ) {}
 
   /**
@@ -230,92 +229,11 @@ export class ShippingService {
    * Requirement: Shipping provider integration (project.md)
    */
   async createShipment(sellerId: string, dto: CreateShipmentDto) {
-    // Verify order and ownership
-    const order = await this.prisma.order.findUnique({
-      where: { id: dto.orderId },
-      include: {
-        seller: { include: { addresses: { where: { isDefault: true } } } },
-        package: { select: { packageNumber: true } },
-      },
-    });
-
-    if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
-    }
-
-    if (order.sellerId !== sellerId) {
-      throw new ForbiddenException("Bu sipariş için kargo oluşturamazsınız");
-    }
-
-    // Order must be in preparing status
-    if (order.status !== OrderStatus.preparing) {
-      throw new BadRequestException("Sipariş hazırlanma durumunda değil");
-    }
-
-    // Check for existing shipment
-    const existingShipment = await this.prisma.shipment.findFirst({
-      where: { orderId: dto.orderId },
-    });
-
-    if (existingShipment) {
-      throw new BadRequestException("Bu sipariş için zaten kargo oluşturulmuş");
-    }
-
-    // Calculate shipping cost
-    const sellerAddress = order.seller.addresses[0];
-    if (!sellerAddress) {
-      throw new BadRequestException("Satıcı adresi bulunamadı");
-    }
-
-    let shippingAddrRow: { city: string | null } | null = null;
-    if (order.shippingAddressId) {
-      shippingAddrRow = await this.prisma.address.findUnique({
-        where: { id: order.shippingAddressId },
-        select: { city: true },
-      });
-    }
-    const shippingCity = resolveShippingDestinationCity(
-      shippingAddrRow,
-      order.shippingAddress,
-    );
-
-    const rate = await this.calculateProviderRate(
+    const shipment = await this.orderShipments.createForSeller(
+      sellerId,
+      dto.orderId,
       dto.provider,
-      sellerAddress.city,
-      shippingCity,
-      1, // Default weight
     );
-
-    // Estimate delivery date
-    const estimatedDelivery = new Date();
-    estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
-
-    // #7: Bu (legacy manuel) uç eskiden Sürat çağrısı YAPMADAN, trackingNumber'sız bir
-    // yerel kayıt oluşturuyordu → gerçek gönderi hiç oluşmuyor VE barcode-retry'ın
-    // codeless filtresi (provider surat + trackingNumber != null) bunu ASLA seçmiyordu
-    // (öksüz kalıyordu). Sürat sağlayıcısında trackingNumber'ı OzelKargoTakipNo (sipariş
-    // no) olarak set et → retry job'u sonraki tick'te gerçek barkodu (providerTrackingId)
-    // idempotent olarak tamamlar. Sürat-dışı sağlayıcılar eskisi gibi lokal kalır.
-    const isSurat = dto.provider === "surat";
-    // Sürat referansı = KOLİ numarası (PKG-…), sipariş numarası değil: paketin tüm
-    // satırları tek gönderiyi paylaşır ve müşteri kargosunu bu kodla sorgular.
-    // Paketsiz (legacy) siparişte sipariş numarasına düşülür.
-    const suratRef = order.package?.packageNumber ?? order.orderNumber;
-    const shipment = await this.prisma.shipment.create({
-      data: {
-        orderId: dto.orderId,
-        packageId: order.packageId ?? null,
-        provider: dto.provider,
-        status: ShipmentStatus.pending,
-        ...(isSurat ? { trackingNumber: suratRef } : {}),
-        cost: rate.cost,
-        estimatedDelivery,
-      },
-      include: {
-        events: true,
-      },
-    });
-
     return this.formatShipmentResponse(shipment);
   }
 

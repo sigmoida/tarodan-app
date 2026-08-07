@@ -189,6 +189,9 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       applyRefund: jest.fn().mockResolvedValue(undefined),
       applyRefundAmounts: jest.fn().mockResolvedValue(undefined),
     };
+    const paymentCommon = {
+      cancelSuratShipmentIfExists: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new PaymentRefundService(
       prisma as any,
       { get: jest.fn().mockReturnValue(undefined) } as any,
@@ -200,9 +203,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       } as any,
       commissionLedger as any,
       { handleOrderRefund: jest.fn().mockResolvedValue(undefined) } as any,
-      {
-        cancelSuratShipmentIfExists: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      paymentCommon as any,
       { record: jest.fn().mockResolvedValue(undefined) } as any, // providerEvents
       undefined, // outbox
       opts.ledger as any, // Faz 6.2 ledger (@Optional)
@@ -214,11 +215,12 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       mockTx,
       prisma,
       commissionLedger,
+      paymentCommon,
     };
   };
 
   it("H3: 1000 TL siparişte 50 TL jest → hold'un yalnız %5'i tüketilir (950 kalır), payment completed kalır", async () => {
-    const { service, captured } = makeService({
+    const { service, captured, paymentCommon } = makeService({
       paymentAmount: 1000,
       holdAmount: 1000, // satıcı payı = 1000 (test kolaylığı)
     });
@@ -233,10 +235,13 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     );
     // Kısmi iade → payment refunded OLMAZ (completed kalır).
     expect(captured.paymentUpdate.data.status).toBe(PaymentStatus.completed);
+    expect(paymentCommon.cancelSuratShipmentIfExists).not.toHaveBeenCalled();
   });
 
   it("H4: 1000 TL siparişte ilk 400 TL iade payment'ı refunded YAPMAZ", async () => {
-    const { service, captured, paytr } = makeService({ paymentAmount: 1000 });
+    const { service, captured, paytr, paymentCommon } = makeService({
+      paymentAmount: 1000,
+    });
 
     await service.processRefund(ORDER_ID, 400, {
       idempotencyKey: "partial-refund-400",
@@ -248,10 +253,11 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     expect(captured.paymentUpdate.data.metadata.refundedOrders[ORDER_ID]).toBe(
       400,
     );
+    expect(paymentCommon.cancelSuratShipmentIfExists).not.toHaveBeenCalled();
   });
 
   it("H4: önceki 400 TL iadeden sonra kalan 600 TL iade → kümülatif tam → refunded", async () => {
-    const { service, captured } = makeService({
+    const { service, captured, paymentCommon } = makeService({
       paymentAmount: 1000,
       metadata: { refundedOrders: { [ORDER_ID]: 400 } },
     });
@@ -263,6 +269,10 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     expect(captured.paymentUpdate.data.status).toBe(PaymentStatus.refunded);
     expect(captured.paymentUpdate.data.metadata.refundedOrders[ORDER_ID]).toBe(
       1000,
+    );
+    expect(paymentCommon.cancelSuratShipmentIfExists).toHaveBeenCalledWith(
+      ORDER_ID,
+      "ORD1",
     );
   });
 

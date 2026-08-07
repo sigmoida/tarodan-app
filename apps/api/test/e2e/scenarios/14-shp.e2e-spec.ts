@@ -1219,24 +1219,24 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
   );
   scenario.skip(
     "SHP-129",
-    "Canlı SOAP integration; surat-api.integration-spec.ts kapsıyor",
+    "Resmi REST create integration; surat-api.integration-spec.ts kapsıyor",
   );
   scenario.skip(
     "SHP-130",
     "Canlı SOAP integration; surat-api.integration-spec.ts kapsıyor",
   );
-  // GonderiSil (iptal) birim/entegrasyon seviye; e2e'de yalnız order-cancel yan etkisi olarak tetiklenir.
+  // Resmi REST sözleşmesinde uzak iptal yok; iptal yalnız yerel durum/cache işlemidir.
   scenario.skip(
     "SHP-131",
-    "GonderiSil olmayan OID idempotent birim assertion; surat-cargo.service.spec.ts kapsıyor",
+    "Yerel iptalin taşıyıcı endpoint çağırmaması birim assertion; surat-cargo.service.spec.ts kapsıyor",
   );
   scenario.skip(
     "SHP-132",
-    "cancelShipmentByOrderNumber integration_disabled birim assertion (config kapalı gerekir); birim spec kapsıyor",
+    "cancelShipmentLocally integration_disabled birim assertion (config kapalı gerekir); birim spec kapsıyor",
   );
   scenario.skip(
     "SHP-133",
-    "GonderiSil teknik hata throw birim assertion; surat-cargo.service.spec.ts kapsıyor",
+    "Yerel iptal cache temizliği hatasının akışı bozmaması birim assertion; surat-cargo.service.spec.ts kapsıyor",
   );
   // Tracking sync (Sürat REST takip API'si) — harness'te stub YOK, canlı endpoint'e gider (test'te null → no-op).
   scenario.skip(

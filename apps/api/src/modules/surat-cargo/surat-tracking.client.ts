@@ -1,27 +1,15 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type {
-  SuratTakipResponse,
-  SuratGonderiPayload,
-} from "./surat-cargo.types";
-import { buildRestGonderi } from "./surat-rest.client";
+import type { SuratTakipResponse } from "./surat-cargo.types";
 
 const SURAT_API_LIVE =
   "https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi";
 const SURAT_API_TEST =
   "https://api02.suratkargo.com.tr/api/KargoTakipHareketDetayi";
-// OrtakBarkodOlustur = gönderi oluştur + barkod/etiket üret (gerçek KargoTakipNo + ZPL döner).
-const SURAT_BARKOD_LIVE =
-  "https://api01.suratkargo.com.tr/api/OrtakBarkodOlustur";
-const SURAT_BARKOD_TEST =
-  "https://api02.suratkargo.com.tr/api/OrtakBarkodOlustur";
-// GonderiSil = gönderiyi sil/pasif et. Query auth (CariKodu/Sifre) + WebSiparisKodu.
-const SURAT_SIL_LIVE = "https://api01.suratkargo.com.tr/api/GonderiSil";
-const SURAT_SIL_TEST = "https://api02.suratkargo.com.tr/api/GonderiSil";
 
 /**
- * 11.1a (G1): Sürat takip/sil URL'i — kimlik (CariKodu/Sifre) query auth ile taşınır
- * (Sürat sözleşmesi; bu uçlar body/header auth kabul etmez). TEK chokepoint: kimlik
+ * Sürat takip URL'i — kimlik (CariKodu/Sifre) query auth ile taşınır
+ * (resmi sözleşme; bu uç body/header auth kabul etmez). TEK chokepoint: kimlik
  * içeren URL yalnız buradan üretilir. INVARYANT: bu URL HİÇBİR log/hata/breadcrumb'a
  * verbatim GİRMEMELİ (Sifre sızar); loglanacaksa önce `redactSuratUrl` ile maskele.
  */
@@ -40,8 +28,8 @@ export function redactSuratUrl(url: string): string {
 }
 
 /**
- * SuratTrackingClient (Faz 11.3a): ham Sürat HTTP çağrıları (takip sorgusu + admin
- * "Sürat Endpoint Testi" probe'ları) ve Sürat tarih-parse yardımcısı. Kimlik-içeren
+ * SuratTrackingClient: yalnız resmi KargoTakipHareketDetayi çağrıları ve Sürat
+ * tarih-parse yardımcısı. Kimlik-içeren
  * URL üretimi yalnız buildAuthedSuratUrl üzerinden; loglar redactSuratUrl'den geçer.
  */
 @Injectable()
@@ -73,22 +61,19 @@ export class SuratTrackingClient {
     const isTestMode =
       this.configService
         .get<string>("SURAT_KARGO_TEST_MODE", "true")
-        ?.trim() === "true";
+        ?.trim() !== "false";
     const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
 
     const url = buildAuthedSuratUrl(baseUrl, cariKodu, sifre, webSiparisKodu);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
-
       const response = await fetch(url, {
         method: "POST",
         headers: { Accept: "application/json" },
         signal: controller.signal,
       });
-
-      clearTimeout(timer);
 
       if (!response.ok) {
         this.logger.warn(
@@ -112,6 +97,8 @@ export class SuratTrackingClient {
         `Surat tracking API request failed for ${webSiparisKodu}: ${redactSuratUrl(String(error?.message ?? error))}`,
       );
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -147,10 +134,10 @@ export class SuratTrackingClient {
         ?.trim() !== "false";
     const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
     const url = buildAuthedSuratUrl(baseUrl, cariKodu, sifre, webSiparisKodu);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
       // Sürat (IIS) POST'ta Content-Length ister → boş gövde ile 0 gönderiyoruz.
       const response = await fetch(url, {
         method: "POST",
@@ -158,8 +145,6 @@ export class SuratTrackingClient {
         body: "",
         signal: controller.signal,
       });
-      clearTimeout(timer);
-
       const text = await response.text();
       let body: SuratTakipResponse | null = null;
       try {
@@ -185,154 +170,8 @@ export class SuratTrackingClient {
         ok: false,
         error: redactSuratUrl(error?.message || String(error)),
       };
-    }
-  }
-
-  /**
-   * Test konsolu: OrtakBarkodOlustur = gönderi oluştur + barkod/etiket üret.
-   * Gövde create ile aynı desende: { KullaniciAdi, Sifre, Gonderi:{...} }. Dönüşte
-   * gerçek KargoTakipNo + ZPL etiket verir (düz create bunları vermez). DB'ye dokunmaz.
-   */
-  async probeBarcode(payload: SuratGonderiPayload): Promise<{
-    ok: boolean;
-    isError?: boolean;
-    message?: string | null;
-    kargoTakipNo?: string | null;
-    barcodeCount?: number;
-    barcodeSample?: string | null;
-    error?: string;
-  }> {
-    const cariKodu = this.configService.get<string>(
-      "SURAT_KARGO_CARI_KODU",
-      "",
-    );
-    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
-    if (!cariKodu || !sifre) {
-      return {
-        ok: false,
-        error: "SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil",
-      };
-    }
-    const isTestMode =
-      this.configService
-        .get<string>("SURAT_KARGO_TEST_MODE", "true")
-        ?.trim() !== "false";
-    const url = isTestMode ? SURAT_BARKOD_TEST : SURAT_BARKOD_LIVE;
-    const body = JSON.stringify({
-      KullaniciAdi: cariKodu,
-      Sifre: sifre,
-      Gonderi: buildRestGonderi(payload),
-    });
-
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20000);
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body,
-        signal: controller.signal,
-      });
+    } finally {
       clearTimeout(timer);
-
-      const text = await response.text();
-      let data: any = null;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        return {
-          ok: false,
-          error: text?.slice(0, 200) || "JSON olmayan yanıt",
-        };
-      }
-
-      const isError = data?.isError ?? data?.IsError ?? false;
-      const barcode: unknown[] = Array.isArray(data?.Barcode)
-        ? data.Barcode
-        : [];
-      return {
-        ok: isError !== true,
-        isError: isError === true,
-        message: data?.Message ?? null,
-        kargoTakipNo: data?.KargoTakipNo ?? null,
-        barcodeCount: barcode.length,
-        barcodeSample: barcode.length ? String(barcode[0]).slice(0, 200) : null,
-      };
-    } catch (error: any) {
-      return {
-        ok: false,
-        error: redactSuratUrl(error?.message || String(error)),
-      };
-    }
-  }
-
-  /**
-   * Test konsolu: GonderiSil = gönderiyi sil/pasif et. Query auth (CariKodu/Sifre) +
-   * WebSiparisKodu. Ham cevabı döner; DB'ye dokunmaz.
-   */
-  async probeGonderiSil(webSiparisKodu: string): Promise<{
-    ok: boolean;
-    httpStatus?: number;
-    isError?: boolean;
-    message?: string | null;
-    error?: string;
-  }> {
-    const cariKodu = this.configService.get<string>(
-      "SURAT_KARGO_CARI_KODU",
-      "",
-    );
-    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
-    if (!cariKodu || !sifre) {
-      return {
-        ok: false,
-        error: "SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil",
-      };
-    }
-    const isTestMode =
-      this.configService
-        .get<string>("SURAT_KARGO_TEST_MODE", "true")
-        ?.trim() !== "false";
-    const baseUrl = isTestMode ? SURAT_SIL_TEST : SURAT_SIL_LIVE;
-    const url = buildAuthedSuratUrl(baseUrl, cariKodu, sifre, webSiparisKodu);
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: "{}",
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      const text = await response.text();
-      let data: any = null;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        return {
-          ok: false,
-          httpStatus: response.status,
-          error: text?.slice(0, 200) || "JSON olmayan yanıt",
-        };
-      }
-      const isError = data?.IsError ?? data?.isError ?? false;
-      return {
-        ok: isError !== true,
-        httpStatus: response.status,
-        isError: isError === true,
-        message: data?.Message ?? data?.GonderiSilResult ?? null,
-      };
-    } catch (error: any) {
-      return {
-        ok: false,
-        error: redactSuratUrl(error?.message || String(error)),
-      };
     }
   }
 

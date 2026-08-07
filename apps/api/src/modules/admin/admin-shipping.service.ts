@@ -1,11 +1,21 @@
-import { Injectable, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { Prisma } from "@prisma/client";
-import { AdminShipmentQueryDto } from "./dto";
+import {
+  AdminShipmentQueryDto,
+  CarrierCancellationTaskQueryDto,
+  ResolveCarrierCancellationTaskDto,
+} from "./dto";
 import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { requestCarrierCancellationTask } from "../surat-cargo/carrier-cancellation-task";
 import { StorageService } from "../storage/storage.service";
 
 /**
@@ -146,6 +156,94 @@ export class AdminShippingService {
     };
   }
 
+  async getCarrierCancellationTasks(query: CarrierCancellationTaskQueryDto) {
+    const where: Prisma.CarrierCancellationTaskWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.search?.trim()
+        ? {
+            OR: [
+              {
+                reference: {
+                  contains: query.search.trim(),
+                  mode: "insensitive",
+                },
+              },
+              {
+                entityId: {
+                  contains: query.search.trim(),
+                  mode: "insensitive",
+                },
+              },
+              {
+                reason: { contains: query.search.trim(), mode: "insensitive" },
+              },
+            ],
+          }
+        : {}),
+    };
+    const page = await paginate(
+      this.prisma.carrierCancellationTask,
+      { where, orderBy: { requestedAt: "desc" } },
+      { ...query, limit: query.limit ?? 20 },
+    );
+    const resolverIds = [
+      ...new Set(
+        page.data
+          .map((task) => task.resolvedBy)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const resolvers = resolverIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: resolverIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const resolverById = new Map(resolvers.map((user) => [user.id, user]));
+    return {
+      ...page,
+      data: page.data.map((task) => ({
+        ...task,
+        resolvedByAdmin: task.resolvedBy
+          ? (resolverById.get(task.resolvedBy) ?? null)
+          : null,
+      })),
+    };
+  }
+
+  async resolveCarrierCancellationTask(
+    taskId: string,
+    adminId: string,
+    dto: ResolveCarrierCancellationTaskDto,
+  ) {
+    const resolution = dto.resolution.trim();
+    if (!resolution) {
+      throw new BadRequestException("Çözüm notu zorunludur");
+    }
+    const updated = await this.prisma.carrierCancellationTask.updateMany({
+      where: { id: taskId, status: "pending" },
+      data: {
+        status: dto.status,
+        resolution,
+        resolvedAt: new Date(),
+        resolvedBy: adminId,
+      },
+    });
+    if (updated.count === 0) {
+      const exists = await this.prisma.carrierCancellationTask.findUnique({
+        where: { id: taskId },
+      });
+      if (!exists)
+        throw new NotFoundException("Taşıyıcı iptal görevi bulunamadı");
+      throw new BadRequestException(
+        "Taşıyıcı iptal görevi zaten sonuçlandırılmış",
+      );
+    }
+    return this.prisma.carrierCancellationTask.findUnique({
+      where: { id: taskId },
+    });
+  }
+
   /**
    * Admin manuel takip senkronu: bir Sürat kargosunun güncel durumunu 30 dk'lık
    * cron'u beklemeden anında Sürat takip API'sinden çeker ve DB'ye yazar.
@@ -185,14 +283,16 @@ export class AdminShippingService {
   /**
    * Sürat REST endpoint testi: sunucudan Sürat'a gerçek bir test gönderisi oluşturur
    * (GonderiyiKargoyaGonder) ve hemen aynı referansla takibini sorgular
-   * (KargoTakipHareketDetayi). DB'ye/siparişe DOKUNMAZ — sadece iki REST endpoint'inin
-   * canlı çalıştığını ham cevaplarla gösterir. Admin "Sürat Endpoint Testi" paneli kullanır.
+   * (KargoTakipHareketDetayi). Sipariş verisine dokunmaz; başarılı oluşturma
+   * sonrasında dış gönderinin manuel temizlenebilmesi için kalıcı görev kaydeder.
+   * Admin "Sürat Endpoint Testi" paneli kullanır.
    */
-  async runSuratEndpointTest(): Promise<{
+  async runSuratEndpointTest(adminId: string): Promise<{
     ref: string;
     enabled: boolean;
     create: { ok: boolean; message: string };
     track: any;
+    cleanupTask: { ok: boolean; id?: string; error?: string } | null;
   }> {
     const ref = `ADMIN-TEST-${Date.now()}`;
 
@@ -202,6 +302,7 @@ export class AdminShippingService {
         enabled: false,
         create: { ok: false, message: "Sürat servisi kullanılamıyor" },
         track: null,
+        cleanupTask: null,
       };
     }
     if (!this.suratCargoService.isIntegrationEnabled()) {
@@ -213,6 +314,7 @@ export class AdminShippingService {
           message: "SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)",
         },
         track: null,
+        cleanupTask: null,
       };
     }
 
@@ -243,12 +345,41 @@ export class AdminShippingService {
             `teknik hata: ${(createResult as any).code ?? "bilinmiyor"}`,
         };
 
-    // 2) Aynı referansla takibi sorgula — Sürat'tan durum oku (REST tracking)
-    const track = this.suratTrackingService
-      ? await this.suratTrackingService.probeTracking(ref)
-      : { ok: false, error: "Takip servisi kullanılamıyor" };
+    let cleanupTask: { ok: boolean; id?: string; error?: string } | null = null;
+    if (createResult.ok) {
+      try {
+        const task = await requestCarrierCancellationTask(this.prisma, {
+          provider: "surat",
+          reference: ref,
+          entityType: "admin_endpoint_test",
+          entityId: ref,
+          reason: "admin_endpoint_test_cleanup",
+          metadata: {
+            requestedBy: adminId,
+            createdAt: new Date().toISOString(),
+          },
+        });
+        cleanupTask = { ok: true, id: task.id };
+      } catch (error: any) {
+        cleanupTask = {
+          ok: false,
+          error: error?.message ?? String(error),
+        };
+      }
+    }
 
-    return { ref, enabled: true, create, track };
+    // 2) Aynı referansla takibi sorgula — dış kayıt oluştuysa temizleme görevi
+    // garanti altına alındıktan sonra Sürat'tan durum oku (REST tracking).
+    let track: any = { ok: false, error: "Takip servisi kullanılamıyor" };
+    if (this.suratTrackingService) {
+      try {
+        track = await this.suratTrackingService.probeTracking(ref);
+      } catch (error: any) {
+        track = { ok: false, error: error?.message ?? String(error) };
+      }
+    }
+
+    return { ref, enabled: true, create, track, cleanupTask };
   }
 
   /**
@@ -261,67 +392,6 @@ export class AdminShippingService {
     if (!this.suratTrackingService)
       return { ok: false, error: "Takip servisi kullanılamıyor" };
     return this.suratTrackingService.probeTracking(ref.trim());
-  }
-
-  /**
-   * Test konsolu: verilen referansla Sürat iptal/geri-çek endpoint'ini (GonderiGeriCek)
-   * çağırır. Uzak çağrı yapar, DB'ye dokunmaz.
-   */
-  async suratTestCancel(
-    ref: string,
-  ): Promise<{ ok: boolean; suratMessage?: string; error?: string }> {
-    if (!ref?.trim())
-      return { ok: false, error: "Referans (OzelKargoTakipNo) gerekli" };
-    if (!this.suratCargoService)
-      return { ok: false, error: "Sürat servisi kullanılamıyor" };
-    if (!this.suratCargoService.isIntegrationEnabled()) {
-      return {
-        ok: false,
-        error: "SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)",
-      };
-    }
-    return this.suratCargoService.cancelShipmentByOrderNumber(ref.trim());
-  }
-
-  /**
-   * Test konsolu: OrtakBarkodOlustur ile gönderi oluştur + barkod/etiket üret.
-   * Gerçek KargoTakipNo + ZPL etiket döner (düz create bunları vermez). DB'ye dokunmaz.
-   */
-  async suratTestBarcode(): Promise<any> {
-    if (!this.suratTrackingService)
-      return { ok: false, error: "Takip servisi kullanılamıyor" };
-    if (!this.suratCargoService?.isIntegrationEnabled()) {
-      return {
-        ok: false,
-        error: "SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)",
-      };
-    }
-    const ref = `ADMIN-BARKOD-${Date.now()}`;
-    const result = await this.suratTrackingService.probeBarcode(
-      buildStandardGonderiPayload({
-        recipientName: "ADMIN BARKOD TEST",
-        address: "Caferağa Mah. Moda Cad. No:14",
-        city: "İstanbul",
-        district: "Kadıköy",
-        phone: "5321112233",
-        ref,
-        content: "Endpoint testi",
-        // Test payload'u telefonu HAM gönderir; builder normalize eder → koru.
-        overrides: { TelefonCep: "5321112233" },
-      }),
-    );
-    return { ref, ...result };
-  }
-
-  /**
-   * Test konsolu: GonderiSil ile gönderiyi sil/pasif et (referansla). DB'ye dokunmaz.
-   */
-  async suratTestSil(ref: string): Promise<any> {
-    if (!ref?.trim())
-      return { ok: false, error: "Referans (WebSiparisKodu) gerekli" };
-    if (!this.suratTrackingService)
-      return { ok: false, error: "Takip servisi kullanılamıyor" };
-    return this.suratTrackingService.probeGonderiSil(ref.trim());
   }
 
   /**

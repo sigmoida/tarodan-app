@@ -3,7 +3,7 @@
  * Her tip için idempotent bir handler kayıtlıdır (OutboxHandlerRegistry).
  */
 
-/** Sürat kargo gönderisini iptal et (iade sonrası). Handler idempotent no-op'tur. */
+/** Kargo gönderisini yerelde iptal et (iade sonrası); uzak Sürat çağrısı yapmaz. */
 export const OUTBOX_SHIPMENT_CANCEL = "shipment.cancel";
 
 export interface ShipmentCancelPayload {

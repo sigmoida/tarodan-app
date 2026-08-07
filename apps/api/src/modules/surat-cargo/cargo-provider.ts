@@ -1,22 +1,56 @@
-import type {
-  SuratShipmentInput,
-  SuratBarcodeResult,
-} from "./surat-cargo.types";
-
-/** DI token — Faz 11.5a: tüketiciler somut SuratCargoService yerine bu soyutlamaya bağlanır. */
+/** Uygulama katmanının somut kargo sağlayıcısından bağımsız DI sınırı. */
 export const CARGO_PROVIDER = Symbol("CARGO_PROVIDER");
 
+export interface CargoRecipient {
+  name: string;
+  address: string;
+  city: string;
+  district: string;
+  phone: string;
+}
+
+export interface CargoShipmentRequest {
+  idempotencyKey: string;
+  correlationId: string;
+  reference: string;
+  recipient: CargoRecipient;
+  content?: string;
+  desi?: number | null;
+  isReturn?: boolean;
+}
+
+export type CargoShipmentResult =
+  | {
+      ok: true;
+      trackingCode: string;
+      labelData: string | null;
+      providerMessage?: string;
+    }
+  | {
+      ok: false;
+      kind: "business";
+      message: string;
+    }
+  | {
+      ok: false;
+      kind: "technical";
+      code: string;
+      cause?: Error;
+    };
+
+export type CargoShipmentFailure = Exclude<CargoShipmentResult, { ok: true }>;
+
+export interface CargoLocalCancellationResult {
+  ok: boolean;
+  providerMessage?: string;
+}
+
 /**
- * CargoProvider (Faz 11.5a) — kargo sağlayıcısı soyutlaması (DIP). Payment bu arayüze
- * bağlanır; sağlayıcı değişse çağıran etkilenmez. (Girdi/çıktı değer-tipleri şimdilik
- * Sürat'tan; servis bağımlılığı ters çevrildi.)
+ * Provider-neutral port. Sürat REST alanları ve yanıt adları yalnız adaptörün
+ * içinde kalır; payment/order/trade/refund katmanlarına sızmaz.
  */
 export interface CargoProvider {
-  isIntegrationEnabled(): boolean;
-  createShipmentWithBarcode(
-    input: SuratShipmentInput,
-  ): Promise<SuratBarcodeResult>;
-  cancelShipmentByOrderNumber(
-    ozelKargoTakipNo: string,
-  ): Promise<{ ok: boolean; suratMessage?: string }>;
+  isEnabled(): boolean;
+  createShipment(input: CargoShipmentRequest): Promise<CargoShipmentResult>;
+  clearLocalShipment(reference: string): Promise<CargoLocalCancellationResult>;
 }

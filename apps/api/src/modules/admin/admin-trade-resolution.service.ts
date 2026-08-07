@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
   Optional,
   Logger,
 } from "@nestjs/common";
@@ -16,12 +17,15 @@ import {
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import { PaymentService } from "../payment/payment.service";
 import { EventService } from "../events/event.service";
-import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import {
+  CARGO_PROVIDER,
+  type CargoProvider,
+} from "../surat-cargo/cargo-provider";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
 import { primaryCashPayment } from "../trade/trade.constants";
+import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 
 /**
  * Takas çözüm & iade/iptal yaşam döngüsü (resolveTrade, markReturnDelivered,
@@ -39,7 +43,10 @@ export class AdminTradeResolutionService {
     private readonly eventService: EventService,
     private readonly common: AdminTradeCommonService,
     @Optional()
-    private readonly suratCargoService?: SuratCargoService,
+    @Inject(CARGO_PROVIDER)
+    private readonly cargo?: CargoProvider,
+    @Optional()
+    private readonly carrierCancellations?: CarrierCancellationService,
   ) {}
 
   /**
@@ -520,7 +527,7 @@ export class AdminTradeResolutionService {
 
     // Side effects outside the transaction:
     //   1) submit return shipment to Sürat (idempotent),
-    //   2) cancel the stuck counterpart shipment at Sürat (best-effort),
+    //   2) cancel the stuck counterpart shipment locally (best-effort; carrier panel is manual),
     //   3) trigger refund.
 
     if (txResult.returnShipmentDraft) {
@@ -532,46 +539,32 @@ export class AdminTradeResolutionService {
           where: { userId: txResult.arrivedOwnerId },
           orderBy: { isDefault: "desc" },
         });
-        if (
-          arrivedAddress &&
-          this.suratCargoService &&
-          this.suratCargoService.isIntegrationEnabled()
-        ) {
-          const result = await this.suratCargoService.createShipmentWithBarcode(
-            {
-              idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
-              correlationId: `trade-force-cancel-${tradeId}`,
-              payload: buildStandardGonderiPayload({
-                recipientName:
-                  arrivedAddress.fullName ||
-                  arrivedUser?.displayName ||
-                  "Takas İade",
-                address: arrivedAddress.address,
-                city: arrivedAddress.city,
-                district: arrivedAddress.district,
-                phone: arrivedAddress.phone,
-                ref: txResult.returnShipmentDraft.oid,
-                content: "Takas Kayıp İade",
-                isReturn: true,
-                // KisiKurum fallback zinciri "Takas İade" (builder'ın "Alıcı"sı
-                // değil) ve trim yok → birebir korumak için override.
-                overrides: {
-                  KisiKurum:
-                    arrivedAddress.fullName ||
-                    arrivedUser?.displayName ||
-                    "Takas İade",
-                },
-              }),
+        if (arrivedAddress && this.cargo && this.cargo.isEnabled()) {
+          const result = await this.cargo.createShipment({
+            idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
+            correlationId: `trade-force-cancel-${tradeId}`,
+            reference: txResult.returnShipmentDraft.oid,
+            recipient: {
+              name:
+                arrivedAddress.fullName ||
+                arrivedUser?.displayName ||
+                "Takas İade",
+              address: arrivedAddress.address,
+              city: arrivedAddress.city,
+              district: arrivedAddress.district,
+              phone: arrivedAddress.phone,
             },
-          );
+            content: "Takas Kayıp İade",
+            isReturn: true,
+          });
           if (result.ok) {
             await this.prisma.tradeShipment.update({
               where: { id: txResult.returnShipmentDraft.id },
               data: {
                 carrier: "surat",
                 trackingNumber: txResult.returnShipmentDraft.oid,
-                providerTrackingId: result.kargoTakipNo,
-                labelZpl: result.labelZpl,
+                providerTrackingId: result.trackingCode,
+                labelZpl: result.labelData,
                 status: ShipmentStatus.label_created,
                 shippedAt: new Date(),
               },
@@ -579,7 +572,7 @@ export class AdminTradeResolutionService {
           } else {
             const r = result as any;
             const errMsg =
-              r.kind === "business" ? r.suratMessage : `technical: ${r.code}`;
+              r.kind === "business" ? r.message : `technical: ${r.code}`;
             this.logger.error(
               `Force-cancel return shipment submit failed for trade ${tradeId}: ${errMsg}`,
             );
@@ -604,24 +597,33 @@ export class AdminTradeResolutionService {
       }
     }
 
-    // Cancel the stuck counterpart shipment in Sürat (best-effort).
+    // Resmi API'de uzak iptal yok: karşı bacağı yerelde iptal et; fiziksel işlem
+    // gerekiyorsa operasyon ekibi Sürat panelinden tamamlar.
     if (
       txResult.stuckShipment.carrier === "surat" &&
       txResult.stuckShipment.trackingNumber &&
-      this.suratCargoService &&
-      this.suratCargoService.isIntegrationEnabled()
+      this.cargo &&
+      this.cargo.isEnabled() &&
+      this.carrierCancellations
     ) {
       try {
-        await this.suratCargoService.cancelShipmentByOrderNumber(
-          txResult.stuckShipment.trackingNumber,
-        );
-        await this.prisma.tradeShipment.update({
-          where: { id: txResult.stuckShipment.id },
-          data: { status: "cancelled" as any },
+        await this.carrierCancellations.request({
+          provider: "surat",
+          reference: txResult.stuckShipment.trackingNumber,
+          entityType: "trade_shipment",
+          entityId: txResult.stuckShipment.id,
+          reason: "admin_force_cancel_stuck_trade",
+          metadata: { tradeId },
+          updateLocal: async (tx) => {
+            await tx.tradeShipment.update({
+              where: { id: txResult.stuckShipment.id },
+              data: { status: "cancelled" as any },
+            });
+          },
         });
       } catch (err: any) {
         this.logger.error(
-          `Force-cancel stuck-shipment Sürat cancel failed trade=${tradeId}: ${err?.message}`,
+          `Force-cancel stuck-shipment local cancel failed trade=${tradeId}: ${err?.message}`,
         );
       }
     }

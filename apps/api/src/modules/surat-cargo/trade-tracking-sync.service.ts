@@ -164,7 +164,6 @@ export class TradeTrackingSyncService {
             ShipmentStatus.delivered,
             ShipmentStatus.returned,
             ShipmentStatus.cancelled,
-            ShipmentStatus.failed,
           ],
         },
         trackingNumber: { not: null },

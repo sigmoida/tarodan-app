@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -23,10 +24,13 @@ import { generateUniqueReference } from "../../common/helpers/generate-reference
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { PaymentService } from "../payment/payment.service";
 import { RefundPendingReconciliationException } from "../payment-providers/refund-errors";
-import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import {
+  CARGO_PROVIDER,
+  type CargoProvider,
+} from "../surat-cargo/cargo-provider";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
-import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 import { CreateRefundRequestDto } from "./dto/create-refund-request.dto";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto/notification.dto";
@@ -75,7 +79,8 @@ export class RefundService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
-    private readonly suratCargoService: SuratCargoService,
+    @Inject(CARGO_PROVIDER) private readonly cargo: CargoProvider,
+    private readonly carrierCancellations: CarrierCancellationService,
     private readonly suratTrackingService: SuratTrackingService,
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
@@ -860,7 +865,7 @@ export class RefundService {
       );
     }
 
-    if (!this.suratCargoService.isIntegrationEnabled()) {
+    if (!this.cargo.isEnabled()) {
       this.logger.warn(
         `Surat integration disabled, marking ${rr.refundNumber} as return_shipment_open without provider call`,
       );
@@ -893,31 +898,25 @@ export class RefundService {
       return updated;
     }
 
-    const result = await this.suratCargoService.createShipmentWithBarcode({
+    const result = await this.cargo.createShipment({
       idempotencyKey: `surat:refund-return:${rr.refundNumber}`,
       correlationId: `refund-${rr.id}`,
-      payload: buildStandardGonderiPayload({
-        recipientName: sellerAddr.fullName || rr.order.seller.displayName,
+      reference: rr.refundNumber,
+      recipient: {
+        name: sellerAddr.fullName || rr.order.seller.displayName,
         address: sellerAddr.address,
         city: sellerAddr.city,
         district: sellerAddr.district,
         phone: sellerAddr.phone,
-        ref: rr.refundNumber,
-        content: `İade: ${rr.order.orderNumber}`,
-        isReturn: true,
-        desi: rr.returnBillableDesi,
-        // KisiKurum fallback burada seller.displayName (builder'ın "Alıcı"sı
-        // değil) ve trim uygulanmıyor → birebir korumak için override.
-        overrides: {
-          KisiKurum: sellerAddr.fullName || rr.order.seller.displayName,
-        },
-      }),
+      },
+      content: `İade: ${rr.order.orderNumber}`,
+      isReturn: true,
+      desi: rr.returnBillableDesi,
     });
 
     if (!result.ok) {
       const r = result as any;
-      const errMsg =
-        r.kind === "business" ? r.suratMessage : `technical: ${r.code}`;
+      const errMsg = r.kind === "business" ? r.message : `technical: ${r.code}`;
       throw new BadRequestException(`Sürat iade kargosu açılamadı: ${errMsg}`);
     }
 
@@ -928,8 +927,8 @@ export class RefundService {
         returnProvider: "surat",
         returnTrackingNumber: rr.refundNumber,
         // Real Sürat return code (KargoTakipNo) + label, created immediately.
-        returnProviderTrackingId: result.kargoTakipNo,
-        returnLabelZpl: result.labelZpl,
+        returnProviderTrackingId: result.trackingCode,
+        returnLabelZpl: result.labelData,
         returnStatus: ShipmentStatus.label_created,
         returnCreatedAt: new Date(),
       },
@@ -1098,8 +1097,9 @@ export class RefundService {
    * D25 (insani senaryo): alıcı iadeyi açtı ama paketi hiç şubeye götürmedi —
    * satıcının hold'u süresiz donuk kalıyordu. `return_shipment_open` + N gün
    * (env REFUND_RETURN_DROPOFF_DAYS, vars. 7) hareketsiz kalan Sürat iadelerini
-   * iptal eder: hold çözülür, Sürat kaydı silinir (kod artık şubede
-   * kullanılamaz), alıcıya bildirim gider.
+   * yerelde iptal eder: hold çözülür ve alıcıya bildirim gider. Resmi REST
+   * sözleşmesinde uzak iptal olmadığı için fiziksel kayıt/kod operasyon ekibinin
+   * Sürat paneli müdahalesini gerektirir.
    *
    * Güvenlik: iptal ETMEDEN önce Sürat'tan CANLI takip çekilir — pakette
    * hareket varsa (alıcı son anda götürdü, poll henüz görmedi) iptal atlanır ve
@@ -1157,26 +1157,38 @@ export class RefundService {
           continue;
         }
 
-        await this.prisma.refundRequest.update({
-          where: { id: rr.id },
-          data: {
-            status: RefundRequestStatus.cancelled,
-            decidedAt: new Date(),
-            decidedBy: "system",
+        const cancellationTask = await this.carrierCancellations.request({
+          provider: "surat",
+          reference: rr.refundNumber,
+          entityType: "refund_return",
+          entityId: rr.id,
+          reason: "return_dropoff_expired",
+          metadata: {
+            orderId: rr.order.id,
+            refundNumber: rr.refundNumber,
+            dropoffDays: days,
+          },
+          updateLocal: async (tx) => {
+            await tx.refundRequest.update({
+              where: { id: rr.id },
+              data: {
+                status: RefundRequestStatus.cancelled,
+                decidedAt: new Date(),
+                decidedBy: "system",
+              },
+            });
           },
         });
         // Hold kilidini kaldır → normal escrow akışına dönsün.
         await this.unfreezeHoldForRefund(rr.order.id);
-        // Sürat'taki iade gönderisini sil — süresi dolmuş kod şubede kullanılamasın
-        // (best-effort; idempotency cache'i de temizlenir).
-        await this.suratCargoService
-          .cancelShipmentByOrderNumber(rr.refundNumber)
-          .catch(() => undefined);
         await this.appendHistory(rr.id, {
           action: "return_dropoff_expired",
           by: "system",
-          details: { days },
+          details: { days, carrierCancellationRequired: true },
         });
+        this.logger.warn(
+          `Refund ${rr.refundNumber} locally expired; carrier cancellation task=${cancellationTask.id}`,
+        );
         await this.safeNotify(
           rr.requesterId,
           NotificationType.REFUND_CANCELLED,

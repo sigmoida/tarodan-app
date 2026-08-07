@@ -323,7 +323,7 @@ export class AdminTradeController {
   @ApiResponse({
     status: HttpStatus.OK,
     description:
-      "Counterpart shipment cancelled in carrier, arrived item returned (optional), trade set to returning",
+      "Counterpart shipment cancelled locally, arrived item returned (optional), trade set to returning; carrier action is manual",
   })
   async forceCancelStuckTrade(
     @Param("id") id: string,

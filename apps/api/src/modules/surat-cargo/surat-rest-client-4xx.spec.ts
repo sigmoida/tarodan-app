@@ -26,7 +26,7 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
     }) as any;
 
     await expect(
-      client.callGonderiyiKargoyaGonderYeni(payload, opts),
+      client.callGonderiyiKargoyaGonder(payload, opts),
     ).rejects.toThrow(/HTTP 400/);
   });
 
@@ -37,7 +37,7 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
     }) as any;
 
     await expect(
-      client.callGonderiyiKargoyaGonderYeni(payload, opts),
+      client.callGonderiyiKargoyaGonder(payload, opts),
     ).rejects.toThrow(/HTTP 401/);
   });
 
@@ -48,7 +48,51 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
         JSON.stringify({ IsError: false, Message: "başarıyla oluşturuldu" }),
     }) as any;
 
-    const res = await client.callGonderiyiKargoyaGonderYeni(payload, opts);
+    const res = await client.callGonderiyiKargoyaGonder(payload, opts);
     expect(res).toBe("Tamam");
+  });
+
+  it("IsError alanı olmayan JSON nesnesini başarı saymaz", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 200,
+      text: async () => JSON.stringify({ Message: "Belirsiz cevap" }),
+    }) as any;
+
+    await expect(
+      client.callGonderiyiKargoyaGonder(payload, opts),
+    ).resolves.toBe("Belirsiz cevap");
+  });
+
+  it("resmi string cevap sözleşmesini kabul eder", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 200,
+      text: async () => JSON.stringify("Tamam"),
+    }) as any;
+
+    await expect(
+      client.callGonderiyiKargoyaGonder(payload, opts),
+    ).resolves.toBe("Tamam");
+  });
+
+  it("resmi string cevap düz metin dönerse de kabul eder", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 200,
+      text: async () => "Tamam",
+    }) as any;
+
+    await expect(
+      client.callGonderiyiKargoyaGonder(payload, opts),
+    ).resolves.toBe("Tamam");
+  });
+
+  it("4xx yanıt gövdesini teşhis için hata mesajına ekler", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 404,
+      text: async () => JSON.stringify({ Message: "Endpoint bulunamadı" }),
+    }) as any;
+
+    await expect(
+      client.callGonderiyiKargoyaGonder(payload, opts),
+    ).rejects.toThrow(/HTTP 404.*Endpoint bulunamadı/);
   });
 });
