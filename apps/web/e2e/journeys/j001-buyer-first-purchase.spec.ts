@@ -32,11 +32,11 @@ test.describe('J1 — Ilk alisveris (satin al + ode + dogrula)', () => {
 
     // 5) UI dogrulama: token enjekte -> alici kendi siparisini gorebiliyor (404/login degil)
     await loginViaToken(page, token);
-    await page.goto(`/orders/${orderId}`);
+    await page.goto(`/profile/orders/${orderId}`);
     await page.waitForLoadState('networkidle').catch(() => {});
     const body = (await page.locator('body').textContent()) ?? '';
     expect(body.length).toBeGreaterThan(200);
     expect(body).not.toMatch(/sayfa bulunamad|not found|404/i);
-    expect(page.url()).toContain(`/orders/${orderId}`);
+    expect(page.url()).toContain(`/profile/orders/${orderId}`);
   });
 });

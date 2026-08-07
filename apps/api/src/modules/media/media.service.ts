@@ -8,6 +8,7 @@ import { ConfigService } from "@nestjs/config";
 import { v4 as uuidv4 } from "uuid";
 import { MembershipService } from "../membership/membership.service";
 import { PrismaService } from "../../prisma";
+import { productImageFolder } from "../product/helpers/product-image-keys";
 import {
   StorageService,
   UploadOptions as StorageUploadOptions,
@@ -350,7 +351,12 @@ export class MediaService {
    */
   async uploadProductImageVariants(
     file: Express.Multer.File,
-    productId?: string,
+    /**
+     * Yükleyen kullanıcı. Anahtar bu kullanıcının klasörüne iner; ilan
+     * oluşturma/düzenleme anahtarın sahibini böyle doğrular (ayrı bir tablo
+     * ya da migration gerekmeden).
+     */
+    ownerUserId: string,
   ): Promise<{ cardKey: string; detailKey: string }> {
     if (!sharp) {
       this.logger.error(
@@ -380,7 +386,7 @@ export class MediaService {
     }
 
     const baseId = uuidv4();
-    const folder = `product-images/${productId || "temp"}`;
+    const folder = productImageFolder(ownerUserId);
     const cacheOpts = {
       contentType: "image/webp" as const,
       cacheControl: "public, max-age=31536000, immutable",

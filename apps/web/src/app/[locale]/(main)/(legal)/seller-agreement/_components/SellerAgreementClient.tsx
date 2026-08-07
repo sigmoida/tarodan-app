@@ -18,20 +18,26 @@ function FeeTable() {
         <thead>
           <tr className="text-left text-muted">
             <th className="pb-2 pr-4 font-medium">Tutar</th>
-            <th className="pb-2 pr-4 font-medium">Komisyon</th>
+            <th className="pb-2 pr-4 font-medium">Satıcı Komisyon</th>
+            <th className="pb-2 pr-4 font-medium">Alıcı Komisyon</th>
+            <th className="pb-2 pr-4 font-medium">Satıcı Kargo</th>
+            <th className="pb-2 pr-4 font-medium">Alıcı Kargo</th>
             <th className="pb-2 pr-4 font-medium">
               Satıcı Platform Hizmet Bedeli
             </th>
-            <th className="pb-2 font-medium">Kargo</th>
+            <th className="pb-2 font-medium">Alıcı Koruma Hizmeti</th>
           </tr>
         </thead>
         <tbody className="text-body">
           {FEE_TABLE.map((row) => (
             <tr key={row.range} className="border-t border-border-subtle">
               <td className="py-2 pr-4 font-medium">{row.range}</td>
-              <td className="py-2 pr-4 tabular-nums">{row.commission}</td>
-              <td className="py-2 pr-4 tabular-nums">{row.serviceFee}</td>
-              <td className="py-2 tabular-nums">{row.shipping}</td>
+              <td className="py-2 pr-4 tabular-nums">{row.sellerCommission}</td>
+              <td className="py-2 pr-4 tabular-nums">{row.buyerCommission}</td>
+              <td className="py-2 pr-4 tabular-nums">{row.sellerShipping}</td>
+              <td className="py-2 pr-4 tabular-nums">{row.buyerShipping}</td>
+              <td className="py-2 pr-4 tabular-nums">{row.sellerServiceFee}</td>
+              <td className="py-2 tabular-nums">{row.buyerProtectionFee}</td>
             </tr>
           ))}
         </tbody>

@@ -32,12 +32,6 @@ export default function ContactClient() {
             </div>
             <div>
               <dt className="text-muted">
-                {t("information.contactInfo.phone")}
-              </dt>
-              <dd>{t("information.contactInfo.phoneValue")}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">
                 {t("information.contactInfo.address")}
               </dt>
               <dd>{t("information.contactInfo.addressValue")}</dd>

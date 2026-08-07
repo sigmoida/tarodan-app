@@ -80,3 +80,48 @@ describe("MediaCleanupService.cleanupTempProductImages", () => {
     expect(storage.deleteFileByKey).not.toHaveBeenCalled();
   });
 });
+/**
+ * Regresyon: sahiplik için kullanıcı klasörü eklenirken tarama öneki bir ara
+ * `products/product-images/` (tamamı) yapılmıştı. Bu, CANLI her ürün görseli
+ * için referans sorgusu çalıştırmak demekti (N+1). Kullanıcı klasörleri
+ * `temp/` ALTINDA durduğu için önek yeniden daraltıldı.
+ */
+describe("temizlik kapsamı", () => {
+  it("yalnız temp önekini tarar (canlı ürün görsellerine dokunmaz)", async () => {
+    const { service, storage } = makeHarness({ objects: [] });
+
+    await service.cleanupTempProductImages();
+
+    expect(storage.listObjects).toHaveBeenCalledWith(
+      "products/product-images/temp/",
+    );
+  });
+
+  it("kullanıcıya özel klasörler temp önekinin ALTINDADIR", async () => {
+    const userScoped =
+      "dev/products/product-images/temp/u/user-1/abc-card.webp";
+    const { service, storage } = makeHarness({
+      objects: [{ key: userScoped, lastModified: OLD }],
+    });
+
+    await service.cleanupTempProductImages();
+
+    // Önek eşleştiği için tarama kapsamına girer ve referanssız olduğu için silinir.
+    expect(userScoped.startsWith("dev/")).toBe(true);
+    expect(userScoped).toContain("products/product-images/temp/u/");
+    expect(storage.deleteFileByKey).toHaveBeenCalledWith(userScoped);
+  });
+
+  it("referans edilen kullanıcı klasörü nesnesi SİLİNMEZ", async () => {
+    const userScoped =
+      "dev/products/product-images/temp/u/user-1/live-card.webp";
+    const { service, storage } = makeHarness({
+      objects: [{ key: userScoped, lastModified: OLD }],
+      referencedKeys: [userScoped],
+    });
+
+    await service.cleanupTempProductImages();
+
+    expect(storage.deleteFileByKey).not.toHaveBeenCalled();
+  });
+});

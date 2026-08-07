@@ -61,7 +61,6 @@ export function useEditListingForm({
   // Shared submit/lifecycle busy flag (also driven by `useListingLifecycle`).
   const [isLoading, setIsLoading] = useState(false);
   // Store preview URLs separately (presigned URLs for display).
-  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [showDiscountSection, setShowDiscountSection] = useState(false);
   const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
   const [readyFormId, setReadyFormId] = useState<string | null>(null);
@@ -126,17 +125,48 @@ export function useEditListingForm({
    * odak değişimindeki bir refetch, satıcının yazdıklarını silerdi.
    */
   const populatedForRef = useRef<string | null>(null);
+  /**
+   * Görsel gönderim engeli. Buton kapatmak yetmez: Enter ile gönderim ve
+   * programatik çağrı da bu kapıdan geçmeli.
+   */
+  const imageSubmitBlockerRef = useRef<{ message: string } | null>(null);
+  /**
+   * Kullanıcı görsellere dokundu mu? `formState.isDirty` tek başına YETMEZ:
+   * bekleyen bir yükleme forma henüz yazılmadığı için form "temiz" görünür ve
+   * focus refetch'i yüklenmekte olan görseli ekrandan silerdi.
+   */
+  const hasUserImageEditsRef = useRef(false);
+  /**
+   * Görsel listesini dolduran callback. Hook sırası yüzünden (form önce, görsel
+   * durumu sonra) doğrudan çağıramıyoruz; kayıt yüklenince tetiklenmesi için
+   * ref üzerinden bağlanır.
+   */
+  const seedExistingImagesRef = useRef<
+    | ((
+        images: Array<{
+          cardKey: string;
+          detailKey: string;
+          cardUrl?: string | null;
+          detailUrl?: string | null;
+        }>,
+        sessionId?: string,
+      ) => void)
+    | null
+  >(null);
   useEffect(() => {
     const edit = listingQuery.data?.edit;
     if (!edit) return;
     if (populatedForRef.current === id) {
-      if (formState.isDirty) return;
+      if (formState.isDirty || hasUserImageEditsRef.current) return;
     }
     populatedForRef.current = id;
 
-    const { newFormData, previewUrls } = buildListingFormData(edit);
+    const { newFormData } = buildListingFormData(edit);
     reset(toValues(newFormData));
-    setImagePreviewUrls(previewUrls);
+    // Kayıtlı görseller `uploaded` olarak yerleşir; yeniden YÜKLENMEZ.
+    // İlan kimliği geçilir: aynı ilanda refetch kullanıcının düzenini ezmez,
+    // BAŞKA ilana geçildiğinde liste zorunlu olarak yenilenir.
+    seedExistingImagesRef.current?.(edit.images ?? [], id);
 
     const { saleData: nextSaleData, saleActive } =
       buildSaleDataFromListing(edit);
@@ -171,6 +201,10 @@ export function useEditListingForm({
   });
 
   const onSubmit = (values: EditListingValues) => {
+    if (imageSubmitBlockerRef.current) {
+      toast.error(imageSubmitBlockerRef.current.message);
+      return;
+    }
     const formPrice = Number(values.price);
 
     const payload: Record<string, unknown> = {
@@ -219,8 +253,9 @@ export function useEditListingForm({
     record: listingQuery.data?.edit ?? null,
     saleData,
     setSaleData,
-    imagePreviewUrls,
-    setImagePreviewUrls,
+    seedExistingImagesRef,
+    imageSubmitBlockerRef,
+    hasUserImageEditsRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,

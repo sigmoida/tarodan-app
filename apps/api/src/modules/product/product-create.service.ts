@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { i18nMessage } from "../i18n";
 import { PrismaService } from "../../prisma";
+import { assertValidProductImages } from "./helpers/product-image-keys";
 import { CacheService } from "../cache/cache.service";
 import { MembershipService } from "../membership/membership.service";
 import { isCorporateSellingSuspended } from "../membership/membership.util";
@@ -124,17 +125,14 @@ export class ProductCreateService {
       );
     }
 
-    // Check image limit based on membership tier
+    // Görsel doğrulaması ORTAK kuraldan (update ile aynı): adet sınırı, tekrar,
+    // biçim ve sahiplik.
     const limits = await this.membershipService.getUserLimits(sellerId);
-    if (dto.images && dto.images.length > limits.maxImages) {
-      throw new BadRequestException(
-        i18nMessage("server.product.imageLimitExceeded", {
-          tierName: limits.tierName,
-          maxImages: limits.maxImages,
-          sentCount: dto.images.length,
-        }),
-      );
-    }
+    assertValidProductImages(dto.images, {
+      userId: sellerId,
+      maxImages: limits.maxImages,
+      tierName: limits.tierName,
+    });
 
     // Takasa açma, güncellemedeki kapıyla AYNI kaynaktan (efektif tier'ın
     // canTrade bayrağı) denetlenir. Önyüz kutuyu gizlese de DTO alanı istemci

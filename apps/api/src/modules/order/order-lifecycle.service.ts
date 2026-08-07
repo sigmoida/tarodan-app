@@ -281,14 +281,18 @@ export class OrderLifecycleService {
                 this.logger.warn(`notify manual_ok failed: ${e.message}`),
               );
           } else if (type === "auto_timeout") {
+            // Aynı bildirim iki tarafa gider; hedef ekran `audience` ile
+            // ayrışır (alıcı `/profile/orders/:id`, satıcı `/seller/...`).
             await Promise.allSettled([
               this.notificationService.notifyOrderAutoCompleted(
                 order.buyerId,
                 orderId,
+                "buyer",
               ),
               this.notificationService.notifyOrderAutoCompleted(
                 order.sellerId,
                 orderId,
+                "seller",
               ),
             ]);
           } else if (type === "admin_force") {
@@ -296,10 +300,12 @@ export class OrderLifecycleService {
               this.notificationService.notifyOrderForceCompletedByAdmin(
                 order.buyerId,
                 orderId,
+                "buyer",
               ),
               this.notificationService.notifyOrderForceCompletedByAdmin(
                 order.sellerId,
                 orderId,
+                "seller",
               ),
             ]);
           }

@@ -124,8 +124,8 @@ test.describe('J33 — Sepet kurallari (stok / kendi urunu / qty0)', () => {
 
     // UI dogrulama: alici kendi siparisini goruyor
     await loginViaToken(page, token);
-    await page.goto(`/orders/${orderId}`);
+    await page.goto(`/profile/orders/${orderId}`);
     await page.waitForLoadState('networkidle').catch(() => {});
-    expect(page.url()).toContain(`/orders/${orderId}`);
+    expect(page.url()).toContain(`/profile/orders/${orderId}`);
   });
 });

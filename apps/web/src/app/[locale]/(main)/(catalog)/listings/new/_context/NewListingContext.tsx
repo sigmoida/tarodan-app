@@ -79,7 +79,6 @@ function useNewListingValue() {
     (_, i) => currentYear - i,
   );
 
-  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   // İndirimli açılış: komisyon önizlemesi o anda geçerli satış fiyatını
   // kullanır; API kapısı ayrıca normal ve indirimli fiyatın ikisini de denetler.
   const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
@@ -158,15 +157,28 @@ function useNewListingValue() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manufacturerId, manufacturerList]);
 
-  const { uploadingImages, handleFileUpload, removeImage } =
-    useListingImageUpload({
-      form,
-      maxImages: limits?.maxImagesPerListing || 3,
-      imagePreviewUrls,
-      setImagePreviewUrls,
-    });
+  const {
+    items: imageItems,
+    uploadingImages,
+    submitBlocker: imageSubmitBlocker,
+    handleFileUpload,
+    removeImage,
+    retryImage,
+    moveImage,
+    makeCover,
+  } = useListingImageUpload({
+    form,
+    maxImages: limits?.maxImagesPerListing || 3,
+  });
 
   const onSubmit = async (values: NewListingValues) => {
+    // Butonu kapatmak yetmez: Enter ile gönderim ve programatik çağrı da bu
+    // kapıdan geçer. Çözümlenmemiş görselle kaydedilen ilan, kullanıcının
+    // ekranda gördüğünden eksik görselle yayınlanıyordu.
+    if (imageSubmitBlocker) {
+      toast.error(imageSubmitBlocker.message);
+      return;
+    }
     if (listingLimits && !listingLimits.canCreateListing) {
       toast.error(
         `İlan limitinize ulaştınız (${listingLimits.currentCount}/${listingLimits.maxListings}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.`,
@@ -245,7 +257,11 @@ function useNewListingValue() {
     form,
     onSubmit,
     uploadingImages,
-    imagePreviewUrls,
+    imageSubmitBlocker,
+    imageItems,
+    retryImage,
+    moveImage,
+    makeCover,
     CONDITIONS,
     yearOptions,
     // catalog data

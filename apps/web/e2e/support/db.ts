@@ -3,24 +3,30 @@
  * Web paketine @prisma/client bağımlılığı eklemeden DB assertion + zaman yolculuğu +
  * cron/sweep tetikleme sağlar. (Bkz. apps/api/src/modules/dev/dev.controller.ts)
  */
-import { APIRequestContext, expect } from '@playwright/test';
-import { API } from './helpers';
+import { APIRequestContext, expect } from "@playwright/test";
+import { API } from "./helpers";
 
 export type SchedulerName =
-  | 'cancel-expired-payments'
-  | 'release-expired-reservations'
-  | 'release-holds-due'
-  | 'reconcile-paytr'
-  | 'sweep-out-of-stock'
-  | 'expire-offers'
-  | 'cancel-expired-trades'
-  | 'check-expired-memberships'
-  | 'process-auto-renewals';
+  | "cancel-expired-payments"
+  | "release-expired-reservations"
+  | "release-holds-due"
+  | "reconcile-paytr"
+  | "sweep-out-of-stock"
+  | "expire-offers"
+  | "cancel-expired-trades"
+  | "check-expired-memberships"
+  | "process-auto-renewals";
 
 /** Cron/sweep'i HTTP'den tetikle (zaman-bazlı/async akışlar). */
-export async function runScheduler(request: APIRequestContext, name: SchedulerName): Promise<any> {
+export async function runScheduler(
+  request: APIRequestContext,
+  name: SchedulerName,
+): Promise<any> {
   const res = await request.post(`${API}/dev/run/${name}`);
-  expect(res.ok(), `dev run ${name} (NODE_ENV=test + DevModule yüklü mü?)`).toBeTruthy();
+  expect(
+    res.ok(),
+    `dev run ${name} (NODE_ENV=test + DevModule yüklü mü?)`,
+  ).toBeTruthy();
   // Scheduler'lar çoğunlukla void döner → boş gövde; res.json() patlamasın (Unexpected end of JSON input).
   return res.json().catch(() => ({}));
 }
@@ -32,7 +38,9 @@ export async function backdate(
   where: Record<string, any>,
   data: Record<string, any>,
 ): Promise<{ count: number }> {
-  const res = await request.post(`${API}/dev/backdate`, { data: { model, where, data } });
+  const res = await request.post(`${API}/dev/backdate`, {
+    data: { model, where, data },
+  });
   expect(res.ok(), `backdate ${model}`).toBeTruthy();
   return res.json();
 }
@@ -45,7 +53,9 @@ export async function dbFind(
   select?: Record<string, any>,
   orderBy?: any,
 ): Promise<any> {
-  const res = await request.post(`${API}/dev/find`, { data: { model, where, select, orderBy } });
+  const res = await request.post(`${API}/dev/find`, {
+    data: { model, where, select, orderBy },
+  });
   expect(res.ok(), `db find ${model}`).toBeTruthy();
   // Kayıt yoksa Nest boş gövde döndürür → res.json() patlamasın (Unexpected end of JSON input) → null.
   return res.json().catch(() => null);
@@ -56,7 +66,9 @@ export async function dbCount(
   model: string,
   where?: Record<string, any>,
 ): Promise<number> {
-  const res = await request.post(`${API}/dev/count`, { data: { model, where } });
+  const res = await request.post(`${API}/dev/count`, {
+    data: { model, where },
+  });
   expect(res.ok(), `db count ${model}`).toBeTruthy();
   return (await res.json()).count;
 }
@@ -76,5 +88,57 @@ export async function expectDbEventually(
     if (last && predicate(last)) return last;
     await new Promise((r) => setTimeout(r, 400));
   }
-  throw new Error(`expectDbEventually(${model}) sağlanmadı. son kayıt: ${JSON.stringify(last)}`);
+  throw new Error(
+    `expectDbEventually(${model}) sağlanmadı. son kayıt: ${JSON.stringify(last)}`,
+  );
+}
+
+/**
+ * Tohumlanacak tek bildirim: tip + üretici verisi + hangi ÜRETİM YOLU.
+ *
+ * Üretimde bildirimi yazan iki ayrı hat var: şablonlu tipler dispatch
+ * servisinden, EventService'in ürettiği tipler (`trade_ready_for_shipping`,
+ * `payment_confirmed` …) push kuyruğundan geçip PushWorker tarafından yazılır.
+ * İkincilerin ŞABLONU YOKTUR; dispatch'ten geçirmeye çalışmak sessizce
+ * düşer, sahte şablon eklemek de gerçek yolu test etmemek olur.
+ */
+export type SeedNotification = {
+  type: string;
+  data?: Record<string, any>;
+  /** Varsayılan `dispatch` (şablonlu tipler). */
+  path?: "dispatch" | "worker";
+  /** Worker yolunda push başlığı/gövdesi — şablon olmadığı için gerekir. */
+  title?: string;
+  body?: string;
+};
+
+/**
+ * Kullanıcıya deterministik bildirim yaz (E2E'nin hangi kartın nerede olduğunu
+ * bilmesi için). Satır doğrudan INSERT edilmez; API'nin gerçek yazma yolundan
+ * geçer, böylece link de üretimdekiyle aynı kodla üretilir.
+ *
+ * `clear` varsayılan olarak açıktır: eski bildirimler listede kalırsa test
+ * kendi tohumladığı kartı ayırt edemez.
+ */
+export async function seedNotifications(
+  request: APIRequestContext,
+  email: string,
+  items: SeedNotification[],
+  clear = true,
+): Promise<{ userId: string; created: string[]; skipped: string[] }> {
+  const res = await request.post(`${API}/dev/notifications/seed`, {
+    data: { email, clear, items },
+  });
+  expect(
+    res.ok(),
+    `bildirim tohumlama (${res.status()}) ${await res.text().catch(() => "")}`,
+  ).toBeTruthy();
+  const body = await res.json();
+  // Tercih ayarı bir tipi susturursa test sessizce eksik kalırdı.
+  expect(
+    body.skipped,
+    `bildirim tercihleri şu tipleri düşürdü: ${body.skipped?.join(", ")}`,
+  ).toEqual([]);
+  expect(body.created.length, "tohumlanan bildirim sayısı").toBe(items.length);
+  return body;
 }

@@ -556,8 +556,10 @@ export class TradeShipmentService {
           NotificationType.CARGO_CODE_READY,
           {
             reference: ship.trade.tradeNumber,
+            // Hedef `tradeId`den merkezî çözümleyici tarafından üretilir;
+            // burada serbest link göndermek web'de olmayan `/trades/:id`
+            // yolunu kaydediyordu.
             tradeId: ship.tradeId,
-            link: `/trades/${ship.tradeId}`,
           },
         );
       } catch (err: any) {

@@ -7,6 +7,7 @@ import { Badge, IconButton } from "@tarodan/ui";
 import { SectionCard, ButtonLink } from "@/components/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { getTimeAgo, type Notification } from "../_lib/notifications";
+import { resolveNotificationHref } from "@/lib/notification-href";
 
 /**
  * A single notification — a plain SectionCard with the icon, title/message, a
@@ -22,8 +23,12 @@ export default function NotificationCard({
 }) {
   const t = useTranslations();
   const locale = useLocale();
-  const { isRead, data, title, message, createdAt, link } = notification;
-  const href = link || data?.link;
+  const { isRead, data, title, message, createdAt } = notification;
+  // Zil ile AYNI yardımcı: iki ekran aynı hedefi açmalı ve hiçbiri ham
+  // `link` alanına güvenmemeli.
+  const resolved = resolveNotificationHref(notification);
+  // Hedefi çözülemeyen bildirim detay sayfasına bağlanmaz; kart tıklanamaz.
+  const href = resolved.isFallback ? undefined : resolved.href;
 
   return (
     <SectionCard className={`p-4 ${!isRead ? "border-primary-300" : ""}`}>
@@ -58,7 +63,10 @@ export default function NotificationCard({
 
       {href && (
         <ButtonLink
+          data-testid="notification-card-link"
           href={href}
+          // Dış hedef locale önekli `Link`ten geçemez — `/tr/https://…` olurdu.
+          external={resolved.isExternal}
           onClick={() => !isRead && onMarkRead(notification.id)}
           variant="outline"
           size="sm"

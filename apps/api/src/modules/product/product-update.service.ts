@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { i18nMessage } from "../i18n";
 import { PrismaService } from "../../prisma";
+import { assertValidProductImages } from "./helpers/product-image-keys";
 import { CacheService } from "../cache/cache.service";
 import { SearchService } from "../search/search.service";
 import { notifyWebRevalidate } from "../../common/revalidate";
@@ -71,6 +72,9 @@ export class ProductUpdateService {
     // Find product with optimistic locking
     const product = await this.prisma.product.findUnique({
       where: { id },
+      // Mevcut görsel anahtarları: düzenlemede kullanıcının kendi eski
+      // görsellerini geri gönderebilmesi için gerekli (sahiplik kontrolü).
+      include: { images: { select: { cardKey: true, detailKey: true } } },
     });
 
     if (!product) {
@@ -415,22 +419,26 @@ export class ProductUpdateService {
       ...(legacySalePrice !== undefined ? { salePrice: legacySalePrice } : {}),
     };
 
-    // Handle image updates if provided
+    // Görsel doğrulaması create ile AYNI kuraldan: üyelik adet sınırı, tekrar,
+    // biçim ve SAHİPLİK. Düzenleme yolunda hiçbiri uygulanmıyordu; sınırın
+    // üstüne çıkmak ve başkasının yüklemesini iliştirmek mümkündü.
     if (dto.images !== undefined) {
-      await this.prisma.productImage.deleteMany({
-        where: { productId: id },
+      const imageLimits = await this.membershipService.getUserLimits(sellerId);
+      assertValidProductImages(dto.images, {
+        userId: sellerId,
+        maxImages: imageLimits.maxImages,
+        tierName: imageLimits.tierName,
+        // Kullanıcının bu üründe HÂLEN duran görselleri, eski anahtar şemasında
+        // olsalar bile geçerlidir.
+        existingKeys: new Set(
+          (product.images ?? []).flatMap(
+            (img: { cardKey: string; detailKey: string }) => [
+              img.cardKey,
+              img.detailKey,
+            ],
+          ),
+        ),
       });
-
-      if (dto.images.length > 0) {
-        await this.prisma.productImage.createMany({
-          data: dto.images.map((img, index) => ({
-            productId: id,
-            cardKey: img.cardKey,
-            detailKey: img.detailKey,
-            sortOrder: index,
-          })),
-        });
-      }
     }
 
     // Check if price changed (for wishlist notifications) – compare previous selling price with new one
@@ -441,51 +449,71 @@ export class ProductUpdateService {
 
     // Update with optimistic locking
     try {
-      const updated = await this.prisma.product.update({
-        where: {
-          id,
-          version: product.version, // Optimistic lock check
-        },
-        data: updateData,
-        include: {
-          images: { orderBy: { sortOrder: "asc" } },
-          seller: {
-            select: {
-              id: true,
-              displayName: true,
-              isVerified: true,
-              sellerType: true,
-            },
+      // Görseller ürün güncellemesiyle AYNI transaction'da yazılır.
+      // Eskiden görseller ÖNCE silinip yeniden oluşturuluyor, iyimser kilit
+      // kontrolü SONRA yapılıyordu: sürüm çakışması olduğunda ürün
+      // değişmemiş ama görselleri gitmiş oluyordu.
+      const updated = await this.prisma.$transaction(async (tx) => {
+        if (dto.images !== undefined) {
+          await tx.productImage.deleteMany({ where: { productId: id } });
+          if (dto.images.length > 0) {
+            await tx.productImage.createMany({
+              // Sıra AUTHORITATIVE: gönderilen dizinin indeksi sortOrder olur.
+              data: dto.images.map((img, index) => ({
+                productId: id,
+                cardKey: img.cardKey,
+                detailKey: img.detailKey,
+                sortOrder: index,
+              })),
+            });
+          }
+        }
+        return tx.product.update({
+          where: {
+            id,
+            version: product.version, // Optimistic lock check
           },
-          category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
-          },
-          brand: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              logo: true,
-            },
-          },
-          carModel: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              brand: {
-                select: { slug: true },
+          data: updateData,
+          include: {
+            images: { orderBy: { sortOrder: "asc" } },
+            seller: {
+              select: {
+                id: true,
+                displayName: true,
+                isVerified: true,
+                sellerType: true,
               },
             },
+            category: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+            brand: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                logo: true,
+              },
+            },
+            carModel: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                brand: {
+                  select: { slug: true },
+                },
+              },
+            },
+            productAttributes: {
+              include: { attribute: { include: { group: true } } },
+            },
           },
-          productAttributes: {
-            include: { attribute: { include: { group: true } } },
-          },
-        },
+        });
       });
 
       if (

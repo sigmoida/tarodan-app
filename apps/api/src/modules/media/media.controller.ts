@@ -168,7 +168,7 @@ export class MediaController {
 
     const results = await Promise.all(
       files.map((file) =>
-        this.mediaService.uploadProductImageVariants(file, productId),
+        this.mediaService.uploadProductImageVariants(file, req.user.id),
       ),
     );
     return results.map((r) => ({

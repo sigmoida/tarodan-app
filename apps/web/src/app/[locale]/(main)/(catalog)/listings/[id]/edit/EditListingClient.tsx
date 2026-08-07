@@ -48,8 +48,9 @@ export default function EditListingClient() {
     onSubmit,
     saleData,
     setSaleData,
-    imagePreviewUrls,
-    setImagePreviewUrls,
+    seedExistingImagesRef,
+    imageSubmitBlockerRef,
+    hasUserImageEditsRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,
@@ -150,13 +151,25 @@ export default function EditListingClient() {
     authLoading,
     isAuthenticated,
   });
-  const { uploadingImages, handleFileUpload, removeImage } =
-    useListingImageUpload({
-      form,
-      maxImages: limits?.maxImagesPerListing || 3,
-      imagePreviewUrls,
-      setImagePreviewUrls,
-    });
+  const {
+    items: imageItems,
+    uploadingImages,
+    submitBlocker: imageSubmitBlocker,
+    hasUserImageEdits,
+    seedExistingImages,
+    handleFileUpload,
+    removeImage,
+    retryImage,
+    moveImage,
+    makeCover,
+  } = useListingImageUpload({
+    form,
+    maxImages: limits?.maxImagesPerListing || 3,
+  });
+  // Kayıt yüklendiğinde mevcut görselleri yerleştirir (yeniden yükleme yok).
+  seedExistingImagesRef.current = seedExistingImages;
+  imageSubmitBlockerRef.current = imageSubmitBlocker;
+  hasUserImageEditsRef.current = hasUserImageEdits;
   const {
     reactivateQuantity,
     setReactivateQuantity,
@@ -283,10 +296,13 @@ export default function EditListingClient() {
         />
         <ImagesCard
           maxImages={limits?.maxImagesPerListing || 3}
-          imagePreviewUrls={imagePreviewUrls}
+          items={imageItems}
           uploadingImages={uploadingImages}
           handleFileUpload={handleFileUpload}
           removeImage={removeImage}
+          retryImage={retryImage}
+          moveImage={moveImage}
+          makeCover={makeCover}
         />
 
         <div className="flex gap-4 pt-2">
@@ -304,10 +320,15 @@ export default function EditListingClient() {
             variant="primary"
             size="lg"
             className="flex-1"
-            disabled={isLoading}
+            disabled={isLoading || !!imageSubmitBlocker}
           >
             {isLoading ? "Güncelleniyor..." : "Değişiklikleri Kaydet"}
           </Button>
+          {imageSubmitBlocker && (
+            <p role="status" className="w-full text-sm text-danger-600">
+              {imageSubmitBlocker.message}
+            </p>
+          )}
         </div>
       </Form>
 

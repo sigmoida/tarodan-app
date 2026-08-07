@@ -8,10 +8,10 @@ import { useNewListing } from "../_context/NewListingContext";
 
 export default function SubmitBar() {
   const t = useTranslations();
-  const { router, form } = useNewListing();
+  const { router, form, imageSubmitBlocker } = useNewListing();
   const isSubmitting = form.formState.isSubmitting;
   return (
-    <div className="flex gap-3">
+    <div className="flex flex-wrap gap-3">
       <Button
         type="button"
         variant="secondary"
@@ -24,10 +24,15 @@ export default function SubmitBar() {
         type="submit"
         variant="primary"
         className="flex-1"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !!imageSubmitBlocker}
       >
         {isSubmitting ? t("common.creating") : t("product.createListing")}
       </Button>
+      {imageSubmitBlocker && (
+        <p role="status" className="w-full text-sm text-danger-600">
+          {imageSubmitBlocker.message}
+        </p>
+      )}
     </div>
   );
 }

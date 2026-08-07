@@ -778,6 +778,7 @@ export class PaymentFulfillmentService {
           isGuestOrder: groupIsGuest,
           buyerSystemEmail: firstOrder.buyer.email || "",
           representativeOrderNumber: firstOrder.orderNumber,
+          representativeOrderId: firstOrder.id,
         });
       } catch (error) {
         this.logger.error(

@@ -596,10 +596,10 @@ test.describe('J96 — Teklif → sipariş → ödeme → satıcıya aktarım', 
 
     // UI dogrulama: alıcı kendi tamamlanmış siparişini görebiliyor (token enjekte)
     await loginViaToken(page, buyerToken);
-    await page.goto(`/orders/${orderId}`);
+    await page.goto(`/profile/orders/${orderId}`);
     await page.waitForLoadState('networkidle').catch(() => {});
     const bodyText = (await page.locator('body').textContent()) ?? '';
     expect(bodyText).not.toMatch(/sayfa bulunamad|not found|404/i);
-    expect(page.url()).toContain(`/orders/${orderId}`);
+    expect(page.url()).toContain(`/profile/orders/${orderId}`);
   });
 });

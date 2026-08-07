@@ -34,6 +34,10 @@ import {
 import { NotificationSettings } from "../user/dto/notification-settings.dto";
 import { NOTIFICATION_TEMPLATES } from "./notification-templates";
 import {
+  normalizeLegacyNotificationLink,
+  resolveWebNotificationLink,
+} from "./notification-link";
+import {
   type Locale,
   type MessageValues,
   defaultLocale,
@@ -309,12 +313,10 @@ export class NotificationDispatchService {
     );
     try {
       const template = NOTIFICATION_TEMPLATES[type];
-      let link = template?.link;
-
-      // Interpolate link with data
-      if (link && data) {
-        link = this.interpolate(link, data);
-      }
+      // Hedef TEK yerden gelir (notification-link.ts). Eskiden şablon linki
+      // enterpole ediliyordu ve eksik değişken `{{orderId}}` olarak linkin
+      // İÇİNDE kaydediliyordu → tıklanınca 404.
+      const link = resolveWebNotificationLink(type, data) ?? undefined;
 
       // Collapse NEW_MESSAGE per thread: if the user already has an UNREAD
       // notification for this thread, update it (latest preview + count)
@@ -585,7 +587,12 @@ export class NotificationDispatchService {
         title: n.title,
         message: n.body,
         icon: data.icon || this.getDefaultIcon(n.type),
-        link: data.link,
+        // Kaydedilmiş link körlemesine döndürülmez: önce tip+data'dan yeniden
+        // çözülür, olmazsa eski yol bugünkü route'a çevrilir. Böylece
+        // veritabanındaki bozuk eski kayıtlar migration olmadan düzelir.
+        link:
+          resolveWebNotificationLink(n.type as NotificationType, data) ??
+          normalizeLegacyNotificationLink(data.link),
         isRead: n.status === "read",
         createdAt: n.createdAt,
         data: data,

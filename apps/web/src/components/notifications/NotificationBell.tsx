@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
+import { resolveNotificationHref } from "@/lib/notification-href";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BellIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { BellIcon as BellSolidIcon } from "@heroicons/react/24/solid";
@@ -22,6 +23,41 @@ interface Notification {
   isRead: boolean;
   createdAt: string;
   data?: Record<string, any>;
+}
+
+/**
+ * Site dışı bildirim hedefi için düz `<a>`.
+ *
+ * `Link` (locale-aware) mutlak adresi kendi öneki ile birleştirip
+ * `/tr/https://…` üretiyor; imzası `Link` ile aynı tutuldu ki çağrı yerinde
+ * yalnız bileşen değişsin.
+ */
+function ExternalNotificationLink({
+  href,
+  onClick,
+  className,
+  children,
+  ...rest
+}: {
+  href: string;
+  onClick?: () => void;
+  className?: string;
+  children: React.ReactNode;
+} & Pick<React.AnchorHTMLAttributes<HTMLAnchorElement>, "id"> & {
+    "data-testid"?: string;
+  }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={onClick}
+      className={className}
+      {...rest}
+    >
+      {children}
+    </a>
+  );
 }
 
 export default function NotificationBell() {
@@ -181,76 +217,86 @@ export default function NotificationBell() {
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-border-subtle">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`relative group px-4 py-3 hover:bg-surface transition-colors ${
-                      !notification.isRead ? "bg-primary-50/50" : ""
-                    }`}
-                  >
-                    <Link
-                      href={
-                        notification.link ||
-                        notification.data?.link ||
-                        "/profile/notifications"
-                      }
-                      onClick={() => {
-                        if (!notification.isRead) {
-                          markAsRead(notification.id);
-                        }
-                        setShowDropdown(false);
-                      }}
-                      className="block"
+              <div
+                className="divide-y divide-border-subtle"
+                data-testid="notification-bell-list"
+              >
+                {notifications.map((notification) => {
+                  // Hedef TEK yardımcıdan (resolveNotificationHref): ham `link`
+                  // alanı güvenilir değil — çözülmemiş şablon, artık var
+                  // olmayan eski yol ve site dışı adres taşıyor.
+                  const resolved = resolveNotificationHref(notification);
+                  // Dış hedef locale önekli `Link`ten geçemez; düz `<a>` olur.
+                  const NotificationLink = resolved.isExternal
+                    ? ExternalNotificationLink
+                    : Link;
+                  return (
+                    <div
+                      key={notification.id}
+                      className={`relative group px-4 py-3 hover:bg-surface transition-colors ${
+                        !notification.isRead ? "bg-primary-50/50" : ""
+                      }`}
                     >
-                      <div className="flex items-start gap-3">
-                        {/* Leading unread indicator — reserves the same width
+                      <NotificationLink
+                        data-testid="notification-bell-link"
+                        href={resolved.href}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            markAsRead(notification.id);
+                          }
+                          setShowDropdown(false);
+                        }}
+                        className="block"
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Leading unread indicator — reserves the same width
                               when read so titles stay aligned. Kept on the left
                               so it never collides with the top-right dismiss X. */}
-                        <span
-                          className="mt-1.5 h-2 w-2 flex-shrink-0"
-                          aria-hidden="true"
-                        >
-                          {!notification.isRead && (
-                            <span className="block h-2 w-2 rounded-full bg-primary-500" />
-                          )}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p
-                              className={`text-sm ${
-                                !notification.isRead
-                                  ? "font-semibold text-heading"
-                                  : "font-medium text-body"
-                              }`}
-                            >
-                              {notification.title}
+                          <span
+                            className="mt-1.5 h-2 w-2 flex-shrink-0"
+                            aria-hidden="true"
+                          >
+                            {!notification.isRead && (
+                              <span className="block h-2 w-2 rounded-full bg-primary-500" />
+                            )}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p
+                                className={`text-sm ${
+                                  !notification.isRead
+                                    ? "font-semibold text-heading"
+                                    : "font-medium text-body"
+                                }`}
+                              >
+                                {notification.title}
+                              </p>
+                              {/* Time hides on hover so the dismiss X can take its spot */}
+                              <span className="text-xs text-subtle flex-shrink-0 transition-opacity group-hover:opacity-0">
+                                {getTimeAgo(notification.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted mt-0.5 line-clamp-1">
+                              {notification.message}
                             </p>
-                            {/* Time hides on hover so the dismiss X can take its spot */}
-                            <span className="text-xs text-subtle flex-shrink-0 transition-opacity group-hover:opacity-0">
-                              {getTimeAgo(notification.createdAt)}
-                            </span>
                           </div>
-                          <p className="text-xs text-muted mt-0.5 line-clamp-1">
-                            {notification.message}
-                          </p>
                         </div>
-                      </div>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dismissNotification(notification.id);
-                      }}
-                      className="absolute top-2 right-2 h-6 w-6 rounded-md text-subtle opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label={t("common.close")}
-                    >
-                      <XMarkIcon className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                ))}
+                      </NotificationLink>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dismissNotification(notification.id);
+                        }}
+                        className="absolute top-2 right-2 h-6 w-6 rounded-md text-subtle opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label={t("common.close")}
+                      >
+                        <XMarkIcon className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

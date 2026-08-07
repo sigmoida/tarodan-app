@@ -315,6 +315,8 @@ export class PaymentExpiryReconciliationService {
           order.sellerId,
           NotificationType.ORDER_PREPARING_DEADLINE_WARNING,
           {
+            // SATICIYA gider: hedef satıcının sipariş ekranı.
+            audience: "seller",
             orderId: order.id,
             orderNumber: order.orderNumber,
             deadline: deadlineStr,

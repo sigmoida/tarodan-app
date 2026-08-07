@@ -580,7 +580,7 @@ test.describe('J131 — Tam tur: premium üye, koleksiyon, mesaj, satış', () =
 
     // 5) UI: alıcı kendi siparişini görebiliyor (404/login değil).
     await loginViaToken(page, buyerToken);
-    await page.goto(`/orders/${orderId}`);
+    await page.goto(`/profile/orders/${orderId}`);
     await page.waitForLoadState('networkidle').catch(() => {});
     const body = (await page.locator('body').textContent()) ?? '';
     expect(body.length).toBeGreaterThan(150);

@@ -99,7 +99,7 @@ export default function NotificationsPage() {
           description={t("notification.emptyDesc")}
         />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2" data-testid="notification-list">
           {filtered.map((notification) => (
             <NotificationCard
               key={notification.id}

@@ -7,6 +7,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { NotificationType, NotificationChannel } from "./dto";
+import type { NotificationAudience } from "./notification-link";
 import { StorageService } from "../storage/storage.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 
@@ -64,7 +65,8 @@ export class NotificationCommerceService {
       userId: sellerId,
       type: NotificationType.ORDER_PAID,
       channels: [NotificationChannel.IN_APP],
-      data: { orderId, amount },
+      // SATICIYA gider: hedef ekran satıcının sipariş sayfası.
+      data: { orderId, amount, audience: "seller" },
     });
   }
 
@@ -97,12 +99,17 @@ export class NotificationCommerceService {
     });
   }
 
-  async notifyOrderAutoCompleted(userId: string, orderId: string) {
+  /** Hem alıcıya hem satıcıya gider; hedef ekran `audience` ile ayrılır. */
+  async notifyOrderAutoCompleted(
+    userId: string,
+    orderId: string,
+    audience: NotificationAudience,
+  ) {
     return this.dispatch.send({
       userId,
       type: NotificationType.ORDER_AUTO_COMPLETED,
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
-      data: { orderId },
+      data: { orderId, audience },
     });
   }
 
@@ -111,20 +118,23 @@ export class NotificationCommerceService {
       userId: sellerId,
       type: NotificationType.ORDER_MANUALLY_CONFIRMED,
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
-      data: { orderId },
+      // SATICIYA gider.
+      data: { orderId, audience: "seller" },
     });
   }
 
+  /** Hem alıcıya hem satıcıya gider; hedef ekran `audience` ile ayrılır. */
   async notifyOrderForceCompletedByAdmin(
     userId: string,
     orderId: string,
+    audience: NotificationAudience,
     reason?: string,
   ) {
     return this.dispatch.send({
       userId,
       type: NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
-      data: { orderId, reason },
+      data: { orderId, reason, audience },
     });
   }
 
@@ -443,7 +453,8 @@ export class NotificationCommerceService {
       this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
     await this.dispatch.sendTemplateEmailToUser(userId, "back-in-stock", {
       productTitle: data.productTitle,
-      productUrl: `${frontendUrl}/products/${productId}`,
+      // Ürün detayının gerçek yolu `/listings/:id`; `/products/:id` 404'tü.
+      productUrl: `${frontendUrl}/listings/${encodeURIComponent(productId)}`,
     });
     return result;
   }

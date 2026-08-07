@@ -10,7 +10,15 @@ const repoRoot = join(webRoot, "..", "..");
 const sourceDir = join(repoRoot, "photos", "logolar");
 const outputDir = join(webRoot, "public", "photos", "logolar");
 
-test("syncs every manufacturer logo into the web public directory", () => {
+test("syncs every manufacturer logo into the web public directory", (t) => {
+  // `photos/logolar` depoda DEĞİL (yerel marka varlıkları). Yoksa bu test bir
+  // kod iddiasını değil, ortamın eksikliğini bildirir; temiz bir checkout'ta
+  // `pnpm test`i düşürüp zincirdeki diğer testlerin hiç çalışmamasına yol
+  // açıyordu. Kaynak varsa aynen doğrular.
+  if (!existsSync(sourceDir)) {
+    t.skip(`kaynak klasör yok: ${sourceDir}`);
+    return;
+  }
   rmSync(outputDir, { recursive: true, force: true });
   // Depo kökünden çalıştırılamaz: betik `@tarodan/brand`'i ÇAĞIRANIN
   // node_modules'ından çözüyor, kök workspace'te o bağlantı yok.

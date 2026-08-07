@@ -27,6 +27,10 @@ export class MediaCleanupService {
     scanned: number;
     deleted: number;
   }> {
+    // YALNIZ temp öneki taranır. Kullanıcıya özel klasörler de bunun ALTINDA
+    // (`temp/u/{userId}/`), yani sahiplik korunurken cron canlı ürün
+    // görsellerine hiç dokunmaz — tüm önek taransaydı her canlı görsel için
+    // referans sorgusu çalışırdı.
     const objects = await this.storage.listObjects(
       "products/product-images/temp/",
     );
