@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -7,8 +8,10 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common";
+import { createHash } from "node:crypto";
 import {
   AdminRole,
+  ElogoInvoiceType,
   OrderStatus,
   OrderCancellationReason,
   PaymentHoldStatus,
@@ -17,7 +20,10 @@ import {
   RefundReason,
   RefundRequestStatus,
   SellerAdjustmentType,
+  SellerType,
   ShipmentStatus,
+  RefundFaultParty,
+  ShippingPackageTierCode,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
@@ -39,6 +45,9 @@ import { StorageService } from "../storage/storage.service";
 import { i18nMessage } from "../i18n";
 import { ShippingTariffService } from "../shipping/shipping-tariff.service";
 import { shippingAmountForDesi } from "../shipping/shipping-tariff.helper";
+import { resolvePackageTier } from "../shipping/shipping-tariff.helper";
+import { storedProductBaseOf } from "../order/order-charged-base.helper";
+import { readInvoiceLineItems } from "../elogo/invoice-lines";
 import {
   calculateRefundFinancials,
   RefundFinancialResult,
@@ -46,6 +55,12 @@ import {
   resolveCancellationPolicy,
   resolveReturnPolicy,
 } from "./refund-financial-policy";
+import {
+  calculateRefundFinancialsV2,
+  type RefundFinancialComponentV2,
+  type RefundFinancialResultV2,
+  type RefundFaultPartyV2,
+} from "./refund-financial-policy-v2";
 
 const COOLING_OFF_DAYS = 14;
 
@@ -88,6 +103,77 @@ export class RefundService {
     @Optional()
     private readonly shippingTariffService?: ShippingTariffService,
   ) {}
+
+  /** Production rollout is opt-in; tests/development exercise v2 by default. */
+  private refundPolicyV2Enabled(): boolean {
+    const configured =
+      process.env.REFUND_POLICY_V2_ENABLED?.trim().toLowerCase();
+    if (configured != null && configured !== "") {
+      return configured === "true" || configured === "1";
+    }
+    return process.env.NODE_ENV !== "production";
+  }
+
+  /**
+   * Product prices on platform-owned sales are VAT-inclusive. Order.taxAmount
+   * intentionally remains zero because the marketplace does not add product
+   * VAT at checkout; the platform-sale eLogo invoice is the authoritative
+   * disclosure snapshot. A refund component therefore has to reconstruct the
+   * included tax from that original product line, not from Order.taxAmount.
+   *
+   * The product line is first by the documented buildPlatformSaleLines
+   * contract. For a delivered platform sale, missing/invalid invoice lines are
+   * a financial-review error: silently emitting 0% would create a return
+   * invoice incompatible with the original document. Before shipment there is
+   * no issued sale document to reverse, so the order split remains sufficient.
+   */
+  private async productTaxAmountForV2Refund(order: {
+    id: string;
+    status: OrderStatus;
+    taxAmount: Prisma.Decimal;
+    productGrossAmount: number;
+    sellerType: SellerType;
+  }): Promise<number> {
+    if (order.sellerType !== SellerType.platform) {
+      return Number(order.taxAmount ?? 0);
+    }
+
+    const invoice = await this.prisma.elogoInvoice.findUnique({
+      where: {
+        type_sourceId: {
+          type: ElogoInvoiceType.platform_sale,
+          sourceId: order.id,
+        },
+      },
+      select: { lineItems: true },
+    });
+    const productLine = readInvoiceLineItems(invoice?.lineItems)[0];
+    if (productLine) {
+      const rate = Math.max(0, productLine.vatRate);
+      if (rate === 0) return 0;
+      return (
+        Math.round(
+          (order.productGrossAmount -
+            order.productGrossAmount / (1 + rate / 100) +
+            Number.EPSILON) *
+            100,
+        ) / 100
+      );
+    }
+
+    const invoicedStatuses: OrderStatus[] = [
+      OrderStatus.delivered,
+      OrderStatus.awaiting_buyer_confirmation,
+      OrderStatus.completed,
+    ];
+    const documentShouldExist = invoicedStatuses.includes(order.status);
+    if (documentShouldExist) {
+      throw new BadRequestException(
+        "Platform satış faturasının ürün KDV snapshot'ı bulunamadı; finansal inceleme gerekli",
+      );
+    }
+    return Number(order.taxAmount ?? 0);
+  }
 
   /**
    * Refund yanıtlarında ürün resimlerini ham ProductImage kaydı yerine
@@ -493,6 +579,18 @@ export class RefundService {
             ? RefundRequestStatus.pending_review
             : RefundRequestStatus.approved,
           ...this.refundFinancialData(policy, financial),
+          ...(policy.requiresAdminReview && this.refundPolicyV2Enabled()
+            ? {
+                policyVersion: 2,
+                financialReviewRequired: true,
+                financialPolicySnapshot: {
+                  version: 2,
+                  provisional: true,
+                  claimReason: reasonCode,
+                  legacyProvisionalCalculation: financial.snapshot,
+                } as unknown as Prisma.InputJsonValue,
+              }
+            : {}),
         },
       });
     } catch (error) {
@@ -502,6 +600,17 @@ export class RefundService {
         );
       }
       throw error;
+    }
+    if (!policy.requiresAdminReview && this.refundPolicyV2Enabled()) {
+      created = await this.finalizeAutomaticV2RefundDecision(
+        created.id,
+        reasonCode === OrderCancellationReason.delivery_delayed
+          ? RefundReason.delivery_delayed
+          : RefundReason.changed_mind,
+        reasonCode === OrderCancellationReason.delivery_delayed
+          ? "seller"
+          : "buyer",
+      );
     }
     await this.freezeHoldForRefund(order.id, created.id);
     await this.prisma.order.update({
@@ -534,7 +643,7 @@ export class RefundService {
     try {
       refundResult = await this.paymentService.processRefund(
         order.id,
-        financial.financials.buyerRefundAmount,
+        Number(created.amount),
         {
           skipRefundEvent: true,
           refundQuantity: order.quantity ?? 1,
@@ -542,17 +651,37 @@ export class RefundService {
           settlement: {
             closeOrder: true,
             holdPortion: 1,
-            sellerFeeRefundAmount: financial.financials.sellerFeeRefundAmount,
-            buyerFeeRefundAmount:
-              financial.financials.buyerProtectionRefundAmount,
-            ...this.shippingSettlement(created.id, financial.financials),
+            ...this.feeSettlementFromComponents(
+              (created as any).financialComponents,
+              {
+                sellerFeeAmount: financial.financials.sellerFeeRefundAmount,
+                buyerFeeAmount:
+                  financial.financials.buyerProtectionRefundAmount,
+              },
+            ),
+            ...this.shippingSettlement(created.id, {
+              sellerShippingCompensationAmount: Number(
+                created.sellerShippingCompensationAmount,
+              ),
+              outboundShippingChargeToSeller: Number(
+                created.outboundShippingChargeToSeller,
+              ),
+              returnShippingChargeToSeller: Number(
+                created.returnShippingChargeToSeller,
+              ),
+            }),
           },
         },
       );
     } catch (error) {
       if (!(error instanceof RefundPendingReconciliationException)) {
-        await this.prisma.refundRequest.delete({ where: { id: created.id } });
-        await this.unfreezeHoldForRefund(order.id);
+        await this.prisma.refundRequest.update({
+          where: { id: created.id },
+          data: {
+            status: RefundRequestStatus.pending_review,
+            financialReviewRequired: true,
+          },
+        });
       }
       throw error;
     }
@@ -622,14 +751,590 @@ export class RefundService {
     return updated;
   }
 
+  /**
+   * Recalculates a reviewed v2 decision from immutable order data and the
+   * currently active return tariff. The token binds approval to this exact
+   * calculation; no financial rows are written by preview.
+   */
+  async previewRefundDecision(
+    refundRequestId: string,
+    resolvedReason: RefundReason,
+    faultParty: RefundFaultPartyV2,
+    allowNonReview = false,
+  ): Promise<{
+    calculationToken: string;
+    resolvedReason: RefundReason;
+    faultParty: RefundFaultPartyV2;
+    outboundPackageTier: ShippingPackageTierCode;
+    outboundFullShippingAmount: number;
+    serviceVatRate: number;
+    returnTariff: {
+      id: string;
+      version: number;
+      tier: ShippingPackageTierCode;
+      amount: number;
+    } | null;
+    financials: RefundFinancialResultV2;
+  }> {
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      include: {
+        order: {
+          include: {
+            shipment: true,
+            product: {
+              select: {
+                shippingPackageTier: true,
+                shippingDesi: true,
+              },
+            },
+            seller: { select: { sellerType: true } },
+            package: true,
+          },
+        },
+      },
+    });
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
+    if (
+      !allowNonReview &&
+      rr.status !== RefundRequestStatus.pending_review &&
+      !rr.financialReviewRequired
+    ) {
+      throw new BadRequestException(
+        "Yalnız inceleme veya finansal mutabakat bekleyen iadeler için karar önizlenebilir",
+      );
+    }
+    if (rr.policyFinalizedAt) {
+      throw new ConflictException("İade finansal politikası zaten kesinleşmiş");
+    }
+    if (!this.shippingTariffService) {
+      throw new BadRequestException(
+        "İade kargo tarifesi servisi kullanılamıyor",
+      );
+    }
+
+    const order = rr.order;
+    const originalTariff = order.package?.shippingTariffId
+      ? await this.shippingTariffService.getById(order.package.shippingTariffId)
+      : null;
+    const outboundTier = originalTariff
+      ? resolvePackageTier(
+          originalTariff,
+          order.package?.billableDesi ?? order.product.shippingDesi ?? 1,
+        ).code
+      : order.product.shippingPackageTier;
+
+    const preHandoverStatuses: ShipmentStatus[] = [
+      ShipmentStatus.pending,
+      ShipmentStatus.label_created,
+      ShipmentStatus.cancelled,
+      ShipmentStatus.failed,
+    ];
+    const hasShipped = Boolean(
+      order.shipment && !preHandoverStatuses.includes(order.shipment.status),
+    );
+    const activeReturnTariff = hasShipped
+      ? await this.shippingTariffService.getActiveOutboundTariff("surat")
+      : null;
+    const returnTier = activeReturnTariff?.packageTiers.find(
+      (tier) => tier.code === outboundTier,
+    );
+    if (activeReturnTariff && !returnTier) {
+      throw new BadRequestException(
+        `Aktif iade tarifesinde '${outboundTier}' paket sınıfı bulunamadı`,
+      );
+    }
+
+    const outboundAlreadySettled = order.packageId
+      ? Boolean(
+          await this.prisma.packageShippingSettlement.findFirst({
+            where: { packageId: order.packageId, leg: "outbound" },
+            select: { id: true },
+          }),
+        )
+      : false;
+    const productGrossAmount = storedProductBaseOf(order);
+    /**
+     * Shipping settlement is package-scoped, so its money source must be the
+     * package snapshot too. Group checkout writes order-level shares only on
+     * the seller's first Order, while OrderPackage holds the canonical totals;
+     * sibling Order rows may therefore contain zero. Reading an arbitrary order
+     * here could consume the one-shot settlement with zero amounts and
+     * permanently prevent the actual shares from being settled later.
+     */
+    const buyerShippingAmount = Number(
+      order.package?.buyerShippingAmount ??
+        order.buyerShippingAmount ??
+        order.shippingCost ??
+        0,
+    );
+    const sellerShippingAmount = Number(
+      order.package?.sellerShippingAmount ?? order.sellerShippingAmount ?? 0,
+    );
+    const outboundFullShippingAmount = Number(
+      order.package?.fullShippingAmount ??
+        buyerShippingAmount + sellerShippingAmount,
+    );
+    const productTaxAmount = await this.productTaxAmountForV2Refund({
+      id: order.id,
+      status: order.status,
+      taxAmount: order.taxAmount,
+      productGrossAmount,
+      sellerType: order.seller.sellerType,
+    });
+    const financials = calculateRefundFinancialsV2({
+      productGrossAmount,
+      productTaxAmount,
+      buyerShippingAmount,
+      sellerShippingAmount,
+      outboundFullShippingAmount,
+      buyerCommissionAmount: Number(order.buyerCommissionAmount ?? 0),
+      buyerPlatformFeeAmount: Number(order.buyerServiceFeeAmount ?? 0),
+      sellerCommissionAmount: Number(order.sellerCommissionAmount ?? 0),
+      sellerPlatformFeeAmount: Number(order.sellerPlatformFeeAmount ?? 0),
+      serviceVatRate: Number(order.serviceVatRate ?? 0),
+      returnShippingAmount: Number(returnTier?.amount ?? 0),
+      orderQuantity: order.quantity ?? 1,
+      refundQuantity: rr.refundQuantity,
+      faultParty,
+      hasShipped,
+      outboundAlreadySettled,
+    });
+    const returnTariff = activeReturnTariff
+      ? {
+          id: activeReturnTariff.id,
+          version: activeReturnTariff.version,
+          tier: outboundTier,
+          amount: Number(returnTier!.amount),
+        }
+      : null;
+    const tokenPayload = {
+      refundRequestId: rr.id,
+      refundUpdatedAt: rr.updatedAt.toISOString(),
+      orderId: order.id,
+      orderVersion: order.version,
+      resolvedReason,
+      faultParty,
+      outboundTier,
+      outboundFullShippingAmount,
+      serviceVatRate: Number(order.serviceVatRate ?? 0),
+      outboundAlreadySettled,
+      returnTariff,
+      financials,
+    };
+    const calculationToken = createHash("sha256")
+      .update(JSON.stringify(tokenPayload))
+      .digest("hex");
+
+    return {
+      calculationToken,
+      resolvedReason,
+      faultParty,
+      outboundPackageTier: outboundTier,
+      outboundFullShippingAmount,
+      serviceVatRate: Number(order.serviceVatRate ?? 0),
+      returnTariff,
+      financials,
+    };
+  }
+
+  private componentTotal(
+    components: RefundFinancialComponentV2[],
+    code: RefundFinancialComponentV2["componentCode"],
+    treatment: RefundFinancialComponentV2["treatment"],
+    field: "netAmount" | "grossAmount" = "grossAmount",
+  ): number {
+    return components
+      .filter(
+        (component) =>
+          component.componentCode === code && component.treatment === treatment,
+      )
+      .reduce((sum, component) => sum + component[field], 0);
+  }
+
+  private feeSettlementFromComponents(
+    components:
+      | Array<{
+          componentCode: string;
+          treatment: string;
+          netAmount: Prisma.Decimal | number;
+        }>
+      | null
+      | undefined,
+    legacy: { sellerFeeAmount: number; buyerFeeAmount: number },
+  ) {
+    if (!components?.length) {
+      return {
+        sellerFeeRefundAmount: legacy.sellerFeeAmount,
+        buyerFeeRefundAmount: legacy.buyerFeeAmount,
+      };
+    }
+    const amount = (code: string, treatment: string) =>
+      components
+        .filter(
+          (component) =>
+            component.componentCode === code &&
+            component.treatment === treatment,
+        )
+        .reduce((sum, component) => sum + Number(component.netAmount), 0);
+    const buyerCommissionRefundAmount = amount(
+      "buyer_commission",
+      "buyer_refund",
+    );
+    const buyerPlatformFeeRefundAmount = amount(
+      "buyer_platform_fee",
+      "buyer_refund",
+    );
+    const sellerCommissionRefundAmount = amount(
+      "seller_commission",
+      "seller_refund",
+    );
+    const sellerPlatformFeeRefundAmount = amount(
+      "seller_platform_fee",
+      "seller_refund",
+    );
+    return {
+      buyerCommissionRefundAmount,
+      buyerPlatformFeeRefundAmount,
+      sellerCommissionRefundAmount,
+      sellerPlatformFeeRefundAmount,
+      buyerFeeRefundAmount:
+        buyerCommissionRefundAmount + buyerPlatformFeeRefundAmount,
+      sellerFeeRefundAmount:
+        sellerCommissionRefundAmount + sellerPlatformFeeRefundAmount,
+    };
+  }
+
+  private async finalizeV2RefundDecision(
+    refundRequestId: string,
+    adminId: string,
+    decision: {
+      resolvedReason: RefundReason;
+      faultParty: RefundFaultPartyV2;
+      calculationToken: string;
+    },
+    options: {
+      allowNonReview?: boolean;
+      /**
+       * An already-open physical return keeps its lifecycle status while the
+       * admin finalizes only the financial snapshot. Requiring the quarantine
+       * marker prevents this escape hatch from being used on ordinary records.
+       */
+      requireFinancialReview?: boolean;
+    } = {},
+  ) {
+    const preview = await this.previewRefundDecision(
+      refundRequestId,
+      decision.resolvedReason,
+      decision.faultParty,
+      options.allowNonReview === true,
+    );
+    if (preview.calculationToken !== decision.calculationToken) {
+      throw new ConflictException(
+        "İade hesabı veya tarife değişti; yeni karar önizlemesi alın",
+      );
+    }
+    const finalizedAt = new Date();
+    const components = preview.financials.components;
+
+    return this.prisma.$transaction(async (tx) => {
+      const current = await tx.refundRequest.findUnique({
+        where: { id: refundRequestId },
+        select: {
+          id: true,
+          status: true,
+          policyFinalizedAt: true,
+          policyCode: true,
+          financialPolicySnapshot: true,
+          financialReviewRequired: true,
+          orderId: true,
+          order: { select: { packageId: true } },
+        },
+      });
+      if (!current) {
+        throw new NotFoundException(i18nMessage("server.refund.notFound"));
+      }
+      if (
+        (!options.allowNonReview &&
+          current.status !== RefundRequestStatus.pending_review) ||
+        current.policyFinalizedAt ||
+        (options.requireFinancialReview && !current.financialReviewRequired)
+      ) {
+        throw new ConflictException(
+          "İade kararı başka bir işlem tarafından kesinleştirildi",
+        );
+      }
+
+      const claimed = await tx.refundRequest.updateMany({
+        where: {
+          id: current.id,
+          policyFinalizedAt: null,
+          ...(!options.allowNonReview
+            ? { status: RefundRequestStatus.pending_review }
+            : {}),
+          ...(options.requireFinancialReview
+            ? { financialReviewRequired: true }
+            : {}),
+        },
+        data: {
+          policyFinalizedBy: adminId,
+        },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          "İade kararı başka bir işlem tarafından kesinleştirildi",
+        );
+      }
+
+      await tx.refundFinancialComponent.createMany({
+        data: components.map((component) => ({
+          refundRequestId: current.id,
+          componentCode: component.componentCode,
+          treatment: component.treatment,
+          netAmount: component.netAmount,
+          taxAmount: component.taxAmount,
+          grossAmount: component.grossAmount,
+          sourceAmount: component.sourceAmount,
+          quantityPortion: component.quantityPortion,
+          metadata: component.metadata as Prisma.InputJsonValue | undefined,
+        })),
+      });
+
+      if (
+        preview.financials.outboundSettlementRequired &&
+        current.order.packageId
+      ) {
+        const outboundNet = preview.outboundFullShippingAmount;
+        const outboundTax =
+          Math.round(
+            outboundNet * (Math.max(0, preview.serviceVatRate) / 100) * 100,
+          ) / 100;
+        await tx.packageShippingSettlement.create({
+          data: {
+            packageId: current.order.packageId,
+            refundRequestId: current.id,
+            leg: "outbound",
+            payer: decision.faultParty as RefundFaultParty,
+            netAmount: outboundNet,
+            taxAmount: outboundTax,
+            grossAmount: outboundNet + outboundTax,
+            sourceKey: `package-outbound:${current.order.packageId}`,
+          },
+        });
+      }
+      const returnSettlement = components.find(
+        (component) => component.componentCode === "return_shipping",
+      );
+      if (returnSettlement) {
+        await tx.packageShippingSettlement.create({
+          data: {
+            packageId: current.order.packageId,
+            refundRequestId: current.id,
+            leg: "return",
+            payer: decision.faultParty as RefundFaultParty,
+            netAmount: returnSettlement.netAmount,
+            taxAmount: returnSettlement.taxAmount,
+            grossAmount: returnSettlement.grossAmount,
+            sourceKey: `refund-return:${current.id}`,
+          },
+        });
+      }
+
+      const sellerFeeRefund =
+        this.componentTotal(
+          components,
+          "seller_commission",
+          "seller_refund",
+          "netAmount",
+        ) +
+        this.componentTotal(
+          components,
+          "seller_platform_fee",
+          "seller_refund",
+          "netAmount",
+        );
+      const buyerFeeRefund =
+        this.componentTotal(
+          components,
+          "buyer_commission",
+          "buyer_refund",
+          "grossAmount",
+        ) +
+        this.componentTotal(
+          components,
+          "buyer_platform_fee",
+          "buyer_refund",
+          "grossAmount",
+        );
+      const retainedSellerPlatformFee = this.componentTotal(
+        components,
+        "seller_platform_fee",
+        "platform_retain",
+        "netAmount",
+      );
+      const oldSnapshot = current.financialPolicySnapshot;
+      const snapshot = {
+        version: 2,
+        resolvedReason: decision.resolvedReason,
+        faultParty: decision.faultParty,
+        calculationToken: preview.calculationToken,
+        finalizedAt: finalizedAt.toISOString(),
+        finalizedBy: adminId,
+        outboundPackageTier: preview.outboundPackageTier,
+        outboundFullShippingAmount: preview.outboundFullShippingAmount,
+        returnTariff: preview.returnTariff,
+        financials: preview.financials,
+        ...(oldSnapshot ? { legacySnapshot: oldSnapshot } : {}),
+      } as unknown as Prisma.InputJsonValue;
+      const suffix = current.policyCode.endsWith("_cancellation")
+        ? "cancellation"
+        : "return";
+
+      return tx.refundRequest.update({
+        where: { id: current.id },
+        data: {
+          resolvedReason: decision.resolvedReason,
+          faultParty: decision.faultParty as RefundFaultParty,
+          policyVersion: 2,
+          policyFinalizedAt: finalizedAt,
+          policyFinalizedBy: adminId,
+          policyCode: `v2_${decision.faultParty}_${suffix}`,
+          financialReviewRequired: false,
+          financialPolicySnapshot: snapshot,
+          amount: preview.financials.buyerRefundAmount,
+          outboundPackageTier: preview.outboundPackageTier,
+          outboundFullShippingAmount: preview.outboundFullShippingAmount,
+          returnShippingAmount: preview.returnTariff?.amount ?? 0,
+          refundedProductAmount: this.componentTotal(
+            components,
+            "product",
+            "buyer_refund",
+          ),
+          refundedOutboundShippingAmount: this.componentTotal(
+            components,
+            "outbound_shipping",
+            "buyer_refund",
+          ),
+          refundedBuyerProtectionAmount: buyerFeeRefund,
+          refundedSellerFeeAmount: sellerFeeRefund,
+          retainedSellerPlatformFeeAmount: retainedSellerPlatformFee,
+          refundedBuyerServiceTaxAmount:
+            preview.financials.refundedBuyerServiceTaxAmount,
+          refundedSellerServiceTaxAmount:
+            preview.financials.refundedSellerServiceTaxAmount,
+          retainedBuyerServiceTaxAmount:
+            preview.financials.retainedBuyerServiceTaxAmount,
+          retainedSellerServiceTaxAmount:
+            preview.financials.retainedSellerServiceTaxAmount,
+          returnShippingChargeToBuyer: this.componentTotal(
+            components,
+            "return_shipping",
+            "buyer_charge",
+          ),
+          returnShippingChargeToSeller: this.componentTotal(
+            components,
+            "return_shipping",
+            "seller_charge",
+          ),
+          sellerShippingCompensationAmount: this.componentTotal(
+            components,
+            "outbound_shipping",
+            "seller_refund",
+          ),
+          outboundShippingChargeToSeller: this.componentTotal(
+            components,
+            "outbound_shipping",
+            "seller_charge",
+          ),
+          carrierClaimRequired: preview.financials.carrierClaimRequired,
+          returnShippingPayer:
+            decision.faultParty === "buyer"
+              ? "buyer"
+              : decision.faultParty === "seller"
+                ? "seller"
+                : "platform",
+          refundShippingFee:
+            this.componentTotal(
+              components,
+              "outbound_shipping",
+              "buyer_refund",
+            ) > 0,
+          refundBuyerFee: buyerFeeRefund > 0,
+          refundSellerCommission: sellerFeeRefund > 0,
+        },
+        include: { financialComponents: true },
+      });
+    });
+  }
+
+  private async finalizeAutomaticV2RefundDecision(
+    refundRequestId: string,
+    resolvedReason: RefundReason,
+    faultParty: RefundFaultPartyV2,
+  ) {
+    const preview = await this.previewRefundDecision(
+      refundRequestId,
+      resolvedReason,
+      faultParty,
+      true,
+    );
+    return this.finalizeV2RefundDecision(
+      refundRequestId,
+      "system",
+      {
+        resolvedReason,
+        faultParty,
+        calculationToken: preview.calculationToken,
+      },
+      { allowNonReview: true },
+    );
+  }
+
   async adminApproveRefundRequest(
     refundRequestId: string,
     adminId: string,
     note?: string,
+    decision?: {
+      resolvedReason: RefundReason;
+      faultParty: RefundFaultPartyV2;
+      calculationToken: string;
+    },
   ) {
+    let lifecyclePreservingFinancialReview = false;
+    if (decision) {
+      const decisionTarget = await this.prisma.refundRequest.findUnique({
+        where: { id: refundRequestId },
+        select: { status: true, financialReviewRequired: true },
+      });
+      if (!decisionTarget) {
+        throw new NotFoundException(i18nMessage("server.refund.notFound"));
+      }
+      lifecyclePreservingFinancialReview =
+        decisionTarget.financialReviewRequired &&
+        decisionTarget.status !== RefundRequestStatus.pending_review;
+      const finalized = await this.finalizeV2RefundDecision(
+        refundRequestId,
+        adminId,
+        decision,
+        lifecyclePreservingFinancialReview
+          ? { allowNonReview: true, requireFinancialReview: true }
+          : {},
+      );
+      if (lifecyclePreservingFinancialReview) {
+        // The parcel may already be with the carrier. Only the immutable money
+        // decision is finalized; status, custody and hold timing stay intact.
+        await this.appendHistory(refundRequestId, {
+          action: "financial_review_finalized",
+          by: adminId,
+          details: { note: note?.trim() || null },
+        });
+        return finalized;
+      }
+    }
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
       include: {
+        financialComponents: true,
         order: {
           select: {
             id: true,
@@ -644,6 +1349,11 @@ export class RefundService {
     if (rr.status !== RefundRequestStatus.pending_review) {
       throw new BadRequestException(
         "Yalnız inceleme bekleyen iade talepleri onaylanabilir",
+      );
+    }
+    if (rr.policyVersion >= 2 && !rr.policyFinalizedAt) {
+      throw new BadRequestException(
+        "V2 iade finansal kararı kesinleşmeden onaylanamaz",
       );
     }
 
@@ -662,8 +1372,10 @@ export class RefundService {
               rr.refundQuantity / Math.max(rr.order.quantity ?? 1, 1),
               1,
             ),
-            sellerFeeRefundAmount: Number(rr.refundedSellerFeeAmount),
-            buyerFeeRefundAmount: Number(rr.refundedBuyerProtectionAmount),
+            ...this.feeSettlementFromComponents(rr.financialComponents, {
+              sellerFeeAmount: Number(rr.refundedSellerFeeAmount),
+              buyerFeeAmount: Number(rr.refundedBuyerProtectionAmount),
+            }),
             ...this.shippingSettlement(rr.id, {
               sellerShippingCompensationAmount: Number(
                 rr.sellerShippingCompensationAmount,
@@ -1032,10 +1744,15 @@ export class RefundService {
   async finalizeRefundForReturnedShipment(refundRequestId: string) {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
-      include: { order: true },
+      include: { order: true, financialComponents: true },
     });
     if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.status === RefundRequestStatus.refunded) return rr;
+    if (rr.financialReviewRequired && !rr.policyFinalizedAt) {
+      throw new BadRequestException(
+        "Finansal inceleme tamamlanmadan para iadesi kesinleştirilemez",
+      );
+    }
 
     // MONEY-M1: Atomik CLAIM. Bu metod 3 yoldan EŞZAMANLI çağrılabilir
     // (finalizeReturnedShipments cron + Sürat sync + admin forceFinalize). Eski
@@ -1074,8 +1791,10 @@ export class RefundService {
               rr.refundQuantity / Math.max(rr.order.quantity ?? 1, 1),
               1,
             ),
-            sellerFeeRefundAmount: Number(rr.refundedSellerFeeAmount),
-            buyerFeeRefundAmount: Number(rr.refundedBuyerProtectionAmount),
+            ...this.feeSettlementFromComponents(rr.financialComponents, {
+              sellerFeeAmount: Number(rr.refundedSellerFeeAmount),
+              buyerFeeAmount: Number(rr.refundedBuyerProtectionAmount),
+            }),
             ...this.shippingSettlement(rr.id, {
               sellerShippingCompensationAmount: Number(
                 rr.sellerShippingCompensationAmount,
@@ -1578,6 +2297,8 @@ export class RefundService {
       buyerShippingAmount?: Prisma.Decimal;
       buyerFeeAmount?: Prisma.Decimal;
       buyerServiceFeeAmount?: Prisma.Decimal;
+      buyerServiceTaxAmount?: Prisma.Decimal;
+      serviceVatRate?: Prisma.Decimal;
       sellerFeeAmount?: Prisma.Decimal;
       sellerCommissionAmount?: Prisma.Decimal;
       sellerPlatformFeeAmount?: Prisma.Decimal;
@@ -1630,6 +2351,8 @@ export class RefundService {
       ),
       buyerFeeAmount: Number(order.buyerFeeAmount ?? 0),
       buyerServiceFeeAmount: Number(order.buyerServiceFeeAmount ?? 0),
+      buyerServiceTaxAmount: Number(order.buyerServiceTaxAmount ?? 0),
+      serviceVatRate: Number(order.serviceVatRate ?? 0),
       sellerFeeAmount: Number(order.sellerFeeAmount ?? 0),
       sellerCommissionAmount: Number(order.sellerCommissionAmount ?? 0),
       sellerPlatformFeeAmount: Number(order.sellerPlatformFeeAmount ?? 0),
@@ -1809,6 +2532,18 @@ export class RefundService {
             ? RefundRequestStatus.pending_review
             : RefundRequestStatus.approved,
           ...this.refundFinancialData(policy, financial),
+          ...(policy.requiresAdminReview && this.refundPolicyV2Enabled()
+            ? {
+                policyVersion: 2,
+                financialReviewRequired: true,
+                financialPolicySnapshot: {
+                  version: 2,
+                  provisional: true,
+                  claimReason: dto.reason,
+                  legacyProvisionalCalculation: financial.snapshot,
+                } as unknown as Prisma.InputJsonValue,
+              }
+            : {}),
         },
       });
     } catch (error) {
@@ -1818,6 +2553,14 @@ export class RefundService {
         );
       }
       throw error;
+    }
+
+    if (!policy.requiresAdminReview && this.refundPolicyV2Enabled()) {
+      created = await this.finalizeAutomaticV2RefundDecision(
+        created.id,
+        dto.reason,
+        dto.reason === RefundReason.changed_mind ? "buyer" : "seller",
+      );
     }
 
     if (policy.requiresAdminReview) {
@@ -1840,32 +2583,58 @@ export class RefundService {
 
     let refundResult: { providerRefundId: string };
     try {
-      refundResult = await this.paymentService.processRefund(order.id, amount, {
-        skipRefundEvent: true, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
-        refundQuantity,
-        idempotencyKey: `refund-request:${created.id}`,
-        settlement: {
-          closeOrder: refundQuantity >= (order.quantity ?? 1),
-          holdPortion: Math.min(
-            refundQuantity / Math.max(order.quantity ?? 1, 1),
-            1,
-          ),
-          sellerFeeRefundAmount: financial.financials.sellerFeeRefundAmount,
-          buyerFeeRefundAmount:
-            financial.financials.buyerProtectionRefundAmount,
-          ...this.shippingSettlement(created.id, financial.financials),
+      refundResult = await this.paymentService.processRefund(
+        order.id,
+        Number(created.amount),
+        {
+          skipRefundEvent: true, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
+          refundQuantity,
+          idempotencyKey: `refund-request:${created.id}`,
+          settlement: {
+            closeOrder: refundQuantity >= (order.quantity ?? 1),
+            holdPortion: Math.min(
+              refundQuantity / Math.max(order.quantity ?? 1, 1),
+              1,
+            ),
+            ...this.feeSettlementFromComponents(
+              (created as any).financialComponents,
+              {
+                sellerFeeAmount: financial.financials.sellerFeeRefundAmount,
+                buyerFeeAmount:
+                  financial.financials.buyerProtectionRefundAmount,
+              },
+            ),
+            ...this.shippingSettlement(created.id, {
+              sellerShippingCompensationAmount: Number(
+                created.sellerShippingCompensationAmount,
+              ),
+              outboundShippingChargeToSeller: Number(
+                created.outboundShippingChargeToSeller,
+              ),
+              returnShippingChargeToSeller: Number(
+                created.returnShippingChargeToSeller,
+              ),
+            }),
+          },
         },
-      });
+      );
     } catch (err) {
       // A definite provider rejection can be retried as a new request. An
       // unknown provider outcome must remain visible and blocked until the
       // durable refund attempt is reconciled.
       if (!(err instanceof RefundPendingReconciliationException)) {
-        await this.prisma.refundRequest.delete({ where: { id: created.id } });
+        await this.prisma.refundRequest.update({
+          where: { id: created.id },
+          data: {
+            status: RefundRequestStatus.pending_review,
+            financialReviewRequired: true,
+          },
+        });
+        await this.freezeHoldForRefund(order.id, created.id);
       }
       this.logger.warn(
         `Instant refund failed for order ${order.orderNumber}, RefundRequest ${created.refundNumber} ` +
-          `${err instanceof RefundPendingReconciliationException ? "retained for reconciliation" : "rolled back"}: ${(err as Error).message}`,
+          `${err instanceof RefundPendingReconciliationException ? "retained for reconciliation" : "moved to financial review"}: ${(err as Error).message}`,
       );
       throw err;
     }
@@ -1978,6 +2747,18 @@ export class RefundService {
           decidedBy: requiresReview ? null : "system",
           decidedAt: requiresReview ? null : new Date(),
           ...this.refundFinancialData(policy, financial),
+          ...(requiresReview && this.refundPolicyV2Enabled()
+            ? {
+                policyVersion: 2,
+                financialReviewRequired: true,
+                financialPolicySnapshot: {
+                  version: 2,
+                  provisional: true,
+                  claimReason: dto.reason,
+                  legacyProvisionalCalculation: financial.snapshot,
+                } as unknown as Prisma.InputJsonValue,
+              }
+            : {}),
         },
       });
     } catch (error) {
@@ -1987,6 +2768,14 @@ export class RefundService {
         );
       }
       throw error;
+    }
+
+    if (!requiresReview && this.refundPolicyV2Enabled()) {
+      created = await this.finalizeAutomaticV2RefundDecision(
+        created.id,
+        dto.reason,
+        dto.reason === RefundReason.changed_mind ? "buyer" : "seller",
+      );
     }
 
     // İade açıldı → satıcı hold'unu kilitle (payout bu iade kapanana kadar bloke).

@@ -108,6 +108,12 @@ export class EscrowHoldService {
       orderId: order.id,
       sellerCommission: order.sellerFeeAmount,
       buyerFee: order.buyerFeeAmount,
+      components: {
+        buyerCommissionAmount: order.buyerCommissionAmount ?? 0,
+        buyerPlatformFeeAmount: order.buyerServiceFeeAmount ?? 0,
+        sellerCommissionAmount: order.sellerCommissionAmount ?? 0,
+        sellerPlatformFeeAmount: order.sellerPlatformFeeAmount ?? 0,
+      },
       tx,
     });
   }

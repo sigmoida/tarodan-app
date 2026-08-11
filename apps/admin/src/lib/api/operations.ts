@@ -86,11 +86,19 @@ export const operationsApi = {
   getRefundRequests: (params?: any) =>
     api.get("/admin/refund-requests", { params }),
   getRefundRequest: (id: string) => api.get(`/admin/refund-requests/${id}`),
-  approveRefundRequest: (id: string, note?: string) =>
-    api.post(
-      `/admin/refund-requests/${id}/approve`,
-      note?.trim() ? { note: note.trim() } : {},
-    ),
+  previewRefundDecision: (
+    id: string,
+    body: { resolvedReason: string; faultParty: string },
+  ) => api.post(`/admin/refund-requests/${id}/decision-preview`, body),
+  approveRefundRequest: (
+    id: string,
+    body: {
+      note?: string;
+      resolvedReason?: string;
+      faultParty?: string;
+      calculationToken?: string;
+    } = {},
+  ) => api.post(`/admin/refund-requests/${id}/approve`, body),
   rejectRefundRequest: (id: string, reason: string) =>
     api.post(`/admin/refund-requests/${id}/reject`, {
       reason: reason.trim(),

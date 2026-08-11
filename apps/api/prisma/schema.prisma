@@ -1395,40 +1395,41 @@ model CheckoutGroup {
 // tek üründe de tek order'lı bir paket kullanılabilir (tek biçim). sellerId/buyerId düz
 // kolon (User ilişkisi yok — denormalize, sorgu için yeterli).
 model OrderPackage {
-  id                      String         @id @default(uuid())
+  id                      String                      @id @default(uuid())
   // Koli numarası (PKG-…): paketin KALICI dış referansı. Sürat'a OzelKargoTakipNo
   // olarak bu gönderilir, müşteri kargosunu bununla sorgular. Eskiden paketin en
   // küçük orderNumber'ı TÜRETİLİYORDU; türetilmiş referans paketin sipariş kümesi
   // değişince kayıyor ve idempotency cache'i ıskalayıp MÜKERRER gönderi açıyordu.
-  packageNumber           String         @unique @map("package_number")
+  packageNumber           String                      @unique @map("package_number")
   // Sürat'ta halen kullanılan fiziksel gönderi referansı. İlk gönderide
   // packageNumber ile aynıdır; yerel/manuel iptal sonrası yeniden ödeme yeni bir
   // revizyon üretir. Böylece iptal edilmiş taşıyıcı kaydı tekrar canlandırılmaz.
-  carrierReference        String?        @map("carrier_reference")
-  checkoutGroupId         String?        @map("checkout_group_id")
-  sellerId                String         @map("seller_id")
-  buyerId                 String         @map("buyer_id")
+  carrierReference        String?                     @map("carrier_reference")
+  checkoutGroupId         String?                     @map("checkout_group_id")
+  sellerId                String                      @map("seller_id")
+  buyerId                 String                      @map("buyer_id")
   // Bu satıcı paketi için TEK kargo ücreti (satıcının paket-içi satır toplamı bedava
   // eşiğini geçerse 0). KANONİK olarak ALICI payıdır (buyerShippingAmount) — tüm
   // checkout yolları (direct/group/guest) artık aynı semantiği yazar.
-  shippingCost            Decimal        @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  shippingCost            Decimal                     @default(0) @map("shipping_cost") @db.Decimal(10, 2)
   // Kargo tarife snapshot'ı: sipariş anındaki aktif tarife. Yeni checkout akışları
   // aktif tarife yoksa fail-closed davranır; nullable alanlar yalnız eski kayıtlar içindir.
   // Geçmişe dönük tarife değişiminden bağımsız audit/yeniden-hesap ve 409 kontrolü için.
-  shippingTariffId        String?        @map("shipping_tariff_id")
-  shippingTariffVersion   Int?           @map("shipping_tariff_version")
+  shippingTariffId        String?                     @map("shipping_tariff_id")
+  shippingTariffVersion   Int?                        @map("shipping_tariff_version")
   // Tam paket kargosu (alıcı/satıcı payına bölünmeden önce) + taraf payları + indirim.
-  fullShippingAmount      Decimal        @default(0) @map("full_shipping_amount") @db.Decimal(10, 2)
-  buyerShippingAmount     Decimal        @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
-  sellerShippingAmount    Decimal        @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
-  shippingDiscountAmount  Decimal        @default(0) @map("shipping_discount_amount") @db.Decimal(10, 2)
-  billableDesi            Int            @default(1) @map("billable_desi")
-  shippingPricingSnapshot Json?          @map("shipping_pricing_snapshot")
-  createdAt               DateTime       @default(now()) @map("created_at")
-  updatedAt               DateTime       @updatedAt @map("updated_at")
-  checkoutGroup           CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id])
+  fullShippingAmount      Decimal                     @default(0) @map("full_shipping_amount") @db.Decimal(10, 2)
+  buyerShippingAmount     Decimal                     @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
+  sellerShippingAmount    Decimal                     @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
+  shippingDiscountAmount  Decimal                     @default(0) @map("shipping_discount_amount") @db.Decimal(10, 2)
+  billableDesi            Int                         @default(1) @map("billable_desi")
+  shippingPricingSnapshot Json?                       @map("shipping_pricing_snapshot")
+  createdAt               DateTime                    @default(now()) @map("created_at")
+  updatedAt               DateTime                    @updatedAt @map("updated_at")
+  checkoutGroup           CheckoutGroup?              @relation(fields: [checkoutGroupId], references: [id])
   orders                  Order[]
   shipments               Shipment[]
+  shippingSettlements     PackageShippingSettlement[]
 
   @@index([checkoutGroupId])
   @@index([sellerId])
@@ -1571,6 +1572,18 @@ model CommissionLedger {
   // DEĞİŞMEZ (tekrarlı kısmi iadeler compound olmasın). Tam iadede refunded = original.
   refundedSellerCommission Decimal @default(0) @map("refunded_seller_commission") @db.Decimal(10, 2)
   refundedBuyerFee         Decimal @default(0) @map("refunded_buyer_fee") @db.Decimal(10, 2)
+
+  // V2 immutable fee basis. Aggregate columns above remain dual-written until
+  // every consumer has moved to the component split.
+  buyerCommissionAmount           Decimal @default(0) @map("buyer_commission_amount") @db.Decimal(10, 2)
+  buyerPlatformFeeAmount          Decimal @default(0) @map("buyer_platform_fee_amount") @db.Decimal(10, 2)
+  sellerCommissionAmount          Decimal @default(0) @map("seller_commission_amount") @db.Decimal(10, 2)
+  sellerPlatformFeeAmount         Decimal @default(0) @map("seller_platform_fee_amount") @db.Decimal(10, 2)
+  refundedBuyerCommissionAmount   Decimal @default(0) @map("refunded_buyer_commission_amount") @db.Decimal(10, 2)
+  refundedBuyerPlatformFeeAmount  Decimal @default(0) @map("refunded_buyer_platform_fee_amount") @db.Decimal(10, 2)
+  refundedSellerCommissionAmount  Decimal @default(0) @map("refunded_seller_commission_amount") @db.Decimal(10, 2)
+  refundedSellerPlatformFeeAmount Decimal @default(0) @map("refunded_seller_platform_fee_amount") @db.Decimal(10, 2)
+  componentBreakdownComplete      Boolean @default(false) @map("component_breakdown_complete")
 
   status       CommissionLedgerStatus @default(pending)
   earnedAt     DateTime?              @map("earned_at")
@@ -2279,17 +2292,24 @@ model ShipmentEvent {
 }
 
 model RefundRequest {
-  id                String              @id @default(uuid())
-  refundNumber      String              @unique @map("refund_number")
-  orderId           String              @map("order_id")
-  requesterId       String              @map("requester_id")
-  reason            RefundReason
-  description       String?
-  evidencePhotoUrls String[]            @default([]) @map("evidence_photo_urls")
-  amount            Decimal             @db.Decimal(10, 2)
+  id                      String              @id @default(uuid())
+  refundNumber            String              @unique @map("refund_number")
+  orderId                 String              @map("order_id")
+  requesterId             String              @map("requester_id")
+  reason                  RefundReason
+  // `reason` is the buyer's claim. These fields are the reviewed financial fact.
+  resolvedReason          RefundReason?       @map("resolved_reason")
+  faultParty              RefundFaultParty?   @map("fault_party")
+  policyVersion           Int                 @default(1) @map("policy_version")
+  policyFinalizedAt       DateTime?           @map("policy_finalized_at")
+  policyFinalizedBy       String?             @map("policy_finalized_by")
+  financialReviewRequired Boolean             @default(false) @map("financial_review_required")
+  description             String?
+  evidencePhotoUrls       String[]            @default([]) @map("evidence_photo_urls")
+  amount                  Decimal             @db.Decimal(10, 2)
   /// Adet bazlı kısmi iade: order.quantity'nin kaç adedi iade ediliyor (default = tümü).
-  refundQuantity    Int                 @default(1) @map("refund_quantity")
-  status            RefundRequestStatus @default(approved)
+  refundQuantity          Int                 @default(1) @map("refund_quantity")
+  status                  RefundRequestStatus @default(approved)
 
   sellerResponse String?   @map("seller_response")
   decidedBy      String?   @map("decided_by")
@@ -2309,27 +2329,35 @@ model RefundRequest {
   refundedAt       DateTime? @map("refunded_at")
   providerRefundId String?   @map("provider_refund_id")
 
-  // Talep oluşturulduğu andaki değişmez finansal karar. Admin ekranı, ödeme,
-  // komisyon, hold ve fatura akışları aynı TL kırılımını kullanır.
-  policyCode                       String  @default("legacy") @map("policy_code")
-  financialPolicySnapshot          Json?   @map("financial_policy_snapshot")
-  returnBillableDesi               Int     @default(1) @map("return_billable_desi")
-  returnShippingAmount             Decimal @default(0) @map("return_shipping_amount") @db.Decimal(10, 2)
-  refundedProductAmount            Decimal @default(0) @map("refunded_product_amount") @db.Decimal(10, 2)
-  refundedOutboundShippingAmount   Decimal @default(0) @map("refunded_outbound_shipping_amount") @db.Decimal(10, 2)
-  refundedBuyerProtectionAmount    Decimal @default(0) @map("refunded_buyer_protection_amount") @db.Decimal(10, 2)
-  refundedSellerFeeAmount          Decimal @default(0) @map("refunded_seller_fee_amount") @db.Decimal(10, 2)
-  retainedSellerPlatformFeeAmount  Decimal @default(0) @map("retained_seller_platform_fee_amount") @db.Decimal(10, 2)
-  returnShippingChargeToBuyer      Decimal @default(0) @map("return_shipping_charge_to_buyer") @db.Decimal(10, 2)
-  returnShippingChargeToSeller     Decimal @default(0) @map("return_shipping_charge_to_seller") @db.Decimal(10, 2)
+  // Legacy/otomatik akışta talep anı snapshot'ı; incelemeli v2 akışında admin
+  // kararına kadar provisional, policyFinalizedAt sonrasında değişmezdir. Admin,
+  // ödeme, komisyon, hold ve fatura aynı kesinleşmiş TL kırılımını kullanır.
+  policyCode                       String                   @default("legacy") @map("policy_code")
+  financialPolicySnapshot          Json?                    @map("financial_policy_snapshot")
+  outboundPackageTier              ShippingPackageTierCode? @map("outbound_package_tier")
+  outboundFullShippingAmount       Decimal                  @default(0) @map("outbound_full_shipping_amount") @db.Decimal(10, 2)
+  returnBillableDesi               Int                      @default(1) @map("return_billable_desi")
+  returnShippingAmount             Decimal                  @default(0) @map("return_shipping_amount") @db.Decimal(10, 2)
+  refundedProductAmount            Decimal                  @default(0) @map("refunded_product_amount") @db.Decimal(10, 2)
+  refundedOutboundShippingAmount   Decimal                  @default(0) @map("refunded_outbound_shipping_amount") @db.Decimal(10, 2)
+  refundedBuyerProtectionAmount    Decimal                  @default(0) @map("refunded_buyer_protection_amount") @db.Decimal(10, 2)
+  refundedBuyerServiceTaxAmount    Decimal                  @default(0) @map("refunded_buyer_service_tax_amount") @db.Decimal(10, 2)
+  refundedSellerServiceTaxAmount   Decimal                  @default(0) @map("refunded_seller_service_tax_amount") @db.Decimal(10, 2)
+  retainedBuyerServiceTaxAmount    Decimal                  @default(0) @map("retained_buyer_service_tax_amount") @db.Decimal(10, 2)
+  retainedSellerServiceTaxAmount   Decimal                  @default(0) @map("retained_seller_service_tax_amount") @db.Decimal(10, 2)
+  refundedSellerFeeAmount          Decimal                  @default(0) @map("refunded_seller_fee_amount") @db.Decimal(10, 2)
+  retainedSellerPlatformFeeAmount  Decimal                  @default(0) @map("retained_seller_platform_fee_amount") @db.Decimal(10, 2)
+  returnShippingChargeToBuyer      Decimal                  @default(0) @map("return_shipping_charge_to_buyer") @db.Decimal(10, 2)
+  returnShippingChargeToSeller     Decimal                  @default(0) @map("return_shipping_charge_to_seller") @db.Decimal(10, 2)
   // Escrow hold'dan TAM kargo düşüldüğü için satıcı kendi payını peşin ödemiş sayılır.
   // Kusur alıcıdaysa / gönderi hiç taşınmadıysa bu pay hold'da satıcıya BIRAKILIR.
-  sellerShippingCompensationAmount Decimal @default(0) @map("seller_shipping_compensation_amount") @db.Decimal(10, 2)
+  sellerShippingCompensationAmount Decimal                  @default(0) @map("seller_shipping_compensation_amount") @db.Decimal(10, 2)
   // Alıcıya geri ödenen gidiş kargosu: Sürat faturası platformda olduğundan kusur
   // satıcıdayken satıcıya borç yazılır (payout mahsubu).
-  outboundShippingChargeToSeller   Decimal @default(0) @map("outbound_shipping_charge_to_seller") @db.Decimal(10, 2)
-  requiresAdminReview              Boolean @default(false) @map("requires_admin_review")
-  penaltyReviewRequired            Boolean @default(false) @map("penalty_review_required")
+  outboundShippingChargeToSeller   Decimal                  @default(0) @map("outbound_shipping_charge_to_seller") @db.Decimal(10, 2)
+  requiresAdminReview              Boolean                  @default(false) @map("requires_admin_review")
+  penaltyReviewRequired            Boolean                  @default(false) @map("penalty_review_required")
+  carrierClaimRequired             Boolean                  @default(false) @map("carrier_claim_required")
 
   refundProductAmount    Boolean              @default(true) @map("refund_product_amount")
   refundShippingFee      Boolean              @default(true) @map("refund_shipping_fee")
@@ -2343,14 +2371,58 @@ model RefundRequest {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  order     Order @relation(fields: [orderId], references: [id])
-  requester User  @relation("UserRefundRequests", fields: [requesterId], references: [id])
+  order                      Order                       @relation(fields: [orderId], references: [id])
+  requester                  User                        @relation("UserRefundRequests", fields: [requesterId], references: [id])
+  financialComponents        RefundFinancialComponent[]
+  packageShippingSettlements PackageShippingSettlement[]
 
   @@index([orderId])
   @@index([requesterId])
   @@index([status])
   @@index([refundNumber])
   @@map("refund_requests")
+}
+
+/// Immutable, auditable refund settlement lines. `amount` on RefundRequest is
+/// derived from buyer-facing component treatments in the same transaction.
+model RefundFinancialComponent {
+  id              String                       @id @default(uuid())
+  refundRequestId String                       @map("refund_request_id")
+  componentCode   RefundFinancialComponentCode @map("component_code")
+  treatment       RefundFinancialTreatment
+  netAmount       Decimal                      @map("net_amount") @db.Decimal(10, 2)
+  taxAmount       Decimal                      @map("tax_amount") @db.Decimal(10, 2)
+  grossAmount     Decimal                      @map("gross_amount") @db.Decimal(10, 2)
+  sourceAmount    Decimal                      @map("source_amount") @db.Decimal(10, 2)
+  quantityPortion Decimal                      @map("quantity_portion") @db.Decimal(8, 6)
+  metadata        Json?
+  createdAt       DateTime                     @default(now()) @map("created_at")
+  refundRequest   RefundRequest                @relation(fields: [refundRequestId], references: [id], onDelete: Restrict)
+
+  @@unique([refundRequestId, componentCode, treatment])
+  @@index([refundRequestId])
+  @@map("refund_financial_components")
+}
+
+/// Package-level one-shot shipping settlement. A partial unique index in the
+/// migration enforces a single outbound settlement per physical package.
+model PackageShippingSettlement {
+  id              String             @id @default(uuid())
+  packageId       String?            @map("package_id")
+  refundRequestId String             @map("refund_request_id")
+  leg             PackageShippingLeg
+  payer           RefundFaultParty
+  netAmount       Decimal            @map("net_amount") @db.Decimal(10, 2)
+  taxAmount       Decimal            @map("tax_amount") @db.Decimal(10, 2)
+  grossAmount     Decimal            @map("gross_amount") @db.Decimal(10, 2)
+  sourceKey       String             @unique @map("source_key")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  orderPackage    OrderPackage?      @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  refundRequest   RefundRequest      @relation(fields: [refundRequestId], references: [id], onDelete: Restrict)
+
+  @@index([packageId, leg])
+  @@index([refundRequestId])
+  @@map("package_shipping_settlements")
 }
 
 /// Yayınlanmış komisyon yapılandırması değiştirilemez. Admin aktif seti
@@ -3119,6 +3191,37 @@ enum RefundReason {
   buyer_damaged
   lost_in_transit
   other
+}
+
+enum RefundFaultParty {
+  buyer
+  seller
+  carrier
+  platform
+}
+
+enum RefundFinancialComponentCode {
+  product
+  outbound_shipping
+  return_shipping
+  buyer_commission
+  buyer_platform_fee
+  seller_commission
+  seller_platform_fee
+}
+
+enum RefundFinancialTreatment {
+  buyer_refund
+  seller_refund
+  buyer_charge
+  seller_charge
+  platform_retain
+  platform_absorb
+}
+
+enum PackageShippingLeg {
+  outbound
+  return
 }
 
 enum OrderCancellationReason {

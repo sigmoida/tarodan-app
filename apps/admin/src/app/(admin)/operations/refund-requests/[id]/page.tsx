@@ -15,7 +15,11 @@ import {
   RefundPolicyCard,
   type ReturnShippingPayer,
 } from "./_components/RefundPolicyCard";
-import type { HistoryEntry, RefundRequestDetail } from "./types";
+import type {
+  HistoryEntry,
+  RefundDecisionPreview,
+  RefundRequestDetail,
+} from "./types";
 import { fmtDate, fmtTry } from "./_lib/format";
 import { RefundReasonSection } from "./_sections/RefundReasonSection";
 import { ReturnShippingSection } from "./_sections/ReturnShippingSection";
@@ -35,7 +39,12 @@ export default function RefundRequestDetailPage() {
     },
   );
   const approveReview = useAdminMutation(
-    (note?: string) => adminApi.approveRefundRequest(id, note),
+    (body: {
+      note?: string;
+      resolvedReason?: string;
+      faultParty?: string;
+      calculationToken?: string;
+    }) => adminApi.approveRefundRequest(id, body),
     {
       invalidates: ["refund-requests", "refunds"],
       successMessage: t("admin.operations.refundRequests.reviewApproved"),
@@ -130,12 +139,24 @@ export default function RefundRequestDetailPage() {
             <RefundNextActionPanel
               status={rr.status}
               reason={rr.reason}
+              shipmentStatus={rr.order.shipment?.status ?? null}
+              policyVersion={rr.policyVersion ?? 1}
+              policyFinalizedAt={rr.policyFinalizedAt ?? null}
+              financialReviewRequired={rr.financialReviewRequired ?? false}
               amount={Number(rr.amount)}
               canForceFinalize={canForceFinalize}
               finalizing={forceFinalize.isPending}
               onFinalize={handleForceFinalize}
               reviewing={approveReview.isPending || rejectReview.isPending}
-              onApprove={(note) => approveReview.mutate(note)}
+              onPreview={async (decision) => {
+                const response = await adminApi.previewRefundDecision(
+                  id,
+                  decision,
+                );
+                return (response.data?.data ??
+                  response.data) as RefundDecisionPreview;
+              }}
+              onApprove={(body) => approveReview.mutate(body)}
               onReject={(reason) => rejectReview.mutate(reason)}
             />
 
@@ -158,6 +179,65 @@ export default function RefundRequestDetailPage() {
 
             <RefundReasonSection rr={rr} />
             <ReturnShippingSection rr={rr} />
+
+            {!!rr.financialComponents?.length && (
+              <section className="rounded-xl border bg-surface-elevated p-4">
+                <h2 className="mb-3 text-base font-semibold">
+                  {t("admin.operations.refundRequests.decisionV2.title")}
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr>
+                        <th className="pb-2 pr-3">
+                          {t(
+                            "admin.operations.refundRequests.decisionV2.component",
+                          )}
+                        </th>
+                        <th className="pb-2 pr-3">
+                          {t(
+                            "admin.operations.refundRequests.decisionV2.treatment",
+                          )}
+                        </th>
+                        <th className="pb-2 pr-3">
+                          {t("admin.operations.refundRequests.decisionV2.net")}
+                        </th>
+                        <th className="pb-2 pr-3">
+                          {t("admin.operations.refundRequests.decisionV2.tax")}
+                        </th>
+                        <th className="pb-2">
+                          {t(
+                            "admin.operations.refundRequests.decisionV2.gross",
+                          )}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rr.financialComponents.map((component) => (
+                        <tr
+                          key={`${component.componentCode}:${component.treatment}`}
+                          className="border-t"
+                        >
+                          <td className="py-2 pr-3">
+                            {component.componentCode}
+                          </td>
+                          <td className="py-2 pr-3">{component.treatment}</td>
+                          <td className="py-2 pr-3">
+                            {fmtTry(component.netAmount)}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {fmtTry(component.taxAmount)}
+                          </td>
+                          <td className="py-2">
+                            {fmtTry(component.grossAmount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
 
             {rr.refundedAt && (
               <div className="rounded-xl border border-success-200 bg-success-50 p-4">

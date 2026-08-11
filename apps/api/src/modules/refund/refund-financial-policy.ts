@@ -1,3 +1,9 @@
+/**
+ * Legacy (`policyVersion=1`) refund calculator retained during dual-read and
+ * rollback. New/finalized v2 refunds use refund-financial-policy-v2.ts. The
+ * older proportional shipping rules in this file are compatibility behavior,
+ * not the package-level v2 policy.
+ */
 export type ReturnShippingPayer = "buyer" | "seller" | "platform" | null;
 
 export interface RefundPolicyDecision {
@@ -35,6 +41,14 @@ export interface RefundFinancialInput {
   buyerShippingAmount: number;
   buyerFeeAmount: number;
   buyerServiceFeeAmount: number;
+  /** Buyer-side service VAT is part of totalAmount, never product value. */
+  buyerServiceTaxAmount?: number;
+  /**
+   * Checkout-time service VAT rate. Legacy refunds need it to put the stored
+   * aggregate VAT back on its shipping/fee lines; VAT must follow the line's
+   * refund decision and must never disappear into the product calculation.
+   */
+  serviceVatRate?: number;
   sellerFeeAmount: number;
   sellerCommissionAmount: number;
   sellerPlatformFeeAmount: number;
@@ -235,18 +249,43 @@ export function calculateRefundFinancials(
     1,
   );
   // Alıcı koruma bedeli = alıcıdan ürün fiyatının ÜSTÜNE tahsil edilen ücretin
-  // TAMAMI (v2: buyerCommission + buyerServiceFee = buyerFeeAmount). Yalnız
+  // TAMAMI (kırılımlı siparişte buyerCommission + buyerServiceFee). Yalnız
   // hizmet bedelini iade edip komisyon bileşenini tutmak, satıcı kusurlu tam
   // iadede bile alıcıyı zarara sokuyordu; `productPaid` her iki bileşeni de
   // düştüğü için politika "koruma bedeli iade edilsin" dediğinde ikisi birden
-  // geri verilmelidir. (Legacy sipariş: buyerFeeAmount zaten toplamın kendisi.)
+  // geri verilmelidir. Tek-kalemli eski siparişte buyerFeeAmount zaten toplamdır.
   const buyerProtectionFee = Math.max(
     0,
     input.buyerFeeAmount || input.buyerServiceFeeAmount,
   );
+  const buyerShipping = Math.max(0, input.buyerShippingAmount);
+  const buyerServiceTax = Math.max(0, input.buyerServiceTaxAmount ?? 0);
+  const serviceVatRate = Math.max(0, input.serviceVatRate ?? 0);
+
+  /**
+   * Legacy Order stores buyer-side service VAT as one aggregate even though it
+   * was calculated line-by-line from shipping, buyer commission and buyer
+   * platform fee. Reconstruct the shipping share from the snapshotted rate and
+   * give the rounded remainder to the fee lines. When an old record has no rate
+   * snapshot, proportional allocation is the only lossless fallback. In both
+   * cases the two shares add back to the exact persisted aggregate.
+   */
+  const shippingTaxCandidate =
+    serviceVatRate > 0
+      ? money(buyerShipping * (serviceVatRate / 100))
+      : buyerShipping + buyerProtectionFee > 0
+        ? money(
+            buyerServiceTax *
+              (buyerShipping / (buyerShipping + buyerProtectionFee)),
+          )
+        : 0;
+  const buyerShippingTax = Math.min(buyerServiceTax, shippingTaxCandidate);
+  const buyerProtectionTax = money(
+    Math.max(0, buyerServiceTax - buyerShippingTax),
+  );
   const productPaid = Math.max(
     0,
-    input.totalAmount - input.buyerShippingAmount - input.buyerFeeAmount,
+    input.totalAmount - buyerShipping - buyerProtectionFee - buyerServiceTax,
   );
   const sellerCommission = Math.max(0, input.sellerCommissionAmount);
   const sellerPlatformFee =
@@ -256,10 +295,10 @@ export function calculateRefundFinancials(
 
   const productRefundAmount = money(productPaid * quantityPortion);
   const outboundShippingRefundAmount = policy.refundOutboundShipping
-    ? money(Math.max(0, input.buyerShippingAmount) * quantityPortion)
+    ? money((buyerShipping + buyerShippingTax) * quantityPortion)
     : 0;
   const buyerProtectionRefundAmount = policy.refundBuyerProtectionFee
-    ? money(buyerProtectionFee * quantityPortion)
+    ? money((buyerProtectionFee + buyerProtectionTax) * quantityPortion)
     : 0;
   const returnShippingAmount = money(Math.max(0, input.returnShippingAmount));
   const returnShippingChargeToBuyer =
@@ -272,9 +311,9 @@ export function calculateRefundFinancials(
         ? sellerPlatformFee * quantityPortion
         : 0),
   );
-  // Kargo, satıcı paketi başına BİR kez alınır ve paketteki tüm adetlere hizmet
-  // eder; kısmi iadede oranlanamaz. Bu yüzden pay tazmini yalnız TAM iadede
-  // (quantityPortion === 1) uygulanır.
+  // Satıcının kendi paket payı tek fiziksel kargoya aittir; legacy akışta bu pay
+  // yalnız TAM iadede tazmin edilir. Alıcının aşağıdaki gidiş kargosu iadesi ise
+  // v1 uyumluluğu için adet oranını korur.
   const isFullRefund = quantityPortion >= 1;
   const sellerShippingCompensationAmount =
     policy.compensateSellerShipping && isFullRefund

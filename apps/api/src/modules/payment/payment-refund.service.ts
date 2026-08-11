@@ -82,6 +82,11 @@ export interface RefundSettlementOptions {
   sellerFeeRefundAmount?: number;
   /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
   buyerFeeRefundAmount?: number;
+  /** V2 four-way fee reversal; aggregate fields above remain dual-written. */
+  buyerCommissionRefundAmount?: number;
+  buyerPlatformFeeRefundAmount?: number;
+  sellerCommissionRefundAmount?: number;
+  sellerPlatformFeeRefundAmount?: number;
   /**
    * Satıcıya yazılacak borçlar (payout mahsubu). İadenin kargo bacağı iki ayrı
    * kalem doğurabilir: dönüş kargosu (`return_shipping`) ve satıcı kusurunda
@@ -1004,6 +1009,14 @@ export class PaymentRefundService {
               {
                 sellerFeeAmount: opts.settlement.sellerFeeRefundAmount ?? 0,
                 buyerFeeAmount: opts.settlement.buyerFeeRefundAmount ?? 0,
+                buyerCommissionAmount:
+                  opts.settlement.buyerCommissionRefundAmount,
+                buyerPlatformFeeAmount:
+                  opts.settlement.buyerPlatformFeeRefundAmount,
+                sellerCommissionAmount:
+                  opts.settlement.sellerCommissionRefundAmount,
+                sellerPlatformFeeAmount:
+                  opts.settlement.sellerPlatformFeeRefundAmount,
                 closeOrder: opts.settlement.closeOrder ?? false,
               },
               tx,
