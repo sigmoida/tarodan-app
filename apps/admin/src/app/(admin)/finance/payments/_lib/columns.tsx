@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@tarodan/ui";
 import { col, type RowActionItem } from "@/components/table";
 import { type Payment, paymentStatusConfig } from "./types";
@@ -7,57 +8,101 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
   return [
-    // Sepet ödemesinde kimlik grup numarasıdır; link anchor sipariş üzerinden
-    // grup dosyasına çözülür. Hedefsiz satır (trade vb.) link üretmez (#null yok).
-    col.link<Payment>(
-      t("admin.finance.common.orderNumber"),
+    col.custom<Payment>(
+      t("admin.finance.payments.referenceNumber"),
       (p) => {
-        const label = p.groupNumber ?? p.orderNumber;
-        const target = p.anchorOrderId;
-        return {
-          href: target ? `/operations/orders/${target}` : "",
-          label: label ? `#${label}` : "—",
-        };
+        const number = p.reference?.number ?? p.groupNumber ?? p.orderNumber;
+        const href =
+          p.sourceType === "trade" && p.reference
+            ? `/operations/trades/${p.reference.id}`
+            : p.anchorOrderId
+              ? `/operations/orders/${p.anchorOrderId}`
+              : null;
+        if (!number) return <span className="text-muted">—</span>;
+        return (
+          <div className="flex items-center gap-2">
+            {href ? (
+              <Link
+                href={href}
+                className="font-mono text-primary-600 hover:underline"
+              >
+                #{number}
+              </Link>
+            ) : (
+              <span className="font-mono">#{number}</span>
+            )}
+            {p.sourceType === "trade" && (
+              <Badge variant="secondary" size="sm">
+                {t("admin.finance.payments.tradeBadge")}
+              </Badge>
+            )}
+          </div>
+        );
       },
-      { grow: 1, minWidth: 130, sortKey: "orderNumber" },
+      {
+        grow: 1,
+        minWidth: 180,
+        sortable: false,
+        exportValue: (p) => p.reference?.number ?? "",
+      },
     ),
     col.user<Payment>(
-      t("admin.finance.common.buyer"),
+      t("admin.finance.payments.payer"),
       (p) => ({
-        name: p.buyer?.displayName ?? "—",
-        secondary: p.buyer?.email,
-        href: p.buyer ? `/accounts/users/${p.buyer.id}` : undefined,
+        name: p.payer?.displayName ?? "—",
+        secondary: p.payer?.email,
+        href: p.payer ? `/accounts/users/${p.payer.id}` : undefined,
       }),
-      { sortKey: "buyer.displayName" },
+      { sortable: false },
     ),
-    // Sepet ödemesi birden çok satıcıyı kapsayabilir → satıcı yerine sepet
-    // özeti; ürün hücresi grupta "N ürünlük sepet" gösterir.
     col.user<Payment>(
-      t("admin.finance.common.seller"),
+      t("admin.finance.payments.counterparty"),
       (p) => ({
-        name: p.seller?.displayName ?? "—",
-        secondary: p.seller?.email,
-        href: p.seller ? `/accounts/users/${p.seller.id}` : undefined,
+        name:
+          p.counterparty?.displayName ??
+          (p.groupSellerCount > 0
+            ? t("admin.finance.payments.sellerCount", {
+                count: p.groupSellerCount,
+              })
+            : "—"),
+        secondary: p.counterparty?.email,
+        href: p.counterparty
+          ? `/accounts/users/${p.counterparty.id}`
+          : undefined,
       }),
-      { sortKey: "seller.displayName" },
+      { sortable: false },
     ),
     col.product<Payment>(
-      t("admin.catalog.common.product"),
-      (p) =>
-        p.product
-          ? {
-              title: p.product.title,
-              href: `/catalog/products/${p.product.id}`,
-            }
-          : {
-              title:
-                p.orderCount > 0
-                  ? t("admin.operations.orders.cartItems", {
-                      count: p.orderCount,
-                    })
-                  : "—",
-            },
-      { sortKey: "product.title" },
+      t("admin.finance.payments.itemSummary"),
+      (p) => {
+        if (p.trade) {
+          const left = p.trade.initiatorItems;
+          const right = p.trade.receiverItems;
+          const title =
+            left.length === 1 && right.length === 1
+              ? `${left[0].title} ↔ ${right[0].title}`
+              : t("admin.finance.payments.tradeItemCount", {
+                  initiatorCount: left.length,
+                  receiverCount: right.length,
+                });
+          return { title, href: `/operations/trades/${p.trade.id}` };
+        }
+        if (p.product) {
+          return {
+            title: p.product.title,
+            href: `/catalog/products/${p.product.id}`,
+          };
+        }
+        return {
+          title:
+            p.orderCount > 0
+              ? t("admin.operations.orders.cartItems", {
+                  count: p.orderCount,
+                })
+              : "—",
+        };
+      },
+      { sortable: false },
     ),
     col.money<Payment>(t("common.amount"), "amount"),
     col.muted<Payment>(

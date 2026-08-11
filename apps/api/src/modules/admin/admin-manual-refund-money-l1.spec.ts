@@ -76,6 +76,28 @@ describe("AdminPaymentService.manualRefund — MONEY-L1 group/trade routing", ()
     expect(paymentService.processRefund).not.toHaveBeenCalled();
   });
 
+  it("trade ödemesinde kısmi tutarı reddeder ve sağlayıcıya gitmez", async () => {
+    const { service, paymentService } = makeService({
+      id: "pay-1",
+      status: PaymentStatus.completed,
+      amount: 100,
+      orderId: null,
+      tradeCashPayment: { tradeId: "trade-1" },
+    });
+
+    await expect(
+      service.manualRefund(
+        "admin-1",
+        "pay-1",
+        50,
+        undefined,
+        "admin-refund-partial-trade",
+      ),
+    ).rejects.toThrow("Takas nakit ödemelerinde yalnız tam iade yapılabilir");
+    expect(paymentService.refundTradeCashTracked).not.toHaveBeenCalled();
+    expect(paymentService.processRefund).not.toHaveBeenCalled();
+  });
+
   it("grup ödemesi (orderId null, trade yok): net hata, processRefund(null) YOK", async () => {
     const { service, paymentService } = makeService({
       id: "pay-1",

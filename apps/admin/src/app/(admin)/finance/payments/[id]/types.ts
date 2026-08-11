@@ -1,5 +1,6 @@
 export interface PaymentDetail {
   id: string;
+  sourceType: "order" | "checkout_group" | "trade" | "unlinked";
   orderId: string | null;
   orderNumber: string | null;
   amount: number;
@@ -20,7 +21,7 @@ export interface PaymentDetail {
     seller: { id: string; displayName: string; email: string };
     product: { id: string; title: string };
     shippingAddress?: any;
-  };
+  } | null;
   /** Sepet ödemesi: grup kimliği + kapsanan siparişler (R3 — ödeme→grup yönü). */
   group?: {
     id: string;
@@ -37,6 +38,7 @@ export interface PaymentDetail {
       refundedTotal: number;
     }>;
   } | null;
+  trade?: TradePaymentDetail | null;
   /** Ödemeye karşı başarıyla sonuçlanmış iade denemelerinin toplamı. */
   refundedTotal?: number;
   paymentHolds?: Array<{
@@ -55,4 +57,51 @@ export interface PaymentDetail {
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
+}
+
+export interface TradePaymentItem {
+  id: string;
+  title: string;
+  quantity: number;
+  valueAtTrade: number;
+}
+
+export interface TradePaymentParty {
+  id: string;
+  displayName: string;
+  email: string;
+}
+
+export interface TradePaymentDetail {
+  id: string;
+  tradeNumber: string;
+  status: string;
+  pricingVersion: string;
+  payer: TradePaymentParty | null;
+  counterparty: TradePaymentParty | null;
+  initiator: TradePaymentParty;
+  receiver: TradePaymentParty;
+  initiatorItems: TradePaymentItem[];
+  receiverItems: TradePaymentItem[];
+  currentPayment: {
+    id: string;
+    payerId: string;
+    recipientId: string | null;
+    cashDifferenceAmount: number;
+    tradeFeeAmount: number;
+    shippingAmount: number;
+    legacyCommissionAmount: number;
+    legacyCommissionTaxAmount: number;
+    totalAmount: number;
+    status: string;
+    refundedAt?: string | null;
+  };
+  payments: Array<{
+    id: string;
+    payerId: string;
+    totalAmount: number;
+    status: string;
+    refundedAt?: string | null;
+  }>;
+  refundableTotal: number;
 }

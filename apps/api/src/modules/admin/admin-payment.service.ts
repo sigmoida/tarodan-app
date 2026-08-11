@@ -26,6 +26,7 @@ import {
 } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
+import { tradePaymentRefundableAmountFor } from "../trade/trade-refund-policy";
 
 /**
  * Ödeme yönetimi (liste, detay, istatistik, manuel iade, zorla iptal) —
@@ -122,6 +123,52 @@ export class AdminPaymentService {
           ],
         },
       });
+      // Takas ödemelerinde Payment.order boş olur. Arama, ödeme satırının
+      // bağlı olduğu takas dosyasından ve iki tarafın ürünlerinden yürütülür.
+      conditions.push({
+        tradeCashPayment: {
+          trade: {
+            OR: [
+              { tradeNumber: { contains: search, mode: "insensitive" } },
+              {
+                initiator: {
+                  displayName: { contains: search, mode: "insensitive" },
+                },
+              },
+              {
+                initiator: {
+                  email: { contains: search, mode: "insensitive" },
+                },
+              },
+              {
+                receiver: {
+                  displayName: { contains: search, mode: "insensitive" },
+                },
+              },
+              {
+                receiver: {
+                  email: { contains: search, mode: "insensitive" },
+                },
+              },
+              {
+                items: {
+                  some: {
+                    product: {
+                      title: { contains: search, mode: "insensitive" },
+                    },
+                  },
+                },
+              },
+              ...(userIds.length > 0
+                ? [
+                    { initiatorId: { in: userIds } },
+                    { receiverId: { in: userIds } },
+                  ]
+                : []),
+            ],
+          },
+        },
+      });
       if (Number.isFinite(numericAmount))
         conditions.push({ amount: numericAmount });
       if (Object.values(PaymentStatus).includes(normalized as PaymentStatus))
@@ -162,8 +209,36 @@ export class AdminPaymentService {
               groupNumber: true,
               buyer: { select: { id: true, displayName: true, email: true } },
               orders: {
-                select: { id: true },
+                select: { id: true, sellerId: true },
                 orderBy: { createdAt: "asc" },
+              },
+            },
+          },
+          tradeCashPayment: {
+            select: {
+              payerId: true,
+              recipientId: true,
+              trade: {
+                select: {
+                  id: true,
+                  tradeNumber: true,
+                  status: true,
+                  pricingVersion: true,
+                  initiator: {
+                    select: { id: true, displayName: true, email: true },
+                  },
+                  receiver: {
+                    select: { id: true, displayName: true, email: true },
+                  },
+                  items: {
+                    select: {
+                      side: true,
+                      quantity: true,
+                      product: { select: { id: true, title: true } },
+                    },
+                    orderBy: { createdAt: "asc" },
+                  },
+                },
               },
             },
           },
@@ -177,30 +252,109 @@ export class AdminPaymentService {
       // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
       // ödemelerde order=null olabilir. Null-safe erişim — aksi halde TÜM liste
       // TypeError ile 500 döner.
-      data: result.data.map((p: any) => ({
-        id: p.id,
-        orderId: p.orderId,
-        orderNumber: p.order?.orderNumber ?? null,
-        // Grup kimliği: liste satırı sepeti temsil eder; link anchor sipariş
-        // üzerinden grup dosyasına çözülür (order id → group file).
-        checkoutGroupId: p.checkoutGroupId ?? null,
-        groupNumber: p.checkoutGroup?.groupNumber ?? null,
-        orderCount: p.checkoutGroup?.orders?.length ?? (p.orderId ? 1 : 0),
-        anchorOrderId: p.checkoutGroup?.orders?.[0]?.id ?? p.orderId ?? null,
-        amount: Number(p.amount),
-        currency: p.currency,
-        provider: p.provider,
-        status: p.status,
-        failureReason: p.failureReason,
-        providerPaymentId: p.providerPaymentId,
-        providerConversationId: p.providerConversationId,
-        buyer: p.order?.buyer ?? p.checkoutGroup?.buyer ?? null,
-        seller: p.order?.seller ?? null,
-        product: p.order?.product ?? null,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-        paidAt: p.paidAt,
-      })),
+      data: result.data.map((p: any) => {
+        const tcp = p.tradeCashPayment;
+        const trade = tcp?.trade;
+        // recipientId yalnız nakit farkın alıcısıdır ve hizmet/kargo satırında
+        // null olabilir. Ekrandaki karşı taraf daima takasın diğer katılımcısıdır.
+        const payerIsInitiator =
+          !!trade && !!tcp && tcp.payerId === trade.initiator.id;
+        const payerIsReceiver =
+          !!trade && !!tcp && tcp.payerId === trade.receiver.id;
+        const tradePayer = payerIsInitiator
+          ? trade.initiator
+          : payerIsReceiver
+            ? trade.receiver
+            : null;
+        const tradeCounterparty = payerIsInitiator
+          ? trade.receiver
+          : payerIsReceiver
+            ? trade.initiator
+            : null;
+        const groupSellerCount = p.checkoutGroup
+          ? new Set(
+              (p.checkoutGroup.orders ?? [])
+                .map((o: any) => o.sellerId)
+                .filter(Boolean),
+            ).size
+          : 0;
+        const sourceType = trade
+          ? "trade"
+          : p.checkoutGroup
+            ? "checkout_group"
+            : p.order
+              ? "order"
+              : "unlinked";
+
+        return {
+          id: p.id,
+          sourceType,
+          reference: trade
+            ? { type: "trade", id: trade.id, number: trade.tradeNumber }
+            : p.checkoutGroup
+              ? {
+                  type: "checkout_group",
+                  id: p.checkoutGroup.id,
+                  number: p.checkoutGroup.groupNumber,
+                }
+              : p.order
+                ? {
+                    type: "order",
+                    id: p.order.id,
+                    number: p.order.orderNumber,
+                  }
+                : null,
+          orderId: p.orderId,
+          orderNumber: p.order?.orderNumber ?? null,
+          // Grup kimliği: liste satırı sepeti temsil eder; link anchor sipariş
+          // üzerinden grup dosyasına çözülür (order id → group file).
+          checkoutGroupId: p.checkoutGroupId ?? null,
+          groupNumber: p.checkoutGroup?.groupNumber ?? null,
+          orderCount: p.checkoutGroup?.orders?.length ?? (p.orderId ? 1 : 0),
+          groupSellerCount,
+          anchorOrderId: p.checkoutGroup?.orders?.[0]?.id ?? p.orderId ?? null,
+          amount: Number(p.amount),
+          currency: p.currency,
+          provider: p.provider,
+          status: p.status,
+          failureReason: p.failureReason,
+          providerPaymentId: p.providerPaymentId,
+          providerConversationId: p.providerConversationId,
+          payer: tradePayer ?? p.order?.buyer ?? p.checkoutGroup?.buyer ?? null,
+          counterparty: tradeCounterparty ?? p.order?.seller ?? null,
+          // Geriye uyumluluk: eski admin tüketicileri bu alanları okumaya devam eder.
+          buyer: p.order?.buyer ?? p.checkoutGroup?.buyer ?? null,
+          seller: p.order?.seller ?? null,
+          product: p.order?.product ?? null,
+          trade: trade
+            ? {
+                id: trade.id,
+                tradeNumber: trade.tradeNumber,
+                status: trade.status,
+                pricingVersion: trade.pricingVersion,
+                payerId: tcp.payerId,
+                recipientId: tcp.recipientId,
+                initiatorItems: trade.items
+                  .filter((item: any) => item.side === "initiator")
+                  .map((item: any) => ({
+                    id: item.product.id,
+                    title: item.product.title,
+                    quantity: item.quantity,
+                  })),
+                receiverItems: trade.items
+                  .filter((item: any) => item.side === "receiver")
+                  .map((item: any) => ({
+                    id: item.product.id,
+                    title: item.product.title,
+                    quantity: item.quantity,
+                  })),
+              }
+            : null,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+          paidAt: p.paidAt,
+        };
+      }),
     };
   }
 
@@ -233,6 +387,37 @@ export class AdminPaymentService {
             },
           },
         },
+        tradeCashPayment: {
+          include: {
+            trade: {
+              include: {
+                initiator: {
+                  select: { id: true, displayName: true, email: true },
+                },
+                receiver: {
+                  select: { id: true, displayName: true, email: true },
+                },
+                items: {
+                  include: {
+                    product: { select: { id: true, title: true } },
+                  },
+                  orderBy: { createdAt: "asc" },
+                },
+                cashPayments: {
+                  include: {
+                    payment: { select: { status: true, provider: true } },
+                  },
+                  orderBy: { createdAt: "asc" },
+                },
+                shipments: {
+                  where: { shippedAt: { not: null } },
+                  select: { id: true },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
         // Paylaşılan ödemeye karşı sipariş-başına iade denemeleri.
         refundAttempts: { orderBy: { createdAt: "desc" } },
         paymentHolds: {
@@ -246,6 +431,26 @@ export class AdminPaymentService {
     }
 
     const group: any = (payment as any).checkoutGroup;
+    const tcp: any = (payment as any).tradeCashPayment;
+    const trade: any = tcp?.trade;
+    const payerIsInitiator =
+      !!trade && !!tcp && tcp.payerId === trade.initiator.id;
+    const payerIsReceiver =
+      !!trade && !!tcp && tcp.payerId === trade.receiver.id;
+    const tradePayer = payerIsInitiator
+      ? trade.initiator
+      : payerIsReceiver
+        ? trade.receiver
+        : null;
+    const tradeCounterparty = payerIsInitiator
+      ? trade.receiver
+      : payerIsReceiver
+        ? trade.initiator
+        : null;
+    // Refund service ile aynı kargo eşiği: herhangi bir shippedAt veya ilk
+    // depo varışı, taraf başına kargo bedelini iade dışına çıkarır.
+    const tradeHandedToCargo =
+      !!trade?.firstWarehouseArrivalAt || (trade?.shipments?.length ?? 0) > 0;
     const attempts: any[] = (payment as any).refundAttempts ?? [];
     const refundedOf = (orderId: string) =>
       attempts
@@ -268,6 +473,13 @@ export class AdminPaymentService {
       id: payment.id,
       orderId: payment.orderId,
       orderNumber: payment.order?.orderNumber ?? null,
+      sourceType: trade
+        ? "trade"
+        : group
+          ? "checkout_group"
+          : payment.order
+            ? "order"
+            : "unlinked",
       amount: Number(payment.amount),
       currency: payment.currency,
       provider: payment.provider,
@@ -315,6 +527,70 @@ export class AdminPaymentService {
               productTitle: o.product?.title ?? null,
               refundedTotal: refundedOf(o.id),
             })),
+          }
+        : null,
+      trade: trade
+        ? {
+            id: trade.id,
+            tradeNumber: trade.tradeNumber,
+            status: trade.status,
+            pricingVersion: trade.pricingVersion,
+            payer: tradePayer,
+            counterparty: tradeCounterparty,
+            initiator: trade.initiator,
+            receiver: trade.receiver,
+            initiatorItems: trade.items
+              .filter((item: any) => item.side === "initiator")
+              .map((item: any) => ({
+                id: item.product.id,
+                title: item.product.title,
+                quantity: item.quantity,
+                valueAtTrade: Number(item.valueAtTrade),
+              })),
+            receiverItems: trade.items
+              .filter((item: any) => item.side === "receiver")
+              .map((item: any) => ({
+                id: item.product.id,
+                title: item.product.title,
+                quantity: item.quantity,
+                valueAtTrade: Number(item.valueAtTrade),
+              })),
+            currentPayment: {
+              id: tcp.id,
+              payerId: tcp.payerId,
+              recipientId: tcp.recipientId,
+              cashDifferenceAmount: Number(tcp.amount),
+              tradeFeeAmount: Number(tcp.tradeFeeAmount),
+              shippingAmount: Number(tcp.shippingAmount),
+              legacyCommissionAmount: Number(tcp.commission),
+              legacyCommissionTaxAmount: Number(tcp.commissionTaxAmount),
+              totalAmount: Number(tcp.totalAmount),
+              status: tcp.status,
+              refundedAt: tcp.refundedAt,
+            },
+            payments: trade.cashPayments.map((cashPayment: any) => ({
+              id: cashPayment.id,
+              payerId: cashPayment.payerId,
+              totalAmount: Number(cashPayment.totalAmount),
+              status: cashPayment.payment?.status ?? cashPayment.status,
+              refundedAt: cashPayment.refundedAt,
+            })),
+            refundableTotal: trade.cashPayments.reduce(
+              (sum: number, cashPayment: any) =>
+                sum +
+                tradePaymentRefundableAmountFor(
+                  {
+                    paymentStatus: cashPayment.payment?.status ?? "",
+                    provider: cashPayment.payment?.provider ?? "",
+                    releasedAt: cashPayment.releasedAt,
+                    refundedAt: cashPayment.refundedAt,
+                    totalAmount: cashPayment.totalAmount,
+                    shippingAmount: cashPayment.shippingAmount,
+                  },
+                  { handedToCargo: tradeHandedToCargo },
+                ),
+              0,
+            ),
           }
         : null,
       refundedTotal: attempts

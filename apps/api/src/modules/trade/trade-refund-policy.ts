@@ -37,6 +37,15 @@ export interface RefundablePayment {
   shippingAmount: number | string | { toString(): string };
 }
 
+export interface TradeRefundCandidate extends RefundablePayment {
+  /** İadeyi yapacak gerçek Payment satırının durumu ve sağlayıcısı. */
+  paymentStatus: string;
+  provider: string;
+  /** Escrow bırakıldıysa veya daha önce iade edildiyse tekrar iade edilemez. */
+  releasedAt?: Date | string | null;
+  refundedAt?: Date | string | null;
+}
+
 /**
  * Bu ödeme satırından iade edilecek tutar.
  *
@@ -51,4 +60,23 @@ export function refundableAmountFor(
   if (!tradeRefundExcludesShipping(ctx)) return round2(total);
   const shipping = Number(payment.shippingAmount) || 0;
   return round2(Math.max(0, total - shipping));
+}
+
+/**
+ * Sağlayıcı iade yolunun hem uygunluk hem tutar politikası. Admin önizlemesi de
+ * bunu kullanır; böylece operatöre gösterilen etki PayTR yolundan sapmaz.
+ */
+export function tradePaymentRefundableAmountFor(
+  payment: TradeRefundCandidate,
+  ctx: TradeRefundContext,
+): number {
+  if (
+    payment.paymentStatus !== "completed" ||
+    payment.provider !== "paytr" ||
+    payment.releasedAt != null ||
+    payment.refundedAt != null
+  ) {
+    return 0;
+  }
+  return refundableAmountFor(payment, ctx);
 }
