@@ -101,6 +101,7 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   ApproveRefundRequestDto,
+  RefundDecisionPreviewDto,
   RejectRefundRequestDto,
   AdminChangeMembershipDto,
 } from "./dto";
@@ -137,6 +138,21 @@ export class AdminRefundController {
     return this.adminService.getRefundRequestDetail(id);
   }
 
+  @Post("refund-requests/:id/decision-preview")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Preview immutable refund v2 financial decision" })
+  async previewRefundDecision(
+    @Param("id") id: string,
+    @Body() dto: RefundDecisionPreviewDto,
+  ) {
+    return this.adminService.previewRefundDecision(
+      id,
+      dto.resolvedReason,
+      dto.faultParty,
+    );
+  }
+
   @Post("refund-requests/:id/approve")
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
@@ -146,7 +162,7 @@ export class AdminRefundController {
     @CurrentUser("id") adminId: string,
     @Body() dto: ApproveRefundRequestDto,
   ) {
-    return this.adminService.approveRefundRequest(adminId, id, dto.note);
+    return this.adminService.approveRefundRequest(adminId, id, dto);
   }
 
   @Post("refund-requests/:id/reject")

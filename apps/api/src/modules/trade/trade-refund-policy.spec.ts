@@ -1,5 +1,6 @@
 import {
   refundableAmountFor,
+  tradePaymentRefundableAmountFor,
   tradeRefundExcludesShipping,
 } from "./trade-refund-policy";
 
@@ -65,6 +66,53 @@ describe("takas iade politikası", () => {
           { handedToCargo: true },
         ),
       ).toBe(35.22);
+    });
+  });
+
+  describe("tradePaymentRefundableAmountFor", () => {
+    const candidate = {
+      paymentStatus: "completed",
+      provider: "paytr",
+      releasedAt: null,
+      refundedAt: null,
+      totalAmount: 95,
+      shippingAmount: 25,
+    };
+
+    it("yalnız tamamlanmış ve bırakılmamış PayTR ödemesini uygun sayar", () => {
+      expect(
+        tradePaymentRefundableAmountFor(candidate, { handedToCargo: false }),
+      ).toBe(95);
+      expect(
+        tradePaymentRefundableAmountFor(
+          { ...candidate, releasedAt: new Date() },
+          { handedToCargo: false },
+        ),
+      ).toBe(0);
+      expect(
+        tradePaymentRefundableAmountFor(
+          { ...candidate, paymentStatus: "failed" },
+          { handedToCargo: false },
+        ),
+      ).toBe(0);
+      expect(
+        tradePaymentRefundableAmountFor(
+          { ...candidate, provider: "other" },
+          { handedToCargo: false },
+        ),
+      ).toBe(0);
+    });
+
+    it("kargoya teslimden sonra yalnız iade edilebilir bakiyeyi döndürür", () => {
+      expect(
+        tradePaymentRefundableAmountFor(candidate, { handedToCargo: true }),
+      ).toBe(70);
+      expect(
+        tradePaymentRefundableAmountFor(
+          { ...candidate, totalAmount: 25 },
+          { handedToCargo: true },
+        ),
+      ).toBe(0);
     });
   });
 });

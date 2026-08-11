@@ -26,6 +26,7 @@ import { paymentStatusConfig } from "../_lib/types";
 import { type PaymentDetail } from "./types";
 import { RefundPaymentModal } from "./_modals/RefundPaymentModal";
 import { ForceCancelPaymentModal } from "./_modals/ForceCancelPaymentModal";
+import { TradePaymentSection } from "./_components/TradePaymentSection";
 import { useTranslations } from "next-intl";
 
 export default function PaymentDetailPage() {
@@ -43,28 +44,36 @@ export default function PaymentDetailPage() {
       emptyTitle={t("admin.finance.payments.empty")}
       title={() => t("admin.finance.payments.detailTitle")}
       subtitle={(p) =>
-        (p.group?.groupNumber ?? p.orderNumber)
-          ? t("admin.finance.payments.orderSubtitle", {
-              number: p.group?.groupNumber ?? p.orderNumber,
+        p.trade?.tradeNumber
+          ? t("admin.finance.payments.tradeSubtitle", {
+              number: p.trade.tradeNumber,
             })
-          : t("admin.finance.payments.paymentSubtitle", {
-              id: p.id?.slice(0, 8) ?? "",
-            })
+          : (p.group?.groupNumber ?? p.orderNumber)
+            ? t("admin.finance.payments.orderSubtitle", {
+                number: p.group?.groupNumber ?? p.orderNumber,
+              })
+            : t("admin.finance.payments.paymentSubtitle", {
+                id: p.id?.slice(0, 8) ?? "",
+              })
       }
       badge={(p) => (
         <StatusBadge status={p.status} config={paymentStatusConfig(t)} />
       )}
       actions={(p) => (
         <>
-          {p.status === "completed" && !p.group && (
-            <Button
-              variant="danger"
-              leftIcon={<ArrowUturnLeftIcon className="h-5 w-5" />}
-              onClick={() => setRefundOpen(true)}
-            >
-              {t("admin.finance.payments.manualRefund")}
-            </Button>
-          )}
+          {p.status === "completed" &&
+            !p.group &&
+            (!p.trade || p.trade.refundableTotal > 0) && (
+              <Button
+                variant="danger"
+                leftIcon={<ArrowUturnLeftIcon className="h-5 w-5" />}
+                onClick={() => setRefundOpen(true)}
+              >
+                {p.trade
+                  ? t("admin.finance.payments.refundWholeTrade")
+                  : t("admin.finance.payments.manualRefund")}
+              </Button>
+            )}
           {p.status !== "completed" && p.status !== "refunded" && (
             <Button
               variant="primary"
@@ -126,7 +135,9 @@ export default function PaymentDetailPage() {
                 )}
               </SectionCard>
 
-              {p.group ? (
+              {p.trade ? (
+                <TradePaymentSection trade={p.trade} />
+              ) : p.group ? (
                 <SectionCard
                   title={t("admin.finance.payments.cartInfo")}
                   actions={
@@ -218,7 +229,7 @@ export default function PaymentDetailPage() {
                 </SectionCard>
               )}
 
-              {!p.order && p.group?.buyer && (
+              {!p.trade && !p.order && p.group?.buyer && (
                 <PartyCard
                   title={t("admin.finance.common.buyer")}
                   name={p.group.buyer.displayName ?? "—"}
@@ -333,6 +344,14 @@ export default function PaymentDetailPage() {
             <RefundPaymentModal
               paymentId={p.id}
               amount={p.amount}
+              trade={
+                p.trade
+                  ? {
+                      tradeNumber: p.trade.tradeNumber,
+                      refundableTotal: p.trade.refundableTotal,
+                    }
+                  : undefined
+              }
               onClose={() => setRefundOpen(false)}
             />
           )}

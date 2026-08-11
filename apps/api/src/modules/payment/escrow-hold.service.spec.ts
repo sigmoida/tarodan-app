@@ -101,6 +101,12 @@ describe("EscrowHoldService.createHold", () => {
       orderId: "o1",
       sellerCommission: 100,
       buyerFee: 30,
+      components: {
+        buyerCommissionAmount: 0,
+        buyerPlatformFeeAmount: 0,
+        sellerCommissionAmount: 0,
+        sellerPlatformFeeAmount: 0,
+      },
       tx,
     });
     expect(tx.sellerAccountAdjustment.upsert).not.toHaveBeenCalled();

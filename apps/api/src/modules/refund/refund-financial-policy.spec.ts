@@ -231,7 +231,7 @@ describe("refund financial policy", () => {
     });
   });
 
-  describe("v2 buyer fee = buyerCommission + buyerServiceFee", () => {
+  describe("split-fee orders on the legacy refund path", () => {
     // Alıcı ücreti İKİ bileşenli: komisyon 30 + hizmet bedeli 50 = 80.
     // totalAmount = 1000 ürün + 130 kargo + 80 alıcı ücreti = 1210.
     const v2Amounts = {
@@ -294,6 +294,50 @@ describe("refund financial policy", () => {
       expect(result.buyerProtectionRefundAmount).toBe(0);
       // Ürün 1000 − dönüş kargosu 180.
       expect(result.buyerRefundAmount).toBe(820);
+    });
+  });
+
+  describe("legacy service VAT follows its underlying refundable line", () => {
+    const taxedAmounts = {
+      ...orderAmounts,
+      // 1000 product + 100 shipping + 50 buyer fees + 30 service VAT.
+      // At 20% the VAT split is 20 shipping + 10 buyer fees.
+      totalAmount: 1180,
+      buyerShippingAmount: 100,
+      buyerFeeAmount: 50,
+      buyerServiceFeeAmount: 50,
+      buyerServiceTaxAmount: 30,
+      serviceVatRate: 20,
+    };
+
+    it("makes the buyer whole on a seller-fault refund instead of losing service VAT", () => {
+      const result = calculateRefundFinancials(
+        resolveReturnPolicy("damaged"),
+        taxedAmounts,
+      );
+
+      expect(result).toMatchObject({
+        productRefundAmount: 1000,
+        outboundShippingRefundAmount: 120,
+        buyerProtectionRefundAmount: 60,
+        buyerRefundAmount: 1180,
+      });
+    });
+
+    it("refunds only shipping VAT when an unshipped buyer cancellation retains the fee", () => {
+      const result = calculateRefundFinancials(
+        resolveCancellationPolicy("wrong_product_selected", {
+          hasShipped: false,
+        }),
+        taxedAmounts,
+      );
+
+      expect(result).toMatchObject({
+        productRefundAmount: 1000,
+        outboundShippingRefundAmount: 120,
+        buyerProtectionRefundAmount: 0,
+        buyerRefundAmount: 1120,
+      });
     });
   });
 

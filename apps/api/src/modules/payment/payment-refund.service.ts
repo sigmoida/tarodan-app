@@ -44,7 +44,7 @@ import {
   ProviderRefundRejectedException,
   RefundPendingReconciliationException,
 } from "../payment-providers/refund-errors";
-import { refundableAmountFor } from "../trade/trade-refund-policy";
+import { tradePaymentRefundableAmountFor } from "../trade/trade-refund-policy";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -82,6 +82,11 @@ export interface RefundSettlementOptions {
   sellerFeeRefundAmount?: number;
   /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
   buyerFeeRefundAmount?: number;
+  /** V2 four-way fee reversal; aggregate fields above remain dual-written. */
+  buyerCommissionRefundAmount?: number;
+  buyerPlatformFeeRefundAmount?: number;
+  sellerCommissionRefundAmount?: number;
+  sellerPlatformFeeRefundAmount?: number;
   /**
    * Satıcıya yazılacak borçlar (payout mahsubu). İadenin kargo bacağı iki ayrı
    * kalem doğurabilir: dönüş kargosu (`return_shipping`) ve satıcı kusurunda
@@ -1004,6 +1009,14 @@ export class PaymentRefundService {
               {
                 sellerFeeAmount: opts.settlement.sellerFeeRefundAmount ?? 0,
                 buyerFeeAmount: opts.settlement.buyerFeeRefundAmount ?? 0,
+                buyerCommissionAmount:
+                  opts.settlement.buyerCommissionRefundAmount,
+                buyerPlatformFeeAmount:
+                  opts.settlement.buyerPlatformFeeRefundAmount,
+                sellerCommissionAmount:
+                  opts.settlement.sellerCommissionRefundAmount,
+                sellerPlatformFeeAmount:
+                  opts.settlement.sellerPlatformFeeRefundAmount,
                 closeOrder: opts.settlement.closeOrder ?? false,
               },
               tx,
@@ -1312,7 +1325,7 @@ export class PaymentRefundService {
    * Takasın TÜM tamamlanmış ödemelerini iade eder.
    *
    * v2'de taraf başına bir ödeme vardır; iptal her ikisini de iade etmelidir.
-   * İade edilecek tutar satır bazında `refundableAmountFor` ile bulunur: ürün
+   * İade edilecek tutar satır bazında `tradePaymentRefundableAmountFor` ile bulunur: ürün
    * kargoya verildikten sonra KARGO bedeli iade DIŞIDIR (platform o maliyeti
    * gerçekten ödemiştir), öncesinde tam iade yapılır.
    *
@@ -1348,8 +1361,12 @@ export class PaymentRefundService {
     let refundedPaymentId: string | undefined;
     let skippedReason: string | undefined;
     for (const payment of payments) {
-      const amount = refundableAmountFor(
+      const amount = tradePaymentRefundableAmountFor(
         {
+          paymentStatus: payment.status,
+          provider: payment.provider,
+          releasedAt: payment.tradeCashPayment?.releasedAt,
+          refundedAt: payment.tradeCashPayment?.refundedAt,
           totalAmount: payment.tradeCashPayment?.totalAmount ?? payment.amount,
           shippingAmount: payment.tradeCashPayment?.shippingAmount ?? 0,
         },
@@ -1668,7 +1685,7 @@ export class PaymentRefundService {
     // Defter ters kaydı: POST-COMMIT best-effort (capture ile aynı felsefe). İade
     // tx'inin İÇİNDE yazmak, defter hatasında para hareketini geri alırdı; burada
     // hata yalnız loglanır ve reconcile açığı yakalar. Kargo bacağı yalnız GERÇEKTEN
-    // iade edildiyse ters kayıt alır (tek otorite: refundableAmountFor).
+    // iade edildiyse ters kayıt alır (tek otorite: takas iade politika helper'ı).
     if (this.ledger) {
       const tcp = payment.tradeCashPayment;
       const shippingAmount = Number(tcp?.shippingAmount ?? 0);

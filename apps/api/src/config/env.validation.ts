@@ -65,6 +65,7 @@ const envSchema = z
     PAYTR_MERCHANT_KEY: z.string().optional(),
     PAYTR_MERCHANT_SALT: z.string().optional(),
     PAYTR_TEST_MODE: z.string().optional(),
+    REFUND_POLICY_V2_ENABLED: z.string().optional(),
     PAYTR_CALLBACK_URL: z.string().optional(),
     // "true" iken payout, aşama-1 kabulünde completed OLMAZ; PayTR'nin transfer
     // sonucu callback'ini (2. aşama) bekler. Panelde "Platform Transfer Sonucu

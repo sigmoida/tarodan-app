@@ -41,6 +41,7 @@ import {
   AdminRefundHistoryQueryDto,
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
+  ApproveRefundRequestDto,
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
@@ -90,6 +91,8 @@ import {
   TicketCategory,
   MembershipTierType,
   OrderStatus,
+  RefundFaultParty,
+  RefundReason,
 } from "@prisma/client";
 import { RefundService } from "../refund/refund.service";
 import { OrderService } from "../order/order.service";
@@ -212,12 +215,24 @@ export class AdminService {
   async approveRefundRequest(
     adminId: string,
     refundRequestId: string,
-    note?: string,
+    dto: ApproveRefundRequestDto,
   ) {
     return this.adminRefundService.approveRefundRequest(
       adminId,
       refundRequestId,
-      note,
+      dto,
+    );
+  }
+
+  async previewRefundDecision(
+    refundRequestId: string,
+    resolvedReason: RefundReason,
+    faultParty: RefundFaultParty,
+  ) {
+    return this.adminRefundService.previewRefundDecision(
+      refundRequestId,
+      resolvedReason,
+      faultParty,
     );
   }
 

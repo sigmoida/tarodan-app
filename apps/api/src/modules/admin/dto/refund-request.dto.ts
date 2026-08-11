@@ -7,7 +7,11 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
-import { RefundRequestStatus } from "@prisma/client";
+import {
+  RefundFaultParty,
+  RefundReason,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { AdminListQueryDto } from "../../../common/list";
 
 export class RefundRequestQueryDto extends AdminListQueryDto {
@@ -38,6 +42,21 @@ export class RefundRequestQueryDto extends AdminListQueryDto {
 }
 
 export class ApproveRefundRequestDto {
+  @ApiPropertyOptional({ enum: RefundReason })
+  @IsOptional()
+  @IsEnum(RefundReason)
+  resolvedReason?: RefundReason;
+
+  @ApiPropertyOptional({ enum: RefundFaultParty })
+  @IsOptional()
+  @IsEnum(RefundFaultParty)
+  faultParty?: RefundFaultParty;
+
+  @ApiPropertyOptional({ description: "Token returned by decision-preview" })
+  @IsOptional()
+  @IsString()
+  calculationToken?: string;
+
   @ApiPropertyOptional({
     example: "Kanıtlar incelendi, satıcı kaynaklı kusur doğrulandı.",
     maxLength: 1000,
@@ -46,6 +65,16 @@ export class ApproveRefundRequestDto {
   @IsString()
   @MaxLength(1000)
   note?: string;
+}
+
+export class RefundDecisionPreviewDto {
+  @ApiProperty({ enum: RefundReason })
+  @IsEnum(RefundReason)
+  resolvedReason!: RefundReason;
+
+  @ApiProperty({ enum: RefundFaultParty })
+  @IsEnum(RefundFaultParty)
+  faultParty!: RefundFaultParty;
 }
 
 export class RejectRefundRequestDto {

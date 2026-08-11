@@ -67,6 +67,7 @@ type RevenueType =
 
 type ResolvedRefundAdjustment = InvoiceRefundReversePayload & {
   finalizedAt: Date;
+  refundRequestId?: string;
 };
 
 /** `cut()` çağrısının türe göre değişen bağlamı. */
@@ -530,6 +531,15 @@ export class ElogoInvoicingService {
         refundedSellerCommission: true,
         buyerFee: true,
         refundedBuyerFee: true,
+        componentBreakdownComplete: true,
+        buyerCommissionAmount: true,
+        buyerPlatformFeeAmount: true,
+        sellerCommissionAmount: true,
+        sellerPlatformFeeAmount: true,
+        refundedBuyerCommissionAmount: true,
+        refundedBuyerPlatformFeeAmount: true,
+        refundedSellerCommissionAmount: true,
+        refundedSellerPlatformFeeAmount: true,
       },
     });
     if (ledgers.length === 0) return null;
@@ -538,18 +548,40 @@ export class ElogoInvoicingService {
       Math.round(values.reduce((a, b) => a + b, 0) * 100) / 100;
 
     return {
-      sellerCommission: sum(ledgers.map((l) => Number(l.sellerCommission))),
-      netSellerCommission: sum(
-        ledgers.map(
-          (l) =>
-            Number(l.sellerCommission) -
-            Number(l.refundedSellerCommission ?? 0),
+      sellerCommission: sum(
+        ledgers.map((l) =>
+          l.componentBreakdownComplete
+            ? Number(l.sellerCommissionAmount) +
+              Number(l.sellerPlatformFeeAmount)
+            : Number(l.sellerCommission),
         ),
       ),
-      buyerFee: sum(ledgers.map((l) => Number(l.buyerFee))),
+      netSellerCommission: sum(
+        ledgers.map((l) =>
+          l.componentBreakdownComplete
+            ? Number(l.sellerCommissionAmount) +
+              Number(l.sellerPlatformFeeAmount) -
+              Number(l.refundedSellerCommissionAmount) -
+              Number(l.refundedSellerPlatformFeeAmount)
+            : Number(l.sellerCommission) -
+              Number(l.refundedSellerCommission ?? 0),
+        ),
+      ),
+      buyerFee: sum(
+        ledgers.map((l) =>
+          l.componentBreakdownComplete
+            ? Number(l.buyerCommissionAmount) + Number(l.buyerPlatformFeeAmount)
+            : Number(l.buyerFee),
+        ),
+      ),
       netBuyerFee: sum(
-        ledgers.map(
-          (l) => Number(l.buyerFee) - Number(l.refundedBuyerFee ?? 0),
+        ledgers.map((l) =>
+          l.componentBreakdownComplete
+            ? Number(l.buyerCommissionAmount) +
+              Number(l.buyerPlatformFeeAmount) -
+              Number(l.refundedBuyerCommissionAmount) -
+              Number(l.refundedBuyerPlatformFeeAmount)
+            : Number(l.buyerFee) - Number(l.refundedBuyerFee ?? 0),
         ),
       ),
     };
@@ -823,6 +855,7 @@ export class ElogoInvoicingService {
           orderId: true,
           status: true,
           finalizedAt: true,
+          idempotencyKey: true,
         },
       });
       if (
@@ -835,7 +868,13 @@ export class ElogoInvoicingService {
           `Refund attempt ${adjustment.refundAttemptId} is not finalized`,
         );
       }
-      resolved = { ...adjustment, finalizedAt: attempt.finalizedAt };
+      resolved = {
+        ...adjustment,
+        finalizedAt: attempt.finalizedAt,
+        refundRequestId: attempt.idempotencyKey?.startsWith("refund-request:")
+          ? attempt.idempotencyKey.slice("refund-request:".length)
+          : undefined,
+      };
     }
     await this.reverseByKeys(await this.relatedInvoiceKeys(orderId), resolved);
   }
@@ -1890,6 +1929,70 @@ export class ElogoInvoicingService {
    * Kesilmiş faturayı tersine çevir. Tam ve daha önce düzeltme almamış e-Arşiv
    * ≤8 günde iptal edilir; diğer durumlarda attempt-bazlı IADE faturası kesilir.
    */
+  private async refundComponentLinesForInvoice(
+    inv: ElogoInvoice,
+    adjustment?: ResolvedRefundAdjustment,
+  ): Promise<InvoiceLineItem[]> {
+    if (!adjustment?.refundRequestId) return [];
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: adjustment.refundRequestId },
+      select: {
+        refundQuantity: true,
+        financialComponents: {
+          where: {
+            treatment:
+              inv.type === "commission" ? "seller_refund" : "buyer_refund",
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+    if (!rr?.financialComponents.length) return [];
+    const allowed =
+      inv.type === "commission"
+        ? new Set(["seller_commission", "seller_platform_fee"])
+        : inv.type === "service_fee"
+          ? new Set(["buyer_commission", "buyer_platform_fee"])
+          : inv.type === "platform_sale"
+            ? new Set([
+                "product",
+                "outbound_shipping",
+                "buyer_commission",
+                "buyer_platform_fee",
+              ])
+            : new Set<string>();
+    const names: Record<string, string> = {
+      product: "İade edilen ürün bedeli",
+      outbound_shipping: "İade edilen gidiş kargosu",
+      buyer_commission: "İade edilen alıcı komisyonu",
+      buyer_platform_fee: "İade edilen alıcı platform hizmet bedeli",
+      seller_commission: "İade edilen satıcı komisyonu",
+      seller_platform_fee: "İade edilen satıcı platform hizmet bedeli",
+    };
+
+    return rr.financialComponents
+      .filter(
+        (component) =>
+          allowed.has(component.componentCode) &&
+          Number(component.netAmount) > 0,
+      )
+      .map((component) => {
+        const net = Number(component.netAmount);
+        const tax = Number(component.taxAmount);
+        const quantity =
+          component.componentCode === "product"
+            ? Math.max(1, rr.refundQuantity)
+            : 1;
+        return {
+          name: names[component.componentCode] ?? component.componentCode,
+          quantity,
+          net,
+          unitPrice: net / quantity,
+          vatRate: net > 0 ? this.round2((tax / net) * 100) : 0,
+        };
+      });
+  }
+
   private async reverseInvoice(
     inv: ElogoInvoice,
     adjustment?: ResolvedRefundAdjustment,
@@ -2011,17 +2114,40 @@ export class ElogoInvoicingService {
     const baseGross = adjustment
       ? await this.resolveInvoiceRefundBase(inv)
       : Number(inv.total);
-    const returnTotal = invoiceAdjustment.fullyRefunded
-      ? remaining
-      : Math.min(
-          remaining,
-          this.round2(baseGross * invoiceAdjustment.refundRatio),
-        );
+    const rawComponentLines = await this.refundComponentLinesForInvoice(
+      inv,
+      adjustment,
+    );
+    const rawComponentTotals = rawComponentLines.length
+      ? invoiceTotalsFromLines(rawComponentLines)
+      : null;
+    const componentScale =
+      rawComponentTotals && rawComponentTotals.total > remaining
+        ? remaining / rawComponentTotals.total
+        : 1;
+    const componentLines = rawComponentLines.map((line) => ({
+      ...line,
+      net: this.round2(line.net * componentScale),
+      unitPrice: (line.net * componentScale) / line.quantity,
+    }));
+    const componentTotals = componentLines.length
+      ? invoiceTotalsFromLines(componentLines)
+      : null;
+    const returnTotal = componentTotals
+      ? Math.min(remaining, componentTotals.total)
+      : invoiceAdjustment.fullyRefunded
+        ? remaining
+        : Math.min(
+            remaining,
+            this.round2(baseGross * invoiceAdjustment.refundRatio),
+          );
     if (returnTotal <= 0.009) return;
     const originalTotal = Number(inv.total);
     const netRatio =
       originalTotal > 0 ? Number(inv.netAmount) / originalTotal : 0;
-    const returnNet = this.round2(returnTotal * netRatio);
+    const returnNet = componentTotals
+      ? Math.min(componentTotals.net, returnTotal)
+      : this.round2(returnTotal * netRatio);
 
     const now = new Date();
     const record = await this.prisma.$transaction(
@@ -2070,6 +2196,9 @@ export class ElogoInvoicingService {
               LINE_DESCRIPTION[inv.type] ||
               "Hizmet bedeli"
             }`,
+            lineItems: componentLines.length
+              ? (componentLines as unknown as Prisma.InputJsonValue)
+              : undefined,
             createdAt: now,
           },
         });

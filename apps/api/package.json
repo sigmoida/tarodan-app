@@ -47,7 +47,8 @@
     "prisma:seed:media:local": "node scripts/run-local-prisma.mjs media",
     "prisma:studio": "prisma studio",
     "seed:edge:auth": "ts-node -r tsconfig-paths/register prisma/seed-edge/auth-states.ts",
-    "smoke:elogo": "node --env-file=.env scripts/elogo-smoke.mjs"
+    "smoke:elogo": "node --env-file=.env scripts/elogo-smoke.mjs",
+    "preflight:refund-policy-v2": "node --env-file=.env scripts/refund-policy-v2-preflight.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1085.0",

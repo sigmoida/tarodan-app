@@ -8,11 +8,17 @@ import {
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { AdminAuditService } from "./admin-audit.service";
-import { Prisma, PaymentStatus, TradeStatus } from "@prisma/client";
+import {
+  Prisma,
+  PaymentStatus,
+  TradeStatus,
+  RefundFaultParty,
+  RefundReason,
+} from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { EventService } from "../events/event.service";
 import { RefundService } from "../refund/refund.service";
-import { RefundRequestQueryDto } from "./dto";
+import { ApproveRefundRequestDto, RefundRequestQueryDto } from "./dto";
 import { paginate, resolveOrderBy } from "../../common/list";
 import { primaryCashPayment } from "../trade/trade.constants";
 
@@ -169,6 +175,8 @@ export class AdminRefundService {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
       include: {
+        financialComponents: { orderBy: { createdAt: "asc" } },
+        packageShippingSettlements: { orderBy: { createdAt: "asc" } },
         requester: {
           select: { id: true, displayName: true, email: true, phone: true },
         },
@@ -197,17 +205,67 @@ export class AdminRefundService {
   async approveRefundRequest(
     adminId: string,
     refundRequestId: string,
-    note?: string,
+    dto: ApproveRefundRequestDto,
   ) {
     const before = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
-      select: { status: true, policyCode: true },
+      select: {
+        status: true,
+        policyCode: true,
+        policyVersion: true,
+        policyFinalizedAt: true,
+        financialReviewRequired: true,
+      },
     });
     if (!before) throw new NotFoundException("İade talebi bulunamadı");
+    const decisionFields = [
+      dto.resolvedReason,
+      dto.faultParty,
+      dto.calculationToken,
+    ];
+    const hasAnyDecisionField = decisionFields.some((value) => value != null);
+    const hasCompleteDecision = decisionFields.every(
+      (value) => typeof value === "string" && value.length > 0,
+    );
+    if (hasAnyDecisionField && !hasCompleteDecision) {
+      throw new BadRequestException(
+        "resolvedReason, faultParty ve calculationToken birlikte gönderilmelidir",
+      );
+    }
+    if (
+      before.policyVersion >= 2 &&
+      !before.policyFinalizedAt &&
+      !hasCompleteDecision
+    ) {
+      throw new BadRequestException(
+        "V2 iade onayı için önce karar önizlemesi alınmalıdır",
+      );
+    }
+    if (
+      before.policyVersion === 1 &&
+      before.financialReviewRequired &&
+      !hasCompleteDecision
+    ) {
+      throw new BadRequestException(
+        "Bu kayıt mevcut finansal yan etkiler nedeniyle karantinadadır; otomatik onaylanamaz",
+      );
+    }
+    if (before.financialReviewRequired && !dto.note?.trim()) {
+      throw new BadRequestException(
+        "Finansal inceleme kaydı için PayTR, satıcı düzeltmesi ve fatura mutabakat notu zorunludur",
+      );
+    }
     const result = await this.refundService.adminApproveRefundRequest(
       refundRequestId,
       adminId,
-      note,
+      dto.note,
+      hasCompleteDecision
+        ? {
+            resolvedReason: dto.resolvedReason!,
+            faultParty: dto.faultParty!,
+            calculationToken: dto.calculationToken!,
+          }
+        : undefined,
     );
     await this.audit.createRequiredAuditLog(
       adminId,
@@ -215,9 +273,26 @@ export class AdminRefundService {
       "RefundRequest",
       refundRequestId,
       { status: before.status, policyCode: before.policyCode },
-      { status: result.status, note: note?.trim() || null },
+      {
+        status: result.status,
+        note: dto.note?.trim() || null,
+        resolvedReason: dto.resolvedReason ?? null,
+        faultParty: dto.faultParty ?? null,
+      },
     );
     return result;
+  }
+
+  async previewRefundDecision(
+    refundRequestId: string,
+    resolvedReason: RefundReason,
+    faultParty: RefundFaultParty,
+  ) {
+    return this.refundService.previewRefundDecision(
+      refundRequestId,
+      resolvedReason,
+      faultParty,
+    );
   }
 
   async rejectRefundRequest(

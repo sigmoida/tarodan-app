@@ -6,6 +6,12 @@ export interface UpsertPendingArgs {
   orderId: string;
   sellerCommission: Prisma.Decimal | number;
   buyerFee: Prisma.Decimal | number;
+  components?: {
+    buyerCommissionAmount: Prisma.Decimal | number;
+    buyerPlatformFeeAmount: Prisma.Decimal | number;
+    sellerCommissionAmount: Prisma.Decimal | number;
+    sellerPlatformFeeAmount: Prisma.Decimal | number;
+  };
   tx?: Prisma.TransactionClient;
 }
 
@@ -28,6 +34,11 @@ export class CommissionLedgerService {
         sellerCommission,
         buyerFee,
         totalPlatformRevenue: total,
+        buyerCommissionAmount: args.components?.buyerCommissionAmount ?? 0,
+        buyerPlatformFeeAmount: args.components?.buyerPlatformFeeAmount ?? 0,
+        sellerCommissionAmount: args.components?.sellerCommissionAmount ?? 0,
+        sellerPlatformFeeAmount: args.components?.sellerPlatformFeeAmount ?? 0,
+        componentBreakdownComplete: args.components != null,
         status: CommissionLedgerStatus.pending,
       },
       update: {},
@@ -89,6 +100,15 @@ export class CommissionLedgerService {
         refundedSellerCommission: true,
         refundedBuyerFee: true,
         status: true,
+        componentBreakdownComplete: true,
+        buyerCommissionAmount: true,
+        buyerPlatformFeeAmount: true,
+        sellerCommissionAmount: true,
+        sellerPlatformFeeAmount: true,
+        refundedBuyerCommissionAmount: true,
+        refundedBuyerPlatformFeeAmount: true,
+        refundedSellerCommissionAmount: true,
+        refundedSellerPlatformFeeAmount: true,
       },
     });
     if (!ledger) return { updated: false, fullyRefunded: false };
@@ -110,12 +130,41 @@ export class CommissionLedgerService {
     // Kümülatif refunded original'e (0.01 tolerans) ulaştıysa tam iade.
     const fullyRefunded =
       newRefSeller.gte(seller.sub(0.01)) && newRefBuyer.gte(buyer.sub(0.01));
+    const proratedComponents = ledger.componentBreakdownComplete
+      ? {
+          refundedBuyerCommissionAmount: Prisma.Decimal.min(
+            new Prisma.Decimal(ledger.refundedBuyerCommissionAmount).add(
+              new Prisma.Decimal(ledger.buyerCommissionAmount).mul(p),
+            ),
+            new Prisma.Decimal(ledger.buyerCommissionAmount),
+          ),
+          refundedBuyerPlatformFeeAmount: Prisma.Decimal.min(
+            new Prisma.Decimal(ledger.refundedBuyerPlatformFeeAmount).add(
+              new Prisma.Decimal(ledger.buyerPlatformFeeAmount).mul(p),
+            ),
+            new Prisma.Decimal(ledger.buyerPlatformFeeAmount),
+          ),
+          refundedSellerCommissionAmount: Prisma.Decimal.min(
+            new Prisma.Decimal(ledger.refundedSellerCommissionAmount).add(
+              new Prisma.Decimal(ledger.sellerCommissionAmount).mul(p),
+            ),
+            new Prisma.Decimal(ledger.sellerCommissionAmount),
+          ),
+          refundedSellerPlatformFeeAmount: Prisma.Decimal.min(
+            new Prisma.Decimal(ledger.refundedSellerPlatformFeeAmount).add(
+              new Prisma.Decimal(ledger.sellerPlatformFeeAmount).mul(p),
+            ),
+            new Prisma.Decimal(ledger.sellerPlatformFeeAmount),
+          ),
+        }
+      : {};
 
     await tx.commissionLedger.update({
       where: { orderId },
       data: {
         refundedSellerCommission: newRefSeller,
         refundedBuyerFee: newRefBuyer,
+        ...proratedComponents,
         ...(fullyRefunded
           ? { status: CommissionLedgerStatus.refunded, refundedAt: new Date() }
           : {}),
@@ -135,6 +184,10 @@ export class CommissionLedgerService {
       sellerFeeAmount: number;
       buyerFeeAmount: number;
       closeOrder: boolean;
+      buyerCommissionAmount?: number;
+      buyerPlatformFeeAmount?: number;
+      sellerCommissionAmount?: number;
+      sellerPlatformFeeAmount?: number;
     },
     tx: Prisma.TransactionClient,
   ): Promise<{ updated: boolean; fullyRefunded: boolean }> {
@@ -146,6 +199,15 @@ export class CommissionLedgerService {
         refundedSellerCommission: true,
         refundedBuyerFee: true,
         status: true,
+        componentBreakdownComplete: true,
+        buyerCommissionAmount: true,
+        buyerPlatformFeeAmount: true,
+        sellerCommissionAmount: true,
+        sellerPlatformFeeAmount: true,
+        refundedBuyerCommissionAmount: true,
+        refundedBuyerPlatformFeeAmount: true,
+        refundedSellerCommissionAmount: true,
+        refundedSellerPlatformFeeAmount: true,
       },
     });
     if (!ledger) return { updated: false, fullyRefunded: false };
@@ -167,12 +229,41 @@ export class CommissionLedgerService {
     const fullyRefunded =
       newRefSeller.gte(seller.sub(0.01)) && newRefBuyer.gte(buyer.sub(0.01));
     const shouldEarnRemainder = amounts.closeOrder && !fullyRefunded;
+    const componentRefunds = ledger.componentBreakdownComplete
+      ? {
+          refundedBuyerCommissionAmount: Prisma.Decimal.min(
+            new Prisma.Decimal(ledger.refundedBuyerCommissionAmount).add(
+              Math.max(0, amounts.buyerCommissionAmount ?? 0),
+            ),
+            new Prisma.Decimal(ledger.buyerCommissionAmount),
+          ),
+          refundedBuyerPlatformFeeAmount: Prisma.Decimal.min(
+            new Prisma.Decimal(ledger.refundedBuyerPlatformFeeAmount).add(
+              Math.max(0, amounts.buyerPlatformFeeAmount ?? 0),
+            ),
+            new Prisma.Decimal(ledger.buyerPlatformFeeAmount),
+          ),
+          refundedSellerCommissionAmount: Prisma.Decimal.min(
+            new Prisma.Decimal(ledger.refundedSellerCommissionAmount).add(
+              Math.max(0, amounts.sellerCommissionAmount ?? 0),
+            ),
+            new Prisma.Decimal(ledger.sellerCommissionAmount),
+          ),
+          refundedSellerPlatformFeeAmount: Prisma.Decimal.min(
+            new Prisma.Decimal(ledger.refundedSellerPlatformFeeAmount).add(
+              Math.max(0, amounts.sellerPlatformFeeAmount ?? 0),
+            ),
+            new Prisma.Decimal(ledger.sellerPlatformFeeAmount),
+          ),
+        }
+      : {};
 
     await tx.commissionLedger.update({
       where: { orderId },
       data: {
         refundedSellerCommission: newRefSeller,
         refundedBuyerFee: newRefBuyer,
+        ...componentRefunds,
         ...(fullyRefunded
           ? {
               status: CommissionLedgerStatus.refunded,
