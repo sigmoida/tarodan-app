@@ -290,12 +290,17 @@ export class AdminTestToolsService {
       case "boost": {
         const before = await this.prisma.product.findUnique({
           where: { id },
-          select: { boostedUntil: true },
+          select: { boostedUntil: true, homeShowcaseUntil: true },
         });
         if (!before) throw new BadRequestException("Ürün bulunamadı");
         await this.prisma.product.update({
           where: { id },
-          data: { boostedUntil: target },
+          data: {
+            boostedUntil: target,
+            // Vitrin penceresi de kaydırılır — aksi halde Vitrin dolum testi
+            // yanıltıcı olur (boost dolar, vitrin eski tarihte kalırdı).
+            ...(before.homeShowcaseUntil ? { homeShowcaseUntil: target } : {}),
+          },
         });
         await this.prisma.productBoost.updateMany({
           where: { productId: id, status: "active" },

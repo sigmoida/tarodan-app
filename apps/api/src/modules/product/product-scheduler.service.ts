@@ -296,9 +296,15 @@ export class ProductSchedulerService implements OnModuleInit {
     try {
       const now = new Date();
 
-      // rankTier=2 ama boostedUntil süresi dolmuş ürünler
+      // Süresi dolmuş boost izleri: filtre rankTier'a DEĞİL boost alanlarına
+      // bakar. Eskiden yalnız rankTier=2 taranıyordu; gece mutabakatı rankTier'ı
+      // indirmiş ama boostedAt'i temizlememişse ürün SÜRESİZ olarak LIFO
+      // sıralamasının tepesinde kalıyordu (stale boostedAt asla süpürülmüyordu).
       const expiredProducts = await this.prisma.product.findMany({
-        where: { rankTier: 2, boostedUntil: { lt: now } },
+        where: {
+          boostedAt: { not: null },
+          boostedUntil: { lt: now },
+        },
         select: {
           id: true,
           sellerId: true,

@@ -306,6 +306,7 @@ export class VirtualOrderFulfillmentService {
       where: { id: boost.productId },
       select: {
         boostedUntil: true,
+        homeShowcaseUntil: true,
         qualityScore: true,
         popularityScore: true,
         viewCount: true,
@@ -319,6 +320,18 @@ export class VirtualOrderFulfillmentService {
         : nowTs;
     const endsAt = new Date(
       base.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
+    );
+    // Vitrin penceresi AYRI izlenir: Vitrin paketi yalnız KENDİ süresi kadar
+    // vitrin verir (varsa kalan vitrin süresinin üstüne eklenir). Eskiden
+    // homeShowcaseUntil = endsAt yazılıyordu — 30 gün kalan ekonomik boost'un
+    // üstüne 3 günlük Vitrin alan ilan 33 gün vitrinde kalıyordu (hediye süre).
+    const showcaseBase =
+      boostedProduct?.homeShowcaseUntil &&
+      boostedProduct.homeShowcaseUntil > nowTs
+        ? boostedProduct.homeShowcaseUntil
+        : nowTs;
+    const showcaseEndsAt = new Date(
+      showcaseBase.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
     );
     await tx.productBoost.update({
       where: { id: boost.id },
@@ -338,8 +351,9 @@ export class VirtualOrderFulfillmentService {
         boostedUntil: endsAt,
         // LIFO ordering key (most-recently purchased first) for search + home.
         boostedAt: nowTs,
-        // A Vitrin (showcaseOnHome) package also lights up the home showcase.
-        ...(boost.showcaseOnHome ? { homeShowcaseUntil: endsAt } : {}),
+        // A Vitrin (showcaseOnHome) package also lights up the home showcase —
+        // yalnız kendi süresi kadar (karışık stack'te hediye süre yok).
+        ...(boost.showcaseOnHome ? { homeShowcaseUntil: showcaseEndsAt } : {}),
         rankTier: 2,
         relevanceScore: computeRelevanceScore({
           rankTier: 2,
