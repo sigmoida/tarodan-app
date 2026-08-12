@@ -28,6 +28,7 @@ import {
   OUTBOX_REVENUE_INVOICE_ISSUE,
 } from "../outbox/outbox.types";
 import { isTradeFullyPaid } from "../trade/trade-payment-rows.helper";
+import { addDaysSkippingSundays } from "../../common/helpers/preparing-deadline";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -244,8 +245,12 @@ export class PaymentFulfillmentService {
         this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
         10,
       );
-      const preparingDeadline = new Date();
-      preparingDeadline.setDate(preparingDeadline.getDate() + preparingDays);
+      // Pazar hariç sayılır: kargo pazar çalışmaz, cuma ödemesinin süresi
+      // fiilen kısalmasın (bkz. addDaysSkippingSundays).
+      const preparingDeadline = addDaysSkippingSundays(
+        new Date(),
+        preparingDays,
+      );
 
       await tx.order.update({
         where: { id: payment.orderId },
@@ -547,8 +552,11 @@ export class PaymentFulfillmentService {
           this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
           10,
         );
-        const preparingDeadline = new Date();
-        preparingDeadline.setDate(preparingDeadline.getDate() + preparingDays);
+        // Pazar hariç sayılır (bkz. addDaysSkippingSundays).
+        const preparingDeadline = addDaysSkippingSundays(
+          new Date(),
+          preparingDays,
+        );
 
         // 1. geçiş: TÜM canlı siparişler preparing — stockout kaskadından önce
         for (const order of aliveOrders) {
