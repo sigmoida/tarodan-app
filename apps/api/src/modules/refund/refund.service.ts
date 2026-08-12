@@ -421,9 +421,14 @@ export class RefundService {
     if (!order) {
       throw new NotFoundException(i18nMessage("server.refund.orderNotFound"));
     }
-    // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) genel iade akışına girmez;
-    // üyeliğin kendi iptal akışı vardır.
-    if (order.orderNumber?.startsWith("MEM-")) {
+    // Sanal siparişler (üyelik MEM-, öne çıkarma BST-) genel iade akışına
+    // girmez: teslimatı olmayan dijital hizmetlerdir. BST- eskiden muaf
+    // değildi — boost siparişi completed + teslimatsız olduğundan cayma
+    // penceresinde sayılıp API'den iade talebi açılabiliyordu.
+    if (
+      order.orderNumber?.startsWith("MEM-") ||
+      order.orderNumber?.startsWith("BST-")
+    ) {
       throw new BadRequestException(
         i18nMessage("server.refund.membershipOrderNotEligible"),
       );

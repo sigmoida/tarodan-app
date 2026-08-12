@@ -778,6 +778,18 @@ export class AdminProductService {
       product._count.offers === 0 &&
       product._count.orders === 0
     ) {
+      // Ödemesi süren ya da geçmişte tamamlanmış boost varken hard delete
+      // YASAK: ProductBoost cascade ile silinir — pending'de ödeme sonradan
+      // tamamlanırsa para yanar (aktivasyon kaydı bulamaz), geçmiş satın alma
+      // izlenebilirliği de yok olur. Soft delete her zaman mümkündür.
+      const boostCount = await this.prisma.productBoost.count({
+        where: { productId },
+      });
+      if (boostCount > 0) {
+        throw new BadRequestException(
+          "Öne çıkarma kaydı olan ürün kalıcı silinemez; pasife alın (soft delete)",
+        );
+      }
       // Hard delete - only if no offers and no orders
       await this.prisma.product.delete({
         where: { id: productId },
