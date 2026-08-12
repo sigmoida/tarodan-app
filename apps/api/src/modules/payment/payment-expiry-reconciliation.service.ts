@@ -97,6 +97,7 @@ export class PaymentExpiryReconciliationService {
       buyerId: string;
       orderId: string;
       productTitle: string;
+      fromOffer: boolean;
     }[] = [];
     for (const order of expired) {
       try {
@@ -243,6 +244,9 @@ export class PaymentExpiryReconciliationService {
           buyerId: order.buyerId,
           orderId: order.id,
           productTitle: order.product?.title ?? "Ürün",
+          // Teklif siparişinde teklif `payment_expired` olur ve alıcı siparişi
+          // yeniden açabilir; bildirim metni bu hakkı söylemek zorunda.
+          fromOffer: Boolean(order.offerId),
         });
         this.logger.log(`Expired unpaid order ${order.orderNumber} (24h TTL)`);
       } catch (err: any) {
@@ -254,7 +258,12 @@ export class PaymentExpiryReconciliationService {
 
     for (const d of dispatched) {
       await this.notificationService
-        .notifyOrderPaymentExpired(d.buyerId, d.orderId, d.productTitle)
+        .notifyOrderPaymentExpired(
+          d.buyerId,
+          d.orderId,
+          d.productTitle,
+          d.fromOffer,
+        )
         .catch((err) =>
           this.logger.warn(
             `order-expired notify failed for ${d.buyerId}: ${err.message}`,

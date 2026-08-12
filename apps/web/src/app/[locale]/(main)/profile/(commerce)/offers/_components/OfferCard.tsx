@@ -13,6 +13,7 @@ import {
   ArrowTrendingUpIcon,
   CheckIcon,
   XMarkIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import {
   Badge,
@@ -48,7 +49,11 @@ interface OfferCardProps {
   activeTab: OfferTab;
   estimatedNet?: number;
   busy: boolean;
-  onAction: (offerId: string, action: "accept" | "reject" | "cancel") => void;
+  onAction: (
+    offerId: string,
+    action: "accept" | "reject" | "cancel",
+    acceptAs?: "seller" | "buyer",
+  ) => void;
   onSellerCounter: (offer: Offer) => void;
   onBuyerCounter: (offer: Offer) => void;
 }
@@ -126,7 +131,9 @@ export default function OfferCard({
         <DropdownMenuContent align="end">
           {isReceived ? (
             <>
-              <DropdownMenuItem onSelect={() => onAction(offer.id, "accept")}>
+              <DropdownMenuItem
+                onSelect={() => onAction(offer.id, "accept", "seller")}
+              >
                 <CheckIcon className="mr-2 h-4 w-4" />
                 {t("offer.acceptOffer")}
               </DropdownMenuItem>
@@ -145,7 +152,9 @@ export default function OfferCard({
             </>
           ) : offer.buyerMustAccept ? (
             <>
-              <DropdownMenuItem onSelect={() => onAction(offer.id, "accept")}>
+              <DropdownMenuItem
+                onSelect={() => onAction(offer.id, "accept", "buyer")}
+              >
                 <CheckIcon className="mr-2 h-4 w-4" />
                 {t("offer.acceptCounter")}
               </DropdownMenuItem>
@@ -232,9 +241,14 @@ export default function OfferCard({
                 config={offerStatusConfig}
                 label={statusLabel}
               />
-              {offer.status === "cancelled" && offer.cancelReason && (
-                <p className="text-xs text-muted">{offer.cancelReason}</p>
-              )}
+              {/* Karşı teklif zinciri önceki turu `rejected` yapar; gerekçe
+                  gösterilmezse geçmiş "reddedildi" rozetleriyle dolu görünür. */}
+              {(offer.status === "cancelled" || offer.status === "rejected") &&
+                offer.cancelReason && (
+                  <p className="max-w-[14rem] text-right text-xs text-muted">
+                    {offer.cancelReason}
+                  </p>
+                )}
             </div>
           </div>
 
@@ -278,6 +292,21 @@ export default function OfferCard({
               </div>
             )}
           </div>
+
+          {/* Kabul, ürünü kilitlemez: stok ancak ödemede rezerve edilir, yani
+              aynı ürün için birden fazla teklif kabul edilmiş olabilir. Bu
+              yarışın ekranda görünmemesi "kabul edildi" ile "stok tükendi"
+              arasındaki en sık destek sorusunu üretiyordu. */}
+          {offer.status === "accepted" && !paid && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg bg-warning-50 p-3 text-warning-600">
+              <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <p className="text-sm">
+                {isReceived
+                  ? t("offer.firstToPayWinsSeller")
+                  : t("offer.firstToPayWinsBuyer")}
+              </p>
+            </div>
+          )}
 
           {offer.message && (
             <div className="mb-4 flex items-start gap-2 rounded-lg bg-surface p-3">

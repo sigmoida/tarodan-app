@@ -131,10 +131,25 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.offerCounterDeclined.message",
     icon: "❌",
   },
+  [NotificationType.OFFER_COUNTER_ACCEPTED]: {
+    titleKey: "server.notification.offerCounterAccepted.title",
+    messageKey: "server.notification.offerCounterAccepted.message",
+    icon: "✅",
+  },
   [NotificationType.OFFER_EXPIRED]: {
     titleKey: "server.notification.offerExpired.title",
     messageKey: "server.notification.offerExpired.message",
     icon: "⏰",
+  },
+  [NotificationType.OFFER_EXPIRED_SELLER]: {
+    titleKey: "server.notification.offerExpiredSeller.title",
+    messageKey: "server.notification.offerExpiredSeller.message",
+    icon: "⏰",
+  },
+  [NotificationType.OFFER_PAYMENT_EXPIRED]: {
+    titleKey: "server.notification.offerPaymentExpired.title",
+    messageKey: "server.notification.offerPaymentExpired.message",
+    icon: "⏳",
   },
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: {
     titleKey: "server.notification.offerCancelledOutOfStock.title",

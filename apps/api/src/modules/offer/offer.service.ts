@@ -25,6 +25,7 @@ import { OrderService } from "../order/order.service";
 import { OrderCheckoutCommonService } from "../order/order-checkout-common.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
@@ -130,7 +131,13 @@ export class OfferService {
       }
 
       // Check minimum offer percentage
-      const productPrice = Number(product.price);
+      //
+      // Taban, ürünün O ANDA geçerli satış fiyatından hesaplanır: `price` kolonu
+      // indirim penceresi kapandığında geri alınmadığı için ham değer, checkout'un
+      // tahsil ettiği fiyattan farklı olabiliyordu (pencere dışında ürün
+      // `oldPrice`tan satılıyor). Tek kaynak `resolveSalePrice`; aksi halde alıcı
+      // gerçek fiyatın %50'sinin altında teklif verebiliyordu.
+      const productPrice = resolveSalePrice(product).price;
       const minOffer = productPrice * (this.minOfferPercentage / 100);
       if (dto.amount < minOffer) {
         throw new BadRequestException(
@@ -242,9 +249,14 @@ export class OfferService {
    * - Normal teklif: yalnızca satıcı kabul eder
    * - Karşı teklif (buyerMustAccept): yalnızca alıcı kabul eder
    * - Uses FOR UPDATE to lock offer and product rows
-   * - Auto-reject other pending offers for same product
    * - Creates order with pending_payment status
    * - Emits offer.accepted event
+   *
+   * TASARIM — kabul teklifi TEKELLEŞTİRMEZ: aynı ürün için birden fazla teklif
+   * kabul edilebilir, diğer pending teklifler otomatik reddedilmez. Kabul yalnız
+   * "anlaşma"dır; stok ödeme başlatıldığında rezerve edilir, dolayısıyla ürünü
+   * ilk ÖDEYEN alır. (Eski docblock "auto-reject other pending offers" diyordu;
+   * kod bunu hiç yapmıyordu.) Ekranlar bu yarışı açıkça göstermek zorundadır.
    */
   async accept(offerId: string, userId: string) {
     const result = await this.prisma.$transaction(async (tx) => {
@@ -457,6 +469,7 @@ export class OfferService {
       return {
         offer: offerWithOrder!,
         order,
+        acceptedByBuyer: mustBuyerAccept,
       };
     });
 
@@ -481,6 +494,31 @@ export class OfferService {
     } catch (error) {
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
     }
+
+    // Zil bildirimleri: `notifyOfferAccepted` tanımlıydı ama HİÇ çağrılmıyordu —
+    // alıcı, 24 saatlik ödeme penceresini yalnız e-postadan öğreniyordu.
+    // Karşı teklifi alıcı kabul ettiğinde satıcının da haberi olmuyordu.
+    try {
+      await this.notificationService.notifyOfferAccepted(
+        result.offer.buyerId,
+        result.offer.productId,
+        Number(result.offer.amount),
+        result.order.id,
+        result.offer.product.title,
+      );
+      if (result.acceptedByBuyer) {
+        await this.notificationService.notifyOfferCounterAccepted(
+          result.offer.sellerId,
+          result.offer.productId,
+          Number(result.offer.amount),
+          result.order.id,
+          result.offer.product.title,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(`offer accepted notification failed: ${error}`);
+    }
+
     return await this.formatOfferResponse(result.offer);
   }
 
@@ -626,16 +664,20 @@ export class OfferService {
         );
       }
 
-      if (dto.amount > Number(offer.product.price)) {
+      // Tavan da ilan fiyatının TEK kaynağından (`resolveSalePrice`) gelir.
+      if (dto.amount > resolveSalePrice(offer.product).price) {
         throw new BadRequestException(
           i18nMessage("server.offer.counterCannotExceedPrice"),
         );
       }
 
-      // Reject old offer
+      // Önceki tur kapanır — "reddedildi" değil, "karşı teklifle devam etti".
       await tx.offer.update({
         where: { id: offerId },
-        data: { status: OfferStatus.rejected },
+        data: {
+          status: OfferStatus.rejected,
+          cancelReason: OFFER_CANCEL_REASON.supersededBySellerCounter,
+        },
       });
 
       // Yeni kayıt: aynı alıcı/satıcı; kabul hakkı alıcıda (buyerMustAccept)
@@ -740,7 +782,7 @@ export class OfferService {
         throw new BadRequestException(i18nMessage("server.offer.offerExpired"));
       }
 
-      const productPrice = Number(offer.product.price);
+      const productPrice = resolveSalePrice(offer.product).price;
       const minOffer = productPrice * (this.minOfferPercentage / 100);
       const sellerCounterAmount = Number(offer.amount);
 
@@ -762,7 +804,10 @@ export class OfferService {
 
       await tx.offer.update({
         where: { id: offerId },
-        data: { status: OfferStatus.rejected },
+        data: {
+          status: OfferStatus.rejected,
+          cancelReason: OFFER_CANCEL_REASON.supersededByBuyerCounter,
+        },
       });
 
       const expiresAt = new Date();

@@ -152,10 +152,21 @@ export const NOTIFICATION_LINKS: Record<
   // Kabul edilen teklifte HENÜZ SİPARİŞ YOKTUR: alıcının ödemesi gerekir.
   // Harita `orderId` istiyordu ama üretici onu hiç göndermiyor; bu yüzden
   // link üretilemiyordu. Hedef, alıcının satın almayı tamamlayacağı ilandır.
-  [NotificationType.OFFER_ACCEPTED]: LISTING,
+  // Kabul edilen teklifte tek iş ÖDEME: hedef ilan değil, ödenecek sipariştir.
+  // (Sipariş henüz oluşmadıysa alıcının teklif listesine düşer.)
+  [NotificationType.OFFER_ACCEPTED]: pattern(
+    "/profile/orders/{{orderId}}",
+    "/profile/offers",
+  ),
+  [NotificationType.OFFER_COUNTER_ACCEPTED]: pattern(
+    "/seller/orders/{{orderId}}",
+    "/profile/offers",
+  ),
+  [NotificationType.OFFER_PAYMENT_EXPIRED]: BUYER_ORDER,
   [NotificationType.OFFER_REJECTED]: LISTING,
   [NotificationType.OFFER_COUNTER_DECLINED]: LISTING,
   [NotificationType.OFFER_EXPIRED]: LISTING,
+  [NotificationType.OFFER_EXPIRED_SELLER]: LISTING,
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
 
   // ── Ürün / ilan ──────────────────────────────────────────────────────────

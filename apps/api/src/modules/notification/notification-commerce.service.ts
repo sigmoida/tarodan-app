@@ -196,16 +196,66 @@ export class NotificationCommerceService {
     });
   }
 
+  /**
+   * Teklif kabul edildi → ALICI'ya. 24 saatlik ödeme penceresi bu bildirimle
+   * duyurulur; hedef ilan değil ödenecek SİPARİŞTİR, bu yüzden `orderId` taşınır.
+   */
   async notifyOfferAccepted(
     buyerId: string,
     productId: string,
     amount: number,
+    orderId?: string,
+    productTitle?: string,
   ) {
     return this.dispatch.send({
       userId: buyerId,
       type: NotificationType.OFFER_ACCEPTED,
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
-      data: { productId, amount },
+      data: { productId, amount, orderId, productTitle },
+    });
+  }
+
+  /**
+   * Karşı teklifi ALICI kabul etti → SATICI'ya. Satıcı, kendi verdiği karşı
+   * teklifin bağlandığını ve karşı tarafın ödeme penceresine girdiğini görür.
+   */
+  async notifyOfferCounterAccepted(
+    sellerId: string,
+    productId: string,
+    amount: number,
+    orderId?: string,
+    productTitle?: string,
+  ) {
+    return this.dispatch.send({
+      userId: sellerId,
+      type: NotificationType.OFFER_COUNTER_ACCEPTED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { productId, amount, orderId, productTitle },
+    });
+  }
+
+  /** Süresi dolan teklif → iki tarafa da (alıcı: kendi teklifi, satıcı: gelen teklif). */
+  async notifyOfferExpired(params: {
+    buyerId: string;
+    sellerId: string;
+    productId: string;
+    productTitle: string;
+  }) {
+    const data = {
+      productId: params.productId,
+      productTitle: params.productTitle,
+    };
+    await this.dispatch.send({
+      userId: params.buyerId,
+      type: NotificationType.OFFER_EXPIRED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data,
+    });
+    await this.dispatch.send({
+      userId: params.sellerId,
+      type: NotificationType.OFFER_EXPIRED_SELLER,
+      channels: [NotificationChannel.IN_APP],
+      data,
     });
   }
 
@@ -294,14 +344,25 @@ export class NotificationCommerceService {
     });
   }
 
+  /**
+   * 24 saatlik ödeme penceresi doldu → alıcıya.
+   *
+   * Teklif kaynaklı siparişte mesaj FARKLIDIR: teklif `payment_expired` olur ve
+   * alıcı `POST /orders/:id/reactivate` ile taze bir pencere açabilir. Eskiden
+   * her iki durumda da genel "siparişiniz iptal edildi" bildirimi gidiyordu;
+   * yeniden açma hakkı kullanıcıya hiçbir yerde söylenmiyordu.
+   */
   async notifyOrderPaymentExpired(
     buyerId: string,
     orderId: string,
     productTitle: string,
+    fromOffer = false,
   ) {
     return this.dispatch.send({
       userId: buyerId,
-      type: NotificationType.ORDER_CANCELLED,
+      type: fromOffer
+        ? NotificationType.OFFER_PAYMENT_EXPIRED
+        : NotificationType.ORDER_CANCELLED,
       data: { orderId, productTitle },
     });
   }

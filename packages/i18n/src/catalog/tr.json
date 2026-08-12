@@ -1310,6 +1310,10 @@
     "acceptCounter": "Karşı Teklifi Kabul Et",
     "acceptConfirmTitle": "Teklifi kabul et",
     "acceptConfirmDesc": "Bu teklifi kabul etmek istediğinizden emin misiniz? Kabul edilen teklif için sipariş oluşturulur.",
+    "acceptConfirmDescSeller": "Teklifi kabul ederseniz teklif fiyatıyla bir sipariş oluşur ve alıcının 24 saatlik ödeme süresi başlar. Kabul, ürünü kilitlemez: diğer teklifler açık kalır ve ürünü ilk ödeyen alır.",
+    "acceptConfirmDescBuyer": "Karşı teklifi kabul ederseniz teklif fiyatıyla sipariş oluşur ve 24 saat içinde ödemeniz gerekir. Ürün, ödeme adımında rezerve edilir; aynı ürünü başka bir alıcı önce öderse siparişiniz karşılanamaz.",
+    "firstToPayWinsBuyer": "Ürün henüz size ayrılmadı. Aynı ürün için başka kabul edilmiş teklifler olabilir; ürünü ilk ödeyen alır.",
+    "firstToPayWinsSeller": "Alıcının 24 saatlik ödeme süresi var. Ürün ödeme tamamlandığında rezerve edilir; o ana kadar diğer teklifler açık kalır.",
     "rejectConfirmTitle": "Teklifi reddet",
     "rejectConfirmDesc": "Bu teklifi reddetmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "cancelConfirmTitle": "Teklifi iptal et",
@@ -6633,9 +6637,21 @@
         "title": "Karşı Teklif Reddedildi",
         "message": "{productTitle} için alıcı karşı teklifinizi kabul etmedi."
       },
+      "offerCounterAccepted": {
+        "title": "Karşı Teklifiniz Kabul Edildi",
+        "message": "{productTitle} için alıcı {amount} TL karşı teklifinizi kabul etti. Ödeme yapması için 24 saati var."
+      },
       "offerExpired": {
         "title": "Teklifin Süresi Doldu",
         "message": "{productTitle} için teklifinizin süresi doldu."
+      },
+      "offerExpiredSeller": {
+        "title": "Teklif Yanıtsız Kapandı",
+        "message": "{productTitle} için gelen teklifin süresi yanıt verilmeden doldu."
+      },
+      "offerPaymentExpired": {
+        "title": "Ödeme Süresi Doldu",
+        "message": "{productTitle} için 24 saatlik ödeme süreniz doldu ve sipariş kapandı. Ürün hâlâ uygunsa siparişi yeniden açıp ödeyebilirsiniz."
       },
       "offerCancelledOutOfStock": {
         "title": "Teklifiniz iptal edildi: ürün stokta kalmadı",

@@ -18,4 +18,12 @@ export const OFFER_CANCEL_REASON = {
   buyerCancelled: "Alıcı tarafından iptal edildi",
   stockDepleted: "Stok tükendiği için otomatik iptal edildi",
   orderCancelled: "Bağlı sipariş iptal edildiği için teklif kapatıldı",
+  /**
+   * Karşı teklif zinciri her turda YENİ bir satır açar ve öncekini `rejected`
+   * yapar. Gerekçe yazılmazsa geçmişte "reddedildi" rozetleri birikiyor ve
+   * kullanıcı pazarlığın reddedilmiş sanıyor; bu iki sabit o satırların
+   * "devam etti" olduğunu söyler.
+   */
+  supersededBySellerCounter: "Satıcı karşı teklif verdiği için kapatıldı",
+  supersededByBuyerCounter: "Alıcı yeni teklif verdiği için kapatıldı",
 } as const;

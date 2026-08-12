@@ -64,11 +64,23 @@ export function useOfferAction() {
     },
   });
 
-  const run = async (vars: { offerId: string; action: OfferActionType }) => {
+  const run = async (vars: {
+    offerId: string;
+    action: OfferActionType;
+    /**
+     * Kabulü KİM yapıyor: satıcı gelen teklifi mi, alıcı karşı teklifi mi?
+     * Kabul ürünü kilitlemediği (ilk ödeyen alır) için uyarı metni iki taraf
+     * için farklıdır.
+     */
+    acceptAs?: "seller" | "buyer";
+  }) => {
     const copy = {
       accept: {
         title: t("offer.acceptConfirmTitle"),
-        description: t("offer.acceptConfirmDesc"),
+        description:
+          vars.acceptAs === "buyer"
+            ? t("offer.acceptConfirmDescBuyer")
+            : t("offer.acceptConfirmDescSeller"),
         destructive: false,
       },
       reject: {
@@ -91,7 +103,7 @@ export function useOfferAction() {
     ) {
       return;
     }
-    mutation.mutate(vars);
+    mutation.mutate({ offerId: vars.offerId, action: vars.action });
   };
 
   return {

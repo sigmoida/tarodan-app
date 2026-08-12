@@ -173,8 +173,41 @@ export class NotificationService {
     buyerId: string,
     productId: string,
     amount: number,
+    orderId?: string,
+    productTitle?: string,
   ) {
-    return this.commerce.notifyOfferAccepted(buyerId, productId, amount);
+    return this.commerce.notifyOfferAccepted(
+      buyerId,
+      productId,
+      amount,
+      orderId,
+      productTitle,
+    );
+  }
+
+  async notifyOfferCounterAccepted(
+    sellerId: string,
+    productId: string,
+    amount: number,
+    orderId?: string,
+    productTitle?: string,
+  ) {
+    return this.commerce.notifyOfferCounterAccepted(
+      sellerId,
+      productId,
+      amount,
+      orderId,
+      productTitle,
+    );
+  }
+
+  async notifyOfferExpired(params: {
+    buyerId: string;
+    sellerId: string;
+    productId: string;
+    productTitle: string;
+  }) {
+    return this.commerce.notifyOfferExpired(params);
   }
 
   async notifyOrderCancelledOutOfStock(
@@ -221,11 +254,13 @@ export class NotificationService {
     buyerId: string,
     orderId: string,
     productTitle: string,
+    fromOffer = false,
   ) {
     return this.commerce.notifyOrderPaymentExpired(
       buyerId,
       orderId,
       productTitle,
+      fromOffer,
     );
   }
 

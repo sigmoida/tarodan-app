@@ -1310,6 +1310,10 @@
     "acceptCounter": "Accept Counter-Offer",
     "acceptConfirmTitle": "Accept offer",
     "acceptConfirmDesc": "Are you sure you want to accept this offer? An order will be created for it.",
+    "acceptConfirmDescSeller": "Accepting creates an order at the offered price and starts the buyer's 24-hour payment window. Accepting does not lock the product: other offers stay open and whoever pays first gets it.",
+    "acceptConfirmDescBuyer": "Accepting the counter-offer creates an order at that price and you must pay within 24 hours. The product is reserved at payment; if another buyer pays for it first, your order cannot be fulfilled.",
+    "firstToPayWinsBuyer": "The product is not reserved for you yet. Other accepted offers may exist for it — whoever pays first gets it.",
+    "firstToPayWinsSeller": "The buyer has 24 hours to pay. The product is reserved once payment completes; until then other offers stay open.",
     "rejectConfirmTitle": "Reject offer",
     "rejectConfirmDesc": "Are you sure you want to reject this offer? This cannot be undone.",
     "cancelConfirmTitle": "Cancel offer",
@@ -6633,9 +6637,21 @@
         "title": "Counter-Offer Declined",
         "message": "The buyer did not accept your counter-offer for {productTitle}."
       },
+      "offerCounterAccepted": {
+        "title": "Your Counter-Offer Was Accepted",
+        "message": "The buyer accepted your {amount} TL counter-offer for {productTitle}. They have 24 hours to pay."
+      },
       "offerExpired": {
         "title": "Your Offer Has Expired",
         "message": "Your offer for {productTitle} has expired."
+      },
+      "offerExpiredSeller": {
+        "title": "Offer Closed Unanswered",
+        "message": "The offer you received for {productTitle} expired before you responded."
+      },
+      "offerPaymentExpired": {
+        "title": "Payment Window Expired",
+        "message": "Your 24-hour payment window for {productTitle} expired and the order was closed. If the product is still available you can reopen the order and pay."
       },
       "offerCancelledOutOfStock": {
         "title": "Your offer was cancelled: product out of stock",

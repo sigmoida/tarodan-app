@@ -178,7 +178,9 @@ function OffersPageContent() {
               activeTab={activeTab}
               estimatedNet={estimatedNet[offer.id]?.sellerNetAmount}
               busy={pendingId === offer.id}
-              onAction={(offerId, action) => run({ offerId, action })}
+              onAction={(offerId, action, acceptAs) =>
+                run({ offerId, action, acceptAs })
+              }
               onSellerCounter={(o) =>
                 setCounterState({ offer: o, mode: "seller" })
               }
