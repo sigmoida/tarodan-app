@@ -1,9 +1,11 @@
+import type { PublicIdentity } from "./user";
+
 export enum TradeStatus {
-  PENDING = 'PENDING',
-  ACCEPTED = 'ACCEPTED',
-  REJECTED = 'REJECTED',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  PENDING = "PENDING",
+  ACCEPTED = "ACCEPTED",
+  REJECTED = "REJECTED",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
 }
 
 export interface Trade {
@@ -28,16 +30,8 @@ export interface TradeItem {
 }
 
 export interface TradeWithDetails extends Trade {
-  initiator: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
-  receiver: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
+  initiator: PublicIdentity;
+  receiver: PublicIdentity;
   initiatorItems: TradeItemWithProduct[];
   receiverItems: TradeItemWithProduct[];
 }
@@ -59,7 +53,7 @@ export interface CreateTradeDto {
 }
 
 export interface TradeResponseDto {
-  action: 'accept' | 'reject' | 'counter';
+  action: "accept" | "reject" | "counter";
   message?: string;
   counterOfferedProductIds?: string[];
   counterRequestedProductIds?: string[];

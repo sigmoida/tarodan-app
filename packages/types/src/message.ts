@@ -1,3 +1,5 @@
+import type { PublicIdentity } from "./user";
+
 export interface Conversation {
   id: string;
   participant1Id: string;
@@ -8,16 +10,8 @@ export interface Conversation {
 }
 
 export interface ConversationWithDetails extends Conversation {
-  participant1: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
-  participant2: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
+  participant1: PublicIdentity;
+  participant2: PublicIdentity;
   lastMessage?: Message;
   unreadCount: number;
 }
@@ -34,17 +28,13 @@ export interface Message {
 }
 
 export interface MessageWithSender extends Message {
-  sender: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
+  sender: PublicIdentity;
 }
 
 export interface MessageAttachment {
   id: string;
   messageId: string;
-  type: 'image' | 'file';
+  type: "image" | "file";
   url: string;
   name: string;
   size: number;

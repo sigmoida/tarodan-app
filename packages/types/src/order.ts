@@ -1,3 +1,5 @@
+import type { PublicIdentity } from "./user";
+
 import { Address } from "./user";
 
 export enum OrderStatus {
@@ -49,16 +51,9 @@ export interface Order {
 }
 
 export interface OrderWithDetails extends Order {
-  buyer?: {
-    id: string;
-    displayName: string;
-    email: string;
-  };
-  seller: {
-    id: string;
-    displayName: string;
-    email: string;
-  };
+  // E-posta karşı tarafa AÇILMAZ; bildirim adresi sunucuda kalır.
+  buyer?: PublicIdentity;
+  seller: PublicIdentity;
   product: {
     id: string;
     name: string;
@@ -139,12 +134,7 @@ export interface InitiatePaymentDto {
 export interface OrderPackageView {
   id: string;
   sellerId: string | null;
-  seller: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string | null;
-    isVerified?: boolean;
-  } | null;
+  seller: PublicIdentity | null;
   /** Alıcı payı — paket başına TEK kargo ücreti. */
   shippingCost: number;
   cargo: {

@@ -1,3 +1,5 @@
+import type { PublicIdentity } from "./user";
+
 export interface Rating {
   id: string;
   orderId: string;
@@ -14,15 +16,8 @@ export interface Rating {
 }
 
 export interface RatingWithDetails extends Rating {
-  reviewer: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
-  reviewee: {
-    id: string;
-    displayName: string;
-  };
+  reviewer: PublicIdentity;
+  reviewee: PublicIdentity;
   product: {
     id: string;
     name: string;

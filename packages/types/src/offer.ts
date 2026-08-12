@@ -1,10 +1,12 @@
+import type { PublicIdentity } from "./user";
+
 export enum OfferStatus {
-  PENDING = 'PENDING',
-  ACCEPTED = 'ACCEPTED',
-  REJECTED = 'REJECTED',
-  COUNTERED = 'COUNTERED',
-  EXPIRED = 'EXPIRED',
-  CANCELLED = 'CANCELLED',
+  PENDING = "PENDING",
+  ACCEPTED = "ACCEPTED",
+  REJECTED = "REJECTED",
+  COUNTERED = "COUNTERED",
+  EXPIRED = "EXPIRED",
+  CANCELLED = "CANCELLED",
 }
 
 export interface Offer {
@@ -28,16 +30,8 @@ export interface OfferWithDetails extends Offer {
     price: number;
     images: string[];
   };
-  buyer: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
-  seller: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
+  buyer: PublicIdentity;
+  seller: PublicIdentity;
   counterOffer?: Offer;
 }
 
@@ -48,7 +42,7 @@ export interface CreateOfferDto {
 }
 
 export interface OfferResponseDto {
-  action: 'accept' | 'reject' | 'counter';
+  action: "accept" | "reject" | "counter";
   counterAmount?: number;
   message?: string;
 }

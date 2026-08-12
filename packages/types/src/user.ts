@@ -1,14 +1,32 @@
 export enum UserRole {
-  USER = 'USER',
-  SELLER = 'SELLER',
-  ADMIN = 'ADMIN',
+  USER = "USER",
+  SELLER = "SELLER",
+  ADMIN = "ADMIN",
 }
 
 export enum MembershipTier {
-  FREE = 'FREE',
-  BASIC = 'BASIC',
-  PREMIUM = 'PREMIUM',
-  BUSINESS = 'BUSINESS',
+  FREE = "FREE",
+  BASIC = "BASIC",
+  PREMIUM = "PREMIUM",
+  BUSINESS = "BUSINESS",
+}
+
+/**
+ * Bir üyenin BAŞKA üyelere görünen kimliği. Zincir (firma adı → kullanıcı adı
+ * → isim) SUNUCUDA çözülür; istemci hazır `publicName` alanını basar.
+ * Gerçek ad yalnız kişinin kendi yüzeylerinde (profil ayarları, fatura,
+ * kargo etiketi) görünür.
+ */
+export interface PublicIdentity {
+  id: string;
+  /** Herkese açık ad. */
+  publicName: string;
+  /** Uyumluluk takma adı — `publicName` ile aynı değeri taşır. */
+  displayName: string;
+  /** Profil bağlantısı için kullanıcı adı; seçilmemişse null. */
+  username: string | null;
+  avatarUrl?: string | null;
+  isVerified?: boolean;
 }
 
 export interface User {
