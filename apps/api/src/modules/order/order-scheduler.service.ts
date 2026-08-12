@@ -8,6 +8,10 @@ import { OrderStatus, TradeStatus, PaymentStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { OrderService } from "./order.service";
 import { ElogoInvoicingService } from "../elogo/elogo-invoicing.service";
+import {
+  PAYMENT_CONFIG_KEYS,
+  resolvePaymentConfigDays,
+} from "../payment/payment.constants";
 import { SellerInvoiceService } from "./seller-invoice.service";
 
 const OPEN_REFUND_STATUSES = [
@@ -309,9 +313,10 @@ export class OrderSchedulerService implements OnModuleInit {
     }
 
     // 2) İade penceresi kapanan teslim edilmiş siparişler → tamamlandı
-    const returnWindowDays =
-      Number(this.configService.get<string>("RETURN_WINDOW_DAYS") ?? "14") ||
-      14;
+    const returnWindowDays = resolvePaymentConfigDays(
+      this.configService,
+      PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
+    );
     const cutoff = new Date(
       Date.now() - returnWindowDays * 24 * 60 * 60 * 1000,
     );

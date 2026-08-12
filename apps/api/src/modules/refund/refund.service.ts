@@ -26,6 +26,10 @@ import {
   ShippingPackageTierCode,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import {
+  PAYMENT_CONFIG_KEYS,
+  envConfigDays,
+} from "../payment/payment.constants";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
@@ -62,7 +66,13 @@ import {
   type RefundFaultPartyV2,
 } from "./refund-financial-policy-v2";
 
-const COOLING_OFF_DAYS = 14;
+/**
+ * Cayma (iade talep) penceresi — satıcı payout takvimiyle AYNI kaynaktan gelir
+ * (PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS). Burada gömülü bir 14 tutmak,
+ * env'den okunan payout penceresiyle sessizce kaymasına yol açıyordu.
+ */
+const coolingOffDays = () =>
+  envConfigDays(PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS);
 
 type RefundFinancialPersistenceData = Pick<
   Prisma.RefundRequestUncheckedCreateInput,
@@ -2392,7 +2402,7 @@ export class RefundService {
         order.deliveredAt ?? order.shipment?.deliveredAt ?? null;
       if (!deliveredAt) return "in_cooling_off";
       const ageDays = (Date.now() - deliveredAt.getTime()) / (1000 * 3600 * 24);
-      return ageDays <= COOLING_OFF_DAYS
+      return ageDays <= coolingOffDays()
         ? "in_cooling_off"
         : "past_cooling_off";
     }

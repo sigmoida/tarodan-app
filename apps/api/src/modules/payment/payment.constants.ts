@@ -16,12 +16,19 @@ export const MONEY_EPSILON = 0.01;
  * Ödeme/iade ile ilgili env config anahtarları ve varsayılanları (tek referans).
  * Kodda `configService.get(KEY) || DEFAULT` deseniyle okunur.
  */
+/**
+ * NOT — takas escrow'u burada DEĞİL: takasın onay/hold pencereleri DB
+ * ayarlarından (PlatformSetting) okunur ve tek kaynakları
+ * `common/helpers/trade-escrow.ts` dosyasıdır.
+ */
 export const PAYMENT_CONFIG_KEYS = {
   /** Ödeme satırını `failed` yapma penceresi (dk). PayTR 3DS ~30dk > bu olmalı. */
   FAIL_TIMEOUT_MINUTES: { key: "PAYMENT_FAIL_TIMEOUT_MINUTES", default: 35 },
-  /** Escrow hold gün sayısı. */
-  HOLD_DAYS: { key: "PAYMENT_HOLD_DAYS", default: 7 },
-  /** İade talep penceresi (gün). */
+  /**
+   * İade talep penceresi (gün) = alıcının koşulsuz cayma süresi. Satıcı payout
+   * uygunluğu (teslim + bu + grace) ve "iade edilebilir mi" kontrolü AYNI
+   * değerden beslenir — ikisi ayrı sabitlerden okununca pencereler kayıyordu.
+   */
   RETURN_WINDOW_DAYS: { key: "RETURN_WINDOW_DAYS", default: 14 },
   /** Payout uygunluğu grace (gün) — iade penceresinden sonra. */
   PAYOUT_GRACE_DAYS: { key: "PAYOUT_GRACE_DAYS", default: 1 },
@@ -44,3 +51,31 @@ export const PAYMENT_CONFIG_KEYS = {
   /** Orphan capture geriye-bakış (saat) — FLOW-M3. */
   ORPHAN_LOOKBACK_HOURS: { key: "PAYTR_ORPHAN_LOOKBACK_HOURS", default: 72 },
 } as const;
+
+/** Env'den okuyabilen minimum yüzey (ConfigService veya test sahtesi). */
+interface ConfigReader {
+  get(key: string): string | undefined;
+}
+
+/**
+ * Bir gün/sayı config'ini env'den okur; anahtar yoksa veya değer geçersizse
+ * (boş/NaN/negatif) tanımdaki varsayılana düşer. `configService.get(KEY) || "14"`
+ * kalıbı yerine BUNU kullan — varsayılan yalnız PAYMENT_CONFIG_KEYS'te yaşasın.
+ */
+export function resolvePaymentConfigDays(
+  configService: ConfigReader,
+  spec: { key: string; default: number },
+): number {
+  const raw = configService.get(spec.key);
+  if (raw === undefined || raw === null || `${raw}`.trim() === "") {
+    return spec.default;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return spec.default;
+  return Math.floor(parsed);
+}
+
+/** ConfigService enjekte edilmemiş yerler için aynı okuma (process.env üzerinden). */
+export function envConfigDays(spec: { key: string; default: number }): number {
+  return resolvePaymentConfigDays({ get: (key) => process.env[key] }, spec);
+}
