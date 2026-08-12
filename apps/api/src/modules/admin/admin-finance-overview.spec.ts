@@ -93,6 +93,9 @@ describe("AdminFinanceService.getFinanceOverview", () => {
       // Ledger formülü (400−50)+(120−20)=450 + takas ücreti matrahı 100.
       platformRevenueNet: 550,
       tradeFeeRevenueNet: 100,
+      // Boost cirosu bu fixture'da 0 (BST- siparişi yok).
+      boostRevenueCollected: 0,
+      boostRevenueCount: 0,
       tradeFeeCollected: 120,
       // PSP kesintisi gelirin İÇİNDEN çıkar: hak ediş 550 − 30.
       pspFeeTotal: 30,
