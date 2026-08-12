@@ -1,4 +1,4 @@
-import { TradeStatus } from '@prisma/client';
+import { TradeStatus } from "@prisma/client";
 
 /**
  * Trade state machine — single source of truth for allowed transitions.
@@ -70,10 +70,10 @@ export const TRADE_VALID_TRANSITIONS: Record<TradeStatus, TradeStatus[]> = {
   [TradeStatus.returning]: [TradeStatus.cancelled],
   [TradeStatus.completed]: [], // Terminal state
   [TradeStatus.cancelled]: [], // Terminal state
-  [TradeStatus.disputed]: [
-    TradeStatus.completed,
-    TradeStatus.cancelled,
-  ],
+  // İtirazın tek çıkışı admin çözümüdür (resolveDispute → completed); itiraz
+  // sürerken kullanıcı iptali de bu tablo üzerinden bloklanır — cancelled
+  // kenarı bilinçli olarak yoktur.
+  [TradeStatus.disputed]: [TradeStatus.completed],
 };
 
 /**

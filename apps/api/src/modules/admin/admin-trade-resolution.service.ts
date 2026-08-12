@@ -22,6 +22,10 @@ import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
 import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 import { TRADE_CANCEL_REASON } from "../trade/trade-cancel-reasons";
+import {
+  allReturnLegsDelivered,
+  allReturnLegsResolved,
+} from "../../common/helpers/trade-return-finalize";
 
 /**
  * Takas çözüm & iade/iptal yaşam döngüsü (resolveTrade, markReturnDelivered,
@@ -104,9 +108,7 @@ export class AdminTradeResolutionService {
           where: { tradeId, leg: "return" },
           select: { id: true, deliveredAt: true },
         });
-        const allDelivered =
-          returnShipments.length >= 2 &&
-          returnShipments.every((s) => s.deliveredAt !== null);
+        const allDelivered = allReturnLegsDelivered(returnShipments);
 
         let finalStatus: TradeStatus = trade.status;
         if (allDelivered && trade.status !== TradeStatus.cancelled) {
@@ -606,11 +608,7 @@ export class AdminTradeResolutionService {
           where: { tradeId, leg: "return" },
           select: { id: true, deliveredAt: true, lostAt: true },
         });
-        const allResolved =
-          returnShipments.length >= 2 &&
-          returnShipments.every(
-            (s) => s.deliveredAt !== null || s.lostAt !== null,
-          );
+        const allResolved = allReturnLegsResolved(returnShipments);
 
         let finalStatus: TradeStatus = trade.status;
         if (allResolved && trade.status !== TradeStatus.cancelled) {
