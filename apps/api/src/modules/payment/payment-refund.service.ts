@@ -36,7 +36,11 @@ import {
   type OrderRevenueInvoicePayload,
 } from "../outbox/outbox.types";
 import { LedgerService } from "../ledger/ledger.service";
-import { MONEY_EPSILON } from "./payment.constants";
+import {
+  MONEY_EPSILON,
+  PAYMENT_CONFIG_KEYS,
+  resolvePaymentConfigDays,
+} from "./payment.constants";
 import { i18nMessage } from "../i18n";
 import {
   ProviderRefundOutcomeUnknownException,
@@ -48,8 +52,8 @@ import { tradePaymentRefundableAmountFor } from "../trade/trade-refund-policy";
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
  * (facade-delege deseni). PaymentService aynı imzalarla buraya delege eder.
- * scheduleHoldReleaseOnDelivery hold penceresi hesabı için holdDays/returnWindowDays/
- * payoutGraceDays alanlarını KENDİ constructor'ında bayt-bayt aynı mantıkla yeniden üretir.
+ * scheduleHoldReleaseOnDelivery'nin pencere değerleri (returnWindowDays/payoutGraceDays)
+ * PAYMENT_CONFIG_KEYS'ten okunur — varsayılanlar orada tek kaynaktır.
  */
 /**
  * 11.4c — Kısmi iade ORANI (TEK otorite): hold tüketimi ve ledger pro-rate AYNI formülü
@@ -120,7 +124,6 @@ const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
 @Injectable()
 export class PaymentRefundService {
   private readonly logger = new Logger(PaymentRefundService.name);
-  private readonly holdDays: number;
   // Escrow yeni model: satıcıya ödeme TESLİMDEN sonra serbest bırakılır.
   // İade TALEP penceresi = teslim + returnWindowDays (14). Satıcı payout uygunluğu
   // = teslim + returnWindowDays + payoutGraceDays. Grace, iade penceresi kapandıktan
@@ -150,17 +153,13 @@ export class PaymentRefundService {
     @Optional()
     private readonly ledger?: LedgerService,
   ) {
-    this.holdDays = parseInt(
-      this.configService.get("PAYMENT_HOLD_DAYS") || "7",
-      10,
+    this.returnWindowDays = resolvePaymentConfigDays(
+      this.configService,
+      PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
     );
-    this.returnWindowDays = parseInt(
-      this.configService.get("RETURN_WINDOW_DAYS") || "14",
-      10,
-    );
-    this.payoutGraceDays = parseInt(
-      this.configService.get("PAYOUT_GRACE_DAYS") || "1",
-      10,
+    this.payoutGraceDays = resolvePaymentConfigDays(
+      this.configService,
+      PAYMENT_CONFIG_KEYS.PAYOUT_GRACE_DAYS,
     );
   }
 
@@ -1856,15 +1855,25 @@ export class PaymentRefundService {
   }
 
   /**
-   * Release held payment to seller
-   * Called when order is completed
+   * Release held payment to seller (admin manuel release yolu).
+   *
+   * `ignoreReleaseDate` (erken bırakma): yalnız TARİH şartını esnetir — sipariş
+   * yine teslim edilmiş/payout-uygun olmalı, açık iade olmamalı ve hold donuk
+   * olmamalı. Yani admin iade penceresi dolmadan parayı bilinçli olarak erken
+   * bırakabilir ama teslim edilmemiş ya da iadesi süren siparişte bırakamaz.
    */
-  async releasePayment(orderId: string) {
+  async releasePayment(
+    orderId: string,
+    opts?: { ignoreReleaseDate?: boolean },
+  ) {
     // H4: açık iade ile DONDURULMUŞ (frozenByRefundId dolu) bir hold ASLA serbest
     // bırakılamaz — aksi halde admin manuel release, açık iadeyle birlikte çift
     // kayba yol açar (satıcıya öde + alıcıya iade). releaseHoldsDue/releasePaymentIfHeld
     // ile aynı invaryant. Hem okuma hem güncelleme frozenByRefundId:null ile sınırlı.
     const now = new Date();
+    const releaseDateFilter = opts?.ignoreReleaseDate
+      ? {}
+      : { releaseAt: { lte: now } };
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
@@ -1891,7 +1900,7 @@ export class PaymentRefundService {
         orderId,
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
-        releaseAt: { lte: now },
+        ...releaseDateFilter,
       },
     });
 
@@ -1908,7 +1917,7 @@ export class PaymentRefundService {
         id: hold.id,
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
-        releaseAt: { lte: now },
+        ...releaseDateFilter,
       },
       data: {
         status: PaymentHoldStatus.released,

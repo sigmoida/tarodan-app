@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsOptional,
   IsString,
   IsIn,
@@ -80,4 +81,12 @@ export class ReleasePayoutDto {
   @IsNotEmpty()
   @MaxLength(500)
   reason: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Early release: skip only the hold-date check. Delivery/refund/frozen guards still apply.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  force?: boolean;
 }

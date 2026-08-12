@@ -789,12 +789,27 @@ export class AdminService {
     return this.payoutService.getPayoutsExport(query);
   }
 
-  async releasePayout(adminId: string, orderId: string, reason?: string) {
-    return this.payoutService.releasePayout(adminId, orderId, reason);
+  async releasePayout(
+    adminId: string,
+    orderId: string,
+    reason?: string,
+    force = false,
+  ) {
+    return this.payoutService.releasePayout(adminId, orderId, reason, force);
   }
 
-  async releaseTradePaymentHold(adminId: string, tradeId: string) {
-    return this.payoutService.releaseTradePaymentHold(adminId, tradeId);
+  async releaseTradePaymentHold(
+    adminId: string,
+    tradeId: string,
+    reason?: string,
+    force = false,
+  ) {
+    return this.payoutService.releaseTradePaymentHold(
+      adminId,
+      tradeId,
+      reason,
+      force,
+    );
   }
 
   async retryPayoutTransfer(adminId: string, transferId: string) {
@@ -829,6 +844,20 @@ export class AdminService {
       adminId,
       tradeId,
       shipmentId,
+    );
+  }
+
+  async markOutboundDelivered(
+    adminId: string,
+    tradeId: string,
+    shipmentId: string,
+    note?: string,
+  ) {
+    return this.tradeService.markOutboundDelivered(
+      adminId,
+      tradeId,
+      shipmentId,
+      note,
     );
   }
 

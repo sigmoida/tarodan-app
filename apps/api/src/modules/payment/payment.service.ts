@@ -143,8 +143,11 @@ export class PaymentService {
     return this.paymentRefund.refundTradeCashTracked(tradeId, opts);
   }
 
-  async releasePayment(orderId: string) {
-    return this.paymentRefund.releasePayment(orderId);
+  async releasePayment(
+    orderId: string,
+    opts?: { ignoreReleaseDate?: boolean },
+  ) {
+    return this.paymentRefund.releasePayment(orderId, opts);
   }
 
   async scheduleHoldReleaseOnDelivery(
