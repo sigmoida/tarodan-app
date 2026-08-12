@@ -12,6 +12,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useCart } from "@/hooks/useCart";
 import { useLocale, useTranslations } from "next-intl";
 import type { WishlistItem } from "../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 /**
  * Favorites data: the user's wishlist OR a shared read-only list (`?ids=`), plus
@@ -80,7 +81,7 @@ export function useFavorites() {
             productCondition: p.condition,
             productStatus: p.status,
             sellerId: p.sellerId ?? p.userId,
-            sellerName: p.seller?.displayName ?? p.sellerName ?? "",
+            sellerName: publicNameOf(p.seller, p.sellerName ?? ""),
             addedAt: p.createdAt,
           };
         });

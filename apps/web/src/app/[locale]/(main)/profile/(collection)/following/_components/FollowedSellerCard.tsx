@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import type { FollowedUser } from "../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 export default function FollowedSellerCard({
   item,
@@ -23,14 +24,14 @@ export default function FollowedSellerCard({
         className="group flex flex-1 items-center gap-4 transition-colors"
       >
         <UserAvatar
-          displayName={item.following.displayName}
+          displayName={publicNameOf(item.following)}
           avatarUrl={item.following?.avatarUrl}
           size="lg"
           className="!h-16 !w-16 !text-2xl"
         />
         <div className="flex-1">
           <h3 className="font-semibold text-heading transition-colors group-hover:text-primary-600">
-            {item.following.displayName}
+            {publicNameOf(item.following)}
           </h3>
           {item.following.bio && (
             <p className="line-clamp-1 text-sm text-muted">

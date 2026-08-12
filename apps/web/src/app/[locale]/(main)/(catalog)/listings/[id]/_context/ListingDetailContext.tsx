@@ -32,6 +32,7 @@ import { getCardImageUrl } from "../_lib/images";
 import { useListingData } from "../_hooks/useListingData";
 import { useProductGallery } from "../_hooks/useProductGallery";
 import { formatTL } from "@/lib/format";
+import { publicNameOf } from "@/lib/public-name";
 
 function useListingDetailValue() {
   const params = useParams();
@@ -136,7 +137,7 @@ function useListingDetailValue() {
           imageUrl: imgUrl,
           seller: {
             id: listing.seller?.id || "",
-            displayName: listing.seller?.displayName || "",
+            displayName: publicNameOf(listing.seller),
           },
         });
         toast.success(t("product.addedToCart"));

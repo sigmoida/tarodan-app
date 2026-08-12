@@ -9,6 +9,7 @@ import type { FeaturedCollector } from "../lib/types";
 import { getImageUrl } from "../lib/helpers";
 import HomeAvatar from "./HomeAvatar";
 import HomeSection from "./HomeSection";
+import { publicNameOf } from "@/lib/public-name";
 
 function CollectionCard({
   collection,
@@ -57,11 +58,11 @@ function CollectionCard({
         <div className="flex items-center gap-2 mb-1.5">
           <HomeAvatar
             size="sm"
-            name={collection.user?.displayName}
+            name={publicNameOf(collection.user)}
             avatarUrl={collection.user?.avatarUrl}
           />
           <span className="flex items-center gap-1 text-xs font-medium text-muted truncate">
-            {collection.user?.displayName || collectorLabel}
+            {publicNameOf(collection.user, collectorLabel)}
             {collection.user?.isVerified && (
               <CheckBadgeIcon className="w-3.5 h-3.5 text-success-500 flex-shrink-0" />
             )}

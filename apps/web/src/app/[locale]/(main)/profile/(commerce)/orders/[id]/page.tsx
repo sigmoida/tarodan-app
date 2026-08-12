@@ -39,6 +39,7 @@ import CancelOrderModal, {
 import GroupCancelSection from "./_sections/GroupCancelSection";
 import BulkRefundSection from "./_sections/BulkRefundSection";
 import BulkRefundModal from "./_modals/BulkRefundModal";
+import { publicNameOf } from "@/lib/public-name";
 
 /**
  * Sipariş GRUP ekranı — tek satın alım bile grup çatısı altında gösterilir.
@@ -192,9 +193,9 @@ export default function OrderGroupDetailPage() {
                 {(multiPackage || pkg.packageNumber) && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-heading">
-                      {multiPackage && pkg.seller?.displayName
+                      {multiPackage && pkg.seller
                         ? t("order.sellerPackage", {
-                            name: pkg.seller.displayName,
+                            name: publicNameOf(pkg.seller),
                           })
                         : t("order.packageNumber")}
                     </p>

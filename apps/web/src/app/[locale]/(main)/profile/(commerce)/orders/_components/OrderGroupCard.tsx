@@ -21,6 +21,7 @@ import {
 } from "../_lib/types";
 import { getDisplayStatus } from "../_lib/status";
 import OrderActions, { type OrderActionHandlers } from "./OrderActions";
+import { publicNameOf } from "@/lib/public-name";
 
 const PLACEHOLDER =
   "https://placehold.co/128x128/f3f4f6/9ca3af?text=%F0%9F%9A%97";
@@ -82,8 +83,8 @@ function OrderLine({
           </p>
           <p className="mt-1.5 text-sm text-muted">
             {order.isSeller
-              ? `${t("order.buyer")}: ${order.buyer?.displayName || "-"}`
-              : `${t("product.seller")}: ${order.seller?.displayName || t("product.seller")}`}
+              ? `${t("order.buyer")}: ${publicNameOf(order.buyer, "-")}`
+              : `${t("product.seller")}: ${publicNameOf(order.seller, t("product.seller"))}`}
           </p>
         </div>
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
@@ -184,8 +185,10 @@ export default function OrderGroupCard({
             >
               {multiPackage && (
                 <p className="mb-2 text-sm font-medium text-heading">
-                  {pkg.seller?.displayName
-                    ? t("order.sellerPackage", { name: pkg.seller.displayName })
+                  {pkg.seller
+                    ? t("order.sellerPackage", {
+                        name: publicNameOf(pkg.seller),
+                      })
                     : t("order.multiItemOrder")}
                 </p>
               )}

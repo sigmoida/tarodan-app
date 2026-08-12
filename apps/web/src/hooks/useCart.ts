@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
+import { publicNameOf } from "@/lib/public-name";
 
 // `useCart` is mounted by the header and may also be mounted by the current
 // page. Keep the login merge single-flight so those consumers cannot submit the
@@ -309,9 +310,7 @@ export function useCart() {
           id: product.sellerId || product.seller?.id || "",
           displayName:
             product.sellerName ||
-            product.seller?.displayName ||
-            product.seller?.name ||
-            "Satıcı",
+            publicNameOf(product.seller, product.seller?.name || "Satıcı"),
         },
       });
       // `addToOfflineCart` yeni satırı adet 1 ekler; ürün sayfasında adet>1

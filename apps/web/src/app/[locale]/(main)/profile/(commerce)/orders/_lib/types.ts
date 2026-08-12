@@ -28,8 +28,8 @@ export interface Order {
     quantity: number;
     price: number;
   }>;
-  seller?: { id: string; displayName: string };
-  buyer?: { id: string; displayName: string };
+  seller?: { id: string; publicName?: string; displayName: string };
+  buyer?: { id: string; publicName?: string; displayName: string };
   shipment?: {
     trackingNumber: string | null;
     cargoCode?: string | null;
@@ -165,6 +165,7 @@ export interface ServerPackageView {
   sellerId: string | null;
   seller: {
     id: string;
+    publicName?: string;
     displayName: string;
     avatarUrl?: string | null;
     isVerified?: boolean;

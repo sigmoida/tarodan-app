@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { EmptyStateCard } from "@/components/ui";
 import CollectionCard from "../../../../(catalog)/collections/_components/CollectionCard";
 import type { Seller, SellerCollection } from "../../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 interface CollectionsTabProps {
   collections: SellerCollection[];
@@ -46,7 +47,7 @@ export default function CollectionsTab({
             ...collection,
             isPublic: true,
             userId: seller.id,
-            userName: seller.displayName,
+            userName: publicNameOf(seller),
           }}
         />
       ))}

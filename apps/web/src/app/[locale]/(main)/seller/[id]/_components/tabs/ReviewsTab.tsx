@@ -9,6 +9,7 @@ import { Link } from "@/i18n/navigation";
 import { EmptyStateCard, SectionCard } from "@/components/ui";
 import UserAvatar from "@/components/UserAvatar";
 import type { RatingStats, UserRating } from "../../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 const DATE_LOCALES: Record<string, string> = { en: "en-US", tr: "tr-TR" };
 
@@ -115,8 +116,7 @@ export default function ReviewsTab({
       {/* List */}
       <div className="space-y-4 lg:col-span-2">
         {reviews.map((review) => {
-          const reviewerName =
-            review.giverName || review.giver?.displayName || "";
+          const reviewerName = review.giverName || publicNameOf(review.giver);
           const giverId = review.giver?.id;
           return (
             <div

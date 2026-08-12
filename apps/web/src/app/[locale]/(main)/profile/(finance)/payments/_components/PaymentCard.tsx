@@ -28,6 +28,7 @@ import {
   type Payment,
   type PaymentActionCb,
 } from "../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
   if (src) {
@@ -103,8 +104,8 @@ export default function PaymentCard({
   const counterparty =
     payment.buyer && payment.seller
       ? currentUserId === payment.buyer.id
-        ? { role: t("product.seller"), name: payment.seller.displayName }
-        : { role: t("order.buyer"), name: payment.buyer.displayName }
+        ? { role: t("product.seller"), name: publicNameOf(payment.seller) }
+        : { role: t("order.buyer"), name: publicNameOf(payment.buyer) }
       : null;
 
   return (

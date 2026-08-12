@@ -19,6 +19,7 @@ export interface FeaturedCollector {
   itemCount: number;
   user: {
     id: string;
+    publicName?: string;
     displayName: string;
     avatarUrl?: string;
     bio?: string;

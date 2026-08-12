@@ -7,6 +7,7 @@ export interface MessageThread {
   id: string;
   otherUser: {
     id: string;
+    publicName?: string;
     displayName: string;
     avatarUrl?: string;
   };

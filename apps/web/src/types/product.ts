@@ -62,8 +62,11 @@ export interface Product {
   likeCount?: number;
   seller?: {
     id: string | number;
+    /** Herkese açık ad (API çözer): firma adı → kullanıcı adı → isim. */
+    publicName?: string;
+    /** Uyumluluk takma adı — publicName ile aynı değer. */
     displayName?: string;
-    username?: string;
+    username?: string | null;
     rating?: number;
   };
   attributes?: ProductAttributeEntry[];

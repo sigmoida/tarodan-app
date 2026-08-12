@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import OrderReviewModal from "@/components/reviews/OrderReviewModal";
 import { useSubmitReview } from "../_hooks/useOrderDetail";
 import { getProductInfo, type OrderDetail } from "../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 interface ReviewModalProps {
   order: OrderDetail | null;
@@ -35,7 +36,7 @@ export default function ReviewModal({
           ? { title: product.title, imageUrl: product.imageUrl }
           : undefined
       }
-      sellerName={order?.seller?.displayName}
+      sellerName={publicNameOf(order?.seller)}
       isSubmitting={submitReview.isPending}
       onSubmit={(v) => {
         if (!order) return;

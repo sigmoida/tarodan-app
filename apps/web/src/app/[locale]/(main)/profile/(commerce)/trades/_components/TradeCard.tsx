@@ -17,6 +17,7 @@ import {
   type TradeItem,
 } from "../_lib/types";
 import { TradeSwapBadge } from "./TradeSwapBadge";
+import { publicNameOf } from "@/lib/public-name";
 
 const fmt = (n: number) =>
   n.toLocaleString("tr-TR", {
@@ -96,8 +97,8 @@ export default function TradeCard({
 
   const isSent = trade.initiatorId === currentUserId;
   const otherUserName = isSent
-    ? trade.receiverName || trade.receiver?.displayName || t("common.name")
-    : trade.initiatorName || trade.initiator?.displayName || t("common.name");
+    ? trade.receiverName || publicNameOf(trade.receiver, t("common.name"))
+    : trade.initiatorName || publicNameOf(trade.initiator, t("common.name"));
   const myItems = isSent ? trade.initiatorItems : trade.receiverItems;
   const theirItems = isSent ? trade.receiverItems : trade.initiatorItems;
 

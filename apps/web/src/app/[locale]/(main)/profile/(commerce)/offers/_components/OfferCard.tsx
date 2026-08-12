@@ -41,6 +41,7 @@ import {
   type Offer,
   type OfferTab,
 } from "../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 interface OfferCardProps {
   offer: Offer;
@@ -261,7 +262,7 @@ export default function OfferCard({
             {otherUser && (
               <SellerChip
                 id={otherUser.id}
-                displayName={otherUser.displayName}
+                displayName={publicNameOf(otherUser)}
                 avatarUrl={otherUser.avatarUrl}
                 role={isReceived ? t("offer.offerer") : t("product.seller")}
                 size="sm"

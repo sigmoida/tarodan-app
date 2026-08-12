@@ -28,8 +28,8 @@ export interface Payment {
   products?: { id: string; title: string; images?: string[] }[];
   /** Sepet ödemesinde her siparişin detayı — accordion bunları açar. */
   orders?: GroupOrder[];
-  buyer: { id: string; displayName: string } | null;
-  seller: { id: string; displayName: string } | null;
+  buyer: { id: string; publicName?: string; displayName: string } | null;
+  seller: { id: string; publicName?: string; displayName: string } | null;
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
