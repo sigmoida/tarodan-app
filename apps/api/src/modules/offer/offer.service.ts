@@ -387,6 +387,10 @@ export class OfferService {
         sellerId: offerData.sellerId,
         categoryId: productData.categoryId,
         shippingDesi: productData.shippingDesi,
+        // Teklifte kupon geçmez ama platformun OTOMATİK bedel kampanyaları
+        // (ör. üyelik avantajı) burada da geçerlidir — kitle eşleşmesi için
+        // alıcının kimliği gerekir.
+        buyerId: offerData.buyerId,
       });
       const commissionResult = offerPricing.commission;
       const totalAmount = offerPricing.totalAmount;
@@ -416,6 +420,13 @@ export class OfferService {
           buyerServiceTaxAmount: offerPricing.buyerServiceTaxAmount,
           sellerServiceTaxAmount: offerPricing.sellerServiceTaxAmount,
           serviceVatRate: offerPricing.serviceVatRate,
+          // Platformun verdiği bedel indirimleri: kesinti kolonları zaten
+          // indirimli tutarı taşır, bunlar rapor ve iade denetimi içindir.
+          buyerFeeDiscountAmount: offerPricing.buyerFeeDiscountAmount ?? 0,
+          sellerFeeDiscountAmount: offerPricing.sellerFeeDiscountAmount ?? 0,
+          feeDiscountBreakdown: offerPricing.feeDiscounts?.length
+            ? (offerPricing.feeDiscounts as unknown as Prisma.InputJsonValue)
+            : undefined,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,

@@ -1,6 +1,7 @@
 import {
   Injectable,
   Logger,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { createHash } from "crypto";
@@ -11,6 +12,8 @@ import { Prisma } from "@prisma/client";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { TaxService } from "../tax/tax.service";
 import { CommissionResult, OrderPricingService } from "./order-pricing.service";
+import { OrderFeeDiscountService } from "./order-fee-discount.service";
+import type { AppliedFeeDiscount } from "../discount/fee-discount.engine";
 import {
   splitShippingByBuyerShare,
   type OutboundTariffLike,
@@ -39,6 +42,8 @@ export class OrderCheckoutCommonService {
     private readonly taxService: TaxService,
     private readonly orderPricing: OrderPricingService,
     private readonly taxPolicy: OrderTaxPolicyService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
 
   /**
@@ -59,11 +64,17 @@ export class OrderCheckoutCommonService {
     shippingDesi: number;
     shippingTariff?: OutboundTariffLike;
     commissionRuleSetId?: string;
+    /** Bedel kampanyalarının hedef kitlesi için — misafirde null. */
+    buyerId?: string | null;
+    buyerTier?: string | null;
   }): Promise<{
     commission: CommissionResult;
     fullShippingAmount: number;
     buyerShippingAmount: number;
     sellerShippingAmount: number;
+    feeDiscounts: AppliedFeeDiscount[];
+    buyerFeeDiscountAmount: number;
+    sellerFeeDiscountAmount: number;
     taxAmount: number;
     withholdingTaxAmount: number;
     buyerServiceTaxAmount: number;
@@ -85,7 +96,7 @@ export class OrderCheckoutCommonService {
     const pinnedCommissionRuleSetId =
       commissionRuleSetId ??
       (await this.orderPricing.resolveCommissionRuleSetSnapshot()).id;
-    const commission = await this.orderPricing.calculateCommission(
+    const rawCommission = await this.orderPricing.calculateCommission(
       amount,
       sellerId,
       categoryId,
@@ -96,16 +107,40 @@ export class OrderCheckoutCommonService {
     // Kargo kararı (quote/checkout ile ORTAK): kademe → o kademenin payı → bölüşüm.
     const {
       fullShipping: fullShippingAmount,
-      buyer: buyerShippingAmount,
-      seller: sellerShippingAmount,
+      buyer: rawBuyerShippingAmount,
+      seller: rawSellerShippingAmount,
     } = this.orderPricing.resolveShippingDecision({
       tariff:
         shippingTariff ??
         (await this.orderPricing.resolveShippingTariffSnapshot()).tariff,
       subtotal: amount,
       billableDesi: shippingDesi,
-      lineShares: [commission.shippingBuyerShares],
+      lineShares: [rawCommission.shippingBuyerShares],
     });
+    // Bedel indirimleri KDV'DEN ÖNCE uygulanır: bir bedel inince matrahı da iner.
+    const discounted = (await this.feeDiscounts?.apply({
+      context: {
+        productId: productId ?? "",
+        categoryId,
+        sellerId,
+        buyerId: params.buyerId ?? null,
+        buyerTier: params.buyerTier ?? null,
+      },
+      commission: rawCommission,
+      buyerShippingAmount: rawBuyerShippingAmount,
+      sellerShippingAmount: rawSellerShippingAmount,
+    })) ?? {
+      commission: rawCommission,
+      buyerShippingAmount: rawBuyerShippingAmount,
+      sellerShippingAmount: rawSellerShippingAmount,
+      applied: [],
+      buyerTotal: 0,
+      sellerTotal: 0,
+    };
+    const commission = discounted.commission;
+    const buyerShippingAmount = discounted.buyerShippingAmount;
+    const sellerShippingAmount = discounted.sellerShippingAmount;
+
     const {
       taxAmount,
       withholdingTaxAmount,
@@ -143,6 +178,9 @@ export class OrderCheckoutCommonService {
       fullShippingAmount,
       buyerShippingAmount,
       sellerShippingAmount,
+      feeDiscounts: discounted.applied,
+      buyerFeeDiscountAmount: discounted.buyerTotal,
+      sellerFeeDiscountAmount: discounted.sellerTotal,
       taxAmount,
       withholdingTaxAmount,
       buyerServiceTaxAmount,
