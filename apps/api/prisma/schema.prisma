@@ -724,6 +724,11 @@ model ProductBoost {
   purchasedAt            DateTime?   @map("purchased_at")
   pausedAt               DateTime?   @map("paused_at")
   pausedRemainingSeconds Int?        @map("paused_remaining_seconds")
+  /// SİSTEM duraklatması: ürün yayından düşünce (süre dolumu, satış, pasife
+  /// alma, red, askı) cron boost'u otomatik duraklatır ve ürün yayına dönünce
+  /// otomatik sürdürür. Admin'in elle duraklattığı boost (false) otomatik
+  /// SÜRDÜRÜLMEZ — admin kararı korunur.
+  pausedBySystem         Boolean     @default(false) @map("paused_by_system")
   extendedDays           Int         @default(0) @map("extended_days")
   baselineViewCount      Int?        @map("baseline_view_count")
   baselineLikeCount      Int?        @map("baseline_like_count")

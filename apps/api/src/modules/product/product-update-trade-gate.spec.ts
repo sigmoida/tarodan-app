@@ -77,6 +77,8 @@ describe("ProductUpdateService — takasa açma kapısı", () => {
       {} as any,
       membershipService as any,
       { assertListingRuleExists: jest.fn() } as any,
+      // moderationAi — düzenleme içerik kapıları (bu spec'in konusu değil)
+      { assertTextClean: jest.fn(), isEnabled: false } as any,
     );
     return { service, membershipService };
   };

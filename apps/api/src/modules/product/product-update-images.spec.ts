@@ -121,6 +121,8 @@ describe("ProductUpdateService — görsel güncellemesi", () => {
       } as any, // ranking
       membershipService as any,
       { assertListingRuleExists: jest.fn() } as any,
+      // moderationAi — düzenleme içerik kapıları (bu spec'in konusu değil)
+      { assertTextClean: jest.fn(), isEnabled: false } as any,
     );
 
     return { service, prisma, tx, wasRolledBack: () => rolledBack };

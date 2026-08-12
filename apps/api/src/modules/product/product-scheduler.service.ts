@@ -428,14 +428,27 @@ export class ProductSchedulerService implements OnModuleInit {
         where: { status: "pending", createdAt: { lt: oneDayAgo } },
         data: { status: "failed" },
       });
+
+      // ── SİSTEM DURAKLAT/SÜRDÜR (B4) ─────────────────────────────────────
+      // Yayında olmayan ürünün boost'u görünmezken akmasın: satın alınan süre
+      // duraklatılır, ürün yayına dönünce kalan süreyle sürer. Tek yerden
+      // (bu 15 dk'lık cron) yürür — süre dolumu, satış, pasife alma, red,
+      // askı ve TÜM gelecekteki yollar otomatik kapsanır (en çok 15 dk sarkma).
+      // Admin'in ELLE duraklattığı boost (pausedBySystem=false) otomatik
+      // sürdürülmez.
+      const paused = await this.pauseBoostsOfDelistedProducts(now);
+      const resumed = await this.resumeSystemPausedBoosts(now);
+
       log(
-        `${expiredProducts.length} ürün boost düşürüldü · ${expiringBoosts.length} boost sona erdi`,
+        `${expiredProducts.length} ürün boost düşürüldü · ${expiringBoosts.length} boost sona erdi · ${paused} duraklatıldı · ${resumed} sürdürüldü`,
       );
       return {
         summary: `${expiredProducts.length} boost düşürüldü · ${expiringBoosts.length} sona erdi`,
         stats: {
           downgraded: expiredProducts.length,
           expired: expiringBoosts.length,
+          systemPaused: paused,
+          systemResumed: resumed,
         },
       };
     } catch (error: any) {
@@ -446,6 +459,121 @@ export class ProductSchedulerService implements OnModuleInit {
       // "başarılı" görünür ve hata yalnız log satırında kalır).
       throw error;
     }
+  }
+
+  /**
+   * Yayında OLMAYAN ürünlerin süresi akan boost'larını sistem duraklatmasına
+   * alır (kalan süre saklanır) ve ürünün boost kolonlarını temizler.
+   */
+  private async pauseBoostsOfDelistedProducts(now: Date): Promise<number> {
+    const rows = await this.prisma.productBoost.findMany({
+      where: {
+        status: "active",
+        endsAt: { gt: now },
+        product: { status: { not: ProductStatus.active } },
+      },
+      select: { id: true, productId: true, endsAt: true },
+    });
+    if (!rows.length) return 0;
+
+    for (const row of rows) {
+      await this.prisma.productBoost.update({
+        where: { id: row.id },
+        data: {
+          status: "paused",
+          pausedAt: now,
+          pausedBySystem: true,
+          pausedRemainingSeconds: Math.max(
+            1,
+            Math.ceil((row.endsAt.getTime() - now.getTime()) / 1000),
+          ),
+        },
+      });
+    }
+    const productIds = [...new Set(rows.map((row) => row.productId))];
+    await this.prisma.product.updateMany({
+      where: { id: { in: productIds } },
+      data: { boostedUntil: null, boostedAt: null, homeShowcaseUntil: null },
+    });
+    this.logger.log(
+      `Sistem duraklatması: ${rows.length} boost (${productIds.length} yayın dışı ürün)`,
+    );
+    return rows.length;
+  }
+
+  /**
+   * Ürünü yeniden YAYINA dönen sistem-duraklatmalı boost'ları kalan süreyle
+   * sürdürür ve ürünün boost kolonlarını yeniden kurar. Yalnız
+   * `pausedBySystem` olanlar — admin'in elle duraklattığı boost'a dokunulmaz.
+   */
+  private async resumeSystemPausedBoosts(now: Date): Promise<number> {
+    const rows = await this.prisma.productBoost.findMany({
+      where: {
+        status: "paused",
+        pausedBySystem: true,
+        product: { status: ProductStatus.active },
+      },
+      orderBy: { purchasedAt: "asc" },
+      select: {
+        id: true,
+        productId: true,
+        showcaseOnHome: true,
+        pausedRemainingSeconds: true,
+        product: { select: { qualityScore: true, popularityScore: true } },
+      },
+    });
+    if (!rows.length) return 0;
+
+    const byProduct = new Map<string, typeof rows>();
+    for (const row of rows) {
+      byProduct.set(row.productId, [
+        ...(byProduct.get(row.productId) ?? []),
+        row,
+      ]);
+    }
+    for (const [productId, productRows] of byProduct) {
+      // Kalan süreler satın alma sırasıyla arka arkaya dizilir (stacking).
+      let base = now;
+      let showcaseBase = now;
+      let showcaseEnd: Date | null = null;
+      for (const row of productRows) {
+        const remainingMs = (row.pausedRemainingSeconds ?? 0) * 1000;
+        const endsAt = new Date(base.getTime() + remainingMs);
+        base = endsAt;
+        if (row.showcaseOnHome) {
+          showcaseEnd = new Date(showcaseBase.getTime() + remainingMs);
+          showcaseBase = showcaseEnd;
+        }
+        await this.prisma.productBoost.update({
+          where: { id: row.id },
+          data: {
+            status: "active",
+            endsAt,
+            pausedAt: null,
+            pausedBySystem: false,
+            pausedRemainingSeconds: null,
+          },
+        });
+      }
+      await this.prisma.product.update({
+        where: { id: productId },
+        data: {
+          boostedUntil: base,
+          boostedAt: now,
+          homeShowcaseUntil: showcaseEnd,
+          rankTier: 2,
+          relevanceScore: computeRelevanceScore({
+            rankTier: 2,
+            qualityScore: productRows[0].product?.qualityScore ?? 0,
+            popularityScore: productRows[0].product?.popularityScore,
+          }),
+        },
+      });
+    }
+    this.logger.log(
+      `Sistem sürdürmesi: ${rows.length} boost (${byProduct.size} yayına dönen ürün)`,
+    );
+    return rows.length;
   }
 
   /**
