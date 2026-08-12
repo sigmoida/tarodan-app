@@ -37,6 +37,7 @@ import {
   assertAudienceConsistent,
   assertBudgetForTarget,
   assertCodeAllowedForTarget,
+  assertSellerCampaignHasCode,
   assertTargetAllowedForActor,
   audienceMatches,
 } from "./discount-authorization";
@@ -129,6 +130,7 @@ export class DiscountService {
     const audience = dto.audience ?? DiscountAudience.everyone;
     assertTargetAllowedForActor(target, isAdmin);
     assertCodeAllowedForTarget(target, Boolean(dto.code));
+    assertSellerCampaignHasCode(target, isAdmin, Boolean(dto.code));
     assertBudgetForTarget(target, dto.budgetLimit);
     assertAudienceConsistent({
       audience,
@@ -1502,6 +1504,9 @@ export class DiscountService {
       where: {
         isActive: true,
         code: null,
+        // YALNIZ ürün fiyatı kampanyaları: bedel kampanyası vitrin fiyatını
+        // DÜŞÜRMEZ (komisyonu/kargoyu indirir) — buraya karışırsa etiket yalan söyler.
+        target: DiscountTarget.product_price,
         startDate: { lte: now },
         endDate: { gte: now },
         OR: [
@@ -1560,6 +1565,9 @@ export class DiscountService {
       where: {
         isActive: true,
         code: null, // Only auto-applied
+        // YALNIZ ürün fiyatı kampanyaları: bedel kampanyası vitrin fiyatını
+        // DÜŞÜRMEZ (komisyonu/kargoyu indirir) — buraya karışırsa etiket yalan söyler.
+        target: DiscountTarget.product_price,
         startDate: { lte: now },
         endDate: { gte: now },
       },
@@ -1606,6 +1614,9 @@ export class DiscountService {
       where: {
         isActive: true,
         code: null, // Only auto-applied campaigns
+        // YALNIZ ürün fiyatı kampanyaları: bedel kampanyası vitrin fiyatını
+        // DÜŞÜRMEZ (komisyonu/kargoyu indirir) — buraya karışırsa etiket yalan söyler.
+        target: DiscountTarget.product_price,
         startDate: { lte: now },
         endDate: { gte: now },
         scope: { in: [DiscountScope.global, DiscountScope.category] },

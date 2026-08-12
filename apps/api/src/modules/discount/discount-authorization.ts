@@ -162,3 +162,23 @@ export function audienceMatches(input: AudienceMatchInput): boolean {
       return false;
   }
 }
+
+/**
+ * Satıcının KODSUZ kampanyası kaldırıldı: ilan indirimiyle (çizili fiyat) aynı
+ * işi yapıyordu ve arayüz "kodsuz kampanyalar devre dışı" derken motor bunları
+ * yine uyguluyordu — iki gerçek kaynak. Satıcının iki aracı kalır: ilan indirimi
+ * ve kupon kodu.
+ */
+export function assertSellerCampaignHasCode(
+  target: DiscountTarget,
+  isAdmin: boolean,
+  hasCode: boolean,
+): void {
+  if (isAdmin) return;
+  if (target !== DiscountTarget.product_price) return;
+  if (!hasCode) {
+    throw new BadRequestException(
+      "Kodsuz mağaza kampanyası kaldırıldı: fiyat indirimi için ilanınızı güncelleyin ya da kupon kodu tanımlayın",
+    );
+  }
+}

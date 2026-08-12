@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Controller,
   Get,
   Post,
@@ -66,10 +67,16 @@ export class DiscountController {
     @CurrentUser("isSeller") isSeller: boolean,
     @Body() dto: CreateDiscountDto,
   ): Promise<DiscountResponseDto> {
-    // For now, non-admin sellers can only create seller-scoped discounts
-    // Admin check would be done via a separate AdminGuard in production
-    const isAdmin = false; // TODO: Check admin status from user context
-    return this.discountService.create(dto, userId, isAdmin);
+    // Bu uç SATICI ucudur: admin kampanyaları `/admin/discounts` üzerinden,
+    // admin token'ıyla oluşturulur. Buradaki aktör hiçbir zaman admin sayılmaz.
+    // Satıcı olmayan bir kullanıcı indirim tanımlayamaz (eskiden `isSeller`
+    // okunuyor ama hiç kullanılmıyordu: ürünü olmayan herkes kayıt açabiliyordu).
+    if (!isSeller) {
+      throw new ForbiddenException(
+        "İndirim tanımlamak için satıcı olmanız gerekir",
+      );
+    }
+    return this.discountService.create(dto, userId, false);
   }
 
   /**
@@ -90,8 +97,8 @@ export class DiscountController {
     @CurrentUser("id") userId: string,
     @Query() query: DiscountQueryDto,
   ): Promise<PaginatedDiscountsDto> {
-    const isAdmin = false; // TODO: Check admin status
-    return this.discountService.findAll(query, userId, isAdmin);
+    // Satıcı ucu: yalnız kendi kampanyalarını görür.
+    return this.discountService.findAll(query, userId, false);
   }
 
   /**
@@ -172,7 +179,8 @@ export class DiscountController {
     @Param("id") id: string,
     @CurrentUser("id") userId: string,
   ): Promise<DiscountResponseDto> {
-    const isAdmin = false; // TODO: Check admin status
+    // Satıcı ucu; admin işlemleri `/admin/discounts` üzerindedir.
+    const isAdmin = false;
     return this.discountService.findOne(id, userId, isAdmin);
   }
 
@@ -202,7 +210,8 @@ export class DiscountController {
     @CurrentUser("id") userId: string,
     @Body() dto: UpdateDiscountDto,
   ): Promise<DiscountResponseDto> {
-    const isAdmin = false; // TODO: Check admin status
+    // Satıcı ucu; admin işlemleri `/admin/discounts` üzerindedir.
+    const isAdmin = false;
     return this.discountService.update(id, dto, userId, isAdmin);
   }
 
@@ -231,7 +240,8 @@ export class DiscountController {
     @Param("id") id: string,
     @CurrentUser("id") userId: string,
   ): Promise<void> {
-    const isAdmin = false; // TODO: Check admin status
+    // Satıcı ucu; admin işlemleri `/admin/discounts` üzerindedir.
+    const isAdmin = false;
     return this.discountService.delete(id, userId, isAdmin);
   }
 }
