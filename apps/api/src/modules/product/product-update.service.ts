@@ -25,6 +25,11 @@ import { MembershipService } from "../membership/membership.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
 import { isCorporateSellingSuspended } from "../membership/membership.util";
 import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
+import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import {
+  loadProductPriceLimits,
+  productPriceLimitViolation,
+} from "./helpers/product-price-limits";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -47,6 +52,8 @@ export class ProductUpdateService {
     private readonly ranking: ProductRankingService,
     private readonly membershipService: MembershipService,
     private readonly commissionGuard: CommissionRuleGuardService,
+    // Düzenleme, oluşturma ile aynı içerik kapılarından geçer (L2).
+    private readonly moderationAi: ModerationAiClient,
   ) {}
 
   /**
@@ -240,6 +247,58 @@ export class ProductUpdateService {
     // Satıcı kendi ilanını DOĞRUDAN aktifleştiremez (aktivasyon isteği pending'e
     // gider); yalnızca pasife alabilir. Geçersiz/izinsiz statü istekleri sessizce
     // yok sayılır (mevcut statü korunur) — böylece düzenleme akışı kırılmaz.
+
+    // Düzenleme, oluşturma ile AYNI içerik kapılarından geçer — onaylı ilanın
+    // metni sonradan serbestçe değiştirilebiliyordu (moderasyonsuz düzenleme).
+    // İlan pending'e DÜŞÜRÜLMEZ; yalnız uygunsuz içerik anında engellenir.
+    if (dto.title !== undefined && dto.title !== product.title) {
+      await this.moderationAi.assertTextClean(dto.title, {
+        entityType: "product",
+        userId: sellerId,
+        field: "title",
+        label: "ürün başlığı",
+      });
+    }
+    if (
+      dto.description !== undefined &&
+      dto.description !== product.description
+    ) {
+      await this.moderationAi.assertTextClean(dto.description ?? "", {
+        entityType: "product",
+        userId: sellerId,
+        field: "description",
+        label: "ürün açıklaması",
+      });
+    }
+
+    // Platform min/max fiyat limiti düzenlemede de geçerli — onaylı ilan
+    // sonradan limit dışı fiyata çekilemesin (create ile aynı kaynak).
+    if (dto.price !== undefined || dto.salePrice != null) {
+      const priceLimits = await loadProductPriceLimits(this.prisma);
+      for (const candidate of [
+        dto.price !== undefined ? Number(dto.price) : null,
+        dto.salePrice != null && Number(dto.salePrice) > 0
+          ? Number(dto.salePrice)
+          : null,
+      ]) {
+        if (candidate == null) continue;
+        const violation = productPriceLimitViolation(candidate, priceLimits);
+        if (violation?.type === "minimum") {
+          throw new BadRequestException(
+            i18nMessage("server.product.priceBelowMinimum", {
+              minPrice: violation.limit,
+            }),
+          );
+        }
+        if (violation?.type === "maximum") {
+          throw new BadRequestException(
+            i18nMessage("server.product.priceAboveMaximum", {
+              maxPrice: violation.limit,
+            }),
+          );
+        }
+      }
+    }
 
     // Check membership for trade feature
     let canEnableTrade = false;
