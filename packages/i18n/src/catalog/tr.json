@@ -809,7 +809,14 @@
     "distanceSalesRequired": "Devam etmek için mesafeli satış sözleşmesini onaylayın",
     "buyNowNotice": "Yalnız seçtiğiniz ürün ödenecek; sepetinizdeki diğer ürünler yerinde kalır.",
     "noItemsSelected": "Ödenecek ürün seçilmedi. Sepetinize dönüp ürün seçin.",
-    "cardSection": "Kart Bilgileri"
+    "cardSection": "Kart Bilgileri",
+    "feeDiscountLine": "{name}",
+    "campaignSavings": "Toplam kazancınız",
+    "feeDiscountTargets": {
+      "buyer_commission": "Komisyon indirimi",
+      "buyer_service_fee": "Hizmet bedeli indirimi",
+      "buyer_shipping": "Kargo indirimi"
+    }
   },
   "order": {
     "myOrders": "Siparişlerim",

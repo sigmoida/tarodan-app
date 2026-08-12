@@ -809,7 +809,14 @@
     "distanceSalesRequired": "Accept the distance sales agreement to continue",
     "buyNowNotice": "Only the item you selected will be paid for; the rest of your cart stays put.",
     "noItemsSelected": "No items selected. Go back to your cart and pick one.",
-    "cardSection": "Card details"
+    "cardSection": "Card details",
+    "feeDiscountLine": "{name}",
+    "campaignSavings": "Your total savings",
+    "feeDiscountTargets": {
+      "buyer_commission": "Commission discount",
+      "buyer_service_fee": "Service fee discount",
+      "buyer_shipping": "Shipping discount"
+    }
   },
   "order": {
     "myOrders": "My Orders",

@@ -48,7 +48,14 @@ import { sellerNetAmountOf } from "./order-net.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
 import { OrderFeeDiscountService } from "./order-fee-discount.service";
-import type { FeeDiscountCandidate } from "../discount/fee-discount.engine";
+import type {
+  AppliedFeeDiscount,
+  FeeDiscountCandidate,
+} from "../discount/fee-discount.engine";
+import {
+  summarizeFeeDiscounts,
+  sumFeeDiscounts,
+} from "../discount/fee-discount-summary";
 
 /**
  * Commission calculation result interface
@@ -253,6 +260,21 @@ export class OrderPricingService {
     commissionAmount: number;
     taxAmount: number;
     couponDiscount: number;
+    /**
+     * Platformun bu sepette verdiği BEDEL indirimleri — kalem bazında toplanmış
+     * hâliyle. Alıcı tarafındaki satırlar ödenecek tutarı düşürür, satıcı
+     * tarafındakiler satıcının hak edişini yükseltir; ekran ikisini de kaynağıyla
+     * birlikte gösterebilsin diye ayrı taşınır.
+     */
+    feeDiscounts: Array<{
+      target: string;
+      name: string;
+      code: string | null;
+      amount: number;
+      side: "buyer" | "seller";
+    }>;
+    buyerFeeDiscountTotal: number;
+    sellerFeeDiscountTotal: number;
     totalAmount: number;
     sellerNetAmount: number;
     items: Array<{
@@ -305,6 +327,19 @@ export class OrderPricingService {
         shippingAmount: number;
         serviceFeeAmount: number;
         total: number;
+        /**
+         * Platformun bu sepette alıcıya verdiği bedel indirimleri. Ürün/kargo/
+         * hizmet satırları ZATEN indirimli tutarı gösterir; bu satırlar
+         * kazancın kaynağını ("komisyon indirimi", "kargo kampanyası") ayrıca
+         * söyler, aksi halde indirim görünmeden erirdi.
+         */
+        feeDiscounts: Array<{
+          target: string;
+          name: string;
+          code: string | null;
+          amount: number;
+        }>;
+        feeDiscountTotal: number;
       };
     };
   }> {
@@ -522,6 +557,7 @@ export class OrderPricingService {
     // Bedel kampanyaları TEK kez yüklenir (satır başına sorgu yok) ve önizleme
     // tahsilatla aynı listeyi görür.
     const feeCampaigns = (await this.feeDiscounts?.preload()) ?? [];
+    const appliedFeeDiscounts: AppliedFeeDiscount[] = [];
     const sellerLeadProduct = new Map<string, string>();
     const sellerLeadCategory = new Map<string, string | null>();
     const buyerTier =
@@ -542,27 +578,26 @@ export class OrderPricingService {
       );
       // Komisyon/hizmet bedeli kampanyaları satır bazında; kargo kampanyası
       // aşağıda PAKET kararından sonra uygulanır (kargo satırın değil paketin).
-      const commissionResult =
-        (
-          await this.feeDiscounts?.apply({
-            context: {
-              productId: product.id,
-              categoryId: product.categoryId,
-              sellerId: product.sellerId,
-              buyerId: userId,
-              buyerTier,
-              quantity,
-            },
-            commission: rawCommissionResult,
-            buyerShippingAmount: 0,
-            sellerShippingAmount: 0,
-            preloaded: feeCampaigns,
-            couponCandidates:
-              couponFeeCandidate && couponEligibleIds.has(product.id)
-                ? [couponFeeCandidate]
-                : [],
-          })
-        )?.commission ?? rawCommissionResult;
+      const lineFeeResult = await this.feeDiscounts?.apply({
+        context: {
+          productId: product.id,
+          categoryId: product.categoryId,
+          sellerId: product.sellerId,
+          buyerId: userId,
+          buyerTier,
+          quantity,
+        },
+        commission: rawCommissionResult,
+        buyerShippingAmount: 0,
+        sellerShippingAmount: 0,
+        preloaded: feeCampaigns,
+        couponCandidates:
+          couponFeeCandidate && couponEligibleIds.has(product.id)
+            ? [couponFeeCandidate]
+            : [],
+      });
+      appliedFeeDiscounts.push(...(lineFeeResult?.applied ?? []));
+      const commissionResult = lineFeeResult?.commission ?? rawCommissionResult;
 
       // Paket payı satır sırasından BAĞIMSIZ olmalı ve paketin KADEMESİNE göre
       // seçilmeli: satırın üç kademelik pay haritasını topla, kademe çözüldükten
@@ -662,7 +697,9 @@ export class OrderPricingService {
         })) ?? {
           buyerShippingAmount: decision.buyer,
           sellerShippingAmount: decision.seller,
+          applied: [] as AppliedFeeDiscount[],
         };
+        appliedFeeDiscounts.push(...(shippingDiscounted.applied ?? []));
         return {
           sellerId,
           // Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
@@ -755,6 +792,15 @@ export class OrderPricingService {
       // yazılır: alıcı için kargo pazarlık edilen sabit bir kalem, vergi ise
       // platformun hizmetine ait tek bir kalemdir.
       summary: {
+        feeDiscounts: summarizeFeeDiscounts(appliedFeeDiscounts)
+          .filter((line) => line.side === "buyer")
+          .map(({ target, name, code, amount }) => ({
+            target,
+            name,
+            code,
+            amount,
+          })),
+        feeDiscountTotal: sumFeeDiscounts(appliedFeeDiscounts, "buyer"),
         productAmount:
           Math.round((itemsSubtotal - couponDiscountTotal) * 100) / 100,
         shippingAmount: Math.round(shippingAmount * 100) / 100,
@@ -773,6 +819,11 @@ export class OrderPricingService {
       // Ürün KDV'si kaldırıldı — alan geriye-uyum için 0 döner.
       taxAmount: 0,
       couponDiscount: couponDiscountTotal,
+      // Aynı kampanya birden çok satıra indiği için kalem+kampanya bazında
+      // toplanır: ekran "komisyon indirimi −36 TL" gibi TEK satır gösterir.
+      feeDiscounts: summarizeFeeDiscounts(appliedFeeDiscounts),
+      buyerFeeDiscountTotal: sumFeeDiscounts(appliedFeeDiscounts, "buyer"),
+      sellerFeeDiscountTotal: sumFeeDiscounts(appliedFeeDiscounts, "seller"),
       totalAmount,
       sellerNetAmount,
       items: quoteItems,
