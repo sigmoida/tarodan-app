@@ -6792,6 +6792,10 @@
         "title": "Kargonuzda Hareket Görünmüyor",
         "message": "{reference} siparişi için kargoyu verdiğinizi işaretlediniz ancak Sürat kayıtlarında paket görünmüyor. Paketi henüz teslim etmediyseniz lütfen en kısa sürede şubeye götürün; aksi hâlde sipariş iptal edilebilir."
       },
+      "orderStuckInTransit": {
+        "title": "Kargoda Takılı Sipariş — Yönetim Gerekli",
+        "message": "{orderNumber} siparişi uzun süredir kargoda ve taşıyıcıdan teslim bilgisi gelmedi; teslim işlenmediği için satıcı ödemesi askıda."
+      },
       "offerAutoRejected": {
         "title": "Teklifiniz Kapatıldı",
         "message": "{cancelReason}"

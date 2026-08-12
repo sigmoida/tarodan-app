@@ -6792,6 +6792,10 @@
         "title": "No Movement On Your Shipment",
         "message": "You marked the package for order {reference} as handed to cargo, but Sürat has no record of it. If you have not dropped it off yet, please take it to a branch soon — otherwise the order may be cancelled."
       },
+      "orderStuckInTransit": {
+        "title": "Stuck Shipment — Admin Action Required",
+        "message": "Order {orderNumber} has been in transit for a long time with no carrier delivery report; the seller payout stays on hold until delivery is recorded."
+      },
       "offerAutoRejected": {
         "title": "Your Offer Was Closed",
         "message": "{cancelReason}"

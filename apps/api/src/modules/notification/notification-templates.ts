@@ -321,6 +321,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.tradeStuckAtWarehouse.message",
     icon: "⚠️",
   },
+  [NotificationType.ORDER_STUCK_IN_TRANSIT]: {
+    titleKey: "server.notification.orderStuckInTransit.title",
+    messageKey: "server.notification.orderStuckInTransit.message",
+    icon: "⚠️",
+  },
   [NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING]: {
     titleKey: "server.notification.tradeOutboundDeliveryMissing.title",
     messageKey: "server.notification.tradeOutboundDeliveryMissing.message",

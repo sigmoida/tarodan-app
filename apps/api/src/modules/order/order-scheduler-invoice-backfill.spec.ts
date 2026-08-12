@@ -45,6 +45,8 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
       {} as any,
       // Satıcı ürün faturası taraması bu senaryonun konusu değil.
       { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
+      { createInAppNotification: jest.fn() } as any,
+      { get: jest.fn(), set: jest.fn() } as any,
       { add: jest.fn() } as any,
     );
     return { service, prisma, orderService };

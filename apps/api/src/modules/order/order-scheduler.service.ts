@@ -13,6 +13,9 @@ import {
   resolvePaymentConfigNumber,
 } from "../payment/payment.constants";
 import { SellerInvoiceService } from "./seller-invoice.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { CacheService } from "../cache/cache.service";
 
 const OPEN_REFUND_STATUSES = [
   "pending_review",
@@ -34,8 +37,60 @@ export class OrderSchedulerService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly sellerInvoice: SellerInvoiceService,
+    private readonly notificationService: NotificationService,
+    private readonly cache: CacheService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
+
+  /**
+   * Takılı kargolar için aktif admin'lere in-app bildirim (24s cache dedup —
+   * cron 10 dk'da bir çalışır, çözülmeyen sipariş ertesi gün tekrar hatırlatılır).
+   * Non-blocking: bildirim hatası cron turunu bozmaz.
+   */
+  private async notifyAdminsOfStuckShipments(
+    orders: Array<{
+      id: string;
+      orderNumber: string;
+      shipment: { shippedAt: Date | null } | null;
+    }>,
+  ): Promise<void> {
+    try {
+      const fresh: typeof orders = [];
+      for (const order of orders) {
+        const key = `stuck-shipment-alerted:${order.id}`;
+        if (await this.cache.get<boolean>(key)) continue;
+        fresh.push(order);
+        await this.cache.set(key, true, { ttl: 24 * 60 * 60 });
+      }
+      if (fresh.length === 0) return;
+
+      const admins = await this.prisma.adminUser.findMany({
+        where: { isActive: true },
+        select: { userId: true },
+      });
+      for (const order of fresh) {
+        for (const admin of admins) {
+          try {
+            await this.notificationService.createInAppNotification(
+              admin.userId,
+              NotificationType.ORDER_STUCK_IN_TRANSIT,
+              {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                shippedAt: order.shipment?.shippedAt?.toISOString(),
+              },
+            );
+          } catch (err: any) {
+            this.logger.error(
+              `Takılı kargo admin bildirimi başarısız (order=${order.id}): ${err?.message}`,
+            );
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`notifyAdminsOfStuckShipments failed: ${err?.message}`);
+    }
+  }
 
   async onModuleInit(): Promise<void> {
     await registerRepeatableCron(
@@ -159,14 +214,24 @@ export class OrderSchedulerService implements OnModuleInit {
       Number(this.configService.get<string>("INVOICE_DEADLINE_DAYS") ?? "5") ||
       5;
 
-    const [stuckShipped, uninvoicedDelivered] = await Promise.all([
-      this.prisma.order.count({
+    // Eşik KARGO YAŞINA bakar (shipment.shippedAt), sipariş satırının
+    // updatedAt'ine değil: alakasız bir güncelleme (bildirim, adres, fatura
+    // alanı) saati sıfırlıyordu ve gerçekten takılı sipariş alarmdan kaçıyordu.
+    const stuckCutoff = new Date(Date.now() - stuckDays * 24 * 60 * 60 * 1000);
+    const [stuckShippedOrders, uninvoicedDelivered] = await Promise.all([
+      this.prisma.order.findMany({
         where: {
           status: OrderStatus.shipped,
-          updatedAt: {
-            lt: new Date(Date.now() - stuckDays * 24 * 60 * 60 * 1000),
-          },
+          shipment: { is: { shippedAt: { lt: stuckCutoff } } },
         },
+        select: {
+          id: true,
+          orderNumber: true,
+          sellerId: true,
+          shipment: { select: { shippedAt: true, trackingNumber: true } },
+        },
+        orderBy: { createdAt: "asc" },
+        take: 50,
       }),
       this.prisma.order.count({
         where: {
@@ -182,10 +247,24 @@ export class OrderSchedulerService implements OnModuleInit {
       }),
     ]);
 
+    const stuckShipped = stuckShippedOrders.length;
     if (stuckShipped > 0) {
+      // Sayı-only alarm eyleme dönük değildi: hangi siparişin takıldığı
+      // görünmüyordu. Artık sipariş numaraları loglanır VE admin'e in-app
+      // bildirim düşer — kurtarma yolu (PATCH /admin/orders/:id status=delivered)
+      // ancak takılan sipariş bilinirse kullanılabilir. Teslim kanıtı yokken
+      // para yine akmaz; amaç askıda kalanı GÖRÜNÜR kılmaktır.
       this.logger.error(
-        `ORDERS_STUCK_SHIPPED count=${stuckShipped} — ${stuckDays} günden uzun süre kargoda; teslimat poll'lanmadıysa fatura hiç kesilmez`,
+        `ORDERS_STUCK_SHIPPED count=${stuckShipped} — ${stuckDays} günden uzun süre kargoda; ` +
+          `teslimat poll'lanmadıysa fatura kesilmez ve escrow serbest bırakılmaz: ` +
+          stuckShippedOrders
+            .map(
+              (o) =>
+                `${o.orderNumber}(id=${o.id} shippedAt=${o.shipment?.shippedAt?.toISOString() ?? "?"})`,
+            )
+            .join(", "),
       );
+      await this.notifyAdminsOfStuckShipments(stuckShippedOrders);
     }
     if (uninvoicedDelivered > 0) {
       this.logger.error(

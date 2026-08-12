@@ -138,6 +138,8 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.ORDER_CANCELLED_SELLER]: SELLER_ORDER,
   [NotificationType.PRODUCT_SOLD]: SELLER_ORDER,
   [NotificationType.CARGO_MOVEMENT_MISSING]: SELLER_ORDER,
+  // Admin alarmı: takılı siparişin kendi dosyasına gider.
+  [NotificationType.ORDER_STUCK_IN_TRANSIT]: BUYER_ORDER,
   // Satıcının ürünü satışa kapandı: alıcı tarafındaki "artık satışta değil"
   // sayfası, kaldırılmış ürünün 404'üne gitmesin.
   [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,

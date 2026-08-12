@@ -60,6 +60,9 @@ export enum NotificationType {
   TRADE_AUTO_CANCELLED = "trade_auto_cancelled",
   // Admin uyarısı: takas depoya ulaştı ama süresi doldu — elle force-cancel-stuck gerekiyor.
   TRADE_STUCK_AT_WAREHOUSE = "trade_stuck_at_warehouse",
+  // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.
+  // Teslim yazılmadan escrow release tarihi kurulmaz → satıcı parası askıda kalır.
+  ORDER_STUCK_IN_TRANSIT = "order_stuck_in_transit",
   // Admin uyarısı: depodan çıkan koli için taşıyıcıdan TESLİM raporu gelmedi. Onay
   // penceresi teslimattan başladığı için takas kendiliğinden tamamlanmaz; admin çözer.
   TRADE_OUTBOUND_DELIVERY_MISSING = "trade_outbound_delivery_missing",
