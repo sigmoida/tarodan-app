@@ -1,12 +1,18 @@
 /**
  * TAKAS İADE POLİTİKASI (v2) — TEK kaynak.
  *
- * v2'de ödemenin içinde KARGO da vardır. Ürün kargoya verildikten sonra iptal
- * olduğunda platform iki bacağın maliyetini gerçekten ödemiştir: o tutar iade
- * EDİLMEZ. Henüz hiçbir ürün kargoya verilmemişken iptal olursa hizmet hiç
- * alınmamıştır → TAM iade (kullanılmamış hizmetin bedeli tutulmaz).
+ * HİZMET BEDELİ HİÇBİR İPTALDE İADE EDİLMEZ: bedel, güvenli takas hizmetinin
+ * karşılığıdır (eşleştirme, escrow, depo kontrol operasyonu) ve iptal edilen
+ * takasta da bu hizmet süreci işletilir. v1 satırlarında aynı rolü nakit-fark
+ * komisyonu (+KDV'si) oynar; o da iade edilmez.
  *
- * Hizmet bedeli ve nakit fark her iki durumda da iade edilir.
+ * KARGO bedeli yalnız fiilen kullanıldıysa iade dışıdır: ürün kargoya
+ * verildikten sonra iptal olduğunda platform bacakların maliyetini gerçekten
+ * ödemiştir. Henüz hiçbir ürün kargoya verilmemişken iptalde kargo hizmeti hiç
+ * doğmadığı için kargo bedeli iade edilir.
+ *
+ * NAKİT FARK her durumda iade edilir (takas gerçekleşmedi; fark alıcısına
+ * gidecek para payerına döner).
  *
  * NOT: takas TAMAMLANDIKTAN sonra iade süreci yoktur (`completed` terminal;
  * itiraz yolu yalnız dispute). Bu politika iptal / red / depoya-kabul-etmeme
@@ -35,6 +41,11 @@ export interface RefundablePayment {
   totalAmount: number | string | { toString(): string };
   /** Bu satırdaki kargo bedeli (v1 satırlarında 0). */
   shippingAmount: number | string | { toString(): string };
+  /** v2 sabit hizmet bedeli (KDV dahil; v1 satırlarında 0). */
+  tradeFeeAmount?: number | string | { toString(): string } | null;
+  /** v1 nakit-fark komisyonu ve KDV'si (v2 satırlarında 0). */
+  commissionAmount?: number | string | { toString(): string } | null;
+  commissionTaxAmount?: number | string | { toString(): string } | null;
 }
 
 export interface TradeRefundCandidate extends RefundablePayment {
@@ -46,20 +57,29 @@ export interface TradeRefundCandidate extends RefundablePayment {
   refundedAt?: Date | string | null;
 }
 
+/** Satırın iade edilmeyen hizmet bedeli bileşeni (v2 sabit ücret ∪ v1 komisyon+KDV). */
+export function tradeServiceFeeOf(payment: RefundablePayment): number {
+  return round2(
+    Math.max(0, Number(payment.tradeFeeAmount ?? 0) || 0) +
+      Math.max(0, Number(payment.commissionAmount ?? 0) || 0) +
+      Math.max(0, Number(payment.commissionTaxAmount ?? 0) || 0),
+  );
+}
+
 /**
- * Bu ödeme satırından iade edilecek tutar.
- *
- * v1 satırlarında `shippingAmount` 0 olduğu için sonuç her zaman tam iadedir —
- * eski davranış korunur.
+ * Bu ödeme satırından iade edilecek tutar:
+ * `total − hizmetBedeli − (kargoya verildiyse kargo)` — asla negatif olmaz.
  */
 export function refundableAmountFor(
   payment: RefundablePayment,
   ctx: TradeRefundContext,
 ): number {
   const total = Number(payment.totalAmount) || 0;
-  if (!tradeRefundExcludesShipping(ctx)) return round2(total);
-  const shipping = Number(payment.shippingAmount) || 0;
-  return round2(Math.max(0, total - shipping));
+  const serviceFee = tradeServiceFeeOf(payment);
+  const shipping = tradeRefundExcludesShipping(ctx)
+    ? Number(payment.shippingAmount) || 0
+    : 0;
+  return round2(Math.max(0, total - serviceFee - shipping));
 }
 
 /**

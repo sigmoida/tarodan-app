@@ -31,7 +31,6 @@ import { OutboxService } from "../outbox/outbox.service";
 import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
-  OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
   OUTBOX_ORDER_REVENUE_INVOICE,
   type InvoiceRefundReversePayload,
   type OrderRevenueInvoicePayload,
@@ -1389,18 +1388,26 @@ export class PaymentRefundService {
           refundedAt: payment.tradeCashPayment?.refundedAt,
           totalAmount: payment.tradeCashPayment?.totalAmount ?? payment.amount,
           shippingAmount: payment.tradeCashPayment?.shippingAmount ?? 0,
+          tradeFeeAmount: payment.tradeCashPayment?.tradeFeeAmount ?? 0,
+          commissionAmount: payment.tradeCashPayment?.commission ?? 0,
+          commissionTaxAmount:
+            payment.tradeCashPayment?.commissionTaxAmount ?? 0,
         },
         { handedToCargo },
       );
       if (amount <= 0) {
-        // Ödenenin tamamı kargoya gitmiş (iade edilecek bakiye yok).
-        skippedReason = "shipping_not_refundable";
+        // Hizmet bedeli (+ kargoya verildiyse kargo) düşülünce iade edilecek
+        // bakiye kalmadı.
+        skippedReason = "nothing_refundable_after_fees";
         continue;
       }
       const result = await this.refundOneTradeCashPayment(
         payment,
         tradeId,
         amount,
+        // Kargo bedeli yalnız hiç kargolanmamış iptalde iadeye dahildir; defter
+        // ters kaydı da aynı sinyali kullanır.
+        { shippingRefunded: !handedToCargo },
       );
       if (result.refunded) {
         refundedPaymentId = refundedPaymentId ?? result.paymentId;
@@ -1440,6 +1447,7 @@ export class PaymentRefundService {
     payment: any,
     tradeId: string,
     amount: number,
+    opts?: { shippingRefunded?: boolean },
   ): Promise<{
     refunded: boolean;
     paymentId?: string;
@@ -1665,13 +1673,11 @@ export class PaymentRefundService {
               where: { id: payment.tradeCashPaymentId },
               data: { status: PaymentStatus.refunded, refundedAt: new Date() },
             });
-            // Faz 5.3 (outbox): eLogo takas-iade ters kaydını iade persist'iyle ATOMİK
-            // sıraya al (post-commit anlık tetik hızlı-yol kalır; handler idempotent).
-            await this.outbox?.enqueue(tx, {
-              type: OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
-              payload: { tradeCashPaymentId: payment.tradeCashPaymentId },
-              dedupeKey: `${OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE}:${payment.tradeCashPaymentId}`,
-            });
+            // NOT: eLogo ters kaydı artık SIRAYA ALINMAZ. Hizmet bedeli hiçbir
+            // iptalde iade edilmediği için platformun hizmet/komisyon e-Arşivi
+            // geçerli kalır; iade edilen kısım (kargo/nakit fark) faturalanan
+            // hizmet bedeli değildir. (Kuyruktaki eski mesajlar için handler
+            // korunur.)
           }
           await tx.refundAttempt.update({
             where: { id: currentAttempt.id },
@@ -1719,11 +1725,10 @@ export class PaymentRefundService {
           recipientId: tcp?.recipientId,
           refundAmount: amount,
           escrowReversal: Math.min(netAmount, amount),
-          // İade tutarı kargoyu kapsıyorsa (tam iade) kargo da geri alınır.
-          shippingReversal:
-            amount >= Number(tcp?.totalAmount ?? 0) - 0.005
-              ? shippingAmount
-              : 0,
+          // Kargo ters kaydı, kargonun iadeye dahil olduğu sinyaline bağlıdır
+          // (hiç kargolanmamış iptal). Eski "amount == total" kıyası, hizmet
+          // bedeli artık hiç iade edilmediği için hiçbir zaman tutmazdı.
+          shippingReversal: opts?.shippingRefunded ? shippingAmount : 0,
         });
       } catch (e: any) {
         this.logger.warn(
@@ -1732,14 +1737,9 @@ export class PaymentRefundService {
       }
     }
 
-    // Takas komisyon e-Arşivini iptal et / iade faturası kes (post-commit, non-blocking).
-    if (payment.tradeCashPaymentId) {
-      void this.elogoInvoicing
-        .handleTradeCashRefund(payment.tradeCashPaymentId)
-        .catch((e) =>
-          this.logger.warn(`eLogo takas iade tetik hatası: ${e?.message}`),
-        );
-    }
+    // NOT: eLogo hizmet/komisyon e-Arşivi burada TERSLENMEZ — hizmet bedeli
+    // hiçbir iptalde iade edilmediği için fatura geçerli kalır (yalnız
+    // kargo/nakit fark iade edilir ve bunlar faturalanan hizmet bedeli değildir).
     return { refunded: true, paymentId: payment.id };
   }
 

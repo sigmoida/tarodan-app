@@ -587,6 +587,9 @@ export class AdminPaymentService {
                     refundedAt: cashPayment.refundedAt,
                     totalAmount: cashPayment.totalAmount,
                     shippingAmount: cashPayment.shippingAmount,
+                    tradeFeeAmount: cashPayment.tradeFeeAmount,
+                    commissionAmount: cashPayment.commission,
+                    commissionTaxAmount: cashPayment.commissionTaxAmount,
                   },
                   { handedToCargo: tradeHandedToCargo },
                 ),
@@ -871,6 +874,9 @@ export class AdminPaymentService {
                 refundedAt: cp.refundedAt,
                 totalAmount: cp.totalAmount,
                 shippingAmount: cp.shippingAmount,
+                tradeFeeAmount: cp.tradeFeeAmount,
+                commissionAmount: cp.commission,
+                commissionTaxAmount: cp.commissionTaxAmount,
               },
               { handedToCargo },
             ),
@@ -887,7 +893,9 @@ export class AdminPaymentService {
           throw new BadRequestException(
             `Takas iadesi politika tutarıyla yapılır: iade edilecek tutar ` +
               `${refundableTotal.toFixed(2)} TL` +
-              (handedToCargo ? " (kargo bedeli hariç)" : "") +
+              (handedToCargo
+                ? " (hizmet bedeli ve kargo hariç)"
+                : " (hizmet bedeli hariç)") +
               `. Farklı tutar girilemez.`,
           );
         }

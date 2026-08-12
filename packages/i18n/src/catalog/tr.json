@@ -1270,7 +1270,7 @@
     "paymentRefunded": "İade edildi",
     "waitingCounterpartyPayment": "Ödemeniz alındı. Karşı tarafın ödemesi bekleniyor.",
     "bothMustPay": "Ürünler, iki ödeme de tamamlanmadan kargoya verilmez.",
-    "shippingNotRefundable": "Ürünler kargoya verildikten sonra iptal edilirse kargo bedeli iade edilmez.",
+    "shippingNotRefundable": "Hizmet bedeli, güvenli takas hizmetinin karşılığı olduğu için iptalde iade edilmez. Ürünler kargoya verildikten sonra iptal edilirse kargo bedeli de iade edilmez.",
     "costPreviewTitle": "Bu teklifin maliyeti",
     "costPreviewYou": "Siz ödersiniz",
     "costPreviewThem": "Karşı taraf öder",

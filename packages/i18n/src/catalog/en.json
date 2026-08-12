@@ -1270,7 +1270,7 @@
     "paymentRefunded": "Refunded",
     "waitingCounterpartyPayment": "We received your payment. Waiting for the other party.",
     "bothMustPay": "Items are not handed to the carrier until both payments are complete.",
-    "shippingNotRefundable": "If the trade is cancelled after the items are handed to the carrier, the shipping fee is not refunded.",
+    "shippingNotRefundable": "The service fee covers the secure-trade service and is not refunded on cancellation. If the trade is cancelled after the items are handed to the carrier, the shipping fee is not refunded either.",
     "costPreviewTitle": "What this offer costs",
     "costPreviewYou": "You pay",
     "costPreviewThem": "They pay",
