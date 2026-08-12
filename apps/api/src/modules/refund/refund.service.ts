@@ -1164,7 +1164,11 @@ export class RefundService {
     const finalizedAt = new Date();
     const components = preview.financials.components;
 
-    return this.prisma.$transaction(async (tx) => {
+    // Bildirim tx İÇİNDE atılmaz: commit sonrası gönderilecek kupon iadeleri
+    // burada biriktirilir.
+    let restoredCoupons: { userId: string; code: string }[] = [];
+
+    const finalized = await this.prisma.$transaction(async (tx) => {
       const current = await tx.refundRequest.findUnique({
         where: { id: refundRequestId },
         select: {
@@ -1216,15 +1220,17 @@ export class RefundService {
       // Kusursuz alıcının kuponu geri verilir (kusur satıcıda/kargoda/platformda).
       // Alıcı kaynaklı iadede hak harcanmış sayılır.
       if (couponSurvivesFault(decision.faultParty as CouponFaultParty)) {
-        await this.discountService
+        const revoked = await this.discountService
           ?.revokeUsageForOrders(
             [current.orderId],
             `refund:${decision.resolvedReason}:${decision.faultParty}`,
             tx,
           )
-          .catch((error) =>
-            this.logger.warn(`kupon iadesi başarısız: ${error}`),
-          );
+          .catch((error) => {
+            this.logger.warn(`kupon iadesi başarısız: ${error}`);
+            return null;
+          });
+        restoredCoupons = revoked?.restoredCoupons ?? [];
       }
 
       await tx.refundFinancialComponent.createMany({
@@ -1406,6 +1412,17 @@ export class RefundService {
         include: { financialComponents: true },
       });
     });
+
+    // Commit başarılı: "kuponunuz geri verildi" haberi ancak şimdi doğru.
+    for (const coupon of restoredCoupons) {
+      await this.notificationService
+        ?.notifyCouponReturned(coupon.userId, coupon.code)
+        .catch((error) =>
+          this.logger.warn(`kupon iade bildirimi başarısız: ${error}`),
+        );
+    }
+
+    return finalized;
   }
 
   private async finalizeAutomaticV2RefundDecision(

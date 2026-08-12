@@ -202,8 +202,17 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING]:
     pattern("/profile/trades"),
   [NotificationType.TRADE_ADDRESS_REQUIRED]: pattern("/profile/trades"),
-  // Kargo kodu takasa aittir: üretici serbest link göndermez.
-  [NotificationType.CARGO_CODE_READY]: TRADE,
+  // Kargo kodu satış siparişinin gönderenine (satıcı) gider; takas bacağı için
+  // üretilirse orderId olmaz ve takas listesine düşer.
+  [NotificationType.CARGO_CODE_READY]: pattern(
+    "/seller/orders/{{orderId}}",
+    "/profile/trades",
+  ),
+
+  // Kupon geri verildi: kod mesajın içinde; gidilecek tekil ekran yok.
+  [NotificationType.COUPON_RETURNED]: none,
+  // Admin'e gider: hedef admin panelindeki kampanya listesi (serbest link).
+  [NotificationType.CAMPAIGN_BUDGET_EXHAUSTED]: free("adminLink"),
 
   // ── İade ─────────────────────────────────────────────────────────────────
   [NotificationType.REFUND_CANCELLED]: BUYER_ORDER,

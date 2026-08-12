@@ -361,6 +361,8 @@ export class PaymentExpiryReconciliationService {
     for (const order of expiredOrders) {
       try {
         let skippedInMotion = false;
+        // Kupon iadesi bildirimi tx İÇİNDE atılmaz; commit sonrası gönderilir.
+        let restoredCoupons: { userId: string; code: string }[] = [];
         await this.prisma.$transaction(async (tx) => {
           // Lock the order row to prevent concurrent modifications (e.g., seller shipping at the same time)
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
@@ -405,11 +407,13 @@ export class PaymentExpiryReconciliationService {
           });
 
           // Kusur satıcıda: alıcının kupon hakkı yanmaz, geri verilir.
-          await this.discountService
+          const revoked = await this.discountService
             ?.revokeUsageForOrders([order.id], "cancel:seller_no_ship", tx)
-            .catch((error) =>
-              this.logger.warn(`kupon iadesi başarısız: ${error}`),
-            );
+            .catch((error) => {
+              this.logger.warn(`kupon iadesi başarısız: ${error}`);
+              return null;
+            });
+          restoredCoupons = revoked?.restoredCoupons ?? [];
 
           // İncelemede bekleyen alıcı iptal talebi varsa onu bu iptal DEVRALIR.
           // Sonuç para açısından zaten talebin isteyeceğinden iyidir (satıcı
@@ -492,6 +496,20 @@ export class PaymentExpiryReconciliationService {
           this.logger.warn(
             `notify seller-no-ship failed for ${order.id}: ${notifyErr?.message}`,
           );
+        }
+
+        // Kupon geri verildiyse haber ver — commit sonrası olduğumuz için doğru an.
+        for (const coupon of restoredCoupons) {
+          try {
+            await this.notificationService.notifyCouponReturned(
+              coupon.userId,
+              coupon.code,
+            );
+          } catch (notifyErr: any) {
+            this.logger.warn(
+              `notify coupon-returned failed for ${order.id}: ${notifyErr?.message}`,
+            );
+          }
         }
 
         // Invalidate product cache

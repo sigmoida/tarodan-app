@@ -142,6 +142,11 @@ export class NotificationService {
     return this.commerce.notifyOrderManuallyConfirmed(sellerId, orderId);
   }
 
+  /** Kupon hakkı geri verildi — commit SONRASI çağrılır. */
+  async notifyCouponReturned(userId: string, code: string) {
+    return this.commerce.notifyCouponReturned(userId, code);
+  }
+
   /** `audience` ZORUNLU: aynı bildirim iki tarafa da gidiyor. */
   async notifyOrderForceCompletedByAdmin(
     userId: string,

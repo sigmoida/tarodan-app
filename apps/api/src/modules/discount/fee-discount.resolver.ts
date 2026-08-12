@@ -1,4 +1,5 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 import { DiscountAudience, DiscountTarget } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { audienceMatches } from "./discount-authorization";
@@ -53,7 +54,12 @@ type ActiveFeeDiscount = {
 export class FeeDiscountResolver {
   private readonly logger = new Logger(FeeDiscountResolver.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Bildirim tembel çözülür (moduleRef): discount ↔ notification modülleri
+    // arasında derleme-zamanı bağımlılık kurmamak için.
+    @Optional() private readonly moduleRef?: ModuleRef,
+  ) {}
 
   /** Şu an yürürlükte olan, kodsuz bedel kampanyaları. */
   async loadActive(now: Date = new Date()): Promise<ActiveFeeDiscount[]> {
@@ -164,13 +170,19 @@ export class FeeDiscountResolver {
           updated.budgetLimit != null &&
           Number(updated.budgetSpent) >= Number(updated.budgetLimit)
         ) {
-          await db.discount.updateMany({
+          const stopped = await db.discount.updateMany({
             where: { id: entry.discountId, budgetStoppedAt: null },
             data: { budgetStoppedAt: new Date() },
           });
           this.logger.log(
             `Kampanya bütçesi doldu, durduruldu: ${entry.discountId}`,
           );
+          // Yalnız damgayı BİZ bastıysak haber ver — yarışan iki harcama iki
+          // bildirim üretmesin. (Çevreleyen tx geri alınırsa bildirim yine de
+          // gitmiş olabilir; nadir ve zararsız, kampanya listesi gerçeği söyler.)
+          if (stopped.count > 0) {
+            await this.notifyBudgetExhausted(entry.discountId);
+          }
         }
       } catch (error) {
         // Bütçe muhasebesi ticareti durdurmaz; sapma raporda görünür.
@@ -178,6 +190,48 @@ export class FeeDiscountResolver {
           `bütçe düşümü başarısız (${entry.discountId}): ${error}`,
         );
       }
+    }
+  }
+
+  /**
+   * Bütçesi dolduğu için durdurulan kampanyayı aktif adminlere haber verir.
+   * Bildirim başarısızlığı ticareti durdurmaz; her hata yalnız loglanır.
+   */
+  private async notifyBudgetExhausted(discountId: string): Promise<void> {
+    try {
+      const [discount, admins] = await Promise.all([
+        this.prisma.discount.findUnique({
+          where: { id: discountId },
+          select: { name: true },
+        }),
+        this.prisma.adminUser.findMany({
+          where: { isActive: true },
+          select: { userId: true },
+        }),
+      ]);
+      if (!discount || !admins.length || !this.moduleRef) return;
+      const { NotificationService } =
+        await import("../notification/notification.service");
+      const { NotificationType } = await import("../notification/dto");
+      const svc = this.moduleRef.get(NotificationService, { strict: false });
+      if (!svc) return;
+      const adminBaseUrl =
+        process.env.ADMIN_URL?.replace(/\/$/, "") ||
+        (process.env.NODE_ENV === "production"
+          ? "https://admin.tarodan.com.tr"
+          : "http://localhost:3002");
+      const adminLink = `${adminBaseUrl}/marketing/discounts`;
+      for (const admin of admins) {
+        await svc.createInAppNotification(
+          admin.userId,
+          NotificationType.CAMPAIGN_BUDGET_EXHAUSTED,
+          { discountId, name: discount.name, adminLink },
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `bütçe-doldu bildirimi başarısız (${discountId}): ${error}`,
+      );
     }
   }
 

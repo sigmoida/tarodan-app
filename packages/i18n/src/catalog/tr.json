@@ -6889,6 +6889,14 @@
         "title": "İadeniz Tamamlandı",
         "message": "{refundNumber} numaralı iadeniz hesabınıza yansıtıldı."
       },
+      "couponReturned": {
+        "title": "Kuponunuz Geri Verildi",
+        "message": "İptal/iade sizin kusurunuz olmadığı için {code} kodlu kupon hakkınız geri verildi. Kodu yeni bir siparişte kullanabilirsiniz."
+      },
+      "campaignBudgetExhausted": {
+        "title": "Kampanya Bütçesi Doldu",
+        "message": "\"{name}\" kampanyasının bütçesi doldu ve kampanya otomatik durduruldu. Bütçeyi artırabilir veya kampanyayı kapalı bırakabilirsiniz."
+      },
       "refundRequestReceived": {
         "title": "İade Talebiniz Alındı",
         "message": "{refundNumber} numaralı iade talebiniz alındı, satıcı yanıtı bekleniyor."

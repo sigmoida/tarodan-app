@@ -45,6 +45,15 @@ import { isProductInDiscountScope } from "./discount-scope";
 import { FeeDiscountResolver } from "./fee-discount.resolver";
 import { automaticBudgetEntriesOf } from "./fee-discount.engine";
 
+/** Kusursuz iadede geri verilen kupon hakkı — commit SONRASI bildirim için. */
+export interface RestoredCoupon {
+  userId: string;
+  /** Yeniden kullanılabilecek kod (kişisel voucher ya da paylaşılan kod). */
+  code: string;
+  /** Kodun geçerlilik sonu; null = kampanya tarihi geçerli. */
+  expiresAt: Date | null;
+}
+
 /**
  * Kusursuz alıcıya iade edilen kupon, kampanya bittiyse koda özel bu kadar gün
  * daha yaşar (indirim-teknik §9).
@@ -1150,12 +1159,20 @@ export class DiscountService {
     orderIds: string[],
     reason: string,
     client?: Prisma.TransactionClient,
-  ): Promise<{ revoked: number; reissuedCodes: string[] }> {
-    if (!orderIds.length) return { revoked: 0, reissuedCodes: [] };
+  ): Promise<{
+    revoked: number;
+    reissuedCodes: string[];
+    /**
+     * Bildirim için: kupon hakkı geri verilen kullanıcılar ve tekrar
+     * kullanabilecekleri kod. Çağıran, TRANSACTION COMMIT olduktan sonra
+     * `notifyCouponReturned` ile haber verir — tx içinde bildirim atılmaz.
+     */
+    restoredCoupons: RestoredCoupon[];
+  }> {
+    const empty = { revoked: 0, reissuedCodes: [], restoredCoupons: [] };
+    if (!orderIds.length) return empty;
 
-    const run = async (
-      tx: Prisma.TransactionClient,
-    ): Promise<{ revoked: number; reissuedCodes: string[] }> => {
+    const run = async (tx: Prisma.TransactionClient): Promise<typeof empty> => {
       const usages = await tx.discountUsage.findMany({
         where: { orderId: { in: orderIds }, revokedAt: null },
         select: {
@@ -1169,10 +1186,11 @@ export class DiscountService {
           },
         },
       });
-      if (!usages.length) return { revoked: 0, reissuedCodes: [] };
+      if (!usages.length) return empty;
 
       const now = new Date();
       const reissuedCodes: string[] = [];
+      const restoredCoupons: RestoredCoupon[] = [];
 
       for (const usage of usages) {
         const marked = await tx.discountUsage.updateMany({
@@ -1215,6 +1233,11 @@ export class DiscountService {
             },
           });
           reissuedCodes.push(voucher.code);
+          restoredCoupons.push({
+            userId: usage.userId,
+            code: voucher.code,
+            expiresAt: personalWindow,
+          });
           continue;
         }
 
@@ -1230,10 +1253,23 @@ export class DiscountService {
             },
           });
           reissuedCodes.push(code);
+          restoredCoupons.push({
+            userId: usage.userId,
+            code,
+            expiresAt: personalWindow,
+          });
+        } else if (usage.discount.code) {
+          // Kampanya hâlâ yürürlükte: kota geri açıldı, kullanıcı paylaşılan
+          // kodu yeniden kullanabilir.
+          restoredCoupons.push({
+            userId: usage.userId,
+            code: usage.discount.code,
+            expiresAt: usage.discount.endDate,
+          });
         }
       }
 
-      return { revoked: usages.length, reissuedCodes };
+      return { revoked: usages.length, reissuedCodes, restoredCoupons };
     };
 
     return client ? run(client) : this.prisma.$transaction(run);

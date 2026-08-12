@@ -945,6 +945,26 @@ export class OrderLifecycleService {
     if (!completed) return { completed: false };
     // Emniyet: teslimde kesilmemişse burada da tetikle (idempotent).
     await this.emitDeliveryRevenueInvoices(orderId);
+    // İki tarafa da haber ver — 48h bayraklı eski yol (completeOrder
+    // auto_timeout) bildirim gönderiyordu, aktif yol sessiz kalıyordu.
+    const parties = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { buyerId: true, sellerId: true },
+    });
+    if (parties && this.notificationService) {
+      await Promise.allSettled([
+        this.notificationService.notifyOrderAutoCompleted(
+          parties.buyerId,
+          orderId,
+          "buyer",
+        ),
+        this.notificationService.notifyOrderAutoCompleted(
+          parties.sellerId,
+          orderId,
+          "seller",
+        ),
+      ]);
+    }
     this.logger.log(
       `Order ${orderId} auto-completed (iade penceresi kapandı: teslim + returnWindow)`,
     );

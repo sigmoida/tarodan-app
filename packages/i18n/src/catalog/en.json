@@ -6889,6 +6889,14 @@
         "title": "Your Refund Is Complete",
         "message": "Your refund {refundNumber} has been credited to your account."
       },
+      "couponReturned": {
+        "title": "Your Coupon Is Back",
+        "message": "Since the cancellation/return was not your fault, your coupon {code} has been restored. You can use the code on a new order."
+      },
+      "campaignBudgetExhausted": {
+        "title": "Campaign Budget Exhausted",
+        "message": "The budget of campaign \"{name}\" has been exhausted and the campaign was stopped automatically. You can raise the budget or leave it stopped."
+      },
       "refundRequestReceived": {
         "title": "Your Refund Request Was Received",
         "message": "Your refund request {refundNumber} was received and is awaiting the seller's response."

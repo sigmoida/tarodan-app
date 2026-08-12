@@ -126,6 +126,20 @@ export class NotificationCommerceService {
     });
   }
 
+  /**
+   * Kusursuz iadede/satıcı-kaynaklı iptalde kupon hakkı geri verildi. Kod mesajın
+   * içinde taşınır (kişisel voucher ya da paylaşılan kampanya kodu). TRANSACTION
+   * COMMIT olduktan sonra çağrılmalıdır.
+   */
+  async notifyCouponReturned(userId: string, code: string) {
+    return this.dispatch.send({
+      userId,
+      type: NotificationType.COUPON_RETURNED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { code },
+    });
+  }
+
   async notifyOrderManuallyConfirmed(sellerId: string, orderId: string) {
     return this.dispatch.send({
       userId: sellerId,

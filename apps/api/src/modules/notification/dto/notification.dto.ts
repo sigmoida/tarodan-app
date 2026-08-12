@@ -100,6 +100,11 @@ export enum NotificationType {
   REFUND_RETURN_DELIVERED_SELLER = "refund_return_delivered_seller",
   REFUND_COMPLETED_SELLER = "refund_completed_seller",
   REFUND_AUTO_ACCEPTED_SELLER = "refund_auto_accepted_seller",
+  // Kusursuz iadede/satıcı-kaynaklı iptalde kupon hakkı geri verildi — kullanıcı
+  // kodu (kişisel voucher ya da paylaşılan kod) yeniden kullanabilir.
+  COUPON_RETURNED = "coupon_returned",
+  // Kampanyanın TL bütçesi doldu ve kampanya otomatik durduruldu — admin'e gider.
+  CAMPAIGN_BUDGET_EXHAUSTED = "campaign_budget_exhausted",
 
   // Cross-flow auto-rejection
   OFFER_AUTO_REJECTED = "offer_auto_rejected",

@@ -78,11 +78,14 @@ describe("bildirim hedefleri", () => {
         { tradeId: "t1" },
         "/profile/trades/t1",
       ],
+      // Sipariş kargo kodu satıcının sipariş ekranına gider; takas bacağı
+      // (orderId yok) takas listesine düşer.
       [
         NotificationType.CARGO_CODE_READY,
-        { tradeId: "t1" },
-        "/profile/trades/t1",
+        { orderId: "o1" },
+        "/seller/orders/o1",
       ],
+      [NotificationType.CARGO_CODE_READY, { tradeId: "t1" }, "/profile/trades"],
       [
         NotificationType.NEW_MESSAGE,
         { threadId: "th1" },

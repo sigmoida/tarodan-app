@@ -401,6 +401,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.refundCompleted.message",
     icon: "💰",
   },
+  [NotificationType.COUPON_RETURNED]: {
+    titleKey: "server.notification.couponReturned.title",
+    messageKey: "server.notification.couponReturned.message",
+    icon: "🎟️",
+  },
+  [NotificationType.CAMPAIGN_BUDGET_EXHAUSTED]: {
+    titleKey: "server.notification.campaignBudgetExhausted.title",
+    messageKey: "server.notification.campaignBudgetExhausted.message",
+    icon: "🛑",
+  },
   [NotificationType.REFUND_REQUEST_RECEIVED]: {
     titleKey: "server.notification.refundRequestReceived.title",
     messageKey: "server.notification.refundRequestReceived.message",
