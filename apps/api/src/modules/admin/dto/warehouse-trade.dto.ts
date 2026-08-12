@@ -7,9 +7,9 @@ import { AdminListQueryDto } from "../../../common/list";
  * Depo kontrolünün kusur ataması. Red her iki tarafın ürününü de geri
  * gönderdiği için "kimin yüzünden" sorusunun cevabı yalnız serbest metinde
  * kalıyordu; artık yapısal olarak kaydedilir (denetim kaydı + operasyon
- * raporlaması). Mali sonucu BUGÜN değiştirmez — iade matrisi her iki tarafa
- * aynı uygulanır (bkz. docs/IDENTITY.md kardeşi docs/TAKAS.md) — ama ayrımı
- * yapmadan o kararı vermek de mümkün değildi.
+ * raporlaması). Mali sonucu BUGÜN değiştirmez — iade matrisi her iki tarafa aynı
+ * uygulanır (tek kaynak: `trade/trade-refund-policy.ts`) — ama ayrımı yapmadan
+ * o kararı vermek de mümkün değildi.
  */
 export const TRADE_INSPECTION_FAULT_SIDES = [
   "initiator",
