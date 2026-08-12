@@ -4,7 +4,7 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
-import { ProductStatus, MembershipTierType } from "@prisma/client";
+import { ProductKind, ProductStatus, MembershipTierType } from "@prisma/client";
 import { computeQualityScore } from "./helpers/quality-score";
 import { computeRelevanceScore } from "./helpers/relevance-score";
 import { NotificationService } from "../notification/notification.service";
@@ -32,8 +32,12 @@ export class ProductSchedulerService implements OnModuleInit {
     recentLike: 10, // Bonus for likes in last 7 days
   };
 
-  // Listing expiration settings
-  private readonly LISTING_EXPIRY_DAYS = 60; // Listings expire after 60 days
+  // İlan yaşam süresi (gün) — env'den; süre publishedAt'ten (yoksa createdAt)
+  // sayılır ve HER onayda tazelenir (yenileme = yeniden onay → taze pencere).
+  private readonly LISTING_EXPIRY_DAYS = (() => {
+    const parsed = Number(process.env.LISTING_TTL_DAYS);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 60;
+  })();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -445,14 +449,24 @@ export class ProductSchedulerService implements OnModuleInit {
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() - this.LISTING_EXPIRY_DAYS);
 
+      // Süre YAYIN anından sayılır (publishedAt; eski kayıtlarda createdAt).
+      // Yalnız gerçek ilanlar: membership/boost sanal ürünleri (kind != listing)
+      // yaşam süresine tabi değildir — eskiden onlar da 60 günde kapanıp
+      // platform hesabına "ilanınız sona erdi" e-postası tetikliyordu.
+      const expiryWhere = {
+        status: ProductStatus.active,
+        kind: ProductKind.listing,
+        OR: [
+          { publishedAt: { lt: expiryDate } },
+          { publishedAt: null, createdAt: { lt: expiryDate } },
+        ],
+      } as const;
+
       // Bu turda dolacak ilanları, satıcıya "ilanınız sona erdi" e-postası
       // gönderebilmek için updateMany'den ÖNCE topla (updateMany etkilenen
       // satırları döndürmez). Aynı where ile güncellendiği için tutarlı.
       const toExpire = await this.prisma.product.findMany({
-        where: {
-          status: ProductStatus.active,
-          createdAt: { lt: expiryDate },
-        },
+        where: expiryWhere,
         select: {
           id: true,
           title: true,
@@ -462,10 +476,7 @@ export class ProductSchedulerService implements OnModuleInit {
 
       // Find and update expired listings
       const result = await this.prisma.product.updateMany({
-        where: {
-          status: ProductStatus.active,
-          createdAt: { lt: expiryDate },
-        },
+        where: expiryWhere,
         data: {
           status: ProductStatus.inactive,
         },
@@ -579,7 +590,12 @@ export class ProductSchedulerService implements OnModuleInit {
       const expiringListings = await this.prisma.product.findMany({
         where: {
           status: ProductStatus.active,
-          createdAt: { gte: bandStart, lt: bandEnd },
+          kind: ProductKind.listing,
+          // Süre yayın anından sayılır (publishedAt; eski kayıtta createdAt).
+          OR: [
+            { publishedAt: { gte: bandStart, lt: bandEnd } },
+            { publishedAt: null, createdAt: { gte: bandStart, lt: bandEnd } },
+          ],
         },
         select: {
           id: true,

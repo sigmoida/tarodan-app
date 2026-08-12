@@ -427,7 +427,15 @@ export class AdminProductService {
 
     const updated = await this.prisma.product.update({
       where: { id: productId },
-      data: { status: ProductStatus.active },
+      // publishedAt her onayda tazelenir: ilan yaşam süresi (LISTING_TTL_DAYS)
+      // yayın anından sayılır — süresi dolup yeniden onaylanan ilan taze
+      // pencere alır (eskiden createdAt sabit kaldığı için ertesi cron yine
+      // kapatıyordu). Onay, varsa eski red gerekçesini de temizler.
+      data: {
+        status: ProductStatus.active,
+        publishedAt: new Date(),
+        rejectionReason: null,
+      },
     });
 
     await this.audit.createAuditLog(
@@ -570,7 +578,12 @@ export class AdminProductService {
 
         const updated = await this.prisma.product.update({
           where: { id: productId },
-          data: { status: ProductStatus.active },
+          // publishedAt tazelenir: yaşam süresi yayın anından sayılır.
+          data: {
+            status: ProductStatus.active,
+            publishedAt: new Date(),
+            rejectionReason: null,
+          },
         });
 
         await this.audit.createAuditLog(

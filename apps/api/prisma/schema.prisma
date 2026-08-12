@@ -621,6 +621,14 @@ model Product {
   /// Active only while a `showcaseOnHome` (Vitrin) package is running; the home
   /// showcase area queries `homeShowcaseUntil > now` ordered by `boostedAt` desc.
   homeShowcaseUntil   DateTime?               @map("home_showcase_until")
+  /// İlanın son YAYINA GİRİŞ anı — 60 günlük yaşam süresi (LISTING_TTL_DAYS)
+  /// buradan sayılır ve HER onayda tazelenir. Eskiden süre createdAt'ten
+  /// sayılıyordu: süresi dolan ilan yeniden onaylansa bile ertesi cron yine
+  /// kapatıyordu (yenileme imkânsızdı). null = eski kayıt → createdAt kullanılır.
+  publishedAt         DateTime?               @map("published_at")
+  /// Moderasyon reddinin gerekçesi — satıcıya kalıcı olarak gösterilir
+  /// (bildirim tek seferlikti, gerekçe kayboluyordu). Onayda temizlenir.
+  rejectionReason     String?                 @map("rejection_reason")
   qualityScore        Int                     @default(0) @map("quality_score")
   rankTier            Int                     @default(0) @map("rank_tier")
   relevanceScore      Int?                    @map("relevance_score")

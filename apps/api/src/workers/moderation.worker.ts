@@ -124,7 +124,12 @@ export class ModerationWorker {
     if (status === "passed") {
       const res = await this.prisma.product.updateMany({
         where: { id: productId, status: ProductStatus.pending },
-        data: { status: ProductStatus.active },
+        // publishedAt: yaşam süresi yayın anından sayılır (yenileme = taze pencere).
+        data: {
+          status: ProductStatus.active,
+          publishedAt: new Date(),
+          rejectionReason: null,
+        },
       });
       if (res.count > 0) {
         await this.refreshProductVisibility(productId);
