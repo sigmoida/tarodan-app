@@ -574,6 +574,9 @@ export class OrderCheckoutGroupService {
           // satıcının İLK satırına yüklenir (kardeş satırlar 0) → order.totalAmount +
           // grup toplamı formülü değişmeden per-seller olur.
           const sellerLineSubtotals = new Map<string, number>();
+          // Kupon ÖNCESİ satıcı alt-toplamları — yalnız ücretsiz kargo eşiği
+          // için (İ14): kupon, kazanılmış ücretsiz kargoyu geri alamaz.
+          const sellerListSubtotals = new Map<string, number>();
           const sellerDesiLines = new Map<
             string,
             Array<{ shippingDesi: number; quantity: number }>
@@ -587,6 +590,11 @@ export class OrderCheckoutGroupService {
             sellerLineSubtotals.set(
               entry.product.sellerId,
               (sellerLineSubtotals.get(entry.product.sellerId) ?? 0) + line,
+            );
+            sellerListSubtotals.set(
+              entry.product.sellerId,
+              (sellerListSubtotals.get(entry.product.sellerId) ?? 0) +
+                entry.productPrice * entry.quantity,
             );
             const packageLines =
               sellerDesiLines.get(entry.product.sellerId) ?? [];
@@ -698,6 +706,8 @@ export class OrderCheckoutGroupService {
                     subtotal,
                     billableDesi: sellerDesi.get(sellerId) ?? 1,
                     lineShares: sellerShareLines.get(sellerId) ?? [],
+                    thresholdSubtotal:
+                      sellerListSubtotals.get(sellerId) ?? subtotal,
                   });
                   const lead = pricing.find(
                     (entry) => entry.product.sellerId === sellerId,

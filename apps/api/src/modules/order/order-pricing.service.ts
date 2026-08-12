@@ -181,6 +181,8 @@ export class OrderPricingService {
     subtotal: number;
     billableDesi: number;
     lineShares: Array<ShippingBuyerShareByTier | null | undefined>;
+    /** Ücretsiz kargo eşiği için KUPON ÖNCESİ tutar; verilmezse subtotal. */
+    thresholdSubtotal?: number;
   }): ReturnType<typeof resolvePackageShippingDecision> {
     return this.guardTierConfig(() => resolvePackageShippingDecision(params));
   }
@@ -565,6 +567,8 @@ export class OrderPricingService {
     // paket (kargo) adımına devreder — kupon + tüm bedel kampanyaları birlikte
     // tavanı aşamaz.
     const sellerAllowanceLeft = new Map<string, number>();
+    // Kupon ÖNCESİ satıcı alt-toplamları — yalnız ücretsiz kargo eşiği için.
+    const sellerListSubtotals = new Map<string, number>();
     const buyerTier =
       (await this.feeDiscounts?.resolveBuyerTier(userId)) ?? null;
 
@@ -654,6 +658,12 @@ export class OrderPricingService {
         product.sellerId,
         (sellerSubtotals.get(product.sellerId) ?? 0) + discountedLine,
       );
+      // Ücretsiz kargo eşiği kupon ÖNCESİ tutardan denetlenir (İ14): kupon,
+      // kazanılmış ücretsiz kargoyu geri alamaz.
+      sellerListSubtotals.set(
+        product.sellerId,
+        (sellerListSubtotals.get(product.sellerId) ?? 0) + lineSubtotal,
+      );
       const desiLines = sellerDesiLines.get(product.sellerId) ?? [];
       desiLines.push({ shippingDesi: product.shippingDesi, quantity });
       sellerDesiLines.set(product.sellerId, desiLines);
@@ -695,6 +705,7 @@ export class OrderPricingService {
           subtotal,
           billableDesi,
           lineShares: sellerShippingShareLines.get(sellerId) ?? [],
+          thresholdSubtotal: sellerListSubtotals.get(sellerId) ?? subtotal,
         });
         // Kargo kampanyası PAKET kararından sonra uygulanır: kargo satırın değil
         // kolinin bedelidir (ücretsiz kargo eşiği de aynı kararın parçasıdır).

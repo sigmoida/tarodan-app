@@ -168,6 +168,12 @@ export function resolvePackageShippingDecision(params: {
   subtotal: number;
   billableDesi: number;
   lineShares: Array<ShippingBuyerShareByTier | null | undefined>;
+  /**
+   * Ücretsiz kargo eşiği KUPON ÖNCESİ tutardan denetlenir: kupon, kazanılmış
+   * ücretsiz kargoyu geri alamaz (indirim-müşteri §4 / İ14). Verilmezse
+   * `subtotal` kullanılır (kuponsuz yollarda ikisi aynıdır).
+   */
+  thresholdSubtotal?: number;
 }): {
   tierCode: ShippingPackageTierCode;
   fullShipping: number;
@@ -179,7 +185,7 @@ export function resolvePackageShippingDecision(params: {
   const tier = resolvePackageTier(tariff, billableDesi);
   const fullShipping = outboundPackageShipping(
     tariff,
-    subtotal,
+    params.thresholdSubtotal ?? subtotal,
     billableDesi,
   ).toNumber();
   const buyerShare = resolvePackageShippingBuyerShare(

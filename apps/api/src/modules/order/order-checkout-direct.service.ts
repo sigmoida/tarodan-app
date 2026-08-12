@@ -408,6 +408,8 @@ export class OrderCheckoutDirectService {
         subtotal: discountedPrice,
         billableDesi: product.shippingDesi,
         lineShares: [rawCommissionResult.shippingBuyerShares],
+        // Ücretsiz kargo eşiği kupon ÖNCESİ fiyattan denetlenir (İ14).
+        thresholdSubtotal: productPrice,
       });
 
       // Platformun bedel kampanyaları: KDV'den ÖNCE uygulanır (bedel inince
