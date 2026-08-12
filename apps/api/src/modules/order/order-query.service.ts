@@ -11,6 +11,7 @@ import { OrderCommonService } from "./order-common.service";
 import {
   PUBLIC_NAME_SELECT,
   publicIdentityFields,
+  toPublicIdentity,
 } from "../../common/helpers/public-identity";
 
 /**
@@ -18,6 +19,22 @@ import {
  * kazanç özeti) — OrderService'ten birebir taşındı. OrderService aynı
  * imzalarla buraya delege eder.
  */
+/**
+ * Teslimat adresi JSON'u yalnız müşterinin girdiği alanlardan oluşmaz; kargo
+ * entegrasyonu ve misafir akışı buraya iç anahtarlar da yazar. Herkese açık
+ * takip yanıtında bunların yeri yok.
+ */
+const INTERNAL_ADDRESS_KEYS = ["suratIdempotencyKey"] as const;
+
+function stripInternalAddressFields(address: unknown) {
+  if (!address || typeof address !== "object" || Array.isArray(address)) {
+    return address;
+  }
+  const clean: Record<string, unknown> = { ...(address as object) };
+  for (const key of INTERNAL_ADDRESS_KEYS) delete clean[key];
+  return clean;
+}
+
 @Injectable()
 export class OrderQueryService {
   constructor(
@@ -235,8 +252,10 @@ export class OrderQueryService {
           order.product.images?.[0]?.cardKey,
         ),
       },
-      seller: order.seller,
-      shippingAddress: order.shippingAddress,
+      seller: toPublicIdentity(order.seller),
+      // Teslimat verisi müşterinin kendi girdiği alanlardır; kargo entegrasyonu
+      // için eklenen iç anahtarlar yükte yeri olmayan uygulama detayıdır.
+      shippingAddress: stripInternalAddressFields(order.shippingAddress),
       shipment: order.shipment
         ? {
             provider: order.shipment.provider,

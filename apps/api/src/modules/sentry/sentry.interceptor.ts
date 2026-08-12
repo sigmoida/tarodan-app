@@ -21,13 +21,11 @@ export class SentryInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     const { method, url, body, params, query, user } = request;
 
-    // Set user context if available
+    // Hata kaydına kimlik olarak YALNIZ id gider. E-posta ve gerçek ad üçüncü
+    // taraf hata izleyicisine taşınacak kişisel veridir; kullanıcıyı panelden
+    // id ile bulmak yeterli.
     if (user) {
-      Sentry.setUser({
-        id: user.id,
-        email: user.email,
-        username: user.displayName,
-      });
+      Sentry.setUser({ id: user.id });
     }
 
     // Add request context
