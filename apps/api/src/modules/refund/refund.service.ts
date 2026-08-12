@@ -30,6 +30,7 @@ import {
   PAYMENT_CONFIG_KEYS,
   envConfigNumber,
 } from "../payment/payment.constants";
+import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
@@ -532,16 +533,11 @@ export class RefundService {
         "Yalnız ödenmiş ve kargo öncesindeki siparişler iptal edilebilir",
       );
     }
-    const preHandoverShipmentStatuses: ShipmentStatus[] = [
-      ShipmentStatus.pending,
-      ShipmentStatus.label_created,
-      ShipmentStatus.cancelled,
-      ShipmentStatus.failed,
-    ];
-    if (
-      order.shipment &&
-      !preHandoverShipmentStatuses.includes(order.shipment.status)
-    ) {
+    // Devir tanımı TEK KAYNAK (shipment-handover): hareket eden durum VEYA
+    // shippedAt. Yalnız statüye bakmak yetmiyordu — Sürat bilinmeyen bir durum
+    // kodu döndürdüğünde poller statüyü değiştirmeden shippedAt yazıyor ve koli
+    // fiilen yoldayken iptal kabul ediliyordu.
+    if (isShipmentHandedToCarrier(order.shipment)) {
       throw new BadRequestException(
         "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
       );
@@ -573,35 +569,70 @@ export class RefundService {
     const refundNumber = await this.generateRefundNumber();
     let created;
     try {
-      created = await this.prisma.refundRequest.create({
-        data: {
-          refundNumber,
-          orderId: order.id,
-          requesterId,
-          reason:
-            reasonCode === OrderCancellationReason.delivery_delayed
-              ? RefundReason.other
-              : RefundReason.changed_mind,
-          description: description?.trim() || null,
-          amount: financial.financials.buyerRefundAmount,
-          refundQuantity: order.quantity ?? 1,
-          status: policy.requiresAdminReview
-            ? RefundRequestStatus.pending_review
-            : RefundRequestStatus.approved,
-          ...this.refundFinancialData(policy, financial),
-          ...(policy.requiresAdminReview && this.refundPolicyV2Enabled()
-            ? {
-                policyVersion: 2,
-                financialReviewRequired: true,
-                financialPolicySnapshot: {
-                  version: 2,
-                  provisional: true,
-                  claimReason: reasonCode,
-                  legacyProvisionalCalculation: financial.snapshot,
-                } as unknown as Prisma.InputJsonValue,
-              }
-            : {}),
-        },
+      /**
+       * İptal talebi, sipariş satırı KİLİTLİYKEN ve uygunluk koşulları YENİDEN
+       * doğrulanarak yazılır. Eskiden uygunluk düz bir okumayla (preflight)
+       * kontrol ediliyor, talep ise kilitsiz yazılıyordu: satıcının "kargoya
+       * verdim" isteği tam bu aralıkta commit olursa kargolanmış sipariş iptal
+       * ediliyor ve parası iade ediliyordu.
+       *
+       * Karşı yön de kapalıdır: kargoya veriliş yolu da aynı satır kilidini
+       * alır ve AKTİF iade talebi görürse reddeder (shipping.service). Yani iki
+       * komuttan hangisi önce commit ederse diğeri temiz bir hatayla düşer.
+       */
+      created = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
+        const fresh = await tx.order.findUnique({
+          where: { id: order.id },
+          select: {
+            status: true,
+            shipment: { select: { status: true, shippedAt: true } },
+          },
+        });
+        if (
+          !fresh ||
+          (fresh.status !== OrderStatus.paid &&
+            fresh.status !== OrderStatus.preparing)
+        ) {
+          throw new BadRequestException(
+            "Sipariş durumu az önce değişti; iptal edilemedi",
+          );
+        }
+        if (isShipmentHandedToCarrier(fresh.shipment)) {
+          throw new BadRequestException(
+            "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
+          );
+        }
+        return tx.refundRequest.create({
+          data: {
+            refundNumber,
+            orderId: order.id,
+            requesterId,
+            reason:
+              reasonCode === OrderCancellationReason.delivery_delayed
+                ? RefundReason.other
+                : RefundReason.changed_mind,
+            description: description?.trim() || null,
+            amount: financial.financials.buyerRefundAmount,
+            refundQuantity: order.quantity ?? 1,
+            status: policy.requiresAdminReview
+              ? RefundRequestStatus.pending_review
+              : RefundRequestStatus.approved,
+            ...this.refundFinancialData(policy, financial),
+            ...(policy.requiresAdminReview && this.refundPolicyV2Enabled()
+              ? {
+                  policyVersion: 2,
+                  financialReviewRequired: true,
+                  financialPolicySnapshot: {
+                    version: 2,
+                    provisional: true,
+                    claimReason: reasonCode,
+                    legacyProvisionalCalculation: financial.snapshot,
+                  } as unknown as Prisma.InputJsonValue,
+                }
+              : {}),
+          },
+        });
       });
     } catch (error) {
       if (this.isDuplicateActiveRefund(error)) {
@@ -836,15 +867,8 @@ export class RefundService {
         ).code
       : order.product.shippingPackageTier;
 
-    const preHandoverStatuses: ShipmentStatus[] = [
-      ShipmentStatus.pending,
-      ShipmentStatus.label_created,
-      ShipmentStatus.cancelled,
-      ShipmentStatus.failed,
-    ];
-    const hasShipped = Boolean(
-      order.shipment && !preHandoverStatuses.includes(order.shipment.status),
-    );
+    // Kargo hizmeti fiilen tüketildi mi — iptal kapılarıyla AYNI tanım.
+    const hasShipped = isShipmentHandedToCarrier(order.shipment);
     const activeReturnTariff = hasShipped
       ? await this.shippingTariffService.getActiveOutboundTariff("surat")
       : null;
@@ -917,6 +941,26 @@ export class RefundService {
     );
     const completesLine =
       priorRefundedQuantity + rr.refundQuantity >= (order.quantity ?? 1);
+    /**
+     * Kargo bedeli PAKET başınadır (escrow hold'u da tam kargoyu paketten bir
+     * kez düşer), bu yüzden satırın tamamlanması tek başına yetmez: koli hâlâ
+     * kardeş satırlar için yola çıkacaksa kargo iade EDİLMEZ. Aksi halde aynı
+     * satıcıdan iki satırlık sepette her satır iptalinde aynı koli bedeli
+     * yeniden iade ediliyordu (grup iptali satır satır döndüğü için birebir
+     * bu senaryo). Paketi KAPATAN son iade kargoyu bir kez iade eder.
+     */
+    const packageStillShipping = order.packageId
+      ? (await this.prisma.order.count({
+          where: {
+            packageId: order.packageId,
+            id: { not: order.id },
+            status: {
+              notIn: [OrderStatus.cancelled, OrderStatus.refunded],
+            },
+          },
+        })) > 0
+      : false;
+    const closesPackageShipping = completesLine && !packageStillShipping;
     const financials = calculateRefundFinancialsV2({
       productGrossAmount,
       productTaxAmount,
@@ -935,6 +979,7 @@ export class RefundService {
       hasShipped,
       outboundAlreadySettled,
       completesLine,
+      closesPackageShipping,
     });
     const returnTariff = activeReturnTariff
       ? {
@@ -957,6 +1002,7 @@ export class RefundService {
       serviceVatRate: Number(order.serviceVatRate ?? 0),
       outboundAlreadySettled,
       completesLine,
+      closesPackageShipping,
       returnTariff,
       financials,
     };

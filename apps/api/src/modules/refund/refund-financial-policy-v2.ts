@@ -55,6 +55,19 @@ export interface RefundFinancialInputV2 {
    * Verilmezse refundQuantity >= orderQuantity'den türetilir.
    */
   completesLine?: boolean;
+  /**
+   * Bu iade, KOLİNİN (OrderPackage) kargo yükümlülüğünü de kapatıyor mu —
+   * yani satır tamamlanıyor VE pakette hâlâ gidecek başka satır kalmıyor mu?
+   *
+   * Kargo bedeli SATIR değil PAKET başınadır (escrow hold'u da tam kargoyu
+   * paketten bir kez düşer). Aynı satıcıdan iki satırlık bir sepette her satır
+   * için kargo iade edilirse aynı koli iki kez iade edilmiş olur. Bu yüzden
+   * gidiş-kargo bileşenleri yalnız paketi kapatan iadede üretilir; kardeşleri
+   * hâlâ giden bir satırın iptali kargo bedelini iade ETMEZ (koli yine yola
+   * çıkacaktır). Verilmezse `completesLine`'a düşer (paketsiz/tek satırlık
+   * sipariş).
+   */
+  closesPackageShipping?: boolean;
 }
 
 export interface RefundFinancialResultV2 {
@@ -184,8 +197,15 @@ export function calculateRefundFinancialsV2(
   // adetlere hizmet etmiştir. Yalnız satırı tamamlayan iade kargo bileşenlerini
   // ve tek seferlik koli mutabakatını üretir.
   const completesLine = input.completesLine ?? quantityPortion >= 1;
+  // Kargo bedeli PAKET başınadır: satır tamamlansa bile kardeş satırlar hâlâ
+  // gidiyorsa gidiş-kargo bileşeni üretilmez (bkz. closesPackageShipping).
+  const closesPackageShipping = input.closesPackageShipping ?? completesLine;
   let outboundSettlementRequired = false;
-  if (completesLine && input.hasShipped && !input.outboundAlreadySettled) {
+  if (
+    closesPackageShipping &&
+    input.hasShipped &&
+    !input.outboundAlreadySettled
+  ) {
     outboundSettlementRequired = input.outboundFullShippingAmount > 0;
     if (input.faultParty === "seller") {
       // Even for a partial return, the buyer receives their complete outbound
@@ -260,8 +280,18 @@ export function calculateRefundFinancialsV2(
         { oneShotPackageSettlement: true },
       );
     }
-  } else if (completesLine && !input.hasShipped) {
+  } else if (
+    closesPackageShipping &&
+    !input.hasShipped &&
+    !input.outboundAlreadySettled
+  ) {
     // No carrier handover means no shipping service was consumed.
+    //
+    // Bu dal da TEK SEFERLİK koli mutabakatı yazar: iptal (kargo öncesi)
+    // yolunda mutabakat satırı üretilmediği için `outboundAlreadySettled`
+    // hiçbir zaman true olmuyordu ve aynı paketin her satırı kargo bedelini
+    // yeniden iade ettirebiliyordu.
+    outboundSettlementRequired = input.outboundFullShippingAmount > 0;
     add(
       "outbound_shipping",
       "buyer_refund",
