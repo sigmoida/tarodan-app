@@ -185,8 +185,18 @@ export const financeApi = {
     dateFrom?: string;
     dateTo?: string;
   }) => api.get("/admin/payouts/export", { params }),
-  releasePayout: (orderId: string, reason: string) =>
-    api.post(`/admin/payouts/release/${orderId}`, { reason }),
+  // force = erken bırakma: yalnız tarih şartını esnetir (teslim/iade/frozen
+  // guard'ları backend'de aynen geçerli).
+  releasePayout: (orderId: string, reason: string, force?: boolean) =>
+    api.post(`/admin/payouts/release/${orderId}`, {
+      reason,
+      ...(force ? { force } : {}),
+    }),
+  releaseTradeHold: (tradeId: string, reason: string, force?: boolean) =>
+    api.post(`/admin/payouts/release-trade/${tradeId}`, {
+      reason,
+      ...(force ? { force } : {}),
+    }),
 
   // Tax Settings — simple VAT config (the old region/rate/rule CRUD was removed
   // from the UI; the backend endpoints remain, the UI uses the tax/vat surface)

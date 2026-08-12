@@ -50,6 +50,13 @@ export const operationsApi = {
     api.post(`/admin/trades/${tradeId}/mark-warehouse-received`, {
       shipmentId,
     }),
+  // Taşıyıcı teslim raporu hiç gelmediğinde operasyonun elle teslim işaretlemesi;
+  // iki çıkış kolisi de teslim olunca escrow onay penceresi başlar.
+  markOutboundDelivered: (tradeId: string, shipmentId: string, note?: string) =>
+    api.post(`/admin/trades/${tradeId}/mark-outbound-delivered`, {
+      shipmentId,
+      ...(note ? { note } : {}),
+    }),
   approveTrade: (tradeId: string, notes?: string) =>
     api.post(`/admin/trades/${tradeId}/approve`, notes ? { notes } : {}),
   rejectTrade: (tradeId: string, reason: string) =>

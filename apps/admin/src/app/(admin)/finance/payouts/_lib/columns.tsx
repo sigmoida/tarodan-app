@@ -57,7 +57,7 @@ export const scheduleColumns = (t: T) => [
 ];
 
 export function transactionColumns(
-  onRelease: ((orderId: string) => void) | undefined,
+  onRelease: ((orderId: string, early: boolean) => void) | undefined,
   t: T,
 ) {
   return [
@@ -121,30 +121,33 @@ export function transactionColumns(
       { sortKey: "status" },
     ),
     // Tek aksiyon için ⋯ menüsü gereksiz tıklamaydı; Transferler sekmesindeki
-    // "Yeniden Dene" ile aynı desen: doğrudan düğme. Yalnız HELD satırda görünür,
-    // iade penceresi (releaseAt) dolmadan devre dışıdır; tıklayınca gerekçe
-    // isteyen onay modalı (ReleasePayoutModal) açılır.
+    // "Yeniden Dene" ile aynı desen: doğrudan düğme. Yalnız HELD satırda görünür.
+    // Süresi dolmuşsa normal release; teslim edilmiş ama süresi dolmamışsa
+    // ERKEN release (uyarılı modal, force ile gider). Teslim edilmemiş
+    // (releaseAt yok) ya da donuk (açık iade) satırda düğme yok — backend de
+    // reddeder.
     ...(onRelease
       ? [
           col.actions<PayoutTransaction>(
             (row) => {
               if (row.status !== "held") return null;
+              if (row.releaseAt == null || row.frozenByRefundId) return null;
               const releaseDue =
-                row.releaseAt != null &&
                 new Date(row.releaseAt).getTime() <= Date.now();
               return (
                 <Button
                   size="sm"
-                  variant="secondary"
-                  disabled={!releaseDue}
+                  variant={releaseDue ? "secondary" : "outline"}
                   title={
                     releaseDue
                       ? undefined
-                      : t("admin.finance.payouts.releaseDescription")
+                      : t("admin.finance.payouts.earlyReleaseHint")
                   }
-                  onClick={() => onRelease(row.orderId)}
+                  onClick={() => onRelease(row.orderId, !releaseDue)}
                 >
-                  {t("admin.finance.payouts.release")}
+                  {releaseDue
+                    ? t("admin.finance.payouts.release")
+                    : t("admin.finance.payouts.releaseEarly")}
                 </Button>
               );
             },

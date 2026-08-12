@@ -17,10 +17,15 @@ import { ReleasePayoutModal } from "./ReleasePayoutModal";
 export function TransactionsTab() {
   const t = useTranslations();
   const { user } = useSession();
-  const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<{
+    orderId: string;
+    early: boolean;
+  } | null>(null);
 
   const columns = transactionColumns(
-    user?.role === "super_admin" ? setReleaseOrderId : undefined,
+    user?.role === "super_admin"
+      ? (orderId, early) => setReleaseTarget({ orderId, early })
+      : undefined,
     t,
   );
 
@@ -57,10 +62,11 @@ export function TransactionsTab() {
         emptyText={t("admin.finance.payouts.empty")}
       />
       <ResourceList.Pagination />
-      {releaseOrderId && (
+      {releaseTarget && (
         <ReleasePayoutModal
-          orderId={releaseOrderId}
-          onClose={() => setReleaseOrderId(null)}
+          orderId={releaseTarget.orderId}
+          early={releaseTarget.early}
+          onClose={() => setReleaseTarget(null)}
         />
       )}
     </ResourceList>

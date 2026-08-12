@@ -17,6 +17,7 @@ import {
 } from "./_lib/trade";
 import { CompensationPanel } from "./_sections/CompensationPanel";
 import { RefundFailurePanel } from "./_sections/RefundFailurePanel";
+import { EscrowReleasePanel } from "./_sections/EscrowReleasePanel";
 import { StuckPanel } from "./_sections/StuckPanel";
 import { ReviewPanel } from "./_sections/ReviewPanel";
 import { TradeInfoCards } from "./_sections/TradeInfoCards";
@@ -58,17 +59,35 @@ export default function TradeDetailPage() {
       successMessage: t("admin.operations.trades.returnDeliveredMsg"),
     },
   );
+  // Taşıyıcı teslimi hiç raporlamazsa escrow onay penceresi başlamaz; operasyon
+  // fiziksel teslimi doğrulayıp elle işaretler.
+  const outboundDelivered = useAdminMutation(
+    (shipmentId: string) => adminApi.markOutboundDelivered(id, shipmentId),
+    {
+      invalidates: ["trades"],
+      successMessage: t("admin.operations.trades.outboundDeliveredMsg"),
+    },
+  );
   const processingShipmentId: string | null = warehouse.isPending
     ? (warehouse.variables ?? null)
     : returnDelivered.isPending
       ? (returnDelivered.variables ?? null)
-      : null;
+      : outboundDelivered.isPending
+        ? (outboundDelivered.variables ?? null)
+        : null;
 
   const handleMarkWarehouse = async (shipmentId: string) => {
     await confirm({
       description: t("admin.operations.trades.confirmWarehouse"),
       destructive: true,
       onConfirm: () => warehouse.mutateAsync(shipmentId),
+    });
+  };
+  const handleMarkOutboundDelivered = async (shipmentId: string) => {
+    await confirm({
+      description: t("admin.operations.trades.confirmOutboundDelivered"),
+      destructive: true,
+      onConfirm: () => outboundDelivered.mutateAsync(shipmentId),
     });
   };
   const handleMarkReturnDelivered = async (shipmentId: string) => {
@@ -135,6 +154,7 @@ export default function TradeDetailPage() {
           <>
             <CompensationPanel trade={trade} />
             <RefundFailurePanel trade={trade} />
+            <EscrowReleasePanel trade={trade} />
             <StuckPanel
               trade={trade}
               show={canForceCancelStuck}
@@ -183,8 +203,16 @@ export default function TradeDetailPage() {
                   <ShipmentLegCard
                     title={t("admin.operations.trades.legFromWarehouse")}
                     shipments={fromWarehouse}
-                    actionLabel={null}
-                    onAction={null}
+                    actionLabel={
+                      isShippingToRecipients
+                        ? t("admin.operations.trades.markOutboundDelivered")
+                        : null
+                    }
+                    onAction={
+                      isShippingToRecipients
+                        ? handleMarkOutboundDelivered
+                        : null
+                    }
                     processingShipmentId={processingShipmentId}
                     productsByShipmentId={shipmentProducts}
                     infoMessage={

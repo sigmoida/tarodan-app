@@ -64,6 +64,10 @@ export interface TradeCashPayment {
   status: string;
   paidAt?: string | null;
   refundedAt?: string | null;
+  /** Escrow: takas tamamlanınca damgalanan serbest bırakma zamanı. */
+  holdReleaseAt?: string | null;
+  /** Nakit fark karşı tarafa açıldıysa dolu. */
+  releasedAt?: string | null;
 }
 
 export interface TradePaymentQuoteParty {

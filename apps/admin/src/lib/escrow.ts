@@ -1,3 +1,9 @@
+import {
+  ESCROW_RELEASE_DAYS,
+  PAYOUT_GRACE_DAYS,
+  REFUND_COOLING_OFF_DAYS,
+} from "@tarodan/shared";
+
 /**
  * Escrow / payout scheduling helpers (new escrow model).
  *
@@ -11,12 +17,12 @@
  * payout list has a releaseAt, that real value takes precedence.
  */
 
-/** Refund window: 14 days of unconditional returns after delivery. */
-export const REFUND_WINDOW_DAYS = 14;
-/** 1-day grace after the window closes, before payout. */
-export const PAYOUT_GRACE_DAYS = 1;
-/** Total days from delivery to release (14 + 1). */
-export const ESCROW_RELEASE_DAYS = REFUND_WINDOW_DAYS + PAYOUT_GRACE_DAYS;
+// Gün sayıları @tarodan/shared'ta TEK yerde tanımlıdır (policy-constants);
+// burada yerel kopya TUTMA — sürüklenip backend'le çelişiyordu.
+export { PAYOUT_GRACE_DAYS, ESCROW_RELEASE_DAYS };
+
+/** Refund window: unconditional returns after delivery, in days. */
+export const REFUND_WINDOW_DAYS = REFUND_COOLING_OFF_DAYS;
 
 const DAY_MS = 86_400_000;
 
