@@ -80,18 +80,14 @@ export class OrderQueryService {
   }
 
   /**
-   * Track guest order by order number and email
-   * Requirement: Guest checkout (requirements.txt)
+   * Müşterinin elindeki kod hangi seviyede olursa olsun (ORD-… sipariş satırı ·
+   * GRP-… sepet · PKG-… koli/kargo etiketi) tekil bir sipariş numarasına çözer.
+   * Takip ve misafir iptali AYNI çözümlemeyi kullanır.
    */
-  async trackGuestOrder(dto: GuestOrderTrackDto) {
-    // Üç kod seviyesinin HEPSİ kabul edilir — müşterinin elindeki hangisiyse:
-    //   ORD-… sipariş satırı · GRP-… sepet · PKG-… koli (kargo etiketindeki kod).
-    // Grup/koli kendi ilk siparişine çözülür; kardeş sipariş numaraları yanında
-    // döner (müşteri tüm sepeti/koliyi takip edebilsin).
-    let lookupNumber = dto.orderNumber;
+  private async resolveGuestLookupNumber(orderNumber: string): Promise<string> {
     const [group, orderPackage] = await Promise.all([
       this.prisma.checkoutGroup.findUnique({
-        where: { groupNumber: dto.orderNumber },
+        where: { groupNumber: orderNumber },
         select: {
           orders: {
             orderBy: { createdAt: "asc" },
@@ -100,7 +96,7 @@ export class OrderQueryService {
         },
       }),
       this.prisma.orderPackage.findUnique({
-        where: { packageNumber: dto.orderNumber },
+        where: { packageNumber: orderNumber },
         select: {
           orders: {
             orderBy: { createdAt: "asc" },
@@ -112,9 +108,53 @@ export class OrderQueryService {
     const resolved = group?.orders?.length
       ? group.orders
       : orderPackage?.orders;
-    if (resolved?.length) {
-      lookupNumber = resolved[0].orderNumber;
+    return resolved?.length ? resolved[0].orderNumber : orderNumber;
+  }
+
+  /**
+   * Misafir erişim doğrulaması (takip ucuyla AYNI kural): sipariş numarası +
+   * siparişte kayıtlı e-posta. Doğrulanırsa siparişin kimliği ve (iptal gibi
+   * sahiplik isteyen komutlar için) sentetik alıcı kimliği döner. E-posta
+   * tutmazsa "bulunamadı" denir — kayıt varlığı sızdırılmaz.
+   */
+  async resolveGuestOrderAccess(dto: {
+    orderNumber: string;
+    email: string;
+  }): Promise<{ id: string; buyerId: string }> {
+    const lookupNumber = await this.resolveGuestLookupNumber(dto.orderNumber);
+    const order = await this.prisma.order.findUnique({
+      where: { orderNumber: lookupNumber },
+      select: {
+        id: true,
+        buyerId: true,
+        shippingAddress: true,
+        buyer: { select: { email: true } },
+      },
+    });
+    if (!order) {
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
+    const guestEmail = (
+      order.shippingAddress as { guestEmail?: string } | null
+    )?.guestEmail?.toLowerCase();
+    const buyerEmail = order.buyer.email?.toLowerCase();
+    const inputEmail = dto.email.toLowerCase();
+    if (guestEmail !== inputEmail && buyerEmail !== inputEmail) {
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
+    }
+    return { id: order.id, buyerId: order.buyerId };
+  }
+
+  /**
+   * Track guest order by order number and email
+   * Requirement: Guest checkout (requirements.txt)
+   */
+  async trackGuestOrder(dto: GuestOrderTrackDto) {
+    // Üç kod seviyesinin HEPSİ kabul edilir — müşterinin elindeki hangisiyse:
+    //   ORD-… sipariş satırı · GRP-… sepet · PKG-… koli (kargo etiketindeki kod).
+    // Grup/koli kendi ilk siparişine çözülür; kardeş sipariş numaraları yanında
+    // döner (müşteri tüm sepeti/koliyi takip edebilsin).
+    const lookupNumber = await this.resolveGuestLookupNumber(dto.orderNumber);
 
     const order = await this.prisma.order.findUnique({
       where: { orderNumber: lookupNumber },

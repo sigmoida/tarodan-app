@@ -36,6 +36,8 @@ export interface Order {
     carrier?: string;
     provider?: string;
     status: string;
+    /** İlk fiziksel devir mührü — iptal hakkının bittiği an (bkz. hasShipped). */
+    shippedAt?: string | null;
   };
   isBuyer?: boolean;
   isSeller?: boolean;
@@ -109,6 +111,18 @@ export const sellerNetOf = (order: Order): number | null => {
 export const isCancelledOrder = (order: Order): boolean =>
   order.cancellationType === "iptal" || order.status === "cancelled";
 
+/**
+ * Kargoya devir sayılmayan gönderi durumları: etiket kesilmiş (label_created)
+ * olabilir ama paket henüz taşıyıcıya geçmemiştir — backend de bu aşamada
+ * iptale izin verir (shipment-handover.ts ile aynı liste).
+ */
+const PRE_HANDOVER_SHIPMENT_STATUSES = [
+  "pending",
+  "label_created",
+  "cancelled",
+  "failed",
+];
+
 /** Sürat'ta yalnız taşıyıcının gerçek kodu gösterilir; iç paket referansı gösterilmez. */
 export const getVisibleTrackingCode = (order: Order): string | null =>
   order.shipment?.cargoCode ??
@@ -116,11 +130,19 @@ export const getVisibleTrackingCode = (order: Order): string | null =>
     ? (order.shipment?.trackingNumber ?? null)
     : null);
 
-/** Kargo öncesi = iptal, kargo sonrası = iade. */
+/**
+ * Kargo öncesi = iptal, kargo sonrası = iade.
+ *
+ * Devir tanımı backend ile AYNI olmalı (shipment-handover.ts): hareket eden
+ * durum VEYA `shippedAt` mührü. Yalnız statüye bakmak yetmiyor — taşıyıcı
+ * bilinmeyen bir durum kodu döndürdüğünde poller statüyü değiştirmeden
+ * shippedAt yazıyor.
+ */
 export const hasShipped = (order: Order): boolean => {
   if (["shipped", "delivered", "completed"].includes(order.status)) return true;
+  if (order.shipment?.shippedAt) return true;
   const s = order.shipment?.status;
-  return !!s && s !== "pending" && s !== "cancelled" && s !== "failed";
+  return !!s && !PRE_HANDOVER_SHIPMENT_STATUSES.includes(s);
 };
 
 /** Kargo/takip satırı yalnız gerçek gönderi varken. */
@@ -211,24 +233,12 @@ export const isGroupCancellable = (group: ServerOrderGroup): boolean =>
       !o.activeRefundRequest,
   );
 
-/**
- * Kargoya devir sayılmayan gönderi durumları: etiket kesilmiş (label_created)
- * olabilir ama paket henüz taşıyıcıya geçmemiştir — backend de bu aşamada
- * iptale izin verir.
- */
-const PRE_HANDOVER_SHIPMENT_STATUSES = [
-  "pending",
-  "label_created",
-  "cancelled",
-  "failed",
-];
-
 /** Tekil iptal önkoşullarının okuduğu asgari sipariş şekli (Order ⊆, OrderDetail ⊆). */
 export interface CancellableOrderLike {
   status: string;
   isBuyer?: boolean;
   activeRefundRequest?: { id: string } | null;
-  shipment?: { status: string } | null;
+  shipment?: { status: string; shippedAt?: string | null } | null;
 }
 
 /**
@@ -241,6 +251,8 @@ export const isOrderCancellable = (o: CancellableOrderLike): boolean => {
   if (o.isBuyer === false) return false;
   if (!CANCELLABLE_STATUSES.includes(o.status)) return false;
   if (o.activeRefundRequest) return false;
+  // Devir tanımı backend ile aynı: shippedAt mührü de devirdir.
+  if (o.shipment?.shippedAt) return false;
   const s = o.shipment?.status;
   return !s || PRE_HANDOVER_SHIPMENT_STATUSES.includes(s);
 };

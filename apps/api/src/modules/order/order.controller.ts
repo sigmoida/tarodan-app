@@ -35,6 +35,7 @@ import {
   GuestCheckoutDto,
   GuestSendVerificationCodeDto,
   GuestOrderTrackDto,
+  GuestOrderCancelDto,
   DirectBuyDto,
   DirectBuyResponseDto,
   SetShippingAddressDto,
@@ -223,6 +224,29 @@ export class OrderController {
   })
   async trackGuestOrder(@Body() dto: GuestOrderTrackDto) {
     return this.orderService.trackGuestOrder(dto);
+  }
+
+  /**
+   * POST /orders/guest/cancel — misafir siparişi iptali (kargo öncesi).
+   *
+   * Kimlik doğrulaması takip ucuyla AYNI: sipariş numarası + siparişteki
+   * e-posta. Buradan sonrası üye iptaliyle birebir aynı komuttur (aynı
+   * kesinti politikası, aynı kargoya-devir kilidi, aynı escrow davranışı).
+   */
+  @Post("guest/cancel")
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Cancel a guest order (order number + email, pre-handover only)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Order cancelled" })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "Order not found or email mismatch",
+  })
+  async cancelGuestOrder(@Body() dto: GuestOrderCancelDto) {
+    return this.orderService.cancelAsGuest(dto);
   }
 
   /**
