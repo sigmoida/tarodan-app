@@ -31,6 +31,8 @@ export const discountSchema = (t: T) =>
         "seller_commission",
         "seller_platform_fee",
         "seller_shipping",
+        // Takas hizmet bedeli (İ25): kodsuz-otomatik, kabulde iki tarafa uygulanır.
+        "trade_service_fee",
       ]),
       audience: z.enum([
         "everyone",
