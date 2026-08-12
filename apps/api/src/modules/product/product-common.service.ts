@@ -335,6 +335,9 @@ export class ProductCommonService {
       color: product.color,
       isBoxed: product.isBoxed,
       status: product.status,
+      // Moderasyon reddi gerekçesi — yalnız satıcının kendi listesinde anlamlı;
+      // public detay rejected ürünü zaten 404'ler, sızıntı riski yok.
+      rejectionReason: product.rejectionReason ?? null,
       isTradeEnabled: product.isTradeEnabled || false,
       // Satıcının NİYETİ (isTradeEnabled) ile GERÇEKTEN takas edilebilirliği
       // ayrı alanlardır: üyelik bitince yetki düşer, bayrak üründe kalır.

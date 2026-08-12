@@ -461,6 +461,20 @@ export class AdminProductService {
     // Web ISR'yi anında tazele (fiyat/indirim değişimi web'e hemen yansısın).
     void notifyWebRevalidate(["products:list", `product:${productId}`]);
 
+    // Satıcıya "ilanınız yayında" bildirimi — şablon tanımlıydı ama hiçbir yol
+    // çağırmıyordu; satıcı yayına girişi ancak listesinden anlıyordu.
+    this.notificationService
+      .createInAppNotification(
+        product.sellerId,
+        NotificationType.PRODUCT_APPROVED,
+        { productId, productTitle: product.title },
+      )
+      .catch((err: any) =>
+        this.logger.warn(
+          `PRODUCT_APPROVED notification failed for ${productId}: ${err?.message}`,
+        ),
+      );
+
     // Yeniden satışa açılan (eski sold/inactive) ilan onaylanıp yayına girince
     // wishlist + son 7 gün stockout-cancelled alıcılara back-in-stock bildirimi
     // gönder. Yeni ilanlarda wishlist boş olacağından zararsızdır. Bildirim
@@ -494,7 +508,9 @@ export class AdminProductService {
 
     const updated = await this.prisma.product.update({
       where: { id: productId },
-      data: { status: ProductStatus.rejected },
+      // Gerekçe KALICI yazılır: bildirim tek seferlikti, satıcı ve admin
+      // detayı gerekçeyi sonradan göremiyordu. Onay temizler.
+      data: { status: ProductStatus.rejected, rejectionReason: dto.reason },
     });
 
     await this.audit.createAuditLog(

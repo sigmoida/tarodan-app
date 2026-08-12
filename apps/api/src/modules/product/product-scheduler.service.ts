@@ -73,6 +73,12 @@ export class ProductSchedulerService implements OnModuleInit {
       "0 10 * * *",
       this.logger,
     );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "pending-moderation-digest",
+      "0 9 * * *",
+      this.logger,
+    );
   }
 
   /**
@@ -529,6 +535,60 @@ export class ProductSchedulerService implements OnModuleInit {
       // "başarılı" görünür ve hata yalnız log satırında kalır).
       throw error;
     }
+  }
+
+  /**
+   * Moderasyonda 48 saatten uzun bekleyen ilanlar için adminlere GÜNLÜK özet.
+   * `pending` süresizdir (yalnız active süre dolumuna tabidir); kuyruk sessizce
+   * yığılıyordu, kimse haber almıyordu. Cron günde bir koştuğu için ayrıca
+   * dedupe gerekmez. Gerçek iş — Bull processor 'pending-moderation-digest'.
+   */
+  async runPendingModerationDigest(log: (msg: string) => void = () => {}) {
+    const threshold = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const staleCount = await this.prisma.product.count({
+      where: {
+        status: ProductStatus.pending,
+        kind: ProductKind.listing,
+        createdAt: { lt: threshold },
+      },
+    });
+    if (staleCount === 0) {
+      log("48 saatten eski bekleyen ilan yok");
+      return { summary: "0 bekleyen ilan", stats: { stale: 0 } };
+    }
+
+    const admins = await this.prisma.adminUser.findMany({
+      where: { isActive: true },
+      select: { userId: true },
+    });
+    const adminBaseUrl =
+      process.env.ADMIN_URL?.replace(/\/$/, "") ||
+      (process.env.NODE_ENV === "production"
+        ? "https://admin.tarodan.com.tr"
+        : "http://localhost:3002");
+    for (const admin of admins) {
+      try {
+        await this.notificationService.createInAppNotification(
+          admin.userId,
+          NotificationType.MODERATION_QUEUE_STALE,
+          {
+            count: staleCount,
+            adminLink: `${adminBaseUrl}/catalog/products?status=pending`,
+          },
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `pending-moderation-digest bildirimi başarısız (${admin.userId}): ${err?.message}`,
+        );
+      }
+    }
+    log(
+      `${staleCount} bekleyen ilan için ${admins.length} admin bilgilendirildi`,
+    );
+    return {
+      summary: `${staleCount} bekleyen ilan (48s+)`,
+      stats: { stale: staleCount, admins: admins.length },
+    };
   }
 
   /**

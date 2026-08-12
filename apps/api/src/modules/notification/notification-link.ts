@@ -213,6 +213,8 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.COUPON_RETURNED]: none,
   // Admin'e gider: hedef admin panelindeki kampanya listesi (serbest link).
   [NotificationType.CAMPAIGN_BUDGET_EXHAUSTED]: free("adminLink"),
+  // Admin'e gider: bekleyen ilan kuyruğu (serbest link).
+  [NotificationType.MODERATION_QUEUE_STALE]: free("adminLink"),
 
   // ── İade ─────────────────────────────────────────────────────────────────
   [NotificationType.REFUND_CANCELLED]: BUYER_ORDER,

@@ -112,6 +112,12 @@ export default function ListingCard({
           </h3>
         )}
 
+        {listing.status === "rejected" && listing.rejectionReason && (
+          <p className="mb-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700">
+            {t("product.rejectionReason")}: {listing.rejectionReason}
+          </p>
+        )}
+
         <div className="mb-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xl font-bold text-primary-500">

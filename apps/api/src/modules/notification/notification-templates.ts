@@ -411,6 +411,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.campaignBudgetExhausted.message",
     icon: "🛑",
   },
+  [NotificationType.MODERATION_QUEUE_STALE]: {
+    titleKey: "server.notification.moderationQueueStale.title",
+    messageKey: "server.notification.moderationQueueStale.message",
+    icon: "⏳",
+  },
   [NotificationType.REFUND_REQUEST_RECEIVED]: {
     titleKey: "server.notification.refundRequestReceived.title",
     messageKey: "server.notification.refundRequestReceived.message",

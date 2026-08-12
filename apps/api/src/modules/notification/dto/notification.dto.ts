@@ -105,6 +105,8 @@ export enum NotificationType {
   COUPON_RETURNED = "coupon_returned",
   // Kampanyanın TL bütçesi doldu ve kampanya otomatik durduruldu — admin'e gider.
   CAMPAIGN_BUDGET_EXHAUSTED = "campaign_budget_exhausted",
+  // Moderasyonda 48 saatten uzun bekleyen ilan var — adminlere günlük özet.
+  MODERATION_QUEUE_STALE = "moderation_queue_stale",
 
   // Cross-flow auto-rejection
   OFFER_AUTO_REJECTED = "offer_auto_rejected",

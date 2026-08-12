@@ -651,7 +651,8 @@
     "shippingFee": "Kargo ücreti",
     "sellerEarning": "Hak edişiniz",
     "packageFeeLabel": "Paket ücreti",
-    "sampleDimensionsLabel": "Örnek ölçü (en × boy × yükseklik)"
+    "sampleDimensionsLabel": "Örnek ölçü (en × boy × yükseklik)",
+    "rejectionReason": "Red gerekçesi"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -6898,6 +6899,10 @@
       "campaignBudgetExhausted": {
         "title": "Kampanya Bütçesi Doldu",
         "message": "\"{name}\" kampanyasının bütçesi doldu ve kampanya otomatik durduruldu. Bütçeyi artırabilir veya kampanyayı kapalı bırakabilirsiniz."
+      },
+      "moderationQueueStale": {
+        "title": "Bekleyen İlanlar Birikti",
+        "message": "{count} ilan 48 saatten uzun süredir moderasyon onayı bekliyor. Kuyruğu inceleyin."
       },
       "refundRequestReceived": {
         "title": "İade Talebiniz Alındı",

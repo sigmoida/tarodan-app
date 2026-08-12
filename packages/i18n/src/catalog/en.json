@@ -651,7 +651,8 @@
     "shippingFee": "Shipping fee",
     "sellerEarning": "Your earnings",
     "packageFeeLabel": "Package fee",
-    "sampleDimensionsLabel": "Sample size (W × L × H)"
+    "sampleDimensionsLabel": "Sample size (W × L × H)",
+    "rejectionReason": "Rejection reason"
   },
   "cart": {
     "myCart": "My Cart",
@@ -6898,6 +6899,10 @@
       "campaignBudgetExhausted": {
         "title": "Campaign Budget Exhausted",
         "message": "The budget of campaign \"{name}\" has been exhausted and the campaign was stopped automatically. You can raise the budget or leave it stopped."
+      },
+      "moderationQueueStale": {
+        "title": "Moderation Queue Is Backing Up",
+        "message": "{count} listings have been waiting for moderation for over 48 hours. Review the queue."
       },
       "refundRequestReceived": {
         "title": "Your Refund Request Was Received",

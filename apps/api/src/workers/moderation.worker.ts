@@ -6,7 +6,7 @@
  * AI servisi kapalı/erişilemezse ürün bugünkü gibi `pending` kalır (graceful).
  */
 import { Processor, Process, OnQueueFailed } from "@nestjs/bull";
-import { Logger } from "@nestjs/common";
+import { Logger, Optional } from "@nestjs/common";
 import { Job } from "bull";
 import { ProductStatus } from "@prisma/client";
 import { PrismaService } from "../prisma";
@@ -15,6 +15,8 @@ import { ModerationAiClient } from "../modules/moderation/moderation-ai.client";
 import { SearchService } from "../modules/search/search.service";
 import { CacheService } from "../modules/cache/cache.service";
 import { notifyWebRevalidate } from "../common/revalidate";
+import { NotificationService } from "../modules/notification/notification.service";
+import { NotificationType } from "../modules/notification/dto";
 import { QUEUE_NAMES } from "./constants";
 
 export interface ProductModerationJob {
@@ -37,6 +39,8 @@ export class ModerationWorker {
     private readonly ai: ModerationAiClient,
     private readonly search: SearchService,
     private readonly cache: CacheService,
+    // Oto-onayda satıcıya "ilanınız yayında" bildirimi (admin onayıyla aynı).
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   @Process("product-image")
@@ -134,6 +138,24 @@ export class ModerationWorker {
       if (res.count > 0) {
         await this.refreshProductVisibility(productId);
         this.logger.log(`Ürün ${productId} AI ile oto-onaylandı (active)`);
+        // Satıcıya "ilanınız yayında" — admin onay yoluyla aynı bildirim.
+        try {
+          const approved = await this.prisma.product.findUnique({
+            where: { id: productId },
+            select: { sellerId: true, title: true },
+          });
+          if (approved) {
+            await this.notificationService?.createInAppNotification(
+              approved.sellerId,
+              NotificationType.PRODUCT_APPROVED,
+              { productId, productTitle: approved.title },
+            );
+          }
+        } catch (err: any) {
+          this.logger.warn(
+            `PRODUCT_APPROVED (oto-onay) bildirimi başarısız ${productId}: ${err?.message}`,
+          );
+        }
       }
     } else {
       if (job.data.directApproval) {
