@@ -34,6 +34,7 @@ import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderFeeDiscountService } from "./order-fee-discount.service";
+import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
@@ -405,6 +406,10 @@ export class OrderGuestCheckoutService {
         commission: rawCommissionResult,
         buyerShippingAmount: rawBuyerShippingAmount,
         sellerShippingAmount: rawSellerShippingAmount,
+        // Misafirde kupon yoktur; tavanın tamamı bedel kampanyalarına açık.
+        remainingAllowance: remainingDiscountAllowanceFor({
+          lineBase: finalPrice,
+        }),
       })) ?? {
         commission: rawCommissionResult,
         buyerShippingAmount: rawBuyerShippingAmount,

@@ -14,6 +14,7 @@ import { TaxService } from "../tax/tax.service";
 import { CommissionResult, OrderPricingService } from "./order-pricing.service";
 import { OrderFeeDiscountService } from "./order-fee-discount.service";
 import type { AppliedFeeDiscount } from "../discount/fee-discount.engine";
+import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
 import {
   splitShippingByBuyerShare,
   type OutboundTariffLike,
@@ -129,6 +130,8 @@ export class OrderCheckoutCommonService {
       commission: rawCommission,
       buyerShippingAmount: rawBuyerShippingAmount,
       sellerShippingAmount: rawSellerShippingAmount,
+      // Teklif siparişinde kupon yoktur; tavanın tamamı bedel kampanyalarına açık.
+      remainingAllowance: remainingDiscountAllowanceFor({ lineBase: amount }),
     })) ?? {
       commission: rawCommission,
       buyerShippingAmount: rawBuyerShippingAmount,

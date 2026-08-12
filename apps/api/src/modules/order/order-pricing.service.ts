@@ -52,6 +52,7 @@ import type {
   AppliedFeeDiscount,
   FeeDiscountCandidate,
 } from "../discount/fee-discount.engine";
+import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
 import {
   summarizeFeeDiscounts,
   sumFeeDiscounts,
@@ -560,6 +561,10 @@ export class OrderPricingService {
     const appliedFeeDiscounts: AppliedFeeDiscount[] = [];
     const sellerLeadProduct = new Map<string, string>();
     const sellerLeadCategory = new Map<string, string | null>();
+    // Toplam indirim tavanı: satır adımının kullanmadığı pay, aynı satıcının
+    // paket (kargo) adımına devreder — kupon + tüm bedel kampanyaları birlikte
+    // tavanı aşamaz.
+    const sellerAllowanceLeft = new Map<string, number>();
     const buyerTier =
       (await this.feeDiscounts?.resolveBuyerTier(userId)) ?? null;
 
@@ -578,6 +583,10 @@ export class OrderPricingService {
       );
       // Komisyon/hizmet bedeli kampanyaları satır bazında; kargo kampanyası
       // aşağıda PAKET kararından sonra uygulanır (kargo satırın değil paketin).
+      const lineAllowance = remainingDiscountAllowanceFor({
+        lineBase: lineSubtotal,
+        couponDiscount: line.couponDiscount,
+      });
       const lineFeeResult = await this.feeDiscounts?.apply({
         context: {
           productId: product.id,
@@ -590,6 +599,7 @@ export class OrderPricingService {
         commission: rawCommissionResult,
         buyerShippingAmount: 0,
         sellerShippingAmount: 0,
+        remainingAllowance: lineAllowance,
         preloaded: feeCampaigns,
         couponCandidates:
           couponFeeCandidate && couponEligibleIds.has(product.id)
@@ -597,6 +607,16 @@ export class OrderPricingService {
             : [],
       });
       appliedFeeDiscounts.push(...(lineFeeResult?.applied ?? []));
+      sellerAllowanceLeft.set(
+        product.sellerId,
+        (sellerAllowanceLeft.get(product.sellerId) ?? 0) +
+          Math.max(
+            0,
+            lineAllowance -
+              ((lineFeeResult?.buyerTotal ?? 0) +
+                (lineFeeResult?.sellerTotal ?? 0)),
+          ),
+      );
       const commissionResult = lineFeeResult?.commission ?? rawCommissionResult;
 
       // Paket payı satır sırasından BAĞIMSIZ olmalı ve paketin KADEMESİNE göre
@@ -688,6 +708,7 @@ export class OrderPricingService {
           },
           buyerShippingAmount: decision.buyer,
           sellerShippingAmount: decision.seller,
+          remainingAllowance: sellerAllowanceLeft.get(sellerId) ?? 0,
           preloaded: feeCampaigns,
           couponCandidates:
             couponFeeCandidate &&

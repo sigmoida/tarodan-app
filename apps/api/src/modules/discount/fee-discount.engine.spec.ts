@@ -3,6 +3,8 @@ import {
   applyFeeDiscounts,
   isBuyerFeeTarget,
   isFeeTarget,
+  remainingDiscountAllowanceFor,
+  MAX_TOTAL_DISCOUNT_PERCENT,
 } from "./fee-discount.engine";
 import type { FeeDiscountCandidate } from "./fee-discount.engine";
 
@@ -216,6 +218,77 @@ describe("applyFeeDiscounts", () => {
 
     expect(result.applied).toHaveLength(0);
   });
+});
+
+describe("remainingDiscountAllowanceFor (MAX_TOTAL_DISCOUNT_PERCENT)", () => {
+  it("tavan %50'dir ve kupon öncesi satır tabanından hesaplanır", () => {
+    expect(MAX_TOTAL_DISCOUNT_PERCENT).toBe(50);
+    expect(remainingDiscountAllowanceFor({ lineBase: 1000 })).toBe(500);
+  });
+
+  it("satıra verilmiş kupon indirimi payı düşürür", () => {
+    expect(
+      remainingDiscountAllowanceFor({ lineBase: 1000, couponDiscount: 300 }),
+    ).toBe(200);
+  });
+
+  it("kupon tek başına tavanı aşarsa bedel kampanyalarına pay kalmaz", () => {
+    expect(
+      remainingDiscountAllowanceFor({ lineBase: 1000, couponDiscount: 600 }),
+    ).toBe(0);
+  });
+
+  it("negatif/sıfır taban 0 pay verir", () => {
+    expect(remainingDiscountAllowanceFor({ lineBase: 0 })).toBe(0);
+    expect(remainingDiscountAllowanceFor({ lineBase: -10 })).toBe(0);
+  });
+
+  it("motor bu payı tavan olarak uygular: kupon + kampanya toplamı tabanın yarısını aşamaz", () => {
+    // 1000 TL satır, 450 TL kupon → bedel kampanyalarına 50 TL pay kalır.
+    const allowance = remainingDiscountAllowanceFor({
+      lineBase: 1000,
+      couponDiscount: 450,
+    });
+    const result = applyFeeDiscounts({
+      candidates: [
+        candidateGlobal({
+          target: DiscountTarget.buyer_commission,
+          type: DiscountType.fixed_amount,
+          value: 40,
+        }),
+        candidateGlobal({
+          target: DiscountTarget.buyer_shipping,
+          type: DiscountType.fixed_amount,
+          value: 100,
+        }),
+      ],
+      amounts: {
+        [DiscountTarget.buyer_commission]: 40,
+        [DiscountTarget.buyer_shipping]: 100,
+      },
+      remainingDiscountAllowance: allowance,
+    });
+    expect(result.total).toBe(50);
+    // Kırpma SONDAN geriye: kargo indirimi kırpılır, komisyon indirimi yaşar.
+    expect(
+      result.applied.find((l) => l.target === DiscountTarget.buyer_commission)
+        ?.amount,
+    ).toBe(40);
+    expect(
+      result.applied.find((l) => l.target === DiscountTarget.buyer_shipping)
+        ?.amount,
+    ).toBe(10);
+  });
+});
+
+const candidateGlobal = (
+  over: Partial<FeeDiscountCandidate> & { target: DiscountTarget },
+): FeeDiscountCandidate => ({
+  id: over.id ?? `d-${over.target}`,
+  name: over.name ?? "Kampanya",
+  type: over.type ?? DiscountType.percentage,
+  value: over.value ?? 50,
+  ...over,
 });
 
 describe("hedef kalem sınıflandırması", () => {

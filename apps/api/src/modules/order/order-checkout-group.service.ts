@@ -37,6 +37,7 @@ import type {
   AppliedFeeDiscount,
   FeeDiscountCandidate,
 } from "../discount/fee-discount.engine";
+import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
 import { distanceSalesConsent } from "./distance-sales-contract";
 import {
   calculatePackageDesi,
@@ -617,6 +618,9 @@ export class OrderCheckoutGroupService {
             ShippingBuyerShareByTier[]
           >();
           const lineFeeDiscounts: AppliedFeeDiscount[][] = [];
+          // Toplam indirim tavanı: satır adımının kullanmadığı pay aynı satıcının
+          // paket (kargo) adımına devreder — quote ile birebir aynı muhasebe.
+          const sellerAllowanceLeft = new Map<string, number>();
           // Kampanyalar sepet başına TEK kez yüklenir; alıcının katmanı da bir kez.
           const feeCampaigns = (await this.feeDiscounts?.preload()) ?? [];
           const buyerTier =
@@ -640,6 +644,10 @@ export class OrderCheckoutGroupService {
             );
             // Komisyon/hizmet bedeli kampanyaları satır bazında (kargo aşağıda,
             // paket kararından sonra) — sepet önizlemesiyle birebir aynı sıra.
+            const lineAllowance = remainingDiscountAllowanceFor({
+              lineBase: entry.productPrice * entry.quantity,
+              couponDiscount: entry.couponDiscount,
+            });
             const feeDiscounted = await this.feeDiscounts?.apply({
               context: {
                 productId: entry.product.id,
@@ -652,6 +660,7 @@ export class OrderCheckoutGroupService {
               commission: rawCommission,
               buyerShippingAmount: 0,
               sellerShippingAmount: 0,
+              remainingAllowance: lineAllowance,
               preloaded: feeCampaigns,
               couponCandidates:
                 couponFeeCandidate && couponEligibleIds.has(entry.product.id)
@@ -660,6 +669,16 @@ export class OrderCheckoutGroupService {
             });
             const commission = feeDiscounted?.commission ?? rawCommission;
             lineFeeDiscounts.push(feeDiscounted?.applied ?? []);
+            sellerAllowanceLeft.set(
+              entry.product.sellerId,
+              (sellerAllowanceLeft.get(entry.product.sellerId) ?? 0) +
+                Math.max(
+                  0,
+                  lineAllowance -
+                    ((feeDiscounted?.buyerTotal ?? 0) +
+                      (feeDiscounted?.sellerTotal ?? 0)),
+                ),
+            );
             lineCommissions.push({ discountedPrice, commission });
             sellerShareLines.set(entry.product.sellerId, [
               ...(sellerShareLines.get(entry.product.sellerId) ?? []),
@@ -693,6 +712,7 @@ export class OrderCheckoutGroupService {
                     },
                     buyerShippingAmount: decision.buyer,
                     sellerShippingAmount: decision.seller,
+                    remainingAllowance: sellerAllowanceLeft.get(sellerId) ?? 0,
                     preloaded: feeCampaigns,
                     couponCandidates:
                       couponFeeCandidate &&

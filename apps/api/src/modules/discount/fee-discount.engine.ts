@@ -42,6 +42,30 @@ export const FEE_TARGETS = [
 
 export type FeeTarget = (typeof FEE_TARGETS)[number];
 
+/**
+ * Kampanya + kupon toplamının üst sınırı: satırın kupon ÖNCESİ tabanının yüzdesi.
+ * Satıcının ilan fiyatı (üstü çizili fiyat farkı) bu hesaba GİRMEZ; kupon girer.
+ */
+export const MAX_TOTAL_DISCOUNT_PERCENT = 50;
+
+/**
+ * Bir satırın bedel kampanyalarına kalan indirim payı. Tavanın satır tabanındaki
+ * karşılığından, o satıra zaten verilmiş kupon indirimi düşülür — böylece kupon +
+ * bedel kampanyaları birlikte tavanı aşamaz. Çok adımlı yollarda (satır ücretleri
+ * → paket kargosu) ilk adımın kullandığı pay ikinci adıma AKTARILARAK düşülür.
+ */
+export function remainingDiscountAllowanceFor(input: {
+  /** Kupon öncesi satır tabanı (ilan fiyatı × adet). */
+  lineBase: number;
+  /** Satıra pay edilmiş kupon indirimi; yoksa 0. */
+  couponDiscount?: number | null;
+}): number {
+  const base = Math.max(0, input.lineBase);
+  const cap = round2(base * (MAX_TOTAL_DISCOUNT_PERCENT / 100));
+  const used = Math.max(0, input.couponDiscount ?? 0);
+  return Math.max(0, round2(cap - used));
+}
+
 export const isFeeTarget = (target: DiscountTarget): target is FeeTarget =>
   (FEE_TARGETS as readonly DiscountTarget[]).includes(target);
 

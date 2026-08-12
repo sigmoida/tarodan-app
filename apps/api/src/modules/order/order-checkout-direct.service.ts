@@ -31,6 +31,7 @@ import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderFeeDiscountService } from "./order-fee-discount.service";
 import type { FeeDiscountCandidate } from "../discount/fee-discount.engine";
+import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
@@ -421,6 +422,10 @@ export class OrderCheckoutDirectService {
         commission: rawCommissionResult,
         buyerShippingAmount: rawBuyerShippingAmount,
         sellerShippingAmount: rawSellerShippingAmount,
+        remainingAllowance: remainingDiscountAllowanceFor({
+          lineBase: productPrice,
+          couponDiscount,
+        }),
         couponCandidates: couponFeeCandidate ? [couponFeeCandidate] : [],
       })) ?? {
         commission: rawCommissionResult,
