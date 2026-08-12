@@ -1040,7 +1040,9 @@
     "bulkRefundAllSuccess": "{count} iade talebi oluşturuldu",
     "bulkRefundPartialFail": "{succeeded} iade talebi oluşturuldu, {failed} talep başarısız oldu",
     "bulkRefundLineCreated": "İade talebi oluşturuldu",
-    "bulkRefundLineFailed": "Talep oluşturulamadı"
+    "bulkRefundLineFailed": "Talep oluşturulamadı",
+    "sellerCampaignAdvantage": "Kampanya avantajınız",
+    "buyerCampaignSaving": "Kampanya indiriminiz"
   },
   "trade": {
     "myTrades": "Takaslarım",

@@ -38,6 +38,9 @@ export interface OrderDetail {
     buyerServiceTaxAmount?: number;
     sellerServiceTaxAmount?: number;
     serviceVatRate?: number;
+    /** Platformun bu siparişte verdiği bedel indirimleri (taraf bazında). */
+    buyerFeeDiscountAmount?: number;
+    sellerFeeDiscountAmount?: number;
     totalAmount: number;
     sellerNetAmount: number;
   };

@@ -235,6 +235,11 @@ export class OrderCommonService {
       buyerServiceTaxAmount,
       sellerServiceTaxAmount,
       serviceVatRate: Number(order.serviceVatRate ?? 0),
+      // Platformun verdiği bedel indirimleri: kesinti kolonları zaten indirimli
+      // tutarı taşır, bu iki satır kazancın KAYNAĞINI söyler (alıcı: daha az
+      // ödedi, satıcı: daha çok hak etti).
+      buyerFeeDiscountAmount: Number(order.buyerFeeDiscountAmount ?? 0),
+      sellerFeeDiscountAmount: Number(order.sellerFeeDiscountAmount ?? 0),
       totalAmount,
       sellerNetAmount,
     };

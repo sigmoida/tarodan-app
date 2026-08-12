@@ -44,6 +44,7 @@ export default function OrderSummaryCard({ order }: { order: OrderDetail }) {
     sellerFee + Math.max(0, sellerServiceTax - sellerShippingVat),
   );
   const sellerProductAmount = money(subtotal + (p?.taxAmount ?? 0));
+  const sellerFeeDiscount = p?.sellerFeeDiscountAmount ?? 0;
 
   if (order.isSeller && !isMembershipOrder(order)) {
     return (
@@ -65,6 +66,14 @@ export default function OrderSummaryCard({ order }: { order: OrderDetail }) {
             <div className="flex justify-between text-muted">
               <span>{t("order.withholdingTax")}</span>
               <span>₺{formatPriceNumber(p?.withholdingTaxAmount ?? 0)}</span>
+            </div>
+          )}
+          {/* Platformun satıcı tarafına verdiği bedel indirimi kesintiyi zaten
+              küçültmüştür; bu satır avantajın KAYNAĞINI söyler. */}
+          {sellerFeeDiscount > 0 && (
+            <div className="flex justify-between text-success-600">
+              <span>{t("order.sellerCampaignAdvantage")}</span>
+              <span>+₺{formatPriceNumber(sellerFeeDiscount)}</span>
             </div>
           )}
           <div className="flex justify-between border-t pt-3 text-lg font-semibold">

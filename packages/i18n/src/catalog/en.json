@@ -1040,7 +1040,9 @@
     "bulkRefundAllSuccess": "{count} return requests created",
     "bulkRefundPartialFail": "{succeeded} return requests created, {failed} failed",
     "bulkRefundLineCreated": "Return request created",
-    "bulkRefundLineFailed": "Request could not be created"
+    "bulkRefundLineFailed": "Request could not be created",
+    "sellerCampaignAdvantage": "Your campaign advantage",
+    "buyerCampaignSaving": "Your campaign discount"
   },
   "trade": {
     "myTrades": "My Trades",
