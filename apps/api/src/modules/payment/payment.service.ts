@@ -120,21 +120,27 @@ export class PaymentService {
     return this.paymentRefund.processRefund(orderId, refundAmount, opts);
   }
 
-  async refundTradeCashPaymentIfCompleted(tradeId: string): Promise<{
+  async refundTradeCashPaymentIfCompleted(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<{
     refunded: boolean;
     paymentId?: string;
     skippedReason?: string;
   }> {
-    return this.paymentRefund.refundTradeCashPaymentIfCompleted(tradeId);
+    return this.paymentRefund.refundTradeCashPaymentIfCompleted(tradeId, opts);
   }
 
-  async refundTradeCashTracked(tradeId: string): Promise<{
+  async refundTradeCashTracked(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<{
     refunded: boolean;
     failed: boolean;
     skippedReason?: string;
     reason?: string;
   }> {
-    return this.paymentRefund.refundTradeCashTracked(tradeId);
+    return this.paymentRefund.refundTradeCashTracked(tradeId, opts);
   }
 
   async releasePayment(orderId: string) {

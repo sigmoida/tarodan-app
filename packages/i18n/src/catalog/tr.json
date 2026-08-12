@@ -1024,7 +1024,16 @@
     "cancelGroupTitle": "Sepeti İptal Et",
     "cancelGroupAllNotice": "Bu işlem sepetteki {count} siparişin tamamını iptal eder; yapılan ödeme tek seferde iade edilir. Kısmi iptal yoktur.",
     "cartSiblings": "Bu sepette başka siparişler de var:",
-    "refundReasonDeliveryDelayed": "Teslimat gecikti"
+    "refundReasonDeliveryDelayed": "Teslimat gecikti",
+    "bulkRefundTitle": "Toplu İade",
+    "bulkRefundIntro": "Bu sepette iade edilebilecek birden fazla ürün var. Ürünleri seçip tek seferde iade talebi oluşturabilirsiniz.",
+    "bulkRefundCta": "Ürünleri Seçerek İade Et",
+    "bulkRefundSelectLabel": "İade edilecek ürünler",
+    "bulkRefundSelectAtLeastOne": "En az bir ürün seçin",
+    "bulkRefundAllSuccess": "{count} iade talebi oluşturuldu",
+    "bulkRefundPartialFail": "{succeeded} iade talebi oluşturuldu, {failed} talep başarısız oldu",
+    "bulkRefundLineCreated": "İade talebi oluşturuldu",
+    "bulkRefundLineFailed": "Talep oluşturulamadı"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -1105,6 +1114,7 @@
       "reasonShipmentLost": "Kargo kayboldu / ulaşmadı",
       "reasonShipmentDamaged": "Ürün hasarlı geldi",
       "reasonWrongItem": "Beklediğim ürün gelmedi",
+      "reasonNotAsDescribed": "Ürün açıklamayla uyuşmuyor",
       "reasonOther": "Diğer",
       "descriptionLabel": "Açıklama",
       "descriptionPlaceholder": "Sorunu detaylandırın (kargo tarihi, fotoğraf gönderebilirim, vb.)",
@@ -1298,6 +1308,12 @@
     "statusCounterOffered": "Karşı Teklif Yapıldı",
     "waitingBuyerCounter": "Alıcının karşı teklifinizi yanıtlaması bekleniyor.",
     "acceptCounter": "Karşı Teklifi Kabul Et",
+    "acceptConfirmTitle": "Teklifi kabul et",
+    "acceptConfirmDesc": "Bu teklifi kabul etmek istediğinizden emin misiniz? Kabul edilen teklif için sipariş oluşturulur.",
+    "rejectConfirmTitle": "Teklifi reddet",
+    "rejectConfirmDesc": "Bu teklifi reddetmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "cancelConfirmTitle": "Teklifi iptal et",
+    "cancelConfirmDesc": "Bu teklifi iptal etmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "lowerOffer": "Daha Düşük Teklif",
     "viewOrder": "Siparişi Görüntüle",
     "listingPriceLabel": "İlan Fiyatı",
@@ -4830,9 +4846,9 @@
         "resolveTitle": "Takas Çözümle",
         "resolution": "Çözüm",
         "resolveComplete": "Takası Tamamla",
-        "resolveCancel": "Takası İptal Et (iade tetiklenir)",
-        "compensateInitiator": "Teklif Verene Tazminat (iptal + iade + tazminat işareti)",
-        "compensateReceiver": "Teklif Alana Tazminat (iptal + iade + tazminat işareti)",
+        "compensateInitiator": "Teklif Verene Tazminat (ödemesi iade edilir + tazminat işareti)",
+        "compensateReceiver": "Teklif Alana Tazminat (ödemesi iade edilir + tazminat işareti)",
+        "compensateBoth": "İki Tarafa da Tazminat (iki ödemeyi de iade eder — ör. iki koli de kayıp)",
         "resolutionNoteLabel": "Çözüm Notu (en az 10 karakter)",
         "resolutionPlaceholder": "Çözüm gerekçesini özetleyin (kargo kayıp, hasar, vs.)",
         "resolvedMsg": "Takas çözümlendi",
@@ -4912,8 +4928,6 @@
         "reviewNotePlaceholder": "İnceleme sonucunu ve gerekçesini yazın",
         "approveButton": "Talebi Onayla",
         "rejectButton": "Talebi Reddet",
-        "policyUpdated": "İade politikası güncellendi",
-        "payerUpdated": "İade kargo tarafı güncellendi",
         "policyCode": "Finansal politika",
         "returnDesi": "İade desisi",
         "returnFee": "İade kargo bedeli",
@@ -5029,6 +5043,10 @@
           "gross": "Brüt"
         },
         "forceFinalizeButton": "Para İadesini Tamamla",
+        "disputeButton": "İtiraz İşaretle",
+        "disputeNotePlaceholder": "İtiraz gerekçesi (en az 10 karakter) — ör. satıcı ürünün hasarlı döndüğünü bildirdi",
+        "disputeConfirm": "İtirazı Kaydet",
+        "disputeMarked": "İade itiraz olarak işaretlendi; otomatik tamamlama durduruldu",
         "counterfeitTitle": "Sahte / taklit ürün şikayeti",
         "counterfeitBody": "Bu talep sahte ürün gerekçesiyle açıldı. İade onaylandıktan sonra satıcı için yaptırım değerlendirin (uyarı, geçici askı veya fesih) ve satıcının diğer ürünleri için risk incelemesi yapın.",
         "policyTitle": "İade Politikası",
@@ -6370,10 +6388,12 @@
       },
       "refunds": {
         "status": {
+          "pendingReview": "İnceleme Bekliyor",
           "waitForDelivery": "Ürün Teslimi Bekleniyor",
           "returnShipmentOpen": "İade Kargosu Hazır",
           "returnInTransit": "İade Yolda",
-          "returnDelivered": "İade Ulaştı (Para Bekleniyor)"
+          "returnDelivered": "İade Ulaştı (Para Bekleniyor)",
+          "disputed": "İtirazlı"
         }
       },
       "errors": {

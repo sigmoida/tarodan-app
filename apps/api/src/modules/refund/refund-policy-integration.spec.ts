@@ -67,6 +67,7 @@ describe("RefundService policy integration", () => {
       order: { findUnique: jest.fn().mockResolvedValue(order) },
       refundRequest: {
         count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(({ data }: any) => {
           const row = {
             id: "refund-1",

@@ -25,7 +25,7 @@ import {
 import { type OrderActionHandlers } from "./_components/OrderActions";
 import OrderGroupCard from "./_components/OrderGroupCard";
 import ReviewModal from "./_modals/ReviewModal";
-import CancelGroupModal from "./_modals/CancelGroupModal";
+import CancelOrderModal from "./_modals/CancelOrderModal";
 
 export default function OrdersPage() {
   const searchParams = useSearchParams();
@@ -174,8 +174,8 @@ export default function OrdersPage() {
         order={reviewingOrder}
         onClose={() => setReviewingOrder(null)}
       />
-      <CancelGroupModal
-        group={cancelGroup}
+      <CancelOrderModal
+        target={cancelGroup ? { kind: "group", group: cancelGroup } : null}
         onClose={() => setCancelGroup(null)}
       />
     </PageShell>

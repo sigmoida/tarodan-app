@@ -30,26 +30,55 @@ export const ORDER_TRANSITION_RULES: Record<
   ],
   [OrderStatus.paid]: [
     { to: OrderStatus.preparing, allowedBy: "seller" },
+    // Kargo öncesi alıcı iptali (İPTAL tipi) — cancel() komutu üzerinden; tam
+    // PSP iadesiyle birlikte processRefund siparişi cancelled yazar.
+    { to: OrderStatus.cancelled, allowedBy: "buyer" },
     { to: OrderStatus.cancelled, allowedBy: "system" },
-    { to: OrderStatus.refunded, allowedBy: "system" },
   ],
-  [OrderStatus.preparing]: [{ to: OrderStatus.shipped, allowedBy: "system" }],
-  [OrderStatus.shipped]: [{ to: OrderStatus.delivered, allowedBy: "system" }],
-  [OrderStatus.delivered]: [{ to: OrderStatus.completed, allowedBy: "buyer" }],
+  [OrderStatus.preparing]: [
+    { to: OrderStatus.shipped, allowedBy: "system" },
+    // Alıcı kargo öncesi iptali + "satıcı kargolamadı" zaman aşımı (cron).
+    { to: OrderStatus.cancelled, allowedBy: "buyer" },
+    { to: OrderStatus.cancelled, allowedBy: "system" },
+  ],
+  [OrderStatus.shipped]: [
+    { to: OrderStatus.delivered, allowedBy: "system" },
+    // Dönüş kargosu açıldığında sipariş iade akışına işaretlenir (Sürat sync).
+    { to: OrderStatus.refund_requested, allowedBy: "system" },
+  ],
+  [OrderStatus.delivered]: [
+    { to: OrderStatus.completed, allowedBy: "buyer" },
+    { to: OrderStatus.refund_requested, allowedBy: "system" },
+    // Tam tutarlı iade finalize olduğunda tek yazıcı processRefund'dur ve
+    // siparişi cancelled kapatır (kısmi adet iadesinde sipariş açık kalır).
+    { to: OrderStatus.cancelled, allowedBy: "system" },
+  ],
   [OrderStatus.awaiting_buyer_confirmation]: [
     { to: OrderStatus.completed, allowedBy: "buyer" },
     { to: OrderStatus.completed, allowedBy: "system" },
     { to: OrderStatus.refund_requested, allowedBy: "buyer" },
+    { to: OrderStatus.cancelled, allowedBy: "system" },
   ],
-  [OrderStatus.completed]: [],
+  // Erken onaylanmış sipariş, teslimat + 14 günlük cayma penceresi içinde
+  // hâlâ iadeye açılabilir; bu çıkışlar YALNIZ sistem iade akışının çıktısıdır
+  // (kullanıcı genel statü ucundan tetikleyemez).
+  [OrderStatus.completed]: [
+    { to: OrderStatus.refund_requested, allowedBy: "system" },
+    { to: OrderStatus.cancelled, allowedBy: "system" },
+  ],
   [OrderStatus.cancelled]: [],
   [OrderStatus.refund_requested]: [
     { to: OrderStatus.refunded, allowedBy: "system" },
+    { to: OrderStatus.cancelled, allowedBy: "system" },
   ],
   [OrderStatus.refunded]: [],
 };
 
-/** Terminal states: no outgoing transition is ever allowed. */
+/**
+ * Kullanıcı akışları için terminal statüler. `completed` kullanıcı statü
+ * geçişleri için terminaldir; cayma penceresi içindeki SİSTEM iade akışı
+ * (yukarıdaki system kenarları) bunun bilinçli istisnasıdır.
+ */
 export const ORDER_TERMINAL_STATUSES: readonly OrderStatus[] = [
   OrderStatus.completed,
   OrderStatus.cancelled,

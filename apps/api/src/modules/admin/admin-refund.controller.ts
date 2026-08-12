@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Put,
-  Patch,
   Delete,
   Body,
   Param,
@@ -50,10 +49,6 @@ import { AdminRoute } from "../auth/decorators/admin-route.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { AdminRole } from "@prisma/client";
 import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
-import {
-  OverrideRefundPolicyDto,
-  SetReturnShippingPayerDto,
-} from "../refund/dto";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -177,6 +172,23 @@ export class AdminRefundController {
     return this.adminService.rejectRefundRequest(adminId, id, dto.reason);
   }
 
+  @Post("refund-requests/:id/dispute")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "O3: Mark a refund disputed during seller inspection (pauses 24h auto-finalize)",
+  })
+  @ApiParam({ name: "id", description: "RefundRequest ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Refund marked disputed" })
+  async markRefundDisputed(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body("note") note: string,
+  ) {
+    return this.adminService.markRefundDisputed(adminId, id, note);
+  }
+
   @Post("refund-requests/:id/force-finalize")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
@@ -210,35 +222,8 @@ export class AdminRefundController {
     return this.adminService.closeStuckRefund(adminId, id, reason);
   }
 
-  // ---------- RefundRequest policy override (Faz 4B.1) ----------
-
-  @Patch("refund-requests/:id/override-policy")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "Override refund policy (4 boolean flags)",
-  })
-  @ApiParam({ name: "id", description: "RefundRequest ID" })
-  async overrideRefundPolicy(
-    @Param("id") id: string,
-    @CurrentUser("id") adminId: string,
-    @Body() dto: OverrideRefundPolicyDto,
-  ) {
-    return this.adminService.overrideRefundPolicy(id, adminId, dto);
-  }
-
-  @Patch("refund-requests/:id/set-shipping-payer")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "Set return shipping payer (buyer/seller/platform)",
-  })
-  @ApiParam({ name: "id", description: "RefundRequest ID" })
-  async setReturnShippingPayer(
-    @Param("id") id: string,
-    @CurrentUser("id") adminId: string,
-    @Body() dto: SetReturnShippingPayerDto,
-  ) {
-    return this.adminService.setReturnShippingPayer(id, adminId, dto.payer);
-  }
+  // NOT: PATCH override-policy ve set-shipping-payer uçları KALDIRILDI —
+  // `policyCode === "legacy"` şartına bağlıydılar ve her kayıt gerçek policy
+  // koduyla yaratıldığı için fiilen erişilemezlerdi. Tek karar akışı:
+  // decision-preview + approve (bileşen bazlı politika).
 }

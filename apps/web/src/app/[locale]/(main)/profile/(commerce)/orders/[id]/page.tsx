@@ -16,9 +16,13 @@ import RefundRequestModal from "./_modals/RefundRequestModal";
 import { useRequireAuth } from "../../../_hooks/useRequireAuth";
 import { useLocale, useTranslations } from "next-intl";
 import { useOrderGroupQuery } from "./_hooks/useOrderDetail";
-import { inferRefundPhase, getOrderStatusLabel } from "./_lib/types";
+import {
+  inferRefundPhase,
+  getOrderStatusLabel,
+  isOrderReturnable,
+} from "./_lib/types";
 import type { OrderDetail } from "./_lib/types";
-import { visibleCargoCode } from "../_lib/types";
+import { isGroupCancellable, visibleCargoCode } from "../_lib/types";
 import OrderItemBlock, {
   type OrderItemBlockHandlers,
 } from "./_sections/OrderItemBlock";
@@ -29,8 +33,12 @@ import GroupPaymentCard from "./_sections/GroupPaymentCard";
 import PartyCard from "./_sections/PartyCard";
 import HelpCard from "./_sections/HelpCard";
 import ReviewModal from "./_modals/ReviewModal";
-import CancelGroupModal from "../_modals/CancelGroupModal";
+import CancelOrderModal, {
+  type CancelTarget,
+} from "../_modals/CancelOrderModal";
 import GroupCancelSection from "./_sections/GroupCancelSection";
+import BulkRefundSection from "./_sections/BulkRefundSection";
+import BulkRefundModal from "./_modals/BulkRefundModal";
 
 /**
  * Sipariş GRUP ekranı — tek satın alım bile grup çatısı altında gösterilir.
@@ -51,7 +59,8 @@ export default function OrderGroupDetailPage() {
     null,
   );
   const [refundOrder, setRefundOrder] = useState<OrderDetail | null>(null);
-  const [cancelGroupOpen, setCancelGroupOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
+  const [bulkRefundOpen, setBulkRefundOpen] = useState(false);
 
   const groupQuery = useOrderGroupQuery(orderId, ready);
   const group = groupQuery.data ?? null;
@@ -96,6 +105,12 @@ export default function OrderGroupDetailPage() {
         : single.status
     : null;
 
+  // Grup iptali kapalıyken (karışık sepet ya da etiketi kesilmiş tekil sipariş)
+  // kargoya devredilmemiş kalemler tek tek iptal edilebilir.
+  const groupCancellable = isGroupCancellable(group);
+  const allowLineCancel = isMulti || !groupCancellable;
+  const returnableOrders = orders.filter(isOrderReturnable);
+
   const handlers: OrderItemBlockHandlers = {
     onReview: setReviewingOrder,
     onRequestRefund: (order) => {
@@ -105,6 +120,12 @@ export default function OrderGroupDetailPage() {
       }
       setRefundOrder(order);
     },
+    onCancelOrder: (order) =>
+      setCancelTarget({
+        kind: "line",
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+      }),
   };
 
   return (
@@ -198,6 +219,7 @@ export default function OrderGroupDetailPage() {
                     order={order}
                     showHeading={isMulti}
                     showCargoRef={orderIndex === 0}
+                    allowLineCancel={allowLineCancel}
                     handlers={handlers}
                   />
                 ))}
@@ -214,7 +236,11 @@ export default function OrderGroupDetailPage() {
           <GroupPaymentCard group={group} />
           <GroupCancelSection
             group={group}
-            onCancel={() => setCancelGroupOpen(true)}
+            onCancel={() => setCancelTarget({ kind: "group", group })}
+          />
+          <BulkRefundSection
+            count={returnableOrders.length}
+            onOpen={() => setBulkRefundOpen(true)}
           />
           <ShippingAddressCard order={firstOrder} />
           {!multiPackage && <PartyCard order={firstOrder} />}
@@ -241,9 +267,19 @@ export default function OrderGroupDetailPage() {
           });
         }}
       />
-      <CancelGroupModal
-        group={cancelGroupOpen ? group : null}
-        onClose={() => setCancelGroupOpen(false)}
+      <CancelOrderModal
+        target={cancelTarget}
+        onClose={() => setCancelTarget(null)}
+      />
+      <BulkRefundModal
+        isOpen={bulkRefundOpen}
+        onClose={() => setBulkRefundOpen(false)}
+        orders={returnableOrders}
+        onSuccess={() => {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.orders.detail(),
+          });
+        }}
       />
     </PageShell>
   );

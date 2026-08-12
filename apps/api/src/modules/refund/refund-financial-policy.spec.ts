@@ -104,6 +104,8 @@ describe("refund financial policy", () => {
       productRefundAmount: 1000,
       outboundShippingRefundAmount: 130,
       buyerProtectionRefundAmount: 50,
+      // Defter ters kaydı için vergisiz karşılık (KDV'siz sipariş: net = brüt).
+      buyerProtectionNetRefundAmount: 50,
       returnShippingAmount: 180,
       returnShippingChargeToBuyer: 0,
       returnShippingChargeToSeller: 180,
@@ -320,6 +322,9 @@ describe("refund financial policy", () => {
         productRefundAmount: 1000,
         outboundShippingRefundAmount: 120,
         buyerProtectionRefundAmount: 60,
+        // Defter (CommissionLedger.buyerFee) NET tutulur: brüt 60'ın vergisiz
+        // karşılığı 50 — ters kayıt bu değeri kullanmalı (K6).
+        buyerProtectionNetRefundAmount: 50,
         buyerRefundAmount: 1180,
       });
     });

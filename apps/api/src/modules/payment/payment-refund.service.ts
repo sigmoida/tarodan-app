@@ -1332,15 +1332,35 @@ export class PaymentRefundService {
    * v1 takaslarda tek satır vardır ve kargo kalemi 0 olduğundan davranış
    * değişmez (tam iade).
    */
-  async refundTradeCashPaymentIfCompleted(tradeId: string): Promise<{
+  async refundTradeCashPaymentIfCompleted(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<{
     refunded: boolean;
     paymentId?: string;
     skippedReason?: string;
   }> {
+    // COMPLETED takas guard'ı — SATIR bazlı niyet filtresi. İtiraz çözümü
+    // takası tamamlarken release EDİLECEK satırları holdReleaseAt ile damgalar;
+    // dolayısıyla completed bir takasta hâlâ iade borcu olan satırlar tam
+    // olarak damgasız (holdReleaseAt=null) kalanlardır. Kapsamsız bir çağrı
+    // (manuel iade, retry cron, reconciliation süpürmesi) completed takasta
+    // yalnız bu satırları iade eder: normal tamamlanmış takasta (confirmReceipt
+    // her satırı damgalar) güvenli no-op'tur, karşı tarafın escrow'u asla
+    // yanlışlıkla iade edilmez. Açık payerId kapsamı ise bilinçli admin
+    // niyetidir ve damga filtresine takılmaz.
+    const tradeRow = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: { status: true },
+    });
+    const restrictToUnstamped =
+      tradeRow?.status === TradeStatus.completed && !opts?.payerId;
     const payments = await this.prisma.payment.findMany({
       where: {
         tradeCashPayment: {
           tradeId,
+          ...(opts?.payerId ? { payerId: opts.payerId } : {}),
+          ...(restrictToUnstamped ? { holdReleaseAt: null } : {}),
           // Escrow: sadece bırakılmamış ve daha önce iade edilmemiş olanlar
           releasedAt: null,
           refundedAt: null,
@@ -1734,14 +1754,20 @@ export class PaymentRefundService {
    * commit edilmiştir; iade hatası iptali geri almaz (`rejectWarehouseTrade` ile
    * aynı felsefe). Çağıran, kullanıcıya sahte bir 500 döndürmek yerine sonucu okur.
    */
-  async refundTradeCashTracked(tradeId: string): Promise<{
+  async refundTradeCashTracked(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<{
     refunded: boolean;
     failed: boolean;
     skippedReason?: string;
     reason?: string;
   }> {
     try {
-      const result = await this.refundTradeCashPaymentIfCompleted(tradeId);
+      const result = await this.refundTradeCashPaymentIfCompleted(
+        tradeId,
+        opts,
+      );
       // Başarı (veya "iade edilecek tamamlanmış ödeme yok" no-op) → varsa eski
       // hata marker'ını temizle. Best-effort; iade zaten yapıldı.
       await this.prisma.trade
@@ -1752,13 +1778,23 @@ export class PaymentRefundService {
         .catch(() => {});
       if (result.refunded) {
         try {
-          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
-            where: { tradeId },
-            select: { payerId: true },
-          });
+          // Bildirim GERÇEKTEN iade edilen tarafa gitmeli: kapsam verildiyse o
+          // taraf, yoksa iade edilen ödeme satırının sahibi. Kapsamsız
+          // findFirst, v2'nin iki-satırlı modelinde yanlış tarafa "iadeniz
+          // tamamlandı" bildirimi atabiliyordu.
+          const cashPayerId =
+            opts?.payerId ??
+            (result.paymentId
+              ? ((
+                  await this.prisma.tradeCashPayment.findFirst({
+                    where: { tradeId, payment: { id: result.paymentId } },
+                    select: { payerId: true },
+                  })
+                )?.payerId ?? null)
+              : null);
           await this.eventService.emitTradeRefundCompleted({
             tradeId,
-            cashPayerId: cashPayment?.payerId ?? null,
+            cashPayerId,
           });
         } catch (emitErr) {
           this.logger.error(
@@ -1792,13 +1828,22 @@ export class PaymentRefundService {
           ),
         );
       try {
-        const cashPayment = await this.prisma.tradeCashPayment.findFirst({
-          where: { tradeId },
-          select: { payerId: true },
-        });
+        // Kapsamlı iadede hata bildirimi o tarafa; kapsamsızda tek ödeme
+        // satırı varsa (v1) sahibi bellidir, iki satırlı v2'de taraf
+        // belirsizdir → null (yanlış tarafa "iade başarısız" bildirmektense
+        // kimseye kişisel bildirim atmamak doğrudur; admin marker'ı görür).
+        let cashPayerId: string | null = opts?.payerId ?? null;
+        if (!cashPayerId) {
+          const rows = await this.prisma.tradeCashPayment.findMany({
+            where: { tradeId },
+            select: { payerId: true },
+            take: 2,
+          });
+          cashPayerId = rows.length === 1 ? rows[0].payerId : null;
+        }
         await this.eventService.emitTradeRefundFailed({
           tradeId,
-          cashPayerId: cashPayment?.payerId ?? null,
+          cashPayerId,
           reason,
         });
       } catch (emitErr) {

@@ -94,22 +94,30 @@ describe("refund financial policy v2", () => {
     },
   );
 
-  it("charges a seller-fault partial return the complete original package only once", () => {
-    const first = calculateRefundFinancialsV2({
+  it("defers outbound shipping to the line-completing refund and settles the package once", () => {
+    // K7: kısmi iade gidiş kargosuna DOKUNMAZ — koli kalan teslim adetlere
+    // hizmet etmiştir (v1'deki tazmin ilkesiyle aynı).
+    const partial = calculateRefundFinancialsV2({
       ...base,
       faultParty: "seller",
       orderQuantity: 2,
       refundQuantity: 1,
     });
-    const second = calculateRefundFinancialsV2({
-      ...base,
-      faultParty: "seller",
-      orderQuantity: 2,
-      refundQuantity: 1,
-      outboundAlreadySettled: true,
-    });
+    expect(
+      partial.components.some((c) => c.componentCode === "outbound_shipping"),
+    ).toBe(false);
+    expect(partial.outboundSettlementRequired).toBe(false);
 
-    expect(first.components).toEqual(
+    // Satırı (önceki iadelerle birlikte) TAMAMLAYAN talep, kargo bileşenlerini
+    // tam koli üzerinden tek seferde üretir.
+    const completing = calculateRefundFinancialsV2({
+      ...base,
+      faultParty: "seller",
+      orderQuantity: 2,
+      refundQuantity: 1,
+      completesLine: true,
+    });
+    expect(completing.components).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           componentCode: "outbound_shipping",
@@ -125,15 +133,25 @@ describe("refund financial policy v2", () => {
         }),
       ]),
     );
-    expect(first.outboundSettlementRequired).toBe(true);
+    expect(completing.outboundSettlementRequired).toBe(true);
+
+    // Koli mutabakatı tek seferliktir: mutabakat düştükten sonra tekrar üretilmez.
+    const afterSettled = calculateRefundFinancialsV2({
+      ...base,
+      faultParty: "seller",
+      orderQuantity: 2,
+      refundQuantity: 1,
+      completesLine: true,
+      outboundAlreadySettled: true,
+    });
     expect(
-      second.components.some(
+      afterSettled.components.some(
         (c) =>
           c.componentCode === "outbound_shipping" &&
           c.treatment === "seller_charge",
       ),
     ).toBe(false);
-    expect(second.outboundSettlementRequired).toBe(false);
+    expect(afterSettled.outboundSettlementRequired).toBe(false);
   });
 
   it.each([0, 10, 20])(

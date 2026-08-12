@@ -655,8 +655,10 @@ export class RefundService {
               (created as any).financialComponents,
               {
                 sellerFeeAmount: financial.financials.sellerFeeRefundAmount,
+                // Defter NET tutar ister; brüt beslemek KDV kadar fazla ters
+                // kayıt üretir (K6).
                 buyerFeeAmount:
-                  financial.financials.buyerProtectionRefundAmount,
+                  financial.financials.buyerProtectionNetRefundAmount,
               },
             ),
             ...this.shippingSettlement(created.id, {
@@ -836,14 +838,19 @@ export class RefundService {
     const activeReturnTariff = hasShipped
       ? await this.shippingTariffService.getActiveOutboundTariff("surat")
       : null;
-    const returnTier = activeReturnTariff?.packageTiers.find(
-      (tier) => tier.code === outboundTier,
+    // O5: dönüş fiyatı TEK kaynaktan — fiziksel dönüş kolisinin desisi aktif
+    // tarifede hangi kademeye düşüyorsa o. Sürat dönüş etiketi de aynı desiyle
+    // kesilir (openReturnShipment → returnBillableDesi), böylece faturalanan
+    // kademe ile taşınan koli ayrışamaz. (Eskiden orijinal GİDİŞ kolisinin
+    // kademesi kullanılıyordu — kısmi iadede küçük koliye büyük koli fiyatı
+    // yazılıyordu.)
+    const returnBillableDesi = Math.max(
+      1,
+      (order.product.shippingDesi ?? 1) * rr.refundQuantity,
     );
-    if (activeReturnTariff && !returnTier) {
-      throw new BadRequestException(
-        `Aktif iade tarifesinde '${outboundTier}' paket sınıfı bulunamadı`,
-      );
-    }
+    const returnTier = activeReturnTariff
+      ? resolvePackageTier(activeReturnTariff, returnBillableDesi)
+      : null;
 
     const outboundAlreadySettled = order.packageId
       ? Boolean(
@@ -882,6 +889,24 @@ export class RefundService {
       productGrossAmount,
       sellerType: order.seller.sellerType,
     });
+    // K7: gidiş kargosu yalnız satırı TAMAMLAYAN iadede işlenir. Art arda
+    // kısmi iadelerde (1/3 sonra 2/3) son talep tek başına "tam" olmadığı için
+    // önceki iade edilmiş adetler de sayılır — aksi halde her şeyini iki
+    // adımda iade eden alıcı kargo iadesini sonsuza dek kaybederdi.
+    const priorRefundedRows = await this.prisma.refundRequest.findMany({
+      where: {
+        orderId: order.id,
+        id: { not: rr.id },
+        status: RefundRequestStatus.refunded,
+      },
+      select: { refundQuantity: true },
+    });
+    const priorRefundedQuantity = priorRefundedRows.reduce(
+      (sum, row) => sum + (row.refundQuantity ?? 0),
+      0,
+    );
+    const completesLine =
+      priorRefundedQuantity + rr.refundQuantity >= (order.quantity ?? 1);
     const financials = calculateRefundFinancialsV2({
       productGrossAmount,
       productTaxAmount,
@@ -899,12 +924,14 @@ export class RefundService {
       faultParty,
       hasShipped,
       outboundAlreadySettled,
+      completesLine,
     });
     const returnTariff = activeReturnTariff
       ? {
           id: activeReturnTariff.id,
           version: activeReturnTariff.version,
-          tier: outboundTier,
+          tier: returnTier!.code,
+          desi: returnBillableDesi,
           amount: Number(returnTier!.amount),
         }
       : null;
@@ -919,6 +946,7 @@ export class RefundService {
       outboundFullShippingAmount,
       serviceVatRate: Number(order.serviceVatRate ?? 0),
       outboundAlreadySettled,
+      completesLine,
       returnTariff,
       financials,
     };
@@ -950,6 +978,32 @@ export class RefundService {
           component.componentCode === code && component.treatment === treatment,
       )
       .reduce((sum, component) => sum + component[field], 0);
+  }
+
+  /**
+   * v1 (bileşensiz) satırlarda defter ters kaydı için NET alıcı ücreti.
+   * `refundedBuyerProtectionAmount` BRÜT saklanır; CommissionLedger.buyerFee
+   * ise NET'tir — brütü beslemek kısmi iadede KDV kadar fazla ters kayıt
+   * üretir. Önce snapshot'taki kesin net alan okunur; bu alandan önce yazılmış
+   * eski kayıtlar için brütten KDV arındırılmış yaklaşık değer kullanılır
+   * (ledger zaten orijinale clamp'ler).
+   */
+  private legacyBuyerFeeNetOf(rr: {
+    refundedBuyerProtectionAmount: Prisma.Decimal | number;
+    financialPolicySnapshot?: Prisma.JsonValue;
+    order?: Record<string, unknown> | null;
+  }): number {
+    const snap = rr.financialPolicySnapshot as any;
+    const fromSnapshot =
+      snap?.financials?.buyerProtectionNetRefundAmount ??
+      snap?.legacyProvisionalCalculation?.financials
+        ?.buyerProtectionNetRefundAmount;
+    if (typeof fromSnapshot === "number") return fromSnapshot;
+    const gross = Number(rr.refundedBuyerProtectionAmount);
+    const rate = Number((rr.order as any)?.serviceVatRate ?? 0);
+    return rate > 0
+      ? Math.round((gross / (1 + rate / 100)) * 100) / 100
+      : gross;
   }
 
   private feeSettlementFromComponents(
@@ -1341,6 +1395,10 @@ export class RefundService {
             sellerId: true,
             status: true,
             quantity: true,
+            // legacyBuyerFeeNetOf'un KDV fallback'i bu kolonu okur — select
+            // edilmezse oran 0 sanılır ve deftere BRÜT ücret gider (K6'nın ta
+            // kendisi, bu kez select eksiğinden).
+            serviceVatRate: true,
           },
         },
       },
@@ -1374,7 +1432,8 @@ export class RefundService {
             ),
             ...this.feeSettlementFromComponents(rr.financialComponents, {
               sellerFeeAmount: Number(rr.refundedSellerFeeAmount),
-              buyerFeeAmount: Number(rr.refundedBuyerProtectionAmount),
+              // Defter NET tutar ister (K6): brüt kolon yerine snapshot'taki net.
+              buyerFeeAmount: this.legacyBuyerFeeNetOf(rr),
             }),
             ...this.shippingSettlement(rr.id, {
               sellerShippingCompensationAmount: Number(
@@ -1531,6 +1590,58 @@ export class RefundService {
       orderId: rr.order.id,
     });
     return updated;
+  }
+
+  /**
+   * O3: Admin, satıcı itirazı/şüphe hâlinde iadeyi `disputed`'a çeker —
+   * return_delivered'daki 24 saatlik otomatik finalize penceresi durur
+   * (finalize cron'u yalnız return_delivered tarar; aktif-statü kümesi
+   * disputed'ı içerdiği için hold da donuk kalır). Çıkış yolları:
+   * force-finalize (alıcıya iade) veya close (iadesiz kapatma, MONEY-H6).
+   */
+  async adminMarkRefundDisputed(
+    refundRequestId: string,
+    adminId: string,
+    note: string,
+  ) {
+    if (!note?.trim() || note.trim().length < 10) {
+      throw new BadRequestException(
+        "İtiraz işareti için en az 10 karakterlik gerekçe zorunludur",
+      );
+    }
+    const allowed: RefundRequestStatus[] = [
+      RefundRequestStatus.return_in_transit,
+      RefundRequestStatus.return_delivered,
+    ];
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { id: true, status: true },
+    });
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
+    if (!allowed.includes(rr.status)) {
+      throw new BadRequestException(
+        `Talep durumu '${rr.status}' itiraz işaretlemek için uygun değil. ` +
+          `Beklenen: ${allowed.join(", ")}`,
+      );
+    }
+    // CAS: finalize cron'u / Sürat sync ile yarışta yalnız biri kazanır.
+    const claimed = await this.prisma.refundRequest.updateMany({
+      where: { id: refundRequestId, status: { in: allowed } },
+      data: { status: RefundRequestStatus.disputed },
+    });
+    if (claimed.count === 0) {
+      throw new ConflictException(
+        "İade bu sırada başka bir akış tarafından ilerletildi; sayfayı yenileyin",
+      );
+    }
+    await this.appendHistory(refundRequestId, {
+      action: "marked_disputed",
+      by: adminId,
+      details: { previousStatus: rr.status, note: note.trim() },
+    });
+    return this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+    });
   }
 
   async getById(refundRequestId: string, userId: string, isAdmin = false) {
@@ -1761,10 +1872,20 @@ export class RefundService {
     // tekrarlardı. Yalnız BİR çağıran `return_delivered→refunded` geçişini kazanır;
     // count===0 → başka biri aldı → tekrarlama. (processRefund'ın kendi refundInProgress
     // marker'ı PayTR çift-çağrısını zaten engelliyor; bu CAS finalize yan-etkilerini tekilleştirir.)
+    // Claim'in HANGİ durumdan alındığını bil: PSP hatasında geri alım aynı
+    // duruma dönmeli. disputed'ı return_delivered'a ezmek hem itiraz kaydını
+    // siliyor hem returnDeliveredAt=null satırı finalize cron'unun göremediği
+    // sahte bir "teslim edildi" durumunda bırakıyordu.
+    const claimedFromStatus =
+      rr.status === RefundRequestStatus.disputed
+        ? RefundRequestStatus.disputed
+        : RefundRequestStatus.return_delivered;
     const claimed = await this.prisma.refundRequest.updateMany({
       where: {
         id: refundRequestId,
-        status: RefundRequestStatus.return_delivered,
+        // rr yukarıda okundu; CAS yalnız o durumdan claim eder — araya giren
+        // bir durum değişikliği count=0 üretir ve tekrarlanmaz.
+        status: claimedFromStatus,
       },
       data: { status: RefundRequestStatus.refunded, refundedAt: new Date() },
     });
@@ -1793,7 +1914,8 @@ export class RefundService {
             ),
             ...this.feeSettlementFromComponents(rr.financialComponents, {
               sellerFeeAmount: Number(rr.refundedSellerFeeAmount),
-              buyerFeeAmount: Number(rr.refundedBuyerProtectionAmount),
+              // Defter NET tutar ister (K6): brüt kolon yerine snapshot'taki net.
+              buyerFeeAmount: this.legacyBuyerFeeNetOf(rr),
             }),
             ...this.shippingSettlement(rr.id, {
               sellerShippingCompensationAmount: Number(
@@ -1810,8 +1932,10 @@ export class RefundService {
         }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
       );
     } catch (err) {
-      // processRefund BAŞARISIZ → claim'i GERİ AL (return_delivered) ki cron retry etsin.
-      // (Money iade edilmedi; yalnız claim kilidini bıraktık.)
+      // processRefund BAŞARISIZ → claim'i GERİ AL: satır claim edildiği duruma
+      // döner (return_delivered → cron retry eder; disputed → itiraz ekranda
+      // kalır, admin yeniden dener). (Money iade edilmedi; yalnız claim
+      // kilidini bıraktık.)
       await this.prisma.refundRequest
         .updateMany({
           where: {
@@ -1819,7 +1943,7 @@ export class RefundService {
             status: RefundRequestStatus.refunded,
           },
           data: {
-            status: RefundRequestStatus.return_delivered,
+            status: claimedFromStatus,
             refundedAt: null,
           },
         })
@@ -2275,20 +2399,6 @@ export class RefundService {
     return "unknown";
   }
 
-  /**
-   * Adet bazlı iade tutarı: tam siparişte (refundQuantity >= orderQuantity)
-   * totalAmount'ın tamamı; kısmi adette orantılı (totalAmount * adet / siparişAdedi).
-   */
-  private computeRefundAmount(
-    order: { totalAmount: Prisma.Decimal; quantity?: number },
-    refundQuantity: number,
-  ): number {
-    const total = Number(order.totalAmount);
-    const orderQty = order.quantity ?? 1;
-    if (refundQuantity >= orderQty || orderQty <= 1) return total;
-    return Math.round(((total * refundQuantity) / orderQty) * 100) / 100;
-  }
-
   private async buildFinancialPolicySnapshot(
     order: {
       totalAmount: Prisma.Decimal;
@@ -2581,6 +2691,11 @@ export class RefundService {
       return created;
     }
 
+    // O9: hold'u PSP çağrısından ÖNCE dondur (createCancellationRefund ile aynı
+    // desen). Eskiden mutlu yol dondurmadan PayTR'ye gidiyordu — iade sürerken
+    // escrow release cron'u holdu satıcıya bırakabilirdi.
+    await this.freezeHoldForRefund(order.id, created.id);
+
     let refundResult: { providerRefundId: string };
     try {
       refundResult = await this.paymentService.processRefund(
@@ -2600,8 +2715,10 @@ export class RefundService {
               (created as any).financialComponents,
               {
                 sellerFeeAmount: financial.financials.sellerFeeRefundAmount,
+                // Defter NET tutar ister; brüt beslemek KDV kadar fazla ters
+                // kayıt üretir (K6).
                 buyerFeeAmount:
-                  financial.financials.buyerProtectionRefundAmount,
+                  financial.financials.buyerProtectionNetRefundAmount,
               },
             ),
             ...this.shippingSettlement(created.id, {
@@ -2872,175 +2989,10 @@ export class RefundService {
   // refund-scheduler'dır: kayıt wait_for_delivery'de kalır ve
   // openReturnShipmentsForDeliveredOrders (10 dk) tam açılışı yeniden dener.
 
-  /**
-   * Admin: RefundRequest policy override (Faz 4B.1 + 4F).
-   * 4 boolean alandan herhangi biri/hepsi güncellenebilir.
-   * Yeni policy'ye göre RefundRequest.amount yeniden hesaplanır (Faz 4F).
-   */
-  async overrideRefundPolicy(
-    refundRequestId: string,
-    adminId: string,
-    payload: {
-      refundProductAmount?: boolean;
-      refundShippingFee?: boolean;
-      refundBuyerFee?: boolean;
-      refundSellerCommission?: boolean;
-    },
-  ) {
-    const before = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      include: { order: true },
-    });
-    if (!before) {
-      throw new NotFoundException(i18nMessage("server.refund.notFound"));
-    }
-    if (
-      before.policyCode !== "legacy" ||
-      before.status !== RefundRequestStatus.pending_review
-    ) {
-      throw new BadRequestException(
-        "Snapshot tabanlı iade politikası değiştirilemez",
-      );
-    }
-
-    // Yeni policy değerleri (mevcut + payload merge)
-    const policy = {
-      refundProductAmount:
-        payload.refundProductAmount ?? before.refundProductAmount,
-      refundShippingFee: payload.refundShippingFee ?? before.refundShippingFee,
-      refundBuyerFee: payload.refundBuyerFee ?? before.refundBuyerFee,
-      refundSellerCommission:
-        payload.refundSellerCommission ?? before.refundSellerCommission,
-    };
-
-    // Yeni iade tutarı (kısmi iade — Faz 4F)
-    const newAmount = this.computePartialRefundAmount(policy, before.order);
-
-    const updated = await this.prisma.refundRequest.update({
-      where: { id: refundRequestId },
-      data: {
-        refundProductAmount: policy.refundProductAmount,
-        refundShippingFee: policy.refundShippingFee,
-        refundBuyerFee: policy.refundBuyerFee,
-        refundSellerCommission: policy.refundSellerCommission,
-        amount: newAmount,
-      },
-    });
-
-    await this.appendHistory(refundRequestId, {
-      action: "policy_overridden",
-      by: adminId,
-      details: {
-        before: {
-          refundProductAmount: before.refundProductAmount,
-          refundShippingFee: before.refundShippingFee,
-          refundBuyerFee: before.refundBuyerFee,
-          refundSellerCommission: before.refundSellerCommission,
-          amount: before.amount,
-        },
-        after: { ...policy, amount: newAmount.toString() },
-      },
-    });
-
-    this.logger.log(
-      `RefundRequest ${refundRequestId} policy overridden by admin ${adminId}; new amount=${newAmount}`,
-    );
-    return updated;
-  }
-
-  /**
-   * Kısmi iade tutarı hesaplaması (Faz 4F).
-   * Spec Bölüm 7 — policy boolean'larına göre order'ın
-   * subtotal/shipping/buyerFee toplamı.
-   *
-   * NOT: refundSellerCommission satıcıdan tahsil işidir; alıcının iade
-   * tutarına eklenmez. Satıcı tahsilatı PaymentHold / PayoutTransfer
-   * mahsuplaşmasıyla yapılır (kapsam dışı — Faz 5+).
-   */
-  private computePartialRefundAmount(
-    policy: {
-      refundProductAmount: boolean;
-      refundShippingFee: boolean;
-      refundBuyerFee: boolean;
-    },
-    order: {
-      totalAmount: any;
-      subtotal: any | null;
-      shippingCost: any;
-      buyerFeeAmount: any;
-    },
-  ): any {
-    const D = (Prisma as any).Decimal;
-    const shippingCost = new D(order.shippingCost ?? 0);
-    const buyerFeeAmount = new D(order.buyerFeeAmount ?? 0);
-
-    // Ürün için iade edilecek tutar = alıcının ürüne FİİLEN ödediği tutar.
-    // totalAmount = ödenenÜrünTutarı + shipping + buyerFee (bkz. order.service checkout)
-    // olduğundan ödenenÜrünTutarı = totalAmount - shipping - buyerFee.
-    // Stored subtotal kullanılmaz: (a) çoğu eski/seed siparişte NULL,
-    // (b) indirim ÖNCESİ orijinal fiyatı tutar -> indirimli siparişte fazla iade.
-    const productAmount = new D(order.totalAmount ?? 0)
-      .sub(shippingCost)
-      .sub(buyerFeeAmount);
-
-    let amount = new D(0);
-    if (policy.refundProductAmount) {
-      amount = amount.add(
-        productAmount.isNegative() ? new D(0) : productAmount,
-      );
-    }
-    if (policy.refundShippingFee) {
-      amount = amount.add(shippingCost);
-    }
-    if (policy.refundBuyerFee) {
-      amount = amount.add(buyerFeeAmount);
-    }
-    return amount;
-  }
-
-  /**
-   * Admin: İade kargosu kim öder (Faz 4B.1).
-   */
-  async setReturnShippingPayer(
-    refundRequestId: string,
-    adminId: string,
-    payer: "buyer" | "seller" | "platform",
-  ) {
-    const before = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      select: {
-        id: true,
-        status: true,
-        policyCode: true,
-        returnShippingPayer: true,
-      },
-    });
-    if (!before) {
-      throw new NotFoundException(i18nMessage("server.refund.notFound"));
-    }
-    if (
-      before.policyCode !== "legacy" ||
-      before.status !== RefundRequestStatus.pending_review
-    ) {
-      throw new BadRequestException(
-        "Snapshot tabanlı iade kargo tarafı değiştirilemez",
-      );
-    }
-
-    const updated = await this.prisma.refundRequest.update({
-      where: { id: refundRequestId },
-      data: { returnShippingPayer: payer as any },
-    });
-
-    await this.appendHistory(refundRequestId, {
-      action: "return_shipping_payer_changed",
-      by: adminId,
-      details: { before: before.returnShippingPayer, after: payer },
-    });
-
-    this.logger.log(
-      `RefundRequest ${refundRequestId} returnShippingPayer set to ${payer} by admin ${adminId}`,
-    );
-    return updated;
-  }
+  // NOT: overrideRefundPolicy / setReturnShippingPayer / computePartialRefundAmount
+  // KALDIRILDI. `policyCode === "legacy"` şartına bağlıydılar; refundFinancialData
+  // her kayda gerçek policy kodu yazdığı için hiçbir üretim kaydında çalışamıyorlardı
+  // ve computePartialRefundAmount vergileri tamamen yok sayan ÜÇÜNCÜ bir tutar
+  // formülüydü. Karar akışı tek kaynaktan yürür: previewRefundDecision +
+  // finalizeV2RefundDecision (bileşen bazlı politika).
 }

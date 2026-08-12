@@ -12,8 +12,11 @@ describe("PaymentRefundService.refundTradeCashTracked — MONEY-H2 failure track
     const prisma = {
       trade: { update: jest.fn().mockResolvedValue({}) },
       tradeCashPayment: {
-        // v2: takas başına taraf-başına satır → tekil okuma findFirst'e döndü.
+        // Başarı yolunda iade edilen satırın sahibi findFirst ile çözülür;
+        // hata yolunda tek-satırlı (v1) takasta sahibi findMany(take:2) bulur
+        // (iki satırlı v2'de taraf belirsiz → null, yanlış tarafa bildirim yok).
         findFirst: jest.fn().mockResolvedValue({ payerId: "payer-1" }),
+        findMany: jest.fn().mockResolvedValue([{ payerId: "payer-1" }]),
       },
     };
     const eventService = {

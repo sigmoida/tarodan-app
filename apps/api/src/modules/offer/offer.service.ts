@@ -28,6 +28,7 @@ import { getAvailableQuantity } from "../product/helpers/product-availability.he
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
+import { OFFER_CANCEL_REASON } from "../trade/trade-cancel-reasons";
 
 @Injectable()
 export class OfferService {
@@ -846,7 +847,7 @@ export class OfferService {
       where: { id: offerId },
       data: {
         status: OfferStatus.cancelled,
-        cancelReason: "Alıcı tarafından iptal edildi",
+        cancelReason: OFFER_CANCEL_REASON.buyerCancelled,
         version: { increment: 1 },
       },
       include: {

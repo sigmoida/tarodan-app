@@ -23,6 +23,7 @@ import TradeMessages from "./_sections/TradeMessages";
 import TradeActionBar from "./_sections/TradeActionBar";
 import CounterOfferEditor from "./_sections/CounterOfferEditor";
 import RejectTradeModal from "./_modals/RejectTradeModal";
+import RaiseDisputeModal from "./_modals/RaiseDisputeModal";
 
 export default function TradeDetailPage() {
   const vm = useTradeDetail();
@@ -41,6 +42,7 @@ export default function TradeDetailPage() {
     canReject,
     canCounter,
     canCancel,
+    canDispute,
     showCancelDisabled,
     needToShip,
     myToWarehouseShipment,
@@ -59,6 +61,9 @@ export default function TradeDetailPage() {
     setShowRejectModal,
     rejectReason,
     setRejectReason,
+    showDisputeModal,
+    setShowDisputeModal,
+    invalidateTrade,
     handleCashPayment,
     handleShipSubmit,
     handleConfirmReceipt,
@@ -221,12 +226,14 @@ export default function TradeDetailPage() {
         canReject={!!canReject}
         canCounter={!!canCounter}
         canCancel={!!canCancel && !paymentCardOwnsCancel}
+        canDispute={!!canDispute}
         showCancelDisabled={!!showCancelDisabled}
         onAddressChange={setTradeAddressId}
         onAccept={handleAccept}
         onCounter={handleOpenCounterModal}
         onReject={() => setShowRejectModal(true)}
         onCancel={handleCancel}
+        onDispute={() => setShowDisputeModal(true)}
       />
 
       <RejectTradeModal
@@ -240,6 +247,13 @@ export default function TradeDetailPage() {
         onReject={handleReject}
         isActionLoading={isActionLoading}
         cancelLabel={t("common.cancel")}
+      />
+
+      <RaiseDisputeModal
+        open={showDisputeModal}
+        onClose={() => setShowDisputeModal(false)}
+        tradeId={trade.id}
+        onSuccess={invalidateTrade}
       />
     </PageShell>
   );

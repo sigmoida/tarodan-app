@@ -8,12 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
-import {
-  ProductStatus,
-  PaymentStatus,
-  TradeStatus,
-  ShipmentStatus,
-} from "@prisma/client";
+import { ProductStatus, TradeStatus, ShipmentStatus } from "@prisma/client";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import { PaymentService } from "../payment/payment.service";
 import { EventService } from "../events/event.service";
@@ -24,8 +19,8 @@ import {
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
-import { primaryCashPayment } from "../trade/trade.constants";
 import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
+import { TRADE_CANCEL_REASON } from "../trade/trade-cancel-reasons";
 
 /**
  * Takas çözüm & iade/iptal yaşam döngüsü (resolveTrade, markReturnDelivered,
@@ -49,146 +44,12 @@ export class AdminTradeResolutionService {
     private readonly carrierCancellations?: CarrierCancellationService,
   ) {}
 
-  /**
-   * Resolve trade dispute or cancel trade
-   */
-  async resolveTrade(
-    adminId: string,
-    tradeId: string,
-    dto: { resolution: string; note?: string },
-  ) {
-    const trade = await this.prisma.trade.findUnique({
-      where: { id: tradeId },
-      include: {
-        items: true,
-        dispute: true,
-      },
-    });
-
-    if (!trade) {
-      throw new NotFoundException("Takas bulunamadı");
-    }
-
-    return this.prisma.$transaction(async (tx) => {
-      // Get all trade items
-      const allItems = await tx.tradeItem.findMany({
-        where: { tradeId },
-      });
-
-      const productIds = allItems.map((item) => item.productId);
-
-      let updatedTrade;
-      let newStatus: TradeStatus;
-
-      if (dto.resolution === "cancel") {
-        // Cancel trade - make products active again
-        newStatus = TradeStatus.cancelled;
-
-        await tx.product.updateMany({
-          where: { id: { in: productIds } },
-          data: { status: ProductStatus.active },
-        });
-
-        updatedTrade = await tx.trade.update({
-          where: { id: tradeId },
-          data: {
-            status: newStatus,
-            cancelledAt: new Date(),
-            cancelReason: dto.note || "Admin tarafından iptal edildi",
-          },
-        });
-      } else if (
-        dto.resolution === "favor_initiator" ||
-        dto.resolution === "complete_trade"
-      ) {
-        // Complete trade
-        newStatus = TradeStatus.completed;
-
-        // CRITICAL: When trade is completed, products should be marked as inactive
-        // (not sold) so they disappear from listings
-        await tx.product.updateMany({
-          where: { id: { in: productIds } },
-          data: { status: ProductStatus.inactive },
-        });
-
-        updatedTrade = await tx.trade.update({
-          where: { id: tradeId },
-          data: {
-            status: newStatus,
-            completedAt: new Date(),
-          },
-        });
-
-        // Update dispute if exists
-        if (trade.dispute) {
-          await tx.tradeDispute.update({
-            where: { tradeId },
-            data: {
-              resolution: dto.resolution,
-              resolvedById: adminId,
-              resolvedAt: new Date(),
-              resolutionNotes: dto.note,
-            },
-          });
-        }
-      } else if (dto.resolution === "favor_receiver") {
-        // Cancel and return products
-        newStatus = TradeStatus.cancelled;
-
-        await tx.product.updateMany({
-          where: { id: { in: productIds } },
-          data: { status: ProductStatus.active },
-        });
-
-        updatedTrade = await tx.trade.update({
-          where: { id: tradeId },
-          data: {
-            status: newStatus,
-            cancelledAt: new Date(),
-            cancelReason: dto.note || "Alıcı lehine iptal edildi",
-          },
-        });
-
-        // Update dispute if exists
-        if (trade.dispute) {
-          await tx.tradeDispute.update({
-            where: { tradeId },
-            data: {
-              resolution: dto.resolution,
-              resolvedById: adminId,
-              resolvedAt: new Date(),
-              resolutionNotes: dto.note,
-            },
-          });
-        }
-      } else {
-        throw new BadRequestException(
-          "Geçersiz çözüm tipi. Geçerli değerler: cancel, favor_initiator, favor_receiver, complete_trade",
-        );
-      }
-
-      // Create audit log
-      await this.audit.createAuditLog(
-        adminId,
-        "trade_resolve",
-        "Trade",
-        tradeId,
-        trade,
-        {
-          ...updatedTrade,
-          resolution: dto.resolution,
-          note: dto.note,
-        },
-      );
-
-      return {
-        success: true,
-        tradeId,
-        resolution: dto.resolution,
-        status: newStatus,
-      };
-    });
-  }
+  // NOT: Eski `resolveTrade` (cancel / favor_initiator / favor_receiver /
+  // complete_trade) KALDIRILDI: hiçbir iade çağırmadan iptal ediyor,
+  // reservedQuantity düşmeden ürünleri aktifliyor ve durum makinesi
+  // tanımıyordu; hiçbir istemci de kullanmıyordu. İtiraz çözümü
+  // TradeLifecycleService.resolveDispute'ta, takılı takas
+  // forceCancelStuckWarehouseTrade'de, depo reddi AdminTradeWarehouseService'te.
 
   /**
    * Admin marks a return shipment as delivered back to its original owner.
@@ -445,7 +306,7 @@ export class AdminTradeResolutionService {
           status: returnShipmentDraft
             ? TradeStatus.returning
             : TradeStatus.cancelled,
-          cancelReason: `Admin force-cancel (stuck): ${reason}`,
+          cancelReason: TRADE_CANCEL_REASON.adminForceCancelStuck(reason),
           ...(returnShipmentDraft ? {} : { cancelledAt: now }),
           updatedAt: now,
         },
@@ -513,10 +374,6 @@ export class AdminTradeResolutionService {
           carrier: stuck.carrier,
         },
         returnShipmentDraft,
-        shouldRefund:
-          !!primaryCashPayment(trade.cashPayments) &&
-          primaryCashPayment(trade.cashPayments).status ===
-            PaymentStatus.completed,
         warehouseAddressId: returnShipmentDraft
           ? await this.common.resolveWarehouseAddressId(tx)
           : null,
@@ -628,34 +485,11 @@ export class AdminTradeResolutionService {
       }
     }
 
-    if (txResult.shouldRefund) {
-      try {
-        await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
-        await this.prisma.trade.update({
-          where: { id: tradeId },
-          data: { refundFailureReason: null, refundFailureAt: null },
-        });
-      } catch (err: any) {
-        const message =
-          err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
-        this.logger.error(
-          `forceCancelStuckWarehouseTrade refund failed for ${tradeId}: ${message}`,
-        );
-        try {
-          await this.prisma.trade.update({
-            where: { id: tradeId },
-            data: {
-              refundFailureReason: message.slice(0, 500),
-              refundFailureAt: new Date(),
-            },
-          });
-        } catch (persistErr: any) {
-          this.logger.error(
-            `Failed to persist refund failure (force-cancel) trade=${tradeId}: ${persistErr?.message}`,
-          );
-        }
-      }
-    }
+    // MONEY: iade HER ZAMAN failure-tracking'li yoldan denenir; ödemesiz
+    // takasta no-op. Eski kod yalnız primaryCashPayment satırına bakıyordu —
+    // v2'de asıl ödeyen DİĞER taraf olduğunda iade hiç denenmiyor, marker da
+    // yazılmadığı için retry cron'u göremiyordu.
+    await this.paymentService.refundTradeCashTracked(tradeId);
 
     return {
       success: true,

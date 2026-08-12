@@ -1024,7 +1024,16 @@
     "cancelGroupTitle": "Cancel Cart",
     "cancelGroupAllNotice": "This cancels all {count} orders in the cart; the payment is refunded in full. Partial cancellation is not available.",
     "cartSiblings": "This cart has other orders too:",
-    "refundReasonDeliveryDelayed": "Delivery was late"
+    "refundReasonDeliveryDelayed": "Delivery was late",
+    "bulkRefundTitle": "Bulk Return",
+    "bulkRefundIntro": "This purchase has more than one returnable item. Select the items and create the return requests in one go.",
+    "bulkRefundCta": "Select Items to Return",
+    "bulkRefundSelectLabel": "Items to return",
+    "bulkRefundSelectAtLeastOne": "Select at least one item",
+    "bulkRefundAllSuccess": "{count} return requests created",
+    "bulkRefundPartialFail": "{succeeded} return requests created, {failed} failed",
+    "bulkRefundLineCreated": "Return request created",
+    "bulkRefundLineFailed": "Request could not be created"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -1105,6 +1114,7 @@
       "reasonShipmentLost": "Shipment lost / undelivered",
       "reasonShipmentDamaged": "Item arrived damaged",
       "reasonWrongItem": "Wrong item received",
+      "reasonNotAsDescribed": "Item not as described",
       "reasonOther": "Other",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Add details (shipping dates, photos available, etc.)",
@@ -1298,6 +1308,12 @@
     "statusCounterOffered": "Counter Offered",
     "waitingBuyerCounter": "Waiting for the buyer to respond to your counter-offer.",
     "acceptCounter": "Accept Counter-Offer",
+    "acceptConfirmTitle": "Accept offer",
+    "acceptConfirmDesc": "Are you sure you want to accept this offer? An order will be created for it.",
+    "rejectConfirmTitle": "Reject offer",
+    "rejectConfirmDesc": "Are you sure you want to reject this offer? This cannot be undone.",
+    "cancelConfirmTitle": "Cancel offer",
+    "cancelConfirmDesc": "Are you sure you want to cancel this offer? This cannot be undone.",
     "lowerOffer": "Lower Offer",
     "viewOrder": "View Order",
     "listingPriceLabel": "Listing Price",
@@ -4830,9 +4846,9 @@
         "resolveTitle": "Resolve Trade",
         "resolution": "Resolution",
         "resolveComplete": "Complete Trade",
-        "resolveCancel": "Cancel Trade (triggers refund)",
-        "compensateInitiator": "Compensate Offerer (cancel + refund + compensation flag)",
-        "compensateReceiver": "Compensate Recipient (cancel + refund + compensation flag)",
+        "compensateInitiator": "Compensate Offerer (refunds their payment + compensation flag)",
+        "compensateReceiver": "Compensate Recipient (refunds their payment + compensation flag)",
+        "compensateBoth": "Compensate Both Parties (refunds both payments — e.g. both parcels lost)",
         "resolutionNoteLabel": "Resolution Note (at least 10 characters)",
         "resolutionPlaceholder": "Summarize the resolution rationale (lost shipment, damage, etc.)",
         "resolvedMsg": "Trade resolved",
@@ -4912,8 +4928,6 @@
         "reviewNotePlaceholder": "Describe the review result and reasoning",
         "approveButton": "Approve Request",
         "rejectButton": "Reject Request",
-        "policyUpdated": "Refund policy updated",
-        "payerUpdated": "Return shipping payer updated",
         "policyCode": "Financial policy",
         "returnDesi": "Return desi",
         "returnFee": "Return shipping fee",
@@ -5029,6 +5043,10 @@
           "gross": "Gross"
         },
         "forceFinalizeButton": "Finalize Refund",
+        "disputeButton": "Mark Disputed",
+        "disputeNotePlaceholder": "Dispute reason (min 10 characters) — e.g. seller reported the item came back damaged",
+        "disputeConfirm": "Confirm Dispute",
+        "disputeMarked": "Refund marked as disputed; auto-finalize paused",
         "counterfeitTitle": "Counterfeit / fake product complaint",
         "counterfeitBody": "This request was opened on grounds of a counterfeit product. After the refund is approved, consider a sanction for the seller (warning, temporary suspension or termination) and run a risk review on the seller's other products.",
         "policyTitle": "Refund Policy",
@@ -6370,10 +6388,12 @@
       },
       "refunds": {
         "status": {
+          "pendingReview": "Pending Review",
           "waitForDelivery": "Awaiting Product Delivery",
           "returnShipmentOpen": "Return Shipment Ready",
           "returnInTransit": "Return in Transit",
-          "returnDelivered": "Return Delivered (Refund Pending)"
+          "returnDelivered": "Return Delivered (Refund Pending)",
+          "disputed": "Disputed"
         }
       },
       "errors": {

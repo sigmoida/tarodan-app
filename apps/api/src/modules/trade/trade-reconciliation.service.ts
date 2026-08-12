@@ -15,6 +15,7 @@ import { getProductStatusFromQuantity } from "../product/helpers/product-status.
 import { PaymentService } from "../payment/payment.service";
 import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "./trade-common.service";
+import { TRADE_CANCEL_REASON } from "./trade-cancel-reasons";
 
 /**
  * Zamanlanmış (cron) takas mutabakat işleri — TradeService'ten birebir taşındı.
@@ -119,26 +120,39 @@ export class TradeReconciliationService {
       },
     });
 
-    // Safe-trade: shipping-to-warehouse timeout. Once any to_warehouse
-    // shipment has been received, an item is already in the warehouse and
-    // auto-cancel would orphan it. Admin must resolve those manually
-    // (reject or force-cancel-stuck).
+    // Safe-trade: shipping-to-warehouse timeout. Kullanıcı iptal kilidiyle
+    // AYNI eşik (computeTradeCanCancel): herhangi bir to_warehouse gönderisi
+    // kargoya verildiyse (shippedAt) veya bir ürün depoya ulaştıysa oto-iptal
+    // YAPILMAZ — koli yoldayken iptal etmek dönüş kargosu olmayan ölü bir
+    // takasa mal taşımak demektir. Bunlar admin'e bırakılır
+    // (reject veya force-cancel-stuck).
     const expiredShippingTrades = await this.prisma.trade.findMany({
       where: {
         status: TradeStatus.shipping_to_warehouse,
         shippingDeadline: { lt: now },
         firstWarehouseArrivalAt: null,
+        shipments: {
+          none: { leg: "to_warehouse", shippedAt: { not: null } },
+        },
       },
     });
 
-    // Stuck trades surface: deadline passed AND one item already arrived.
-    // These need manual admin action (force-cancel-stuck); we log them every
-    // run so they don't sit silent.
+    // Stuck trades surface: deadline passed AND an item is already moving
+    // (arrived at warehouse OR handed to cargo). These need manual admin
+    // action (reject / force-cancel-stuck); we log them every run so they
+    // don't sit silent.
     const stuckTrades = await this.prisma.trade.findMany({
       where: {
         status: TradeStatus.shipping_to_warehouse,
         shippingDeadline: { lt: now },
-        firstWarehouseArrivalAt: { not: null },
+        OR: [
+          { firstWarehouseArrivalAt: { not: null } },
+          {
+            shipments: {
+              some: { leg: "to_warehouse", shippedAt: { not: null } },
+            },
+          },
+        ],
       },
       select: {
         id: true,
@@ -162,7 +176,13 @@ export class TradeReconciliationService {
       await this.notifyAdminsOfStuckTrades(stuckTrades);
     }
 
-    let cancelledCount = 0;
+    // Kayıp koli: kargoya verilmiş ama depoya HİÇ ulaşmamış takas, kargo
+    // kilidi yüzünden oto-iptal kümesine girmez (koli hâlâ yolda olabilir).
+    // Süresiz askıda da kalmamalı: son tarih + bekleme süresi (varsayılan 14
+    // gün) geçtiyse koli kayıp sayılır ve takas otomatik çözülür.
+    const lostResolved = await this.autoResolveLostParcelTrades(now);
+
+    let cancelledCount = lostResolved;
 
     for (const trade of [
       ...expiredPendingTrades,
@@ -171,28 +191,45 @@ export class TradeReconciliationService {
       ...expiredShippingTrades,
     ]) {
       try {
-        try {
-          await this.paymentService.refundTradeCashPaymentIfCompleted(trade.id);
-        } catch (refundErr: any) {
-          this.logger.error(
-            `autoCancelExpiredTrades: PayTR nakit iade başarısız trade=${trade.id} — iptal atlandı: ${refundErr?.message}`,
-          );
-          continue;
-        }
-
-        await this.prisma.$transaction(async (tx) => {
+        // SIRA KRİTİK: önce KOŞULLU-ATOMİK iptal (tx içinde tüm uygunluk
+        // koşulları yeniden doğrulanır), iade ANCAK iptal commit olduysa ve
+        // sonrasında yapılır. Eski sıra (önce iade, sonra tx) iki yarışa
+        // açıktı: (a) anlık görüntü ile tx arasında koli kargoya verildiyse
+        // status değişmediği için iade + iptal yine işliyordu — dönüş legi
+        // olmayan ölü takasa koli taşınıyordu; (b) awaiting_payment'ta PayTR
+        // callback'i araya girerse yeni tahsil edilen ödeme iade ediliyor ama
+        // tx statü değişikliğini görüp iptali atlıyordu — takas canlı, para
+        // alıcıda. İade tx SONRASINDA tracked yoldan yapılır; hata iptali
+        // geri almaz, marker + retryFailedTradeRefunds parayı toparlar
+        // (status=cancelled süpürme kapsamındadır).
+        const cancelled = await this.prisma.$transaction(async (tx) => {
           // FOR UPDATE: trade satırını kilitle; başka bir işlem (örn. acceptTrade)
           // bu trade'i aynı anda değiştirmeye çalışırsa bekler.
           await tx.$queryRaw`SELECT id FROM trades WHERE id = ${trade.id} FOR UPDATE`;
 
-          // Kilitleme sonrası en güncel statüyü oku
+          // Kilitleme sonrası en güncel durumu oku ve UYGUNLUĞU yeniden doğrula.
           const freshTrade = await tx.trade.findUnique({
             where: { id: trade.id },
-            select: { status: true },
+            select: { status: true, firstWarehouseArrivalAt: true },
           });
           // Başka bir akış zaten işleme almışsa bu trade'i atla
           if (!freshTrade || freshTrade.status !== trade.status) {
-            return;
+            return false;
+          }
+          // Kargo kilidi anlık görüntüde DEĞİL, kilitli tx içinde doğrulanır:
+          // koli bu arada kargoya verildiyse ya da depoya vardıysa iptal etme —
+          // takas stuck kümesine düşer, admin/kayıp-koli akışı ilgilenir.
+          if (trade.status === TradeStatus.shipping_to_warehouse) {
+            if (freshTrade.firstWarehouseArrivalAt) return false;
+            const shippedLeg = await tx.tradeShipment.findFirst({
+              where: {
+                tradeId: trade.id,
+                leg: "to_warehouse",
+                shippedAt: { not: null },
+              },
+              select: { id: true },
+            });
+            if (shippedLeg) return false;
           }
 
           const allItems = await tx.tradeItem.findMany({
@@ -246,11 +283,17 @@ export class TradeReconciliationService {
             where: { id: trade.id },
             data: {
               status: TradeStatus.cancelled,
-              cancelReason: "Süre dolumu nedeniyle otomatik iptal",
+              cancelReason: TRADE_CANCEL_REASON.autoExpired,
               cancelledAt: now,
             },
           });
+          return true;
         });
+        if (!cancelled) continue;
+
+        // İade YALNIZ iptal commit olduktan sonra (yukarıdaki sıra notu).
+        await this.paymentService.refundTradeCashTracked(trade.id);
+
         await this.tradeCommon.invalidateProductCachesForTrade(trade.id);
 
         // Cancel Sürat shipments if any (best-effort)
@@ -279,6 +322,161 @@ export class TradeReconciliationService {
     }
 
     return cancelledCount;
+  }
+
+  /**
+   * Kayıp koli otomatik çözümü: shippingDeadline + TRADE_LOST_PARCEL_GRACE_DAYS
+   * (varsayılan 14 gün) geçmiş, en az bir to_warehouse kolisi kargoya verilmiş
+   * ama depoya HİÇ varış kaydı olmayan takas kayıp sayılır. Koşullu-atomik
+   * iptal → izlenen iade (matris gereği kargo hariç) → koli kaybolan tarafa
+   * tazminat işareti. Kaybolan ürün yeniden satışa AÇILMAZ (birim fiziksel
+   * olarak yok): adetleri düşülür; kargolanmamış tarafın ürünü normal şekilde
+   * serbest kalır. Bu, kullanıcı iptal kilidinin (koli yolda → iptal yok)
+   * süresiz askı üretmesini engeller.
+   */
+  private async autoResolveLostParcelTrades(now: Date): Promise<number> {
+    const graceDays = Math.max(
+      1,
+      Number(process.env.TRADE_LOST_PARCEL_GRACE_DAYS ?? 14),
+    );
+    const cutoff = new Date(now.getTime() - graceDays * 24 * 60 * 60 * 1000);
+    const candidates = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.shipping_to_warehouse,
+        shippingDeadline: { lt: cutoff },
+        firstWarehouseArrivalAt: null,
+        shipments: { some: { leg: "to_warehouse", shippedAt: { not: null } } },
+      },
+      select: {
+        id: true,
+        tradeNumber: true,
+        initiatorId: true,
+        receiverId: true,
+      },
+      take: 20,
+    });
+
+    let resolved = 0;
+    for (const trade of candidates) {
+      try {
+        const claimed = await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM trades WHERE id = ${trade.id} FOR UPDATE`;
+          const fresh = await tx.trade.findUnique({
+            where: { id: trade.id },
+            select: { status: true, firstWarehouseArrivalAt: true },
+          });
+          // Bu arada depoya vardıysa ya da statü değiştiyse dokunma.
+          if (
+            !fresh ||
+            fresh.status !== TradeStatus.shipping_to_warehouse ||
+            fresh.firstWarehouseArrivalAt
+          ) {
+            return false;
+          }
+          const shippedLegs = await tx.tradeShipment.findMany({
+            where: {
+              tradeId: trade.id,
+              leg: "to_warehouse",
+              shippedAt: { not: null },
+            },
+            select: { shipperId: true },
+          });
+          if (shippedLegs.length === 0) return false;
+          const lostShipperIds = new Set(shippedLegs.map((s) => s.shipperId));
+
+          const items = await tx.tradeItem.findMany({
+            where: { tradeId: trade.id },
+            select: { productId: true, quantity: true, side: true },
+          });
+          const ownerOf = (side: string) =>
+            side === "initiator" ? trade.initiatorId : trade.receiverId;
+          for (const item of items) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${item.productId} FOR UPDATE`;
+            const prod = await tx.product.findUnique({
+              where: { id: item.productId },
+              select: { quantity: true, reservedQuantity: true },
+            });
+            if (!prod) continue;
+            const qty = item.quantity ?? 1;
+            const newReserved = safeDecrementReserved(
+              prod.reservedQuantity,
+              qty,
+            );
+            if (lostShipperIds.has(ownerOf(item.side))) {
+              // Kaybolan birimler stoktan da düşer; ilan kalan stoğuna göre
+              // durumunu alır (tekil üründe inactive/sold-out'a düşer).
+              const newQuantity =
+                prod.quantity === null
+                  ? null
+                  : Math.max(0, prod.quantity - qty);
+              await tx.product.update({
+                where: { id: item.productId },
+                data: {
+                  reservedQuantity: newReserved,
+                  ...(prod.quantity === null ? {} : { quantity: newQuantity }),
+                  status: getProductStatusFromQuantity(newQuantity),
+                },
+              });
+            } else {
+              // Kargolanmamış taraf: normal rezervasyon çözümü.
+              await tx.product.update({
+                where: { id: item.productId },
+                data: {
+                  reservedQuantity: newReserved,
+                  status:
+                    newReserved > 0
+                      ? ProductStatus.reserved
+                      : ProductStatus.active,
+                },
+              });
+            }
+          }
+
+          await tx.trade.update({
+            where: { id: trade.id },
+            data: {
+              status: TradeStatus.cancelled,
+              cancelReason: TRADE_CANCEL_REASON.lostParcel,
+              cancelledAt: now,
+              // Ücret iadesi koli bedelini kapsamaz ve kaybolan ÜRÜNÜN değeri
+              // iade değildir — ops out-of-band tazmin eder (CompensationPanel).
+              compensationPendingUserId: [...lostShipperIds][0],
+              compensationResolvedAt: null,
+            },
+          });
+          return true;
+        });
+        if (!claimed) continue;
+
+        await this.paymentService.refundTradeCashTracked(trade.id);
+        await this.tradeCommon.invalidateProductCachesForTrade(trade.id);
+        await this.tradeShipment.cancelSuratShipmentsForTrade(trade.id);
+        resolved++;
+
+        if (this.eventService) {
+          try {
+            await this.eventService.emitTradeAutoCancelled({
+              tradeId: trade.id,
+              initiatorId: trade.initiatorId,
+              receiverId: trade.receiverId,
+              reason: TRADE_CANCEL_REASON.lostParcel,
+            });
+          } catch (err) {
+            this.logger.error(
+              `Failed to emit trade.auto-cancelled (lost parcel) for trade ${trade.id}: ${err}`,
+            );
+          }
+        }
+        this.logger.warn(
+          `Lost-parcel auto-resolve: trade ${trade.tradeNumber} (${trade.id}) cancelled after ${graceDays}d grace; compensation flagged`,
+        );
+      } catch (error: any) {
+        this.logger.error(
+          `Lost-parcel auto-resolve failed for trade ${trade.id}: ${error?.message}`,
+        );
+      }
+    }
+    return resolved;
   }
 
   /**
@@ -332,6 +530,11 @@ export class TradeReconciliationService {
             TradeStatus.cancelled,
             TradeStatus.returning,
             TradeStatus.disputed,
+            // compensate_* itiraz çözümü takası COMPLETED bırakır; başarısız
+            // tazminat iadesi de marker yazar ve burada toparlanmalıdır.
+            // Kapsamsız çağrı completed'da güvenlidir: satır bazlı niyet
+            // filtresi (holdReleaseAt=null) yalnız iade borcu satırları görür.
+            TradeStatus.completed,
           ],
         },
       },

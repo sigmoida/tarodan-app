@@ -214,6 +214,9 @@ export {
   taxScopeConfig,
   membershipTierConfig,
   refundReasonConfig,
+  BUYER_SELECTABLE_REFUND_REASONS,
+  orderCancellationReasonConfig,
+  BUYER_SELECTABLE_CANCELLATION_REASONS,
   shipmentStatusConfig,
   notificationChannelConfig,
   deliveryStatusConfig,
@@ -233,6 +236,9 @@ export {
   type StatusConfig,
   type BadgeVariant,
 } from "./lib/status-configs";
+
+// Client policy constants (backend is the source of truth — see @tarodan/shared)
+export { REFUND_COOLING_OFF_DAYS, ESCROW_RELEASE_DAYS } from "@tarodan/shared";
 
 // Utilities
 export { cn } from "./lib/utils";
