@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
@@ -31,6 +32,8 @@ import {
 } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderFeeDiscountService } from "./order-fee-discount.service";
+import type { AppliedFeeDiscount } from "../discount/fee-discount.engine";
 import { distanceSalesConsent } from "./distance-sales-contract";
 import {
   calculatePackageDesi,
@@ -60,6 +63,8 @@ export class OrderCheckoutGroupService {
     private readonly orderPricing: OrderPricingService,
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
 
   private formatCheckoutGroupCreateResponse(group: {
@@ -533,6 +538,8 @@ export class OrderCheckoutGroupService {
             pricingEntry: (typeof pricing)[number];
             orderNumber: string;
             commissionResult: CommissionResult;
+            /** Bu satıra düşen bedel indirimleri (rapor + iade denetimi). */
+            feeDiscountsApplied?: AppliedFeeDiscount[];
             /** Tahsil edilen ürün tabanı — `Order.subtotal`. */
             subtotal: number;
             shippingCost: number;
@@ -598,6 +605,11 @@ export class OrderCheckoutGroupService {
             string,
             ShippingBuyerShareByTier[]
           >();
+          const lineFeeDiscounts: AppliedFeeDiscount[][] = [];
+          // Kampanyalar sepet başına TEK kez yüklenir; alıcının katmanı da bir kez.
+          const feeCampaigns = (await this.feeDiscounts?.preload()) ?? [];
+          const buyerTier =
+            (await this.feeDiscounts?.resolveBuyerTier(buyerId)) ?? null;
           const pinnedRuleSetId = commissionRuleSet.id;
           for (const entry of pricing) {
             const discountedPrice = chargedProductBaseOf({
@@ -605,7 +617,7 @@ export class OrderCheckoutGroupService {
               quantity: entry.quantity,
               couponDiscount: entry.couponDiscount,
             });
-            const commission = await this.orderPricing.calculateCommission(
+            const rawCommission = await this.orderPricing.calculateCommission(
               discountedPrice,
               entry.product.sellerId,
               entry.product.categoryId,
@@ -615,22 +627,77 @@ export class OrderCheckoutGroupService {
                 : discountedPrice,
               entry.product.id,
             );
+            // Komisyon/hizmet bedeli kampanyaları satır bazında (kargo aşağıda,
+            // paket kararından sonra) — sepet önizlemesiyle birebir aynı sıra.
+            const feeDiscounted = await this.feeDiscounts?.apply({
+              context: {
+                productId: entry.product.id,
+                categoryId: entry.product.categoryId,
+                sellerId: entry.product.sellerId,
+                buyerId,
+                buyerTier,
+                quantity: entry.quantity,
+              },
+              commission: rawCommission,
+              buyerShippingAmount: 0,
+              sellerShippingAmount: 0,
+              preloaded: feeCampaigns,
+            });
+            const commission = feeDiscounted?.commission ?? rawCommission;
+            lineFeeDiscounts.push(feeDiscounted?.applied ?? []);
             lineCommissions.push({ discountedPrice, commission });
             sellerShareLines.set(entry.product.sellerId, [
               ...(sellerShareLines.get(entry.product.sellerId) ?? []),
               commission.shippingBuyerShares,
             ]);
           }
+          const sellerShippingFeeDiscounts = new Map<
+            string,
+            AppliedFeeDiscount[]
+          >();
           const sellerShippingDecision = new Map(
-            [...sellerLineSubtotals.entries()].map(([sellerId, subtotal]) => [
-              sellerId,
-              this.orderPricing.resolveShippingDecision({
-                tariff: shippingTariff.tariff,
-                subtotal,
-                billableDesi: sellerDesi.get(sellerId) ?? 1,
-                lineShares: sellerShareLines.get(sellerId) ?? [],
-              }),
-            ]),
+            await Promise.all(
+              [...sellerLineSubtotals.entries()].map(
+                async ([sellerId, subtotal]) => {
+                  const decision = this.orderPricing.resolveShippingDecision({
+                    tariff: shippingTariff.tariff,
+                    subtotal,
+                    billableDesi: sellerDesi.get(sellerId) ?? 1,
+                    lineShares: sellerShareLines.get(sellerId) ?? [],
+                  });
+                  const lead = pricing.find(
+                    (entry) => entry.product.sellerId === sellerId,
+                  );
+                  const discounted = await this.feeDiscounts?.applyShipping({
+                    context: {
+                      productId: lead?.product.id ?? "",
+                      categoryId: lead?.product.categoryId ?? null,
+                      sellerId,
+                      buyerId,
+                      buyerTier,
+                    },
+                    buyerShippingAmount: decision.buyer,
+                    sellerShippingAmount: decision.seller,
+                    preloaded: feeCampaigns,
+                  });
+                  if (discounted?.applied.length) {
+                    sellerShippingFeeDiscounts.set(
+                      sellerId,
+                      discounted.applied,
+                    );
+                  }
+                  return [
+                    sellerId,
+                    {
+                      ...decision,
+                      buyer: discounted?.buyerShippingAmount ?? decision.buyer,
+                      seller:
+                        discounted?.sellerShippingAmount ?? decision.seller,
+                    },
+                  ] as const;
+                },
+              ),
+            ),
           );
 
           const sellerShippingCharged = new Set<string>();
@@ -726,6 +793,14 @@ export class OrderCheckoutGroupService {
               serviceVatRate,
               totalAmount,
               suratIdempotencyKey,
+              // Bu satıra düşen bedel indirimleri: satır kampanyaları + (kargo
+              // yalnız satıcının ilk satırına yüklendiği için) kargo kampanyası.
+              feeDiscountsApplied: [
+                ...(lineFeeDiscounts[entryIndex] ?? []),
+                ...(chargedThisLine
+                  ? (sellerShippingFeeDiscounts.get(entrySellerId) ?? [])
+                  : []),
+              ],
             });
           }
 
@@ -879,6 +954,15 @@ export class OrderCheckoutGroupService {
                   input.commissionResult.sellerPlatformFeeAmount,
                 buyerShippingAmount: input.buyerShippingAmount,
                 sellerShippingAmount: input.sellerShippingAmount,
+                buyerFeeDiscountAmount: (input.feeDiscountsApplied ?? [])
+                  .filter((line) => line.side === "buyer")
+                  .reduce((sum, line) => sum + line.amount, 0),
+                sellerFeeDiscountAmount: (input.feeDiscountsApplied ?? [])
+                  .filter((line) => line.side === "seller")
+                  .reduce((sum, line) => sum + line.amount, 0),
+                feeDiscountBreakdown: input.feeDiscountsApplied?.length
+                  ? (input.feeDiscountsApplied as unknown as Prisma.InputJsonValue)
+                  : undefined,
                 financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
                   pricingHash: dto.expectedPricingHash,
                   productId: entry.productId,
