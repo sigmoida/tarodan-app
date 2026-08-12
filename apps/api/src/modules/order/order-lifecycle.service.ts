@@ -7,15 +7,11 @@ import {
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
-import { UpdateOrderStatusDto, CancelOrderDto } from "./dto";
-import {
-  OrderStatus,
-  OfferStatus,
-  RefundRequestStatus,
-  ShipmentStatus,
-} from "@prisma/client";
+import { CancelOrderDto, GuestOrderCancelDto } from "./dto";
+import { OrderStatus, OfferStatus, RefundRequestStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
@@ -23,7 +19,6 @@ import { CommissionLedgerService } from "../commission/commission-ledger.service
 import { ElogoInvoicingService } from "../elogo";
 import { OrderCommonService } from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
-import { ORDER_TRANSITION_RULES } from "./order-state-machine";
 import { DiscountService } from "../discount/discount.service";
 import { RefundService } from "../refund/refund.service";
 
@@ -102,113 +97,6 @@ export class OrderLifecycleService {
       { ...order, shippingAddress },
       userId,
     );
-  }
-
-  /**
-   * Update order status (seller only for certain transitions)
-   * Business Rules:
-   * - pending_payment → paid (handled by payment module)
-   * - paid → preparing (seller)
-   * - preparing → shipped (handled by shipping module)
-   * - shipped → delivered (handled by shipping module)
-   * - delivered → completed (buyer confirms)
-   */
-  async updateStatus(
-    orderId: string,
-    userId: string,
-    dto: UpdateOrderStatusDto,
-  ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      throw new NotFoundException(i18nMessage("server.order.notFound"));
-    }
-
-    // Para/yan-etki taşıyan hedefler genel setter'dan DÜZ YAZILAMAZ: iptal,
-    // rezervasyon/kupon/iade makinesi isteyen cancel() komutuna delege edilir;
-    // refund statüleri yalnız sistem iade akışının çıktısıdır. Tabloda kenar
-    // bulunması yeterli değildir — buradan sızarsa statü para olmadan değişir.
-    if (dto.status === OrderStatus.cancelled) {
-      return this.cancel(orderId, userId, { reason: dto.note });
-    }
-    if (
-      dto.status === OrderStatus.refunded ||
-      dto.status === OrderStatus.refund_requested
-    ) {
-      throw new BadRequestException(
-        i18nMessage("server.order.statusChangeSystemOnly"),
-      );
-    }
-
-    // Validate state transitions against the canonical order state graph
-    // (single source of truth — see order-state-machine.ts).
-    const currentTransitions = ORDER_TRANSITION_RULES[order.status] ?? [];
-    const transition = currentTransitions.find((t) => t.to === dto.status);
-
-    if (!transition) {
-      throw new BadRequestException(
-        i18nMessage("server.order.statusTransitionNotAllowed", {
-          from: order.status,
-          to: dto.status,
-        }),
-      );
-    }
-
-    // Check permission
-    if (transition.allowedBy === "buyer" && order.buyerId !== userId) {
-      throw new ForbiddenException(
-        i18nMessage("server.order.statusChangeForbidden"),
-      );
-    }
-    if (transition.allowedBy === "seller" && order.sellerId !== userId) {
-      throw new ForbiddenException(
-        i18nMessage("server.order.statusChangeForbidden"),
-      );
-    }
-    if (transition.allowedBy === "system") {
-      throw new BadRequestException(
-        i18nMessage("server.order.statusChangeSystemOnly"),
-      );
-    }
-
-    const updatedOrder = await this.prisma.order.update({
-      where: {
-        id: orderId,
-        version: order.version, // Optimistic locking
-      },
-      data: {
-        status: dto.status,
-        version: { increment: 1 },
-      },
-      include: {
-        product: {
-          include: {
-            images: { take: 1, orderBy: { sortOrder: "asc" } },
-          },
-        },
-        buyer: {
-          select: {
-            id: true,
-            displayName: true,
-            isVerified: true,
-            avatarUrl: true,
-          },
-        },
-        seller: {
-          select: {
-            id: true,
-            displayName: true,
-            isVerified: true,
-            avatarUrl: true,
-          },
-        },
-        shipment: true,
-      },
-    });
-
-    return await this.orderCommon.formatOrderResponse(updatedOrder, userId);
   }
 
   /**
@@ -474,7 +362,7 @@ export class OrderLifecycleService {
           select: {
             id: true,
             status: true,
-            shipment: { select: { status: true } },
+            shipment: { select: { status: true, shippedAt: true } },
           },
         },
       },
@@ -486,12 +374,6 @@ export class OrderLifecycleService {
       throw new ForbiddenException(i18nMessage("server.order.cancelForbidden"));
     }
 
-    const preHandover: ShipmentStatus[] = [
-      ShipmentStatus.pending,
-      ShipmentStatus.label_created,
-      ShipmentStatus.cancelled,
-      ShipmentStatus.failed,
-    ];
     const cancellable = [
       OrderStatus.pending_payment,
       OrderStatus.paid,
@@ -506,10 +388,12 @@ export class OrderLifecycleService {
         i18nMessage("server.order.groupAlreadyCancelled"),
       );
     }
+    // Devir tanımı TEK KAYNAK (shipment-handover): hareket eden durum VEYA
+    // shippedAt mührü.
     const blocked = remaining.some(
       (o) =>
         !cancellable.includes(o.status) ||
-        (o.shipment && !preHandover.includes(o.shipment.status)),
+        isShipmentHandedToCarrier(o.shipment ?? null),
     );
     if (blocked) {
       throw new BadRequestException(
@@ -526,10 +410,31 @@ export class OrderLifecycleService {
     return this.orderQuery.findCheckoutGroup(groupId, userId);
   }
 
+  /**
+   * Misafir iptali: üyeliksiz alıcı, sipariş numarası + e-posta ile kimliğini
+   * doğrular (takip ucuyla aynı kural) ve ÜYE İPTALİYLE AYNI komuta düşer —
+   * ayrı bir para yolu yoktur, dolayısıyla kesinti politikası, kargoya-devir
+   * kilidi ve escrow davranışı birebir aynıdır.
+   *
+   * Gerekliydi: misafir siparişi sentetik bir alıcıya bağlıdır ve oturum
+   * tabanlı uçlar bu kullanıcı için hiç çalışmaz; süreç dokümanının "alıcı,
+   * kargoya verilene kadar iptal edebilir" taahhüdü misafirde karşılıksızdı.
+   */
+  async cancelAsGuest(dto: GuestOrderCancelDto) {
+    const access = await this.orderQuery.resolveGuestOrderAccess({
+      orderNumber: dto.orderNumber,
+      email: dto.email,
+    });
+    return this.cancel(access.id, access.buyerId, {
+      reasonCode: dto.reasonCode,
+      reason: dto.reason,
+    });
+  }
+
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
     const preflight = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { shipment: { select: { status: true } } },
+      include: { shipment: { select: { status: true, shippedAt: true } } },
     });
     if (!preflight) {
       throw new NotFoundException(i18nMessage("server.order.notFound"));
@@ -546,16 +451,9 @@ export class OrderLifecycleService {
           "Ödenmiş sipariş iptalinde neden kodu zorunludur",
         );
       }
-      const preHandoverShipmentStatuses: ShipmentStatus[] = [
-        ShipmentStatus.pending,
-        ShipmentStatus.label_created,
-        ShipmentStatus.cancelled,
-        ShipmentStatus.failed,
-      ];
-      const handedToCarrier =
-        preflight.shipment &&
-        !preHandoverShipmentStatuses.includes(preflight.shipment.status);
-      if (handedToCarrier) {
+      // Ön kontrol (net hata mesajı için); bağlayıcı doğrulama
+      // createCancellationRefund içinde sipariş satırı KİLİTLİYKEN yapılır.
+      if (isShipmentHandedToCarrier(preflight.shipment)) {
         throw new BadRequestException(
           "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
         );

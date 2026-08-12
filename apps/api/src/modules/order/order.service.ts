@@ -3,10 +3,10 @@ import { ShippingPackageTierCode } from "@prisma/client";
 import {
   CreateOrderDto,
   OrderQueryDto,
-  UpdateOrderStatusDto,
   CancelOrderDto,
   GuestCheckoutDto,
   GuestOrderTrackDto,
+  GuestOrderCancelDto,
   DirectBuyDto,
   CheckoutQuoteDto,
   GuestSendVerificationCodeDto,
@@ -186,6 +186,10 @@ export class OrderService {
 
   // Taşındı: order-query.service.ts — imzalar aynen korunuyor (facade delege).
 
+  async cancelAsGuest(dto: GuestOrderCancelDto) {
+    return this.orderLifecycle.cancelAsGuest(dto);
+  }
+
   async trackGuestOrder(dto: GuestOrderTrackDto) {
     return this.orderQuery.trackGuestOrder(dto);
   }
@@ -247,14 +251,6 @@ export class OrderService {
     },
   ) {
     return this.orderLifecycle.setShippingAddress(orderId, userId, dto);
-  }
-
-  async updateStatus(
-    orderId: string,
-    userId: string,
-    dto: UpdateOrderStatusDto,
-  ) {
-    return this.orderLifecycle.updateStatus(orderId, userId, dto);
   }
 
   async completeOrder(

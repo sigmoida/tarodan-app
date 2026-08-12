@@ -13,6 +13,7 @@ import {
   isSuratReturnCompleted,
 } from "./surat-status.mapper";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
+import { SHIPPABLE_ORDER_STATUSES } from "../order/order-state-machine";
 import { SuratTrackingClient } from "./surat-tracking.client";
 
 /**
@@ -290,7 +291,9 @@ export class OrderTrackingSyncService {
         const orderCas = await tx.order.updateMany({
           where: {
             id: shipment.orderId,
-            status: { in: [OrderStatus.paid, OrderStatus.preparing] },
+            // Tek kaynak: order-state-machine (satıcı ve admin yolları da aynı
+            // listeye uyar) — kapanmış sipariş `shipped`'e diriltilemez.
+            status: { in: [...SHIPPABLE_ORDER_STATUSES] },
           },
           data: {
             status: OrderStatus.shipped,

@@ -10,6 +10,8 @@ describe("ShippingService.updateTracking — #5 tracking-key koruması", () => {
   const makeService = (shipment: any) => {
     const captured = { updateData: undefined as any };
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      refundRequest: { findFirst: jest.fn().mockResolvedValue(null) },
       shipment: {
         updateMany: jest.fn().mockImplementation((arg: any) => {
           captured.updateData = arg.data;
@@ -20,7 +22,7 @@ describe("ShippingService.updateTracking — #5 tracking-key koruması", () => {
           .mockResolvedValue({ ...shipment, events: [] }),
       },
       shipmentEvent: { create: jest.fn().mockResolvedValue({}) },
-      order: { update: jest.fn().mockResolvedValue({}) },
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
     const prisma = {
       shipment: {
@@ -52,7 +54,7 @@ describe("ShippingService.updateTracking — #5 tracking-key koruması", () => {
     provider: "surat",
     status: ShipmentStatus.pending,
     trackingNumber: null,
-    order: { sellerId: "seller-1", buyerId: "buyer-1" },
+    order: { sellerId: "seller-1", buyerId: "buyer-1", status: "preparing" },
     ...over,
   });
 

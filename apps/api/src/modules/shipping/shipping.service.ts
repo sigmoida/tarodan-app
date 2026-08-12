@@ -16,6 +16,8 @@ import {
   ShippingProvider,
 } from "./dto";
 import { canTransitionShipmentStatus } from "./shipment-state-machine";
+import { SHIPPABLE_ORDER_STATUSES } from "../order/order-state-machine";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "../refund/refund-active-statuses";
 import { ShippingTariffService } from "./shipping-tariff.service";
 import {
   shippingAmountForDesi,
@@ -270,6 +272,19 @@ export class ShippingService {
       );
     }
 
+    // SİPARİŞ tarafı guard'ı: iptal/iade ile kapanmış bir siparişin kargosu
+    // "kargoya verildi" yapılamaz. Eskiden yalnız kargo satırı kontrol
+    // ediliyordu; iptal edilmiş siparişin kargosu `pending`/`label_created`
+    // kalabildiği için bu kontrol geçiyor ve sipariş cancelled → shipped'e
+    // DİRİLİYORDU (sonra teslimde escrow release tarihi kuruluyor, kısmi
+    // iadede satıcıya para gidiyordu). Asıl kilit tx içindeki koşullu
+    // güncellemedir; buradaki ön kontrol yalnız net hata mesajı içindir.
+    if (!SHIPPABLE_ORDER_STATUSES.includes(shipment.order.status)) {
+      throw new BadRequestException(
+        "Bu sipariş kargoya verilebilir durumda değil (iptal edilmiş, iade sürecinde veya çoktan kargolanmış).",
+      );
+    }
+
     const trackingUrl =
       (this.trackingUrls[shipment.provider as ShippingProvider] ??
         this.trackingUrls[ShippingProvider.surat]) + dto.trackingNumber;
@@ -295,6 +310,24 @@ export class ShippingService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Alıcı iptaliyle ORTAK kilit: iptal talebi de aynı sipariş satırını
+      // FOR UPDATE ile kilitleyip yazılır (refund.service). Böylece iki komut
+      // sıraya girer ve hangisi önce commit ederse diğeri temiz bir hatayla
+      // düşer — "hem iptal edildi hem kargoya verildi" durumu oluşamaz.
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${shipment.orderId} FOR UPDATE`;
+      const activeRefund = await tx.refundRequest.findFirst({
+        where: {
+          orderId: shipment.orderId,
+          status: { in: [...ACTIVE_REFUND_REQUEST_STATUSES] },
+        },
+        select: { id: true },
+      });
+      if (activeRefund) {
+        throw new BadRequestException(
+          "Bu sipariş için açık bir iptal/iade talebi var; talep sonuçlanmadan kargoya veremezsiniz.",
+        );
+      }
+
       // Update shipment — M7 CAS: #86 guard'ı yukarıda snapshot'a göre bakıldı;
       // arada webhook/poller delivered yazdıysa picked_up'a geri sarmayalım.
       const cas = await tx.shipment.updateMany({
@@ -322,14 +355,26 @@ export class ShippingService {
         },
       });
 
-      // Update order status
-      await tx.order.update({
-        where: { id: shipment.orderId },
+      // Update order status — KOŞULLU-ATOMİK: ön kontrol ile bu tx arasında
+      // alıcı iptali (ya da iade finalize'ı) commit olduysa hiçbir satır
+      // eşleşmez ve tüm tx geri sarılır; kargo satırı da picked_up'a geçmez.
+      // TOCTOU yok: "iptal edildi mi" sorusu paranın/statünün yazıldığı ANDA
+      // sorulur.
+      const orderShipped = await tx.order.updateMany({
+        where: {
+          id: shipment.orderId,
+          status: { in: [...SHIPPABLE_ORDER_STATUSES] },
+        },
         data: {
           status: OrderStatus.shipped,
           version: { increment: 1 },
         },
       });
+      if (orderShipped.count === 0) {
+        throw new BadRequestException(
+          "Sipariş durumu az önce değişti (iptal/iade edilmiş olabilir); sayfayı yenileyip tekrar deneyin.",
+        );
+      }
 
       return this.formatShipmentResponse(updatedShipment);
     });
