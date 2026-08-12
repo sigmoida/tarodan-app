@@ -1,6 +1,7 @@
 "use client";
 
 import toast from "react-hot-toast";
+import type { AxiosResponse } from "axios";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { FormModal, FormInput, FormSelect, useZodForm } from "@tarodan/ui/form";
@@ -50,7 +51,10 @@ export function StaffFormModal({
   const selectedRole = form.watch("role");
 
   const save = useAdminMutation(
-    (v: StaffFormValues) =>
+    // axios 1.19'dan beri AxiosResponse istek gövdesinin tipini de taşıyor;
+    // iki farklı uç birleşemeyen bir union üretmesin diye dönüş tipi ortak
+    // AxiosResponse'a sabitlenir.
+    (v: StaffFormValues): Promise<AxiosResponse> =>
       editing
         ? adminApi.updateStaff(editing.id, { role: v.role })
         : adminApi.assignStaff({
