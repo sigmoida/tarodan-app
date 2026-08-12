@@ -1,5 +1,10 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DiscountType, DiscountScope } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  DiscountType,
+  DiscountScope,
+  DiscountTarget,
+  DiscountAudience,
+} from "@prisma/client";
 
 export class DiscountResponseDto {
   @ApiProperty()
@@ -59,7 +64,6 @@ export class DiscountResponseDto {
   @ApiPropertyOptional()
   isFlashSale?: boolean;
 
-
   @ApiProperty()
   usageLimitPerUser: number;
 
@@ -88,11 +92,32 @@ export class DiscountResponseDto {
   updatedAt: Date;
 
   // Computed fields
-  @ApiProperty({ description: 'İndirim şu an geçerli mi?' })
+  @ApiProperty({ description: "İndirim şu an geçerli mi?" })
   isCurrentlyValid: boolean;
 
-  @ApiProperty({ description: 'Kalan kullanım hakkı' })
+  @ApiProperty({ description: "Kalan kullanım hakkı" })
   remainingUsage?: number;
+
+  @ApiProperty({ enum: DiscountTarget })
+  target?: DiscountTarget;
+
+  @ApiProperty({ enum: DiscountAudience })
+  audience?: DiscountAudience;
+
+  @ApiPropertyOptional({ isArray: true, type: String })
+  targetTierTypes?: string[];
+
+  @ApiPropertyOptional({ isArray: true, type: String })
+  targetUserIds?: string[];
+
+  @ApiPropertyOptional()
+  budgetLimit?: number;
+
+  @ApiPropertyOptional()
+  budgetSpent?: number;
+
+  @ApiPropertyOptional()
+  budgetStoppedAt?: Date;
 }
 
 export class PaginatedDiscountsDto {

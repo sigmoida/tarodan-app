@@ -27,9 +27,17 @@ import {
   DiscountScope,
   DiscountType,
   DiscountFundedBy,
+  DiscountTarget,
+  DiscountAudience,
   CouponReservationStatus,
   Prisma,
 } from "@prisma/client";
+import {
+  assertAudienceConsistent,
+  assertBudgetForTarget,
+  assertCodeAllowedForTarget,
+  assertTargetAllowedForActor,
+} from "./discount-authorization";
 
 /**
  * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
@@ -102,6 +110,20 @@ export class DiscountService {
     // the per-line bug). Block their creation until real buy-X-get-Y / quantity-tier
     // logic exists (F4.2).
     assertSupportedDiscountType(dto.type);
+
+    // Cep kuralı: ürün fiyatı satıcının, bedeller platformun. Kupon kodu yalnız
+    // alıcının ödediği kalemlere bağlanır; bedel indirimi TL bütçesi ister.
+    const target = dto.target ?? DiscountTarget.product_price;
+    const audience = dto.audience ?? DiscountAudience.everyone;
+    assertTargetAllowedForActor(target, isAdmin);
+    assertCodeAllowedForTarget(target, Boolean(dto.code));
+    assertBudgetForTarget(target, dto.budgetLimit);
+    assertAudienceConsistent({
+      audience,
+      target,
+      tierTypes: dto.targetTierTypes,
+      userIds: dto.targetUserIds,
+    });
 
     // Sellers can only create discounts for their own products
     if (!isAdmin && dto.scope === DiscountScope.global) {
@@ -201,6 +223,18 @@ export class DiscountService {
           dto.platformFundedRatio != null
             ? new Prisma.Decimal(dto.platformFundedRatio)
             : null,
+        target,
+        audience,
+        budgetLimit:
+          dto.budgetLimit != null ? new Prisma.Decimal(dto.budgetLimit) : null,
+        targetTiers: dto.targetTierTypes?.length
+          ? {
+              create: dto.targetTierTypes.map((tierType) => ({ tierType })),
+            }
+          : undefined,
+        targetUsers: dto.targetUserIds?.length
+          ? { create: dto.targetUserIds.map((userId) => ({ userId })) }
+          : undefined,
       },
       include: {
         seller: { select: { id: true, displayName: true } },
@@ -241,6 +275,47 @@ export class DiscountService {
     // Sellers can only update their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
       throw new ForbiddenException("Bu indirimi düzenleme yetkiniz yok");
+    }
+
+    // Cep kuralı düzenlemede de geçerlidir: hedef kalem değiştirilerek satıcı
+    // platformun bedellerine, platform da satıcının fiyatına geçemez.
+    const nextTarget = dto.target ?? discount.target;
+    const nextAudience = dto.audience ?? discount.audience;
+    assertTargetAllowedForActor(nextTarget, isAdmin);
+    assertCodeAllowedForTarget(
+      nextTarget,
+      Boolean(dto.code !== undefined ? dto.code : discount.code),
+    );
+    assertBudgetForTarget(
+      nextTarget,
+      dto.budgetLimit !== undefined
+        ? dto.budgetLimit
+        : discount.budgetLimit != null
+          ? Number(discount.budgetLimit)
+          : null,
+    );
+    if (dto.target !== undefined || dto.audience !== undefined) {
+      const [tiers, users] = await Promise.all([
+        dto.targetTierTypes !== undefined
+          ? Promise.resolve(dto.targetTierTypes as string[])
+          : this.prisma.discountTargetTier
+              .findMany({
+                where: { discountId: id },
+                select: { tierType: true },
+              })
+              .then((rows) => rows.map((row) => row.tierType as string)),
+        dto.targetUserIds !== undefined
+          ? Promise.resolve(dto.targetUserIds)
+          : this.prisma.discountTargetUser
+              .findMany({ where: { discountId: id }, select: { userId: true } })
+              .then((rows) => rows.map((row) => row.userId)),
+      ]);
+      assertAudienceConsistent({
+        audience: nextAudience,
+        target: nextTarget,
+        tierTypes: tiers,
+        userIds: users,
+      });
     }
 
     // Check code uniqueness if changing
@@ -324,6 +399,28 @@ export class DiscountService {
               ? new Prisma.Decimal(dto.platformFundedRatio)
               : null,
         }),
+      ...(dto.target !== undefined && { target: dto.target }),
+      ...(dto.audience !== undefined && { audience: dto.audience }),
+      ...(dto.budgetLimit !== undefined && {
+        budgetLimit:
+          dto.budgetLimit != null ? new Prisma.Decimal(dto.budgetLimit) : null,
+        // Tavan yükseltilince durdurulmuş kampanya yeniden akmalıdır.
+        budgetStoppedAt: null,
+      }),
+      // Hedef listeleri gönderildiyse TAMAMEN değiştirilir (kısmi ekleme yok:
+      // "listeden çıkardım ama hâlâ indirim alıyor" durumunu doğururdu).
+      ...(dto.targetTierTypes !== undefined && {
+        targetTiers: {
+          deleteMany: {},
+          create: dto.targetTierTypes.map((tierType) => ({ tierType })),
+        },
+      }),
+      ...(dto.targetUserIds !== undefined && {
+        targetUsers: {
+          deleteMany: {},
+          create: dto.targetUserIds.map((userId) => ({ userId })),
+        },
+      }),
     };
 
     const updated = await this.prisma.discount.update({
@@ -1436,6 +1533,14 @@ export class DiscountService {
       remainingUsage: discount.usageLimitTotal
         ? discount.usageLimitTotal - discount.usedCount
         : undefined,
+      target: discount.target,
+      audience: discount.audience,
+      targetTierTypes: discount.targetTiers?.map((row: any) => row.tierType),
+      targetUserIds: discount.targetUsers?.map((row: any) => row.userId),
+      budgetLimit:
+        discount.budgetLimit != null ? Number(discount.budgetLimit) : undefined,
+      budgetSpent: Number(discount.budgetSpent ?? 0),
+      budgetStoppedAt: discount.budgetStoppedAt ?? undefined,
     };
   }
 }
