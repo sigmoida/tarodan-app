@@ -3667,7 +3667,9 @@
         "budgetLimit": "Budget cap (TL)",
         "budgetHelper": "Required for fee discounts: the campaign stops on its own once the cap is reached.",
         "budgetUsage": "Budget",
-        "budgetStopped": "Budget spent"
+        "budgetStopped": "Budget spent",
+        "platformCost": "Cost to the platform",
+        "budgetRemaining": "Remaining budget"
       },
       "emailTemplates": {
         "title": "Email Templates",

@@ -6,9 +6,11 @@ import {
   CheckCircleIcon,
   TagIcon,
   SparklesIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
+import { fmtTry } from "@/lib/format";
 import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { type Discount } from "../_lib/types";
@@ -33,12 +35,23 @@ export function DiscountsStats() {
         active: list.filter((d) => d.isCurrentlyValid).length,
         coupons: list.filter((d) => d.code).length,
         auto: list.filter((d) => !d.code).length,
+        // Bedel kampanyalarının maliyeti doğrudan platform gelirinden çıkar:
+        // harcanan bütçe bu maliyetin ta kendisidir.
+        spent: list.reduce((sum, d) => sum + (d.budgetSpent ?? 0), 0),
+        budget: list.reduce((sum, d) => sum + (d.budgetLimit ?? 0), 0),
       };
     },
     staleTime: 30_000,
   });
 
-  const s = data ?? { total: 0, active: 0, coupons: 0, auto: 0 };
+  const s = data ?? {
+    total: 0,
+    active: 0,
+    coupons: 0,
+    auto: 0,
+    spent: 0,
+    budget: 0,
+  };
 
   if (isError) {
     return (
@@ -47,7 +60,7 @@ export function DiscountsStats() {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
       <MetricCard
         icon={TicketIcon}
         tone="info"
@@ -79,6 +92,21 @@ export function DiscountsStats() {
         tone="primary"
         label={t("admin.marketing.discounts.automaticCampaigns")}
         value={s.auto}
+        loading={isLoading}
+      />
+      <MetricCard
+        icon={BanknotesIcon}
+        tone="warning"
+        label={t("admin.marketing.discounts.platformCost")}
+        value={fmtTry(s.spent) ?? "—"}
+        footer={
+          s.budget > 0 ? (
+            <span className="text-muted">
+              {t("admin.marketing.discounts.budgetRemaining")}:{" "}
+              {fmtTry(Math.max(0, s.budget - s.spent))}
+            </span>
+          ) : undefined
+        }
         loading={isLoading}
       />
     </div>

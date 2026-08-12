@@ -2898,9 +2898,15 @@ model Advertisement {
   endDate         DateTime?    @map("end_date")
   clickCount      Int          @default(0) @map("click_count")
   impressionCount Int          @default(0) @map("impression_count")
+  /// Banner bir KAMPANYAYI duyuruyorsa ona bağlanır: şerit, kampanyanın adını ve
+  /// kodunu kendisi okur, admin metni elle kopyalamaz (kampanya bitince şerit de
+  /// kendiliğinden düşer).
+  discountId      String?      @map("discount_id")
+  discount        Discount?    @relation(fields: [discountId], references: [id], onDelete: SetNull)
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
+  @@index([discountId])
   @@index([position, deviceType, isActive])
   @@index([startDate, endDate])
   @@map("advertisements")
@@ -2962,6 +2968,7 @@ model Discount {
   reservations        CouponReservation[]
   targetTiers         DiscountTargetTier[]
   targetUsers         DiscountTargetUser[]
+  advertisements      Advertisement[]
   category            Category?            @relation(fields: [categoryId], references: [id])
   seller              User?                @relation(fields: [sellerId], references: [id])
 

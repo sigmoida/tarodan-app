@@ -1,6 +1,7 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
+import { FeeDiscountResolver } from "../discount/fee-discount.resolver";
 import { StorageService } from "../storage/storage.service";
 import {
   canTradeFromMembership,
@@ -33,6 +34,8 @@ export class ProductCommonService {
     private readonly prisma: PrismaService,
     private readonly discountService: DiscountService,
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly feeDiscounts?: FeeDiscountResolver,
   ) {}
 
   /**
@@ -190,7 +193,33 @@ export class ProductCommonService {
     const discountPrices =
       await this.discountService.getEffectiveDisplayPriceMany(discountItems);
 
-    const pre = { sellerStats, productRatings, discountPrices };
+    // Bedel kampanyaları vitrin FİYATINI değiştirmez (komisyonu/kargoyu indirir),
+    // bu yüzden ancak bir rozetle görünür olabilirler. Vitrin herkese açıktır:
+    // yalnız kimlik gerektirmeyen (herkese/tüm alıcılara açık) kampanyalar
+    // duyurulur — üyeliğe özel bir avantajı herkese vaat etmiş olmayız.
+    const feeCampaigns = (await this.feeDiscounts?.loadActive()) ?? [];
+    const feeCampaignLabels = new Map<string, string[]>();
+    for (const item of discountItems) {
+      const matched = (
+        this.feeDiscounts?.selectFor(feeCampaigns as any, {
+          productId: item.productId,
+          categoryId: item.categoryId,
+          sellerId: item.sellerId,
+          buyerId: null,
+          buyerTier: null,
+        }) ?? []
+      )
+        .filter((candidate) => candidate.target.startsWith("buyer_"))
+        .map((candidate) => candidate.name);
+      if (matched.length) feeCampaignLabels.set(item.productId, matched);
+    }
+
+    const pre = {
+      sellerStats,
+      productRatings,
+      discountPrices,
+      feeCampaignLabels,
+    };
     return Promise.all(products.map((p) => this.buildProductResponse(p, pre)));
   }
 
@@ -215,6 +244,8 @@ export class ProductCommonService {
       >;
       productRatings: Map<string, { average: number | null; count: number }>;
       discountPrices: Map<string, number | null>;
+      /** Vitrinde rozet olarak gösterilecek bedel kampanyaları (ürün başına). */
+      feeCampaignLabels?: Map<string, string[]>;
     },
   ) {
     const s = product.seller?.id
@@ -282,6 +313,9 @@ export class ProductCommonService {
     return {
       id: product.id,
       productCode: product.productCode,
+      // Bedel kampanyaları fiyatı değiştirmediği için rozetle duyurulur
+      // ("Komisyonsuz alışveriş"); boşsa alan hiç gönderilmez.
+      feeCampaigns: pre.feeCampaignLabels?.get(product.id) ?? undefined,
       sellerId, // flat sellerId (nested seller.id'ye ek) — API tüketicileri için
       title: product.title,
       description: product.description,

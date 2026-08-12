@@ -37,6 +37,12 @@ export interface Product {
   salePrice?: number | null;
   saleStartDate?: string | null;
   saleEndDate?: string | null;
+  /**
+   * Bu ürün için geçerli, herkese açık BEDEL kampanyalarının adları
+   * ("Komisyonsuz alışveriş" gibi). Fiyatı değiştirmedikleri için vitrinde
+   * yalnız rozet olarak görünürler.
+   */
+  feeCampaigns?: string[];
   discountPercent?: number | null;
   isOnSale?: boolean;
   isBoosted?: boolean;

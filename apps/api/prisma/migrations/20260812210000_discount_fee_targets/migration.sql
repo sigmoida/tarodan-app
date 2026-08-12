@@ -75,3 +75,11 @@ ALTER TABLE "orders"
 -- Koda özel son kullanma tarihi: kusursuz alıcıya iade edilen kupon, kampanya
 -- bitmiş olsa bile 30 gün daha yaşar (kampanyanın tarihi herkes için değişmez).
 ALTER TABLE "discount_codes" ADD COLUMN "expires_at" TIMESTAMP(3);
+
+-- Banner bir kampanyayı duyurabilir: şerit metni kampanyadan okunur ve kampanya
+-- bitince duyuru da kendiliğinden düşer.
+ALTER TABLE "advertisements" ADD COLUMN "discount_id" TEXT;
+CREATE INDEX "advertisements_discount_id_idx" ON "advertisements"("discount_id");
+ALTER TABLE "advertisements"
+  ADD CONSTRAINT "advertisements_discount_id_fkey"
+  FOREIGN KEY ("discount_id") REFERENCES "discounts"("id") ON DELETE SET NULL ON UPDATE CASCADE;

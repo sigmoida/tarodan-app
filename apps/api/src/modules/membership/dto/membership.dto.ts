@@ -139,8 +139,11 @@ export class CreateMembershipTierDto {
   @IsBoolean()
   canTrade: boolean;
 
-  @IsBoolean()
-  isAdFree: boolean;
+  /**
+   * DEVRE DIŞI: banner'lar herkese gösterilir. Kolon geriye uyum için duruyor;
+   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
+   */
+  isAdFree?: boolean;
 
   @Type(() => Number)
   @IsNumber()
@@ -160,7 +163,11 @@ export class MembershipTierResponseDto {
   maxImagesPerListing: number;
   canCreateCollections: boolean;
   canTrade: boolean;
-  isAdFree: boolean;
+  /**
+   * DEVRE DIŞI: banner'lar herkese gösterilir. Kolon geriye uyum için duruyor;
+   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
+   */
+  isAdFree?: boolean;
   featuredListingSlots: number;
   isActive: boolean;
 }
@@ -203,7 +210,11 @@ export class MembershipLimitsDto {
   canUseFreeSlot: boolean;
   canTrade: boolean;
   canCreateCollection: boolean;
-  isAdFree: boolean;
+  /**
+   * DEVRE DIŞI: banner'lar herkese gösterilir. Alan geriye uyum için duruyor;
+   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
+   */
+  isAdFree?: boolean;
   maxImages: number;
   maxFreeListings: number; // Total max free listings for tier
   maxTotalListings: number; // Total max listings for tier

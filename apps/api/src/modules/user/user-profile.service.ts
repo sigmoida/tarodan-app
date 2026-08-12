@@ -179,7 +179,6 @@ export class UserProfileService {
       maxImagesPerListing: effectiveTier.maxImagesPerListing,
       canCreateCollections: effectiveTier.canCreateCollections,
       canTrade: effectiveTier.canTrade,
-      isAdFree: effectiveTier.isAdFree,
       featuredListingSlots: effectiveTier.featuredListingSlots,
     };
     const membershipInfo = user.membership

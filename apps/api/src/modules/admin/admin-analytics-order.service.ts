@@ -348,6 +348,10 @@ export class AdminAnalyticsOrderService {
         discountAmount: num(o.discountAmount),
         discountCode: o.discountCode ?? null,
         platformFundedDiscount: num(o.platformFundedDiscount),
+        // Platformun BEDEL kalemlerinden verdiği indirimler: komisyon geliri bu
+        // kadar düşmüştür, raporda kaybolmasın diye ayrı taşınır.
+        buyerFeeDiscountAmount: num(o.buyerFeeDiscountAmount),
+        sellerFeeDiscountAmount: num(o.sellerFeeDiscountAmount),
         buyerShippingAmount: num(o.buyerShippingAmount),
         sellerShippingAmount: num(o.sellerShippingAmount),
         buyerFeeAmount: num(o.buyerFeeAmount),
