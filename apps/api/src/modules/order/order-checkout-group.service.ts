@@ -1046,6 +1046,14 @@ export class OrderCheckoutGroupService {
               input.commissionResult,
             );
 
+            // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken
+            // harcanır; ödenmeyen sipariş kapanırken geri verilir. Kuponun
+            // bütçesi aşağıdaki reserveUsage ile tutulur.
+            await this.feeDiscounts?.spendBudgets(
+              input.feeDiscountsApplied ?? null,
+              tx,
+            );
+
             await tx.product.update({
               where: { id: entry.productId },
               data: { reservedQuantity: { increment: entry.quantity } },

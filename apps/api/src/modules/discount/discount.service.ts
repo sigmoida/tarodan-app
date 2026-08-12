@@ -43,6 +43,7 @@ import {
 } from "./discount-authorization";
 import { isProductInDiscountScope } from "./discount-scope";
 import { FeeDiscountResolver } from "./fee-discount.resolver";
+import { automaticBudgetEntriesOf } from "./fee-discount.engine";
 
 /**
  * Kusursuz alıcıya iade edilen kupon, kampanya bittiyse koda özel bu kadar gün
@@ -1270,6 +1271,24 @@ export class DiscountService {
         })),
         tx,
       );
+      // Kodsuz (otomatik) kampanyaların bütçesi sipariş OLUŞURKEN harcanır;
+      // ödenmeyen sipariş kapanırken buradan geri döner. Sipariş başına damga
+      // (feeDiscountBudgetReleasedAt) claim görevi görür: iki yol aynı siparişi
+      // aynı anda kapatsa bile bütçe bir kez iade edilir.
+      const withBreakdown = await tx.order.findMany({
+        where: { id: { in: orderIds }, feeDiscountBudgetReleasedAt: null },
+        select: { id: true, feeDiscountBreakdown: true },
+      });
+      for (const order of withBreakdown) {
+        const entries = automaticBudgetEntriesOf(order.feeDiscountBreakdown);
+        if (!entries.length) continue;
+        const claimed = await tx.order.updateMany({
+          where: { id: order.id, feeDiscountBudgetReleasedAt: null },
+          data: { feeDiscountBudgetReleasedAt: new Date() },
+        });
+        if (claimed.count === 0) continue;
+        await this.feeDiscountBudget?.releaseBudget(entries, tx);
+      }
       return result;
     };
     if (client) {

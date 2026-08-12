@@ -54,6 +54,32 @@ export const MAX_TOTAL_DISCOUNT_PERCENT = 50;
  * bedel kampanyaları birlikte tavanı aşamaz. Çok adımlı yollarda (satır ücretleri
  * → paket kargosu) ilk adımın kullandığı pay ikinci adıma AKTARILARAK düşülür.
  */
+/**
+ * Bir siparişin `feeDiscountBreakdown` snapshot'ından, bütçesi sipariş oluşurken
+ * harcanmış KODSUZ (otomatik) kampanyaların kampanya-başına toplamını çıkarır.
+ * Kuponlu satırlar dahil edilmez: kuponun bütçesi CouponReservation ile döner.
+ */
+export function automaticBudgetEntriesOf(
+  breakdown: unknown,
+): { discountId: string; amount: number }[] {
+  if (!Array.isArray(breakdown)) return [];
+  const totals = new Map<string, number>();
+  for (const line of breakdown) {
+    if (!line || typeof line !== "object") continue;
+    const { discountId, discountCode, amount } = line as {
+      discountId?: unknown;
+      discountCode?: unknown;
+      amount?: unknown;
+    };
+    if (typeof discountId !== "string" || !discountId) continue;
+    if (discountCode) continue;
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    totals.set(discountId, round2((totals.get(discountId) ?? 0) + value));
+  }
+  return [...totals].map(([discountId, amount]) => ({ discountId, amount }));
+}
+
 export function remainingDiscountAllowanceFor(input: {
   /** Kupon öncesi satır tabanı (ilan fiyatı × adet). */
   lineBase: number;

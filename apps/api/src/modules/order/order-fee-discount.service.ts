@@ -2,7 +2,10 @@ import { Injectable, Logger, Optional } from "@nestjs/common";
 import { DiscountTarget } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { FeeDiscountResolver } from "../discount/fee-discount.resolver";
-import { applyFeeDiscounts } from "../discount/fee-discount.engine";
+import {
+  applyFeeDiscounts,
+  automaticBudgetEntriesOf,
+} from "../discount/fee-discount.engine";
 import type {
   AppliedFeeDiscount,
   FeeDiscountCandidate,
@@ -263,6 +266,22 @@ export class OrderFeeDiscountService {
       buyerTotal: result.buyerTotal,
       sellerTotal: result.sellerTotal,
     };
+  }
+
+  /**
+   * Kodsuz (otomatik) kampanyaların verdiği indirimi kampanya bütçesine yazar.
+   * Sipariş OLUŞURKEN, aynı transaction içinde çağrılır — kupon satırları hariç
+   * tutulur çünkü kuponun bütçesi rezervasyon adımında zaten harcanmıştır.
+   * Ödenmeyen sipariş kapanırken `releaseReservedUsageForOrders` bütçeyi geri verir.
+   */
+  async spendBudgets(
+    applied: AppliedFeeDiscount[] | null | undefined,
+    client?: unknown,
+  ): Promise<void> {
+    if (!this.resolver || !applied?.length) return;
+    const entries = automaticBudgetEntriesOf(applied);
+    if (!entries.length) return;
+    await this.resolver.spendBudget(entries, client);
   }
 
   /**

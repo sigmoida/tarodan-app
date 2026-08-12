@@ -661,6 +661,10 @@ export class OrderCheckoutDirectService {
         commissionResult,
       );
 
+      // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken harcanır;
+      // ödenmeyen sipariş kapanırken releaseReservedUsageForOrders geri verir.
+      await this.feeDiscounts?.spendBudgets(feeDiscounted.applied, tx);
+
       // Hold coupon capacity while payment is pending. This does NOT increment
       // usedCount or create DiscountUsage; successful payment converts it to real
       // usage atomically in PaymentFulfillmentService.
@@ -965,6 +969,14 @@ export class OrderCheckoutDirectService {
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           buyerShippingAmount: offerBuyerShippingAmount,
           sellerShippingAmount: offerSellerShippingAmount,
+          // Bedel indirimleri kesinti kolonlarına zaten işlenmiş durumda; bu üç
+          // alan rapor, iade denetimi ve bütçe iadesi içindir (teklif kabul
+          // yolundaki create ile aynı — eksikti).
+          buyerFeeDiscountAmount: offerPricing.buyerFeeDiscountAmount ?? 0,
+          sellerFeeDiscountAmount: offerPricing.sellerFeeDiscountAmount ?? 0,
+          feeDiscountBreakdown: offerPricing.feeDiscounts?.length
+            ? (offerPricing.feeDiscounts as unknown as Prisma.InputJsonValue)
+            : undefined,
           financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
             pricingHash: offerPricingHash,
             productId: offer.productId,
@@ -1024,6 +1036,12 @@ export class OrderCheckoutDirectService {
         commissionResult.commissionAmount,
         Number(offer.amount),
         commissionResult,
+      );
+
+      // Kodsuz kampanyaların bütçesi sipariş oluşurken harcanır.
+      await this.feeDiscounts?.spendBudgets(
+        offerPricing.feeDiscounts ?? null,
+        tx,
       );
 
       // Rezervasyon teklif kabul edildiğinde (offer.service accept) yapıldı; burada tekrar yapmıyoruz.

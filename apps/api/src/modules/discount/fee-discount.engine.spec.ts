@@ -1,6 +1,7 @@
 import { DiscountTarget, DiscountType } from "@prisma/client";
 import {
   applyFeeDiscounts,
+  automaticBudgetEntriesOf,
   isBuyerFeeTarget,
   isFeeTarget,
   remainingDiscountAllowanceFor,
@@ -289,6 +290,25 @@ const candidateGlobal = (
   type: over.type ?? DiscountType.percentage,
   value: over.value ?? 50,
   ...over,
+});
+
+describe("automaticBudgetEntriesOf", () => {
+  it("kodsuz satırları kampanya başına toplar, kuponlu satırları dışlar", () => {
+    expect(
+      automaticBudgetEntriesOf([
+        { discountId: "a", discountCode: null, amount: 30 },
+        { discountId: "a", discountCode: null, amount: 20.5 },
+        { discountId: "b", discountCode: "YAZ10", amount: 15 },
+        { discountId: "c", discountCode: null, amount: 0 },
+      ]),
+    ).toEqual([{ discountId: "a", amount: 50.5 }]);
+  });
+
+  it("bozuk/boş snapshot'ta boş liste döner", () => {
+    expect(automaticBudgetEntriesOf(null)).toEqual([]);
+    expect(automaticBudgetEntriesOf("x")).toEqual([]);
+    expect(automaticBudgetEntriesOf([{ amount: 5 }])).toEqual([]);
+  });
 });
 
 describe("hedef kalem sınıflandırması", () => {

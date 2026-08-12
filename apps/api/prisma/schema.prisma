@@ -1495,6 +1495,10 @@ model Order {
   sellerFeeDiscountAmount    Decimal                  @default(0) @map("seller_fee_discount_amount") @db.Decimal(10, 2)
   // Kalem bazında hangi kampanyadan ne kadar indirim verildiğinin snapshot'ı.
   feeDiscountBreakdown       Json?                    @map("fee_discount_breakdown")
+  // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken harcanır; ödenmeyen
+  // sipariş kapanırken geri verilir. Bu damga geri vermeyi TEK seferlik yapar
+  // (claim) — kupon bütçesi ise CouponReservation üzerinden döner.
+  feeDiscountBudgetReleasedAt DateTime?               @map("fee_discount_budget_released_at")
   // Siparişin ÜRÜN TABANI: alıcıdan ürün için gerçekten tahsil edilen tutar
   // (indirim ve kupon sonrası). Komisyon, kargo kararı, vergiler, alıcı toplamı ve
   // satıcı hak edişi hep bu tabandan türer — `order-charged-base.helper.ts`.

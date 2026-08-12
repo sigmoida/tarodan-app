@@ -636,6 +636,9 @@ export class OrderGuestCheckoutService {
         commissionResult,
       );
 
+      // Kodsuz kampanyaların bütçesi sipariş oluşurken harcanır.
+      await this.feeDiscounts?.spendBudgets(feeDiscounted.applied, tx);
+
       // Adet bazlı rezervasyon: 1 adet rezerve et (invalidation yok — cron halledecek).
       // Bulgu F: yalnız DIRECT-BUY'da (offerId yok) create'de rezerve et. Teklif
       // siparişlerinde rezerv ödeme başlatınca (payment-initiate, offerId &&

@@ -23,6 +23,7 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { OrderService } from "../order/order.service";
 import { OrderCheckoutCommonService } from "../order/order-checkout-common.service";
+import { OrderFeeDiscountService } from "../order/order-fee-discount.service";
 import { ProductLockService } from "../product/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
@@ -55,6 +56,8 @@ export class OfferService {
     // Teklif siparişinin bedelleri (kargo + KDV + stopaj + toplam) normal satışla
     // AYNI primitiften gelir; burada ayrı hesap yapılmaz.
     private readonly checkoutCommon: OrderCheckoutCommonService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {
     this.offerExpiryHours = parseInt(
       this.configService.get("OFFER_EXPIRY_HOURS") || "24",
@@ -444,6 +447,13 @@ export class OfferService {
 
       this.logger.log(
         `Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount}, shipping=${offerPricing.buyerShippingAmount}, tax=${offerPricing.taxAmount})`,
+      );
+
+      // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken harcanır;
+      // ödenmeyen sipariş kapanırken releaseReservedUsageForOrders geri verir.
+      await this.feeDiscounts?.spendBudgets(
+        offerPricing.feeDiscounts ?? null,
+        tx,
       );
 
       // Re-fetch offer with order relation so response includes orderId

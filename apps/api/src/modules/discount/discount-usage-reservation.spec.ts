@@ -30,6 +30,12 @@ describe("DiscountService coupon usage lifecycle", () => {
         findUnique: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      // Otomatik kampanya bütçe iadesi: release, siparişin breakdown'ını okur ve
+      // damgayı claim eder; kupon testlerinde breakdown'sız sipariş yeterli.
+      order: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       ...txOverrides,
     } as any;
     const prisma = {
@@ -123,5 +129,65 @@ describe("DiscountService coupon usage lifecycle", () => {
     });
     expect(tx.$executeRaw).not.toHaveBeenCalled();
     expect(tx.discountUsage.create).not.toHaveBeenCalled();
+  });
+
+  it("returns automatic (code-less) campaign budget once, via the order claim stamp", async () => {
+    const budget = { releaseBudget: jest.fn(), spendBudget: jest.fn() };
+    const breakdown = [
+      { discountId: "auto-1", discountCode: null, amount: 30 },
+      { discountId: "auto-1", discountCode: null, amount: 20 },
+      // Kuponlu satırın bütçesi rezervasyonla döner; buradan DÖNMEZ.
+      { discountId: "coupon-1", discountCode: "YAZ10", amount: 15 },
+    ];
+    const { service, tx } = makeService({
+      order: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: "order-1", feeDiscountBreakdown: breakdown },
+          ]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    });
+    (service as any).feeDiscountBudget = budget;
+
+    await service.releaseReservedUsageForOrders(["order-1"]);
+
+    expect(tx.order.updateMany).toHaveBeenCalledWith({
+      where: { id: "order-1", feeDiscountBudgetReleasedAt: null },
+      data: { feeDiscountBudgetReleasedAt: expect.any(Date) },
+    });
+    expect(budget.releaseBudget).toHaveBeenCalledWith(
+      [{ discountId: "auto-1", amount: 50 }],
+      tx,
+    );
+  });
+
+  it("does not double-release budget when the claim was already taken", async () => {
+    const budget = { releaseBudget: jest.fn(), spendBudget: jest.fn() };
+    const { service } = makeService({
+      order: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "order-1",
+            feeDiscountBreakdown: [
+              { discountId: "auto-1", discountCode: null, amount: 30 },
+            ],
+          },
+        ]),
+        // Yarış: başka bir yol damgayı bizden önce almış.
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    });
+    (service as any).feeDiscountBudget = budget;
+
+    await service.releaseReservedUsageForOrders(["order-1"]);
+
+    // Kupon rezervasyon yolu boş listeyle çağırabilir; damga alınamadığı için
+    // otomatik kampanya girdisi HİÇBİR çağrıda olmamalı.
+    const releasedEntries = budget.releaseBudget.mock.calls.flatMap(
+      ([entries]) => entries as { discountId: string }[],
+    );
+    expect(releasedEntries).toEqual([]);
   });
 });
