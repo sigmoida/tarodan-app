@@ -132,11 +132,22 @@ export class ProductBoostService {
     productPrice: number,
     userId: string,
   ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }> {
+    // Üyelik hedeflemesi GEÇERLİ üyelik ister: süresi bitmiş/iptal-dolmuş üye
+    // premium-hedefli paketleri satın alamaz (status + dönem sonu kontrolü).
     const membership = await this.prisma.userMembership.findUnique({
       where: { userId },
-      select: { tier: { select: { type: true } } },
+      select: {
+        status: true,
+        currentPeriodEnd: true,
+        tier: { select: { type: true } },
+      },
     });
-    const tierType = membership?.tier.type ?? "free";
+    const membershipValid =
+      membership != null &&
+      ["active", "cancelled"].includes(membership.status) &&
+      membership.currentPeriodEnd != null &&
+      membership.currentPeriodEnd > new Date();
+    const tierType = membershipValid ? membership.tier.type : "free";
     const pkg = await this.prisma.adPackage.findFirst({
       where: {
         id: packageId,
@@ -185,11 +196,22 @@ export class ProductBoostService {
     }
     const productPrice = Number(product.price);
     const enabled = await this.isBoostEnabled();
+    // Üyelik hedeflemesi GEÇERLİ üyelik ister: süresi bitmiş/iptal-dolmuş üye
+    // premium-hedefli paketleri satın alamaz (status + dönem sonu kontrolü).
     const membership = await this.prisma.userMembership.findUnique({
       where: { userId },
-      select: { tier: { select: { type: true } } },
+      select: {
+        status: true,
+        currentPeriodEnd: true,
+        tier: { select: { type: true } },
+      },
     });
-    const tierType = membership?.tier.type ?? "free";
+    const membershipValid =
+      membership != null &&
+      ["active", "cancelled"].includes(membership.status) &&
+      membership.currentPeriodEnd != null &&
+      membership.currentPeriodEnd > new Date();
+    const tierType = membershipValid ? membership.tier.type : "free";
 
     const packages = await this.prisma.adPackage.findMany({
       where: {

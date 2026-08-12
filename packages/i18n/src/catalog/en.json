@@ -6838,7 +6838,11 @@
       },
       "boostExpired": {
         "title": "🚀 Boost period ended",
-        "message": "The boost for your listing \"{productTitle}\" has ended. Auto-renew was on — boost it again with one click."
+        "message": "The boost for \"{productTitle}\" has ended. You can boost your listing again anytime."
+      },
+      "boostActivated": {
+        "title": "🚀 Boost Active",
+        "message": "The boost for \"{productTitle}\" has started. Your listing now ranks at the top of lists."
       },
       "tradeAutoCancelled": {
         "title": "Trade Cancelled Automatically",

@@ -407,7 +407,10 @@ export class ProductSchedulerService implements OnModuleInit {
             },
           });
         }
-        if (b.autoRenew && b.product && premiumSet.has(b.product.sellerId)) {
+        // Süre dolumu HER satın alana bildirilir — eskiden yalnız autoRenew
+        // açık + premium satıcı haber alıyordu; normal alıcı boost'unun
+        // bittiğini hiçbir kanaldan öğrenmiyordu.
+        if (b.product) {
           await this.notificationService
             .createInAppNotification(b.userId, NotificationType.BOOST_EXPIRED, {
               productTitle: b.product.title,

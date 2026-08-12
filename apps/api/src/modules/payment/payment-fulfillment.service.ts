@@ -14,6 +14,7 @@ import {
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
@@ -493,9 +494,41 @@ export class PaymentFulfillmentService {
     }
     if (isBoostOrder) {
       this.virtualOrder.issueBoostInvoice(resultOrder.id);
+      // Satın alana "öne çıkarma aktif" bildirimi — post-commit, hata
+      // aktivasyonu bozmaz. (Eskiden hiçbir aktivasyon bildirimi yoktu.)
+      void this.notifyBoostActivated(resultOrder.id, resultOrder.buyerId);
     }
 
     return true;
+  }
+
+  /** Boost aktivasyon bildirimi: gerçek ürünün başlığı ProductBoost'tan gelir. */
+  private async notifyBoostActivated(
+    orderId: string,
+    buyerId: string,
+  ): Promise<void> {
+    try {
+      const boost = await this.prisma.productBoost.findUnique({
+        where: { orderId },
+        select: {
+          productId: true,
+          product: { select: { title: true } },
+        },
+      });
+      if (!boost) return;
+      await this.notificationService?.createInAppNotification(
+        buyerId,
+        NotificationType.BOOST_ACTIVATED,
+        {
+          productId: boost.productId,
+          productTitle: boost.product?.title ?? "",
+        },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `BOOST_ACTIVATED bildirimi başarısız (${orderId}): ${err?.message}`,
+      );
+    }
   }
 
   /**

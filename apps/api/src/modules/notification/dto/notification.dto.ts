@@ -140,6 +140,8 @@ export enum NotificationType {
   LISTING_EXPIRED = "listing_expired",
   LISTING_VIEWS_MILESTONE = "listing_views_milestone",
   BOOST_EXPIRED = "boost_expired",
+  // Öne çıkarma ödemesi tamamlandı ve boost aktifleşti — satın alana gider.
+  BOOST_ACTIVATED = "boost_activated",
 
   // Promotion notifications
   PROMOTION = "promotion",

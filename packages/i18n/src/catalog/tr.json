@@ -6838,7 +6838,11 @@
       },
       "boostExpired": {
         "title": "🚀 Öne çıkarma süresi doldu",
-        "message": "\"{productTitle}\" ilanının öne çıkarması bitti. Otomatik yenileme açıktı — tek tıkla yeniden öne çıkar."
+        "message": "\"{productTitle}\" ilanının öne çıkarması sona erdi. Dilerseniz ilanınızı yeniden öne çıkarabilirsiniz."
+      },
+      "boostActivated": {
+        "title": "🚀 Öne Çıkarma Aktif",
+        "message": "\"{productTitle}\" ilanınızın öne çıkarması başladı. İlanınız listelerin üst sırasında gösteriliyor."
       },
       "tradeAutoCancelled": {
         "title": "Takas Otomatik İptal Edildi",

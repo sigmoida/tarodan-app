@@ -182,6 +182,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.LISTING_EXPIRED]: pattern("/profile/listings"),
   [NotificationType.LISTING_VIEWS_MILESTONE]: LISTING,
   [NotificationType.BOOST_EXPIRED]: pattern("/profile/listings"),
+  [NotificationType.BOOST_ACTIVATED]: pattern("/profile/listings"),
 
   // ── Ödeme (satıcıya) ─────────────────────────────────────────────────────
   // Hedef kitle TİPTEN belli: ikisi de satıcıya gider, `orderId` varlığına
