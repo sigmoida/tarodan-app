@@ -107,7 +107,15 @@ export class OrderCommonService {
     if (order.status !== OrderStatus.cancelled) return false;
     if (order.buyerId !== userId) return false;
     if (!order.offerId || !order.offer) return false;
-    if (order.offer.status !== OfferStatus.accepted) return false;
+    // `payment_expired` DE yeniden açılabilir — reactivate() bu iki statüyü
+    // kabul eder ve 24 saatlik pencere cron'u teklifi HER ZAMAN
+    // `payment_expired` yapar. Yalnız `accepted` arandığı için buton tam da
+    // var olma sebebi olan senaryoda hiç çıkmıyordu.
+    if (
+      order.offer.status !== OfferStatus.accepted &&
+      order.offer.status !== OfferStatus.payment_expired
+    )
+      return false;
     if (!order.product) return false;
     const available = getAvailableQuantity(order.product);
     if (available !== null && available < 1) return false;
