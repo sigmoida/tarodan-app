@@ -10,7 +10,7 @@ import { OrderService } from "./order.service";
 import { ElogoInvoicingService } from "../elogo/elogo-invoicing.service";
 import {
   PAYMENT_CONFIG_KEYS,
-  resolvePaymentConfigDays,
+  resolvePaymentConfigNumber,
 } from "../payment/payment.constants";
 import { SellerInvoiceService } from "./seller-invoice.service";
 
@@ -313,7 +313,7 @@ export class OrderSchedulerService implements OnModuleInit {
     }
 
     // 2) İade penceresi kapanan teslim edilmiş siparişler → tamamlandı
-    const returnWindowDays = resolvePaymentConfigDays(
+    const returnWindowDays = resolvePaymentConfigNumber(
       this.configService,
       PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
     );

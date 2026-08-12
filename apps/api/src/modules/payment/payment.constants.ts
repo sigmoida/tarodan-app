@@ -62,7 +62,7 @@ interface ConfigReader {
  * (boş/NaN/negatif) tanımdaki varsayılana düşer. `configService.get(KEY) || "14"`
  * kalıbı yerine BUNU kullan — varsayılan yalnız PAYMENT_CONFIG_KEYS'te yaşasın.
  */
-export function resolvePaymentConfigDays(
+export function resolvePaymentConfigNumber(
   configService: ConfigReader,
   spec: { key: string; default: number },
 ): number {
@@ -76,6 +76,9 @@ export function resolvePaymentConfigDays(
 }
 
 /** ConfigService enjekte edilmemiş yerler için aynı okuma (process.env üzerinden). */
-export function envConfigDays(spec: { key: string; default: number }): number {
-  return resolvePaymentConfigDays({ get: (key) => process.env[key] }, spec);
+export function envConfigNumber(spec: {
+  key: string;
+  default: number;
+}): number {
+  return resolvePaymentConfigNumber({ get: (key) => process.env[key] }, spec);
 }

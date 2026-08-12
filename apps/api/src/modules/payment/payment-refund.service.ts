@@ -39,7 +39,7 @@ import { LedgerService } from "../ledger/ledger.service";
 import {
   MONEY_EPSILON,
   PAYMENT_CONFIG_KEYS,
-  resolvePaymentConfigDays,
+  resolvePaymentConfigNumber,
 } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 import {
@@ -153,11 +153,11 @@ export class PaymentRefundService {
     @Optional()
     private readonly ledger?: LedgerService,
   ) {
-    this.returnWindowDays = resolvePaymentConfigDays(
+    this.returnWindowDays = resolvePaymentConfigNumber(
       this.configService,
       PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
     );
-    this.payoutGraceDays = resolvePaymentConfigDays(
+    this.payoutGraceDays = resolvePaymentConfigNumber(
       this.configService,
       PAYMENT_CONFIG_KEYS.PAYOUT_GRACE_DAYS,
     );

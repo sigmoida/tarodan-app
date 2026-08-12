@@ -28,7 +28,7 @@ import {
 import { PrismaService } from "../../prisma";
 import {
   PAYMENT_CONFIG_KEYS,
-  envConfigDays,
+  envConfigNumber,
 } from "../payment/payment.constants";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
@@ -72,7 +72,7 @@ import {
  * env'den okunan payout penceresiyle sessizce kaymasına yol açıyordu.
  */
 const coolingOffDays = () =>
-  envConfigDays(PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS);
+  envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS);
 
 type RefundFinancialPersistenceData = Pick<
   Prisma.RefundRequestUncheckedCreateInput,
@@ -2036,7 +2036,7 @@ export class RefundService {
    * poll'lanamadığından yanlış iptal riski var → ops takibi.
    */
   async expireStaleOpenReturns(): Promise<number> {
-    const days = Number(process.env.REFUND_RETURN_DROPOFF_DAYS) || 7;
+    const days = envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_DROPOFF_DAYS);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
     let stale: Array<{
@@ -2221,7 +2221,7 @@ export class RefundService {
   // kayıt finalize edilmez. Pencere dolunca cron otomatik finalize eder.
   // (Poller'daki anlık finalize kaldırıldı — tek finalize yolu bu cron.)
   async findReturnDeliveredPendingFinalize(): Promise<string[]> {
-    const hours = Number(process.env.REFUND_RETURN_INSPECTION_HOURS) || 24;
+    const hours = envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_INSPECTION_HOURS);
     const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
     const rows = await this.prisma.refundRequest.findMany({
       where: {
