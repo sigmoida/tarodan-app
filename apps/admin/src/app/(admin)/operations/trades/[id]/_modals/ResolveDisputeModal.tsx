@@ -72,14 +72,14 @@ export function ResolveDisputeModal({
             <option value="complete_trade">
               {t("admin.operations.trades.resolveComplete")}
             </option>
-            <option value="cancel_trade">
-              {t("admin.operations.trades.resolveCancel")}
-            </option>
             <option value="compensate_initiator">
               {t("admin.operations.trades.compensateInitiator")}
             </option>
             <option value="compensate_receiver">
               {t("admin.operations.trades.compensateReceiver")}
+            </option>
+            <option value="compensate_both">
+              {t("admin.operations.trades.compensateBoth")}
             </option>
           </Select>
         </div>

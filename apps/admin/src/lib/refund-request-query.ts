@@ -9,6 +9,11 @@ export const refundStatusOptions = (
   t: T,
 ): { value: string; label: string }[] => [
   { value: "all", label: t("common.allStatuses") },
+  // Aksiyon bekleyen durumlar başta: onay/ret paneli pending_review'da çalışır.
+  {
+    value: "pending_review",
+    label: t("admin.shared.refunds.status.pendingReview"),
+  },
   { value: "approved", label: t("common.approved") },
   {
     value: "wait_for_delivery",
@@ -26,7 +31,9 @@ export const refundStatusOptions = (
     value: "return_delivered",
     label: t("admin.shared.refunds.status.returnDelivered"),
   },
+  { value: "disputed", label: t("admin.shared.refunds.status.disputed") },
   { value: "refunded", label: t("common.completed") },
+  { value: "rejected", label: t("common.rejected") },
   { value: "cancelled", label: t("common.cancelled") },
 ];
 

@@ -42,27 +42,9 @@ export const operationsApi = {
     payload: { hours: number; reason?: string },
   ) => api.post(`/admin/orders/${id}/extend-confirmation`, payload),
 
-  // RefundRequest policy override (Phase 4B.1)
-  overrideRefundPolicy: (
-    id: string,
-    payload: {
-      refundProductAmount?: boolean;
-      refundShippingFee?: boolean;
-      refundBuyerFee?: boolean;
-      refundSellerCommission?: boolean;
-    },
-  ) => api.patch(`/admin/refund-requests/${id}/override-policy`, payload),
-
-  setReturnShippingPayer: (
-    id: string,
-    payer: "buyer" | "seller" | "platform",
-  ) => api.patch(`/admin/refund-requests/${id}/set-shipping-payer`, { payer }),
-
   // Trades
   getTrades: (params?: any) => api.get("/admin/trades", { params }),
   getTrade: (id: string) => api.get(`/admin/trades/${id}`),
-  resolveTrade: (id: string, resolution: any) =>
-    api.post(`/admin/trades/${id}/resolve`, resolution),
   // Safe-trade (escrow) admin actions
   markWarehouseReceived: (tradeId: string, shipmentId: string) =>
     api.post(`/admin/trades/${tradeId}/mark-warehouse-received`, {
@@ -105,6 +87,8 @@ export const operationsApi = {
     }),
   forceFinalizeRefund: (id: string) =>
     api.post(`/admin/refund-requests/${id}/force-finalize`),
+  markRefundDisputed: (id: string, note: string) =>
+    api.post(`/admin/refund-requests/${id}/dispute`, { note: note.trim() }),
   markTradeReturnLost: (
     tradeId: string,
     body: { shipmentId: string; reason: string; compensateUserId?: string },
