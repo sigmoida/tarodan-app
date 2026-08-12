@@ -58,6 +58,7 @@ model User {
   collectionViews         CollectionView[]
   collections             Collection[]
   discountUsages          DiscountUsage[]
+  discountTargets         DiscountTargetUser[]
   couponReservations      CouponReservation[]
   discounts               Discount[]
   emailVerificationTokens EmailVerificationToken[]
@@ -1486,6 +1487,14 @@ model Order {
   // Satıcı payout tabanı bu kadar geri EKLENİR (escrow) → platform-fonlu kampanyada
   // satıcı indirim öncesi tutar üzerinden ödenir. Varsayılan 0 (satıcı-fonlu, eski davranış).
   platformFundedDiscount     Decimal                  @default(0) @map("platform_funded_discount") @db.Decimal(10, 2)
+  // Platformun BEDEL kalemlerinden verdiği indirimler. Kesinti kolonları
+  // (komisyon / hizmet bedeli / kargo payı) zaten indirim SONRASI tutarı taşır;
+  // bu iki toplam yalnız raporlama ve iade denetimi içindir. Alıcı tarafı
+  // alıcının ödediğini, satıcı tarafı satıcının hak edişini etkiler.
+  buyerFeeDiscountAmount     Decimal                  @default(0) @map("buyer_fee_discount_amount") @db.Decimal(10, 2)
+  sellerFeeDiscountAmount    Decimal                  @default(0) @map("seller_fee_discount_amount") @db.Decimal(10, 2)
+  // Kalem bazında hangi kampanyadan ne kadar indirim verildiğinin snapshot'ı.
+  feeDiscountBreakdown       Json?                    @map("fee_discount_breakdown")
   // Siparişin ÜRÜN TABANI: alıcıdan ürün için gerçekten tahsil edilen tutar
   // (indirim ve kupon sonrası). Komisyon, kargo kararı, vergiler, alıcı toplamı ve
   // satıcı hak edişi hep bu tabandan türer — `order-charged-base.helper.ts`.
@@ -2898,53 +2907,92 @@ model Advertisement {
 }
 
 model Discount {
-  id                  String              @id @default(uuid())
-  code                String?             @unique
+  id                  String               @id @default(uuid())
+  code                String?              @unique
   name                String
   description         String?
   type                DiscountType
-  value               Decimal             @db.Decimal(10, 2)
+  value               Decimal              @db.Decimal(10, 2)
   scope               DiscountScope
-  sellerId            String?             @map("seller_id")
-  categoryId          String?             @map("category_id")
-  targetProductIds    String[]            @default([])
-  minCartValue        Decimal?            @map("min_cart_value") @db.Decimal(10, 2)
-  maxDiscountAmount   Decimal?            @map("max_discount_amount") @db.Decimal(10, 2)
-  usageLimitTotal     Int?                @map("usage_limit_total")
-  usageLimitPerUser   Int?                @default(1) @map("usage_limit_per_user")
-  usedCount           Int                 @default(0) @map("used_count")
-  isStackable         Boolean             @default(false) @map("is_stackable")
-  priority            Int                 @default(0)
-  isActive            Boolean             @default(true) @map("is_active")
-  startDate           DateTime            @map("start_date")
-  endDate             DateTime            @map("end_date")
-  createdAt           DateTime            @default(now()) @map("created_at")
-  updatedAt           DateTime            @updatedAt @map("updated_at")
-  buyQuantity         Int?                @map("buy_quantity")
-  getQuantity         Int?                @map("get_quantity")
-  isFlashSale         Boolean             @default(false) @map("is_flash_sale")
-  minQuantity         Int?                @default(1) @map("min_quantity")
+  sellerId            String?              @map("seller_id")
+  categoryId          String?              @map("category_id")
+  targetProductIds    String[]             @default([])
+  minCartValue        Decimal?             @map("min_cart_value") @db.Decimal(10, 2)
+  maxDiscountAmount   Decimal?             @map("max_discount_amount") @db.Decimal(10, 2)
+  usageLimitTotal     Int?                 @map("usage_limit_total")
+  usageLimitPerUser   Int?                 @default(1) @map("usage_limit_per_user")
+  usedCount           Int                  @default(0) @map("used_count")
+  isStackable         Boolean              @default(false) @map("is_stackable")
+  priority            Int                  @default(0)
+  isActive            Boolean              @default(true) @map("is_active")
+  startDate           DateTime             @map("start_date")
+  endDate             DateTime             @map("end_date")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  buyQuantity         Int?                 @map("buy_quantity")
+  getQuantity         Int?                 @map("get_quantity")
+  isFlashSale         Boolean              @default(false) @map("is_flash_sale")
+  minQuantity         Int?                 @default(1) @map("min_quantity")
   /// Toplu üretilen tek-kullanımlık voucher kodları için "batch şablonu" işareti.
   /// true ise bu Discount'ın paylaşımlı `code`'u yoktur; kodlar `codes` altındadır.
-  isBatch             Boolean             @default(false) @map("is_batch")
+  isBatch             Boolean              @default(false) @map("is_batch")
   /// Kampanya maliyetini KİM üstlenir (F2.4). seller (varsayılan): indirimi satıcı
   /// yer (payout tabanı düşer, mevcut davranış). platform: platform finanse eder →
   /// satıcıya indirim ÖNCESİ tutar üzerinden ödenir (escrow'da geri eklenir). shared:
   /// platformFundedRatio kadar platform üstlenir.
-  fundedBy            DiscountFundedBy    @default(seller) @map("funded_by")
+  fundedBy            DiscountFundedBy     @default(seller) @map("funded_by")
   /// shared için platform payı [0,1] (0.30 = %30 platform, %70 satıcı).
-  platformFundedRatio Decimal?            @map("platform_funded_ratio") @db.Decimal(5, 4)
+  platformFundedRatio Decimal?             @map("platform_funded_ratio") @db.Decimal(5, 4)
+  /// İndirimin İNDİRDİĞİ kalem. Cep kuralı: `product_price` yalnız satıcının,
+  /// diğer altı bedel yalnız platformun kalemidir (indirim-teknik §1).
+  target              DiscountTarget       @default(product_price)
+  /// İndirimin KİME açık olduğu. `membership_tiers` → targetTiers,
+  /// `specific_buyers`/`specific_sellers` → targetUsers satırlarıyla eşleşir.
+  audience            DiscountAudience     @default(everyone)
+  /// Kampanyanın TL bütçe tavanı. Bedel indirimlerinde zorunludur; maliyeti
+  /// doğrudan platform üstlendiği için kontrolsüz kalamaz.
+  budgetLimit         Decimal?             @map("budget_limit") @db.Decimal(12, 2)
+  /// Rezerve edilmiş + tüketilmiş indirim toplamı. Serbest bırakılan rezervasyon
+  /// bu sayacı geri düşürür.
+  budgetSpent         Decimal              @default(0) @map("budget_spent") @db.Decimal(12, 2)
+  /// Bütçe tavanı dolduğu için otomatik durdurulduysa dolar.
+  budgetStoppedAt     DateTime?            @map("budget_stopped_at")
   usages              DiscountUsage[]
   codes               DiscountCode[]
   reservations        CouponReservation[]
-  category            Category?           @relation(fields: [categoryId], references: [id])
-  seller              User?               @relation(fields: [sellerId], references: [id])
+  targetTiers         DiscountTargetTier[]
+  targetUsers         DiscountTargetUser[]
+  category            Category?            @relation(fields: [categoryId], references: [id])
+  seller              User?                @relation(fields: [sellerId], references: [id])
 
   @@index([sellerId])
   @@index([isActive, startDate, endDate])
   @@index([code])
   @@index([scope])
   @@map("discounts")
+}
+
+/// `audience = membership_tiers` kampanyasının hedeflediği üyelik katmanları.
+model DiscountTargetTier {
+  discountId String             @map("discount_id")
+  tierType   MembershipTierType @map("tier_type")
+  discount   Discount           @relation(fields: [discountId], references: [id], onDelete: Cascade)
+
+  @@id([discountId, tierType])
+  @@index([tierType])
+  @@map("discount_target_tiers")
+}
+
+/// `audience = specific_buyers | specific_sellers` kampanyasının hedeflediği kişiler.
+model DiscountTargetUser {
+  discountId String   @map("discount_id")
+  userId     String   @map("user_id")
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([discountId, userId])
+  @@index([userId])
+  @@map("discount_target_users")
 }
 
 /// Tek-kullanımlık voucher kodu (kampanya/hediye). Parent Discount = şablon
@@ -2967,14 +3015,18 @@ model DiscountCode {
 }
 
 model DiscountUsage {
-  id         String   @id @default(uuid())
-  discountId String   @map("discount_id")
-  userId     String   @map("user_id")
-  orderId    String?  @map("order_id")
-  amount     Decimal  @db.Decimal(10, 2)
-  createdAt  DateTime @default(now()) @map("created_at")
-  discount   Discount @relation(fields: [discountId], references: [id])
-  user       User     @relation(fields: [userId], references: [id])
+  id           String    @id @default(uuid())
+  discountId   String    @map("discount_id")
+  userId       String    @map("user_id")
+  orderId      String?   @map("order_id")
+  amount       Decimal   @db.Decimal(10, 2)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  /// Kusursuz alıcıya kupon geri verildiğinde dolar. Satır SİLİNMEZ (denetim izi
+  /// kalır); kota ve bütçe hesapları yalnız `revokedAt = null` satırları sayar.
+  revokedAt    DateTime? @map("revoked_at")
+  revokeReason String?   @map("revoke_reason")
+  discount     Discount  @relation(fields: [discountId], references: [id])
+  user         User      @relation(fields: [userId], references: [id])
 
   @@index([discountId, userId])
   @@index([orderId])
@@ -3421,6 +3473,29 @@ enum DiscountFundedBy {
   seller
   platform
   shared
+}
+
+/// İndirimin indirdiği kalem. Cep kuralı: ürün fiyatı satıcının, kalan altı bedel
+/// platformundur; yetki doğrulaması bu alana bakar.
+enum DiscountTarget {
+  product_price
+  buyer_commission
+  buyer_service_fee
+  buyer_shipping
+  seller_commission
+  seller_platform_fee
+  seller_shipping
+}
+
+/// İndirimin hedef kitlesi. Kupon kodu yalnız ALICI tarafındaki kalemlere
+/// bağlanabildiği için satıcı hedefli indirimler daima otomatiktir.
+enum DiscountAudience {
+  everyone
+  membership_tiers
+  specific_buyers
+  specific_sellers
+  all_buyers
+  all_sellers
 }
 
 enum CouponReservationStatus {
