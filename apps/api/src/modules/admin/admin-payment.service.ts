@@ -23,6 +23,7 @@ import {
   PaymentStatus,
   RefundAttemptStatus,
   RefundRequestStatus,
+  TradeStatus,
 } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
@@ -830,18 +831,69 @@ export class AdminPaymentService {
     // ödemelerinde payment.orderId NULL'dur → eski kod processRefund(null) çağırıp
     // yanlış/karışık davranıyordu. Ödeme tipini ayır:
     if (!payment.orderId) {
-      // Trade nakit ödemesi → takas iade yolu (tam tutar; kısmi trade iadesi yok).
+      // Trade nakit ödemesi → takas iade yolu. Tutar POLİTİKADAN gelir
+      // (trade-refund-policy): kargoya verildiyse kargo bedeli HARİÇ iade
+      // edilir. Eski kod amount'u payment.amount'a (tam tahsilat) karşı
+      // doğruluyordu — admin "tam iade" onaylayıp kısmi iade alıyordu ve
+      // gerçek tutar yanıtta yoktu.
       if (payment.tradeCashPayment?.tradeId) {
-        if (
-          amount !== undefined &&
-          Math.abs(amount - Number(payment.amount)) > 0.01
-        ) {
+        const tradeId = payment.tradeCashPayment.tradeId;
+        const [cashPayments, tradeRow, shippedCount] = await Promise.all([
+          this.prisma.tradeCashPayment.findMany({
+            where: { tradeId },
+            include: { payment: { select: { status: true, provider: true } } },
+          }),
+          this.prisma.trade.findUnique({
+            where: { id: tradeId },
+            select: { firstWarehouseArrivalAt: true, status: true },
+          }),
+          this.prisma.tradeShipment.count({
+            where: { tradeId, shippedAt: { not: null } },
+          }),
+        ]);
+        const handedToCargo =
+          !!tradeRow?.firstWarehouseArrivalAt || shippedCount > 0;
+        // COMPLETED takasta iade guard'ı yalnız damgasız (holdReleaseAt=null)
+        // satırları iade eder — doğrulama tutarı da AYNI kümeden hesaplanmalı,
+        // yoksa admin'e gösterilen tutar ile fiilen iade edilen ayrışır.
+        const refundableRows =
+          tradeRow?.status === TradeStatus.completed
+            ? cashPayments.filter((cp) => cp.holdReleaseAt === null)
+            : cashPayments;
+        const refundableTotal = refundableRows.reduce(
+          (sum, cp) =>
+            sum +
+            tradePaymentRefundableAmountFor(
+              {
+                paymentStatus: cp.payment?.status ?? "",
+                provider: cp.payment?.provider ?? "",
+                releasedAt: cp.releasedAt,
+                refundedAt: cp.refundedAt,
+                totalAmount: cp.totalAmount,
+                shippingAmount: cp.shippingAmount,
+              },
+              { handedToCargo },
+            ),
+          0,
+        );
+        if (refundableTotal <= 0) {
           throw new BadRequestException(
-            "Takas nakit ödemelerinde yalnız tam iade yapılabilir",
+            tradeRow?.status === TradeStatus.completed
+              ? "Bu takasta iade borcu olan satır yok: tamamlanmış takasta yalnız itiraz çözümünün iade bıraktığı satırlar iade edilebilir."
+              : "Bu takasta iade edilebilir bir tutar kalmadı.",
           );
         }
-        const tradeId = payment.tradeCashPayment.tradeId;
+        if (amount !== undefined && Math.abs(amount - refundableTotal) > 0.01) {
+          throw new BadRequestException(
+            `Takas iadesi politika tutarıyla yapılır: iade edilecek tutar ` +
+              `${refundableTotal.toFixed(2)} TL` +
+              (handedToCargo ? " (kargo bedeli hariç)" : "") +
+              `. Farklı tutar girilemez.`,
+          );
+        }
         const res = await this.paymentService.refundTradeCashTracked(tradeId);
+        // Audit GERÇEK sonucu kaydeder — iade edilmemişken "iade edildi" yazan
+        // bir denetim izi bırakılmaz.
         await this.audit.createRequiredAuditLog(
           adminId,
           "payment_manual_refund",
@@ -851,6 +903,11 @@ export class AdminPaymentService {
           {
             tradeCashRefund: true,
             tradeId,
+            attemptedAmount: refundableTotal,
+            shippingExcluded: handedToCargo,
+            refunded: res.refunded,
+            failed: res.failed,
+            skippedReason: res.skippedReason ?? null,
             reason: reason || "Admin tarafından manuel iade",
           },
         );
@@ -859,9 +916,18 @@ export class AdminPaymentService {
             `Takas iadesi başarısız: ${res.reason ?? "bilinmeyen hata"} (retry cron devreye girer)`,
           );
         }
+        if (!res.refunded) {
+          // failed değil ama iade de yapılmadı (ör. uygun satır kalmadı) —
+          // başarı toast'ı yerine net hata dön.
+          throw new BadRequestException(
+            `Takas iadesi yapılamadı: ${res.skippedReason ?? "iade edilebilir satır yok"}`,
+          );
+        }
         return {
-          success: res.refunded,
+          success: true,
           tradeId,
+          refundedAmount: refundableTotal,
+          shippingExcluded: handedToCargo,
           reason: reason || "Admin tarafından manuel iade",
         };
       }

@@ -9,7 +9,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { ApproveWarehouseTradeDto, RejectWarehouseTradeDto } from "./dto";
-import { PaymentStatus, TradeStatus, ShipmentStatus } from "@prisma/client";
+import { TradeStatus, ShipmentStatus } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { EventService } from "../events/event.service";
 import {
@@ -19,7 +19,6 @@ import {
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
-import { primaryCashPayment } from "../trade/trade.constants";
 
 /**
  * Safe-trade (depo escrow) admin akışının depo-tarafı: depo teslim alma
@@ -782,16 +781,10 @@ export class AdminTradeWarehouseService {
         },
       );
 
-      const shouldRefund =
-        !!primaryCashPayment(trade.cashPayments) &&
-        primaryCashPayment(trade.cashPayments).status ===
-          PaymentStatus.completed;
-
       return {
         initiatorId: trade.initiatorId,
         receiverId: trade.receiverId,
         status: updatedTrade.status,
-        shouldRefund,
         warehouseAddressId,
         returnDrafts: [
           {
@@ -846,64 +839,17 @@ export class AdminTradeWarehouseService {
     // Refund failure does NOT roll back the reject: return shipments are
     // already on their way back to users. Instead, the failure is persisted
     // on the trade so the admin UI can surface a "retry refund" affordance.
-    let refundFailureMessage: string | null = null;
-    if (result.shouldRefund) {
-      try {
-        await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
-        await this.prisma.trade.update({
-          where: { id: tradeId },
-          data: { refundFailureReason: null, refundFailureAt: null },
-        });
-        try {
-          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
-            where: { tradeId },
-            select: { payerId: true },
-          });
-          await this.eventService.emitTradeRefundCompleted({
-            tradeId,
-            cashPayerId: cashPayment?.payerId ?? null,
-          });
-        } catch (emitErr) {
-          this.logger.error(
-            `Failed to emit trade.refund-completed for trade ${tradeId}: ${emitErr}`,
-          );
-        }
-      } catch (err: any) {
-        refundFailureMessage =
-          err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
-        this.logger.error(
-          `refundTradeCashPaymentIfCompleted failed for trade ${tradeId}: ${refundFailureMessage}`,
-        );
-        try {
-          await this.prisma.trade.update({
-            where: { id: tradeId },
-            data: {
-              refundFailureReason: refundFailureMessage.slice(0, 500),
-              refundFailureAt: new Date(),
-            },
-          });
-        } catch (persistErr: any) {
-          this.logger.error(
-            `Failed to persist refund failure for trade ${tradeId}: ${persistErr?.message}`,
-          );
-        }
-        try {
-          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
-            where: { tradeId },
-            select: { payerId: true },
-          });
-          await this.eventService.emitTradeRefundFailed({
-            tradeId,
-            cashPayerId: cashPayment?.payerId ?? null,
-            reason: refundFailureMessage,
-          });
-        } catch (emitErr) {
-          this.logger.error(
-            `Failed to emit trade.refund-failed for trade ${tradeId}: ${emitErr}`,
-          );
-        }
-      }
-    }
+    // MONEY: iade HER ZAMAN failure-tracking'li yoldan denenir (marker + retry
+    // cron + refund-completed/failed event'leri tracked helper'ın içinde);
+    // ödemesiz takasta no-op. Eski shouldRefund kapısı yalnız
+    // primaryCashPayment satırına bakıyordu — v2'de asıl ödeyen DİĞER taraf
+    // olduğunda iade hiç denenmiyor, marker da yazılmadığı için retry cron'u
+    // göremiyordu.
+    const refundResult =
+      await this.paymentService.refundTradeCashTracked(tradeId);
+    const refundFailureMessage = refundResult.failed
+      ? (refundResult.reason ?? "Bilinmeyen hata (PayTR iade başarısız)")
+      : null;
 
     try {
       await this.eventService.emitTradeWarehouseRejected({

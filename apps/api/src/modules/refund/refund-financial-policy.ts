@@ -63,6 +63,13 @@ export interface RefundFinancialResult {
   productRefundAmount: number;
   outboundShippingRefundAmount: number;
   buyerProtectionRefundAmount: number;
+  /**
+   * Alıcı koruma bedelinin VERGİSİZ (net) iade karşılığı. CommissionLedger
+   * kolonları net tutulduğu için defter ters kaydı BU değeri kullanmalıdır —
+   * brüt (`buyerProtectionRefundAmount`) beslemek kısmi iadede KDV kadar
+   * fazla ters kayıt üretir (ledger clamp'i yalnız tam iadede maskeler).
+   */
+  buyerProtectionNetRefundAmount: number;
   returnShippingAmount: number;
   returnShippingChargeToBuyer: number;
   returnShippingChargeToSeller: number;
@@ -300,6 +307,9 @@ export function calculateRefundFinancials(
   const buyerProtectionRefundAmount = policy.refundBuyerProtectionFee
     ? money((buyerProtectionFee + buyerProtectionTax) * quantityPortion)
     : 0;
+  const buyerProtectionNetRefundAmount = policy.refundBuyerProtectionFee
+    ? money(buyerProtectionFee * quantityPortion)
+    : 0;
   const returnShippingAmount = money(Math.max(0, input.returnShippingAmount));
   const returnShippingChargeToBuyer =
     policy.returnShippingPayer === "buyer" ? returnShippingAmount : 0;
@@ -328,6 +338,7 @@ export function calculateRefundFinancials(
     productRefundAmount,
     outboundShippingRefundAmount,
     buyerProtectionRefundAmount,
+    buyerProtectionNetRefundAmount,
     returnShippingAmount,
     returnShippingChargeToBuyer,
     returnShippingChargeToSeller,

@@ -181,37 +181,6 @@ export class AdminService {
     );
   }
 
-  // ---------- RefundRequest policy override (Faz 4B.1) ----------
-
-  async overrideRefundPolicy(
-    refundRequestId: string,
-    adminId: string,
-    payload: {
-      refundProductAmount?: boolean;
-      refundShippingFee?: boolean;
-      refundBuyerFee?: boolean;
-      refundSellerCommission?: boolean;
-    },
-  ) {
-    return this.refundService.overrideRefundPolicy(
-      refundRequestId,
-      adminId,
-      payload,
-    );
-  }
-
-  async setReturnShippingPayer(
-    refundRequestId: string,
-    adminId: string,
-    payer: "buyer" | "seller" | "platform",
-  ) {
-    return this.refundService.setReturnShippingPayer(
-      refundRequestId,
-      adminId,
-      payer,
-    );
-  }
-
   async approveRefundRequest(
     adminId: string,
     refundRequestId: string,
@@ -851,14 +820,6 @@ export class AdminService {
     return this.tradeService.getTradeById(tradeId);
   }
 
-  async resolveTrade(
-    adminId: string,
-    tradeId: string,
-    dto: { resolution: string; note?: string },
-  ) {
-    return this.tradeService.resolveTrade(adminId, tradeId, dto);
-  }
-
   async markWarehouseReceived(
     adminId: string,
     tradeId: string,
@@ -930,6 +891,18 @@ export class AdminService {
     return this.adminRefundService.forceFinalizeRefund(
       adminId,
       refundRequestId,
+    );
+  }
+
+  async markRefundDisputed(
+    adminId: string,
+    refundRequestId: string,
+    note: string,
+  ) {
+    return this.adminRefundService.markRefundDisputed(
+      adminId,
+      refundRequestId,
+      note,
     );
   }
 

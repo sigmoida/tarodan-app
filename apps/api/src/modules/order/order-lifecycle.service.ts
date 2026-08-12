@@ -16,7 +16,6 @@ import {
   RefundRequestStatus,
   ShipmentStatus,
 } from "@prisma/client";
-import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
@@ -125,6 +124,22 @@ export class OrderLifecycleService {
 
     if (!order) {
       throw new NotFoundException(i18nMessage("server.order.notFound"));
+    }
+
+    // Para/yan-etki taşıyan hedefler genel setter'dan DÜZ YAZILAMAZ: iptal,
+    // rezervasyon/kupon/iade makinesi isteyen cancel() komutuna delege edilir;
+    // refund statüleri yalnız sistem iade akışının çıktısıdır. Tabloda kenar
+    // bulunması yeterli değildir — buradan sızarsa statü para olmadan değişir.
+    if (dto.status === OrderStatus.cancelled) {
+      return this.cancel(orderId, userId, { reason: dto.note });
+    }
+    if (
+      dto.status === OrderStatus.refunded ||
+      dto.status === OrderStatus.refund_requested
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.order.statusChangeSystemOnly"),
+      );
     }
 
     // Validate state transitions against the canonical order state graph
@@ -578,28 +593,19 @@ export class OrderLifecycleService {
         );
       }
 
-      // Can only cancel before shipping
-      const cancellableStatuses: OrderStatus[] = [
-        OrderStatus.pending_payment,
-        OrderStatus.paid,
-        OrderStatus.preparing,
-      ];
-
-      if (!cancellableStatuses.includes(order.status)) {
+      // Erken dal paid/preparing'i tüketti (createCancellationRefund) — buraya
+      // yalnız pending_payment ulaşmalı. Preflight ile tx arasında ödeme
+      // tamamlandıysa (yarış) iptali burada sürdürmek PARAYI İADE ETMEDEN statü
+      // yazmak olurdu; reddet — alıcı yeniden dener ve paid yolu iade
+      // makinesiyle iptal eder.
+      if (order.status !== OrderStatus.pending_payment) {
         throw new BadRequestException(
           i18nMessage("server.order.cannotCancelShipped"),
         );
       }
 
-      // Determine new status based on payment
-      const newStatus =
-        order.status === OrderStatus.pending_payment
-          ? OrderStatus.cancelled
-          : OrderStatus.refunded; // Will trigger refund in payment module
-
-      // Update order. cancellationType='iptal': kargo öncesi iptal — status para
-      // akışı için (paid/preparing'de 'refunded' tetikler) ama bu alan raporlama/
-      // admin için "İADE değil İPTAL" der. reason opsiyonel; boşsa genel default.
+      // Ödenmemiş iptal: PSP'ye gidilmez, statü doğrudan cancelled olur.
+      // cancellationType='iptal' raporlama/admin için "İADE değil İPTAL" der.
       const cancelReasonText =
         dto?.reason?.trim() || "Alıcı tarafından iptal edildi";
       const cancelledOrder = await tx.order.update({
@@ -608,7 +614,7 @@ export class OrderLifecycleService {
           version: order.version,
         },
         data: {
-          status: newStatus,
+          status: OrderStatus.cancelled,
           cancellationType: "iptal",
           cancellationReasonCode: dto?.reasonCode,
           cancelReason: cancelReasonText,
@@ -639,56 +645,20 @@ export class OrderLifecycleService {
         },
       });
 
-      // Rezervasyonu kaldır (pending_payment ise sipariş adedi kadar serbest bırak).
+      // Rezervasyonu kaldır (sipariş adedi kadar serbest bırak).
       // GUARD: reservationReleasedAt doluysa rezervasyon 5dk cron (releaseExpiredOrder
-      // Reservations) tarafından ZATEN bırakılmıştır; sipariş pending_payment kalsa da
-      // burada 2. kez düşmemeliyiz — yoksa reservedQuantity negatife düşer (oversell).
+      // Reservations) tarafından ZATEN bırakılmıştır; burada 2. kez düşmemeliyiz —
+      // yoksa reservedQuantity negatife düşer (oversell).
       // CLAMP: GREATEST(...,0) ile atomik + 0'a sabitli (read-modify-write yarışına kapalı),
       // invalidatePendingOrdersForProduct'taki pattern ile aynı.
-      if (
-        order.status === OrderStatus.pending_payment &&
-        !order.reservationReleasedAt
-      ) {
+      // (pending_payment'ta quantity hiç düşmediği için stok geri-yükleme yoktur;
+      // ödenmiş iptallerin stok geri-yüklemesi processRefund'da tek yazıcıdır.)
+      if (!order.reservationReleasedAt) {
         await tx.$executeRaw`
           UPDATE "products"
           SET "reserved_quantity" = GREATEST("reserved_quantity" - ${order.quantity ?? 1}, 0)
           WHERE "id" = ${order.productId}
         `;
-      }
-
-      // Ödenmiş sipariş iptali (newStatus=refunded): fiziksel stoğu BURADA, iptalle aynı
-      // transaction'da geri yükle — PayTR para iadesini BEKLEMEDEN. Böylece tekil ürün,
-      // iade PayTR'de sürerken/başarısızken piyasadan silinmez (envanter müsaitliği ≠ para
-      // iadesi). Para iadesi processRefund cron'unda bağımsız yürür. Idempotency: stok bir
-      // kez geri yüklenir, stockRestoredAt işaretlenir; processRefund bu doluysa stok-restore'u
-      // atlar (çift geri-yükleme yok). Adet bazlı → batch-safe. pending_payment'ta quantity hiç
-      // düşmediği için (yalnız reserved rezerve edilir) stok geri-yükleme YALNIZ paid/preparing
-      // içindir; o state'ler zaten pre-shipping (kargolanan iptal edilemez, yukarıda bloklu).
-      if (newStatus === OrderStatus.refunded && !order.stockRestoredAt) {
-        const restoreQty = order.quantity ?? 1;
-        const prod = await tx.product.findUnique({
-          where: { id: order.productId },
-          select: { quantity: true },
-        });
-        if (
-          prod &&
-          prod.quantity !== null &&
-          prod.quantity !== undefined &&
-          restoreQty > 0
-        ) {
-          const newQty = prod.quantity + restoreQty;
-          await tx.product.update({
-            where: { id: order.productId },
-            data: {
-              quantity: { increment: restoreQty },
-              status: getProductStatusFromQuantity(newQty),
-            },
-          });
-        }
-        await tx.order.update({
-          where: { id: orderId },
-          data: { stockRestoredAt: new Date() },
-        });
       }
 
       // Re-enable the offer (or mark as cancelled)
@@ -772,7 +742,15 @@ export class OrderLifecycleService {
         i18nMessage("server.order.reactivateNotFromOffer"),
       );
     }
-    if (order.offer.status !== OfferStatus.accepted) {
+    // O8: Ödeme zaman aşımı teklifi `payment_expired`'a çeker ("tekrar
+    // ödenebilir" niyetiyle) ve siparişi iptal eder — bu ucun var olma sebebi
+    // tam olarak o durumdur. Eskiden yalnız `accepted` kabul edildiği ve hiçbir
+    // iptal yolu teklifi accepted bırakmadığı için uç HİÇ çalışamıyordu.
+    // Alıcının kendi iptali (offer.status=cancelled) yeniden açılamaz.
+    if (
+      order.offer.status !== OfferStatus.accepted &&
+      order.offer.status !== OfferStatus.payment_expired
+    ) {
       throw new BadRequestException(
         i18nMessage("server.order.reactivateOfferNotAccepted"),
       );
@@ -791,9 +769,24 @@ export class OrderLifecycleService {
         where: { id: orderId },
         data: {
           status: OrderStatus.pending_payment,
+          // TAZE ödeme penceresi: sıfırlanmazsa süresi geçmiş paymentExpiresAt
+          // yüzünden bir sonraki cron taraması siparişi anında yeniden iptal
+          // ederdi. Pencere, teklif kabulündekiyle aynı (24 saat).
+          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          // Rezervasyon YUKARIDA tazelendi; bayrak temizlenmezse ödeme
+          // başlatma "rezervasyon bırakılmış" dalına girip aynı adetleri
+          // İKİNCİ kez rezerve eder (tekil üründe kalıcı stok-dışı görünüm).
+          reservationReleasedAt: null,
           version: { increment: 1 },
         },
       });
+      // Teklif tekrar "anlaşma" durumuna döner; ödeme tamamlanınca normal akış.
+      if (order.offer!.status === OfferStatus.payment_expired) {
+        await tx.offer.update({
+          where: { id: order.offerId! },
+          data: { status: OfferStatus.accepted },
+        });
+      }
     });
 
     return this.orderQuery.findOne(orderId, userId);

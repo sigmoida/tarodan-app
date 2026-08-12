@@ -45,6 +45,16 @@ export interface RefundFinancialInputV2 {
   faultParty: RefundFaultPartyV2;
   hasShipped: boolean;
   outboundAlreadySettled?: boolean;
+  /**
+   * Bu iade, satırın SON kalan adetlerini de kapsıyor mu (önceki iade edilmiş
+   * adetler + bu talep >= sipariş adedi)? Gidiş kargosu adet başına değil
+   * KOLİ başına bir hizmettir: satırda teslim kalan adet olduğu sürece kargo
+   * hizmeti tüketilmiş sayılır ve hiçbir gidiş-kargo bileşeni üretilmez
+   * (v1'deki "kargo kalan adetlere de hizmet etti" ilkesiyle aynı). Satırı
+   * sonradan tamamlayan iade, koli mutabakatını o zaman tetikler.
+   * Verilmezse refundQuantity >= orderQuantity'den türetilir.
+   */
+  completesLine?: boolean;
 }
 
 export interface RefundFinancialResultV2 {
@@ -170,8 +180,12 @@ export function calculateRefundFinancialsV2(
   }
 
   const outboundTax = (amount: number) => lineTax(amount, input.serviceVatRate);
+  // K7: kısmi (adet) iadede gidiş kargosu HİÇ işlenmez — koli, kalan teslim
+  // adetlere hizmet etmiştir. Yalnız satırı tamamlayan iade kargo bileşenlerini
+  // ve tek seferlik koli mutabakatını üretir.
+  const completesLine = input.completesLine ?? quantityPortion >= 1;
   let outboundSettlementRequired = false;
-  if (input.hasShipped && !input.outboundAlreadySettled) {
+  if (completesLine && input.hasShipped && !input.outboundAlreadySettled) {
     outboundSettlementRequired = input.outboundFullShippingAmount > 0;
     if (input.faultParty === "seller") {
       // Even for a partial return, the buyer receives their complete outbound
@@ -246,7 +260,7 @@ export function calculateRefundFinancialsV2(
         { oneShotPackageSettlement: true },
       );
     }
-  } else if (!input.hasShipped) {
+  } else if (completesLine && !input.hasShipped) {
     // No carrier handover means no shipping service was consumed.
     add(
       "outbound_shipping",

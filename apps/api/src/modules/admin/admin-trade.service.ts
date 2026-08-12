@@ -41,14 +41,6 @@ export class AdminTradeService {
     return this.query.getTradeById(tradeId);
   }
 
-  async resolveTrade(
-    adminId: string,
-    tradeId: string,
-    dto: { resolution: string; note?: string },
-  ) {
-    return this.resolution.resolveTrade(adminId, tradeId, dto);
-  }
-
   async markWarehouseReceived(
     adminId: string,
     tradeId: string,
