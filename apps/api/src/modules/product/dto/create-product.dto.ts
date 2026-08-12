@@ -87,7 +87,10 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ImageVariantDto)
   @ArrayMinSize(3, { message: "En az 3 resim yüklenmelidir" })
-  @ArrayMaxSize(10, { message: "En fazla 10 resim yüklenebilir" })
+  // Mutlak üst sınır = en yüksek katmanın hakkı (Business 15). Gerçek limit
+  // KULLANICININ katmanından runtime'da doğrulanır (assertValidProductImages);
+  // eski sabit 10, Business satıcının 15 görsel hakkını DTO'da kesiyordu.
+  @ArrayMaxSize(15, { message: "En fazla 15 resim yüklenebilir" })
   images: Array<{ cardKey: string; detailKey: string }>;
 
   @ApiPropertyOptional({

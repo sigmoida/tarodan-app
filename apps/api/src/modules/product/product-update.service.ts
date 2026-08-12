@@ -16,7 +16,7 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { UpdateProductDto } from "./dto";
-import { ProductStatus, Prisma } from "@prisma/client";
+import { OfferStatus, ProductStatus, Prisma } from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { ProductCommonService } from "./product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../common/helpers/public-identity";
@@ -26,6 +26,7 @@ import { productShippingTierData } from "./helpers/product-shipping-tier.helper"
 import { isCorporateSellingSuspended } from "../membership/membership.util";
 import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { OFFER_CANCEL_REASON } from "../trade/trade-cancel-reasons";
 import {
   loadProductPriceLimits,
   productPriceLimitViolation,
@@ -899,6 +900,43 @@ export class ProductUpdateService {
       where: { id },
       data: { status: ProductStatus.deleted },
     });
+
+    // Bekleyen teklifler ANINDA gerekçeyle kapatılır — eskiden açık kalıp
+    // cron'la sessizce expire oluyordu; alıcı ilan kalktığını öğrenmiyordu.
+    // (Kabul zaten guard'lı; buradaki iş açık pazarlıkların temiz kapanışı.)
+    try {
+      const openOffers = await this.prisma.offer.findMany({
+        where: { productId: id, status: OfferStatus.pending },
+        select: { id: true, buyerId: true },
+      });
+      if (openOffers.length) {
+        await this.prisma.offer.updateMany({
+          where: { id: { in: openOffers.map((o) => o.id) } },
+          data: {
+            status: OfferStatus.cancelled,
+            cancelReason: OFFER_CANCEL_REASON.listingDeleted,
+          },
+        });
+        for (const offer of openOffers) {
+          await this.notificationService
+            .notifyOfferCancelledOutOfStock(
+              offer.buyerId,
+              id,
+              product.title,
+              product.categoryId ?? null,
+            )
+            .catch((err: any) =>
+              this.logger.warn(
+                `offer-cancelled bildirimi başarısız (${offer.id}): ${err?.message}`,
+              ),
+            );
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `silinen ilanın teklifleri kapatılamadı (${id}): ${err?.message}`,
+      );
+    }
 
     // Invalidate cache
     await this.cache.del(`products:detail:${id}`);

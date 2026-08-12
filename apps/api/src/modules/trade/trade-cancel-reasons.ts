@@ -26,4 +26,5 @@ export const OFFER_CANCEL_REASON = {
    */
   supersededBySellerCounter: "Satıcı karşı teklif verdiği için kapatıldı",
   supersededByBuyerCounter: "Alıcı yeni teklif verdiği için kapatıldı",
+  listingDeleted: "İlan satıcı tarafından kaldırıldığı için teklif kapatıldı",
 } as const;
