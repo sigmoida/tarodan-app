@@ -86,10 +86,11 @@ export const ORDER_TRANSITION_RULES: Record<
     { to: OrderStatus.cancelled, allowedBy: "system" },
   ],
   // Kabul edilen teklifin ödeme penceresi kaçtığında sipariş iptal olur;
-  // satıcı teklifi yeniden aktifleştirirse AYNI sipariş taze 24 saatlik
-  // pencereyle ödemeye geri döner (reactivate). Tek diriltme kenarı budur.
+  // ALICI teklifi yeniden aktifleştirirse (reactivate — yalnız alıcıya açık,
+  // stok kapılı) AYNI sipariş taze ödeme penceresiyle geri döner. Tek
+  // diriltme kenarı budur.
   [OrderStatus.cancelled]: [
-    { to: OrderStatus.pending_payment, allowedBy: "seller" },
+    { to: OrderStatus.pending_payment, allowedBy: "buyer" },
   ],
   [OrderStatus.refund_requested]: [
     { to: OrderStatus.refunded, allowedBy: "system" },
