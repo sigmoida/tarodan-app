@@ -4,6 +4,10 @@ import { PrismaService } from "../../prisma";
 import { EventService } from "../events";
 import { LedgerService } from "../ledger/ledger.service";
 import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * FulfillmentFinalizer (Faz 8.2) — FİZİKSEL (üyelik/boost olmayan) bir ödenmiş
@@ -116,7 +120,7 @@ export class FulfillmentFinalizer {
         ? shippingAddressData?.guestName ||
           shippingAddressData?.fullName ||
           "Misafir Müşteri"
-        : order.buyer.displayName || order.buyer.email;
+        : publicName(order.buyer);
 
       await this.eventService.emitOrderPaid({
         orderId: order.id,
@@ -134,7 +138,7 @@ export class FulfillmentFinalizer {
         buyerEmail: actualBuyerEmail,
         buyerName: actualBuyerName,
         sellerEmail: order.seller.email,
-        sellerName: order.seller.displayName || order.seller.email,
+        sellerName: publicName(order.seller),
         paymentMethod: payment.provider,
         transactionId,
         shippingAddress: {

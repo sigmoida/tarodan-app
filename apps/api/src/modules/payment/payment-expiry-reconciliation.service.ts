@@ -24,6 +24,10 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { DiscountService } from "../discount/discount.service";
 import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "../refund/refund-active-statuses";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 // SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR — böyle
 // bir siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı
@@ -284,7 +288,7 @@ export class PaymentExpiryReconciliationService {
         preparingWarningSentAt: null,
       },
       include: {
-        seller: { select: { id: true, email: true, displayName: true } },
+        seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         product: { select: { id: true, title: true } },
       },
     });
@@ -338,8 +342,8 @@ export class PaymentExpiryReconciliationService {
         preparingDeadline: { lt: now },
       },
       include: {
-        buyer: { select: { id: true, email: true, displayName: true } },
-        seller: { select: { id: true, email: true, displayName: true } },
+        buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
+        seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         product: { select: { id: true, title: true, quantity: true } },
       },
     });
@@ -537,7 +541,7 @@ export class PaymentExpiryReconciliationService {
       include: {
         order: {
           include: {
-            buyer: { select: { id: true, email: true, displayName: true } },
+            buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
           },
         },
         checkoutGroup: {
@@ -636,8 +640,7 @@ export class PaymentExpiryReconciliationService {
               orderNumber: payment.order.orderNumber,
               buyerId: payment.order.buyerId,
               buyerEmail: payment.order.buyer.email,
-              buyerName:
-                payment.order.buyer.displayName || payment.order.buyer.email,
+              buyerName: publicName(payment.order.buyer),
               amount: Number(payment.amount),
               provider: payment.provider,
               failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,

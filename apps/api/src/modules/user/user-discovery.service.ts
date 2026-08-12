@@ -8,6 +8,10 @@ import {
   saleCapableSellerWhere,
 } from "../membership/membership.util";
 import { publicUserRatingWhere } from "../../common/helpers/public-rating";
+import {
+  PUBLIC_IDENTITY_SELECT,
+  publicIdentityFields,
+} from "../../common/helpers/public-identity";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
@@ -117,13 +121,7 @@ export class UserDiscoveryService {
       },
       include: {
         user: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            bio: true,
-            isVerified: true,
-          },
+          select: { ...PUBLIC_IDENTITY_SELECT, bio: true },
         },
         _count: {
           select: { items: true, likes: true },
@@ -176,7 +174,7 @@ export class UserDiscoveryService {
           itemCount: collection._count.items,
           user: {
             id: collection.user.id,
-            displayName: collection.user.displayName,
+            ...publicIdentityFields(collection.user),
             avatarUrl: await this.common.resolveAvatarUrl(
               collection.user.avatarUrl,
             ),
@@ -324,13 +322,7 @@ export class UserDiscoveryService {
       where: { id: collectionId },
       include: {
         user: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            bio: true,
-            isVerified: true,
-          },
+          select: { ...PUBLIC_IDENTITY_SELECT, bio: true },
         },
         items: { select: { product: { select: { status: true } } } },
         _count: { select: { items: true, likes: true } },
@@ -386,7 +378,7 @@ export class UserDiscoveryService {
       score,
       user: {
         id: collection.user.id,
-        displayName: collection.user.displayName,
+        ...publicIdentityFields(collection.user),
         avatarUrl: await this.common.resolveAvatarUrl(
           collection.user.avatarUrl,
         ),
@@ -690,7 +682,7 @@ export class UserDiscoveryService {
 
     return {
       id: user.id,
-      displayName: user.displayName,
+      ...publicIdentityFields(user),
       companyName: user.companyName,
       avatarUrl: await this.common.resolveAvatarUrl(user.avatarUrl),
       bio: user.bio,
@@ -818,7 +810,7 @@ export class UserDiscoveryService {
 
         return {
           id: seller.id,
-          displayName: seller.displayName,
+          ...publicIdentityFields(seller),
           avatarUrl: resolvedAvatar,
           bio: seller.bio,
           isVerified: seller.isVerified,

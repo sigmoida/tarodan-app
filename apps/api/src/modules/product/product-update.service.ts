@@ -19,6 +19,7 @@ import { UpdateProductDto } from "./dto";
 import { ProductStatus, Prisma } from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { ProductCommonService } from "./product-common.service";
+import { PUBLIC_IDENTITY_SELECT } from "../../common/helpers/public-identity";
 import { ProductRankingService } from "./product-ranking.service";
 import { MembershipService } from "../membership/membership.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
@@ -478,12 +479,7 @@ export class ProductUpdateService {
           include: {
             images: { orderBy: { sortOrder: "asc" } },
             seller: {
-              select: {
-                id: true,
-                displayName: true,
-                isVerified: true,
-                sellerType: true,
-              },
+              select: PUBLIC_IDENTITY_SELECT,
             },
             category: {
               select: {
@@ -626,13 +622,7 @@ export class ProductUpdateService {
               include: {
                 images: { orderBy: { sortOrder: "asc" } },
                 seller: {
-                  select: {
-                    id: true,
-                    displayName: true,
-                    isVerified: true,
-                    sellerType: true,
-                    avatarUrl: true,
-                  },
+                  select: PUBLIC_IDENTITY_SELECT,
                 },
                 category: { select: { id: true, name: true, slug: true } },
                 brand: {

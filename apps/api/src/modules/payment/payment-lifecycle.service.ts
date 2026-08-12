@@ -17,6 +17,10 @@ import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { i18nMessage } from "../i18n";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 export type PaymentAccessContext =
   { internal: true } | { userId: string | null; capabilityAuthorized: boolean };
@@ -228,8 +232,10 @@ export class PaymentLifecycleService {
       include: {
         order: {
           include: {
-            buyer: { select: { id: true, email: true, displayName: true } },
-            seller: { select: { id: true, email: true, displayName: true } },
+            buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
+            seller: {
+              select: { id: true, email: true, ...PUBLIC_NAME_SELECT },
+            },
           },
         },
       },
@@ -330,7 +336,7 @@ export class PaymentLifecycleService {
         orderNumber: payment.order.orderNumber,
         buyerId: payment.order.buyerId,
         buyerEmail: payment.order.buyer.email,
-        buyerName: payment.order.buyer.displayName || payment.order.buyer.email,
+        buyerName: publicName(payment.order.buyer),
         amount: Number(payment.amount),
         provider: payment.provider,
         failureReason: "Kullanıcı tarafından iptal edildi",

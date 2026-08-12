@@ -11,6 +11,10 @@ import { CollectionListResponseDto } from "./dto";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { CollectionCommonService } from "./collection-common.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 // "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
 // mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
@@ -223,7 +227,7 @@ export class CollectionSocialService {
         try {
           const user = await this.prisma.user.findUnique({
             where: { id: userId },
-            select: { displayName: true },
+            select: PUBLIC_NAME_SELECT,
           });
 
           await this.notificationService.createInAppNotification(
@@ -232,7 +236,7 @@ export class CollectionSocialService {
             {
               collectionId: collection.id,
               collectionName: collection.name,
-              userName: user?.displayName || "Bir kullanıcı",
+              userName: publicName(user),
             },
           );
         } catch (notifError) {
@@ -356,11 +360,7 @@ export class CollectionSocialService {
             collection: {
               include: {
                 user: {
-                  select: {
-                    id: true,
-                    displayName: true,
-                    avatarUrl: true,
-                  },
+                  select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
                 },
                 // Gerçek görünür item sayısı — items aşağıda kapak için take:4 ile
                 // sınırlı olduğundan itemCount'u bu _count'tan override ediyoruz.

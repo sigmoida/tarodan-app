@@ -21,6 +21,7 @@ import { OrderCommonService } from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
 import { DiscountService } from "../discount/discount.service";
 import { RefundService } from "../refund/refund.service";
+import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -527,7 +528,7 @@ export class OrderLifecycleService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -535,7 +536,7 @@ export class OrderLifecycleService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -730,7 +731,7 @@ export class OrderLifecycleService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -738,7 +739,7 @@ export class OrderLifecycleService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -835,7 +836,7 @@ export class OrderLifecycleService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -843,7 +844,7 @@ export class OrderLifecycleService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },

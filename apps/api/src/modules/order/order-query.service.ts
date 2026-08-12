@@ -8,6 +8,10 @@ import { i18nMessage } from "../i18n";
 import { OrderQueryDto, GuestOrderTrackDto } from "./dto";
 import { OrderStatus, Prisma, ProductKind } from "@prisma/client";
 import { OrderCommonService } from "./order-common.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicIdentityFields,
+} from "../../common/helpers/public-identity";
 
 /**
  * Sipariş sorguları (liste, detay, grup görünümleri, misafir takibi, satıcı
@@ -167,7 +171,7 @@ export class OrderQueryService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             email: true,
             isVerified: true,
           },
@@ -175,7 +179,7 @@ export class OrderQueryService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -338,7 +342,7 @@ export class OrderQueryService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -346,7 +350,7 @@ export class OrderQueryService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -404,7 +408,7 @@ export class OrderQueryService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -412,7 +416,7 @@ export class OrderQueryService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -495,7 +499,7 @@ export class OrderQueryService {
     buyer: {
       select: {
         id: true,
-        displayName: true,
+        ...PUBLIC_NAME_SELECT,
         isVerified: true,
         avatarUrl: true,
       },
@@ -503,7 +507,7 @@ export class OrderQueryService {
     seller: {
       select: {
         id: true,
-        displayName: true,
+        ...PUBLIC_NAME_SELECT,
         isVerified: true,
         avatarUrl: true,
       },
@@ -852,7 +856,7 @@ export class OrderQueryService {
           seller: seller
             ? {
                 id: seller.id,
-                displayName: seller.displayName,
+                ...publicIdentityFields(seller),
                 avatarUrl: seller.avatarUrl ?? null,
                 isVerified: seller.isVerified ?? false,
               }
@@ -897,7 +901,7 @@ export class OrderQueryService {
             buyer: {
               select: {
                 id: true,
-                displayName: true,
+                ...PUBLIC_NAME_SELECT,
                 isVerified: true,
                 avatarUrl: true,
               },
@@ -905,7 +909,7 @@ export class OrderQueryService {
             seller: {
               select: {
                 id: true,
-                displayName: true,
+                ...PUBLIC_NAME_SELECT,
                 isVerified: true,
                 avatarUrl: true,
               },

@@ -29,6 +29,11 @@ import { generateUniqueReference } from "../../common/helpers/generate-reference
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
 import { OFFER_CANCEL_REASON } from "../trade/trade-cancel-reasons";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+  toPublicIdentity,
+} from "../../common/helpers/public-identity";
 
 @Injectable()
 export class OfferService {
@@ -92,7 +97,7 @@ export class OfferService {
         where: { id: dto.productId },
         include: {
           seller: {
-            select: { id: true, displayName: true, email: true },
+            select: { id: true, ...PUBLIC_NAME_SELECT, email: true },
           },
         },
       });
@@ -177,7 +182,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -186,7 +191,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -200,7 +205,7 @@ export class OfferService {
         productTitle: product.title,
         productPrice,
         sellerEmail: product.seller?.email || "",
-        sellerName: product.seller?.displayName || "",
+        sellerName: publicName(product.seller),
       };
     });
 
@@ -213,7 +218,7 @@ export class OfferService {
         productPrice: result.productPrice,
         offerAmount: Number(result.offer.amount),
         buyerId: result.offer.buyerId,
-        buyerName: result.offer.buyer.displayName || "Alıcı",
+        buyerName: publicName(result.offer.buyer),
         sellerId: result.offer.sellerId,
         sellerEmail: result.sellerEmail,
         sellerName: result.sellerName || "Satıcı",
@@ -339,7 +344,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -348,7 +353,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -430,7 +435,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -439,7 +444,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -466,9 +471,9 @@ export class OfferService {
         offerAmount: Number(result.offer.amount),
         buyerId: result.offer.buyerId,
         buyerEmail: (result.offer.buyer as any).email || "",
-        buyerName: result.offer.buyer.displayName || "Alıcı",
+        buyerName: publicName(result.offer.buyer),
         sellerId: result.offer.sellerId,
-        sellerName: result.offer.seller.displayName || "Satıcı",
+        sellerName: publicName(result.offer.seller),
       });
       this.logger.log(
         `offer.accepted event emitted for offer ${result.offer.id}`,
@@ -526,7 +531,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -534,7 +539,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -657,7 +662,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -665,7 +670,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -783,7 +788,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -791,7 +796,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -859,7 +864,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -867,7 +872,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -946,7 +951,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -954,7 +959,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -992,7 +997,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -1000,7 +1005,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -1075,7 +1080,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -1083,7 +1088,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -1185,21 +1190,23 @@ export class OfferService {
         categoryId:
           offer.product.categoryId ?? offer.product.category?.id ?? undefined,
       },
-      buyer: offer.buyer
-        ? {
-            ...offer.buyer,
-            avatarUrl: await this.resolveOfferAvatarUrl(offer.buyer.avatarUrl),
-          }
-        : offer.buyer,
-      seller: offer.seller
-        ? {
-            ...offer.seller,
-            avatarUrl: await this.resolveOfferAvatarUrl(offer.seller.avatarUrl),
-          }
-        : offer.seller,
+      // Karşı taraf herkese açık kimliğiyle görünür: gerçek ad ve e-posta
+      // (bildirim için seçilir) yüke girmez.
+      buyer: await this.toOfferParty(offer.buyer),
+      seller: await this.toOfferParty(offer.seller),
       cancelReason: offer.cancelReason ?? null,
       createdAt: offer.createdAt,
       updatedAt: offer.updatedAt,
+    };
+  }
+
+  /** Teklifin karşı tarafı: herkese açık kimlik + çözülmüş avatar. */
+  private async toOfferParty(user: any) {
+    if (!user) return user;
+    const { email: _email, ...rest } = user;
+    return {
+      ...toPublicIdentity(rest),
+      avatarUrl: await this.resolveOfferAvatarUrl(user.avatarUrl),
     };
   }
 

@@ -9,6 +9,11 @@ import { PaymentStatus } from "@prisma/client";
 import { StorageService } from "../storage/storage.service";
 import { i18nMessage, I18nService } from "../i18n";
 import { type Locale, defaultLocale } from "@tarodan/i18n";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+  toPublicIdentity,
+} from "../../common/helpers/public-identity";
 
 // Aktif (devam eden) iade talebi durumları — order-common.pickActiveRefundRequest
 // ile aynı liste. "refunded" burada YOK; tamamlanmış iade ayrı ele alınır.
@@ -302,8 +307,8 @@ export class PaymentQueryService {
       include: {
         order: {
           include: {
-            buyer: { select: { id: true, displayName: true } },
-            seller: { select: { id: true, displayName: true } },
+            buyer: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+            seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
           },
         },
       },
@@ -465,13 +470,13 @@ export class PaymentQueryService {
                   },
                 },
               },
-              buyer: { select: { id: true, displayName: true } },
-              seller: { select: { id: true, displayName: true } },
+              buyer: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+              seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
             },
           },
           checkoutGroup: {
             include: {
-              buyer: { select: { id: true, displayName: true } },
+              buyer: { select: { id: true, ...PUBLIC_NAME_SELECT } },
               orders: {
                 include: {
                   product: {
@@ -485,7 +490,7 @@ export class PaymentQueryService {
                       },
                     },
                   },
-                  seller: { select: { id: true, displayName: true } },
+                  seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
                   // Alt-siparişin display durumu (İade Sürecinde/Edildi/İptal) için.
                   refundRequests: {
                     orderBy: { createdAt: "desc" as const },
@@ -604,14 +609,17 @@ export class PaymentQueryService {
                   ),
                 image: toImageUrls(o.product)?.images?.[0] ?? null,
                 amount: Number(o.totalAmount ?? 0),
-                sellerName: o.seller?.displayName ?? null,
+                sellerName: publicName(o.seller),
                 // Ham status yerine display status → İade Sürecinde/Edildi/İptal
                 // ayrımı orders listesiyle tutarlı olur.
                 status: groupOrderDisplayStatus(o),
               }))
             : undefined,
-          buyer: p.order?.buyer ?? group?.buyer ?? null,
-          seller: p.order?.seller ?? firstGroupOrder?.seller ?? null,
+          // Ham kullanıcı satırı yerine herkese açık kimlik.
+          buyer: toPublicIdentity(p.order?.buyer ?? group?.buyer ?? null),
+          seller: toPublicIdentity(
+            p.order?.seller ?? firstGroupOrder?.seller ?? null,
+          ),
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
           paidAt: p.paidAt,

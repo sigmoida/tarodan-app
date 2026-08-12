@@ -48,6 +48,10 @@ import {
   RefundPendingReconciliationException,
 } from "../payment-providers/refund-errors";
 import { tradePaymentRefundableAmountFor } from "../trade/trade-refund-policy";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -410,8 +414,8 @@ export class PaymentRefundService {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
         include: {
-          buyer: { select: { id: true, email: true, displayName: true } },
-          seller: { select: { id: true, email: true, displayName: true } },
+          buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
+          seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         },
       });
       // refund.service akışı kendi REFUND_COMPLETED (push+mail) bildirimini gönderiyor;
@@ -441,10 +445,10 @@ export class PaymentRefundService {
             orderNumber: order.orderNumber,
             buyerId: order.buyerId,
             buyerEmail: order.buyer.email,
-            buyerName: order.buyer.displayName || order.buyer.email,
+            buyerName: publicName(order.buyer),
             sellerId: order.sellerId,
             sellerEmail: order.seller.email,
-            sellerName: order.seller.displayName || order.seller.email,
+            sellerName: publicName(order.seller),
             refundAmount: amountToRefund,
             totalAmount: Number(payment.amount),
             provider: payment.provider,

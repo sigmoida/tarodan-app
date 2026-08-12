@@ -60,6 +60,10 @@ import {
 } from "../../common/helpers/generate-reference";
 import { calculateServiceTax } from "../order/order-service-tax.helper";
 import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * Takas yaşam döngüsü metodları (create/accept/reject/counter/cancel/ship/
@@ -275,8 +279,8 @@ export class TradeLifecycleService {
           pricingVersion: TRADE_PRICING_V2,
         },
         include: {
-          initiator: { select: { id: true, displayName: true } },
-          receiver: { select: { id: true, displayName: true } },
+          initiator: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+          receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         },
       });
 
@@ -311,7 +315,7 @@ export class TradeLifecycleService {
     try {
       const initiator = await this.prisma.user.findUnique({
         where: { id: initiatorId },
-        select: { displayName: true },
+        select: PUBLIC_NAME_SELECT,
       });
 
       await this.notificationService.createInAppNotification(
@@ -319,7 +323,7 @@ export class TradeLifecycleService {
         NotificationType.TRADE_RECEIVED,
         {
           tradeId: trade.id,
-          initiatorName: initiator?.displayName || "Bir kullanıcı",
+          initiatorName: publicName(initiator),
         },
       );
     } catch (error) {
@@ -966,7 +970,7 @@ export class TradeLifecycleService {
     try {
       const counterOfferer = await this.prisma.user.findUnique({
         where: { id: originalReceiverId },
-        select: { displayName: true },
+        select: PUBLIC_NAME_SELECT,
       });
 
       await this.notificationService.createInAppNotification(
@@ -974,7 +978,7 @@ export class TradeLifecycleService {
         NotificationType.TRADE_COUNTER,
         {
           tradeId,
-          counterOffererName: counterOfferer?.displayName || "Bir kullanıcı",
+          counterOffererName: publicName(counterOfferer),
         },
       );
     } catch (error) {

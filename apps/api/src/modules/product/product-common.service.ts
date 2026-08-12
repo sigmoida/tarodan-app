@@ -8,6 +8,7 @@ import {
 } from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductStatus } from "@prisma/client";
+import { publicIdentityFields } from "../../common/helpers/public-identity";
 import { getAvailableQuantity } from "./helpers/product-availability.helper";
 import { resolveSalePrice } from "./helpers/product-sale-window";
 import {
@@ -331,10 +332,12 @@ export class ProductCommonService {
         average: ratingAverage,
         count: ratingCount,
       },
+      // Satıcı kartı herkese açıktır: ad tek zincirden gelir (firma → username
+      // → isim), gerçek ad yüke hiç girmez.
       seller: product.seller
         ? {
             id: product.seller.id,
-            displayName: product.seller.displayName,
+            ...publicIdentityFields(product.seller),
             isVerified: product.seller.isVerified,
             sellerType: product.seller.sellerType,
             avatarUrl: await this.resolveAvatarUrl(

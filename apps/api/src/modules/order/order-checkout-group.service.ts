@@ -36,6 +36,10 @@ import {
   calculatePackageDesi,
   type ShippingBuyerShareByTier,
 } from "../shipping/shipping-tariff.helper";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * Toplu checkout (CheckoutGroup) akışı: sepetteki tüm ürünler tek grup + ürün
@@ -220,7 +224,9 @@ export class OrderCheckoutGroupService {
               kind: ProductKind.listing,
             },
             include: {
-              seller: { select: { id: true, email: true, displayName: true } },
+              seller: {
+                select: { id: true, email: true, ...PUBLIC_NAME_SELECT },
+              },
             },
           });
           const productMap = new Map(products.map((p) => [p.id, p]));
@@ -931,7 +937,7 @@ export class OrderCheckoutGroupService {
               productTitle: entry.product.title,
               sellerId: entry.product.sellerId,
               sellerEmail: entry.product.seller?.email ?? null,
-              sellerName: entry.product.seller?.displayName ?? null,
+              sellerName: publicName(entry.product.seller),
             });
           }
 
@@ -997,7 +1003,7 @@ export class OrderCheckoutGroupService {
       ? null
       : await this.prisma.user.findUnique({
           where: { id: buyerId },
-          select: { email: true, displayName: true },
+          select: { email: true, ...PUBLIC_NAME_SELECT },
         });
 
     for (const order of result.createdOrders) {
@@ -1012,9 +1018,7 @@ export class OrderCheckoutGroupService {
           productTitle: order.productTitle,
           totalAmount: order.totalAmount,
           buyerEmail: isGuest ? guest?.email || "" : buyerUser?.email || "",
-          buyerName: isGuest
-            ? guest?.name || "Misafir"
-            : buyerUser?.displayName || buyerUser?.email || "",
+          buyerName: isGuest ? guest?.name || "Misafir" : publicName(buyerUser),
           sellerEmail: order.sellerEmail || "",
           sellerName: order.sellerName || "Satıcı",
         });

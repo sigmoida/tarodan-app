@@ -12,6 +12,7 @@ import { CollectionCommonService } from "./collection-common.service";
 import * as https from "https";
 import * as http from "http";
 import { configureSharpSafety } from "../../common/image/sharp-safety";
+import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 
 // Sharp is optional. Yükleme hatası sessizce yutulmasın (bkz. media.service —
 // staging'de sharp'sız imaj tek 400 ile teşhis edilemiyordu).
@@ -67,7 +68,7 @@ export class CollectionCoverService {
       where: { id: collectionId },
       data: { coverImageKey },
       include: {
-        user: { select: { id: true, displayName: true } },
+        user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         items: {
           include: {
             product: {

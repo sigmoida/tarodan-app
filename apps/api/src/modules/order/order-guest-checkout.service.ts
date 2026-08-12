@@ -38,6 +38,7 @@ import {
   REFERENCE_PREFIX,
   reprefixReference,
 } from "../../common/helpers/code-prefixes";
+import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 
 /**
  * Misafir checkout + e-posta OTP alt sistemi: sendGuestCheckoutVerificationCode,
@@ -236,7 +237,7 @@ export class OrderGuestCheckoutService {
         where: { id: dto.productId },
         include: {
           images: { take: 1, orderBy: { sortOrder: "asc" } },
-          seller: { select: { id: true, email: true, displayName: true } },
+          seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         },
       });
 
@@ -571,7 +572,7 @@ export class OrderGuestCheckoutService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -579,7 +580,7 @@ export class OrderGuestCheckoutService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },

@@ -14,6 +14,10 @@ import {
   isPremiumEntitled,
 } from "../membership/membership.util";
 import { i18nMessage } from "../i18n";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * UserAnalyticsService — ağır analitik: getUserAnalytics (dönemsel satış/
@@ -230,7 +234,7 @@ export class UserAnalyticsService {
           totalAmount: true,
           createdAt: true,
           product: { select: { title: true } },
-          buyer: { select: { displayName: true } },
+          buyer: { select: PUBLIC_NAME_SELECT },
         },
       }),
       this.prisma.productLike.findMany({
@@ -240,7 +244,7 @@ export class UserAnalyticsService {
         select: {
           createdAt: true,
           product: { select: { title: true } },
-          user: { select: { displayName: true } },
+          user: { select: PUBLIC_NAME_SELECT },
         },
       }),
       this.prisma.message.findMany({
@@ -252,7 +256,7 @@ export class UserAnalyticsService {
         select: {
           createdAt: true,
           threadId: true,
-          sender: { select: { displayName: true } },
+          sender: { select: PUBLIC_NAME_SELECT },
         },
       }),
     ]);
@@ -281,19 +285,19 @@ export class UserAnalyticsService {
         productTitle: o.product?.title || "Ürün",
         timestamp: o.createdAt.toISOString(),
         amount: Number(o.totalAmount),
-        userDisplayName: o.buyer?.displayName,
+        userDisplayName: publicName(o.buyer),
       })),
       ...recentLikes.map((l) => ({
         type: "favorite" as const,
         productTitle: l.product?.title || "Ürün",
         timestamp: l.createdAt.toISOString(),
-        userDisplayName: l.user?.displayName,
+        userDisplayName: publicName(l.user),
       })),
       ...recentMessages.map((m, i) => ({
         type: "message" as const,
         productTitle: messageProductTitles[i],
         timestamp: m.createdAt.toISOString(),
-        userDisplayName: m.sender?.displayName,
+        userDisplayName: publicName(m.sender),
       })),
     ]
       .sort(

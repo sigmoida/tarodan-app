@@ -5,6 +5,7 @@ import { StorageService } from "../storage/storage.service";
 import { computeTradeCanCancel } from "./trade.state-machine";
 import { TradeResponseDto } from "./dto";
 import { primaryCashPayment } from "./trade.constants";
+import { publicName } from "../../common/helpers/public-identity";
 
 /**
  * Takas modülü ortak yardımcıları (yanıt DTO formatlama + ürün cache
@@ -184,9 +185,9 @@ export class TradeCommonService {
       id: trade.id,
       tradeNumber: trade.tradeNumber,
       initiatorId: trade.initiatorId,
-      initiatorName: trade.initiator?.displayName || "",
+      initiatorName: publicName(trade.initiator),
       receiverId: trade.receiverId,
-      receiverName: trade.receiver?.displayName || "",
+      receiverName: publicName(trade.receiver),
       status: trade.status,
       initiatorItems: (trade.items || [])
         .filter((item: any) => item.side === "initiator")
@@ -209,7 +210,7 @@ export class TradeCommonService {
         ? {
             id: initiatorShipment.id,
             shipperId: initiatorShipment.shipperId,
-            shipperName: trade.initiator?.displayName || "",
+            shipperName: publicName(trade.initiator),
             carrier: initiatorShipment.carrier,
             // Hide counterparty tracking until both to_warehouse shipped
             trackingNumber:
@@ -234,7 +235,7 @@ export class TradeCommonService {
         ? {
             id: receiverShipment.id,
             shipperId: receiverShipment.shipperId,
-            shipperName: trade.receiver?.displayName || "",
+            shipperName: publicName(trade.receiver),
             carrier: receiverShipment.carrier,
             trackingNumber:
               !viewerUserId ||

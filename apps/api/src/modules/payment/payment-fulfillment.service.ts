@@ -29,6 +29,10 @@ import {
 } from "../outbox/outbox.types";
 import { isTradeFullyPaid } from "../trade/trade-payment-rows.helper";
 import { addDaysSkippingSundays } from "../../common/helpers/preparing-deadline";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -723,7 +727,7 @@ export class PaymentFulfillmentService {
           : firstOrder.buyer.email;
         const groupBuyerName = groupIsGuest
           ? firstAddr?.guestName || firstAddr?.fullName || "Misafir Müşteri"
-          : firstOrder.buyer.displayName || firstOrder.buyer.email;
+          : publicName(firstOrder.buyer);
         const group = await this.prisma.checkoutGroup.findUnique({
           where: { id: payment.checkoutGroupId },
           select: { groupNumber: true },
@@ -736,7 +740,7 @@ export class PaymentFulfillmentService {
           { sellerName: string; shippingCost: number }
         >();
         for (const o of result.fulfilledOrders) {
-          const sellerName = o.seller.displayName || o.seller.email || "Satıcı";
+          const sellerName = publicName(o.seller);
           const cost = Number(o.shippingCost ?? 0);
           const existing = shippingBySeller.get(o.sellerId);
           if (existing) {
@@ -1015,7 +1019,7 @@ export class PaymentFulfillmentService {
       const groupOrders = await this.prisma.order.findMany({
         where: { checkoutGroupId: payment.checkoutGroupId },
         include: {
-          buyer: { select: { id: true, email: true, displayName: true } },
+          buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         },
       });
 
@@ -1033,7 +1037,7 @@ export class PaymentFulfillmentService {
             orderNumber: order.orderNumber,
             buyerId: order.buyerId,
             buyerEmail: order.buyer.email,
-            buyerName: order.buyer.displayName || order.buyer.email,
+            buyerName: publicName(order.buyer),
             amount: Number(order.totalAmount),
             provider: payment.provider,
             failureReason: reason,
@@ -1102,7 +1106,7 @@ export class PaymentFulfillmentService {
         const order = await this.prisma.order.findUnique({
           where: { id: payment.orderId },
           include: {
-            buyer: { select: { id: true, email: true, displayName: true } },
+            buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
           },
         });
 
@@ -1113,7 +1117,7 @@ export class PaymentFulfillmentService {
             orderNumber: order.orderNumber,
             buyerId: order.buyerId,
             buyerEmail: order.buyer.email,
-            buyerName: order.buyer.displayName || order.buyer.email,
+            buyerName: publicName(order.buyer),
             amount: Number(payment.amount),
             provider: payment.provider,
             failureReason: reason,

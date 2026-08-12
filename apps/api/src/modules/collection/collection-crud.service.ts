@@ -24,6 +24,10 @@ import { SearchIndexingService } from "../search/search-indexing.service";
 import { StorageService } from "../storage/storage.service";
 import { CollectionCommonService } from "./collection-common.service";
 import { CollectionCoverService } from "./collection-cover.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 // "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
 // mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
@@ -116,7 +120,7 @@ export class CollectionCrudService {
         categoryId: dto.categoryId || undefined,
       },
       include: {
-        user: { select: { id: true, displayName: true } },
+        user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         category: { select: { id: true, name: true, slug: true } },
         items: {
           include: {
@@ -157,7 +161,7 @@ export class CollectionCrudService {
     const collection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
       include: {
-        user: { select: { id: true, displayName: true } },
+        user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         category: { select: { id: true, name: true, slug: true } },
         items: {
           include: {
@@ -274,7 +278,7 @@ export class CollectionCrudService {
     const collection = await this.prisma.collection.findFirst({
       where: { slug },
       include: {
-        user: { select: { id: true, displayName: true } },
+        user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         category: { select: { id: true, name: true, slug: true } },
         items: {
           include: {
@@ -404,7 +408,7 @@ export class CollectionCrudService {
       this.prisma.collection.findMany({
         where,
         include: {
-          user: { select: { id: true, displayName: true } },
+          user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
           _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
         },
         orderBy: { createdAt: "desc" },
@@ -438,7 +442,7 @@ export class CollectionCrudService {
         collections.map(async (c) => ({
           id: c.id,
           userId: c.userId,
-          userName: c.user.displayName,
+          userName: publicName(c.user),
           name: c.name,
           slug: c.slug,
           description: c.description || undefined,
@@ -560,7 +564,7 @@ export class CollectionCrudService {
     const collections = await this.prisma.collection.findMany({
       where: { id: { in: ids } },
       include: {
-        user: { select: { id: true, displayName: true } },
+        user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         category: { select: { id: true, name: true, slug: true } },
         _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
       },
@@ -585,7 +589,7 @@ export class CollectionCrudService {
         collections.map(async (c) => ({
           id: c.id,
           userId: c.userId,
-          userName: c.user.displayName,
+          userName: publicName(c.user),
           categoryId: c.categoryId ?? undefined,
           category: c.category
             ? {
@@ -677,7 +681,7 @@ export class CollectionCrudService {
       this.prisma.collection.findMany({
         where,
         include: {
-          user: { select: { id: true, displayName: true } },
+          user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
           category: { select: { id: true, name: true, slug: true } },
           _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
         },
@@ -730,7 +734,7 @@ export class CollectionCrudService {
         collections.map(async (c) => ({
           id: c.id,
           userId: c.userId,
-          userName: c.user.displayName,
+          userName: publicName(c.user),
           categoryId: c.categoryId ?? undefined,
           category: c.category
             ? {
@@ -836,7 +840,7 @@ export class CollectionCrudService {
           : {}),
       },
       include: {
-        user: { select: { id: true, displayName: true } },
+        user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         category: { select: { id: true, name: true, slug: true } },
         items: {
           include: {

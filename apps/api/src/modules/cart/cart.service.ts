@@ -37,6 +37,10 @@ import {
 } from "../shipping/shipping-tariff.helper";
 import { i18nMessage } from "../i18n";
 import { canSellFromMembership } from "../membership/membership.util";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
@@ -430,7 +434,7 @@ export class CartService {
   private saleEligibilitySellerSelect() {
     return {
       id: true,
-      displayName: true,
+      ...PUBLIC_NAME_SELECT,
       businessStatus: true,
       companyName: true,
       taxId: true,
@@ -568,7 +572,7 @@ export class CartService {
         productTitle: product.title,
         productImage: resolvedImage,
         sellerId: product.sellerId,
-        sellerName: product.seller?.displayName || "Satıcı",
+        sellerName: publicName(product.seller),
         quantity: item.quantity,
         originalPrice,
         salePrice: hasDiscount ? effectivePrice : undefined,

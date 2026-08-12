@@ -34,6 +34,11 @@ import {
   REFERENCE_PREFIX,
   reprefixReference,
 } from "../../common/helpers/code-prefixes";
+import {
+  PUBLIC_NAME_SELECT,
+  PublicIdentityInput,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * Grup dışı satın alma akışları: Hızlı Al (createDirectOrder), teklif→sipariş (create)
@@ -119,7 +124,7 @@ export class OrderCheckoutDirectService {
         where: { id: dto.productId },
         include: {
           seller: {
-            select: { id: true, displayName: true },
+            select: { id: true, ...PUBLIC_NAME_SELECT },
           },
         },
       });
@@ -588,10 +593,10 @@ export class OrderCheckoutDirectService {
             },
           },
           buyer: {
-            select: { id: true, email: true, displayName: true },
+            select: { id: true, email: true, ...PUBLIC_NAME_SELECT },
           },
           seller: {
-            select: { id: true, email: true, displayName: true },
+            select: { id: true, email: true, ...PUBLIC_NAME_SELECT },
           },
         },
       });
@@ -635,8 +640,8 @@ export class OrderCheckoutDirectService {
       try {
         const createdOrder = order as typeof order & {
           product: { title: string };
-          buyer: { email: string; displayName: string | null };
-          seller: { email: string | null; displayName: string | null };
+          buyer: { email: string } & PublicIdentityInput;
+          seller: { email: string | null } & PublicIdentityInput;
         };
         await this.eventService.emitOrderCreated({
           orderId: createdOrder.id,
@@ -647,9 +652,9 @@ export class OrderCheckoutDirectService {
           productTitle: createdOrder.product.title,
           totalAmount,
           buyerEmail: createdOrder.buyer.email,
-          buyerName: createdOrder.buyer.displayName || createdOrder.buyer.email,
+          buyerName: publicName(createdOrder.buyer),
           sellerEmail: createdOrder.seller.email || "",
-          sellerName: createdOrder.seller.displayName || "Satıcı",
+          sellerName: publicName(createdOrder.seller),
         });
         this.logger.log(
           `order.created event emitted for order ${createdOrder.orderNumber}`,
@@ -945,7 +950,7 @@ export class OrderCheckoutDirectService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -953,7 +958,7 @@ export class OrderCheckoutDirectService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },

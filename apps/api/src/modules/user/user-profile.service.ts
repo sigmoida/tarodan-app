@@ -36,6 +36,10 @@ import {
 } from "./dto";
 import { UserCommonService } from "./user-common.service";
 import { isUsernameAllowed, normalizeUsername } from "../auth/username.util";
+import {
+  PUBLIC_IDENTITY_SELECT,
+  toPublicIdentity,
+} from "../../common/helpers/public-identity";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
@@ -782,18 +786,13 @@ export class UserProfileService {
     // başkası bakarken yalnızca herkese görünür/biten kayıtlar sayılır.
     const isOwner = !!viewerId && viewerId === userId;
 
+    // adminCode (B/K kodu) İÇ referanstır: herkese açık profilde yeri yok.
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true,
-        adminCode: true,
-        username: true,
-        displayName: true,
-        avatarUrl: true,
+        ...PUBLIC_IDENTITY_SELECT,
         bio: true,
-        isVerified: true,
         isSeller: true,
-        sellerType: true,
         createdAt: true,
       },
     });
@@ -896,7 +895,7 @@ export class UserProfileService {
     const trustVisible = isPremium;
 
     return {
-      ...user,
+      ...toPublicIdentity(user),
       avatarUrl: resolvedAvatarUrl,
       followersCount,
       isPremium,

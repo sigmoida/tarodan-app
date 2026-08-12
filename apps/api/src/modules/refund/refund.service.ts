@@ -66,6 +66,11 @@ import {
   type RefundFinancialResultV2,
   type RefundFaultPartyV2,
 } from "./refund-financial-policy-v2";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+  toPublicIdentity,
+} from "../../common/helpers/public-identity";
 
 /**
  * Cayma (iade talep) penceresi — satıcı payout takvimiyle AYNI kaynaktan gelir
@@ -200,11 +205,18 @@ export class RefundService {
       .filter(Boolean);
   }
 
+  /**
+   * İade yanıtı iki tarafa da açıktır (alıcı ↔ satıcı): kullanıcı satırları
+   * herkese açık kimliğe indirgenir, ürün görselleri public URL'e çevrilir.
+   */
   private withResolvedImages<T extends Record<string, any>>(rr: T): T {
     const product = rr?.order?.product;
     if (product?.images) {
       product.images = this.toProductImageUrls(product.images);
     }
+    if (rr?.order?.buyer) rr.order.buyer = toPublicIdentity(rr.order.buyer);
+    if (rr?.order?.seller) rr.order.seller = toPublicIdentity(rr.order.seller);
+    if (rr?.requester) (rr as any).requester = toPublicIdentity(rr.requester);
     return rr;
   }
 
@@ -340,8 +352,8 @@ export class RefundService {
             select: {
               orderNumber: true,
               sellerId: true,
-              buyer: { select: { displayName: true } },
-              seller: { select: { displayName: true } },
+              buyer: { select: PUBLIC_NAME_SELECT },
+              seller: { select: PUBLIC_NAME_SELECT },
               product: { select: { title: true } },
             },
           },
@@ -355,8 +367,8 @@ export class RefundService {
         recipientId,
         templateKey,
         {
-          buyerName: rr.order?.buyer?.displayName ?? "",
-          sellerName: rr.order?.seller?.displayName ?? "",
+          buyerName: publicName(rr.order?.buyer),
+          sellerName: publicName(rr.order?.seller),
           orderNumber: rr.order?.orderNumber,
           orderId: rr.orderId,
           productTitle: rr.order?.product?.title ?? "",
@@ -1706,16 +1718,18 @@ export class RefundService {
       include: {
         order: {
           include: {
-            buyer: { select: { id: true, displayName: true, avatarUrl: true } },
+            buyer: {
+              select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
+            },
             seller: {
-              select: { id: true, displayName: true, avatarUrl: true },
+              select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
             },
             product: { select: { id: true, title: true, images: true } },
             shipment: true,
             payment: { select: { amount: true, currency: true, paidAt: true } },
           },
         },
-        requester: { select: { id: true, displayName: true } },
+        requester: { select: { id: true, ...PUBLIC_NAME_SELECT } },
       },
     });
     if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
@@ -1757,7 +1771,7 @@ export class RefundService {
             product: { select: { id: true, title: true, images: true } },
           },
         },
-        requester: { select: { id: true, displayName: true } },
+        requester: { select: { id: true, ...PUBLIC_NAME_SELECT } },
       },
     });
     return rows.map((rr) => this.withResolvedImages(rr));
