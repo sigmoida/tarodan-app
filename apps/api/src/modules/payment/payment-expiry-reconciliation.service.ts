@@ -6,7 +6,7 @@ import {
   PaymentHoldStatus,
   OrderStatus,
   OfferStatus,
-  ShipmentStatus,
+  RefundRequestStatus,
 } from "@prisma/client";
 import {
   getProductStatusFromQuantity,
@@ -22,21 +22,12 @@ import { EventService } from "../events";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { DiscountService } from "../discount/discount.service";
+import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "../refund/refund-active-statuses";
 
-// SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR. Bu
-// statüler poller tarafından gerçek kargo hareketiyle set edilir — böyle bir
-// siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı alır.
-// `pending`/`label_created` HARİÇ: yalnız barkod/etiket var ama kargoya verilmemiş
-// olabilir (immediate-barcode her ödemede etiket üretir) — onlar gerçek "göndermedi".
-const SHIPMENT_IN_MOTION_STATUSES: ShipmentStatus[] = [
-  ShipmentStatus.picked_up,
-  ShipmentStatus.in_transit,
-  ShipmentStatus.at_delivery_branch,
-  ShipmentStatus.out_for_delivery,
-  ShipmentStatus.delivered,
-  ShipmentStatus.return_in_progress,
-  ShipmentStatus.returned,
-];
+// SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR — böyle
+// bir siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı
+// alır. Tanım artık iptal kapılarıyla ORTAK: shipment-handover.ts.
 
 /**
  * Ödeme/sipariş süre-dolumu mutabakat süpürmeleri (cron). PaymentReconciliationService
@@ -378,11 +369,7 @@ export class PaymentExpiryReconciliationService {
             where: { orderId: order.id },
             select: { status: true, shippedAt: true },
           });
-          if (
-            shipment &&
-            (SHIPMENT_IN_MOTION_STATUSES.includes(shipment.status) ||
-              shipment.shippedAt !== null)
-          ) {
+          if (isShipmentHandedToCarrier(shipment)) {
             skippedInMotion = true;
             return;
           }
@@ -402,6 +389,27 @@ export class PaymentExpiryReconciliationService {
           await tx.paymentHold.updateMany({
             where: { orderId: order.id, status: PaymentHoldStatus.held },
             data: { status: PaymentHoldStatus.cancelled },
+          });
+
+          // İncelemede bekleyen alıcı iptal talebi varsa onu bu iptal DEVRALIR.
+          // Sonuç para açısından zaten talebin isteyeceğinden iyidir (satıcı
+          // kargolamadığı için kesintisiz TAM iade), ama talep kapatılmazsa
+          // aktif kalıyor: admin sonradan onaylamayı denediğinde kümülatif iade
+          // tavanına takılıp pending_review'a geri düşüyor ve sipariş sonsuza
+          // dek "açık iade" görünüyordu (payout guard'ları da bu satıra bakar).
+          const supersededAt = new Date();
+          await tx.refundRequest.updateMany({
+            where: {
+              orderId: order.id,
+              status: { in: ACTIVE_REFUND_REQUEST_STATUSES },
+            },
+            data: {
+              status: RefundRequestStatus.cancelled,
+              decidedAt: supersededAt,
+              decidedBy: "system",
+              sellerResponse:
+                "Satıcı süresinde kargolamadığı için sipariş otomatik iptal edildi ve tam iade yapıldı; talep bu iptalle kapatıldı.",
+            },
           });
 
           // Ledger: Senaryo A — komisyon waived (Faz 3B.7).

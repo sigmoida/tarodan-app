@@ -3,6 +3,7 @@ import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./payment-metadata.types";
 import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
+import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 
 export interface ShipmentCancellationResult {
   ok: boolean;
@@ -66,7 +67,22 @@ export class PaymentCommonService {
         );
       }
 
+      /**
+       * #86 durum makinesi: HAREKET EDEN koli yerelde `cancelled` YAPILMAZ.
+       * `cancelled` terminaldir; poller terminal satırı aday kümesinden
+       * eler, böylece gerçek teslim/dönüş bir daha hiç kaydedilemez ve
+       * admin'in elle-teslim kurtarma ucu da çalışamaz hale gelirdi
+       * (kargo `delivered`'a geçemediği için). Taşıyıcı gerçeği korunur;
+       * sipariş iptali zaten order.status'te izlenir ve teslim handler'ı
+       * iptal edilmiş siparişi ilerletmez.
+       */
       const markLocalCancelled = async (was: string) => {
+        if (!canTransitionShipmentStatus(shipment.status, "cancelled" as any)) {
+          this.logger.log(
+            `Surat local cancel skipped for order ${orderNumber}: shipment in motion (${was}) — carrier truth preserved`,
+          );
+          return;
+        }
         await this.prisma.shipment.update({
           where: { id: shipment.id },
           data: { status: "cancelled" as any },
@@ -111,6 +127,14 @@ export class PaymentCommonService {
             previousStatus: shipment.status,
           },
           updateLocal: async (tx) => {
+            // Aynı kural: hareket eden koliyi terminal `cancelled`'a çekme —
+            // taşıyıcı iptal görevi zaten oluşturuldu, fiziksel sonucu poller
+            // yazacak (teslim edildi / göndericiye döndü).
+            if (
+              !canTransitionShipmentStatus(shipment.status, "cancelled" as any)
+            ) {
+              return;
+            }
             await tx.shipment.update({
               where: { id: shipment.id },
               data: { status: "cancelled" as any },
