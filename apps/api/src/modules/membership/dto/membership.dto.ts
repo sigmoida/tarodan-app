@@ -148,7 +148,9 @@ export class CreateMembershipTierDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  featuredListingSlots: number;
+  @IsOptional()
+  /** DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı; değer yazılsa da okunmaz. */
+  featuredListingSlots?: number;
 }
 
 export class MembershipTierResponseDto {
@@ -168,7 +170,8 @@ export class MembershipTierResponseDto {
    * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
    */
   isAdFree?: boolean;
-  featuredListingSlots: number;
+  /** DEVRE DIŞI (isAdFree gibi): yeni yanıtlarda doldurulmaz, hiçbir yerde okunmaz. */
+  featuredListingSlots?: number;
   isActive: boolean;
 }
 
@@ -199,10 +202,12 @@ export class UserMembershipResponseDto {
   // Computed usage stats
   usedFreeListings: number;
   usedTotalListings: number;
-  usedFeaturedSlots: number;
+  /** DEVRE DIŞI: hep 0'dı; yeni yanıtlarda doldurulmaz. */
+  usedFeaturedSlots?: number;
   remainingFreeListings: number;
   remainingTotalListings: number;
-  remainingFeaturedSlots: number;
+  /** DEVRE DIŞI: yeni yanıtlarda doldurulmaz. */
+  remainingFeaturedSlots?: number;
 }
 
 export class MembershipLimitsDto {
@@ -220,7 +225,8 @@ export class MembershipLimitsDto {
   maxTotalListings: number; // Total max listings for tier
   remainingFreeListings: number;
   remainingTotalListings: number;
-  remainingFeaturedSlots: number;
+  /** DEVRE DIŞI: yeni yanıtlarda doldurulmaz. */
+  remainingFeaturedSlots?: number;
   tierName: string;
   tierType: MembershipTierType;
 }

@@ -316,6 +316,10 @@ export class SearchProductService {
             ]
           : [
               { relevanceScore: "desc" },
+              // Sorgusuz ES gezinmesinde (ör. indirim rayı) de LIFO korunur:
+              // aynı relevanceScore'daki boost'lular en-son-alan-önde sıralanır.
+              // PG browse ile aynı kural — indirim rayında LIFO uygulanmıyordu.
+              { boostedAt: { order: "desc", missing: "_last" } },
               { viewCount: "desc" },
               { createdAt: "desc" },
             ];

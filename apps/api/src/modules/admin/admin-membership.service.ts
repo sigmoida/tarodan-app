@@ -48,7 +48,6 @@ export class AdminMembershipService {
         canCreateCollections: t.canCreateCollections,
         canTrade: t.canTrade,
         isAdFree: t.isAdFree,
-        featuredListingSlots: t.featuredListingSlots,
         isActive: t.isActive,
         sortOrder: t.sortOrder,
         userCount: t._count.userMemberships,

@@ -4,7 +4,12 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
-import { ProductKind, ProductStatus, MembershipTierType } from "@prisma/client";
+import {
+  Prisma,
+  ProductKind,
+  ProductStatus,
+  MembershipTierType,
+} from "@prisma/client";
 import { computeQualityScore } from "./helpers/quality-score";
 import { computeRelevanceScore } from "./helpers/relevance-score";
 import { NotificationService } from "../notification/notification.service";
@@ -596,14 +601,14 @@ export class ProductSchedulerService implements OnModuleInit {
       // Yalnız gerçek ilanlar: membership/boost sanal ürünleri (kind != listing)
       // yaşam süresine tabi değildir — eskiden onlar da 60 günde kapanıp
       // platform hesabına "ilanınız sona erdi" e-postası tetikliyordu.
-      const expiryWhere = {
+      const expiryWhere: Prisma.ProductWhereInput = {
         status: ProductStatus.active,
         kind: ProductKind.listing,
         OR: [
           { publishedAt: { lt: expiryDate } },
           { publishedAt: null, createdAt: { lt: expiryDate } },
         ],
-      } as const;
+      };
 
       // Bu turda dolacak ilanları, satıcıya "ilanınız sona erdi" e-postası
       // gönderebilmek için updateMany'den ÖNCE topla (updateMany etkilenen

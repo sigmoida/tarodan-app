@@ -15,6 +15,8 @@ describe("AdminModerationService event list", () => {
       { moderationEvent, user } as any,
       {} as any,
       {} as any,
+      // adminProduct — kanonik onay/red delegasyonu (bu spec'in konusu değil)
+      { approveProduct: jest.fn(), rejectProduct: jest.fn() } as any,
       undefined as any,
     );
 
@@ -59,6 +61,8 @@ describe("AdminModerationService event list", () => {
       { moderationEvent, user } as any,
       {} as any,
       {} as any,
+      // adminProduct — kanonik onay/red delegasyonu (bu spec'in konusu değil)
+      { approveProduct: jest.fn(), rejectProduct: jest.fn() } as any,
       undefined as any,
     );
 

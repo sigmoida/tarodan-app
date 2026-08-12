@@ -8,7 +8,7 @@ export interface MembershipTier {
   maxImagesPerListing: number;
   canTrade: boolean;
   canCreateCollections: boolean;
-  featuredListingSlots: number;
+  // featuredListingSlots kaldırıldı: öne çıkarmayı ücretli paketler devraldı.
   // isAdFree kaldırıldı: banner'lar herkese gösterilir (avantaj devre dışı).
 }
 

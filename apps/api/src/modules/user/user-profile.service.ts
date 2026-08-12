@@ -179,7 +179,7 @@ export class UserProfileService {
       maxImagesPerListing: effectiveTier.maxImagesPerListing,
       canCreateCollections: effectiveTier.canCreateCollections,
       canTrade: effectiveTier.canTrade,
-      featuredListingSlots: effectiveTier.featuredListingSlots,
+      // featuredListingSlots kaldırıldı: ücretli öne çıkarma paketleri devraldı.
     };
     const membershipInfo = user.membership
       ? {

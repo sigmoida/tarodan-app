@@ -251,9 +251,6 @@ export class MembershipCommonService {
       },
     });
 
-    // Count featured listings (placeholder - would need featured flag on product)
-    const featuredListings = 0;
-
     // Limitler DOĞRUDAN katman satırından gelir — tek kaynak MembershipTier.
     // Buradaki eski platform-ayarı override zinciri kaldırıldı (basic dalı da
     // yoktu, yani ayar ile davranış zaten çelişiyordu).
@@ -263,21 +260,17 @@ export class MembershipCommonService {
     // Calculate remaining
     const usedFreeListings = Math.min(activeListings, maxFreeListings);
     const usedTotalListings = activeListings;
-    const usedFeaturedSlots = featuredListings;
 
     return {
       usedFreeListings,
       usedTotalListings,
-      usedFeaturedSlots,
       remainingFreeListings: Math.max(0, maxFreeListings - usedFreeListings),
       remainingTotalListings:
         maxTotalListings === -1
           ? -1 // Unlimited
           : Math.max(0, maxTotalListings - usedTotalListings),
-      remainingFeaturedSlots: Math.max(
-        0,
-        tier.featuredListingSlots - usedFeaturedSlots,
-      ),
+      // featured-slot alanları kaldırıldı: özellik hiç uygulanmadı (sayaç hep
+      // 0'dı) ve öne çıkarmayı ücretli paketler devraldı.
     };
   }
 
@@ -294,8 +287,8 @@ export class MembershipCommonService {
       maxImagesPerListing: tier.maxImagesPerListing,
       canCreateCollections: tier.canCreateCollections,
       canTrade: tier.canTrade,
-      isAdFree: tier.isAdFree,
-      featuredListingSlots: tier.featuredListingSlots,
+      // isAdFree + featuredListingSlots DEVRE DIŞI: banner herkese gösterilir,
+      // öne çıkarmayı ücretli paketler devraldı — vaat edilmez, dönülmez.
       isActive: tier.isActive,
     };
   }

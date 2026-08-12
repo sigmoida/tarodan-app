@@ -39,7 +39,13 @@ describe("AdminFinanceService.getFinanceOverview", () => {
           },
         }),
       },
-      order: { count: jest.fn().mockResolvedValue(4) }, // faturasız teslimat
+      order: {
+        count: jest.fn().mockResolvedValue(4), // faturasız teslimat
+        // Boost (BST-) ciro toplamı — bu spec'in konusu değil, 0 döner.
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _sum: { totalAmount: 0 }, _count: { id: 0 } }),
+      },
       elogoInvoice: { count: jest.fn().mockResolvedValue(1) }, // tükenen
       // Dönemin GERÇEK PSP kesintisi: defterdeki psp_fee debit toplamı
       // (PayTR ekstresinden eşleştirilip yazılır) — tahmini oran DEĞİL.

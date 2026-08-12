@@ -117,7 +117,6 @@ export class MembershipService {
         maxTotalListings,
         remainingFreeListings: membership.remainingFreeListings, // Already calculated correctly by getUserUsageStats
         remainingTotalListings: membership.remainingTotalListings, // Already calculated correctly by getUserUsageStats
-        remainingFeaturedSlots: membership.remainingFeaturedSlots,
         tierName: membership.tier.name,
         tierType: membership.tier.type,
       };
