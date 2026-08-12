@@ -184,4 +184,25 @@ describe("validateCoupon — hedef kitle, bütçe ve hedef kalem", () => {
     expect(result.discount?.estimatedDiscount).toBe(100);
     expect(result.discount?.target).toBe(DiscountTarget.product_price);
   });
+
+  it("kişi-başı limitsiz + herkese açık kod M İ S A F İ R D E çalışır", async () => {
+    // usageLimitPerUser=null: giriş şartı yok — misafirin kullanabildiği tek
+    // kod türü budur (Ç3 kararı).
+    const service = makeService({ usageLimitPerUser: null });
+
+    const result = await validate(service, null);
+
+    expect(result.isValid).toBe(true);
+  });
+
+  it("kişi-başı limitli kod misafirde giriş ister", async () => {
+    const service = makeService({ usageLimitPerUser: 1 });
+
+    const result = await validate(service, null);
+
+    expect(result).toEqual({
+      isValid: false,
+      error: "Bu kupon için giriş yapmanız gerekir",
+    });
+  });
 });

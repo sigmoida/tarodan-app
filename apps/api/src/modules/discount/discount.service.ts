@@ -149,6 +149,15 @@ export class DiscountService {
       userIds: dto.targetUserIds,
     });
 
+    // Limitsiz (kişi-başı limitsiz) kod yalnız kitlesi HERKES olan kampanyada
+    // tanımlanabilir: misafirler ancak böyle bir kodu kullanabilir, kimlik
+    // gerektiren kitlede ise limitsizlik kişi-başı denetimi anlamsız kılar.
+    if (dto.usageLimitPerUser === 0 && audience !== DiscountAudience.everyone) {
+      throw new BadRequestException(
+        "Kişi başı limitsiz kod yalnız 'herkes' kitlesinde tanımlanabilir",
+      );
+    }
+
     // Sellers can only create discounts for their own products
     if (!isAdmin && dto.scope === DiscountScope.global) {
       throw new ForbiddenException("Satıcılar global indirim oluşturamazlar");
@@ -225,7 +234,10 @@ export class DiscountService {
           ? new Prisma.Decimal(dto.maxDiscountAmount)
           : null,
         usageLimitTotal: dto.usageLimitTotal || null,
-        usageLimitPerUser: dto.usageLimitPerUser || 1,
+        // 0 = bilinçli limitsiz (null): misafirlerin kullanabildiği tek kod türü.
+        // Varsayılan 1 — limitsizlik ancak açıkça istenirse.
+        usageLimitPerUser:
+          dto.usageLimitPerUser === 0 ? null : dto.usageLimitPerUser || 1,
         minQuantity: dto.minQuantity || null,
         buyQuantity: dto.buyQuantity || null,
         getQuantity: dto.getQuantity || null,
@@ -342,6 +354,20 @@ export class DiscountService {
       });
     }
 
+    // Limitsiz kod kuralı düzenlemede de geçerli (create ile aynı gerekçe).
+    const nextPerUserLimit =
+      dto.usageLimitPerUser !== undefined
+        ? dto.usageLimitPerUser
+        : discount.usageLimitPerUser;
+    if (
+      (nextPerUserLimit === 0 || nextPerUserLimit === null) &&
+      nextAudience !== DiscountAudience.everyone
+    ) {
+      throw new BadRequestException(
+        "Kişi başı limitsiz kod yalnız 'herkes' kitlesinde tanımlanabilir",
+      );
+    }
+
     // Check code uniqueness if changing
     if (dto.code && dto.code !== discount.code) {
       const existing = await this.prisma.discount.findUnique({
@@ -395,7 +421,10 @@ export class DiscountService {
         usageLimitTotal: dto.usageLimitTotal,
       }),
       ...(dto.usageLimitPerUser !== undefined && {
-        usageLimitPerUser: dto.usageLimitPerUser,
+        // 0 = bilinçli limitsiz (null) — yalnız 'herkes' kitlesinde (yukarıda
+        // doğrulandı); misafirlerin kullanabildiği tek kod türü.
+        usageLimitPerUser:
+          dto.usageLimitPerUser === 0 ? null : dto.usageLimitPerUser,
       }),
       ...(dto.minQuantity !== undefined && {
         minQuantity: dto.minQuantity,

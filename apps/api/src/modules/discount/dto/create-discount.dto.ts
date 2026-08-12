@@ -138,12 +138,14 @@ export class CreateDiscountDto {
   usageLimitTotal?: number;
 
   @ApiPropertyOptional({
-    description: "Kullanıcı başı kullanım limiti",
+    description:
+      "Kullanıcı başı kullanım limiti. 0 = limitsiz (yalnız kitlesi 'herkes' " +
+      "olan kampanyada; misafirler ancak limitsiz kodu kullanabilir).",
     default: 1,
   })
   @IsOptional()
   @IsNumber()
-  @Min(1)
+  @Min(0)
   @Type(() => Number)
   usageLimitPerUser?: number;
 

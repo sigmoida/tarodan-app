@@ -24,7 +24,8 @@ export interface Discount {
   getQuantity: number | null;
   maxDiscountAmount: number | null;
   usageLimitTotal: number | null;
-  usageLimitPerUser: number;
+  /** null = kişi-başı limitsiz (misafirler yalnız böyle kodu kullanabilir). */
+  usageLimitPerUser: number | null;
   usedCount: number;
   isStackable: boolean;
   priority: number;

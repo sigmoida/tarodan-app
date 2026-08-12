@@ -84,7 +84,8 @@ function toDefaults(d?: Discount): DiscountFormValues {
     getQuantity: d.getQuantity?.toString() ?? "",
     maxDiscountAmount: d.maxDiscountAmount?.toString() ?? "",
     usageLimitTotal: d.usageLimitTotal?.toString() ?? "",
-    usageLimitPerUser: d.usageLimitPerUser.toString(),
+    // null = limitsiz; formda 0 olarak temsil edilir (API sözleşmesi: 0 = limitsiz).
+    usageLimitPerUser: (d.usageLimitPerUser ?? 0).toString(),
     isStackable: d.isStackable,
     isActive: d.isActive,
     isFlashSale: d.isFlashSale,
@@ -113,7 +114,12 @@ function toPayload(v: DiscountFormValues) {
     usageLimitTotal: v.usageLimitTotal
       ? parseInt(v.usageLimitTotal)
       : undefined,
-    usageLimitPerUser: parseInt(v.usageLimitPerUser) || 1,
+    // 0 = kişi-başı limitsiz (yalnız 'herkes' kitlesinde; misafirler ancak
+    // limitsiz kodu kullanabilir). Boş bırakılırsa varsayılan 1.
+    usageLimitPerUser:
+      v.usageLimitPerUser.trim() === ""
+        ? 1
+        : parseInt(v.usageLimitPerUser) || 0,
     isStackable: v.isStackable,
     priority: 0,
     isActive: v.isActive,
@@ -372,9 +378,9 @@ export function DiscountFormModal({
         <FormInput
           name="usageLimitPerUser"
           type="number"
-          min="1"
+          min="0"
           label={t("admin.marketing.discounts.perUserLimit")}
-          placeholder="1"
+          placeholder={t("admin.marketing.discounts.perUserLimitPlaceholder")}
         />
       </div>
 

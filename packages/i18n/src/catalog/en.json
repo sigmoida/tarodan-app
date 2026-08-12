@@ -3593,6 +3593,7 @@
         "fiveHundredExample": "E.g. 500",
         "totalUsageLimit": "Total Usage Limit",
         "perUserLimit": "Per-User Limit",
+        "perUserLimitPlaceholder": "0 = unlimited (guests can only use unlimited codes)",
         "unlimited": "Unlimited",
         "startDate": "Start Date",
         "endDate": "End Date",

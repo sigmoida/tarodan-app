@@ -3593,6 +3593,7 @@
         "fiveHundredExample": "Örn: 500",
         "totalUsageLimit": "Toplam Kullanım Limiti",
         "perUserLimit": "Kullanıcı Başı Limit",
+        "perUserLimitPlaceholder": "0 = limitsiz (misafirler yalnız limitsiz kodu kullanabilir)",
         "unlimited": "Sınırsız",
         "startDate": "Başlangıç Tarihi",
         "endDate": "Bitiş Tarihi",
