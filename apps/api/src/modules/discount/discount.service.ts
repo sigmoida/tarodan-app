@@ -44,6 +44,12 @@ import { isProductInDiscountScope } from "./discount-scope";
 import { FeeDiscountResolver } from "./fee-discount.resolver";
 
 /**
+ * Kusursuz alıcıya iade edilen kupon, kampanya bittiyse koda özel bu kadar gün
+ * daha yaşar (indirim-teknik §9).
+ */
+const COUPON_REISSUE_DAYS = 30;
+
+/**
  * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
  * logic (they fall through to the flat fixed-amount branch → mispricing). Reject them
  * at create/update until proper buy-X-get-Y / quantity-tier support exists (F4.2).
@@ -641,6 +647,7 @@ export class DiscountService {
     // DiscountCode tablosuna bak → parent Discount kuralları geçerli, ek olarak
     // kod tek kullanımlıktır (isRedeemed).
     let voucherCodeId: string | undefined;
+    let voucherHasOwnWindow = false;
     if (!discount) {
       const voucher = await this.prisma.discountCode.findUnique({
         where: { code },
@@ -654,6 +661,14 @@ export class DiscountService {
       }
       discount = voucher.discount;
       voucherCodeId = voucher.id;
+      // Koda özel süre varsa kampanyanın tarih penceresi yerine O geçerlidir:
+      // kusursuz alıcıya iade edilen kupon, kampanya bitmiş olsa da yaşar.
+      if (voucher.expiresAt) {
+        if (new Date() > voucher.expiresAt) {
+          return { isValid: false, error: "Bu kuponun süresi doldu" };
+        }
+        voucherHasOwnWindow = true;
+      }
     }
 
     if (!discount.isActive) {
@@ -661,12 +676,14 @@ export class DiscountService {
     }
 
     const now = new Date();
-    if (now < discount.startDate) {
-      return { isValid: false, error: "Bu kupon henüz başlamadı" };
-    }
+    if (!voucherHasOwnWindow) {
+      if (now < discount.startDate) {
+        return { isValid: false, error: "Bu kupon henüz başlamadı" };
+      }
 
-    if (now > discount.endDate) {
-      return { isValid: false, error: "Bu kuponun süresi doldu" };
+      if (now > discount.endDate) {
+        return { isValid: false, error: "Bu kuponun süresi doldu" };
+      }
     }
 
     // Hedef kitle: kimlik gerektiren bir hedefte misafir kabul edilemez (kimin
@@ -749,7 +766,8 @@ export class DiscountService {
         };
       }
       const userUsageCount = await this.prisma.discountUsage.count({
-        where: { discountId: discount.id, userId },
+        // İptal edilmiş (geri verilmiş) kullanım kotayı işgal etmez.
+        where: { discountId: discount.id, userId, revokedAt: null },
       });
       const userReservationCount = await this.prisma.couponReservation.count({
         where: {
@@ -1115,6 +1133,109 @@ export class DiscountService {
     }
   }
 
+  /**
+   * Kusursuz alıcıya kuponu GERİ VERİR.
+   *
+   * Kullanım kaydı silinmez, iptal işareti alır (denetim izi kalır) ve kotadan
+   * düşer. Kampanyanın toplam sayacı ile bütçesi geri açılır. Tek-kullanımlık kod
+   * yeniden kullanılabilir hale gelir; kampanya bu arada sona ermişse koda ÖZEL
+   * 30 günlük bir süre tanınır (kampanyanın tarihi herkes için değişmez).
+   * Paylaşımlı kodlu kampanyada süre bittiyse kullanıcıya tek-kullanımlık yeni
+   * bir kod üretilir.
+   */
+  async revokeUsageForOrders(
+    orderIds: string[],
+    reason: string,
+    client?: Prisma.TransactionClient,
+  ): Promise<{ revoked: number; reissuedCodes: string[] }> {
+    if (!orderIds.length) return { revoked: 0, reissuedCodes: [] };
+
+    const run = async (
+      tx: Prisma.TransactionClient,
+    ): Promise<{ revoked: number; reissuedCodes: string[] }> => {
+      const usages = await tx.discountUsage.findMany({
+        where: { orderId: { in: orderIds }, revokedAt: null },
+        select: {
+          id: true,
+          discountId: true,
+          userId: true,
+          orderId: true,
+          amount: true,
+          discount: {
+            select: { id: true, code: true, endDate: true, isActive: true },
+          },
+        },
+      });
+      if (!usages.length) return { revoked: 0, reissuedCodes: [] };
+
+      const now = new Date();
+      const reissuedCodes: string[] = [];
+
+      for (const usage of usages) {
+        const marked = await tx.discountUsage.updateMany({
+          where: { id: usage.id, revokedAt: null },
+          data: { revokedAt: now, revokeReason: reason },
+        });
+        if (marked.count === 0) continue;
+
+        // Toplam sayaç geri açılır (negatife düşmeden).
+        await tx.$executeRaw`
+          UPDATE discounts
+          SET used_count = GREATEST(used_count - 1, 0), updated_at = NOW()
+          WHERE id = ${usage.discountId}
+        `;
+        await this.feeDiscountBudget?.releaseBudget(
+          [{ discountId: usage.discountId, amount: Number(usage.amount) }],
+          tx,
+        );
+
+        const campaignOver =
+          !usage.discount.isActive || now > usage.discount.endDate;
+        const personalWindow = campaignOver
+          ? new Date(now.getTime() + COUPON_REISSUE_DAYS * 24 * 60 * 60 * 1000)
+          : null;
+
+        // Bu siparişte harcanmış tek-kullanımlık kod varsa onu geri aç.
+        const voucher = await tx.discountCode.findFirst({
+          where: { discountId: usage.discountId, orderId: usage.orderId },
+          select: { id: true, code: true },
+        });
+        if (voucher) {
+          await tx.discountCode.update({
+            where: { id: voucher.id },
+            data: {
+              isRedeemed: false,
+              redeemedById: null,
+              redeemedAt: null,
+              orderId: null,
+              ...(personalWindow ? { expiresAt: personalWindow } : {}),
+            },
+          });
+          reissuedCodes.push(voucher.code);
+          continue;
+        }
+
+        // Paylaşımlı kodlu kampanya bitmişse hak, kişiye özel yeni bir kodla
+        // yaşatılır — aksi halde "geri verildi" dediğimiz hak kullanılamazdı.
+        if (campaignOver && personalWindow) {
+          const code = generateReferenceCode(REFERENCE_PREFIX.voucher);
+          await tx.discountCode.create({
+            data: {
+              discountId: usage.discountId,
+              code,
+              expiresAt: personalWindow,
+            },
+          });
+          reissuedCodes.push(code);
+        }
+      }
+
+      return { revoked: usages.length, reissuedCodes };
+    };
+
+    return client ? run(client) : this.prisma.$transaction(run);
+  }
+
   /** Release pending-payment reservations without changing real usage. */
   async releaseReservedUsageForOrders(
     orderIds: string[],
@@ -1216,7 +1337,7 @@ export class DiscountService {
       });
       if (perUser?.usageLimitPerUser) {
         const userUsage = await tx.discountUsage.count({
-          where: { discountId, userId },
+          where: { discountId, userId, revokedAt: null },
         });
         if (userUsage >= perUser.usageLimitPerUser) {
           throw new BadRequestException("Bu kuponu zaten kullandınız");

@@ -404,6 +404,13 @@ export class PaymentExpiryReconciliationService {
             data: { status: PaymentHoldStatus.cancelled },
           });
 
+          // Kusur satıcıda: alıcının kupon hakkı yanmaz, geri verilir.
+          await this.discountService
+            ?.revokeUsageForOrders([order.id], "cancel:seller_no_ship", tx)
+            .catch((error) =>
+              this.logger.warn(`kupon iadesi başarısız: ${error}`),
+            );
+
           // İncelemede bekleyen alıcı iptal talebi varsa onu bu iptal DEVRALIR.
           // Sonuç para açısından zaten talebin isteyeceğinden iyidir (satıcı
           // kargolamadığı için kesintisiz TAM iade), ama talep kapatılmazsa

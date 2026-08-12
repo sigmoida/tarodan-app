@@ -26,6 +26,9 @@ import {
   ShippingPackageTierCode,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { couponSurvivesFault } from "../discount/coupon-restore-policy";
+import type { CouponFaultParty } from "../discount/coupon-restore-policy";
+import { DiscountService } from "../discount/discount.service";
 import {
   PAYMENT_CONFIG_KEYS,
   envConfigNumber,
@@ -118,6 +121,8 @@ export class RefundService {
     private readonly storageService: StorageService,
     @Optional()
     private readonly shippingTariffService?: ShippingTariffService,
+    @Optional()
+    private readonly discountService?: DiscountService,
   ) {}
 
   /** Production rollout is opt-in; tests/development exercise v2 by default. */
@@ -1206,6 +1211,20 @@ export class RefundService {
         throw new ConflictException(
           "İade kararı başka bir işlem tarafından kesinleştirildi",
         );
+      }
+
+      // Kusursuz alıcının kuponu geri verilir (kusur satıcıda/kargoda/platformda).
+      // Alıcı kaynaklı iadede hak harcanmış sayılır.
+      if (couponSurvivesFault(decision.faultParty as CouponFaultParty)) {
+        await this.discountService
+          ?.revokeUsageForOrders(
+            [current.orderId],
+            `refund:${decision.resolvedReason}:${decision.faultParty}`,
+            tx,
+          )
+          .catch((error) =>
+            this.logger.warn(`kupon iadesi başarısız: ${error}`),
+          );
       }
 
       await tx.refundFinancialComponent.createMany({

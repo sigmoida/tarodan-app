@@ -71,3 +71,7 @@ ALTER TABLE "orders"
   ADD COLUMN "buyer_fee_discount_amount" DECIMAL(10,2) NOT NULL DEFAULT 0,
   ADD COLUMN "seller_fee_discount_amount" DECIMAL(10,2) NOT NULL DEFAULT 0,
   ADD COLUMN "fee_discount_breakdown" JSONB;
+
+-- Koda özel son kullanma tarihi: kusursuz alıcıya iade edilen kupon, kampanya
+-- bitmiş olsa bile 30 gün daha yaşar (kampanyanın tarihi herkes için değişmez).
+ALTER TABLE "discount_codes" ADD COLUMN "expires_at" TIMESTAMP(3);

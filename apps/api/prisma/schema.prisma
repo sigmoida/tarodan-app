@@ -3001,6 +3001,10 @@ model DiscountCode {
   id           String              @id @default(uuid())
   discountId   String              @map("discount_id")
   code         String              @unique
+  /// Koda ÖZEL son kullanma tarihi. Kusursuz alıcıya kupon geri verilirken
+  /// kampanya sona ermişse kod bu alanla 30 gün daha yaşar; boşsa kampanyanın
+  /// kendi tarih penceresi geçerlidir.
+  expiresAt    DateTime?           @map("expires_at")
   isRedeemed   Boolean             @default(false) @map("is_redeemed")
   redeemedById String?             @map("redeemed_by_id")
   redeemedAt   DateTime?           @map("redeemed_at")
