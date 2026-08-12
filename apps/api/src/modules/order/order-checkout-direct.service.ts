@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
@@ -28,6 +29,7 @@ import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderFeeDiscountService } from "./order-fee-discount.service";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
@@ -60,6 +62,8 @@ export class OrderCheckoutDirectService {
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly group: OrderCheckoutGroupService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
 
   /**
@@ -378,7 +382,7 @@ export class OrderCheckoutDirectService {
 
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on discounted product price, not including shipping
-      const commissionResult = await this.orderPricing.calculateCommission(
+      const rawCommissionResult = await this.orderPricing.calculateCommission(
         discountedPrice,
         product.sellerId,
         product.categoryId,
@@ -391,14 +395,38 @@ export class OrderCheckoutDirectService {
       // alıcı/satıcı bölüşümü. Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
       const {
         fullShipping,
-        buyer: buyerShippingAmount,
-        seller: sellerShippingAmount,
+        buyer: rawBuyerShippingAmount,
+        seller: rawSellerShippingAmount,
       } = this.orderPricing.resolveShippingDecision({
         tariff: shippingTariff.tariff,
         subtotal: discountedPrice,
         billableDesi: product.shippingDesi,
-        lineShares: [commissionResult.shippingBuyerShares],
+        lineShares: [rawCommissionResult.shippingBuyerShares],
       });
+
+      // Platformun bedel kampanyaları: KDV'den ÖNCE uygulanır (bedel inince
+      // matrahı da iner) ve kesinti kalemlerinin kendisine yazılır.
+      const feeDiscounted = (await this.feeDiscounts?.apply({
+        context: {
+          productId: product.id,
+          categoryId: product.categoryId,
+          sellerId: product.sellerId,
+          buyerId,
+        },
+        commission: rawCommissionResult,
+        buyerShippingAmount: rawBuyerShippingAmount,
+        sellerShippingAmount: rawSellerShippingAmount,
+      })) ?? {
+        commission: rawCommissionResult,
+        buyerShippingAmount: rawBuyerShippingAmount,
+        sellerShippingAmount: rawSellerShippingAmount,
+        applied: [],
+        buyerTotal: 0,
+        sellerTotal: 0,
+      };
+      const commissionResult = feeDiscounted.commission;
+      const buyerShippingAmount = feeDiscounted.buyerShippingAmount;
+      const sellerShippingAmount = feeDiscounted.sellerShippingAmount;
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
       // Vergiler: ürün KDV'si (politikayla kapalı), hizmet KDV'si (iki taraf) ve stopaj.
       const {
@@ -555,6 +583,11 @@ export class OrderCheckoutDirectService {
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           buyerShippingAmount,
           sellerShippingAmount,
+          buyerFeeDiscountAmount: feeDiscounted.buyerTotal,
+          sellerFeeDiscountAmount: feeDiscounted.sellerTotal,
+          feeDiscountBreakdown: feeDiscounted.applied.length
+            ? (feeDiscounted.applied as unknown as Prisma.InputJsonValue)
+            : undefined,
           financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
             pricingHash: dto.expectedPricingHash,
             productId: dto.productId,

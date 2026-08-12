@@ -5,6 +5,7 @@ import {
   ConflictException,
   ServiceUnavailableException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
@@ -46,6 +47,7 @@ import { buyerTotalOf } from "./order-total.helper";
 import { sellerNetAmountOf } from "./order-net.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
+import { OrderFeeDiscountService } from "./order-fee-discount.service";
 
 /**
  * Commission calculation result interface
@@ -104,6 +106,8 @@ export class OrderPricingService {
     private readonly shippingTariffs: ShippingTariffService,
     private readonly discountService: DiscountService,
     private readonly taxPolicy: OrderTaxPolicyService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
 
   /**
@@ -508,12 +512,20 @@ export class OrderPricingService {
     const commissionRuleSet = await this.resolveCommissionRuleSetSnapshot();
     const pinnedRuleSetId = commissionRuleSet.id;
 
+    // Bedel kampanyaları TEK kez yüklenir (satır başına sorgu yok) ve önizleme
+    // tahsilatla aynı listeyi görür.
+    const feeCampaigns = (await this.feeDiscounts?.preload()) ?? [];
+    const sellerLeadProduct = new Map<string, string>();
+    const sellerLeadCategory = new Map<string, string | null>();
+    const buyerTier =
+      (await this.feeDiscounts?.resolveBuyerTier(userId)) ?? null;
+
     // Pass 2: satır ücretleri İNDİRİMLİ baz üzerinden (create yolu ile birebir).
     for (const line of lines) {
       const { product, quantity, unitPrice, lineSubtotal } = line;
       const discountedLine = Math.max(0, lineSubtotal - line.couponDiscount);
 
-      const commissionResult = await this.calculateCommission(
+      const rawCommissionResult = await this.calculateCommission(
         discountedLine,
         product.sellerId,
         product.categoryId,
@@ -521,6 +533,25 @@ export class OrderPricingService {
         quantity > 0 ? discountedLine / quantity : discountedLine,
         product.id,
       );
+      // Komisyon/hizmet bedeli kampanyaları satır bazında; kargo kampanyası
+      // aşağıda PAKET kararından sonra uygulanır (kargo satırın değil paketin).
+      const commissionResult =
+        (
+          await this.feeDiscounts?.apply({
+            context: {
+              productId: product.id,
+              categoryId: product.categoryId,
+              sellerId: product.sellerId,
+              buyerId: userId,
+              buyerTier,
+              quantity,
+            },
+            commission: rawCommissionResult,
+            buyerShippingAmount: 0,
+            sellerShippingAmount: 0,
+            preloaded: feeCampaigns,
+          })
+        )?.commission ?? rawCommissionResult;
 
       // Paket payı satır sırasından BAĞIMSIZ olmalı ve paketin KADEMESİNE göre
       // seçilmeli: satırın üç kademelik pay haritasını topla, kademe çözüldükten
@@ -560,6 +591,12 @@ export class OrderPricingService {
       const desiLines = sellerDesiLines.get(product.sellerId) ?? [];
       desiLines.push({ shippingDesi: product.shippingDesi, quantity });
       sellerDesiLines.set(product.sellerId, desiLines);
+      // Kargo kampanyasının kapsam eşleşmesi paketin İLK satırından okunur:
+      // koli tek bedel taşır, satır bazında kargo indirimi anlamsızdır.
+      if (!sellerLeadProduct.has(product.sellerId)) {
+        sellerLeadProduct.set(product.sellerId, product.id);
+        sellerLeadCategory.set(product.sellerId, product.categoryId ?? null);
+      }
 
       quoteItems.push({
         productId: product.id,
@@ -584,8 +621,8 @@ export class OrderPricingService {
         calculatePackageDesi(packageLines),
       ]),
     );
-    const shippingBySeller = [...sellerSubtotals.entries()].map(
-      ([sellerId, subtotal]) => {
+    const shippingBySeller = await Promise.all(
+      [...sellerSubtotals.entries()].map(async ([sellerId, subtotal]) => {
         const billableDesi = sellerDesi.get(sellerId) ?? 1;
         const decision = this.resolveShippingDecision({
           tariff: shippingTariff.tariff,
@@ -593,15 +630,32 @@ export class OrderPricingService {
           billableDesi,
           lineShares: sellerShippingShareLines.get(sellerId) ?? [],
         });
+        // Kargo kampanyası PAKET kararından sonra uygulanır: kargo satırın değil
+        // kolinin bedelidir (ücretsiz kargo eşiği de aynı kararın parçasıdır).
+        const shippingDiscounted = (await this.feeDiscounts?.applyShipping({
+          context: {
+            productId: sellerLeadProduct.get(sellerId) ?? "",
+            categoryId: sellerLeadCategory.get(sellerId) ?? null,
+            sellerId,
+            buyerId: userId,
+            buyerTier,
+          },
+          buyerShippingAmount: decision.buyer,
+          sellerShippingAmount: decision.seller,
+          preloaded: feeCampaigns,
+        })) ?? {
+          buyerShippingAmount: decision.buyer,
+          sellerShippingAmount: decision.seller,
+        };
         return {
           sellerId,
           // Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
-          shippingCost: decision.buyer,
-          sellerShippingCost: decision.seller,
+          shippingCost: shippingDiscounted.buyerShippingAmount,
+          sellerShippingCost: shippingDiscounted.sellerShippingAmount,
           billableDesi,
           packageTier: decision.tierCode,
         };
-      },
+      }),
     );
     const shippingAmount = shippingBySeller.reduce(
       (sum, s) => sum + s.shippingCost,

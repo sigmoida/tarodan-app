@@ -188,4 +188,71 @@ export class OrderFeeDiscountService {
       sellerTotal: result.sellerTotal,
     };
   }
+
+  /**
+   * YALNIZ kargo payı kampanyaları. Kargo, satırların değil PAKETİN kararıdır
+   * (kademe → pay → bölüşüm), bu yüzden çok satırlı sepette komisyondan ayrı bir
+   * adımda uygulanır. Tekil satın almada iki adım aynı anda çalışır.
+   */
+  async applyShipping(input: {
+    context: OrderFeeDiscountContext;
+    buyerShippingAmount: number;
+    sellerShippingAmount: number;
+    remainingAllowance?: number | null;
+    preloaded?: unknown[];
+  }): Promise<{
+    buyerShippingAmount: number;
+    sellerShippingAmount: number;
+    applied: AppliedFeeDiscount[];
+    buyerTotal: number;
+    sellerTotal: number;
+  }> {
+    const unchanged = {
+      buyerShippingAmount: input.buyerShippingAmount,
+      sellerShippingAmount: input.sellerShippingAmount,
+      applied: [] as AppliedFeeDiscount[],
+      buyerTotal: 0,
+      sellerTotal: 0,
+    };
+    if (!this.resolver) return unchanged;
+
+    let candidates: FeeDiscountCandidate[] = [];
+    try {
+      const buyerTier =
+        input.context.buyerTier !== undefined
+          ? input.context.buyerTier
+          : await this.resolveBuyerTier(input.context.buyerId);
+      const rows =
+        (input.preloaded as any[]) ?? (await this.resolver.loadActive());
+      candidates = this.resolver
+        .selectFor(rows as any, { ...input.context, buyerTier })
+        .filter(
+          (candidate) =>
+            candidate.target === DiscountTarget.buyer_shipping ||
+            candidate.target === DiscountTarget.seller_shipping,
+        );
+    } catch (error) {
+      this.logger.warn(`kargo kampanyası çözülemedi: ${error}`);
+      return unchanged;
+    }
+    if (!candidates.length) return unchanged;
+
+    const result = applyFeeDiscounts({
+      candidates,
+      quantity: input.context.quantity,
+      remainingDiscountAllowance: input.remainingAllowance ?? null,
+      amounts: {
+        [DiscountTarget.buyer_shipping]: input.buyerShippingAmount,
+        [DiscountTarget.seller_shipping]: input.sellerShippingAmount,
+      },
+    });
+
+    return {
+      buyerShippingAmount: result.amounts[DiscountTarget.buyer_shipping] ?? 0,
+      sellerShippingAmount: result.amounts[DiscountTarget.seller_shipping] ?? 0,
+      applied: result.applied,
+      buyerTotal: result.buyerTotal,
+      sellerTotal: result.sellerTotal,
+    };
+  }
 }
