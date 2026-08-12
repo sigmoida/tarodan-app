@@ -34,7 +34,11 @@ import { AppleAuthService } from "./apple-auth.service";
 import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
 import { SecurityService } from "../security/security.service";
-import { isUsernameAllowed, normalizeUsername } from "./username.util";
+import {
+  allocateUsernameFromEmail,
+  isUsernameAllowed,
+  normalizeUsername,
+} from "./username.util";
 import { ENTITY_PREFIX } from "../../common/helpers/code-prefixes";
 
 /** Hesap tipi öneki — yalnızca bireysel (B) veya kurumsal (K). */
@@ -1709,12 +1713,19 @@ export class AuthService {
       return this.buildUserAuthResponse(byEmail.id);
     }
 
-    // 3) Yeni kullanıcı
+    // 3) Yeni kullanıcı. Sosyal girişte kullanıcı adı SORULMAZ; e-postadan
+    //    türetilir (bkz. allocateUsernameFromEmail). `usernameClaimedAt` boş
+    //    kalır: adı kullanıcı seçmediği için bir kereliğine değiştirebilir.
     const displayName = profile.name?.trim() || profile.email.split("@")[0];
+    const username = await allocateUsernameFromEmail(
+      this.prisma,
+      profile.email,
+    );
     const created = await this.prisma.user.create({
       data: {
         email: profile.email,
         passwordHash: null,
+        username,
         displayName,
         avatarUrl: profile.picture ?? null,
         isEmailVerified: true,
@@ -1773,12 +1784,17 @@ export class AuthService {
       return this.buildUserAuthResponse(byEmail.id);
     }
 
-    // 3) Yeni kullanıcı
+    // 3) Yeni kullanıcı (Google ile aynı kural: kullanıcı adı e-postadan türer)
     const displayName = fullName?.trim() || profile.email.split("@")[0];
+    const username = await allocateUsernameFromEmail(
+      this.prisma,
+      profile.email,
+    );
     const created = await this.prisma.user.create({
       data: {
         email: profile.email,
         passwordHash: null,
+        username,
         displayName,
         isEmailVerified: true,
         isSeller: false,

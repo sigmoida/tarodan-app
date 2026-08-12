@@ -257,10 +257,10 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
       get: (k: string) =>
         k === "FEATURE_48H_CONFIRMATION_WINDOW" ? flag : undefined,
     };
-    // Constructor 5 argüman ister: (prisma, orderService, configService,
-    // elogoInvoicing, scheduledQueue). elogoInvoicing ve scheduledQueue yalnız
-    // onModuleInit / diğer cron'larda kullanılır; runAutoCompleteConfirmedOrders
-    // için gerekmez → boş stub yeterli (init'i çağırmayız).
+    // Constructor: (prisma, orderService, configService, elogoInvoicing,
+    // sellerInvoice, notificationService, cache, scheduledQueue). Bunlardan
+    // yalnız prisma/orderService/config runAutoCompleteConfirmedOrders'ta
+    // kullanılır; kalanı onModuleInit / diğer cron'ların işi → stub yeterli.
     return new OrderSchedulerService(
       prisma,
       orderService,
@@ -268,6 +268,8 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
       {} as any,
       // Satıcı ürün faturası taraması bu senaryonun konusu değil.
       { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
+      { createNotification: async () => {} } as any,
+      { get: async () => null, set: async () => {} } as any,
       {} as any,
     );
   }

@@ -7,6 +7,11 @@ import {
   Matches,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from "../username.util";
 
 export class BusinessRegisterDto {
   @ApiProperty({ example: "Ayşe Yılmaz" })
@@ -59,9 +64,9 @@ export class CorporateInvitationDto {
 
   @ApiProperty({ example: "tarodan.kurumsal" })
   @IsString()
-  @MinLength(3)
-  @MaxLength(30)
-  @Matches(/^[a-z0-9](?:[a-z0-9._]*[a-z0-9])?$/)
+  @MinLength(USERNAME_MIN_LENGTH)
+  @MaxLength(USERNAME_MAX_LENGTH)
+  @Matches(USERNAME_PATTERN)
   username: string;
 
   @ApiProperty()

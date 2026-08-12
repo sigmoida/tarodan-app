@@ -66,6 +66,8 @@ describe("48h window core + auto-complete cron (E2E)", () => {
       } as any /* elogoInvoicing (no-op stub) */,
       // Satıcı ürün faturası taraması bu senaryonun konusu değil.
       { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
+      { createNotification: async () => {} } as any /* notificationService */,
+      { get: async () => null, set: async () => {} } as any /* cache */,
       {} as any /* scheduledQueue */,
     );
   }

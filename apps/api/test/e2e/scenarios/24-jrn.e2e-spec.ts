@@ -356,9 +356,10 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
       get: (k: string) =>
         k === "FEATURE_48H_CONFIRMATION_WINDOW" ? "true" : undefined,
     };
-    // Constructor: (prisma, orderService, configService, elogoInvoicing, scheduledQueue).
-    // runAutoCompleteConfirmedOrders yalnız config flag + prisma + orderService kullanır;
-    // elogoInvoicing ve scheduledQueue stub geçilir.
+    // Constructor: (prisma, orderService, configService, elogoInvoicing,
+    // sellerInvoice, notificationService, cache, scheduledQueue).
+    // runAutoCompleteConfirmedOrders yalnız config flag + prisma + orderService
+    // kullanır; kalanı stub geçilir.
     return new OrderSchedulerService(
       prisma,
       orderService,
@@ -366,6 +367,8 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
       {} as any,
       // Satıcı ürün faturası taraması bu senaryonun konusu değil.
       { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
+      { createNotification: async () => {} } as any,
+      { get: async () => null, set: async () => {} } as any,
       {} as any,
     );
   }
