@@ -38,6 +38,7 @@ import {
   assertCodeAllowedForTarget,
   assertTargetAllowedForActor,
 } from "./discount-authorization";
+import { isProductInDiscountScope } from "./discount-scope";
 
 /**
  * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
@@ -1450,6 +1451,10 @@ export class DiscountService {
 
   // Helper methods
 
+  /**
+   * Kapsam kuralı tek kaynaktan (`discount-scope.ts`) okunur: kupon doğrulaması,
+   * vitrin fiyatı ve bedel kampanyası çözümü aynı yanıtı verir.
+   */
   private isProductEligibleForDiscount(
     product: { id: string; categoryId: string; sellerId: string },
     discount: {
@@ -1459,29 +1464,7 @@ export class DiscountService {
       targetProductIds: string[];
     },
   ): boolean {
-    switch (discount.scope) {
-      case DiscountScope.global:
-        return (
-          discount.sellerId === null || discount.sellerId === product.sellerId
-        );
-
-      case DiscountScope.category:
-        return product.categoryId === discount.categoryId;
-
-      case DiscountScope.product:
-        // Sadece seçili ürünler: boş liste = hiçbir ürüne uygulanmaz
-        if (!discount.targetProductIds?.length) return false;
-        return discount.targetProductIds.includes(product.id);
-
-      case DiscountScope.seller:
-        // Tüm mağaza: sadece bu satıcının ürünleri
-        return (
-          discount.sellerId != null && product.sellerId === discount.sellerId
-        );
-
-      default:
-        return false;
-    }
+    return isProductInDiscountScope(product, discount);
   }
 
   private mapToResponse(discount: any): DiscountResponseDto {
