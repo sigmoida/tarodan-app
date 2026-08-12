@@ -9,7 +9,7 @@ export interface MembershipTier {
   canTrade: boolean;
   canCreateCollections: boolean;
   featuredListingSlots: number;
-  isAdFree: boolean;
+  // isAdFree kaldırıldı: banner'lar herkese gösterilir (avantaj devre dışı).
 }
 
 export interface ProfileStats {

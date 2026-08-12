@@ -19,7 +19,6 @@ export const TIER_DEFAULTS: Record<string, MembershipTier> = {
     canTrade: false,
     canCreateCollections: false,
     featuredListingSlots: 0,
-    isAdFree: false,
   },
   basic: {
     type: "basic",
@@ -30,7 +29,6 @@ export const TIER_DEFAULTS: Record<string, MembershipTier> = {
     canTrade: true,
     canCreateCollections: true,
     featuredListingSlots: 2,
-    isAdFree: false,
   },
   premium: {
     type: "premium",
@@ -41,7 +39,6 @@ export const TIER_DEFAULTS: Record<string, MembershipTier> = {
     canTrade: true,
     canCreateCollections: true,
     featuredListingSlots: 10,
-    isAdFree: true,
   },
   business: {
     type: "business",
@@ -52,7 +49,6 @@ export const TIER_DEFAULTS: Record<string, MembershipTier> = {
     canTrade: true,
     canCreateCollections: true,
     featuredListingSlots: 50,
-    isAdFree: true,
   },
 };
 

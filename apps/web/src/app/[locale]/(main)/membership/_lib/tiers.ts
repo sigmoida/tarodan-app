@@ -58,7 +58,6 @@ export function normalizeTierData(raw: unknown): TierData {
     maxImagesPerListing: row?.maxImagesPerListing,
     canTrade: row?.canTrade,
     canCreateCollections: row?.canCreateCollections,
-    isAdFree: row?.isAdFree,
   });
   const capabilities: Record<TierId, TierCapabilities> = {
     free: caps(free),
@@ -85,7 +84,7 @@ export function normalizeTierData(raw: unknown): TierData {
  * Canonical plan-card features for a tier, derived ENTIRELY from the admin-driven
  * tier row (DB MembershipTier). The SINGLE source both the membership page and the
  * checkout page use, so the two never contradict and an admin toggle (limits /
- * images / canTrade / canCreateCollections / isAdFree) is reflected everywhere.
+ * images / canTrade / canCreateCollections) is reflected everywhere.
  * No hardcoded capability copy — the earlier drift (200 vs unlimited listings,
  * 10 vs 15 images, differing trade/collection flags) came from duplicating these.
  */
@@ -115,7 +114,8 @@ export function buildTierFeatures(
       text: t("collection.collections"),
       included: !!caps.canCreateCollections,
     },
-    { text: t("membership.noAds"), included: !!caps.isAdFree },
+    // "Reklamsız" avantajı DEVRE DIŞI: banner'lar herkese gösterilir, hiçbir
+    // katman bu vaadi veremez.
   ];
 }
 

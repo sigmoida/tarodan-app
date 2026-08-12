@@ -29,7 +29,7 @@ export interface TierCapabilities {
   maxImagesPerListing?: number;
   canTrade?: boolean;
   canCreateCollections?: boolean;
-  isAdFree?: boolean;
+  // isAdFree kaldırıldı: banner'lar herkese gösterilir (avantaj devre dışı).
 }
 
 /** Normalized tier data the server hands the client (prices + limits + capabilities). */
