@@ -631,14 +631,30 @@ export class TradeReconciliationService {
    * güvenilir bir telafi sağlar.
    */
   async reconcileMissingInboundShipments(): Promise<{ fixed: number }> {
-    const trades = await this.prisma.trade.findMany({
-      where: {
-        status: TradeStatus.shipping_to_warehouse,
-        shipments: { none: { leg: "to_warehouse" } },
+    // Eksik bacak TARAF bazında aranır: yalnız "hiç bacağı olmayan" takasları
+    // taramak, tek tarafın bacağı eksik kalmış takası (ör. adres sonradan
+    // eklendi) sonsuza dek onarımsız bırakıyordu. createInboundTradeShipments
+    // taraf bazında idempotenttir: var olan bacağa dokunmaz, eksiği tamamlar;
+    // adressiz taraf için günde bir "adres ekle" bildirimi de orada atılır.
+    const candidates = await this.prisma.trade.findMany({
+      where: { status: TradeStatus.shipping_to_warehouse },
+      select: {
+        id: true,
+        initiatorId: true,
+        receiverId: true,
+        shipments: {
+          where: { leg: "to_warehouse" },
+          select: { shipperId: true },
+        },
       },
-      select: { id: true },
-      take: 50,
+      take: 200,
     });
+    const trades = candidates
+      .filter((t) => {
+        const shippers = new Set(t.shipments.map((s) => s.shipperId));
+        return !shippers.has(t.initiatorId) || !shippers.has(t.receiverId);
+      })
+      .slice(0, 50);
 
     let fixed = 0;
     for (const t of trades) {
