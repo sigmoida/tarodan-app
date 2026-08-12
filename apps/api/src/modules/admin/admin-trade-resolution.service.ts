@@ -10,6 +10,7 @@ import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { ProductStatus, TradeStatus, ShipmentStatus } from "@prisma/client";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
+import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { PaymentService } from "../payment/payment.service";
 import { EventService } from "../events/event.service";
 import {
@@ -597,36 +598,72 @@ export class AdminTradeResolutionService {
         if (allResolved && trade.status !== TradeStatus.cancelled) {
           const items = await tx.tradeItem.findMany({
             where: { tradeId },
-            select: { productId: true, quantity: true },
+            select: { productId: true, quantity: true, side: true },
           });
-          const byProduct = new Map<string, number>();
+          // Kayıp bacaktaki ürünler sahibine HİÇ ulaşmadı: rezervasyonu
+          // çözmekle kalmayıp stoktan da düşülür — aksi halde fiziksel olarak
+          // kaybolmuş ürün ilan olarak yeniden satışa çıkardı. Gidiş
+          // bacağındaki kayıp koli çözümü (autoResolveLostParcelTrades) da
+          // aynı kuralı uygular; iki yol arasında fark olmamalı.
+          const lostShipments = await tx.tradeShipment.findMany({
+            where: { tradeId, leg: "return", lostAt: { not: null } },
+            select: { recipientUserId: true },
+          });
+          const lostOwnerIds = new Set(
+            lostShipments
+              .map((s) => s.recipientUserId)
+              .filter((id): id is string => id !== null),
+          );
+          const ownerOf = (side: string) =>
+            side === "initiator" ? trade.initiatorId : trade.receiverId;
+
+          const byProduct = new Map<string, { qty: number; lost: boolean }>();
           for (const item of items) {
-            byProduct.set(
-              item.productId,
-              (byProduct.get(item.productId) ?? 0) + item.quantity,
-            );
+            const prev = byProduct.get(item.productId);
+            const lost = lostOwnerIds.has(ownerOf(item.side));
+            byProduct.set(item.productId, {
+              qty: (prev?.qty ?? 0) + item.quantity,
+              lost: (prev?.lost ?? false) || lost,
+            });
           }
-          for (const [productId, qty] of byProduct) {
+          for (const [productId, { qty, lost }] of byProduct) {
             await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
             const prod = await tx.product.findUnique({
               where: { id: productId },
-              select: { reservedQuantity: true },
+              select: { reservedQuantity: true, quantity: true },
             });
             if (prod) {
               const newReserved = safeDecrementReserved(
                 prod.reservedQuantity,
                 qty,
               );
-              await tx.product.update({
-                where: { id: productId },
-                data: {
-                  reservedQuantity: newReserved,
-                  status:
-                    newReserved > 0
-                      ? ProductStatus.reserved
-                      : ProductStatus.active,
-                },
-              });
+              if (lost) {
+                const newQuantity =
+                  prod.quantity === null
+                    ? null
+                    : Math.max(0, prod.quantity - qty);
+                await tx.product.update({
+                  where: { id: productId },
+                  data: {
+                    reservedQuantity: newReserved,
+                    ...(prod.quantity === null
+                      ? {}
+                      : { quantity: newQuantity }),
+                    status: getProductStatusFromQuantity(newQuantity),
+                  },
+                });
+              } else {
+                await tx.product.update({
+                  where: { id: productId },
+                  data: {
+                    reservedQuantity: newReserved,
+                    status:
+                      newReserved > 0
+                        ? ProductStatus.reserved
+                        : ProductStatus.active,
+                  },
+                });
+              }
             }
           }
 

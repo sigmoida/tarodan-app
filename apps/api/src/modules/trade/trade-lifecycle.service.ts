@@ -1111,111 +1111,28 @@ export class TradeLifecycleService {
   }
 
   // ==========================================================================
-  // SHIP TRADE (One party ships their items)
+  // SHIP TRADE (DEPRECATED — legacy eşler-arası akışın kargo ucu)
+  //
+  // Depo-escrow akışında hiçbir takas `accepted` durumunda kalmaz: kabul
+  // doğrudan `awaiting_payment` ya da `shipping_to_warehouse` üretir ve iki
+  // `to_warehouse` gönderisi sistem tarafından oluşturulur. Bu uç yalnız
+  // legacy satırlar için ulaşılabilirdi; onlar da kargolama son tarihinde
+  // otomatik iptal ediliyor. Açık bırakmak, `leg`/`recipientType` alanları
+  // olmadan TradeShipment üreten canlı bir yol demekti — depo akışının
+  // varsaydığı veri şeklini bozabilirdi. `ship-to-warehouse` ile aynı şekilde
+  // 410 Gone döner.
   // ==========================================================================
   async shipTrade(
     tradeId: string,
     userId: string,
-    dto: ShipTradeDto,
+    _dto: ShipTradeDto,
   ): Promise<TradeResponseDto> {
-    // Üyelik kapısı KASITLI olarak kaldırıldı: takas, kabul edildiği (accepted)
-    // anda her iki tarafın da premium üyeliği vardı (acceptTrade/counterTrade
-    // kapıları bunu garanti eder). Üyelik kabul SONRASI sona erse bile, dönem
-    // içinde başlamış takasın kargo/teslim akışı sıkıntısız tamamlanabilmelidir.
-    // Aksi halde "kabul ettim ama kargolayamıyorum" çıkmazı oluşurdu.
-    const address = await this.prisma.address.findFirst({
-      where: { id: dto.fromAddressId, userId },
-    });
-    if (!address) {
-      throw new NotFoundException(i18nMessage("server.trade.addressNotFound"));
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      const trade = await this.getTradeWithLock(tradeId, tx);
-
-      const isInitiator = trade.initiatorId === userId;
-      const isReceiver = trade.receiverId === userId;
-
-      if (!isInitiator && !isReceiver) {
-        throw new ForbiddenException(
-          i18nMessage("server.trade.notAuthorizedForAction"),
-        );
-      }
-
-      const canShipStatuses: TradeStatus[] = [
-        TradeStatus.accepted,
-        TradeStatus.initiator_shipped,
-        TradeStatus.receiver_shipped,
-      ];
-
-      if (!canShipStatuses.includes(trade.status)) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.cannotShipInStatus", {
-            status: trade.status,
-          }),
-        );
-      }
-
-      const existingShipment = await tx.tradeShipment.findFirst({
-        where: { tradeId, shipperId: userId },
-      });
-      if (existingShipment) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.alreadyShipped"),
-        );
-      }
-
-      let newStatus: TradeStatus;
-      if (trade.status === TradeStatus.accepted) {
-        newStatus = isInitiator
-          ? TradeStatus.initiator_shipped
-          : TradeStatus.receiver_shipped;
-      } else if (
-        (trade.status === TradeStatus.initiator_shipped && isReceiver) ||
-        (trade.status === TradeStatus.receiver_shipped && isInitiator)
-      ) {
-        newStatus = TradeStatus.both_shipped;
-      } else {
-        throw new BadRequestException(
-          i18nMessage("server.trade.invalidShipmentStatus"),
-        );
-      }
-
-      const trackingNumber = generateReferenceCode(
-        REFERENCE_PREFIX.shipmentFallback,
-      );
-
-      // LEGACY doğrudan (depo dışı) akış: burada taşıyıcı takibi yok, teslim
-      // olayı da yok — pencere kargoya veriliş anından sayılır. Güvenli takas
-      // (depolu) akışında saat TESLİMATTAN başlar, bkz. trade-escrow helper'ı.
-      let confirmationDeadline: Date | null = null;
-      if (newStatus === TradeStatus.both_shipped) {
-        confirmationDeadline = await computeTradeConfirmationDeadline(tx);
-      }
-
-      await tx.tradeShipment.create({
-        data: {
-          tradeId,
-          shipperId: userId,
-          fromAddressId: dto.fromAddressId,
-          carrier: "surat",
-          trackingNumber,
-          status: ShipmentStatus.label_created,
-          shippedAt: new Date(),
-        },
-      });
-
-      await tx.trade.update({
-        where: { id: tradeId, version: trade.version },
-        data: {
-          status: newStatus,
-          confirmationDeadline,
-          version: { increment: 1 },
-        },
-      });
-    });
-
-    return this.tradeQuery.getTradeById(tradeId, userId);
+    this.logger.warn(
+      `Deprecated shipTrade called by user=${userId} trade=${tradeId}; safe-trade flow creates both inbound shipments automatically`,
+    );
+    throw new GoneException(
+      i18nMessage("server.trade.shipToWarehouseDeprecated"),
+    );
   }
 
   // ==========================================================================
@@ -1308,14 +1225,13 @@ export class TradeLifecycleService {
         );
       }
 
-      if (
-        trade.confirmationDeadline &&
-        new Date() > trade.confirmationDeadline
-      ) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.confirmationDeadlinePassed"),
-        );
-      }
+      // Süre dolduysa onay REDDEDİLMEZ. Pencere geçtiğinde takas zaten
+      // otomatik tamamlanacaktır (autoConfirmExpiredReceipts, 5 dk'da bir);
+      // aradaki boşlukta "onayla" diyen kullanıcıya hata göstermek, sonucu
+      // değiştirmeyen bir engeldi. Süre dolduktan sonra onay, cron'un yapacağı
+      // işi kullanıcının kendi eliyle yapmasıdır — para akışı aynıdır.
+      // Legacy (depo dışı) akışta pencere kargoya verilişten sayıldığı için
+      // eski katı kural orada da gereksizdi.
 
       let newStatus: TradeStatus;
       if (trade.status === TradeStatus.shipping_to_recipients) {
