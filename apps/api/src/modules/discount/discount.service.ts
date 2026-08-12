@@ -687,6 +687,17 @@ export class DiscountService {
       return { isValid: false, error: "Bu kupon artık aktif değil" };
     }
 
+    // Cep kuralı: admin ürün fiyatından İNDİRİM YAPAMAZ. Eski platform/paylaşımlı
+    // fonlu ürün-fiyatı kuponları tanım tarafında çoktan engellendi; aktif kalmış
+    // eski bir kayıt da yeni siparişlere uygulanmaz — aksi halde
+    // `platformFundedDiscount` yeni siparişlerde tekrar dolardı.
+    const couponTargetsPrice =
+      (discount.target ?? DiscountTarget.product_price) ===
+      DiscountTarget.product_price;
+    if (couponTargetsPrice && discount.fundedBy !== DiscountFundedBy.seller) {
+      return { isValid: false, error: "Bu kupon artık geçerli değil" };
+    }
+
     const now = new Date();
     if (!voucherHasOwnWindow) {
       if (now < discount.startDate) {
@@ -1546,66 +1557,14 @@ export class DiscountService {
     const result = new Map<string, number | null>();
     if (!items.length) return result;
 
-    const now = new Date();
-    const sellerIds = [
-      ...new Set(items.map((i) => i.sellerId).filter(Boolean)),
-    ];
-    const categoryIds = [
-      ...new Set(items.map((i) => i.categoryId).filter(Boolean)),
-    ];
-    const productIds = items.map((i) => i.productId);
-
-    const discounts = await this.prisma.discount.findMany({
-      where: {
-        isActive: true,
-        code: null,
-        // YALNIZ ürün fiyatı kampanyaları: bedel kampanyası vitrin fiyatını
-        // DÜŞÜRMEZ (komisyonu/kargoyu indirir) — buraya karışırsa etiket yalan söyler.
-        target: DiscountTarget.product_price,
-        startDate: { lte: now },
-        endDate: { gte: now },
-        OR: [
-          { scope: DiscountScope.global, sellerId: null },
-          { scope: DiscountScope.seller, sellerId: { in: sellerIds } },
-          { scope: DiscountScope.category, categoryId: { in: categoryIds } },
-          {
-            scope: DiscountScope.product,
-            targetProductIds: { hasSome: productIds },
-          },
-        ],
-      },
-      orderBy: { priority: "asc" },
-    });
-
+    // KODSUZ ürün-fiyatı kampanyası artık TANIMLANAMAZ (satıcı kampanyası kod
+    // ister; admin ürün fiyatına dokunamaz — cep kuralı). Vitrin fiyatını
+    // düşüren tek mekanizma ürünün kendi indirimli satış fiyatıdır
+    // (product-sale-window). Eski kodsuz kayıtlar bilinçli olarak YOK sayılır;
+    // adet koşullu türler (bogo/bulk_quantity) ise birim vitrin fiyatını değil
+    // sepetteki satır tutarını etkiler ve burada uygulanmaz.
     for (const item of items) {
-      const { productId, sellerId, categoryId, currentDisplayPrice } = item;
-      const product = { id: productId, sellerId, categoryId };
-      let bestPrice: number | null = null;
-      for (const d of discounts) {
-        if (!this.isProductEligibleForDiscount(product, d)) continue;
-
-        let effectivePrice: number;
-        if (d.type === "percentage") {
-          const discountAmount = currentDisplayPrice * (Number(d.value) / 100);
-          const capped =
-            d.maxDiscountAmount != null
-              ? Math.min(discountAmount, Number(d.maxDiscountAmount))
-              : discountAmount;
-          effectivePrice = Math.max(0, currentDisplayPrice - capped);
-        } else {
-          effectivePrice = Math.max(
-            0,
-            currentDisplayPrice -
-              Math.min(Number(d.value), currentDisplayPrice),
-          );
-        }
-        if (effectivePrice < currentDisplayPrice) {
-          if (bestPrice == null || effectivePrice < bestPrice) {
-            bestPrice = effectivePrice;
-          }
-        }
-      }
-      result.set(productId, bestPrice);
+      result.set(item.productId, null);
     }
     return result;
   }
@@ -1623,6 +1582,10 @@ export class DiscountService {
         // YALNIZ ürün fiyatı kampanyaları: bedel kampanyası vitrin fiyatını
         // DÜŞÜRMEZ (komisyonu/kargoyu indirir) — buraya karışırsa etiket yalan söyler.
         target: DiscountTarget.product_price,
+        // Kodsuz yüzde/sabit fiyat kampanyaları KALDIRILDI (eski kayıtlar yok
+        // sayılır); "kampanyalı ürün" filtresi yalnız adet koşullu satıcı
+        // kampanyalarını (bogo / bulk_quantity) tanır.
+        type: { in: [DiscountType.bogo, DiscountType.bulk_quantity] },
         startDate: { lte: now },
         endDate: { gte: now },
       },

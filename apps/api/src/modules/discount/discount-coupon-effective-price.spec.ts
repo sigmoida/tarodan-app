@@ -1,6 +1,13 @@
 import { DiscountScope, DiscountType } from "@prisma/client";
 import { DiscountService } from "./discount.service";
 
+/**
+ * Kupon fiyat tabanı: kodsuz ürün-fiyatı kampanyaları KALDIRILDI — vitrin
+ * fiyatını yalnız ürünün kendi indirimli satış fiyatı düşürür. Kupon matematiği
+ * bu yüzden ürünün fiyatından hesaplanır; eski (legacy) kodsuz kampanya kaydı
+ * aktif kalsa bile tabanı DEĞİŞTİRMEZ ve platform-fonlu eski ürün-fiyatı
+ * kuponu doğrulamadan geçemez.
+ */
 describe("DiscountService coupon pricing base", () => {
   const now = new Date();
   const product = {
@@ -30,7 +37,8 @@ describe("DiscountService coupon pricing base", () => {
     fundedBy: "seller",
     platformFundedRatio: null,
   };
-  const automaticCampaign = {
+  // Eski (artık tanımlanamayan) kodsuz %50 kampanyası — tabanı ETKİLEMEMELİ.
+  const legacyAutomaticCampaign = {
     ...coupon,
     id: "campaign-1",
     code: null,
@@ -44,7 +52,7 @@ describe("DiscountService coupon pricing base", () => {
     const prisma = {
       discount: {
         findUnique: jest.fn().mockResolvedValue({ ...coupon, ...overrides }),
-        findMany: jest.fn().mockResolvedValue([automaticCampaign]),
+        findMany: jest.fn().mockResolvedValue([legacyAutomaticCampaign]),
       },
       discountCode: {
         findUnique: jest.fn(),
@@ -66,7 +74,7 @@ describe("DiscountService coupon pricing base", () => {
     );
   }
 
-  it("caps a coupon to the effective campaign price, not the base product price", async () => {
+  it("legacy kodsuz kampanya kupon tabanını DEĞİŞTİRMEZ — taban ürün fiyatıdır", async () => {
     const result = await makeService().validateCoupon(
       {
         code: coupon.code,
@@ -76,11 +84,25 @@ describe("DiscountService coupon pricing base", () => {
     );
 
     expect(result.isValid).toBe(true);
-    expect(result.discount?.estimatedDiscount).toBe(50);
+    // 80 TL sabit kupon 100 TL tabana uygulanır; eski %50 kampanyası yok sayılır.
+    expect(result.discount?.estimatedDiscount).toBe(80);
   });
 
-  it("checks minimum cart value against the effective campaign total", async () => {
+  it("minimum sepet tutarı ürün fiyatı tabanından denetlenir", async () => {
     const result = await makeService({ minCartValue: 75 }).validateCoupon(
+      {
+        code: coupon.code,
+        cartItems: [{ productId: product.id, quantity: 1 }],
+      },
+      "buyer-1",
+    );
+
+    // Taban 100 TL ≥ 75 TL: eski kampanya tabanı düşürüp reddettiremez.
+    expect(result.isValid).toBe(true);
+  });
+
+  it("eski platform-fonlu ürün-fiyatı kuponu doğrulamadan GEÇEMEZ (cep kuralı)", async () => {
+    const result = await makeService({ fundedBy: "platform" }).validateCoupon(
       {
         code: coupon.code,
         cartItems: [{ productId: product.id, quantity: 1 }],
@@ -90,8 +112,23 @@ describe("DiscountService coupon pricing base", () => {
 
     expect(result).toEqual({
       isValid: false,
-      error: "Minimum sepet tutarı: 75.00 TL",
+      error: "Bu kupon artık geçerli değil",
     });
+  });
+
+  it("paylaşımlı fonlu eski kupon da reddedilir", async () => {
+    const result = await makeService({
+      fundedBy: "shared",
+      platformFundedRatio: 0.5,
+    }).validateCoupon(
+      {
+        code: coupon.code,
+        cartItems: [{ productId: product.id, quantity: 1 }],
+      },
+      "buyer-1",
+    );
+
+    expect(result.isValid).toBe(false);
   });
 
   describe("sepete uygunluk", () => {
