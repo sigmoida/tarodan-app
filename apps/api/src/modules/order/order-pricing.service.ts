@@ -48,6 +48,7 @@ import { sellerNetAmountOf } from "./order-net.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
 import { OrderFeeDiscountService } from "./order-fee-discount.service";
+import type { FeeDiscountCandidate } from "../discount/fee-discount.engine";
 
 /**
  * Commission calculation result interface
@@ -464,6 +465,9 @@ export class OrderPricingService {
     // F1.1: kuponu quote'ta da uygula — YALNIZ uygun satırlara dağıt; fee/tax/kargo
     // İNDİRİMLİ baz üzerinden hesaplanır (create ile aynı) → önizleme = tahsilat.
     let couponDiscountTotal = 0;
+    // Bedel hedefli kupon ürün tabanına dokunmaz; motora aday olarak geçer.
+    let couponFeeCandidate: FeeDiscountCandidate | null = null;
+    let couponEligibleIds = new Set<string>();
     if (dto.couponCode && lines.length > 0) {
       const validation = await this.discountService.validateCoupon(
         {
@@ -481,8 +485,11 @@ export class OrderPricingService {
         );
       }
       if (validation.discount) {
+        couponFeeCandidate =
+          this.feeDiscounts?.couponCandidate(validation.discount) ?? null;
         const total = validation.discount.estimatedDiscount;
         const eligibleIds = new Set(validation.discount.eligibleProductIds);
+        couponEligibleIds = eligibleIds;
         const eligibleLines = lines.filter((l) =>
           eligibleIds.has(l.product.id),
         );
@@ -550,6 +557,10 @@ export class OrderPricingService {
             buyerShippingAmount: 0,
             sellerShippingAmount: 0,
             preloaded: feeCampaigns,
+            couponCandidates:
+              couponFeeCandidate && couponEligibleIds.has(product.id)
+                ? [couponFeeCandidate]
+                : [],
           })
         )?.commission ?? rawCommissionResult;
 
@@ -643,6 +654,11 @@ export class OrderPricingService {
           buyerShippingAmount: decision.buyer,
           sellerShippingAmount: decision.seller,
           preloaded: feeCampaigns,
+          couponCandidates:
+            couponFeeCandidate &&
+            couponEligibleIds.has(sellerLeadProduct.get(sellerId) ?? "")
+              ? [couponFeeCandidate]
+              : [],
         })) ?? {
           buyerShippingAmount: decision.buyer,
           sellerShippingAmount: decision.seller,

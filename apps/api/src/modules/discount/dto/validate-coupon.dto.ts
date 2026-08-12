@@ -8,6 +8,7 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
+import type { DiscountTarget } from "@prisma/client";
 
 export class CartItemDto {
   @ApiProperty({ description: "Ürün ID" })
@@ -70,5 +71,16 @@ export class ValidationResultDto {
      * geçilir → sipariş kesinleşince kod atomik olarak "kullanıldı" işaretlenir.
      */
     voucherCodeId?: string;
+    /**
+     * Kuponun İNDİRDİĞİ kalem. `product_price` klasik davranıştır (ürün tabanı
+     * düşer). Bedel hedefli kuponlarda ürün fiyatına DOKUNULMAZ; kupon, komisyon /
+     * hizmet bedeli / kargo payına uygulanır ve tutarı ancak bedeller hesaplandıktan
+     * sonra bilinebilir (bu yüzden `estimatedDiscount` 0 döner).
+     */
+    target: DiscountTarget;
+    /** Bedel hedefli kuponun uygulanacağı miktarı sınırlayan kalan bütçe. */
+    budgetRemaining?: number | null;
+    /** Kampanya tavanı — bedel kuponunda motor bunu da uygular. */
+    maxDiscountAmount?: number | null;
   };
 }

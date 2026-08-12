@@ -33,7 +33,10 @@ import {
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderFeeDiscountService } from "./order-fee-discount.service";
-import type { AppliedFeeDiscount } from "../discount/fee-discount.engine";
+import type {
+  AppliedFeeDiscount,
+  FeeDiscountCandidate,
+} from "../discount/fee-discount.engine";
 import { distanceSalesConsent } from "./distance-sales-contract";
 import {
   calculatePackageDesi,
@@ -462,6 +465,9 @@ export class OrderCheckoutGroupService {
           // F2.4: kupon indiriminin platform payı [0,1] — her siparişin
           // platformFundedDiscount snapshot'ını hesaplamak için.
           let appliedPlatformFundedShare = 0;
+          // Bedel hedefli kupon ürün tabanına dokunmaz; motora aday olarak geçer.
+          let couponFeeCandidate: FeeDiscountCandidate | null = null;
+          let couponEligibleIds = new Set<string>();
           if (dto.couponCode) {
             const validation = await this.discountService.validateCoupon(
               {
@@ -489,6 +495,11 @@ export class OrderCheckoutGroupService {
               appliedVoucherCodeId = validation.discount.voucherCodeId;
               appliedPlatformFundedShare =
                 validation.discount.platformFundedShare;
+              couponFeeCandidate =
+                this.feeDiscounts?.couponCandidate(validation.discount) ?? null;
+              couponEligibleIds = new Set(
+                validation.discount.eligibleProductIds,
+              );
               const totalCoupon = validation.discount.estimatedDiscount;
               // Kupon YALNIZ uygun (scope) satırlara, satır toplamı oranında
               // dağıtılır — uygun olmayan satıcı/kategori satırları indirim payı
@@ -642,6 +653,10 @@ export class OrderCheckoutGroupService {
               buyerShippingAmount: 0,
               sellerShippingAmount: 0,
               preloaded: feeCampaigns,
+              couponCandidates:
+                couponFeeCandidate && couponEligibleIds.has(entry.product.id)
+                  ? [couponFeeCandidate]
+                  : [],
             });
             const commission = feeDiscounted?.commission ?? rawCommission;
             lineFeeDiscounts.push(feeDiscounted?.applied ?? []);
@@ -679,6 +694,11 @@ export class OrderCheckoutGroupService {
                     buyerShippingAmount: decision.buyer,
                     sellerShippingAmount: decision.seller,
                     preloaded: feeCampaigns,
+                    couponCandidates:
+                      couponFeeCandidate &&
+                      couponEligibleIds.has(lead?.product.id ?? "")
+                        ? [couponFeeCandidate]
+                        : [],
                   });
                   if (discounted?.applied.length) {
                     sellerShippingFeeDiscounts.set(
@@ -1028,10 +1048,16 @@ export class OrderCheckoutGroupService {
           // Kupon kotası grup başına BİR KEZ tutulur. Gerçek kullanım ve usedCount
           // yalnız başarılı ödeme sonrasında PaymentFulfillmentService'te yazılır.
           if (appliedDiscountId) {
-            const totalCouponDiscount = pricing.reduce(
-              (sum, p) => sum + p.couponDiscount,
-              0,
-            );
+            const totalCouponDiscount = couponFeeCandidate
+              ? orderInputs.reduce(
+                  (sum, input) =>
+                    sum +
+                    (input.feeDiscountsApplied ?? [])
+                      .filter((line) => line.discountId === appliedDiscountId)
+                      .reduce((lineSum, line) => lineSum + line.amount, 0),
+                  0,
+                )
+              : pricing.reduce((sum, p) => sum + p.couponDiscount, 0);
             if (totalCouponDiscount > 0 && createdOrders.length > 0) {
               await this.discountService.reserveUsage(
                 appliedDiscountId,

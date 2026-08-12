@@ -200,6 +200,7 @@ export class OrderFeeDiscountService {
     sellerShippingAmount: number;
     remainingAllowance?: number | null;
     preloaded?: unknown[];
+    couponCandidates?: FeeDiscountCandidate[];
   }): Promise<{
     buyerShippingAmount: number;
     sellerShippingAmount: number;
@@ -214,27 +215,35 @@ export class OrderFeeDiscountService {
       buyerTotal: 0,
       sellerTotal: 0,
     };
-    if (!this.resolver) return unchanged;
-
-    let candidates: FeeDiscountCandidate[] = [];
+    // Kupon adayı, otomatik kampanyalar çözülemese bile yaşamalıdır: alıcı kodu
+    // yazdı ve kabul edildi.
+    let candidates: FeeDiscountCandidate[] = [
+      ...(input.couponCandidates ?? []),
+    ];
     try {
+      if (!this.resolver) throw new Error("resolver yok");
       const buyerTier =
         input.context.buyerTier !== undefined
           ? input.context.buyerTier
           : await this.resolveBuyerTier(input.context.buyerId);
       const rows =
         (input.preloaded as any[]) ?? (await this.resolver.loadActive());
-      candidates = this.resolver
-        .selectFor(rows as any, { ...input.context, buyerTier })
-        .filter(
-          (candidate) =>
-            candidate.target === DiscountTarget.buyer_shipping ||
-            candidate.target === DiscountTarget.seller_shipping,
-        );
+      candidates.push(
+        ...this.resolver.selectFor(rows as any, {
+          ...input.context,
+          buyerTier,
+        }),
+      );
     } catch (error) {
-      this.logger.warn(`kargo kampanyası çözülemedi: ${error}`);
-      return unchanged;
+      if (this.resolver) {
+        this.logger.warn(`kargo kampanyası çözülemedi: ${error}`);
+      }
     }
+    candidates = candidates.filter(
+      (candidate) =>
+        candidate.target === DiscountTarget.buyer_shipping ||
+        candidate.target === DiscountTarget.seller_shipping,
+    );
     if (!candidates.length) return unchanged;
 
     const result = applyFeeDiscounts({
@@ -253,6 +262,41 @@ export class OrderFeeDiscountService {
       applied: result.applied,
       buyerTotal: result.buyerTotal,
       sellerTotal: result.sellerTotal,
+    };
+  }
+
+  /**
+   * Doğrulanmış bir kuponu motor adayına çevirir. Ürün fiyatı hedefli kuponda
+   * null döner: o kupon ürün tabanını düşürür, bedellere dokunmaz.
+   */
+  couponCandidate(
+    validated:
+      | {
+          id: string;
+          name: string;
+          code?: string | null;
+          type: string;
+          value: number;
+          target?: DiscountTarget | null;
+          maxDiscountAmount?: number | null;
+          budgetRemaining?: number | null;
+        }
+      | null
+      | undefined,
+  ): FeeDiscountCandidate | null {
+    const target = validated?.target;
+    if (!validated || !target || target === DiscountTarget.product_price) {
+      return null;
+    }
+    return {
+      id: validated.id,
+      name: validated.name,
+      code: validated.code ?? null,
+      target,
+      type: validated.type as FeeDiscountCandidate["type"],
+      value: validated.value,
+      maxDiscountAmount: validated.maxDiscountAmount ?? null,
+      budgetRemaining: validated.budgetRemaining ?? null,
     };
   }
 }

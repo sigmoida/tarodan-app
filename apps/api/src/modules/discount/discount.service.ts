@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -37,8 +38,10 @@ import {
   assertBudgetForTarget,
   assertCodeAllowedForTarget,
   assertTargetAllowedForActor,
+  audienceMatches,
 } from "./discount-authorization";
 import { isProductInDiscountScope } from "./discount-scope";
+import { FeeDiscountResolver } from "./fee-discount.resolver";
 
 /**
  * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
@@ -61,6 +64,8 @@ export class DiscountService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly searchService: SearchService,
+    @Optional()
+    private readonly feeDiscountBudget?: FeeDiscountResolver,
   ) {}
 
   /**
@@ -621,6 +626,10 @@ export class DiscountService {
     const sellerCategoryInclude = {
       seller: { select: { id: true, displayName: true } },
       category: { select: { id: true, name: true } },
+      // Hedef kitle eşleşmesi kupon için de geçerlidir: üyelik/kişi hedefli bir
+      // kod, hedefte olmayan alıcıda kabul edilmemelidir.
+      targetTiers: { select: { tierType: true } },
+      targetUsers: { select: { userId: true } },
     };
 
     let discount = await this.prisma.discount.findUnique({
@@ -658,6 +667,55 @@ export class DiscountService {
 
     if (now > discount.endDate) {
       return { isValid: false, error: "Bu kuponun süresi doldu" };
+    }
+
+    // Hedef kitle: kimlik gerektiren bir hedefte misafir kabul edilemez (kimin
+    // hedefte olduğu bilinemez → sessizce herkese açılırdı).
+    if (
+      discount.audience === DiscountAudience.membership_tiers ||
+      discount.audience === DiscountAudience.specific_buyers
+    ) {
+      if (!userId) {
+        return {
+          isValid: false,
+          error: "Bu kupon için giriş yapmanız gerekir",
+        };
+      }
+      const buyerTier =
+        discount.audience === DiscountAudience.membership_tiers
+          ? await this.resolveUserTier(userId)
+          : null;
+      const matches = audienceMatches({
+        audience: discount.audience,
+        target: discount.target ?? DiscountTarget.product_price,
+        tierTypes: (discount as any).targetTiers.map(
+          (row: { tierType: string }) => row.tierType,
+        ),
+        userIds: (discount as any).targetUsers.map(
+          (row: { userId: string }) => row.userId,
+        ),
+        buyerId: userId,
+        buyerTier,
+      });
+      if (!matches) {
+        return {
+          isValid: false,
+          error: "Bu kupon hesabınız için geçerli değil",
+        };
+      }
+    }
+
+    // Bütçe tavanı: bedel kuponunun maliyeti platformundur, tavan dolduysa kupon
+    // yeni sepetlere uygulanmaz.
+    const budgetRemaining =
+      discount.budgetLimit != null
+        ? Math.max(
+            0,
+            Number(discount.budgetLimit) - Number(discount.budgetSpent ?? 0),
+          )
+        : null;
+    if (discount.budgetStoppedAt || budgetRemaining === 0) {
+      return { isValid: false, error: "Bu kampanyanın bütçesi doldu" };
     }
 
     // Real usage is incremented only after successful payment. Active checkout
@@ -781,14 +839,23 @@ export class DiscountService {
     // multiplied per eligible line and never exceeding the discountable amount (so a
     // multi-item cart can't drive the order total negative). maxDiscountAmount is the
     // final cap. Single source of truth for coupon math (see computeCouponDiscount).
-    const estimatedDiscount = this.computeCouponDiscount(
-      discount.type,
-      Number(discount.value),
-      eligibleSubtotal,
-      discount.maxDiscountAmount != null
-        ? Number(discount.maxDiscountAmount)
-        : null,
-    );
+    // Bedel hedefli kuponda ürün tabanına DOKUNULMAZ; tutar ancak komisyon/kargo
+    // hesaplandıktan sonra bilinir (fiyat hattı motoru uygular). Bu yüzden burada
+    // 0 döner ve hedef bilgisi taşınır.
+    // Hedefi yazılmamış (eski) kayıt ürün fiyatı kuponu sayılır — sessizce bedel
+    // kuponuna dönüşmemeli.
+    const couponTarget = discount.target ?? DiscountTarget.product_price;
+    const isFeeCoupon = couponTarget !== DiscountTarget.product_price;
+    const estimatedDiscount = isFeeCoupon
+      ? 0
+      : this.computeCouponDiscount(
+          discount.type,
+          Number(discount.value),
+          eligibleSubtotal,
+          discount.maxDiscountAmount != null
+            ? Number(discount.maxDiscountAmount)
+            : null,
+        );
 
     return {
       isValid: true,
@@ -803,12 +870,22 @@ export class DiscountService {
         estimatedDiscount,
         eligibleProductIds,
         platformFundedShare:
-          discount.fundedBy === DiscountFundedBy.platform
+          // Bedel kuponunun maliyeti tanımı gereği platformundur; ürün fiyatı
+          // kuponunda eski fonlama ekseni geçerlidir (eski kayıtlar için).
+          isFeeCoupon
             ? 1
-            : discount.fundedBy === DiscountFundedBy.shared
-              ? Number(discount.platformFundedRatio ?? 0)
-              : 0,
+            : discount.fundedBy === DiscountFundedBy.platform
+              ? 1
+              : discount.fundedBy === DiscountFundedBy.shared
+                ? Number(discount.platformFundedRatio ?? 0)
+                : 0,
         voucherCodeId,
+        target: couponTarget,
+        budgetRemaining,
+        maxDiscountAmount:
+          discount.maxDiscountAmount != null
+            ? Number(discount.maxDiscountAmount)
+            : null,
       },
     };
   }
@@ -835,6 +912,19 @@ export class DiscountService {
       discount = maxDiscountAmount;
     }
     return discount;
+  }
+
+  /**
+   * Kullanıcının geçerli üyelik katmanı — üyelik hedefli kupon eşleşmesi için.
+   * Aboneliği aktif değilse katman yok sayılır.
+   */
+  async resolveUserTier(userId: string): Promise<string | null> {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      select: { status: true, tier: { select: { type: true } } },
+    });
+    if (!membership || membership.status !== "active") return null;
+    return membership.tier?.type ?? null;
   }
 
   /**
@@ -966,6 +1056,10 @@ export class DiscountService {
           expiresAt,
         },
       });
+
+      // Bütçe, rezerve edilen + tüketilen toplamıdır: ödeme ekranındaki sepet de
+      // kampanyanın parasını tutar, aksi halde tavan aşılabilirdi.
+      await this.feeDiscountBudget?.spendBudget([{ discountId, amount }], tx);
     };
 
     if (client) {
@@ -1027,8 +1121,16 @@ export class DiscountService {
     client?: Prisma.TransactionClient,
   ): Promise<void> {
     if (!orderIds.length) return;
-    const run = (tx: Prisma.TransactionClient) =>
-      tx.couponReservation.updateMany({
+    const run = async (tx: Prisma.TransactionClient) => {
+      // Serbest bırakılan rezervasyonun tuttuğu bütçe kampanyaya geri döner.
+      const releasing = await tx.couponReservation.findMany({
+        where: {
+          orderId: { in: orderIds },
+          status: CouponReservationStatus.active,
+        },
+        select: { discountId: true, amount: true },
+      });
+      const result = await tx.couponReservation.updateMany({
         where: {
           orderId: { in: orderIds },
           status: CouponReservationStatus.active,
@@ -1038,6 +1140,15 @@ export class DiscountService {
           releasedAt: new Date(),
         },
       });
+      await this.feeDiscountBudget?.releaseBudget(
+        releasing.map((row) => ({
+          discountId: row.discountId,
+          amount: Number(row.amount),
+        })),
+        tx,
+      );
+      return result;
+    };
     if (client) {
       await run(client);
     } else {

@@ -30,6 +30,7 @@ import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderFeeDiscountService } from "./order-fee-discount.service";
+import type { FeeDiscountCandidate } from "../discount/fee-discount.engine";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
@@ -347,6 +348,7 @@ export class OrderCheckoutDirectService {
       // F2.4: kupon indiriminin platform payı [0,1].
       let couponPlatformFundedShare = 0;
 
+      let couponFeeCandidate: FeeDiscountCandidate | null = null;
       if (dto.couponCode) {
         const validation = await this.discountService.validateCoupon(
           {
@@ -362,6 +364,9 @@ export class OrderCheckoutDirectService {
           appliedDiscountId = validation.discount.id;
           appliedVoucherCodeId = validation.discount.voucherCodeId;
           couponPlatformFundedShare = validation.discount.platformFundedShare;
+          // Bedel hedefli kupon ürün tabanına dokunmaz; motora aday geçer.
+          couponFeeCandidate =
+            this.feeDiscounts?.couponCandidate(validation.discount) ?? null;
         } else if (!validation.isValid) {
           throw new BadRequestException(
             validation.error || i18nMessage("server.order.invalidCouponCode"),
@@ -416,6 +421,7 @@ export class OrderCheckoutDirectService {
         commission: rawCommissionResult,
         buyerShippingAmount: rawBuyerShippingAmount,
         sellerShippingAmount: rawSellerShippingAmount,
+        couponCandidates: couponFeeCandidate ? [couponFeeCandidate] : [],
       })) ?? {
         commission: rawCommissionResult,
         buyerShippingAmount: rawBuyerShippingAmount,
@@ -653,12 +659,19 @@ export class OrderCheckoutDirectService {
       // Hold coupon capacity while payment is pending. This does NOT increment
       // usedCount or create DiscountUsage; successful payment converts it to real
       // usage atomically in PaymentFulfillmentService.
-      if (appliedDiscountId && couponDiscount > 0) {
+      // Bedel hedefli kuponda ürün tabanı düşmez; kotayı ve bütçeyi tutan tutar,
+      // bedellerden verilen indirimdir.
+      const reservedCouponAmount = couponFeeCandidate
+        ? feeDiscounted.applied
+            .filter((line) => line.discountId === appliedDiscountId)
+            .reduce((sum, line) => sum + line.amount, 0)
+        : couponDiscount;
+      if (appliedDiscountId && reservedCouponAmount > 0) {
         await this.discountService.reserveUsage(
           appliedDiscountId,
           buyerId,
           order.id,
-          couponDiscount,
+          reservedCouponAmount,
           appliedVoucherCodeId,
           paymentExpiresAt,
           tx,
