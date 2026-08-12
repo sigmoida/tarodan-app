@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { ConfigService } from "@nestjs/config";
@@ -32,6 +33,7 @@ import { DiscountService } from "../discount";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderFeeDiscountService } from "./order-fee-discount.service";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
@@ -61,6 +63,8 @@ export class OrderGuestCheckoutService {
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly group: OrderCheckoutGroupService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
 
   /**
@@ -366,7 +370,7 @@ export class OrderGuestCheckoutService {
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on product price, not including shipping
       const pinnedRuleSetId = commissionRuleSet.id;
-      const commissionResult = await this.orderPricing.calculateCommission(
+      const rawCommissionResult = await this.orderPricing.calculateCommission(
         finalPrice,
         product.sellerId,
         product.categoryId,
@@ -379,14 +383,39 @@ export class OrderGuestCheckoutService {
       // bölüşüm. Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
       const {
         fullShipping,
-        buyer: buyerShippingAmount,
-        seller: sellerShippingAmount,
+        buyer: rawBuyerShippingAmount,
+        seller: rawSellerShippingAmount,
       } = this.orderPricing.resolveShippingDecision({
         tariff: shippingTariff.tariff,
         subtotal: finalPrice,
         billableDesi: product.shippingDesi,
-        lineShares: [commissionResult.shippingBuyerShares],
+        lineShares: [rawCommissionResult.shippingBuyerShares],
       });
+
+      // Misafirde kimlik yoktur: yalnız herkese açık kampanyalar uygulanır
+      // (üyelik ve kişiye özel hedefler kimlik gerektirir → eşleşmez).
+      const feeDiscounted = (await this.feeDiscounts?.apply({
+        context: {
+          productId: product.id,
+          categoryId: product.categoryId,
+          sellerId: product.sellerId,
+          buyerId: null,
+          buyerTier: null,
+        },
+        commission: rawCommissionResult,
+        buyerShippingAmount: rawBuyerShippingAmount,
+        sellerShippingAmount: rawSellerShippingAmount,
+      })) ?? {
+        commission: rawCommissionResult,
+        buyerShippingAmount: rawBuyerShippingAmount,
+        sellerShippingAmount: rawSellerShippingAmount,
+        applied: [],
+        buyerTotal: 0,
+        sellerTotal: 0,
+      };
+      const commissionResult = feeDiscounted.commission;
+      const buyerShippingAmount = feeDiscounted.buyerShippingAmount;
+      const sellerShippingAmount = feeDiscounted.sellerShippingAmount;
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
       // Vergiler: ürün KDV'si (politikayla kapalı), hizmet KDV'si (iki taraf) ve stopaj.
       const {
@@ -559,6 +588,11 @@ export class OrderGuestCheckoutService {
             sellerServiceTaxAmount: guestSellerServiceTax,
             totalAmount,
           }),
+          buyerFeeDiscountAmount: feeDiscounted.buyerTotal,
+          sellerFeeDiscountAmount: feeDiscounted.sellerTotal,
+          feeDiscountBreakdown: feeDiscounted.applied.length
+            ? (feeDiscounted.applied as unknown as Prisma.InputJsonValue)
+            : undefined,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,
