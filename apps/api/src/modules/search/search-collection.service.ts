@@ -1,7 +1,15 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { SearchCommonService } from './search-common.service';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { SearchCommonService } from "./search-common.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * Koleksiyon indeksleme + arama alt servisi (search.service.ts'ten birebir
@@ -26,9 +34,9 @@ export class SearchCollectionService {
       id: collection.id,
       name: collection.name,
       slug: collection.slug,
-      description: collection.description || '',
+      description: collection.description || "",
       userId: collection.userId,
-      userName: collection.user?.displayName || '',
+      userName: publicName(collection.user),
       categoryId: collection.categoryId || undefined,
       categoryName: collection.category?.name || undefined,
       isPublic: collection.isPublic,
@@ -36,14 +44,16 @@ export class SearchCollectionService {
       viewCount: collection.viewCount || 0,
       likeCount: collection.likeCount || 0,
       itemCount: collection._count?.items ?? 0,
-      coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
+      coverImageUrl: collection.coverImageKey
+        ? this.storageService.getPublicAssetUrl(collection.coverImageKey)
+        : undefined,
       createdAt: collection.createdAt,
       updatedAt: collection.updatedAt,
     };
   }
 
   private readonly collectionInclude = {
-    user: { select: { id: true, displayName: true } },
+    user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
     category: { select: { id: true, name: true, slug: true } },
     _count: { select: { items: true } },
   };
@@ -69,7 +79,10 @@ export class SearchCollectionService {
   async removeCollection(collectionId: string): Promise<void> {
     if (!this.common.isAvailable()) return;
     try {
-      await this.common.client.delete({ index: this.common.collectionsIndex, id: collectionId });
+      await this.common.client.delete({
+        index: this.common.collectionsIndex,
+        id: collectionId,
+      });
     } catch (error) {
       this.logger.warn(`ES delete error for collection ${collectionId}`);
     }
@@ -78,15 +91,19 @@ export class SearchCollectionService {
   async reindexAllCollections(): Promise<number> {
     if (!this.common.isAvailable()) return 0;
     if (this.common.reindexingCollections) {
-      this.logger.warn('Collections reindex already in progress, skipping');
+      this.logger.warn("Collections reindex already in progress, skipping");
       return 0;
     }
     this.common.reindexingCollections = true;
     try {
       await this.prisma.searchIndex.upsert({
         where: { indexName: this.common.collectionsIndex },
-        update: { status: 'rebuilding' },
-        create: { indexName: this.common.collectionsIndex, status: 'rebuilding', settings: {} },
+        update: { status: "rebuilding" },
+        create: {
+          indexName: this.common.collectionsIndex,
+          status: "rebuilding",
+          settings: {},
+        },
       });
 
       const collections = await this.prisma.collection.findMany({
@@ -101,13 +118,22 @@ export class SearchCollectionService {
           { index: { _index: this.common.collectionsIndex, _id: c.id } },
           this.buildCollectionDocument(c),
         ]);
-        const bulkResp = await this.common.client.bulk({ refresh: true, operations });
+        const bulkResp = await this.common.client.bulk({
+          refresh: true,
+          operations,
+        });
 
         if (bulkResp.errors) {
-          const failed = (bulkResp.items ?? []).filter((item: any) => item.index?.error);
-          this.logger.error(`Collections bulk indexing had ${failed.length} failures`);
+          const failed = (bulkResp.items ?? []).filter(
+            (item: any) => item.index?.error,
+          );
+          this.logger.error(
+            `Collections bulk indexing had ${failed.length} failures`,
+          );
           for (const f of failed.slice(0, 5)) {
-            this.logger.error(`  Failed doc ${(f as any).index?._id}: ${JSON.stringify((f as any).index?.error)}`);
+            this.logger.error(
+              `  Failed doc ${(f as any).index?._id}: ${JSON.stringify((f as any).index?.error)}`,
+            );
           }
           indexed = collections.length - failed.length;
         } else {
@@ -130,26 +156,37 @@ export class SearchCollectionService {
           const deleteOps = orphanIds.flatMap((id) => [
             { delete: { _index: this.common.collectionsIndex, _id: id } },
           ]);
-          await this.common.client.bulk({ refresh: true, operations: deleteOps });
-          this.logger.log(`Removed ${orphanIds.length} orphaned docs from collections index`);
+          await this.common.client.bulk({
+            refresh: true,
+            operations: deleteOps,
+          });
+          this.logger.log(
+            `Removed ${orphanIds.length} orphaned docs from collections index`,
+          );
         }
       } catch (orphanErr) {
-        this.logger.warn('Failed to clean orphaned collection docs from ES');
+        this.logger.warn("Failed to clean orphaned collection docs from ES");
       }
 
       await this.prisma.searchIndex.update({
         where: { indexName: this.common.collectionsIndex },
-        data: { status: 'active', documentCount: indexed, lastSyncedAt: new Date() },
+        data: {
+          status: "active",
+          documentCount: indexed,
+          lastSyncedAt: new Date(),
+        },
       });
       this.logger.log(`Reindexed ${indexed} collections (non-destructive)`);
       return indexed;
     } catch (error) {
-      this.logger.error('Collections reindex error');
-      await this.prisma.searchIndex.update({
-        where: { indexName: this.common.collectionsIndex },
-        data: { status: 'error' },
-      }).catch(() => {});
-      throw new InternalServerErrorException('Collections reindex failed');
+      this.logger.error("Collections reindex error");
+      await this.prisma.searchIndex
+        .update({
+          where: { indexName: this.common.collectionsIndex },
+          data: { status: "error" },
+        })
+        .catch(() => {});
+      throw new InternalServerErrorException("Collections reindex failed");
     } finally {
       this.common.reindexingCollections = false;
     }
@@ -163,13 +200,23 @@ export class SearchCollectionService {
     isPublic?: boolean;
     isFeatured?: boolean;
     userId?: string;
-    sortBy?: 'popular' | 'recent' | 'name' | 'items' | 'items_asc' | 'items_desc';
+    sortBy?:
+      "popular" | "recent" | "name" | "items" | "items_asc" | "items_desc";
     page?: number;
     pageSize?: number;
   }): Promise<{ ids: string[]; total: number } | null> {
     if (!this.common.isAvailable()) return null;
 
-    const { query, categoryId, isPublic, isFeatured, userId, sortBy = 'popular', page = 1, pageSize = 20 } = options;
+    const {
+      query,
+      categoryId,
+      isPublic,
+      isFeatured,
+      userId,
+      sortBy = "popular",
+      page = 1,
+      pageSize = 20,
+    } = options;
 
     const must: any[] = [];
     const filter: any[] = [];
@@ -179,17 +226,22 @@ export class SearchCollectionService {
         bool: {
           should: [
             { match: { name: { query, boost: 5 } } },
-            { match: { 'name.edge_ngram': { query, boost: 3 } } },
+            { match: { "name.edge_ngram": { query, boost: 3 } } },
             { match: { description: { query, boost: 1.5 } } },
-            { match: { 'description.edge_ngram': { query, boost: 1 } } },
+            { match: { "description.edge_ngram": { query, boost: 1 } } },
             { match: { userName: { query, boost: 2 } } },
-            { match: { 'userName.edge_ngram': { query, boost: 1 } } },
+            { match: { "userName.edge_ngram": { query, boost: 1 } } },
             { match: { categoryName: { query, boost: 2 } } },
             {
               multi_match: {
                 query,
-                fields: ['name^3', 'description', 'userName^2', 'categoryName^2'],
-                fuzziness: 'AUTO',
+                fields: [
+                  "name^3",
+                  "description",
+                  "userName^2",
+                  "categoryName^2",
+                ],
+                fuzziness: "AUTO",
                 prefix_length: 1,
                 boost: 1.5,
               },
@@ -207,12 +259,24 @@ export class SearchCollectionService {
 
     let sort: any[];
     switch (sortBy) {
-      case 'popular': sort = [{ viewCount: 'desc' }, { likeCount: 'desc' }]; break;
-      case 'recent': sort = [{ createdAt: 'desc' }]; break;
-      case 'name': sort = [{ 'name.keyword': 'asc' }]; break;
-      case 'items': case 'items_desc': sort = [{ itemCount: 'desc' }]; break;
-      case 'items_asc': sort = [{ itemCount: 'asc' }]; break;
-      default: sort = query ? [{ _score: 'desc' }] : [{ viewCount: 'desc' }];
+      case "popular":
+        sort = [{ viewCount: "desc" }, { likeCount: "desc" }];
+        break;
+      case "recent":
+        sort = [{ createdAt: "desc" }];
+        break;
+      case "name":
+        sort = [{ "name.keyword": "asc" }];
+        break;
+      case "items":
+      case "items_desc":
+        sort = [{ itemCount: "desc" }];
+        break;
+      case "items_asc":
+        sort = [{ itemCount: "asc" }];
+        break;
+      default:
+        sort = query ? [{ _score: "desc" }] : [{ viewCount: "desc" }];
     }
 
     try {
@@ -227,11 +291,11 @@ export class SearchCollectionService {
         sort,
         from: (page - 1) * pageSize,
         size: pageSize,
-        _source: ['id'],
+        _source: ["id"],
       });
 
       const total =
-        typeof response.hits.total === 'number'
+        typeof response.hits.total === "number"
           ? response.hits.total
           : (response.hits.total as any)?.value || 0;
 
@@ -240,7 +304,7 @@ export class SearchCollectionService {
         total,
       };
     } catch (error) {
-      this.logger.warn('Collections search error, falling back to Prisma');
+      this.logger.warn("Collections search error, falling back to Prisma");
       return null;
     }
   }
@@ -249,19 +313,23 @@ export class SearchCollectionService {
     if (!this.common.isAvailable()) return;
     try {
       const [esRes, dbCount] = await Promise.all([
-        this.common.client.count({ index: this.common.collectionsIndex }).catch(() => ({ count: 0 })),
+        this.common.client
+          .count({ index: this.common.collectionsIndex })
+          .catch(() => ({ count: 0 })),
         this.prisma.collection.count({ where: { isPublic: true } }),
       ]);
       const esCount = esRes?.count ?? 0;
       if (dbCount > 0 && (esCount === 0 || esCount < dbCount * 0.5)) {
-        this.logger.log(`Collections index out of sync: ES=${esCount}, DB=${dbCount} – reindexing...`);
+        this.logger.log(
+          `Collections index out of sync: ES=${esCount}, DB=${dbCount} – reindexing...`,
+        );
         const indexed = await this.reindexAllCollections();
         this.logger.log(`Collections reindex complete: ${indexed} indexed.`);
       } else if (dbCount > 0 && esCount > 0) {
         const sample = await this.common.client.search({
           index: this.common.collectionsIndex,
           size: 5,
-          _source: ['id'],
+          _source: ["id"],
         });
         const sampleIds = sample.hits.hits
           .map((h: any) => h._source?.id as string)
@@ -275,12 +343,17 @@ export class SearchCollectionService {
               `Collections index has stale IDs (${found}/${sampleIds.length} valid) – reindexing...`,
             );
             const indexed = await this.reindexAllCollections();
-            this.logger.log(`Collections reindex complete: ${indexed} indexed.`);
+            this.logger.log(
+              `Collections reindex complete: ${indexed} indexed.`,
+            );
           }
         }
       }
     } catch (err) {
-      this.logger.warn('syncCollectionsIndexIfEmpty failed', err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        "syncCollectionsIndexIfEmpty failed",
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 }

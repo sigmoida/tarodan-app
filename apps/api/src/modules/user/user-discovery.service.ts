@@ -12,6 +12,10 @@ import {
   PUBLIC_IDENTITY_SELECT,
   publicIdentityFields,
 } from "../../common/helpers/public-identity";
+import {
+  LEGACY_USERNAME_PREFIX,
+  normalizeUsername,
+} from "../auth/username.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
@@ -829,8 +833,11 @@ export class UserDiscoveryService {
   }
 
   /**
-   * İsimle satıcı arama (autocomplete). Yalnızca aktif ürünü olan, banlı/silinmemiş
-   * satıcıları döndürür — profili herkese açık olmayanları sızdırmaz.
+   * Satıcı arama (autocomplete). Arama HERKESE AÇIK kimlik üzerinden yapılır:
+   * kullanıcı adı ve firma adı. Gerçek ad (`displayName`) yalnızca kullanıcı
+   * adı seçmemiş eski hesaplarda görünür olduğundan onlarda hâlâ aranabilir —
+   * kullanıcı adını seçmiş bir üye artık gerçek adıyla bulunamaz.
+   * Yalnızca aktif ürünü olan, banlı/silinmemiş satıcıları döndürür.
    */
   async searchSellers(query: string, limit: number = 8) {
     const q = (query || "").trim();
@@ -847,15 +854,20 @@ export class UserDiscoveryService {
         products: {
           some: { ...catalogProductWhere(), status: "active" },
         },
-        displayName: { contains: q, mode: "insensitive" },
+        OR: [
+          { username: { contains: normalizeUsername(q), mode: "insensitive" } },
+          { companyName: { contains: q, mode: "insensitive" } },
+          {
+            // Kullanıcı adı seçmemiş hesapta herkese açık ad = gerçek ad.
+            username: { startsWith: LEGACY_USERNAME_PREFIX },
+            displayName: { contains: q, mode: "insensitive" },
+          },
+        ],
       },
       take: Math.min(20, Math.max(1, Number(limit) || 8)),
       orderBy: { products: { _count: "desc" } },
       select: {
-        id: true,
-        displayName: true,
-        avatarUrl: true,
-        isVerified: true,
+        ...PUBLIC_IDENTITY_SELECT,
         _count: {
           select: {
             products: {
@@ -869,7 +881,7 @@ export class UserDiscoveryService {
     return Promise.all(
       sellers.map(async (s) => ({
         id: s.id,
-        displayName: s.displayName,
+        ...publicIdentityFields(s),
         avatarUrl: await this.common.resolveAvatarUrl(s.avatarUrl),
         isVerified: s.isVerified,
         totalListings: s._count.products,
