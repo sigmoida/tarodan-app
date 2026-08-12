@@ -301,6 +301,24 @@ export class AdminTradeResolutionService {
         };
       }
 
+      // KUSUR: kolisini kargoya vermiş taraflar üstüne düşeni yapmıştır →
+      // ödemeleri hizmet bedeli ve kargo dahil TAM iade edilir. Karşı taraf
+      // kolisini hiç vermediyse standart matrise tabidir; o da vermiş ama
+      // kargoda takılmışsa iki taraf da kusursuzdur (taşıyıcı kaynaklı).
+      const faultlessShipperIds = [
+        ...new Set(
+          toWarehouseShipments
+            .filter((s) => s.shippedAt !== null || s.deliveredAt !== null)
+            .map((s) => s.shipperId),
+        ),
+      ];
+      if (faultlessShipperIds.length > 0) {
+        await tx.tradeCashPayment.updateMany({
+          where: { tradeId, payerId: { in: faultlessShipperIds } },
+          data: { fullRefundEntitled: true },
+        });
+      }
+
       await tx.trade.update({
         where: { id: tradeId },
         data: {

@@ -1,22 +1,38 @@
 /**
  * TAKAS İADE POLİTİKASI (v2) — TEK kaynak.
  *
- * HİZMET BEDELİ HİÇBİR İPTALDE İADE EDİLMEZ: bedel, güvenli takas hizmetinin
- * karşılığıdır (eşleştirme, escrow, depo kontrol operasyonu) ve iptal edilen
- * takasta da bu hizmet süreci işletilir. v1 satırlarında aynı rolü nakit-fark
- * komisyonu (+KDV'si) oynar; o da iade edilmez.
+ * İki soru sorulur, sırayla:
  *
- * KARGO bedeli yalnız fiilen kullanıldıysa iade dışıdır: ürün kargoya
- * verildikten sonra iptal olduğunda platform bacakların maliyetini gerçekten
- * ödemiştir. Henüz hiçbir ürün kargoya verilmemişken iptalde kargo hizmeti hiç
- * doğmadığı için kargo bedeli iade edilir.
+ * 1) BU TARAF KUSURSUZ MU? Takas, bu tarafın hiçbir kusuru olmadan bozulduysa
+ *    (karşı taraf ödemedi, karşı taraf kargolamadı, karşı taraf vazgeçti,
+ *    karşı tarafın ürünü depo kontrolünden geçmedi, koli kargoda kayboldu)
+ *    iade TAM tutar üzerinden yapılır: hizmet bedeli ve kargo dahil. Kusursuz
+ *    tarafın cebinden hiçbir şey çıkmaz; doğan maliyeti platform üstlenir.
+ *    Karar iptali yazan yolda verilir ve ödeme satırına
+ *    `fullRefundEntitled` olarak KAYDEDİLİR — iade sağlayıcıda patlayıp retry
+ *    cron'una düşse bile aynı tutar yeniden hesaplansın diye.
  *
- * NAKİT FARK her durumda iade edilir (takas gerçekleşmedi; fark alıcısına
- * gidecek para payerına döner).
+ * 2) DEĞİLSE, kalem kalem düşülür:
+ *    - HİZMET BEDELİ iade edilmez: bedel, güvenli takas hizmetinin (eşleştirme,
+ *      escrow, depo kontrol operasyonu) karşılığıdır ve iptal edilen takasta da
+ *      bu süreç işletilmiştir. v1 satırlarında aynı rolü nakit-fark komisyonu
+ *      (+KDV'si) oynar.
+ *    - KARGO yalnız fiilen kullanıldıysa iade dışıdır: ürün kargoya verildikten
+ *      sonraki iptalde platform bacakların maliyetini gerçekten ödemiştir. Hiç
+ *      kargolanmadan iptalde kargo hizmeti hiç doğmadığı için iade edilir.
+ *    - NAKİT FARK her durumda iade edilir (takas gerçekleşmedi).
+ *
+ * Kusur atfının yapıldığı yerler:
+ *   · ödeme süresi aşımı        → ödeyen taraf kusursuz
+ *   · kullanıcı iptali          → KARŞI taraf kusursuz (vazgeçen değil)
+ *   · takılı takas çözümü       → kolisini kargoya vermiş taraf kusursuz
+ *   · kayıp koli                → iki taraf da kusursuz (taşıyıcı kaynaklı)
+ *   · depo reddi                → `faultySide` dışındaki taraf kusursuz
+ *   · kargolama süresi aşımı, hiçbir koli verilmedi → iki taraf da kusurlu
  *
  * NOT: takas TAMAMLANDIKTAN sonra iade süreci yoktur (`completed` terminal;
- * itiraz yolu yalnız dispute). Bu politika iptal / red / depoya-kabul-etmeme
- * yollarında geçerlidir.
+ * itiraz yolu ayrıdır ve ürünleri geri toplamaz — orada mağduriyet tazminatla
+ * kapatılır, bu matrisle değil).
  */
 
 const round2 = (value: number): number =>
@@ -31,11 +47,6 @@ export interface TradeRefundContext {
   handedToCargo: boolean;
 }
 
-/** Kargo bedeli iade dışı mı? (yalnız kargoya verildikten sonra) */
-export function tradeRefundExcludesShipping(ctx: TradeRefundContext): boolean {
-  return ctx.handedToCargo;
-}
-
 export interface RefundablePayment {
   /** Tahsil edilen toplam. */
   totalAmount: number | string | { toString(): string };
@@ -46,6 +57,11 @@ export interface RefundablePayment {
   /** v1 nakit-fark komisyonu ve KDV'si (v2 satırlarında 0). */
   commissionAmount?: number | string | { toString(): string } | null;
   commissionTaxAmount?: number | string | { toString(): string } | null;
+  /**
+   * Bu tarafın kusuru olmadan bozulan takas → tam iade. İptali yazan yol
+   * karar verir ve satıra kaydeder (`TradeCashPayment.fullRefundEntitled`).
+   */
+  fullRefundEntitled?: boolean | null;
 }
 
 export interface TradeRefundCandidate extends RefundablePayment {
@@ -66,17 +82,28 @@ export function tradeServiceFeeOf(payment: RefundablePayment): number {
   );
 }
 
+/** Kargo bedeli iade dışı mı? (yalnız kargoya verildikten sonra, kusurlu tarafta) */
+export function tradeRefundExcludesShipping(
+  payment: RefundablePayment,
+  ctx: TradeRefundContext,
+): boolean {
+  if (payment.fullRefundEntitled) return false;
+  return ctx.handedToCargo;
+}
+
 /**
- * Bu ödeme satırından iade edilecek tutar:
- * `total − hizmetBedeli − (kargoya verildiyse kargo)` — asla negatif olmaz.
+ * Bu ödeme satırından iade edilecek tutar. Kusursuz tarafta tahsil edilenin
+ * TAMAMI; aksi halde `total − hizmetBedeli − (kargoya verildiyse kargo)`.
+ * Asla negatif olmaz.
  */
 export function refundableAmountFor(
   payment: RefundablePayment,
   ctx: TradeRefundContext,
 ): number {
   const total = Number(payment.totalAmount) || 0;
+  if (payment.fullRefundEntitled) return round2(Math.max(0, total));
   const serviceFee = tradeServiceFeeOf(payment);
-  const shipping = tradeRefundExcludesShipping(ctx)
+  const shipping = tradeRefundExcludesShipping(payment, ctx)
     ? Number(payment.shippingAmount) || 0
     : 0;
   return round2(Math.max(0, total - serviceFee - shipping));

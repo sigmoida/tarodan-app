@@ -993,6 +993,13 @@ model TradeCashPayment {
   holdReleaseAt       DateTime?        @map("hold_release_at")
   releasedAt          DateTime?        @map("released_at")
   refundedAt          DateTime?        @map("refunded_at")
+  /// KUSURSUZ TARAF işareti. Takas, bu satırın sahibinin kusuru OLMADAN
+  /// bozulduğunda (karşı taraf ödemedi/kargolamadı, karşı tarafın ürünü depo
+  /// kontrolünden geçmedi, koli kayboldu, karşı taraf vazgeçti) iptali kararla
+  /// yazan yol bu bayrağı işaretler ve iade TAM tutar üzerinden yapılır —
+  /// hizmet bedeli ve kargo dahil. Karar satıra yazılır ki iade PayTR'da
+  /// patlayıp retry cron'una düşse bile aynı tutar hesaplansın.
+  fullRefundEntitled  Boolean          @default(false) @map("full_refund_entitled")
   createdAt           DateTime         @default(now()) @map("created_at")
   updatedAt           DateTime         @updatedAt @map("updated_at")
   trade               Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)

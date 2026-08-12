@@ -1091,6 +1091,17 @@ export class TradeLifecycleService {
           version: { increment: 1 },
         },
       });
+
+      // KUSUR: vazgeçen taraf iptali başlattı; KARŞI taraf üstüne düşeni
+      // yapmıştı. Onun ödemesi hizmet bedeli ve kargo dahil TAM iade edilir
+      // (bkz. trade-refund-policy). Karar satıra yazılır — iade sağlayıcıda
+      // patlarsa retry cron'u da aynı tutarı hesaplar.
+      const otherPartyId =
+        trade.initiatorId === userId ? trade.receiverId : trade.initiatorId;
+      await tx.tradeCashPayment.updateMany({
+        where: { tradeId, payerId: otherPartyId },
+        data: { fullRefundEntitled: true },
+      });
     });
 
     if (!alreadyCancelled) {

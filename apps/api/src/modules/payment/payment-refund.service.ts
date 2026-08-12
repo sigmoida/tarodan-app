@@ -1395,6 +1395,9 @@ export class PaymentRefundService {
           commissionAmount: payment.tradeCashPayment?.commission ?? 0,
           commissionTaxAmount:
             payment.tradeCashPayment?.commissionTaxAmount ?? 0,
+          // Kusursuz taraf kararı iptali yazan yolda verilip satıra kaydedilir;
+          // retry cron'u da aynı tutarı hesaplasın diye buradan okunur.
+          fullRefundEntitled: payment.tradeCashPayment?.fullRefundEntitled,
         },
         { handedToCargo },
       );

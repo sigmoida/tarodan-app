@@ -1121,6 +1121,25 @@ export class AdminTradeWarehouseService {
         },
       });
 
+      // KUSUR: kontrolden geçemeyen ürün kimin ise takası o bozmuştur. Diğer
+      // taraf üstüne düşeni eksiksiz yapmıştır → ödemesi hizmet bedeli ve kargo
+      // dahil TAM iade edilir (bkz. trade-refund-policy). "neither" operasyonel
+      // reddir (ör. bizim hatamız): iki taraf da kusursuzdur.
+      const faultlessPayerIds =
+        dto.faultySide === "initiator"
+          ? [trade.receiverId]
+          : dto.faultySide === "receiver"
+            ? [trade.initiatorId]
+            : dto.faultySide === "neither"
+              ? [trade.initiatorId, trade.receiverId]
+              : [];
+      if (faultlessPayerIds.length > 0) {
+        await tx.tradeCashPayment.updateMany({
+          where: { tradeId, payerId: { in: faultlessPayerIds } },
+          data: { fullRefundEntitled: true },
+        });
+      }
+
       const updatedTrade = await tx.trade.update({
         where: { id: tradeId },
         data: {

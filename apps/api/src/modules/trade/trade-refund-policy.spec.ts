@@ -6,21 +6,39 @@ import {
 } from "./trade-refund-policy";
 
 /**
- * TAKAS İADE MATRİSİ — hizmet bedeli HİÇBİR iptalde iade edilmez (güvenli
- * takas hizmetinin bedelidir); kargo yalnız fiilen kullanıldıysa (kargoya
- * verildikten sonra) iade dışıdır; nakit fark her durumda iade edilir.
+ * TAKAS İADE MATRİSİ.
+ *
+ * Önce kusur sorulur: takas bu tarafın kusuru OLMADAN bozulduysa
+ * (`fullRefundEntitled`) tahsil edilenin tamamı iade edilir. Aksi halde hizmet
+ * bedeli hiçbir iptalde iade edilmez ve kargo yalnız fiilen kullanıldıysa
+ * (kargoya verildikten sonra) iade dışıdır; nakit fark her durumda iade edilir.
  *
  * Takas TAMAMLANDIKTAN sonra iade süreci yoktur (yalnız dispute); bu politika
  * iptal/red/return yollarında geçerlidir.
  */
 describe("takas iade politikası", () => {
+  const line = { totalAmount: 295, shippingAmount: 60, tradeFeeAmount: 35 };
+
   describe("tradeRefundExcludesShipping", () => {
     it("hiçbir ürün kargoya verilmediyse kargo da iade edilir", () => {
-      expect(tradeRefundExcludesShipping({ handedToCargo: false })).toBe(false);
+      expect(tradeRefundExcludesShipping(line, { handedToCargo: false })).toBe(
+        false,
+      );
     });
 
     it("ürün kargoya verildiyse kargo iade DIŞIDIR", () => {
-      expect(tradeRefundExcludesShipping({ handedToCargo: true })).toBe(true);
+      expect(tradeRefundExcludesShipping(line, { handedToCargo: true })).toBe(
+        true,
+      );
+    });
+
+    it("kusursuz tarafta kargo da iade edilir (ürün yola çıkmış olsa bile)", () => {
+      expect(
+        tradeRefundExcludesShipping(
+          { ...line, fullRefundEntitled: true },
+          { handedToCargo: true },
+        ),
+      ).toBe(false);
     });
   });
 
@@ -91,6 +109,23 @@ describe("takas iade politikası", () => {
       ).toBe(0);
     });
 
+    it("KUSURSUZ tarafta tahsil edilenin TAMAMI iade edilir", () => {
+      // Karşı taraf ödemedi / kargolamadı / ürünü kontrolden geçmedi: bu taraf
+      // hizmet bedelini de kargosunu da kaybetmez.
+      expect(
+        refundableAmountFor(
+          { ...payment, fullRefundEntitled: true },
+          { handedToCargo: true },
+        ),
+      ).toBe(295);
+      expect(
+        refundableAmountFor(
+          { ...payment, fullRefundEntitled: true },
+          { handedToCargo: false },
+        ),
+      ).toBe(295);
+    });
+
     it("kuruşlu tutarlarda kuruş hassasiyetini korur", () => {
       expect(
         refundableAmountFor(
@@ -132,6 +167,23 @@ describe("takas iade politikası", () => {
         tradePaymentRefundableAmountFor(
           { ...candidate, provider: "other" },
           { handedToCargo: false },
+        ),
+      ).toBe(0);
+    });
+
+    it("kusursuz tarafta uygunluk guard'ları hâlâ geçerlidir", () => {
+      // Tam iade hakkı, iade edilmiş ya da escrow'u bırakılmış satırı yeniden
+      // iade edilebilir yapmaz.
+      expect(
+        tradePaymentRefundableAmountFor(
+          { ...candidate, fullRefundEntitled: true },
+          { handedToCargo: true },
+        ),
+      ).toBe(95);
+      expect(
+        tradePaymentRefundableAmountFor(
+          { ...candidate, fullRefundEntitled: true, refundedAt: new Date() },
+          { handedToCargo: true },
         ),
       ).toBe(0);
     });

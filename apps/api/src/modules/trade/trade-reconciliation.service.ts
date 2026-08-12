@@ -316,6 +316,13 @@ export class TradeReconciliationService {
       ...expiredPaymentTrades,
       ...expiredShippingTrades,
     ]) {
+      // Kusur ataması: ÖDEME süresi aşımında ödemesini yapmış taraf kusursuzdur
+      // (takas karşı taraf ödemediği için bozuldu) → tam iade. Kargolama süresi
+      // aşımında (bu kümeye yalnız HİÇBİR kolinin verilmediği takaslar girer)
+      // iki taraf da üstüne düşeni yapmamıştır; kimse kusursuz sayılmaz.
+      const paymentDefaultCancel = expiredPaymentTrades.some(
+        (t) => t.id === trade.id,
+      );
       try {
         // SIRA KRİTİK: önce KOŞULLU-ATOMİK iptal (tx içinde tüm uygunluk
         // koşulları yeniden doğrulanır), iade ANCAK iptal commit olduysa ve
@@ -413,6 +420,14 @@ export class TradeReconciliationService {
               cancelledAt: now,
             },
           });
+
+          if (paymentDefaultCancel) {
+            // Tamamlanmış her ödeme satırı, üstüne düşeni yapmış tarafa aittir.
+            await tx.tradeCashPayment.updateMany({
+              where: { tradeId: trade.id, status: PaymentStatus.completed },
+              data: { fullRefundEntitled: true },
+            });
+          }
           return true;
         });
         if (!cancelled) continue;
@@ -554,6 +569,13 @@ export class TradeReconciliationService {
               });
             }
           }
+
+          // Koli taşıyıcıda kayboldu: hiçbir tarafın kusuru yok → iki ödeme de
+          // hizmet bedeli ve kargo dahil TAM iade edilir.
+          await tx.tradeCashPayment.updateMany({
+            where: { tradeId: trade.id, status: PaymentStatus.completed },
+            data: { fullRefundEntitled: true },
+          });
 
           await tx.trade.update({
             where: { id: trade.id },
