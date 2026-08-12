@@ -63,6 +63,10 @@ export class AdminTradeService {
     );
   }
 
+  async startWarehouseReview(adminId: string, tradeId: string) {
+    return this.warehouse.startWarehouseReview(adminId, tradeId);
+  }
+
   async approveWarehouseTrade(
     adminId: string,
     tradeId: string,

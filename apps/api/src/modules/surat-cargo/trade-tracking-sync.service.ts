@@ -2,6 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { PrismaService } from "../../prisma";
 import { ShipmentStatus, TradeStatus, PaymentStatus } from "@prisma/client";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { ElogoInvoicingService } from "../elogo/elogo-invoicing.service";
 import type { SuratTakipGonderi } from "./surat-cargo.types";
 import {
@@ -467,6 +469,41 @@ export class TradeTrackingSyncService {
     // v2'de taraf başına bir satır vardır → HER tamamlanmış satır kendi faturasını doğurur.
     // Post-commit, non-blocking, idempotent (cut() type+sourceId tekil).
     if (!transitioned) return;
+
+    // Taraflara "ürünler depoda" bildirimi (admin manuel yolu ile aynı mesaj).
+    // moduleRef ile lazy çözülür: bu servis bildirim modülüne statik bağımlı
+    // olmasın (fatura tetiği ile aynı desen). Best-effort.
+    try {
+      const parties = await this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: { initiatorId: true, receiverId: true },
+      });
+      if (parties) {
+        const notifications = this.moduleRef.get(NotificationService, {
+          strict: false,
+        });
+        for (const userId of [parties.initiatorId, parties.receiverId]) {
+          await notifications
+            .createInAppNotification(
+              userId,
+              NotificationType.TRADE_AT_WAREHOUSE,
+              {
+                tradeId,
+              },
+            )
+            .catch((e: any) =>
+              this.logger.warn(
+                `TRADE_AT_WAREHOUSE notify failed trade=${tradeId} user=${userId}: ${e?.message}`,
+              ),
+            );
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(
+        `TRADE_AT_WAREHOUSE notify skipped for trade ${tradeId}: ${e?.message}`,
+      );
+    }
+
     try {
       const tcps = await this.prisma.tradeCashPayment.findMany({
         where: { tradeId, status: PaymentStatus.completed },

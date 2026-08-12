@@ -861,6 +861,10 @@ export class AdminService {
     );
   }
 
+  async startWarehouseReview(adminId: string, tradeId: string) {
+    return this.tradeService.startWarehouseReview(adminId, tradeId);
+  }
+
   async approveWarehouseTrade(
     adminId: string,
     tradeId: string,

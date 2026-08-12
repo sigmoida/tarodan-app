@@ -185,6 +185,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_COMPLETED]: TRADE,
   [NotificationType.TRADE_REJECTED]: pattern("/profile/trades"),
   [NotificationType.TRADE_AUTO_CANCELLED]: pattern("/profile/trades"),
+  [NotificationType.TRADE_AT_WAREHOUSE]: TRADE,
   [NotificationType.TRADE_STUCK_AT_WAREHOUSE]: pattern("/profile/trades"),
   [NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING]:
     pattern("/profile/trades"),

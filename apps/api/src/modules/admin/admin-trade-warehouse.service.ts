@@ -11,6 +11,8 @@ import { AdminAuditService } from "./admin-audit.service";
 import { ApproveWarehouseTradeDto, RejectWarehouseTradeDto } from "./dto";
 import { TradeStatus, ShipmentStatus } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { EventService } from "../events/event.service";
 import {
   CARGO_PROVIDER,
@@ -40,6 +42,7 @@ export class AdminTradeWarehouseService {
     private readonly audit: AdminAuditService,
     private readonly paymentService: PaymentService,
     private readonly eventService: EventService,
+    private readonly notificationService: NotificationService,
     private readonly common: AdminTradeCommonService,
     @Optional()
     @Inject(CARGO_PROVIDER)
@@ -537,6 +540,16 @@ export class AdminTradeWarehouseService {
             );
           }
         }
+        // İki koli de depoda: taraflara haber ver. Bu bildirim olmadan süreç,
+        // kullanıcı açısından "iptal edemezsin" uyarısından sonra sessizleşiyor
+        // ve kontrol bitene kadar hiçbir sinyal gelmiyordu.
+        if (res.status === TradeStatus.at_warehouse) {
+          await this.notifyTradeAtWarehouse(
+            res.tradeId,
+            res.initiatorId,
+            res.receiverId,
+          );
+        }
         return res;
       });
   }
@@ -633,6 +646,79 @@ export class AdminTradeWarehouseService {
         shipmentId,
         confirmationDeadline,
       };
+    });
+  }
+
+  /**
+   * "Ürünler depoda" bildirimi (iki tarafa). Best-effort: bildirim hatası depo
+   * akışını bozmaz. Sürat poller'ı da aynı bildirimi kendi geçişinde atar.
+   */
+  private async notifyTradeAtWarehouse(
+    tradeId: string,
+    initiatorId: string,
+    receiverId: string,
+  ): Promise<void> {
+    for (const userId of [initiatorId, receiverId]) {
+      try {
+        await this.notificationService.createInAppNotification(
+          userId,
+          NotificationType.TRADE_AT_WAREHOUSE,
+          { tradeId },
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `TRADE_AT_WAREHOUSE notify failed trade=${tradeId} user=${userId}: ${err?.message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Depo kontrolünü BAŞLATIR: `at_warehouse` → `admin_reviewing`.
+   *
+   * `admin_reviewing` şemada ve durum makinesinde vardı ama hiçbir kod onu
+   * yazmıyordu: "uzman kontrolü" aşamasının veri karşılığı yoktu — kontrolün
+   * ne zaman başladığı, kimin baktığı kayıtlı değildi ve kullanıcıya "kontrol
+   * ediliyor" diye bir durum gösterilemiyordu. Kontrolü üstlenen operatör bu
+   * ucu çağırır; kim/ne zaman bilgisi denetim kaydında durur.
+   *
+   * İdempotent: zaten `admin_reviewing` ise sessizce aynı sonucu döner.
+   */
+  async startWarehouseReview(adminId: string, tradeId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: { id: true, status: true },
+      });
+      if (!trade) {
+        throw new NotFoundException("Takas bulunamadı");
+      }
+      if (trade.status === TradeStatus.admin_reviewing) {
+        return { success: true, tradeId, status: trade.status, already: true };
+      }
+      if (trade.status !== TradeStatus.at_warehouse) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' — kontrole yalnız 'at_warehouse' takas alınabilir`,
+        );
+      }
+
+      const updated = await tx.trade.update({
+        where: { id: tradeId },
+        data: { status: TradeStatus.admin_reviewing, updatedAt: new Date() },
+      });
+
+      await this.audit.createAuditLog(
+        adminId,
+        "trade_warehouse_review_started",
+        "Trade",
+        tradeId,
+        trade,
+        updated,
+      );
+
+      return { success: true, tradeId, status: updated.status, already: false };
     });
   }
 
@@ -1053,6 +1139,10 @@ export class AdminTradeWarehouseService {
         {
           ...updatedTrade,
           reason: dto.reason,
+          // Kusur ataması denetim kaydında saklanır: hangi tarafın ürünü
+          // elendi sorusu sonradan raporlanabilsin (mali sonuç bugün her iki
+          // taraf için aynıdır, bkz. iade matrisi).
+          faultySide: dto.faultySide,
           returnShipments: [returnToInitiator.id, returnToReceiver.id],
         },
       );

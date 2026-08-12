@@ -57,10 +57,18 @@ export const operationsApi = {
       shipmentId,
       ...(note ? { note } : {}),
     }),
+  // Depo kontrolünü üstlen: at_warehouse -> admin_reviewing (kim/ne zaman
+  // denetim kaydına yazılır; kullanıcı "kontrol ediliyor" durumunu görür).
+  startTradeReview: (tradeId: string) =>
+    api.post(`/admin/trades/${tradeId}/start-review`),
   approveTrade: (tradeId: string, notes?: string) =>
     api.post(`/admin/trades/${tradeId}/approve`, notes ? { notes } : {}),
-  rejectTrade: (tradeId: string, reason: string) =>
-    api.post(`/admin/trades/${tradeId}/reject`, { reason }),
+  // faultySide: kontrolde hangi tarafın ürünü elendi — denetim kaydına yazılır.
+  rejectTrade: (
+    tradeId: string,
+    reason: string,
+    faultySide: "initiator" | "receiver" | "both" | "neither",
+  ) => api.post(`/admin/trades/${tradeId}/reject`, { reason, faultySide }),
   markReturnDelivered: (tradeId: string, shipmentId: string) =>
     api.post(`/admin/trades/${tradeId}/mark-return-delivered`, { shipmentId }),
   retryTradeRefund: (tradeId: string) =>

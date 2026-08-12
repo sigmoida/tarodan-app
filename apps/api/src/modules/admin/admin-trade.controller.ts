@@ -198,6 +198,26 @@ export class AdminTradeController {
     );
   }
 
+  @Post("trades/:id/start-review")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Take a warehouse-arrived trade into inspection (at_warehouse -> admin_reviewing)",
+  })
+  @ApiParam({ name: "id", description: "Trade ID" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      "Trade moved to admin_reviewing; reviewer recorded in audit log",
+  })
+  async startWarehouseReview(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.adminService.startWarehouseReview(adminId, id);
+  }
+
   @Post("trades/:id/approve")
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)

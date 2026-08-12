@@ -316,6 +316,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.tradeAutoCancelled.message",
     icon: "🔄",
   },
+  [NotificationType.TRADE_AT_WAREHOUSE]: {
+    titleKey: "server.notification.tradeAtWarehouse.title",
+    messageKey: "server.notification.tradeAtWarehouse.message",
+    icon: "🏬",
+  },
   [NotificationType.TRADE_STUCK_AT_WAREHOUSE]: {
     titleKey: "server.notification.tradeStuckAtWarehouse.title",
     messageKey: "server.notification.tradeStuckAtWarehouse.message",

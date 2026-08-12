@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Modal, ModalFooter, Textarea } from "@tarodan/ui";
+import { Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+
+type FaultySide = "initiator" | "receiver" | "both" | "neither";
 
 export function RejectTradeModal({
   open,
@@ -17,12 +19,19 @@ export function RejectTradeModal({
 }) {
   const t = useTranslations();
   const [reason, setReason] = useState("");
+  // Kusur ataması: red her iki ürünü de geri gönderdiği için "kimin yüzünden"
+  // sorusu yalnız serbest metinde kalıyordu. Zorunlu seçim denetim kaydına yazılır.
+  const [faultySide, setFaultySide] = useState<FaultySide | "">("");
   useEffect(() => {
-    if (open) setReason("");
+    if (open) {
+      setReason("");
+      setFaultySide("");
+    }
   }, [open]);
 
   const reject = useAdminMutation(
-    () => adminApi.rejectTrade(tradeId, reason.trim()),
+    () =>
+      adminApi.rejectTrade(tradeId, reason.trim(), faultySide as FaultySide),
     {
       invalidates: ["trades"],
       successMessage: t("admin.operations.trades.rejectedMsg"),
@@ -46,7 +55,7 @@ export function RejectTradeModal({
           confirmLabel={t("admin.operations.trades.reject")}
           destructive
           isLoading={reject.isPending}
-          disabled={tooShort}
+          disabled={tooShort || !faultySide}
         />
       }
     >
@@ -54,6 +63,36 @@ export function RejectTradeModal({
         <p className="text-sm text-body">
           {t("admin.operations.trades.rejectBody")}
         </p>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-body">
+            {t("admin.operations.trades.faultySide")}{" "}
+            <span className="text-danger-600">*</span>
+          </label>
+          <Select
+            value={faultySide}
+            onChange={(e) => setFaultySide(e.target.value as FaultySide)}
+            disabled={reject.isPending}
+            options={[
+              { value: "", label: t("admin.operations.trades.faultySideHint") },
+              {
+                value: "initiator",
+                label: t("admin.operations.trades.faultySideInitiator"),
+              },
+              {
+                value: "receiver",
+                label: t("admin.operations.trades.faultySideReceiver"),
+              },
+              {
+                value: "both",
+                label: t("admin.operations.trades.faultySideBoth"),
+              },
+              {
+                value: "neither",
+                label: t("admin.operations.trades.faultySideNeither"),
+              },
+            ]}
+          />
+        </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-body">
             {t("admin.operations.trades.rejectReason")}{" "}

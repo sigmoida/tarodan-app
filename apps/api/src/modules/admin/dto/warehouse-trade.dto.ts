@@ -3,6 +3,23 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { ShipmentStatus } from "@prisma/client";
 import { AdminListQueryDto } from "../../../common/list";
 
+/**
+ * Depo kontrolünün kusur ataması. Red her iki tarafın ürününü de geri
+ * gönderdiği için "kimin yüzünden" sorusunun cevabı yalnız serbest metinde
+ * kalıyordu; artık yapısal olarak kaydedilir (denetim kaydı + operasyon
+ * raporlaması). Mali sonucu BUGÜN değiştirmez — iade matrisi her iki tarafa
+ * aynı uygulanır (bkz. docs/IDENTITY.md kardeşi docs/TAKAS.md) — ama ayrımı
+ * yapmadan o kararı vermek de mümkün değildi.
+ */
+export const TRADE_INSPECTION_FAULT_SIDES = [
+  "initiator",
+  "receiver",
+  "both",
+  "neither",
+] as const;
+export type TradeInspectionFaultSide =
+  (typeof TRADE_INSPECTION_FAULT_SIDES)[number];
+
 export class ApproveWarehouseTradeDto {
   @ApiPropertyOptional({
     example: "Her iki ürün de sağlıklı durumda, gönderim onaylandı",
@@ -22,6 +39,15 @@ export class RejectWarehouseTradeDto {
   @IsString()
   @MaxLength(500)
   reason: string;
+
+  @ApiProperty({
+    enum: TRADE_INSPECTION_FAULT_SIDES,
+    example: "initiator",
+    description:
+      "Which side's item failed inspection — recorded on the audit trail",
+  })
+  @IsIn(TRADE_INSPECTION_FAULT_SIDES)
+  faultySide: TradeInspectionFaultSide;
 }
 
 export class MarkShipmentDto {

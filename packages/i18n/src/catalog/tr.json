@@ -4928,7 +4928,16 @@
         "escrowReleaseReasonLabel": "Gerekçe",
         "escrowReleaseReasonPlaceholder": "Örn. iki taraf da teslimatı ve ürünleri teyit etti",
         "escrowReleaseConfirm": "Serbest Bırak",
-        "escrowReleasedMsg": "Takas nakit ödemesi serbest bırakıldı"
+        "escrowReleasedMsg": "Takas nakit ödemesi serbest bırakıldı",
+        "startReview": "Kontrole al",
+        "reviewInProgress": "Takas kontrol altında: ürünleri inceleyip onaylayın ya da reddedin.",
+        "reviewStartedMsg": "Takas kontrole alındı",
+        "faultySide": "Uygunsuz ürün hangi tarafta?",
+        "faultySideHint": "Seçiniz",
+        "faultySideInitiator": "Teklifi başlatan tarafın ürünü",
+        "faultySideReceiver": "Teklifi alan tarafın ürünü",
+        "faultySideBoth": "Her iki tarafın ürünü",
+        "faultySideNeither": "Ürün kaynaklı değil (operasyonel red)"
       },
       "refundRequests": {
         "title": "İade Takibi",
@@ -6863,6 +6872,10 @@
       "sellerApplicationRejected": {
         "title": "Kurumsal Başvurunuz Reddedildi",
         "message": "Kurumsal hesap başvurunuz reddedildi.{reason}"
+      },
+      "tradeAtWarehouse": {
+        "title": "Ürünler depomuzda",
+        "message": "Takasın iki ürünü de Tarodan deposuna ulaştı. Uzman kontrolünden sonra ürünler yeni sahiplerine gönderilecek."
       }
     },
     "auth": {

@@ -4928,7 +4928,16 @@
         "escrowReleaseReasonLabel": "Reason",
         "escrowReleaseReasonPlaceholder": "E.g. both parties confirmed delivery and the items",
         "escrowReleaseConfirm": "Release",
-        "escrowReleasedMsg": "Trade cash payment released"
+        "escrowReleasedMsg": "Trade cash payment released",
+        "startReview": "Start inspection",
+        "reviewInProgress": "Trade is under inspection: examine the items, then approve or reject.",
+        "reviewStartedMsg": "Trade taken into inspection",
+        "faultySide": "Which side's item failed?",
+        "faultySideHint": "Select",
+        "faultySideInitiator": "The offering party's item",
+        "faultySideReceiver": "The receiving party's item",
+        "faultySideBoth": "Both parties' items",
+        "faultySideNeither": "Not item related (operational rejection)"
       },
       "refundRequests": {
         "title": "Refund Tracking",
@@ -6863,6 +6872,10 @@
       "sellerApplicationRejected": {
         "title": "Your Business Application Was Rejected",
         "message": "Your business account application was rejected.{reason}"
+      },
+      "tradeAtWarehouse": {
+        "title": "Items reached our warehouse",
+        "message": "Both items in your trade arrived at the Tarodan warehouse. After inspection they will be shipped to their new owners."
       }
     },
     "auth": {

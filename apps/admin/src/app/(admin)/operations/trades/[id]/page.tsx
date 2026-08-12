@@ -68,6 +68,12 @@ export default function TradeDetailPage() {
       successMessage: t("admin.operations.trades.outboundDeliveredMsg"),
     },
   );
+  // Depo kontrolünü üstlen (at_warehouse -> admin_reviewing).
+  const startReview = useAdminMutation(() => adminApi.startTradeReview(id), {
+    invalidates: ["trades"],
+    successMessage: t("admin.operations.trades.reviewStartedMsg"),
+  });
+
   const processingShipmentId: string | null = warehouse.isPending
     ? (warehouse.variables ?? null)
     : returnDelivered.isPending
@@ -162,6 +168,9 @@ export default function TradeDetailPage() {
             />
             <ReviewPanel
               show={canApproveReject}
+              underReview={trade.status === "admin_reviewing"}
+              onStartReview={() => startReview.mutate(undefined as never)}
+              startingReview={startReview.isPending}
               onApprove={() => setShowApprove(true)}
               onReject={() => setShowReject(true)}
             />
