@@ -46,8 +46,10 @@ export class TradeCashPaymentResponseDto {
   recipientId: string | null;
   /** Nakit fark (v2'de yalnız farkı ödeyen tarafta > 0). */
   amount: number;
-  /** v2: takas hizmet bedeli (KDV DAHİL). */
+  /** v2: takas hizmet bedeli (KDV DAHİL; kampanya varsa indirim sonrası). */
   tradeFeeAmount: number;
+  /** İ25: hizmet bedeli kampanyasının bu satıra verdiği indirim. */
+  tradeFeeDiscountAmount?: number;
   /** v2: bu tarafın 2 bacaklık kargo bedeli. */
   shippingAmount: number;
   /** LEGACY (v1): aracılık komisyonu. */

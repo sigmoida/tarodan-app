@@ -20,7 +20,11 @@ export interface TradeCashPaymentRow {
   recipientId: string | null;
   /** Nakit fark (fark ödemeyen tarafta 0). */
   amount: number;
+  /** Kampanya varsa İNDİRİM SONRASI hizmet bedeli (tahsil edilen tutar). */
   tradeFeeAmount: number;
+  /** Takas hizmet bedeli kampanyasının bu satıra verdiği indirim. */
+  tradeFeeDiscountAmount: number;
+  tradeFeeCampaignId: string | null;
   shippingAmount: number;
   /** PayTR'den tahsil edilecek toplam. */
   totalAmount: number;
@@ -31,13 +35,28 @@ export interface TradeCashPaymentRow {
   status: PaymentStatus;
 }
 
+/** Kampanyanın bir tarafa verdiği indirim (İ25) — kabulde dondurulur. */
+export interface TradeFeeDiscount {
+  discountId: string;
+  amount: number;
+}
+
+const round2 = (value: number): number =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
 export function buildTradeCashPaymentRows(
   tradeId: string,
   quote: TradeQuote,
+  feeDiscounts?: Map<string, TradeFeeDiscount>,
 ): TradeCashPaymentRow[] {
   return [quote.initiator, quote.receiver].map((party) => {
     const counterparty =
       party.side === "initiator" ? quote.receiver : quote.initiator;
+    // İ25: hizmet bedeli kampanyası kabulde uygulanır ve satıra İNDİRİMLİ bedel
+    // yazılır — iade/fatura/rapor tahsil edilen gerçek tutarı okur (siparişteki
+    // "kesinti kolonları indirim sonrası tutarı taşır" ilkesiyle aynı).
+    const discount = feeDiscounts?.get(party.userId) ?? null;
+    const discountAmount = Math.min(discount?.amount ?? 0, party.serviceFee);
     return {
       tradeId,
       payerId: party.userId,
@@ -45,9 +64,12 @@ export function buildTradeCashPaymentRows(
       // bir alıcısı vardır — o da karşı taraftır.
       recipientId: party.cashDifference > 0 ? counterparty.userId : null,
       amount: party.cashDifference,
-      tradeFeeAmount: party.serviceFee,
+      tradeFeeAmount: round2(party.serviceFee - discountAmount),
+      tradeFeeDiscountAmount: round2(discountAmount),
+      tradeFeeCampaignId:
+        discountAmount > 0 ? (discount?.discountId ?? null) : null,
       shippingAmount: party.shipping,
-      totalAmount: party.total,
+      totalAmount: round2(party.total - discountAmount),
       commission: 0,
       commissionTaxAmount: 0,
       provider: "pending",

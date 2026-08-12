@@ -140,3 +140,51 @@ describe("takas kabul durumu (v2)", () => {
     expect(nextStatus).toBe(TradeStatus.awaiting_payment);
   });
 });
+
+describe("takas hizmet bedeli kampanyası (İ25)", () => {
+  it("indirim satıra İNDİRİMLİ bedel + indirim tutarı + kampanya kimliği olarak yazılır", () => {
+    // Yalnız initiator'a 20 TL indirim.
+    const discounts = new Map([
+      ["user-a", { discountId: "camp-1", amount: 20 }],
+    ]);
+    const [initiator, receiver] = buildTradeCashPaymentRows(
+      "trade-1",
+      quote,
+      discounts,
+    );
+
+    expect(initiator).toMatchObject({
+      tradeFeeAmount: 15,
+      tradeFeeDiscountAmount: 20,
+      tradeFeeCampaignId: "camp-1",
+      totalAmount: 75,
+    });
+    // Karşı taraf indirimsiz: alanlar nötr kalır.
+    expect(receiver).toMatchObject({
+      tradeFeeAmount: 40,
+      tradeFeeDiscountAmount: 0,
+      tradeFeeCampaignId: null,
+      totalAmount: 300,
+    });
+  });
+
+  it("indirim bedeli aşamaz: bedelden büyük indirim bedele kırpılır", () => {
+    const discounts = new Map([
+      ["user-a", { discountId: "camp-1", amount: 500 }],
+    ]);
+    const [initiator] = buildTradeCashPaymentRows("trade-1", quote, discounts);
+
+    expect(initiator.tradeFeeAmount).toBe(0);
+    expect(initiator.tradeFeeDiscountAmount).toBe(35);
+    // Kargo ve fark dokunulmaz: toplam yalnız bedel kadar iner.
+    expect(initiator.totalAmount).toBe(60);
+  });
+
+  it("kampanyasız kabulde alanlar nötr (0 / null) yazılır", () => {
+    const rows = buildTradeCashPaymentRows("trade-1", quote);
+    for (const row of rows) {
+      expect(row.tradeFeeDiscountAmount).toBe(0);
+      expect(row.tradeFeeCampaignId).toBeNull();
+    }
+  });
+});

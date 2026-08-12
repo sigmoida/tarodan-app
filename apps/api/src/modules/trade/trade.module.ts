@@ -24,6 +24,7 @@ import { EventModule } from "../events";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
+import { DiscountModule } from "../discount/discount.module";
 
 @Module({
   imports: [
@@ -38,6 +39,8 @@ import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
     SuratCargoModule,
     // Takas kargo bedeli sipariş tarifesiyle AYNI kaynaktan gelir (leaf modül).
     ShippingTariffModule,
+    // Takas hizmet bedeli kampanyası (İ25) — DiscountService kabulde çözer.
+    DiscountModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [TradeController],

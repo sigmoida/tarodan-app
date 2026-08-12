@@ -3650,7 +3650,8 @@
           "buyer_shipping": "Alıcı kargo payı",
           "seller_commission": "Satıcı komisyonu",
           "seller_platform_fee": "Satıcı platform hizmet bedeli",
-          "seller_shipping": "Satıcı kargo payı"
+          "seller_shipping": "Satıcı kargo payı",
+          "trade_service_fee": "Takas Hizmet Bedeli"
         },
         "audienceLabel": "Hedef Kitle",
         "audienceHelper": "Kalem kimin cebine bakıyorsa kitle o tarafta değerlendirilir.",

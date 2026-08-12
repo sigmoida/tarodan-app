@@ -3650,7 +3650,8 @@
           "buyer_shipping": "Buyer shipping share",
           "seller_commission": "Seller commission",
           "seller_platform_fee": "Seller platform fee",
-          "seller_shipping": "Seller shipping share"
+          "seller_shipping": "Seller shipping share",
+          "trade_service_fee": "Trade Service Fee"
         },
         "audienceLabel": "Audience",
         "audienceHelper": "The audience is evaluated on the side whose pocket the item belongs to.",

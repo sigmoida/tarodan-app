@@ -45,6 +45,13 @@ export function assertCodeAllowedForTarget(
       "Satıcı tarafındaki bedel indirimleri kupon koduna bağlanamaz; hedef kitleyle otomatik tanımlanır",
     );
   }
+  // Takas akışında kod girilecek bir ekran yoktur: kampanya kabul anında
+  // kendiliğinden uygulanır (İ25).
+  if (target === DiscountTarget.trade_service_fee) {
+    throw new BadRequestException(
+      "Takas hizmet bedeli kampanyası kupon koduna bağlanamaz; otomatik uygulanır",
+    );
+  }
 }
 
 /**
@@ -55,7 +62,10 @@ export function assertBudgetForTarget(
   target: DiscountTarget,
   budgetLimit?: number | null,
 ): void {
-  if (!isFeeTarget(target)) return;
+  // Takas hizmet bedeli de platform geliridir: aynı TL bütçe şartına tabidir.
+  if (!isFeeTarget(target) && target !== DiscountTarget.trade_service_fee) {
+    return;
+  }
   if (budgetLimit == null || budgetLimit <= 0) {
     throw new BadRequestException(
       "Bedel indirimleri için TL bütçe tavanı zorunludur",

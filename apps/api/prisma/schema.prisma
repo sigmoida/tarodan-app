@@ -975,8 +975,13 @@ model TradeCashPayment {
   recipientId         String?          @map("recipient_id")
   /// Nakit fark (v2'de yalnız fark ödeyen tarafın satırında > 0).
   amount              Decimal          @db.Decimal(10, 2)
-  /// v2: takas hizmet bedeli — kural sabitlerinin toplamı (KDV DAHİL).
+  /// v2: takas hizmet bedeli — kural sabitlerinin toplamı (KDV DAHİL). Kampanya
+  /// varsa İNDİRİM SONRASI tutar yazılır (sipariş kolonlarıyla aynı ilke).
   tradeFeeAmount      Decimal          @default(0) @map("trade_fee_amount") @db.Decimal(10, 2)
+  /// Takas hizmet bedeli kampanyasının bu satıra verdiği indirim (rapor + bütçe iadesi).
+  tradeFeeDiscountAmount Decimal       @default(0) @map("trade_fee_discount_amount") @db.Decimal(10, 2)
+  /// İndirimi veren kampanya — bütçe iadesi tam iadede bu kimlikle yapılır.
+  tradeFeeCampaignId  String?          @map("trade_fee_campaign_id")
   /// v2: bu tarafın 2 bacaklık kargo bedeli. İPTALDE İADE EDİLMEZ (ürün kargoya
   /// verildikten sonra); kargoya verilmeden önceki iptalde tam iade edilir.
   shippingAmount      Decimal          @default(0) @map("shipping_amount") @db.Decimal(10, 2)
@@ -3500,6 +3505,9 @@ enum DiscountTarget {
   seller_commission
   seller_platform_fee
   seller_shipping
+  /// Takas hizmet bedeli (İ25): admin tanımlar, kodsuz-otomatik uygulanır,
+  /// kabul anında her iki tarafın sabit ücretine iner (platformun cebi).
+  trade_service_fee
 }
 
 /// İndirimin hedef kitlesi. Kupon kodu yalnız ALICI tarafındaki kalemlere

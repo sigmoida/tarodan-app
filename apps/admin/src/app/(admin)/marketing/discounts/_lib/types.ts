@@ -53,7 +53,8 @@ export type DiscountTarget =
   | "buyer_shipping"
   | "seller_commission"
   | "seller_platform_fee"
-  | "seller_shipping";
+  | "seller_shipping"
+  | "trade_service_fee";
 
 export type DiscountAudience =
   | "everyone"
@@ -71,6 +72,8 @@ export const PLATFORM_TARGETS: DiscountTarget[] = [
   "seller_commission",
   "seller_platform_fee",
   "seller_shipping",
+  // Takas hizmet bedeli (İ25): kodsuz-otomatik, kabulde iki tarafa uygulanır.
+  "trade_service_fee",
 ];
 
 export const targetLabel = (t: T, target: DiscountTarget): string =>

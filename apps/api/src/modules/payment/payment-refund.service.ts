@@ -23,6 +23,7 @@ import { PaymentProvider } from "./dto";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
 import { CacheService } from "../cache/cache.service";
+import { DiscountService } from "../discount/discount.service";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -162,6 +163,9 @@ export class PaymentRefundService {
     // (eksik bildirimdense fazlası yeğdir).
     @Optional()
     private readonly cache?: CacheService,
+    // İ25: bedel dahil TAM iadede takas kampanya bütçesi geri döner.
+    @Optional()
+    private readonly discountService?: DiscountService,
   ) {
     this.returnWindowDays = resolvePaymentConfigNumber(
       this.configService,
@@ -1690,6 +1694,26 @@ export class PaymentRefundService {
             // geçerli kalır; iade edilen kısım (kargo/nakit fark) faturalanan
             // hizmet bedeli değildir. (Kuyruktaki eski mesajlar için handler
             // korunur.)
+            // İ25: kusursuz tarafın TAM iadesi bedeli de kapsar → bedele
+            // verilmiş kampanya indirimi hiç "maliyet" olmadı; bütçesi geri
+            // döner. refundedAt geçişi tek seferlik olduğundan çift dönüş yok.
+            const tcp = payment.tradeCashPayment;
+            const feeDiscount = Number(tcp?.tradeFeeDiscountAmount ?? 0);
+            if (
+              tcp?.fullRefundEntitled &&
+              tcp?.tradeFeeCampaignId &&
+              feeDiscount > 0
+            ) {
+              await this.discountService?.releaseTradeFeeBudget(
+                [
+                  {
+                    discountId: tcp.tradeFeeCampaignId,
+                    amount: feeDiscount,
+                  },
+                ],
+                tx,
+              );
+            }
           }
           await tx.refundAttempt.update({
             where: { id: currentAttempt.id },

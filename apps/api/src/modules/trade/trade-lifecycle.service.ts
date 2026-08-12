@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   GoneException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { MembershipService } from "../membership/membership.service";
@@ -40,6 +41,7 @@ import { ProductLockService } from "../product/product-lock.service";
 import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "./trade-common.service";
 import { TradeQueryService } from "./trade-query.service";
+import { DiscountService } from "../discount/discount.service";
 import {
   CreateTradeDto,
   AcceptTradeDto,
@@ -86,6 +88,8 @@ export class TradeLifecycleService {
     private readonly tradeCommon: TradeCommonService,
     private readonly tradeQuery: TradeQueryService,
     private readonly tradeQuote: TradeQuoteService,
+    // Takas hizmet bedeli kampanyası (İ25) — yoksa takas indirimsiz akar.
+    @Optional() private readonly discountService?: DiscountService,
   ) {}
 
   // ==========================================================================
@@ -528,9 +532,40 @@ export class TradeLifecycleService {
         // Ekranların gösterdiği teklif ile tahsil edilen tutar aynı kaynaktan
         // gelir, bu yüzden ayrışamaz.
         if (quote) {
+          // İ25: takas hizmet bedeli kampanyası kabul anında çözülür ve fiyat
+          // snapshot'ıyla birlikte dondurulur; bütçesi de burada harcanır.
+          // Kampanya çözülemezse takas indirimsiz akar; ticaret durmaz.
+          let feeDiscounts = new Map<
+            string,
+            { discountId: string; name: string; amount: number }
+          >();
+          try {
+            feeDiscounts =
+              (await this.discountService?.resolveTradeFeeDiscounts([
+                {
+                  userId: quote.initiator.userId,
+                  feeAmount: quote.initiator.serviceFee,
+                },
+                {
+                  userId: quote.receiver.userId,
+                  feeAmount: quote.receiver.serviceFee,
+                },
+              ])) ?? feeDiscounts;
+          } catch (error) {
+            this.logger.warn(
+              `takas hizmet bedeli kampanyası çözülemedi (${tradeId}): ${error}`,
+            );
+          }
           await tx.tradeCashPayment.createMany({
-            data: buildTradeCashPaymentRows(tradeId, quote),
+            data: buildTradeCashPaymentRows(tradeId, quote, feeDiscounts),
           });
+          const budgetEntries = [...feeDiscounts.values()].map((won) => ({
+            discountId: won.discountId,
+            amount: won.amount,
+          }));
+          if (budgetEntries.length) {
+            await this.discountService?.spendTradeFeeBudget(budgetEntries, tx);
+          }
         }
       } else if (trade.cashAmount && trade.cashPayerId) {
         // v1 (LEGACY): yalnız farkı ödeyen taraftan, farkın yüzdesi kadar

@@ -172,6 +172,9 @@ export class TradeCommonService {
       recipientId: p.recipientId ?? null,
       amount: parseFloat(p.amount),
       tradeFeeAmount: parseFloat(p.tradeFeeAmount ?? 0),
+      // İ25: hizmet bedeli kampanyasının bu satıra verdiği indirim — ekran
+      // "kampanya: −X TL" satırını buradan basar.
+      tradeFeeDiscountAmount: parseFloat(p.tradeFeeDiscountAmount ?? 0),
       shippingAmount: parseFloat(p.shippingAmount ?? 0),
       commission: parseFloat(p.commission),
       totalAmount: parseFloat(p.totalAmount),
