@@ -100,6 +100,7 @@ describe("OrderPricingService.getCheckoutQuote — per-seller shipping", () => {
       {
         getEffectiveDisplayPrice: async () => null,
         getEffectiveDisplayPriceMany: async () => new Map(),
+        quantityDiscountsForLines: async () => new Map(),
       } as any,
       testTaxPolicy(),
     );

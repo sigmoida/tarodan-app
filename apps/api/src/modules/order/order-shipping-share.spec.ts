@@ -228,6 +228,7 @@ describe("OrderPricingService.getCheckoutQuote — mixed shipping shares", () =>
       {
         getEffectiveDisplayPrice: async () => null,
         getEffectiveDisplayPriceMany: async () => new Map(),
+        quantityDiscountsForLines: async () => new Map(),
       } as any,
       testTaxPolicy(),
     );

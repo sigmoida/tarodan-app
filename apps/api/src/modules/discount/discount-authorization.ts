@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
-import { DiscountAudience, DiscountTarget } from "@prisma/client";
+import { DiscountAudience, DiscountTarget, DiscountType } from "@prisma/client";
 import { isBuyerFeeTarget, isFeeTarget } from "./fee-discount.engine";
 
 /**
@@ -173,9 +173,17 @@ export function assertSellerCampaignHasCode(
   target: DiscountTarget,
   isAdmin: boolean,
   hasCode: boolean,
+  type?: DiscountType | null,
 ): void {
   if (isAdmin) return;
   if (target !== DiscountTarget.product_price) return;
+  // Adet koşullu türler (bogo / bulk_quantity) BİLİNÇLİ olarak kodsuzdur:
+  // "sepete 3. ürün eklendiği anda kendiliğinden uygulanır" (İ3/İ7). Kodsuz
+  // yasağının gerekçesi vitrin fiyatını ikinci bir kaynaktan düşüren blanket
+  // kampanyalardı; adet kampanyası birim vitrin fiyatına dokunmaz.
+  if (type === DiscountType.bogo || type === DiscountType.bulk_quantity) {
+    return;
+  }
   if (!hasCode) {
     throw new BadRequestException(
       "Kodsuz mağaza kampanyası kaldırıldı: fiyat indirimi için ilanınızı güncelleyin ya da kupon kodu tanımlayın",

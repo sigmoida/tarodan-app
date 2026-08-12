@@ -445,8 +445,28 @@ export class OrderCheckoutGroupService {
               originalPrice,
               productDiscount: Math.max(0, originalPrice - productPrice),
               couponDiscount: 0,
+              quantityDiscount: 0,
+              quantityCampaignId: null as string | null,
             };
           });
+
+          // Adet koşullu satıcı kampanyaları (bogo / bulk_quantity): satır
+          // bazında, quote ile ORTAK metottan (İ3/İ7) — önizleme = tahsilat.
+          const quantityDiscounts =
+            await this.discountService.quantityDiscountsForLines(
+              pricing.map((entry) => ({
+                productId: entry.productId,
+                sellerId: entry.product.sellerId,
+                categoryId: entry.product.categoryId,
+                unitPrice: entry.productPrice,
+                quantity: entry.quantity,
+              })),
+            );
+          for (const entry of pricing) {
+            const won = quantityDiscounts.get(entry.productId);
+            entry.quantityDiscount = won?.amount ?? 0;
+            entry.quantityCampaignId = won?.discountId ?? null;
+          }
 
           // F1.3: quote'un birim-fiyat hash'i ile doğrula — ürün fiyatı/kampanya quote'tan
           // sonra değiştiyse 409 PRICING_CHANGED (sessiz farklı tahsil yok). Hash yoksa atlanır.
@@ -587,15 +607,18 @@ export class OrderCheckoutGroupService {
               unitPrice: entry.productPrice,
               quantity: entry.quantity,
               couponDiscount: entry.couponDiscount,
+              quantityDiscount: entry.quantityDiscount,
             });
             sellerLineSubtotals.set(
               entry.product.sellerId,
               (sellerLineSubtotals.get(entry.product.sellerId) ?? 0) + line,
             );
+            // Eşik kupon ÖNCESİ tutardan (İ14); satıcının adet kampanyası ise
+            // kendi fiyat indirimi olduğundan eşiğe dahildir.
             sellerListSubtotals.set(
               entry.product.sellerId,
               (sellerListSubtotals.get(entry.product.sellerId) ?? 0) +
-                entry.productPrice * entry.quantity,
+                (entry.productPrice * entry.quantity - entry.quantityDiscount),
             );
             const packageLines =
               sellerDesiLines.get(entry.product.sellerId) ?? [];
@@ -640,6 +663,7 @@ export class OrderCheckoutGroupService {
               unitPrice: entry.productPrice,
               quantity: entry.quantity,
               couponDiscount: entry.couponDiscount,
+              quantityDiscount: entry.quantityDiscount,
             });
             const rawCommission = await this.orderPricing.calculateCommission(
               discountedPrice,
@@ -653,8 +677,10 @@ export class OrderCheckoutGroupService {
             );
             // Komisyon/hizmet bedeli kampanyaları satır bazında (kargo aşağıda,
             // paket kararından sonra) — sepet önizlemesiyle birebir aynı sıra.
+            // Tavan tabanı satıcı indirimi (adet kampanyası) SONRASI tutardır.
             const lineAllowance = remainingDiscountAllowanceFor({
-              lineBase: entry.productPrice * entry.quantity,
+              lineBase:
+                entry.productPrice * entry.quantity - entry.quantityDiscount,
               couponDiscount: entry.couponDiscount,
             });
             const feeDiscounted = await this.feeDiscounts?.apply({
@@ -924,7 +950,10 @@ export class OrderCheckoutGroupService {
 
           for (const input of orderInputs) {
             const entry = input.pricingEntry;
-            const totalDiscount = entry.productDiscount + entry.couponDiscount;
+            const totalDiscount =
+              entry.productDiscount +
+              entry.quantityDiscount +
+              entry.couponDiscount;
 
             const shippingAddressJson: Record<string, unknown> = {
               id: shippingAddress.id,
@@ -978,6 +1007,10 @@ export class OrderCheckoutGroupService {
                     ? {
                         productDiscount: entry.productDiscount,
                         couponDiscount: entry.couponDiscount,
+                        // Adet koşullu satıcı kampanyası (bogo/bulk_quantity):
+                        // satıcının cebinden, satır bazında.
+                        quantityDiscount: entry.quantityDiscount,
+                        quantityCampaignId: entry.quantityCampaignId,
                         appliedDiscountId,
                         originalPrice: entry.originalPrice,
                       }

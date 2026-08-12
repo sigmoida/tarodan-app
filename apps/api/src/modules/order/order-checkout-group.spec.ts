@@ -295,6 +295,7 @@ describe("OrderService checkout group (batch checkout)", () => {
               .fn()
               .mockResolvedValue(new Map()),
             getEffectiveDisplayPrice: jest.fn().mockResolvedValue(null),
+            quantityDiscountsForLines: jest.fn().mockResolvedValue(new Map()),
           },
         },
         {

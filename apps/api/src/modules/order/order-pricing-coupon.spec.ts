@@ -27,6 +27,7 @@ describe("OrderPricingService.getCheckoutQuote coupon contract", () => {
     } as any;
     const discountService = {
       getEffectiveDisplayPrice: jest.fn().mockResolvedValue(null),
+      quantityDiscountsForLines: jest.fn().mockResolvedValue(new Map()),
       validateCoupon: jest.fn().mockResolvedValue(validation),
     } as any;
     const service = new OrderPricingService(

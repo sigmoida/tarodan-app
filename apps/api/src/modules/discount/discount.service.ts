@@ -44,6 +44,7 @@ import {
 import { isProductInDiscountScope } from "./discount-scope";
 import { FeeDiscountResolver } from "./fee-discount.resolver";
 import { automaticBudgetEntriesOf } from "./fee-discount.engine";
+import { bestQuantityCampaignDiscount } from "./quantity-campaign";
 
 /** Kusursuz iadede geri verilen kupon hakkı — commit SONRASI bildirim için. */
 export interface RestoredCoupon {
@@ -61,14 +62,50 @@ export interface RestoredCoupon {
 const COUPON_REISSUE_DAYS = 30;
 
 /**
- * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
- * logic (they fall through to the flat fixed-amount branch → mispricing). Reject them
- * at create/update until proper buy-X-get-Y / quantity-tier support exists (F4.2).
+ * Adet koşullu türlerin (bogo / bulk_quantity) şekil doğrulaması. İkisi de
+ * SATICI ürün-fiyatı kampanyasıdır (cep kuralı: assertTargetAllowedForActor
+ * admin'i zaten engeller), kodsuz-otomatik çalışır ve sepette SATIR bazında
+ * uygulanır (quantity-campaign.ts).
  */
-function assertSupportedDiscountType(type?: DiscountType | null): void {
-  if (type === DiscountType.bogo || type === DiscountType.bulk_quantity) {
+function assertQuantityTypeShape(input: {
+  type?: DiscountType | null;
+  target: DiscountTarget;
+  value?: number | null;
+  minQuantity?: number | null;
+  buyQuantity?: number | null;
+  getQuantity?: number | null;
+}): void {
+  const { type } = input;
+  if (type !== DiscountType.bogo && type !== DiscountType.bulk_quantity) {
+    return;
+  }
+  if (input.target !== DiscountTarget.product_price) {
     throw new BadRequestException(
-      "Bu indirim tipi henüz desteklenmiyor (bogo/bulk_quantity)",
+      "Adet koşullu kampanya yalnız ürün fiyatına tanımlanabilir",
+    );
+  }
+  if (type === DiscountType.bogo) {
+    if (
+      !(Number(input.buyQuantity) >= 1) ||
+      !(Number(input.getQuantity) >= 1)
+    ) {
+      throw new BadRequestException(
+        "'Al X, Y bedava' kampanyası için buyQuantity ve getQuantity en az 1 olmalıdır",
+      );
+    }
+    return;
+  }
+  // bulk_quantity: eşik en az 2 (tek adet koşulsuz indirim demektir — o iş
+  // ilan fiyatının), değer 0-100 arası yüzde.
+  if (!(Number(input.minQuantity) >= 2)) {
+    throw new BadRequestException(
+      "Adet koşullu indirim için minQuantity en az 2 olmalıdır",
+    );
+  }
+  const percent = Number(input.value);
+  if (!(percent > 0) || percent > 100) {
+    throw new BadRequestException(
+      "Adet koşullu indirimin değeri 1-100 arası yüzde olmalıdır",
     );
   }
 }
@@ -128,19 +165,21 @@ export class DiscountService {
     actorId: string | null,
     isAdmin: boolean,
   ): Promise<DiscountResponseDto> {
-    // bogo / bulk_quantity are NOT implemented in the redemption engine — they would
-    // be silently treated as a flat fixed-amount discount (mispricing, and compounds
-    // the per-line bug). Block their creation until real buy-X-get-Y / quantity-tier
-    // logic exists (F4.2).
-    assertSupportedDiscountType(dto.type);
-
     // Cep kuralı: ürün fiyatı satıcının, bedeller platformun. Kupon kodu yalnız
     // alıcının ödediği kalemlere bağlanır; bedel indirimi TL bütçesi ister.
     const target = dto.target ?? DiscountTarget.product_price;
     const audience = dto.audience ?? DiscountAudience.everyone;
+    assertQuantityTypeShape({
+      type: dto.type,
+      target,
+      value: dto.value,
+      minQuantity: dto.minQuantity,
+      buyQuantity: dto.buyQuantity,
+      getQuantity: dto.getQuantity,
+    });
     assertTargetAllowedForActor(target, isAdmin);
     assertCodeAllowedForTarget(target, Boolean(dto.code));
-    assertSellerCampaignHasCode(target, isAdmin, Boolean(dto.code));
+    assertSellerCampaignHasCode(target, isAdmin, Boolean(dto.code), dto.type);
     assertBudgetForTarget(target, dto.budgetLimit);
     assertAudienceConsistent({
       audience,
@@ -305,9 +344,6 @@ export class DiscountService {
       throw new NotFoundException("İndirim bulunamadı");
     }
 
-    // bogo/bulk_quantity unsupported (F4.2) — reject switching to an unimplemented type.
-    assertSupportedDiscountType(dto.type);
-
     // Sellers can only update their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
       throw new ForbiddenException("Bu indirimi düzenleme yetkiniz yok");
@@ -317,10 +353,28 @@ export class DiscountService {
     // platformun bedellerine, platform da satıcının fiyatına geçemez.
     const nextTarget = dto.target ?? discount.target;
     const nextAudience = dto.audience ?? discount.audience;
+    // Adet koşullu tür kuralları birleşik (dto ?? mevcut) değerlerle doğrulanır.
+    assertQuantityTypeShape({
+      type: dto.type ?? discount.type,
+      target: nextTarget,
+      value: dto.value ?? Number(discount.value),
+      minQuantity:
+        dto.minQuantity !== undefined ? dto.minQuantity : discount.minQuantity,
+      buyQuantity:
+        dto.buyQuantity !== undefined ? dto.buyQuantity : discount.buyQuantity,
+      getQuantity:
+        dto.getQuantity !== undefined ? dto.getQuantity : discount.getQuantity,
+    });
     assertTargetAllowedForActor(nextTarget, isAdmin);
     assertCodeAllowedForTarget(
       nextTarget,
       Boolean(dto.code !== undefined ? dto.code : discount.code),
+    );
+    assertSellerCampaignHasCode(
+      nextTarget,
+      isAdmin,
+      Boolean(dto.code !== undefined ? dto.code : discount.code),
+      dto.type ?? discount.type,
     );
     assertBudgetForTarget(
       nextTarget,
@@ -1594,6 +1648,85 @@ export class DiscountService {
     // sepetteki satır tutarını etkiler ve burada uygulanmaz.
     for (const item of items) {
       result.set(item.productId, null);
+    }
+    return result;
+  }
+
+  /**
+   * Sepet satırları için adet koşullu SATICI kampanyalarını (bogo /
+   * bulk_quantity) TEK sorguyla çözer. Satır bazlıdır (İ7): koşul o satırın
+   * adediyle değerlendirilir; aynı satıra uyan kampanyalardan en yüksek
+   * indirimi veren kazanır. Quote ve grup checkout AYNI metodu çağırır —
+   * önizleme ile tahsilat ayrışamaz.
+   */
+  async quantityDiscountsForLines(
+    lines: {
+      productId: string;
+      sellerId: string;
+      categoryId: string | null;
+      unitPrice: number;
+      quantity: number;
+    }[],
+  ): Promise<
+    Map<string, { discountId: string; name: string; amount: number }>
+  > {
+    const result = new Map<
+      string,
+      { discountId: string; name: string; amount: number }
+    >();
+    // İki türün de eşiği en az 2 adettir; tek adetlik satır sorguyu tetiklemez.
+    const multi = lines.filter((line) => line.quantity >= 2);
+    if (!multi.length) return result;
+
+    const now = new Date();
+    const sellerIds = [...new Set(multi.map((line) => line.sellerId))];
+    const productIds = multi.map((line) => line.productId);
+    const campaigns = await this.prisma.discount.findMany({
+      where: {
+        isActive: true,
+        code: null,
+        target: DiscountTarget.product_price,
+        type: { in: [DiscountType.bogo, DiscountType.bulk_quantity] },
+        startDate: { lte: now },
+        endDate: { gte: now },
+        OR: [
+          { scope: DiscountScope.seller, sellerId: { in: sellerIds } },
+          {
+            scope: DiscountScope.product,
+            targetProductIds: { hasSome: productIds },
+          },
+        ],
+      },
+      orderBy: { priority: "asc" },
+    });
+    if (!campaigns.length) return result;
+
+    for (const line of multi) {
+      const eligible = campaigns.filter(
+        (campaign) =>
+          // Satıcı kampanyası yalnız KENDİ ürününe iner (cep kuralı).
+          campaign.sellerId === line.sellerId &&
+          this.isProductEligibleForDiscount(
+            {
+              id: line.productId,
+              sellerId: line.sellerId,
+              categoryId: line.categoryId ?? "",
+            },
+            campaign,
+          ),
+      );
+      const winner = bestQuantityCampaignDiscount(
+        eligible,
+        line.unitPrice,
+        line.quantity,
+      );
+      if (winner) {
+        result.set(line.productId, {
+          discountId: (winner.campaign as { id: string }).id,
+          name: winner.campaign.name,
+          amount: winner.amount,
+        });
+      }
     }
     return result;
   }
