@@ -228,14 +228,12 @@ tanımlanmadan açılırsa hiçbir payout tamamlanamaz), `PAYTR_REPORT_SYNC_ENAB
 `FEATURE_48H_CONFIRMATION_WINDOW`, `PAYTR_CARD_STORAGE_ENABLED`,
 `PAYTR_RECURRING_ENABLED`, `BULLBOARD_ENABLED`, `ENABLE_SWAGGER`.
 
-**Launch'ta AÇILMASI gereken bayrak — `REFUND_POLICY_V2_ENABLED=true`:**
-Bileşen bazlı iade politikası (v2) production'da varsayılan KAPALIDIR; bayrak
-açılmazsa tüm iadeler eski v1 oransal formülle hesaplanır ve admin'deki
-karar-önizleme (kusur bazlı bileşen dökümü) finalize edilmez. Coolify'da API
-env'ine ekle. v1 yolu bir süre acil-durum anahtarı (kill-switch) olarak kalır:
-para hesabında beklenmedik sorun çıkarsa bayrağı kapatmak v1'e döndürür.
-Birkaç stabil haftadan sonra bayrağın ve v1 hesaplayıcının tamamen sökülmesi
-planlıdır (yeni kayıtlar zaten çift yazılır, geri dönüş güvenlidir).
+**İade politikası v2 — VARSAYILAN AÇIK:** Bileşen bazlı iade politikası (v2)
+artık kod tarafında varsayılan AÇIKTIR; launch'ta env eklemek GEREKMEZ.
+`REFUND_POLICY_V2_ENABLED=false` yalnız acil-durum anahtarıdır (kill-switch):
+para hesabında beklenmedik sorun çıkarsa v1 oransal formüle döndürür. Birkaç
+stabil haftadan sonra bayrağın ve v1 hesaplayıcının tamamen sökülmesi planlıdır
+(yeni kayıtlar zaten çift yazılır, geri dönüş güvenlidir).
 
 **PayTR panel tarafı:** ödeme bildirim URL'i
 `https://<api-host>/api/payments/callback/paytr` (env'deki `PAYTR_CALLBACK_URL`

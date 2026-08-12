@@ -9,6 +9,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { paymentWindowEnd } from "../payment/payment.constants";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
@@ -545,7 +546,7 @@ export class OrderCheckoutGroupService {
               })) > 0,
           );
 
-          const paymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          const paymentExpiresAt = paymentWindowEnd();
           const orderInputs: Array<{
             pricingEntry: (typeof pricing)[number];
             orderNumber: string;

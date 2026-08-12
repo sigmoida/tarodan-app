@@ -24,6 +24,7 @@ import { NotificationType } from "../notification/dto";
 import { OrderService } from "../order/order.service";
 import { OrderCheckoutCommonService } from "../order/order-checkout-common.service";
 import { OrderFeeDiscountService } from "../order/order-fee-discount.service";
+import { paymentWindowEnd } from "../payment/payment.constants";
 import { ProductLockService } from "../product/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
@@ -441,7 +442,7 @@ export class OfferService {
           sellerCommissionAmount: commissionResult.sellerCommissionAmount,
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt: paymentWindowEnd(),
         },
       });
 

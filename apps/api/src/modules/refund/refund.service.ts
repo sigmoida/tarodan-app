@@ -125,14 +125,19 @@ export class RefundService {
     private readonly discountService?: DiscountService,
   ) {}
 
-  /** Production rollout is opt-in; tests/development exercise v2 by default. */
+  /**
+   * Bileşen bazlı v2 iade matematiği ANLAŞILAN davranıştır ve VARSAYILAN
+   * AÇIKTIR (müşteri dokümanları v2'yi anlatır: komisyon iade edilir, platform
+   * ücreti kusur tarafında kalır). Env yalnız acil geri dönüş içindir:
+   * REFUND_POLICY_V2_ENABLED=false v1'e düşürür.
+   */
   private refundPolicyV2Enabled(): boolean {
     const configured =
       process.env.REFUND_POLICY_V2_ENABLED?.trim().toLowerCase();
     if (configured != null && configured !== "") {
       return configured === "true" || configured === "1";
     }
-    return process.env.NODE_ENV !== "production";
+    return true;
   }
 
   /**
@@ -1218,8 +1223,13 @@ export class RefundService {
       }
 
       // Kusursuz alıcının kuponu geri verilir (kusur satıcıda/kargoda/platformda).
-      // Alıcı kaynaklı iadede hak harcanmış sayılır.
-      if (couponSurvivesFault(decision.faultParty as CouponFaultParty)) {
+      // Alıcı kaynaklı iadede hak harcanmış sayılır. KISMİ iadede kupon
+      // KULLANILMIŞ sayılır: sipariş kısmen ayakta ve indirimi hâlâ taşıyorken
+      // kuponu da geri vermek çifte fayda olurdu — hak yalnız TAM iadede döner.
+      if (
+        couponSurvivesFault(decision.faultParty as CouponFaultParty) &&
+        preview.financials.quantityPortion >= 1
+      ) {
         const revoked = await this.discountService
           ?.revokeUsageForOrders(
             [current.orderId],

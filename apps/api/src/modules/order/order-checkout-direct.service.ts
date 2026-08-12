@@ -10,6 +10,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { paymentWindowEnd } from "../payment/payment.constants";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
@@ -555,7 +556,7 @@ export class OrderCheckoutDirectService {
           sellerShippingAmount,
         },
       });
-      const paymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const paymentExpiresAt = paymentWindowEnd();
 
       // Create order with discount info
       const order = await tx.order.create({
@@ -1001,7 +1002,7 @@ export class OrderCheckoutDirectService {
             totalAmount,
           }),
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt: paymentWindowEnd(),
           shippingAddressId: dto.shippingAddressId,
           shippingAddress: offerShippingJson as
             Prisma.InputJsonValue | undefined,

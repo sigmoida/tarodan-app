@@ -50,6 +50,12 @@ export const PAYMENT_CONFIG_KEYS = {
   },
   /** Orphan capture geriye-bakış (saat) — FLOW-M3. */
   ORPHAN_LOOKBACK_HOURS: { key: "PAYTR_ORPHAN_LOOKBACK_HOURS", default: 72 },
+  /**
+   * Sipariş ödeme penceresi (saat): sipariş oluşunca `paymentExpiresAt` bu kadar
+   * ileriye kurulur. Checkout (direct/grup/misafir), teklif kabulü ve
+   * reaktivasyon AYNI değeri kullanır — eskiden 6 ayrı noktada 24 sabitti.
+   */
+  PAYMENT_WINDOW_HOURS: { key: "ORDER_PAYMENT_WINDOW_HOURS", default: 24 },
 } as const;
 
 /** Env'den okuyabilen minimum yüzey (ConfigService veya test sahtesi). */
@@ -81,4 +87,10 @@ export function envConfigNumber(spec: {
   default: number;
 }): number {
   return resolvePaymentConfigNumber({ get: (key) => process.env[key] }, spec);
+}
+
+/** Sipariş ödeme penceresinin bitişi: şimdi + PAYMENT_WINDOW_HOURS. */
+export function paymentWindowEnd(from: Date = new Date()): Date {
+  const hours = envConfigNumber(PAYMENT_CONFIG_KEYS.PAYMENT_WINDOW_HOURS);
+  return new Date(from.getTime() + hours * 60 * 60 * 1000);
 }

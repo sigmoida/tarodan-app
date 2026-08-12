@@ -11,6 +11,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { paymentWindowEnd } from "../payment/payment.constants";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
@@ -599,7 +600,7 @@ export class OrderGuestCheckoutService {
             ? (feeDiscounted.applied as unknown as Prisma.InputJsonValue)
             : undefined,
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt: paymentWindowEnd(),
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {

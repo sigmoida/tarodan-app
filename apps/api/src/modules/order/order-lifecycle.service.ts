@@ -22,6 +22,7 @@ import { OrderQueryService } from "./order-query.service";
 import { DiscountService } from "../discount/discount.service";
 import { RefundService } from "../refund/refund.service";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
+import { paymentWindowEnd } from "../payment/payment.constants";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -671,7 +672,7 @@ export class OrderLifecycleService {
           // TAZE ödeme penceresi: sıfırlanmazsa süresi geçmiş paymentExpiresAt
           // yüzünden bir sonraki cron taraması siparişi anında yeniden iptal
           // ederdi. Pencere, teklif kabulündekiyle aynı (24 saat).
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt: paymentWindowEnd(),
           // Rezervasyon YUKARIDA tazelendi; bayrak temizlenmezse ödeme
           // başlatma "rezervasyon bırakılmış" dalına girip aynı adetleri
           // İKİNCİ kez rezerve eder (tekil üründe kalıcı stok-dışı görünüm).
